@@ -1,0 +1,109 @@
+# Checks every push and pull request: formatting, lints and tests on Windows, Linux and macOS, and
+# the forge code against a real Forgejo and a real Gitea (started by ci/forge-server.sh).
+name: CI
+
+# Every branch pushed here, and pull requests from forks (one from a branch here is checked by its
+# push already).
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev \
+            libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev pkg-config
+      - name: Formatting
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+  test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev \
+            libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev pkg-config
+      - name: Test
+        run: cargo test --locked
+
+  forges:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    name: forges (Forgejo ${{ matrix.forgejo }}, Gitea ${{ matrix.gitea }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The latest releases, and the oldest still supported (Forgejo's long-term one).
+          - forgejo: "17.0.1"
+            gitea: "28.3.0"
+          - forgejo: "15.0.11"
+            gitea: "1.26.4"
+    env:
+      FORGEJO_VERSION: ${{ matrix.forgejo }}
+      GITEA_VERSION: ${{ matrix.gitea }}
+      FORGE_CACHE: ${{ github.workspace }}/.forge-cache
+      FORGE_WORK: ${{ runner.temp }}/forges
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Forge binaries
+        uses: actions/cache@v4
+        with:
+          path: .forge-cache
+          key: forges-${{ runner.os }}-forgejo-${{ matrix.forgejo }}-gitea-${{ matrix.gitea }}
+      - name: Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev \
+            libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev pkg-config
+      - name: Build the tests
+        run: cargo test --locked --lib --no-run
+      - name: Start Forgejo and Gitea
+        run: |
+          ci/forge-server.sh forgejo 3000 "$GITHUB_ENV"
+          ci/forge-server.sh gitea 3001 "$GITHUB_ENV"
+      - name: Test against them
+        run: cargo test --locked --lib forge::gitea::live -- --ignored --nocapture
+      - name: Server logs
+        if: failure()
+        run: |
+          for log in "$FORGE_WORK"/*/log/*; do
+            echo "::group::$log"
+            cat "$log"
+            echo "::endgroup::"
+          done

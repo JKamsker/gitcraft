@@ -12,6 +12,8 @@
 //! Without one, public repositories can still be read.
 
 mod details;
+#[cfg(test)]
+mod live;
 mod post;
 
 use std::collections::HashMap;
@@ -70,27 +72,11 @@ impl Provider for GiteaFamily {
     }
 
     fn list(&self, _: &Path, hosting: &Hosting) -> Result<Vec<PullRequest>, String> {
-        let endpoint = format!("repos/{}/pulls?state=open&sort=recentupdate", hosting.path);
-        let items = self.api(hosting).get_all(&endpoint, 100)?;
-        Ok(items.iter().map(parse_pull_request).collect())
+        list(&self.api(hosting), hosting)
     }
 
     fn create(&self, _: &Path, hosting: &Hosting, new: &NewPullRequest) -> Result<String, String> {
-        // Drafts are marked in the title, which both forges understand.
-        let title = if new.draft && !is_draft_title(new.title) {
-            format!("WIP: {}", new.title)
-        } else {
-            new.title.to_owned()
-        };
-        let payload = json!({
-            "head": new.branch,
-            "base": new.base,
-            "title": title,
-            "body": new.body,
-        });
-        let endpoint = format!("repos/{}/pulls", hosting.path);
-        let answer = self.api(hosting).send("POST", &endpoint, Some(&payload))?;
-        Ok(at(&answer, "/html_url").to_owned())
+        create(&self.api(hosting), hosting, new)
     }
 
     /// The accounts the latest commits belong to, as the API ties them to their emails.
@@ -122,6 +108,40 @@ impl Pages for GiteaFamily {
         post::GiteaTarget::of(self.api(hosting), self.name, hosting, details)
             .map(|t| Box::new(t) as Box<dyn Target>)
     }
+}
+
+fn list(api: &Api, hosting: &Hosting) -> Result<Vec<PullRequest>, String> {
+    let endpoint = format!("repos/{}/pulls?state=open&sort=recentupdate", hosting.path);
+    let items = api.get_all(&endpoint, 100)?;
+    Ok(items.iter().map(parse_pull_request).collect())
+}
+
+fn create(api: &Api, hosting: &Hosting, new: &NewPullRequest) -> Result<String, String> {
+    // Drafts are marked in the title, which both forges understand.
+    let title = if new.draft && !is_draft_title(new.title) {
+        format!("WIP: {}", new.title)
+    } else {
+        new.title.to_owned()
+    };
+    let payload = json!({
+        "head": new.branch,
+        "base": new.base,
+        "title": title,
+        "body": new.body,
+    });
+    let endpoint = format!("repos/{}/pulls", hosting.path);
+    // A branch pushed a moment ago may not be known yet: the forge takes pushes in turn.
+    let mut tries = 0;
+    let answer = loop {
+        match api.send("POST", &endpoint, Some(&payload)) {
+            Err(failure) if failure.status == Some(404) && tries < 10 => {
+                tries += 1;
+                std::thread::sleep(std::time::Duration::from_secs(1));
+            }
+            answer => break answer?,
+        }
+    };
+    Ok(at(&answer, "/html_url").to_owned())
 }
 
 /// Whether a title marks its pull request a draft (work in progress), as both forges read it.
