@@ -60,12 +60,39 @@ impl GiteaTarget {
     }
 
     /// Comments on lines go into the pending review, which is started for them when there's none.
+    ///
+    /// The two forges differ here. Forgejo adds a comment to a review through the review's own
+    /// endpoint, and won't start a pending review without words of its own (which sending the
+    /// review replaces). Gitea has no such endpoint; posting another pending review adds to the
+    /// one there is.
     fn add_to_pending(&self, comment: &LineComment) -> Result<(), String> {
         if self.pr_id.is_empty() {
             return Err("Couldn't read all of this pull request. Load it again.".to_owned());
         }
-        let payload = review_payload(&self.head_oid, "PENDING", "", std::slice::from_ref(comment));
-        self.post_review(&payload)
+        let comments = std::slice::from_ref(comment);
+        if let Some(review) = &self.pending_review {
+            let endpoint = self.pulls(&format!("/reviews/{review}/comments"));
+            match self
+                .api
+                .send("POST", &endpoint, Some(&comment_payload(comment)))
+            {
+                Ok(_) => return Ok(()),
+                Err(failure) if matches!(failure.status, Some(404 | 405)) => {}
+                Err(failure) => return Err(failure.message),
+            }
+        }
+        let payload = review_payload(&self.head_oid, "PENDING", "", comments);
+        match self
+            .api
+            .send("POST", &self.pulls("/reviews"), Some(&payload))
+        {
+            Ok(_) => Ok(()),
+            Err(failure) if needs_words(&failure.message) => {
+                let payload = review_payload(&self.head_oid, "PENDING", PENDING_WORDS, comments);
+                self.post_review(&payload)
+            }
+            Err(failure) => Err(failure.message),
+        }
     }
 }
 
@@ -82,12 +109,22 @@ impl Target for GiteaTarget {
     fn review(&self, verdict: Verdict, body: &str) -> Result<(), String> {
         let event = event(verdict);
         match &self.pending_review {
-            Some(review) => self
-                .post(
-                    &self.pulls(&format!("/reviews/{review}")),
-                    &json!({ "event": event, "body": body }),
-                )
-                .map(|_| ()),
+            Some(review) => {
+                let endpoint = self.pulls(&format!("/reviews/{review}"));
+                let payload = json!({ "event": event, "body": body });
+                match self.api.send("POST", &endpoint, Some(&payload)) {
+                    Ok(_) => Ok(()),
+                    // Forgejo counts only the words, not the comments on lines.
+                    Err(failure) if body.trim().is_empty() && needs_words(&failure.message) => {
+                        Err(format!(
+                            "{} sends a review of comments only with a few words: write \
+                             something, or approve",
+                            self.name
+                        ))
+                    }
+                    Err(failure) => Err(failure.message),
+                }
+            }
             None => self.post_review(&review_payload(&self.head_oid, event, body, &[])),
         }
     }
@@ -223,6 +260,25 @@ impl Target for GiteaTarget {
     }
 }
 
+/// What a pending review says until it's sent, where the forge wants it to say something: sending
+/// it replaces this with what the review says.
+pub(super) const PENDING_WORDS: &str = "Review in progress";
+
+/// Whether the forge refused something for having no words of its own.
+fn needs_words(error: &str) -> bool {
+    error.contains("requires a body")
+}
+
+/// A comment on a line: a removed line is on the old position, an added or unchanged one on the
+/// new.
+fn comment_payload(comment: &LineComment) -> Value {
+    let position = match comment.side {
+        DiffSide::Left => "old_position",
+        DiffSide::Right => "new_position",
+    };
+    json!({ "path": comment.path, "body": comment.body, position: comment.line })
+}
+
 /// How the API names a verdict.
 fn event(verdict: Verdict) -> &'static str {
     match verdict {
@@ -232,8 +288,7 @@ fn event(verdict: Verdict) -> &'static str {
     }
 }
 
-/// What `POST …/pulls/N/reviews` is sent: a comment on a removed line is on the old position, one
-/// on an added or unchanged line on the new.
+/// What `POST …/pulls/N/reviews` is sent.
 pub(super) fn review_payload(
     head_oid: &str,
     event: &str,
@@ -242,17 +297,7 @@ pub(super) fn review_payload(
 ) -> Value {
     let mut payload = json!({ "commit_id": head_oid, "event": event, "body": body });
     if !comments.is_empty() {
-        let comments: Vec<Value> = comments
-            .iter()
-            .map(|comment| {
-                let position = match comment.side {
-                    DiffSide::Left => "old_position",
-                    DiffSide::Right => "new_position",
-                };
-                json!({ "path": comment.path, "body": comment.body, position: comment.line })
-            })
-            .collect();
-        payload["comments"] = Value::Array(comments);
+        payload["comments"] = Value::Array(comments.iter().map(comment_payload).collect());
     }
     payload
 }
@@ -329,6 +374,17 @@ mod tests {
             assert_eq!(payload["head_commit_id"], "abc");
             assert_eq!(payload["delete_branch_after_merge"], false);
         }
+    }
+
+    #[test]
+    fn knows_a_refusal_for_want_of_words() {
+        assert!(needs_words(
+            "Forgejo: review event PENDING requires a body (HTTP 422)"
+        ));
+        assert!(needs_words(
+            "Forgejo: review event COMMENT requires a body or a comment (HTTP 422)"
+        ));
+        assert!(!needs_words("Forgejo: not found (HTTP 404)"));
     }
 
     #[test]

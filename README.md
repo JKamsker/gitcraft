@@ -221,6 +221,23 @@ git config gitcraft.forge gitea                               # just this reposi
 
 The value is one of `github`, `gitlab`, `forgejo` or `gitea`.
 
+### Testing against a real Forgejo and Gitea
+
+The Forgejo / Gitea code has tests that go through a pull request's whole life on real servers:
+detection, opening, the list, reading it in full, fetching its changes, comments, pending reviews,
+replies, dismissals, suggested changes and merging. `ci/forge-server.sh` downloads a release
+(checksum verified), starts it on 127.0.0.1 with SQLite and two users, and writes their tokens to an
+env file; CI does the same for the latest and the oldest supported releases (`.github/workflows/ci.yml`).
+
+```bash
+ci/forge-server.sh forgejo 3000 forges.env   # FORGEJO_VERSION=… for another release
+ci/forge-server.sh gitea 3001 forges.env     # GITEA_VERSION=…
+set -a; . ./forges.env; set +a
+cargo test --lib forge::gitea::live -- --ignored --nocapture
+```
+
+A plain `cargo test` skips them.
+
 ### Looking at the UI headlessly
 
 `examples/ui_shot.rs` drives the app without a window (egui_kittest) and saves PNGs:
@@ -247,6 +264,7 @@ was made this way, on a demo repository.
 | `src/forge/gitea/`       | Forgejo and Gitea through their REST API: list, the page of one, comments, reviews, merges; finding the login |
 | `src/forge/http.rs`      | the REST client for forges without a command-line tool                             |
 | `src/forge/cli.rs`       | running `gh` / `glab`                                                              |
+| `ci/forge-server.sh`     | a throwaway Forgejo or Gitea for the live tests (`src/forge/gitea/live.rs`)        |
 | `src/pull_request.rs` | one pull request in full, whatever the forge: details, checks, comments, changes, safe markdown |
 | `src/pr_post.rs` | what goes out: the `Target` trait each forge implements, and what they share (suggestions, merge rules) |
 | `src/pr_threads.rs` | review threads, the pending review and permissions                          |
