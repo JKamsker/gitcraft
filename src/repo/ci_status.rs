@@ -79,7 +79,7 @@ impl CiStatuses {
 impl RepoTab {
     /// The repository on its forge, whose builds are shown.
     pub(super) fn ci_project(&self) -> Option<Project> {
-        Project::of(self.forge?, &self.remotes)
+        Project::of(self.forge()?, &self.remotes)
     }
 
     /// The build status of commit `sha`, if it has one.

@@ -28,7 +28,7 @@ fn method_of(draft: &PrDraft, d: &PrDetails) -> MergeMethod {
 }
 
 /// Whether the app has to delete the branch after merging. Where the repository is set to do it,
-/// GitHub does so whatever is chosen here.
+/// the forge does so whatever is chosen here.
 pub(super) fn deletes_branch(own_branch: bool, repo_deletes: bool, choice: Option<bool>) -> bool {
     own_branch && !repo_deletes && choice == Some(true)
 }
@@ -89,7 +89,8 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
     if host_path.as_ref() == own_branch.as_ref() && extras.delete_branch_on_merge {
         ui.label(
             RichText::new(format!(
-                "GitHub deletes {} afterwards: this repository is set to.",
+                "{} deletes {} afterwards: this repository is set to.",
+                d.forge.map_or("The forge", crate::forge::Forge::name),
                 d.head_branch
             ))
             .color(t.text_faint)

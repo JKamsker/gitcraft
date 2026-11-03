@@ -1,0 +1,377 @@
+//! Saying something on a pull request through the REST API: comments, reviews with their comments
+//! on lines (pending ones too), replies, dismissals, suggested changes, merging.
+
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD as BASE64;
+use serde_json::{Value, json};
+
+use super::details::parse_thread_id;
+use super::{Api, Hosting};
+use crate::pr_post::{
+    LineComment, MergeMethod, Suggestion, Target, Verdict, apply_lines, decode_file, encode_path,
+};
+use crate::pull_request::{DiffSide, PrDetails, at};
+
+/// A pull request on a Forgejo or Gitea to say something on.
+pub(super) struct GiteaTarget {
+    api: Api,
+    name: &'static str,
+    /// `owner/name`.
+    path: String,
+    number: u64,
+    head_oid: String,
+    head_branch: String,
+    head_repo: Option<String>,
+    pr_id: String,
+    pending_review: Option<String>,
+}
+
+impl GiteaTarget {
+    pub(super) fn of(
+        api: Api,
+        name: &'static str,
+        hosting: &Hosting,
+        details: &PrDetails,
+    ) -> Option<GiteaTarget> {
+        Some(GiteaTarget {
+            api,
+            name,
+            path: hosting.path.clone(),
+            number: details.number,
+            head_oid: details.head_oid.clone(),
+            head_branch: details.head_branch.clone(),
+            head_repo: details.extras.head_repo.clone(),
+            pr_id: details.extras.pr_id.clone(),
+            pending_review: details.extras.pending_review.clone(),
+        })
+        .filter(|t| t.number > 0)
+    }
+
+    fn pulls(&self, rest: &str) -> String {
+        format!("repos/{}/pulls/{}{rest}", self.path, self.number)
+    }
+
+    fn post(&self, endpoint: &str, payload: &Value) -> Result<Value, String> {
+        Ok(self.api.send("POST", endpoint, Some(payload))?)
+    }
+
+    fn post_review(&self, payload: &Value) -> Result<(), String> {
+        self.post(&self.pulls("/reviews"), payload).map(|_| ())
+    }
+
+    /// Comments on lines go into the pending review, which is started for them when there's none.
+    fn add_to_pending(&self, comment: &LineComment) -> Result<(), String> {
+        if self.pr_id.is_empty() {
+            return Err("Couldn't read all of this pull request. Load it again.".to_owned());
+        }
+        let payload = review_payload(&self.head_oid, "PENDING", "", std::slice::from_ref(comment));
+        self.post_review(&payload)
+    }
+}
+
+impl Target for GiteaTarget {
+    fn path(&self) -> &str {
+        &self.path
+    }
+
+    fn comment(&self, body: &str) -> Result<(), String> {
+        let endpoint = format!("repos/{}/issues/{}/comments", self.path, self.number);
+        self.post(&endpoint, &json!({ "body": body })).map(|_| ())
+    }
+
+    fn review(&self, verdict: Verdict, body: &str) -> Result<(), String> {
+        let event = event(verdict);
+        match &self.pending_review {
+            Some(review) => self
+                .post(
+                    &self.pulls(&format!("/reviews/{review}")),
+                    &json!({ "event": event, "body": body }),
+                )
+                .map(|_| ()),
+            None => self.post_review(&review_payload(&self.head_oid, event, body, &[])),
+        }
+    }
+
+    fn comment_now(&self, comment: &LineComment) -> Result<(), String> {
+        let payload = review_payload(
+            &self.head_oid,
+            event(Verdict::Comment),
+            "",
+            std::slice::from_ref(comment),
+        );
+        self.post_review(&payload)
+    }
+
+    fn add_pending(&self, comment: &LineComment) -> Result<(), String> {
+        self.add_to_pending(comment)
+    }
+
+    fn remove_pending(&self, comment: &str, last: bool) -> Result<(), String> {
+        if last {
+            return self.discard_pending();
+        }
+        let review = self
+            .pending_review
+            .as_ref()
+            .ok_or("There is no pending review")?;
+        let endpoint = self.pulls(&format!("/reviews/{review}/comments/{comment}"));
+        match self.api.send("DELETE", &endpoint, None) {
+            Ok(_) => Ok(()),
+            Err(failure) if matches!(failure.status, Some(404 | 405)) => Err(format!(
+                "This {} can't take one comment out of a pending review: discard the review, or \
+                 send it ({})",
+                self.name, failure.message
+            )),
+            Err(failure) => Err(failure.message),
+        }
+    }
+
+    fn discard_pending(&self) -> Result<(), String> {
+        let review = self
+            .pending_review
+            .as_ref()
+            .ok_or("There is no pending review")?;
+        self.api
+            .send("DELETE", &self.pulls(&format!("/reviews/{review}")), None)?;
+        Ok(())
+    }
+
+    /// A comment on the same line of the same file is a reply: that's what makes a conversation
+    /// here. With a review pending, it goes into it, as it would on the web page.
+    fn reply(&self, thread: &str, body: &str) -> Result<(), String> {
+        let (side, line, path) =
+            parse_thread_id(thread).ok_or("This thread can't be answered from here")?;
+        let comment = LineComment {
+            path: path.to_owned(),
+            line,
+            side,
+            body: body.to_owned(),
+        };
+        match self.pending_review {
+            Some(_) => self.add_to_pending(&comment),
+            None => self.comment_now(&comment),
+        }
+    }
+
+    fn set_resolved(&self, _: &str, _: bool) -> Result<(), String> {
+        Err(format!(
+            "{}'s API can't resolve conversations: do it on the pull request's web page",
+            self.name
+        ))
+    }
+
+    fn dismiss(&self, review: &str, message: &str) -> Result<(), String> {
+        self.post(
+            &self.pulls(&format!("/reviews/{review}/dismissals")),
+            &json!({ "message": message }),
+        )
+        .map(|_| ())
+    }
+
+    fn merge(&self, method: MergeMethod, delete_branch: bool) -> Result<(), String> {
+        self.post(
+            &self.pulls("/merge"),
+            &merge_payload(&self.head_oid, method),
+        )?;
+        if delete_branch {
+            let endpoint = format!(
+                "repos/{}/branches/{}",
+                self.path,
+                encode_path(&self.head_branch)
+            );
+            // Commits pushed since the merge would lose their branch, so which commit it's on is
+            // checked first; a push can still come in between, just in a much smaller window.
+            if let Ok(branch) = self.api.get(&endpoint)
+                && branch_tip(&branch).is_some_and(|tip| tip != self.head_oid)
+            {
+                return Err(
+                    "It's merged, but the branch has new commits, so it was kept".to_owned(),
+                );
+            }
+            match self.api.send("DELETE", &endpoint, None) {
+                // Gone already: that's what deleting it wanted.
+                Ok(_) => {}
+                Err(failure) if failure.status == Some(404) => {}
+                Err(failure) => {
+                    return Err(format!(
+                        "It's merged, but the branch wasn't deleted: {}",
+                        failure.message
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn apply_suggestion(&self, suggestion: &Suggestion) -> Result<(), String> {
+        let head = self
+            .head_repo
+            .as_ref()
+            .ok_or("The repository of this branch is gone")?;
+        let endpoint = format!("repos/{head}/contents/{}", encode_path(&suggestion.path));
+        let file = self.api.get(&format!("{endpoint}?ref={}", self.head_oid))?;
+        let content = decode_file(&file, self.name)?;
+        let changed = apply_lines(&content, suggestion.start, suggestion.end, &suggestion.text)?;
+        let payload = json!({
+            "message": format!("Apply suggestion from @{}", suggestion.author),
+            "content": BASE64.encode(changed),
+            "sha": file.get("sha"),
+            "branch": self.head_branch,
+        });
+        self.api.send("PUT", &endpoint, Some(&payload))?;
+        Ok(())
+    }
+}
+
+/// How the API names a verdict.
+fn event(verdict: Verdict) -> &'static str {
+    match verdict {
+        Verdict::Comment => "COMMENT",
+        Verdict::Approve => "APPROVED",
+        Verdict::RequestChanges => "REQUEST_CHANGES",
+    }
+}
+
+/// What `POST …/pulls/N/reviews` is sent: a comment on a removed line is on the old position, one
+/// on an added or unchanged line on the new.
+pub(super) fn review_payload(
+    head_oid: &str,
+    event: &str,
+    body: &str,
+    comments: &[LineComment],
+) -> Value {
+    let mut payload = json!({ "commit_id": head_oid, "event": event, "body": body });
+    if !comments.is_empty() {
+        let comments: Vec<Value> = comments
+            .iter()
+            .map(|comment| {
+                let position = match comment.side {
+                    DiffSide::Left => "old_position",
+                    DiffSide::Right => "new_position",
+                };
+                json!({ "path": comment.path, "body": comment.body, position: comment.line })
+            })
+            .collect();
+        payload["comments"] = Value::Array(comments);
+    }
+    payload
+}
+
+/// What `POST …/pulls/N/merge` is sent. The commit is named, so that nothing pushed since the page
+/// was read gets merged unseen; the branch is deleted apart, once that's known to be safe.
+pub(super) fn merge_payload(head_oid: &str, method: MergeMethod) -> Value {
+    let method = match method {
+        MergeMethod::Merge => "merge",
+        MergeMethod::Squash => "squash",
+        MergeMethod::Rebase => "rebase",
+    };
+    json!({ "Do": method, "head_commit_id": head_oid, "delete_branch_after_merge": false })
+}
+
+/// The commit a branch is on, from what the API answers when asked for it.
+fn branch_tip(branch: &Value) -> Option<&str> {
+    Some(at(branch, "/commit/id")).filter(|tip| !tip.is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn line(path: &str, line: u64, side: DiffSide, body: &str) -> LineComment {
+        LineComment {
+            path: path.to_owned(),
+            line,
+            side,
+            body: body.to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_review_names_its_verdict_and_commit() {
+        for (verdict, name) in [
+            (Verdict::Comment, "COMMENT"),
+            (Verdict::Approve, "APPROVED"),
+            (Verdict::RequestChanges, "REQUEST_CHANGES"),
+        ] {
+            let payload = review_payload("abc", event(verdict), "Text", &[]);
+            assert_eq!(payload["event"], name);
+            assert_eq!(payload["commit_id"], "abc");
+            assert_eq!(payload["body"], "Text");
+            assert!(payload.get("comments").is_none());
+        }
+    }
+
+    #[test]
+    fn comments_on_lines_go_on_their_side() {
+        let comments = [
+            line("src/a.rs", 12, DiffSide::Right, "New line"),
+            line("src/b.rs", 3, DiffSide::Left, "Removed line"),
+        ];
+        let payload = review_payload("abc", "PENDING", "", &comments);
+        assert_eq!(
+            payload["comments"],
+            json!([
+                {"path": "src/a.rs", "new_position": 12, "body": "New line"},
+                {"path": "src/b.rs", "old_position": 3, "body": "Removed line"},
+            ])
+        );
+    }
+
+    #[test]
+    fn a_merge_names_its_method_and_commit() {
+        for (method, name) in [
+            (MergeMethod::Merge, "merge"),
+            (MergeMethod::Squash, "squash"),
+            (MergeMethod::Rebase, "rebase"),
+        ] {
+            let payload = merge_payload("abc", method);
+            assert_eq!(payload["Do"], name);
+            assert_eq!(payload["head_commit_id"], "abc");
+            assert_eq!(payload["delete_branch_after_merge"], false);
+        }
+    }
+
+    #[test]
+    fn reads_which_commit_a_branch_is_on() {
+        let branch = json!({"name": "b", "commit": {"id": "abc123"}});
+        assert_eq!(branch_tip(&branch), Some("abc123"));
+        assert_eq!(branch_tip(&json!({"message": "not found"})), None);
+    }
+
+    fn target(pending: Option<&str>) -> GiteaTarget {
+        GiteaTarget {
+            api: Api::new("Forgejo", "https://127.0.0.1:9", "127.0.0.1", None),
+            name: "Forgejo",
+            path: "o/r".to_owned(),
+            number: 1,
+            head_oid: "h".to_owned(),
+            head_branch: "b".to_owned(),
+            head_repo: None,
+            pr_id: String::new(),
+            pending_review: pending.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn nothing_goes_out_without_knowing_the_pull_request() {
+        let error = target(None).add_pending(&line("a", 1, DiffSide::Right, "x"));
+        assert!(error.is_err_and(|e| e.contains("Load it again")));
+    }
+
+    #[test]
+    fn conversations_cant_be_resolved_through_the_api() {
+        assert!(target(None).set_resolved("R1:a", true).is_err());
+    }
+
+    #[test]
+    fn a_thread_from_elsewhere_cant_be_answered() {
+        let error = target(None).reply("PRRT_1", "x");
+        assert!(error.is_err_and(|e| e.contains("can't be answered")));
+    }
+
+    #[test]
+    fn nothing_is_pending_to_discard() {
+        assert!(target(None).discard_pending().is_err());
+        assert!(target(None).remove_pending("1", false).is_err());
+    }
+}

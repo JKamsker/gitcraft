@@ -101,9 +101,16 @@ impl RepoTab {
         };
         view.request = request;
         view.loading = true;
-        let (path, number) = (self.path.clone(), view.number);
+        let (path, number, hosting) = (self.path.clone(), view.number, self.hosting.clone());
         spawn(&self.tx, ctx, move || {
-            Msg::PrDetails(request, Box::new(pr::details(&path, number)))
+            let details = match hosting
+                .as_ref()
+                .and_then(|h| Some((h, h.forge.provider().pages()?)))
+            {
+                Some((hosting, pages)) => pages.details(&path, hosting, number),
+                None => Err("gitcraft can't show this forge's pull requests".to_owned()),
+            };
+            Msg::PrDetails(request, Box::new(details))
         });
     }
 

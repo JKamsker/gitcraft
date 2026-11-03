@@ -18,12 +18,9 @@ impl RepoTab {
         idle: bool,
         sections: &mut Sections,
     ) {
-        let Some(forge) = self.forge else { return };
+        let Some(forge) = self.forge() else { return };
         let t = Tokens::get(ui.ctx());
-        let title = match forge {
-            Forge::GitHub => "PULL REQUESTS",
-            Forge::GitLab => "MERGE REQUESTS",
-        };
+        let title = forge.list_title();
         let open = sections.add(
             ui,
             Header {
@@ -117,7 +114,7 @@ impl RepoTab {
             let center = pos2(rect.right() - 14.0, y);
             acts.extend(ci_status::dot(ui, r.id.with("ci"), center, &pr.sha, status));
         }
-        let has_view = forge == Forge::GitHub;
+        let has_view = forge.has_pages();
         let r = r.on_hover_text(if has_view {
             format!("{}\nClick to open, double-click for the browser", pr.url)
         } else {

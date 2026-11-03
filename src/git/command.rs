@@ -172,6 +172,40 @@ fn run_inner(
     }
 }
 
+/// What git's credential helpers keep for `url` (`https://host`), asking nobody: no terminal
+/// prompt, no askpass program, no sign-in window.
+pub fn stored_credentials(url: &str) -> Option<Credentials> {
+    use std::io::Write;
+    use std::process::Stdio;
+    let mut cmd = git_cmd();
+    unattended(&mut cmd);
+    cmd.args(["credential", "fill"])
+        .env("GCM_INTERACTIVE", "never")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    let mut child = cmd.spawn().ok()?;
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(format!("url={url}\n\n").as_bytes());
+    }
+    let out = child.wait_with_output().ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    parse_credentials(&String::from_utf8_lossy(&out.stdout))
+}
+
+/// The name and password in what `git credential fill` prints.
+fn parse_credentials(out: &str) -> Option<Credentials> {
+    let field = |name: &str| {
+        out.lines()
+            .find_map(|line| line.strip_prefix(name)?.strip_prefix('='))
+            .map(str::to_owned)
+    };
+    let (username, password) = (field("username")?, field("password")?);
+    (!password.is_empty()).then_some(Credentials { username, password })
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Write;
@@ -360,5 +394,17 @@ mod tests {
         assert!(text.contains("username=nancy\n"), "{text}");
         assert!(text.contains("password=secret\n"), "{text}");
         Ok(())
+    }
+
+    #[test]
+    fn reads_a_stored_credential() {
+        let out = "protocol=https\nhost=codeberg.org\nusername=ana\npassword=s3=cret\n";
+        let creds = parse_credentials(out);
+        assert_eq!(
+            creds.map(|c| (c.username, c.password)),
+            Some(("ana".to_owned(), "s3=cret".to_owned()))
+        );
+        assert!(parse_credentials("protocol=https\nhost=x\n").is_none());
+        assert!(parse_credentials("username=ana\npassword=\n").is_none());
     }
 }
