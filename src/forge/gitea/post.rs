@@ -9,6 +9,7 @@ use super::details::parse_thread_id;
 use super::{Api, Hosting};
 use crate::pr_post::{
     LineComment, MergeMethod, Suggestion, Target, Verdict, apply_lines, decode_file, encode_path,
+    may_delete_branch,
 };
 use crate::pull_request::{DiffSide, PrDetails, at};
 
@@ -216,15 +217,15 @@ impl Target for GiteaTarget {
                 self.path,
                 encode_path(&self.head_branch)
             );
-            // Commits pushed since the merge would lose their branch, so which commit it's on is
-            // checked first; a push can still come in between, just in a much smaller window.
-            if let Ok(branch) = self.api.get(&endpoint)
-                && branch_tip(&branch).is_some_and(|tip| tip != self.head_oid)
-            {
-                return Err(
-                    "It's merged, but the branch has new commits, so it was kept".to_owned(),
-                );
-            }
+            // Which commit it's on is checked first; a push can still come in between, just in
+            // a much smaller window.
+            let tip = match self.api.get(&endpoint) {
+                Ok(branch) => branch_tip(&branch).map(str::to_owned),
+                // Gone already: that's what deleting it wanted.
+                Err(failure) if failure.status == Some(404) => return Ok(()),
+                Err(_) => None,
+            };
+            may_delete_branch(tip.as_deref(), &self.head_oid)?;
             match self.api.send("DELETE", &endpoint, None) {
                 // Gone already: that's what deleting it wanted.
                 Ok(_) => {}

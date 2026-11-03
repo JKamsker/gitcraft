@@ -99,6 +99,8 @@ pub struct PrDetails {
     pub review_decision: String,
     pub labels: Vec<String>,
     pub checks: Vec<Check>,
+    /// The checks couldn't be read: why. Without it, no checks means none ran.
+    pub checks_error: Option<String>,
     pub commits: Vec<PrCommit>,
     /// Oldest first.
     pub timeline: Vec<Entry>,

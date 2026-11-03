@@ -94,6 +94,7 @@ pub(crate) fn parse_details(json: &str) -> Result<PrDetails, String> {
             .map(|label| at(label, "/name").to_owned())
             .collect(),
         checks: items(&v, "/statusCheckRollup").iter().map(check).collect(),
+        checks_error: None,
         commits: items(&v, "/commits").iter().map(commit).collect(),
         timeline,
         inline_error: None,

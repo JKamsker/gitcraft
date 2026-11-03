@@ -65,7 +65,8 @@ enum Msg {
     Search(String, Result<Vec<String>, String>),
     /// A comparison's files, for the request numbered so.
     Compare(u64, Result<CompareData, String>),
-    Prs(Result<Vec<PullRequest>, String>),
+    /// The pull requests of `Hosting`, which may not be the tab's any more when they come.
+    Prs(Box<Hosting>, Result<Vec<PullRequest>, String>),
     /// A pull request in full, for the request numbered so.
     PrDetails(u64, Box<Result<crate::pull_request::PrDetails, String>>),
     PrFiles(u64, Result<crate::pull_request::PrFiles, String>),
@@ -667,7 +668,8 @@ impl RepoTab {
         self.prs_loaded = Some(Instant::now());
         let path = self.path.clone();
         spawn(&self.tx, ctx, move || {
-            Msg::Prs(hosting.forge.provider().list(&path, &hosting))
+            let prs = hosting.forge.provider().list(&path, &hosting);
+            Msg::Prs(Box::new(hosting), prs)
         });
     }
 
@@ -1574,6 +1576,9 @@ impl RepoTab {
                             self.hosting = loaded.hosting;
                             self.prs.clear();
                             self.prs_loaded = None;
+                            // The page shown is another repository's now: what it would send
+                            // would go to this one, under that pull request's number.
+                            self.close_pr();
                         }
                         if self
                             .prs_loaded
@@ -1728,7 +1733,9 @@ impl RepoTab {
                     }
                 }
             }
-            Msg::Prs(result) => match result {
+            // An answer about the remote as it was before it changed is no answer.
+            Msg::Prs(hosting, _) if self.hosting.as_ref() != Some(&*hosting) => {}
+            Msg::Prs(_, result) => match result {
                 Ok(prs) => {
                     self.prs = prs;
                     self.pr_error = None;

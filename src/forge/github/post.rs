@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 use super::gh_with_input;
 use crate::pr_post::{
     LineComment, MergeMethod, Suggestion, Target, Verdict, apply_lines, decode_file, encode_path,
+    may_delete_branch,
 };
 use crate::pull_request::{DiffSide, PrDetails, repo_of_url};
 
@@ -53,6 +54,11 @@ fn merge_payload(head_oid: &str, method: MergeMethod) -> Value {
 /// Whether a failed deletion only says the branch is gone already.
 fn branch_was_gone(error: &str) -> bool {
     error.contains("Reference does not exist")
+}
+
+/// Whether asking for a ref failed for want of it.
+fn ref_not_found(error: &str) -> bool {
+    error.contains("(HTTP 404)")
 }
 
 /// The commit a branch is on, from what GitHub answers when asked for its ref.
@@ -272,19 +278,19 @@ impl Target for GitHubTarget {
         )?;
         if delete_branch {
             let branch = encode_path(&self.head_branch);
-            // Commits pushed since the merge would lose their branch. GitHub deletes without
-            // asking which commit it's on, so this is checked first; a push can still come in
-            // between, just in a much smaller window.
-            if let Ok(answer) = self.api(
+            // GitHub deletes without asking which commit it's on, so this is checked first; a
+            // push can still come in between, just in a much smaller window.
+            let tip = match self.api(
                 "GET",
                 &format!("repos/{}/git/ref/heads/{branch}", self.path),
                 None,
-            ) && ref_tip(&answer).is_some_and(|tip| tip != self.head_oid)
-            {
-                return Err(
-                    "It's merged, but the branch has new commits, so it was kept".to_owned(),
-                );
-            }
+            ) {
+                Ok(answer) => ref_tip(&answer),
+                // Gone already: that's what deleting it wanted.
+                Err(e) if ref_not_found(&e) => return Ok(()),
+                Err(_) => None,
+            };
+            may_delete_branch(tip.as_deref(), &self.head_oid)?;
             let endpoint = format!("repos/{}/git/refs/heads/{branch}", self.path);
             if let Err(e) = self.api("DELETE", &endpoint, None)
                 && !branch_was_gone(&e)
@@ -399,6 +405,13 @@ mod tests {
     fn a_branch_gone_already_is_what_deleting_it_wanted() {
         assert!(branch_was_gone("gh: Reference does not exist (HTTP 422)"));
         assert!(!branch_was_gone("gh: Must have admin rights (HTTP 403)"));
+    }
+
+    #[test]
+    fn a_ref_that_isnt_there_is_told_from_other_failures() {
+        assert!(ref_not_found("gh: Not Found (HTTP 404)"));
+        assert!(!ref_not_found("gh: Bad credentials (HTTP 401)"));
+        assert!(!ref_not_found("error connecting to api.github.com"));
     }
 
     #[test]

@@ -59,6 +59,7 @@ impl GiteaFamily {
             &hosting.host,
             find_login(&hosting.web),
         )
+        .on_refused(forget_login)
     }
 }
 
@@ -170,11 +171,24 @@ fn parse_pull_request(item: &Value) -> PullRequest {
     }
 }
 
-/// The login to send to the forge at `web` (`https://host[:port]`), if the user has one. Found
-/// ones are kept for the session: git's credential helper can be slow to ask.
-fn find_login(web: &str) -> Option<Login> {
+/// The logins found so far, by server.
+fn found_logins() -> &'static Mutex<HashMap<String, Login>> {
     static FOUND: OnceLock<Mutex<HashMap<String, Login>>> = OnceLock::new();
-    let found = FOUND.get_or_init(Default::default);
+    FOUND.get_or_init(Default::default)
+}
+
+/// Drops the login kept for `web`: the server refused it, so the next request looks again (a new
+/// `tea login`, a token stored in git's helper since).
+fn forget_login(web: &str) {
+    if let Ok(mut found) = found_logins().lock() {
+        found.remove(web);
+    }
+}
+
+/// The login to send to the forge at `web` (`https://host[:port]`), if the user has one. Found
+/// ones are kept until the server refuses them: git's credential helper can be slow to ask.
+fn find_login(web: &str) -> Option<Login> {
+    let found = found_logins();
     if let Some(login) = found.lock().ok().and_then(|f| f.get(web).cloned()) {
         return Some(login);
     }

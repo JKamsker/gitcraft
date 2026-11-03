@@ -26,7 +26,12 @@ pub(super) fn run_with_input(
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x0800_0000);
     }
-    let not_installed = |_| format!("{tool} isn't installed: gitcraft uses it for {noun}s");
+    let not_installed = |e: std::io::Error| match e.kind() {
+        std::io::ErrorKind::NotFound if repo.is_dir() => {
+            format!("{tool} isn't installed: gitcraft uses it for {noun}s")
+        }
+        _ => format!("couldn't run {tool} in {}: {e}", repo.display()),
+    };
     let out = match input {
         None => cmd.output().map_err(not_installed)?,
         Some(input) => {

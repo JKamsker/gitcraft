@@ -31,7 +31,9 @@ impl Provider for GitLab {
     }
 
     fn list(&self, repo: &Path, _: &Hosting) -> Result<Vec<PullRequest>, String> {
-        parse_list(&self.run(repo, &["mr", "list", "--output", "json"])?)
+        // glab gives 30 at a time otherwise; 100, as GitHub's and Forgejo's lists have.
+        let args = ["mr", "list", "--output", "json", "--per-page", "100"];
+        parse_list(&self.run(repo, &args)?)
     }
 
     fn create(&self, repo: &Path, _: &Hosting, new: &NewPullRequest) -> Result<String, String> {
