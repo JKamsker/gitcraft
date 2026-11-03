@@ -76,7 +76,6 @@ jobs:
       FORGEJO_VERSION: ${{ matrix.forgejo }}
       GITEA_VERSION: ${{ matrix.gitea }}
       FORGE_CACHE: ${{ github.workspace }}/.forge-cache
-      FORGE_WORK: ${{ runner.temp }}/forges
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -94,6 +93,8 @@ jobs:
       - name: Build the tests
         run: cargo test --locked --lib --no-run
       - name: Start Forgejo and Gitea
+        env:
+          FORGE_WORK: ${{ runner.temp }}/forges
         run: |
           ci/forge-server.sh forgejo 3000 "$GITHUB_ENV"
           ci/forge-server.sh gitea 3001 "$GITHUB_ENV"
@@ -101,6 +102,8 @@ jobs:
         run: cargo test --locked --lib forge::gitea::live -- --ignored --nocapture
       - name: Server logs
         if: failure()
+        env:
+          FORGE_WORK: ${{ runner.temp }}/forges
         run: |
           for log in "$FORGE_WORK"/*/log/*; do
             echo "::group::$log"
