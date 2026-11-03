@@ -8,10 +8,10 @@ use serde_json::{Value, json};
 use super::details::parse_thread_id;
 use super::{Api, Hosting};
 use crate::pr_post::{
-    LineComment, MergeMethod, Suggestion, Target, Verdict, apply_lines, decode_file, encode_path,
-    may_delete_branch,
+    LineComment, MergeMethod, Suggestion, Target, Verdict, apply_lines, check_path, decode_file,
+    encode_path, may_delete_branch,
 };
-use crate::pull_request::{DiffSide, PrDetails, at};
+use crate::pull_request::{DiffSide, PrDetails, at, repo_of_url};
 
 /// A pull request on a Forgejo or Gitea to say something on.
 pub(super) struct GiteaTarget {
@@ -34,10 +34,13 @@ impl GiteaTarget {
         hosting: &Hosting,
         details: &PrDetails,
     ) -> Option<GiteaTarget> {
+        // The repository as the forge names it, which the remote may spell otherwise; the remote's
+        // own only when the pull request's address doesn't say.
+        let path = repo_of_url(&details.url).map_or_else(|| hosting.path.clone(), |(_, path)| path);
         Some(GiteaTarget {
             api,
             name,
-            path: hosting.path.clone(),
+            path,
             number: details.number,
             head_oid: details.head_oid.clone(),
             head_branch: details.head_branch.clone(),
@@ -56,6 +59,16 @@ impl GiteaTarget {
         Ok(self.api.send("POST", endpoint, Some(payload))?)
     }
 
+    /// Whether what the forge holds for the viewer is known: both forges fold a pending review
+    /// into any review sent, so sending without knowing of one would publish it.
+    fn known(&self) -> Result<(), String> {
+        if self.pr_id.is_empty() {
+            Err("Couldn't read all of this pull request. Load it again.".to_owned())
+        } else {
+            Ok(())
+        }
+    }
+
     fn post_review(&self, payload: &Value) -> Result<(), String> {
         self.post(&self.pulls("/reviews"), payload).map(|_| ())
     }
@@ -67,18 +80,26 @@ impl GiteaTarget {
     /// review replaces). Gitea has no such endpoint; posting another pending review adds to the
     /// one there is.
     fn add_to_pending(&self, comment: &LineComment) -> Result<(), String> {
-        if self.pr_id.is_empty() {
-            return Err("Couldn't read all of this pull request. Load it again.".to_owned());
-        }
+        self.known()?;
         let comments = std::slice::from_ref(comment);
         if let Some(review) = &self.pending_review {
+            // Forgejo adds to any review it's given, a sent one too: one sent from elsewhere since
+            // the page was read would publish the comment.
+            let state = self.api.get(&self.pulls(&format!("/reviews/{review}")))?;
+            if at(&state, "/state") != "PENDING" {
+                return Err(
+                    "Your pending review was sent or discarded meanwhile. Load it again."
+                        .to_owned(),
+                );
+            }
             let endpoint = self.pulls(&format!("/reviews/{review}/comments"));
             match self
                 .api
                 .send("POST", &endpoint, Some(&comment_payload(comment)))
             {
                 Ok(_) => return Ok(()),
-                Err(failure) if matches!(failure.status, Some(404 | 405)) => {}
+                // Gitea has no such endpoint; any other refusal is the forge's answer.
+                Err(failure) if failure.status == Some(405) => {}
                 Err(failure) => return Err(failure.message),
             }
         }
@@ -98,16 +119,13 @@ impl GiteaTarget {
 }
 
 impl Target for GiteaTarget {
-    fn path(&self) -> &str {
-        &self.path
-    }
-
     fn comment(&self, body: &str) -> Result<(), String> {
         let endpoint = format!("repos/{}/issues/{}/comments", self.path, self.number);
         self.post(&endpoint, &json!({ "body": body })).map(|_| ())
     }
 
     fn review(&self, verdict: Verdict, body: &str) -> Result<(), String> {
+        self.known()?;
         let event = event(verdict);
         match &self.pending_review {
             Some(review) => {
@@ -131,6 +149,7 @@ impl Target for GiteaTarget {
     }
 
     fn comment_now(&self, comment: &LineComment) -> Result<(), String> {
+        self.known()?;
         let payload = review_payload(
             &self.head_oid,
             event(Verdict::Comment),
@@ -242,6 +261,7 @@ impl Target for GiteaTarget {
     }
 
     fn apply_suggestion(&self, suggestion: &Suggestion) -> Result<(), String> {
+        check_path(&suggestion.path)?;
         let head = self
             .head_repo
             .as_ref()
@@ -413,6 +433,14 @@ mod tests {
     fn nothing_goes_out_without_knowing_the_pull_request() {
         let error = target(None).add_pending(&line("a", 1, DiffSide::Right, "x"));
         assert!(error.is_err_and(|e| e.contains("Load it again")));
+    }
+
+    #[test]
+    fn nothing_folds_a_pending_review_in_unknowingly() {
+        let t = target(None);
+        assert!(t.comment_now(&line("a", 1, DiffSide::Right, "x")).is_err());
+        assert!(t.review(Verdict::Comment, "x").is_err());
+        assert!(t.reply("R1:a", "x").is_err());
     }
 
     #[test]

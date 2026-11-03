@@ -168,6 +168,17 @@ pub fn files(
     remotes: &[Remote],
     credentials: Option<&Credentials>,
 ) -> Result<PrFiles, String> {
+    // What the forge says goes to git as refspecs: anything but a commit id or a branch name could
+    // make the fetch write a ref (`+x:refs/heads/main`) or read as an option.
+    if !is_oid(&details.head_oid) || !is_oid(&details.base_oid) {
+        return Err("the forge named commits that aren't commit ids".to_owned());
+    }
+    if !is_branch_name(&details.base_branch) {
+        return Err(format!(
+            "the forge named a base branch git can't take: {:?}",
+            details.base_branch
+        ));
+    }
     let has = |oid: &str| {
         git::run(
             Some(repo),
@@ -181,18 +192,13 @@ pub fn files(
         // No refs and no FETCH_HEAD: nothing here changes but the objects being available.
         let base = format!("refs/heads/{}", details.base_branch);
         let mut args = vec!["fetch", "--no-tags", "--no-write-fetch-head", remote];
-        if !details.head_ref.is_empty() {
+        if is_branch_ref(&details.head_ref) {
             args.push(&details.head_ref);
         }
         args.push(&base);
         // The branches may have moved on since the details were read (a force push even leaves
         // the old commits out), so the very commits are asked for too.
-        args.extend(
-            [&details.head_oid, &details.base_oid]
-                .into_iter()
-                .filter(|oid| !oid.is_empty())
-                .map(String::as_str),
-        );
+        args.extend([details.head_oid.as_str(), details.base_oid.as_str()]);
         git::run_with(Some(repo), &args, credentials)?;
     }
     let from = git::merge_base(repo, &details.base_oid, &details.head_oid)?;
@@ -202,6 +208,31 @@ pub fn files(
         to: details.head_oid.clone(),
         files,
     })
+}
+
+/// Whether `oid` is a whole commit id (SHA-1 or SHA-256), nothing else.
+fn is_oid(oid: &str) -> bool {
+    matches!(oid.len(), 40 | 64) && oid.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+/// Whether `name` is a branch name git takes, and nothing a refspec or an option could be made of:
+/// `git check-ref-format`'s rules.
+fn is_branch_name(name: &str) -> bool {
+    let forbidden = |c: char| c.is_ascii_control() || " ~^:?*[\\".contains(c);
+    !name.is_empty()
+        && !name.starts_with(['-', '/', '.'])
+        && !name.ends_with(['/', '.'])
+        && !name.ends_with(".lock")
+        && !name.contains("..")
+        && !name.contains("//")
+        && !name.contains("@{")
+        && !name.contains("/.")
+        && !name.chars().any(forbidden)
+}
+
+/// Whether `r` is a ref the fetch may name, like the `refs/pull/12/head` the forges' modules set.
+fn is_branch_ref(r: &str) -> bool {
+    r.strip_prefix("refs/").is_some_and(is_branch_name)
 }
 
 /// The string at `pointer`, or nothing.
@@ -266,19 +297,30 @@ pub fn tally(checks: &[Check]) -> (usize, usize, usize, usize) {
 /// The host and `owner/repo` of a pull request's URL: `…/pull/12` on GitHub, `…/pulls/12` on
 /// Forgejo and Gitea, `…/-/merge_requests/12` on GitLab.
 pub(crate) fn repo_of_url(url: &str) -> Option<(String, String)> {
+    // The marker nearest the end: a repository may well be called `pulls`.
     let repo = ["/-/merge_requests/", "/pulls/", "/pull/"]
         .iter()
-        .find_map(|marker| url.split_once(marker))?
-        .0;
+        .filter_map(|marker| url.rsplit_once(marker))
+        .filter(|(_, number)| number.split(['/', '#', '?']).next().is_some_and(is_number))
+        .map(|(repo, _)| repo)
+        .max_by_key(|repo| repo.len())?;
     forge::location(repo)
+}
+
+fn is_number(text: &str) -> bool {
+    !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit())
 }
 
 /// The remote of the repository a pull request's URL belongs to.
 pub(crate) fn remote_for<'a>(remotes: &'a [Remote], url: &str) -> Option<&'a str> {
-    let repo = repo_of_url(url)?;
+    let (host, path) = repo_of_url(url)?;
+    // Forges take `Owner/Repo` and `owner/repo` for the same repository.
     remotes
         .iter()
-        .find(|remote| forge::location(&remote.url).as_ref() == Some(&repo))
+        .find(|remote| {
+            forge::location(&remote.url)
+                .is_some_and(|(h, p)| h == host && p.eq_ignore_ascii_case(&path))
+        })
         .map(|remote| remote.name.as_str())
 }
 
@@ -700,6 +742,19 @@ mod tests {
             Some(("gitlab.com".to_owned(), "g/sub/r".to_owned()))
         );
         assert_eq!(repo_of_url("https://github.com/o/r"), None);
+        // A repository may be called what the markers say.
+        assert_eq!(
+            repo_of_url("https://github.com/acme/pulls/pull/3"),
+            Some(("github.com".to_owned(), "acme/pulls".to_owned()))
+        );
+        assert_eq!(
+            repo_of_url("https://codeberg.org/o/pulls/pulls/3#issuecomment-1"),
+            Some(("codeberg.org".to_owned(), "o/pulls".to_owned()))
+        );
+        assert_eq!(
+            repo_of_url("https://github.com/o/pull/pull/12"),
+            Some(("github.com".to_owned(), "o/pull".to_owned()))
+        );
     }
 
     fn remote(name: &str, url: &str) -> Remote {
@@ -720,6 +775,10 @@ mod tests {
             Some("up")
         );
         assert_eq!(remote_for(&remotes, "https://github.com/x/y/pull/1"), None);
+        assert_eq!(
+            remote_for(&remotes, "https://github.com/O/R/pull/1"),
+            Some("up")
+        );
     }
 
     fn entry(kind: EntryKind) -> Entry {
@@ -905,6 +964,60 @@ mod tests {
     fn plain_text_with_exclamation_marks_is_left_alone() {
         let body = "Wow![not an image] and [link](https://a.example) ![unfinished](";
         assert_eq!(safe_markdown(body, "github.com"), body);
+    }
+
+    #[test]
+    fn only_commit_ids_and_branch_names_reach_the_fetch() {
+        assert!(is_oid(&"a".repeat(40)) && is_oid(&"0".repeat(64)));
+        for bad in [
+            "",
+            "abc",
+            "+refs/pull/1/head:refs/heads/main",
+            "--update-head-ok",
+        ] {
+            assert!(!is_oid(bad), "{bad}");
+        }
+        for good in ["main", "feat/x", "release-1.2", "a@b"] {
+            assert!(is_branch_name(good), "{good}");
+        }
+        for bad in [
+            "",
+            "-x",
+            "x:refs/heads/main",
+            "a..b",
+            "a b",
+            "x.lock",
+            "/x",
+            "x/",
+            "a@{1}",
+            "a/.b",
+        ] {
+            assert!(!is_branch_name(bad), "{bad}");
+        }
+        assert!(is_branch_ref("refs/pull/12/head"));
+        assert!(!is_branch_ref("+refs/pull/1/head:refs/heads/main"));
+        assert!(!is_branch_ref(""));
+    }
+
+    #[test]
+    fn a_forge_naming_anything_but_commits_gets_nothing_fetched() {
+        let details = PrDetails {
+            head_oid: "+refs/pull/1/head:refs/heads/main".to_owned(),
+            base_oid: "--update-head-ok".to_owned(),
+            base_branch: "main".to_owned(),
+            ..PrDetails::default()
+        };
+        let refused = files(Path::new("."), &details, &[], None);
+        assert!(refused.is_err_and(|e| e.contains("aren't commit ids")));
+        let details = PrDetails {
+            head_oid: "a".repeat(40),
+            base_oid: "b".repeat(40),
+            base_branch: "x:refs/heads/main".to_owned(),
+            ..PrDetails::default()
+        };
+        assert!(
+            files(Path::new("."), &details, &[], None).is_err_and(|e| e.contains("can't take"))
+        );
     }
 
     #[test]

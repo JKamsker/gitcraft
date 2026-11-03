@@ -19,6 +19,7 @@ mod post;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
@@ -131,18 +132,25 @@ fn create(api: &Api, hosting: &Hosting, new: &NewPullRequest) -> Result<String, 
         "body": new.body,
     });
     let endpoint = format!("repos/{}/pulls", hosting.path);
-    // A branch pushed a moment ago may not be known yet: the forge takes pushes in turn.
+    // A branch pushed a moment ago may not be known yet: the forge takes pushes in turn. Without
+    // a login, "not found" is the private repository's answer, which waiting won't change.
     let mut tries = 0;
     let answer = loop {
         match api.send("POST", &endpoint, Some(&payload)) {
-            Err(failure) if failure.status == Some(404) && tries < 10 => {
+            Err(failure) if failure.status == Some(404) && api.logged_in() && tries < 10 => {
                 tries += 1;
-                std::thread::sleep(std::time::Duration::from_secs(1));
+                std::thread::sleep(Duration::from_secs(1));
             }
             answer => break answer?,
         }
     };
-    Ok(at(&answer, "/html_url").to_owned())
+    match at(&answer, "/html_url") {
+        "" => Err(format!(
+            "{} didn't say which pull request it opened",
+            api.name()
+        )),
+        url => Ok(url.to_owned()),
+    }
 }
 
 /// Whether a title marks its pull request a draft (work in progress), as both forges read it.
@@ -171,37 +179,69 @@ fn parse_pull_request(item: &Value) -> PullRequest {
     }
 }
 
+/// What was found for a server: the login, or that there's none, and the logins it refused.
+#[derive(Default)]
+struct Found {
+    login: Option<Login>,
+    at: Option<Instant>,
+    refused: Vec<Login>,
+}
+
+/// How long "no login" stands before it's looked for again: a credential helper may ask for a
+/// keyring to be unlocked, which nobody wants on every request.
+const NO_LOGIN_FOR: Duration = Duration::from_secs(10 * 60);
+
 /// The logins found so far, by server.
-fn found_logins() -> &'static Mutex<HashMap<String, Login>> {
-    static FOUND: OnceLock<Mutex<HashMap<String, Login>>> = OnceLock::new();
+fn found_logins() -> &'static Mutex<HashMap<String, Found>> {
+    static FOUND: OnceLock<Mutex<HashMap<String, Found>>> = OnceLock::new();
     FOUND.get_or_init(Default::default)
 }
 
-/// Drops the login kept for `web`: the server refused it, so the next request looks again (a new
-/// `tea login`, a token stored in git's helper since).
+/// Sets the login kept for `web` aside: the server refused it, so it isn't sent there again and
+/// the next request looks for another (a new `tea login`, a token stored in git's helper since), or
+/// goes without.
 fn forget_login(web: &str) {
-    if let Ok(mut found) = found_logins().lock() {
-        found.remove(web);
+    if let Ok(mut found) = found_logins().lock()
+        && let Some(entry) = found.get_mut(web)
+    {
+        if let Some(login) = entry.login.take() {
+            entry.refused.push(login);
+        }
+        entry.at = None;
     }
 }
 
-/// The login to send to the forge at `web` (`https://host[:port]`), if the user has one. Found
-/// ones are kept until the server refuses them: git's credential helper can be slow to ask.
+/// The login to send to the forge at `web` (`https://host[:port]`), if the user has one. What's
+/// found is kept: a login until the server refuses it, the lack of one for a while. One lookup
+/// runs at a time, so that a credential helper asks once.
 fn find_login(web: &str) -> Option<Login> {
-    let found = found_logins();
-    if let Some(login) = found.lock().ok().and_then(|f| f.get(web).cloned()) {
-        return Some(login);
+    let Ok(mut found) = found_logins().lock() else {
+        return None;
+    };
+    let entry = found.entry(web.to_owned()).or_default();
+    let fresh = match (&entry.login, entry.at) {
+        (Some(_), _) => true,
+        (None, Some(at)) => at.elapsed() < NO_LOGIN_FOR,
+        (None, None) => false,
+    };
+    if !fresh {
+        let refused = &entry.refused;
+        let usable = |login: &Login| !refused.contains(login);
+        let login = env_login(web)
+            .filter(usable)
+            .or_else(|| tea_login(web).filter(usable))
+            .or_else(|| {
+                crate::git::stored_credentials(web)
+                    .map(|c| Login::Basic {
+                        user: c.username,
+                        password: c.password,
+                    })
+                    .filter(usable)
+            });
+        entry.login = login;
+        entry.at = Some(Instant::now());
     }
-    let login = env_login(web).or_else(|| tea_login(web)).or_else(|| {
-        crate::git::stored_credentials(web).map(|c| Login::Basic {
-            user: c.username,
-            password: c.password,
-        })
-    })?;
-    if let Ok(mut found) = found.lock() {
-        found.insert(web.to_owned(), login.clone());
-    }
-    Some(login)
+    entry.login.clone()
 }
 
 /// `tea`'s variables, for the server they name only.
@@ -225,16 +265,16 @@ fn same_server(a: &str, b: &str) -> bool {
     norm(a) == norm(b)
 }
 
-/// The hosts `tea` is logged in to: a server whose name doesn't say it's a Gitea or a Forgejo is
-/// still one when `tea` has a login there.
-pub(super) fn logged_in_hosts() -> Vec<String> {
+/// The servers `tea` is logged in to, as `(host, web address)`: a server whose name doesn't say
+/// it's a Gitea or a Forgejo is still one when `tea` has a login there, and its login says where
+/// its web pages are when the remote is an SSH one.
+pub(super) fn tea_servers() -> Vec<(String, String)> {
     tea_logins()
         .iter()
         .filter_map(|login| {
-            let rest = login.url.split_once("://").map_or(&*login.url, |(_, r)| r);
-            let authority = rest.split('/').next()?;
-            let host = authority.split(':').next()?;
-            (!host.is_empty()).then(|| host.to_lowercase())
+            let web = login.url.trim().trim_end_matches('/');
+            let (host, _) = super::location(&format!("{web}/x/y"))?;
+            Some((host, web.to_owned()))
         })
         .collect()
 }

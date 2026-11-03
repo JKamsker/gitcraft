@@ -2,10 +2,11 @@
 # the forge code against a real Forgejo and a real Gitea (started by ci/forge-server.sh).
 name: CI
 
-# Every branch pushed here, and pull requests from forks (one from a branch here is checked by its
-# push already).
+# Pull requests, as they would be merged into their base, and the default branch as it is. Any
+# other branch can be checked by hand (Actions › CI › Run workflow).
 on:
   push:
+    branches: [master]
   pull_request:
   workflow_dispatch:
 
@@ -21,7 +22,6 @@ env:
 
 jobs:
   lint:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,7 +40,6 @@ jobs:
         run: cargo clippy --locked --all-targets -- -D warnings
 
   test:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     strategy:
       fail-fast: false
       matrix:
@@ -60,9 +59,9 @@ jobs:
         run: cargo test --locked
 
   forges:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     name: forges (Forgejo ${{ matrix.forgejo }}, Gitea ${{ matrix.gitea }})
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -99,7 +98,10 @@ jobs:
           ci/forge-server.sh forgejo 3000 "$GITHUB_ENV"
           ci/forge-server.sh gitea 3001 "$GITHUB_ENV"
       - name: Test against them
-        run: cargo test --locked --lib forge::gitea::live -- --ignored --nocapture
+        run: |
+          cargo test --locked --lib forge::gitea::live -- --ignored --nocapture 2>&1 | tee live.log
+          # Green has to mean both ran: a renamed module would match nothing and pass.
+          grep -q "test result: ok. 2 passed" live.log
       - name: Server logs
         if: failure()
         env:

@@ -10,8 +10,8 @@ use serde_json::{Value, json};
 
 use super::gh_with_input;
 use crate::pr_post::{
-    LineComment, MergeMethod, Suggestion, Target, Verdict, apply_lines, decode_file, encode_path,
-    may_delete_branch,
+    LineComment, MergeMethod, Suggestion, Target, Verdict, apply_lines, check_path, decode_file,
+    encode_path, may_delete_branch,
 };
 use crate::pull_request::{DiffSide, PrDetails, repo_of_url};
 
@@ -133,10 +133,6 @@ impl GitHubTarget {
 }
 
 impl Target for GitHubTarget {
-    fn path(&self) -> &str {
-        &self.path
-    }
-
     /// Adds a comment to the conversation.
     fn comment(&self, body: &str) -> Result<(), String> {
         let endpoint = format!("repos/{}/issues/{}/comments", self.path, self.number);
@@ -305,6 +301,7 @@ impl Target for GitHubTarget {
     /// commit that was reviewed, so if it has changed since, GitHub refuses instead of the change
     /// landing on the wrong lines.
     fn apply_suggestion(&self, suggestion: &Suggestion) -> Result<(), String> {
+        check_path(&suggestion.path)?;
         let head = self
             .head_repo
             .as_ref()

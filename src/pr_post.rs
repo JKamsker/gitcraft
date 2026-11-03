@@ -176,6 +176,20 @@ pub(crate) fn may_delete_branch(tip: Option<&str>, merged: &str) -> Result<(), S
     }
 }
 
+/// A file's path as a comment gives it, refused if it could climb out of the contents API
+/// (`../../other/repo/contents/x`) once the URL is resolved.
+pub(crate) fn check_path(path: &str) -> Result<(), String> {
+    let climbs = path.starts_with('/')
+        || path
+            .split('/')
+            .any(|part| part.is_empty() || part == "." || part == "..");
+    if climbs {
+        Err(format!("{path:?} isn't a path in the repository"))
+    } else {
+        Ok(())
+    }
+}
+
 /// A suggested change to apply.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Suggestion {
@@ -189,9 +203,6 @@ pub struct Suggestion {
 /// A pull request to say something on, on its forge. Each method sends one thing and answers
 /// whether it went through; what the forge said when it didn't.
 pub trait Target: Send {
-    /// `owner/name` of the repository.
-    fn path(&self) -> &str;
-
     /// Adds a comment to the conversation.
     fn comment(&self, body: &str) -> Result<(), String>;
 
@@ -304,6 +315,14 @@ mod tests {
         assert_eq!(may_delete_branch(Some("abc"), "abc"), Ok(()));
         assert!(may_delete_branch(Some("def"), "abc").is_err_and(|e| e.contains("new commits")));
         assert!(may_delete_branch(None, "abc").is_err_and(|e| e.contains("couldn't be read")));
+    }
+
+    #[test]
+    fn a_suggestion_stays_in_its_repository() {
+        assert!(check_path("src/a.rs").is_ok());
+        for bad in ["../x", "a/../../b", "/etc/passwd", "a//b", "./a", ""] {
+            assert!(check_path(bad).is_err(), "{bad}");
+        }
     }
 
     #[test]

@@ -17,10 +17,10 @@ use serde_json::json;
 use super::details::{self, thread_id};
 use super::post::GiteaTarget;
 use super::{Api, FORGEJO, GITEA, GiteaFamily, Login, create, list};
-use crate::forge::{self, Hosting, NewPullRequest, Provider};
+use crate::forge::{self, Forge, Hosting, NewPullRequest, Provider};
 use crate::git;
 use crate::pr_post::{self, LineComment, MergeMethod, Suggestion, Target, Verdict};
-use crate::pull_request::{self, DiffSide, EntryKind, PrDetails};
+use crate::pull_request::{self, DiffSide, EntryKind, PrDetails, at};
 
 macro_rules! ensure {
     ($cond:expr, $($why:tt)+) => {
@@ -225,6 +225,13 @@ fn whole_life(family: &'static GiteaFamily) -> Result<(), String> {
         "{feat:?}"
     );
     ensure!(wip.draft && wip.title.starts_with("WIP: "), "{wip:?}");
+    // The forges call a draft unmergeable; that's no conflict.
+    let wip_details = details::read(&server.author(), family.forge, &hosting, wip.number)?;
+    ensure!(
+        wip_details.draft && wip_details.mergeable != "CONFLICTING",
+        "the draft reads as conflicting: {:?}",
+        wip_details.mergeable
+    );
     // Through the provider too, with whatever login it finds: the repository is public.
     eprintln!(
         "{}: Through the provider too, with whatever login it finds: the repository is public",
@@ -333,6 +340,22 @@ fn whole_life(family: &'static GiteaFamily) -> Result<(), String> {
     target(server.reviewer(), &d)?.add_pending(&line(DiffSide::Right, 2, "pending one"))?;
     let d = as_reviewer()?;
     let review = d.extras.pending_review.clone().ok_or("no pending review")?;
+    // The author is a site admin, who is shown the reviewer's draft: it isn't the author's.
+    let admin = read(&server.author())?;
+    ensure!(
+        admin.extras.pending_review.is_none(),
+        "the admin took the reviewer's draft for theirs: {:?}",
+        admin.extras.pending_review
+    );
+    ensure!(
+        admin
+            .extras
+            .threads
+            .iter()
+            .flat_map(|t| &t.comments)
+            .all(|c| c.body != "pending one"),
+        "the admin sees the reviewer's draft"
+    );
     target(server.reviewer(), &d)?.add_pending(&line(DiffSide::Right, 6, "pending two"))?;
     let d = as_reviewer()?;
     ensure!(
@@ -355,9 +378,11 @@ fn whole_life(family: &'static GiteaFamily) -> Result<(), String> {
         .find(|(_, body)| body == "pending one")
         .map(|(id, _)| id.clone())
         .ok_or("the first pending comment is gone")?;
-    match target(server.reviewer(), &d)?.remove_pending(&first, false) {
-        Ok(()) => {
-            eprintln!("{}: one pending comment taken out", family.name);
+    let removed = target(server.reviewer(), &d)?.remove_pending(&first, false);
+    match family.forge {
+        // Forgejo has the endpoint: the comment has to go.
+        Forge::Forgejo => {
+            removed?;
             let d = as_reviewer()?;
             let left: Vec<String> = d
                 .extras
@@ -366,9 +391,11 @@ fn whole_life(family: &'static GiteaFamily) -> Result<(), String> {
                 .collect();
             ensure!(left == ["pending two"], "left pending {left:?}");
         }
-        // A server without that endpoint says why, and the review stays as it was.
-        Err(e) => {
-            eprintln!("{}: can't take one pending comment out: {e}", family.name);
+        // Gitea hasn't: it says why, and the review stays as it was.
+        _ => {
+            let e = removed
+                .err()
+                .ok_or("Gitea took one comment out of a review")?;
             ensure!(e.contains("can't take one comment out"), "removing: {e}");
         }
     }
@@ -431,11 +458,13 @@ fn whole_life(family: &'static GiteaFamily) -> Result<(), String> {
         thread.can_reply && !thread.can_resolve && !thread.outdated,
         "{thread:?}"
     );
+    // Forgejo files a comment on a removed line under the merge base: that's no outdated one.
     ensure!(
         d.extras.threads.iter().any(|t| t.side == DiffSide::Left
             && t.line == Some(2)
+            && !t.outdated
             && t.comments.iter().any(|c| c.body == "The old line")),
-        "no thread on the old line: {:?}",
+        "no current thread on the old line: {:?}",
         d.extras.threads
     );
     ensure!(
@@ -445,15 +474,22 @@ fn whole_life(family: &'static GiteaFamily) -> Result<(), String> {
         "resolving should say it can't"
     );
 
-    // A review of comments on lines alone: Gitea sends it, Forgejo wants words with it.
+    // A review of comments on lines alone: Gitea 28 sends it, Forgejo and older Gitea want words
+    // with it, and gitcraft says so.
     eprintln!("{}: A review of comments on lines alone", family.name);
     target(server.reviewer(), &d)?.add_pending(&line(DiffSide::Right, 5, "Only this"))?;
     let d = as_reviewer()?;
+    let version = server.author().get("version")?;
+    let major: u32 = at(&version, "/version")
+        .split('.')
+        .next()
+        .and_then(|n| n.parse().ok())
+        .unwrap_or(0);
+    let sends = family.forge == Forge::Gitea && major >= 28;
     match target(server.reviewer(), &d)?.review(Verdict::Comment, "") {
-        Ok(()) => eprintln!("{}: sent without words", family.name),
+        Ok(()) => ensure!(sends, "{} {major} sent it without words", family.name),
         Err(e) => {
-            eprintln!("{}: {e}", family.name);
-            ensure!(e.contains("a few words"), "sending: {e}");
+            ensure!(!sends && e.contains("a few words"), "sending: {e}");
             target(server.reviewer(), &d)?.discard_pending()?;
         }
     }

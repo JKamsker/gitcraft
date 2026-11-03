@@ -42,21 +42,38 @@ case "$kind" in
   *) echo "unknown forge: $kind (forgejo or gitea)" >&2; exit 1 ;;
 esac
 
+# The checksums of the releases CI runs, kept here: one fetched beside the binary only shows the
+# download is whole, not that the server's files are the ones they were. Other releases fall back
+# to the server's checksum.
+pinned() {
+  case "$1" in
+    forgejo-17.0.1-amd64) echo 51a8cdf4a1252e79f4b3855d7a7891af6c6635105420768c460e2f0690385d6f ;;
+    forgejo-15.0.11-amd64) echo 17b59b5f8a8f968126b7a6fcc1d45d9531228dbf293f172cf5565d2e72e999a3 ;;
+    gitea-28.3.0-amd64) echo 5f834e8f04986f3b9206cf14743b5a6e6996ceddc238dac6409866ebda2a0686 ;;
+    gitea-1.26.4-amd64) echo 0faa36d151918f8f7d6e0f3ae67597d1c338583d695add146ac393109d0fc44a ;;
+  esac
+}
+
 cache=${FORGE_CACHE:-$HOME/.cache/gitcraft-forges}
 bin="$cache/$kind-$version-$arch"
 mkdir -p "$cache"
+expected=$(pinned "$kind-$version-$arch")
+if [ -z "$expected" ]; then
+  echo "No checksum kept for $kind $version ($arch): trusting the one $url.sha256 gives" >&2
+  expected=$(curl -fsSL --retry 3 "$url.sha256" | awk '{print $1}')
+fi
 if [ ! -x "$bin" ]; then
   echo "Downloading $kind $version" >&2
   curl -fsSL --retry 3 -o "$bin.part" "$url"
-  expected=$(curl -fsSL --retry 3 "$url.sha256" | awk '{print $1}')
-  actual=$(sha256sum "$bin.part" | awk '{print $1}')
-  if [ "$expected" != "$actual" ]; then
-    echo "checksum mismatch for $url: expected $expected, got $actual" >&2
-    rm -f "$bin.part"
-    exit 1
-  fi
   chmod +x "$bin.part"
   mv "$bin.part" "$bin"
+fi
+# Checked every time: a binary from a cache is only as good as whoever filled it.
+actual=$(sha256sum "$bin" | awk '{print $1}')
+if [ "$expected" != "$actual" ]; then
+  echo "checksum mismatch for $bin: expected $expected, got $actual" >&2
+  rm -f "$bin"
+  exit 1
 fi
 
 work="${FORGE_WORK:-${TMPDIR:-/tmp}/gitcraft-forges}/$kind-$port"

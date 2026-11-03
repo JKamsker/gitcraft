@@ -105,6 +105,18 @@ struct Loaded {
     requested: usize,
 }
 
+/// Whether two hostings are the same repository on the same forge, however it's reached (HTTPS
+/// or SSH): the first load, with nothing before it, moves nothing anywhere.
+fn same_repository(before: Option<&Hosting>, now: Option<&Hosting>) -> bool {
+    match (before, now) {
+        (None, _) => true,
+        (Some(a), Some(b)) => {
+            a.forge == b.forge && a.host == b.host && a.path.eq_ignore_ascii_case(&b.path)
+        }
+        (Some(_), None) => false,
+    }
+}
+
 /// What to re-read after an operation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Refresh {
@@ -1278,7 +1290,8 @@ impl RepoTab {
         if self.avatars_hinted || !Settings::get(ctx).avatars {
             return;
         }
-        let Some(hosting) = self.hosting.clone() else {
+        // A local mirror has no host to ask.
+        let Some(hosting) = self.hosting.clone().filter(|h| !h.host.is_empty()) else {
             return;
         };
         self.avatars_hinted = true;
@@ -1573,12 +1586,19 @@ impl RepoTab {
                         self.identity = loaded.identity;
                         self.remotes = loaded.remotes;
                         if loaded.hosting != self.hosting {
+                            let moved =
+                                !same_repository(self.hosting.as_ref(), loaded.hosting.as_ref());
                             self.hosting = loaded.hosting;
                             self.prs.clear();
+                            self.pr_error = None;
                             self.prs_loaded = None;
-                            // The page shown is another repository's now: what it would send
-                            // would go to this one, under that pull request's number.
-                            self.close_pr();
+                            if moved {
+                                // The page and what was written for it are another repository's
+                                // now: sent, they would go to this one, under that number.
+                                self.close_pr();
+                                self.pr_drafts.clear();
+                                self.avatars_hinted = false;
+                            }
                         }
                         if self
                             .prs_loaded

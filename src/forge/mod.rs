@@ -164,25 +164,64 @@ pub trait Pages: Sync {
 /// The forge hosting `origin` (or the first remote). git's config can say which it is, for a
 /// server whose name doesn't tell: `gitcraft.forge` for one repository, `gitcraft.<host>.forge`
 /// for every repository on that host (`git config --global gitcraft.git.example.org.forge
-/// forgejo`). Otherwise the host's name decides, then the hosts `tea` is logged in to.
+/// forgejo`). Otherwise the host's name decides, then the servers `tea` is logged in to, then
+/// the remote's whole URL.
 pub fn detect(repo: &Path, remotes: &[Remote]) -> Option<Hosting> {
+    detect_with(remotes, &gitcraft_config(repo), &gitea::tea_servers())
+}
+
+/// [`detect`], given git's config and the servers `tea` knows as `(host, web address)`.
+fn detect_with(
+    remotes: &[Remote],
+    config: &HashMap<String, String>,
+    tea: &[(String, String)],
+) -> Option<Hosting> {
     let remote = remotes
         .iter()
         .find(|r| r.name == "origin")
         .or_else(|| remotes.first())?;
-    let (host, path) = location(&remote.url)?;
-    let config = gitcraft_config(repo);
-    let forge = choose(&host, &config).or_else(|| {
-        gitea::logged_in_hosts()
-            .contains(&host)
-            .then_some(Forge::Gitea)
-    })?;
+    let tea_web = |host: &str| {
+        tea.iter()
+            .find(|(h, _)| h == host)
+            .map(|(_, web)| web.clone())
+    };
+    let Some((host, path)) = location(&remote.url) else {
+        // A local mirror named after its GitHub or GitLab repository: `gh` and `glab` find the
+        // forge from the other remotes.
+        return by_url(&remote.url).map(|forge| Hosting {
+            forge,
+            host: String::new(),
+            path: String::new(),
+            web: String::new(),
+        });
+    };
+    let forge = choose(&host, config)
+        .or_else(|| tea_web(&host).map(|_| Forge::Gitea))
+        .or_else(|| by_url(&remote.url))?;
+    // An SSH remote says nothing of the web server; `tea`'s login for the host does.
+    let web = match web_base(&remote.url) {
+        Some(web) => web,
+        None => tea_web(&host).unwrap_or_else(|| format!("https://{host}")),
+    };
     Some(Hosting {
         forge,
-        web: web_base(&remote.url, &host),
+        web,
         host,
         path,
     })
+}
+
+/// What a remote's whole URL says, as gitcraft went by before it knew hosts: a GitLab served
+/// under a path or reached as `gitlab@…`, a mirror kept in a folder named after its repository.
+fn by_url(url: &str) -> Option<Forge> {
+    let url = url.to_lowercase();
+    if url.contains("github.com") || url.contains("github.") {
+        Some(Forge::GitHub)
+    } else if url.contains("gitlab") {
+        Some(Forge::GitLab)
+    } else {
+        None
+    }
 }
 
 /// The forge for `host`: from git's config if it names one, else from the host's name.
@@ -218,18 +257,24 @@ fn parse_config(out: &str) -> HashMap<String, String> {
         .collect()
 }
 
-/// `https://host` of a remote, with the port its URL names when that's a web URL (an SSH port
-/// says nothing about the web server's).
-fn web_base(url: &str, host: &str) -> String {
+/// `https://host[:port]` of a web remote; nothing for an SSH one, whose port says nothing about
+/// the web server's.
+fn web_base(url: &str) -> Option<String> {
     let url = url.trim();
-    for scheme in ["https", "http"] {
-        if let Some(rest) = url.strip_prefix(&format!("{scheme}://")) {
-            let authority = rest.split('/').next().unwrap_or(rest);
-            let authority = authority.rsplit_once('@').map_or(authority, |(_, a)| a);
-            return format!("{scheme}://{}", authority.to_lowercase());
-        }
+    ["https", "http"].into_iter().find_map(|scheme| {
+        let rest = url.strip_prefix(&format!("{scheme}://"))?;
+        let authority = rest.split('/').next().unwrap_or(rest);
+        let authority = authority.rsplit_once('@').map_or(authority, |(_, a)| a);
+        Some(format!("{scheme}://{}", authority.to_lowercase()))
+    })
+}
+
+/// The host of `host[:port]`, an IPv6 one (`[fd00::5]:3000`) with its brackets.
+fn without_port(authority: &str) -> &str {
+    match authority.find(']') {
+        Some(end) if authority.starts_with('[') => &authority[..=end],
+        _ => authority.split(':').next().unwrap_or(authority),
     }
-    format!("https://{host}")
 }
 
 /// The web host and `owner/repo` path of a remote URL: `https://host/owner/repo.git`,
@@ -240,7 +285,7 @@ pub fn location(url: &str) -> Option<(String, String)> {
         Some((_, rest)) => {
             let rest = rest.rsplit_once('@').map_or(rest, |(_, r)| r);
             let (host, path) = rest.split_once('/')?;
-            (host.split(':').next().unwrap_or(host), path)
+            (without_port(host), path)
         }
         None => {
             let rest = url.rsplit_once('@').map_or(url, |(_, r)| r);
@@ -331,8 +376,9 @@ mod tests {
             name: name.into(),
             url: url.into(),
         };
-        let dir = std::env::temp_dir();
-        let forge = |remotes: &[Remote]| detect(&dir, remotes).map(|h| h.forge);
+        // Neither the machine's git config nor its `tea` logins: what the remotes say alone.
+        let forge =
+            |remotes: &[Remote]| detect_with(remotes, &HashMap::new(), &[]).map(|h| h.forge);
         assert_eq!(
             forge(&[r("origin", "git@github.com:a/b.git")]),
             Some(Forge::GitHub)
@@ -370,25 +416,77 @@ mod tests {
     }
 
     #[test]
+    fn a_remote_whose_host_doesnt_tell_goes_by_its_whole_url() {
+        let r = |url: &str| Remote {
+            name: "origin".into(),
+            url: url.into(),
+        };
+        let forge = |url: &str| detect_with(&[r(url)], &HashMap::new(), &[]).map(|h| h.forge);
+        assert_eq!(
+            forge("gitlab@code.acme.com:group/proj.git"),
+            Some(Forge::GitLab)
+        );
+        assert_eq!(
+            forge("https://acme.com/gitlab/group/proj.git"),
+            Some(Forge::GitLab)
+        );
+        assert_eq!(forge("/home/me/src/github.com/o/r"), Some(Forge::GitHub));
+        let mirror = detect_with(&[r("/home/me/src/github.com/o/r")], &HashMap::new(), &[]);
+        assert_eq!(mirror.map(|h| h.host), Some(String::new()));
+        // A host that says what it is wins over the rest of the URL.
+        assert_eq!(
+            forge("https://gitlab.com/ana/ana.github.io"),
+            Some(Forge::GitLab)
+        );
+    }
+
+    #[test]
+    fn an_ssh_remote_gets_its_web_address_from_teas_login() {
+        let r = Remote {
+            name: "origin".into(),
+            url: "git@gitea.lan:o/r.git".into(),
+        };
+        let tea = [("gitea.lan".to_owned(), "http://gitea.lan:3000".to_owned())];
+        let hosting = detect_with(&[r], &HashMap::new(), &tea);
+        assert_eq!(
+            hosting.map(|h| (h.forge, h.web)),
+            Some((Forge::Gitea, "http://gitea.lan:3000".to_owned()))
+        );
+    }
+
+    #[test]
     fn the_web_server_keeps_its_port_and_an_ssh_one_is_dropped() {
         assert_eq!(
-            web_base(
-                "https://me:tok@Git.Example.org:3000/o/r.git",
-                "git.example.org"
-            ),
-            "https://git.example.org:3000"
+            web_base("https://me:tok@Git.Example.org:3000/o/r.git").as_deref(),
+            Some("https://git.example.org:3000")
         );
         assert_eq!(
-            web_base("http://git.local/o/r.git", "git.local"),
-            "http://git.local"
+            web_base("http://git.local/o/r.git").as_deref(),
+            Some("http://git.local")
+        );
+        assert_eq!(web_base("ssh://git@git.example.org:2222/o/r.git"), None);
+        assert_eq!(web_base("git@codeberg.org:o/r.git"), None);
+        let r = Remote {
+            name: "origin".into(),
+            url: "ssh://git@git.example.org:2222/o/r.git".into(),
+        };
+        let config = parse_config("gitcraft.forge forgejo\n");
+        let hosting = detect_with(&[r], &config, &[]);
+        assert_eq!(
+            hosting.map(|h| h.web).as_deref(),
+            Some("https://git.example.org")
+        );
+    }
+
+    #[test]
+    fn an_ipv6_host_keeps_its_brackets() {
+        assert_eq!(
+            location("https://[fd00::5]:3000/o/r.git"),
+            Some(("[fd00::5]".to_owned(), "o/r".to_owned()))
         );
         assert_eq!(
-            web_base("ssh://git@git.example.org:2222/o/r.git", "git.example.org"),
-            "https://git.example.org"
-        );
-        assert_eq!(
-            web_base("git@codeberg.org:o/r.git", "codeberg.org"),
-            "https://codeberg.org"
+            web_base("https://[fd00::5]:3000/o/r.git").as_deref(),
+            Some("https://[fd00::5]:3000")
         );
     }
 }

@@ -393,14 +393,20 @@ impl RepoTab {
         let Some(Ok(details)) = &view.details else {
             return;
         };
-        let Some(target) = self.hosting.as_ref().and_then(|hosting| {
-            let pages = hosting.forge.provider().pages()?;
-            pages.target(&self.path, hosting, details)
-        }) else {
+        let Some(hosting) = self.hosting.clone() else {
+            return;
+        };
+        let Some(pages) = hosting.forge.provider().pages() else {
             return;
         };
         let number = view.number;
-        let can_delete_branch = details.extras.head_repo.as_deref() == Some(target.path());
+        // The repository as the forge names it, as the merge box compares it.
+        let own_repo = crate::pull_request::repo_of_url(&details.url).map(|(_, path)| path);
+        let can_delete_branch =
+            own_repo.is_some() && details.extras.head_repo.as_deref() == own_repo.as_deref();
+        // What says something on the pull request is made where it's sent: finding its login can
+        // run a credential helper, which mustn't hold the window up.
+        let (repo, details) = (self.path.clone(), details.clone());
         let delete_default = details.extras.delete_branch_on_merge;
         let draft = self.pr_drafts.entry(number).or_default();
         let line = draft.target.clone().map(|t| LineComment {
@@ -493,7 +499,10 @@ impl RepoTab {
         spawn(&self.tx, ctx, move || Msg::PrPosted {
             number,
             what,
-            result: job(target.as_ref()),
+            result: match pages.target(&repo, &hosting, &details) {
+                Some(target) => job(target.as_ref()),
+                None => Err("This pull request can't be acted on from here".to_owned()),
+            },
         });
     }
 
