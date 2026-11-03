@@ -120,10 +120,10 @@ impl RepoTab {
         let Some(Ok(details)) = &view.details else {
             return;
         };
-        let Some(target) = self.hosting.as_ref().and_then(|hosting| {
-            let pages = hosting.forge.provider().pages()?;
-            pages.target(&self.path, hosting, details)
-        }) else {
+        let Some(hosting) = self.hosting.clone() else {
+            return;
+        };
+        let Some(pages) = hosting.forge.provider().pages() else {
             return;
         };
         let number = view.number;
@@ -132,15 +132,21 @@ impl RepoTab {
         if draft.posting {
             return;
         }
-        let Some((what, job)) = post_job(act, draft, details, target.as_ref()) else {
+        let Some((what, job)) = post_job(act, draft, details) else {
             return;
         };
+        // What says something on the pull request is made where it's sent: finding its login can
+        // run a credential helper, which mustn't hold the window up.
+        let (repo, details) = (self.path.clone(), details.clone());
         draft.posting = true;
         draft.error = None;
         spawn(&self.tx, ctx, move || Msg::PrPosted {
             number,
             what,
-            result: job(target.as_ref()),
+            result: match pages.target(&repo, &hosting, &details) {
+                Some(target) => job(target.as_ref()),
+                None => Err("This pull request can't be acted on from here".to_owned()),
+            },
         });
     }
 
@@ -186,12 +192,7 @@ impl RepoTab {
 }
 
 /// What `act` sends from `draft`, and how: `None` for what sends nothing.
-fn post_job(
-    act: PrAct,
-    draft: &PrDraft,
-    details: &PrDetails,
-    target: &dyn Target,
-) -> Option<(Posted, PostJob)> {
+fn post_job(act: PrAct, draft: &PrDraft, details: &PrDetails) -> Option<(Posted, PostJob)> {
     let line = draft.target.clone().map(|t| LineComment {
         path: t.path,
         line: t.line,
@@ -268,8 +269,10 @@ fn post_job(
         }
         PrAct::Merge => {
             let method = draft.merge_method.unwrap_or_default();
+            // The repository as the forge names it, as the merge box compares it.
+            let own_repo = crate::pull_request::repo_of_url(&details.url).map(|(_, path)| path);
             let delete = crate::repo::pr_merge::deletes_branch(
-                details.extras.head_repo.as_deref() == Some(target.path()),
+                own_repo.is_some() && details.extras.head_repo.as_deref() == own_repo.as_deref(),
                 details.extras.delete_branch_on_merge,
                 draft.delete_branch,
             );

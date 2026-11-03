@@ -112,10 +112,19 @@ pub(super) fn assemble(answers: &Answers, forge: Forge, web: &str) -> PrDetails 
     };
     let head_oid = text("/head/sha");
     let title = text("/title");
+    let draft = flag(pr, "/draft") == Some(true) || is_draft_title(&title);
 
-    let threads = threads(&answers.reviews, &head_oid, answers.viewer.is_some());
-    let pending = answers
+    // A site admin is shown everyone's pending reviews: only the viewer's are the viewer's to
+    // add to, send or discard, and the others' are nobody else's to read.
+    let viewer = answers.viewer.as_deref();
+    let reviews: Vec<(Value, Vec<Value>)> = answers
         .reviews
+        .iter()
+        .filter(|(review, _)| at(review, "/state") != "PENDING" || is_by(review, viewer))
+        .cloned()
+        .collect();
+    let threads = threads(&reviews, &head_oid, at(pr, "/merge_base"), viewer.is_some());
+    let pending = reviews
         .iter()
         .map(|(review, _)| review)
         .find(|review| at(review, "/state") == "PENDING");
@@ -175,7 +184,7 @@ pub(super) fn assemble(answers: &Answers, forge: Forge, web: &str) -> PrDetails 
     PrDetails {
         forge: Some(forge),
         number: number("/number"),
-        draft: flag(pr, "/draft") == Some(true) || is_draft_title(&title),
+        draft,
         title,
         body: absolute_links(at(pr, "/body"), web),
         state: state.to_owned(),
@@ -191,14 +200,16 @@ pub(super) fn assemble(answers: &Answers, forge: Forge, web: &str) -> PrDetails 
         additions: number("/additions"),
         deletions: number("/deletions"),
         changed_files: number("/changed_files"),
+        // A draft can't be merged whether or not it has conflicts, and these forges say so the
+        // same way: by not calling it mergeable.
         mergeable: match (open, flag(pr, "/mergeable")) {
             (true, Some(true)) => "MERGEABLE",
-            (true, Some(false)) => "CONFLICTING",
+            (true, Some(false)) if !draft => "CONFLICTING",
             _ => "",
         }
         .to_owned(),
         merge_state: String::new(),
-        review_decision: review_decision(&answers.reviews).to_owned(),
+        review_decision: review_decision(&reviews).to_owned(),
         labels: items(pr, "/labels")
             .iter()
             .map(|label| at(label, "/name").to_owned())
@@ -250,8 +261,10 @@ fn review_decision(reviews: &[(Value, Vec<Value>)]) -> &'static str {
     let mut last: Vec<(String, i64, &str)> = Vec::new();
     for (review, _) in reviews {
         let state = at(review, "/state");
+        // Only official reviews count: by someone who may approve, and not asked to look again.
         if !matches!(state, "APPROVED" | "REQUEST_CHANGES")
             || review.get("dismissed").and_then(Value::as_bool) == Some(true)
+            || review.get("official").and_then(Value::as_bool) == Some(false)
         {
             continue;
         }
@@ -272,8 +285,22 @@ fn review_decision(reviews: &[(Value, Vec<Value>)]) -> &'static str {
     }
 }
 
-/// The comments on lines, one thread per line of a file and side.
-fn threads(reviews: &[(Value, Vec<Value>)], head_oid: &str, logged_in: bool) -> Vec<Thread> {
+/// Whether `review` is `viewer`'s.
+fn is_by(review: &Value, viewer: Option<&str>) -> bool {
+    viewer.is_some_and(|viewer| at(review, "/user/login").eq_ignore_ascii_case(viewer))
+}
+
+/// The comments on lines, one thread per line of a file and side. A thread is current while its
+/// first comment's review was made on `head`, the pull request's last commit: its line numbers are
+/// that commit's. A comment's own commit doesn't tell, as Forgejo files those on removed and
+/// unchanged lines under the merge base; it stands in only when a review names no commit, and then
+/// the merge base (`base`) counts too.
+fn threads(
+    reviews: &[(Value, Vec<Value>)],
+    head: &str,
+    base: &str,
+    logged_in: bool,
+) -> Vec<Thread> {
     let mut threads: Vec<Thread> = Vec::new();
     // Which commit each thread's first comment was written on.
     let mut first_commit: Vec<(String, i64)> = Vec::new();
@@ -297,7 +324,14 @@ fn threads(reviews: &[(Value, Vec<Value>)], head_oid: &str, logged_in: bool) -> 
                 pending,
             };
             let resolved = comment.get("resolver").is_some_and(|r| !r.is_null());
-            let commit = at(comment, "/commit_id").to_owned();
+            let commit = match at(review, "/commit_id") {
+                "" => match at(comment, "/commit_id") {
+                    "" => String::new(),
+                    on if on == base => head.to_owned(),
+                    on => on.to_owned(),
+                },
+                on => on.to_owned(),
+            };
             match threads.iter().position(|t| t.id == id) {
                 Some(i) => {
                     threads[i].comments.push(entry);
@@ -328,7 +362,7 @@ fn threads(reviews: &[(Value, Vec<Value>)], head_oid: &str, logged_in: bool) -> 
         }
     }
     for (thread, (commit, _)) in threads.iter_mut().zip(&first_commit) {
-        thread.outdated = !commit.is_empty() && commit != head_oid;
+        thread.outdated = !commit.is_empty() && commit != head;
         thread.comments.sort_by_key(|c| c.at);
     }
     threads
@@ -530,6 +564,9 @@ mod tests {
     fn merged_and_conflicting_say_so() {
         let mut a = answers();
         a.pr["mergeable"] = json!(false);
+        // A draft isn't mergeable either way: that says nothing of conflicts.
+        assert_eq!(assemble(&a, Forge::Forgejo, WEB).mergeable, "");
+        a.pr["title"] = json!("Add search");
         assert_eq!(assemble(&a, Forge::Forgejo, WEB).mergeable, "CONFLICTING");
         a.pr["state"] = json!("closed");
         a.pr["merged"] = json!(true);
@@ -680,6 +717,53 @@ mod tests {
         let on_b = &threads[1];
         assert_eq!((on_b.side, on_b.line), (DiffSide::Left, Some(3)));
         assert!(on_b.outdated && on_b.resolved);
+    }
+
+    #[test]
+    fn someone_elses_draft_is_not_the_viewers() {
+        let mut a = answers();
+        // An admin, shown bo's pending review.
+        a.viewer = Some("admin".to_owned());
+        let pr = assemble(&a, Forge::Forgejo, WEB);
+        assert_eq!(pr.extras.pending_review, None);
+        assert!(
+            pr.extras
+                .threads
+                .iter()
+                .flat_map(|t| &t.comments)
+                .all(|c| c.body != "Mine")
+        );
+        // Whose it is goes by name, whatever the case.
+        a.viewer = Some("BO".to_owned());
+        let pr = assemble(&a, Forge::Forgejo, WEB);
+        assert_eq!(pr.extras.pending_review.as_deref(), Some("3"));
+    }
+
+    #[test]
+    fn only_official_reviews_decide() {
+        let mut a = answers();
+        a.reviews[1].0["official"] = json!(false);
+        // cy's approval doesn't count, so their request for changes stands.
+        assert_eq!(review_decision(&a.reviews), "CHANGES_REQUESTED");
+    }
+
+    #[test]
+    fn a_thread_is_as_current_as_the_review_it_came_with() {
+        let mut a = answers();
+        // Forgejo files the comment under the merge base; the review says which head it was on.
+        a.reviews[0].0["commit_id"] = json!("h1");
+        a.reviews[0].1[1]["commit_id"] = json!("b0");
+        let threads = assemble(&a, Forge::Forgejo, WEB).extras.threads;
+        assert!(threads.iter().all(|t| !t.outdated), "{threads:?}");
+        // Pushed to since: the line numbers are another commit's.
+        a.reviews[0].0["commit_id"] = json!("h0");
+        let threads = assemble(&a, Forge::Forgejo, WEB).extras.threads;
+        assert!(threads[0].outdated && threads[1].outdated, "{threads:?}");
+        // No commit on the review: the comment's own, the merge base standing for the head.
+        a.reviews[0].0["commit_id"] = json!("");
+        a.pr["merge_base"] = json!("b0");
+        let threads = assemble(&a, Forge::Forgejo, WEB).extras.threads;
+        assert!(!threads[0].outdated && !threads[1].outdated, "{threads:?}");
     }
 
     #[test]

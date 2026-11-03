@@ -69,8 +69,12 @@ impl Api {
             web: web.trim_end_matches('/').to_owned(),
             login,
             on_refused: None,
-            agent: ureq::AgentBuilder::new()
-                .timeout(Duration::from_secs(20))
+            agent: with_proxy(ureq::AgentBuilder::new(), web)
+                // A large repository on a busy server can take its time over a page of the list.
+                .timeout(Duration::from_secs(30))
+                // A redirect turns a POST into a GET and drops the login: what was sent would read
+                // as done. It's said instead (see `send`).
+                .redirects(0)
                 .user_agent(concat!("gitcraft/", env!("CARGO_PKG_VERSION")))
                 .build(),
         }
@@ -80,6 +84,11 @@ impl Api {
     pub fn on_refused(mut self, forget: fn(&str)) -> Api {
         self.on_refused = Some(forget);
         self
+    }
+
+    /// "Forgejo" or "Gitea".
+    pub fn name(&self) -> &'static str {
+        self.name
     }
 
     /// Whether a login goes along with the requests.
@@ -103,8 +112,9 @@ impl Api {
                 _ => return Err(self.unexpected("a list")),
             };
             // An endpoint that doesn't page gives everything every time: the first page is it.
+            // A short page isn't the last one: the server's own cap on a page may be below ours.
             let repeats = page > 1 && !items.is_empty() && items.first() == all.first();
-            let last = items.len() < PAGE || repeats;
+            let last = items.is_empty() || repeats;
             if !repeats {
                 all.extend(items);
             }
@@ -139,6 +149,19 @@ impl Api {
             None => request.call(),
         };
         match answer {
+            Ok(response) if (300..400).contains(&response.status()) => {
+                let to = response
+                    .header("location")
+                    .unwrap_or("elsewhere")
+                    .to_owned();
+                Err(Failure {
+                    status: Some(response.status()),
+                    message: format!(
+                        "{} sent gitcraft to {to}: set the remote to the server's own address",
+                        self.host
+                    ),
+                })
+            }
             Ok(response) => {
                 let text = response.into_string().map_err(|e| Failure {
                     status: None,
@@ -185,6 +208,12 @@ impl Api {
             format!("{said} (HTTP {status})")
         };
         match (status, &self.login) {
+            // A private repository is "not found" to whoever isn't known.
+            (404, None) => format!(
+                "{}: {said}. If the repository is private, gitcraft found no login for {}: add one \
+                 with `tea login add`, or let git's credential helper keep one for https://{}",
+                self.name, self.host, self.host
+            ),
             (401 | 403, None) => format!(
                 "{}: {said}. gitcraft found no login for {}: add one with `tea login add`, or \
                  let git's credential helper keep one for https://{}",
@@ -197,6 +226,67 @@ impl Api {
             _ => format!("{}: {said}", self.name),
         }
     }
+}
+
+/// `builder` going through the proxy the environment sets for `web`, as git and curl pick it.
+fn with_proxy(builder: ureq::AgentBuilder, web: &str) -> ureq::AgentBuilder {
+    let proxy = proxy_for(web, |name| {
+        std::env::var(name).ok().filter(|v| !v.is_empty())
+    });
+    match proxy.and_then(|url| ureq::Proxy::new(url).ok()) {
+        Some(proxy) => builder.proxy(proxy),
+        None => builder,
+    }
+}
+
+/// The proxy for `web` (`https://host[:port]`): the scheme's own variable, else `ALL_PROXY`, unless
+/// `NO_PROXY` names the host (`*`, a domain and its subdomains, an IPv4 range like `10.0.0.0/8`).
+fn proxy_for(web: &str, var: impl Fn(&str) -> Option<String>) -> Option<String> {
+    let (scheme, rest) = web.split_once("://")?;
+    let authority = rest.split('/').next().unwrap_or(rest);
+    let host = match authority.find(']') {
+        Some(end) if authority.starts_with('[') => &authority[1..end],
+        _ => authority.split(':').next().unwrap_or(authority),
+    }
+    .to_lowercase();
+    let first = |names: &[&str]| names.iter().find_map(|name| var(name));
+    let excluded = first(&["no_proxy", "NO_PROXY"]).unwrap_or_default();
+    if excluded
+        .split(',')
+        .map(|entry| entry.trim().to_lowercase())
+        .any(|entry| bypasses(&entry, &host))
+    {
+        return None;
+    }
+    match scheme {
+        "https" => first(&["https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]),
+        _ => first(&["http_proxy", "HTTP_PROXY", "all_proxy", "ALL_PROXY"]),
+    }
+}
+
+/// Whether one `NO_PROXY` entry covers `host`.
+fn bypasses(entry: &str, host: &str) -> bool {
+    if entry == "*" {
+        return true;
+    }
+    if let Some((net, bits)) = entry.split_once('/') {
+        let (Ok(net), Ok(bits), Ok(ip)) = (
+            net.parse::<std::net::Ipv4Addr>(),
+            bits.parse::<u32>(),
+            host.parse::<std::net::Ipv4Addr>(),
+        ) else {
+            return false;
+        };
+        let mask = u32::MAX.checked_shl(32 - bits.min(32)).unwrap_or(0);
+        return u32::from(net) & mask == u32::from(ip) & mask;
+    }
+    let entry = entry.trim_start_matches("*.").trim_start_matches('.');
+    let entry = match entry.find(']') {
+        Some(end) if entry.starts_with('[') => &entry[1..end],
+        _ if entry.matches(':').count() == 1 => entry.split(':').next().unwrap_or(entry),
+        _ => entry,
+    };
+    !entry.is_empty() && (host == entry || host.ends_with(&format!(".{entry}")))
 }
 
 /// What an error answer says: `{"message": "..."}`, sometimes with `errors` beside it.
@@ -229,6 +319,61 @@ mod tests {
             password: "pw".into(),
         };
         assert_eq!(basic.header(), "Basic YW5hOnB3");
+    }
+
+    #[test]
+    fn the_proxy_is_the_schemes_unless_no_proxy_names_the_host() {
+        let env = |pairs: &'static [(&'static str, &'static str)]| {
+            move |name: &str| {
+                pairs
+                    .iter()
+                    .find(|(k, _)| *k == name)
+                    .map(|(_, v)| (*v).to_owned())
+            }
+        };
+        let vars = env(&[
+            ("HTTPS_PROXY", "http://proxy:8080"),
+            ("HTTP_PROXY", "http://plain:3128"),
+            (
+                "NO_PROXY",
+                "localhost, .corp.example,git.lan:3000,10.0.0.0/8,::1",
+            ),
+        ]);
+        let proxy = |web: &str| proxy_for(web, vars);
+        assert_eq!(
+            proxy("https://codeberg.org").as_deref(),
+            Some("http://proxy:8080")
+        );
+        assert_eq!(
+            proxy("http://codeberg.org").as_deref(),
+            Some("http://plain:3128")
+        );
+        for direct in [
+            "http://localhost:3000",
+            "https://git.corp.example",
+            "https://corp.example",
+            "http://git.lan:3000",
+            "http://10.1.2.3:3000",
+            "http://[::1]:3000",
+        ] {
+            assert_eq!(proxy(direct), None, "{direct}");
+        }
+        assert_eq!(
+            proxy("https://notcorp.example").as_deref(),
+            Some("http://proxy:8080")
+        );
+        assert_eq!(
+            proxy("http://11.1.2.3").as_deref(),
+            Some("http://plain:3128")
+        );
+        let everything = env(&[("HTTPS_PROXY", "http://p"), ("no_proxy", "*")]);
+        assert_eq!(proxy_for("https://codeberg.org", everything), None);
+        let all = env(&[("ALL_PROXY", "http://all")]);
+        assert_eq!(
+            proxy_for("https://x.org", all).as_deref(),
+            Some("http://all")
+        );
+        assert_eq!(proxy_for("https://x.org", env(&[])), None);
     }
 
     #[test]

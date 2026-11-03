@@ -32,6 +32,18 @@ pub(super) struct Loaded {
     pub(super) read: u64,
 }
 
+/// Whether two hostings are the same repository on the same forge, however it's reached (HTTPS
+/// or SSH): the first load, with nothing before it, moves nothing anywhere.
+fn same_repository(before: Option<&Hosting>, now: Option<&Hosting>) -> bool {
+    match (before, now) {
+        (None, _) => true,
+        (Some(a), Some(b)) => {
+            a.forge == b.forge && a.host == b.host && a.path.eq_ignore_ascii_case(&b.path)
+        }
+        (Some(_), None) => false,
+    }
+}
+
 impl RepoTab {
     /// Re-reads refs, history, working tree, worktrees, stashes, remotes and submodules in the
     /// background.
@@ -278,18 +290,21 @@ impl RepoTab {
         self.lfs = loaded.lfs;
         // Another project (origin pointed elsewhere): its pull requests are other ones, under
         // the same numbers, and a list asked of the old one is not to be taken in.
-        let moved = loaded.remotes != self.remotes;
+        let remotes_changed = loaded.remotes != self.remotes;
         self.remotes = loaded.remotes;
-        let rehosted = loaded.hosting != self.hosting;
-        if rehosted || moved {
+        if loaded.hosting != self.hosting || remotes_changed {
+            let moved = !same_repository(self.hosting.as_ref(), loaded.hosting.as_ref());
             self.hosting = loaded.hosting;
             self.prs.clear();
+            self.pr_error = None;
             self.prs_loaded = None;
-        }
-        if rehosted {
-            // The page shown is another repository's now: what it would send would go to this
-            // one, under that pull request's number.
-            self.close_pr();
+            if moved {
+                // The page and what was written for it are another repository's now: sent, they
+                // would go to this one, under that number.
+                self.close_pr();
+                self.pr_drafts.clear();
+                self.avatars_hinted = false;
+            }
         }
         if self
             .prs_loaded
@@ -488,7 +503,8 @@ impl RepoTab {
         if self.avatars_hinted || !Settings::get(ctx).avatars {
             return;
         }
-        let Some(hosting) = self.hosting.clone() else {
+        // A local mirror has no host to ask.
+        let Some(hosting) = self.hosting.clone().filter(|h| !h.host.is_empty()) else {
             return;
         };
         self.avatars_hinted = true;

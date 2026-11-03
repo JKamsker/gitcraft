@@ -120,13 +120,13 @@ mod tests {
     #[test]
     fn avatars_are_asked_on_the_remotes_port() {
         let at = |url: &str| {
-            let (host, path) = super::super::location(url).unwrap_or_default();
-            api_authority(&Hosting {
-                forge: super::super::Forge::GitLab,
-                web: super::super::web_base(url, &host),
-                host,
-                path,
-            })
+            let origin = crate::git::Remote {
+                name: "origin".into(),
+                url: url.into(),
+            };
+            super::super::detect_with(&[origin], &Default::default(), &[])
+                .map(|hosting| api_authority(&hosting))
+                .unwrap_or_default()
         };
         assert_eq!(
             at("https://gitlab.example.com:8443/g/p.git"),
