@@ -348,7 +348,7 @@ impl RepoTab {
                 refresh: Refresh::All,
             });
         }
-        if let Some(forge) = self.forge {
+        if let Some(forge) = self.forge() {
             let existing = self.prs.iter().find(|p| p.branch == b.name);
             match existing {
                 Some(pr) => {
@@ -744,12 +744,9 @@ impl RepoTab {
     }
 
     fn pr_section(&self, ui: &mut Ui, acts: &mut Vec<Action>, idle: bool, sections: &mut Sections) {
-        let Some(forge) = self.forge else { return };
+        let Some(forge) = self.forge() else { return };
         let t = Tokens::get(ui.ctx());
-        let title = match forge {
-            crate::forge::Forge::GitHub => "PULL REQUESTS",
-            crate::forge::Forge::GitLab => "MERGE REQUESTS",
-        };
+        let title = forge.list_title();
         let open = sections.add(
             ui,
             Header {
@@ -815,7 +812,7 @@ impl RepoTab {
                 egui::FontId::proportional(11.0),
                 t.text_faint,
             );
-            let has_view = forge == crate::forge::Forge::GitHub;
+            let has_view = forge.has_pages();
             let r = r.on_hover_text(if has_view {
                 format!("{}\nClick to open, double-click for the browser", pr.url)
             } else {

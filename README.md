@@ -55,8 +55,12 @@ so your config, credentials and hooks apply as usual.
   prune.
 - Stashes: stash (with a message, untracked files included), see what a stash holds, apply, pop,
   drop.
-- Pull / merge requests of GitHub (through `gh`) or GitLab (through `glab`): list, open in the
-  browser, check out, create from a branch.
+- Pull / merge requests of GitHub (through `gh`), GitLab (through `glab`), Forgejo and Gitea
+  (through their API; Codeberg is Forgejo): list, open in the browser, check out, create from a
+  branch. On GitHub, Forgejo and Gitea a click opens one in the big area: description, checks,
+  commits, conversation and changed files; comment, review (with comments on lines, pending until
+  sent), reply, apply suggested changes, dismiss reviews and merge. Forgejo's and Gitea's API can't
+  resolve conversations, so that stays on their web page.
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
 
 **Changes and commits** (right)
@@ -102,7 +106,8 @@ so your config, credentials and hooks apply as usual.
 - Command palette (Ctrl+P): every action and branch, fuzzy matched.
 - Manual (F1, or the book in the title bar): what each part does and every keyboard shortcut.
 - Avatars: on a GitHub repository, the authors' GitHub accounts (through `gh` when installed, else
-  GitHub's API); on GitLab, the host's avatar API; elsewhere Gravatar (a hash of the email).
+  GitHub's API); on Forgejo and Gitea, the accounts the host ties the commits to; on GitLab, the
+  host's avatar API; elsewhere Gravatar (a hash of the email).
   Cached on disk; can be turned off.
 - Settings: zoom, branch column width, graph columns, avatars, notifications, update check,
   background fetch, editor command, default shell and terminal font size, saved identities.
@@ -150,6 +155,20 @@ Linux needs the usual eframe system packages (e.g. `libxkbcommon-dev`, `libgtk-3
 file dialogs, `libdbus-1-dev` for notifications). Pull requests need the GitHub CLI (`gh`) or
 GitLab CLI (`glab`), logged in.
 
+Forgejo and Gitea need no tool of their own. gitcraft uses a login the user already has for the
+host, and never stores one: `GITEA_SERVER_URL` + `GITEA_SERVER_TOKEN` when they name that server,
+else a login of `tea` (`tea login add`, which works with Forgejo too), else what git's credential
+helper keeps for `https://host` (a password or an access token). Public repositories can be read
+without any. codeberg.org and hosts named like `forgejo…` / `gitea…` are recognised, as are the
+hosts `tea` is logged in to; for any other server, tell git's config which forge it is:
+
+```bash
+git config --global gitcraft.git.example.org.forge forgejo   # every repository on that host
+git config gitcraft.forge gitea                               # just this repository
+```
+
+The value is one of `github`, `gitlab`, `forgejo` or `gitea`.
+
 ### Looking at the UI headlessly
 
 `examples/ui_shot.rs` drives the app without a window (egui_kittest) and saves PNGs:
@@ -170,11 +189,16 @@ was made this way, on a demo repository.
 | ------------------------ | ---------------------------------------------------------------------------------- |
 | `src/git.rs`             | `git` CLI wrapper and output parsing (refs, log, status, stashes, remotes, search) |
 | `src/graph.rs`           | lane layout for the commit graph                                                   |
-| `src/forge.rs`           | pull / merge requests through `gh` and `glab`                                      |
-| `src/pull_request.rs` | one pull request in full through `gh`: details, checks, comments, changes |
-| `src/pr_post.rs` | what goes out through `gh`: comments, reviews, replies, suggestions, merges |
-| `src/pr_threads.rs` | review threads, the pending review and permissions, from GitHub's GraphQL API |
-| `src/avatars.rs`         | avatars from GitHub, GitLab or Gravatar, cached on disk                            |
+| `src/forge/mod.rs`       | the forges behind one `Provider` trait: which one hosts a remote, list, create, avatars, the page of one |
+| `src/forge/github/`      | GitHub through `gh`: list, `gh pr view`, GraphQL threads, comments, reviews, merges |
+| `src/forge/gitlab.rs`    | GitLab through `glab`: list and create                                             |
+| `src/forge/gitea/`       | Forgejo and Gitea through their REST API: list, the page of one, comments, reviews, merges; finding the login |
+| `src/forge/http.rs`      | the REST client for forges without a command-line tool                             |
+| `src/forge/cli.rs`       | running `gh` / `glab`                                                              |
+| `src/pull_request.rs` | one pull request in full, whatever the forge: details, checks, comments, changes, safe markdown |
+| `src/pr_post.rs` | what goes out: the `Target` trait each forge implements, and what they share (suggestions, merge rules) |
+| `src/pr_threads.rs` | review threads, the pending review and permissions                          |
+| `src/avatars.rs`         | avatars from GitHub, Forgejo / Gitea, GitLab or Gravatar, cached on disk           |
 | `src/update.rs`          | new-release check                                                                  |
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |
 | `src/shell_path.rs`      | on macOS, the login shell's PATH for the commands gitcraft starts                  |

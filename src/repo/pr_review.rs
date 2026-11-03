@@ -1,6 +1,6 @@
 //! Saying something on the pull request shown: a comment on its page, a review from the box under
 //! its files, threads on lines from the diff. What is only typed stays as a draft of the tab; a
-//! comment added to the review is on GitHub already, in a pending review only its author sees.
+//! comment added to the review is on the forge already, in a pending review only its author sees.
 
 use std::collections::HashMap;
 
@@ -19,7 +19,7 @@ use crate::theme::{self, Tokens};
 const THREAD_MAX_H: f32 = 260.0;
 
 /// Something to send, on a thread of its own.
-type PostJob = Box<dyn FnOnce(&Target) -> Result<(), String> + Send>;
+type PostJob = Box<dyn FnOnce(&dyn Target) -> Result<(), String> + Send>;
 
 /// A line a comment is being written on.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -203,7 +203,7 @@ impl PrDraft {
     }
 }
 
-/// The side and number of a diff line a comment can go on, if it can: GitHub takes them on the
+/// The side and number of a diff line a comment can go on, if it can: forges take them on the
 /// lines of the diff, in `column` (the old or new half of the side-by-side view, `None` for the
 /// unified one).
 pub(super) fn target_of(
@@ -393,7 +393,10 @@ impl RepoTab {
         let Some(Ok(details)) = &view.details else {
             return;
         };
-        let Some(target) = Target::of(&self.path, details) else {
+        let Some(target) = self.hosting.as_ref().and_then(|hosting| {
+            let pages = hosting.forge.provider().pages()?;
+            pages.target(&self.path, hosting, details)
+        }) else {
             return;
         };
         let number = view.number;
@@ -442,13 +445,24 @@ impl RepoTab {
                 Posted::Resolve(resolved),
                 Box::new(move |t| t.set_resolved(&thread, resolved)),
             ),
-            PrAct::ApplySuggestion { thread, suggestion } => (
-                Posted::Suggestion,
-                Box::new(move |t| {
-                    t.apply_suggestion(&suggestion)?;
-                    t.set_resolved(&thread, true)
-                }),
-            ),
+            PrAct::ApplySuggestion { thread, suggestion } => {
+                // Where the forge can't resolve the thread, applying the change is all there is.
+                let resolve = details
+                    .extras
+                    .threads
+                    .iter()
+                    .any(|t| t.id == thread && t.can_resolve);
+                (
+                    Posted::Suggestion,
+                    Box::new(move |t| {
+                        t.apply_suggestion(&suggestion)?;
+                        if resolve {
+                            t.set_resolved(&thread, true)?;
+                        }
+                        Ok(())
+                    }),
+                )
+            }
             PrAct::Dismiss => {
                 let Some(review) = draft.dismissing.clone() else {
                     return;
@@ -475,7 +489,7 @@ impl RepoTab {
         spawn(&self.tx, ctx, move || Msg::PrPosted {
             number,
             what,
-            result: job(&target),
+            result: job(target.as_ref()),
         });
     }
 
@@ -787,6 +801,11 @@ fn threads(
 ) -> ThreadsShown {
     let t = Tokens::get(ui.ctx());
     let width = ui.available_width() - 16.0;
+    let forge = view
+        .details
+        .as_ref()
+        .and_then(|d| d.as_ref().ok()?.forge)
+        .map_or("the forge", crate::forge::Forge::name);
     let mut shown = ThreadsShown {
         reply_to: None,
         pending_exists: false,
@@ -869,7 +888,7 @@ fn threads(
                 }
                 if thread.more_comments {
                     ui.label(
-                        RichText::new("This thread goes on: the rest is on GitHub.")
+                        RichText::new(format!("This thread goes on: the rest is on {forge}."))
                             .color(t.text_faint)
                             .small(),
                     );

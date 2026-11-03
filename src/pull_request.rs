@@ -1,5 +1,6 @@
-//! One pull request in full, through `gh`: its description, build status, commits and comments,
-//! and the changes it proposes. Only GitHub for now; the list of `forge.rs` covers GitLab too.
+//! One pull request in full, whichever forge it's on: its description, build status, commits and
+//! comments, and the changes it proposes. The forges' modules (`forge/`) read it; this is what they
+//! read it into, and what the page makes of it.
 
 use std::path::Path;
 
@@ -7,11 +8,7 @@ use serde_json::Value;
 
 use crate::forge::{self, Forge};
 use crate::git::{self, ChangedFile, Credentials, Remote};
-use crate::pr_threads::{self, PrExtras};
-
-const FIELDS: &str = "number,title,body,state,isDraft,author,url,baseRefName,baseRefOid,\
-    headRefName,headRefOid,createdAt,updatedAt,additions,deletions,changedFiles,mergeable,\
-    mergeStateStatus,reviewDecision,labels,statusCheckRollup,commits,comments,reviews";
+use crate::pr_threads::PrExtras;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CheckState {
@@ -77,6 +74,8 @@ pub struct Entry {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PrDetails {
+    /// The forge it was read from.
+    pub forge: Option<Forge>,
     pub number: u64,
     pub title: String,
     pub body: String,
@@ -88,6 +87,8 @@ pub struct PrDetails {
     pub base_oid: String,
     pub head_branch: String,
     pub head_oid: String,
+    /// Where the forge keeps the proposed commits (`refs/pull/12/head`), to fetch them by.
+    pub head_ref: String,
     pub created_at: i64,
     pub updated_at: i64,
     pub additions: u64,
@@ -108,7 +109,7 @@ pub struct PrDetails {
 }
 
 /// The sent comments of the threads, for the conversation.
-fn line_entries(extras: &PrExtras) -> Vec<Entry> {
+pub(crate) fn line_entries(extras: &PrExtras) -> Vec<Entry> {
     extras
         .threads
         .iter()
@@ -158,48 +159,6 @@ pub struct PrFiles {
     pub files: Vec<ChangedFile>,
 }
 
-/// Reads the pull request numbered `number` of the repository at `repo`.
-pub fn details(repo: &Path, number: u64) -> Result<PrDetails, String> {
-    let details = read_details(repo, number)?;
-    // It's read in two goes. A push in between would put the threads' line numbers on another
-    // commit than the one the page takes for the pull request's, so that goes again.
-    if read_in_step(&details) {
-        return Ok(details);
-    }
-    let details = read_details(repo, number)?;
-    if read_in_step(&details) {
-        Ok(details)
-    } else {
-        Err("The pull request changed while it was read. Load it again.".to_owned())
-    }
-}
-
-/// Whether both goes of reading `details` saw the same commit (or the threads weren't read).
-fn read_in_step(details: &PrDetails) -> bool {
-    details.inline_error.is_some() || details.extras.head_oid == details.head_oid
-}
-
-fn read_details(repo: &Path, number: u64) -> Result<PrDetails, String> {
-    let view = forge::tool(
-        Forge::GitHub,
-        repo,
-        &["pr", "view", &number.to_string(), "--json", FIELDS],
-    )?;
-    let mut details = parse_details(&view)?;
-    match repo_of_url(&details.url) {
-        Some((host, path)) => match pr_threads::fetch(repo, &host, &path, number) {
-            Ok(extras) => {
-                details.timeline.extend(line_entries(&extras));
-                details.extras = extras;
-            }
-            Err(e) => details.inline_error = Some(e),
-        },
-        None => details.inline_error = Some("unexpected pull request URL".to_owned()),
-    }
-    details.timeline.sort_by_key(|entry| entry.at);
-    Ok(details)
-}
-
 /// Finds the changes of `details`, fetching its commits first if they aren't here yet.
 pub fn files(
     repo: &Path,
@@ -218,18 +177,14 @@ pub fn files(
         let remote = remote_for(remotes, &details.url)
             .ok_or("no remote of this repository is the one the pull request belongs to")?;
         // No refs and no FETCH_HEAD: nothing here changes but the objects being available.
-        let head = format!("refs/pull/{}/head", details.number);
         let base = format!("refs/heads/{}", details.base_branch);
+        let mut args = vec!["fetch", "--no-tags", "--no-write-fetch-head", remote];
+        if !details.head_ref.is_empty() {
+            args.push(&details.head_ref);
+        }
+        args.push(&base);
         // The branches may have moved on since the details were read (a force push even leaves
         // the old commits out), so the very commits are asked for too.
-        let mut args = vec![
-            "fetch",
-            "--no-tags",
-            "--no-write-fetch-head",
-            remote,
-            &head,
-            &base,
-        ];
         args.extend(
             [&details.head_oid, &details.base_oid]
                 .into_iter()
@@ -247,51 +202,6 @@ pub fn files(
     })
 }
 
-pub(crate) fn parse_details(json: &str) -> Result<PrDetails, String> {
-    let v: Value =
-        serde_json::from_str(json).map_err(|e| format!("unexpected output of gh: {e}"))?;
-    let text = |key: &str| at(&v, key).to_owned();
-    let number = |key: &str| v.pointer(key).and_then(Value::as_u64).unwrap_or(0);
-    let time = |key: &str| parse_time(at(&v, key)).unwrap_or(0);
-
-    let mut timeline: Vec<Entry> = items(&v, "/comments").iter().map(comment).collect();
-    timeline.extend(items(&v, "/reviews").iter().filter_map(review));
-    timeline.sort_by_key(|entry| entry.at);
-    Ok(PrDetails {
-        number: number("/number"),
-        title: text("/title"),
-        body: text("/body"),
-        state: text("/state"),
-        draft: v
-            .pointer("/isDraft")
-            .and_then(Value::as_bool)
-            .unwrap_or(false),
-        author: login(&v, "/author/login"),
-        url: text("/url"),
-        base_branch: text("/baseRefName"),
-        base_oid: text("/baseRefOid"),
-        head_branch: text("/headRefName"),
-        head_oid: text("/headRefOid"),
-        created_at: time("/createdAt"),
-        updated_at: time("/updatedAt"),
-        additions: number("/additions"),
-        deletions: number("/deletions"),
-        changed_files: number("/changedFiles"),
-        mergeable: text("/mergeable"),
-        merge_state: text("/mergeStateStatus"),
-        review_decision: text("/reviewDecision"),
-        labels: items(&v, "/labels")
-            .iter()
-            .map(|label| at(label, "/name").to_owned())
-            .collect(),
-        checks: items(&v, "/statusCheckRollup").iter().map(check).collect(),
-        commits: items(&v, "/commits").iter().map(commit).collect(),
-        timeline,
-        inline_error: None,
-        extras: PrExtras::default(),
-    })
-}
-
 /// The string at `pointer`, or nothing.
 pub(crate) fn at<'a>(v: &'a Value, pointer: &str) -> &'a str {
     v.pointer(pointer)
@@ -306,93 +216,24 @@ pub(crate) fn items<'a>(v: &'a Value, pointer: &str) -> &'a [Value] {
         .map_or(&[], Vec::as_slice)
 }
 
-/// The account at `pointer`: a deleted one has none, and GitHub calls those "ghost".
-pub(crate) fn login(v: &Value, pointer: &str) -> String {
-    match at(v, pointer) {
-        "" => "ghost".to_owned(),
-        name => name.strip_prefix("app/").unwrap_or(name).to_owned(),
-    }
-}
-
-fn check(v: &Value) -> Check {
-    if at(v, "/__typename") == "StatusContext" {
-        let state = match at(v, "/state") {
-            "SUCCESS" => CheckState::Passed,
-            "FAILURE" | "ERROR" => CheckState::Failed,
-            "PENDING" | "EXPECTED" => CheckState::Running,
-            _ => CheckState::Skipped,
-        };
-        return Check {
-            name: at(v, "/context").to_owned(),
-            state,
-            detail: at(v, "/description").to_owned(),
-            url: at(v, "/targetUrl").to_owned(),
-        };
-    }
-    let state = match (at(v, "/status"), at(v, "/conclusion")) {
-        ("COMPLETED", "SUCCESS") => CheckState::Passed,
-        ("COMPLETED", "FAILURE" | "TIMED_OUT" | "STARTUP_FAILURE" | "ACTION_REQUIRED") => {
-            CheckState::Failed
-        }
-        ("COMPLETED", _) => CheckState::Skipped,
-        _ => CheckState::Running,
-    };
-    Check {
-        name: at(v, "/name").to_owned(),
-        state,
-        detail: at(v, "/workflowName").to_owned(),
-        url: at(v, "/detailsUrl").to_owned(),
-    }
-}
-
-fn commit(v: &Value) -> PrCommit {
-    let author = match at(v, "/authors/0/login") {
-        "" => at(v, "/authors/0/name"),
-        name => name,
-    };
-    PrCommit {
-        oid: at(v, "/oid").to_owned(),
-        headline: at(v, "/messageHeadline").to_owned(),
-        author: author.to_owned(),
-    }
-}
-
-fn comment(v: &Value) -> Entry {
-    Entry {
-        kind: EntryKind::Comment,
-        author: login(v, "/author/login"),
-        at: parse_time(at(v, "/createdAt")).unwrap_or(0),
-        body: at(v, "/body").to_owned(),
-        url: at(v, "/url").to_owned(),
-        review_id: None,
-    }
-}
-
-/// A review, if it says anything: one that only holds comments on lines has no text of its own.
-fn review(v: &Value) -> Option<Entry> {
-    let body = at(v, "/body");
-    let verdict = match at(v, "/state") {
-        "APPROVED" => "approved",
-        "CHANGES_REQUESTED" => "requested changes",
-        "DISMISSED" => "had a review dismissed",
-        "COMMENTED" if !body.is_empty() => "reviewed",
-        _ => return None,
-    };
-    let dismissable = matches!(at(v, "/state"), "APPROVED" | "CHANGES_REQUESTED");
-    let id = at(v, "/id");
-    Some(Entry {
-        kind: EntryKind::Review(verdict),
-        author: login(v, "/author/login"),
-        at: parse_time(at(v, "/submittedAt")).unwrap_or(0),
-        body: body.to_owned(),
-        url: at(v, "/url").to_owned(),
-        review_id: (dismissable && !id.is_empty()).then(|| id.to_owned()),
-    })
-}
-
-/// Seconds since the epoch of a UTC time like `2026-11-02T20:37:34Z`.
+/// Seconds since the epoch of a time like `2026-11-02T20:37:34Z` or `2026-11-02T21:37:34+01:00`.
 pub(crate) fn parse_time(iso: &str) -> Option<i64> {
-    let (date, time) = iso.strip_suffix('Z')?.split_once('T')?;
+    let (iso, offset) = match iso.strip_suffix('Z') {
+        Some(utc) => (utc, 0),
+        None => {
+            let at = iso.len().checked_sub(6)?;
+            let (time, zone) = (iso.get(..at)?, iso.get(at..)?);
+            let sign = match zone.as_bytes().first() {
+                Some(b'+') => 1,
+                Some(b'-') => -1,
+                _ => return None,
+            };
+            let (hours, minutes) = zone.get(1..)?.split_once(':')?;
+            let offset = hours.parse::<i64>().ok()? * 3_600 + minutes.parse::<i64>().ok()? * 60;
+            (time, sign * offset)
+        }
+    };
+    let (date, time) = iso.split_once('T')?;
     let numbers = |text: &str, separator: char| -> Option<[i64; 3]> {
         let mut parts = text.split(separator).map(|n| n.parse::<i64>().ok());
         Some([parts.next()??, parts.next()??, parts.next()??])
@@ -406,7 +247,7 @@ pub(crate) fn parse_time(iso: &str) -> Option<i64> {
     let of_year = (153 * ((month + 9) % 12) + 2) / 5 + day - 1;
     let of_cycle = of_era * 365 + of_era / 4 - of_era / 100 + of_year;
     let days = era * 146_097 + of_cycle - 719_468;
-    Some(days * 86_400 + hour * 3_600 + minute * 60 + second)
+    Some(days * 86_400 + hour * 3_600 + minute * 60 + second - offset)
 }
 
 /// How many checks passed, failed, are running and were skipped.
@@ -420,9 +261,14 @@ pub fn tally(checks: &[Check]) -> (usize, usize, usize, usize) {
     )
 }
 
-/// The host and `owner/repo` of a pull request's URL.
+/// The host and `owner/repo` of a pull request's URL: `…/pull/12` on GitHub, `…/pulls/12` on
+/// Forgejo and Gitea, `…/-/merge_requests/12` on GitLab.
 pub(crate) fn repo_of_url(url: &str) -> Option<(String, String)> {
-    forge::location(url.split_once("/pull/")?.0)
+    let repo = ["/-/merge_requests/", "/pulls/", "/pull/"]
+        .iter()
+        .find_map(|marker| url.split_once(marker))?
+        .0;
+    forge::location(repo)
 }
 
 /// The remote of the repository a pull request's URL belongs to.
@@ -822,143 +668,17 @@ fn is_trusted_image(url: &str, host: &str) -> bool {
 mod tests {
     use super::*;
 
-    const VIEW: &str = r#"{
-        "number": 12, "title": "Add search", "body": "Adds **search**.", "state": "OPEN",
-        "isDraft": true, "author": {"login": "ana"}, "url": "https://github.com/o/r/pull/12",
-        "baseRefName": "master", "baseRefOid": "b0", "headRefName": "feat/search",
-        "headRefOid": "h0", "createdAt": "2026-11-02T20:00:00Z", "updatedAt": "2026-11-02T21:00:00Z",
-        "additions": 10, "deletions": 2, "changedFiles": 3, "mergeable": "CONFLICTING",
-        "mergeStateStatus": "DIRTY", "reviewDecision": "CHANGES_REQUESTED",
-        "labels": [{"name": "bug"}, {"name": "ui"}],
-        "statusCheckRollup": [
-            {"__typename": "CheckRun", "name": "test", "workflowName": "CI", "status": "COMPLETED",
-             "conclusion": "SUCCESS", "detailsUrl": "https://ci/1"},
-            {"__typename": "CheckRun", "name": "lint", "workflowName": "CI", "status": "COMPLETED",
-             "conclusion": "FAILURE", "detailsUrl": "https://ci/2"},
-            {"__typename": "CheckRun", "name": "e2e", "workflowName": "CI", "status": "IN_PROGRESS",
-             "conclusion": "", "detailsUrl": "https://ci/3"},
-            {"__typename": "CheckRun", "name": "docs", "workflowName": "CI", "status": "COMPLETED",
-             "conclusion": "SKIPPED", "detailsUrl": "https://ci/4"},
-            {"__typename": "CheckRun", "name": "old", "workflowName": "CI", "status": "COMPLETED",
-             "conclusion": "TIMED_OUT", "detailsUrl": "https://ci/5"},
-            {"__typename": "StatusContext", "context": "ci/legacy", "state": "PENDING",
-             "description": "Waiting", "targetUrl": "https://ci/6"},
-            {"__typename": "StatusContext", "context": "ci/ok", "state": "SUCCESS",
-             "description": "", "targetUrl": "https://ci/7"}
-        ],
-        "commits": [{"oid": "c1", "messageHeadline": "feat: search",
-                     "authors": [{"login": "ana", "name": "Ana"}]}],
-        "comments": [{"author": {"login": "bo"}, "body": "Nice", "createdAt": "2026-11-02T20:30:00Z",
-                      "url": "https://github.com/o/r/pull/12#c1"}],
-        "reviews": [
-            {"author": {"login": "cy"}, "body": "Please fix", "state": "CHANGES_REQUESTED",
-             "submittedAt": "2026-11-02T20:10:00Z"},
-            {"author": {"login": "cy"}, "body": "", "state": "COMMENTED",
-             "submittedAt": "2026-11-02T20:11:00Z"},
-            {"id": "PRR_di", "author": {"login": "di"}, "body": "", "state": "APPROVED",
-             "submittedAt": "2026-11-02T20:50:00Z"}
-        ]
-    }"#;
-
-    fn parsed() -> PrDetails {
-        parse_details(VIEW).unwrap_or_default()
-    }
-
-    #[test]
-    fn reads_the_pull_request_itself() {
-        let pr = parsed();
-        assert_eq!(pr.number, 12);
-        assert_eq!(pr.title, "Add search");
-        assert_eq!(pr.body, "Adds **search**.");
-        assert!(pr.draft);
-        assert_eq!(pr.author, "ana");
-        assert_eq!(
-            (pr.base_branch.as_str(), pr.base_oid.as_str()),
-            ("master", "b0")
-        );
-        assert_eq!(
-            (pr.head_branch.as_str(), pr.head_oid.as_str()),
-            ("feat/search", "h0")
-        );
-        assert_eq!((pr.additions, pr.deletions, pr.changed_files), (10, 2, 3));
-        assert_eq!(pr.mergeable, "CONFLICTING");
-        assert_eq!(pr.review_decision, "CHANGES_REQUESTED");
-        assert_eq!(pr.labels, ["bug", "ui"]);
-        assert_eq!(pr.commits[0].headline, "feat: search");
-        assert_eq!(pr.commits[0].author, "ana");
-    }
-
-    #[test]
-    fn output_that_is_not_json_is_an_error() {
-        assert!(parse_details("oops").is_err());
-    }
-
-    #[test]
-    fn understands_both_kinds_of_check() {
-        let pr = parsed();
-        let states: Vec<(&str, CheckState)> = pr
-            .checks
-            .iter()
-            .map(|c| (c.name.as_str(), c.state))
-            .collect();
-        assert_eq!(
-            states,
-            [
-                ("test", CheckState::Passed),
-                ("lint", CheckState::Failed),
-                ("e2e", CheckState::Running),
-                ("docs", CheckState::Skipped),
-                ("old", CheckState::Failed),
-                ("ci/legacy", CheckState::Running),
-                ("ci/ok", CheckState::Passed),
-            ]
-        );
-        assert_eq!(pr.checks[0].url, "https://ci/1");
-        assert_eq!(pr.checks[0].detail, "CI");
-        assert_eq!(pr.checks[5].detail, "Waiting");
-    }
-
-    #[test]
-    fn counts_the_checks_by_outcome() {
-        assert_eq!(tally(&parsed().checks), (2, 2, 2, 1));
-    }
-
-    #[test]
-    fn the_timeline_has_comments_and_reviews_that_say_something() {
-        let pr = parsed();
-        let said: Vec<(&str, &EntryKind)> = pr
-            .timeline
-            .iter()
-            .map(|e| (e.author.as_str(), &e.kind))
-            .collect();
-        assert_eq!(
-            said,
-            [
-                ("cy", &EntryKind::Review("requested changes")),
-                ("bo", &EntryKind::Comment),
-                ("di", &EntryKind::Review("approved")),
-            ]
-        );
-    }
-
-    #[test]
-    fn approvals_and_requests_for_changes_can_be_dismissed() {
-        let pr = parsed();
-        let approval = pr.timeline.iter().find(|e| e.author == "di");
-        assert_eq!(
-            approval.and_then(|e| e.review_id.as_deref()),
-            Some("PRR_di")
-        );
-        // Without an id there's nothing to refer to.
-        let request = pr.timeline.iter().find(|e| e.author == "cy");
-        assert_eq!(request.and_then(|e| e.review_id.as_deref()), None);
-    }
-
     #[test]
     fn parses_utc_times() {
         assert_eq!(parse_time("1970-01-01T00:00:00Z"), Some(0));
         assert_eq!(parse_time("2000-03-01T00:00:00Z"), Some(951_868_800));
         assert_eq!(parse_time("2026-11-02T20:37:34Z"), Some(1_793_651_854));
+        assert_eq!(parse_time("2026-11-02T21:37:34+01:00"), Some(1_793_651_854));
+        assert_eq!(
+            parse_time("2026-11-02T15:37:34.123-05:00"),
+            Some(1_793_651_854)
+        );
+        assert_eq!(parse_time("2026-11-02T20:37:34"), None);
         assert_eq!(parse_time("not a time"), None);
         assert_eq!(parse_time(""), None);
     }
@@ -968,6 +688,14 @@ mod tests {
         assert_eq!(
             repo_of_url("https://github.com/o/r/pull/12"),
             Some(("github.com".to_owned(), "o/r".to_owned()))
+        );
+        assert_eq!(
+            repo_of_url("https://codeberg.org/o/r/pulls/12"),
+            Some(("codeberg.org".to_owned(), "o/r".to_owned()))
+        );
+        assert_eq!(
+            repo_of_url("https://gitlab.com/g/sub/r/-/merge_requests/3"),
+            Some(("gitlab.com".to_owned(), "g/sub/r".to_owned()))
         );
         assert_eq!(repo_of_url("https://github.com/o/r"), None);
     }
@@ -1028,14 +756,6 @@ mod tests {
     #[test]
     fn no_review_is_coming_on_a_finished_pull_request() {
         assert_eq!(reviews_label("", false, &[]), "No reviews");
-    }
-
-    #[test]
-    fn an_app_goes_by_its_name_alone() {
-        let v: Value = serde_json::json!({"author": {"login": "app/github-actions"}});
-        assert_eq!(login(&v, "/author/login"), "github-actions");
-        let person: Value = serde_json::json!({"author": {"login": "ana"}});
-        assert_eq!(login(&person, "/author/login"), "ana");
     }
 
     #[test]
@@ -1183,21 +903,6 @@ mod tests {
     fn plain_text_with_exclamation_marks_is_left_alone() {
         let body = "Wow![not an image] and [link](https://a.example) ![unfinished](";
         assert_eq!(safe_markdown(body, "github.com"), body);
-    }
-
-    #[test]
-    fn threads_read_on_another_commit_are_not_shown_on_this_one() {
-        let mut details = PrDetails {
-            head_oid: "h1".to_owned(),
-            ..PrDetails::default()
-        };
-        details.extras.head_oid = "h1".to_owned();
-        assert!(read_in_step(&details));
-        details.extras.head_oid = "h0".to_owned();
-        assert!(!read_in_step(&details));
-        // Without threads there are no line numbers to put on the wrong commit.
-        details.inline_error = Some("offline".to_owned());
-        assert!(read_in_step(&details));
     }
 
     #[test]

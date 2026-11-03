@@ -26,7 +26,7 @@ use std::time::{Duration, Instant};
 
 use egui::{Key, Ui};
 
-use crate::forge::{self, Forge, PullRequest};
+use crate::forge::{self, Forge, Hosting, NewPullRequest, PullRequest};
 use crate::git::{
     self, Commit, CommitDetail, Identity, InProgress, Refs, Remote, Stash, StatusFile, WorkStatus,
     Worktree,
@@ -97,6 +97,8 @@ struct Loaded {
     worktrees: Vec<Worktree>,
     stashes: Vec<Stash>,
     remotes: Vec<Remote>,
+    /// The forge `origin` is on, if gitcraft knows it.
+    hosting: Option<Hosting>,
     identity: Identity,
     /// How many commits were asked for (more exist when that many came back).
     requested: usize,
@@ -427,7 +429,8 @@ pub struct RepoTab {
     stashes: Vec<Stash>,
     remotes: Vec<Remote>,
     identity: Identity,
-    forge: Option<Forge>,
+    /// Where `origin` is hosted, when it's on a forge gitcraft knows.
+    hosting: Option<Hosting>,
     prs: Vec<PullRequest>,
     pr_error: Option<String>,
     prs_loaded: Option<Instant>,
@@ -538,7 +541,7 @@ impl RepoTab {
             stashes: Vec::new(),
             remotes: Vec::new(),
             identity: Identity::default(),
-            forge: None,
+            hosting: None,
             prs: Vec::new(),
             pr_error: None,
             prs_loaded: None,
@@ -623,6 +626,7 @@ impl RepoTab {
                 let worktrees = git::worktrees(&path).unwrap_or_default();
                 let stashes = git::stashes(&path).unwrap_or_default();
                 let remotes = git::remotes(&path).unwrap_or_default();
+                let hosting = forge::detect(&path, &remotes);
                 let identity = git::identity(&path);
                 Ok(Box::new(Loaded {
                     refs,
@@ -631,6 +635,7 @@ impl RepoTab {
                     worktrees,
                     stashes,
                     remotes,
+                    hosting,
                     identity,
                     requested: count,
                 }))
@@ -656,10 +661,14 @@ impl RepoTab {
     }
 
     fn load_prs(&mut self, ctx: &egui::Context) {
-        let Some(forge) = self.forge else { return };
+        let Some(hosting) = self.hosting.clone() else {
+            return;
+        };
         self.prs_loaded = Some(Instant::now());
         let path = self.path.clone();
-        spawn(&self.tx, ctx, move || Msg::Prs(forge::list(&path, forge)));
+        spawn(&self.tx, ctx, move || {
+            Msg::Prs(hosting.forge.provider().list(&path, &hosting))
+        });
     }
 
     /// Watches the folder so changes made elsewhere (editor, terminal) show up by themselves.
@@ -1261,20 +1270,13 @@ impl RepoTab {
         );
     }
 
-    /// Once per tab, on a GitHub / GitLab repository: tells the avatar loader where its authors'
-    /// account pictures are.
+    /// Once per tab, on a forge's repository: tells the avatar loader where its authors' account
+    /// pictures are.
     fn hint_avatars(&mut self, ctx: &egui::Context) {
         if self.avatars_hinted || !Settings::get(ctx).avatars {
             return;
         }
-        let Some(forge) = self.forge else { return };
-        let Some((host, path)) = self
-            .remotes
-            .iter()
-            .find(|r| r.name == "origin")
-            .or_else(|| self.remotes.first())
-            .and_then(|r| forge::location(&r.url))
-        else {
+        let Some(hosting) = self.hosting.clone() else {
             return;
         };
         self.avatars_hinted = true;
@@ -1284,20 +1286,16 @@ impl RepoTab {
         emails.dedup();
         let ctx = ctx.clone();
         std::thread::spawn(move || {
-            match forge {
-                Forge::GitHub => {
-                    for (email, url) in forge::github_avatars(&repo, &host, &path) {
-                        crate::avatars::hint(&email, crate::avatars::Hint::Url(url));
-                    }
-                }
-                Forge::GitLab => {
-                    for email in emails {
-                        crate::avatars::hint(&email, crate::avatars::Hint::GitLab(host.clone()));
-                    }
-                }
+            for (email, hint) in hosting.forge.provider().avatars(&repo, &hosting, &emails) {
+                crate::avatars::hint(&email, hint);
             }
             ctx.request_repaint();
         });
+    }
+
+    /// The forge `origin` is on.
+    pub(super) fn forge(&self) -> Option<Forge> {
+        self.hosting.as_ref().map(|h| h.forge)
     }
 
     /// HTTPS credentials for this tab's git commands (from the clone that made it).
@@ -1571,10 +1569,9 @@ impl RepoTab {
                         self.stash_view =
                             viewed.and_then(|h| self.stashes.iter().position(|s| s.hash == h));
                         self.identity = loaded.identity;
-                        let forge = forge::detect(&loaded.remotes);
                         self.remotes = loaded.remotes;
-                        if forge != self.forge {
-                            self.forge = forge;
+                        if loaded.hosting != self.hosting {
+                            self.hosting = loaded.hosting;
                             self.prs.clear();
                             self.prs_loaded = None;
                         }
@@ -1941,11 +1938,13 @@ impl RepoTab {
                 body,
                 draft,
             } => {
-                let Some(forge) = self.forge else { return };
+                let Some(hosting) = self.hosting.clone() else {
+                    return;
+                };
                 if self.busy_op.is_some() {
                     return;
                 }
-                let label = format!("Create {}", forge.noun());
+                let label = format!("Create {}", hosting.forge.noun());
                 self.busy_op = Some(label.clone());
                 self.op_started = Some(Instant::now());
                 let path = self.path.clone();
@@ -1953,7 +1952,14 @@ impl RepoTab {
                     // Publish the branch first, so the forge can see it.
                     let pushed = git::run(Some(&path), &["push", "-u", "origin", &branch]);
                     let result = pushed.and_then(|_| {
-                        forge::create(&path, forge, &branch, &base, &title, &body, draft)
+                        let new = NewPullRequest {
+                            branch: &branch,
+                            base: &base,
+                            title: &title,
+                            body: &body,
+                            draft,
+                        };
+                        hosting.forge.provider().create(&path, &hosting, &new)
                     });
                     Msg::OpDone {
                         label,

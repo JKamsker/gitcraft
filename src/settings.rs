@@ -51,7 +51,8 @@ pub struct Settings {
     pub diff_whole_file: bool,
     /// Background fetch interval in minutes; 0 turns it off.
     pub auto_fetch_minutes: u32,
-    /// Load avatars: GitHub / GitLab accounts on repositories hosted there, Gravatar otherwise.
+    /// Load avatars: GitHub / Forgejo / Gitea / GitLab accounts on repositories hosted there,
+    /// Gravatar otherwise.
     pub avatars: bool,
     /// Command that opens a folder or file in the user's editor.
     pub editor: String,
@@ -148,8 +149,8 @@ impl Settings {
                 .on_hover_text("The tab moves to the worktree and shows its branch, which also opens a list to switch between them. What you leave behind keeps running: terminals, operations, a half-written commit message.");
             ui.end_row();
             ui.label("Avatars");
-            ui.checkbox(&mut self.avatars, "Load from GitHub, GitLab or Gravatar")
-                .on_hover_text("On a GitHub repository, its commit list says which account each author is; on GitLab, the host is asked by email. Other authors: an MD5 hash of the email goes to gravatar.com. Cached on disk.");
+            ui.checkbox(&mut self.avatars, "Load from the forge or Gravatar")
+                .on_hover_text("On a GitHub, Forgejo or Gitea repository, its commit list says which account each author is; on GitLab, the host is asked by email. Other authors: an MD5 hash of the email goes to gravatar.com. Cached on disk.");
             ui.end_row();
             ui.label("Code colours");
             ui.horizontal(|ui| {
