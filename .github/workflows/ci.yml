@@ -1,4 +1,4 @@
-# Checks every push and pull request: formatting, lints and tests on Windows, Linux and macOS, and
+# Checks every push and pull request: formatting, lints and tests on Windows and Linux, and
 # the forge code against a real Forgejo and a real Gitea (started by ci/forge-server.sh).
 name: CI
 
@@ -43,7 +43,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # macOS is off for now: hosted macOS runners are often not assigned at all, which leaves
+        # pull requests red over a job that never ran. The release workflow still tests on macOS.
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
