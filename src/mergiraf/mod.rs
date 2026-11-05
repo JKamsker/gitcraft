@@ -105,11 +105,21 @@ fn find() -> Option<Found> {
 /// later ones are refreshed in the background, the old answer standing meanwhile, and `ctx`
 /// repainted when the new one is in.
 pub fn state(ctx: &egui::Context) -> State {
-    current(Some(ctx.clone()))
+    // Remembered for any refresh, also one started where there is no UI (`solve`): the UI
+    // may have shown the old answer while it ran.
+    if let Ok(mut repaint) = REPAINT.lock()
+        && repaint.is_none()
+    {
+        *repaint = Some(ctx.clone());
+    }
+    current()
 }
 
-/// [`state`], with `repaint` repainted when a background refresh is in.
-fn current(repaint: Option<egui::Context>) -> State {
+/// The UI to repaint when a background refresh is in.
+static REPAINT: Mutex<Option<egui::Context>> = Mutex::new(None);
+
+/// [`state`], for callers without a UI.
+fn current() -> State {
     let Ok(mut cache) = STATE.lock() else {
         return State::default();
     };
@@ -126,6 +136,7 @@ fn current(repaint: Option<egui::Context>) -> State {
                         *cache = Some((Instant::now(), fresh));
                     }
                     REFRESHING.store(false, Ordering::Release);
+                    let repaint = REPAINT.lock().ok().and_then(|ctx| ctx.clone());
                     if let Some(ctx) = repaint {
                         ctx.request_repaint();
                     }
@@ -207,7 +218,7 @@ pub fn use_in_merges(ctx: &egui::Context, on: bool) {
 /// with every conflict it could solve solved, the others still marked. The file itself is left
 /// as it is.
 pub fn solve(repo: &Path, path: &str) -> Result<String, String> {
-    let found = current(None).found.ok_or("Mergiraf isn't installed")?;
+    let found = current().found.ok_or("Mergiraf isn't installed")?;
     let out = quiet(Command::new(&found.program))
         .current_dir(repo)
         .args(["solve", "--stdout", "--", path])
