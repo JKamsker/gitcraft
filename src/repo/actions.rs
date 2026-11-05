@@ -218,6 +218,12 @@ pub(super) fn abort_action(state: InProgress) -> Action {
 }
 
 impl RepoTab {
+    /// Changes whenever what [`Self::palette_items`] is made from (refs, remotes, submodules…)
+    /// is read again.
+    pub(crate) fn palette_generation(&self) -> u64 {
+        self.history_gen
+    }
+
     /// What the command palette offers for this repository.
     pub(crate) fn palette_items(&self) -> Vec<(String, String, Action)> {
         let mut items: Vec<(String, String, Action)> = vec![
