@@ -13,6 +13,7 @@ mod setup;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::{Duration, Instant};
 
 /// Other ways to install it.
@@ -99,22 +100,48 @@ fn find() -> Option<Found> {
     })
 }
 
-/// Whether Mergiraf is installed and git set up to use it, as of at most [`RECHECK`] ago.
+/// Whether Mergiraf is installed and git set up to use it, as of about [`RECHECK`] ago. Asked
+/// every frame (the conflict editor, the settings): only the first answer is worked out here,
+/// later ones are refreshed in the background, the old answer standing meanwhile.
 pub fn state() -> State {
     let Ok(mut cache) = STATE.lock() else {
         return State::default();
     };
-    if let Some((when, state)) = cache.as_ref()
-        && when.elapsed() < RECHECK
-    {
-        return state.clone();
+    match cache.as_ref() {
+        Some((when, state)) => {
+            if when.elapsed() >= RECHECK && !REFRESHING.swap(true, Ordering::AcqRel) {
+                let generation = FORGOTTEN.load(Ordering::Acquire);
+                std::thread::spawn(move || {
+                    let fresh = read_state();
+                    // Not over what a `forget` meanwhile said is out of date.
+                    if let Ok(mut cache) = STATE.lock()
+                        && FORGOTTEN.load(Ordering::Acquire) == generation
+                    {
+                        *cache = Some((Instant::now(), fresh));
+                    }
+                    REFRESHING.store(false, Ordering::Release);
+                });
+            }
+            state.clone()
+        }
+        None => {
+            let state = read_state();
+            *cache = Some((Instant::now(), state.clone()));
+            state
+        }
     }
-    let state = State {
+}
+
+/// A background refresh of [`STATE`] is running.
+static REFRESHING: AtomicBool = AtomicBool::new(false);
+/// How many times [`forget`] dropped the answer.
+static FORGOTTEN: AtomicU32 = AtomicU32::new(0);
+
+fn read_state() -> State {
+    State {
         found: find(),
         in_merges: setup::in_merges(),
-    };
-    *cache = Some((Instant::now(), state.clone()));
-    state
+    }
 }
 
 pub fn found() -> Option<Found> {
@@ -123,6 +150,7 @@ pub fn found() -> Option<Found> {
 
 fn forget() {
     if let Ok(mut cache) = STATE.lock() {
+        FORGOTTEN.fetch_add(1, Ordering::AcqRel);
         *cache = None;
     }
 }
