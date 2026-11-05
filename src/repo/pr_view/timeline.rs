@@ -53,9 +53,15 @@ pub(super) fn timeline(
         // grown a little since from being stepped over while it shows.
         let height_id = ui.id().with(("pr-card-height", i));
         let dismissing = entry.review_id.is_some() && entry.review_id == draft.dismissing;
-        let fits = (width, entry.body.len(), files.is_some(), dismissing);
+        let text = {
+            use std::hash::{Hash, Hasher};
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            entry.body.hash(&mut hasher);
+            hasher.finish()
+        };
+        let fits = (width, text, files.is_some(), dismissing);
         let known = ui
-            .data(|data| data.get_temp::<((f32, usize, bool, bool), f32)>(height_id))
+            .data(|data| data.get_temp::<((f32, u64, bool, bool), f32)>(height_id))
             .filter(|(measured, _)| *measured == fits)
             .map(|(_, h)| h);
         let unseen = known.filter(|&h| {

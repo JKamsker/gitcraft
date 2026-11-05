@@ -194,6 +194,8 @@ pub(super) fn files<'a, T>(
         }
         if end < files.len() {
             ui.add_space((files.len() - end) as f32 * pitch);
+            // What follows the list (another list) keeps its ids too.
+            ui.skip_ahead_auto_ids(files.len() - end);
         }
         return;
     }
