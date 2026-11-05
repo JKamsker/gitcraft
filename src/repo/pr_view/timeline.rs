@@ -39,20 +39,40 @@ pub(super) fn timeline(
         return;
     }
     for (i, (entry, body)) in d.timeline.iter().zip(bodies).enumerate() {
-        egui::Frame::new()
-            .fill(t.card)
-            .corner_radius(t.radius)
-            .inner_margin(egui::Margin::symmetric(12, 10))
-            .show(ui, |ui| {
-                let inner = width - 24.0;
-                ui.set_width(inner);
-                entry_header(ui, entry, d, files, acts);
-                if !body.is_empty() {
-                    ui.add_space(6.0);
-                    blocks(ui, cache, &format!("entry-{i}"), body, inner);
-                }
-                dismiss_box(ui, entry, draft, acts);
+        // A long discussion is hundreds of cards of formatted text: one out of sight is only
+        // stepped over, by its height when last drawn (at this width, with this text). Each
+        // card has ids of its own, so stepping over one changes nothing in the others.
+        let height_id = ui.id().with(("pr-card-height", i));
+        let fits = (width, entry.body.len());
+        let known = ui
+            .data(|data| data.get_temp::<((f32, usize), f32)>(height_id))
+            .filter(|(measured, _)| *measured == fits)
+            .map(|(_, h)| h);
+        let unseen = known.filter(|&h| {
+            !ui.is_rect_visible(egui::Rect::from_min_size(ui.cursor().min, vec2(width, h)))
+        });
+        if let Some(h) = unseen {
+            ui.push_id(("pr-card", i), |ui| ui.allocate_space(vec2(width, h)));
+        } else {
+            let card = ui.push_id(("pr-card", i), |ui| {
+                egui::Frame::new()
+                    .fill(t.card)
+                    .corner_radius(t.radius)
+                    .inner_margin(egui::Margin::symmetric(12, 10))
+                    .show(ui, |ui| {
+                        let inner = width - 24.0;
+                        ui.set_width(inner);
+                        entry_header(ui, entry, d, files, acts);
+                        if !body.is_empty() {
+                            ui.add_space(6.0);
+                            blocks(ui, cache, &format!("entry-{i}"), body, inner);
+                        }
+                        dismiss_box(ui, entry, draft, acts);
+                    });
             });
+            let h = card.response.rect.height();
+            ui.data_mut(|data| data.insert_temp(height_id, (fits, h)));
+        }
         ui.add_space(8.0);
     }
 }
