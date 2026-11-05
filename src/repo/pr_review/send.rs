@@ -141,6 +141,7 @@ impl RepoTab {
         draft.posting = true;
         draft.error = None;
         spawn(&self.tx, ctx, move || Msg::PrPosted {
+            hosting: Box::new(hosting.clone()),
             number,
             what,
             result: match pages.target(&repo, &hosting, &details) {
@@ -220,7 +221,10 @@ fn post_job(act: PrAct, draft: &PrDraft, details: &PrDetails) -> Option<(Posted,
             (Posted::LineNow, Box::new(move |t| t.comment_now(&line)))
         }
         PrAct::RemovePending(comment) => {
-            let last = details.extras.pending_comments().count() <= 1;
+            // The whole review goes with its last comment, but only when all of them were read: a
+            // thread may hold more than came with the page.
+            let last = details.extras.pending_comments().count() <= 1
+                && !details.extras.threads.iter().any(|t| t.more_comments);
             (
                 Posted::RemovePending,
                 Box::new(move |t| t.remove_pending(&comment, last)),

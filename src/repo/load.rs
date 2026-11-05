@@ -34,7 +34,7 @@ pub(super) struct Loaded {
 
 /// Whether two hostings are the same repository on the same forge, however it's reached (HTTPS
 /// or SSH): the first load, with nothing before it, moves nothing anywhere.
-fn same_repository(before: Option<&Hosting>, now: Option<&Hosting>) -> bool {
+pub(super) fn same_repository(before: Option<&Hosting>, now: Option<&Hosting>) -> bool {
     match (before, now) {
         (None, _) => true,
         (Some(a), Some(b)) => {
@@ -302,6 +302,7 @@ impl RepoTab {
                 // The page and what was written for it are another repository's now: sent, they
                 // would go to this one, under that number.
                 self.close_pr();
+                self.ci_view = None;
                 self.pr_drafts.clear();
                 self.avatars_hinted = false;
             }

@@ -305,8 +305,8 @@ pub fn web_url(url: &str) -> Option<String> {
     if !host.contains('.') {
         return None;
     }
-    // On the port of an `http(s)://` URL; an SSH port says nothing about the web pages.
-    let base = web_base(url).unwrap_or_else(|| format!("https://{host}"));
+    // A web remote names its server, port included; an SSH remote's port is not the web's.
+    let base = web_base(&url.to_lowercase()).unwrap_or_else(|| format!("https://{host}"));
     Some(format!("{base}/{path}"))
 }
 
@@ -389,6 +389,10 @@ mod tests {
         assert_eq!(
             web_url("ssh://git@git.example.org:2222/team/repo.git"),
             Some("https://git.example.org/team/repo".to_owned())
+        );
+        assert_eq!(
+            web_url("https://me@git.example.org:3000/o/r.git"),
+            Some("https://git.example.org:3000/o/r".to_owned())
         );
         assert_eq!(web_url("C:/repos/gitcraft"), None);
         assert_eq!(web_url("/srv/git/repo.git"), None);

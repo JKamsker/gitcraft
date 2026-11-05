@@ -265,8 +265,8 @@ was made this way, on a demo repository.
 | `src/forge/http.rs`      | the REST client for forges without a command-line tool                             |
 | `src/forge/cli.rs`       | running `gh` / `glab`                                                              |
 | `ci/forge-server.sh`     | a throwaway Forgejo or Gitea for the live tests (`src/forge/gitea/live.rs`)        |
-| `src/pull_request.rs` | one pull request in full, whatever the forge: details, checks, comments, changes, safe markdown |
-| `src/pr_post.rs` | what goes out: the `Target` trait each forge implements, and what they share (suggestions, merge rules) |
+| `src/pull_request/mod.rs` | one pull request in full, whatever the forge: details, checks, comments, changes, safe markdown |
+| `src/pr_post/mod.rs` | what goes out: the `Target` trait each forge implements, and what they share (suggestions, merge rules) |
 | `src/pr_threads.rs` | review threads, the pending review and permissions                          |
 | `src/avatars.rs`         | avatars from GitHub, Forgejo / Gitea, GitLab or Gravatar, cached on disk           |
 | `src/update.rs`          | new-release check                                                                  |

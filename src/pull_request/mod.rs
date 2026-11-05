@@ -230,7 +230,7 @@ fn is_branch_name(name: &str) -> bool {
     !name.is_empty()
         && !name.starts_with(['-', '/', '.'])
         && !name.ends_with(['/', '.'])
-        && !name.ends_with(".lock")
+        && !name.split('/').any(|part| part.ends_with(".lock"))
         && !name.contains("..")
         && !name.contains("//")
         && !name.contains("@{")
@@ -422,6 +422,7 @@ mod tests {
             "a..b",
             "a b",
             "x.lock",
+            "x.lock/y",
             "/x",
             "x/",
             "a@{1}",

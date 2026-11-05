@@ -9,7 +9,7 @@ use super::file_text::FileText;
 use super::load::Loaded;
 use super::watch::Reread;
 use super::{CompareData, OpKind, Refresh, RepoTab, diff, file_view, ops, pr_review, quick_edit};
-use crate::forge::PullRequest;
+use crate::forge::{Hosting, PullRequest};
 use crate::git::{self, Commit, CommitDetail, WorkStatus};
 use crate::settings::Settings;
 
@@ -65,6 +65,8 @@ pub(super) enum Msg {
     PrFiles(u64, Result<crate::pull_request::PrFiles, String>),
     /// Something said on a pull request went out, or didn't.
     PrPosted {
+        /// Where it was sent: an answer from a repository the tab has moved away from is no answer.
+        hosting: Box<Hosting>,
         number: u64,
         what: pr_review::Posted,
         result: Result<(), String>,
@@ -327,10 +329,13 @@ impl RepoTab {
             }
             Msg::PrDetails(request, result) => self.pr_details_arrived(request, *result, ctx),
             Msg::PrFiles(request, result) => self.pr_files_arrived(request, result, ctx),
+            Msg::PrPosted { hosting, .. }
+                if !super::load::same_repository(Some(&*hosting), self.hosting.as_ref()) => {}
             Msg::PrPosted {
                 number,
                 what,
                 result,
+                ..
             } => self.pr_posted(number, what, result, ctx),
             Msg::Compare(request, result) => {
                 if let Some(c) = &mut self.compare
