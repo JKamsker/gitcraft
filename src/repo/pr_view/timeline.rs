@@ -12,6 +12,9 @@ use crate::theme::{self, Tokens};
 
 use super::blocks;
 
+/// How far out of view a comment card is still drawn.
+const CARD_MARGIN: f32 = 200.0;
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn timeline(
     ui: &mut Ui,
@@ -40,16 +43,19 @@ pub(super) fn timeline(
     }
     for (i, (entry, body)) in d.timeline.iter().zip(bodies).enumerate() {
         // A long discussion is hundreds of cards of formatted text: one out of sight is only
-        // stepped over, by its height when last drawn (at this width, with this text). Each
-        // card has ids of its own, so stepping over one changes nothing in the others.
+        // stepped over, by its height when last drawn (at this width, with this text, with or
+        // without the changed files' button). Each card has ids of its own, so stepping over
+        // one changes nothing in the others. A margin around the view keeps a card that has
+        // grown a little since from being stepped over while it shows.
         let height_id = ui.id().with(("pr-card-height", i));
-        let fits = (width, entry.body.len());
+        let fits = (width, entry.body.len(), files.is_some());
         let known = ui
-            .data(|data| data.get_temp::<((f32, usize), f32)>(height_id))
+            .data(|data| data.get_temp::<((f32, usize, bool), f32)>(height_id))
             .filter(|(measured, _)| *measured == fits)
             .map(|(_, h)| h);
         let unseen = known.filter(|&h| {
-            !ui.is_rect_visible(egui::Rect::from_min_size(ui.cursor().min, vec2(width, h)))
+            let card = egui::Rect::from_min_size(ui.cursor().min, vec2(width, h));
+            !ui.clip_rect().expand(CARD_MARGIN).intersects(card)
         });
         if let Some(h) = unseen {
             ui.push_id(("pr-card", i), |ui| ui.allocate_space(vec2(width, h)));
