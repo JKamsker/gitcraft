@@ -102,6 +102,17 @@ pub(super) fn spawn(
 impl RepoTab {
     /// Drains finished background work and file-system events.
     pub fn poll(&mut self, ctx: &egui::Context) {
+        self.poll_as(ctx, true);
+    }
+
+    /// [`Self::poll`] for a worktree view parked behind the one shown: its own work is seen
+    /// through, but it doesn't fetch, follow builds or reload for changes on disk. The view
+    /// shown does that for the repository they share, and this one reloads when shown again.
+    pub(crate) fn poll_parked_view(&mut self, ctx: &egui::Context) {
+        self.poll_as(ctx, false);
+    }
+
+    fn poll_as(&mut self, ctx: &egui::Context, shown: bool) {
         // Changes on disk, debounced. Taken in before the finished work, so that a reload
         // that work starts covers what it wrote itself (see `reload`).
         if let Some(rx) = &self.fs_rx {
@@ -113,6 +124,9 @@ impl RepoTab {
 
         while let Ok(msg) = self.rx.try_recv() {
             self.handle(msg, ctx);
+        }
+        if !shown {
+            return;
         }
         if let Some((git_dir, at)) = self.fs_pending
             && at.elapsed() > Duration::from_millis(400)
