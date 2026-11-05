@@ -1,5 +1,7 @@
 //! The command palette (Ctrl+P): app commands, themes and the open repository's actions.
 
+use std::path::PathBuf;
+
 use egui::{Align2, Key, RichText, Sense, Stroke, Ui, pos2, vec2};
 
 use super::{App, Tab};
@@ -16,9 +18,9 @@ pub(super) struct Palette {
     entries: Option<(EntriesKey, Vec<Item>)>,
 }
 
-/// What the palette's entries were made from: the active tab, and its repository's palette
-/// generation.
-type EntriesKey = (usize, Option<u64>);
+/// What the palette's entries were made from: the active tab, and its repository (a tab's
+/// view can change to another worktree) and that repository's palette generation.
+type EntriesKey = (usize, Option<(PathBuf, (u64, u64))>);
 
 /// A palette entry: its label, the label lowercased (what the query is matched against), its
 /// hint, what it runs.
@@ -138,7 +140,7 @@ impl App {
         let key = (
             self.active,
             match self.tabs.get(self.active) {
-                Some(Tab::Repo(repo)) => Some(repo.palette_generation()),
+                Some(Tab::Repo(repo)) => Some((repo.path.clone(), repo.palette_generation())),
                 _ => None,
             },
         );
