@@ -99,6 +99,8 @@ pub struct RepoTab {
     log_from: Option<Vec<String>>,
     /// Counts the reloads of `history`, so that a page asked for before one is dropped.
     history_gen: u64,
+    /// The `git log` older pages are read from, and the `history_gen` it reads for.
+    log_stream: Arc<std::sync::Mutex<Option<(u64, git::LogStream)>>>,
     work: WorkStatus,
     /// Rows of the graph: the WIP pseudo-commit (when the tree is dirty) followed by `history`.
     commits: Vec<Arc<Commit>>,
@@ -229,6 +231,7 @@ impl RepoTab {
             visibility: Default::default(),
             log_from: None,
             history_gen: 0,
+            log_stream: Default::default(),
             work: WorkStatus::default(),
             commits: Vec::new(),
             graph: Graph {

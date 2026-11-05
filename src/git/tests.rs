@@ -112,3 +112,51 @@ fn clone_folder_names() {
     assert_eq!(clone_dir_name("C:\\repos\\thing\\"), "thing");
     assert_eq!(clone_dir_name("git@host:proj"), "proj");
 }
+
+/// Older history read page after page from one running `git log` is what `log` gives at once.
+#[test]
+fn history_read_in_pages_is_the_whole_log() -> Result<(), String> {
+    let dir = std::env::temp_dir().join(format!("gitcraft-log-pages-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let git = |args: &[&str]| run(Some(&dir), args);
+    for args in [
+        &["init", "-q", "-b", "main"][..],
+        &["config", "user.name", "t"],
+        &["config", "user.email", "t@t"],
+        &["config", "commit.gpgSign", "false"],
+    ] {
+        git(args)?;
+    }
+    for i in 0..23 {
+        git(&[
+            "commit",
+            "-q",
+            "--allow-empty",
+            "-m",
+            &format!("c{i}\n\nbody {i}"),
+        ])?;
+        if i % 5 == 0 {
+            git(&["branch", &format!("b{i}")])?;
+        }
+    }
+    let whole = log(&dir, None, 0, 100)?;
+    let mut stream = LogStream::start(&dir, None, 3)?;
+    let mut paged = log(&dir, None, 0, 3)?;
+    loop {
+        let page = stream.next_page(7)?;
+        let last = page.len() < 7;
+        paged.extend(page);
+        if last {
+            break;
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    let hashes = |c: &[Commit]| c.iter().map(|c| c.hash.clone()).collect::<Vec<_>>();
+    assert_eq!(whole.len(), 23);
+    assert_eq!(hashes(&paged), hashes(&whole));
+    assert_eq!(paged[22].summary, whole[22].summary);
+    assert_eq!(paged[22].body, "body 0");
+    assert_eq!(paged[20].refs, whole[20].refs);
+    Ok(())
+}

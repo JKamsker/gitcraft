@@ -124,8 +124,34 @@ impl RepoTab {
         let skip = self.history.len();
         let generation = self.history_gen;
         let from = self.log_from.clone();
+        let stream = Arc::clone(&self.log_stream);
         spawn(&self.tx, ctx, move || {
-            let page = git::log(&path, from.as_deref(), skip, git::LOG_PAGE);
+            let page = (|| {
+                let mut slot = stream
+                    .lock()
+                    .map_err(|_| "Reading older history failed".to_owned())?;
+                // The first page of this history (since it was last reloaded) starts the
+                // `git log` the next ones are read from.
+                if slot
+                    .as_ref()
+                    .is_none_or(|(made_for, _)| *made_for != generation)
+                {
+                    *slot = None;
+                    *slot = Some((
+                        generation,
+                        git::LogStream::start(&path, from.as_deref(), skip)?,
+                    ));
+                }
+                let page = match slot.as_mut() {
+                    Some((_, log)) => log.next_page(git::LOG_PAGE),
+                    None => Ok(Vec::new()),
+                };
+                // At the end of history (or after an error): nothing more to read from it.
+                if !matches!(&page, Ok(p) if p.len() == git::LOG_PAGE) {
+                    *slot = None;
+                }
+                page
+            })();
             Msg::More(generation, page)
         });
     }
@@ -154,6 +180,9 @@ impl RepoTab {
         // A page asked for before this was read past the old history, which
         // this one replaces: it would leave a gap.
         self.history_gen += 1;
+        // The `git log` older pages came from read the history replaced: let it go (once a
+        // page being read from it is in).
+        self.log_stream = Default::default();
         self.loading_more = false;
         self.refs = loaded.refs;
         self.has_more = loaded.history.len() >= loaded.requested;
