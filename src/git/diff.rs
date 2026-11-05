@@ -68,8 +68,14 @@ fn parse_numstat(out: &str) -> Vec<(String, Option<u32>, Option<u32>)> {
 
 /// Fills in the line counts of `files` from `--numstat -z` output.
 fn add_line_counts(files: &mut [ChangedFile], numstat: &str) {
-    for (path, added, removed) in parse_numstat(numstat) {
-        if let Some(file) = files.iter_mut().find(|f| f.path == path) {
+    // By path: a commit can touch tens of thousands of files.
+    let mut counts: std::collections::HashMap<String, (Option<u32>, Option<u32>)> =
+        parse_numstat(numstat)
+            .into_iter()
+            .map(|(path, added, removed)| (path, (added, removed)))
+            .collect();
+    for file in files.iter_mut() {
+        if let Some((added, removed)) = counts.remove(&file.path) {
             file.added = added;
             file.removed = removed;
         }

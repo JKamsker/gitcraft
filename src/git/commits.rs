@@ -1,6 +1,7 @@
 //! Commits: the graph's log, one commit's details, searches, the commits a rebase rewrites, and
 //! how revisions relate.
 
+use std::collections::HashSet;
 use std::path::Path;
 
 use super::ChangedFile;
@@ -222,6 +223,8 @@ pub fn search(repo: &Path, from: Option<&[String]>, query: &str) -> Result<Vec<S
         return Ok(Vec::new());
     }
     let mut hashes: Vec<String> = Vec::new();
+    // A short query matches most of history: a linear check per hash would be quadratic.
+    let mut seen: HashSet<String> = HashSet::new();
     let base = ["log", NO_SIGNATURE, "--date-order", "-i", "--format=%H"];
     for filter in [format!("--grep={query}"), format!("--author={query}")] {
         let mut args = base.to_vec();
@@ -230,7 +233,7 @@ pub fn search(repo: &Path, from: Option<&[String]>, query: &str) -> Result<Vec<S
         push_revisions(&mut args, from);
         if let Ok(out) = run(Some(repo), &args) {
             for h in out.lines() {
-                if !hashes.iter().any(|x| x == h) {
+                if seen.insert(h.to_owned()) {
                     hashes.push(h.to_owned());
                 }
             }
