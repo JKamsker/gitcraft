@@ -119,17 +119,18 @@ pub(super) fn copy_selection(
     sel: Option<TextSel>,
     lines: &[DiffLine],
 ) {
-    let selected_text = sel.map(|s| s.text(lines)).filter(|s| !s.is_empty());
-    if let Some(text) = &selected_text {
-        let copy = !ui.ctx().egui_wants_keyboard_input()
-            && ui.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Copy)));
-        if copy {
-            ui.ctx().copy_text(text.clone());
-        }
+    // Put together only when asked for: a selection can span thousands of lines.
+    let selected_text = || sel.map(|s| s.text(lines)).filter(|s| !s.is_empty());
+    let copy = sel.is_some()
+        && !ui.ctx().egui_wants_keyboard_input()
+        && ui.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Copy)));
+    if copy && let Some(text) = selected_text() {
+        ui.ctx().copy_text(text);
     }
     egui::Popup::context_menu(drag)
         .style(crate::theme::menu_style)
         .show(|ui| {
+            let selected_text = selected_text();
             if ui
                 .add_enabled(selected_text.is_some(), egui::Button::new("Copy"))
                 .clicked()
