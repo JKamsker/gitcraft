@@ -35,6 +35,7 @@ impl RepoTab {
         // Changes seen on disk so far are read by this reload (or the one queued after the
         // current one): reloading for them again would read the same.
         self.fs_pending = None;
+        self.deferred = false;
         if self.loading {
             // What changed may have been read before it changed: read again once this is in.
             self.reload_again = true;

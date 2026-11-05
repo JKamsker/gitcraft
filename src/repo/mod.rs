@@ -84,6 +84,10 @@ pub struct RepoTab {
     tx: Sender<Msg>,
     rx: Receiver<Msg>,
 
+    /// When the tab was made: its opening screen shows only if the first read takes a while.
+    opened: Instant,
+    /// The first read waits to be started (see [`RepoTab::new_deferred`]).
+    deferred: bool,
     loading: bool,
     /// A reload was asked for while one was running, which may have read too early.
     reload_again: bool,
@@ -211,6 +215,14 @@ pub struct RepoTab {
 
 impl RepoTab {
     pub fn new(path: PathBuf, ctx: &egui::Context) -> Self {
+        let mut tab = Self::new_deferred(path, ctx);
+        tab.start_deferred(ctx);
+        tab
+    }
+
+    /// A tab whose first read waits until [`Self::start_deferred`] (or until it is shown): the
+    /// tabs restored on start read one after the other, the one shown first.
+    pub fn new_deferred(path: PathBuf, ctx: &egui::Context) -> Self {
         let name = path
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
@@ -221,6 +233,8 @@ impl RepoTab {
             name,
             tx,
             rx,
+            opened: Instant::now(),
+            deferred: true,
             loading: false,
             reload_again: false,
             load_error: None,
@@ -306,8 +320,19 @@ impl RepoTab {
             finished: Vec::new(),
         };
         tab.watch(ctx);
-        tab.reload(ctx);
         tab
+    }
+
+    /// Starts the first read of a tab made with [`Self::new_deferred`], if not started yet.
+    pub fn start_deferred(&mut self, ctx: &egui::Context) {
+        if std::mem::take(&mut self.deferred) {
+            self.reload(ctx);
+        }
+    }
+
+    /// Nothing read yet: the tab shows its opening screen.
+    pub fn opening(&self) -> bool {
+        self.history_gen == 0 && self.load_error.is_none()
     }
 
     pub fn is_busy(&self) -> bool {
