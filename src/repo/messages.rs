@@ -102,16 +102,17 @@ pub(super) fn spawn(
 impl RepoTab {
     /// Drains finished background work and file-system events.
     pub fn poll(&mut self, ctx: &egui::Context) {
-        while let Ok(msg) = self.rx.try_recv() {
-            self.handle(msg, ctx);
-        }
-
-        // Changes on disk, debounced.
+        // Changes on disk, debounced. Taken in before the finished work, so that a reload
+        // that work starts covers what it wrote itself (see `reload`).
         if let Some(rx) = &self.fs_rx {
             while let Ok(git_dir) = rx.try_recv() {
                 let was = self.fs_pending.map(|(g, _)| g).unwrap_or(false);
                 self.fs_pending = Some((was || git_dir, Instant::now()));
             }
+        }
+
+        while let Ok(msg) = self.rx.try_recv() {
+            self.handle(msg, ctx);
         }
         if let Some((git_dir, at)) = self.fs_pending
             && at.elapsed() > Duration::from_millis(400)
@@ -167,8 +168,15 @@ impl RepoTab {
             Msg::More(_, result) => self.more_loaded(result, ctx),
             Msg::Status(result) => match result {
                 Ok(work) => {
+                    let wip_row_changed = work.is_clean() != self.work.is_clean();
                     self.work = work;
-                    self.rebuild(ctx);
+                    if wip_row_changed {
+                        self.rebuild(ctx);
+                    } else {
+                        // The rows are the same: only what shows the working tree needs
+                        // refreshing, not the whole graph.
+                        self.refresh_work(ctx);
+                    }
                     if self.compare.as_ref().is_some_and(|c| c.target.is_none()) {
                         self.reload_compare(ctx);
                     }

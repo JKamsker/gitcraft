@@ -72,22 +72,29 @@ pub(super) fn linked_git_dirs(worktree: &Path) -> Option<(PathBuf, PathBuf)> {
 /// `Some(false)` re-reading the working tree, `None` nothing. `git_dirs`: git folders outside
 /// the worktree that are watched too.
 pub(super) fn fs_change(path: &Path, git_dirs: &[PathBuf]) -> Option<bool> {
-    // Refs, HEAD, the index and merge state matter; objects and logs don't.
+    // Refs, HEAD and merge state call for a full reload; the index only for the working tree
+    // (staging writes it, and so does any other tool's `git status`); objects and logs for
+    // nothing. FETCH_HEAD (every fetch, even one that brings nothing) and ORIG_HEAD (written
+    // along with HEAD) say nothing the refs don't.
     let relevant = |inside: &str| {
-        inside.starts_with("refs")
-            || inside == "HEAD"
-            || inside == "index"
-            || inside == "packed-refs"
-            || inside.ends_with("_HEAD")
-            || inside.starts_with("rebase-")
+        if inside == "index" {
+            Some(false)
+        } else {
+            (inside.starts_with("refs")
+                || inside == "HEAD"
+                || inside == "packed-refs"
+                || (inside.ends_with("_HEAD") && inside != "FETCH_HEAD" && inside != "ORIG_HEAD")
+                || inside.starts_with("rebase-"))
+            .then_some(true)
+        }
     };
     if let Some(inside) = git_dirs.iter().find_map(|d| path.strip_prefix(d).ok()) {
         let inside = inside.to_string_lossy().replace('\\', "/");
-        return relevant(&inside).then_some(true);
+        return relevant(&inside);
     }
     let s = path.to_string_lossy().replace('\\', "/");
     match s.split_once("/.git/") {
-        Some((_, inside)) => relevant(inside).then_some(true),
+        Some((_, inside)) => relevant(inside),
         None => Some(false),
     }
 }

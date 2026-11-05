@@ -100,9 +100,9 @@ fn a_linked_worktree_is_watched_where_git_keeps_its_data() {
     assert_eq!(Some(common.clone()), canonical);
     assert!(own.starts_with(&common) && own != common);
     let watched = [own.clone(), common.clone()];
-    // Its HEAD and index, the shared refs: reload; objects: nothing; its files: status.
+    // Its HEAD, the shared refs: reload; objects: nothing; its index and files: status.
     assert_eq!(fs_change(&own.join("HEAD"), &watched), Some(true));
-    assert_eq!(fs_change(&own.join("index"), &watched), Some(true));
+    assert_eq!(fs_change(&own.join("index"), &watched), Some(false));
     assert_eq!(
         fs_change(&common.join("refs/heads/side"), &watched),
         Some(true)
@@ -110,7 +110,10 @@ fn a_linked_worktree_is_watched_where_git_keeps_its_data() {
     assert_eq!(fs_change(&common.join("objects/ab/cd"), &watched), None);
     assert_eq!(fs_change(&linked.join("src/a.rs"), &watched), Some(false));
     // A main worktree as before.
-    assert_eq!(fs_change(Path::new("/r/.git/index"), &[]), Some(true));
+    assert_eq!(fs_change(Path::new("/r/.git/index"), &[]), Some(false));
+    assert_eq!(fs_change(Path::new("/r/.git/MERGE_HEAD"), &[]), Some(true));
+    assert_eq!(fs_change(Path::new("/r/.git/FETCH_HEAD"), &[]), None);
+    assert_eq!(fs_change(Path::new("/r/.git/ORIG_HEAD"), &[]), None);
     assert_eq!(fs_change(Path::new("/r/.git/objects/x"), &[]), None);
     assert_eq!(fs_change(Path::new("/r/a.rs"), &[]), Some(false));
 }

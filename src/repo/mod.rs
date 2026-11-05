@@ -44,6 +44,7 @@ pub(crate) mod worktree_tab;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::Instant;
 
@@ -89,7 +90,7 @@ pub struct RepoTab {
     load_error: Option<String>,
     refs: Refs,
     /// Commits as git listed them.
-    history: Vec<Commit>,
+    history: Vec<Arc<Commit>>,
     has_more: bool,
     loading_more: bool,
     /// The branches hidden from the graph or soloed in it.
@@ -100,7 +101,7 @@ pub struct RepoTab {
     history_gen: u64,
     work: WorkStatus,
     /// Rows of the graph: the WIP pseudo-commit (when the tree is dirty) followed by `history`.
-    commits: Vec<Commit>,
+    commits: Vec<Arc<Commit>>,
     graph: Graph,
     index: HashMap<String, usize>,
     worktrees: Vec<Worktree>,
