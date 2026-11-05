@@ -79,6 +79,38 @@ fn selected_text_follows_the_side_it_was_made_on() {
 }
 
 #[test]
+fn a_line_cut_to_be_shown_is_copied_whole() {
+    use crate::repo::highlight::{MAX_LINE_CHARS, cap_line};
+    let whole = format!("let x = \"{}\";", "y".repeat(MAX_LINE_CHARS));
+    let mut lines = parse(&format!("@@ -1,2 +1,2 @@\n a\n+{whole}\n"));
+    let uncut: std::collections::HashMap<usize, String> = lines
+        .iter_mut()
+        .enumerate()
+        .filter_map(|(i, l)| Some((i, cap_line(&mut l.text, None)?)))
+        .collect();
+    assert_eq!(uncut.get(&2), Some(&whole));
+    let shown = lines[2].text.chars().count();
+    let sel = |anchor, cursor| TextSel {
+        side: Side::Unified,
+        anchor,
+        cursor,
+    };
+    // Through the end of what is shown (the note included): the whole line.
+    assert_eq!(
+        sel((1, 0), (2, shown)).text(&lines, &uncut),
+        format!("a\n{whole}")
+    );
+    // From inside the note: from the cut on, to the end.
+    let rest: String = whole.chars().skip(MAX_LINE_CHARS).collect();
+    assert_eq!(
+        sel((2, MAX_LINE_CHARS + 3), (2, shown)).text(&lines, &uncut),
+        rest
+    );
+    // Within what is shown: just that.
+    assert_eq!(sel((2, 0), (2, 3)).text(&lines, &uncut), "let");
+}
+
+#[test]
 fn numbers_follow_hunk_headers() {
     let text = "diff --git a/f b/f\nindex 1..2 100644\n--- a/f\n+++ b/f\n@@ -3,3 +3,4 @@ fn x\n a\n-b\n+c\n+d\n e\n\\ No newline at end of file\n";
     let lines = parse(text);

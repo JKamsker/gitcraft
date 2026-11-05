@@ -6,6 +6,7 @@ use std::ops::Range;
 use egui::Ui;
 
 use super::{DiffLine, Kind};
+use crate::repo::highlight::MAX_LINE_CHARS;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Side {
@@ -71,9 +72,20 @@ impl TextSel {
             let Some(line) = lines.get(i).filter(|l| self.side.shows(l.kind)) else {
                 continue;
             };
-            let from = if i == start.0 { start.1 } else { 0 };
-            let to = if i == end.0 { end.1 } else { usize::MAX };
-            let text = uncut.get(&i).unwrap_or(&line.text);
+            let mut from = if i == start.0 { start.1 } else { 0 };
+            let mut to = if i == end.0 { end.1 } else { usize::MAX };
+            let text = match uncut.get(&i) {
+                // A line cut to be shown: the places are in what is shown, the cut part and
+                // then the note of what was left out, which stands for the rest of the line.
+                Some(whole) => {
+                    from = from.min(MAX_LINE_CHARS);
+                    if to > MAX_LINE_CHARS {
+                        to = usize::MAX;
+                    }
+                    whole
+                }
+                None => &line.text,
+            };
             out.push(
                 text.chars()
                     .skip(from)
