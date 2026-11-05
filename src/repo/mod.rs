@@ -188,9 +188,9 @@ pub struct RepoTab {
     terminal_error: Option<String>,
 
     watcher: Option<notify::RecommendedWatcher>,
-    fs_rx: Option<Receiver<bool>>,
+    fs_rx: Option<Receiver<watch::FsChange>>,
     /// A change on disk not yet reloaded: (inside .git, when).
-    fs_pending: Option<(bool, Instant)>,
+    fs_pending: Option<(watch::FsChange, Instant)>,
 
     /// Actions queued from outside (the command palette).
     queued: Vec<Action>,

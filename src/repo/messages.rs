@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use super::file_text::FileText;
 use super::load::Loaded;
+use super::watch::FsChange;
 use super::{CompareData, OpKind, Refresh, RepoTab, diff, file_view, ops, pr_review, quick_edit};
 use crate::forge::PullRequest;
 use crate::git::{self, Commit, CommitDetail, WorkStatus};
@@ -15,6 +16,9 @@ use crate::settings::Settings;
 /// Results coming back from background git calls.
 pub(super) enum Msg {
     Loaded(Result<Box<Loaded>, String>),
+    Submodules(Vec<git::Submodule>),
+    /// The worktree's watcher, set up in the background (`None` when it couldn't be).
+    Watcher(Option<Box<notify::RecommendedWatcher>>),
     /// A further page of history, read while `history_gen` was so: a reload since may have
     /// moved the commits it skipped, so then it no longer fits.
     More(u64, Result<Vec<Commit>, String>),
@@ -23,7 +27,7 @@ pub(super) enum Msg {
     /// The answer to the diff request numbered so (see [`DiffView::next_request`]).
     ///
     /// [`DiffView::next_request`]: super::DiffView::next_request
-    Diff(u64, Result<diff::DiffData, String>),
+    Diff(u64, Result<Box<diff::DiffData>, String>),
     /// The whole file of the diff, read along with the diff request numbered so.
     DiffFile(u64, Result<FileText, String>),
     FileHistory(String, Option<String>, Result<Vec<git::FileCommit>, String>),
@@ -116,9 +120,9 @@ impl RepoTab {
         // Changes on disk, debounced. Taken in before the finished work, so that a reload
         // that work starts covers what it wrote itself (see `reload`).
         if let Some(rx) = &self.fs_rx {
-            while let Ok(git_dir) = rx.try_recv() {
-                let was = self.fs_pending.map(|(g, _)| g).unwrap_or(false);
-                self.fs_pending = Some((was || git_dir, Instant::now()));
+            while let Ok(change) = rx.try_recv() {
+                let was = self.fs_pending.map(|(c, _)| c);
+                self.fs_pending = Some((was.max(Some(change)).unwrap_or(change), Instant::now()));
             }
         }
 
@@ -128,16 +132,19 @@ impl RepoTab {
         if !shown {
             return;
         }
-        if let Some((git_dir, at)) = self.fs_pending
+        if let Some((change, at)) = self.fs_pending
             && at.elapsed() > Duration::from_millis(400)
             && !self.loading
             && self.busy_op.is_none()
         {
             self.fs_pending = None;
-            if git_dir {
-                self.reload(ctx);
-            } else {
-                self.reload_status(ctx);
+            match change {
+                FsChange::Git => self.reload(ctx),
+                FsChange::Index => {
+                    self.reload_status(ctx);
+                    self.reload_submodules(ctx);
+                }
+                FsChange::Files => self.reload_status(ctx),
             }
         }
 
@@ -178,6 +185,8 @@ impl RepoTab {
     fn handle(&mut self, msg: Msg, ctx: &egui::Context) {
         match msg {
             Msg::Loaded(result) => self.loaded(result, ctx),
+            Msg::Submodules(list) => self.submodules = list,
+            Msg::Watcher(watcher) => self.watcher = watcher.map(|w| *w),
             Msg::More(generation, _) if generation != self.history_gen => {}
             Msg::More(_, result) => self.more_loaded(result, ctx),
             Msg::Status(result) => match result {
@@ -250,7 +259,7 @@ impl RepoTab {
             Msg::TreeFiles(hash, result) => self.all_files.arrived(&hash, result),
             Msg::Diff(request, result) => {
                 if let Some(view) = &mut self.diff {
-                    view.arrived(request, result);
+                    view.arrived(request, result.map(|data| *data));
                 }
             }
             Msg::DiffFile(request, result) => {

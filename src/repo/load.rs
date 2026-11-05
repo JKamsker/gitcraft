@@ -106,13 +106,17 @@ impl RepoTab {
     }
 
     pub(super) fn reload_status(&mut self, ctx: &egui::Context) {
-        // Working-tree changes seen so far are read by this; git data changes still need a
-        // full reload.
-        if self.fs_pending.is_some_and(|(git_dir, _)| !git_dir) {
-            self.fs_pending = None;
-        }
         let path = self.path.clone();
         spawn(&self.tx, ctx, move || Msg::Status(git::status(&path)));
+    }
+
+    /// Re-reads the submodules: the commits they should be at are in the index, which can
+    /// change without any ref moving (`git add` of a submodule, `git submodule add`).
+    pub(super) fn reload_submodules(&mut self, ctx: &egui::Context) {
+        let path = self.path.clone();
+        spawn(&self.tx, ctx, move || {
+            Msg::Submodules(git::submodules(&path).unwrap_or_default())
+        });
     }
 
     pub(super) fn load_more(&mut self, ctx: &egui::Context) {

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use super::commands::{local_name_of, refuse_option_like};
 use super::operations::{run_steps, stash_push_args};
 use super::toolbar::headline;
-use super::watch::{fs_change, linked_git_dirs};
+use super::watch::{FsChange, fs_change, linked_git_dirs};
 use super::{DiffKey, DiffView, OpKind, Undo, ops};
 use crate::git;
 
@@ -100,22 +100,44 @@ fn a_linked_worktree_is_watched_where_git_keeps_its_data() {
     assert_eq!(Some(common.clone()), canonical);
     assert!(own.starts_with(&common) && own != common);
     let watched = [own.clone(), common.clone()];
-    // Its HEAD, the shared refs: reload; objects: nothing; its index and files: status.
-    assert_eq!(fs_change(&own.join("HEAD"), &watched), Some(true));
-    assert_eq!(fs_change(&own.join("index"), &watched), Some(false));
+    // Its HEAD, the shared refs: reload; objects: nothing; its index: status and submodules;
+    // its files: status.
+    assert_eq!(fs_change(&own.join("HEAD"), &watched), Some(FsChange::Git));
+    assert_eq!(
+        fs_change(&own.join("index"), &watched),
+        Some(FsChange::Index)
+    );
     assert_eq!(
         fs_change(&common.join("refs/heads/side"), &watched),
-        Some(true)
+        Some(FsChange::Git)
     );
     assert_eq!(fs_change(&common.join("objects/ab/cd"), &watched), None);
-    assert_eq!(fs_change(&linked.join("src/a.rs"), &watched), Some(false));
+    assert_eq!(
+        fs_change(&linked.join("src/a.rs"), &watched),
+        Some(FsChange::Files)
+    );
     // A main worktree as before.
-    assert_eq!(fs_change(Path::new("/r/.git/index"), &[]), Some(false));
-    assert_eq!(fs_change(Path::new("/r/.git/MERGE_HEAD"), &[]), Some(true));
+    assert_eq!(
+        fs_change(Path::new("/r/.git/index"), &[]),
+        Some(FsChange::Index)
+    );
+    assert_eq!(
+        fs_change(Path::new("/r/.git/MERGE_HEAD"), &[]),
+        Some(FsChange::Git)
+    );
     assert_eq!(fs_change(Path::new("/r/.git/FETCH_HEAD"), &[]), None);
     assert_eq!(fs_change(Path::new("/r/.git/ORIG_HEAD"), &[]), None);
     assert_eq!(fs_change(Path::new("/r/.git/objects/x"), &[]), None);
-    assert_eq!(fs_change(Path::new("/r/a.rs"), &[]), Some(false));
+    assert_eq!(fs_change(Path::new("/r/a.rs"), &[]), Some(FsChange::Files));
+    assert_eq!(
+        fs_change(Path::new("/r/.gitmodules"), &[]),
+        Some(FsChange::Index)
+    );
+    // A repository made with `--ref-format=reftable`.
+    assert_eq!(
+        fs_change(Path::new("/r/.git/reftable/tables.list"), &[]),
+        Some(FsChange::Git)
+    );
 }
 
 #[test]
