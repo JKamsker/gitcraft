@@ -224,10 +224,36 @@ fn an_older_read_of_the_working_tree_does_not_replace_a_newer_one() {
         let _ = tab.tx.send(msg);
     }
     tab.poll(&ctx);
-    let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(tab.work.unstaged, vec![file("newer")]);
     assert_eq!(tab.submodules.len(), 1);
     assert_eq!(tab.submodules[0].path, "newer");
+
+    // A full reload started before them (read 1) comes in last: the working tree, and this
+    // worktree's count of changes, stay those of the newer status read.
+    let here = |changes| git::Worktree {
+        path: dir.clone(),
+        current: true,
+        changes: Some(changes),
+        ..Default::default()
+    };
+    let _ = tab.tx.send(Msg::Loaded(Ok(Box::new(super::load::Loaded {
+        refs: Default::default(),
+        history: Vec::new(),
+        work: git::WorkStatus::default(),
+        worktrees: vec![here(0)],
+        stashes: Vec::new(),
+        remotes: Vec::new(),
+        submodules: Vec::new(),
+        lfs: false,
+        identity: Default::default(),
+        requested: git::LOG_PAGE,
+        log_from: None,
+        read: 1,
+    }))));
+    tab.poll(&ctx);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(tab.work.unstaged, vec![file("newer")]);
+    assert_eq!(tab.worktrees, vec![here(1)]);
 }
 
 #[test]

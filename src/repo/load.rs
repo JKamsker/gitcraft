@@ -245,6 +245,11 @@ impl RepoTab {
             self.work = loaded.work;
         }
         self.worktrees = loaded.worktrees;
+        // This worktree's count is that of the working tree kept, which may be newer.
+        let changes = self.work.changed_files();
+        if let Some(here) = self.worktrees.iter_mut().find(|wt| wt.current) {
+            here.changes = Some(changes);
+        }
         self.take_visibility(loaded.log_from, ctx);
         // Stash numbers shift when one is pushed or dropped; follow the commit.
         let viewed = self
