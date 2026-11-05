@@ -160,3 +160,32 @@ fn history_read_in_pages_is_the_whole_log() -> Result<(), String> {
     assert_eq!(paged[20].refs, whole[20].refs);
     Ok(())
 }
+
+/// A `git log` that fails (a revision gone) says why, rather than looking like the end of
+/// history.
+#[test]
+fn history_read_in_pages_reports_failure() -> Result<(), String> {
+    let dir = std::env::temp_dir().join(format!("gitcraft-log-fail-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    run(Some(&dir), &["init", "-q"])?;
+    run(
+        Some(&dir),
+        &[
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-q",
+            "--allow-empty",
+            "-m",
+            "a",
+        ],
+    )?;
+    let gone = ["no-such-branch".to_owned()];
+    let result = LogStream::start(&dir, Some(&gone), 0).and_then(|mut s| s.next_page(10));
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(result.is_err());
+    Ok(())
+}

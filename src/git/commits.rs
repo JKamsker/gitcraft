@@ -150,12 +150,41 @@ impl LogStream {
                 .read_until(RS as u8, &mut record)
                 .map_err(|e| format!("could not read git log: {e}"))?;
             if read == 0 {
+                self.check_exit()?;
                 break;
             }
             let text = String::from_utf8_lossy(&record);
             page.extend(parse_record(text.trim_end_matches(RS)));
         }
         Ok(page)
+    }
+}
+
+impl LogStream {
+    /// At the end of the output: whether git ended well, and what it said when it didn't.
+    fn check_exit(&mut self) -> Result<(), String> {
+        use std::io::Read;
+        let status = self
+            .child
+            .wait()
+            .map_err(|e| format!("could not run git: {e}"))?;
+        if status.success() {
+            return Ok(());
+        }
+        let mut err = String::new();
+        if let Some(stderr) = self.child.stderr.as_mut() {
+            let _ = stderr.read_to_string(&mut err);
+        }
+        // A freshly initialised repository has no commits yet.
+        if err.contains("does not have any commits") {
+            return Ok(());
+        }
+        let err = err.trim();
+        Err(if err.is_empty() {
+            format!("git log failed ({status})")
+        } else {
+            err.to_owned()
+        })
     }
 }
 

@@ -54,7 +54,7 @@ pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Chi
     cmd.arg("-C").arg(dir).args(args);
     cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null());
+        .stderr(std::process::Stdio::piped());
     cmd.spawn().map_err(|e| format!("could not run git: {e}"))
 }
 
