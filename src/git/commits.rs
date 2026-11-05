@@ -122,35 +122,60 @@ fn parse_record(record: &str) -> Option<Commit> {
 /// fresh `log --skip=n` would walk the n commits skipped (with `--date-order`, all history)
 /// again for every page.
 pub struct LogStream {
+    /// `None` for no revisions at all, which have no history (as with [`log`]).
+    git: Option<RunningLog>,
+}
+
+struct RunningLog {
     child: std::process::Child,
     out: std::io::BufReader<std::process::ChildStdout>,
+    /// What git says on its error output, read as it comes (unread, a full pipe would stop
+    /// git, and with it the output read here).
+    err: Option<std::thread::JoinHandle<String>>,
 }
 
 impl LogStream {
     /// The commits of `from` (else every branch) after the first `skip`.
     pub fn start(repo: &Path, from: Option<&[String]>, skip: usize) -> Result<Self, String> {
+        // No revisions would make git log HEAD.
+        if from.is_some_and(|revs| revs.is_empty()) {
+            return Ok(Self { git: None });
+        }
         let mut child = super::command::spawn_piped(repo, &log_args(from, skip, None).as_args())?;
         let out = child
             .stdout
             .take()
             .map(std::io::BufReader::new)
             .ok_or("could not read git log")?;
-        Ok(Self { child, out })
+        let err = child.stderr.take().map(|mut stderr| {
+            std::thread::spawn(move || {
+                use std::io::Read;
+                let mut text = String::new();
+                let _ = stderr.read_to_string(&mut text);
+                text
+            })
+        });
+        Ok(Self {
+            git: Some(RunningLog { child, out, err }),
+        })
     }
 
     /// The next `n` commits; fewer at the end of history.
     pub fn next_page(&mut self, n: usize) -> Result<Vec<Commit>, String> {
         use std::io::BufRead;
+        let Some(git) = &mut self.git else {
+            return Ok(Vec::new());
+        };
         let mut page = Vec::with_capacity(n);
         let mut record = Vec::new();
         while page.len() < n {
             record.clear();
-            let read = self
+            let read = git
                 .out
                 .read_until(RS as u8, &mut record)
                 .map_err(|e| format!("could not read git log: {e}"))?;
             if read == 0 {
-                self.check_exit()?;
+                git.check_exit()?;
                 break;
             }
             let text = String::from_utf8_lossy(&record);
@@ -160,23 +185,20 @@ impl LogStream {
     }
 }
 
-impl LogStream {
+impl RunningLog {
     /// At the end of the output: whether git ended well, and what it said when it didn't.
     fn check_exit(&mut self) -> Result<(), String> {
-        use std::io::Read;
         let status = self
             .child
             .wait()
             .map_err(|e| format!("could not run git: {e}"))?;
-        if status.success() {
-            return Ok(());
-        }
-        let mut err = String::new();
-        if let Some(stderr) = self.child.stderr.as_mut() {
-            let _ = stderr.read_to_string(&mut err);
-        }
+        let err = self
+            .err
+            .take()
+            .and_then(|reader| reader.join().ok())
+            .unwrap_or_default();
         // A freshly initialised repository has no commits yet.
-        if err.contains("does not have any commits") {
+        if status.success() || err.contains("does not have any commits") {
             return Ok(());
         }
         let err = err.trim();
@@ -188,9 +210,10 @@ impl LogStream {
     }
 }
 
-impl Drop for LogStream {
+impl Drop for RunningLog {
     fn drop(&mut self) {
-        // Not needed any more (history reloaded, the tab closed): don't leave it waiting.
+        // Not needed any more (history reloaded, the tab closed): don't leave it waiting. Its
+        // error output then ends, and with it the thread reading that.
         let _ = self.child.kill();
         let _ = self.child.wait();
     }

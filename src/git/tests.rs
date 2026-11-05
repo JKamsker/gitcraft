@@ -151,7 +151,10 @@ fn history_read_in_pages_is_the_whole_log() -> Result<(), String> {
             break;
         }
     }
+    // No revisions have no history, as with `log` (git alone would log HEAD).
+    let none = LogStream::start(&dir, Some(&[]), 0)?.next_page(7)?;
     let _ = std::fs::remove_dir_all(&dir);
+    assert!(none.is_empty());
     let hashes = |c: &[Commit]| c.iter().map(|c| c.hash.clone()).collect::<Vec<_>>();
     assert_eq!(whole.len(), 23);
     assert_eq!(hashes(&paged), hashes(&whole));
