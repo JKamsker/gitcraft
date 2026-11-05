@@ -168,6 +168,16 @@ pub(super) fn files<'a, T>(
 ) {
     if !Settings::get(ui.ctx()).files_as_tree {
         // A commit can change tens of thousands of files: only the rows in sight are drawn.
+        // While a menu is open (perhaps one of a row out of sight, which must go on being
+        // shown), row by row.
+        if egui::Popup::is_any_open(ui.ctx()) {
+            for f in files {
+                if !skip_unseen(ui, widgets::ROW_H) {
+                    row(ui, None, f);
+                }
+            }
+            return;
+        }
         let pitch = widgets::ROW_H + ui.spacing().item_spacing.y;
         let top = ui.cursor().top();
         let clip = ui.clip_rect();
@@ -264,10 +274,14 @@ pub(super) fn show<'a, T>(
 }
 
 /// Moves past a row `h` tall instead of drawing it, when it would be out of sight. The rows
-/// after it keep the ids they would have had.
+/// after it keep the ids they would have had. A row whose menu is open is drawn anyway: a
+/// menu not shown for a frame closes.
 pub(super) fn skip_unseen(ui: &mut Ui, h: f32) -> bool {
     let rect = Rect::from_min_size(ui.cursor().min, vec2(ui.available_width(), h));
-    if ui.is_rect_visible(rect) {
+    // The row's response would get the next id, and its menu that id's (see
+    // `egui::Popup::default_response_id`).
+    let menu = ui.next_auto_id().with("popup");
+    if ui.is_rect_visible(rect) || egui::Popup::is_id_open(ui.ctx(), menu) {
         return false;
     }
     ui.add_space(h + ui.spacing().item_spacing.y);

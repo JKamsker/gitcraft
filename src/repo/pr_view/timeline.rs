@@ -41,19 +41,27 @@ pub(super) fn timeline(
         );
         return;
     }
+    // With a screen reader on, every card is drawn: one stepped over would be missing from
+    // what it reads. (Asking for the accessibility node of this `Ui`, which exists already,
+    // answers whether accessibility is on without adding anything.)
+    let reader = ui.ctx().accesskit_node_builder(ui.id(), |_| ()).is_some();
     for (i, (entry, body)) in d.timeline.iter().zip(bodies).enumerate() {
         // A long discussion is hundreds of cards of formatted text: one out of sight is only
         // stepped over, by its height when last drawn (at this width, with this text, with or
-        // without the changed files' button). Each card has ids of its own, so stepping over
+        // without the changed files' button, with or without the box to dismiss it). Each card has ids of its own, so stepping over
         // one changes nothing in the others. A margin around the view keeps a card that has
         // grown a little since from being stepped over while it shows.
         let height_id = ui.id().with(("pr-card-height", i));
-        let fits = (width, entry.body.len(), files.is_some());
+        let dismissing = entry.review_id.is_some() && entry.review_id == draft.dismissing;
+        let fits = (width, entry.body.len(), files.is_some(), dismissing);
         let known = ui
-            .data(|data| data.get_temp::<((f32, usize, bool), f32)>(height_id))
+            .data(|data| data.get_temp::<((f32, usize, bool, bool), f32)>(height_id))
             .filter(|(measured, _)| *measured == fits)
             .map(|(_, h)| h);
         let unseen = known.filter(|&h| {
+            if reader {
+                return false;
+            }
             let card = egui::Rect::from_min_size(ui.cursor().min, vec2(width, h));
             !ui.clip_rect().expand(CARD_MARGIN).intersects(card)
         });
