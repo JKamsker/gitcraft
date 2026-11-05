@@ -67,10 +67,10 @@ fn selected_text_follows_the_side_it_was_made_on() {
     };
     // Dragged backwards, from "let x" in the removal to the end of "a".
     let unified = sel(Side::Unified, (2, 5), (1, 1));
-    assert_eq!(unified.text(&lines), "\nlet x");
+    assert_eq!(unified.text(&lines, &Default::default()), "\nlet x");
     // On the new side the removals are not there.
     let new = sel(Side::New, (1, 0), (5, 1));
-    assert_eq!(new.text(&lines), "a\nlet x = 2;\nb");
+    assert_eq!(new.text(&lines, &Default::default()), "a\nlet x = 2;\nb");
     assert_eq!(new.chars_of(4, Side::New), Some(0..usize::MAX));
     assert_eq!(new.chars_of(4, Side::Old), None);
     assert_eq!(new.chars_of(5, Side::New), Some(0..1));

@@ -191,7 +191,7 @@ impl<'a> Rows<'a> {
         if self.text_hover || text_drag.dragged() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::Text);
         }
-        copy_selection(ui, &text_drag, sel, &data.lines);
+        copy_selection(ui, &text_drag, sel, &data.lines, &data.uncut);
         sel
     }
 

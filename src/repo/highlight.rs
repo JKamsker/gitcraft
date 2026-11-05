@@ -91,13 +91,13 @@ pub fn highlight<'a>(
 /// every frame it is in sight, and a minified file can be a single line of megabytes.
 pub(crate) const MAX_LINE_CHARS: usize = 5000;
 
-/// Cuts a line shown (and its colours) to [`MAX_LINE_CHARS`], saying how much was left out.
-/// Only what is shown: patches are made from the line as git printed it.
-pub(crate) fn cap_line(text: &mut String, spans: Option<&mut Spans>) {
-    let Some((cut, _)) = text.char_indices().nth(MAX_LINE_CHARS) else {
-        return;
-    };
+/// Cuts a line shown (and its colours) to [`MAX_LINE_CHARS`], saying how much was left out;
+/// returns the line as it was when it was cut. Only what is shown: patches are made from the
+/// line as git printed it.
+pub(crate) fn cap_line(text: &mut String, spans: Option<&mut Spans>) -> Option<String> {
+    let (cut, _) = text.char_indices().nth(MAX_LINE_CHARS)?;
     let note = format!(" … {} more characters", text[cut..].chars().count());
+    let whole = text.clone();
     text.truncate(cut);
     if let Some(spans) = spans {
         let mut left = MAX_LINE_CHARS;
@@ -117,6 +117,7 @@ pub(crate) fn cap_line(text: &mut String, spans: Option<&mut Spans>) {
         spans.push((Color32::GRAY, note.clone()));
     }
     text.push_str(&note);
+    Some(whole)
 }
 
 #[cfg(test)]
@@ -127,7 +128,7 @@ mod tests {
     fn long_lines_are_cut_with_their_colours() {
         let red = Color32::RED;
         let mut short = "abc".to_owned();
-        cap_line(&mut short, None);
+        assert_eq!(cap_line(&mut short, None), None);
         assert_eq!(short, "abc");
 
         let mut text = "é".repeat(MAX_LINE_CHARS + 7);
@@ -136,7 +137,8 @@ mod tests {
             (red, "é".repeat(5)),
             (red, "é".repeat(3)),
         ];
-        cap_line(&mut text, Some(&mut spans));
+        let whole = text.clone();
+        assert_eq!(cap_line(&mut text, Some(&mut spans)), Some(whole));
         assert_eq!(
             text,
             format!("{} … 7 more characters", "é".repeat(MAX_LINE_CHARS))

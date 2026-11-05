@@ -1,5 +1,6 @@
 //! Selecting text in a diff by dragging over it, on one side, and copying it.
 
+use std::collections::HashMap;
 use std::ops::Range;
 
 use egui::Ui;
@@ -61,8 +62,9 @@ impl TextSel {
         (from < to).then_some(from..to)
     }
 
-    /// The selected text, one line of the side per line.
-    pub(super) fn text(&self, lines: &[DiffLine]) -> String {
+    /// The selected text, one line of the side per line; a line cut to be shown is copied
+    /// whole from `uncut` (by line).
+    pub(super) fn text(&self, lines: &[DiffLine], uncut: &HashMap<usize, String>) -> String {
         let (start, end) = self.ordered();
         let mut out: Vec<String> = Vec::new();
         for i in start.0..=end.0 {
@@ -71,9 +73,9 @@ impl TextSel {
             };
             let from = if i == start.0 { start.1 } else { 0 };
             let to = if i == end.0 { end.1 } else { usize::MAX };
+            let text = uncut.get(&i).unwrap_or(&line.text);
             out.push(
-                line.text
-                    .chars()
+                text.chars()
                     .skip(from)
                     .take(to.saturating_sub(from))
                     .collect(),
@@ -118,9 +120,10 @@ pub(super) fn copy_selection(
     drag: &egui::Response,
     sel: Option<TextSel>,
     lines: &[DiffLine],
+    uncut: &HashMap<usize, String>,
 ) {
     // Put together only when asked for: a selection can span thousands of lines.
-    let selected_text = || sel.map(|s| s.text(lines)).filter(|s| !s.is_empty());
+    let selected_text = || sel.map(|s| s.text(lines, uncut)).filter(|s| !s.is_empty());
     let copy = sel.is_some()
         && !ui.ctx().egui_wants_keyboard_input()
         && ui.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Copy)));

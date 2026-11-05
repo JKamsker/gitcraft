@@ -77,6 +77,8 @@ pub struct DiffData {
     pub partial: bool,
     /// Characters in the longest line, for the width to scroll (counted once, not every frame).
     longest: usize,
+    /// The lines cut to be shown, as they were: what copying them copies.
+    pub(super) uncut: std::collections::HashMap<usize, String>,
     /// The runs of changed rows and the changes they make, unified and side by side: worked
     /// out the first time they are needed, not every frame.
     map: [std::sync::OnceLock<(map::ChangeRuns, Vec<std::ops::Range<usize>>)>; 2],
@@ -155,8 +157,11 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
     let mut spans = highlight_sides(&path, &lines, dark);
     let (mut changed, split) = pair_lines(&lines);
     let mut lines = lines;
-    for (line, spans) in lines.iter_mut().zip(spans.iter_mut()) {
-        cap_line(&mut line.text, spans.as_mut());
+    let mut uncut = std::collections::HashMap::new();
+    for (i, (line, spans)) in lines.iter_mut().zip(spans.iter_mut()).enumerate() {
+        if let Some(whole) = cap_line(&mut line.text, spans.as_mut()) {
+            uncut.insert(i, whole);
+        }
     }
     for range in changed.iter_mut().flatten() {
         *range = (range.0.min(MAX_LINE_CHARS), range.1.min(MAX_LINE_CHARS));
@@ -176,6 +181,7 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         header,
         partial,
         longest,
+        uncut,
         map: Default::default(),
     })
 }

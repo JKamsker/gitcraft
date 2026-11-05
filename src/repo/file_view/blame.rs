@@ -33,7 +33,7 @@ pub(crate) fn load_blame(
     let mut lines = git::blame(repo, rev, path)?;
     let mut spans = highlight::highlight(path, lines.iter().map(|l| l.text.as_str()), dark);
     for (i, line) in lines.iter_mut().enumerate() {
-        highlight::cap_line(&mut line.text, spans.as_mut().and_then(|s| s.get_mut(i)));
+        let _ = highlight::cap_line(&mut line.text, spans.as_mut().and_then(|s| s.get_mut(i)));
     }
     let times = lines.iter().filter(|l| !l.uncommitted()).map(|l| l.time);
     let span = (times.clone().min().unwrap_or(0), times.max().unwrap_or(0));
