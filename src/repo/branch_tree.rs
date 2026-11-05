@@ -148,7 +148,8 @@ impl TreeView {
             indent,
             start_open: false,
             left: 34.0,
-            leaf_h: None,
+            // A filter opens every folder with a match: thousands of rows.
+            leaf_h: Some(ROW_H),
         }
     }
 }
@@ -264,7 +265,7 @@ pub(super) fn show<'a, T>(
 
 /// Moves past a row `h` tall instead of drawing it, when it would be out of sight. The rows
 /// after it keep the ids they would have had.
-fn skip_unseen(ui: &mut Ui, h: f32) -> bool {
+pub(super) fn skip_unseen(ui: &mut Ui, h: f32) -> bool {
     let rect = Rect::from_min_size(ui.cursor().min, vec2(ui.available_width(), h));
     if ui.is_rect_visible(rect) {
         return false;
