@@ -97,6 +97,26 @@ pub(super) enum FsChange {
     Git,
 }
 
+/// What a tab reads again for a change on disk.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Reread {
+    /// Everything (a full reload).
+    All,
+    Status,
+    Submodules,
+}
+
+impl FsChange {
+    /// What to read again for this change.
+    pub(super) fn rereads(self) -> &'static [Reread] {
+        match self {
+            FsChange::Git => &[Reread::All],
+            FsChange::Index => &[Reread::Status, Reread::Submodules],
+            FsChange::Files => &[Reread::Status],
+        }
+    }
+}
+
 /// What a change on disk at `path` calls for (`None`: nothing). `git_dirs`: git folders
 /// outside the worktree that are watched too.
 pub(super) fn fs_change(path: &Path, git_dirs: &[PathBuf]) -> Option<FsChange> {

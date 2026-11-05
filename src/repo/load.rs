@@ -26,6 +26,8 @@ pub(super) struct Loaded {
     pub(super) requested: usize,
     /// What `history` was logged from.
     pub(super) log_from: Option<Vec<String>>,
+    /// Which read this is (see `RepoTab::reads`).
+    pub(super) read: u64,
 }
 
 impl RepoTab {
@@ -42,6 +44,7 @@ impl RepoTab {
             return;
         }
         self.loading = true;
+        let read = self.next_read();
         let path = self.path.clone();
         // Keep the pages already loaded.
         let count = self.history.len().clamp(git::LOG_PAGE, MAX_HISTORY);
@@ -101,22 +104,65 @@ impl RepoTab {
                     identity,
                     requested: count,
                     log_from,
+                    read,
                 }))
             })())
         });
     }
 
     pub(super) fn reload_status(&mut self, ctx: &egui::Context) {
+        let read = self.next_read();
         let path = self.path.clone();
-        spawn(&self.tx, ctx, move || Msg::Status(git::status(&path)));
+        spawn(&self.tx, ctx, move || Msg::Status(read, git::status(&path)));
+    }
+
+    /// The watcher is there now. What changed while it was being set up (it walks the whole
+    /// worktree, which takes a while) made no event: whatever was read before may have missed
+    /// it. Not for a first read yet to start (it reads after this), nor for a parked view
+    /// (it reloads when shown).
+    pub(super) fn watcher_arrived(&mut self, ctx: &egui::Context) {
+        if self.deferred || !self.shown {
+            return;
+        }
+        if self.loading {
+            self.recheck_after_load = true;
+        } else {
+            self.recheck(ctx);
+        }
+    }
+
+    /// Reads the working tree and submodules again, and the refs to see whether anything
+    /// moved: rather than a whole reload, which on a large repository is far longer.
+    fn recheck(&mut self, ctx: &egui::Context) {
+        self.reload_status(ctx);
+        self.reload_submodules(ctx);
+        let path = self.path.clone();
+        spawn(&self.tx, ctx, move || Msg::RefsCheck(git::refs(&path)));
+    }
+
+    /// The number of a read starting now.
+    fn next_read(&mut self) -> u64 {
+        self.reads += 1;
+        self.reads
+    }
+
+    /// Whether an answer of `read` is newer than what is shown from the read `shown`; if so,
+    /// it becomes what is shown.
+    pub(super) fn newer(read: u64, shown: &mut u64) -> bool {
+        let newer = read > *shown;
+        if newer {
+            *shown = read;
+        }
+        newer
     }
 
     /// Re-reads the submodules: the commits they should be at are in the index, which can
     /// change without any ref moving (`git add` of a submodule, `git submodule add`).
     pub(super) fn reload_submodules(&mut self, ctx: &egui::Context) {
+        let read = self.next_read();
         let path = self.path.clone();
         spawn(&self.tx, ctx, move || {
-            Msg::Submodules(git::submodules(&path).unwrap_or_default())
+            Msg::Submodules(read, git::submodules(&path).unwrap_or_default())
         });
     }
 
@@ -177,6 +223,8 @@ impl RepoTab {
         }
         if std::mem::take(&mut self.reload_again) {
             self.reload(ctx);
+        } else if std::mem::take(&mut self.recheck_after_load) {
+            self.recheck(ctx);
         }
     }
 
@@ -192,7 +240,10 @@ impl RepoTab {
         self.refs = loaded.refs;
         self.has_more = loaded.history.len() >= loaded.requested;
         self.history = loaded.history;
-        self.work = loaded.work;
+        // A status read since this reload started is newer.
+        if Self::newer(loaded.read, &mut self.work_read) {
+            self.work = loaded.work;
+        }
         self.worktrees = loaded.worktrees;
         self.take_visibility(loaded.log_from, ctx);
         // Stash numbers shift when one is pushed or dropped; follow the commit.
@@ -203,7 +254,9 @@ impl RepoTab {
         self.stashes = loaded.stashes;
         self.stash_view = viewed.and_then(|h| self.stashes.iter().position(|s| s.hash == h));
         self.identity = loaded.identity;
-        self.submodules = loaded.submodules;
+        if Self::newer(loaded.read, &mut self.submodules_read) {
+            self.submodules = loaded.submodules;
+        }
         self.lfs = loaded.lfs;
         let forge = forge::detect(&loaded.remotes);
         self.remotes = loaded.remotes;

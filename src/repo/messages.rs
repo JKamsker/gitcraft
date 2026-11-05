@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use super::file_text::FileText;
 use super::load::Loaded;
-use super::watch::FsChange;
+use super::watch::Reread;
 use super::{CompareData, OpKind, Refresh, RepoTab, diff, file_view, ops, pr_review, quick_edit};
 use crate::forge::PullRequest;
 use crate::git::{self, Commit, CommitDetail, WorkStatus};
@@ -16,13 +16,17 @@ use crate::settings::Settings;
 /// Results coming back from background git calls.
 pub(super) enum Msg {
     Loaded(Result<Box<Loaded>, String>),
-    Submodules(Vec<git::Submodule>),
+    /// The submodules, from the read numbered so (see `RepoTab::reads`).
+    Submodules(u64, Vec<git::Submodule>),
+    /// The refs as they are now, to compare with those read (see `RepoTab::recheck`).
+    RefsCheck(Result<git::Refs, String>),
     /// The worktree's watcher, set up in the background (`None` when it couldn't be).
     Watcher(Option<Box<notify::RecommendedWatcher>>),
     /// A further page of history, read while `history_gen` was so: a reload since may have
     /// moved the commits it skipped, so then it no longer fits.
     More(u64, Result<Vec<Commit>, String>),
-    Status(Result<WorkStatus, String>),
+    /// The working tree, from the read numbered so (see `RepoTab::reads`).
+    Status(u64, Result<WorkStatus, String>),
     Detail(String, Result<CommitDetail, String>),
     /// The answer to the diff request numbered so (see [`DiffView::next_request`]).
     ///
@@ -117,6 +121,7 @@ impl RepoTab {
     }
 
     fn poll_as(&mut self, ctx: &egui::Context, shown: bool) {
+        self.shown = shown;
         // Changes on disk, debounced. Taken in before the finished work, so that a reload
         // that work starts covers what it wrote itself (see `reload`).
         if let Some(rx) = &self.fs_rx {
@@ -138,13 +143,12 @@ impl RepoTab {
             && self.busy_op.is_none()
         {
             self.fs_pending = None;
-            match change {
-                FsChange::Git => self.reload(ctx),
-                FsChange::Index => {
-                    self.reload_status(ctx);
-                    self.reload_submodules(ctx);
+            for reread in change.rereads() {
+                match reread {
+                    Reread::All => self.reload(ctx),
+                    Reread::Status => self.reload_status(ctx),
+                    Reread::Submodules => self.reload_submodules(ctx),
                 }
-                FsChange::Files => self.reload_status(ctx),
             }
         }
 
@@ -185,12 +189,28 @@ impl RepoTab {
     fn handle(&mut self, msg: Msg, ctx: &egui::Context) {
         match msg {
             Msg::Loaded(result) => self.loaded(result, ctx),
-            Msg::Submodules(list) => self.submodules = list,
-            Msg::Watcher(watcher) => self.watcher = watcher.map(|w| *w),
+            Msg::Submodules(read, list) => {
+                if Self::newer(read, &mut self.submodules_read) {
+                    self.submodules = list;
+                }
+            }
+            Msg::Watcher(watcher) => {
+                self.watcher = watcher.map(|w| *w);
+                self.watcher_arrived(ctx);
+            }
+            Msg::RefsCheck(refs) => {
+                // Moved before the watcher could see it.
+                if refs.is_ok_and(|refs| refs != self.refs) {
+                    self.reload(ctx);
+                }
+            }
             Msg::More(generation, _) if generation != self.history_gen => {}
             Msg::More(_, result) => self.more_loaded(result, ctx),
-            Msg::Status(result) => match result {
+            // Older than the working tree shown (a reload started since came in first).
+            Msg::Status(read, _) if read <= self.work_read => {}
+            Msg::Status(read, result) => match result {
                 Ok(work) => {
+                    self.work_read = read;
                     let wip_row_changed = work.is_clean() != self.work.is_clean();
                     self.work = work;
                     if wip_row_changed {

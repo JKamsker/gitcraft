@@ -88,6 +88,18 @@ pub struct RepoTab {
     opened: Instant,
     /// The first read waits to be started (see [`RepoTab::new_deferred`]).
     deferred: bool,
+    /// Numbers the reads of the repository, in the order they start: an answer that arrives
+    /// after a later read's doesn't put back what that one replaced.
+    reads: u64,
+    /// The read the working tree shown comes from.
+    work_read: u64,
+    /// The read the submodules shown come from.
+    submodules_read: u64,
+    /// The watcher came while the first read ran, which may have missed changes made before
+    /// the watcher was there: check again once it is in.
+    recheck_after_load: bool,
+    /// Polled as the view shown (not a parked worktree view).
+    shown: bool,
     loading: bool,
     /// A reload was asked for while one was running, which may have read too early.
     reload_again: bool,
@@ -235,6 +247,11 @@ impl RepoTab {
             rx,
             opened: Instant::now(),
             deferred: true,
+            reads: 0,
+            work_read: 0,
+            submodules_read: 0,
+            recheck_after_load: false,
+            shown: true,
             loading: false,
             reload_again: false,
             load_error: None,
