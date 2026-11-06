@@ -34,6 +34,7 @@ impl RepoTab {
                     );
                 amend_started =
                     amend.changed() && self.amend && self.commit_summary.trim().is_empty();
+                self.dco.toggle(ui, !rebasing, acts);
             });
         });
         if amend_started {

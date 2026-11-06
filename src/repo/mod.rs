@@ -10,6 +10,7 @@ mod ci_view;
 pub(crate) mod columns;
 mod commands;
 mod conflict;
+mod dco;
 mod detail;
 mod dialogs;
 mod diff;
@@ -137,6 +138,8 @@ pub struct RepoTab {
     prs_loaded: Option<Instant>,
     /// The build status of the commits that show one.
     ci: ci_status::CiStatuses,
+    /// Whether commits are signed off (DCO), and the sign-offs of the pull request shown.
+    dco: dco::Dco,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -299,6 +302,7 @@ impl RepoTab {
             pr_error: None,
             prs_loaded: None,
             ci: ci_status::CiStatuses::default(),
+            dco: dco::Dco::default(),
             selected: None,
             stash_view: None,
             scroll_to: None,
