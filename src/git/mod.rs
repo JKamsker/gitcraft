@@ -9,6 +9,9 @@ mod lfs;
 mod refs;
 mod status;
 mod submodule;
+mod unity;
+#[cfg(test)]
+pub(crate) use self::unity::tests as unity_tests;
 mod worktree;
 
 pub use self::command::*;
@@ -19,6 +22,7 @@ pub use self::lfs::*;
 pub use self::refs::*;
 pub use self::status::*;
 pub use self::submodule::*;
+pub use self::unity::*;
 pub use self::worktree::*;
 
 use std::path::{Path, PathBuf};
