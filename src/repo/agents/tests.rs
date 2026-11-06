@@ -106,6 +106,7 @@ fn starting_a_task_makes_its_worktree_lists_it_and_hands_its_tab_the_agent() {
         worktree: PathBuf::new(),
         recipe: Recipe::default(),
         agent: None,
+        run: None,
     });
     assert_eq!(launch.recipe.copy, [".env.local"]);
     assert_eq!(

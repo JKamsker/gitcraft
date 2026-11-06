@@ -75,6 +75,7 @@ impl RepoTab {
                         worktree: self.path.clone(),
                         recipe,
                         agent: None,
+                        run: None,
                     },
                     ctx,
                 );
@@ -86,6 +87,7 @@ impl RepoTab {
                     worktree: PathBuf::from(&task.path),
                     recipe: Recipe::default(),
                     agent: Some(task.agent),
+                    run: None,
                 };
                 if crate::remote::same_dir(&launch.worktree, &self.path) {
                     self.start_launch(launch, ctx);
@@ -234,6 +236,7 @@ impl RepoTab {
                     worktree: made.worktree,
                     recipe,
                     agent,
+                    run: None,
                 };
                 if opened {
                     PendingLaunches::queue(launch);

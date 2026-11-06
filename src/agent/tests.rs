@@ -69,6 +69,7 @@ impl Fixture {
             worktree: self.worktree.clone(),
             recipe,
             agent: agent.map(str::to_owned),
+            run: None,
         }
     }
 }
@@ -236,6 +237,7 @@ fn a_repository_elsewhere_gets_its_script_in_words_every_shell_reads() -> Result
         worktree: PathBuf::from("ssh://build/home/me/wt x"),
         recipe: Recipe::default(),
         agent: Some("claude 'it'\\''s'".to_owned()),
+        run: None,
     };
     let shell = crate::terminal::ShellSpec {
         label: "sh".to_owned(),
@@ -298,6 +300,7 @@ fn a_pending_launch_waits_for_its_own_worktree() {
         worktree: path.clone(),
         recipe: Recipe::default(),
         agent: None,
+        run: None,
     });
     assert!(PendingLaunches::take(Path::new("ssh://h/home/me/other")).is_none());
     assert!(PendingLaunches::take(Path::new("ssh://h/home/me/pending-test-wt/")).is_some());
