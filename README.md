@@ -104,6 +104,14 @@ so your config, credentials and hooks apply as usual.
 - Interactive rebase: the commits to rewrite, newest on top; pick, reword (edit the message in
   place), squash, fix up or drop each one, move them up and down, then _Start rebase_. Ctrl+Z
   undoes it.
+- Bisect: _Start bisect here…_ in a commit's menu (or the palette) marks it good (HEAD is then
+  the bad end) or bad, and checks out commits between the two for you to test. A banner over
+  the graph names the commit to test and about how many steps are left, with _Good_, _Bad_,
+  _Skip_ and _Stop_; the graph tints good, bad and skipped commits. _Run a command…_ has `git
+  bisect run` test each commit on the repository's machine, its output streamed under the
+  banner and stoppable. At the end the first bad commit is selected and _Finish_ checks out
+  again the branch you were on. A bisect started in a terminal is picked up and goes on from
+  the banner. Refused while there are uncommitted changes or a merge or rebase in progress.
 - Quick edits from a commit's menu, for commits of the checked-out branch: _Edit commit
   message_, _Drop commit_, _Move commit up_ / _down_, each a rebase without the editor and undone
   with Ctrl+Z. What can't be done (a merge, merges after the commit) is greyed out with why.

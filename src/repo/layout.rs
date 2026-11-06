@@ -41,6 +41,16 @@ impl RepoTab {
                 .frame(egui::Frame::new().fill(t.card))
                 .show(ui, |ui| self.terminal_panel(ui, &mut acts));
         }
+        if self.bisect.shows() {
+            egui::Panel::top("repo_bisect")
+                .frame(
+                    egui::Frame::new()
+                        .fill(t.chrome)
+                        .inner_margin(egui::Margin::symmetric(10, 6))
+                        .stroke(egui::Stroke::new(1.0, t.separator)),
+                )
+                .show(ui, |ui| self.bisect_banner(ui, &mut acts));
+        }
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(t.dock))
             .show(ui, |ui| {
