@@ -35,7 +35,10 @@ impl App {
 /// another program's window in front (Windows, some Linux desktops), its taskbar button
 /// flashes or its dock icon bounces until it is clicked.
 fn come_to_front(ctx: &egui::Context) {
-    if ctx.input(|i| i.viewport().minimized == Some(true)) {
+    // On macOS egui never learns that the window went to the Dock (only on start), and asking
+    // to restore one that isn't minimized changes nothing there; elsewhere it would also undo
+    // a maximized window, so it is asked only when known minimized.
+    if cfg!(target_os = "macos") || ctx.input(|i| i.viewport().minimized == Some(true)) {
         ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
     }
     ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
