@@ -248,6 +248,7 @@ impl App {
         self.workspaces_view.look_unasked(&all);
 
         let mut request = None;
+        let mut open_my_work = false;
         ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
             ui.horizontal(|ui| {
                 ui.label(
@@ -263,6 +264,15 @@ impl App {
                             error: None,
                             focus: true,
                         });
+                    }
+                    let find = ui
+                        .link(RichText::new("Where's my work?").small())
+                        .on_hover_text(
+                            "Commits not pushed, stashes and changes in every repository \
+                             gitcraft knows",
+                        );
+                    if find.clicked() {
+                        open_my_work = true;
                     }
                 });
             });
@@ -293,6 +303,9 @@ impl App {
         });
         if let Some(r) = request {
             self.workspace_request(r, &ctx);
+        }
+        if open_my_work {
+            self.open_my_work(&ctx);
         }
     }
 
