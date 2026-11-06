@@ -98,8 +98,8 @@ impl RepoTab {
     }
 
     /// Reads the commits after `onto` in the background, has `plan` make the todo list of
-    /// them (it may make commits too: it runs there), and runs the rebase, `after` it the steps
-    /// that finish the rewrite. It refuses once the branch checked out is another or HEAD moved
+    /// them (it may make commits too: it runs there), and runs the rebase between the steps
+    /// `around` it (those that prepare and finish the rewrite). It refuses once the branch checked out is another or HEAD moved
     /// since that read; undone as one step. `started` hears whether it started, or why not.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn rewrite_with(
@@ -107,7 +107,7 @@ impl RepoTab {
         label: String,
         onto: String,
         plan: impl FnOnce(Vec<Entry>) -> Result<Vec<Entry>, String> + Send + 'static,
-        after: Vec<Vec<String>>,
+        around: (Vec<Vec<String>>, Vec<Vec<String>>),
         undo: Undo,
         started: impl FnOnce(&mut RepoTab, Result<(), String>) + Send + 'static,
         ctx: &egui::Context,
@@ -129,8 +129,11 @@ impl RepoTab {
                     started(tab, Err(why));
                 }
                 Ok((command, head)) => {
+                    let (before, after) = around;
                     let steps = [
-                        vec![tab.same_branch(), expect_ref_at("HEAD", &head), command],
+                        vec![tab.same_branch(), expect_ref_at("HEAD", &head)],
+                        before,
+                        vec![command],
                         after,
                     ]
                     .concat();

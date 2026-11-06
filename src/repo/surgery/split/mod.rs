@@ -488,7 +488,7 @@ impl RepoTab {
                 todo.extend(rest.iter().cloned());
                 Ok(todo)
             },
-            Vec::new(),
+            (Vec::new(), Vec::new()),
             Undo::HeadMove { mode: "--keep" },
             move |tab, started| {
                 let Some(editor) = tab.split.as_mut().filter(|e| e.id == id) else {
