@@ -52,6 +52,8 @@ struct StripActions {
     close_worktree: bool,
     /// The tab closed last is to be opened again.
     reopen: bool,
+    /// The work of this repository tab is to be teleported.
+    teleport: Option<PathBuf>,
 }
 
 /// A tab's name, laid out, its colour, the tab's width, its worktree chip and how many of its
@@ -286,6 +288,9 @@ impl App {
         }
         if actions.reopen {
             self.reopen_closed_tab(ctx);
+        }
+        if let Some(source) = actions.teleport {
+            self.start_teleport(source, ctx);
         }
         // Opened and closed after the strip is drawn.
         if actions.switch_to.is_some() {
