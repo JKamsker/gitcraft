@@ -541,6 +541,8 @@ mod tests {
             &["init", "-q", "-b", "main"][..],
             &["config", "user.name", "t"],
             &["config", "user.email", "t@t"],
+            // The files read back as written, whatever Windows' git would convert.
+            &["config", "core.autocrlf", "false"],
         ] {
             assert!(git(args).is_ok(), "{args:?}");
         }
