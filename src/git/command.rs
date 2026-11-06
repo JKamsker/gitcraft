@@ -103,6 +103,8 @@ struct Ran {
 pub(super) struct Extra {
     pre: Vec<&'static str>,
     env: Vec<(&'static str, String)>,
+    /// On another machine: a test of a parallel bisect (see [`run_for_test`]).
+    test: Option<std::time::Duration>,
 }
 
 /// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
@@ -151,7 +153,8 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
         unset: GIT_ENV_REMOVED.iter().map(|n| (*n).to_owned()).collect(),
         stdin: None,
         long: goes_over_network(args),
-        timeout: None,
+        test: extra.test.is_some(),
+        timeout: extra.test,
     }
 }
 
@@ -213,6 +216,31 @@ pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Chi
     cmd.spawn().map_err(|e| format!("could not run git: {e}"))
 }
 
+/// How a git call ended: its exit code (`None`: ended by a signal) and what it printed.
+#[derive(Clone, Debug)]
+pub struct Exit {
+    pub code: Option<i32>,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+}
+
+/// Runs git with `args` in `dir` for a parallel bisect's tests, whatever it exits with. On
+/// another machine it gets a shell of its own (as many run side by side as there are tests at
+/// once) and is stopped there after `limit`; here it runs as long as it takes, and the caller
+/// stops it (see `parallel_bisect::runner`).
+pub fn run_for_test(dir: &Path, args: &[&str], limit: std::time::Duration) -> Result<Exit, String> {
+    let extra = Extra {
+        test: Some(limit),
+        ..Extra::default()
+    };
+    let out = execute(Some(dir), &extra, args)?;
+    Ok(Exit {
+        code: out.code,
+        stdout: out.stdout,
+        stderr: out.stderr,
+    })
+}
+
 /// Like [`run`], but exit codes in `ok` count as success (`diff --no-index` exits 1 on changes).
 pub fn run_ok_codes(dir: Option<&Path>, args: &[&str], ok: &[i32]) -> Result<String, String> {
     run_inner(dir, args, ok, None, false)
@@ -271,6 +299,7 @@ fn unattended_extra(unix: bool) -> Extra {
     Extra {
         pre: vec!["-c", "credential.interactive=false", "-c", "core.askPass="],
         env,
+        test: None,
     }
 }
 

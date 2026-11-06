@@ -51,6 +51,9 @@ pub struct Request {
     /// It goes over the network and may take minutes (fetch, push…): run in shells of their
     /// own, so the quick reads aren't left waiting behind it.
     pub long: bool,
+    /// A test run of a parallel bisect (which may take as long as its own limit): run in shells
+    /// of their own, as many side by side as there are tests at once.
+    pub test: bool,
     /// How long it may take before it is stopped; `None`: as long as its lane allows (see
     /// [`Request::time_limit`]).
     pub timeout: Option<std::time::Duration>,
@@ -66,8 +69,11 @@ impl Request {
 
     /// How long it may run before it is stopped.
     pub(super) fn time_limit(&self) -> Duration {
-        self.timeout
-            .unwrap_or(if self.long { LONG_FOR } else { QUICK_FOR })
+        self.timeout.unwrap_or(if self.long || self.test {
+            LONG_FOR
+        } else {
+            QUICK_FOR
+        })
     }
 }
 
@@ -89,6 +95,7 @@ impl std::fmt::Debug for Request {
             .field("unset", &self.unset)
             .field("stdin", &self.stdin.as_ref().map(Vec::len))
             .field("long", &self.long)
+            .field("test", &self.test)
             .field("timeout", &self.timeout)
             .finish()
     }
@@ -105,7 +112,13 @@ pub struct Output {
 /// Runs `req` on `host`, in one of the shells kept open there.
 pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
     super::ui_guard::off_ui_thread(&req.what())?;
-    let lane = if req.long { Lane::Long } else { Lane::Quick };
+    let lane = if req.test {
+        Lane::Test
+    } else if req.long {
+        Lane::Long
+    } else {
+        Lane::Quick
+    };
     let pool = pool(host, lane);
     loop {
         let mut taken = pool.take(host, lane)?;
