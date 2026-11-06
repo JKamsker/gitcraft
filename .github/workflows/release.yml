@@ -144,7 +144,7 @@ jobs:
         shell: pwsh
         run: |
           choco install innosetup --no-progress -y
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /Qp "/DAppVersion=$($env:VERSION)""/DOutputName=$($env:PKG)-setup" packaging\windows\gitcraft.iss
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /Qp "/DAppVersion=$($env:VERSION)" "/DOutputName=$($env:PKG)-setup" packaging\windows\gitcraft.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Move-Item dist\*.exe .
 
@@ -181,7 +181,10 @@ jobs:
           name="$PKG"
           strip target/release/gitcraft
           cargo deb --no-build --output "$name.deb"
-          cargo generate-rpm --output "$name.rpm"
+          # rpm has no `-` in a version: `0.3.4~dev.6`, which comes before 0.3.4 (cargo deb
+          # does the same on its own).
+          rpm_version="$(printf '%s' "$VERSION" | tr '-' '~')"
+          cargo generate-rpm --output "$name.rpm" --set-metadata "version = \"$rpm_version\""
           # The .deb installs, with its menu entry and icon; the .rpm holds the same files.
           sudo apt-get install -y desktop-file-utils rpm "./$name.deb"
           desktop-file-validate /usr/share/applications/gitcraft.desktop
