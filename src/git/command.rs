@@ -1,7 +1,45 @@
 //! Running git: the environment every call gets, credentials for remotes, errors.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::RwLock;
+
+/// The config file the active gitcraft profile has git read as its global config (see
+/// `settings::profiles`), if it sets anything.
+static PROFILE_CONFIG: RwLock<Option<PathBuf>> = RwLock::new(None);
+
+/// Has every git command from now on read `path` as its global config, or the user's own again
+/// with `None`. It is still the global scope, so what a repository sets itself (`--local`,
+/// `--worktree`) wins over it.
+pub fn set_profile_config(path: Option<PathBuf>) {
+    if let Ok(mut current) = PROFILE_CONFIG.write() {
+        *current = path;
+    }
+}
+
+/// Whether `args` reads or writes the user's own global config: `git config --global …`
+/// (signing settings, Mergiraf's set-up), which must never land in the profile's file, which is
+/// written over.
+fn user_global_config(args: &[&str]) -> bool {
+    let mut rest = args;
+    while let [flag, _, tail @ ..] = rest
+        && *flag == "-c"
+    {
+        rest = tail;
+    }
+    rest.first() == Some(&"config") && rest.contains(&"--global")
+}
+
+/// Points `cmd` at the active profile's config, unless `args` is about the user's own.
+fn with_profile(cmd: &mut Command, args: &[&str]) {
+    if user_global_config(args) {
+        return;
+    }
+    let path = PROFILE_CONFIG.read().ok().and_then(|p| p.clone());
+    if let Some(path) = path {
+        cmd.env("GIT_CONFIG_GLOBAL", path);
+    }
+}
 
 fn git_cmd() -> Command {
     let mut cmd = Command::new("git");
@@ -34,6 +72,7 @@ pub fn run(dir: Option<&Path>, args: &[&str]) -> Result<String, String> {
 /// Runs git and returns stdout as raw bytes (file contents: images…).
 pub fn run_bytes(dir: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
     let mut cmd = git_cmd();
+    with_profile(&mut cmd, args);
     if let Some(dir) = dir {
         cmd.arg("-C").arg(dir);
     }
@@ -51,6 +90,7 @@ pub fn run_bytes(dir: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
 /// Starts git in `dir` with its output piped, for a caller that reads it bit by bit.
 pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Child, String> {
     let mut cmd = git_cmd();
+    with_profile(&mut cmd, args);
     cmd.arg("-C").arg(dir).args(args);
     cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
@@ -141,6 +181,7 @@ fn run_inner(
     quiet: bool,
 ) -> Result<String, String> {
     let mut cmd = git_cmd();
+    with_profile(&mut cmd, args);
     if let Some(dir) = dir {
         cmd.arg("-C").arg(dir);
     }
@@ -178,6 +219,20 @@ mod tests {
     use std::process::Stdio;
 
     use super::*;
+
+    /// `git config --global` reaches the user's own file, whatever comes before it; every
+    /// other command (and a repository's own `config`) goes by the profile.
+    #[test]
+    fn only_global_config_commands_skip_the_profile() {
+        assert!(user_global_config(&["config", "--global", "user.name"]));
+        assert!(user_global_config(&[
+            "-c", "core.x=y", "config", "--global", "--list"
+        ]));
+        assert!(!user_global_config(&["config", "user.name"]));
+        assert!(!user_global_config(&["commit", "-m", "--global"]));
+        assert!(!user_global_config(&["-c", "config"]));
+        assert!(!user_global_config(&[]));
+    }
 
     /// What git gets from the helper is what was typed, backslashes (`DOMAIN\user`) included.
     #[test]

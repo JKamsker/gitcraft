@@ -92,6 +92,12 @@ pub(crate) enum Action {
     OpenPath(PathBuf),
     OpenInEditor(PathBuf),
     SetIdentity(String, String),
+    /// Takes the repository's own `user.name` / `user.email` out (which of them it sets), so
+    /// that the profile's or the global config's apply again.
+    ClearIdentity {
+        name: bool,
+        email: bool,
+    },
     /// How diffs show: side by side, without whitespace changes, the whole file.
     SetDiffOptions {
         split: bool,

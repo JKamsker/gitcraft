@@ -229,7 +229,7 @@ impl App {
             .collect()
     }
 
-    /// Settings, command palette, theme menu and manual.
+    /// Settings, command palette, theme menu, manual and the profile in use.
     fn bar_buttons(&mut self, ui: &mut Ui, t: &Tokens) {
         ui.add_space(4.0);
         ui.spacing_mut().item_spacing.x = 6.0;
@@ -257,6 +257,7 @@ impl App {
         if icons::bar_button(ui, "book-open", "Manual and keyboard shortcuts (F1)").clicked() {
             self.manual_open = true;
         }
+        self.profile_button(ui, t);
     }
 
     fn apply_strip_actions(&mut self, actions: StripActions, ctx: &egui::Context) {

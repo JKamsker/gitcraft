@@ -94,13 +94,16 @@ pub fn init(path: &Path) -> Result<(), String> {
     run(Some(path), &["init"]).map(|_| ())
 }
 
-/// The name and email commits are made with here, and whether they're set for this repository
-/// only.
+/// The name and email commits are made with here (a repository's own config wins over the
+/// profile's, which wins over the global one), and whether this repository sets them itself.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Identity {
     pub name: String,
     pub email: String,
+    /// The repository sets `user.name` itself.
     pub local: bool,
+    /// The repository sets `user.email` itself.
+    pub local_email: bool,
 }
 
 pub fn identity(repo: &Path) -> Identity {
@@ -109,6 +112,7 @@ pub fn identity(repo: &Path) -> Identity {
         name: get(&["config", "user.name"]).unwrap_or_default(),
         email: get(&["config", "user.email"]).unwrap_or_default(),
         local: get(&["config", "--local", "user.name"]).is_some(),
+        local_email: get(&["config", "--local", "user.email"]).is_some(),
     }
 }
 

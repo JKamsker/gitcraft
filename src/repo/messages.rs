@@ -18,6 +18,8 @@ pub(super) enum Msg {
     Loaded(Result<Box<Loaded>, String>),
     /// The submodules, from the read numbered so (see `RepoTab::reads`).
     Submodules(u64, Vec<git::Submodule>),
+    /// Who commits are made as, read again (the profile's author changed).
+    Identity(git::Identity),
     /// The refs as they are now, to compare with those read (see `RepoTab::recheck`).
     RefsCheck(Result<git::Refs, String>),
     /// The worktree's watcher, set up in the background (`None` when it couldn't be).
@@ -227,6 +229,7 @@ impl RepoTab {
                     self.submodules = list;
                 }
             }
+            Msg::Identity(identity) => self.identity = identity,
             Msg::Watcher(watcher) => {
                 self.watcher = watcher.map(|w| *w);
                 self.watcher_arrived(ctx);
