@@ -119,6 +119,8 @@ pub(crate) enum Action {
     DiffStep(i32),
     /// The commit pane lists every file of the commit, or only those it changed.
     ViewAllFiles(bool),
+    /// The commit pane of a merge shows what it resolved, or the files it changed.
+    ShowRemerge(bool),
     SaveConflict,
     /// Let Mergiraf solve what it can of the open conflict.
     SolveWithMergiraf,

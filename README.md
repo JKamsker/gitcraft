@@ -97,6 +97,15 @@ so your config, credentials and hooks apply as usual.
   diff. On a branch, _Changes x adds to main_ shows only what it changed since the two diverged,
   as a pull request shows it, and _Compare main with x_ every difference; a checkbox switches
   between the two. The right pane says how many commits each side has that the other hasn't.
+- What a merge resolved: on a merge commit, _What this merge resolved_ lists only what differs
+  between the merge git would have made of its parents and the one recorded
+  (`git show --remerge-diff`): the conflicts resolved, then anything edited beyond the merge
+  (an "evil" merge). Each opens in the diff view, git's conflict message on top and every hunk
+  marked _resolves a conflict_ or _edited beyond the merge_; a clean, unedited merge says so.
+  Merge rows of the graph that resolved something carry a _resolved_ (or _edited_) badge, read
+  in the background for the rows on screen only; a click shows what it resolved. Needs git 2.36
+  or newer where the repository is (otherwise the box is greyed out and says why); git doesn't
+  redo octopus merges, which the box says too.
 - Patches: _Create patch from commit…_ saves a commit as a file (`git format-patch`). _Apply
   patch…_ (the latest commit's menu, the changes row's menu or the palette) turns one from
   `git format-patch` into commits (`git am`) and puts any other diff on the working tree

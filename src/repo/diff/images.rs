@@ -60,6 +60,8 @@ pub(super) fn load_images(
             Area::Untracked | Area::Conflicted => (None, get(None, path)),
         },
         DiffKey::Range { from, to, .. } => (old(from), get(to.as_deref(), path)),
+        // git's own merge of a picture is nowhere to be read.
+        DiffKey::Remerge { hash, .. } => (None, get(Some(hash), path)),
     };
     let id = image_id(old.as_deref(), new.as_deref());
     ImagePair { old, new, id }

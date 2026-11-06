@@ -198,6 +198,7 @@ impl RepoTab {
                 }
             }
             Action::ViewAllFiles(on) => self.all_files.on = on,
+            Action::ShowRemerge(on) => self.remerges.on = on,
             Action::FileView { path, rev, tab } => self.open_file_view(path, rev, tab, ctx),
             Action::CloseFileView => self.file_view = None,
             Action::InteractiveRebase { onto, label } => self.interactive_rebase(onto, label, ctx),

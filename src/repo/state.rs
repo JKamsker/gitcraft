@@ -79,13 +79,22 @@ pub(crate) enum DiffKey {
         to: Option<String>,
         path: String,
     },
+    /// A file of what the merge `hash` resolved: git's own merge of its parents against the
+    /// one recorded (see [`crate::git::remerge`]). `old_path`: its name in git's merge.
+    Remerge {
+        hash: String,
+        path: String,
+        old_path: Option<String>,
+    },
 }
 
 impl DiffKey {
     /// The file the diff is of.
     pub(super) fn path(&self) -> &str {
         match self {
-            DiffKey::Commit { path, .. } | DiffKey::Range { path, .. } => path,
+            DiffKey::Commit { path, .. }
+            | DiffKey::Range { path, .. }
+            | DiffKey::Remerge { path, .. } => path,
             DiffKey::Work(file) => &file.path,
         }
     }
