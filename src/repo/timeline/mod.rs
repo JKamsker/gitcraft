@@ -8,6 +8,11 @@
 //! the view is [`view`].
 
 pub(super) mod observe;
+pub(super) mod remove;
+mod remove_tab;
+#[cfg(test)]
+mod remove_tests;
+mod remove_view;
 pub(super) mod snapshot;
 pub(super) mod store;
 mod tab;
