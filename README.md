@@ -212,6 +212,15 @@ so your config, credentials and hooks apply as usual.
     a YAML alias is compared as what its anchor holds; JSON may have the comments and
     trailing commas of JSON-with-comments files. A file that doesn't parse says on which side
     and line.
+  - _As a table_ (for `.csv` and `.tsv`): a grid of the rows added, removed and changed, the
+    changed cells as `old → new`, the unchanged rows between them folded (click to open) and
+    the header kept on top. Columns are matched by name; one renamed (most of its values the
+    same) shows `old → new name`, and columns added or removed are marked. Rows are matched
+    by their first column when its values are all there and all different (a key), else by
+    content. Quoted cells may hold commas, quotes and line breaks; a quote that never ends
+    falls back to the plain diff with the line.
+  - _Data tracked by DVC_ (for `.dvc` files): each path it tracks before and after, with its
+    size, hash and, for a folder, how many files it holds, as files in Git LFS show.
   - _Dependency changes_ (the package, for `Cargo.lock`, `package-lock.json`,
     `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `poetry.lock`, `uv.lock`, `composer.lock` and
     `go.sum`): the packages upgraded, downgraded, added and removed, each with its versions,
