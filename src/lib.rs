@@ -22,6 +22,7 @@ mod settings;
 mod shell_path;
 mod spinner;
 mod tab_look;
+mod teleport;
 mod terminal;
 mod theme;
 mod update;
