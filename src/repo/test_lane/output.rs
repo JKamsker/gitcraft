@@ -43,7 +43,8 @@ impl RepoTab {
                     .stick_to_bottom(true)
                     .auto_shrink(false)
                     .show(ui, |ui| {
-                        if kept.lines.is_empty() {
+                        // A test that couldn't run printed nothing: the line above says why.
+                        if kept.lines.is_empty() && !matches!(kept.end, TestEnd::Failed(_)) {
                             ui.label(RichText::new("It printed nothing.").color(t.text_dim));
                         }
                         for line in &kept.lines {

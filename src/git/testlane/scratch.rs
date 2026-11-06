@@ -1,7 +1,8 @@
 //! Throwaway worktrees for running tests and rehearsing operations, out of the user's way:
-//! detached, inside the repository's git folder (`<common dir>/gitcraft-scratch/`), on the
-//! repository's machine, removed when done, however the work ended (dropped, stopped or
-//! failed). One left by a gitcraft that crashed is removed the next time one is made.
+//! detached, on the repository's machine, in its temporary folder (never inside the user's
+//! checkout, where tools looking in parent folders would find its files), removed when done
+//! however the work ended (dropped, stopped or failed). One left by a gitcraft of this machine
+//! that crashed is removed the next time one is made.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -9,8 +10,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::git::run;
 use crate::remote;
 
-/// The folder, in the git folder, that holds them.
+/// The folder, in the temporary folder, that holds them (a folder per repository in it).
 pub const SCRATCH_DIR: &str = "gitcraft-scratch";
+
+/// What the worktrees are made for: the first part of their names.
+const LABELS: [&str; 3] = ["test", "rehearse", "interaction"];
 
 /// Numbers the worktrees this process makes.
 static MADE: AtomicU64 = AtomicU64::new(0);
@@ -25,13 +29,18 @@ pub struct Scratch {
 }
 
 impl Scratch {
-    /// A new one, at `rev`, its name starting with `label` (`test`), its files not checked
-    /// out: each use checks out what it needs.
+    /// A new one, at `rev`, for `label` (`test`, `rehearse`, `interaction`), its files not
+    /// checked out: each use checks out what it needs.
     pub fn add_empty(repo: &Path, label: &str, rev: &str) -> Result<Scratch, String> {
-        sweep_left_over(repo);
-        let dir = remote::join(&common_dir(repo)?, SCRATCH_DIR);
-        let n = MADE.fetch_add(1, Ordering::Relaxed);
-        let path = remote::join(&dir, &format!("{label}-{}-{n}", std::process::id()));
+        let root = scratch_root(repo)?;
+        sweep_left_over(repo, &root);
+        let name = ScratchName {
+            label: label.to_owned(),
+            machine: this_machine(),
+            pid: std::process::id(),
+            n: MADE.fetch_add(1, Ordering::Relaxed),
+        };
+        let path = remote::join(&root, &name.to_string());
         let there = remote::git_path(&path);
         let args = [
             "worktree",
@@ -95,47 +104,118 @@ fn is_listed(repo: &Path, path: &Path) -> bool {
     })
 }
 
-/// The repository's common git folder (the main worktree's `.git`), in the form the command
-/// layer takes.
-pub fn common_dir(repo: &Path) -> Result<PathBuf, String> {
+/// The repository's common git folder (the main worktree's `.git`), as git there names it.
+fn common_dir_there(repo: &Path) -> Result<String, String> {
     let out = run(Some(repo), &["rev-parse", "--git-common-dir"])?;
     let printed = out.trim_end_matches(['\n', '\r']);
     if printed.is_empty() {
         return Err("git didn't say where the repository's git folder is".to_owned());
     }
-    Ok(remote::resolve(repo, printed))
+    Ok(remote::git_path(&remote::resolve(repo, printed)))
 }
 
-/// Whether `path` (as git prints it) is one of the scratch worktrees.
+/// The folder of `repo`'s scratch worktrees: `<temporary folder>/gitcraft-scratch/<key>` on
+/// the repository's machine, `key` telling repositories apart.
+pub fn scratch_root(repo: &Path) -> Result<PathBuf, String> {
+    let common = common_dir_there(repo)?;
+    let key = format!("{:x}", md5::compute(common.as_bytes()));
+    let key = key.get(..12).unwrap_or(&key);
+    Ok(match remote::parse(repo) {
+        Some(t) => remote::encode(&t.host, &format!("/tmp/{SCRATCH_DIR}/{key}")),
+        None => std::env::temp_dir().join(SCRATCH_DIR).join(key),
+    })
+}
+
+/// A scratch worktree's folder name, `<label>-<machine>-<pid>-<n>`: the machine and process of
+/// the gitcraft that made it, so that one left by a crash can be told from one in use.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ScratchName {
+    label: String,
+    machine: String,
+    pid: u32,
+    n: u64,
+}
+
+impl std::fmt::Display for ScratchName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-{}-{}-{}", self.label, self.machine, self.pid, self.n)
+    }
+}
+
+impl ScratchName {
+    /// The name `name` is, when it is one.
+    fn parse(name: &str) -> Option<ScratchName> {
+        let mut parts = name.split('-');
+        let (label, machine) = (parts.next()?, parts.next()?);
+        let (pid, n) = (parts.next()?.parse().ok()?, parts.next()?.parse().ok()?);
+        if parts.next().is_some() || !LABELS.contains(&label) || machine.is_empty() {
+            return None;
+        }
+        Some(ScratchName {
+            label: label.to_owned(),
+            machine: machine.to_owned(),
+            pid,
+            n,
+        })
+    }
+}
+
+/// This machine's name as it goes in a scratch name: letters and digits only.
+fn this_machine() -> String {
+    let name = std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .ok()
+        .or_else(|| std::fs::read_to_string("/etc/hostname").ok())
+        .unwrap_or_default();
+    machine_word(&name)
+}
+
+fn machine_word(name: &str) -> String {
+    let word: String = name
+        .trim()
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .take(24)
+        .collect();
+    if word.is_empty() {
+        "here".to_owned()
+    } else {
+        word
+    }
+}
+
+/// Whether `path` (as git prints it) is one of the scratch worktrees: a scratch name, in a
+/// repository's folder of [`SCRATCH_DIR`].
 pub fn is_scratch_path(path: &str) -> bool {
     let path = path.replace('\\', "/");
-    path.contains(&format!("/{SCRATCH_DIR}/"))
+    let mut parts = path.trim_end_matches('/').rsplit('/');
+    let (Some(name), Some(_key), Some(dir)) = (parts.next(), parts.next(), parts.next()) else {
+        return false;
+    };
+    dir == SCRATCH_DIR && ScratchName::parse(name).is_some()
 }
 
-/// The gitcraft process that made the scratch worktree named `name`, from its name.
-fn maker_of(name: &str) -> Option<u32> {
-    let mut parts = name.rsplitn(3, '-');
-    let _n = parts.next()?;
-    parts.next()?.parse().ok()
-}
-
-/// Removes the scratch worktrees left by a gitcraft that is no longer running (it crashed, or
-/// was killed in the middle of a run). Those of this one, or of one still running, stay.
-fn sweep_left_over(repo: &Path) {
+/// Removes the scratch worktrees of `repo` (in `root`) left by a gitcraft of this machine that
+/// is no longer running (it crashed, or was killed in the middle of a run). Those of this one,
+/// of one still running, of another machine, and anything not named as gitcraft names them,
+/// stay.
+fn sweep_left_over(repo: &Path, root: &Path) {
     let Ok(out) = run(Some(repo), &["worktree", "list", "--porcelain"]) else {
         return;
     };
-    let me = std::process::id();
+    let root = remote::git_path(root).replace('\\', "/");
+    let me = this_machine();
     for printed in out.lines().filter_map(|l| l.strip_prefix("worktree ")) {
-        if !is_scratch_path(printed) {
+        let Some(name) = printed
+            .replace('\\', "/")
+            .strip_prefix(root.as_str())
+            .and_then(|rest| rest.strip_prefix('/'))
+            .and_then(ScratchName::parse)
+        else {
             continue;
-        }
-        let name = printed.rsplit(['/', '\\']).next().unwrap_or_default();
-        match maker_of(name) {
-            Some(pid) if pid == me || process_alive(pid) => {}
-            _ => {
-                let _ = remove_worktree(repo, &remote::resolve(repo, printed));
-            }
+        };
+        if name.machine == me && name.pid != std::process::id() && !process_alive(name.pid) {
+            let _ = remove_worktree(repo, &remote::resolve(repo, printed));
         }
     }
 }
@@ -168,24 +248,47 @@ fn process_alive(pid: u32) -> bool {
     }
 }
 
+/// This machine's name as scratch names have it, for tests elsewhere.
+#[cfg(test)]
+pub(crate) fn tests_machine() -> String {
+    this_machine()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn scratch_paths_are_told_apart_on_every_system() {
-        assert!(is_scratch_path("/r/.git/gitcraft-scratch/test-1-0"));
-        assert!(is_scratch_path(r"C:\r\.git\gitcraft-scratch\test-1-0"));
-        assert!(!is_scratch_path("/r/gitcraft-scratch-not"));
-        assert!(!is_scratch_path("/home/me/repo"));
+        assert!(is_scratch_path(
+            "/tmp/gitcraft-scratch/0123abcd/test-box-1-0"
+        ));
+        assert!(is_scratch_path(
+            r"C:\Temp\gitcraft-scratch\0123abcd\rehearse-PC1-7-2"
+        ));
+        // Folders of the user's that happen to be called so.
+        assert!(!is_scratch_path("/home/me/gitcraft-scratch/wip"));
+        assert!(!is_scratch_path("/home/me/gitcraft-scratch/x/wip"));
+        assert!(!is_scratch_path("/home/me/other/k/test-box-1-0"));
+        assert!(!is_scratch_path("test-box-1-0"));
     }
 
     #[test]
-    fn the_maker_is_read_from_the_name() {
-        assert_eq!(maker_of("test-1234-7"), Some(1234));
-        assert_eq!(maker_of("rehearse-99-0"), Some(99));
-        assert_eq!(maker_of("odd"), None);
-        assert_eq!(maker_of("a-b-c"), None);
+    fn names_say_who_made_them() {
+        let name = ScratchName {
+            label: "test".into(),
+            machine: "box".into(),
+            pid: 1234,
+            n: 7,
+        };
+        assert_eq!(name.to_string(), "test-box-1234-7");
+        assert_eq!(ScratchName::parse("test-box-1234-7"), Some(name));
+        assert_eq!(ScratchName::parse("wip"), None);
+        assert_eq!(ScratchName::parse("test-1234-7"), None);
+        assert_eq!(ScratchName::parse("other-box-1-2"), None);
+        assert_eq!(ScratchName::parse("test-box-1-2-3"), None);
+        assert_eq!(machine_word(" my-pc.local\n"), "mypclocal");
+        assert_eq!(machine_word(""), "here");
     }
 
     #[test]

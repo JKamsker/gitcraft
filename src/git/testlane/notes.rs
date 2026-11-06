@@ -56,8 +56,9 @@ pub fn test_command(repo: &Path, name: &str) -> Result<Option<String>, String> {
     let key = format!("test.{name}.command");
     // Exit 1: not set.
     let out = crate::git::run_ok_codes(Some(repo), &["config", "--get", &key], &[0, 1])?;
-    let command = out.trim_end_matches(['\n', '\r']);
-    Ok((!command.trim().is_empty()).then(|| command.to_owned()))
+    // Spaces around it (a hand-edited config) don't make it another command.
+    let command = out.trim();
+    Ok((!command.is_empty()).then(|| command.to_owned()))
 }
 
 /// Sets the command of the test `name` in the repository's own config, as `git test add` does.

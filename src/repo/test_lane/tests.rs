@@ -2,6 +2,7 @@
 //! dots as the results come in, a reload after a rebase that keeps the trees, Stop, and a
 //! command changed with its old results forgotten.
 
+use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 use super::banner::progress_text;
@@ -89,7 +90,10 @@ fn testing_a_branch_fills_the_lane() -> Result<(), String> {
     assert_eq!(dot_of(&tab, &repo, "main")?, None);
     let run = tab.test_lane.run.as_ref().ok_or("no run")?;
     assert_eq!((run.good, run.bad, run.failed), (2, 2, 0));
-    assert_eq!(run.first_bad.as_deref(), Some(commits[2].as_str()));
+    assert_eq!(
+        run.first_bad.as_ref().map(|(_, c)| c.as_str()),
+        Some(commits[2].as_str())
+    );
     assert_eq!(
         progress_text(run),
         "Tested main..feature with `test ! -e broken`: 4 done · 2 passed · 2 failed"
@@ -254,7 +258,7 @@ fn a_bad_range_says_why() -> Result<(), String> {
     let (said, bad) = tab.status.clone().ok_or("nothing said")?;
     assert!(bad);
     assert!(
-        said.starts_with("Testing no-such..feature failed:"),
+        said.starts_with("Couldn't test no-such..feature:"),
         "{said}"
     );
     assert!(matches!(
@@ -291,7 +295,7 @@ fn messages_say_how_a_run_went() {
     );
     assert_eq!(
         ended_message("x", &Err("boom".into())),
-        ("Testing x failed: boom".to_owned(), true)
+        ("Couldn't test x: boom".to_owned(), true)
     );
 }
 
@@ -316,4 +320,114 @@ fn dots_say_what_they_mean() {
         .0,
         "Failed: ended by a signal"
     );
+}
+
+/// Results come as they finish, the stored ones first: the banner's first failure is still the
+/// oldest commit that failed, and two commits with one tree count once.
+#[test]
+fn the_first_failure_is_the_oldest_whatever_finishes_first() -> Result<(), String> {
+    let ctx = egui::Context::default();
+    let (repo, _) = branch_repo("order", 1, 9)?;
+    let mut tab = open(&repo, &ctx)?;
+    let start = dialog_start(&tab, None)?;
+    tab.test_lane.runs = 7;
+    tab.test_lane.run = Some(LaneRun {
+        id: 7,
+        range: start.range,
+        command: "x".into(),
+        total: None,
+        queued: HashSet::new(),
+        running: HashSet::new(),
+        good: 0,
+        bad: 0,
+        failed: 0,
+        first_bad: None,
+        order: HashMap::new(),
+        stop: RunStop::default(),
+        started: Instant::now(),
+        ended: None,
+    });
+    let trees = ["t1", "t2", "t3", "t2"].map(str::to_owned).to_vec();
+    tab.tests_listed(7, trees);
+    let done = |commit: &str, tree: &str, verdict| TestEvent::Done {
+        commit: commit.into(),
+        tree: tree.into(),
+        end: TestEnd::Ran {
+            verdict,
+            code: Some(1),
+        },
+        lines: Vec::new(),
+    };
+    tab.tests_event(7, done("c3", "t3", Verdict::Bad));
+    tab.tests_event(7, done("c2", "t2", Verdict::Bad));
+    tab.tests_event(7, done("c1", "t1", Verdict::Good));
+    let run = tab.test_lane.run.as_ref().ok_or("no run")?;
+    assert_eq!(run.total, Some(3));
+    assert_eq!(run.first_bad.as_ref().map(|(_, c)| c.as_str()), Some("c2"));
+    assert!(progress_text(run).contains("3 of 3 done"));
+    // An event of another run says nothing about this one.
+    tab.tests_event(6, done("c0", "t0", Verdict::Bad));
+    assert_eq!(tab.test_lane.dot("t0"), None);
+    Ok(())
+}
+
+/// Results already stored are said apart from those tested.
+#[test]
+fn stored_results_are_not_counted_as_tested() {
+    let summary = RunSummary {
+        good: 3,
+        bad: 1,
+        known: 2,
+        ..RunSummary::default()
+    };
+    assert_eq!(
+        ended_message("a..b", &Ok(summary)).0,
+        "Tested 2 commits of a..b (2 had a result already): 3 passed, 1 failed"
+    );
+    let cleanup = RunSummary {
+        good: 1,
+        cleanup: Some("busy".into()),
+        ..RunSummary::default()
+    };
+    let (said, bad) = ended_message("x", &Ok(cleanup));
+    assert!(bad);
+    assert!(
+        said.ends_with("Couldn't remove a scratch worktree: busy"),
+        "{said}"
+    );
+}
+
+/// Writing a result moves the notes ref: that alone reloads nothing.
+#[test]
+fn notes_written_do_not_reload_the_tab() {
+    use crate::repo::watch::{FsChange, fs_change};
+    let git = std::path::Path::new("/r/.git");
+    assert_eq!(fs_change(&git.join("refs/notes/tests/default"), &[]), None);
+    assert_eq!(
+        fs_change(&git.join("refs/heads/main"), &[]),
+        Some(FsChange::Git)
+    );
+}
+
+/// A command stored with spaces around it is the same command: its results stay.
+#[test]
+fn a_stored_command_with_spaces_is_the_same() -> Result<(), String> {
+    let ctx = egui::Context::default();
+    let (repo, commits) = branch_repo("spaces", 1, 9)?;
+    repo.git(&["config", "test.default.command", "  true  "])?;
+    assert_eq!(
+        git::test_command(repo.path(), git::DEFAULT_TEST)?.as_deref(),
+        Some("true")
+    );
+    let tree = repo.tree(&commits[0])?;
+    git::write_result(repo.path(), git::DEFAULT_TEST, &tree, Verdict::Good, false)?;
+    let mut tab = open(&repo, &ctx)?;
+    let mut asked = dialog_start(&tab, None)?;
+    assert_eq!(asked.command, "true");
+    asked.forget = true;
+    start(&mut tab, &ctx, asked)?;
+    let (said, _) = tab.status.clone().ok_or("nothing said")?;
+    assert!(said.contains("1 had a result already"), "{said}");
+    assert_eq!(dot_of(&tab, &repo, &commits[0])?, Some(DotState::Good));
+    Ok(())
 }

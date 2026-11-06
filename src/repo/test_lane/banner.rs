@@ -17,7 +17,10 @@ impl RepoTab {
                     Some(run) if run.going() => {
                         if ui
                             .button("Stop")
-                            .on_hover_text("Stops the tests going on; their results are not kept")
+                            .on_hover_text(
+                                "Stops the tests: those that finished keep their result, those \
+                                 part way through are dropped",
+                            )
                             .clicked()
                         {
                             acts.push(Action::TestLane(LaneAct::Stop));
@@ -38,7 +41,8 @@ impl RepoTab {
                         Some(run) => self.run_status(ui, run, acts),
                         None => {
                             let e = self.test_lane.error.as_deref().unwrap_or_default();
-                            ui.add(egui::Label::new(RichText::new(e).color(t.danger)).truncate());
+                            ui.add(egui::Label::new(RichText::new(e).color(t.danger)).truncate())
+                                .on_hover_text(e);
                         }
                     }
                 });
@@ -49,11 +53,12 @@ impl RepoTab {
     fn run_status(&self, ui: &mut Ui, run: &LaneRun, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         if let Some(Err(e)) = &run.ended {
-            ui.add(egui::Label::new(RichText::new(e).color(t.danger)).truncate());
+            let said = format!("Couldn't test {}: {e}", run.range);
+            ui.add(egui::Label::new(RichText::new(&said).color(t.danger)).truncate())
+                .on_hover_text(said);
             return;
         }
-        let first_bad = run.first_bad.as_ref().filter(|_| run.bad > 0);
-        if let Some(commit) = first_bad {
+        if let Some((_, commit)) = &run.first_bad {
             let label = format!("First failure: {}", short(commit));
             if ui
                 .link(RichText::new(label).color(t.danger))
@@ -64,7 +69,9 @@ impl RepoTab {
             }
             ui.add_space(6.0);
         }
-        ui.add(egui::Label::new(RichText::new(progress_text(run)).color(t.text_dim)).truncate());
+        let said = progress_text(run);
+        ui.add(egui::Label::new(RichText::new(&said).color(t.text_dim)).truncate())
+            .on_hover_text(said);
     }
 }
 
@@ -78,7 +85,9 @@ pub(super) fn progress_text(run: &LaneRun) -> String {
         (true, Some(total)) => parts.push(format!("{done} of {total} done")),
         (false, _) => parts.push(format!("{done} done")),
     }
-    parts.push(format!("{} passed", run.good));
+    if done > 0 {
+        parts.push(format!("{} passed", run.good));
+    }
     if run.bad > 0 {
         parts.push(format!("{} failed", run.bad));
     }

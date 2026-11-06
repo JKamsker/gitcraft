@@ -86,9 +86,11 @@ impl Repo {
             .count())
     }
 
-    /// What is left in the scratch folder.
+    /// What is left in the repository's scratch folder.
     pub(crate) fn scratch_left(&self) -> usize {
-        std::fs::read_dir(self.dir.join(".git").join(git::SCRATCH_DIR))
+        git::scratch_root(&self.dir)
+            .ok()
+            .and_then(|root| std::fs::read_dir(root).ok())
             .map(|d| d.count())
             .unwrap_or(0)
     }

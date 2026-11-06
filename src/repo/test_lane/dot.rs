@@ -1,8 +1,8 @@
-//! The lane's mark by a commit: a small square (a round dot is CI's), filled green or red for
-//! a result, outlined while it waits or runs, with what it means on hover; a click shows what
-//! the test printed.
+//! The lane's mark by a commit: a small square (a round dot is CI's), green with a tick or red
+//! with a cross for a result, outlined while it waits or runs, amber with a dot when it couldn't
+//! be tested, with what it means on hover; a click shows what the test printed.
 
-use egui::{CornerRadius, Id, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, vec2};
+use egui::{CornerRadius, Id, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
 
 use super::{DotState, LaneAct, dot_tip};
 use crate::repo::{Action, RepoTab};
@@ -41,12 +41,23 @@ fn paint(ui: &Ui, t: &Tokens, center: Pos2, half: f32, state: DotState) {
     let round = CornerRadius::same(2);
     let painter = ui.painter();
     match state {
+        // A tick or a cross in it too: not by colour alone.
         DotState::Good => {
             painter.rect_filled(square, round, t.success);
+            let mark = Stroke::new(1.4, t.card);
+            let (l, r) = (square.left() + half * 0.45, square.right() - half * 0.4);
+            let bottom = pos2(center.x - half * 0.15, square.bottom() - half * 0.5);
+            painter.line_segment([pos2(l, center.y), bottom], mark);
+            painter.line_segment([bottom, pos2(r, square.top() + half * 0.5)], mark);
         }
         DotState::Bad => {
             painter.rect_filled(square, round, t.danger);
+            let mark = Stroke::new(1.4, t.card);
+            let inner = square.shrink(half * 0.55);
+            painter.line_segment([inner.left_top(), inner.right_bottom()], mark);
+            painter.line_segment([inner.right_top(), inner.left_bottom()], mark);
         }
+        // Outlined, with a dot in it: it couldn't be tested.
         DotState::Failed => {
             painter.rect_stroke(
                 square,
@@ -54,6 +65,7 @@ fn paint(ui: &Ui, t: &Tokens, center: Pos2, half: f32, state: DotState) {
                 Stroke::new(1.6, t.warning),
                 StrokeKind::Inside,
             );
+            painter.circle_filled(center, 1.3, t.warning);
         }
         DotState::Queued => {
             painter.rect_stroke(
@@ -80,24 +92,29 @@ fn paint(ui: &Ui, t: &Tokens, center: Pos2, half: f32, state: DotState) {
 }
 
 impl RepoTab {
-    /// The lane's heading in the graph's header `header`: its icon, over the lane.
+    /// The lane's heading in the graph's header `header`: its icon, over the lane; a click
+    /// opens Test commits….
     pub(in crate::repo) fn test_lane_header(
         &self,
         ui: &Ui,
         header: Rect,
         cols: &crate::repo::columns::Cols,
+        acts: &mut Vec<Action>,
     ) {
         let t = Tokens::get(ui.ctx());
-        let center = egui::pos2(header.right() - cols.trailing() - 23.0, header.center().y);
+        let center = pos2(header.right() - cols.trailing() - 23.0, header.center().y);
         let rect = Rect::from_center_size(center, vec2(12.0, 12.0));
         crate::icons::paint(ui, rect, "flask-conical", 12.0, t.text_faint);
         let tip = match self.test_lane.command() {
-            Some(command) => format!("Tests: `{command}` (test.default.command)"),
-            None => {
-                "Tests: no test command yet; Test commits… in a commit's menu sets one".to_owned()
+            Some(command) => {
+                format!("Tests: `{command}` (test.default.command)\nClick to test commits")
             }
+            None => "Tests: no test command yet\nClick to test commits with one".to_owned(),
         };
-        ui.interact(rect, ui.id().with("test-lane-header"), Sense::hover())
-            .on_hover_text(tip);
+        let id = ui.id().with("test-lane-header");
+        let resp = ui.interact(rect.expand(3.0), id, Sense::click());
+        if resp.on_hover_text(tip).clicked() && !self.test_lane.running() {
+            acts.push(self.test_dialog(None));
+        }
     }
 }
