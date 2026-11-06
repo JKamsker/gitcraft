@@ -190,6 +190,8 @@ pub(crate) enum Action {
     SearchCode(bool),
     /// Start, move on or stop a bisect, or run a command for it.
     Bisect(super::bisect::BisectAct),
+    /// Rehearse a rebase or merge, stop it, or do it for real.
+    Rehearse(super::rehearse::RehearseAct),
     /// Test commits for the test lane, stop them, show what one printed.
     TestLane(super::test_lane::LaneAct),
 }
@@ -421,6 +423,7 @@ impl RepoTab {
         }
         items.extend(self.bisect_palette_items());
         items.extend(self.test_palette_items());
+        items.extend(self.rehearse_palette_items());
         for b in &self.refs.local {
             if !b.is_head {
                 items.push((

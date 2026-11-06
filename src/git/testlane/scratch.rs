@@ -60,6 +60,19 @@ impl Scratch {
         })
     }
 
+    /// Checks out `rev` in it, whatever was changed there.
+    pub fn checkout(&self, rev: &str) -> Result<(), String> {
+        run(
+            Some(&self.path),
+            &["checkout", "--detach", "--force", "-q", rev],
+        )
+        .map(|_| ())
+        .map_err(|e| {
+            let at = rev.get(..8).unwrap_or(rev);
+            format!("could not check out {at} in a scratch worktree: {e}")
+        })
+    }
+
     /// Removes it now, saying why if it couldn't be.
     pub fn remove(mut self) -> Result<(), String> {
         self.removed = true;

@@ -3,6 +3,7 @@
 mod bisect;
 mod branch;
 mod confirm;
+mod rehearse;
 mod remote;
 mod test_commits;
 mod upstream;
@@ -114,6 +115,15 @@ pub enum Dialog {
     },
     /// `git bisect run` with the command typed.
     BisectRun {
+        command: String,
+        focus: bool,
+    },
+    /// Rehearse a rebase or merge of the checked-out branch with `other`.
+    Rehearse {
+        other: String,
+        remote: bool,
+        rebase: bool,
+        compare: bool,
         command: String,
         focus: bool,
     },
@@ -302,6 +312,7 @@ impl RepoTab {
             None => "on this machine".to_owned(),
         };
         let is_remote = crate::remote::is_remote(&self.path);
+        let current_branch = self.refs.current.clone();
         let Some(dialog) = &mut self.dialog else {
             return;
         };
@@ -435,6 +446,25 @@ impl RepoTab {
                 Dialog::BisectRun { command, focus } => {
                     bisect::bisect_run(ui, enter, &machine, command, focus)
                 }
+                Dialog::Rehearse {
+                    other,
+                    remote,
+                    rebase,
+                    compare,
+                    command,
+                    focus,
+                } => rehearse::rehearse(
+                    ui,
+                    enter,
+                    &machine,
+                    current_branch.as_deref(),
+                    other,
+                    *remote,
+                    rebase,
+                    compare,
+                    command,
+                    focus,
+                ),
                 Dialog::TestCommits {
                     start,
                     stored,

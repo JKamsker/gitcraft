@@ -83,6 +83,7 @@ impl RepoTab {
 
         self.dialogs(&ctx, &mut acts);
         self.test_output_window(&ctx, &mut acts);
+        self.rehearse_window(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
         }
