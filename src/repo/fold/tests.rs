@@ -873,7 +873,13 @@ fn an_abort_confirmed_after_the_rebase_was_replaced_resets_no_other_branch() {
 /// replay renamed a file away from (its old name is written when the commit before is).
 #[test]
 fn ignored_files_named_with_spaces_or_renamed_away_are_refused() {
-    for (name, rename) in [(" collision ", false), ("old-name", true)] {
+    // Windows takes trailing spaces off file names: such a file can't be there.
+    let cases: &[(&str, bool)] = if cfg!(windows) {
+        &[("old-name", true)]
+    } else {
+        &[(" collision ", false), ("old-name", true)]
+    };
+    for &(name, rename) in cases {
         let dir = repo(
             if rename {
                 "ignored-renamed"
