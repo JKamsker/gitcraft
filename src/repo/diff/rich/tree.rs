@@ -71,7 +71,7 @@ impl Node {
                 if text.chars().count() > MAX_PREVIEW {
                     s.push('…');
                 }
-                let s = s.replace('\n', "⏎");
+                let s = s.replace('\n', "\\n");
                 if *ty == Ty::String {
                     format!("\"{s}\"")
                 } else {
@@ -92,6 +92,45 @@ impl Node {
     }
 }
 
+/// A hash of a value's content (not where it is), to tell values apart quickly.
+pub fn shape_hash(node: &Node) -> u64 {
+    use std::hash::{Hash, Hasher};
+    fn feed(node: &Node, h: &mut std::collections::hash_map::DefaultHasher) {
+        match node {
+            Node::Scalar { text, ty } => {
+                0u8.hash(h);
+                text.hash(h);
+                ty.name().hash(h);
+            }
+            Node::Map(fields) => {
+                1u8.hash(h);
+                // In any order: the same keys and values are the same map.
+                let mut parts: Vec<u64> = fields
+                    .iter()
+                    .map(|f| {
+                        let mut fh = std::collections::hash_map::DefaultHasher::new();
+                        f.key.hash(&mut fh);
+                        feed(&f.node, &mut fh);
+                        fh.finish()
+                    })
+                    .collect();
+                parts.sort_unstable();
+                parts.hash(h);
+            }
+            Node::List(items) => {
+                2u8.hash(h);
+                items.len().hash(h);
+                for i in items {
+                    feed(&i.node, h);
+                }
+            }
+        }
+    }
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    feed(node, &mut h);
+    h.finish()
+}
+
 /// `key` as a step of a path: bare when it is a plain name, quoted otherwise.
 pub fn path_key(parent: &str, key: &str) -> String {
     let plain = !key.is_empty()
@@ -107,6 +146,27 @@ pub fn path_key(parent: &str, key: &str) -> String {
         step
     } else {
         format!("{parent}.{step}")
+    }
+}
+
+/// Where each line of a text starts, to find the line of a byte quickly.
+pub struct Lines(Vec<usize>);
+
+impl Lines {
+    pub fn new(text: &str) -> Self {
+        let mut starts = vec![0];
+        starts.extend(
+            text.bytes()
+                .enumerate()
+                .filter(|(_, b)| *b == b'\n')
+                .map(|(i, _)| i + 1),
+        );
+        Self(starts)
+    }
+
+    /// The line byte `offset` is on, from 1.
+    pub fn at(&self, offset: usize) -> u32 {
+        self.0.partition_point(|&s| s <= offset) as u32
     }
 }
 
