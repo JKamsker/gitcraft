@@ -1,9 +1,11 @@
 //! Thin wrapper over the `git` command line. Every call shells out to the installed git, so
 //! gitcraft behaves exactly like the user's own git (config, credentials, hooks).
 
+mod attributes;
 mod command;
 mod commits;
 mod diff;
+mod diff_algorithm;
 mod files;
 mod lfs;
 mod refs;
@@ -11,9 +13,11 @@ mod status;
 mod submodule;
 mod worktree;
 
+pub use self::attributes::*;
 pub use self::command::*;
 pub use self::commits::*;
 pub use self::diff::*;
+pub use self::diff_algorithm::*;
 pub use self::files::*;
 pub use self::lfs::*;
 pub use self::refs::*;

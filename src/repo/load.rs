@@ -357,6 +357,7 @@ impl RepoTab {
         if Self::newer(loaded.read, &mut self.work_read) {
             self.work = loaded.work;
         }
+        self.folding.saw_status(&self.work, &self.refs.head);
         // The last counts of worktrees this read left uncounted (on another machine) stay
         // until they are counted again.
         let counted: Vec<(PathBuf, Option<usize>)> = self

@@ -171,6 +171,19 @@ so your config, credentials and hooks apply as usual.
   green; click a mark to jump to its change, or anywhere else on the strip to scroll there.
 - The _Diff_ / _File_ switch shows the whole file as it is after the change instead (before it,
   for a deleted file), coloured and with line numbers.
+- The algorithm in a diff's header (_Default_, _Myers_, _Minimal_, _Patience_, _Histogram_)
+  pairs the lines another way when they line up badly: the diff is read again with
+  `--diff-algorithm`, the line at the top of the view stays at the top, and the choice is kept
+  for that file type (`.rs`, `Makefile`…; Settings → Git → Diffs lists and forgets them). The
+  repository's config is never written; _Default_ is what `diff.algorithm` says.
+- Generated files and lockfiles start folded: files marked `linguist-generated` or `-diff` in
+  `.gitattributes` (read with `git check-attr`, so every attributes file counts, and
+  `linguist-generated=false` keeps a file open), lockfiles (`Cargo.lock`, `package-lock.json`,
+  `yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`, `go.sum`, `Gemfile.lock`, `composer.lock`…) and
+  minified files (`*.min.js`, `*.min.css`). File lists gather them at their end under one
+  closed row (_2 lockfiles +1,204 −880_), and their diff shows only a line such as
+  _+1,204 −880, lockfile_ until _Show the changes_. Settings → Git → Diffs adds patterns of your
+  own (`*.snap`, `dist/**`) or turns folding off.
 - A Markdown file's diff has an eye button that renders it: the changes block by block (removed
   ones red, added ones green, the rest as they are) or, with _File_, the whole file. Images of
   the repository show as they are on each side of the change; any other image is a link, so a
@@ -405,6 +418,7 @@ was made this way, on a demo repository.
 | `src/repo/graph_view.rs` | commit graph, pills, search bar, commit menu                                       |
 | `src/repo/detail.rs`     | commit / stash detail, changes and commit box                                      |
 | `src/repo/diff.rs`       | diff loading, pairing and the diff view (unified, split, images)                   |
+| `src/repo/fold/` | generated files and lockfiles folded in file lists and diffs |
 | `src/repo/highlight.rs`  | syntax colours (syntect)                                                           |
 | `src/vscode_theme.rs`    | VS Code's current colour theme as a syntect theme                                  |
 | `src/repo/conflict.rs`   | three-pane conflict editor                                                         |

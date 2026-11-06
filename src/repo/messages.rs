@@ -321,6 +321,7 @@ impl RepoTab {
                         here.changes = Some(changes);
                     }
                     let wip_row_changed = work.is_clean() != self.work.is_clean();
+                    self.folding.saw_status(&work, &self.refs.head);
                     self.work = work;
                     if wip_row_changed {
                         self.rebuild(ctx);

@@ -70,6 +70,8 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Right-click a file for its history, its blame or the whole file as it is at the commit.",
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",
+            "When a diff pairs lines that have nothing to do with each other, pick another algorithm (Myers, Minimal, Patience, Histogram) in its header: the line at the top stays in view, the choice is kept for that file type, and the repository's config is left alone.",
+            "Generated files (linguist-generated or -diff in .gitattributes), lockfiles and minified files start folded: at the end of file lists, and in their diff behind a line such as “+1,204 −880, lockfile”. One click opens them; Settings → Git → Diffs adds patterns or turns folding off.",
             "Right-click a pull request and choose Open in worktree to work on its branch in a worktree of its own, made for it when there is none.",
             "A terminal panel with tabs, in the repository's folder.",
         ],

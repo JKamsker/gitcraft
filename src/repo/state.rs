@@ -118,6 +118,13 @@ pub(crate) struct DiffView {
     /// The latest read of this diff: only its answer is shown, so a slower answer to an older
     /// read (before the whitespace or whole-file setting changed…) can't replace it.
     pub(super) request: u64,
+    /// A folded file's lines (a lockfile…) were opened.
+    pub(super) unfolded: bool,
+    /// Where the view was when the diff was asked for again another way (another algorithm):
+    /// put back at the top once the new reading arrives; with whether diffs show side by side.
+    pub(super) keep_place: Option<(diff::Place, bool)>,
+    /// A scroll offset to go to on the next frame.
+    pub(super) scroll_to: Option<f32>,
 }
 
 /// Numbers the diff reads of every tab, so no two diffs ever wait for the same number.
@@ -139,6 +146,9 @@ impl DiffView {
             jump: None,
             at_change: None,
             request: 0,
+            unfolded: false,
+            keep_place: None,
+            scroll_to: None,
         }
     }
 
@@ -152,6 +162,9 @@ impl DiffView {
     pub(super) fn arrived(&mut self, request: u64, result: Result<diff::DiffData, String>) {
         if request != self.request {
             return;
+        }
+        if let (Some((place, split)), Ok(data)) = (self.keep_place.take(), &result) {
+            self.scroll_to = Some(diff::offset_of_place(data, data.shows_split(split), place));
         }
         self.data = Some(result);
         // The lines may have moved.

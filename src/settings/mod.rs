@@ -1,5 +1,6 @@
 //! User settings: stored with the app state, readable from anywhere through the egui context.
 
+mod diffs;
 mod layout;
 mod page;
 mod preview;
@@ -69,6 +70,13 @@ pub struct Settings {
     pub diff_split: bool,
     /// Diffs show the whole file, not just the lines around the changes.
     pub diff_whole_file: bool,
+    /// The diff algorithm chosen for each file type (see [`crate::git::file_type`]); a type
+    /// not listed uses git's own default.
+    pub diff_algorithms: std::collections::BTreeMap<String, crate::git::DiffAlgorithm>,
+    /// Generated files, lockfiles and minified files start folded in file lists and diffs.
+    pub fold_generated: bool,
+    /// More files to fold: glob patterns separated by commas, spaces or new lines.
+    pub fold_patterns: String,
     /// Background fetch interval in minutes; 0 turns it off.
     pub auto_fetch_minutes: u32,
     /// What the toolbar's Pull does.
@@ -128,6 +136,9 @@ impl Default for Settings {
             files_as_tree: true,
             diff_split: false,
             diff_whole_file: false,
+            diff_algorithms: Default::default(),
+            fold_generated: true,
+            fold_patterns: String::new(),
             auto_fetch_minutes: 10,
             pull_mode: Default::default(),
             avatars: true,
@@ -650,6 +661,7 @@ impl Settings {
                         },
                     );
                 });
+                section(ui, f, "Diffs", None, |card| self.diffs_ui(card));
                 section(
                     ui,
                     f,

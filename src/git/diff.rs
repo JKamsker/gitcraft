@@ -124,6 +124,8 @@ pub struct DiffOptions {
     pub ignore_ws: bool,
     /// The whole file as context, not just the lines around the changes.
     pub whole_file: bool,
+    /// How lines are paired; `None`: as the user's git config says (`diff.algorithm`).
+    pub algorithm: Option<super::DiffAlgorithm>,
 }
 
 impl DiffOptions {
@@ -138,6 +140,8 @@ impl DiffOptions {
             // More context than any file has lines: git shows each file as one hunk.
             args.push("--unified=999999999");
         }
+        // On the command line, never in the repository's config.
+        args.extend(self.algorithm.map(super::DiffAlgorithm::arg));
     }
 }
 

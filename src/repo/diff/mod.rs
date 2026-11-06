@@ -3,6 +3,9 @@
 //! their objects. Uncommitted changes can be staged, unstaged or discarded a hunk or a few
 //! lines at a time.
 
+mod algorithm;
+#[cfg(test)]
+mod algorithm_tests;
 mod images;
 mod jump;
 mod lfs;
@@ -10,6 +13,7 @@ mod map;
 mod paint;
 mod parse;
 mod patch;
+mod place;
 pub(super) mod rendered;
 mod rows;
 mod select;
@@ -23,6 +27,7 @@ use super::DiffKey;
 use super::highlight::{self, MAX_LINE_CHARS, Spans, cap_line};
 use crate::git::{self, Area, DiffOptions};
 
+pub(super) use algorithm::algorithm_for;
 pub use images::ImagePair;
 use images::{is_image, load_images, renamed_from};
 pub use lfs::LfsPair;
@@ -30,6 +35,7 @@ use lfs::lfs_pair;
 pub use parse::parse;
 use parse::{is_new_file, pair_lines, patch_header};
 pub use patch::{hunk_changes, partial_patch};
+pub(super) use place::{Place, offset_of_place};
 pub(super) use select::TextSel;
 
 const LINE_H: f32 = 19.0;
@@ -90,7 +96,7 @@ pub struct DiffData {
 impl DiffData {
     /// Whether the lines show side by side when that's the setting (`split`): a new file takes
     /// the whole width, rather than half of it next to an empty old side.
-    pub(in crate::repo::diff) fn shows_split(&self, split: bool) -> bool {
+    pub(in crate::repo) fn shows_split(&self, split: bool) -> bool {
         split && !self.new_file
     }
 

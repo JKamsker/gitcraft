@@ -15,6 +15,7 @@ mod dialogs;
 mod diff;
 mod file_text;
 mod file_view;
+mod fold;
 pub(crate) mod graph_view;
 pub(crate) mod highlight;
 mod keep_submodules;
@@ -171,6 +172,8 @@ pub struct RepoTab {
     diff_as_file: bool,
     /// Markdown files show rendered in diffs (their changes, or the file).
     diff_rendered: bool,
+    /// What is known of which files start folded (generated, lockfiles).
+    folding: fold::Folding,
     /// Whether the commit pane lists every file of the commit, and those read.
     all_files: detail::AllFiles,
     conflict: Option<conflict::ConflictEditor>,
@@ -321,6 +324,7 @@ impl RepoTab {
             diff_ignore_ws: false,
             diff_as_file: false,
             diff_rendered: false,
+            folding: Default::default(),
             all_files: Default::default(),
             conflict: None,
             conflict_generation: 0,
