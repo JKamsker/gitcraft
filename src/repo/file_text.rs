@@ -107,7 +107,7 @@ pub(crate) fn show(
     id: impl std::hash::Hash + std::fmt::Debug,
     text: Option<&Result<FileText, String>>,
     find: &mut Find,
-    source: Source,
+    source: impl FnOnce() -> Source,
 ) {
     let t = Tokens::get(ui.ctx());
     let data = match text {
@@ -144,29 +144,21 @@ pub(crate) fn show(
         .x;
     let width = (NUM_W + 16.0 + data.longest as f32 * char_w + 24.0).max(ui.available_width());
     let lines = &data.lines;
-    let key = SourceKey {
-        what: source,
-        at: lines.as_ptr() as usize,
-        len: lines.len(),
-    };
-    find.update(
-        ui.ctx(),
-        key,
-        lines.len(),
-        |i| find::nth(lines, i),
-        Layout::Lines,
-    );
+    if find.open {
+        let key = SourceKey {
+            what: source(),
+            at: lines.as_ptr() as usize,
+            len: lines.len(),
+        };
+        let text = |i| find::nth(lines, i);
+        find.update(ui.ctx(), key, lines.len(), text, Layout::Lines);
+    }
     let mut scroll = egui::ScrollArea::both()
         .id_salt(("file_text", id))
         .auto_shrink(false);
     if let Some(hit) = find.take_reveal() {
-        let (y, x) = find.offsets_for(&hit, char_w);
-        if let Some(y) = y {
-            scroll = scroll.vertical_scroll_offset(y);
-        }
-        if let Some(x) = x {
-            scroll = scroll.horizontal_scroll_offset(x);
-        }
+        let text = find::nth(lines, hit.line).unwrap_or_default();
+        scroll = find.scroll_to(scroll, &hit, text, char_w);
     }
     ui.spacing_mut().item_spacing.y = 0.0;
     let find_ref = &*find;

@@ -91,35 +91,35 @@ fn a_diff_is_stepped_through_in_the_order_of_its_rows() -> Result<(), String> {
     let mut find = Find::default();
     find.show();
     find.query = query("needle");
-    let _ = search_diff(&mut find, &ctx, 1, &data, false);
+    let _ = search_diff(&mut find, &ctx, PATH, &data, false);
     // Unified: the removed line comes first.
     assert_eq!(stepped(&mut find), [(removed, 0), (added, 0)]);
     // Side by side: the added line is on the row above, on the right. The current match
     // stays the one it was.
     let before = find.current().map(|h| h.line);
-    let _ = search_diff(&mut find, &ctx, 1, &data, true);
+    let _ = search_diff(&mut find, &ctx, PATH, &data, true);
     assert_eq!(find.current().map(|h| h.line), before);
     assert_eq!(stepped(&mut find), [(added, 0), (removed, 0)]);
 
     // Case folds beyond ASCII ("ß" matches "SS" only as a full fold, which isn't done).
     find.query = query("grüße");
-    let _ = search_diff(&mut find, &ctx, 1, &data, false);
+    let _ = search_diff(&mut find, &ctx, PATH, &data, false);
     assert_eq!(find.count(), 1);
     find.query.case_sensitive = true;
     find.query.text = "Needle".to_owned();
-    let _ = search_diff(&mut find, &ctx, 1, &data, false);
+    let _ = search_diff(&mut find, &ctx, PATH, &data, false);
     assert_eq!(stepped(&mut find), [(added, 0)]);
     // Hunk headers aren't searched.
     find.query = query("@@");
-    let _ = search_diff(&mut find, &ctx, 1, &data, false);
+    let _ = search_diff(&mut find, &ctx, PATH, &data, false);
     assert_eq!(
         (find.count(), find.summary()),
-        (0, Some(("No results".into(), false)))
+        (0, Some(("no results".into(), false)))
     );
     // A broken regular expression says so.
     find.query = query("needle(");
     find.query.regex = true;
-    let _ = search_diff(&mut find, &ctx, 1, &data, false);
+    let _ = search_diff(&mut find, &ctx, PATH, &data, false);
     assert!(
         find.summary()
             .is_some_and(|(text, error)| error && text.contains("regular"))
@@ -161,12 +161,15 @@ fn stepping_goes_round_and_starts_where_the_reader_is() {
     // Already in view: no scrolling down; sideways neither.
     let hit = find.take_reveal();
     assert!(hit.is_some());
-    assert_eq!(hit.map(|h| find.offsets_for(&h, 7.0)), Some((None, None)));
+    assert_eq!(
+        hit.map(|h| find.offsets_for(&h, "", 7.0)),
+        Some((None, None))
+    );
     find.step(-1);
     assert_eq!(find.current().map(|h| h.line), Some(39));
     // Row 39 is above the view: scrolled so that it is in the middle.
     let hit = find.take_reveal();
-    let (y, _) = hit.map_or((None, None), |h| find.offsets_for(&h, 7.0));
+    let (y, _) = hit.map_or((None, None), |h| find.offsets_for(&h, "", 7.0));
     assert_eq!(y, Some(39.0 * 19.0 - (190.0 - 19.0) / 2.0));
     for _ in 0..60 {
         find.step(1);
@@ -191,7 +194,7 @@ fn a_huge_file_is_searched_over_frames_not_in_one() {
     find.show();
     find.query = query("9 of");
     let key = super::SourceKey {
-        what: super::Source::DiffFile(3),
+        what: super::Source::DiffFile("big.txt".into()),
         at: lines.as_ptr() as usize,
         len: lines.len(),
     };
@@ -411,4 +414,201 @@ fn ctrl_f_finds_in_the_diff_file_or_blame_shown_and_in_the_commits_otherwise() -
     assert_eq!(in_file, 1);
     assert!(left);
     Ok(())
+}
+
+/// The key of `n` lines of a file view, read into `at`.
+fn file_key(path: &str, at: usize, n: usize) -> super::SourceKey {
+    super::SourceKey {
+        what: super::Source::File {
+            path: path.into(),
+            rev: None,
+        },
+        at,
+        len: n,
+    }
+}
+
+#[test]
+fn lines_read_again_keep_the_current_match_and_another_view_starts_at_its_top() {
+    let ctx = egui::Context::default();
+    let lines: Vec<String> = (0..100).map(|i| format!("x{i}")).collect();
+    let mut find = Find::default();
+    find.show();
+    find.query = query("x");
+    let search = |find: &mut Find, key| {
+        find.update(
+            &ctx,
+            key,
+            100,
+            |i| super::nth(&lines, i),
+            super::Layout::Lines,
+        );
+    };
+    search(&mut find, file_key("a", 1, 100));
+    for _ in 0..7 {
+        find.step(1);
+    }
+    let _ = find.take_reveal();
+    find.saw(Seen {
+        y: 40.0 * 19.0,
+        height: 190.0,
+        text_w: 500.0,
+        line_h: 19.0,
+        x: 0.0,
+    });
+    // The same file read again (saved elsewhere): the same match, no scrolling.
+    search(&mut find, file_key("a", 2, 100));
+    assert_eq!(find.current().map(|h| h.line), Some(7));
+    assert!(find.take_reveal().is_none());
+    // Another file: from its top, not from where the last one was scrolled.
+    search(&mut find, file_key("b", 3, 100));
+    assert_eq!(find.current().map(|h| h.line), Some(0));
+    assert!(find.take_reveal().is_some());
+}
+
+#[test]
+fn results_go_once_nothing_shown_is_searched() {
+    let ctx = egui::Context::default();
+    let lines = ["needle"];
+    let mut find = Find::default();
+    find.show();
+    find.query = query("needle");
+    find.update(
+        &ctx,
+        file_key("a", 1, 1),
+        1,
+        |i| super::nth(&lines, i),
+        super::Layout::Lines,
+    );
+    // The bar of the next frame: searched, so kept.
+    find.drop_unsearched();
+    assert_eq!(find.count(), 1);
+    // An image took the file's place: nothing searched before the bar of the frame after.
+    find.drop_unsearched();
+    assert_eq!(
+        (find.count(), find.summary(), find.current()),
+        (0, None, None)
+    );
+    find.step(1);
+    assert!(find.current().is_none());
+}
+
+#[test]
+fn the_note_on_a_cut_line_is_not_searched() {
+    let ctx = egui::Context::default();
+    let max = crate::repo::highlight::MAX_LINE_CHARS;
+    let lines = [format!("{} … 1000 more characters", "a".repeat(max))];
+    let mut find = Find::default();
+    find.show();
+    find.query = query("more");
+    find.update(
+        &ctx,
+        file_key("a", 1, 1),
+        1,
+        |i| super::nth(&lines, i),
+        super::Layout::Lines,
+    );
+    assert_eq!(find.count(), 0);
+    find.query = query("a");
+    find.update(
+        &ctx,
+        file_key("a", 1, 1),
+        1,
+        |i| super::nth(&lines, i),
+        super::Layout::Lines,
+    );
+    assert_eq!(find.count(), max);
+}
+
+#[test]
+fn tabs_count_four_columns_when_scrolling_sideways() {
+    assert_eq!(super::columns("\t\tab", 3), 9);
+    assert_eq!(super::columns("äb", 2), 2);
+    let mut find = Find::default();
+    find.saw(Seen {
+        y: 0.0,
+        height: 190.0,
+        text_w: 70.0,
+        line_h: 19.0,
+        x: 0.0,
+    });
+    let hit = super::Hit {
+        row: 0,
+        side: 0,
+        start: 3,
+        end: 4,
+        line: 0,
+    };
+    // Three characters in: in view without tabs, 12 columns (84 points) in with them.
+    assert_eq!(find.offsets_for(&hit, "abcd", 7.0), (None, None));
+    let (_, x) = find.offsets_for(&hit, "\t\t\td", 7.0);
+    assert_eq!(x, Some(84.0 - 70.0 / 3.0));
+}
+
+/// With the find bar open, a key typed into another field (the terminal, the commit message)
+/// stays that field's: Ctrl+F and F3 are readline's and the pager's there.
+#[test]
+fn keys_typed_into_another_field_are_left_to_it() {
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred("/nonexistent/find-keys-test".into(), &ctx);
+    tab.diff = Some(crate::repo::DiffView::new(DiffKey::Commit {
+        hash: "abc".into(),
+        path: "a.txt".into(),
+    }));
+    tab.find.show();
+    let mut other = String::new();
+    let mut frame = |tab: &mut RepoTab, events: Vec<Event>, focus: bool| {
+        let mut left = Vec::new();
+        let input = RawInput {
+            events,
+            ..Default::default()
+        };
+        ctx.run_ui(input, |ui| {
+            // As the tab does: its keys first, then what it draws.
+            let free = !ui.ctx().egui_wants_keyboard_input();
+            tab.find_keys(ui.ctx(), free);
+            left = ui.input(|i| i.events.clone());
+            let id = egui::Id::new("other");
+            let _ = ui.add(egui::TextEdit::singleline(&mut other).id(id));
+            if focus {
+                ui.memory_mut(|m| m.request_focus(id));
+            }
+            // Like the terminal, it keeps Escape (for the shell).
+            let keep = egui::EventFilter {
+                tab: true,
+                horizontal_arrows: true,
+                vertical_arrows: true,
+                escape: true,
+            };
+            ui.memory_mut(|m| m.set_focus_lock_filter(id, keep));
+        })
+        .drop_without_applying_deltas();
+        left
+    };
+    let key = |key, modifiers| {
+        [true, false].map(|pressed| Event::Key {
+            key,
+            physical_key: None,
+            pressed,
+            repeat: false,
+            modifiers,
+        })
+    };
+    let kept = |left: &[Event], k: Key| {
+        left.iter()
+            .any(|e| matches!(e, Event::Key { key, pressed: true, .. } if *key == k))
+    };
+    let _ = frame(&mut tab, Vec::new(), true);
+    tab.find.focus = false;
+    let ctrl_f = frame(&mut tab, key(Key::F, Modifiers::COMMAND).to_vec(), false);
+    let f3 = frame(&mut tab, key(Key::F3, Modifiers::NONE).to_vec(), false);
+    let esc = frame(&mut tab, key(Key::Escape, Modifiers::NONE).to_vec(), false);
+    assert!(kept(&ctrl_f, Key::F), "Ctrl+F");
+    assert!(kept(&f3, Key::F3), "F3");
+    assert!(kept(&esc, Key::Escape), "Esc");
+    assert!(tab.find.open && !tab.find.focus);
+    // With nothing focused, Ctrl+F is the find bar's.
+    ctx.memory_mut(|m| m.surrender_focus(egui::Id::new("other")));
+    let ctrl_f = frame(&mut tab, key(Key::F, Modifiers::COMMAND).to_vec(), false);
+    assert!(!kept(&ctrl_f, Key::F) && tab.find.focus);
 }

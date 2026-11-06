@@ -8,13 +8,16 @@ use crate::repo::diff::{DiffData, Kind};
 pub(crate) fn search_diff(
     find: &mut Find,
     ctx: &egui::Context,
-    request: u64,
+    path: &str,
     data: &DiffData,
     split: bool,
 ) -> Option<Hit> {
+    if !find.open {
+        return None;
+    }
     let lines = &data.lines;
     let key = SourceKey {
-        what: Source::Diff(request),
+        what: Source::Diff(path.to_owned()),
         at: lines.as_ptr() as usize,
         len: lines.len(),
     };

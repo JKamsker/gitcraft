@@ -77,27 +77,24 @@ impl RepoTab {
         let longest = data.longest as f32;
         let width = (GUTTER_W + NUM_W + 16.0 + longest * char_w + 24.0).max(ui.available_width());
         let find = &mut self.find;
-        let key = SourceKey {
-            what: Source::Blame {
-                path: view.path.clone(),
-                rev: view.rev.clone(),
-            },
-            at: data.lines.as_ptr() as usize,
-            len: data.lines.len(),
-        };
-        let text = |i: usize| data.lines.get(i).map(|l| l.text.as_str());
-        find.update(ui.ctx(), key, data.lines.len(), text, Layout::Lines);
+        if find.open {
+            let key = SourceKey {
+                what: Source::Blame {
+                    path: view.path.clone(),
+                    rev: view.rev.clone(),
+                },
+                at: data.lines.as_ptr() as usize,
+                len: data.lines.len(),
+            };
+            let text = |i: usize| data.lines.get(i).map(|l| l.text.as_str());
+            find.update(ui.ctx(), key, data.lines.len(), text, Layout::Lines);
+        }
         let mut scroll = egui::ScrollArea::both()
             .id_salt(("file_blame", &view.path, &view.rev))
             .auto_shrink(false);
         if let Some(hit) = find.take_reveal() {
-            let (y, x) = find.offsets_for(&hit, char_w);
-            if let Some(y) = y {
-                scroll = scroll.vertical_scroll_offset(y);
-            }
-            if let Some(x) = x {
-                scroll = scroll.horizontal_scroll_offset(x);
-            }
+            let text = data.lines.get(hit.line).map_or("", |l| l.text.as_str());
+            scroll = find.scroll_to(scroll, &hit, text, char_w);
         }
         ui.spacing_mut().item_spacing.y = 0.0;
         let found = &*find;

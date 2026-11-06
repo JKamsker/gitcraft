@@ -127,7 +127,7 @@ impl RepoTab {
                 ("file_view", &view.path, &view.rev),
                 view.text.as_ref(),
                 &mut self.find,
-                Source::File {
+                || Source::File {
                     path: view.path.clone(),
                     rev: view.rev.clone(),
                 },

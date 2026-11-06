@@ -25,7 +25,12 @@ pub(crate) fn paint_marks(
     t: &Tokens,
 ) {
     let at = |c: usize| origin.x + galley.pos_from_cursor(CCursor::new(c)).min.x;
-    for (k, chars) in marks.ranges.iter().enumerate() {
+    // Only those in sight: a line of a minified file can hold thousands. The ranges are in
+    // order, so are their places.
+    let clip = painter.clip_rect().x_range();
+    let first = marks.ranges.partition_point(|r| at(r.end) < clip.min);
+    let shown = marks.ranges[first..].partition_point(|r| at(r.start) <= clip.max);
+    for (k, chars) in marks.ranges.iter().enumerate().skip(first).take(shown) {
         let rect = Rect::from_x_y_ranges(
             Rangef::new(at(chars.start), at(chars.end).max(at(chars.start) + 2.0)),
             Rangef::new(y.min + 1.0, y.max - 1.0),

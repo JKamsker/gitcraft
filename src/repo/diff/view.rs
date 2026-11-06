@@ -66,7 +66,7 @@ impl RepoTab {
             self.find.bar(ui, what.name());
         }
         if as_file {
-            let source = find::Source::DiffFile(view.request);
+            let source = || find::Source::DiffFile(path.clone());
             file_text::show(
                 ui,
                 ("diff_file", &path),
@@ -90,7 +90,7 @@ impl RepoTab {
         }
 
         let split = data.shows_split(split);
-        let reveal = find::search_diff(&mut self.find, ui.ctx(), view.request, data, split);
+        let reveal = find::search_diff(&mut self.find, ui.ctx(), &path, data, split);
         let shift = ui.input(|i| i.modifiers.shift);
         let mut rows = Rows::new(ui, view, data, review.as_ref(), partial, split)
             .with_find(&self.find, reveal);

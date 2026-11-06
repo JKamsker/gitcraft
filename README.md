@@ -172,10 +172,10 @@ so your config, credentials and hooks apply as usual.
 - The _Diff_ / _File_ switch shows the whole file as it is after the change instead (before it,
   for a deleted file), coloured and with line numbers.
 - Ctrl+F in a diff (unified or side by side), a file or a blame finds in it rather than in the
-  commits: every match marked, _Enter_ / _Shift+Enter_ (or F3 / Shift+F3) step through them in
-  the order of the rows, with which of how many in the bar; match case, whole words and regular
-  expressions are toggles; Esc closes it. A very long file is searched a little each frame, the
-  window never waits for it.
+  commits: every match is marked and _Enter_ / _Shift+Enter_ (or F3 / Shift+F3) step through
+  them in the order of the rows; the bar shows which match of how many (e.g. 3 of 12). Match
+  case, whole words and regular expressions are toggles; Esc closes the bar. A very long file
+  is searched a few lines per frame, so the window stays responsive.
 - A Markdown file's diff has an eye button that renders it: the changes block by block (removed
   ones red, added ones green, the rest as they are) or, with _File_, the whole file. Images of
   the repository show as they are on each side of the change; any other image is a link, so a
@@ -417,7 +417,7 @@ was made this way, on a demo repository.
 | `src/repo/rebase.rs`     | interactive rebase editor and its todo list                                        |
 | `src/repo/file_view.rs`  | a file's history, blame and contents at a commit                                   |
 | `src/repo/file_text.rs`  | a whole file at a commit, coloured, for the file view and diffs                    |
-| `src/repo/find.rs` | find in the diff, file or blame shown: the bar, matching, marks and keys |
+| `src/repo/find/`         | find in the diff, file or blame shown: the bar, matching, marks, keys              |
 | `src/repo/dialogs.rs`    | branch, tag, stash, remote, worktree, pull request and confirm dialogs             |
 | `src/repo/widgets.rs`    | shared painted widgets (panel headers, file rows, avatars, tabs)                   |
 | `src/app.rs`             | window shell: tabs, start page, cloning, palette, settings, toasts                 |
