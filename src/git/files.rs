@@ -123,6 +123,9 @@ pub struct FileCommit {
     pub time: i64,
     pub summary: String,
     pub path: String,
+    /// In a history of some lines: the lines of the file the commit's change to them covers
+    /// (as they are in the commit); empty otherwise.
+    pub lines: Vec<(u32, u32)>,
 }
 
 /// Every commit that changed `path` up to `rev` (HEAD when `None`), newest first, following
@@ -162,6 +165,7 @@ fn parse_file_history(out: &str) -> Vec<FileCommit> {
                 time: f.next().and_then(|t| t.parse().ok()).unwrap_or(0),
                 summary: f.next().unwrap_or_default().to_owned(),
                 path: String::new(),
+                lines: Vec::new(),
             };
             c.path = lines.rfind(|l| !l.is_empty())?.to_owned();
             Some(c)

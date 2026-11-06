@@ -67,7 +67,12 @@ impl RepoTab {
                         selected(&f),
                         RowExtra::Stats(f.added, f.removed),
                     );
-                    widgets::file_menu(&r.row, &f.path, rev, false, acts);
+                    match key(&f.path) {
+                        DiffKey::Commit { hash, .. } => {
+                            widgets::commit_file_menu(&r.row, &f.path, &hash, acts)
+                        }
+                        _ => widgets::file_menu(&r.row, &f.path, rev, false, acts),
+                    }
                     if r.row.clicked() {
                         acts.push(Action::OpenDiff(key(&f.path)));
                     }

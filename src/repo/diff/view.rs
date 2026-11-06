@@ -7,7 +7,7 @@ use super::images::image_view;
 use super::lfs::lfs_view;
 use super::rendered;
 use super::rows::Rows;
-use super::{DiffData, Kind, Pick, unstage_args};
+use super::{DiffData, Kind, Pick, old_name, picked_in_file, unstage_args};
 use crate::git::{Area, StatusFile};
 use crate::icons;
 use crate::pull_request::DiffSide;
@@ -25,6 +25,8 @@ impl RepoTab {
 
         let (path, origin) = self.diff_origin(&view.key);
         let partial = matches!(&view.data, Some(Ok(d)) if d.partial) && idle;
+        // Lines and hunks can be picked: to stage, unstage or discard, or to revert.
+        let pickable = matches!(&view.data, Some(Ok(d)) if d.partial || d.revertable) && idle;
         let settings = Settings::get(ui.ctx());
         let (split, ignore_ws, whole_file) = (
             settings.diff_split,
@@ -62,7 +64,23 @@ impl RepoTab {
             return;
         }
         if as_file {
-            file_text::show(ui, ("diff_file", &path), view.file.as_ref());
+            let before = matches!(&view.file, Some(Ok(f)) if f.before);
+            let old_path = match &view.data {
+                Some(Ok(d)) => old_name(&d.header),
+                _ => None,
+            };
+            let pick = |range| picked_in_file(&view.key, old_path.as_deref(), before, range);
+            let history = pick((1, 1))
+                .map(|_| ())
+                .ok_or("A file that isn't committed has no history yet");
+            let id = ("diff_file", &path);
+            if let Some(p) = file_text::show(ui, id, view.file.as_ref(), history).and_then(pick) {
+                acts.push(Action::LineHistory {
+                    path: p.path,
+                    at: p.at,
+                    range: p.range,
+                });
+            }
             return;
         }
         let Some(data) = ready_data(ui, view, ignore_ws, &t) else {
@@ -80,7 +98,7 @@ impl RepoTab {
 
         let split = data.shows_split(split);
         let shift = ui.input(|i| i.modifiers.shift);
-        let mut rows = Rows::new(ui, view, data, review.as_ref(), partial, split);
+        let mut rows = Rows::new(ui, view, data, review.as_ref(), pickable, split);
         let sel = rows.show(ui, &path, acts);
         let (clicked, offset, jumped) = (rows.clicked, rows.offset, rows.jumped);
 
@@ -155,8 +173,16 @@ impl RepoTab {
                         DiffKey::Range { to: None, .. } => (None, false),
                         DiffKey::Work(_) => (None, true),
                     };
-                    widgets::file_menu(&title, path, rev, ignorable, acts);
+                    match &view.key {
+                        DiffKey::Commit { hash, .. } => {
+                            widgets::commit_file_menu(&title, path, hash, acts)
+                        }
+                        _ => widgets::file_menu(&title, path, rev, ignorable, acts),
+                    }
                     widgets::chip(ui, origin, t.text_dim);
+                    if let Some(ranges) = &view.lines {
+                        widgets::chip(ui, &lines_chip(ranges), t.accent);
+                    }
                     let before = if rendered {
                         matches!(&view.rendered, Some(Ok(md)) if md.before)
                     } else {
@@ -173,10 +199,20 @@ impl RepoTab {
                             let partial = partial && !as_file && !rendered;
                             clear = self.file_actions(ui, view, file, partial, acts);
                         }
+                        if let DiffKey::Commit { hash, path } = &view.key
+                            && view.lines.is_none()
+                        {
+                            let lines = !as_file && !rendered;
+                            clear = self.commit_actions(ui, view, (hash, path), lines, acts);
+                        }
                         ui.add_space(8.0);
                         if !as_file && !rendered {
-                            view_options(ui, &t, (split, ignore_ws, whole_file), acts);
-                            ui.add_space(8.0);
+                            // A diff of some lines only (`git log -L`) shows them whole, with
+                            // whitespace: those options don't apply to it.
+                            if view.lines.is_none() {
+                                view_options(ui, &t, (split, ignore_ws, whole_file), acts);
+                                ui.add_space(8.0);
+                            }
                             change_steps(ui, acts);
                             ui.add_space(8.0);
                         }
@@ -258,6 +294,55 @@ impl RepoTab {
             .clicked()
     }
 
+    /// Revert the commit's changes to the whole file or, once lines are clicked in its diff
+    /// (`lines`: they show), those lines. True when "Clear" was clicked.
+    fn commit_actions(
+        &self,
+        ui: &mut Ui,
+        view: &DiffView,
+        (hash, path): (&str, &str),
+        lines: bool,
+        acts: &mut Vec<Action>,
+    ) -> bool {
+        let idle = self.busy_op.is_none();
+        let chosen = view.chosen.len();
+        let revertable = matches!(&view.data, Some(Ok(d)) if d.revertable);
+        // Laid out right to left. The lines' buttons take the place of the file's, which stays
+        // in the file's menu, so the header keeps room for the rest.
+        if lines && revertable && chosen > 0 {
+            let noun = if chosen == 1 { "line" } else { "lines" };
+            let b = ui
+                .add_enabled(idle, egui::Button::new(format!("Revert {chosen} {noun}")))
+                .on_hover_text(
+                    "Undo only the lines clicked in the working tree, to look over before \
+                     committing",
+                );
+            if b.clicked() {
+                acts.push(Action::PickLines {
+                    pick: Pick::Revert,
+                    lines: view.chosen.clone(),
+                });
+            }
+            return ui
+                .button("Clear")
+                .on_hover_text("Unselect the lines")
+                .clicked();
+        }
+        let b = ui
+            .add_enabled(idle, egui::Button::new("Revert file"))
+            .on_hover_text(
+                "Undo this commit's changes to the file in the working tree, to look over \
+                 before committing",
+            );
+        if b.clicked() {
+            acts.push(Action::RevertFile {
+                hash: hash.to_owned(),
+                path: path.to_owned(),
+            });
+        }
+        false
+    }
+
     /// "abc1234 → def5678" for a diff between two commits, with the names of the comparison.
     fn range_label(&self, from: &str, to: &Option<String>) -> String {
         let name = |rev: &str| {
@@ -294,6 +379,26 @@ impl DiffView {
             }
         }
     }
+}
+
+/// "Lines 4–9" (and the others, when the lines moved apart): those the diff is limited to.
+fn lines_chip(ranges: &[crate::git::LineRange]) -> String {
+    let parts: Vec<String> = ranges
+        .iter()
+        .map(|&(a, b)| {
+            if a == b {
+                a.to_string()
+            } else {
+                format!("{a}–{b}")
+            }
+        })
+        .collect();
+    let noun = if ranges.len() == 1 && ranges[0].0 == ranges[0].1 {
+        "Line"
+    } else {
+        "Lines"
+    };
+    format!("{noun} {}", parts.join(", "))
 }
 
 /// Whitespace, whole file, side by side and unified toggles, laid out right to left.

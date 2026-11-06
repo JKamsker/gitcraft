@@ -247,7 +247,7 @@ impl RepoTab {
         self.follow_checkout_move(result.is_ok(), ctx);
     }
 
-    fn record_undo(&mut self, label: &str, kind: OpKind) {
+    pub(super) fn record_undo(&mut self, label: &str, kind: OpKind) {
         match kind {
             OpKind::Normal(Undo::None, _) => {}
             OpKind::Normal(Undo::HeadMove { mode }, heads) => {

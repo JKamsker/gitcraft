@@ -197,7 +197,7 @@ pub(super) fn hunk_button(
 ) -> (egui::Response, f32) {
     let t = Tokens::get(ui.ctx());
     let label = format!("{} hunk", pick.verb());
-    let color = if pick == Pick::Discard {
+    let color = if matches!(pick, Pick::Discard | Pick::Revert) {
         t.text_dim
     } else {
         t.accent
@@ -235,6 +235,10 @@ pub(super) fn hunk_button(
             "Unstage this hunk. Click lines to unstage only some of them (Shift+click for a range)."
         }
         Pick::Discard => "Throw away this hunk's changes (Ctrl+Z brings them back).",
+        Pick::Revert => {
+            "Undo this hunk of the commit in the working tree, to look over before committing. \
+             Click lines to revert only some of them (Shift+click for a range)."
+        }
     };
     (resp.on_hover_text(tip), r.left())
 }
