@@ -2,6 +2,7 @@
 //! (branches on the left, commit graph or diff in the middle, commit detail / changes on the right).
 
 mod actions;
+mod activity;
 mod apply;
 mod branch_tree;
 mod branch_visibility;
@@ -196,6 +197,8 @@ pub struct RepoTab {
     running: Option<running::Running>,
     /// Operations asked for while another ran, to run after it.
     waiting: running::Waiting,
+    /// The operations run, with their commands and output (the Activity panel).
+    activity: activity::ActivityLog,
     /// The running operation moves the checkout: update the submodules after it, if asked to.
     update_submodules: bool,
     status: Option<(String, bool)>,
@@ -341,6 +344,7 @@ impl RepoTab {
             op_started: None,
             running: None,
             waiting: Default::default(),
+            activity: Default::default(),
             update_submodules: false,
             status: None,
             branch_filter: String::new(),

@@ -203,7 +203,10 @@ impl RepoTab {
         self.busy_op = None;
         // Done with it before anything starts after it (updating the submodules).
         let running = self.running.take();
-        let cancelled = result.is_err() && running.is_some_and(|r| r.control.is_cancelled());
+        let cancelled =
+            result.is_err() && running.as_ref().is_some_and(|r| r.control.is_cancelled());
+        let steps = running.map(|r| r.control.steps()).unwrap_or_default();
+        self.log_activity(&label, &result, cancelled, quiet, steps);
         let long = self
             .op_started
             .take()
@@ -331,6 +334,7 @@ impl RepoTab {
 
 /// Runs one step of an operation: one that goes over the network followed through `control`
 /// (its progress shown, and stopped on a cancel), any other as it is; none once cancelled.
+/// What each did is kept in `control`, for the activity log.
 fn run_step(
     path: &Path,
     args: &[&str],
@@ -338,14 +342,24 @@ fn run_step(
     quiet: bool,
     control: Option<&Arc<git::OpControl>>,
 ) -> Result<String, String> {
-    match control {
-        Some(c) if c.is_cancelled() => Err(git::CANCELLED.to_owned()),
-        Some(c) if git::goes_over_network(args) => {
-            git::run_watched(Some(path), args, creds, quiet, c)
-        }
-        _ if quiet => git::run_unattended(Some(path), args, creds),
-        _ => git::run_with(Some(path), args, creds),
+    let Some(control) = control else {
+        return if quiet {
+            git::run_unattended(Some(path), args, creds)
+        } else {
+            git::run_with(Some(path), args, creds)
+        };
+    };
+    if control.is_cancelled() {
+        return Err(git::CANCELLED.to_owned());
     }
+    // Each call kept for the activity log.
+    let (result, recorded) = if git::goes_over_network(args) {
+        git::run_watched_recorded(Some(path), args, creds, quiet, control)
+    } else {
+        git::run_recorded(Some(path), args, creds, quiet)
+    };
+    control.record(recorded);
+    result
 }
 
 /// What a cancelled operation says: that it was, with what it may have left behind: the lock

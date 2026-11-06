@@ -15,6 +15,10 @@ use crate::terminal::ShellSpec;
 pub(crate) enum Action {
     /// Stop the operation running (one that goes over the network).
     CancelOp,
+    /// Open or close the Activity panel.
+    ToggleActivity,
+    /// Open the Activity panel on the latest operation (an error clicked in the toolbar).
+    ShowLastActivity,
     Select(usize),
     SelectHash(String),
     SelectStash(usize),
@@ -344,6 +348,11 @@ impl RepoTab {
                 "Toggle terminal".into(),
                 "terminal".into(),
                 Action::ToggleTerminal,
+            ),
+            (
+                "Activity: operations and their output".into(),
+                "log".into(),
+                Action::ToggleActivity,
             ),
             (
                 "New terminal".into(),
