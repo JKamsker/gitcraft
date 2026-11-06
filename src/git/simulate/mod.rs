@@ -1,0 +1,94 @@
+//! Working out what an operation would do without doing it, for the ghost run (and anything
+//! else that wants to know before acting): commits replayed onto another one as a rebase or
+//! cherry-pick would, in memory with `git replay` (git 2.44+) or with `git merge-tree` one
+//! commit at a time (2.40+); merges with `git merge-tree --write-tree` (2.38+); on an older
+//! git, both in a scratch clone in the temporary folder (see [`scratch`]).
+//!
+//! Only objects are written, which no ref holds and gc clears: no ref, index, working tree,
+//! reflog or config of the repository changes, nor does anything of its hooks run. Every git
+//! call goes through [`super::run`], so a repository in WSL or over SSH is simulated there.
+
+mod picks;
+mod reach;
+mod scratch;
+mod version;
+
+pub use picks::{Replay, Replayed, Stop, rebase_picks, replay};
+pub use reach::{Merge, is_ancestor, leaving, merge, unreachable};
+pub use version::GitVersion;
+
+/// What a simulation ran on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Engine {
+    /// `git replay`, all commits in one call.
+    Replay,
+    /// `git merge-tree --write-tree`, a commit (or a merge) at a time.
+    MergeTree,
+    /// A scratch clone in the temporary folder, for a git too old for the other two.
+    Scratch,
+}
+
+impl Engine {
+    /// How the ghost run says what it ran on.
+    pub fn describe(self) -> &'static str {
+        match self {
+            Engine::Replay => "git replay, in memory",
+            Engine::MergeTree => "git merge-tree, in memory",
+            Engine::Scratch => "a scratch clone in the temporary folder",
+        }
+    }
+}
+
+/// What a simulation that was asked to stop returns: the one asking has gone (the hover ended).
+pub const CANCELLED: &str = "cancelled";
+
+/// Options before the subcommand of every git call that writes a commit object: an identity
+/// that always works (the copies are only looked at, never kept), no signing (no key prompt,
+/// no pinentry window), no hooks, and no gc or maintenance started by the writes.
+const WRITE_OPTS: [&str; 12] = [
+    "-c",
+    "user.name=gitcraft ghost run",
+    "-c",
+    "user.email=ghost-run@gitcraft.invalid",
+    "-c",
+    "commit.gpgSign=false",
+    "-c",
+    "gc.auto=0",
+    "-c",
+    "maintenance.auto=false",
+    "-c",
+    "core.hooksPath=.gitcraft-ghost-run-no-hooks",
+];
+
+/// [`WRITE_OPTS`] followed by `args`.
+fn with_write_opts<'a>(args: &[&'a str]) -> Vec<&'a str> {
+    WRITE_OPTS
+        .iter()
+        .copied()
+        .chain(args.iter().copied())
+        .collect()
+}
+
+/// Whether `s` is a full object name (what the simulation passes on to git, never a name a
+/// ref or an option could take).
+fn is_oid(s: &str) -> bool {
+    matches!(s.len(), 40 | 64) && s.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+/// The full object name `rev` resolves to, as a commit.
+fn commit_oid(repo: &std::path::Path, rev: &str) -> Result<String, String> {
+    super::resolve(repo, rev)
+}
+
+/// The tree of the commit `oid`.
+fn tree_of(repo: &std::path::Path, oid: &str) -> Result<String, String> {
+    super::run(
+        Some(repo),
+        &["rev-parse", "--verify", "-q", &format!("{oid}^{{tree}}")],
+    )
+    .map(|s| s.trim().to_owned())
+    .map_err(|_| format!("{oid} has no tree"))
+}
+
+#[cfg(test)]
+pub(crate) mod tests;
