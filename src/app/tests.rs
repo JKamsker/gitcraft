@@ -1,5 +1,7 @@
 //! Saved state, the active tab on start, the window icon and palette matching.
 
+use eframe::Storage as _;
+
 use super::palette::fuzzy;
 use super::{Saved, active_among_kept, window_icon};
 use crate::tab_look::{TabColor, TabLook};
@@ -66,4 +68,120 @@ fn fuzzy_matching() {
     assert!(fuzzy("check out main", "co main"));
     assert!(!fuzzy("fetch", "push"));
     assert!(fuzzy("anything", ""));
+}
+
+/// A repository in WSL (`GITCRAFT_TEST_WSL=<distro>`; skipped without): the window is driven
+/// through actions of every kind, and none of them makes the window's thread wait for WSL.
+#[test]
+fn a_remote_repository_never_holds_up_the_window() -> Result<(), String> {
+    use crate::remote::{self, Host, Request};
+    use std::time::{Duration, Instant};
+    type H<'a> = egui_kittest::Harness<'a, super::App>;
+
+    let Ok(distro) = std::env::var("GITCRAFT_TEST_WSL") else {
+        return Ok(());
+    };
+    let host = Host::Wsl(distro);
+    let dir = format!("/tmp/gitcraft-window-{}", std::process::id());
+    let setup = format!(
+        concat!(
+            "set -e; rm -rf {d}; mkdir -p {d}; cd {d}; git init -q -b main\n",
+            "git config user.name t; git config user.email t@t\n",
+            "printf '1\\n2\\n3\\n' > a.txt; git add a.txt; git commit -q -m one\n",
+            "printf '1\\n2\\n3\\n4\\n' > a.txt; git commit -q -a -m two\n",
+            "git tag -a v1 -m 'the first'\n",
+            "printf '1\\nX\\n3\\n4\\n' > a.txt; echo x > ignored.txt\n",
+        ),
+        d = dir
+    );
+    let made = remote::exec(
+        &host,
+        &Request {
+            script: setup,
+            ..Request::default()
+        },
+    )?;
+    assert_eq!(made.code, 0, "{}", String::from_utf8_lossy(&made.stderr));
+    let refused_before = remote::refused_on_ui_thread();
+
+    let path = remote::encode(&host, &dir);
+    let mut harness = egui_kittest::Harness::builder()
+        .with_size([1400.0, 860.0])
+        .build_eframe(|cc| super::App::new(cc, Some(path)));
+    // Frames as the window draws them, with time for the background work to come back.
+    let run_for = |harness: &mut H<'_>, ms: u64| {
+        let until = Instant::now() + Duration::from_millis(ms);
+        while Instant::now() < until {
+            harness.step();
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    };
+    let settled = |harness: &H<'_>| {
+        let state = harness.state();
+        matches!(state.tabs.get(state.active),
+            Some(super::Tab::Repo(r)) if !r.opening() && r.settled())
+    };
+    let with_tab = |harness: &mut H<'_>, f: &dyn Fn(&mut crate::repo::RepoTab)| {
+        let state = harness.state_mut();
+        let active = state.active;
+        if let Some(super::Tab::Repo(r)) = state.tabs.get_mut(active) {
+            f(r);
+        }
+    };
+    // Connected and read.
+    for _ in 0..300 {
+        run_for(&mut harness, 100);
+        if settled(&harness) {
+            break;
+        }
+    }
+    assert!(settled(&harness), "the repository never opened");
+    for phase in [1, 2] {
+        with_tab(&mut harness, &|r| {
+            for action in r.sample_actions(phase) {
+                r.queue(action);
+            }
+        });
+        run_for(&mut harness, 4000);
+        // A dialog an action opened is let go, so that the next ones run.
+        with_tab(&mut harness, &|r| r.close_dialog());
+    }
+    let refused = remote::refused_on_ui_thread() - refused_before;
+    // Cleaned up from another thread: this one is the window's now.
+    let cleanup = Request {
+        script: format!("rm -rf {dir}"),
+        ..Request::default()
+    };
+    let _ = std::thread::spawn(move || remote::exec(&host, &cleanup)).join();
+    assert_eq!(refused, 0, "commands asked of WSL from the window's thread");
+    Ok(())
+}
+
+/// The tabs of the profiles not in use survive a restart, and saves from before profiles load.
+#[test]
+fn profile_tabs_survive_a_restart() {
+    let mut saved = Saved::default();
+    saved.profile_states.insert(
+        2,
+        super::profiles::ProfileState {
+            open: vec!["C:/code/work".into()],
+            active: 0,
+            recent: vec!["C:/code/work".into()],
+            theme: crate::theme::ThemeKind::Light,
+        },
+    );
+    let mut storage = Memory::default();
+    eframe::set_value(&mut storage, eframe::APP_KEY, &saved);
+    let back: Option<Saved> = eframe::get_value(&storage, eframe::APP_KEY);
+    assert_eq!(
+        back.map(|b| b.profile_states),
+        Some(saved.profile_states.clone())
+    );
+
+    let mut old = Memory::default();
+    old.set_string(eframe::APP_KEY, "(open: [\"C:/a\"], active: 0)".to_owned());
+    let back: Option<Saved> = eframe::get_value(&old, eframe::APP_KEY);
+    let back = back.unwrap_or_default();
+    assert_eq!(back.open, [std::path::PathBuf::from("C:/a")]);
+    assert!(back.profile_states.is_empty());
 }

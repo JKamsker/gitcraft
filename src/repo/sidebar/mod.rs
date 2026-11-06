@@ -127,9 +127,9 @@ impl RepoTab {
             acts.push(Action::OpenBranches(None));
         }
         col.add_space(5.0);
-        let prs = self.forge.map(|forge| match forge {
-            crate::forge::Forge::GitHub => "Pull requests",
-            crate::forge::Forge::GitLab => "Merge requests",
+        let prs = self.forge().map(|forge| match forge.noun() {
+            "merge request" => "Merge requests",
+            _ => "Pull requests",
         });
         let tags = (!self.refs.tags.is_empty()).then_some("Tags");
         let submodules = (!self.submodules.is_empty()).then_some("Submodules");

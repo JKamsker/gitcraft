@@ -72,8 +72,37 @@ impl RepoTab {
             if let Some(problem) = editor.problem() {
                 return Err(problem);
             }
-            Ok((editor.command()?, editor.head))
+            Ok(editor)
         });
+        match result {
+            Ok(editor) => self.with_rebase_command(editor, ctx, move |tab, command, ctx| {
+                tab.reword_ready(&hash, command, ctx);
+            }),
+            Err(e) => self.status = Some((format!("Edit message: {e}"), true)),
+        }
+    }
+
+    /// Writes `editor`'s todo list and messages where git runs (on another machine, in the
+    /// background), then `then` with the rebase command and the head it starts from.
+    pub(super) fn with_rebase_command(
+        &mut self,
+        editor: rebase::RebaseEditor,
+        ctx: &egui::Context,
+        then: impl FnOnce(&mut RepoTab, Result<(Vec<String>, String), String>, &egui::Context)
+        + Send
+        + 'static,
+    ) {
+        let repo = self.path.clone();
+        self.here_or_later(ctx, move || Ok((editor.command(&repo)?, editor.head)), then);
+    }
+
+    /// Runs the reword of `hash` once its rebase command is ready.
+    fn reword_ready(
+        &mut self,
+        hash: &str,
+        result: Result<(Vec<String>, String), String>,
+        ctx: &egui::Context,
+    ) {
         match result {
             // Started while something else ran: say so rather than drop it.
             Ok(_) if self.busy_op.is_some() => {
@@ -87,7 +116,7 @@ impl RepoTab {
             }
             // The todo list replaces the commits read: not one made since.
             Ok((command, head)) => self.run_undoable(
-                &format!("Edit the message of {}", short(&hash)),
+                &format!("Edit the message of {}", short(hash)),
                 vec![self.same_branch(), expect_ref_at("HEAD", &head), command],
                 Refresh::All,
                 Undo::HeadMove { mode: "--keep" },
@@ -164,8 +193,10 @@ impl RepoTab {
 
     /// Runs the rebase the editor describes.
     pub(super) fn run_rebase(&mut self, ctx: &egui::Context) {
-        let Some(editor) = &self.rebase else { return };
-        if editor.problem().is_some() || self.busy_op.is_some() {
+        let Some(editor) = &mut self.rebase else {
+            return;
+        };
+        if editor.problem().is_some() || editor.starting || self.busy_op.is_some() {
             return;
         }
         // Committed or pulled while the editor was open: its todo list would drop that. Checked
@@ -175,13 +206,42 @@ impl RepoTab {
             self.status = Some((why, true));
             return;
         }
-        match editor.command() {
-            Ok(command) => {
-                let label = format!("Interactive rebase onto {}", editor.onto_label);
-                let guards = [self.same_branch(), expect_ref_at("HEAD", &editor.head)];
+        let label = format!("Interactive rebase onto {}", editor.onto_label);
+        // Started once: until its files are written (elsewhere, in the background), it can't
+        // be started again, and it runs only if this editor is still the one open then.
+        editor.starting = true;
+        let (plan, id) = (editor.clone(), editor.id);
+        self.with_rebase_command(plan, ctx, move |tab, command, ctx| {
+            tab.rebase_ready(id, &label, command, ctx);
+        });
+    }
+
+    /// Runs the rebase of editor `id` once its command is ready, if that editor is still the
+    /// one open: cancelled (or another rebase opened) meanwhile, nothing runs.
+    fn rebase_ready(
+        &mut self,
+        id: u64,
+        label: &str,
+        command: Result<(Vec<String>, String), String>,
+        ctx: &egui::Context,
+    ) {
+        let Some(editor) = self.rebase.as_mut().filter(|e| e.id == id) else {
+            return;
+        };
+        editor.starting = false;
+        match command {
+            // Something else started while the files were written.
+            Ok(_) if self.busy_op.is_some() => {
+                self.status = Some((
+                    format!("{label}: something else is running, try again when it's done"),
+                    true,
+                ));
+            }
+            Ok((command, head)) => {
+                let guards = [self.same_branch(), expect_ref_at("HEAD", &head)];
                 self.rebase = None;
                 self.run_undoable(
-                    &label,
+                    label,
                     [guards.to_vec(), vec![command]].concat(),
                     Refresh::All,
                     Undo::HeadMove { mode: "--keep" },
@@ -264,6 +324,48 @@ mod tests {
         assert!(made.is_ok());
         assert!(matches!(result, Some(Err(_))), "{result:?}");
         assert_eq!(head, unseen);
+    }
+
+    /// A rebase whose files were still being written when its editor was cancelled (or another
+    /// opened) doesn't start; nor can one being started be started a second time.
+    #[test]
+    fn a_rebase_prepared_for_an_editor_gone_since_does_not_run() {
+        let dir = repo("rebase-cancelled");
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+        tab.refs.head = git::head(&dir);
+        let commits = git::rebase_commits(&dir, "HEAD~1").unwrap_or_default();
+        let editor = rebase::RebaseEditor::new("HEAD~1".to_owned(), "HEAD~1".to_owned(), commits);
+        let id = editor.id;
+        let ready = || {
+            Ok((
+                vec!["rebase".to_owned(), "HEAD~1".to_owned()],
+                String::new(),
+            ))
+        };
+
+        // Being started: a second Start does nothing.
+        tab.rebase = Some(editor.clone());
+        if let Some(e) = tab.rebase.as_mut() {
+            e.starting = true;
+        }
+        tab.run_rebase(&ctx);
+        assert!(tab.busy_op.is_none());
+
+        // Cancelled while its files were written.
+        tab.rebase = None;
+        tab.rebase_ready(id, "Rebase", ready(), &ctx);
+        assert!(tab.busy_op.is_none());
+
+        // Another editor opened meanwhile: that one is left alone.
+        let other = rebase::RebaseEditor::new("HEAD~1".to_owned(), "HEAD~1".to_owned(), vec![]);
+        let other_id = other.id;
+        tab.rebase = Some(other);
+        tab.rebase_ready(id, "Rebase", ready(), &ctx);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(tab.busy_op.is_none());
+        assert_eq!(tab.rebase.as_ref().map(|e| e.id), Some(other_id));
+        assert_ne!(id, other_id);
     }
 
     /// Editing the message of what the tab thinks is the latest commit, after another was made

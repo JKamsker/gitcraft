@@ -1,21 +1,84 @@
-//! Running git: the environment every call gets, credentials for remotes, errors.
+//! Running git: the environment every call gets, credentials for remotes, errors. A call for a
+//! repository in WSL or over SSH runs git there (see [`crate::remote`]), with the same
+//! environment.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::RwLock;
+
+/// The config file the active gitcraft profile has git read as its global config (see
+/// `settings::profiles`), if it sets anything.
+static PROFILE_CONFIG: RwLock<Option<PathBuf>> = RwLock::new(None);
+
+/// Has every git command from now on read `path` as its global config, or the user's own again
+/// with `None`. It is still the global scope, so what a repository sets itself (`--local`,
+/// `--worktree`) wins over it.
+pub fn set_profile_config(path: Option<PathBuf>) {
+    if let Ok(mut current) = PROFILE_CONFIG.write() {
+        *current = path;
+    }
+}
+
+/// Whether `args` reads or writes the user's own global config: `git config --global …`
+/// (signing settings, Mergiraf's set-up), which must never land in the profile's file, which is
+/// written over.
+fn user_global_config(args: &[&str]) -> bool {
+    let rest = after_options(args);
+    rest.first() == Some(&"config") && rest.contains(&"--global")
+}
+
+/// `args` from the subcommand on: past the options before it (`-c x=y`, `-C dir`,
+/// `--literal-pathspecs`…).
+fn after_options<'a>(args: &'a [&'a str]) -> &'a [&'a str] {
+    let mut rest = args;
+    loop {
+        match rest {
+            ["-c" | "-C", _, tail @ ..] => rest = tail,
+            [word, tail @ ..] if word.starts_with('-') => rest = tail,
+            _ => return rest,
+        }
+    }
+}
+
+/// Points `cmd` at the active profile's config, unless `args` is about the user's own.
+fn with_profile(cmd: &mut Command, args: &[&str]) {
+    if user_global_config(args) {
+        return;
+    }
+    let path = PROFILE_CONFIG.read().ok().and_then(|p| p.clone());
+    if let Some(path) = path {
+        cmd.env("GIT_CONFIG_GLOBAL", path);
+    }
+}
+
+use crate::remote::{self, Target};
+
+/// What every git call is run with.
+/// - `GIT_TERMINAL_PROMPT`: never block on an interactive prompt (credential helpers with a
+///   GUI still work).
+/// - `GIT_EDITOR`: `rebase --continue`, `merge --continue`… would otherwise open an editor
+///   nobody sees.
+/// - `LANGUAGE`: messages in English whatever the user's language: errors are told apart by
+///   their words (`is_auth_error`…). `C` in LANGUAGE wins over LC_ALL / LANG for messages only,
+///   so the character set (and what hooks see of it) stays the user's.
+const GIT_ENV: [(&str, &str); 4] = [
+    ("GIT_TERMINAL_PROMPT", "0"),
+    ("GIT_OPTIONAL_LOCKS", "0"),
+    ("GIT_EDITOR", "true"),
+    ("LANGUAGE", "C"),
+];
+
+/// Interactive rebases set `sequence.editor` themselves; an inherited one would win.
+const GIT_ENV_REMOVED: [&str; 1] = ["GIT_SEQUENCE_EDITOR"];
 
 fn git_cmd() -> Command {
     let mut cmd = Command::new("git");
-    // Never block on an interactive prompt: credential helpers with a GUI still work.
-    cmd.env("GIT_TERMINAL_PROMPT", "0");
-    cmd.env("GIT_OPTIONAL_LOCKS", "0");
-    // `rebase --continue`, `merge --continue`… would otherwise open an editor nobody sees.
-    cmd.env("GIT_EDITOR", "true");
-    // Interactive rebases set `sequence.editor` themselves; an inherited one would win.
-    cmd.env_remove("GIT_SEQUENCE_EDITOR");
-    // Messages in English whatever the user's language: errors are told apart by their words
-    // (`is_auth_error`…). `C` in LANGUAGE wins over LC_ALL / LANG for messages only, so the
-    // character set (and what hooks see of it) stays the user's.
-    cmd.env("LANGUAGE", "C");
+    for (name, value) in GIT_ENV {
+        cmd.env(name, value);
+    }
+    for name in GIT_ENV_REMOVED {
+        cmd.env_remove(name);
+    }
     crate::shell_path::apply(&mut cmd);
     #[cfg(windows)]
     {
@@ -26,6 +89,98 @@ fn git_cmd() -> Command {
     cmd
 }
 
+/// How a git call ended, here or elsewhere.
+struct Ran {
+    code: Option<i32>,
+    /// The exit status as it reads in an error.
+    status: String,
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+}
+
+/// Options before the subcommand, and variables, a call is run with on top of [`GIT_ENV`].
+#[derive(Default)]
+struct Extra {
+    pre: Vec<&'static str>,
+    env: Vec<(&'static str, String)>,
+}
+
+/// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
+fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
+    if let Some(target) = dir.and_then(remote::parse) {
+        return execute_there(&target, extra, args);
+    }
+    let mut cmd = git_cmd();
+    with_profile(&mut cmd, args);
+    if let Some(dir) = dir {
+        cmd.arg("-C").arg(dir);
+    }
+    cmd.args(&extra.pre);
+    for (name, value) in &extra.env {
+        cmd.env(name, value);
+    }
+    cmd.args(args);
+    let out = cmd
+        .output()
+        .map_err(|e| format!("could not run git: {e}"))?;
+    Ok(Ran {
+        code: out.status.code(),
+        status: out.status.to_string(),
+        stdout: out.stdout,
+        stderr: out.stderr,
+    })
+}
+
+/// The request that runs git with `args` in `target`'s folder, on its machine.
+fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Request {
+    let words: Vec<String> = extra
+        .pre
+        .iter()
+        .copied()
+        .chain(args.iter().copied())
+        .map(remote::sh_quote)
+        .collect();
+    remote::Request {
+        cwd: Some(target.path.clone()),
+        script: format!("exec git {}", words.join(" ")),
+        env: GIT_ENV
+            .iter()
+            .map(|(n, v)| ((*n).to_owned(), (*v).to_owned()))
+            .chain(extra.env.iter().map(|(n, v)| ((*n).to_owned(), v.clone())))
+            .collect(),
+        unset: GIT_ENV_REMOVED.iter().map(|n| (*n).to_owned()).collect(),
+        stdin: None,
+        long: goes_over_network(args),
+        timeout: None,
+    }
+}
+
+/// Whether the git command `args` (its options first) talks to a remote and may take minutes.
+fn goes_over_network(args: &[&str]) -> bool {
+    matches!(
+        after_options(args).first().copied(),
+        Some("fetch" | "pull" | "push" | "clone" | "ls-remote" | "remote" | "submodule" | "lfs")
+    )
+}
+
+fn execute_there(target: &Target, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
+    let out = remote::exec(&target.host, &remote_request(target, extra, args))?;
+    // The folder is gone (or never was) on that machine.
+    if out.code == 1 && remote::is_missing_folder(&out.stderr) {
+        return Err(format!(
+            "{} isn't a folder on {}",
+            target.path,
+            target.host.label()
+        ));
+    }
+    Ok(Ran {
+        code: Some(out.code),
+        status: format!("exit status: {}", out.code),
+        stdout: out.stdout,
+        stderr: out.stderr,
+    })
+}
+
 /// Runs git in `dir` and returns stdout, or the error output.
 pub fn run(dir: Option<&Path>, args: &[&str]) -> Result<String, String> {
     run_ok_codes(dir, args, &[0])
@@ -33,15 +188,8 @@ pub fn run(dir: Option<&Path>, args: &[&str]) -> Result<String, String> {
 
 /// Runs git and returns stdout as raw bytes (file contents: images…).
 pub fn run_bytes(dir: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
-    let mut cmd = git_cmd();
-    if let Some(dir) = dir {
-        cmd.arg("-C").arg(dir);
-    }
-    cmd.args(args);
-    let out = cmd
-        .output()
-        .map_err(|e| format!("could not run git: {e}"))?;
-    if out.status.success() {
+    let out = execute(dir, &Extra::default(), args)?;
+    if out.code == Some(0) {
         Ok(out.stdout)
     } else {
         Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
@@ -50,7 +198,14 @@ pub fn run_bytes(dir: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
 
 /// Starts git in `dir` with its output piped, for a caller that reads it bit by bit.
 pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Child, String> {
+    if let Some(target) = remote::parse(dir) {
+        return remote::spawn(
+            &target.host,
+            &remote_request(&target, &Extra::default(), args),
+        );
+    }
     let mut cmd = git_cmd();
+    with_profile(&mut cmd, args);
     cmd.arg("-C").arg(dir).args(args);
     cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
@@ -97,22 +252,34 @@ pub fn run_unattended(
     run_inner(dir, args, &[0], creds, true)
 }
 
-/// Sets `cmd` (before its subcommand) to open no sign-in window: no credential helper window
+/// What sets git (before its subcommand) to open no sign-in window: no credential helper window
 /// (Git Credential Manager and git ≥ 2.46 heed `credential.interactive`), nor git's askpass
 /// program. git reads `GIT_ASKPASS` before `core.askPass` and `SSH_ASKPASS`, so an inherited one
 /// (VS Code's terminal, ksshaskpass) would win over an empty `core.askPass`, and its being set
 /// but empty makes git skip all three. ssh asks on the terminal the app was started from, if
 /// any (a passphrase, a new host key: the fetch would wait there for good), or else runs
-/// `SSH_ASKPASS` itself: on Unix it is made to ask a program that answers nothing, `false`,
-/// and nothing else; where that isn't there, never to run one.
-fn unattended(cmd: &mut Command) {
-    cmd.args(["-c", "credential.interactive=false", "-c", "core.askPass="]);
-    cmd.env("GIT_ASKPASS", "");
-    if cfg!(unix) {
-        cmd.env("SSH_ASKPASS_REQUIRE", "force");
-        cmd.env("SSH_ASKPASS", "false");
+/// `SSH_ASKPASS` itself: on Unix (`unix`: where git runs) it is made to ask a program that
+/// answers nothing, `false`, and nothing else; where that isn't there, never to run one.
+fn unattended_extra(unix: bool) -> Extra {
+    let mut env = vec![("GIT_ASKPASS", String::new())];
+    if unix {
+        env.push(("SSH_ASKPASS_REQUIRE", "force".to_owned()));
+        env.push(("SSH_ASKPASS", "false".to_owned()));
     } else {
-        cmd.env("SSH_ASKPASS_REQUIRE", "never");
+        env.push(("SSH_ASKPASS_REQUIRE", "never".to_owned()));
+    }
+    Extra {
+        pre: vec!["-c", "credential.interactive=false", "-c", "core.askPass="],
+        env,
+    }
+}
+
+/// Sets `cmd` to open no sign-in window (see [`unattended_extra`]).
+fn unattended(cmd: &mut Command) {
+    let extra = unattended_extra(cfg!(unix));
+    cmd.args(&extra.pre);
+    for (name, value) in extra.env {
+        cmd.env(name, value);
     }
 }
 
@@ -140,23 +307,23 @@ fn run_inner(
     creds: Option<&Credentials>,
     quiet: bool,
 ) -> Result<String, String> {
-    let mut cmd = git_cmd();
-    if let Some(dir) = dir {
-        cmd.arg("-C").arg(dir);
-    }
+    let mut extra = Extra::default();
     if quiet {
-        unattended(&mut cmd);
+        // Unix on the machine git runs on: another one is always Linux (WSL, an SSH server).
+        let unix = cfg!(unix) || dir.is_some_and(remote::is_remote);
+        extra = unattended_extra(unix);
     }
     if let Some(c) = creds {
-        cmd.args(["-c", ENV_HELPER]);
-        cmd.env("GITCRAFT_GIT_USERNAME", &c.username);
-        cmd.env("GITCRAFT_GIT_PASSWORD", &c.password);
+        extra.pre.extend(["-c", ENV_HELPER]);
+        extra
+            .env
+            .push(("GITCRAFT_GIT_USERNAME", c.username.clone()));
+        extra
+            .env
+            .push(("GITCRAFT_GIT_PASSWORD", c.password.clone()));
     }
-    cmd.args(args);
-    let out = cmd
-        .output()
-        .map_err(|e| format!("could not run git: {e}"))?;
-    if out.status.code().is_some_and(|c| ok.contains(&c)) {
+    let out = execute(dir, &extra, args)?;
+    if out.code.is_some_and(|c| ok.contains(&c)) {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {
         // Merges and pulls report conflicts on stdout and the summary on stderr.
@@ -172,12 +339,87 @@ fn run_inner(
     }
 }
 
+/// What git's credential helpers keep for `url` (`https://host`), asking nobody: no terminal
+/// prompt, no askpass program, no sign-in window.
+pub fn stored_credentials(url: &str) -> Option<Credentials> {
+    use std::io::Write;
+    use std::process::Stdio;
+    let mut cmd = git_cmd();
+    with_profile(&mut cmd, &["credential", "fill"]);
+    unattended(&mut cmd);
+    cmd.args(["credential", "fill"])
+        .env("GCM_INTERACTIVE", "never")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    let mut child = cmd.spawn().ok()?;
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(format!("url={url}\n\n").as_bytes());
+    }
+    let out = child.wait_with_output().ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    parse_credentials(&String::from_utf8_lossy(&out.stdout))
+}
+
+/// The name and password in what `git credential fill` prints.
+fn parse_credentials(out: &str) -> Option<Credentials> {
+    let field = |name: &str| {
+        out.lines()
+            .find_map(|line| line.strip_prefix(name)?.strip_prefix('='))
+            .map(str::to_owned)
+    };
+    let (username, password) = (field("username")?, field("password")?);
+    (!password.is_empty()).then_some(Credentials { username, password })
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Write;
     use std::process::Stdio;
 
     use super::*;
+
+    /// Network operations go to shells of their own on another machine; reads don't.
+    #[test]
+    fn network_operations_are_told_apart() {
+        for (args, long) in [
+            (&["fetch", "--prune"][..], true),
+            (&["-c", "credential.helper=x", "push", "origin"][..], true),
+            (&["--literal-pathspecs", "pull"][..], true),
+            (&["submodule", "update"][..], true),
+            (&["status", "--porcelain"][..], false),
+            (&["-c", "fetch.x=1", "log"][..], false),
+            (&["--no-optional-locks", "status"][..], false),
+            (&[][..], false),
+        ] {
+            assert_eq!(goes_over_network(args), long, "{args:?}");
+        }
+    }
+
+    /// `git config --global` reaches the user's own file, whatever comes before it; every
+    /// other command (and a repository's own `config`) goes by the profile.
+    #[test]
+    fn only_global_config_commands_skip_the_profile() {
+        assert!(user_global_config(&["config", "--global", "user.name"]));
+        assert!(user_global_config(&[
+            "-c", "core.x=y", "config", "--global", "--list"
+        ]));
+        assert!(!user_global_config(&["config", "user.name"]));
+        assert!(!user_global_config(&["commit", "-m", "--global"]));
+        assert!(!user_global_config(&["-c", "config"]));
+        // Whatever options come before the subcommand.
+        assert!(user_global_config(&["-C", "/r", "config", "--global", "x"]));
+        assert!(user_global_config(&[
+            "--literal-pathspecs",
+            "config",
+            "--global",
+            "x"
+        ]));
+        assert!(user_global_config(&["-ck=v", "config", "--global", "x"]));
+        assert!(!user_global_config(&[]));
+    }
 
     /// What git gets from the helper is what was typed, backslashes (`DOMAIN\user`) included.
     #[test]
@@ -360,5 +602,17 @@ mod tests {
         assert!(text.contains("username=nancy\n"), "{text}");
         assert!(text.contains("password=secret\n"), "{text}");
         Ok(())
+    }
+
+    #[test]
+    fn reads_a_stored_credential() {
+        let out = "protocol=https\nhost=codeberg.org\nusername=ana\npassword=s3=cret\n";
+        let creds = parse_credentials(out);
+        assert_eq!(
+            creds.map(|c| (c.username, c.password)),
+            Some(("ana".to_owned(), "s3=cret".to_owned()))
+        );
+        assert!(parse_credentials("protocol=https\nhost=x\n").is_none());
+        assert!(parse_credentials("username=ana\npassword=\n").is_none());
     }
 }

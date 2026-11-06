@@ -180,6 +180,13 @@ impl RepoTab {
         self.work().label()
     }
 
+    /// What is unfinished in this view or one of its parked worktrees, if anything: what closing
+    /// the whole tab would lose.
+    pub(crate) fn unfinished_anywhere(&mut self) -> Option<&'static str> {
+        self.unfinished()
+            .or_else(|| self.parked.iter_mut().find_map(|p| p.unfinished()))
+    }
+
     /// What the tab strip shows for this tab.
     pub(crate) fn label(&self, worktrees_in_same_tab: bool) -> TabLabel {
         if worktrees_in_same_tab {
@@ -204,13 +211,13 @@ impl RepoTab {
     /// Takes over from `from`, the same repository's view this one follows, so that the name and
     /// the sidebar are right from the first frame and a sign-in isn't asked for again.
     pub(crate) fn continue_from(&mut self, from: &RepoTab) {
-        let here = std::fs::canonicalize(&self.path).ok();
+        let is_here = crate::remote::is_same_dir_as(&self.path);
         self.worktrees = from
             .worktrees
             .iter()
             .cloned()
             .map(|mut w| {
-                w.current = here.is_some() && std::fs::canonicalize(&w.path).ok() == here;
+                w.current = is_here(&w.path);
                 w
             })
             .collect();
@@ -222,6 +229,10 @@ impl RepoTab {
     /// Coming back to this view from the background: catch up, and show the selected commit
     /// again, as the graph's scroll position is the tab's and not the view's.
     pub(crate) fn resume(&mut self, ctx: &egui::Context) {
+        // Elsewhere, looked at again (parking stopped that; see `park`).
+        if crate::remote::is_remote(&self.path) && self.poller.is_none() {
+            self.watch(ctx);
+        }
         self.reload(ctx);
         self.scroll_to = self.selected;
     }
@@ -246,12 +257,20 @@ impl RepoTab {
 
     /// Parks `view`, the worktree this tab just moved away from, and lets go of what isn't worth
     /// keeping any more.
-    pub(crate) fn park(&mut self, view: Box<RepoTab>) {
+    pub(crate) fn park(&mut self, mut view: Box<RepoTab>) {
+        // One on another machine stops being asked every few seconds while it isn't shown
+        // (a dozen parked views would keep the shells there busy); it is looked at again on
+        // coming back.
+        view.poller = None;
         self.parked.push(view);
         // A worktree whose folder is gone can't be gone back to, but what still runs in it is
         // seen through first.
-        self.parked
-            .retain_mut(|parked| parked.path.is_dir() || parked.work().running());
+        self.parked.retain_mut(|parked| {
+            // Elsewhere, kept: asking would be a round trip on the UI thread.
+            crate::remote::is_remote(&parked.path)
+                || parked.path.is_dir()
+                || parked.work().running()
+        });
         let unfinished: Vec<bool> = self
             .parked
             .iter_mut()

@@ -32,6 +32,8 @@ pub(crate) mod pull;
 mod quick_edit;
 mod rebase;
 mod rewrite;
+#[cfg(test)]
+mod samples;
 mod sidebar;
 mod state;
 mod terminals;
@@ -39,6 +41,7 @@ mod terminals;
 mod tests;
 mod toolbar;
 mod watch;
+mod watch_remote;
 pub(crate) mod widgets;
 pub(crate) mod worktree_tab;
 
@@ -48,7 +51,7 @@ use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::Instant;
 
-use crate::forge::{Forge, PullRequest};
+use crate::forge::{Forge, Hosting, PullRequest};
 use crate::git::{
     self, Commit, CommitDetail, Identity, Refs, Remote, Stash, Submodule, WorkStatus, Worktree,
 };
@@ -127,7 +130,8 @@ pub struct RepoTab {
     /// It keeps files in Git LFS, and git-lfs is installed.
     lfs: bool,
     identity: Identity,
-    forge: Option<Forge>,
+    /// Where `origin` is hosted, when it's on a forge gitcraft knows.
+    hosting: Option<Hosting>,
     prs: Vec<PullRequest>,
     pr_error: Option<String>,
     prs_loaded: Option<Instant>,
@@ -165,9 +169,14 @@ pub struct RepoTab {
     diff_ignore_ws: bool,
     /// Diffs show the whole file instead of the changes.
     diff_as_file: bool,
+    /// Markdown files show rendered in diffs (their changes, or the file).
+    diff_rendered: bool,
     /// Whether the commit pane lists every file of the commit, and those read.
     all_files: detail::AllFiles,
     conflict: Option<conflict::ConflictEditor>,
+    /// How many times a conflict editor was opened in the tab: the one open is the latest, and
+    /// what is read in the background for an earlier one is not taken for it.
+    conflict_generation: u64,
 
     commit_summary: String,
     commit_body: String,
@@ -202,6 +211,15 @@ pub struct RepoTab {
     terminal_error: Option<String>,
 
     watcher: Option<notify::RecommendedWatcher>,
+    /// For a repository on another machine, which no watcher sees: what keeps its poller
+    /// going (it stops once this is dropped).
+    poller: Option<std::sync::Arc<()>>,
+    /// The worktrees' changes are being counted (see `count_worktrees`).
+    counting_worktrees: bool,
+    /// A read came in while they were counted: they are counted again after.
+    recount_worktrees: bool,
+    /// When they were last counted (see `recount_siblings`).
+    counted_at: Instant,
     fs_rx: Option<Receiver<watch::FsChange>>,
     /// A change on disk not yet reloaded: (inside .git, when).
     fs_pending: Option<(watch::FsChange, Instant)>,
@@ -210,6 +228,8 @@ pub struct RepoTab {
     queued: Vec<Action>,
     /// A folder the app should open (taken by `App`).
     pub open_request: Option<OpenRequest>,
+    /// A worktree to open once the operation so labelled (which makes it) is done.
+    open_when_done: Option<(String, PathBuf)>,
     /// The other worktrees this tab was on, oldest first, for coming back to. Boxed as in
     /// `Tab::Repo`, which they move in and out of.
     #[allow(clippy::vec_box)]
@@ -274,7 +294,7 @@ impl RepoTab {
             submodules: Vec::new(),
             lfs: false,
             identity: Identity::default(),
-            forge: None,
+            hosting: None,
             prs: Vec::new(),
             pr_error: None,
             prs_loaded: None,
@@ -300,8 +320,10 @@ impl RepoTab {
             avatars_hinted: false,
             diff_ignore_ws: false,
             diff_as_file: false,
+            diff_rendered: false,
             all_files: Default::default(),
             conflict: None,
+            conflict_generation: 0,
             commit_summary: String::new(),
             commit_body: String::new(),
             amend: false,
@@ -325,10 +347,15 @@ impl RepoTab {
             terminal_open: false,
             terminal_error: None,
             watcher: None,
+            poller: None,
+            counting_worktrees: false,
+            recount_worktrees: false,
+            counted_at: Instant::now(),
             fs_rx: None,
             fs_pending: None,
             queued: Vec::new(),
             open_request: None,
+            open_when_done: None,
             parked: Vec::new(),
             parked_status: Vec::new(),
             keys_blocked: false,
@@ -357,6 +384,11 @@ impl RepoTab {
     /// Queues an action from outside the tab (the command palette).
     pub(crate) fn queue(&mut self, action: Action) {
         self.queued.push(action);
+    }
+
+    /// The forge `origin` is on.
+    pub(super) fn forge(&self) -> Option<Forge> {
+        self.hosting.as_ref().map(|h| h.forge)
     }
 
     /// HTTPS credentials for this tab's git commands (from the clone that made it).

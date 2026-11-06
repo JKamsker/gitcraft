@@ -19,6 +19,13 @@ pub(crate) enum Action {
     OpenDiff(DiffKey),
     /// Show a pull request in the big area.
     OpenPr(u64),
+    /// Open the worktree of a pull request (proposing `branch`, at `sha`), making it first
+    /// when there is none.
+    OpenPrWorktree {
+        number: u64,
+        branch: String,
+        sha: String,
+    },
     ClosePr,
     ReloadPr,
     /// Something done on the pull request shown.
@@ -92,6 +99,12 @@ pub(crate) enum Action {
     OpenPath(PathBuf),
     OpenInEditor(PathBuf),
     SetIdentity(String, String),
+    /// Takes the repository's own `user.name` / `user.email` out (which of them it sets), so
+    /// that the profile's or the global config's apply again.
+    ClearIdentity {
+        name: bool,
+        email: bool,
+    },
     /// How diffs show: side by side, without whitespace changes, the whole file.
     SetDiffOptions {
         split: bool,
@@ -100,6 +113,8 @@ pub(crate) enum Action {
     },
     /// Diffs show the whole file as it is after the change, or the changes.
     DiffAsFile(bool),
+    /// Markdown files show rendered in diffs, or as text.
+    DiffRendered(bool),
     /// Scroll the diff to the next change (`1`) or the previous one (`-1`).
     DiffStep(i32),
     /// The commit pane lists every file of the commit, or only those it changed.
@@ -143,6 +158,12 @@ pub(crate) enum Action {
     CloseRebase,
     /// Remember these HTTPS credentials and run the operation that needed them again.
     SignIn(git::Credentials),
+    /// Ask before deleting the local tag `name` (at the commit `target`), once what it points
+    /// at is known (read in the background for a repository on another machine).
+    DeleteTag {
+        name: String,
+        target: String,
+    },
     /// Add `pattern` to `.gitignore`; stop tracking `path` if git tracks it.
     Ignore {
         pattern: String,

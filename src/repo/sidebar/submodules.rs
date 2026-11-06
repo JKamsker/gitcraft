@@ -42,7 +42,7 @@ impl RepoTab {
             let r = submodule_row(ui, sub).on_hover_text(submodule_tip(sub));
             let cloned = sub.state != SubmoduleState::NotInitialized;
             if r.double_clicked() && cloned {
-                acts.push(Action::OpenTab(self.path.join(&sub.path)));
+                acts.push(Action::OpenTab(crate::remote::join(&self.path, &sub.path)));
             }
             egui::Popup::context_menu(&r)
                 .style(crate::theme::menu_style)
@@ -65,7 +65,7 @@ impl RepoTab {
         {
             acts.push(update_one(&sub.path));
         }
-        let folder = self.path.join(&sub.path);
+        let folder = crate::remote::join(&self.path, &sub.path);
         if ui
             .add_enabled(cloned, egui::Button::new("Open in a new tab"))
             .on_disabled_hover_text("Update it first to clone it")
@@ -73,8 +73,15 @@ impl RepoTab {
         {
             acts.push(Action::OpenTab(folder.clone()));
         }
+        // Not asked of another machine every frame: in WSL it's there once cloned, over SSH
+        // this machine can't open it.
+        let revealable = if crate::remote::is_remote(&folder) {
+            cloned && crate::remote::openable_here(&folder).is_ok()
+        } else {
+            folder.is_dir()
+        };
         if ui
-            .add_enabled(folder.is_dir(), egui::Button::new(reveal_label()))
+            .add_enabled(revealable, egui::Button::new(reveal_label()))
             .clicked()
         {
             acts.push(Action::OpenPath(sub.path.clone().into()));

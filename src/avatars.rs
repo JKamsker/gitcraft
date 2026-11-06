@@ -1,7 +1,7 @@
-//! Author avatars, fetched in the background, cached on disk, painted round. A repository on
-//! GitHub or GitLab tells us (through [`hint`]) where its authors' account pictures are; other
-//! addresses go to Gravatar (or GitHub for its noreply ones). Initials stand in until (or unless)
-//! one loads.
+//! Author avatars, fetched in the background, cached on disk, painted round. A repository on a
+//! forge (GitHub, Forgejo, Gitea, GitLab) tells us (through [`hint`]) where its authors' account
+//! pictures are; other addresses go to Gravatar (or GitHub for its noreply ones). Initials stand
+//! in until (or unless) one loads.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -30,7 +30,7 @@ struct Avatars {
 /// Where an address's picture is, when a forge knows better than Gravatar.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Hint {
-    /// The account's avatar URL (GitHub).
+    /// The account's avatar URL (GitHub, Forgejo, Gitea).
     Url(String),
     /// Ask this GitLab host's avatar API.
     GitLab(String),

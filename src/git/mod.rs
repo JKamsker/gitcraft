@@ -59,9 +59,27 @@ fn not_an_option(rev: &str) -> Result<&str, String> {
 }
 
 /// `git clone url dest`, run from `dest`'s parent.
+/// For a `dest` in WSL or over SSH, git there clones it, from that machine's home folder.
 pub fn clone(url: &str, dest: &Path, creds: Option<&Credentials>) -> Result<(), String> {
+    if let Some(target) = crate::remote::parse(dest) {
+        let (from, there) = clone_from(&target.path);
+        let from = crate::remote::encode(&target.host, from);
+        return run_with(Some(&from), &["clone", "--", url, &there], creds).map(|_| ());
+    }
     let dest = dest.to_string_lossy();
     run_with(None, &["clone", "--", url, &dest], creds).map(|_| ())
+}
+
+/// Where git clones into `dest` (a path on another machine) from, and `dest` as it is given:
+/// from `/` for an absolute path; under `~` as a path relative to it (git doesn't expand `~`
+/// itself; only an SSH path can say `~`, a WSL one is always absolute); the home folder itself
+/// as `.` there (git takes it when empty).
+fn clone_from(dest: &str) -> (&'static str, String) {
+    match dest.strip_prefix("~/") {
+        Some(rest) => ("~", rest.to_owned()),
+        None if dest == "~" => ("~", ".".to_owned()),
+        None => ("/", dest.to_owned()),
+    }
 }
 
 /// The folder name `git clone` would pick for `url`.
@@ -83,24 +101,38 @@ pub fn version() -> Result<String, String> {
 
 /// The top-level folder of the repository containing `path`.
 pub fn toplevel(path: &Path) -> Result<PathBuf, String> {
-    let out = run(Some(path), &["rev-parse", "--show-toplevel"])
-        .map_err(|_| format!("{} is not inside a git repository", path.display()))?;
+    let out = run(Some(path), &["rev-parse", "--show-toplevel"]).map_err(|e| {
+        // Elsewhere, not reaching the machine (or the folder there) says more.
+        if crate::remote::is_remote(path) && !e.contains("not a git repository") {
+            e
+        } else {
+            format!("{} is not inside a git repository", path.display())
+        }
+    })?;
     // Only the line end: a folder's name can end with a space.
-    Ok(PathBuf::from(out.trim_end_matches(['\n', '\r'])))
+    let top = out.trim_end_matches(['\n', '\r']);
+    Ok(match crate::remote::parse(path) {
+        // A path of that machine, in the form this app gives them (a `\` in a name kept).
+        Some(target) => crate::remote::encode(&target.host, top),
+        None => PathBuf::from(top),
+    })
 }
 
 pub fn init(path: &Path) -> Result<(), String> {
-    std::fs::create_dir_all(path).map_err(|e| format!("could not create folder: {e}"))?;
+    crate::remote::create_dir_all(path).map_err(|e| format!("could not create folder: {e}"))?;
     run(Some(path), &["init"]).map(|_| ())
 }
 
-/// The name and email commits are made with here, and whether they're set for this repository
-/// only.
+/// The name and email commits are made with here (a repository's own config wins over the
+/// profile's, which wins over the global one), and whether this repository sets them itself.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Identity {
     pub name: String,
     pub email: String,
+    /// The repository sets `user.name` itself.
     pub local: bool,
+    /// The repository sets `user.email` itself.
+    pub local_email: bool,
 }
 
 pub fn identity(repo: &Path) -> Identity {
@@ -109,6 +141,7 @@ pub fn identity(repo: &Path) -> Identity {
         name: get(&["config", "user.name"]).unwrap_or_default(),
         email: get(&["config", "user.email"]).unwrap_or_default(),
         local: get(&["config", "--local", "user.name"]).is_some(),
+        local_email: get(&["config", "--local", "user.email"]).is_some(),
     }
 }
 

@@ -8,6 +8,10 @@ use eframe::egui_wgpu::{WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew, wgpu};
 use gitcraft::app;
 
 fn main() -> eframe::Result {
+    // Started by ssh to ask the running app something (see `remote::askpass`): no window.
+    if let Some(code) = app::askpass_helper() {
+        std::process::exit(code);
+    }
     app::warm_up();
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

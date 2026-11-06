@@ -81,6 +81,16 @@ pub(crate) enum DiffKey {
     },
 }
 
+impl DiffKey {
+    /// The file the diff is of.
+    pub(super) fn path(&self) -> &str {
+        match self {
+            DiffKey::Commit { path, .. } | DiffKey::Range { path, .. } => path,
+            DiffKey::Work(file) => &file.path,
+        }
+    }
+}
+
 pub(crate) struct DiffView {
     pub(super) key: DiffKey,
     pub(super) data: Option<Result<diff::DiffData, String>>,
@@ -92,6 +102,10 @@ pub(crate) struct DiffView {
     pub(super) text_sel: Option<diff::TextSel>,
     /// The whole file, read when the diff is switched to it.
     pub(super) file: Option<Result<FileText, String>>,
+    /// A Markdown file rendered, read when the diff is switched to that.
+    pub(super) rendered: Option<Result<diff::rendered::RenderedMd, String>>,
+    /// What the rendered Markdown keeps between frames.
+    pub(super) markdown: egui_commonmark::CommonMarkCache,
     /// How far the lines were scrolled down last frame.
     pub(super) scroll: f32,
     /// A change (by its place among the changes) to scroll to on the next frame.
@@ -115,6 +129,8 @@ impl DiffView {
             anchor: None,
             text_sel: None,
             file: None,
+            rendered: None,
+            markdown: Default::default(),
             scroll: 0.0,
             jump: None,
             at_change: None,
@@ -146,6 +162,22 @@ impl DiffView {
     pub(super) fn file_arrived(&mut self, request: u64, result: Result<FileText, String>) {
         if request == self.request {
             self.file = Some(result);
+        }
+    }
+
+    /// Shows the Markdown rendered read along with the read numbered `request`, unless a newer
+    /// read was made since.
+    pub(super) fn rendered_arrived(
+        &mut self,
+        request: u64,
+        result: Result<diff::rendered::RenderedMd, String>,
+        ctx: &egui::Context,
+    ) {
+        if request == self.request {
+            if let Ok(md) = &result {
+                diff::rendered::include_images(ctx, md);
+            }
+            self.rendered = Some(result);
         }
     }
 }

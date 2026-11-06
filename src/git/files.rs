@@ -8,7 +8,7 @@ use super::{END_OPTS, FS, LITERAL_PATHS, NO_SIGNATURE, RS, UTF8, not_an_option, 
 /// `rev` is `None`.
 pub fn file_at(repo: &Path, rev: Option<&str>, path: &str) -> Result<Vec<u8>, String> {
     match rev {
-        None => worktree_file(&repo.join(path)).map_err(|e| format!("{path}: {e}")),
+        None => worktree_file(&crate::remote::join(repo, path)).map_err(|e| format!("{path}: {e}")),
         // The index as `:0:path`: `:path` of a file named `1:x` would be stage 1 of `x`.
         Some("") => run_bytes(Some(repo), &["show", END_OPTS, &format!(":0:{path}")]),
         Some(rev) => run_bytes(Some(repo), &["show", END_OPTS, &format!("{rev}:{path}")]),
@@ -20,6 +20,10 @@ pub fn file_at(repo: &Path, rev: Option<&str>, path: &str) -> Result<Vec<u8>, St
 /// leaves the other side's link in place when it conflicts with a file (`x -> /dev/zero`):
 /// read through, the app would never stop reading it. Anything else but a file is refused.
 pub fn worktree_file(file: &Path) -> std::io::Result<Vec<u8>> {
+    // In WSL or over SSH: the same, read there.
+    if let Some(read) = crate::remote::worktree_file(file) {
+        return read;
+    }
     let meta = std::fs::symlink_metadata(file)?;
     if meta.file_type().is_symlink() {
         return Ok(std::fs::read_link(file)?
@@ -64,13 +68,20 @@ pub fn tree_files(repo: &Path, rev: &str) -> Result<Vec<String>, String> {
 /// when it was already there.
 pub fn add_to_gitignore(repo: &Path, pattern: &str) -> Result<bool, String> {
     let file = repo.join(".gitignore");
-    let existing = match std::fs::read_to_string(&file) {
+    // A `.gitignore` a repository made a link (to `~/.bashrc`…) is not written through: the
+    // line added comes from a file name the repository chose too.
+    match crate::remote::try_is_link(&file) {
+        Ok(false) => {}
+        Ok(true) => return Err(".gitignore is a symbolic link: not changed".to_owned()),
+        Err(e) => return Err(format!("could not check .gitignore: {e}")),
+    }
+    let existing = match crate::remote::read_to_string(&file) {
         Ok(s) => s,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
         Err(e) => return Err(format!("could not read .gitignore: {e}")),
     };
     match gitignore_with(&existing, pattern) {
-        Some(updated) => std::fs::write(&file, updated)
+        Some(updated) => crate::remote::write(&file, updated.as_bytes())
             .map(|_| true)
             .map_err(|e| format!("could not write .gitignore: {e}")),
         None => Ok(false),

@@ -20,7 +20,7 @@ impl RepoTab {
         let Some(view) = &self.ci_view else {
             return;
         };
-        let noun = match self.forge {
+        let noun = match self.forge() {
             Some(Forge::GitLab) => "Pipelines",
             _ => "Workflow runs",
         };

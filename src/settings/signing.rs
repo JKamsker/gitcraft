@@ -4,12 +4,14 @@
 use std::time::{Duration, Instant};
 
 use egui::{RichText, Ui};
+use serde::{Deserialize, Serialize};
 
+use super::layout::{self, Card, Filter, section};
 use crate::theme::Tokens;
 
 /// How long values read from the config hold while nothing is being edited: it can change
 /// outside gitcraft.
-const RECHECK: Duration = Duration::from_secs(30);
+pub(super) const RECHECK: Duration = Duration::from_secs(30);
 
 /// `gpg.format` values, with what the settings page calls them.
 const FORMATS: [(&str, &str); 3] = [
@@ -18,9 +20,10 @@ const FORMATS: [(&str, &str); 3] = [
     ("x509", "X.509 (S/MIME)"),
 ];
 
-/// The signing part of a git config, as it is set there.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(super) struct Signing {
+/// The signing part of a git config, as it is set there (or as a profile sets it).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Signing {
     /// `gpg.format`; empty when unset (git then uses openpgp).
     pub format: String,
     /// `user.signingkey`.
@@ -35,7 +38,7 @@ pub(super) struct Signing {
 
 impl Signing {
     /// The format git signs with, `openpgp` when none is set.
-    fn format(&self) -> &str {
+    pub(super) fn format(&self) -> &str {
         if self.format.is_empty() {
             "openpgp"
         } else {
@@ -45,7 +48,7 @@ impl Signing {
 }
 
 /// The config key of the signing program for `format`.
-fn program_key(format: &str) -> &'static str {
+pub(super) fn program_key(format: &str) -> &'static str {
     program_keys(format)[0]
 }
 
@@ -164,10 +167,97 @@ struct Form {
     error: Option<String>,
 }
 
+/// The signing fields as rows of `card`, editing `edit`; `salt` keeps the ids of two forms
+/// apart. Returns true when a choice changed or a text field was left: when to write what was
+/// typed.
+pub(super) fn fields_rows(card: &mut Card, edit: &mut Signing, salt: &str) -> bool {
+    let mut commit = false;
+    card.row("Format", "gpg openpgp ssh x509 s/mime", |ui| {
+        let shown = FORMATS
+            .iter()
+            .find(|(value, _)| *value == edit.format())
+            .map_or(edit.format(), |(_, label)| label);
+        egui::ComboBox::from_id_salt((salt, "format"))
+            .width(layout::fit(ui, super::COMBO_WIDTH))
+            .selected_text(shown)
+            .show_ui(ui, |ui| {
+                for (value, label) in FORMATS {
+                    if ui.selectable_label(edit.format() == value, label).clicked()
+                        && edit.format() != value
+                    {
+                        // Read back with the program set for it.
+                        edit.format = value.to_owned();
+                        commit = true;
+                    }
+                }
+            })
+            .response
+            .on_hover_text("gpg.format");
+    });
+
+    let (key_hint, program_hint) = match edit.format() {
+        "ssh" => ("~/.ssh/id_ed25519.pub, or key::ssh-ed25519 …", "ssh-keygen"),
+        "x509" => ("Certificate ID", "gpgsm"),
+        _ => ("Key ID or fingerprint", "gpg"),
+    };
+    card.row_hint(
+        "Signing key",
+        "Empty: picked from your identity",
+        "signingkey gpg ssh",
+        |ui| {
+            let key = ui
+                .add(
+                    layout::field(&mut edit.key)
+                        .id_salt((salt, "key"))
+                        .hint_text(key_hint)
+                        .desired_width(layout::fit(ui, super::FIELD_WIDTH)),
+                )
+                .on_hover_text("user.signingkey; empty lets git pick one from your identity");
+            commit |= key.lost_focus();
+        },
+    );
+
+    card.row_hint(
+        "Program",
+        "Empty: the one on the PATH",
+        "gpg ssh-keygen gpgsm",
+        |ui| {
+            let program = ui
+                .add(
+                    layout::field(&mut edit.program)
+                        .id_salt((salt, "program"))
+                        .hint_text(program_hint)
+                        .desired_width(layout::fit(ui, super::FIELD_WIDTH)),
+                )
+                .on_hover_text(format!(
+                    "{}; empty runs {program_hint} from the PATH",
+                    program_key(edit.format())
+                ));
+            commit |= program.lost_focus();
+        },
+    );
+
+    card.row("Sign by default", "commits tags gpgsign", |ui| {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 18.0;
+            commit |= ui
+                .checkbox(&mut edit.sign_commits, "Commits")
+                .on_hover_text("commit.gpgSign")
+                .changed();
+            commit |= ui
+                .checkbox(&mut edit.sign_tags, "Tags")
+                .on_hover_text("tag.gpgSign: annotated tags")
+                .changed();
+        });
+    });
+    commit
+}
+
 const GLOBAL: &[&str] = &["--global"];
 
 /// The commit signing form. Choices are written at once, text fields when they lose focus.
-pub(super) fn signing_ui(ui: &mut Ui) {
+/// `overridden_by`: the profile in use, when it signs its own way, which wins over this form.
+pub(super) fn signing_ui(ui: &mut Ui, filter: &Filter, overridden_by: Option<&str>) {
     let t = Tokens::get(ui.ctx());
     let id = egui::Id::new("settings-signing");
     let mut form = ui
@@ -183,85 +273,34 @@ pub(super) fn signing_ui(ui: &mut Ui) {
             }
         });
     let mut commit = false;
-    egui::Grid::new("settings-signing")
-        .num_columns(2)
-        .spacing([16.0, 8.0])
-        .show(ui, |ui| {
-            ui.label("Format");
-            let shown = FORMATS
-                .iter()
-                .find(|(value, _)| *value == form.edit.format())
-                .map_or(form.edit.format(), |(_, label)| label);
-            egui::ComboBox::from_id_salt("settings-signing-format")
-                .selected_text(shown)
-                .show_ui(ui, |ui| {
-                    for (value, label) in FORMATS {
-                        if ui
-                            .selectable_label(form.edit.format() == value, label)
-                            .clicked()
-                            && form.edit.format() != value
-                        {
-                            // Read back with the program set for it.
-                            form.edit.format = value.to_owned();
-                            commit = true;
-                        }
-                    }
-                })
-                .response
-                .on_hover_text("gpg.format");
-            ui.end_row();
-
-            let (key_hint, program_hint) = match form.edit.format() {
-                "ssh" => ("~/.ssh/id_ed25519.pub, or key::ssh-ed25519 …", "ssh-keygen"),
-                "x509" => ("Certificate ID", "gpgsm"),
-                _ => ("Key ID or fingerprint", "gpg"),
-            };
-            ui.label("Signing key");
-            let key = ui
-                .add(
-                    egui::TextEdit::singleline(&mut form.edit.key)
-                        .hint_text(key_hint)
-                        .desired_width(300.0),
-                )
-                .on_hover_text("user.signingkey; empty lets git pick one from your identity");
-            commit |= key.lost_focus();
-            ui.end_row();
-
-            ui.label("Program");
-            let program = ui
-                .add(
-                    egui::TextEdit::singleline(&mut form.edit.program)
-                        .hint_text(program_hint)
-                        .desired_width(300.0),
-                )
-                .on_hover_text(format!(
-                    "{}; empty runs {program_hint} from the PATH",
-                    program_key(form.edit.format())
-                ));
-            commit |= program.lost_focus();
-            ui.end_row();
-
-            ui.label("Sign by default");
-            ui.horizontal(|ui| {
-                commit |= ui
-                    .checkbox(&mut form.edit.sign_commits, "Commits")
-                    .on_hover_text("commit.gpgSign")
-                    .changed();
-                commit |= ui
-                    .checkbox(&mut form.edit.sign_tags, "Tags")
-                    .on_hover_text("tag.gpgSign: annotated tags")
-                    .changed();
-            });
-            ui.end_row();
-        });
-    match &form.error {
-        Some(e) => ui.label(RichText::new(e).color(t.danger).small()),
-        None => ui.label(
-            RichText::new("Your global git config; a repository's own config can override it.")
-                .color(t.text_faint)
-                .small(),
+    section(
+        ui,
+        filter,
+        "Commit signing",
+        Some(
+            "Your global git config on this machine; a repository's own config, or a profile \
+             that signs its own way, can override it. Repositories in WSL or over SSH use that \
+             machine's own.",
         ),
-    };
+        |card| {
+            if let Some(profile) = overridden_by {
+                card.full("profile own override", |ui| {
+                    ui.label(
+                        RichText::new(format!(
+                            "The profile “{profile}” signs its own way (Settings → Profile): \
+                             what is set here doesn't apply while it is in use."
+                        ))
+                        .color(t.warning)
+                        .small(),
+                    );
+                });
+            }
+            commit |= fields_rows(card, &mut form.edit, "settings-signing");
+            if let Some(e) = &form.error {
+                card.full("", |ui| ui.label(RichText::new(e).color(t.danger).small()));
+            }
+        },
+    );
     if commit && form.edit != form.saved {
         form.error = write(GLOBAL, &form.saved, &form.edit).err();
         form.saved = read(GLOBAL);

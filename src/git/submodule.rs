@@ -46,7 +46,9 @@ impl SubmoduleState {
 
 /// The submodules, each with how it stands; none when there is no `.gitmodules`.
 pub fn submodules(repo: &Path) -> Result<Vec<Submodule>, String> {
-    if !repo.join(".gitmodules").is_file() {
+    let listed = crate::remote::try_is_file(&repo.join(".gitmodules"))
+        .map_err(|e| format!("could not read .gitmodules: {e}"))?;
+    if !listed {
         return Ok(Vec::new());
     }
     let mut list = parse_submodule_status(&run(Some(repo), &["submodule", "status"])?);

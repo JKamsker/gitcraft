@@ -51,6 +51,7 @@ impl Step {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct Entry {
     pub commit: RebaseCommit,
     pub step: Step,
@@ -58,6 +59,7 @@ pub(crate) struct Entry {
     pub message: String,
 }
 
+#[derive(Clone)]
 pub(crate) struct RebaseEditor {
     /// What the commits are replayed onto (a commit or a branch).
     pub onto: String,
@@ -67,10 +69,17 @@ pub(crate) struct RebaseEditor {
     /// HEAD when the commits were read: the todo list replaces the branch's commits with
     /// these, so one made since (a commit, a pull) would be dropped.
     pub head: String,
+    /// Which editor this is (each one opened has its own): a rebase prepared for one closed
+    /// since never starts.
+    pub id: u64,
+    /// Its rebase is being prepared (on another machine, in the background): it can't be
+    /// started again, nor changed, meanwhile.
+    pub starting: bool,
 }
 
 impl RebaseEditor {
     pub fn new(onto: String, onto_label: String, commits: Vec<RebaseCommit>) -> Self {
+        static IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         // `git log --reverse onto..HEAD`: HEAD comes last.
         let head = commits.last().map(|c| c.hash.clone()).unwrap_or_default();
         let entries = commits
@@ -86,6 +95,8 @@ impl RebaseEditor {
             onto_label,
             entries,
             head,
+            id: IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            starting: false,
         }
     }
 
@@ -134,8 +145,12 @@ impl RebaseEditor {
     }
 
     /// Writes the todo list and the new messages to a fresh temporary folder and returns the
-    /// git command that runs the rebase with them.
-    pub fn command(&self) -> Result<Vec<String>, String> {
+    /// git command that runs the rebase with them. For a repository in WSL or over SSH, on
+    /// that machine, where git reads them.
+    pub fn command(&self, repo: &Path) -> Result<Vec<String>, String> {
+        if let Some(target) = crate::remote::parse(repo) {
+            return self.command_there(&target);
+        }
         let dir = private_dir(&std::env::temp_dir())
             .map_err(|e| format!("could not prepare the rebase: {e}"))?;
         let write = |name: &str, text: &str| -> Result<PathBuf, String> {
@@ -156,15 +171,46 @@ impl RebaseEditor {
             files.get(i).cloned().flatten().map(|p| sh_path(&p))
         });
         let todo_file = write("todo.txt", &todo)?;
-        Ok(vec![
+        Ok(self.rebase_args(&sh_path(&todo_file)))
+    }
+
+    /// [`Self::command`] for a repository on another machine: the files in a private folder
+    /// there.
+    fn command_there(&self, target: &crate::remote::Target) -> Result<Vec<String>, String> {
+        let write = |name: &str, text: &str| {
+            crate::remote::host_temp_file(target, name, text.as_bytes())
+                .map_err(|e| format!("could not prepare the rebase: {e}"))
+        };
+        let mut files = Vec::new();
+        for (i, e) in self.entries.iter().enumerate() {
+            files.push(if self.changed(e) {
+                Some(write(&format!("rebase-message-{i}.txt"), &e.message)?)
+            } else {
+                None
+            });
+        }
+        let todo = todo(&self.entries, |i| {
+            files
+                .get(i)
+                .cloned()
+                .flatten()
+                .map(|p| crate::remote::sh_quote(&p))
+        });
+        let todo_file = write("rebase-todo.txt", &todo)?;
+        Ok(self.rebase_args(&crate::remote::sh_quote(&todo_file)))
+    }
+
+    /// The rebase, its todo list copied from `todo_file` (quoted for `sh`).
+    fn rebase_args(&self, todo_file: &str) -> Vec<String> {
+        vec![
             "-c".to_owned(),
-            format!("sequence.editor=cp {}", sh_path(&todo_file)),
+            format!("sequence.editor=cp {todo_file}"),
             "rebase".to_owned(),
             "-i".to_owned(),
             "--autostash".to_owned(),
             "--end-of-options".to_owned(),
             self.onto.clone(),
-        ])
+        ]
     }
 }
 
@@ -289,10 +335,13 @@ impl RepoTab {
                         }
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if editor.starting {
+                            ui.add(crate::spinner::Spinner::new());
+                        }
                         if widgets::primary_button(
                             ui,
                             "Start rebase",
-                            idle && problem.is_none(),
+                            idle && problem.is_none() && !editor.starting,
                             120.0,
                         )
                         .clicked()
@@ -308,10 +357,15 @@ impl RepoTab {
 
         let n = editor.entries.len();
         let mut swap: Option<(usize, usize)> = None;
+        // What is being started is what is shown.
+        let starting = editor.starting;
         egui::ScrollArea::vertical()
             .id_salt("rebase_list")
             .auto_shrink(false)
             .show(ui, |ui| {
+                if starting {
+                    ui.disable();
+                }
                 ui.add_space(6.0);
                 // Newest first, like the graph; `i` indexes git's oldest-first order.
                 for i in (0..n).rev() {

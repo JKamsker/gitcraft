@@ -60,6 +60,26 @@ impl RepoTab {
         let Some(view) = &self.pr_view else {
             return;
         };
+        // What can be done with the pull request's branch here.
+        if let Some(Ok(details)) = &view.details {
+            let idle = self.busy_op.is_none();
+            egui::Frame::new()
+                .inner_margin(egui::Margin::symmetric(12, 8))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        self.pr_worktree_button(
+                            ui,
+                            acts,
+                            details.number,
+                            &details.head_branch,
+                            &details.head_oid,
+                            idle,
+                            false,
+                        );
+                    });
+                });
+            ui.separator();
+        }
         if let Some(Ok(details)) = view
             .details
             .as_ref()
@@ -303,6 +323,10 @@ fn chips(ui: &mut Ui, d: &PrDetails) {
 
 fn checks(ui: &mut Ui, d: &PrDetails, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
+    if let Some(e) = &d.checks_error {
+        ui.colored_label(t.warning, format!("Couldn't read the checks: {e}"));
+        return;
+    }
     if d.checks.is_empty() {
         ui.label(
             RichText::new("No checks ran on this pull request.")
@@ -336,7 +360,10 @@ fn checks(ui: &mut Ui, d: &PrDetails, acts: &mut Vec<Action>) {
     for check in sorted {
         let (rect, r) = ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::click());
         // A run of GitHub Actions opens in the pipeline view, anything else in the browser.
-        let run = crate::ci::github::run_of_url(&check.url);
+        // Forgejo's and Gitea's Actions have the same URLs, but gitcraft doesn't read their runs.
+        let run = (d.forge == Some(crate::forge::Forge::GitHub))
+            .then(|| crate::ci::github::run_of_url(&check.url))
+            .flatten();
         let opens = pr::is_web_url(&check.url);
         if r.hovered() && opens {
             ui.painter().rect_filled(rect, t.radius_sm, t.hover);

@@ -342,6 +342,7 @@ fn an_older_read_of_the_working_tree_does_not_replace_a_newer_one() {
         worktrees: vec![here(0)],
         stashes: Vec::new(),
         remotes: Vec::new(),
+        hosting: None,
         submodules: Vec::new(),
         lfs: false,
         identity: Default::default(),

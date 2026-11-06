@@ -38,6 +38,11 @@ impl RepoTab {
                     self.ci_view = None;
                 }
             }
+            Action::OpenPrWorktree {
+                number,
+                branch,
+                sha,
+            } => self.open_pr_worktree(number, &branch, &sha, ctx),
             Action::ClosePr => {
                 self.close_pr();
                 self.diff = None;
@@ -66,6 +71,7 @@ impl RepoTab {
             Action::CheckoutPull(name) => self.checkout_pull(&name, ctx),
             Action::CheckoutRemote(name) => self.checkout_remote(&name, ctx),
             Action::Dialog(dialog) => self.dialog = Some(dialog),
+            Action::DeleteTag { name, target } => self.delete_tag(name, target, ctx),
             Action::Commit => self.commit(ctx),
             Action::Fetch => {
                 self.last_fetch = Instant::now();
@@ -126,11 +132,19 @@ impl RepoTab {
                 }
             }
             Action::OpenPath(rel) => {
-                let _ = open::that_detached(self.path.join(rel));
+                if let Err(e) = crate::remote::open_here(crate::remote::join(
+                    &self.path,
+                    &rel.to_string_lossy(),
+                )) {
+                    self.status = Some((e, true));
+                }
             }
             Action::OpenInEditor(rel) => {
                 let editor = Settings::get(ctx).editor;
-                if let Err(e) = open_in_editor(&editor, &self.path.join(rel)) {
+                if let Err(e) = open_in_editor(
+                    &editor,
+                    &crate::remote::join(&self.path, &rel.to_string_lossy()),
+                ) {
                     self.status = Some((e, true));
                 }
             }
@@ -144,14 +158,42 @@ impl RepoTab {
                 plain,
                 ctx,
             ),
+            Action::ClearIdentity { name, email } => {
+                let mut list: Vec<&[&str]> = Vec::new();
+                if name {
+                    list.push(&["config", "--local", "--unset-all", "user.name"]);
+                }
+                if email {
+                    list.push(&["config", "--local", "--unset-all", "user.email"]);
+                }
+                if !list.is_empty() {
+                    self.run_ops(
+                        "Use the profile's author",
+                        ops(&list),
+                        Refresh::All,
+                        plain,
+                        ctx,
+                    );
+                }
+            }
             Action::SetDiffOptions {
                 split,
                 ignore_ws,
                 whole_file,
             } => self.set_diff_options(split, ignore_ws, whole_file, ctx),
             Action::DiffAsFile(on) => self.show_diff_as_file(on, ctx),
+            Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
             Action::DiffStep(delta) => {
-                if let Some(view) = self.diff.as_mut().filter(|_| !self.diff_as_file) {
+                let rendered = self.diff_rendered
+                    && self
+                        .diff
+                        .as_ref()
+                        .is_some_and(|v| diff::rendered::is_markdown(v.key.path()));
+                if let Some(view) = self
+                    .diff
+                    .as_mut()
+                    .filter(|_| !self.diff_as_file && !rendered)
+                {
                     view.step_change(Settings::get(ctx).diff_split, delta);
                 }
             }
@@ -231,12 +273,37 @@ impl RepoTab {
 
     /// Adds `pattern` to `.gitignore`, and stops tracking `path` if git tracks it.
     fn ignore(&mut self, pattern: &str, path: &str, ctx: &egui::Context) {
-        match git::add_to_gitignore(&self.path, pattern) {
+        // On another machine, the file is read and written there, in the background.
+        let (repo, pattern, path) = (self.path.clone(), pattern.to_owned(), path.to_owned());
+        self.here_or_later(
+            ctx,
+            move || {
+                let added = git::add_to_gitignore(&repo, &pattern);
+                let tracked = added.is_ok() && git::is_tracked(&repo, &path);
+                (pattern, path, added, tracked)
+            },
+            |tab, (pattern, path, added, tracked), ctx| {
+                tab.ignored(&pattern, &path, added, tracked, ctx);
+            },
+        );
+    }
+
+    /// Stops tracking `path` once `pattern` is in `.gitignore`, if it was tracked.
+    fn ignored(
+        &mut self,
+        pattern: &str,
+        path: &str,
+        added: Result<bool, String>,
+        tracked: bool,
+        ctx: &egui::Context,
+    ) {
+        match added {
             Err(e) => self.status = Some((e, true)),
             Ok(added) => {
-                if git::is_tracked(&self.path, path) {
-                    self.run_ops(
+                if tracked {
+                    self.run_prepared(
                         &format!("Ignore {pattern}"),
+                        &format!("{pattern} is in .gitignore, but {path} is still tracked"),
                         ops(&[&[
                             "--literal-pathspecs",
                             "rm",
@@ -281,13 +348,6 @@ impl RepoTab {
         let Some(patch) = diff::partial_patch(&data.header, &data.lines, lines, pick) else {
             return;
         };
-        let patch = match git::save_patch(&patch) {
-            Ok(p) => p.to_string_lossy().into_owned(),
-            Err(e) => {
-                self.status = Some((e, true));
-                return;
-            }
-        };
         let n = lines.len();
         let label = format!(
             "{} {n} line{} of {}",
@@ -295,18 +355,50 @@ impl RepoTab {
             if n == 1 { "" } else { "s" },
             file.path
         );
+        // Written where git runs: on another machine, in the background.
+        let repo = self.path.clone();
+        self.here_or_later(
+            ctx,
+            move || git::save_patch_for(&repo, &patch),
+            move |tab, saved, ctx| tab.apply_picked(pick, &label, saved, ctx),
+        );
+    }
+
+    /// Applies the patch of lines picked, saved at `saved` (see [`Self::pick_lines`]).
+    fn apply_picked(
+        &mut self,
+        pick: diff::Pick,
+        label: &str,
+        saved: Result<String, String>,
+        ctx: &egui::Context,
+    ) {
+        let patch = match saved {
+            Ok(p) => p,
+            Err(e) => {
+                self.status = Some((e, true));
+                return;
+            }
+        };
         let mut args = pick.args().to_vec();
         args.push(&patch);
-        if pick == diff::Pick::Discard {
+        let kind = if pick == diff::Pick::Discard {
             // Applying the same patch forward brings the lines back.
             let undo = Undo::Custom {
                 undo: ops(&[&["apply", &patch]]),
                 redo: ops(&[&args]),
             };
-            self.run_undoable(&label, ops(&[&args]), Refresh::Status, undo, ctx);
+            OpKind::Normal(undo, self.refs.head.clone())
         } else {
-            self.run_ops(&label, ops(&[&args]), Refresh::Status, OpKind::plain(), ctx);
-        }
+            OpKind::plain()
+        };
+        self.run_prepared(
+            label,
+            &format!("{label}: not done"),
+            ops(&[&args]),
+            Refresh::Status,
+            kind,
+            ctx,
+        );
     }
 
     /// Asks Mergiraf to solve what it can of the open conflict.
@@ -351,26 +443,81 @@ impl RepoTab {
 
     /// Writes the conflict editor's file and marks it resolved.
     fn save_conflict(&mut self, ctx: &egui::Context) {
-        let Some(editor) = &self.conflict else { return };
-        match editor.save(&self.path) {
-            Ok(()) => {
-                let file = editor.path.clone();
-                self.run_ops(
-                    "Mark resolved",
-                    ops(&[&["--literal-pathspecs", "add", "--", &file]]),
-                    Refresh::Status,
-                    OpKind::plain(),
-                    ctx,
-                );
+        let Some(editor) = &mut self.conflict else {
+            return;
+        };
+        // Elsewhere, written in the background (see `conflict_saved`), one save at a time: the
+        // editor waits (see `ConflictEditor::saving`) so a later one can't be overtaken.
+        if crate::remote::is_remote(&self.path) {
+            if editor.saving {
+                return;
             }
+            match editor.solved() {
+                Ok(text) => {
+                    editor.saving = true;
+                    let (repo, path) = (self.path.clone(), editor.path.clone());
+                    spawn(&self.tx, ctx, move || {
+                        let saved = super::conflict::save_solved(&repo, &path, &text);
+                        Msg::ConflictSaved(path, saved)
+                    });
+                }
+                Err(e) => self.status = Some((e, true)),
+            }
+            return;
+        }
+        let saved = editor.save(&self.path);
+        let file = editor.path.clone();
+        self.conflict_saved(file, saved, ctx);
+    }
+
+    /// Marks `file` resolved once its conflicts were saved.
+    pub(super) fn conflict_saved(
+        &mut self,
+        file: String,
+        saved: Result<(), String>,
+        ctx: &egui::Context,
+    ) {
+        match saved {
+            Ok(()) => self.run_prepared(
+                "Mark resolved",
+                &format!("Saved {file}, but not marked resolved"),
+                ops(&[&["--literal-pathspecs", "add", "--", &file]]),
+                Refresh::Status,
+                OpKind::plain(),
+                ctx,
+            ),
             Err(e) => self.status = Some((e, true)),
         }
+    }
+
+    /// Runs `ops`, the git step that follows what was just done (on another machine, in the
+    /// background meanwhile). When another operation started in the meantime, it can't: the
+    /// user is told (`left`: what is left undone) rather than left to think it ran.
+    #[allow(clippy::too_many_arguments)]
+    fn run_prepared(
+        &mut self,
+        label: &str,
+        left: &str,
+        ops: Vec<Vec<String>>,
+        refresh: Refresh,
+        kind: OpKind,
+        ctx: &egui::Context,
+    ) {
+        if let Some(busy) = &self.busy_op {
+            self.status = Some((
+                format!("{left}: {busy} was still running. Try again once it's done."),
+                true,
+            ));
+            return;
+        }
+        self.run_ops(label, ops, refresh, kind, ctx);
     }
 }
 
 /// Runs the user's editor command with `path` (through `cmd` on Windows, where editors are
 /// usually `.cmd` scripts).
 pub(crate) fn open_in_editor(editor: &str, path: &Path) -> Result<(), String> {
+    crate::remote::openable_here(path)?;
     let editor = if editor.trim().is_empty() {
         "code"
     } else {

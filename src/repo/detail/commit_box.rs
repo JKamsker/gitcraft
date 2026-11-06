@@ -13,6 +13,7 @@ impl RepoTab {
         // A rebase or patch stopped on conflicts: the button continues it.
         let continuing = self.work.in_progress.filter(|s| s.continues());
         let rebasing = continuing.is_some();
+        let mut amend_started = false;
         ui.horizontal(|ui| {
             ui.label(
                 RichText::new(match continuing {
@@ -31,16 +32,27 @@ impl RepoTab {
                     .on_hover_text(
                         "Rewrite the last commit with the staged changes and this message",
                     );
-                if amend.changed() && self.amend && self.commit_summary.trim().is_empty() {
-                    // Start from the message being amended.
-                    if let Ok(msg) = crate::git::head_message(&self.path) {
-                        let (summary, body) = msg.split_once('\n').unwrap_or((msg.as_str(), ""));
-                        self.commit_summary = summary.trim().to_owned();
-                        self.commit_body = body.trim().to_owned();
-                    }
-                }
+                amend_started =
+                    amend.changed() && self.amend && self.commit_summary.trim().is_empty();
             });
         });
+        if amend_started {
+            // Start from the message being amended (read in the background for a repository
+            // on another machine), unless one was typed meanwhile.
+            let repo = self.path.clone();
+            self.here_or_later(
+                ui.ctx(),
+                move || crate::git::head_message(&repo),
+                |tab, msg, _| {
+                    let Ok(msg) = msg else { return };
+                    if tab.amend && tab.commit_summary.trim().is_empty() {
+                        let (summary, body) = msg.split_once('\n').unwrap_or((msg.as_str(), ""));
+                        tab.commit_summary = summary.trim().to_owned();
+                        tab.commit_body = body.trim().to_owned();
+                    }
+                },
+            );
+        }
         if self.amend {
             let pushed = self
                 .refs
@@ -121,34 +133,104 @@ impl RepoTab {
     fn identity_row(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         let idle = self.busy_op.is_none();
+        let settings = crate::settings::Settings::get(ui.ctx());
+        let profile = settings.profile();
+        // A repository on another machine is by that machine's git config: the profile's
+        // author and signing are for git run here.
+        let elsewhere = crate::remote::parse(&self.path).map(|target| target.host.label());
         ui.horizontal(|ui| {
             let id = &self.identity;
+            // Where the name and the email each come from: the repository's own config, the
+            // profile (here only), or the global config (that machine's, for one elsewhere).
+            let source = |local: bool, value: &str, profile_value: &str| {
+                let profile_value = profile_value.trim();
+                if local {
+                    "this repository".to_owned()
+                } else if elsewhere.is_none() && !profile_value.is_empty() && value == profile_value
+                {
+                    format!("profile {}", profile.title())
+                } else if let Some(host) = &elsewhere {
+                    format!("global ({host})")
+                } else {
+                    "global".to_owned()
+                }
+            };
             let who = if id.name.is_empty() {
                 "No identity set (git config user.name)".to_owned()
             } else {
-                format!(
-                    "as {} <{}>{}",
-                    id.name,
-                    id.email,
-                    if id.local { "" } else { " · global" }
-                )
+                let name_from = source(id.local, &id.name, &profile.author_name);
+                let email_from = source(id.local_email, &id.email, &profile.author_email);
+                let source = if name_from == email_from {
+                    format!(" · {name_from}")
+                } else {
+                    format!(" · name: {name_from}, email: {email_from}")
+                };
+                format!("as {} <{}>{source}", id.name, id.email)
             };
-            ui.add(egui::Label::new(RichText::new(who).color(t.text_faint).small()).truncate());
-            let profiles = crate::settings::Settings::get(ui.ctx()).profiles;
+            let resp =
+                ui.add(egui::Label::new(RichText::new(who).color(t.text_faint).small()).truncate());
+            if id.local || id.local_email {
+                resp.on_hover_text(if elsewhere.is_some() {
+                    "Set in this repository's own config, which wins over that machine's global one"
+                } else {
+                    "Set in this repository's own config, which wins over the profile's author"
+                });
+            }
+            // The saved identities, then the authors of the profiles, each once.
+            let mut choices: Vec<(String, String, String)> = settings
+                .identities
+                .iter()
+                .map(|p| (p.label.clone(), p.name.clone(), p.email.clone()))
+                .collect();
+            for p in &settings.user_profiles {
+                let (name, email) = (p.author_name.trim(), p.author_email.trim());
+                if !name.is_empty()
+                    && !email.is_empty()
+                    && !choices.iter().any(|(_, n, e)| n == name && e == email)
+                {
+                    choices.push((
+                        format!("Profile {}", p.title()),
+                        name.to_owned(),
+                        email.to_owned(),
+                    ));
+                }
+            }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let b = icons::small_button(ui, "user-round", "Commit as…");
                 egui::Popup::menu(&b)
                     .style(crate::theme::menu_style)
                     .show(|ui| {
-                        if profiles.is_empty() {
+                        if choices.is_empty() {
                             ui.label(
-                                RichText::new("Add identities in Settings").color(t.text_faint),
+                                RichText::new("Add identities or profile authors in Settings")
+                                    .color(t.text_faint),
                             );
                         }
-                        for p in &profiles {
-                            let label = format!("{} — {} <{}>", p.label, p.name, p.email);
-                            if ui.add_enabled(idle, egui::Button::new(label)).clicked() {
-                                acts.push(Action::SetIdentity(p.name.clone(), p.email.clone()));
+                        for (label, name, email) in &choices {
+                            let text = format!("{label} — {name} <{email}>");
+                            if ui
+                                .add_enabled(idle, egui::Button::new(text))
+                                .on_hover_text("Sets it in this repository's own config")
+                                .clicked()
+                            {
+                                acts.push(Action::SetIdentity(name.clone(), email.clone()));
+                            }
+                        }
+                        if (id.local || id.local_email) && elsewhere.is_none() {
+                            ui.separator();
+                            if ui
+                                .add_enabled(idle, egui::Button::new("Use the profile's author"))
+                                .on_hover_text(
+                                    "Takes user.name and user.email out of this repository's \
+                                     own config, so that the profile's (or your global config's) \
+                                     apply",
+                                )
+                                .clicked()
+                            {
+                                acts.push(Action::ClearIdentity {
+                                    name: id.local,
+                                    email: id.local_email,
+                                });
                             }
                         }
                     });

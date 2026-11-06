@@ -98,3 +98,105 @@ fn settings_survive_a_restart() {
     let back: Option<Settings> = eframe::get_value(&storage, "s");
     assert_eq!(back, Some(settings));
 }
+
+/// Earlier versions kept "Commit as…" identities under `profiles`; they stay identities, and
+/// everything else becomes the default profile's.
+#[test]
+fn settings_from_before_profiles_get_a_default_profile() {
+    let mut storage = Memory::default();
+    storage.set_string(
+        "s",
+        "(editor: \"subl\", profiles: [(label: \"Work\", name: \"Ann\", email: \"ann@corp\")])"
+            .to_owned(),
+    );
+    let back: Option<Settings> = eframe::get_value(&storage, "s");
+    let mut back = back.unwrap_or_default();
+    back.ensure_profile();
+    assert_eq!(
+        back.identities,
+        [SavedIdentity {
+            label: "Work".into(),
+            name: "Ann".into(),
+            email: "ann@corp".into(),
+        }]
+    );
+    assert_eq!(back.user_profiles, [UserProfile::default()]);
+    assert_eq!(back.profile().id, back.active_profile);
+    assert!(!back.profile().sets_git());
+}
+
+#[test]
+fn profiles_are_added_named_and_kept_apart() {
+    let mut settings = Settings::default();
+    settings.profile_mut().author_email = "me@home".into();
+    let work = settings.add_profile(&settings.new_profile_name("Profile"), false);
+    let copy = settings.add_profile(&settings.new_profile_name("Default"), true);
+    assert_eq!(settings.new_profile_name("Profile"), "Profile 2");
+    let names: Vec<&str> = settings
+        .user_profiles
+        .iter()
+        .map(|p| p.name.as_str())
+        .collect();
+    assert_eq!(names, ["Default", "Profile", "Default 2"]);
+    // A new one is empty, a copy has the settings of the one in use, and none is switched to.
+    let by_id = |id| settings.user_profiles.iter().find(|p| p.id == id).cloned();
+    assert_eq!(by_id(work).map(|p| p.author_email), Some(String::new()));
+    assert_eq!(
+        by_id(copy).map(|p| p.author_email),
+        Some("me@home".to_owned())
+    );
+    assert_eq!(settings.active_profile, 1);
+    assert_eq!((work, copy), (2, 3));
+
+    // The active one deleted: another takes over.
+    settings.user_profiles.retain(|p| p.id != 1);
+    settings.ensure_profile();
+    assert_eq!(settings.active_profile, work);
+    settings.user_profiles.clear();
+    settings.ensure_profile();
+    assert_eq!(settings.user_profiles.len(), 1);
+}
+
+/// How many rows a search finds on each page, with the page drawn nowhere.
+fn found(query: &str) -> Vec<(Page, usize)> {
+    let ctx = egui::Context::default();
+    let mut settings = Settings::default();
+    let mut counts = Vec::new();
+    let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+        counts = Page::ALL
+            .iter()
+            .map(|&page| {
+                let filter = Filter::new(query, page.title(), true);
+                let mut view = SettingsView {
+                    theme: crate::theme::ThemeKind::Dark,
+                    git_version: "2.45.0",
+                    dialog_open: false,
+                    request: None,
+                };
+                settings.page_ui(ui, page, &filter, &mut view);
+                (page, filter.found())
+            })
+            .filter(|(_, n)| *n > 0)
+            .collect();
+    });
+    // Nothing renders here: the font texture is left unapplied on purpose.
+    output.textures_delta.clear();
+    counts
+}
+
+#[test]
+fn a_search_finds_settings_by_name_keyword_section_or_page() {
+    // A keyword only, any case.
+    assert_eq!(found("GRAVATAR"), vec![(Page::Appearance, 1)]);
+    // Every word has to be there.
+    assert_eq!(found("fetch background"), vec![(Page::Git, 1)]);
+    // A section's name finds all its rows.
+    assert_eq!(found("mergiraf"), vec![(Page::Git, 3)]);
+    // Shortcuts by their keys or what they do.
+    assert_eq!(found("reopen"), vec![(Page::Shortcuts, 1)]);
+    // The profile's own settings are found too.
+    assert_eq!(found("user.email"), vec![(Page::Profile, 1)]);
+    assert_eq!(found("theme dark"), vec![(Page::Profile, 1)]);
+    assert_eq!(found("ssh passphrase"), vec![(Page::Git, 1)]);
+    assert!(found("nothing like this qqq").is_empty());
+}

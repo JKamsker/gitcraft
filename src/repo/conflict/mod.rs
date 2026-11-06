@@ -42,6 +42,12 @@ pub struct ConflictEditor {
     pub on_disk: usize,
     /// The file as it was opened: while it stays so, a refresh keeps the choices made.
     opened: String,
+    /// Which opening of a conflict editor in the tab this is: what was read or checked in the
+    /// background for an earlier one (closed since) is not taken for this one.
+    pub generation: u64,
+    /// Being written on another machine, in the background: neither edited nor saved again
+    /// until that is done, so an older save can't land after a newer one.
+    pub saving: bool,
 }
 
 /// Whether `line` (without its line ending) is git's `kind` conflict marker: exactly seven
@@ -211,7 +217,73 @@ fn unresolved_in(result: &str, segments: &[Segment]) -> usize {
 
 /// Whether `file` is a symbolic link (not what it points to).
 fn is_link(file: &Path) -> bool {
-    std::fs::symlink_metadata(file).is_ok_and(|m| m.file_type().is_symlink())
+    crate::remote::is_link(file)
+}
+
+/// Writes `text`, the conflicts of `path` (in the repository at `repo`) solved, over it. On
+/// another machine, a round trip: in the background.
+pub fn save_solved(repo: &Path, path: &str, text: &str) -> Result<(), String> {
+    let file = crate::remote::join(repo, path);
+    if let Some(target) = crate::remote::parse(&file) {
+        return save_there(&target, text).map_err(|e| format!("Could not save {path}: {e}"));
+    }
+    // A link put there since it was opened is not written through.
+    if is_link(&file) {
+        return Err(format!("{path} is a symbolic link now: not saved"));
+    }
+    std::fs::write(&file, text).map_err(|e| format!("Could not save {path}: {e}"))
+}
+
+/// What the save script ends with when the file is a link, or not a file, now.
+const NOT_A_PLAIN_FILE: i32 = 4;
+
+/// The script that saves a solved file on another machine, from its input: written to a new
+/// file beside it (its mode copied), then renamed over it. A rename replaces whatever is at
+/// the path, never follows it: a link put there after the check is replaced, not written
+/// through.
+fn save_script(file: &str) -> String {
+    let f = crate::remote::sh_path(file);
+    let dir = crate::remote::sh_path(crate::remote::parent_there(file));
+    format!(
+        concat!(
+            "f={f}\n",
+            "if [ -L \"$f\" ] || [ ! -f \"$f\" ]; then exit {not_plain}; fi\n",
+            "t=$(mktemp {dir}/.gitcraft-save.XXXXXX) || exit 1\n",
+            "trap 'rm -f \"$t\"' EXIT\n",
+            "cat > \"$t\" || exit 1\n",
+            "m=$(stat -c %a -- \"$f\" 2>/dev/null || stat -f %Lp -- \"$f\" 2>/dev/null)\n",
+            "chmod \"${{m:-644}}\" \"$t\" || exit 1\n",
+            "mv -f -- \"$t\" \"$f\"\n",
+        ),
+        f = f,
+        dir = dir,
+        not_plain = NOT_A_PLAIN_FILE,
+    )
+}
+
+/// [`save_solved`] on another machine (blocking: from a thread of its own).
+fn save_there(target: &crate::remote::Target, text: &str) -> Result<(), String> {
+    let out = crate::remote::exec(
+        &target.host,
+        &crate::remote::Request {
+            script: save_script(&target.path),
+            stdin: Some(text.as_bytes().to_vec()),
+            ..crate::remote::Request::default()
+        },
+    )?;
+    match out.code {
+        0 => Ok(()),
+        NOT_A_PLAIN_FILE => Err("it is a symbolic link, or not a file, now: not saved".to_owned()),
+        _ => Err(String::from_utf8_lossy(&out.stderr).trim().to_owned()),
+    }
+}
+
+/// Whether `path` (in the repository at `repo`) is no longer `opened`, as it was opened:
+/// `None` when it couldn't be read (on another machine, a dropped connection says nothing
+/// about the file). On another machine, a round trip: in the background.
+pub fn changed_on_disk(repo: &Path, path: &str, opened: &str) -> Option<bool> {
+    let bytes = crate::git::worktree_file(&crate::remote::join(repo, path)).ok()?;
+    Some(String::from_utf8(bytes).ok().as_deref() != Some(opened))
 }
 
 impl ConflictEditor {
@@ -219,10 +291,12 @@ impl ConflictEditor {
     pub fn open(repo: &Path, path: &str, state: Option<InProgress>) -> Option<Self> {
         // Never a link: a merge can leave one from the other side here, and saving would write
         // through it to wherever it points.
-        if is_link(&repo.join(path)) {
+        if is_link(&crate::remote::join(repo, path)) {
             return None;
         }
-        let text = String::from_utf8(crate::git::worktree_file(&repo.join(path)).ok()?).ok()?;
+        let text =
+            String::from_utf8(crate::git::worktree_file(&crate::remote::join(repo, path)).ok()?)
+                .ok()?;
         let (segments, ours_label, theirs_label) = parse(&text);
         let conflicts = segments
             .iter()
@@ -243,16 +317,20 @@ impl ConflictEditor {
             rebase: state == Some(InProgress::Rebase),
             solving: false,
             on_disk: conflicts,
+            generation: 0,
+            saving: false,
         })
     }
 
-    /// Whether the file in the repository at `repo` is no longer as it was opened.
+    /// Whether the file in the repository at `repo` is no longer as it was opened (here, one
+    /// that can't be read is gone).
     pub fn changed_on_disk(&self, repo: &Path) -> bool {
-        crate::git::worktree_file(&repo.join(&self.path))
-            .ok()
-            .and_then(|bytes| String::from_utf8(bytes).ok())
-            .as_ref()
-            != Some(&self.opened)
+        changed_on_disk(repo, &self.path, &self.opened) != Some(false)
+    }
+
+    /// The file as it was opened (for [`changed_on_disk`] in the background).
+    pub fn opened(&self) -> &str {
+        &self.opened
     }
 
     /// Takes `text`, the file with some of its conflicts solved elsewhere (by Mergiraf): the
@@ -298,6 +376,12 @@ impl ConflictEditor {
     }
 
     pub fn save(&self, repo: &Path) -> Result<(), String> {
+        let text = self.solved()?;
+        save_solved(repo, &self.path, &text)
+    }
+
+    /// The file with every conflict solved, as it is to be saved; or how many are left.
+    pub fn solved(&self) -> Result<String, String> {
         let left = self.unresolved();
         if left > 0 {
             return Err(format!(
@@ -306,12 +390,7 @@ impl ConflictEditor {
                 self.path
             ));
         }
-        let file = repo.join(&self.path);
-        // A link put there since it was opened is not written through.
-        if is_link(&file) {
-            return Err(format!("{} is a symbolic link now: not saved", self.path));
-        }
-        std::fs::write(file, &self.result).map_err(|e| format!("Could not save {}: {e}", self.path))
+        Ok(self.result.clone())
     }
 
     /// Names for the two sides as the user thinks of them.
@@ -406,6 +485,8 @@ mod tests {
             rebase: false,
             solving: false,
             on_disk: 1,
+            generation: 0,
+            saving: false,
         };
         assert_eq!(ed.unresolved(), 1);
         ed.choose(0, Choice::Ours);
@@ -430,6 +511,8 @@ mod tests {
             rebase: false,
             solving: false,
             on_disk: conflicts,
+            generation: 0,
+            saving: false,
         }
     }
 
@@ -531,6 +614,114 @@ mod tests {
         );
         let _ = std::fs::remove_dir_all(&dir);
         assert!(link.is_none() && zero.is_none());
+        Ok(())
+    }
+
+    /// What was read or checked in the background for an editor closed since (or opened
+    /// again since) is not taken for the one open: its choices stay. A change seen for the one
+    /// open opens it again; not while it is being saved.
+    #[test]
+    fn results_for_an_earlier_editor_are_not_taken() -> Result<(), String> {
+        use crate::git::{Area, StatusFile};
+        use crate::repo::{DiffKey, RepoTab};
+        let dir =
+            std::env::temp_dir().join(format!("gitcraft-conflict-gen-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        std::fs::write(dir.join("f"), FILE).map_err(|e| e.to_string())?;
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+        let file = StatusFile {
+            path: "f".to_owned(),
+            old_path: None,
+            code: 'U',
+            area: Area::Conflicted,
+        };
+        tab.open_diff(DiffKey::Work(file), &ctx);
+        let now = tab.conflict_generation;
+        let chosen = |tab: &RepoTab| tab.conflict.as_ref().map(|ed| ed.choices.clone());
+        if let Some(ed) = tab.conflict.as_mut() {
+            assert_eq!(ed.generation, now);
+            ed.choose(0, Choice::Ours);
+        }
+        let picked = Some(vec![Some(Choice::Ours), None]);
+
+        // Read for an earlier opening: not taken.
+        let earlier = ConflictEditor::open(&dir, "f", None).map(Box::new);
+        tab.conflict_opened(now - 1, "f".to_owned(), earlier);
+        assert_eq!(chosen(&tab), picked);
+        // Changed, as seen for an earlier opening: nothing reopened.
+        tab.conflict_changed(now - 1, "f".to_owned(), &ctx);
+        assert_eq!(chosen(&tab), picked);
+        // Nor while the one open is being saved.
+        if let Some(ed) = tab.conflict.as_mut() {
+            ed.saving = true;
+        }
+        tab.conflict_changed(now, "f".to_owned(), &ctx);
+        assert_eq!(chosen(&tab), picked);
+        if let Some(ed) = tab.conflict.as_mut() {
+            ed.saving = false;
+        }
+        // Changed, as seen for the one open: opened again from the file.
+        tab.conflict_changed(now, "f".to_owned(), &ctx);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(chosen(&tab), Some(vec![None, None]));
+        assert_eq!(tab.conflict.as_ref().map(|ed| ed.generation), Some(now + 1));
+        Ok(())
+    }
+
+    /// The save script on another machine replaces the file (keeping its mode) rather than
+    /// write through a link, and refuses one that is a link.
+    #[test]
+    fn the_save_script_replaces_rather_than_follows() {
+        let script = save_script("~/repo/dir/it's.txt");
+        assert!(
+            script.starts_with("f=\"$HOME\"'/repo/dir/it'\\''s.txt'\n"),
+            "{script}"
+        );
+        assert!(script.contains("mktemp \"$HOME\"'/repo/dir'/.gitcraft-save.XXXXXX"));
+        assert!(script.contains("if [ -L \"$f\" ] || [ ! -f \"$f\" ]; then exit 4; fi"));
+        assert!(script.contains("mv -f -- \"$t\" \"$f\""));
+    }
+
+    /// Against WSL (`GITCRAFT_TEST_WSL=<distro>`; skipped otherwise): a solved file is saved
+    /// with its mode, a link in its place is refused and left alone.
+    #[cfg(windows)]
+    #[test]
+    fn a_solved_file_is_saved_there() -> Result<(), String> {
+        let Ok(distro) = std::env::var("GITCRAFT_TEST_WSL") else {
+            return Ok(());
+        };
+        let host = crate::remote::Host::Wsl(distro);
+        let dir = format!("/tmp/gitcraft-conflict-save-{}", std::process::id());
+        let sh = |script: String| {
+            crate::remote::exec(
+                &host,
+                &crate::remote::Request {
+                    script,
+                    ..crate::remote::Request::default()
+                },
+            )
+        };
+        let made = sh(format!(
+            "rm -rf {dir} && mkdir -p {dir} && printf 'x\\n' > {dir}/run.sh && chmod 755 \
+             {dir}/run.sh && printf 'secret\\n' > {dir}/target && ln -s target {dir}/link"
+        ))?;
+        assert_eq!(made.code, 0, "{}", String::from_utf8_lossy(&made.stderr));
+        let repo = crate::remote::encode(&host, &dir);
+        let saved = save_solved(&repo, "run.sh", "solved\n");
+        let linked = save_solved(&repo, "link", "over the link\n");
+        let after = sh(format!(
+            "cat {dir}/run.sh; stat -c %a {dir}/run.sh; cat {dir}/target; [ -L {dir}/link ] && \
+             echo link; ls -a {dir} | grep -c gitcraft-save"
+        ))?;
+        let _ = sh(format!("rm -rf {dir}"));
+        assert_eq!(saved, Ok(()));
+        assert!(linked.is_err(), "{linked:?}");
+        assert_eq!(
+            String::from_utf8_lossy(&after.stdout),
+            "solved\n755\nsecret\nlink\n0\n"
+        );
         Ok(())
     }
 

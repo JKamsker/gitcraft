@@ -37,27 +37,26 @@ impl App {
         }
     }
 
-    /// The settings tab: the form in a centred column, scrolling as a whole.
+    /// The settings tab: its pages beside the chosen one (see [`crate::settings`]).
     pub(super) fn settings_page(&mut self, ui: &mut Ui) {
-        const WIDTH: f32 = 640.0;
-        egui::ScrollArea::vertical()
-            .auto_shrink([false, false])
-            .show(ui, |ui| {
-                let side = ((ui.available_width() - WIDTH) / 2.0).max(24.0);
-                ui.horizontal(|ui| {
-                    ui.add_space(side);
-                    ui.vertical(|ui| {
-                        ui.set_width(WIDTH.min(ui.available_width() - 24.0));
-                        ui.add_space(32.0);
-                        ui.label(RichText::new("Settings").font(theme::semibold(22.0)));
-                        ui.add_space(4.0);
-                        if self.settings.ui(ui) {
-                            self.settings.set(ui.ctx());
-                        }
-                        ui.add_space(32.0);
-                    });
-                });
-            });
+        let ctx = ui.ctx().clone();
+        let version = self.git_version.clone().unwrap_or_default();
+        let mut view = crate::settings::SettingsView {
+            theme: self.theme,
+            git_version: &version,
+            dialog_open: self.clone_form.is_some()
+                || self.remote_form.is_some()
+                || self.askpass_open()
+                || self.palette.is_some()
+                || self.manual_open,
+            request: None,
+        };
+        if self.settings.page(ui, &mut view) {
+            self.settings.set(&ctx);
+        }
+        if let Some(request) = view.request {
+            self.profile_request(request, &ctx);
+        }
     }
 
     pub(super) fn manual_ui(&mut self, ctx: &egui::Context) {

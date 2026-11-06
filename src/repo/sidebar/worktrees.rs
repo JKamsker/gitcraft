@@ -159,7 +159,8 @@ fn worktree_menu_items(
     can_open: bool,
     any_prunable: bool,
 ) {
-    let path = wt.path.display().to_string();
+    // As git (and a shell) on the worktree's machine names it.
+    let path = crate::remote::git_path(&wt.path);
     if same_tab
         && ui
             .add_enabled(can_open, egui::Button::new("Open"))
@@ -184,8 +185,12 @@ fn worktree_menu_items(
             cwd: Some(wt.path.clone()),
         });
     }
-    if ui.button(crate::repo::reveal_label()).clicked() {
-        let _ = open::that_detached(&wt.path);
+    let openable = crate::remote::openable_here(&wt.path).is_ok();
+    if ui
+        .add_enabled(openable, egui::Button::new(crate::repo::reveal_label()))
+        .clicked()
+    {
+        let _ = crate::remote::open_here(wt.path.clone());
     }
     if ui.button("Copy path").clicked() {
         ui.ctx().copy_text(path.clone());

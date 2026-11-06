@@ -40,7 +40,9 @@ impl RepoTab {
     pub(super) fn follow_checkout_move(&mut self, ok: bool, ctx: &egui::Context) {
         if std::mem::take(&mut self.update_submodules)
             && ok
-            && self.path.join(".gitmodules").is_file()
+            // Elsewhere, not asked from here (a round trip on the UI thread): an update without
+            // submodules does nothing.
+            && (crate::remote::is_remote(&self.path) || self.path.join(".gitmodules").is_file())
         {
             self.run_ops(
                 "Update submodules",

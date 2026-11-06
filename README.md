@@ -14,7 +14,59 @@ so your config, credentials and hooks apply as usual.
   recent repositories.
 - Browser-like tabs, one per repository (Ctrl+T, Ctrl+W, middle-click; Ctrl+Shift+T reopens a
   closed one). Open tabs, recents, theme and settings are remembered.
+- Profiles, as in GitKraken: switch between them from the title bar (or the palette). Each has
+  its own open tabs, recent repositories, theme, git author and commit signing (Settings →
+  Profile); the other settings pages are shared. Switching closes this profile's tabs and opens the
+  other one's (refused while a tab has unfinished work).
 - Changes made elsewhere (editor, terminal) show up by themselves: the folder is watched.
+- Repositories on another machine, in a WSL distribution or over SSH: the window stays here and
+  git runs there (see below).
+
+**Remote repositories (WSL, SSH)**
+
+- Start page → _Remote_ (or the palette's _Open remote repository_): pick a WSL distribution
+  or an SSH host (the hosts of `~/.ssh/config` are offered), and the repository's folder there
+  (`/home/me/repo` or `~/repo`), typed or found with _Browse…_, which lists that machine's
+  folders and marks its repositories. A `\\wsl.localhost\…` folder chosen with _Open_ is a WSL
+  repository too, and `gitcraft ssh://host/path/to/repo` opens one from the command line.
+- The window never waits for that machine: everything asked of it is asked in the background,
+  and a slow or unreachable machine only shows as work still going on (anything asked of it
+  from the window's thread is refused rather than run, and a test drives the window against a
+  WSL repository to keep it so).
+- git, and every file read or written in the repository (diffs of the working tree, staging
+  lines, the conflict editor, `.gitignore`, rebase todo lists), runs on that machine, with its
+  own git, config, credentials and hooks. Nothing has to be installed there but git and a POSIX
+  `sh` with the tools any Linux, BSD or macOS has: `mktemp -d` (each shell's temporary
+  folder), `base64 -d` (what a command reads, a patch or a file's new contents), `cat` and
+  `wc` (passing output back), `stat` (GNU or BSD: noticing changes), and `ps` with `awk`
+  (stopping a command that hung, and all it started).
+- A few shells per machine are kept open (`ssh -T host sh`, `wsl.exe -d distro --exec sh`), so a
+  command costs one round trip, not a new connection; history is read page by page in them
+  too. SSH signs in as it does in a terminal (keys, an agent, `~/.ssh/config`;
+  `GITCRAFT_SSH_CONFIG` names another config): what it asks — a password, a key's
+  passphrase, whether to trust a host seen for the first time — is asked in the window (ssh
+  runs gitcraft as its `SSH_ASKPASS`). A password or passphrase typed is kept for that machine
+  while gitcraft runs, so the other shells don't ask again, and forgotten as soon as ssh says
+  it was wrong. Tick **Remember connection** to keep it after a restart too: once ssh has
+  signed in with it (a wrong one is never saved), it is saved encrypted in the system's
+  credential store (Windows Credential Manager, the macOS Keychain, the Secret Service on
+  Linux), never in gitcraft's own files, and forgotten when it stops working or with
+  **Forget saved SSH sign-ins** in the command palette (or Settings → Git).
+- Names with a `\` in them (Linux allows one) work like any other.
+- Network operations (fetch, pull, push, clone) run in shells of their own, so the reads never
+  wait behind them. A command that hangs is stopped there, with what it started, after 5
+  minutes (30 for network operations).
+- Changes made there show up by themselves: the repository is looked at every few seconds
+  (every 15 while the window isn't focused).
+- The terminal opens a shell on that machine, in the repository, whatever the login shell
+  (bash, zsh, fish, csh…). Pull requests and builds use `gh` / `glab` of this machine, told
+  which repository, and only for github.com, gitlab.com or a host they're signed in to.
+  Forgejo and Gitea are asked from this machine too, with this machine's login for the host.
+- Over SSH, programs of this machine can't open the files (reveal in the file manager, open in
+  editor, Mergiraf). In WSL they can, through `\\wsl.localhost`.
+- Settings that write this machine's global git config (commit signing, Mergiraf) don't apply
+  there, nor do a profile's author and signing: that machine's own git config does (the commit
+  box says `· global (SSH · host)`).
 
 **Graph**
 
@@ -76,8 +128,15 @@ so your config, credentials and hooks apply as usual.
   rebase.
 - Stashes: stash (with a message, untracked files included), see what a stash holds, apply, pop,
   drop.
-- Pull / merge requests of GitHub (through `gh`) or GitLab (through `glab`): list, open in the
-  browser, check out, create from a branch.
+- Pull / merge requests of GitHub (through `gh`), GitLab (through `glab`), Forgejo and Gitea
+  (through their API; Codeberg is Forgejo): list, open in the browser, check out, create from a
+  branch. On GitHub, Forgejo and Gitea a click opens one in the big area: description, checks,
+  commits, conversation and changed files; comment, review (with comments on lines, pending until
+  sent), reply, apply suggested changes, dismiss reviews and merge. Forgejo's and Gitea's API can't
+  resolve conversations, so that stays on their web page. _Open in worktree_ (in a request's menu,
+  and above the changed files of an open pull request) opens the worktree its branch is checked
+  out in, or makes one beside the repository first: on the local branch, on a new one tracking
+  the remote branch, or fetched from the forge for a fork that isn't a remote here.
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
 
 **Changes and commits** (right)
@@ -93,15 +152,17 @@ so your config, credentials and hooks apply as usual.
   click the changed lines you want (Shift+click for a range) and stage, unstage or discard only
   those. Discarding can be undone with Ctrl+Z.
 - Commit box (Ctrl+Enter; with nothing staged it stages everything), _Amend last commit_
-  (warns when the commit is already pushed), the identity you commit as, and saved identities to
-  switch a repository to.
+  (warns when the commit is already pushed), the identity you commit as (and whether it is the
+  repository's own, the profile's or the global one), and saved identities or profile authors
+  to switch a repository to; _Use the profile's author_ takes the repository's own out again.
 - Undo / redo (Ctrl+Z / Ctrl+Y) of commits, amends, merges, rebases, pulls, resets,
   cherry-picks, reverts, checkouts, branch create / rename / delete, tags and stashes.
 
 **Diffs and conflicts** (centre)
 
-- Unified or side by side, syntax colours, the changed part of each line marked, whitespace
-  changes optional, images shown before / after. Esc closes.
+- Unified or side by side (a new file takes the whole width, with no empty old side), syntax
+  colours, the changed part of each line marked, whitespace changes optional, images shown
+  before / after. Esc closes.
 - A file kept in Git LFS shows as its LFS objects before and after, with their sizes, rather
   than the text of the pointer git stores. With git-lfs installed, the palette (Ctrl+P) of a
   repository that uses LFS has _LFS: Fetch_ and _LFS: Pull_.
@@ -110,6 +171,10 @@ so your config, credentials and hooks apply as usual.
   green; click a mark to jump to its change, or anywhere else on the strip to scroll there.
 - The _Diff_ / _File_ switch shows the whole file as it is after the change instead (before it,
   for a deleted file), coloured and with line numbers.
+- A Markdown file's diff has an eye button that renders it: the changes block by block (removed
+  ones red, added ones green, the rest as they are) or, with _File_, the whole file. Images of
+  the repository show as they are on each side of the change; any other image is a link, so a
+  file can't make gitcraft contact a server.
 - Code takes the colours of the theme VS Code (or Insiders, VSCodium) is using, read from its
   settings and extensions, when it is dark or light like gitcraft's; a setting turns it off.
 - Conflicts open in a three-pane editor: each conflict's two sides with _Ours_, _Theirs_ and
@@ -145,16 +210,26 @@ so your config, credentials and hooks apply as usual.
 - Command palette (Ctrl+P): every action and branch, fuzzy matched.
 - Manual (F1, or the book in the title bar): what each part does and every keyboard shortcut.
 - Avatars: on a GitHub repository, the authors' GitHub accounts (through `gh` when installed, else
-  GitHub's API); on GitLab, the host's avatar API; elsewhere Gravatar (a hash of the email).
+  GitHub's API); on Forgejo and Gitea, the accounts the host ties the commits to; on GitLab, the
+  host's avatar API; elsewhere Gravatar (a hash of the email).
   Cached on disk; can be turned off.
-- Settings: zoom, branch column width, graph columns, avatars, notifications, update check,
-  background fetch, keeping submodules up to date, editor command, default shell and terminal
-  font size, saved identities.
-- Commit signing in Settings: the format (OpenPGP, SSH or X.509), signing key and program, and
-  whether commits and tags are signed by default. These are your global git config's
-  `gpg.format`, `user.signingkey`, `gpg.program` (`gpg.ssh.program`, `gpg.x509.program`),
+- Settings (Ctrl+, or the gear in the title bar), in pages listed on the left: the profile in
+  use and what is its own, zoom, branch column width, graph columns, avatars, notifications,
+  update check, background fetch, keeping submodules up to date, editor command, default shell
+  and terminal font size, saved identities, SSH sign-ins, and every keyboard shortcut. Ctrl+F
+  searches all pages at once (Esc clears it); Alt+↑ / Alt+↓ go through the pages.
+- Commit signing in Settings → Commit signing: the format (OpenPGP, SSH or X.509), signing key
+  and program, and whether commits and tags are signed by default. These are your global git
+  config's `gpg.format`, `user.signingkey`, `gpg.program` (`gpg.ssh.program`, `gpg.x509.program`),
   `commit.gpgSign` and `tag.gpgSign`, shown as they are set and written back there; git does
-  the signing as usual.
+  the signing as usual. A profile can sign its own way instead (Settings → Profile).
+- How a profile's git author and signing reach git: gitcraft writes them to a config file of the
+  profile's (in its data folder, `profiles/<id>.gitconfig`) that includes your own global config
+  first and then sets the profile's values, and runs git with `GIT_CONFIG_GLOBAL` pointing at it
+  (git 2.32 or later). So the profile wins over `~/.gitconfig`, and a repository's own config
+  (`git config --local`, `--worktree`) wins over the profile, as it does over `~/.gitconfig`.
+  `git config --global` from gitcraft still reads and writes your own file. The built-in
+  terminal keeps your own config.
 - Looks on GitHub for a newer release on every start, of the main channel (releases) or the dev
   channel (a prerelease of every change to `dev`). It downloads it in the background and parks it
   on disk; "Update now" in the banner then swaps it in place of the running version and restarts.
@@ -167,7 +242,9 @@ so your config, credentials and hooks apply as usual.
 ## Download
 
 Ready-made builds for Windows, Linux (x86-64) and macOS (Apple silicon and Intel) are on the
-[releases page](https://github.com/Vancete/gitcraft/releases). Git must be installed.
+[releases page](https://github.com/Vancete/gitcraft/releases). Git must be installed. New
+releases are built for Windows and Linux only for now: the release workflow's macOS job is off
+until GitHub's macOS runners pick it up again, so on a Mac build from source (below) meanwhile.
 
 - **Windows:** `gitcraft-…-setup.exe` installs it for your user (no administrator rights), with a
   Start menu entry, an optional desktop icon, _Open in gitcraft_ on folders and an uninstaller.
@@ -202,6 +279,50 @@ Linux needs the usual eframe system packages (e.g. `libxkbcommon-dev`, `libgtk-3
 file dialogs, `libdbus-1-dev` for notifications). Pull requests need the GitHub CLI (`gh`) or
 GitLab CLI (`glab`), logged in.
 
+Forgejo and Gitea need no tool of their own. gitcraft uses a login the user already has for the
+host, and never stores one: `GITEA_SERVER_URL` + `GITEA_SERVER_TOKEN` when they name that server,
+else a login of `tea` (`tea login add`, which works with Forgejo too), else what git's credential
+helper keeps for `https://host` (a password or an access token). Public repositories can be read
+without any. codeberg.org and hosts named like `forgejo…` / `gitea…` are recognised, as are the
+hosts `tea` is logged in to; for any other server, tell git's config which forge it is:
+
+```bash
+git config --global gitcraft.git.example.org.forge forgejo   # every repository on that host
+git config gitcraft.forge gitea                               # just this repository
+```
+
+The value is one of `github`, `gitlab`, `forgejo` or `gitea`.
+
+### Testing against a real Forgejo and Gitea
+
+The Forgejo / Gitea code has tests that go through a pull request's whole life on real servers:
+detection, opening, the list, reading it in full, fetching its changes, comments, pending reviews,
+replies, dismissals, suggested changes and merging. `ci/forge-server.sh` downloads a release
+(checksum verified), starts it on 127.0.0.1 with SQLite and two users, and writes their tokens to an
+env file; CI does the same for the latest and the oldest supported releases (`.github/workflows/ci.yml`).
+
+```bash
+ci/forge-server.sh forgejo 3000 forges.env   # FORGEJO_VERSION=… for another release
+ci/forge-server.sh gitea 3001 forges.env     # GITEA_VERSION=…
+set -a; . ./forges.env; set +a
+cargo test --lib forge::gitea::live -- --ignored --nocapture
+```
+
+A plain `cargo test` skips them.
+
+### Remote repositories, against real machines
+
+The tests of `src/remote/live_tests.rs` run only when given a machine:
+
+```sh
+GITCRAFT_TEST_SSH='build-host:~/repos/some-repo' cargo test live_tests -- --nocapture  # reads it
+GITCRAFT_TEST_WSL=Ubuntu cargo test live_tests -- --nocapture  # works in a scratch repo in /tmp
+GITCRAFT_TEST_WSL=Ubuntu cargo test never_holds_up_the_window  # drives the window against one
+```
+
+`cargo run --example ui_shot` ends by saying how many commands for another machine were asked
+from the window's thread (each is a bug: refused, it would have frozen the window).
+
 ### Looking at the UI headlessly
 
 `examples/ui_shot.rs` drives the app without a window (egui_kittest) and saves PNGs:
@@ -222,14 +343,21 @@ was made this way, on a demo repository.
 | ------------------------ | ---------------------------------------------------------------------------------- |
 | `src/git.rs`             | `git` CLI wrapper and output parsing (refs, log, status, stashes, remotes, search) |
 | `src/graph.rs`           | lane layout for the commit graph                                                   |
-| `src/forge.rs`           | pull / merge requests through `gh` and `glab`                                      |
-| `src/pull_request.rs` | one pull request in full through `gh`: details, checks, comments, changes |
-| `src/pr_post.rs` | what goes out through `gh`: comments, reviews, replies, suggestions, merges |
-| `src/pr_threads.rs` | review threads, the pending review and permissions, from GitHub's GraphQL API |
-| `src/avatars.rs`         | avatars from GitHub, GitLab or Gravatar, cached on disk                            |
+| `src/forge/mod.rs`       | the forges behind one `Provider` trait: which one hosts a remote, list, create, avatars, the page of one |
+| `src/forge/github/`      | GitHub through `gh`: list, `gh pr view`, GraphQL threads, comments, reviews, merges |
+| `src/forge/gitlab.rs`    | GitLab through `glab`: list and create                                             |
+| `src/forge/gitea/`       | Forgejo and Gitea through their REST API: list, the page of one, comments, reviews, merges; finding the login |
+| `src/forge/http.rs`      | the REST client for forges without a command-line tool                             |
+| `src/forge/cli.rs`       | running `gh` / `glab`                                                              |
+| `ci/forge-server.sh`     | a throwaway Forgejo or Gitea for the live tests (`src/forge/gitea/live.rs`)        |
+| `src/pull_request/mod.rs` | one pull request in full, whatever the forge: details, checks, comments, changes, safe markdown |
+| `src/pr_post/mod.rs` | what goes out: the `Target` trait each forge implements, and what they share (suggestions, merge rules) |
+| `src/pr_threads.rs` | review threads, the pending review and permissions                          |
+| `src/avatars.rs`         | avatars from GitHub, Forgejo / Gitea, GitLab or Gravatar, cached on disk           |
 | `src/update.rs`          | new-release check                                                                  |
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |
 | `src/shell_path.rs`      | on macOS, the login shell's PATH for the commands gitcraft starts                  |
+| `src/remote.rs` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
 | `src/settings.rs`        | user settings and their form                                                       |
 | `src/manual.rs`          | the manual (F1): features and keyboard shortcuts                                   |
 | `src/theme.rs`           | colour tokens, fonts, egui style (PhotoCraft's Pro themes)                         |

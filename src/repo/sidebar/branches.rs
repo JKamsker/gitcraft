@@ -262,7 +262,7 @@ impl RepoTab {
         {
             acts.push(self.unset_upstream_action(b));
         }
-        let Some(forge) = self.forge else { return };
+        let Some(forge) = self.forge() else { return };
         match self.prs.iter().find(|p| p.branch == b.name) {
             Some(pr) => {
                 if ui

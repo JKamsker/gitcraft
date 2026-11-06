@@ -125,14 +125,77 @@ impl RepoTab {
             self.conflict = None;
             return;
         }
+        // A new opening: what is still on its way for an earlier one is not for this one.
+        self.conflict_generation += 1;
+        let generation = self.conflict_generation;
         self.conflict = match &key {
+            // Elsewhere, read in the background (see `conflict_opened`).
+            DiffKey::Work(file)
+                if file.area == git::Area::Conflicted && crate::remote::is_remote(&self.path) =>
+            {
+                let (repo, path, state) =
+                    (self.path.clone(), file.path.clone(), self.work.in_progress);
+                spawn(&self.tx, ctx, move || {
+                    let editor = conflict::ConflictEditor::open(&repo, &path, state);
+                    Msg::ConflictOpened(generation, path, editor.map(Box::new))
+                });
+                None
+            }
             DiffKey::Work(file) if file.area == git::Area::Conflicted => {
-                conflict::ConflictEditor::open(&self.path, &file.path, self.work.in_progress)
+                conflict::ConflictEditor::open(&self.path, &file.path, self.work.in_progress).map(
+                    |mut ed| {
+                        ed.generation = generation;
+                        ed
+                    },
+                )
             }
             _ => None,
         };
         self.diff = Some(DiffView::new(key));
         self.refresh_diff(ctx);
+    }
+
+    /// The conflict editor of `path`, read in the background for the opening numbered
+    /// `generation`, if that is still the latest and its diff the one open: one read for an
+    /// opening closed since would replace (or reset) the editor opened after it.
+    pub(super) fn conflict_opened(
+        &mut self,
+        generation: u64,
+        path: String,
+        editor: Option<Box<conflict::ConflictEditor>>,
+    ) {
+        let open = matches!(&self.diff, Some(DiffView { key: DiffKey::Work(file), .. })
+            if file.path == path && file.area == git::Area::Conflicted);
+        if open && generation == self.conflict_generation {
+            self.conflict = editor.map(|e| {
+                let mut ed = *e;
+                ed.generation = generation;
+                ed
+            });
+        }
+    }
+
+    /// The file of the conflict editor opened as `generation` changed on disk (seen in the
+    /// background): opened again from what is there now, if that editor is still the one open.
+    pub(super) fn conflict_changed(&mut self, generation: u64, path: String, ctx: &egui::Context) {
+        if self
+            .conflict
+            .as_ref()
+            .is_none_or(|ed| ed.path != path || ed.generation != generation || ed.saving)
+        {
+            return;
+        }
+        let Some(DiffView {
+            key: DiffKey::Work(file),
+            ..
+        }) = &self.diff
+        else {
+            return;
+        };
+        let key = DiffKey::Work(file.clone());
+        self.diff = None;
+        self.conflict = None;
+        self.open_diff(key, ctx);
     }
 
     /// Reads the open diff again, showing the old one meanwhile.
@@ -151,6 +214,31 @@ impl RepoTab {
             Msg::Diff(request, result)
         });
         self.load_diff_file(ctx);
+        self.load_diff_rendered(ctx);
+    }
+
+    /// Renders the Markdown file of the open diff, when diffs show Markdown rendered.
+    pub(super) fn load_diff_rendered(&mut self, ctx: &egui::Context) {
+        let Some(view) = self
+            .diff
+            .as_ref()
+            .filter(|v| self.diff_rendered && diff::rendered::is_markdown(v.key.path()))
+        else {
+            return;
+        };
+        let (request, key, path) = (view.request, view.key.clone(), self.path.clone());
+        spawn(&self.tx, ctx, move || {
+            let result = diff::rendered::load(&path, &key);
+            Msg::DiffRendered(request, Box::new(result))
+        });
+    }
+
+    /// Shows Markdown files rendered in diffs, or as text.
+    pub(super) fn show_diff_rendered(&mut self, on: bool, ctx: &egui::Context) {
+        self.diff_rendered = on;
+        if self.diff.as_ref().is_some_and(|d| d.rendered.is_none()) {
+            self.load_diff_rendered(ctx);
+        }
     }
 
     /// Reads the whole file of the open diff, when diffs show the file.

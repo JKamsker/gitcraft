@@ -153,6 +153,7 @@ fn threads(
         return shown;
     };
     let extras = &details.extras;
+    let forge = details.forge.map_or("the forge", crate::forge::Forge::name);
     shown.pending_exists = extras.pending_review.is_some();
     shown.open = details.state == "OPEN";
     let open = shown.open;
@@ -190,7 +191,7 @@ fn threads(
                 }
                 if thread.more_comments {
                     ui.label(
-                        RichText::new("This thread goes on: the rest is on GitHub.")
+                        RichText::new(format!("This thread goes on: the rest is on {forge}."))
                             .color(t.text_faint)
                             .small(),
                     );

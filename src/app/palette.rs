@@ -33,9 +33,13 @@ enum AppCommand {
     Open,
     Create,
     Clone,
+    OpenRemote,
+    ForgetSignIns,
     Settings,
     Manual,
     Theme(ThemeKind),
+    Profile(u64),
+    NewProfile,
 }
 
 enum Entry {
@@ -78,6 +82,16 @@ impl App {
                 Entry::App(AppCommand::Clone),
             ),
             (
+                "Open remote repository (WSL, SSH)…".to_owned(),
+                "app".to_owned(),
+                Entry::App(AppCommand::OpenRemote),
+            ),
+            (
+                "Forget saved SSH sign-ins".to_owned(),
+                "app".to_owned(),
+                Entry::App(AppCommand::ForgetSignIns),
+            ),
+            (
                 "Settings".to_owned(),
                 "app".to_owned(),
                 Entry::App(AppCommand::Settings),
@@ -105,6 +119,20 @@ impl App {
                 Entry::App(AppCommand::Theme(kind)),
             ));
         }
+        for p in &self.settings.user_profiles {
+            if p.id != self.settings.active_profile {
+                list.push((
+                    format!("Switch to profile: {}", p.title()),
+                    "profile".to_owned(),
+                    Entry::App(AppCommand::Profile(p.id)),
+                ));
+            }
+        }
+        list.push((
+            "New profile".to_owned(),
+            "profile".to_owned(),
+            Entry::App(AppCommand::NewProfile),
+        ));
         if let Some(Tab::Repo(repo)) = self.tabs.get(self.active) {
             for (label, hint, action) in repo.palette_items() {
                 list.push((label, hint, Entry::Repo(action)));
@@ -120,9 +148,20 @@ impl App {
             Entry::App(AppCommand::Open) => self.pick_existing(ctx),
             Entry::App(AppCommand::Create) => self.pick_new(ctx),
             Entry::App(AppCommand::Clone) => self.start_clone(),
+            Entry::App(AppCommand::OpenRemote) => self.start_open_remote(ctx),
+            // The system's store can take a while (the Secret Service is another process).
+            Entry::App(AppCommand::ForgetSignIns) => {
+                std::thread::spawn(crate::remote::askpass::forget_saved);
+            }
             Entry::App(AppCommand::Settings) => self.open_settings(),
             Entry::App(AppCommand::Manual) => self.manual_open = true,
             Entry::App(AppCommand::Theme(kind)) => self.set_theme(ctx, kind),
+            Entry::App(AppCommand::Profile(id)) => {
+                self.switch_profile(id, ctx);
+            }
+            Entry::App(AppCommand::NewProfile) => {
+                self.profile_request(crate::settings::ProfileRequest::New, ctx);
+            }
             Entry::Repo(action) => {
                 if let Some(Tab::Repo(repo)) = self.tabs.get_mut(self.active) {
                     repo.queue(action);

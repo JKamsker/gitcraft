@@ -8,7 +8,7 @@ use crate::repo::diff::Kind;
 
 use super::LineTarget;
 
-/// The side and number of a diff line a comment can go on, if it can: GitHub takes them on the
+/// The side and number of a diff line a comment can go on, if it can: forges take them on the
 /// lines of the diff, in `column` (the old or new half of the side-by-side view, `None` for the
 /// unified one).
 pub(in crate::repo) fn target_of(

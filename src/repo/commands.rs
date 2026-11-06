@@ -6,7 +6,7 @@ use super::actions::BranchRef;
 use super::messages::spawn_or;
 use super::operations::{expect_ref, stash_push_args};
 use super::{Action, Msg, OpKind, Refresh, RepoTab, Undo, ops, sidebar};
-use crate::forge;
+use crate::forge::{self, NewPullRequest};
 use crate::git::{self, Branch};
 
 impl RepoTab {
@@ -335,7 +335,9 @@ impl RepoTab {
         draft: bool,
         ctx: &egui::Context,
     ) {
-        let Some(forge) = self.forge else { return };
+        let Some(hosting) = self.hosting.clone() else {
+            return;
+        };
         if self.busy_op.is_some() {
             return;
         }
@@ -343,7 +345,7 @@ impl RepoTab {
         let Some(remote) = self.default_remote() else {
             return;
         };
-        let label = format!("Create {}", forge.noun());
+        let label = format!("Create {}", hosting.forge.noun());
         self.busy_op = Some(label.clone());
         self.op_started = Some(Instant::now());
         // Signing in after this fails must not run some earlier operation again.
@@ -372,8 +374,16 @@ impl RepoTab {
                 &["-c", "push.default=simple", "push", "-u", &remote, &refspec],
                 creds.as_ref(),
             );
-            let result = pushed
-                .and_then(|_| forge::create(&path, forge, &branch, &base, &title, &body, draft));
+            let result = pushed.and_then(|_| {
+                let new = NewPullRequest {
+                    branch: &branch,
+                    base: &base,
+                    title: &title,
+                    body: &body,
+                    draft,
+                };
+                hosting.forge.provider().create(&path, &hosting, &new)
+            });
             Msg::OpDone {
                 label,
                 result,

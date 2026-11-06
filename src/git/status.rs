@@ -96,7 +96,7 @@ pub fn status(repo: &Path) -> Result<WorkStatus, String> {
         &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
     )?;
     let mut status = parse_status(&out);
-    status.in_progress = in_progress(repo);
+    status.in_progress = in_progress(repo)?;
     if status.in_progress.is_some() {
         status.prepared_message = prepared_message(repo);
     }
@@ -104,34 +104,82 @@ pub fn status(repo: &Path) -> Result<WorkStatus, String> {
 }
 
 /// The operation git left half done in `repo`, if any.
-fn in_progress(repo: &Path) -> Option<InProgress> {
+/// Fails when that couldn't be asked (a repository on another machine not reached): no
+/// operation in progress would be an answer, and a wrong one.
+fn in_progress(repo: &Path) -> Result<Option<InProgress>, String> {
+    if let Some(target) = crate::remote::parse(repo) {
+        return in_progress_there(&target);
+    }
+    let asked = |e: std::io::Error| format!("could not read the repository's state: {e}");
     for dir in ["rebase-merge", "rebase-apply"] {
-        if let Ok(path) = run(Some(repo), &["rev-parse", "--git-path", dir])
-            && repo.join(path.trim()).is_dir()
-        {
+        let Ok(path) = run(Some(repo), &["rev-parse", "--git-path", dir]) else {
+            continue;
+        };
+        let state = crate::remote::resolve(repo, path.trim());
+        if crate::remote::try_is_dir(&state).map_err(asked)? {
             // `git am` keeps its state there too, marked by this file.
-            let am = repo.join(path.trim()).join("applying").is_file();
-            return Some(if am {
+            let am = crate::remote::try_is_file(&state.join("applying")).map_err(asked)?;
+            return Ok(Some(if am {
                 InProgress::Am
             } else {
                 InProgress::Rebase
-            });
+            }));
         }
     }
-    [
+    Ok([
         (InProgress::Merge, "MERGE_HEAD"),
         (InProgress::CherryPick, "CHERRY_PICK_HEAD"),
         (InProgress::Revert, "REVERT_HEAD"),
     ]
     .into_iter()
     .find(|(_, head)| run(Some(repo), &["rev-parse", "-q", "--verify", head]).is_ok())
-    .map(|(state, _)| state)
+    .map(|(state, _)| state))
+}
+
+/// [`in_progress`] for a repository on another machine: asked there in one go, not in six
+/// round trips on every read of the status.
+fn in_progress_there(target: &crate::remote::Target) -> Result<Option<InProgress>, String> {
+    // Its git folder as git names it: relative to here, or absolute (`--absolute-git-dir`
+    // is git 2.13+).
+    const SCRIPT: &str = concat!(
+        "g=$(git rev-parse --git-dir) || exit 1\n",
+        "for d in rebase-merge rebase-apply; do\n",
+        "  if [ -d \"$g/$d\" ]; then\n",
+        "    if [ -f \"$g/$d/applying\" ]; then echo am; else echo rebase; fi; exit 0\n",
+        "  fi\n",
+        "done\n",
+        "for h in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD; do\n",
+        "  git rev-parse -q --verify \"$h\" >/dev/null && { echo \"$h\"; exit 0; }\n",
+        "done\n",
+        "echo none\n",
+    );
+    let out = crate::remote::exec(
+        &target.host,
+        &crate::remote::Request {
+            cwd: Some(target.path.clone()),
+            script: SCRIPT.to_owned(),
+            ..crate::remote::Request::default()
+        },
+    )?;
+    let said = String::from_utf8_lossy(&out.stdout);
+    match (out.code, said.trim()) {
+        (0, "am") => Ok(Some(InProgress::Am)),
+        (0, "rebase") => Ok(Some(InProgress::Rebase)),
+        (0, "MERGE_HEAD") => Ok(Some(InProgress::Merge)),
+        (0, "CHERRY_PICK_HEAD") => Ok(Some(InProgress::CherryPick)),
+        (0, "REVERT_HEAD") => Ok(Some(InProgress::Revert)),
+        (0, "none") => Ok(None),
+        _ => Err(format!(
+            "could not read the repository's state: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        )),
+    }
 }
 
 /// The message git prepared for the commit that ends the operation in progress.
 fn prepared_message(repo: &Path) -> Option<String> {
     let path = run(Some(repo), &["rev-parse", "--git-path", "MERGE_MSG"]).ok()?;
-    let message = std::fs::read_to_string(repo.join(path.trim())).ok()?;
+    let message = crate::remote::read_to_string(&crate::remote::resolve(repo, path.trim())).ok()?;
     // Drop git's `#` comment lines.
     Some(
         message

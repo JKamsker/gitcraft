@@ -1,9 +1,12 @@
 //! Window shell: git check, browser-like tabs, the start page and cloning.
 
+mod askpass_dialog;
 mod clone;
 mod home;
 mod palette;
 mod panels;
+mod profiles;
+mod remote_open;
 mod tab_strip;
 mod tabs;
 #[cfg(test)]
@@ -28,6 +31,7 @@ use crate::update;
 use clone::CloneForm;
 use palette::Palette;
 use panels::Toast;
+use remote_open::{Connecting, RemoteForm};
 use tab_strip::TabDrag;
 
 const MAX_RECENT: usize = 12;
@@ -51,6 +55,9 @@ struct Saved {
     skipped_version: String,
     /// Repository tabs given their own icon or colour.
     tab_looks: BTreeMap<PathBuf, TabLook>,
+    /// What the profiles not in use had open; `open`, `active`, `recent` and `theme` are the
+    /// profile's in use.
+    profile_states: profiles::ProfileStates,
 }
 
 enum Tab {
@@ -82,6 +89,12 @@ pub struct App {
     cloning: Option<(PathBuf, Receiver<Result<(), String>>)>,
     /// The form of the running clone, back on screen if it needs credentials.
     cloning_form: Option<CloneForm>,
+    /// The dialog that opens a repository in WSL or over SSH.
+    remote_form: Option<RemoteForm>,
+    /// Repositories on other machines being reached, each tab to open once it answers.
+    connecting: Vec<Connecting>,
+    /// ssh's question being answered (a password, a new host key).
+    askpass: askpass_dialog::AskpassState,
     /// A newer release than this build.
     update: Option<update::Found>,
     update_rx: Option<Receiver<Result<Option<update::Found>, String>>>,
@@ -95,6 +108,10 @@ pub struct App {
     skipped_version: String,
     tab_looks: BTreeMap<PathBuf, TabLook>,
     settings: Settings,
+    /// The profiles not in use: their tabs, recent repositories and theme.
+    profile_states: profiles::ProfileStates,
+    /// What the profile set for git when the repository tabs last read who commits are by.
+    profile_git_seen: String,
     manual_open: bool,
     palette: Option<Palette>,
     toasts: Vec<Toast>,
@@ -106,6 +123,10 @@ pub struct App {
 impl App {
     /// `open_arg`: a repository passed on the command line, opened (or focused) on start.
     pub fn new(cc: &eframe::CreationContext<'_>, open_arg: Option<PathBuf>) -> Self {
+        // The window's thread: it never waits for another machine (see `remote::ui_guard`).
+        crate::remote::mark_ui_thread();
+        // ssh's questions (passwords, new host keys) come to this window.
+        crate::remote::askpass::set_repaint(cc.egui_ctx.clone());
         let saved: Saved = cc
             .storage
             .and_then(|s| eframe::get_value(s, eframe::APP_KEY))
@@ -115,7 +136,9 @@ impl App {
         crate::image_fit::install(ctx);
         theme::install_fonts(ctx);
         theme::apply(ctx, saved.theme);
-        saved.settings.set(ctx);
+        let mut settings = saved.settings;
+        settings.ensure_profile();
+        settings.set(ctx);
         crate::desktop_entry::refresh();
 
         let mut app = Self {
@@ -129,7 +152,9 @@ impl App {
             recent: saved.recent,
             theme: saved.theme,
             clone_parent: saved.clone_parent,
-            settings: saved.settings.clone(),
+            settings,
+            profile_states: saved.profile_states,
+            profile_git_seen: String::new(),
             manual_open: false,
             palette: None,
             toasts: Vec::new(),
@@ -140,6 +165,9 @@ impl App {
             clone_form: None,
             cloning: None,
             cloning_form: None,
+            remote_form: None,
+            connecting: Vec::new(),
+            askpass: Default::default(),
             update: None,
             update_rx: None,
             update_looked: None,
@@ -152,7 +180,7 @@ impl App {
         let mut kept = Vec::new();
         if app.git_version.is_ok() {
             for path in saved.open {
-                let is_dir = path.is_dir();
+                let is_dir = tabs::reopenable(&path);
                 kept.push(is_dir);
                 if is_dir {
                     // Read once shown, or once the one shown is read: one at a time first.
@@ -178,15 +206,39 @@ impl App {
         self.open_repo(path, ctx);
     }
 
-    /// Opens `path` in the active tab if it's a start page, otherwise in a new tab.
+    /// Opens `path` in the active tab if it's a start page, otherwise in a new tab. One on
+    /// another machine opens once it is reached, in the background.
     fn open_repo(&mut self, path: &Path, ctx: &egui::Context) {
-        let root = match repo_root(path) {
-            Ok(root) => root,
-            Err(e) => {
-                self.error = Some(e);
+        if crate::remote::is_remote(path) {
+            // Already open: no need to reach it first.
+            if let Some(i) = self
+                .tabs
+                .iter()
+                .position(|t| matches!(t, Tab::Repo(r) if r.path == path))
+            {
+                self.active = i;
                 return;
             }
-        };
+            self.connect(path.to_owned(), None, ctx);
+            return;
+        }
+        match repo_root(path) {
+            Ok(root) => self.open_root(root, ctx),
+            Err(e) => self.report(e),
+        }
+    }
+
+    /// Says why a repository couldn't be opened: on the start page, and in a toast when
+    /// another tab is shown (where the start page's message would go unseen).
+    fn report(&mut self, e: String) {
+        if !matches!(self.tabs.get(self.active), Some(Tab::Home)) {
+            self.toasts.push(Toast::new(e.clone(), true));
+        }
+        self.error = Some(e);
+    }
+
+    /// Opens the repository whose top folder is `root` (see [`Self::open_repo`]).
+    fn open_root(&mut self, root: PathBuf, ctx: &egui::Context) {
         self.remember(&root);
         self.error = None;
 
@@ -258,25 +310,34 @@ impl App {
     fn shortcuts(&mut self, ctx: &egui::Context) -> bool {
         // A focused text field or the terminal keeps these keys for itself.
         let modal_open = self.clone_form.is_some()
+            || self.remote_form.is_some()
+            || self.askpass_open()
             || self.palette.is_some()
             || self.manual_open
             || ctx.egui_wants_keyboard_input();
-        let (new_tab, reopen, close, refresh, focused, palette, manual) = ctx.input(|i| {
-            let t = i.modifiers.command && i.key_pressed(Key::T);
-            (
-                t && !i.modifiers.shift,
-                t && i.modifiers.shift,
-                i.modifiers.command && i.key_pressed(Key::W),
-                i.key_pressed(Key::F5),
-                i.focused,
-                i.modifiers.command && i.key_pressed(Key::P),
-                i.key_pressed(Key::F1),
-            )
-        });
-        if manual && self.clone_form.is_none() && self.palette.is_none() {
+        let (new_tab, reopen, close, refresh, focused, palette, manual, settings) =
+            ctx.input(|i| {
+                let t = i.modifiers.command && i.key_pressed(Key::T);
+                (
+                    t && !i.modifiers.shift,
+                    t && i.modifiers.shift,
+                    i.modifiers.command && i.key_pressed(Key::W),
+                    i.key_pressed(Key::F5),
+                    i.focused,
+                    i.modifiers.command && i.key_pressed(Key::P),
+                    i.key_pressed(Key::F1),
+                    i.modifiers.command && i.key_pressed(Key::Comma),
+                )
+            });
+        if settings && !modal_open {
+            self.open_settings();
+        }
+        // Not over a dialog that asks something (the clone, the remote one, ssh's question).
+        let asking = self.clone_form.is_some() || self.remote_form.is_some() || self.askpass_open();
+        if manual && !asking && self.palette.is_none() {
             self.manual_open = !self.manual_open;
         }
-        if palette && self.clone_form.is_none() {
+        if palette && !asking {
             if self.palette.is_some() {
                 self.palette = None;
             } else {
@@ -307,10 +368,14 @@ impl App {
     fn active_tab_ui(&mut self, ui: &mut Ui, t: &Tokens) {
         let ctx = ui.ctx().clone();
         let active = self.active;
+        let asking = self.askpass_open();
         match self.tabs.get_mut(active) {
             Some(Tab::Repo(repo)) => {
-                repo.keys_blocked =
-                    self.palette.is_some() || self.manual_open || self.clone_form.is_some();
+                repo.keys_blocked = self.palette.is_some()
+                    || self.manual_open
+                    || self.clone_form.is_some()
+                    || self.remote_form.is_some()
+                    || asking;
                 // Its widgets' state (scroll offsets, text fields' undo, open menus) is its own:
                 // every repository tab lays out the same widgets, which would otherwise share
                 // it with the tab shown before.
@@ -361,7 +426,9 @@ impl eframe::App for App {
             return;
         }
         self.poll_clone(&ctx);
+        self.poll_connecting(&ctx);
         self.poll_update(&ctx);
+        self.notice_profile_git(&ctx);
         let focused = self.shortcuts(&ctx);
 
         // Background repos still need their results drained. Those restored on start are read
@@ -407,6 +474,8 @@ impl eframe::App for App {
 
         self.active_tab_ui(ui, &t);
         self.clone_dialog(&ctx);
+        self.remote_dialog(&ctx);
+        self.askpass_dialog(&ctx);
         self.palette_ui(&ctx);
         self.manual_ui(&ctx);
         self.toast_finished(focused);
@@ -414,22 +483,8 @@ impl eframe::App for App {
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        let open: Vec<PathBuf> = self
-            .tabs
-            .iter()
-            .filter_map(|t| match t {
-                Tab::Repo(r) => Some(r.path.clone()),
-                Tab::Home | Tab::Settings => None,
-            })
-            .collect();
         // Index of the active tab among the saved (repo) tabs.
-        let active = self
-            .tabs
-            .iter()
-            .take(self.active + 1)
-            .filter(|t| matches!(t, Tab::Repo(_)))
-            .count()
-            .saturating_sub(1);
+        let (open, active) = self.open_repos();
         let saved = Saved {
             open,
             active,
@@ -439,6 +494,7 @@ impl eframe::App for App {
             settings: self.settings.clone(),
             skipped_version: self.skipped_version.clone(),
             tab_looks: self.tab_looks.clone(),
+            profile_states: self.profile_states.clone(),
         };
         eframe::set_value(storage, eframe::APP_KEY, &saved);
     }
@@ -462,8 +518,25 @@ fn repo_scope(path: &Path) -> egui::Id {
 /// The top of the repository `path` is in, in the form tabs are told apart by.
 fn repo_root(path: &Path) -> Result<PathBuf, String> {
     let root = git::toplevel(path)?;
+    // Already in its one form; resolving it here would mean nothing.
+    if crate::remote::is_remote(&root) {
+        return Ok(root);
+    }
     let root = std::fs::canonicalize(&root).unwrap_or(root);
     Ok(strip_verbatim(root))
+}
+
+/// When this process was started by ssh as its askpass program: asks the running app ssh's
+/// question and returns the exit code to end with, before any window is made. `None` for an
+/// ordinary start.
+pub fn askpass_helper() -> Option<i32> {
+    crate::remote::askpass::run_helper()
+}
+
+/// How many commands for a repository on another machine were asked from the window's thread
+/// (and refused: it never waits for a network). For tests and `examples/ui_shot.rs`.
+pub fn refused_on_ui_thread() -> usize {
+    crate::remote::refused_on_ui_thread()
 }
 
 /// Work the first frame will need, started before the window is made so that it overlaps with

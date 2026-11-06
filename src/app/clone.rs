@@ -119,7 +119,9 @@ impl App {
             return;
         }
         let dest = PathBuf::from(form.parent.trim()).join(form.name.trim());
-        let occupied = dest.exists()
+        // Elsewhere, git there refuses a folder that isn't empty, and says so.
+        let occupied = !crate::remote::is_remote(&dest)
+            && dest.exists()
             && std::fs::read_dir(&dest)
                 .map(|mut d| d.next().is_some())
                 .unwrap_or(true);
@@ -153,6 +155,18 @@ impl App {
         let dest = dest.clone();
         self.cloning = None;
         match result {
+            // On another machine, it opens once reached again, the credentials along.
+            Ok(()) if crate::remote::is_remote(&dest) => {
+                let creds =
+                    self.cloning_form
+                        .take()
+                        .filter(|f| f.auth)
+                        .map(|form| git::Credentials {
+                            username: form.username.trim().to_owned(),
+                            password: form.password,
+                        });
+                self.connect(dest, creds, ctx);
+            }
             Ok(()) => {
                 // Show it in a start page tab if one is active, otherwise in a new tab.
                 self.open_repo(&dest, ctx);
