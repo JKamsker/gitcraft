@@ -481,16 +481,14 @@ impl eframe::App for App {
         let focused = self.shortcuts(&ctx);
 
         // Background repos still need their results drained. Those restored on start are read
-        // once the one shown is: they would otherwise all compete with it.
-        let shown_read = !matches!(self.tabs.get(self.active), Some(Tab::Repo(r)) if r.opening());
+        // only once shown, and those left alone for a while are suspended (see
+        // `repo::lifecycle`).
         for (i, tab) in self.tabs.iter_mut().enumerate() {
             if let Tab::Repo(r) = tab
                 && i != self.active
             {
-                if shown_read {
-                    r.start_deferred(&ctx);
-                }
                 r.poll(&ctx);
+                r.background_tick();
             }
         }
 
