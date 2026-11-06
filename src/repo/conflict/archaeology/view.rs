@@ -370,15 +370,16 @@ fn answer_text(found: &Found, timelines: &Timelines, names: (&str, &str)) -> Str
                     .to_owned();
             };
             let mut text = format!(
-                "⚑ First conflicting pair: {} ({}) and {} ({}). Their merge already conflicts \
-                 in this file",
+                "⚑ Where it started: {} ({}) and {} ({}). Their merge already conflicts in \
+                 this file",
                 named(a),
                 names.0,
                 named(b),
                 names.1
             );
             text.push_str(if *checked {
-                ", while the commits just before each don't."
+                ", while the commits just before each don't (found by halving each side, as git \
+                 bisect does: a conflict that came and went earlier can be missed)."
             } else {
                 ". The history isn't a straight line here, so an earlier pair may conflict too."
             });

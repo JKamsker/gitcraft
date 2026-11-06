@@ -279,17 +279,28 @@ fn the_tab_reads_and_searches_for_the_open_editor() -> Result<(), String> {
     tab.archaeology_act(Act::ShowChange(hash.clone(), "short".to_owned()), &ctx);
     let hidden = history(&tab).is_some_and(|h| h.change.is_none());
 
-    // A read for an earlier opening isn't taken by the one open now.
+    // A read for an earlier opening isn't taken by the one open now: its answer is caught and
+    // handed to the tab after the editor was opened again.
+    let (tx, rx) = std::sync::mpsc::channel();
+    tab.tx = tx;
+    if let Some(ed) = tab.conflict.as_mut() {
+        ed.history.timelines = Read::NotAsked;
+    }
     tab.archaeology_act(Act::Load, &ctx);
+    let started = history(&tab).is_some_and(|h| h.timelines == Read::Reading);
     if let Some(ed) = tab.conflict.as_mut() {
         ed.generation += 1;
         ed.history = History::default();
     }
-    for _ in 0..40 {
-        tab.poll(&ctx);
-        std::thread::sleep(std::time::Duration::from_millis(10));
-    }
+    let delivered = match rx.recv_timeout(std::time::Duration::from_secs(10)) {
+        Ok(crate::repo::messages::Msg::Then(then)) => {
+            then(&mut tab, &ctx);
+            true
+        }
+        _ => false,
+    };
     let untouched = history(&tab).is_some_and(|h| h.timelines == Read::NotAsked);
+    assert!(started && delivered);
     let _ = std::fs::remove_dir_all(&dir);
 
     assert_eq!(
@@ -371,7 +382,7 @@ fn the_strip_shows_both_sides_and_the_answer() -> Result<(), String> {
     }
     harness.run();
     harness.get_by_label("Find where it started");
-    harness.get_by_label_contains("First conflicting pair: a1 “add caching”");
+    harness.get_by_label_contains("Where it started: a1 “add caching”");
     // Picking a commit on each side offers its change and a test merge of the two.
     harness.get_by_label_contains("a2  tune").click();
     harness.run();
@@ -553,5 +564,52 @@ fn merges_on_a_side_do_not_hide_where_it_started() -> Result<(), String> {
     );
     let shown = merge_change.ok_or("no merge")??;
     assert!(shown.contains("+m13"), "{shown}");
+    Ok(())
+}
+
+/// Both sides made the same change, then theirs changed it again: a merge keeps ours' copy, so
+/// the pair is found rather than "only one side".
+#[test]
+fn the_same_change_on_both_sides_is_kept_for_a_merge() -> Result<(), String> {
+    let path = "f.txt";
+    let dir = based("same", path)?;
+    git(&dir, &["checkout", "-qb", "theirs"])?;
+    commit(&dir, path, &[(4, "X")], "theirs: X")?;
+    commit(&dir, path, &[(4, "Y")], "theirs: Y")?;
+    git(&dir, &["checkout", "-q", "main"])?;
+    commit(&dir, path, &[(4, "X")], "main: X")?;
+    let _ = git(&dir, &["merge", "theirs"]);
+    let t = timelines(&dir, path, Some(InProgress::Merge));
+    let found = t
+        .as_ref()
+        .map(|t| search(&dir, path, t))
+        .map_err(String::clone);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(summaries(&t?.ours), ["main: X"]);
+    assert_eq!(
+        found?.0,
+        Ok(Found::Pair {
+            ours: 0,
+            theirs: 1,
+            checked: true
+        })
+    );
+    Ok(())
+}
+
+/// A first commit picked has no parent to merge from: said, not a raw git error.
+#[test]
+fn a_picked_first_commit_says_there_is_no_history() -> Result<(), String> {
+    let path = "f.txt";
+    let dir = based("root", path)?;
+    git(&dir, &["checkout", "-q", "--orphan", "other"])?;
+    git(&dir, &["rm", "-q", "-rf", "."])?;
+    commit(&dir, path, &[(1, "other")], "other root")?;
+    let root = git(&dir, &["rev-parse", "HEAD"])?;
+    git(&dir, &["checkout", "-q", "main"])?;
+    let _ = git(&dir, &["cherry-pick", root.trim()]);
+    let t = timelines(&dir, path, Some(InProgress::CherryPick));
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(t.is_err_and(|e| e.contains("no parent")));
     Ok(())
 }
