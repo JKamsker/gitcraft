@@ -109,12 +109,12 @@ impl WriteOp {
     }
 }
 
-/// One request: the token from the window's discovery file, the repository (as gitcraft names
-/// it: see `app::repo_root`), who asks, and what.
+/// One request: the proof that the asker holds the window's token (see `link`), the
+/// repository (as gitcraft names it: see `app::repo_root`), who asks, and what.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Request {
     pub v: u32,
-    pub token: String,
+    pub proof: String,
     pub repo: String,
     pub agent: String,
     pub op: WriteOp,

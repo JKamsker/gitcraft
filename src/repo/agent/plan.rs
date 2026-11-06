@@ -31,10 +31,16 @@ pub(crate) struct Plan {
 /// What the approval card says.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Ask {
+    /// What and on what: "Delete branch feature/x".
     pub title: String,
     /// Exactly what will happen, in words.
     pub body: String,
+    /// What undo can and can't do about it afterwards, said once under the commands.
+    pub undo_note: String,
 }
+
+/// Said under a card's commands for what can't be undone from gitcraft.
+const NO_UNDO: &str = "This can't be undone from gitcraft.";
 
 /// The repository as a plan needs it: HEAD's commit (empty before the first commit) and the
 /// branch checked out (`None` when detached).
@@ -163,21 +169,32 @@ fn paths_label(paths: &[String]) -> String {
     }
 }
 
-/// The conflicted files among `paths` (a path names a file, or a folder of them).
+/// The conflicted files among `paths` (a path names a file, or a folder of them), as git
+/// itself reads the paths: however they are spelled, git is the one that matches them.
 fn conflicted_among(repo: &Path, paths: &[String]) -> Result<Vec<String>, String> {
-    let work = git::status(repo)?;
-    let inside = |file: &str| {
-        paths.iter().any(|p| {
-            let p = p.trim_end_matches('/');
-            p == "." || file == p || file.starts_with(&format!("{p}/"))
-        })
-    };
-    Ok(work
-        .conflicted
-        .into_iter()
-        .map(|f| f.path)
-        .filter(|f| inside(f))
-        .collect())
+    let mut args: Vec<&str> = vec!["--literal-pathspecs", "ls-files", "-u", "-z", "--"];
+    args.extend(paths.iter().map(String::as_str));
+    // `<mode> <hash> <stage>\t<path>`, a line per stage.
+    let out = git::run(Some(repo), &args)?;
+    let mut files: Vec<String> = out
+        .split('\0')
+        .filter_map(|line| line.split_once('\t').map(|(_, path)| path.to_owned()))
+        .collect();
+    files.dedup();
+    Ok(files)
+}
+
+/// Refuses while a merge, rebase, cherry-pick or revert is in progress: `what` would end it, and
+/// undo can't start it again.
+fn not_in_progress(repo: &Path, what: &str) -> Result<(), String> {
+    match git::status(repo)?.in_progress {
+        Some(state) => Err(format!(
+            "a {} is in progress: {what} would end it, which can't be undone. Finish or abort \
+             it first (see `conflicts`)",
+            state.label().to_lowercase()
+        )),
+        None => Ok(()),
+    }
 }
 
 /// The index entries under `paths` that differ from HEAD (staged changes): `mode,hash,path`, as
@@ -277,9 +294,10 @@ fn stage(repo: &Path, here: &Here, paths: &[String]) -> Result<Plan, String> {
             undo: Undo::None,
             ask: Some(Ask {
                 title: "Mark conflicts resolved".to_owned(),
+                undo_note: NO_UNDO.to_owned(),
                 body: format!(
-                    "Stage {} as resolved: {}. git then forgets the conflict, so this can't be \
-                     undone.",
+                    "Stage {} as resolved: {}. git then forgets the conflict and its three \
+                     sides.",
                     if conflicted.len() == 1 {
                         "this conflicted file"
                     } else {
@@ -435,6 +453,7 @@ fn checkout(repo: &Path, here: &Here, branch: &str) -> Result<Plan, String> {
     if here.branch.as_deref() == Some(branch) {
         return Err(format!("{branch} is checked out already"));
     }
+    not_in_progress(repo, "checking out")?;
     let previous = here.checked_out();
     // `--`: the name is a branch, never a file to throw the changes of away.
     let run = ops(&[&["checkout", branch, "--"]]);
@@ -459,6 +478,7 @@ fn stash(repo: &Path, message: &str) -> Result<Plan, String> {
     if git::status(repo)?.is_clean() {
         return Err("there are no changes to stash".to_owned());
     }
+    not_in_progress(repo, "stashing")?;
     let message = message.trim();
     if message.chars().any(char::is_control) || message.len() > 1000 {
         return Err("the stash message must be one line of at most 1000 bytes".to_owned());
@@ -497,12 +517,108 @@ fn replay(repo: &Path, commit: &str, what: &str, command: &[&str]) -> Result<Pla
     })
 }
 
+/// How many tracked files have uncommitted changes, staged or not (untracked ones aside: a hard
+/// reset keeps them).
+fn tracked_changes(repo: &Path) -> usize {
+    let Ok(work) = git::status(repo) else {
+        return 0;
+    };
+    let mut paths: Vec<&str> = work
+        .staged
+        .iter()
+        .chain(
+            work.unstaged
+                .iter()
+                .filter(|f| f.area != git::Area::Untracked),
+        )
+        .chain(&work.conflicted)
+        .map(|f| f.path.as_str())
+        .collect();
+    paths.sort_unstable();
+    paths.dedup();
+    paths.len()
+}
+
+/// How many commits `to` has that `from` doesn't.
+fn commits_between(repo: &Path, from: &str, to: &str) -> usize {
+    git::run(
+        Some(repo),
+        &["rev-list", "--count", &format!("{from}..{to}")],
+    )
+    .ok()
+    .and_then(|n| n.trim().parse().ok())
+    .unwrap_or(0)
+}
+
+/// The card of a hard reset of `target` (at `here`) to `hash`.
+fn hard_ask(repo: &Path, here: &Here, hash: &str, target: &str) -> Ask {
+    let lost = match tracked_changes(repo) {
+        0 => "There are no uncommitted changes to tracked files now.".to_owned(),
+        1 => "The uncommitted changes to 1 tracked file are thrown away for good.".to_owned(),
+        n => format!("The uncommitted changes to {n} tracked files are thrown away for good."),
+    };
+    let left = match commits_between(repo, hash, &here.head) {
+        0 => String::new(),
+        1 => format!(
+            " The commit after {} is no longer on {target}.",
+            short(hash)
+        ),
+        n => format!(
+            " The {n} commits after {} are no longer on {target}.",
+            short(hash)
+        ),
+    };
+    Ask {
+        title: format!("Hard reset {target} to {}", short(hash)),
+        body: format!(
+            "Move {target} from {} to {} (“{}”) and make the working tree match it. \
+             {lost}{left} Untracked files stay.",
+            short(&here.head),
+            short(hash),
+            summary(repo, hash)
+        ),
+        undo_note: format!(
+            "Ctrl+Z moves {target} back afterwards; the thrown-away changes stay lost."
+        ),
+    }
+}
+
+/// The card of a mixed reset when something is staged: unstaging it isn't undone (undo moves
+/// the branch only). Nothing staged: no card.
+fn mixed_ask(repo: &Path, here: &Here, hash: &str, target: &str) -> Result<Option<Ask>, String> {
+    let staged = git::run(Some(repo), &["diff", "--cached", "--name-only", "-z"])?;
+    let files = staged.split('\0').filter(|f| !f.is_empty()).count();
+    if files == 0 {
+        return Ok(None);
+    }
+    Ok(Some(Ask {
+        title: format!("Reset {target} to {} (mixed)", short(hash)),
+        body: format!(
+            "Move {target} from {} to {} (“{}”) and unstage everything: the {files} staged \
+             file{} keep their changes, unstaged. The working tree stays as it is.",
+            short(&here.head),
+            short(hash),
+            summary(repo, hash),
+            if files == 1 { "" } else { "s" },
+        ),
+        undo_note: format!(
+            "Ctrl+Z moves {target} back afterwards, but doesn't stage those changes again."
+        ),
+    }))
+}
+
 fn reset(repo: &Path, here: &Here, commit: &str, mode: ResetMode) -> Result<Plan, String> {
     if here.head.is_empty() {
         return Err("there are no commits to reset to yet".to_owned());
     }
     let hash = commit_of(repo, commit)?;
     let target = here.branch.clone().unwrap_or_else(|| "HEAD".to_owned());
+    if hash == here.head {
+        // Nothing would move, so nothing would go on the undo list, while the index (and a
+        // hard reset's working tree) would still change.
+        return Err(format!("{target} is at {} already", short(&hash)));
+    }
+    not_in_progress(repo, "a reset")?;
     let word = match mode {
         ResetMode::Soft => "soft",
         ResetMode::Mixed => "mixed",
@@ -514,24 +630,11 @@ fn reset(repo: &Path, here: &Here, commit: &str, mode: ResetMode) -> Result<Plan
         expect_ref_at("HEAD", &here.head),
         ops(&[&["reset", mode.flag(), &hash]]).concat(),
     ];
-    let ask = (mode == ResetMode::Hard).then(|| {
-        let changed = git::status(repo).map(|w| w.changed_files()).unwrap_or(0);
-        let lost = match changed {
-            0 => "There are no uncommitted changes now.".to_owned(),
-            1 => "The uncommitted changes to 1 file are thrown away for good.".to_owned(),
-            n => format!("The uncommitted changes to {n} files are thrown away for good."),
-        };
-        Ask {
-            title: "Hard reset".to_owned(),
-            body: format!(
-                "Move {target} from {} to {} (“{}”) and make the working tree match it. {lost} \
-                 Undo moves {target} back, but can't bring those changes back.",
-                short(&here.head),
-                short(&hash),
-                summary(repo, &hash)
-            ),
-        }
-    });
+    let ask = match mode {
+        ResetMode::Soft => None,
+        ResetMode::Mixed => mixed_ask(repo, here, &hash, &target)?,
+        ResetMode::Hard => Some(hard_ask(repo, here, &hash, &target)),
+    };
     Ok(Plan {
         label: format!("Reset {target} to {} ({word})", short(&hash)),
         ops: steps,
@@ -570,14 +673,15 @@ fn rewrite(repo: &Path, here: &Here, commit: &str, edit: Edit) -> Result<Plan, S
         Edit::Message => return Err("the message is changed with `commit` and `amend`".to_owned()),
     };
     let ask = (edit == Edit::Drop).then(|| Ask {
-        title: "Drop commit".to_owned(),
+        title: format!("Drop commit {}", short(&hash)),
         body: format!(
             "Remove {} (“{}”) and its changes from {branch}, and replay the {after} commit{} \
-             after it. Undo puts {branch} back as it is now.",
+             after it. If a later commit conflicts, the rebase stops for you to finish or abort.",
             short(&hash),
             summary(repo, &hash),
             if after == 1 { "" } else { "s" },
         ),
+        undo_note: format!("Ctrl+Z puts {branch} back as it is now."),
     });
     Ok(Plan {
         label: format!("{what} {}", short(&hash)),
@@ -622,13 +726,14 @@ fn delete_branch(repo: &Path, here: &Here, name: &str, force: bool) -> Result<Pl
             redo: redo_delete(name, ops(&[&["branch", "-D", "--", name]])),
         },
         ask: Some(Ask {
-            title: "Delete branch".to_owned(),
+            title: format!("Delete branch {name}"),
             body: format!(
                 "Delete the local branch “{name}”, at {} (“{}”),{merged_note}. Its copy on a \
-                 remote stays. Undo makes it again at that commit.",
+                 remote stays.",
                 short(&target),
                 summary(repo, &target)
             ),
+            undo_note: "Ctrl+Z makes it again at that commit.".to_owned(),
         }),
     })
 }
@@ -670,41 +775,68 @@ fn push(repo: &Path, here: &Here, force: bool) -> Result<Plan, String> {
             (remote, branch.clone(), true)
         }
     };
+    let (ahead, behind) = local.ahead_behind();
+    if !publish && !force && ahead == 0 {
+        return Err(format!(
+            "nothing to push: {branch} has no commits that {remote}/{there} lacks"
+        ));
+    }
     let refspec = format!("refs/heads/{branch}:refs/heads/{there}");
     let mut step = vec!["push".to_owned()];
     if force {
-        step.push("--force-with-lease".to_owned());
+        // The lease is what the card shows: the remote branch where it was last fetched. A
+        // fetch while the card waits doesn't widen what may be overwritten.
+        let seen =
+            git::resolve(repo, &format!("refs/remotes/{remote}/{there}")).unwrap_or_default();
+        step.push(format!("--force-with-lease=refs/heads/{there}:{seen}"));
     }
     if publish {
         step.push("-u".to_owned());
     }
     step.extend([remote.clone(), refspec]);
-    let (ahead, behind) = local.ahead_behind();
     let to = format!("{remote}/{there}");
-    let body = if publish {
-        format!("Publish {branch} on {remote} as {there}, and track it. A push can't be undone.")
+    let plural = |n: u32| if n == 1 { "" } else { "s" };
+    let (title, body) = if publish {
+        (
+            format!("Publish {branch} on {remote}"),
+            format!("Send {branch} to {remote} as a new branch {there}, and track it."),
+        )
     } else if force {
-        format!(
-            "Overwrite {to} with {branch} ({ahead} ahead, {behind} behind). The {behind} \
-             commit{} only {to} has are gone from it, for everyone who uses it; with \
-             --force-with-lease git refuses if {to} moved since it was last fetched. A push \
-             can't be undone.",
-            if behind == 1 { "" } else { "s" }
+        let gone = match behind {
+            0 => format!("{to} has no commits that {branch} lacks, as of the last fetch."),
+            n => format!(
+                "The {n} commit{} on {to} that {branch} doesn't have are removed from it, for \
+                 everyone who uses it.",
+                plural(n)
+            ),
+        };
+        (
+            format!("Force push {branch} to {to}"),
+            format!(
+                "Overwrite {to} with {branch}. {gone} git refuses if {to} has changed since \
+                 it was last fetched."
+            ),
         )
     } else {
-        format!(
-            "Send {branch}'s {ahead} new commit{} to {to}. A push can't be undone.",
-            if ahead == 1 { "" } else { "s" }
+        (
+            format!("Push {branch} to {to}"),
+            format!(
+                "Send {branch}'s {ahead} new commit{} to {to}.",
+                plural(ahead)
+            ),
         )
     };
+    // What is sent is the branch as the card describes it: not commits made since.
+    let at = local.target.clone();
     Ok(Plan {
         label: format!("{} {branch}", if force { "Force push" } else { "Push" }),
-        ops: vec![step],
+        ops: vec![expect_ref_at(&format!("refs/heads/{branch}"), &at), step],
         refresh: Refresh::All,
         undo: Undo::None,
         ask: Some(Ask {
-            title: if force { "Force push" } else { "Push" }.to_owned(),
+            title,
             body,
+            undo_note: NO_UNDO.to_owned(),
         }),
     })
 }

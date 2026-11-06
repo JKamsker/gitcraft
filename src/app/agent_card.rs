@@ -90,26 +90,32 @@ fn countdown(left: std::time::Duration) -> String {
     format!("{}:{:02}", s / 60, s % 60)
 }
 
+/// How long Approve takes no click after the card appears: a click then was meant for what
+/// the card popped up over.
+const ARMING: std::time::Duration = std::time::Duration::from_millis(700);
+
 fn card_ui(ui: &mut Ui, t: &Tokens, card: &CardView, name: &str, path: &str) -> Option<Answer> {
     ui.horizontal(|ui| {
         ui.add(icons::image("bot", 16.0, t.accent));
+        // As the agent names itself: plain text, not styled as anything verified.
         ui.label(
-            RichText::new(format!("{} asks", card.agent))
-                .color(t.text_dim)
-                .font(theme::medium(12.5)),
+            RichText::new(format!("{} wants to:", card.agent))
+                .color(t.text)
+                .font(theme::medium(13.0)),
         );
     });
     ui.add_space(4.0);
     ui.label(RichText::new(&card.ask.title).font(theme::semibold(15.0)));
     ui.label(
-        RichText::new(format!("In {name} · {path}"))
+        RichText::new(format!("In {name}"))
             .color(t.text_faint)
             .small(),
-    );
+    )
+    .on_hover_text(path);
     ui.add_space(8.0);
     ui.add(egui::Label::new(&card.ask.body).wrap());
     ui.add_space(8.0);
-    ui.label(RichText::new("It runs:").color(t.text_dim).small());
+    ui.label(RichText::new("Commands:").color(t.text_dim).small());
     egui::Frame::new()
         .fill(t.field)
         .corner_radius(t.radius_sm)
@@ -121,34 +127,33 @@ fn card_ui(ui: &mut Ui, t: &Tokens, card: &CardView, name: &str, path: &str) -> 
             }
         });
     ui.add_space(8.0);
-    let (undo_text, undo_color) = if card.undoable {
-        (
-            "Once done, Ctrl+Z undoes it, as any step of gitcraft's.",
-            t.text_dim,
-        )
-    } else {
-        ("This can't be undone.", t.warning)
-    };
-    ui.label(RichText::new(undo_text).color(undo_color).small());
+    let undo_color = if card.undoable { t.text_dim } else { t.warning };
+    ui.add(egui::Label::new(RichText::new(&card.ask.undo_note).color(undo_color).small()).wrap());
     ui.label(
         RichText::new(format!(
-            "Denied by itself in {} if you don't answer.",
+            "Denied automatically in {} if you don't answer. Esc denies.",
             countdown(card.left)
         ))
         .color(t.text_faint)
         .small(),
     );
     ui.add_space(14.0);
+    let armed = card.shown_for >= ARMING;
+    if !armed {
+        ui.ctx().request_repaint_after(ARMING - card.shown_for);
+    }
     let mut answer = None;
     ui.horizontal(|ui| {
+        // Red only for what can't be undone.
+        let fill = if card.undoable { t.accent } else { t.danger };
         let approve = egui::Button::new(
             RichText::new("Approve")
                 .color(egui::Color32::WHITE)
                 .font(theme::medium(12.5)),
         )
-        .fill(t.danger)
+        .fill(fill)
         .min_size(egui::vec2(90.0, 30.0));
-        if ui.add(approve).clicked() {
+        if ui.add_enabled(armed, approve).clicked() {
             answer = Some(Answer::Approve);
         }
         let deny = ui.add(egui::Button::new("Deny").min_size(egui::vec2(80.0, 30.0)));

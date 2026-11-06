@@ -130,12 +130,19 @@ fn an_approved_request_runs_and_stays_undoable() {
     let top = tab.undo_stack.last().and_then(|e| e.agent.clone());
     let _ = std::fs::remove_dir_all(&dir);
     assert!(before, "nothing runs before the user answers");
+    let armed_at_once = card
+        .as_ref()
+        .is_some_and(|c| c.shown_for.as_millis() >= 700);
+    assert!(
+        !armed_at_once,
+        "Approve takes no click the moment the card shows"
+    );
     let card = card.map(|c| (c.agent, c.ask.title, c.commands, c.undoable));
     assert_eq!(
         card,
         Some((
             "Claude Code".to_owned(),
-            "Delete branch".to_owned(),
+            "Delete branch old".to_owned(),
             vec!["git branch -d -- old".to_owned()],
             true,
         ))
@@ -233,4 +240,85 @@ fn a_request_that_cant_be_planned_says_why() {
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(reply.as_ref().map(|r| r.outcome), Some(Outcome::Failed));
     assert!(reply.is_some_and(|r| r.message.contains("no local branch called missing")));
+}
+
+#[test]
+fn a_request_is_planned_against_the_repository_it_runs_on() {
+    let ctx = egui::Context::default();
+    let dir = repo("planned-late");
+    // `side` changes a.txt one way, `main` the other: picking it conflicts.
+    for args in [
+        &["switch", "-q", "-c", "side"][..],
+        &["commit", "-q", "--allow-empty", "-m", "x"],
+    ] {
+        assert!(git::run(Some(&dir), args).is_ok());
+    }
+    let _ = std::fs::write(dir.join("a.txt"), "side\n");
+    assert!(git::run(Some(&dir), &["add", "a.txt"]).is_ok());
+    assert!(git::run(Some(&dir), &["commit", "-q", "-m", "side"]).is_ok());
+    assert!(git::run(Some(&dir), &["switch", "-q", "main"]).is_ok());
+    let _ = std::fs::write(dir.join("a.txt"), "main\n");
+    assert!(git::run(Some(&dir), &["add", "a.txt"]).is_ok());
+    assert!(git::run(Some(&dir), &["commit", "-q", "-m", "main"]).is_ok());
+    let mut tab = tab(&dir, &ctx);
+    // Sent together: the stage is clean when it comes in, conflicted when its turn comes.
+    let pick = ask(
+        &mut tab,
+        &ctx,
+        WriteOp::CherryPick {
+            commit: "side".into(),
+        },
+    );
+    let stage = ask(
+        &mut tab,
+        &ctx,
+        WriteOp::Stage {
+            paths: vec!["a.txt".into()],
+        },
+    );
+    let picked = answer(&mut tab, &ctx, &pick);
+    settle(&mut tab, &ctx, |t| t.agent_card().is_some());
+    let card = tab.agent_card().map(|c| c.ask.title);
+    tab.agent_decide(false, &ctx);
+    let staged = answer(&mut tab, &ctx, &stage);
+    let still = git::run(Some(&dir), &["ls-files", "-u"]).unwrap_or_default();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(
+        picked.map(|r| r.outcome),
+        Some(Outcome::Failed),
+        "the pick conflicts"
+    );
+    assert_eq!(card.as_deref(), Some("Mark conflicts resolved"));
+    assert_eq!(staged.map(|r| r.outcome), Some(Outcome::Denied));
+    assert!(!still.is_empty(), "the conflict is left for the user");
+}
+
+#[test]
+fn an_approval_holds_only_for_what_the_card_showed() {
+    let ctx = egui::Context::default();
+    let dir = repo("approval-stale");
+    let mut tab = tab(&dir, &ctx);
+    let rx = ask(&mut tab, &ctx, delete_old());
+    settle(&mut tab, &ctx, |t| t.agent_card().is_some());
+    let first = tab.agent_card().map(|c| c.ask.body);
+    // `old` gets a commit while the card is open.
+    assert!(
+        git::run(
+            Some(&dir),
+            &["commit", "-q", "--allow-empty", "-m", "later"]
+        )
+        .is_ok()
+    );
+    assert!(git::run(Some(&dir), &["branch", "-f", "old", "HEAD"]).is_ok());
+    tab.agent_decide(true, &ctx);
+    settle(&mut tab, &ctx, |t| t.agent_card().is_some());
+    let second = tab.agent_card().map(|c| c.ask.body);
+    let kept = git::resolve(&dir, "refs/heads/old").is_ok();
+    tab.agent_decide(false, &ctx);
+    let reply = answer(&mut tab, &ctx, &rx);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(first.is_some() && second.is_some());
+    assert_ne!(first, second, "the card shows the branch as it is now");
+    assert!(kept, "not deleted on an approval of what it was before");
+    assert_eq!(reply.map(|r| r.outcome), Some(Outcome::Denied));
 }

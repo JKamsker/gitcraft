@@ -64,7 +64,9 @@ static STAGE: ToolDef = ToolDef {
     title: "Stage files",
     description: "Stages these files' changes (new, changed or deleted), as `git add` does. Runs \
                   in the gitcraft window that has the repository open, as a step of its undo \
-                  list: Ctrl+Z there puts the index back as it was.",
+                  list: Ctrl+Z there puts the index back as it was. Staging a conflicted file \
+                  marks it resolved, which can't be undone: the user has to approve that in the \
+                  window first, and the call waits for their answer.",
     kind: Kind::Write,
     schema: || paths_schema("Files or folders, relative to the top of the repository."),
     run: |ctx, a| send(ctx, &stage_op(a)?),

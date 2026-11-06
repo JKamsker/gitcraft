@@ -69,7 +69,9 @@ pub fn without_credentials(url: &str) -> String {
     let Some((user, host)) = host_part.rsplit_once('@') else {
         return url.to_owned();
     };
-    let web = matches!(scheme.to_lowercase().as_str(), "http" | "https");
+    // `helper::https://…` goes through a remote helper, over https all the same.
+    let last = scheme.rsplit("::").next().unwrap_or(scheme);
+    let web = matches!(last.to_lowercase().as_str(), "http" | "https");
     match user.split_once(':') {
         Some((name, _)) if !web => format!("{scheme}://{name}@{host}{path}"),
         None if !web => url.to_owned(),

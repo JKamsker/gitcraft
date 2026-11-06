@@ -207,7 +207,7 @@ so your config, credentials and hooks apply as usual.
   stdio, for Claude Code, Codex and other agents. Add it once:
 
   ```sh
-  claude mcp add gitcraft -- gitcraft mcp
+  claude mcp add --scope user gitcraft -- gitcraft mcp
   codex mcp add gitcraft -- gitcraft mcp
   ```
 
@@ -227,10 +227,10 @@ so your config, credentials and hooks apply as usual.
   `reset` (soft, mixed) and `move_commit`. Each is a step of that tab's undo list, marked with a
   robot on the undo button and named in its tooltip, so Ctrl+Z also takes back what the agent
   did. With no window for the repository, they fail and say to open it.
-- What can't be undone, or throws work away, waits on an _Approve / Deny_ card in the window
+- What can't be undone, or is easy to regret, waits on an _Approve / Deny_ card in the window
   that names the agent, says what will happen and shows the git commands: `push` (forced or
   not), `delete_branch`, a `hard` reset, `drop_commit`, and staging a conflicted file (which ends
-  the conflict). The call waits for the answer; after two minutes it is denied by itself.
+  the conflict). The call waits for the answer; after two minutes it is denied automatically.
 - Settings → Agents turns agents' changes off; the reading tools still work. The window and
   `gitcraft mcp` talk over 127.0.0.1 with a random token kept in a file only you can read, in
   gitcraft's data folder (`agents/`).

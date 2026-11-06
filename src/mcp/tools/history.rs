@@ -171,6 +171,32 @@ pub(super) fn resolve_commit(ctx: &Ctx, rev: &str) -> Result<String, String> {
     .ok_or_else(|| format!("`{rev}` is not a commit in this repository"))
 }
 
+/// Refuses a path git doesn't find in the working tree as a file of the repository: one gone,
+/// or behind a symbolic link to a folder (which `blame` would follow, out of the repository).
+/// git looks at the path itself, here or on the repository's machine.
+fn in_working_tree(ctx: &Ctx, path: &str) -> Result<(), String> {
+    let gone = git::run(
+        Some(&ctx.repo),
+        &[
+            "--literal-pathspecs",
+            "diff-files",
+            "--name-only",
+            "--diff-filter=D",
+            "-z",
+            "--",
+            path,
+        ],
+    )?;
+    if gone.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "`{path}` isn't in the working tree as a file of the repository (deleted, or behind \
+             a symbolic link): pass `rev` to blame it as committed"
+        ))
+    }
+}
+
 /// The most lines one blame call returns.
 const MAX_BLAME: u64 = 400;
 
@@ -212,7 +238,10 @@ fn blame(ctx: &Ctx, a: &Args) -> Result<Value, String> {
             start + MAX_BLAME - 1
         ));
     }
-    let lines = git::blame(&ctx.repo, rev, path)?;
+    if rev.is_none() {
+        in_working_tree(ctx, path)?;
+    }
+    let lines = git::blame_plain(&ctx.repo, rev, path)?;
     let total = lines.len();
     let rows: Vec<Value> = lines
         .iter()
@@ -231,4 +260,62 @@ fn blame(ctx: &Ctx, a: &Args) -> Result<Value, String> {
         })
         .collect();
     Ok(json!({ "path": path, "total_lines": total, "lines": rows }))
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    /// A file committed in `docs/`, then `docs` swapped for a link to a folder outside.
+    #[test]
+    fn blame_never_follows_a_link_out_of_the_repository() {
+        let base = std::env::temp_dir().join(format!("gitcraft-blame-link-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let (dir, outside) = (base.join("repo"), base.join("secret"));
+        let _ = std::fs::create_dir_all(dir.join("docs"));
+        let _ = std::fs::create_dir_all(&outside);
+        let _ = std::fs::write(dir.join("docs/key"), "committed\n");
+        let _ = std::fs::write(outside.join("key"), "SECRET\n");
+        for args in [
+            &["init", "-q"][..],
+            &["-c", "user.name=t", "-c", "user.email=t@t", "add", "-A"],
+            &[
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@t",
+                "commit",
+                "-q",
+                "-m",
+                "docs",
+            ],
+        ] {
+            assert!(git::run(Some(&dir), args).is_ok());
+        }
+        let _ = std::fs::remove_dir_all(dir.join("docs"));
+        let _ = std::os::unix::fs::symlink(&outside, dir.join("docs"));
+        let ctx = Ctx {
+            repo: dir.clone(),
+            agent: "t".into(),
+            link_dir: None,
+            wait: std::time::Duration::from_secs(1),
+        };
+        let at = |rev: Option<&str>| {
+            let mut args = serde_json::Map::new();
+            args.insert("path".into(), json!("docs/key"));
+            if let Some(rev) = rev {
+                args.insert("rev".into(), json!(rev));
+            }
+            blame(&ctx, &Args::new(&args))
+        };
+        let worktree = at(None);
+        let committed = at(Some("HEAD"));
+        let _ = std::fs::remove_dir_all(&base);
+        assert!(worktree.is_err_and(|e| e.contains("symbolic link")));
+        let text = committed.map(|v| v.to_string()).unwrap_or_default();
+        assert!(
+            text.contains("committed") && !text.contains("SECRET"),
+            "{text}"
+        );
+    }
 }
