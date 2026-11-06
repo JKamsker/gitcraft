@@ -51,6 +51,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "In a file's diff, stage, unstage or discard one hunk, or click the lines you want and act on only those.",
             "A file kept in Git LFS shows as its LFS objects and their sizes; the palette has LFS: Fetch and LFS: Pull when git-lfs is installed.",
             "The arrows in a diff's header jump from change to change; the marks beside the scrollbar show where the changes are, and a click on one jumps there.",
+            "Code moved within a file shows in a muted colour of its own, with a bar beside both places. Moved to line… / Moved from line… on the block's first line opens the two places together, with the lines edited on the way marked, and goes to either.",
             "Write the summary and description and commit; amend the last commit; pick the identity you commit as, or Use the profile's author to take a repository's own one out.",
             "Profiles (title bar, or Settings → Profile): each has its own tabs, recent repositories, theme, git author and commit signing. A repository's own git config (user.name, user.email, signing) still wins over the profile's.",
             "Settings → Commit signing sets the format, key and program git signs with, and whether it signs commits and tags by default, in your global git config; Settings → Profile can sign just for the profile instead.",

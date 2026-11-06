@@ -77,6 +77,9 @@ impl RepoTab {
             let draft = self.pr_drafts.entry(pr.number).or_default();
             line_comment_panel(ui, &t, pr, draft, data, acts);
         }
+        if let Some(b) = view.moved {
+            super::moved_view::panel(ui, &t, data, b, acts);
+        }
 
         let split = data.shows_split(split);
         let shift = ui.input(|i| i.modifiers.shift);
@@ -88,6 +91,7 @@ impl RepoTab {
             view.text_sel = sel;
             view.scroll = offset;
             view.jump = None;
+            view.jump_line = None;
             if let Some(i) = jumped {
                 view.at_change = Some((i, offset));
             }

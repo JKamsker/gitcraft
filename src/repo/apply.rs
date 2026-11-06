@@ -197,6 +197,16 @@ impl RepoTab {
                     view.step_change(Settings::get(ctx).diff_split, delta);
                 }
             }
+            Action::DiffMoved(block) => {
+                if let Some(view) = &mut self.diff {
+                    view.moved = block;
+                }
+            }
+            Action::DiffJumpLine(i) => {
+                if let Some(view) = &mut self.diff {
+                    view.jump_line = Some(i);
+                }
+            }
             Action::ViewAllFiles(on) => self.all_files.on = on,
             Action::FileView { path, rev, tab } => self.open_file_view(path, rev, tab, ctx),
             Action::CloseFileView => self.file_view = None,
