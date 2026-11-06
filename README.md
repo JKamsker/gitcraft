@@ -224,6 +224,13 @@ so your config, credentials and hooks apply as usual.
   Hooks take effect the next time the agent starts in the worktree. On a WSL or SSH machine, where gitcraft isn't,
   the hooks run a `sh` script gitcraft writes into the repository's git folder. The turns are
   not history: the graph leaves them out.
+- Hand it to the agent: click a line's number in any diff to write a note for the agent on it
+  (kept in this worktree only, never published). Notes collect in NOTES FOR THE AGENT under the
+  big area; _Send to agent_ types them into the worktree's agent terminal as one message
+  (pasted, not sent: press Enter there) and clears them. The same _Send to agent_ is on a
+  conflict (each conflict's three sides), on a failing CI run's log (its end) and on a pull
+  request's thread (with its file and line). It goes only to a program that takes a pasted
+  message, as agent CLIs do, never as lines a shell would run.
 - _Bake-off: compare attempts…_ (palette, or _Compare them_ under AGENTS): pick 2–4 worktrees or
   branches that tried the same task (the agent tasks come picked when there are 2–4 of them).
   A grid compares them with the commit they all start from (their merge base; one that started
@@ -406,6 +413,7 @@ was made this way, on a demo repository.
 | `src/agent/` | coding agents: the worktree setup recipe, the agent tasks, the terminal script that runs them |
 | `src/repo/agents/` | the AGENTS section and the agent task and setup recipe dialogs |
 | `src/agent/checkpoint.rs` | agent turns: `gitcraft checkpoint`, the turns of a worktree; `hooks.rs` installs the agents' hooks, `checkpoint.sh` is the script for other machines |
+| `src/agent/handoff.rs` | hand-off: the messages typed into an agent's terminal (notes, conflicts, CI logs, threads), the notes tray |
 | `src/agent/bakeoff/` | bake-off: comparing attempts, new dependencies, hunks, assembling a branch, builds |
 | `src/repo/bakeoff/` | the bake-off page and its attempt picker |
 | `src/settings/`          | user settings, profiles, and the settings pages                                    |

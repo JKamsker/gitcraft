@@ -2,6 +2,7 @@
 //! the agent there), the worktree setup recipe every new worktree gets, and the AGENTS section
 //! listing the tasks with their uncommitted changes. The logic is in [`crate::agent`].
 
+mod handoff;
 mod panel;
 mod recipe_editor;
 mod start;
@@ -13,6 +14,7 @@ use crate::agent::{AgentTask, Launch, PendingLaunches, Recipe, tasks};
 use crate::repo::{OpKind, OpenRequest, Refresh, RepoTab};
 use crate::terminal::Terminal;
 
+pub(in crate::repo) use handoff::{TrayAct, note_panel};
 pub(super) use recipe_editor::RecipeForm;
 pub(super) use start::StartForm;
 
@@ -36,6 +38,8 @@ pub(crate) struct AgentsState {
     /// This worktree's top folder as git names it, which its turns are marked with.
     turns_top: Option<String>,
     turns_reading: bool,
+    /// Notes for the agent, and the one being written.
+    pub(in crate::repo) tray: handoff::Tray,
 }
 
 /// A worktree an operation is making.
@@ -70,6 +74,11 @@ pub(crate) enum AgentAct {
     InstallHooks,
     /// Deletes the saved turns of a session.
     ForgetTurns(String),
+    /// Starts a note for the agent on a line of the diff shown.
+    OpenNote(crate::repo::pr_review::LineTarget),
+    Tray(handoff::TrayAct),
+    /// Types a message (a conflict, a CI log, a thread: what it is) into the agent's terminal.
+    Send(String, &'static str),
 }
 
 impl RepoTab {
@@ -113,6 +122,11 @@ impl RepoTab {
                 }
             }
             AgentAct::InstallHooks => self.install_hooks(ctx),
+            AgentAct::OpenNote(target) => self.tray_act(handoff::TrayAct::Open(target), ctx),
+            AgentAct::Tray(act) => self.tray_act(act, ctx),
+            AgentAct::Send(message, what) => {
+                self.send_to_agent(&message, what);
+            }
             AgentAct::ForgetTurns(session) => self.forget_turns(session, ctx),
             AgentAct::Forget(path) => {
                 let repo = self.path.clone();
@@ -130,6 +144,7 @@ impl RepoTab {
     pub(super) fn agents_frame(&mut self, ctx: &egui::Context) {
         crate::agent::launch::warm_up();
         self.reload_turns(ctx);
+        self.load_tray(ctx);
         if let Some(launch) = PendingLaunches::take(&self.path) {
             self.start_launch(launch, ctx);
         }
