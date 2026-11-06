@@ -87,7 +87,8 @@ fn starting_a_task_makes_its_worktree_lists_it_and_hands_its_tab_the_agent() {
     let listed = pump(&mut tab, &ctx, |tab| !tab.agents.tasks.is_empty());
     let opens = matches!(&tab.open_request, Some(OpenRequest::Worktree(p)) if *p == folder);
     // The worktree's tab takes the launch: the recipe, then the agent with its first message.
-    let launch = PendingLaunches::take(&folder);
+    // As a tab of it asks: by its folder resolved (on Windows, not `RUNNER~1`'s short form).
+    let launch = PendingLaunches::take(&crate::agent::launch::tab_form(&folder));
     let task = tab.agents.tasks.first().cloned().unwrap_or_default();
     let on_disk = tasks::load(&dir).unwrap_or_default();
     let branch = git::run(Some(&folder), &["branch", "--show-current"]).unwrap_or_default();
