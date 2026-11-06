@@ -62,6 +62,7 @@ impl RepoTab {
             });
 
         self.dialogs(&ctx, &mut acts);
+        self.package_panel(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
         }

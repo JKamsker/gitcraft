@@ -1625,6 +1625,7 @@ dependencies = [
  "egui_commonmark",
  "egui_extras",
  "egui_kittest",
+ "flate2",
  "image",
  "keyring",
  "md5",

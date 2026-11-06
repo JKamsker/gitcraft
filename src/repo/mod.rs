@@ -23,6 +23,7 @@ mod load;
 mod messages;
 mod navigate;
 mod operations;
+mod package;
 mod patches;
 mod pinned_sections;
 mod pr_merge;
@@ -158,6 +159,8 @@ pub struct RepoTab {
     compare_requests: u64,
     file_view: Option<file_view::FileView>,
     rebase: Option<rebase::RebaseEditor>,
+    /// The panel of what a package will publish, while open.
+    package: Option<package::PackageView>,
     /// The selected commit's message, being edited in the right pane.
     reword: Option<Reword>,
     /// HTTPS credentials typed in this session, used for every later git command of the tab.
@@ -314,6 +317,7 @@ impl RepoTab {
             compare_requests: 0,
             file_view: None,
             rebase: None,
+            package: None,
             reword: None,
             credentials: None,
             last_op: None,

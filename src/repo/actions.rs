@@ -188,6 +188,8 @@ pub(crate) enum Action {
     CloseCompare,
     /// Search commit messages, or what commits changed in files.
     SearchCode(bool),
+    /// The panel of what a package will publish.
+    Package(super::package::PackageAct),
 }
 
 /// Compares two branches, given to git by their full refs (a tag of the same name is not
@@ -352,6 +354,11 @@ impl RepoTab {
                 },
             ),
             ("Reload".into(), "F5".into(), Action::Reload),
+            (
+                "What a package will publish".into(),
+                "cargo / npm".into(),
+                Action::Package(super::package::PackageAct::Open),
+            ),
             (
                 reveal_label().into(),
                 "folder".into(),
