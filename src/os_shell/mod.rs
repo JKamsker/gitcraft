@@ -20,22 +20,39 @@ pub use linux::set_progress as linux_progress;
 pub use windows::set_progress as windows_progress;
 
 /// Puts `items` in the taskbar button's or launcher's menu, in the background (it writes a
-/// file, or talks to the shell); a list like the last one put there is not put again.
+/// file, or talks to the shell), on one thread that applies only the latest list asked for, so
+/// that two quick changes can't land in the wrong order. A list like the last one asked for is
+/// not asked for again.
 pub fn set_menu(items: Vec<MenuItem>) {
-    use std::sync::Mutex;
+    use std::sync::mpsc::{Sender, channel};
+    use std::sync::{Mutex, OnceLock};
     static LAST: Mutex<Vec<MenuItem>> = Mutex::new(Vec::new());
+    static WORKER: OnceLock<Mutex<Sender<Vec<MenuItem>>>> = OnceLock::new();
     if let Ok(mut last) = LAST.lock() {
         if *last == items {
             return;
         }
         last.clone_from(&items);
     }
-    std::thread::spawn(move || {
-        #[cfg(windows)]
-        windows::set_menu(&items);
-        #[cfg(target_os = "linux")]
-        linux::set_menu(&items);
-        #[cfg(not(any(windows, target_os = "linux")))]
-        let _ = items;
+    let worker = WORKER.get_or_init(|| {
+        let (tx, rx) = channel::<Vec<MenuItem>>();
+        std::thread::spawn(move || {
+            while let Ok(mut items) = rx.recv() {
+                // Only the latest of those waiting.
+                while let Ok(newer) = rx.try_recv() {
+                    items = newer;
+                }
+                #[cfg(windows)]
+                windows::set_menu(&items);
+                #[cfg(target_os = "linux")]
+                linux::set_menu(&items);
+                #[cfg(not(any(windows, target_os = "linux")))]
+                let _ = items;
+            }
+        });
+        Mutex::new(tx)
     });
+    if let Ok(tx) = worker.lock() {
+        let _ = tx.send(items);
+    }
 }

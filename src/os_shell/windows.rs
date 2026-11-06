@@ -19,13 +19,13 @@ pub(super) fn set_menu(items: &[MenuItem]) {
     let _ = gitcraft_os::set_jump_list(&exe, "Recent repositories", &recent, &tasks);
 }
 
-/// Shows `state` on the taskbar button of the window `hwnd`.
-pub fn set_progress(hwnd: isize, state: TaskbarState) {
+/// Shows `state` on the taskbar button of the window `hwnd`; whether that went through.
+pub fn set_progress(hwnd: isize, state: TaskbarState) -> bool {
     let progress = match state {
         TaskbarState::Idle => gitcraft_os::Progress::None,
         TaskbarState::Running(None) => gitcraft_os::Progress::Indeterminate,
         TaskbarState::Running(Some(f)) => gitcraft_os::Progress::Value(f),
         TaskbarState::Failed => gitcraft_os::Progress::Error,
     };
-    let _ = gitcraft_os::set_taskbar_progress(hwnd, progress);
+    gitcraft_os::set_taskbar_progress(hwnd, progress).is_ok()
 }
