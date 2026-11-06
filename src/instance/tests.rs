@@ -284,3 +284,57 @@ fn of_starts_at_the_same_moment_only_one_opens_a_window() -> Result<(), String> 
     }
     std::fs::remove_dir_all(&dir).map_err(|e| e.to_string())
 }
+
+/// Sends one byte every 100 ms on `stream`, without a line break, for `for_ms`.
+fn trickle(mut stream: TcpStream, for_ms: u64) -> std::thread::JoinHandle<()> {
+    std::thread::spawn(move || {
+        for _ in 0..for_ms / 100 {
+            if stream.write_all(b"{").is_err() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    })
+}
+
+/// A line sent a byte now and then is given up on once its time is out, all told, not only
+/// when one byte is late.
+#[test]
+fn a_line_sent_byte_by_byte_runs_out_of_time() -> Result<(), String> {
+    let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).map_err(|e| e.to_string())?;
+    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
+    let sender = TcpStream::connect(("127.0.0.1", port)).map_err(|e| e.to_string())?;
+    let (received, _) = listener.accept().map_err(|e| e.to_string())?;
+    let slow = trickle(sender, 3000);
+    let started = std::time::Instant::now();
+    let line = super::server::read_line(&received, Duration::from_millis(500))
+        .map_err(|e| e.to_string())?;
+    assert_eq!(line, None);
+    assert!(
+        started.elapsed() < Duration::from_millis(1500),
+        "{:?}",
+        started.elapsed()
+    );
+    drop(received);
+    let _ = slow.join();
+    Ok(())
+}
+
+/// Every connection the listener serves at once held open by someone sending a byte now and
+/// then: once their time is out, a start is served again.
+#[test]
+fn slow_senders_dont_lock_later_starts_out() -> Result<(), String> {
+    let dir = temp_dir("slow");
+    let first = primary(&dir)?;
+    let port = first.port().ok_or("no port")?;
+    let slow: Vec<_> = (0..super::server::MAX_CONNECTIONS)
+        .map(|_| TcpStream::connect(("127.0.0.1", port)).map(|s| trickle(s, 20_000)))
+        .collect::<Result<_, _>>()
+        .map_err(|e| e.to_string())?;
+    let second = claim(&dir, &Ok(Request::Focus), Duration::from_secs(15));
+    assert!(matches!(second, Claim::HandedOver), "{}", describe(&second));
+    assert_eq!(first.take_requests(), vec![Request::Focus]);
+    first.shut_down();
+    drop(slow);
+    std::fs::remove_dir_all(&dir).map_err(|e| e.to_string())
+}
