@@ -140,6 +140,46 @@ pub fn try_is_link(path: &Path) -> io::Result<bool> {
     test(path, "-L")
 }
 
+/// Whether `rel` (a path in the repository at `repo`, `/` between names) is a file of it on
+/// that machine: not reached through a folder that is a link, and at most `max` bytes. `None`
+/// for a repository here. One round trip, so not on the window's thread.
+pub fn file_within(repo: &Path, rel: &str, max: u64) -> Option<io::Result<bool>> {
+    let t = parse(repo)?;
+    let Some(script) = file_within_script(&t.path, rel, max) else {
+        return Some(Ok(false));
+    };
+    Some(run(&t, script, None).map(|out| out.code == 0))
+}
+
+/// The script [`file_within`] runs in `repo` (a path there): exit code 0 when `rel` is such a
+/// file. `None` for an empty path.
+fn file_within_script(repo: &str, rel: &str, max: u64) -> Option<String> {
+    let names: Vec<&str> = rel.split('/').filter(|n| !n.is_empty()).collect();
+    if names.is_empty() {
+        return None;
+    }
+    let mut script = format!("cd -- {} || exit 1\n", sh_path(repo));
+    for i in 1..names.len() {
+        script.push_str(&format!(
+            "[ -L {} ] && exit 1\n",
+            sh_quote(&names[..i].join("/"))
+        ));
+    }
+    let file = sh_quote(&names.join("/"));
+    script.push_str(&format!(
+        concat!(
+            "[ -L {f} ] && exit 0\n",
+            "[ -f {f} ] || exit 1\n",
+            "size=$(wc -c < {f}) || exit 1\n",
+            "[ \"$size\" -le {max} ] || exit 1\n",
+            "exit 0\n"
+        ),
+        f = file,
+        max = max,
+    ));
+    Some(script)
+}
+
 /// A file of a working tree as git sees it: a symbolic link is the path it holds, not what it
 /// points to; anything else but a file is refused (see `git::worktree_file`).
 pub fn worktree_file(file: &Path) -> Option<io::Result<Vec<u8>>> {
@@ -245,5 +285,39 @@ pub fn host_temp_file(t: &Target, suffix: &str, bytes: &[u8]) -> Result<String, 
             t.host.label(),
             failed(&out)
         ))
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    /// The check run on another machine, run here by `sh` the same way: a linked folder, a
+    /// missing file and a file too large are refused.
+    #[test]
+    fn the_check_of_a_file_there_refuses_what_it_should() -> Result<(), String> {
+        let dir = std::env::temp_dir().join(format!("gitcraft-within-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("docs")).map_err(|e| e.to_string())?;
+        std::fs::write(dir.join("docs/s.png"), "picture").map_err(|e| e.to_string())?;
+        std::os::unix::fs::symlink("/", dir.join("docs/l")).map_err(|e| e.to_string())?;
+        let repo = dir.display().to_string();
+        let ok = |rel: &str, max: u64| {
+            let script = file_within_script(&repo, rel, max).unwrap_or_default();
+            std::process::Command::new("sh")
+                .args(["-c", &script])
+                .status()
+                .is_ok_and(|s| s.success())
+        };
+        let found = (
+            ok("docs/s.png", 100),
+            ok("docs/l/etc/hostname", 1 << 20),
+            ok("docs/none.png", 100),
+            ok("docs/s.png", 3),
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(found, (true, false, false, false));
+        assert!(file_within_script(&repo, "", 1).is_none());
+        Ok(())
     }
 }

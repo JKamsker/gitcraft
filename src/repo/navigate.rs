@@ -219,17 +219,20 @@ impl RepoTab {
 
     /// Renders the Markdown file of the open diff, when diffs show Markdown rendered.
     pub(super) fn load_diff_rendered(&mut self, ctx: &egui::Context) {
+        let rendered = self.diff_rendered;
         let Some(view) = self
             .diff
-            .as_ref()
-            .filter(|v| self.diff_rendered && diff::rendered::is_markdown(v.key.path()))
+            .as_mut()
+            .filter(|v| rendered && diff::rendered::is_markdown(v.key.path()))
         else {
             return;
         };
-        let (request, key, path) = (view.request, view.key.clone(), self.path.clone());
+        view.rendered_load += 1;
+        let ids = (view.request, view.rendered_load);
+        let (key, path) = (view.key.clone(), self.path.clone());
         spawn(&self.tx, ctx, move || {
             let result = diff::rendered::load(&path, &key);
-            Msg::DiffRendered(request, Box::new(result))
+            Msg::DiffRendered(ids, Box::new(result))
         });
     }
 

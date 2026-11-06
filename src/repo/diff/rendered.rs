@@ -447,11 +447,12 @@ fn markdown(ui: &mut Ui, cache: &mut CommonMarkCache, text: &str, width: f32) {
 
 /// Whether the working tree's `path` (a path in the repository, `/` between names) is a file
 /// of the repository here, not reached through a folder that is a link (`docs/l -> /` would
-/// read anything), nor larger than an image is taken. A repository on another machine is read
-/// there, as git sees it.
+/// read anything), nor larger than an image is taken. For a repository on another machine,
+/// asked there.
 fn working_tree_file_inside(repo: &Path, path: &str) -> bool {
-    if crate::remote::is_remote(repo) {
-        return true;
+    // On another machine, checked there the same way, before anything is read from it.
+    if let Some(checked) = crate::remote::file_within(repo, path, MAX_IMAGE_BYTES as u64) {
+        return checked.unwrap_or(false);
     }
     let mut at = repo.to_path_buf();
     let names: Vec<&str> = path.split('/').filter(|n| !n.is_empty()).collect();
@@ -606,10 +607,22 @@ mod tests {
         let plain = working_tree_file_inside(&dir, "docs/s.png");
         let linked = working_tree_file_inside(&dir, "docs/l/etc/hostname");
         let missing = working_tree_file_inside(&dir, "docs/none.png");
+        // And as the rendered file's images are read: nothing through the link.
+        let mut images = Images::default();
+        let side = Side {
+            rev: None,
+            path: "docs/a.md".to_owned(),
+        };
+        let through_link = images.local(&dir, &side, "l/etc/hostname");
+        let read_after_link = images.found.len();
+        let beside = images.local(&dir, &side, "s.png");
         let _ = std::fs::remove_dir_all(&dir);
         assert!(plain);
         assert!(!linked);
         assert!(!missing);
+        assert_eq!((through_link, read_after_link), (None, 0));
+        assert!(beside.is_some());
+        assert_eq!(images.found.len(), 1);
         Ok(())
     }
 
