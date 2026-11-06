@@ -52,8 +52,8 @@ pub fn scan(dir: &Path) -> (Vec<FileTheme>, Vec<(String, String)>) {
         match load(&path) {
             Ok((name, credit, palette)) => themes.push(FileTheme {
                 file,
-                name,
-                credit,
+                name: capped(name),
+                credit: capped(credit),
                 palette,
             }),
             Err(e) => errors.push((file, e)),
@@ -62,16 +62,37 @@ pub fn scan(dir: &Path) -> (Vec<FileTheme>, Vec<(String, String)>) {
     (themes, errors)
 }
 
-/// The latest time a theme file in `dir` (or the folder itself) changed.
-pub fn changed_at(dir: &Path) -> Option<std::time::SystemTime> {
-    let modified = |p: &Path| std::fs::metadata(p).and_then(|m| m.modified()).ok();
-    let mut latest = modified(dir)?;
-    for e in std::fs::read_dir(dir).ok()?.flatten() {
-        if let Some(m) = modified(&e.path()) {
-            latest = latest.max(m);
-        }
+/// What the theme files in `dir` are now: their names, sizes and times, hashed. It changes
+/// when any of them does, whatever the times say (a file from the future included).
+pub fn fingerprint(dir: &Path) -> Option<u64> {
+    use std::hash::{Hash, Hasher};
+    let mut entries: Vec<(String, u64, Option<std::time::SystemTime>)> = std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .filter(|e| kind_of(&e.path()).is_some())
+        .map(|e| {
+            let meta = e.metadata().ok();
+            (
+                e.file_name().to_string_lossy().into_owned(),
+                meta.as_ref().map_or(0, |m| m.len()),
+                meta.and_then(|m| m.modified().ok()),
+            )
+        })
+        .collect();
+    entries.sort();
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    entries.hash(&mut h);
+    Some(h.finish())
+}
+
+/// Longest a theme's name is kept: a file may say anything.
+const MAX_NAME: usize = 80;
+
+fn capped(name: String) -> String {
+    if name.chars().count() <= MAX_NAME {
+        return name;
     }
-    Some(latest)
+    name.chars().take(MAX_NAME - 1).collect::<String>() + "…"
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -362,12 +383,11 @@ pub fn from_base16(text: &str) -> Option<(Option<String>, Option<String>, Palett
     let mut author = None;
     let mut variant = None;
     for line in text.lines() {
-        let line = line.split(" #").next().unwrap_or(line).trim();
         let Some((key, value)) = line.split_once(':') else {
             continue;
         };
         let key = key.trim().trim_matches('"');
-        let value = value.trim().trim_matches(|c| c == '"' || c == '\'').trim();
+        let value = yaml_scalar(value);
         match key {
             "scheme" | "name" if !value.is_empty() => name = Some(value.to_owned()),
             "author" if !value.is_empty() => author = Some(value.to_owned()),
@@ -437,6 +457,18 @@ pub fn from_base16(text: &str) -> Option<(Option<String>, Option<String>, Palett
         ]);
     }
     Some((name, author, p))
+}
+
+/// A YAML scalar as the schemes write them: quoted (`"Material #2"`, a `#` inside kept), or
+/// plain with an optional ` # comment` after it.
+fn yaml_scalar(value: &str) -> &str {
+    let value = value.trim();
+    for quote in ['"', '\''] {
+        if let Some(rest) = value.strip_prefix(quote) {
+            return rest.find(quote).map_or(rest, |end| &rest[..end]).trim();
+        }
+    }
+    value.split(" #").next().unwrap_or(value).trim()
 }
 
 /// A theme file of gitcraft's own with every colour of `palette`, starting from the theme
@@ -511,9 +543,24 @@ pub fn save_copy(name: &str, palette: &Palette, extends: Option<&str>) -> Result
 /// Copies the theme file at `from` into the themes folder, once it reads as a theme; returns
 /// its file's name there.
 pub fn import(from: &Path) -> Result<String, String> {
-    let (name, _, _) = load(from)?;
     let dir = dir().ok_or("no folder to keep themes in")?;
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    import_into(from, &dir)
+}
+
+/// [`import`] into `dir`.
+fn import_into(from: &Path, dir: &Path) -> Result<String, String> {
+    let (name, _, _) = load(from)?;
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    // Already one of the themes there: nothing to copy.
+    let canonical = |p: &Path| std::fs::canonicalize(p).ok();
+    if from
+        .parent()
+        .and_then(canonical)
+        .is_some_and(|p| Some(p) == canonical(dir))
+    {
+        return Ok(file_name(from));
+    }
+    let dir = dir.to_owned();
     let ext = from
         .extension()
         .map_or("json".to_owned(), |e| e.to_string_lossy().to_lowercase());
@@ -530,6 +577,8 @@ pub fn import(from: &Path) -> Result<String, String> {
                 doc.insert("type".into(), json!(if dark { "dark" } else { "light" }));
             }
             doc.insert("colors".into(), Value::Object(colors));
+            // So it reads back as a VS Code theme even when its colours are few.
+            doc.insert("tokenColors".into(), json!([]));
             let text = serde_json::to_string_pretty(&Value::Object(doc)).unwrap_or_default();
             std::fs::write(&to, text).map_err(|e| e.to_string())?;
         }
@@ -709,5 +758,80 @@ base0F: "ab7967"
         assert!(themes.is_empty());
         assert_eq!(errors.len(), 1);
         assert_eq!(errors[0].0, "broken.json");
+    }
+
+    #[test]
+    fn quoted_scheme_values_keep_their_hash() {
+        assert_eq!(yaml_scalar(r#" "Material #2" # a comment"#), "Material #2");
+        assert_eq!(yaml_scalar(" '#181818'"), "#181818");
+        assert_eq!(yaml_scalar(" 181818 # plain, then a comment"), "181818");
+    }
+
+    #[test]
+    fn long_names_are_cut() {
+        let name = capped("x".repeat(5000));
+        assert_eq!(name.chars().count(), MAX_NAME);
+        assert!(name.ends_with('…'));
+        assert_eq!(capped("Short".to_owned()), "Short");
+    }
+
+    #[test]
+    fn importing_a_theme_already_there_copies_nothing() {
+        let dir = temp_dir("import-same");
+        let path = dir.join("mine.json");
+        let _ = std::fs::write(&path, r#"{ "name": "Mine", "dark": true }"#);
+        let back = import_into(&path, &dir);
+        let count = std::fs::read_dir(&dir).map(|d| d.count()).unwrap_or(0);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(back.ok().as_deref(), Some("mine.json"));
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn an_imported_vscode_theme_with_an_include_reads_back_as_one() {
+        let from = temp_dir("import-from");
+        let to = temp_dir("import-to");
+        let _ = std::fs::write(
+            from.join("base.json"),
+            r##"{ "colors": { "editor.background": "#fafafa" } }"##,
+        );
+        let _ = std::fs::write(
+            from.join("light.json"),
+            r##"{ "name": "Pale", "type": "light", "include": "./base.json" }"##,
+        );
+        let file = import_into(&from.join("light.json"), &to);
+        let read = file.as_ref().ok().map(|f| load(&to.join(f)));
+        let _ = std::fs::remove_dir_all(&from);
+        let _ = std::fs::remove_dir_all(&to);
+        assert!(matches!(read, Some(Ok(_))), "the import does not read back");
+        let Some(Ok((name, credit, palette))) = read else {
+            return;
+        };
+        assert_eq!(name, "Pale");
+        assert!(credit.starts_with("VS Code"));
+        assert!(!palette.dark);
+        assert_eq!(palette.dock, hex(0xfafafa));
+    }
+
+    #[test]
+    fn the_fingerprint_follows_any_change() {
+        let dir = temp_dir("fingerprint");
+        let path = dir.join("a.json");
+        let _ = std::fs::write(&path, "{}");
+        let first = fingerprint(&dir);
+        // Same time (set back by hand), other contents: still a change.
+        let when = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
+        let _ = std::fs::write(&path, r#"{ "name": "B" }"#);
+        if let (Some(when), Ok(file)) = (when, std::fs::File::options().write(true).open(&path)) {
+            let _ = file.set_modified(when);
+        }
+        let second = fingerprint(&dir);
+        let _ = std::fs::write(dir.join("notes.txt"), "not a theme");
+        let third = fingerprint(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(first.is_some());
+        assert_ne!(first, second);
+        // Files that aren't themes don't count.
+        assert_eq!(second, third);
     }
 }

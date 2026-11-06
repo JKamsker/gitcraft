@@ -10,8 +10,9 @@ pub mod catalog;
 pub mod files;
 pub mod palette;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 
 use egui::{
     Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Stroke, TextStyle,
@@ -100,7 +101,7 @@ impl Group {
 }
 
 /// A theme to choose.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ThemeInfo {
     pub id: ThemeId,
     pub name: String,
@@ -122,47 +123,123 @@ impl ThemeInfo {
     }
 }
 
-/// Every theme there is to choose, read again from the themes folder (and VS Code) when they
-/// change, at most every few seconds.
+/// The themes read last, and what they were read from.
+struct Cache {
+    checked: Instant,
+    /// The themes folder's files as they were read (see [`files::fingerprint`]).
+    folder: Option<u64>,
+    themes: Arc<Vec<ThemeInfo>>,
+    errors: Vec<(String, String)>,
+}
+
+static CACHE: Mutex<Option<Cache>> = Mutex::new(None);
+/// A look at the themes folder and VS Code is under way on another thread.
+static LOOKING: AtomicBool = AtomicBool::new(false);
+/// How often the themes folder and VS Code are looked at again.
+const RECHECK: Duration = Duration::from_secs(2);
+
+/// Every theme there is to choose. Read once on the first call; then looked at again on
+/// another thread when older than a few seconds, so the window never waits for the disk.
 pub fn themes() -> Arc<Vec<ThemeInfo>> {
-    struct Cache {
-        checked: Instant,
-        /// When the themes folder changed, and VS Code's theme, as they were read.
-        folder: Option<SystemTime>,
-        editor: Option<String>,
-        themes: Arc<Vec<ThemeInfo>>,
-    }
-    static CACHE: Mutex<Option<Cache>> = Mutex::new(None);
-    const RECHECK: Duration = Duration::from_secs(2);
-    let Ok(mut cache) = CACHE.lock() else {
-        return Arc::new(builtin_infos());
+    let stale = match CACHE.lock() {
+        Ok(cache) => match cache.as_ref() {
+            Some(c) => {
+                let themes = c.themes.clone();
+                if c.checked.elapsed() >= RECHECK && !LOOKING.swap(true, Ordering::AcqRel) {
+                    std::thread::spawn(|| {
+                        look_again();
+                        LOOKING.store(false, Ordering::Release);
+                    });
+                }
+                return themes;
+            }
+            None => true,
+        },
+        Err(_) => return Arc::new(builtin_infos()),
     };
-    if let Some(c) = cache.as_ref()
-        && c.checked.elapsed() < RECHECK
-    {
-        return c.themes.clone();
+    if stale {
+        refresh();
     }
+    CACHE
+        .lock()
+        .ok()
+        .and_then(|c| c.as_ref().map(|c| c.themes.clone()))
+        .unwrap_or_else(|| Arc::new(builtin_infos()))
+}
+
+/// What was read last: the folder's fingerprint, the themes and the files that didn't read.
+type Snapshot = (Option<u64>, Arc<Vec<ThemeInfo>>, Vec<(String, String)>);
+
+fn snapshot() -> Option<Snapshot> {
+    let cache = CACHE.lock().ok()?;
+    cache
+        .as_ref()
+        .map(|c| (c.folder, c.themes.clone(), c.errors.clone()))
+}
+
+/// Reads the themes again now: after a theme file was added, so it can be chosen at once.
+pub fn refresh() {
+    let before = snapshot();
+    let next = read_themes(before, true);
+    if let Ok(mut cache) = CACHE.lock() {
+        *cache = Some(next);
+    }
+}
+
+/// [`refresh`] if anything changed; true when it did. On a thread of its own.
+fn look_again() -> bool {
+    let before = snapshot();
+    let old = before.as_ref().map(|(_, themes, _)| themes.clone());
+    let next = read_themes(before, false);
+    let changed = old.is_none_or(|old| *old != *next.themes);
+    if let Ok(mut cache) = CACHE.lock() {
+        *cache = Some(next);
+    }
+    changed
+}
+
+/// The themes: the catalogue's, the themes folder's (read again only when its files changed,
+/// unless `force`), and VS Code's. A file that no longer reads keeps the theme it was last
+/// read as, so a typo while editing it doesn't change the window: it is listed as an error.
+fn read_themes(before: Option<Snapshot>, force: bool) -> Cache {
     let dir = files::dir();
-    let folder = dir.as_deref().and_then(files::changed_at);
-    let editor = crate::vscode_theme::current();
-    let editor_name = editor.as_ref().map(|e| e.name.clone());
-    if let Some(c) = cache.as_mut()
-        && c.folder == folder
-        && c.editor == editor_name
-    {
-        c.checked = Instant::now();
-        return c.themes.clone();
-    }
+    let folder = dir.as_deref().and_then(files::fingerprint);
     let mut list = builtin_infos();
-    let (own, errors) = dir.as_deref().map(files::scan).unwrap_or_default();
-    list.extend(own.into_iter().map(|f| ThemeInfo {
-        id: ThemeId::file(&f.file),
-        name: f.name,
-        credit: f.credit,
-        group: Group::Yours,
-        palette: f.palette,
-    }));
-    if let Some(e) = editor.filter(|e| !e.workbench.is_empty()) {
+    let (own, errors) = match &before {
+        Some((was, themes, errors)) if *was == folder && !force => (
+            themes
+                .iter()
+                .filter(|t| t.group == Group::Yours)
+                .cloned()
+                .collect(),
+            errors.clone(),
+        ),
+        _ => {
+            let (read, errors) = dir.as_deref().map(files::scan).unwrap_or_default();
+            let mut own: Vec<ThemeInfo> = read
+                .into_iter()
+                .map(|f| ThemeInfo {
+                    id: ThemeId::file(&f.file),
+                    name: f.name,
+                    credit: f.credit,
+                    group: Group::Yours,
+                    palette: f.palette,
+                })
+                .collect();
+            if let Some((_, themes, _)) = &before {
+                for (file, _) in &errors {
+                    let id = ThemeId::file(file);
+                    if let Some(last) = themes.iter().find(|t| t.id == id) {
+                        own.push(last.clone());
+                    }
+                }
+                own.sort_by(|a, b| a.id.0.cmp(&b.id.0));
+            }
+            (own, errors)
+        }
+    };
+    list.extend(own);
+    if let Some(e) = crate::vscode_theme::current().filter(|e| !e.workbench.is_empty()) {
         list.push(ThemeInfo {
             id: ThemeId::new(ThemeId::VSCODE),
             name: format!("Follow VS Code ({})", e.name),
@@ -171,25 +248,22 @@ pub fn themes() -> Arc<Vec<ThemeInfo>> {
             palette: files::from_vscode(&e.workbench, Some(e.dark)),
         });
     }
-    let themes = Arc::new(list);
-    *cache = Some(Cache {
+    Cache {
         checked: Instant::now(),
         folder,
-        editor: editor_name,
-        themes: themes.clone(),
-    });
-    if let Ok(mut e) = ERRORS.lock() {
-        *e = errors;
+        themes: Arc::new(list),
+        errors,
     }
-    themes
 }
-
-static ERRORS: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
 
 /// The files in the themes folder that could not be read as themes, and why.
 pub fn theme_errors() -> Vec<(String, String)> {
     let _ = themes();
-    ERRORS.lock().map(|e| e.clone()).unwrap_or_default()
+    CACHE
+        .lock()
+        .ok()
+        .and_then(|c| c.as_ref().map(|c| c.errors.clone()))
+        .unwrap_or_default()
 }
 
 fn builtin_infos() -> Vec<ThemeInfo> {
@@ -217,8 +291,8 @@ pub fn find(id: &ThemeId) -> Option<ThemeInfo> {
     themes().iter().find(|t| t.id == *id).cloned()
 }
 
-/// The theme `id`, or gitcraft's dark or light one when there is none such any more (a theme
-/// file removed, VS Code uninstalled).
+/// The theme `id`, or gitcraft's dark one when there is none such any more (a theme file
+/// removed, VS Code uninstalled).
 pub fn resolve(id: &ThemeId) -> ThemeInfo {
     find(id).unwrap_or_else(|| {
         let mut fallback = builtin_infos().swap_remove(0);
@@ -386,6 +460,7 @@ fn choice_id() -> egui::Id {
 
 /// Paints the app with the theme `id`, changed by `tweaks`.
 pub fn apply(ctx: &egui::Context, id: &ThemeId, tweaks: &Tweaks) {
+    FOLLOWING.store(follows(id), Ordering::Relaxed);
     let t = resolve(id).tokens(tweaks);
     ctx.data_mut(|d| {
         d.insert_temp(
@@ -400,26 +475,47 @@ pub fn apply(ctx: &egui::Context, id: &ThemeId, tweaks: &Tweaks) {
 }
 
 /// Follows a theme that can change while it is in use: a file in the themes folder being
-/// edited, or VS Code's theme switched there. Cheap to call every frame.
+/// edited, or VS Code's theme switched there. Cheap to call every frame; the first call starts
+/// a thread that looks for such changes while the window is idle and wakes it for them.
 pub fn poll(ctx: &egui::Context) {
-    static LAST: Mutex<Option<Instant>> = Mutex::new(None);
-    if let Ok(mut last) = LAST.lock() {
-        if last.is_some_and(|l| l.elapsed() < Duration::from_secs(1)) {
-            return;
-        }
-        *last = Some(Instant::now());
-    }
+    static WATCHING: std::sync::Once = std::sync::Once::new();
+    WATCHING.call_once(|| {
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            loop {
+                std::thread::sleep(RECHECK);
+                if FOLLOWING.load(Ordering::Relaxed) && !LOOKING.swap(true, Ordering::AcqRel) {
+                    let changed = look_again();
+                    LOOKING.store(false, Ordering::Release);
+                    if changed {
+                        ctx.request_repaint();
+                    }
+                }
+            }
+        });
+    });
     let Some(choice) = ctx.data(|d| d.get_temp::<Choice>(choice_id())) else {
         return;
     };
-    if !(choice.id.0.starts_with("file:") || choice.id.0 == ThemeId::VSCODE) {
+    if !follows(&choice.id) {
         return;
     }
-    let t = resolve(&choice.id).tokens(&choice.tweaks);
+    // Gone, or not readable for now (a file half saved): the window stays as it is.
+    let Some(info) = find(&choice.id) else {
+        return;
+    };
+    let t = info.tokens(&choice.tweaks);
     if t != Tokens::get(ctx) {
         set_tokens(ctx, t);
         ctx.request_repaint();
     }
+}
+
+/// The theme in use can change without being chosen again: [`poll`] follows it.
+static FOLLOWING: AtomicBool = AtomicBool::new(false);
+
+fn follows(id: &ThemeId) -> bool {
+    id.0.starts_with("file:") || id.0 == ThemeId::VSCODE
 }
 
 fn tokens_id() -> egui::Id {

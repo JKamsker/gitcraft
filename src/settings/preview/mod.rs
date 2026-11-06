@@ -135,6 +135,8 @@ impl Preview {
 struct Pointed {
     page: Option<Page>,
     preview: Preview,
+    /// Which row, of those with this preview.
+    row: Id,
 }
 
 fn pointed_id() -> Id {
@@ -142,12 +144,12 @@ fn pointed_id() -> Id {
 }
 
 /// A row with `preview` is pointed at (on `page`, or in the search results when `None`).
-pub(super) fn point(ctx: &egui::Context, page: Option<Page>, preview: Preview) {
+pub(super) fn point(ctx: &egui::Context, page: Option<Page>, preview: Preview, row: Id) {
     let before = ctx.data(|d| d.get_temp::<Pointed>(pointed_id()));
-    if before.is_none_or(|b| b.preview != preview || b.page != page) {
+    if before.is_none_or(|b| b.preview != preview || b.page != page || b.row != row) {
         ctx.request_repaint();
     }
-    ctx.data_mut(|d| d.insert_temp(pointed_id(), Pointed { page, preview }));
+    ctx.data_mut(|d| d.insert_temp(pointed_id(), Pointed { page, preview, row }));
 }
 
 /// Forgets the row pointed at last: what a search found changed.
@@ -188,8 +190,28 @@ pub(super) fn shown(ctx: &egui::Context, page: Option<Page>) -> Option<Preview> 
 }
 
 /// Whether `preview` is what shows now: its row is marked.
-pub(super) fn is_shown(ctx: &egui::Context, page: Option<Page>, preview: Preview) -> bool {
-    shown(ctx, page) == Some(preview)
+/// Whether the row `row` with `preview` is the one whose preview shows: the one pointed at,
+/// or else the first drawn this frame with the preview shown.
+pub(super) fn is_marked(
+    ctx: &egui::Context,
+    page: Option<Page>,
+    preview: Preview,
+    row: Id,
+) -> bool {
+    if shown(ctx, page) != Some(preview) {
+        return false;
+    }
+    let pointed = ctx.data(|d| d.get_temp::<Pointed>(pointed_id()));
+    if let Some(p) = pointed.filter(|p| p.page == page) {
+        return p.row == row;
+    }
+    let frame = ctx.cumulative_frame_nr();
+    let id = Id::new("settings-preview-marked");
+    let marked = ctx.data(|d| d.get_temp::<u64>(id)) == Some(frame);
+    if !marked {
+        ctx.data_mut(|d| d.insert_temp(id, frame));
+    }
+    !marked
 }
 
 fn theme_hover_id() -> Id {

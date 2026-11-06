@@ -214,7 +214,6 @@ fn gallery(ui: &mut Ui, f: &Filter, view: &mut SettingsView, tweaks: &theme::Twe
                     );
                     if resp.hovered() {
                         preview::point_theme(ui.ctx(), &info.id);
-                        preview::point(ui.ctx(), f.at_page(), Preview::Theme);
                     }
                     let resp = resp
                         .on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -354,6 +353,7 @@ impl Settings {
                     {
                         match theme::files::import(&path) {
                             Ok(file) => {
+                                theme::refresh();
                                 view.request = Some(ProfileRequest::Theme(ThemeId::file(&file)));
                                 set_message(ui.ctx(), Ok(format!("Imported as {file}")));
                             }
@@ -386,6 +386,7 @@ impl Settings {
                             extends,
                         ) {
                             Ok(file) => {
+                                theme::refresh();
                                 view.request = Some(ProfileRequest::Theme(ThemeId::file(&file)));
                                 set_message(ui.ctx(), Ok(format!("Saved as {file}")));
                             }

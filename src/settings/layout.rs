@@ -48,11 +48,6 @@ impl Filter {
         self
     }
 
-    /// The page drawn, `None` in the search results.
-    pub fn at_page(&self) -> Option<Page> {
-        self.at
-    }
-
     /// Whether `text` has one of the search's words: what of a long list to show while
     /// searching (only those, when any has one).
     pub fn names(&self, text: &str) -> bool {
@@ -266,14 +261,15 @@ impl Card<'_> {
         if let Some(preview) = preview {
             let at = self.filter.at;
             let ctx = self.ui.ctx().clone();
+            let key = egui::Id::new(("settings-row", self.section, found_by.first().copied()));
             if self.ui.rect_contains_pointer(row) {
-                preview::point(&ctx, at, preview);
+                preview::point(&ctx, at, preview, key);
             }
             if at.is_none() {
                 preview::found(&ctx, preview);
             }
             // The row whose preview shows is marked along its left edge.
-            if preview::is_shown(&ctx, at, preview) {
+            if preview::is_marked(&ctx, at, preview, key) {
                 let bar = egui::Rect::from_min_size(
                     row.left_top() + vec2(0.0, 8.0),
                     vec2(3.0, (row.height() - 16.0).max(8.0)),
