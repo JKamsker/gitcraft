@@ -246,7 +246,10 @@ impl App {
         if self.profile_git_seen != now {
             self.profile_git_seen = now;
             for tab in &mut self.tabs {
-                if let Tab::Repo(r) = tab {
+                // One not read yet, or suspended, reads it when shown.
+                if let Tab::Repo(r) = tab
+                    && !r.sleeping()
+                {
                     r.reload_identity(ctx);
                 }
             }

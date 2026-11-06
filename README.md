@@ -19,6 +19,11 @@ so your config, credentials and hooks apply as usual.
   Profile); the other settings pages are shared. Switching closes this profile's tabs and opens the
   other one's (refused while a tab has unfinished work).
 - Changes made elsewhere (editor, terminal) show up by themselves: the folder is watched.
+- Lazy tabs: tabs restored on start read the repository and watch its folder only once they are
+  first shown, so many saved tabs don't mean as many history loads and folder watchers at
+  startup. A tab left in the background for 10 minutes with nothing going on (no operation,
+  running terminal, typed message, open editor or unsent review) drops its graph and diff and
+  stops watching and fetching; shown again, it reads afresh and selects the same commit.
 - Repositories on another machine, in a WSL distribution or over SSH: the window stays here and
   git runs there (see below).
 
