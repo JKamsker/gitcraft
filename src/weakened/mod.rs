@@ -17,7 +17,7 @@ pub(crate) mod repo_tests;
 #[cfg(test)]
 mod tests;
 
-pub use load::{Scope, scan};
+pub use load::{Area, Scope, scan};
 use patch::{FilePatch, Hunk, Mark};
 
 /// The badge's label.
@@ -45,7 +45,7 @@ impl Reason {
             Reason::RemovedAssertions => "Removes assertions",
             Reason::RemovedTests => "Removes tests",
             Reason::DeletedTestFile => "Deletes a test file",
-            Reason::SkipsTests => "Skips or disables tests",
+            Reason::SkipsTests => "Skips, disables or focuses tests",
             Reason::TrivialAssertion => "Adds an assertion that can't fail",
             Reason::LoosenedTolerance => "Loosens a tolerance",
             Reason::SnapshotRewrite => "Rewrites a snapshot wholesale",
@@ -64,8 +64,37 @@ pub struct Flag {
     pub hunk: Option<usize>,
     /// The line it is on: in the new file for added lines, in the old one for removed lines.
     pub line: Option<u32>,
-    /// What was seen, to show as it is: `line 12: adds #[ignore]`.
+    /// The line is a removed one (its number is in the old file).
+    pub removed: bool,
+    /// What was seen, to show as it is: `line 12: #[ignore]`, `old line 4: assert x`.
     pub evidence: String,
+}
+
+impl Flag {
+    /// A flag for `line` of hunk `hunk`, with `detail` (what changed) before the line quoted.
+    fn at(reason: Reason, hunk: usize, line: &patch::Line, detail: Option<String>) -> Self {
+        let removed = line.mark == Mark::Removed;
+        let side = if removed { "old line" } else { "line" };
+        let detail = detail.map(|d| format!(" ({d})")).unwrap_or_default();
+        Flag {
+            reason,
+            hunk: Some(hunk),
+            line: Some(line.number),
+            removed,
+            evidence: format!("{side} {}{detail}: {}", line.number, quote(&line.text)),
+        }
+    }
+
+    /// A flag for the whole file.
+    fn file(reason: Reason, evidence: String) -> Self {
+        Flag {
+            reason,
+            hunk: None,
+            line: None,
+            removed: false,
+            evidence,
+        }
+    }
 }
 
 /// The flags of one file of a patch.
@@ -82,28 +111,41 @@ impl FileFlags {
     }
 }
 
-/// `flags` as a hover text, grouped by reason.
+/// Most lines of evidence a hover lists per reason.
+const LISTED: usize = 5;
+
+/// `flags` as a hover text, grouped by reason, removed lines before added ones.
 pub fn summary<'a>(flags: impl Iterator<Item = &'a Flag>) -> String {
     let mut sorted: Vec<&Flag> = flags.collect();
-    sorted.sort_by_key(|f| (f.reason, f.line));
-    let mut out = String::from("Weakens checks");
-    let mut last = None;
-    for flag in sorted {
-        if last != Some(flag.reason) {
-            out.push_str(&format!("\n{}:", flag.reason.label()));
-            last = Some(flag.reason);
+    sorted.sort_by_key(|f| (f.reason, !f.removed, f.line));
+    let mut out: Vec<String> = Vec::new();
+    let mut at = 0;
+    while at < sorted.len() {
+        let reason = sorted[at].reason;
+        let same = sorted[at..]
+            .iter()
+            .take_while(|f| f.reason == reason)
+            .count();
+        out.push(format!("{}:", reason.label()));
+        for flag in &sorted[at..at + same.min(LISTED)] {
+            out.push(format!("  {}", flag.evidence));
         }
-        out.push_str(&format!("\n  {}", flag.evidence));
+        if same > LISTED {
+            out.push(format!("  and {} more", same - LISTED));
+        }
+        at += same;
     }
-    out
+    out.join("\n")
 }
 
 /// The files of `text` (a diff of one or more files) that weaken the checks.
 pub fn scan_patch(text: &str) -> Vec<FileFlags> {
-    patch::parse(text)
+    let files = patch::parse(text);
+    let moved = moved_lines(&files);
+    files
         .iter()
         .filter_map(|file| {
-            let flags = scan_file(file);
+            let flags = scan_file(file, &moved);
             (!flags.is_empty()).then(|| FileFlags {
                 path: file.path.clone(),
                 flags,
@@ -115,115 +157,172 @@ pub fn scan_patch(text: &str) -> Vec<FileFlags> {
 /// Longest a line is quoted in the evidence.
 const QUOTE_CHARS: usize = 100;
 
-/// `line N: what — the line`, the line cut to [`QUOTE_CHARS`].
-fn evidence(line: u32, what: &str, text: &str) -> String {
+/// The line trimmed and cut to [`QUOTE_CHARS`].
+fn quote(text: &str) -> String {
     let t = text.trim();
     let mut quoted: String = t.chars().take(QUOTE_CHARS).collect();
     if t.chars().count() > QUOTE_CHARS {
         quoted.push('…');
     }
-    format!("line {line}: {what}: {quoted}")
+    quoted
 }
 
-/// Everything one file's changes weaken.
-pub fn scan_file(file: &FilePatch) -> Vec<Flag> {
-    let test_file = paths::is_test(&file.path);
+/// Files whose lines are prose, not code: what they say about tests or hooks is no change.
+fn is_prose(path: &str) -> bool {
+    let lower = path.to_lowercase();
+    let ext = lower.rsplit_once('.').map(|(_, e)| e).unwrap_or_default();
+    matches!(
+        ext,
+        "md" | "markdown" | "txt" | "rst" | "adoc" | "asciidoc" | "org" | "textile"
+    )
+}
+
+/// How `path`'s lines are read.
+fn lang_of(path: &str) -> lines::Lang {
+    let lower = path.to_lowercase();
+    let ext = lower.rsplit_once('.').map(|(_, e)| e).unwrap_or_default();
+    lines::Lang {
+        test_file: paths::is_test(path),
+        dash_comments: matches!(ext, "sql" | "lua" | "hs" | "elm" | "ada"),
+    }
+}
+
+/// Assertions and tests added somewhere in the patch, as they read trimmed: removed from one
+/// file and added to another, they moved and weaken nothing.
+fn moved_lines(files: &[FilePatch]) -> std::collections::HashSet<String> {
+    files
+        .iter()
+        .flat_map(|f| {
+            let lang = lang_of(&f.path);
+            f.hunks
+                .iter()
+                .flat_map(|h| &h.lines)
+                .filter(move |l| {
+                    l.mark == Mark::Added
+                        && (lines::is_assertion(&l.text, lang)
+                            || lines::is_test_start(&l.text, lang))
+                })
+                .map(|l| l.text.trim().to_owned())
+        })
+        .collect()
+}
+
+/// Everything one file's changes weaken; `moved`: lines added elsewhere in the patch.
+pub fn scan_file(file: &FilePatch, moved: &std::collections::HashSet<String>) -> Vec<Flag> {
+    let lang = lang_of(&file.path);
     let mut flags = Vec::new();
-    if file.deleted && test_file {
-        flags.push(Flag {
-            reason: Reason::DeletedTestFile,
-            hunk: None,
-            line: None,
-            evidence: format!("deletes {}", file.path),
-        });
+    if file.deleted && lang.test_file {
+        flags.push(Flag::file(
+            Reason::DeletedTestFile,
+            format!("deletes {}", file.path),
+        ));
     }
     if paths::is_snapshot(&file.path) && !file.added {
         flags.extend(snapshot_rewrite(file));
     }
+    if is_prose(&file.path) {
+        return flags;
+    }
     let ci = paths::ci_kind(&file.path);
     let ci_keys = ci.map(|_| ci::added_keys(&file.hunks)).unwrap_or_default();
-    let net_asserts = net(file, lines::is_assertion);
-    let net_tests = net(file, lines::is_test_start);
+    let ci_file = ci.map(|kind| ci::FileCi {
+        kind,
+        added_keys: &ci_keys,
+        job_indent: ci::job_indent(&file.hunks),
+    });
+    let assertion = Kind {
+        is: lines::is_assertion,
+        lang,
+        moved,
+    };
+    let test = Kind {
+        is: lines::is_test_start,
+        lang,
+        moved,
+    };
+    let net_asserts = net(file, &assertion);
+    let net_tests = net(file, &test);
     for (index, hunk) in file.hunks.iter().enumerate() {
         if !file.deleted {
             if net_asserts < 0 {
-                flags.extend(removed(
-                    hunk,
-                    index,
-                    lines::is_assertion,
-                    Reason::RemovedAssertions,
-                ));
+                flags.extend(removed(hunk, index, &assertion, Reason::RemovedAssertions));
             }
             if net_tests < 0 {
-                flags.extend(removed(
-                    hunk,
-                    index,
-                    lines::is_test_start,
-                    Reason::RemovedTests,
-                ));
+                flags.extend(removed(hunk, index, &test, Reason::RemovedTests));
             }
         }
-        flags.extend(added_lines(hunk, index, test_file));
-        flags.extend(loosened(hunk, index));
-        if let Some(kind) = ci {
-            flags.extend(ci::flags(kind, index, hunk, &ci_keys));
+        flags.extend(added_lines(hunk, index, lang, ci.is_some()));
+        flags.extend(loosened(hunk, index, lang));
+        if let Some(ci_file) = &ci_file {
+            flags.extend(ci::flags(ci_file, index, hunk));
         }
     }
     flags
 }
 
-/// Added minus removed lines that `is` holds for, over the whole file.
-fn net(file: &FilePatch, is: fn(&str) -> bool) -> i64 {
+/// A kind of line counted (assertions, tests): a removed one added back somewhere in the
+/// patch (`moved`) is not counted as removed.
+struct Kind<'a> {
+    is: fn(&str, lines::Lang) -> bool,
+    lang: lines::Lang,
+    moved: &'a std::collections::HashSet<String>,
+}
+
+impl Kind<'_> {
+    fn counts(&self, line: &patch::Line) -> bool {
+        match line.mark {
+            Mark::Added => (self.is)(&line.text, self.lang),
+            Mark::Removed => {
+                (self.is)(&line.text, self.lang) && !self.moved.contains(line.text.trim())
+            }
+            Mark::Context => false,
+        }
+    }
+}
+
+/// Added minus removed lines of `kind`, over the whole file.
+fn net(file: &FilePatch, kind: &Kind<'_>) -> i64 {
     let count = |mark| {
         file.hunks
             .iter()
             .flat_map(|h| &h.lines)
-            .filter(|l| l.mark == mark && is(&l.text))
+            .filter(|l| l.mark == mark && kind.counts(l))
             .count() as i64
     };
     count(Mark::Added) - count(Mark::Removed)
 }
 
-/// The lines `is` holds for that a hunk removes more of than it adds: each of those removed.
-fn removed(hunk: &Hunk, index: usize, is: fn(&str) -> bool, reason: Reason) -> Vec<Flag> {
+/// The lines of `kind` that a hunk removes more of than it adds: each of those removed.
+fn removed(hunk: &Hunk, index: usize, kind: &Kind<'_>, reason: Reason) -> Vec<Flag> {
     let of = |mark| {
         hunk.lines
             .iter()
-            .filter(move |l| l.mark == mark && is(&l.text))
+            .filter(move |l| l.mark == mark && kind.counts(l))
     };
     if of(Mark::Removed).count() <= of(Mark::Added).count() {
         return Vec::new();
     }
     of(Mark::Removed)
-        .map(|l| Flag {
-            reason,
-            hunk: Some(index),
-            line: Some(l.number),
-            evidence: evidence(l.number, "removes", &l.text),
-        })
+        .map(|l| Flag::at(reason, index, l, None))
         .collect()
 }
 
 /// Skips, assertions that can't fail and skipped hooks among a hunk's added lines.
-fn added_lines(hunk: &Hunk, index: usize, test_file: bool) -> Vec<Flag> {
+fn added_lines(hunk: &Hunk, index: usize, lang: lines::Lang, ci: bool) -> Vec<Flag> {
     let mut out = Vec::new();
     for l in hunk.lines.iter().filter(|l| l.mark == Mark::Added) {
-        let mut push = |reason, what: &str| {
-            out.push(Flag {
-                reason,
-                hunk: Some(index),
-                line: Some(l.number),
-                evidence: evidence(l.number, what, &l.text),
-            });
-        };
-        if let Some(marker) = lines::skip_marker(&l.text, test_file) {
-            push(Reason::SkipsTests, &format!("adds `{marker}`"));
+        if lines::skip_marker(&l.text, lang).is_some() {
+            out.push(Flag::at(Reason::SkipsTests, index, l, None));
         }
-        if lines::is_trivial_assertion(&l.text) {
-            push(Reason::TrivialAssertion, "adds");
+        if lines::is_trivial_assertion(&l.text, lang) {
+            out.push(Flag::at(Reason::TrivialAssertion, index, l, None));
         }
-        if lines::code(&l.text).is_some() && skips_hooks(&l.text) {
-            push(Reason::SkipsHooks, "adds `--no-verify`");
+        // Skipping hooks is said on a command line: a continuation line (`  --no-verify \`) of
+        // a script or a CI step counts, as code elsewhere does.
+        let text = l.text.trim_start();
+        let hook_line = lines::code(&l.text, lang).is_some() || (ci && text.starts_with("--"));
+        if hook_line && skips_hooks(text) {
+            out.push(Flag::at(Reason::SkipsHooks, index, l, None));
         }
     }
     out
@@ -233,29 +332,28 @@ fn skips_hooks(text: &str) -> bool {
     text.contains("--no-verify") || text.contains("core.hooksPath=/dev/null")
 }
 
-/// Margins a hunk widens: a removed line with a margin, and an added one with the same word
-/// and a looser number.
-fn loosened(hunk: &Hunk, index: usize) -> Vec<Flag> {
+/// Margins a hunk widens. The lines with a margin it removes and those it adds are taken in
+/// pairs, in order (the first removed with the first added…), and each word compared.
+/// Only in test files, or on a line that asserts.
+fn loosened(hunk: &Hunk, index: usize, lang: lines::Lang) -> Vec<Flag> {
     let margins = |mark| {
         hunk.lines
             .iter()
-            .filter(move |l| l.mark == mark && lines::code(&l.text).is_some())
-            .filter_map(|l| tolerance::margin(&l.text).map(|m| (l, m)))
+            .filter(move |l| l.mark == mark && lines::code(&l.text, lang).is_some())
+            .filter(move |l| lang.test_file || lines::is_assertion(&l.text, lang))
+            .map(|l| (l, tolerance::margins(&l.text)))
+            .filter(|(_, m)| !m.is_empty())
     };
-    let before: Vec<_> = margins(Mark::Removed).collect();
-    margins(Mark::Added)
-        .filter_map(|(l, after)| {
-            let (_, was) = before.iter().find(|(_, b)| b.word == after.word)?;
-            tolerance::loosened(was, &after).then(|| Flag {
-                reason: Reason::LoosenedTolerance,
-                hunk: Some(index),
-                line: Some(l.number),
-                evidence: evidence(
-                    l.number,
-                    &format!("`{}` from {} to {}", after.word, was.value, after.value),
-                    &l.text,
-                ),
-            })
+    margins(Mark::Removed)
+        .zip(margins(Mark::Added))
+        .flat_map(|((_, before), (line, after))| {
+            tolerance::loosened(&before, &after)
+                .into_iter()
+                .map(|(m, was)| {
+                    let detail = format!("{} {was} → {}", m.word.trim_end_matches('('), m.written);
+                    Flag::at(Reason::LoosenedTolerance, index, line, Some(detail))
+                })
+                .collect::<Vec<_>>()
         })
         .collect()
 }
@@ -263,28 +361,31 @@ fn loosened(hunk: &Hunk, index: usize) -> Vec<Flag> {
 /// Fewest changed lines a snapshot needs to count as rewritten wholesale.
 const SNAPSHOT_MIN_LINES: usize = 10;
 
-/// A snapshot deleted, or with nearly all its lines replaced (little context left).
+/// A snapshot deleted, or with nine lines in ten or more replaced: one hunk from its first
+/// line to its end (fewer lines of context after it than git shows, so nothing follows).
 fn snapshot_rewrite(file: &FilePatch) -> Option<Flag> {
-    let total = |mark| file.hunks.iter().map(|h| h.count(mark)).sum::<usize>();
-    let (removed, added, context) = (
-        total(Mark::Removed),
-        total(Mark::Added),
-        total(Mark::Context),
-    );
-    let what = if file.deleted {
-        format!("deletes the snapshot {}", file.path)
-    } else if removed >= SNAPSHOT_MIN_LINES
-        && added >= SNAPSHOT_MIN_LINES
-        && context * 10 <= removed + added
-    {
-        format!("replaces {removed} lines with {added}, {context} kept")
-    } else {
+    if file.deleted {
+        return Some(Flag::file(
+            Reason::SnapshotRewrite,
+            format!("deletes the snapshot {}", file.path),
+        ));
+    }
+    let [hunk] = file.hunks.as_slice() else {
         return None;
     };
-    Some(Flag {
-        reason: Reason::SnapshotRewrite,
-        hunk: None,
-        line: None,
-        evidence: what,
+    let removed = hunk.count(Mark::Removed);
+    let trailing = hunk
+        .lines
+        .iter()
+        .rev()
+        .take_while(|l| l.mark == Mark::Context)
+        .count();
+    let old = hunk.old_count as usize;
+    let whole = hunk.old_start <= 1 && trailing < 3 && removed * 10 >= old * 9;
+    (removed >= SNAPSHOT_MIN_LINES && whole).then(|| {
+        Flag::file(
+            Reason::SnapshotRewrite,
+            format!("replaces {removed} of its {old} lines"),
+        )
     })
 }

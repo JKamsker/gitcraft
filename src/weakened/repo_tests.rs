@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use super::{Reason, Scope, scan};
+use super::{Area, Reason, Scope, scan};
 
 pub(crate) fn git(dir: &Path, args: &[&str]) -> Result<String, String> {
     crate::git::run(Some(dir), args)
@@ -107,9 +107,24 @@ fn a_commit_a_range_and_the_working_tree() -> Result<(), String> {
         test,
         "#[test]\n#[ignore]\nfn logs_in() {\n    assert!(true);\n}\n",
     )?;
-    let work = scan(&dir, &Scope::Work(1))?;
-    assert_eq!(work.len(), 1);
-    assert_eq!(work[0].flags[0].reason, Reason::TrivialAssertion);
+    let unstaged = scan(&dir, &Scope::Work(Area::Unstaged))?;
+    assert_eq!(unstaged.len(), 1);
+    assert_eq!(unstaged[0].flags[0].reason, Reason::TrivialAssertion);
+    // Staged, it moves from one scan to the other.
+    git(&dir, &["add", "--", test])?;
+    assert!(scan(&dir, &Scope::Work(Area::Unstaged))?.is_empty());
+    assert_eq!(scan(&dir, &Scope::Work(Area::Staged))?.len(), 1);
+    // A new file nobody added yet; a binary one is left out.
+    write(
+        &dir,
+        "tests/new test.py",
+        "def test_new():\n    assert True\n",
+    )?;
+    write(&dir, "tests/binary_test.bin", "\0\0assert True\n")?;
+    let untracked = scan(&dir, &Scope::Work(Area::Untracked))?;
+    assert_eq!(untracked.len(), 1, "{untracked:?}");
+    assert_eq!(untracked[0].path, "tests/new test.py");
+    assert_eq!(untracked[0].flags[0].line, Some(2));
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())
 }
@@ -125,8 +140,15 @@ fn errors_say_what_could_not_be_read() -> Result<(), String> {
         message.starts_with("Could not read the changes"),
         "{message}"
     );
-    // A repository with no commit yet has no HEAD to compare the working tree with.
-    assert!(scan(&dir, &Scope::Work(0)).is_err());
+    // Before the first commit, what is staged is read against nothing.
+    write(
+        &dir,
+        "tests/a_test.go",
+        "func TestA(t *testing.T) {\n\tt.Skip()\n}\n",
+    )?;
+    git(&dir, &["add", "-A"])?;
+    let staged = scan(&dir, &Scope::Work(Area::Staged))?;
+    assert_eq!(staged.len(), 1);
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())
 }

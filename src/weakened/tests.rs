@@ -139,10 +139,9 @@ fn loosened_and_tightened_tolerances() {
     let files = scan_patch(&looser);
     let flag = &files[0].flags[0];
     assert_eq!(flag.reason, Reason::LoosenedTolerance);
-    assert!(
-        flag.evidence.contains("from 0.000001 to 0.01"),
-        "{}",
-        flag.evidence
+    assert_eq!(
+        flag.evidence,
+        "line 1 (rtol 1e-6 → 1e-2): assert np.allclose(a, b, rtol=1e-2)"
     );
     let tighter = diff(
         "tests/test_num.py",
@@ -193,10 +192,9 @@ fn ci_allowed_to_fail_and_jobs_removed() {
     );
     let files = scan_patch(&job);
     assert_eq!(files[0].flags.len(), 1);
-    assert!(
-        files[0].flags[0]
-            .evidence
-            .contains("removes the job `lint`")
+    assert_eq!(
+        files[0].flags[0].evidence,
+        "old line 2 (the job `lint`): lint:"
     );
     let trigger = diff(
         ".github/workflows/ci.yml",
@@ -264,7 +262,10 @@ fn several_files_and_hunks_are_kept_apart() {
     assert_eq!(files[1].path, "src/b.rs");
     assert_eq!(files[1].flags[0].hunk, Some(1));
     assert_eq!(files[1].flags[0].line, Some(11));
-    assert!(files[1].summary().contains("Skips or disables tests"));
+    assert_eq!(
+        files[1].summary(),
+        "Skips, disables or focuses tests:\n  line 11: #[ignore]"
+    );
 }
 
 #[test]
@@ -284,4 +285,212 @@ fn a_huge_patch_is_read_in_one_pass() {
     let started = std::time::Instant::now();
     assert!(scan_patch(&text).is_empty());
     assert!(started.elapsed() < std::time::Duration::from_secs(5));
+}
+
+#[test]
+fn removed_lines_are_numbered_in_the_old_file_and_listed_first() {
+    let text = diff(
+        "tests/a.rs",
+        "-    assert!(a);\n-    assert!(b);\n+    #[ignore]",
+    );
+    let summary = scan_patch(&text)[0].summary();
+    assert_eq!(
+        summary,
+        "Removes assertions:\n  old line 1: assert!(a);\n  old line 2: assert!(b);\nSkips, disables or focuses tests:\n  line 1: #[ignore]"
+    );
+}
+
+#[test]
+fn long_lists_are_cut_in_the_hover() {
+    let body: String = (0..9).map(|i| format!("-    assert!(x{i});\n")).collect();
+    let text = diff("tests/a.rs", body.trim_end());
+    let summary = scan_patch(&text)[0].summary();
+    assert!(summary.ends_with("and 4 more"), "{summary}");
+    assert_eq!(summary.lines().count(), 7);
+}
+
+#[test]
+fn prose_strings_and_look_alikes_are_left_alone() {
+    let cases = [
+        // Documentation about the feature itself.
+        (
+            "README.md",
+            "+Adds `--no-verify` and `t.Skip()` and #[ignore]",
+        ),
+        ("docs/notes.txt", "+git commit --no-verify"),
+        // Markers inside strings: a scanner's own patterns, test fixtures.
+        ("src/rules.rs", "+    \"it.skip(\","),
+        ("src/rules.rs", "+const S: &str = \"#[ignore]\";"),
+        ("tests/rules_test.rs", "+    let s = \"@pytest.mark.skip\";"),
+        // Attributes that only start the same.
+        ("src/Dto.cs", "+    [IgnoreDataMember]"),
+        ("app/src/main/User.kt", "+    @IgnoredOnParcel"),
+        ("src/a.py", "+model.fit(\"train.csv\")"),
+        ("tests/q.js", "+pending = []"),
+    ];
+    for (path, line) in cases {
+        let text = diff(path, &format!(" context\n{line}"));
+        assert!(
+            reasons(&text).is_empty(),
+            "{path}: {line}: {:?}",
+            reasons(&text)
+        );
+    }
+}
+
+#[test]
+fn non_assertions_removed_are_not_flagged() {
+    let cases = [
+        (
+            "src/lib.rs",
+            "-    let x = foo().expect(\"has foo\");\n+    let x = foo()?;",
+        ),
+        ("src/auth.js", "-  jwt.verify(token, key);"),
+        ("src/load.js", "-  const p = require.resolve('x');"),
+        // `[TestCategory]` is no test; removing it removes none.
+        ("tests/ATests.cs", "-    [TestCategory(\"slow\")]"),
+    ];
+    for (path, body) in cases {
+        let text = diff(path, &format!(" context\n{body}"));
+        assert!(
+            reasons(&text).is_empty(),
+            "{path}: {body}: {:?}",
+            reasons(&text)
+        );
+    }
+    // Still an assertion, as a method or a debug one.
+    let debug = diff("src/a.rs", " fn f() {\n-    debug_assert!(ok);\n }");
+    assert_eq!(reasons(&debug), vec![Reason::RemovedAssertions]);
+    let method = diff(
+        "tests/test_a.py",
+        " def test_a(self):\n-        self.assertEqual(a, b)",
+    );
+    assert_eq!(reasons(&method), vec![Reason::RemovedAssertions]);
+}
+
+#[test]
+fn margins_outside_tests_and_tighter_ones_are_not_loosened() {
+    let css = diff("web/site.css", "-  margin: 4px;\n+  margin: 8px;");
+    assert!(reasons(&css).is_empty());
+    let egui = diff(
+        "src/ui.rs",
+        "-    .inner_margin(Margin::same(4))\n+    .inner_margin(Margin::same(8))",
+    );
+    assert!(reasons(&egui).is_empty());
+    let coverage = diff("ci/cov.toml", "-threshold = 70\n+threshold = 80");
+    assert!(reasons(&coverage).is_empty());
+    // In a non-test file, on a line that asserts: it counts.
+    let assert_line = diff(
+        "src/num.rs",
+        "-    assert!(approx(a, b, epsilon = 1e-9));\n+    assert!(approx(a, b, epsilon = 1e-3));",
+    );
+    assert_eq!(reasons(&assert_line), vec![Reason::LoosenedTolerance]);
+}
+
+#[test]
+fn every_margin_of_a_line_and_lines_in_pairs() {
+    let both = diff(
+        "tests/test_a.py",
+        "-    np.testing.assert_allclose(a, b, rtol=1e-5, atol=1e-8)\n+    np.testing.assert_allclose(a, b, rtol=1e-7, atol=1e-1)",
+    );
+    let files = scan_patch(&both);
+    assert_eq!(files[0].flags.len(), 1);
+    assert!(files[0].flags[0].evidence.contains("atol 1e-8 → 1e-1"));
+    // Two lines renamed, values the same: compared in pairs, nothing loosened.
+    let renamed = diff(
+        "tests/test_a.py",
+        "-    check(a, rtol=1e-9)\n-    check(b, rtol=1e-2)\n+    check(x, rtol=1e-9)\n+    check(y, rtol=1e-2)",
+    );
+    assert!(reasons(&renamed).is_empty());
+    // Another word's number is not this one's.
+    let other = diff(
+        "tests/test_a.py",
+        "-    close(a, rtol=tol, atol=1e-8)\n+    close(a, rtol=tol, atol=1e-8, x=5)",
+    );
+    assert!(reasons(&other).is_empty());
+    // Nested calls in the arguments.
+    let nested = diff(
+        "web/a.test.js",
+        "-  expect(f(x)).toBeCloseTo(sum(c, d), 5);\n+  expect(f(x)).toBeCloseTo(sum(c, d), 1);",
+    );
+    assert_eq!(reasons(&nested), vec![Reason::LoosenedTolerance]);
+    let python = diff(
+        "tests/test_a.py",
+        "-        self.assertAlmostEqual(f(x), 1.0, 3)\n+        self.assertAlmostEqual(f(x), 1.0, 1)",
+    );
+    assert_eq!(reasons(&python), vec![Reason::LoosenedTolerance]);
+}
+
+#[test]
+fn a_test_moved_to_another_file_is_no_removal() {
+    let text = format!(
+        "{}{}",
+        diff(
+            "src/a.rs",
+            " mod tests {\n-    #[test]\n-    fn t() { assert_eq!(f(), 1); }\n }"
+        ),
+        diff(
+            "tests/a.rs",
+            " use x;\n+    #[test]\n+    fn t() { assert_eq!(f(), 1); }"
+        ),
+    );
+    assert!(reasons(&text).is_empty(), "{:?}", reasons(&text));
+}
+
+#[test]
+fn snapshot_rewrite_needs_most_of_the_file() {
+    // 60 lines rewritten at the top of a longer snapshot: three lines of context follow.
+    let removed: String = (0..60).map(|i| format!("-old {i}\n")).collect();
+    let added: String = (0..60).map(|i| format!("+new {i}\n")).collect();
+    let head = format!("{removed}{added} keep 1\n keep 2\n keep 3");
+    let text = format!(
+        "diff --git a/s.snap b/s.snap\n--- a/s.snap\n+++ b/s.snap\n@@ -1,63 +1,63 @@\n{head}\n"
+    );
+    assert!(reasons(&text).is_empty());
+    let whole = format!(
+        "diff --git a/s.snap b/s.snap\n--- a/s.snap\n+++ b/s.snap\n@@ -1,60 +1,60 @@\n{removed}{}\n",
+        added.trim_end()
+    );
+    let files = scan_patch(&whole);
+    assert_eq!(files[0].flags[0].evidence, "replaces 60 of its 60 lines");
+}
+
+#[test]
+fn ci_jobs_four_spaces_in_and_hooks_on_continuation_lines() {
+    let four = diff(
+        ".github/workflows/ci.yml",
+        " jobs:\n-    test:\n-        runs-on: x\n     lint:",
+    );
+    assert_eq!(reasons(&four), vec![Reason::CiRemovedJob]);
+    // A nested key of the same name added elsewhere doesn't hide the job's removal.
+    let nested = diff(
+        ".github/workflows/ci.yml",
+        " jobs:\n-  test:\n-    runs-on: x\n   lint:\n+    test:\n+      x: 1",
+    );
+    assert_eq!(reasons(&nested), vec![Reason::CiRemovedJob]);
+    let continued = diff(
+        ".github/workflows/release.yml",
+        "       run: |\n         git commit -m x \\\n+          --no-verify",
+    );
+    assert_eq!(reasons(&continued), vec![Reason::SkipsHooks]);
+    let shell = diff("scripts/ship.sh", " git commit -m x \\\n+  --no-verify");
+    // `--` starts no comment in a shell script.
+    assert_eq!(reasons(&shell), vec![Reason::SkipsHooks]);
+}
+
+#[test]
+fn trivial_assertions_with_a_message_and_rust_ignore_attributes() {
+    let message = diff(
+        "tests/test_a.py",
+        " def test_a():\n+    assert True, \"todo\"",
+    );
+    assert_eq!(reasons(&message), vec![Reason::TrivialAssertion]);
+    let cfg = diff(
+        "src/a.rs",
+        " #[test]\n+#[cfg_attr(not(feature = \"slow\"), ignore)]",
+    );
+    assert_eq!(reasons(&cfg), vec![Reason::SkipsTests]);
+    let pointer = diff("src/a.c", " void f() {\n+    *p = assert_ok(x);\n }");
+    // `*p = …` is code, not a block comment: no flag, but read.
+    assert!(reasons(&pointer).is_empty());
 }

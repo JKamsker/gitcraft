@@ -186,6 +186,14 @@ impl RepoTab {
                 },
             );
         });
+        if let Some(first) = files.first() {
+            let area = super::super::weakened_marks::area_of(first.area);
+            let scope = crate::weakened::Scope::Work(area);
+            let found = self
+                .weakened
+                .get(ui.ctx(), &self.path, scope, self.work_read);
+            super::super::weakened_marks::error_note(ui, found.as_ref());
+        }
     }
 
     /// One working-tree file with hover buttons (hidden while an operation runs).
@@ -200,8 +208,11 @@ impl RepoTab {
         let key = DiffKey::Work(f.clone());
         let selected = self.open_key() == Some(&key);
         let buttons = if self.busy_op.is_none() { buttons } else { &[] };
-        let scope = crate::weakened::Scope::Work(self.work_read);
-        let found = self.weakened.get(ui.ctx(), &self.path, scope);
+        let area = super::super::weakened_marks::area_of(f.area);
+        let scope = crate::weakened::Scope::Work(area);
+        let found = self
+            .weakened
+            .get(ui.ctx(), &self.path, scope, self.work_read);
         let plain = RowExtra::Buttons(buttons);
         let (extra, flags) = super::super::weakened_marks::extra(found.as_ref(), &f.path, &plain);
         let r = widgets::file_row(

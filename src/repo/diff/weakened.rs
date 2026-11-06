@@ -24,25 +24,29 @@ pub(super) fn by_hunk_line(text: &str, lines: &[DiffLine]) -> HashMap<usize, Str
     for (place, &line) in headers.iter().enumerate() {
         let flags = file.flags.iter().filter(|f| f.hunk.unwrap_or(0) == place);
         let tip = crate::weakened::summary(flags);
-        if tip.contains('\n') {
+        if !tip.is_empty() {
             out.insert(line, tip);
         }
     }
     out
 }
 
-/// The badge right-aligned at `right` on the header of hunk `i`, `tip` on hover.
+/// The badge right-aligned at `right` on the header of hunk `i`, `tip` on hover. Opaque, so
+/// the header's text under it doesn't show through.
 pub(super) fn badge(ui: &mut Ui, right: f32, y: f32, tip: &str, i: usize) {
     let t = Tokens::get(ui.ctx());
-    let font = theme::medium(10.5);
-    let galley = ui
-        .painter()
-        .layout_no_wrap(crate::weakened::BADGE.to_owned(), font, t.warning);
-    let size = galley.size() + vec2(12.0, 4.0);
+    let color = crate::repo::widgets::badge_text(&t);
+    let galley = ui.painter().layout_no_wrap(
+        crate::weakened::BADGE.to_owned(),
+        theme::medium(10.0),
+        color,
+    );
+    let size = galley.size() + vec2(10.0, 3.0);
     let rect = Rect::from_min_size(pos2(right - size.x, y - size.y / 2.0), size);
     let painter = ui.painter();
+    painter.rect_filled(rect.expand(3.0), CornerRadius::ZERO, t.dock);
     painter.rect_filled(rect, CornerRadius::same(4), t.warning.gamma_multiply(0.18));
-    painter.galley(rect.min + vec2(6.0, 2.0), galley, t.warning);
+    painter.galley(rect.min + vec2(5.0, 1.5), galley, color);
     ui.interact(rect, ui.id().with(("weakened-hunk", i)), Sense::hover())
         .on_hover_text(tip);
 }

@@ -3,7 +3,7 @@
 
 use super::patch::{Hunk, Mark};
 use super::paths::Ci;
-use super::{Flag, Reason, evidence};
+use super::{Flag, Reason};
 
 /// What an added line of CI configuration does to let failures through.
 fn lets_fail(text: &str) -> Option<&'static str> {
@@ -74,51 +74,62 @@ const GITLAB_NOT_JOBS: [&str; 11] = [
     "spec",
 ];
 
-/// A job (or trigger) whose block a removed line opened: what the evidence calls it.
-fn removed_block(kind: Ci, text: &str) -> Option<String> {
+/// A job (or trigger) whose block a removed line opened: what the evidence calls it. A
+/// workflow's jobs are `job_indent` in (the least any block key of the file is, past none).
+fn removed_block(kind: Ci, text: &str, job_indent: usize) -> Option<String> {
     let (indent, key) = block_key(text)?;
     match kind {
-        Ci::Actions if indent == 2 && ACTIONS_TRIGGERS.contains(&key) => {
-            Some(format!("removes the `{key}` trigger"))
+        Ci::Actions if indent == job_indent && ACTIONS_TRIGGERS.contains(&key) => {
+            Some(format!("the `{key}` trigger"))
         }
-        Ci::Actions if indent == 2 && !ACTIONS_NOT_JOBS.contains(&key) => {
-            Some(format!("removes the job `{key}`"))
+        Ci::Actions if indent == job_indent && !ACTIONS_NOT_JOBS.contains(&key) => {
+            Some(format!("the job `{key}`"))
         }
         Ci::GitLab if indent == 0 && !key.starts_with('.') && !GITLAB_NOT_JOBS.contains(&key) => {
-            Some(format!("removes the job `{key}`"))
+            Some(format!("the job `{key}`"))
         }
         _ => None,
     }
 }
 
+/// How far in a workflow's jobs are: the least indentation of a block key past none, among
+/// the lines the diff shows (two spaces when it shows none).
+pub fn job_indent(hunks: &[Hunk]) -> usize {
+    hunks
+        .iter()
+        .flat_map(|h| &h.lines)
+        .filter_map(|l| block_key(&l.text).map(|(indent, _)| indent))
+        .filter(|&indent| indent > 0)
+        .min()
+        .unwrap_or(2)
+}
+
+/// What the rest of the file tells about one of its hunks.
+pub struct FileCi<'a> {
+    pub kind: Ci,
+    /// Block keys added anywhere in the file, with how far in they are.
+    pub added_keys: &'a [(usize, String)],
+    pub job_indent: usize,
+}
+
 /// The flags of one hunk of a CI file.
-pub fn flags(kind: Ci, index: usize, hunk: &Hunk, added_keys: &[String]) -> Vec<Flag> {
+pub fn flags(file: &FileCi<'_>, index: usize, hunk: &Hunk) -> Vec<Flag> {
     let mut out = Vec::new();
     for line in &hunk.lines {
         match line.mark {
             Mark::Added => {
-                if let Some(what) = lets_fail(&line.text) {
-                    out.push(Flag {
-                        reason: Reason::CiAllowsFailure,
-                        hunk: Some(index),
-                        line: Some(line.number),
-                        evidence: evidence(line.number, &format!("adds `{what}`"), &line.text),
-                    });
+                if lets_fail(&line.text).is_some() {
+                    out.push(Flag::at(Reason::CiAllowsFailure, index, line, None));
                 }
             }
             Mark::Removed => {
-                let key = block_key(&line.text).map(|(_, k)| k.to_owned());
-                // Moved or renamed in place: added back elsewhere in the file.
-                if key.as_ref().is_some_and(|k| added_keys.contains(k)) {
+                // Moved: added back elsewhere in the file, as far in.
+                let key = block_key(&line.text).map(|(i, k)| (i, k.to_owned()));
+                if key.as_ref().is_some_and(|k| file.added_keys.contains(k)) {
                     continue;
                 }
-                if let Some(what) = removed_block(kind, &line.text) {
-                    out.push(Flag {
-                        reason: Reason::CiRemovedJob,
-                        hunk: Some(index),
-                        line: Some(line.number),
-                        evidence: evidence(line.number, &what, &line.text),
-                    });
+                if let Some(what) = removed_block(file.kind, &line.text, file.job_indent) {
+                    out.push(Flag::at(Reason::CiRemovedJob, index, line, Some(what)));
                 }
             }
             Mark::Context => {}
@@ -127,12 +138,12 @@ pub fn flags(kind: Ci, index: usize, hunk: &Hunk, added_keys: &[String]) -> Vec<
     out
 }
 
-/// The block keys added anywhere in a file, at whatever depth.
-pub fn added_keys(hunks: &[Hunk]) -> Vec<String> {
+/// The block keys added anywhere in a file, with how far in they are.
+pub fn added_keys(hunks: &[Hunk]) -> Vec<(usize, String)> {
     hunks
         .iter()
         .flat_map(|h| &h.lines)
         .filter(|l| l.mark == Mark::Added)
-        .filter_map(|l| block_key(&l.text).map(|(_, k)| k.to_owned()))
+        .filter_map(|l| block_key(&l.text).map(|(i, k)| (i, k.to_owned())))
         .collect()
 }

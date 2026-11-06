@@ -81,12 +81,17 @@ pub fn file_row(
         RowExtra::Buttons(buttons) => {
             if hovered || selected {
                 (right, button) = hover_buttons(ui, &painter, &t, &row, right, buttons);
+            } else if label.is_some() {
+                // The badge stays where it is when the buttons come up on hover.
+                right -= BUTTON_W * buttons.len() as f32;
             }
         }
         RowExtra::Badged(..) => {}
     }
     if let Some(label) = label {
-        let at = warning_badge(&painter, &t, right, y, label);
+        // Room left for the name; with too little, the badge shrinks to its icon.
+        let room = right - (rect.left() + 32.0 + shift);
+        let at = warning_badge(ui, &painter, &t, (right, y), label, room < 180.0);
         right = at.left() - 6.0;
         badge = Some(at);
     }
@@ -131,15 +136,43 @@ pub fn file_row(
     FileRowResponse { row, button, badge }
 }
 
-/// A small warning pill with `label`, right-aligned at `right`; returns where it is.
-fn warning_badge(painter: &Painter, t: &Tokens, right: f32, y: f32, label: &str) -> Rect {
-    let font = theme::medium(10.0);
-    let galley = painter.layout_no_wrap(label.to_owned(), font, t.warning);
+/// Width a hover button takes, with its gap.
+const BUTTON_W: f32 = 22.0;
+
+/// A small warning pill with `label` (only its icon when `compact`), right-aligned at
+/// `right`; returns where it is.
+fn warning_badge(
+    ui: &Ui,
+    painter: &Painter,
+    t: &Tokens,
+    (right, y): (f32, f32),
+    label: &str,
+    compact: bool,
+) -> Rect {
+    let color = badge_text(t);
+    if compact {
+        let rect = Rect::from_center_size(pos2(right - 9.0, y), vec2(18.0, 18.0));
+        painter.rect_filled(rect, CornerRadius::same(4), t.warning.gamma_multiply(0.18));
+        icons::paint(ui, rect, "circle-alert", 12.0, color);
+        return rect;
+    }
+    let galley = painter.layout_no_wrap(label.to_owned(), theme::medium(10.0), color);
     let size = galley.size() + vec2(10.0, 3.0);
     let rect = Rect::from_min_size(pos2(right - size.x, y - size.y / 2.0), size);
     painter.rect_filled(rect, CornerRadius::same(4), t.warning.gamma_multiply(0.18));
-    painter.galley(rect.min + vec2(5.0, 1.5), galley, t.warning);
+    painter.galley(rect.min + vec2(5.0, 1.5), galley, color);
     rect
+}
+
+/// The warning colour, darkened on light themes so small text on its tint stays readable.
+pub fn badge_text(t: &Tokens) -> egui::Color32 {
+    if t.dark() {
+        t.warning
+    } else {
+        let [r, g, b, _] = t.warning.to_array();
+        let dim = |c: u8| (f32::from(c) * 0.72) as u8;
+        egui::Color32::from_rgb(dim(r), dim(g), dim(b))
+    }
 }
 
 /// `+added −removed` (or `bin`) right-aligned at `right`; returns where the name must end.
