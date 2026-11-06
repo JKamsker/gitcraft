@@ -35,7 +35,8 @@ tail -c 8192 "$2" 2>/dev/null
 exit $r"#;
 
 /// Stops the test whose process file is `$1`, and everything it started: only a process that
-/// is that test (its command line names the file), never one that took over its number.
+/// is that test (its command line names the file), never one that took over its number. `-ww`:
+/// macOS cuts a command line to the terminal's width otherwise, the file's name with it.
 /// Where git's `sh` is Git for Windows', through Windows itself (`taskkill /T`).
 pub const STOP_SCRIPT: &str = r#"f=$1
 p=$(cat "$f" 2>/dev/null) || exit 0
@@ -43,7 +44,7 @@ case $p in ''|*[!0-9]*) exit 0;; esac
 if [ -r "/proc/$p/cmdline" ]; then
   tr '\000' ' ' <"/proc/$p/cmdline" | grep -qF -- "$f" || exit 0
 else
-  ps -o args= -p "$p" 2>/dev/null | grep -qF -- "$f" || exit 0
+  { ps -ww -o args= -p "$p" 2>/dev/null || ps -o args= -p "$p" 2>/dev/null; } | grep -qF -- "$f" || exit 0
 fi
 if [ -r "/proc/$p/winpid" ]; then
   MSYS2_ARG_CONV_EXCL='*' taskkill /T /F /PID "$(cat "/proc/$p/winpid")" >/dev/null 2>&1
@@ -83,12 +84,20 @@ pub fn sh_alias(name: &str, script: &str, args: &[&str]) -> Vec<String> {
     ]
 }
 
+/// How long stopping a test, or clearing a folder of worktrees, may take.
+const SHELL_FOR: Duration = Duration::from_secs(30 * 60);
+
 /// Runs `script` with `sh` in `dir` (on its machine) and waits for it; its output, or why it
-/// failed.
+/// failed. Elsewhere in a test's shell, so that it never waits behind the tab's reads.
 pub fn shell(dir: &Path, script: &str, args: &[&str]) -> Result<String, String> {
     let words = sh_alias("gitcraft-bisect-sh", script, args);
     let words: Vec<&str> = words.iter().map(String::as_str).collect();
-    git::run(Some(dir), &words)
+    let exit = git::run_for_test(dir, &words, SHELL_FOR)?;
+    if exit.code == Some(0) {
+        Ok(String::from_utf8_lossy(&exit.stdout).into_owned())
+    } else {
+        Err(String::from_utf8_lossy(&exit.stderr).trim().to_owned())
+    }
 }
 
 /// A test to run: in the worktree `dir`, its process file and log `pid_file` and `log` (paths

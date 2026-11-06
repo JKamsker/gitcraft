@@ -192,8 +192,8 @@ pub(super) fn parallel_bisect(ui: &mut Ui, enter: bool, form: &mut ParallelForm)
     );
     ui.label(
         RichText::new(
-            "As git bisect run: exit code 0 is good, 125 skips, any other up to 127 is bad, \
-             128 or more stops the bisect.",
+            "As git bisect run: exit code 0 is good, 125 skips, any other up to 127 is bad. \
+             128 or more (a crash) stops the bisect on an end, and skips any other commit.",
         )
         .small()
         .color(t.text_faint),

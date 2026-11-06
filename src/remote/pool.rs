@@ -115,7 +115,10 @@ impl Pool {
             {
                 return Err(why.clone());
             }
-            let wait_for_first = connected == 0 && state.connecting > 0;
+            // Tests open their connections one at a time: ssh servers drop new ones at random
+            // past a few being made at once (`MaxStartups`), and a parallel bisect asks for many.
+            let one_at_a_time = connected == 0 || lane == Lane::Test;
+            let wait_for_first = one_at_a_time && state.connecting > 0;
             if !wait_for_first && state.open < lane.max() {
                 state.open += 1;
                 state.connecting += 1;

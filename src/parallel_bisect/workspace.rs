@@ -8,7 +8,8 @@
 //! (or the tab opens).
 
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, PoisonError};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use super::machine::Machine;
 use super::runner;
@@ -22,14 +23,21 @@ const FOLDER: &str = "gitcraft-bisect";
 const RUNS: &str = ".cache/gitcraft/bisect";
 
 /// What says the folder is in use: `gitcraft <process> <unix seconds>`, rewritten every
-/// [`super::session::HEARTBEAT`] while the bisect runs.
+/// [`HEARTBEAT`] while the bisect runs.
 const OWNER: &str = "owner";
+
+/// How often the owner is rewritten.
+const HEARTBEAT: std::time::Duration = std::time::Duration::from_secs(20);
 
 /// A folder whose owner wasn't rewritten for this long is a crashed bisect's.
 const STALE_AFTER: i64 = 90;
 
 /// The most history sent to another machine in one go (through its shell).
 const MAX_SEND: usize = 256 << 20;
+
+/// Numbers the bundles made in this process, so that two bisects sending at once never share a
+/// ref.
+static SENDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// The folders of the bisects running in this process.
 static ACTIVE: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
@@ -44,6 +52,8 @@ pub struct Workspace {
     pub base_there: String,
     /// Held while a worktree is added.
     adding: Mutex<()>,
+    /// The thread saying the folder is in use runs while this holds.
+    beating: Arc<AtomicBool>,
     closed: bool,
 }
 
@@ -71,6 +81,7 @@ impl Workspace {
             base,
             base_there,
             adding: Mutex::new(()),
+            beating: Arc::default(),
             closed: false,
         };
         ws.clear()?;
@@ -81,8 +92,26 @@ impl Workspace {
                 ws.machine.label()
             )
         })?;
-        ws.heartbeat();
+        ws.keep_beating();
         Ok(ws)
+    }
+
+    /// Says the folder is in use now and every [`HEARTBEAT`] until it is closed, from a thread
+    /// of its own: through every step (sending the commits, reading the range, the rounds).
+    fn keep_beating(&self) {
+        self.beating.store(true, Ordering::Relaxed);
+        let (beating, owner) = (Arc::clone(&self.beating), remote::join(&self.base, OWNER));
+        std::thread::spawn(move || {
+            let mut last: Option<std::time::Instant> = None;
+            while beating.load(Ordering::Relaxed) {
+                if last.is_none_or(|at| at.elapsed() >= HEARTBEAT) {
+                    last = Some(std::time::Instant::now());
+                    let line = format!("gitcraft {} {}\n", std::process::id(), git::now());
+                    let _ = remote::write(&owner, line.as_bytes());
+                }
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
+        });
     }
 
     /// Worktree `n`'s folder: as the app names it, and as a path there.
@@ -98,12 +127,6 @@ impl Workspace {
     pub fn adding<T>(&self, add: impl FnOnce() -> T) -> T {
         let _held = self.adding.lock().unwrap_or_else(PoisonError::into_inner);
         add()
-    }
-
-    /// Says the folder is still in use (see [`OWNER`]).
-    pub fn heartbeat(&self) {
-        let owner = format!("gitcraft {} {}\n", std::process::id(), git::now());
-        let _ = remote::write(&remote::join(&self.base, OWNER), owner.as_bytes());
     }
 
     /// Sends the commits `wanted` (and their history) to the repository there, when it is not
@@ -166,15 +189,20 @@ impl Workspace {
     /// Takes away everything a bisect made there: stops its tests that still run, removes its
     /// worktrees and its folder, and its refs.
     fn clear(&self) -> Result<(), String> {
-        runner::shell(&self.repo, CLEAR, &[&self.base_there, runner::STOP_SCRIPT])
-            .map(|_| ())
-            .map_err(|e| {
-                format!(
-                    "could not clear {} on {}: {e}",
-                    self.base_there,
-                    self.machine.label()
-                )
-            })
+        let pid = std::process::id().to_string();
+        runner::shell(
+            &self.repo,
+            CLEAR,
+            &[&self.base_there, runner::STOP_SCRIPT, &pid],
+        )
+        .map(|_| ())
+        .map_err(|e| {
+            format!(
+                "could not clear {} on {}: {e}",
+                self.base_there,
+                self.machine.label()
+            )
+        })
     }
 
     /// Clears what the bisect made (once; dropping it does the same).
@@ -182,6 +210,7 @@ impl Workspace {
         if std::mem::replace(&mut self.closed, true) {
             return Ok(());
         }
+        self.beating.store(false, Ordering::Relaxed);
         let cleared = self.clear();
         release(&self.base);
         cleared
@@ -199,12 +228,15 @@ fn refuse_if_in_use(base: &Path, machine: &Machine) -> Result<(), String> {
     let Ok(owner) = remote::read_to_string(&remote::join(base, OWNER)) else {
         return Ok(());
     };
+    let ours = owner.split_whitespace().nth(1) == Some(std::process::id().to_string().as_str());
     let at: i64 = owner
         .split_whitespace()
         .nth(2)
         .and_then(|w| w.parse().ok())
         .unwrap_or(0);
-    if git::now() - at < STALE_AFTER {
+    // This process's own (claimed by none of its bisects, or `claim` would have refused):
+    // left by one whose clean-up failed.
+    if !ours && git::now() - at < STALE_AFTER {
         return Err(format!(
             "another gitcraft window is running a parallel bisect in this repository on {}; \
              cancel it there first",
@@ -234,6 +266,7 @@ pub fn clear_leftovers(repo: &Path) {
         base,
         base_there,
         adding: Mutex::new(()),
+        beating: Arc::default(),
         closed: false,
     };
     let _ = ws.close();
@@ -253,7 +286,11 @@ pub fn base_for(repo: &Path, machine: &Machine) -> Result<(PathBuf, String), Str
 }
 
 /// What [`Workspace::clear`] runs in the repository there, `$1` the folder, `$2` the script
-/// that stops a test by its process file. Only a folder named so is ever removed.
+/// that stops a test by its process file, `$3` this process's number. Only a folder named so is
+/// ever removed, and only the worktrees in it: never `git worktree prune`, which would also
+/// forget the user's own worktrees whose folder is away (an unmounted drive). The refs it takes
+/// away are the commits sent there, and those a crashed gitcraft made to send some (not this
+/// one's, which another bisect of it may be sending right now).
 const CLEAR: &str = r#"b=$1
 case $b in */.cache/gitcraft/bisect/run-*) ;; *) echo "gitcraft: $b is no bisect folder" >&2; exit 1;; esac
 if [ -d "$b" ]; then
@@ -265,9 +302,12 @@ git worktree list --porcelain | sed -n 's/^worktree //p' | while IFS= read -r w;
   case $w in "$b"/*) git worktree remove --force --force "$w" >/dev/null 2>&1;; esac
 done
 rm -rf "$b"
-git worktree prune
+c=$(git rev-parse --git-common-dir) && for g in "$c"/worktrees/*/gitdir; do
+  [ -f "$g" ] || continue
+  case $(cat "$g") in "$b"/*) rm -rf "${g%/gitdir}";; esac
+done
 git for-each-ref --format='%(refname)' refs/gitcraft-bisect/ | while IFS= read -r r; do
-  git update-ref -d "$r"
+  case $r in refs/gitcraft-bisect/send-"$3"-*) ;; *) git update-ref -d "$r";; esac
 done
 true"#;
 
@@ -376,7 +416,10 @@ fn has_commit(repo: &Path, hash: &str) -> bool {
 /// refs it needs are made in `source` for a moment.
 fn bundle(source: &Path, with: &[String], without: &[String]) -> Result<Vec<u8>, String> {
     let names: Vec<String> = (0..with.len())
-        .map(|i| format!("refs/{FOLDER}/send-{}-{i}", std::process::id()))
+        .map(|i| {
+            let seq = SENDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            format!("refs/{FOLDER}/send-{}-{seq}-{i}", std::process::id())
+        })
         .collect();
     let made: Result<(), String> = names.iter().zip(with).try_for_each(|(name, hash)| {
         git::run(Some(source), &["update-ref", name, hash]).map(|_| ())

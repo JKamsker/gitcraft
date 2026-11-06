@@ -56,6 +56,11 @@ impl Machine {
     /// Its home folder, as a path there.
     pub fn home(&self) -> Result<String, String> {
         match self {
+            // On Windows, USERPROFILE: a HOME set by Git Bash (`/c/Users/me`) reads one way
+            // in git's `sh` and another in git itself.
+            Machine::Here if cfg!(windows) => std::env::var("USERPROFILE")
+                .or_else(|_| std::env::var("HOME"))
+                .map_err(|_| "could not find the home folder of this computer".to_owned()),
             Machine::Here => std::env::var("HOME")
                 .or_else(|_| std::env::var("USERPROFILE"))
                 .map_err(|_| "could not find the home folder of this computer".to_owned()),
