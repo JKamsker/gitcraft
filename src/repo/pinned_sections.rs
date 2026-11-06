@@ -156,7 +156,7 @@ fn header_row(
         theme::semibold(11.5),
         t.text_dim,
     );
-    painter.text(
+    let count = painter.text(
         pos2(rect.right() - 10.0, y),
         Align2::RIGHT_CENTER,
         header.count.to_string(),
@@ -164,7 +164,9 @@ fn header_row(
         t.text_faint,
     );
     if let Some(button) = placed.header.button.as_mut() {
-        let r = Rect::from_center_size(pos2(rect.right() - 36.0, y), vec2(20.0, 20.0));
+        // Left of the count, however many digits it has.
+        let x = (count.left() - 16.0).min(rect.right() - 36.0);
+        let r = Rect::from_center_size(pos2(x, y), vec2(20.0, 20.0));
         let b = ui
             .interact(r, placed.id.with("button"), Sense::click())
             .on_hover_text(button.tooltip);

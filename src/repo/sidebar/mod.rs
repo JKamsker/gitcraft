@@ -19,7 +19,6 @@ use crate::git::Branch;
 use crate::icons;
 use crate::theme::Tokens;
 
-pub(super) use pull_requests::plain_branch_name;
 pub(super) use remotes::{remote_of, remote_short};
 // For the stash menu of the graph and the detail pane, and the banner's Pop and Apply: by the
 // stash itself, not its number, which moves.

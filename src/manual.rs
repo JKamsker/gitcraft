@@ -69,7 +69,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",
             "Right-click a pull request and choose Open in worktree to work on its branch in a worktree of its own, made for it when there is none.",
-            "Start work from an issue (Ctrl+P, or the button on the pull requests' header) lists the open issues assigned to you on GitHub, GitLab, Forgejo or Gitea; pick one for a branch named after it (42-fix-login-crash), here or in a new worktree. While it is checked out, a card above the graph keeps the issue's acceptance criteria (or its task list, or its description) in view, and its pull request starts with the issue's title and Closes #42.",
+            "Start work from an issue (Ctrl+P, or the button on the pull requests' header) lists the open issues assigned to you on GitHub, GitLab, Forgejo or Gitea; pick one for a branch named after it (42-fix-login-crash) from the remote's default branch, here or in a new worktree. While it is checked out, a card above the graph keeps the issue's acceptance criteria (or its task list, or its description) in view as of the day it was read, and its pull request (merge request, on GitLab) starts with the issue's title and Closes #42.",
             "A terminal panel with tabs, in the repository's folder.",
         ],
     ),

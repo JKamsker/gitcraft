@@ -1,12 +1,21 @@
-//! The issues assigned to the person `gh` is signed in as, to start work from.
+//! The issues assigned to the person `gh` is signed in as, to start work from, and one of them
+//! read again.
 
 use std::path::Path;
 
 use serde_json::Value;
 
-use super::{TOOL, gh};
-use crate::forge::Issue;
+use super::TOOL;
+use crate::forge::{Issue, cli};
 use crate::pull_request::{at, items};
+
+/// What the fields asked of `gh` are.
+const FIELDS: &str = "number,title,body,url,labels";
+
+/// `gh`, for issues: what it says when it isn't installed is about them.
+fn gh(repo: &Path, args: &[&str]) -> Result<String, String> {
+    cli::run(TOOL, "issue", repo, args)
+}
 
 /// The open issues assigned to `@me`: the account `gh` is signed in to for this host.
 pub(super) fn assigned(repo: &Path) -> Result<Vec<Issue>, String> {
@@ -20,12 +29,23 @@ pub(super) fn assigned(repo: &Path) -> Result<Vec<Issue>, String> {
             "--state",
             "open",
             "--limit",
-            "100",
+            &crate::forge::ISSUES_MAX.to_string(),
             "--json",
-            "number,title,body,url,labels",
+            FIELDS,
         ],
     )?;
     parse(&out)
+}
+
+/// Issue `number` as it is now.
+pub(super) fn one(repo: &Path, number: u64) -> Result<Issue, String> {
+    let out = gh(
+        repo,
+        &["issue", "view", &number.to_string(), "--json", FIELDS],
+    )?;
+    let value: Value =
+        serde_json::from_str(&out).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
+    parse_issue(&value).ok_or_else(|| format!("unexpected {TOOL} output: not an issue"))
 }
 
 fn parse(json: &str) -> Result<Vec<Issue>, String> {
@@ -34,22 +54,21 @@ fn parse(json: &str) -> Result<Vec<Issue>, String> {
     let list = value
         .as_array()
         .ok_or_else(|| format!("unexpected {TOOL} output: not a list of issues"))?;
-    Ok(list
-        .iter()
-        .filter_map(|item| {
-            Some(Issue {
-                number: item.get("number").and_then(Value::as_u64)?,
-                title: at(item, "/title").to_owned(),
-                body: at(item, "/body").to_owned(),
-                url: at(item, "/url").to_owned(),
-                labels: items(item, "/labels")
-                    .iter()
-                    .map(|label| at(label, "/name").to_owned())
-                    .filter(|name| !name.is_empty())
-                    .collect(),
-            })
-        })
-        .collect())
+    Ok(list.iter().filter_map(parse_issue).collect())
+}
+
+fn parse_issue(item: &Value) -> Option<Issue> {
+    Some(Issue {
+        number: item.get("number").and_then(Value::as_u64)?,
+        title: at(item, "/title").to_owned(),
+        body: at(item, "/body").to_owned(),
+        url: at(item, "/url").to_owned(),
+        labels: items(item, "/labels")
+            .iter()
+            .map(|label| at(label, "/name").to_owned())
+            .filter(|name| !name.is_empty())
+            .collect(),
+    })
 }
 
 #[cfg(test)]

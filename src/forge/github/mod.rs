@@ -81,6 +81,10 @@ impl Provider for GitHub {
         issues::assigned(repo)
     }
 
+    fn issue(&self, repo: &Path, _: &Hosting, number: u64) -> Result<Issue, String> {
+        issues::one(repo, number)
+    }
+
     /// The authors' GitHub accounts, from the repository's latest commits (the API ties each
     /// commit to the account its email belongs to). Through `gh` when it's installed (private
     /// repositories, higher limits), else GitHub's public API.

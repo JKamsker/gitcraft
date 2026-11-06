@@ -116,6 +116,10 @@ pub struct PullRequest {
     pub draft: bool,
 }
 
+/// How many of the issues assigned to you are listed at most: the list says when it may have
+/// more.
+pub(crate) const ISSUES_MAX: usize = 100;
+
 /// An open issue assigned to the person signed in, to start work from.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Issue {
@@ -158,6 +162,14 @@ pub trait Provider: Sync {
     /// The open issues of the repository assigned to the person signed in.
     fn assigned_issues(&self, _repo: &Path, _hosting: &Hosting) -> Result<Vec<Issue>, String> {
         Err(format!("gitcraft can't list {}'s issues", self.name()))
+    }
+
+    /// Issue `number` of the repository as it is now, to read its description again.
+    fn issue(&self, _repo: &Path, _hosting: &Hosting, number: u64) -> Result<Issue, String> {
+        Err(format!(
+            "gitcraft can't read {}'s issue #{number}",
+            self.name()
+        ))
     }
 
     /// The page of one pull request, if gitcraft has one for this forge.
