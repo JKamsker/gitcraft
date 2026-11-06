@@ -71,6 +71,8 @@ pub(crate) enum Action {
     /// Open a worktree the way the settings say: in this tab, or in its own.
     OpenWorktree(PathBuf),
     ToggleTerminal,
+    /// Pop a view out into its own window, or bring it back.
+    Popout(super::popout::Request),
     /// Collapse or bring back the branches panel.
     ToggleBranches,
     /// Open the branches panel at a section (by its key), or in its filter when `None`.
@@ -363,6 +365,7 @@ impl RepoTab {
                 Action::OpenInEditor(PathBuf::new()),
             ),
         ]);
+        items.extend(super::popout::palette_items());
         if let Some(url) = self.web_page() {
             items.push((
                 "Open in browser".into(),

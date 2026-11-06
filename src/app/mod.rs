@@ -521,6 +521,12 @@ impl eframe::App for App {
             self.close_current_worktree(&ctx);
         }
 
+        // Views popped out of any tab keep their windows, the tab shown or not.
+        for tab in &mut self.tabs {
+            if let Tab::Repo(r) = tab {
+                r.popouts_ui(&ctx);
+            }
+        }
         self.active_tab_ui(ui, &t);
         self.clone_dialog(&ctx);
         self.remote_dialog(&ctx);

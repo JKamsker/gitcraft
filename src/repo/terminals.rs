@@ -75,7 +75,8 @@ impl RepoTab {
     /// The bottom panel: terminal tabs and the active shell.
     pub(super) fn terminal_panel(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
-        widgets::terminal_tabs(ui, &self.terminals, self.active_terminal, acts);
+        let popped = !self.docked(super::popout::Panel::Terminal);
+        widgets::terminal_tabs(ui, &self.terminals, self.active_terminal, popped, acts);
         if let Some(err) = &self.terminal_error {
             ui.add_space(8.0);
             ui.horizontal(|ui| {

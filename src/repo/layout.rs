@@ -3,6 +3,7 @@
 
 use egui::{Key, Ui};
 
+use super::popout::Panel;
 use super::{Action, RepoTab, pr_review, widgets};
 use crate::icons;
 use crate::settings::Settings;
@@ -33,7 +34,7 @@ impl RepoTab {
             )
             .show(ui, |ui| self.toolbar(ui, &mut acts));
         self.side_panels(ui, &mut acts);
-        if self.terminal_open {
+        if self.terminal_open && self.docked(Panel::Terminal) {
             egui::Panel::bottom("repo_terminal")
                 .resizable(true)
                 .default_size(260.0)
@@ -48,13 +49,16 @@ impl RepoTab {
                     self.conflict_view(ui, &mut acts);
                 } else if self.rebase.is_some() {
                     self.rebase_view(ui, &mut acts);
-                } else if self.diff.is_some() && !self.history_beside_diff() {
+                } else if self.diff.is_some()
+                    && !self.history_beside_diff()
+                    && self.docked(Panel::Diff)
+                {
                     self.diff_view(ui, &mut acts);
                 } else if self.file_view.is_some() {
                     self.file_view(ui, &mut acts);
-                } else if self.ci_view.is_some() {
+                } else if self.ci_view.is_some() && self.docked(Panel::Ci) {
                     self.ci_view_ui(ui, &mut acts);
-                } else if self.pr_view.is_some() {
+                } else if self.pr_view.is_some() && self.docked(Panel::Pr) {
                     self.pr_view_ui(ui, &mut acts);
                 } else {
                     self.graph_view(ui, &mut acts);
@@ -234,7 +238,7 @@ impl RepoTab {
 }
 
 /// F7 or Alt+↓ for the next change of a diff (`1`), Shift+F7 or Alt+↑ for the previous one.
-fn change_step(i: &egui::InputState) -> Option<i32> {
+pub(super) fn change_step(i: &egui::InputState) -> Option<i32> {
     let alt = i.modifiers.alt && !i.modifiers.command;
     if (i.key_pressed(Key::F7) && !i.modifiers.shift) || (alt && i.key_pressed(Key::ArrowDown)) {
         Some(1)

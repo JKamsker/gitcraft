@@ -70,6 +70,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",
             "Right-click a pull request and choose Open in worktree to work on its branch in a worktree of its own, made for it when there is none.",
             "A terminal panel with tabs, in the repository's folder.",
+            "The pop-out button in the header of a diff, the terminal, a pull request or the CI view (or Pop out the view shown / Pop out the terminal in the command palette) moves it into a window of its own, say on another monitor; the main window goes back to the graph. It works there as before and stays open while you switch tabs. Closing that window, or its Bring back button, puts the view back; closing the view (Esc, its ×) closes the window too.",
         ],
     ),
 ];
