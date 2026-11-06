@@ -200,14 +200,15 @@ impl<'a> Rows<'a> {
                 .pointer_hits
                 .iter()
                 .find(|(_, over)| *over)
-                .or(self.pointer_hits.first())
                 .map(|&((i, side, _), _)| (i, side));
-            note_right_click(ui, path, hit);
+            if let Some(links) = self.links {
+                note_right_click(ui, links.id(), hit);
+            }
         }
         let links = self.links;
         copy_selection(ui, &text_drag, sel, &data.lines, &data.uncut, |ui| {
             if let Some(links) = links {
-                links.items(ui, &data.lines, sel, acts);
+                links.items(ui, (&data.lines, &data.header), sel, acts);
             }
         });
         sel

@@ -48,46 +48,87 @@ pub(super) fn link_lines(
     }
 }
 
-/// Where a right-click on the lines was, for their menu: the row and side.
-fn clicked_id(path: &str) -> egui::Id {
-    egui::Id::new(("diff_link_row", path))
+/// Where the last right-click on the lines was, for their menu: the row and side.
+fn clicked_id() -> egui::Id {
+    egui::Id::new("diff_link_row")
 }
 
-/// Notes the row right-clicked (`hit`), which the lines' menu links to when no text is selected.
-pub(super) fn note_right_click(ui: &Ui, path: &str, hit: Option<(usize, Side)>) {
-    if let Some(hit) = hit {
-        ui.data_mut(|d| d.insert_temp(clicked_id(path), hit));
-    }
+/// Notes the row right-clicked (`hit`; `None`: below the last line), which the lines' menu links
+/// to unless it is in the text selected. Each diff's rows are their own: what was noted for
+/// another one is dropped.
+pub(super) fn note_right_click(ui: &Ui, diff: egui::Id, hit: Option<(usize, Side)>) {
+    ui.data_mut(|d| match hit {
+        Some(hit) => {
+            d.insert_temp(clicked_id(), (diff, hit));
+        }
+        None => d.remove::<(egui::Id, (usize, Side))>(clicked_id()),
+    });
 }
 
 impl LineLinks<'_> {
-    /// The menu's entries for the selected rows (`sel`), else the one right-clicked.
+    /// Which diff these are the links of, for the row right-clicked in it.
+    pub(super) fn id(&self) -> egui::Id {
+        egui::Id::new(("diff_links", &self.path, &self.new, &self.old))
+    }
+
+    /// The menu's entries for the row right-clicked, or the rows selected when it is one of
+    /// them. `header`: the patch's, which names a renamed file's old path.
     pub(super) fn items(
         &self,
         ui: &mut Ui,
-        lines: &[DiffLine],
+        (lines, header): (&[DiffLine], &str),
         sel: Option<TextSel>,
         acts: &mut Vec<Action>,
     ) {
-        let rows = match sel {
-            Some(sel) => Some((sel.rows(), sel.side)),
-            None => ui
-                .data(|d| d.get_temp::<(usize, Side)>(clicked_id(&self.path)))
-                .map(|(i, side)| ((i, i), side)),
-        };
+        let clicked = ui
+            .data(|d| d.get_temp::<(egui::Id, (usize, Side))>(clicked_id()))
+            .filter(|(diff, _)| *diff == self.id())
+            .map(|(_, hit)| hit);
+        let rows = rows_to_link(sel.map(|s| (s.rows(), s.side)), clicked);
         let Some((old, picked)) = rows.and_then(|(rows, side)| link_lines(lines, rows, side))
         else {
             return;
         };
         let Some(menu) = (self.menu)() else { return };
         ui.separator();
-        let rev = if old { &self.old } else { &self.new };
-        let target = Target::File {
-            rev: rev.clone(),
-            path: self.path.clone(),
-            lines: Some(picked),
+        let target = self.target(old, picked, header);
+        let what = if old {
+            format!("{} (before the change)", picked.label())
+        } else {
+            picked.label()
         };
-        menu.items(ui, &picked.label(), &target, acts);
+        menu.items(ui, &what, &target, acts);
+    }
+}
+
+impl LineLinks<'_> {
+    /// The file lines `picked` are of: before the change (`old`) under the name the patch's
+    /// `header` says it was renamed from, if it was.
+    fn target(&self, old: bool, picked: Lines, header: &str) -> Target {
+        let (rev, path) = if old {
+            let path = super::images::renamed_from(header).unwrap_or(&self.path);
+            (&self.old, path)
+        } else {
+            (&self.new, self.path.as_str())
+        };
+        Target::File {
+            rev: rev.clone(),
+            path: path.to_owned(),
+            lines: Some(picked),
+        }
+    }
+}
+
+/// The rows a link goes to: the row right-clicked (`clicked`), or the rows selected (`sel`)
+/// when it is one of them or nothing was right-clicked in this diff.
+fn rows_to_link(
+    sel: Option<((usize, usize), Side)>,
+    clicked: Option<(usize, Side)>,
+) -> Option<((usize, usize), Side)> {
+    match (sel, clicked) {
+        (Some(((a, b), side)), Some((i, _))) if (a..=b).contains(&i) => Some(((a, b), side)),
+        (_, Some((i, side))) => Some(((i, i), side)),
+        (sel, None) => sel,
     }
 }
 
@@ -176,6 +217,50 @@ mod tests {
                     last: 12
                 }
             ))
+        );
+    }
+
+    #[test]
+    fn a_right_click_outside_the_selection_links_its_own_row() {
+        let sel = Some(((3, 6), Side::Unified));
+        assert_eq!(rows_to_link(sel, Some((4, Side::Unified))), sel);
+        assert_eq!(
+            rows_to_link(sel, Some((9, Side::New))),
+            Some(((9, 9), Side::New))
+        );
+        assert_eq!(rows_to_link(sel, None), sel);
+        assert_eq!(
+            rows_to_link(None, Some((2, Side::Old))),
+            Some(((2, 2), Side::Old))
+        );
+        assert_eq!(rows_to_link(None, None), None);
+    }
+
+    #[test]
+    fn removed_lines_of_a_renamed_file_link_to_its_old_name() {
+        let menu = || None;
+        let links = LineLinks {
+            path: "new name.rs".into(),
+            new: "abc".into(),
+            old: "abc^".into(),
+            menu: &menu,
+        };
+        let header = "diff --git a/old.rs b/new name.rs\nsimilarity index 90%\n\
+                      rename from old.rs\nrename to new name.rs\n";
+        let picked = Lines { first: 2, last: 3 };
+        let file = |rev: &str, path: &str| Target::File {
+            rev: rev.into(),
+            path: path.into(),
+            lines: Some(picked),
+        };
+        assert_eq!(links.target(true, picked, header), file("abc^", "old.rs"));
+        assert_eq!(
+            links.target(false, picked, header),
+            file("abc", "new name.rs")
+        );
+        assert_eq!(
+            links.target(true, picked, "diff --git a/x b/x\n"),
+            file("abc^", "new name.rs")
         );
     }
 

@@ -57,11 +57,11 @@ fn github_links_from_ssh_and_https_remotes() -> Result<(), String> {
     );
     assert_eq!(
         url(&h, &file("src/main.rs", Lines::new(7, 7))),
-        format!("https://github.com/o/r/blob/{SHA}/src/main.rs#L7")
+        format!("https://github.com/o/r/blob/{SHA}/src/main.rs?plain=1#L7")
     );
     assert_eq!(
         url(&h, &file("src/main.rs", Lines::new(12, 3))),
-        format!("https://github.com/o/r/blob/{SHA}/src/main.rs#L3-L12")
+        format!("https://github.com/o/r/blob/{SHA}/src/main.rs?plain=1#L3-L12")
     );
     Ok(())
 }
@@ -80,11 +80,11 @@ fn gitlab_links_have_their_dash_and_ranges_without_a_second_l() -> Result<(), St
     );
     assert_eq!(
         url(&h, &file("a.txt", Lines::new(4, 9))),
-        format!("https://gitlab.com/group/sub/proj/-/blob/{SHA}/a.txt#L4-9")
+        format!("https://gitlab.com/group/sub/proj/-/blob/{SHA}/a.txt?plain=1#L4-9")
     );
     assert_eq!(
         url(&h, &file("a.txt", Lines::new(4, 4))),
-        format!("https://gitlab.com/group/sub/proj/-/blob/{SHA}/a.txt#L4")
+        format!("https://gitlab.com/group/sub/proj/-/blob/{SHA}/a.txt?plain=1#L4")
     );
     Ok(())
 }
@@ -108,7 +108,7 @@ fn forgejo_and_gitea_links() -> Result<(), String> {
         );
         assert_eq!(
             url(&h, &file("docs/a.md", Lines::new(1, 2))),
-            format!("{web}/o/r/src/commit/{SHA}/docs/a.md#L1-L2")
+            format!("{web}/o/r/src/commit/{SHA}/docs/a.md?display=source#L1-L2")
         );
     }
     Ok(())
@@ -170,7 +170,9 @@ fn paths_and_branches_are_percent_encoded() -> Result<(), String> {
     );
     assert_eq!(
         url(&h, &file("ünï/日本.txt", Lines::new(2, 3))),
-        format!("https://github.com/o/r/blob/{SHA}/%C3%BCn%C3%AF/%E6%97%A5%E6%9C%AC.txt#L2-L3")
+        format!(
+            "https://github.com/o/r/blob/{SHA}/%C3%BCn%C3%AF/%E6%97%A5%E6%9C%AC.txt?plain=1#L2-L3"
+        )
     );
     assert_eq!(
         url(&h, &file("100%/a+b(c)@d.rs", None)),
@@ -188,7 +190,7 @@ fn a_long_path_and_huge_line_numbers_stay_whole() -> Result<(), String> {
     let h = hosting("git@github.com:o/r.git", None)?;
     let deep = vec!["d"; 500].join("/");
     let link = url(&h, &file(&deep, Lines::new(1, u32::MAX)));
-    assert!(link.ends_with(&format!("/{deep}#L1-L{}", u32::MAX)));
+    assert!(link.ends_with(&format!("/{deep}?plain=1#L1-L{}", u32::MAX)));
     Ok(())
 }
 

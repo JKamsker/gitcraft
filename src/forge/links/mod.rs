@@ -73,9 +73,9 @@ pub enum Place<'a> {
 ///
 /// | | commit | branch | file at a commit | lines |
 /// |---|---|---|---|---|
-/// | GitHub | `/commit/<sha>` | `/tree/<branch>` | `/blob/<sha>/<path>` | `#L3-L5` |
-/// | GitLab | `/-/commit/<sha>` | `/-/tree/<branch>` | `/-/blob/<sha>/<path>` | `#L3-5` |
-/// | Forgejo, Gitea | `/commit/<sha>` | `/src/branch/<branch>` | `/src/commit/<sha>/<path>` | `#L3-L5` |
+/// | GitHub | `/commit/<sha>` | `/tree/<branch>` | `/blob/<sha>/<path>` | `?plain=1#L3-L5` |
+/// | GitLab | `/-/commit/<sha>` | `/-/tree/<branch>` | `/-/blob/<sha>/<path>` | `?plain=1#L3-5` |
+/// | Forgejo, Gitea | `/commit/<sha>` | `/src/branch/<branch>` | `/src/commit/<sha>/<path>` | `?display=source#L3-L5` |
 ///
 /// The repository's page is `hosting.web` and its path, which keeps a server's port and the
 /// folder it's installed under (`https://example.org/gitlab/group/repo`).
@@ -103,6 +103,12 @@ pub fn url(hosting: &Hosting, place: &Place) -> String {
             };
             let mut out = format!("{repo}{dash}/{blob}/{sha}/{}", encode_path(path));
             if let Some(lines) = lines {
+                // A Markdown file (or a notebook, CSV, SVG…) shows rendered, where a line's
+                // anchor goes nowhere: ask for its source.
+                out.push_str(match hosting.forge {
+                    Forge::GitHub | Forge::GitLab => "?plain=1",
+                    Forge::Forgejo | Forge::Gitea => "?display=source",
+                });
                 out.push_str(&anchor(hosting.forge, *lines));
             }
             out
