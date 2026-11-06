@@ -3,7 +3,8 @@
 
 use egui::{Context, RichText, Ui};
 
-use super::{Form, ReleaseAct, ReleaseView, Status, plan_of};
+use super::{Form, ReleaseAct, ReleaseView, Run, Status, plan_of};
+use crate::forge::Forge;
 use crate::release::{self, Draft};
 use crate::repo::{Action, RepoTab, short, widgets};
 use crate::theme::{self, Tokens};
@@ -20,13 +21,16 @@ impl RepoTab {
             .fill(t.card)
             .stroke(egui::Stroke::new(1.0, t.field_border))
             .corner_radius(t.radius_lg)
-            .inner_margin(egui::Margin::same(18));
+            .inner_margin(egui::Margin::same(18))
+            .shadow(ctx.global_style().visuals.window_shadow);
         let modal = egui::Modal::new(egui::Id::new("gitcraft-release"))
             .frame(frame)
             .backdrop_color(egui::Color32::from_black_alpha(110));
+        // What scrolls leaves room for the buttons below it, on a short window too.
+        let room = (ctx.content_rect().height() - 220.0).max(160.0);
         let response = modal.show(ctx, |ui| {
             ui.set_width(560.0);
-            contents(ui, view, forge, acts);
+            contents(ui, view, forge, room, acts);
         });
         if response.should_close() {
             acts.push(Action::Release(ReleaseAct::Close));
@@ -37,7 +41,8 @@ impl RepoTab {
 fn contents(
     ui: &mut Ui,
     view: &mut ReleaseView,
-    forge: Option<crate::forge::Forge>,
+    forge: Option<Forge>,
+    room: f32,
     acts: &mut Vec<Action>,
 ) {
     let t = Tokens::get(ui.ctx());
@@ -64,31 +69,34 @@ fn contents(
         ),
         None => "No release before it: every commit up to it".to_owned(),
     };
-    ui.label(RichText::new(format!("Of {} · {since}", short(&draft.commit))).color(t.text_dim));
+    ui.label(
+        RichText::new(format!("Release of {} · {since}", short(&draft.commit))).color(t.text_dim),
+    );
     ui.add_space(8.0);
     let started = view.run.is_some();
-    ui.add_enabled_ui(!started, |ui| form(ui, &draft, &mut view.form, acts));
+    let plan = plan_of(&draft, &view.form);
+    let problem = release::tag_problem(&plan.tag, &draft.tags).or_else(|| {
+        (plan.bump.as_ref().is_some_and(|b| !b.manifests.is_empty())
+            && release::version::Version::parse(&plan.tag).is_none())
+        .then(|| "Moving the version in the files needs a version like v1.3.0".to_owned())
+    });
+    egui::ScrollArea::vertical()
+        .max_height(room)
+        .auto_shrink([false, true])
+        .show(ui, |ui| {
+            ui.add_enabled_ui(!started, |ui| form(ui, &draft, &mut view.form, forge, acts));
+            ui.add_space(8.0);
+            match &view.run {
+                None => preview(ui, &plan, forge),
+                Some(run) => steps(ui, run),
+            }
+        });
     ui.add_space(8.0);
     match &view.run {
         None => {
-            let plan = plan_of(&draft, &view.form);
-            let problem = release::tag_problem(&plan.tag, &draft.tags);
-            heading(ui, "WHAT IT WILL DO");
-            for (i, (_, text)) in plan.preview(forge).iter().enumerate() {
-                ui.add(egui::Label::new(format!("{}. {text}", i + 1)).wrap());
-            }
-            ui.label(
-                RichText::new(
-                    "Ctrl+Z takes the version commit and the tag back off here; what was pushed \
-                     and the release on the forge stay (delete them there).",
-                )
-                .color(t.text_faint)
-                .small(),
-            );
             if let Some(p) = &problem {
                 ui.colored_label(t.warning, p);
             }
-            ui.add_space(10.0);
             ui.horizontal(|ui| {
                 if widgets::primary_button(ui, "Cut release", problem.is_none(), 110.0).clicked() {
                     acts.push(Action::Release(ReleaseAct::Run));
@@ -97,26 +105,6 @@ fn contents(
             });
         }
         Some(run) => {
-            heading(ui, "STEPS");
-            for (step, status) in &run.steps {
-                let (mark, color) = match status {
-                    Status::Waiting => ("·", t.text_faint),
-                    Status::Running => ("…", t.text_dim),
-                    Status::Done => ("✔", t.success),
-                    Status::Failed(_) => ("✖", t.danger),
-                };
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new(mark).color(color));
-                    ui.label(step.label());
-                });
-                if let Status::Failed(e) = status {
-                    ui.add(egui::Label::new(RichText::new(e).color(t.danger).small()).wrap());
-                }
-            }
-            if let Some(url) = &run.done.url {
-                ui.hyperlink_to(format!("The release: {url}"), url);
-            }
-            ui.add_space(10.0);
             let running = run.running();
             let failed = run
                 .steps
@@ -130,6 +118,17 @@ fn contents(
                 {
                     acts.push(Action::Release(ReleaseAct::Run));
                 }
+                if failed
+                    && ui
+                        .add_enabled(!running, egui::Button::new("Skip this step"))
+                        .on_hover_text(
+                            "Goes on without it (done by hand, or not wanted): Resume then runs \
+                             the steps after it",
+                        )
+                        .clicked()
+                {
+                    acts.push(Action::Release(ReleaseAct::Skip));
+                }
                 if running {
                     ui.add(crate::spinner::Spinner::new());
                 }
@@ -139,18 +138,82 @@ fn contents(
     }
 }
 
-/// The choices.
-fn form(ui: &mut Ui, draft: &Draft, form: &mut Form, acts: &mut Vec<Action>) {
+/// What the release will do, before it runs.
+fn preview(ui: &mut Ui, plan: &release::Plan, forge: Option<Forge>) {
     let t = Tokens::get(ui.ctx());
+    heading(ui, "WHAT IT WILL DO");
+    for (i, (_, text)) in plan.preview(forge).iter().enumerate() {
+        ui.add(egui::Label::new(format!("{}. {text}", i + 1)).wrap());
+    }
+    ui.label(
+        RichText::new(
+            "Ctrl+Z takes the version commit and the tag back off here; what was pushed and the \
+             release on the forge stay (delete them there).",
+        )
+        .color(t.text_faint)
+        .small(),
+    );
+}
+
+/// The steps as they went.
+fn steps(ui: &mut Ui, run: &Run) {
+    let t = Tokens::get(ui.ctx());
+    heading(ui, "STEPS");
+    for (step, status) in &run.steps {
+        let (mark, color) = match status {
+            Status::Waiting => ("·", t.text_faint),
+            Status::Running => ("…", t.text_dim),
+            Status::Done => ("✔", t.success),
+            Status::Skipped => ("–", t.text_faint),
+            Status::Failed(_) => ("✖", t.danger),
+        };
+        ui.horizontal(|ui| {
+            ui.label(RichText::new(mark).color(color));
+            ui.label(step.label());
+            if *status == Status::Skipped {
+                ui.label(RichText::new("skipped").color(t.text_faint).small());
+            }
+        });
+        if let Status::Failed(e) = status {
+            egui::ScrollArea::vertical()
+                .id_salt("release-error")
+                .max_height(120.0)
+                .show(ui, |ui| {
+                    ui.add(egui::Label::new(RichText::new(e).color(t.danger).small()).wrap());
+                });
+        }
+    }
+    if let Some(url) = &run.done.url {
+        ui.hyperlink_to(format!("The release: {url}"), url);
+    }
+}
+
+/// The choices.
+fn form(ui: &mut Ui, draft: &Draft, form: &mut Form, forge: Option<Forge>, acts: &mut Vec<Action>) {
+    let t = Tokens::get(ui.ctx());
+    let gitlab = forge == Some(Forge::GitLab);
+    if gitlab {
+        form.prerelease = false;
+    }
     ui.horizontal(|ui| {
         ui.label(RichText::new("Version").color(t.text_dim));
         ui.add(egui::TextEdit::singleline(&mut form.tag).desired_width(140.0))
             .on_hover_text("The tag; suggested from the Conventional Commits since the last one");
-        ui.checkbox(&mut form.prerelease, "Pre-release");
+        ui.add_enabled(
+            !gitlab && form.publish,
+            egui::Checkbox::new(&mut form.prerelease, "Pre-release"),
+        )
+        .on_hover_text("The forge's release is marked a pre-release")
+        .on_disabled_hover_text(if gitlab {
+            "GitLab has no pre-releases"
+        } else {
+            "For the forge's release: tick Make the release on the forge"
+        });
     });
     ui.add_space(4.0);
     ui.label(RichText::new("Notes (Markdown)").color(t.text_dim).small());
     egui::ScrollArea::vertical()
+        .id_salt("release-notes")
         .max_height(180.0)
         .show(ui, |ui| {
             ui.add(
@@ -188,17 +251,28 @@ fn form(ui: &mut Ui, draft: &Draft, form: &mut Form, acts: &mut Vec<Action>) {
         draft.remote.is_some(),
         egui::Checkbox::new(&mut form.push, push),
     );
+    let publish = match (forge, form.push) {
+        (None, _) => {
+            "Make the release on the forge (gitcraft doesn't know this repository's forge)"
+                .to_owned()
+        }
+        (Some(f), false) => format!("Make the release on {} (needs the push)", f.name()),
+        (Some(f), true) => format!("Make the release on {}", f.name()),
+    };
     ui.add_enabled(
-        form.push,
-        egui::Checkbox::new(&mut form.publish, "Make the release on the forge"),
+        form.push && forge.is_some(),
+        egui::Checkbox::new(&mut form.publish, publish),
     );
     if form.publish && form.push {
         ui.horizontal_wrapped(|ui| {
             for (i, file) in form.assets.iter().enumerate() {
-                let name = file
+                let mut name = file
                     .file_name()
                     .map(|n| n.to_string_lossy().into_owned())
                     .unwrap_or_default();
+                if name.chars().count() > 40 {
+                    name = name.chars().take(39).collect::<String>() + "…";
+                }
                 if ui
                     .button(format!("{name} ✖"))
                     .on_hover_text(format!("{}\nClick to leave it out", file.display()))
@@ -207,7 +281,11 @@ fn form(ui: &mut Ui, draft: &Draft, form: &mut Form, acts: &mut Vec<Action>) {
                     acts.push(Action::Release(ReleaseAct::RemoveAsset(i)));
                 }
             }
-            if ui.button("Attach files…").clicked() {
+            if ui
+                .button("Attach files…")
+                .on_hover_text("Files of this computer")
+                .clicked()
+            {
                 acts.push(Action::Release(ReleaseAct::AddAssets));
             }
         });

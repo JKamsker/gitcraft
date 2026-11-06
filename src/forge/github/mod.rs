@@ -95,6 +95,15 @@ impl Provider for GitHub {
         if new.prerelease {
             args.push("--prerelease");
         }
+        // Made already (a step that timed out after the forge made it, or a workflow of the
+        // tag's): that one.
+        if let Ok(url) = gh(
+            repo,
+            &["release", "view", new.tag, "--json", "url", "-q", ".url"],
+        ) && !url.trim().is_empty()
+        {
+            return Ok(url.trim().to_owned());
+        }
         gh_with_input(repo, &args, Some(new.notes)).map(|out| out.trim().to_owned())
     }
 

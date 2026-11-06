@@ -62,16 +62,33 @@ impl Provider for GitLab {
         hosting: &Hosting,
         new: &super::NewRelease,
     ) -> Result<String, String> {
-        self.run(
+        let url = format!("{}/{}/-/releases/{}", hosting.web, hosting.path, new.tag);
+        // Made already: that one.
+        if self.run(repo, &["release", "view", new.tag]).is_ok() {
+            return Ok(url);
+        }
+        // The notes from a file: a long history would not fit a command line.
+        let notes = std::env::temp_dir().join(format!(
+            "gitcraft-release-notes-{}-{}.md",
+            std::process::id(),
+            new.tag.replace(['/', '\\'], "-")
+        ));
+        std::fs::write(&notes, new.notes).map_err(|e| format!("Couldn't write the notes: {e}"))?;
+        let path = notes.to_string_lossy().into_owned();
+        let made = self.run(
             repo,
             &[
-                "release", "create", new.tag, "--name", new.title, "--notes", new.notes,
+                "release",
+                "create",
+                new.tag,
+                "--name",
+                new.title,
+                "--notes-file",
+                &path,
             ],
-        )?;
-        Ok(format!(
-            "{}/{}/-/releases/{}",
-            hosting.web, hosting.path, new.tag
-        ))
+        );
+        let _ = std::fs::remove_file(&notes);
+        made.map(|_| url)
     }
 
     fn upload_assets(
@@ -81,10 +98,16 @@ impl Provider for GitLab {
         tag: &str,
         files: &[std::path::PathBuf],
     ) -> Result<(), String> {
-        let paths = super::path_args(files);
-        let mut args = vec!["release", "upload", tag];
-        args.extend(paths.iter().map(String::as_str));
-        self.run(repo, &args).map(|_| ())
+        // One at a time: one sent already (a resumed upload) is passed over.
+        for path in super::path_args(files) {
+            match self.run(repo, &["release", "upload", tag, &path]) {
+                Err(e) if e.to_lowercase().contains("already") => {}
+                other => {
+                    other?;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// The host's own avatar API, asked by email.

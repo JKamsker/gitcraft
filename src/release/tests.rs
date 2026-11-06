@@ -34,6 +34,7 @@ fn project(name: &str) -> (PathBuf, PathBuf) {
     run(&dir, &["config", "user.name", "Zoë"]);
     run(&dir, &["config", "user.email", "zoe@example.org"]);
     run(&dir, &["config", "tag.gpgSign", "false"]);
+    run(&dir, &["config", "commit.gpgSign", "false"]);
     let cargo = "[package]\nname = \"app\"\nversion = \"1.2.3\"\nedition = \"2024\"\n";
     let lock = "version = 4\n\n[[package]]\nname = \"app\"\nversion = \"1.2.3\"\n";
     let _ = std::fs::write(dir.join("Cargo.lock"), lock);
@@ -101,6 +102,7 @@ fn plan_of(draft: &Draft, notes: &str) -> Plan {
         notes: notes.to_owned(),
         bump: Some(Bump {
             branch: "main".into(),
+            remote_ref: "refs/heads/main".into(),
             version: draft.suggested.number(),
             manifests: draft.manifests.clone(),
             changelog: true,
@@ -151,7 +153,7 @@ fn every_local_step_and_the_push() {
     assert!(message.contains("### Features"), "{message}");
     assert_eq!(subject.trim(), "chore(release): v1.3.0");
     assert_eq!(tagged.trim(), done.bump_commit.clone().unwrap_or_default());
-    assert_eq!(remote_tag, done.tag_object.clone().unwrap_or_default());
+    assert_eq!(remote_tag, done.tag_commit.clone().unwrap_or_default());
     assert_eq!(remote_main, tagged.trim());
     assert!(status.trim().is_empty(), "{status}");
 }
@@ -180,7 +182,7 @@ fn a_failed_push_can_be_resumed_from_where_it_stopped() {
         tag.is_ok() && push.is_err() && resumed.is_ok(),
         "{tag:?} {push:?} {resumed:?}"
     );
-    assert_eq!(remote, done.tag_object);
+    assert_eq!(remote, done.tag_commit);
     assert!(again.is_err());
 }
 
@@ -229,4 +231,62 @@ fn the_preview_says_every_step() {
     assert!(preview[0].1.contains("signed tag v2.0.0"));
     assert!(preview[2].1.contains("pre-release v2.0.0 on GitHub"));
     assert!(preview[3].1.contains("app.tar.gz"));
+}
+
+/// Changes made to a manifest after the release was planned are never written over, and the
+/// version commit goes where it was planned only.
+#[test]
+fn the_version_commit_refuses_changed_files_and_another_branch() {
+    let (dir, bare) = project("guards");
+    let draft = draft(&dir, "HEAD", Some("origin".into()));
+    let Ok(draft) = draft else { return };
+    let plan = plan_of(&draft, "notes");
+    let _ = std::fs::write(
+        dir.join("Cargo.toml"),
+        "[package]\nname = \"app\"\nversion = \"1.2.3\"\n# mine\n",
+    );
+    let changed = run_step(&dir, &plan, Step::Bump, &mut Done::default(), None, None);
+    let kept = std::fs::read_to_string(dir.join("Cargo.toml")).unwrap_or_default();
+    run(&dir, &["checkout", "-q", "--", "Cargo.toml"]);
+    run(&dir, &["checkout", "-q", "-b", "other"]);
+    let elsewhere = run_step(&dir, &plan, Step::Bump, &mut Done::default(), None, None);
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(&bare);
+    assert!(changed.is_err_and(|e| e.contains("changed since")));
+    assert!(kept.contains("# mine"));
+    assert!(elsewhere.is_err_and(|e| e.contains("isn't checked out")));
+}
+
+/// The push sends the version commit, not commits made on the branch after it.
+#[test]
+fn the_push_sends_the_version_commit_only() {
+    let (dir, bare) = project("push-commit");
+    let draft = draft(&dir, "HEAD", Some("origin".into()));
+    let Ok(draft) = draft else { return };
+    let plan = plan_of(&draft, "notes");
+    let mut done = Done::default();
+    let bumped = run_step(&dir, &plan, Step::Bump, &mut done, None, None);
+    let tagged = run_step(&dir, &plan, Step::Tag, &mut done, None, None);
+    commit(&dir, "later.txt", "later\n", "feat: later");
+    let pushed = run_step(&dir, &plan, Step::Push, &mut done, None, None);
+    let remote = git::resolve(&bare, "refs/heads/main").ok();
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(&bare);
+    assert!(
+        bumped.is_ok() && tagged.is_ok() && pushed.is_ok(),
+        "{pushed:?}"
+    );
+    assert_eq!(remote, done.bump_commit);
+}
+
+#[test]
+fn a_tag_that_isnt_a_version_isnt_taken_for_the_last_release() {
+    let (dir, bare) = project("not-a-version");
+    run(&dir, &["tag", "nightly"]);
+    let draft = draft(&dir, "HEAD", None);
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(&bare);
+    assert!(draft.is_ok_and(
+        |d| d.last_tag.as_deref() == Some("v1.2.3") && d.suggested.to_string() == "v1.3.0"
+    ));
 }

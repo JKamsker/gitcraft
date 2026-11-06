@@ -139,23 +139,23 @@ so your config, credentials and hooks apply as usual.
   the remote branch, or fetched from the forge for a fork that isn't a remote here.
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
 - _Cut release…_ (a commit's menu, or the palette for HEAD) suggests the next version from the
-  Conventional Commits since the last tag (`feat` a minor version, `!` or `BREAKING CHANGE` a
-  major one — a minor one before 1.0 —, anything else a patch; a release candidate becomes its
-  release; the tag's `v` or no `v` is kept) and drafts the notes, grouped by type (breaking
-  changes, features, bug fixes, performance, documentation, other) with links to the pull
-  requests they name, to edit. It can move the version in `Cargo.toml` (and `Cargo.lock`) and
-  `package.json` (and `package-lock.json`), changing nothing else in them, and add the notes on
-  top of `CHANGELOG.md`, in one commit, `chore(release): v1.3.0` (from the tip of the branch
-  checked out, with those files unchanged); make an annotated or signed tag whose message is the
-  notes (headings kept); push the commit and the tag at once (`--atomic`); and make the release
-  on the forge (`gh release create`, `glab release create`, Forgejo's and Gitea's API) with files
-  attached. The dialog says what each step will do before anything runs, then how each went;
-  a step that failed (a push refused, the forge unreachable) can be resumed from there, the
-  steps before it kept. Ctrl+Z takes the version commit and the tag back off here; what was
-  pushed and published stays.
-
-**Changes and commits** (right)
-
+  Conventional Commits since the last version tag (`v1.2.3` or `1.2.3`; other tags are passed
+  over): `feat` moves the minor version, `!` or `BREAKING CHANGE` the major one (the minor one
+  before 1.0), anything else the patch; a release candidate becomes its release; the tag's `v`
+  (or its absence) is kept. It drafts the notes, grouped by type (breaking changes, features, bug
+  fixes, performance, documentation, other), with links to the pull requests their summaries
+  name (`(#12)`), to edit. It can move the version in `Cargo.toml` (and the package's entry in
+  `Cargo.lock`) and `package.json` (and `package-lock.json`), changing nothing else in them, and
+  add the notes on top of `CHANGELOG.md`, in one commit, `chore(release): v1.3.0` (from the tip
+  of the branch checked out, with those files unchanged); make an annotated or signed tag whose
+  message is the notes (headings kept); push that commit to the branch's upstream and the tag,
+  both or neither (`--atomic`); and make the release on the forge (`gh release create`,
+  `glab release create`, Forgejo's and Gitea's API; pre-releases except on GitLab) with files
+  of this computer attached. The dialog says what each step will do before anything runs, then
+  how each went. A step that failed (a push refused, the forge unreachable) can be resumed from
+  there — a release or file the forge has already is kept, not made twice — or skipped; a push
+  that needs signing in asks. Ctrl+Z takes the version commit and the tag back off here (the
+  tag put back as it was on Ctrl+Y); what was pushed and published stays.
 - Conflicted / unstaged / staged lists with stage, unstage, discard and mark-resolved buttons,
   _Stage all_ / _Unstage all_; right-click a file to open it, open it in your editor, show it in
   its folder, see its history or blame, or ignore it (the file, its extension or its folder go

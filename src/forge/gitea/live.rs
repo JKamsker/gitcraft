@@ -693,9 +693,35 @@ fn release_with_a_file(
         "v1.0.0",
         std::slice::from_ref(&file),
     )?;
+    // Resumed: the same release, the file not attached twice.
+    let again = create_release(
+        &server.author(),
+        hosting,
+        &forge::NewRelease {
+            tag: "v1.0.0",
+            title: "v1.0.0",
+            notes: "other",
+            prerelease: true,
+        },
+    )?;
+    ensure!(again == url, "made again at {again}");
+    upload_assets(
+        &server.author(),
+        hosting,
+        "v1.0.0",
+        std::slice::from_ref(&file),
+    )?;
     let release = server
         .author()
         .get(&format!("repos/{}/releases/tags/v1.0.0", hosting.path))?;
+    ensure!(
+        release
+            .get("assets")
+            .and_then(serde_json::Value::as_array)
+            .map(Vec::len)
+            == Some(1),
+        "attached twice: {release}"
+    );
     ensure!(
         at(&release, "/body").contains("ü things")
             && release

@@ -42,6 +42,8 @@ pub(crate) struct Draft {
     pub sign: bool,
     /// The remote to push to.
     pub remote: Option<String>,
+    /// Where on it the branch goes (`refs/heads/main`).
+    pub remote_ref: Option<String>,
     /// The tags that exist, to refuse one again.
     pub tags: Vec<String>,
 }
@@ -56,7 +58,16 @@ pub(crate) fn draft(repo: &Path, commit: &str, remote: Option<String>) -> Result
     // over by git's own `--match` only loosely: checked here).
     let last_tag = git::run_ok_codes(
         Some(repo),
-        &["describe", "--tags", "--abbrev=0", &commit],
+        &[
+            "describe",
+            "--tags",
+            "--abbrev=0",
+            "--match",
+            "v[0-9]*",
+            "--match",
+            "[0-9]*",
+            &commit,
+        ],
         &[0, 128],
     )
     .ok()
@@ -113,6 +124,24 @@ pub(crate) fn draft(repo: &Path, commit: &str, remote: Option<String>) -> Result
         &[0, 1],
     )
     .is_ok_and(|v| v.trim() == "true");
+    let remote_ref = branch.as_deref().map(|b| {
+        let out = git::run(
+            Some(repo),
+            &[
+                "for-each-ref",
+                "--format=%(upstream:remotename)%00%(upstream:remoteref)",
+                &format!("refs/heads/{b}"),
+            ],
+        )
+        .unwrap_or_default();
+        let mut parts = out.trim().split('\0');
+        match (parts.next(), parts.next()) {
+            (Some(r), Some(dst)) if Some(r) == remote.as_deref() && !dst.is_empty() => {
+                dst.to_owned()
+            }
+            _ => format!("refs/heads/{b}"),
+        }
+    });
     let tags: Vec<String> = git::run(Some(repo), &["tag", "--list"])?
         .lines()
         .map(str::to_owned)
@@ -146,6 +175,7 @@ pub(crate) fn draft(repo: &Path, commit: &str, remote: Option<String>) -> Result
         changelog,
         sign,
         remote,
+        remote_ref,
         tags,
     })
 }
@@ -213,6 +243,9 @@ pub(crate) struct Plan {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Bump {
     pub branch: String,
+    /// The branch on the remote the version commit is pushed to (`refs/heads/main`): the
+    /// branch's upstream there, else the branch of its name.
+    pub remote_ref: String,
     /// The version written, without its prefix.
     pub version: String,
     pub manifests: Vec<(Kind, String)>,
@@ -302,15 +335,19 @@ impl Plan {
                         if self.sign { "-s" } else { "-a" },
                         self.tag
                     ),
-                    Step::Push => format!(
-                        "Pushes {}the tag to {} (git push --atomic)",
-                        if self.bump.is_some() {
-                            "the commit and "
-                        } else {
-                            ""
-                        },
-                        self.push.as_deref().unwrap_or_default()
-                    ),
+                    Step::Push => {
+                        let remote = self.push.as_deref().unwrap_or_default();
+                        match &self.bump {
+                            Some(b) => format!(
+                                "Pushes the version commit to {remote}'s {} and the tag to \
+                                 {remote}, both or neither (git push --atomic)",
+                                b.remote_ref
+                                    .strip_prefix("refs/heads/")
+                                    .unwrap_or(&b.remote_ref)
+                            ),
+                            None => format!("Pushes the tag to {remote}"),
+                        }
+                    }
                     Step::Publish => format!(
                         "Makes the {}release {} on {} with the notes",
                         if self.prerelease { "pre-" } else { "" },
@@ -349,8 +386,10 @@ impl Plan {
 pub(crate) struct Done {
     /// The version commit made.
     pub bump_commit: Option<String>,
-    /// The tag object made.
+    /// The tag object made (not the commit it points to).
     pub tag_object: Option<String>,
+    /// The commit the tag points to.
+    pub tag_commit: Option<String>,
     /// The URL of the release on the forge.
     pub url: Option<String>,
 }
@@ -389,7 +428,14 @@ pub(crate) fn run_step(
                     &target,
                 ],
             )?;
-            done.tag_object = Some(git::resolve(repo, &format!("refs/tags/{}", plan.tag))?);
+            let tag_ref = format!("refs/tags/{}", plan.tag);
+            // The tag object itself: putting it back on redo keeps the notes and signature.
+            done.tag_object = Some(
+                git::run(Some(repo), &["rev-parse", "--verify", &tag_ref])?
+                    .trim()
+                    .to_owned(),
+            );
+            done.tag_commit = Some(git::resolve(repo, &tag_ref)?);
         }
         Step::Push => {
             let remote = plan.push.as_deref().ok_or("no remote to push to")?;
@@ -399,8 +445,10 @@ pub(crate) fn run_step(
                 "--".to_owned(),
                 remote.to_owned(),
             ];
-            if let (Some(bump), Some(_)) = (&plan.bump, &done.bump_commit) {
-                args.push(format!("refs/heads/{0}:refs/heads/{0}", bump.branch));
+            // The version commit itself (not what the branch has become since), to the branch
+            // it goes to there.
+            if let (Some(bump), Some(commit)) = (&plan.bump, &done.bump_commit) {
+                args.push(format!("{commit}:{}", bump.remote_ref));
             }
             args.push(format!("refs/tags/{0}:refs/tags/{0}", plan.tag));
             let args: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -433,12 +481,69 @@ pub(crate) fn run_step(
 
 /// Writes the new version (and the notes in the changelog) and commits those files only.
 fn commit_bump(repo: &Path, plan: &Plan, bump: &Bump) -> Result<String, String> {
-    if git::head(repo) != plan.commit {
+    let checked_out = git::run_ok_codes(Some(repo), &["symbolic-ref", "-q", "HEAD"], &[0, 1])?;
+    if checked_out.trim() != format!("refs/heads/{}", bump.branch) || git::head(repo) != plan.commit
+    {
         return Err(format!(
-            "{} has moved since the release was planned: plan it again",
-            bump.branch
+            "{} isn't checked out at {} any more: plan the release again",
+            bump.branch,
+            crate::repo::short(&plan.commit)
         ));
     }
+    // Changes made to those files since the dialog opened are never written over.
+    let touched = bump_files(repo, bump);
+    let mut args = vec!["status", "--porcelain", "--"];
+    args.extend(touched.iter().map(String::as_str));
+    if !git::run(Some(repo), &args)?.trim().is_empty() {
+        return Err(format!(
+            "{} changed since the release was planned: commit or stash that first",
+            touched.join(", ")
+        ));
+    }
+    let written = write_bump(repo, plan, bump);
+    let files = match written {
+        Ok(files) => files,
+        Err(e) => {
+            restore(repo, &touched);
+            return Err(e);
+        }
+    };
+    let message = format!("chore(release): {}", plan.tag);
+    let mut args = vec!["commit", "-q", "-m", &message, "--"];
+    args.extend(files.iter().map(String::as_str));
+    if let Err(e) = git::run(Some(repo), &args) {
+        // A hook refused it: the files go back as they were.
+        restore(repo, &files);
+        return Err(e);
+    }
+    Ok(git::head(repo))
+}
+
+/// The files the version commit may change (those of them at HEAD).
+fn bump_files(repo: &Path, bump: &Bump) -> Vec<String> {
+    let mut files: Vec<String> = Vec::new();
+    for (kind, _) in &bump.manifests {
+        let (manifest, lock) = kind.files();
+        files.push(manifest.to_owned());
+        if git::file_at(repo, Some("HEAD"), lock).is_ok() {
+            files.push(lock.to_owned());
+        }
+    }
+    if bump.changelog {
+        files.push(CHANGELOG.to_owned());
+    }
+    files
+}
+
+/// Puts `files` back as they are at HEAD.
+fn restore(repo: &Path, files: &[String]) {
+    let mut args = vec!["checkout", "HEAD", "--"];
+    args.extend(files.iter().map(String::as_str));
+    let _ = git::run(Some(repo), &args);
+}
+
+/// Writes the new version and notes; the files written.
+fn write_bump(repo: &Path, plan: &Plan, bump: &Bump) -> Result<Vec<String>, String> {
     let mut files: Vec<String> = Vec::new();
     for (kind, old) in &bump.manifests {
         let (manifest, lock) = kind.files();
@@ -448,8 +553,9 @@ fn commit_bump(repo: &Path, plan: &Plan, bump: &Bump) -> Result<String, String> 
             .ok_or_else(|| format!("Couldn't find the version in {manifest}"))?;
         write(repo, manifest, &new)?;
         files.push(manifest.to_owned());
+        let names: Vec<String> = kind.own_name(&text).into_iter().collect();
         if let Ok(text) = read_at_head(repo, lock)
-            && let Some(new) = kind.bump_lock(&text, old, &bump.version)
+            && let Some(new) = kind.bump_lock(&text, &names, old, &bump.version)
             && new != text
         {
             write(repo, lock, &new)?;
@@ -465,11 +571,7 @@ fn commit_bump(repo: &Path, plan: &Plan, bump: &Bump) -> Result<String, String> 
         )?;
         files.push(CHANGELOG.to_owned());
     }
-    let message = format!("chore(release): {}", plan.tag);
-    let mut args = vec!["commit", "-q", "-m", &message, "--"];
-    args.extend(files.iter().map(String::as_str));
-    git::run(Some(repo), &args)?;
-    Ok(git::head(repo))
+    Ok(files)
 }
 
 fn read_at_head(repo: &Path, file: &str) -> Result<String, String> {
