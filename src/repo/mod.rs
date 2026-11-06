@@ -22,6 +22,7 @@ mod layout;
 mod load;
 mod messages;
 mod navigate;
+mod offline;
 mod operations;
 mod patches;
 mod pinned_sections;

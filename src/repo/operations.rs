@@ -36,6 +36,12 @@ impl RepoTab {
         if self.busy_op.is_some() {
             return;
         }
+        if let Some(why) = offline_refusal(&ops) {
+            if !quiet {
+                self.status = Some((format!("{label}: not started. {why}"), true));
+            }
+            return;
+        }
         self.busy_op = Some(label.to_owned());
         self.op_started = Some(Instant::now());
         self.note_checkout_move(&ops, ctx);
@@ -288,6 +294,21 @@ impl RepoTab {
             self.undo_stack.remove(0);
         }
     }
+}
+
+/// Why `ops` don't run now: one of them goes on the network, and offline mode is on.
+pub(super) fn offline_refusal(ops: &[Vec<String>]) -> Option<String> {
+    let pause = crate::network::refused()?;
+    let network = ops.iter().any(|op| {
+        let args: Vec<&str> = op.iter().map(String::as_str).collect();
+        git::goes_over_network(&args)
+    });
+    network.then(|| {
+        format!(
+            "{}: turn it off in the toolbar or Settings → Git.",
+            pause.why()
+        )
+    })
 }
 
 /// [`run_steps_counted`] without where it stopped.

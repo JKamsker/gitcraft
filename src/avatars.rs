@@ -20,6 +20,9 @@ enum State {
     /// The picture, and its cache key (which says where it came from).
     Ready(Arc<[u8]>, String),
     Missing,
+    /// Not in the cache, and not downloaded while gitcraft stays off the network (offline or
+    /// metered): asked for again once it may go on it, at this [`crate::network::resumed`].
+    Deferred(u64),
 }
 
 struct Avatars {
@@ -282,6 +285,9 @@ fn fetch(agent: &ureq::Agent, email: &str, hint: Option<&Hint>) -> State {
             return State::Missing;
         }
     }
+    if crate::network::background_paused().is_some() {
+        return State::Deferred(crate::network::resumed());
+    }
     let (url, keep) = source(agent, email, hint);
     let dir = dir.filter(|_| keep);
     match download(agent, &url) {
@@ -314,6 +320,15 @@ pub fn paint(ui: &egui::Ui, rect: Rect, email: &str) -> bool {
     let state = {
         let mut map = lock(&av.map);
         match map.get(&k) {
+            // Put off while off the network, which it may go on again since.
+            Some(State::Deferred(at))
+                if *at != crate::network::resumed()
+                    && crate::network::background_paused().is_none() =>
+            {
+                map.insert(k.clone(), State::Pending);
+                let _ = lock(&av.queue).send(k.clone());
+                State::Pending
+            }
             Some(s) => s.clone(),
             None => {
                 map.insert(k.clone(), State::Pending);
@@ -338,6 +353,17 @@ pub fn paint(ui: &egui::Ui, rect: Rect, email: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// While gitcraft stays off the network, an avatar not in the cache is put off, not
+    /// downloaded (nor written down as missing).
+    #[test]
+    fn an_avatar_is_put_off_while_off_the_network() {
+        let _paused = crate::network::test_pause::set(Some(crate::network::Pause::Metered));
+        let agent = ureq::AgentBuilder::new().build();
+        let email = format!("nobody-{}@example.invalid", std::process::id());
+        let state = fetch(&agent, &email, None);
+        assert!(matches!(state, State::Deferred(at) if at == crate::network::resumed()));
+    }
 
     #[test]
     fn a_cached_picture_is_written_whole_and_alone() {

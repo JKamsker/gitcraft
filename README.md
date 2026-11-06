@@ -201,6 +201,16 @@ so your config, credentials and hooks apply as usual.
 - Pull's arrow (or a right-click on it) sets what it does: fast-forward, merging when the branch
   has diverged; fast-forward only; or rebase. Also in Settings, and the menu has _Fetch all_.
 - Background fetch every few minutes (Settings; 0 turns it off).
+- Offline mode (Settings → Git, or _Go offline_ in the palette): nothing goes on the network by
+  itself (the background fetch, avatars, update checks and downloads, the polling of builds and
+  pull requests), and Fetch, Pull, Push and anything else that would reach a remote say why they
+  don't run instead of waiting for a network that isn't there. The toolbar says
+  _Offline · last fetched 3 h ago_; a click on it goes online. Without that switch, gitcraft
+  asks the system every minute whether there is a connection and whether it is metered (Windows:
+  a metered or roaming network, or one at its data limit; Linux: NetworkManager): without a
+  connection, or on a metered one (unless Settings → Git says otherwise), only that background
+  work pauses, and the toolbar says so; what you ask for still runs. Avatars already downloaded
+  still show; the others come once the network is back.
 - HTTPS sign-in: when a remote wants a username and password (or token) and no credential helper
   provides them, a dialog asks and the operation runs again. They stay in memory for the tab;
   git's own credential helper, if there is one, stores them. Cloning asks the same way.
