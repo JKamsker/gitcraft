@@ -16,7 +16,7 @@ use crate::git;
 use crate::repo::diff::Kind;
 use crate::repo::{RepoTab, Undo, short};
 
-pub(crate) use preview::Preview;
+pub(crate) use preview::{Look, Preview};
 
 /// Most commits a commit is split into.
 pub(crate) const MAX_GROUPS: usize = 9;

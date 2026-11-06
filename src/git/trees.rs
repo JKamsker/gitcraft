@@ -97,6 +97,28 @@ pub fn patch_bytes_between(repo: &Path, from: &str, to: &str) -> Result<Vec<u8>,
     super::run_bytes(Some(repo), &args)
 }
 
+/// What is staged, as [`patch_bytes_between`] writes it, and its paths as
+/// [`paths_between`] lists them.
+pub fn staged_patch(repo: &Path) -> Result<(Vec<u8>, Vec<String>), String> {
+    let mut args = vec!["diff", "--cached"];
+    args.extend(PATCH);
+    args.push("--");
+    let patch = super::run_bytes(Some(repo), &args)?;
+    let raw = run(
+        Some(repo),
+        &[
+            "diff",
+            "--cached",
+            "--raw",
+            "-z",
+            "--no-renames",
+            "--ignore-submodules=none",
+            "--",
+        ],
+    )?;
+    Ok((patch, parse_raw(&raw)))
+}
+
 /// The paths [`patch_between`] has, in its order: one whose type changes (a file becoming a
 /// link…) twice, as it has a removal and an addition.
 pub fn paths_between(repo: &Path, from: &str, to: &str) -> Result<Vec<String>, String> {

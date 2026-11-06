@@ -4,11 +4,15 @@
 //! them in place of the old one and replays the commits after it, so a conflict goes to the
 //! usual conflict flow and Ctrl+Z puts the branch back as one step.
 
+mod absorb;
+#[cfg(test)]
+mod absorb_tests;
 mod patchset;
 mod split;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use absorb::AbsorbEditor;
 pub(crate) use split::SplitEditor;
 
 use egui::Ui;

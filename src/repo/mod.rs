@@ -161,6 +161,8 @@ pub struct RepoTab {
     rebase: Option<rebase::RebaseEditor>,
     /// A commit being split (`surgery`).
     split: Option<Box<surgery::SplitEditor>>,
+    /// Staged fixes being distributed into the commits they belong to (`surgery`).
+    absorb: Option<Box<surgery::AbsorbEditor>>,
     /// The selected commit's message, being edited in the right pane.
     reword: Option<Reword>,
     /// HTTPS credentials typed in this session, used for every later git command of the tab.
@@ -318,6 +320,7 @@ impl RepoTab {
             file_view: None,
             rebase: None,
             split: None,
+            absorb: None,
             reword: None,
             credentials: None,
             last_op: None,

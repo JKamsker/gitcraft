@@ -110,6 +110,14 @@ so your config, credentials and hooks apply as usual.
   _Split commit_ puts them in place of the old one (together they are exactly the old commit) and
   replays the commits after it. Ctrl+Z undoes it. A merge, merges after the commit, and the
   first commit are greyed out with why.
+- _Distribute staged fixes…_ (above the staged files, or the palette): each staged change goes
+  into the earlier commit of the branch that last changed those lines, as git-absorb does. A
+  change whose lines one commit last changed is matched; one several commits changed is only
+  suggested (the newest); one no commit of the branch changed (a new file, an older line) stays
+  staged. Change any of them, _Check_ the fixups and what stays staged, then absorb: fixup
+  commits are rebased into their commits and the rest is staged again. Ctrl+Z undoes it. With
+  `git-absorb` installed (on the repository's machine for WSL / SSH), _Run git-absorb instead_
+  hands it over.
 - Quick edits from a commit's menu, for commits of the checked-out branch: _Edit commit
   message_, _Drop commit_, _Move commit up_ / _down_, each a rebase without the editor and undone
   with Ctrl+Z. What can't be done (a merge, merges after the commit) is greyed out with why.
@@ -386,7 +394,7 @@ was made this way, on a demo repository.
 | `src/vscode_theme.rs`    | VS Code's current colour theme as a syntect theme                                  |
 | `src/repo/conflict.rs`   | three-pane conflict editor                                                         |
 | `src/mergiraf.rs` | Mergiraf, run as the user's own command when it is installed |
-| `src/repo/surgery/`      | history surgery: splitting a commit (`split/`), patches of some lines (`patchset.rs`) |
+| `src/repo/surgery/`      | history surgery: splitting a commit (`split/`), absorbing staged fixes (`absorb/`), patches of some lines (`patchset.rs`) |
 | `src/git/trees.rs`       | commits made in a scratch index (`tree_after`, `commit_tree`) for rewrites         |
 | `src/repo/rebase.rs`     | interactive rebase editor and its todo list                                        |
 | `src/repo/file_view.rs`  | a file's history, blame and contents at a commit                                   |
