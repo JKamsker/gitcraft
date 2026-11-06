@@ -19,6 +19,8 @@ pub struct Version {
     pub target: String,
     /// Names passed over because a file (or a tracked one) is there already.
     pub taken: Vec<String>,
+    /// A `.gitignore` names the target: Stage both adds it anyway.
+    pub ignored: bool,
 }
 
 /// What Keep both would write for `path`.
@@ -77,7 +79,7 @@ pub(super) fn tags(branches: (Option<&str>, Option<&str>), rebase: bool) -> (Str
         if t.is_empty() { other.to_owned() } else { t }
     };
     let (ours, theirs) = (pick(branches.0, fallback.0), pick(branches.1, fallback.1));
-    if ours.eq_ignore_ascii_case(&theirs) {
+    if ours.to_lowercase() == theirs.to_lowercase() {
         (
             format!("{ours}-{}", fallback.0),
             format!("{theirs}-{}", fallback.1),
@@ -102,7 +104,7 @@ pub(super) fn free_name(
         } else {
             tagged(path, &format!("{tag}-{n}"))
         };
-        let clash = also_taken.is_some_and(|other| other.eq_ignore_ascii_case(&name));
+        let clash = also_taken.is_some_and(|other| other.to_lowercase() == name.to_lowercase());
         if !clash && !taken(&name)? {
             return Ok((name, passed));
         }
@@ -187,19 +189,23 @@ pub fn plan(repo: &Path, path: &str, state: Option<InProgress>) -> Result<Plan, 
     let is_taken = |rel: &str| taken(repo, rel);
     let (ours_target, ours_taken) = free_name(path, &ours_tag, None, is_taken)?;
     let (theirs_target, theirs_taken) = free_name(path, &theirs_tag, Some(&ours_target), is_taken)?;
-    let version = |stage: &Stage, who: &str, branch: Option<String>, target, taken| {
-        Ok::<_, String>(Version {
-            origin: match branch {
-                Some(b) => format!("{who} ({b})"),
-                None => who.to_owned(),
-            },
-            oid: stage.oid.clone(),
-            executable: stage.mode == "100755",
-            size: git::object_size(repo, &stage.oid)?,
-            target,
-            taken,
-        })
-    };
+    let version =
+        |stage: &Stage, who: &str, branch: Option<String>, target: String, taken: Vec<String>| {
+            Ok::<_, String>(Version {
+                origin: match branch {
+                    Some(b) => format!("{who} ({b})"),
+                    None => who.to_owned(),
+                },
+                oid: stage.oid.clone(),
+                executable: stage.mode == "100755",
+                size: git::checked_out_blob(repo, &stage.oid, path)
+                    .map_err(|e| format!("Could not read the version of {who}: {e}"))?
+                    .len() as u64,
+                ignored: git::is_ignored(repo, &target)?,
+                target,
+                taken,
+            })
+        };
     Ok(Plan {
         path: path.to_owned(),
         ours: version(ours, ours_who, ours_branch, ours_target, ours_taken)?,
@@ -219,7 +225,7 @@ pub fn plan(repo: &Path, path: &str, state: Option<InProgress>) -> Result<Plan, 
 pub fn write(repo: &Path, plan: &Plan) -> Result<(), String> {
     let mut written: Option<&str> = None;
     for version in [&plan.ours, &plan.theirs] {
-        let done = git::blob(repo, &version.oid)
+        let done = git::checked_out_blob(repo, &version.oid, &plan.path)
             .map_err(|e| format!("Could not read the version of {}: {e}", version.origin))
             .and_then(|bytes| {
                 create_new(
@@ -256,9 +262,9 @@ fn create_new(file: &Path, bytes: &[u8], executable: bool) -> Result<(), String>
     let f = crate::remote::sh_path(&target.path);
     // `set -C`: the shell opens the file only if nothing is there (O_EXCL).
     let script = format!(
-        "if [ -e {f} ] || [ -L {f} ]; then exit {EXISTS}; fi\nset -C\ncat > {f} || exit 1\n{}",
+        "if [ -e {f} ] || [ -L {f} ]; then exit {EXISTS}; fi\nset -C\ncat > {f} || {{ rm -f -- {f}; exit 1; }}\n{}",
         if executable {
-            format!("chmod +x {f}\n")
+            format!("chmod +x {f} || {{ rm -f -- {f}; exit 1; }}\n")
         } else {
             String::new()
         }
@@ -279,7 +285,6 @@ fn create_new(file: &Path, bytes: &[u8], executable: bool) -> Result<(), String>
 }
 
 fn create_new_here(file: &Path, bytes: &[u8], executable: bool) -> Result<(), String> {
-    use std::io::Write;
     let mut opened = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -288,6 +293,18 @@ fn create_new_here(file: &Path, bytes: &[u8], executable: bool) -> Result<(), St
             std::io::ErrorKind::AlreadyExists => APPEARED.to_owned(),
             _ => e.to_string(),
         })?;
+    let filled = fill(&mut opened, bytes, executable);
+    if filled.is_err() {
+        // Not left half written.
+        drop(opened);
+        let _ = std::fs::remove_file(file);
+    }
+    filled
+}
+
+/// Writes `bytes` to the file just created, made executable when asked.
+fn fill(opened: &mut std::fs::File, bytes: &[u8], executable: bool) -> Result<(), String> {
+    use std::io::Write;
     opened.write_all(bytes).map_err(|e| e.to_string())?;
     #[cfg(unix)]
     if executable {
@@ -325,17 +342,19 @@ fn remove(file: &Path) -> Result<(), String> {
     }
 }
 
-/// The steps that stage both files and take `plan.path` out, as it was in conflict.
+/// The steps that stage both files (also when a `.gitignore` names them), then take
+/// `plan.path` out, as it was in conflict: added first, so a refused add leaves the conflict as
+/// it was rather than resolved as a deletion.
 pub fn stage_steps(plan: &Plan) -> Vec<Vec<String>> {
+    let force = plan.ours.ignored || plan.theirs.ignored;
+    let mut add = vec!["--literal-pathspecs", "add"];
+    if force {
+        add.push("-f");
+    }
+    add.extend(["--", &plan.ours.target, &plan.theirs.target]);
     let steps: [&[&str]; 2] = [
+        &add,
         &["--literal-pathspecs", "rm", "-q", "-f", "--", &plan.path],
-        &[
-            "--literal-pathspecs",
-            "add",
-            "--",
-            &plan.ours.target,
-            &plan.theirs.target,
-        ],
     ];
     crate::repo::ops(&steps)
 }
@@ -387,6 +406,10 @@ mod tests {
             ("main-ours".into(), "Main-theirs".into())
         );
         assert_eq!(
+            tags((Some("jö"), Some("JÖ")), false),
+            ("jö-ours".into(), "JÖ-theirs".into())
+        );
+        assert_eq!(
             tags((Some("///"), Some("..")), false),
             ("ours".into(), "theirs".into())
         );
@@ -399,6 +422,9 @@ mod tests {
         let (name, passed) = free_name("logo.png", "main", None, taken)?;
         assert_eq!(name, "logo.main-3.png");
         assert_eq!(passed, on_disk.map(str::to_owned).to_vec());
+        // Also when only the case of a letter outside ASCII differs.
+        let (name, _) = free_name("a.png", "jö", Some("a.JÖ.png"), |_| Ok(false))?;
+        assert_eq!(name, "a.jö-2.png");
         // Not the name the other version takes, also when only the case differs.
         let (name, _) = free_name("logo.png", "x", Some("LOGO.X.png"), |_| Ok(false))?;
         assert_eq!(name, "logo.x-2.png");

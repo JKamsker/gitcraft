@@ -183,9 +183,16 @@ fn contents(ui: &mut Ui, t: &Tokens, state: &KeepBoth) -> Option<Step> {
         KeepBoth::Written(plan) => {
             ui.add(
                 egui::Label::new(format!(
-                    "Wrote {} and {}. They are in the changes list as new files: click them \
-                     there to check them. Nothing is staged yet.",
-                    plan.ours.target, plan.theirs.target
+                    "Wrote {} and {}.{} Nothing is staged yet.",
+                    plan.ours.target,
+                    plan.theirs.target,
+                    if plan.ours.ignored || plan.theirs.ignored {
+                        " A .gitignore hides them from the changes list: check them in the \
+                         folder."
+                    } else {
+                        " They are in the changes list as new files: click them there to check \
+                         them."
+                    }
                 ))
                 .wrap(),
             );
@@ -272,6 +279,19 @@ fn version_row(ui: &mut Ui, t: &Tokens, version: &Version) {
                 .color(t.text_dim)
                 .small(),
             );
+            if version.ignored {
+                ui.add(
+                    egui::Label::new(
+                        RichText::new(
+                            "A .gitignore names this file: it won't show in the changes \
+                             list, and Stage both adds it anyway",
+                        )
+                        .color(t.text_dim)
+                        .small(),
+                    )
+                    .wrap(),
+                );
+            }
             if !version.taken.is_empty() {
                 ui.add(
                     egui::Label::new(

@@ -60,17 +60,24 @@ fn parse_stages(out: &str, path: &str) -> ConflictStages {
     stages
 }
 
-/// The contents of the blob `oid`.
-pub fn blob(repo: &Path, oid: &str) -> Result<Vec<u8>, String> {
-    run_bytes(Some(repo), &["cat-file", "blob", oid])
+/// The blob `oid` as it is checked out at `path`: through the filters its attributes name
+/// (Git LFS's smudge, line endings), so an LFS pointer comes out as the file it points to.
+pub fn checked_out_blob(repo: &Path, oid: &str, path: &str) -> Result<Vec<u8>, String> {
+    run_bytes(
+        Some(repo),
+        &["cat-file", "--filters", &format!("--path={path}"), oid],
+    )
 }
 
-/// The size in bytes of the object `oid`.
-pub fn object_size(repo: &Path, oid: &str) -> Result<u64, String> {
-    let out = run(Some(repo), &["cat-file", "-s", oid])?;
-    out.trim()
-        .parse()
-        .map_err(|_| format!("could not read the size of object {oid}"))
+/// Whether `path` would be ignored if it were a new file (a `.gitignore` names it).
+pub fn is_ignored(repo: &Path, path: &str) -> Result<bool, String> {
+    // Exit 0: ignored (and printed); 1: not.
+    let out = run_ok_codes(
+        Some(repo),
+        &["check-ignore", "--no-index", "--", path],
+        &[0, 1],
+    )?;
+    Ok(!out.trim().is_empty())
 }
 
 /// `path`'s conflict made again from its stages in the index, in the zdiff3 style: each
