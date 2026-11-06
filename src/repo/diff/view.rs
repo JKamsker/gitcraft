@@ -169,7 +169,6 @@ impl RepoTab {
                         if icons::small_button(ui, "x", "Close (Esc)").clicked() {
                             acts.push(Action::CloseDiff);
                         }
-                        self.split_toggle(ui);
                         if let DiffKey::Work(file) = &view.key {
                             let partial = partial && !as_file && !rendered;
                             clear = self.file_actions(ui, view, file, partial, acts);
@@ -179,6 +178,9 @@ impl RepoTab {
                             view_options(ui, &t, (split, ignore_ws, whole_file), acts);
                             ui.add_space(8.0);
                             change_steps(ui, acts);
+                            ui.add_space(8.0);
+                        }
+                        if self.split_toggle(ui) {
                             ui.add_space(8.0);
                         }
                         if markdown.is_some() {
