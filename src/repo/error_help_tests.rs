@@ -1,5 +1,6 @@
 //! The card in a real tab, driven as the window draws it: an operation fails on a lock, the
-//! card offers to remove it, and, confirmed, the operation runs again and works. (Not a
+//! card offers to remove it, and, confirmed, the operation runs again, works, and the card
+//! is gone. (Not a
 //! stash: `git stash` fails on a lock without a word.)
 
 use std::time::{Duration, Instant};
@@ -87,7 +88,9 @@ fn a_lock_explained_removed_and_the_file_staged() -> Result<(), String> {
     assert!(harness.query_by_label("Cancel").is_some());
     harness.get_by_label("Remove stale lock").click();
     until(&mut harness, |tab| {
-        tab.error_card.as_ref().is_some_and(|c| c.fixed())
+        tab.error_card
+            .as_ref()
+            .is_some_and(|c| matches!(c.stage(), crate::error_card::Stage::Done { .. }))
     });
     assert!(!lock.exists());
     for _ in 0..3 {
@@ -97,12 +100,7 @@ fn a_lock_explained_removed_and_the_file_staged() -> Result<(), String> {
     until(&mut harness, |tab| {
         tab.settled() && tab.work.staged.len() == 1
     });
-    // The card stays while it says what it did; closed, it is gone.
-    for _ in 0..3 {
-        harness.step();
-    }
-    harness.get_by_label("Close").click();
-    harness.step();
+    // Fixed, with nothing to undo: the card went with the retry.
     assert!(harness.state().error_card.is_none());
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())

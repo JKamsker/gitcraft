@@ -162,7 +162,7 @@ fn the_confirmation_says_which_file_and_what() {
     assert_eq!(add.button(), "Trust this folder");
     assert_eq!(
         add.confirm(),
-        "Adds safe.directory = /srv/r to /home/me/.gitconfig. Undo takes it out again."
+        "Adds safe.directory = /srv/r to /home/me/.gitconfig. Undo, on this card, takes it out again."
     );
     let set = Fix::Config {
         edit: ConfigEdit {
@@ -290,7 +290,7 @@ fn the_card_removes_a_stale_lock() -> Result<(), String> {
     assert_eq!(card.offered().map(Fix::button), Some("Remove stale lock"));
     card.ask();
     assert_eq!(card.stage(), &Stage::Confirming);
-    card.back();
+    card.back(&ctx);
     assert_eq!(card.stage(), &Stage::Idle);
     assert!(lock.exists());
     card.ask();
@@ -302,7 +302,8 @@ fn the_card_removes_a_stale_lock() -> Result<(), String> {
         "{:?}",
         card.stage()
     );
-    assert!(card.fixed());
+    // Nothing to undo: the card isn't kept for it.
+    assert!(!card.fixed());
     assert!(!lock.exists());
     run(Some(&dir), &["add", "-A"])?;
     let _ = std::fs::remove_dir_all(&dir);
@@ -460,5 +461,133 @@ fn a_folder_owned_by_someone_else() -> Result<(), String> {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
+    Ok(())
+}
+
+/// A lock written again after the card looked: removing it fails, and going back looks again,
+/// so that the fix is offered for the lock as it is now.
+#[test]
+fn a_lock_written_again_is_looked_at_again() -> Result<(), String> {
+    let dir = repo("lock-rewritten")?;
+    let lock = dir.join(".git/index.lock");
+    std::fs::write(&lock, "").map_err(|e| e.to_string())?;
+    let err = failure(run(Some(&dir), &["add", "-A"]), "locked")?;
+    let ctx = egui::Context::default();
+    let mut card = ErrorCard::for_error(&err, &dir, "Stage all", &ctx).ok_or("known")?;
+    settle(&mut card);
+    // As if a git wrote it since.
+    if let Some(Ok(found)) = &mut card.found
+        && let Some(Fix::RemoveLock(seen)) = &mut found.fix
+    {
+        seen.modified -= 100;
+    }
+    card.ask();
+    card.confirm(&ctx);
+    settle(&mut card);
+    assert!(matches!(card.stage(), Stage::Failed(e) if e.contains("written again")));
+    assert!(lock.exists());
+    card.back(&ctx);
+    assert!(card.found.is_none(), "looks again");
+    settle(&mut card);
+    card.ask();
+    card.confirm(&ctx);
+    settle(&mut card);
+    assert!(
+        matches!(card.stage(), Stage::Done { .. }),
+        "{:?}",
+        card.stage()
+    );
+    assert!(!lock.exists());
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+/// The same failure again keeps the card; Try again is offered once per failure.
+#[test]
+fn the_same_failure_keeps_its_card() -> Result<(), String> {
+    let dir = repo("same-again")?;
+    let err = "fatal: refusing to merge unrelated histories";
+    let ctx = egui::Context::default();
+    let mut card = ErrorCard::for_error(err, &dir, "Merge", &ctx).ok_or("known")?;
+    assert!(card.is_about(err));
+    assert!(!card.is_about("fatal: early EOF"));
+    assert!(!card.is_about("something else"));
+    assert!(card.can_retry());
+    card.retried();
+    assert!(!card.can_retry());
+    card.failed_again();
+    assert!(card.can_retry());
+    settle(&mut card);
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+/// A card that replaces one whose fix was made keeps that fix's undo; a failed undo can be
+/// tried again.
+#[test]
+fn an_undo_is_never_lost() -> Result<(), String> {
+    let dir = repo("undo-kept")?;
+    let ctx = egui::Context::default();
+    let fix = Fix::Config {
+        edit: ConfigEdit::set(&dir, Scope::Repo, "core.longpaths", "true")?,
+        file: "the repository's config".to_owned(),
+    };
+    let mut first =
+        ErrorCard::for_error("error: x: Filename too long", &dir, "Pull", &ctx).ok_or("known")?;
+    settle(&mut first);
+    let (what, undo) = fix.apply(&dir)?;
+    first.stage = Stage::Done { what, undo };
+    assert!(first.fixed());
+    let mut second = ErrorCard::for_error("fatal: early EOF", &dir, "Pull", &ctx)
+        .ok_or("known")?
+        .replacing(Some(first));
+    assert!(second.fixed());
+    assert!(
+        second
+            .earlier()
+            .is_some_and(|w| w.contains("core.longpaths"))
+    );
+    second.undo_earlier(&ctx);
+    let start = Instant::now();
+    while second.earlier_undone().is_none() && start.elapsed() < Duration::from_secs(20) {
+        std::thread::sleep(Duration::from_millis(20));
+        second.poll();
+    }
+    assert!(matches!(second.earlier_undone(), Some(Ok(_))));
+    assert!(!second.fixed());
+    assert!(run(Some(&dir), &["config", "--local", "core.longpaths"]).is_err());
+    settle(&mut second);
+
+    // A lock's removal has no undo: such a card isn't kept for one.
+    let removed = Stage::Done {
+        what: "Removed x.".to_owned(),
+        undo: None,
+    };
+    let mut third = ErrorCard::for_error("fatal: early EOF", &dir, "Pull", &ctx).ok_or("known")?;
+    third.stage = removed;
+    assert!(!third.fixed());
+    settle(&mut third);
+
+    // An undo that fails keeps its undo, to try again.
+    let gone = dir.join("a folder, not a file");
+    std::fs::create_dir_all(&gone).map_err(|e| e.to_string())?;
+    let broken = Fix::Config {
+        edit: ConfigEdit::add(Scope::File(gone.clone()), "safe.directory", "/x"),
+        file: gone.display().to_string(),
+    };
+    let mut card = ErrorCard::for_error("fatal: early EOF", &dir, "Pull", &ctx).ok_or("known")?;
+    settle(&mut card);
+    card.stage = Stage::Done {
+        what: String::new(),
+        undo: Some(broken),
+    };
+    card.undo(&ctx);
+    settle(&mut card);
+    assert!(
+        matches!(card.stage(), Stage::Done { what, undo: Some(_) } if what.starts_with("Undo failed")),
+        "{:?}",
+        card.stage()
+    );
+    let _ = std::fs::remove_dir_all(&dir);
     Ok(())
 }

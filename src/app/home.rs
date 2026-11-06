@@ -89,7 +89,8 @@ impl App {
                         }
                     });
 
-                    if let Some(err) = &self.error {
+                    // The card has git's words itself.
+                    if let Some(err) = self.error.as_ref().filter(|_| self.error_card.is_none()) {
                         ui.add_space(12.0);
                         ui.colored_label(t.danger, err);
                     }

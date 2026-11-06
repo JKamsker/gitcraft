@@ -15,21 +15,22 @@ impl ErrorCard {
     /// ask of the owner comes back.
     pub fn ui(&mut self, ui: &mut Ui, retry: bool) -> Option<CardEvent> {
         self.poll();
+        let retry = retry && self.can_retry();
         let t = Tokens::get(ui.ctx());
         let mut event = None;
-        let stroke = match self.stage {
+        let accent = match self.stage {
             Stage::Failed(_) => t.danger,
             Stage::Done { .. } | Stage::Undone(_) => t.success,
             _ => t.warning,
         };
         egui::Frame::new()
             .fill(t.card)
-            .stroke(egui::Stroke::new(1.0, stroke))
+            .stroke(egui::Stroke::new(1.0, accent))
             .corner_radius(t.radius)
             .inner_margin(egui::Margin::symmetric(12, 10))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                if self.header(ui) {
+                if self.header(ui, accent) {
                     event = Some(CardEvent::Close);
                 }
                 ui.add_space(4.0);
@@ -43,19 +44,22 @@ impl ErrorCard {
                     event = Some(e);
                 }
             });
+        if event == Some(CardEvent::Retry) {
+            self.retried();
+        }
         event
     }
 
     /// The icon, the title and the close button; whether that was clicked.
-    fn header(&self, ui: &mut Ui) -> bool {
+    fn header(&self, ui: &mut Ui, accent: egui::Color32) -> bool {
         let t = Tokens::get(ui.ctx());
         let mut close = false;
         ui.horizontal(|ui| {
-            icons::inline(ui, "circle-alert", 16.0, t.warning);
+            icons::inline(ui, "circle-alert", 16.0, accent);
             ui.add(
                 egui::Label::new(
                     RichText::new(text::title(&self.problem))
-                        .font(theme::semibold(13.5))
+                        .font(theme::semibold(14.0))
                         .color(t.text),
                 )
                 .wrap(),
@@ -119,7 +123,7 @@ impl ErrorCard {
         let ctx = ui.ctx().clone();
         let mut event = None;
         let retry_button = |ui: &mut Ui, event: &mut Option<CardEvent>| {
-            if retry && ui.button("Try again").clicked() {
+            if retry && button(ui, "Try again").clicked() {
                 *event = Some(CardEvent::Retry);
             }
         };
@@ -136,18 +140,18 @@ impl ErrorCard {
             }
             Stage::Confirming => {
                 let Some(fix) = self.offered() else {
-                    self.back();
+                    self.back(&ctx);
                     return None;
                 };
-                let (button, confirm) = (fix.button(), fix.confirm());
+                let (label, confirm) = (fix.button(), fix.confirm());
                 ui.add(egui::Label::new(RichText::new(confirm).color(t.text)).wrap());
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
-                    if primary_button(ui, button, true, 0.0).clicked() {
+                    if primary_button(ui, label, true, 0.0).clicked() {
                         self.confirm(&ctx);
                     }
-                    if ui.button("Cancel").clicked() {
-                        self.back();
+                    if button(ui, "Cancel").clicked() {
+                        self.back(&ctx);
                     }
                 });
             }
@@ -161,7 +165,7 @@ impl ErrorCard {
                 ui.add(egui::Label::new(RichText::new(what).color(t.success)).wrap());
                 ui.horizontal(|ui| {
                     retry_button(ui, &mut event);
-                    if undo.is_some() && ui.button("Undo").clicked() {
+                    if undo.is_some() && button(ui, "Undo").clicked() {
                         self.undo(&ctx);
                     }
                 });
@@ -171,11 +175,38 @@ impl ErrorCard {
             }
             Stage::Failed(e) => {
                 ui.add(egui::Label::new(RichText::new(e).color(t.danger)).wrap());
-                if ui.button("Back").clicked() {
-                    self.back();
+                if button(ui, "Back").clicked() {
+                    self.back(&ctx);
                 }
             }
         }
+        self.earlier_ui(ui);
         event
     }
+
+    /// The fix of the card this one replaced, while it can still be undone here.
+    fn earlier_ui(&mut self, ui: &mut Ui) {
+        let t = Tokens::get(ui.ctx());
+        let ctx = ui.ctx().clone();
+        if let Some(what) = self.earlier().map(str::to_owned) {
+            ui.add_space(4.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.label(RichText::new(format!("Earlier: {what}")).color(t.text_faint));
+                if button(ui, "Undo that").clicked() {
+                    self.undo_earlier(&ctx);
+                }
+            });
+        } else if let Some(done) = self.earlier_undone() {
+            let (text, color) = match done {
+                Ok(what) => (what.clone(), t.text_dim),
+                Err(e) => (e.clone(), t.danger),
+            };
+            ui.add(egui::Label::new(RichText::new(text).color(color)).wrap());
+        }
+    }
+}
+
+/// A secondary button as tall as [`primary_button`], for the rows they share.
+fn button(ui: &mut Ui, text: &str) -> egui::Response {
+    ui.add(egui::Button::new(text).min_size(egui::vec2(0.0, 30.0)))
 }

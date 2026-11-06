@@ -271,14 +271,16 @@ so your config, credentials and hooks apply as usual.
 - When git fails in a way gitcraft knows, a card under the toolbar (or on the start page, for a
   repository that won't open) says what happened, with git's own words below. Where there is a
   fix, a button makes it, after saying exactly what it changes and in which config file; a
-  config change can be undone from the card, and _Try again_ runs what failed again:
+  config change can be undone from the card (until it is closed), and _Try again_ runs what
+  failed again once, when it is the tab's last operation:
   - a repository owned by another user (_dubious ownership_): **Trust this folder** adds that
     folder, and only it (never `*`), to `safe.directory` in your global config;
   - a `.lock` file left behind (_index.lock exists_): how old it is and which git processes are
-    running on that machine, then **Remove stale lock** (only a `….lock` file in the
+    running on that machine (on Windows and on another machine, gitcraft's own included), then
+    **Remove stale lock** (only a `….lock` file in the
     repository's git folder, and only if nothing wrote it since);
-  - _Filename too long_: **Enable long paths** sets `core.longpaths` for the repository (Git
-    for Windows);
+  - _Filename too long_ in an open repository (a checkout, a pull): **Enable long paths** sets
+    `core.longpaths` for the repository (Git for Windows; a failed clone isn't explained yet);
   - _SSL certificate problem_: **Use Windows' certificates** sets `http.sslBackend=schannel` in
     your global config (Git for Windows);
   - explained only: line-ending warnings (what `core.autocrlf` does, as it is set here, against

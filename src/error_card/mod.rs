@@ -35,6 +35,15 @@ pub struct ErrorCard {
     stage: Stage,
     /// The background work going on, if any.
     rx: Option<Receiver<Reply>>,
+    /// A fix the card this one replaced had made, still undoable from here: (what it did,
+    /// its undo).
+    earlier: Option<(String, Fix)>,
+    /// What came of undoing [`Self::earlier`].
+    earlier_undone: Option<Result<String, String>>,
+    /// The background work undoing [`Self::earlier`], if any.
+    earlier_rx: Option<Receiver<Result<String, String>>>,
+    /// Try again was used since what it is about last failed.
+    retried: bool,
 }
 
 /// Where the fix is at.
@@ -57,7 +66,8 @@ pub enum Stage {
 enum Reply {
     Found(Result<Found, String>),
     Applied(Result<(String, Option<Fix>), String>),
-    Undone(Result<String, String>),
+    /// Undone, or why not with the undo kept to try again.
+    Undone(Result<String, (String, Fix)>),
 }
 
 /// What the card asks of its owner.
@@ -87,11 +97,12 @@ impl ErrorCard {
             found: None,
             stage: Stage::Idle,
             rx: None,
+            earlier: None,
+            earlier_undone: None,
+            earlier_rx: None,
+            retried: false,
         };
-        let (problem, dir) = (card.problem.clone(), card.dir.clone());
-        card.start(ctx, move || {
-            Reply::Found(fix::gather(&problem, &dir, place))
-        });
+        card.look_again(ctx);
         Some(card)
     }
 
@@ -115,9 +126,62 @@ impl ErrorCard {
         &self.label
     }
 
-    /// A fix was made and not taken back: the card stays, for its undo.
+    /// A fix was made that can still be taken back here: the card stays, for its undo.
     pub fn fixed(&self) -> bool {
-        matches!(self.stage, Stage::Done { .. })
+        matches!(self.stage, Stage::Done { undo: Some(_), .. }) || self.earlier.is_some()
+    }
+
+    /// Takes the place of `old`, keeping the undo of a fix it made (the config change stays
+    /// until undone, so its undo must not go with the card).
+    pub fn replacing(mut self, old: Option<ErrorCard>) -> Self {
+        if let Some(old) = old {
+            self.earlier = match old.stage {
+                Stage::Done {
+                    what,
+                    undo: Some(undo),
+                } => Some((what, undo)),
+                _ => old.earlier,
+            };
+        }
+        self
+    }
+
+    /// What an earlier card's fix did, while it can be undone here.
+    pub fn earlier(&self) -> Option<&str> {
+        self.earlier.as_ref().map(|(what, _)| what.as_str())
+    }
+
+    /// What came of undoing the earlier card's fix.
+    pub fn earlier_undone(&self) -> Option<&Result<String, String>> {
+        self.earlier_undone.as_ref()
+    }
+
+    /// Undoes the earlier card's fix, in the background.
+    pub fn undo_earlier(&mut self, ctx: &egui::Context) {
+        let Some((_, fix)) = self.earlier.take() else {
+            return;
+        };
+        let (tx, rx) = channel();
+        let (ctx, dir) = (ctx.clone(), self.dir.clone());
+        std::thread::spawn(move || {
+            let _ = tx.send(fix.undo(&dir));
+            ctx.request_repaint();
+        });
+        self.earlier_rx = Some(rx);
+    }
+
+    fn poll_earlier(&mut self) {
+        let Some(rx) = &self.earlier_rx else { return };
+        match rx.try_recv() {
+            Ok(done) => self.earlier_undone = Some(done),
+            Err(TryRecvError::Empty) => return,
+            Err(TryRecvError::Disconnected) => {
+                self.earlier_undone = Some(Err(
+                    "Internal error: the undo stopped before it was done".to_owned(),
+                ))
+            }
+        }
+        self.earlier_rx = None;
     }
 
     /// Runs `job` in the background; its reply is taken in by [`Self::poll`].
@@ -133,6 +197,7 @@ impl ErrorCard {
 
     /// Takes in what the background work came back with.
     pub fn poll(&mut self) {
+        self.poll_earlier();
         let Some(rx) = &self.rx else { return };
         let reply = match rx.try_recv() {
             Ok(reply) => reply,
@@ -155,7 +220,12 @@ impl ErrorCard {
             Reply::Applied(Ok((what, undo))) => self.stage = Stage::Done { what, undo },
             Reply::Applied(Err(e)) => self.stage = Stage::Failed(e),
             Reply::Undone(Ok(what)) => self.stage = Stage::Undone(what),
-            Reply::Undone(Err(e)) => self.stage = Stage::Failed(e),
+            Reply::Undone(Err((e, fix))) => {
+                self.stage = Stage::Done {
+                    what: format!("Undo failed: {e}"),
+                    undo: Some(fix),
+                }
+            }
         }
     }
 
@@ -172,10 +242,48 @@ impl ErrorCard {
     }
 
     /// Back to showing the problem (the confirmation cancelled, a failure read).
-    pub fn back(&mut self) {
-        if matches!(self.stage, Stage::Confirming | Stage::Failed(_)) {
-            self.stage = Stage::Idle;
+    pub fn back(&mut self, ctx: &egui::Context) {
+        match self.stage {
+            Stage::Confirming => self.stage = Stage::Idle,
+            // What was found may be what made it fail (a lock written again since): found
+            // out afresh.
+            Stage::Failed(_) => {
+                self.stage = Stage::Idle;
+                self.look_again(ctx);
+            }
+            _ => {}
         }
+    }
+
+    /// Finds out about the problem again, in the background.
+    fn look_again(&mut self, ctx: &egui::Context) {
+        self.found = None;
+        let (problem, dir, place) = (self.problem.clone(), self.dir.clone(), self.place);
+        self.start(ctx, move || {
+            Reply::Found(fix::gather(&problem, &dir, place))
+        });
+    }
+
+    /// Whether `error` is this card's problem again (what failed was run again and failed the
+    /// same way): the card stays as it is rather than being made again.
+    pub fn is_about(&self, error: &str) -> bool {
+        errors::explain(error).is_some_and(|p| p == self.problem)
+    }
+
+    /// What it is about failed the same way again: Try again is offered again.
+    pub fn failed_again(&mut self) {
+        self.retried = false;
+    }
+
+    /// Try again was asked for: it isn't offered again until what it ran fails again (it
+    /// might run an operation twice that worked).
+    pub fn retried(&mut self) {
+        self.retried = true;
+    }
+
+    /// Whether Try again can be offered, as far as the card knows.
+    pub fn can_retry(&self) -> bool {
+        !self.retried
     }
 
     /// Makes the fix confirmed, in the background.
@@ -201,7 +309,9 @@ impl ErrorCard {
         };
         let (fix, dir) = (fix.clone(), self.dir.clone());
         self.stage = Stage::Working;
-        self.start(ctx, move || Reply::Undone(fix.undo(&dir)));
+        self.start(ctx, move || {
+            Reply::Undone(fix.undo(&dir).map_err(|e| (e, fix)))
+        });
     }
 }
 
