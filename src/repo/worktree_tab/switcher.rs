@@ -154,6 +154,16 @@ fn switcher_row(ui: &mut Ui, wt: &Worktree, work: Option<&str>) -> Response {
     let t = Tokens::get(ui.ctx());
     let (rect, resp) =
         ui.allocate_exact_size(vec2(ui.available_width(), SWITCHER_ROW_H), Sense::click());
+    crate::repo::widgets::a11y_selected(
+        &resp,
+        || {
+            let branch = wt.branch.as_deref().unwrap_or("detached HEAD");
+            let changes = changes_line(wt).unwrap_or_default();
+            let path = crate::remote::display(&wt.path);
+            crate::a11y::labels::join([path.as_str(), branch, work.unwrap_or(""), changes.as_str()])
+        },
+        wt.current,
+    );
     if resp.hovered() {
         ui.painter().rect_filled(rect, 0.0, t.hover);
     }

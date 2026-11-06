@@ -359,6 +359,10 @@ fn checks(ui: &mut Ui, d: &PrDetails, acts: &mut Vec<Action>) {
     sorted.sort_by_key(|c| rank(c.state));
     for check in sorted {
         let (rect, r) = ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::click());
+        crate::repo::widgets::a11y(&r, egui::WidgetType::Button, || {
+            let state = crate::repo::ci_status::state_word(check.state);
+            crate::a11y::labels::join([check.name.as_str(), check.detail.as_str(), state])
+        });
         // A run of GitHub Actions opens in the pipeline view, anything else in the browser.
         // Forgejo's and Gitea's Actions have the same URLs, but gitcraft doesn't read their runs.
         let run = (d.forge == Some(crate::forge::Forge::GitHub))

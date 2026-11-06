@@ -175,6 +175,18 @@ pub(super) fn job_graph(
 fn job_card(ui: &mut Ui, rect: Rect, job: &Job, selected: bool, now: i64, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
     let resp = ui.interact(rect, ui.id().with(("ci-job", job.id)), Sense::click());
+    crate::repo::widgets::a11y_selected(
+        &resp,
+        || {
+            let state = crate::repo::ci_status::state_word(job.state);
+            crate::a11y::labels::join([
+                format!("job {}", job.name).as_str(),
+                job.stage.as_str(),
+                state,
+            ])
+        },
+        selected,
+    );
     let fill = if resp.hovered() { t.hover } else { t.card };
     let painter = ui.painter();
     painter.rect_filled(rect, t.radius, fill);

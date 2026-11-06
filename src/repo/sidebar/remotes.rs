@@ -3,6 +3,7 @@
 use egui::{Align2, Rect, Response, Ui, pos2, vec2};
 
 use super::{REMOTE_INDENT, ROW_H, matches, visibility};
+use crate::a11y::labels;
 use crate::git::{Branch, Remote};
 use crate::icons;
 use crate::repo::actions::BranchRef;
@@ -67,6 +68,10 @@ impl RepoTab {
             let mut expanded = ui.data_mut(|d| d.get_persisted::<bool>(id)).unwrap_or(true);
             // By the remote: its menu's Fetch must not move to another one.
             let (rect, r) = widgets::keyed_row(ui, ROW_H, ("remote-row", &remote.name));
+            widgets::a11y(&r, egui::WidgetType::CollapsingHeader, || {
+                let count = labels::count(branches.len(), "branch", "branches");
+                labels::section(&format!("remote {}", remote.name), &count, expanded)
+            });
             if r.clicked() {
                 expanded = !expanded;
                 ui.data_mut(|d| d.insert_persisted(id, expanded));
@@ -308,6 +313,14 @@ fn remote_row(ui: &mut Ui, full: &str, row: LeafRow<'_>, has_pr: bool, hidden: b
     let t = Tokens::get(ui.ctx());
     // Known by the branch, not its place: a fetch adds and prunes rows under an open menu.
     let (rect, resp) = widgets::keyed_row(ui, ROW_H, ("branch-row", full));
+    widgets::a11y(&resp, egui::WidgetType::Button, || {
+        let name = format!("remote branch {}", labels::ref_name(full));
+        let notes = [
+            (has_pr, "has a pull request"),
+            (hidden, "hidden from the graph"),
+        ];
+        labels::with_notes(&name, &notes)
+    });
     if resp.hovered() {
         ui.painter().rect_filled(rect, 0.0, t.hover);
     }

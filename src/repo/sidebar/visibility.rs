@@ -90,17 +90,22 @@ pub(super) fn eye(ui: &Ui, row: &Response, full: &str, shown: bool) -> Option<Ac
         vec2(18.0, 18.0),
     );
     let resp = ui.interact(rect, row.id.with("eye"), Sense::click());
-    if shown && !row.contains_pointer() && !resp.contains_pointer() {
-        return None;
-    }
-    let t = Tokens::get(ui.ctx());
-    let tint = if resp.hovered() { t.text } else { t.text_faint };
-    icons::paint(ui, rect, if shown { "eye" } else { "eye-off" }, 13.0, tint);
     let tip = if shown {
         "Hide in the graph"
     } else {
         "Show in the graph"
     };
+    crate::repo::widgets::a11y(&resp, egui::WidgetType::Button, || {
+        format!("{tip}: {}", crate::a11y::labels::ref_name(full))
+    });
+    // Shown to the keyboard too, while the row or the eye has it.
+    let keyboard = row.has_focus() || resp.has_focus();
+    if shown && !keyboard && !row.contains_pointer() && !resp.contains_pointer() {
+        return None;
+    }
+    let t = Tokens::get(ui.ctx());
+    let tint = if resp.hovered() { t.text } else { t.text_faint };
+    icons::paint(ui, rect, if shown { "eye" } else { "eye-off" }, 13.0, tint);
     resp.on_hover_text(tip)
         .clicked()
         .then(|| Action::BranchVisibility(Change::Toggle(full.to_owned())))

@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use egui::{Align2, Rect, Sense, Ui, pos2, vec2};
 
 use super::remote_short;
+use crate::a11y::labels;
 use crate::forge::{Forge, PullRequest};
 use crate::git::Branch;
 use crate::icons;
@@ -67,6 +68,9 @@ impl RepoTab {
         // Known by its number, not its place: the list reloads (and reorders) on its own, and a
         // menu left open (Check out) must stay this one's.
         let (rect, r) = widgets::keyed_row(ui, 36.0, ("pr-row", pr.number));
+        widgets::a11y(&r, egui::WidgetType::Button, || {
+            labels::pull_request(pr.number, &pr.title, &pr.author, &pr.branch, pr.draft)
+        });
         let shown = self.pr_view.as_ref().is_some_and(|v| v.number == pr.number);
         if shown {
             ui.painter().rect_filled(rect, 0.0, t.row_selected);

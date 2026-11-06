@@ -147,6 +147,12 @@ fn pending_list(ui: &mut Ui, extras: &PrExtras, posting: bool, acts: &mut Vec<Ac
         let remove = ui
             .interact(x, ui.id().with(("pending-remove", &comment.id)), sense)
             .on_hover_text("Remove from the review");
+        crate::repo::widgets::a11y(&remove, egui::WidgetType::Button, || {
+            format!(
+                "Remove the comment on {}{line} from the review",
+                thread.path
+            )
+        });
         if remove.hovered() && !posting {
             ui.painter().rect_filled(x, t.radius_sm, t.pressed);
         }

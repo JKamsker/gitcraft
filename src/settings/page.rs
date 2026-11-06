@@ -140,8 +140,11 @@ impl Settings {
                 })
                 .response
                 .interact(Sense::click())
-                .on_hover_text("Open this page")
-                .on_hover_cursor(egui::CursorIcon::PointingHand);
+                .on_hover_text("Open this page");
+            crate::repo::widgets::a11y(&resp, egui::WidgetType::Link, || {
+                format!("Open the {} page", page.title())
+            });
+            let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
             if resp.clicked() {
                 view.page = page;
                 view.query.clear();
@@ -207,6 +210,14 @@ fn nav(ui: &mut Ui, view: &mut View, counts: &[usize]) {
         let count = counts.get(i).copied();
         let selected = !searching && page == view.page;
         let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 32.0), Sense::click());
+        crate::repo::widgets::a11y_selected(
+            &resp,
+            || {
+                let matches = count.map(|n| crate::a11y::labels::count(n, "match", "matches"));
+                crate::a11y::labels::join([page.title(), &matches.unwrap_or_default()])
+            },
+            selected,
+        );
         let fill = if selected {
             t.hover
         } else if resp.hovered() {

@@ -239,6 +239,13 @@ so your config, credentials and hooks apply as usual.
 - Toasts, and a desktop notification when a long operation ends while the window is in the
   background.
 - Themes: Dark, Medium Gray and Light, from PhotoCraft's Pro palettes.
+- Keyboard and screen readers: Tab / Shift+Tab reach every button, row, pill and card, the one
+  with the keyboard ringed in the accent colour, and Enter or Space clicks it. The graph is one
+  Tab stop on the selected commit, ↑ / ↓ moving the keyboard along. Each painted widget has a
+  name for screen readers (AccessKit): a graph row reads "commit a301da9, Merge…, Jonas, 26
+  minutes ago, branch dev". The system's reduced-motion setting (Animation effects on Windows,
+  Reduce motion on macOS, GNOME's or KDE's animations) stops the tabs and panels sliding;
+  `GITCRAFT_REDUCE_MOTION=1` (or `0`) decides instead.
 
 ## Download
 
@@ -361,6 +368,7 @@ was made this way, on a demo repository.
 | `src/remote/` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
 | `src/settings/`          | user settings, profiles, and the settings pages                                    |
 | `src/manual.rs`          | the manual (F1): features and keyboard shortcuts                                   |
+| `src/a11y/`              | keyboard focus ring, screen-reader names of painted widgets, reduced motion        |
 | `src/theme.rs`           | colour tokens, fonts, egui style (PhotoCraft's Pro themes)                         |
 | `src/icons.rs`           | embedded Lucide SVG icons, tinted                                                  |
 | `src/terminal.rs`        | integrated terminal: pty, VT parsing (`vt100`), painting, keys, selection          |

@@ -72,7 +72,11 @@ impl RepoTab {
 
         // Keyboard navigation (only when no text field has focus, nor a window of the app's
         // is over the tab: the manual, the palette, the clone form).
-        if !ui.ctx().egui_wants_keyboard_input() && self.dialog.is_none() && !self.keys_blocked {
+        // The rows are one Tab stop (see `a11y::list_stop`), whose ↑ / ↓ are these.
+        let rows_id = ui.id().with("graph-rows");
+        let keys_free =
+            !ui.ctx().egui_wants_keyboard_input() || crate::a11y::list_has_focus(ui.ctx(), rows_id);
+        if keys_free && self.dialog.is_none() && !self.keys_blocked {
             self.arrow_keys(ui, acts);
         }
 
@@ -84,6 +88,7 @@ impl RepoTab {
         // Column headers.
         let (header, header_resp) =
             ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::click());
+        super::widgets::a11y(&header_resp, egui::WidgetType::Button, "Graph columns");
         header::column_headers(ui, &t, header, &cols);
         self.column_handles(ui, header, &prefs, &cols, &settings);
         header::header_menu(&header_resp, &settings);
@@ -112,12 +117,20 @@ impl RepoTab {
             if range.end + 40 >= self.commits.len() && self.has_more && !self.loading_more {
                 acts.push(Action::LoadMore);
             }
+            // Tab reaches the selected row, else the first in view.
+            let stop = self
+                .selected
+                .filter(|s| range.contains(s))
+                .unwrap_or(range.start);
             for i in range {
                 if i >= self.commits.len() {
                     loading_row(ui, &t);
                     continue;
                 }
-                let resp = self.commit_row(ui, i, cols, lanes, now, acts);
+                let resp = self.commit_row(ui, i, cols, lanes, now, i == stop, acts);
+                if i == stop {
+                    crate::a11y::list_stop(&resp, rows_id);
+                }
                 if resp.clicked() {
                     // Ctrl+click: compare the selected commit with this one.
                     let compare = ui

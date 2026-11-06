@@ -231,6 +231,7 @@ pub(super) fn dot(ui: &Ui, id: Id, center: Pos2, sha: &str, status: &Status) -> 
     let t = Tokens::get(ui.ctx());
     let rect = Rect::from_center_size(center, vec2(DOT_R * 2.0 + 6.0, DOT_R * 2.0 + 6.0));
     let resp: Response = ui.interact(rect, id, Sense::click());
+    super::widgets::a11y(&resp, egui::WidgetType::Button, || tooltip(status));
     let radius = if resp.hovered() { DOT_R + 1.0 } else { DOT_R };
     paint_dot(ui.painter(), &t, center, radius, status.state);
     let clicked = resp.on_hover_text(tooltip(status)).clicked();

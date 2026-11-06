@@ -1,10 +1,12 @@
 //! One commit row of the graph: its background, the description and the hash, author, when
 //! and date columns.
 
-use egui::{Align2, Color32, CornerRadius, FontId, Painter, Pos2, Rect, Response, Sense, Stroke};
+use egui::{Align2, Color32, CornerRadius, FontId, Painter, Pos2, Rect, Response, Stroke};
 use egui::{Ui, pos2, vec2};
 
+use super::badge::{Badge, badges};
 use super::{AVATAR_D, ROW_GAP, ROW_H, ROW_PITCH};
+use crate::a11y::labels;
 use crate::git::{self, Commit};
 use crate::repo::columns::Cols;
 use crate::repo::{Action, RepoTab, WIP_HASH, ci_status, widgets};
@@ -56,6 +58,7 @@ pub(super) fn row_id(ui: &Ui, hash: &str) -> egui::Id {
 }
 
 impl RepoTab {
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn commit_row(
         &self,
         ui: &mut Ui,
@@ -63,16 +66,20 @@ impl RepoTab {
         cols: Cols,
         lanes: Lanes,
         now: i64,
+        tab_stop: bool,
         acts: &mut Vec<Action>,
     ) -> Response {
         let t = Tokens::get(ui.ctx());
         let (auto_id, rect) = ui.allocate_space(vec2(ui.available_width(), ROW_PITCH));
+        let sense = crate::a11y::list_row_sense(tab_stop);
         let Some(commit) = self.commits.get(i) else {
-            return ui.interact(rect, auto_id, Sense::click());
+            return ui.interact(rect, auto_id, sense);
         };
         // Known by its commit, not its place: rows shift when a reload adds commits or the
         // changes row above them, and a menu opened on one must stay that commit's.
-        let resp = ui.interact(rect, row_id(ui, &commit.hash), Sense::click());
+        let resp = ui.interact(rect, row_id(ui, &commit.hash), sense);
+        let label = || self.row_label(commit, now);
+        widgets::a11y_selected(&resp, label, self.selected == Some(i));
         let painter = ui.painter_at(rect);
         let is_wip = commit.hash == WIP_HASH;
         let is_match = self.search.matches.contains(&commit.hash);
@@ -114,6 +121,25 @@ impl RepoTab {
             }
         }
         resp
+    }
+
+    /// What a screen reader says for the row of `commit`: the changes row's counts, a stash's
+    /// message, or a commit's hash, summary, author, age and branches.
+    fn row_label(&self, commit: &Commit, now: i64) -> String {
+        if commit.hash == WIP_HASH {
+            let w = &self.work;
+            return labels::changes(w.conflicted.len(), w.staged.len(), w.unstaged.len());
+        }
+        let when = git::relative_time(commit.time, now);
+        if self.stashes.iter().any(|s| s.hash == commit.hash) {
+            return labels::join(["stash", commit.summary.as_str(), when.as_str()]);
+        }
+        let refs: Vec<String> = badges(&commit.refs, &self.refs)
+            .iter()
+            .map(Badge::spoken)
+            .collect();
+        let short = crate::repo::short(&commit.hash);
+        labels::commit(short, &commit.summary, &commit.author, &when, &refs)
     }
 
     /// Whether `commit` is an end of the comparison shown on the right (the changes row for

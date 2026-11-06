@@ -3,6 +3,7 @@
 use egui::{Align2, Rect, Response, Ui, pos2, vec2};
 
 use super::{ROW_H, matches, remote_short, visibility};
+use crate::a11y::labels;
 use crate::ci::Status;
 use crate::git::Branch;
 use crate::icons;
@@ -425,6 +426,16 @@ fn branch_row(
     // Known by the branch, not its place: a fetch or a branch made in the terminal shifts the
     // rows, and a menu left open (Merge, Rebase, Check out…) must stay this branch's.
     let (rect, resp) = widgets::keyed_row(ui, ROW_H, ("branch-row", full));
+    widgets::a11y(&resp, egui::WidgetType::Button, || {
+        let branch = labels::branch(labels::ref_name(full), is_head, ahead as _, behind as _);
+        let notes = [
+            (gone, "upstream gone"),
+            (in_worktree, "checked out in another worktree"),
+            (has_pr, "has a pull request"),
+            (hidden, "hidden from the graph"),
+        ];
+        labels::with_notes(&branch, &notes)
+    });
     let painter = ui.painter_at(rect);
     if is_head {
         painter.rect_filled(rect, 0.0, t.accent.gamma_multiply(0.14));

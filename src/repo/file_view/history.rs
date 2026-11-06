@@ -75,6 +75,12 @@ impl RepoTab {
                     let Some(c) = commits.get(i) else { continue };
                     let (rect, resp) =
                         ui.allocate_exact_size(vec2(ui.available_width(), ROW_H), Sense::click());
+                    let label = || {
+                        let when = git::relative_time(c.time, now);
+                        let short = c.hash.get(..7).unwrap_or(&c.hash);
+                        crate::a11y::labels::commit(short, &c.summary, &c.author, &when, &[])
+                    };
+                    widgets::a11y_selected(&resp, label, open == Some(c.hash.as_str()));
                     let p = ui.painter_at(rect);
                     if open == Some(c.hash.as_str()) {
                         p.rect_filled(rect, 0.0, t.row_selected);

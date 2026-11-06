@@ -3,6 +3,7 @@
 use egui::{Align2, CornerRadius, Painter, Rect, Response, Sense, Ui, pos2, vec2};
 
 use super::{ROW_H, status_color};
+use crate::a11y::labels;
 use crate::icons;
 use crate::theme::{self, Tokens};
 
@@ -37,6 +38,7 @@ pub fn file_row(
     // Stage must stay this file's. A list that can show a path another one shows too (staged
     // and unstaged) is drawn under an id of its own.
     let (rect, row) = super::keyed_row(ui, ROW_H, ("file-row", path));
+    super::a11y_selected(&row, || labels::file(path, code, old_path), selected);
     let hovered = ui.rect_contains_pointer(rect);
     let painter = ui.painter_at(rect);
     if selected {
@@ -69,7 +71,10 @@ pub fn file_row(
             right = stats(&painter, &t, right, y, added, removed);
         }
         RowExtra::Buttons(buttons) => {
-            if hovered || selected {
+            // Also while the keyboard is on the row or one of them, so Tab reaches them.
+            let keyboard = row.has_focus()
+                || (0..buttons.len()).any(|i| ui.memory(|m| m.has_focus(button_id(&row, i))));
+            if hovered || selected || keyboard {
                 (right, button) = hover_buttons(ui, &painter, &t, &row, right, buttons);
             }
         }
@@ -171,8 +176,9 @@ fn hover_buttons(
     for (i, (icon, tooltip)) in buttons.iter().enumerate().rev() {
         let r = Rect::from_center_size(pos2(right - 10.0, y), vec2(20.0, 20.0));
         let resp = ui
-            .interact(r, row.id.with(("btn", i)), Sense::click())
+            .interact(r, button_id(row, i), Sense::click())
             .on_hover_text(*tooltip);
+        super::a11y(&resp, egui::WidgetType::Button, *tooltip);
         if resp.hovered() {
             painter.rect_filled(r, t.radius_sm, t.pressed);
         }
@@ -189,6 +195,11 @@ fn hover_buttons(
         right = r.left() - 2.0;
     }
     (right, clicked)
+}
+
+/// The `i`th icon button of `row`.
+fn button_id(row: &Response, i: usize) -> egui::Id {
+    row.id.with(("btn", i))
 }
 
 /// `(folder, name)` of a path: `src/repo` and `mod.rs`. A slash at the end (git shows a nested

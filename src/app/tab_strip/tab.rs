@@ -1,12 +1,13 @@
 //! One tab on the strip: its icon, name, worktree chip, badge and close button.
 
-use egui::{Pos2, Rect, Sense, Stroke, Ui, pos2, vec2};
+use egui::{Pos2, Rect, Sense, Stroke, Ui, WidgetType, pos2, vec2};
 
 use super::{BADGE_W, Placed, TabDrag, TabEnv};
+use crate::a11y::labels;
 use crate::app::Tab;
 use crate::icons;
-use crate::repo::RepoTab;
 use crate::repo::worktree_tab::{self, Chip};
+use crate::repo::{RepoTab, widgets};
 use crate::tab_look::{self, TabLook};
 use crate::theme::{self, Tokens};
 
@@ -29,6 +30,12 @@ pub(super) fn tab_ui(ui: &mut Ui, placed: Placed<'_>, env: &mut TabEnv<'_>) {
         Tab::Settings => ("Settings".to_owned(), false),
     };
     let resp = ui.interact(rect, id, Sense::click_and_drag());
+    let name = title.galley.text();
+    let label = || match tooltip.as_str() {
+        same if same == name => name.to_owned(),
+        more => labels::join([name, more]),
+    };
+    widgets::a11y_selected(&resp, label, active);
     let hovered = resp.hovered() && env.dragging.is_none();
     let default_look = TabLook::default();
     let look = match tab {
@@ -175,12 +182,16 @@ fn active_chip(
     let t = env.t;
     let body = chip_rect.with_max_x(chip_rect.right() - worktree_tab::CHIP_CLOSE_W);
     let c = ui.interact(body, id.with("worktree"), Sense::click());
+    widgets::a11y(&c, WidgetType::Button, || {
+        labels::join(["Switch worktree", chip.full_name.as_str()])
+    });
     worktree_tab::paint_chip(ui, chip_rect, chip, true, c.hovered());
     let close_rect = Rect::from_center_size(
         pos2(chip_rect.right() - worktree_tab::CHIP_CLOSE_W / 2.0, y),
         vec2(18.0, 18.0),
     );
     let x = ui.interact(close_rect, id.with("close-worktree"), Sense::click());
+    widgets::a11y(&x, WidgetType::Button, "Close this worktree");
     if x.hovered() {
         ui.painter().rect_filled(close_rect, t.radius_sm, t.pressed);
     }
@@ -239,6 +250,7 @@ fn close_button(
     dragging: Option<usize>,
 ) -> bool {
     let c = ui.interact(rect, tab_id.with("close"), Sense::click());
+    widgets::a11y(&c, WidgetType::Button, "Close tab");
     if c.hovered() {
         ui.painter().rect_filled(rect, t.radius_sm, t.pressed);
     }

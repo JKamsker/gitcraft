@@ -1,0 +1,90 @@
+//! Accessibility of the hand-painted widgets: a focus ring while one has the keyboard, a name
+//! for screen readers (AccessKit), and the system's reduced-motion setting.
+//!
+//! Painted rows, pills and cards sense clicks, so egui already lets Tab reach them and Enter /
+//! Space click them. [`a11y`] names each one and marks it for the ring, which [`end_frame`]
+//! draws over everything else of its layer once the frame is painted.
+
+mod focus;
+pub mod labels;
+pub mod motion;
+
+use egui::{Response, WidgetInfo, WidgetType};
+
+pub use focus::{keyboard_taken, list_has_focus, list_row_sense, list_stop};
+
+/// What a widget is called, built only when a screen reader or an event asks: a graph row's
+/// name joins several fields, and rows are drawn every frame.
+pub trait Label {
+    fn text(&self) -> String;
+}
+
+impl Label for &str {
+    fn text(&self) -> String {
+        (*self).to_owned()
+    }
+}
+
+impl Label for String {
+    fn text(&self) -> String {
+        self.clone()
+    }
+}
+
+impl Label for &String {
+    fn text(&self) -> String {
+        (*self).clone()
+    }
+}
+
+impl<F: Fn() -> String> Label for F {
+    fn text(&self) -> String {
+        self()
+    }
+}
+
+/// Names a hand-painted widget for screen readers (as `typ`, read as `label`) and gives it the
+/// focus ring while it has the keyboard. Call once per frame, after the widget's interaction.
+pub fn a11y(resp: &Response, typ: WidgetType, label: impl Label) {
+    let enabled = resp.enabled();
+    resp.widget_info(|| WidgetInfo::labeled(typ, enabled, labels::clean(&label.text())));
+    focus::note(resp);
+}
+
+/// [`a11y`] for a row of a list that is selected or not (a commit, a palette entry), so a
+/// screen reader says which one is.
+pub fn a11y_selected(resp: &Response, label: impl Label, selected: bool) {
+    let enabled = resp.enabled();
+    resp.widget_info(|| WidgetInfo {
+        selected: Some(selected),
+        ..WidgetInfo::labeled(
+            WidgetType::SelectableLabel,
+            enabled,
+            labels::clean(&label.text()),
+        )
+    });
+    focus::note(resp);
+}
+
+/// [`a11y`] in a chain of a response's calls, for a button that only shows an icon: its name
+/// replaces the one the shared button gave it.
+pub trait Named {
+    fn named(self, label: impl Label) -> Self;
+}
+
+impl Named for Response {
+    fn named(self, label: impl Label) -> Self {
+        a11y(&self, WidgetType::Button, label);
+        self
+    }
+}
+
+/// Once the frame's widgets are drawn: the focus ring, over them, and egui's own animations
+/// stopped when the system asks for less motion.
+pub fn end_frame(ctx: &egui::Context) {
+    focus::paint_ring(ctx);
+    motion::apply(ctx);
+}
+
+#[cfg(test)]
+mod tests;
