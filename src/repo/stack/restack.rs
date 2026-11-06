@@ -79,7 +79,7 @@ impl RepoTab {
 
     pub(in crate::repo) fn abort_restack(&mut self, ctx: &egui::Context) {
         self.run_restack("Abort restack", ctx, |path| {
-            restack::abort(path).map(|()| Outcome::Done(Vec::new()))
+            restack::abort(path).map(Outcome::Aborted)
         });
     }
 
@@ -107,14 +107,14 @@ impl RepoTab {
         };
         spawn_or(&self.tx, ctx, failed, move || match work(&path) {
             Ok(outcome) => Msg::Then(Box::new(move |tab, ctx| {
-                tab.restack_done(&label, outcome, ctx);
+                tab.restack_done(outcome, ctx);
             })),
             Err(e) => failed_msg(label, e),
         });
     }
 
     /// Takes in how a restack (or the part of it run now) ended.
-    fn restack_done(&mut self, label: &str, outcome: Outcome, ctx: &egui::Context) {
+    fn restack_done(&mut self, outcome: Outcome, ctx: &egui::Context) {
         self.busy_op = None;
         let long = self
             .op_started
@@ -125,9 +125,6 @@ impl RepoTab {
                 let n = moved.len();
                 self.status = Some((
                     match n {
-                        _ if label == "Abort restack" => {
-                            "Restack aborted: every branch is back where it was".to_owned()
-                        }
                         0 => "Restack: every branch was already on its parent's tip".to_owned(),
                         1 => "Restack: 1 branch moved · Ctrl+Z puts it back".to_owned(),
                         n => format!("Restack: {n} branches moved · Ctrl+Z puts them back"),
@@ -144,6 +141,23 @@ impl RepoTab {
                     });
                     self.redo_stack.clear();
                 }
+            }
+            Outcome::Aborted(kept) => {
+                self.status = Some(if kept.is_empty() {
+                    (
+                        "Restack aborted: every branch is back where it was".to_owned(),
+                        false,
+                    )
+                } else {
+                    (
+                        format!(
+                            "Restack aborted: every branch is back where it was but {}, which \
+                             got commits after it was restacked and is left as it is",
+                            kept.join(", ")
+                        ),
+                        true,
+                    )
+                });
             }
             Outcome::Stopped {
                 branch, worktree, ..
@@ -339,7 +353,16 @@ pub(crate) fn undo_steps(moved: &[Moved]) -> (Vec<Vec<String>>, Vec<Vec<String>>
                 Place::Nowhere => {}
             }
         }
-        for m in moved {
+        // The resets first, which refuse over changes they would lose: refused, nothing has
+        // moved yet. A branch not checked out goes last (`branch -f`, which refuses one
+        // checked out somewhere since).
+        let mut order: Vec<&Moved> = moved.iter().collect();
+        order.sort_by_key(|m| match m.place {
+            Place::Here => 0,
+            Place::Worktree(_) => 1,
+            Place::Nowhere => 2,
+        });
+        for m in order {
             let (from, to) = ends(m, back);
             steps.push(move_step(m, from, to));
             let key = config_key(&m.branch, BASE_KEY);
@@ -368,20 +391,19 @@ fn ends(m: &Moved, back: bool) -> (&str, &str) {
 }
 
 /// The git command that moves `m`'s branch from `from` to `to`, where it is checked out.
-fn move_step(m: &Moved, from: &str, to: &str) -> Vec<String> {
-    let words: Vec<&str> = match &m.place {
-        Place::Here => vec!["reset", "-q", "--keep", to],
-        Place::Worktree(_) => vec!["reset", "-q", "--keep", to],
-        Place::Nowhere => vec!["update-ref", "-m", "gitcraft: undo restack"],
-    };
+/// (Its `expect_ref_at` checks it is still at `from`.)
+fn move_step(m: &Moved, _from: &str, to: &str) -> Vec<String> {
     let mut step: Vec<String> = Vec::new();
     if let Place::Worktree(path) = &m.place {
         step.extend(["-C".to_owned(), there(path)]);
     }
+    let words: Vec<&str> = match &m.place {
+        Place::Here | Place::Worktree(_) => vec!["reset", "-q", "--keep", to],
+        // git refuses to force a branch checked out in any worktree: one checked out since
+        // isn't moved under its files.
+        Place::Nowhere => vec!["branch", "-f", "--", &m.branch, to],
+    };
     step.extend(words.into_iter().map(str::to_owned));
-    if m.place == Place::Nowhere {
-        step.extend([local_ref(&m.branch), to.to_owned(), from.to_owned()]);
-    }
     step
 }
 

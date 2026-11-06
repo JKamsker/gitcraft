@@ -289,7 +289,15 @@ fn todo(
     refs: &[(String, String)],
 ) -> String {
     let mut out = String::new();
+    // A branch's update-ref waits for the squashes and fixups melded into its commit: placed
+    // before them, the branch would be left on the commit as it was before they were.
+    let mut waiting: Vec<&str> = Vec::new();
     for (i, e) in entries.iter().enumerate() {
+        if !matches!(e.step, Step::Squash | Step::Fixup) {
+            for name in waiting.drain(..) {
+                out.push_str(&format!("update-ref {name}\n"));
+            }
+        }
         let verb = match e.step {
             Step::Pick | Step::Reword => "pick",
             Step::Squash => "squash",
@@ -302,9 +310,14 @@ fn todo(
                 "exec git commit --amend --allow-empty --cleanup=whitespace -F {file}\n"
             ));
         }
-        for (_, name) in refs.iter().filter(|(at, _)| *at == e.commit.hash) {
-            out.push_str(&format!("update-ref {name}\n"));
-        }
+        waiting.extend(
+            refs.iter()
+                .filter(|(at, _)| *at == e.commit.hash)
+                .map(|(_, name)| name.as_str()),
+        );
+    }
+    for name in waiting {
+        out.push_str(&format!("update-ref {name}\n"));
     }
     out
 }
@@ -598,7 +611,11 @@ mod tests {
             entry("c3", Step::Squash),
             entry("d4", Step::Drop),
         ];
-        let refs = [("c3".to_owned(), "refs/heads/api".to_owned())];
+        // api on b2, which c3 is squashed into: placed after the squash. ui on the last one.
+        let refs = [
+            ("b2".to_owned(), "refs/heads/api".to_owned()),
+            ("d4".to_owned(), "refs/heads/ui".to_owned()),
+        ];
         let todo = todo(
             &entries,
             |i| (i == 1).then(|| "'/tmp/m 1.txt'".to_owned()),
@@ -606,7 +623,7 @@ mod tests {
         );
         assert_eq!(
             todo,
-            "pick a1 summary a1\npick b2 summary b2\nexec git commit --amend --allow-empty --cleanup=whitespace -F '/tmp/m 1.txt'\nsquash c3 summary c3\nupdate-ref refs/heads/api\ndrop d4 summary d4\n"
+            "pick a1 summary a1\npick b2 summary b2\nexec git commit --amend --allow-empty --cleanup=whitespace -F '/tmp/m 1.txt'\nsquash c3 summary c3\nupdate-ref refs/heads/api\ndrop d4 summary d4\nupdate-ref refs/heads/ui\n"
         );
     }
 

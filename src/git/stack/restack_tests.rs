@@ -351,3 +351,79 @@ fn a_conflict_in_another_worktree_stops_there_resumes_and_aborts() -> Result<(),
     run(true)?;
     run(false)
 }
+
+/// A parent rewound to an older commit: the commit it lost is dropped from the layer too,
+/// not kept as one of the layer's own.
+#[test]
+fn a_rewound_parent_is_restacked_onto() -> Result<(), String> {
+    let repo = TestRepo::new("restack rewound")?;
+    repo.branch("a", "main")?;
+    let a1 = repo.commit("a1.txt", "1\n", "a1")?;
+    repo.commit("a2.txt", "2\n", "a2")?;
+    repo.steps(&super::set_parent_ops("a", "main", &repo.tip("main")?))?;
+    repo.branch("b", "a")?;
+    repo.commit("b.txt", "b\n", "b")?;
+    repo.steps(&super::set_parent_ops("b", "a", &repo.tip("a")?))?;
+    repo.checkout("main")?;
+    repo.git(&["branch", "-f", "a", &a1])?;
+    let Outcome::Done(moved) = start(repo.path(), steps(&repo, &["b"])?)? else {
+        return Err("stopped".into());
+    };
+    assert_eq!(moved.len(), 1);
+    assert_eq!(on_top(&repo, "a", "b")?, "1");
+    assert!(repo.git(&["cat-file", "-e", "b:a2.txt"]).is_err());
+    Ok(())
+}
+
+/// Aborting leaves alone a layer that got commits after it was restacked.
+#[test]
+fn aborting_keeps_commits_made_after_a_layer_was_restacked() -> Result<(), String> {
+    let repo = conflicting_in("restack abort keeps", "ui")?;
+    let api = repo.tip("api")?;
+    assert!(matches!(
+        start(repo.path(), steps(&repo, &["api", "ui"])?)?,
+        Outcome::Stopped { .. }
+    ));
+    repo.git(&["rebase", "--abort"])?;
+    repo.checkout("api")?;
+    let precious = repo.commit("precious.txt", "p\n", "precious")?;
+    repo.checkout("main")?;
+    let kept = abort(repo.path())?;
+    assert_eq!(kept, ["api"]);
+    assert_eq!(repo.tip("api")?, precious);
+    assert_ne!(repo.tip("api")?, api);
+    assert!(pending(repo.path())?.is_none());
+    Ok(())
+}
+
+/// A layer whose worktree has a merge of the user's going on isn't rebased there, nor is that
+/// merge taken for a stop of the restack.
+#[test]
+fn a_worktree_with_an_operation_in_progress_is_refused() -> Result<(), String> {
+    let repo = TestRepo::new("restack wt busy")?;
+    repo.stack(&["schema", "api"])?;
+    repo.checkout("schema")?;
+    repo.commit("s2.txt", "2\n", "schema 2")?;
+    repo.git(&["branch", "side", "main"])?;
+    repo.checkout("side")?;
+    repo.commit("api.txt", "side\n", "side changes api's file")?;
+    repo.checkout("main")?;
+    let wt = worktree(&repo, "api")?;
+    let result = (|| -> Result<(), String> {
+        // A merge stopped on conflicts there.
+        assert!(git_in(&wt, &["merge", "side"]).is_err());
+        let api = repo.tip("api")?;
+        let err = start(repo.path(), steps(&repo, &["api"])?)
+            .err()
+            .unwrap_or_default();
+        assert!(err.contains("merge in progress"), "{err}");
+        assert_eq!(repo.tip("api")?, api);
+        // Kept, so that it can be aborted once the merge is dealt with.
+        git_in(&wt, &["merge", "--abort"])?;
+        assert!(abort(repo.path())?.is_empty());
+        Ok(())
+    })();
+    let _ = repo.git(&["worktree", "remove", "--force", &wt.to_string_lossy()]);
+    let _ = std::fs::remove_dir_all(&wt);
+    result
+}
