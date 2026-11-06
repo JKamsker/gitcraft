@@ -212,6 +212,15 @@ so your config, credentials and hooks apply as usual.
     a YAML alias is compared as what its anchor holds; JSON may have the comments and
     trailing commas of JSON-with-comments files. A file that doesn't parse says on which side
     and line.
+  - _Dependency changes_ (the package, for `Cargo.lock`, `package-lock.json`,
+    `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `poetry.lock`, `uv.lock`, `composer.lock` and
+    `go.sum`): the packages upgraded, downgraded, added and removed, each with its versions,
+    a link to its registry page (crates.io, npm, PyPI, Packagist, pkg.go.dev) and one to what
+    changed between the two versions (diff.rs for crates, npmdiff.dev for npm packages, the
+    release history elsewhere); changes of licence are shown where the lockfile records them
+    (npm, Composer). A package kept at several versions is listed per version added or
+    removed. A click on a package's name goes to its line. The links open in the browser only
+    when clicked: reading the lockfile asks nothing of any server.
   - _API contract changes_ (the server, for an OpenAPI or Swagger file: offered on files named
     like one, and from the view by key of any JSON or YAML file that is one): what breaks the
     API's clients, each with its endpoint — endpoints removed, parameters that became required
