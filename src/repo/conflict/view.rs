@@ -3,7 +3,7 @@
 
 use egui::{RichText, Sense, Stroke, Ui, vec2};
 
-use super::{Choice, ConflictEditor, Segment, render};
+use super::{Choice, ConflictEditor, Segment};
 use crate::icons;
 use crate::repo::diff::literal_path;
 use crate::repo::{Action, Refresh, RepoTab, ops, widgets};
@@ -13,13 +13,15 @@ impl RepoTab {
     pub(in crate::repo) fn conflict_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         let idle = self.busy_op.is_none();
+        let rerere = self.rerere.enabled;
         let Some(ed) = &mut self.conflict else { return };
         let (ours_name, theirs_name) = ed.side_names();
         let left = ed.unresolved();
         // While it is written (on another machine), what is saved is what is shown.
         let editable = !ed.saving;
 
-        ed.header(ui, &t, idle && editable, left, acts);
+        ed.header(ui, &t, (idle && editable, rerere), left, acts);
+        ed.reused_banner(ui, &t, idle, rerere, acts);
         ed.result_panel(ui, &t, editable);
         ed.conflict_list(ui, &t, (&ours_name, &theirs_name), editable);
     }
@@ -27,7 +29,15 @@ impl RepoTab {
 
 impl ConflictEditor {
     /// Header: the file, how many conflicts are resolved, save, the whole-file actions, close.
-    fn header(&self, ui: &mut Ui, t: &Tokens, idle: bool, left: usize, acts: &mut Vec<Action>) {
+    /// `rerere`: whether resolutions are remembered here.
+    fn header(
+        &self,
+        ui: &mut Ui,
+        t: &Tokens,
+        (idle, rerere): (bool, Option<bool>),
+        left: usize,
+        acts: &mut Vec<Action>,
+    ) {
         let total = self.choices.len();
         egui::Frame::new()
             .fill(t.chrome)
@@ -61,6 +71,7 @@ impl ConflictEditor {
                             acts.push(Action::SaveConflict);
                         }
                         self.whole_file_buttons(ui, idle, acts);
+                        super::reused::rerere_switch(ui, rerere, acts);
                     });
                 });
             });
@@ -75,7 +86,9 @@ impl ConflictEditor {
             ("--ours", "--theirs")
         };
         // Also for a repository elsewhere: Mergiraf solves a copy of the file here.
-        let offer_mergiraf = crate::settings::Settings::get(ui.ctx()).mergiraf
+        // Not for a file without markers, which Mergiraf would solve from scratch.
+        let offer_mergiraf = self.reused.is_none()
+            && crate::settings::Settings::get(ui.ctx()).mergiraf
             && crate::mergiraf::found(ui.ctx()).is_some();
         if offer_mergiraf {
             if self.solving {
@@ -142,11 +155,7 @@ impl ConflictEditor {
                             );
                         if ui.small_button("Back to choices").clicked() {
                             self.manual = false;
-                            self.result = render(
-                                &self.segments,
-                                &self.choices,
-                                (&self.ours_label, &self.theirs_label),
-                            );
+                            self.result = self.rendered();
                         }
                     }
                 });
@@ -195,7 +204,9 @@ impl ConflictEditor {
                                         .font(theme::semibold(12.0)),
                                 );
                                 ui.add_space(8.0);
-                                if let Some(choice) = choice_buttons(ui, t, chosen, names) {
+                                let recorded = self.recorded(k).is_some();
+                                if let Some(choice) = choice_buttons(ui, t, chosen, names, recorded)
+                                {
                                     pick = Some((k, choice));
                                 }
                             });
@@ -216,6 +227,11 @@ impl ConflictEditor {
                                     side_box(col, t, (k, side), name, text, picked);
                                 }
                             });
+                            if let Some(text) = self.recorded(k) {
+                                ui.add_space(4.0);
+                                let picked = chosen == Some(Choice::Recorded);
+                                super::reused::recorded_box(ui, t, k, text, picked);
+                            }
                         });
                     let (sep, _) =
                         ui.allocate_exact_size(vec2(ui.available_width(), 1.0), Sense::hover());
@@ -229,20 +245,23 @@ impl ConflictEditor {
     }
 }
 
-/// The four ways to resolve one conflict, the `chosen` one lit; returns the one clicked.
+/// The ways to resolve one conflict (the reused text too, when there is one: `recorded`), the
+/// `chosen` one lit; returns the one clicked.
 fn choice_buttons(
     ui: &mut Ui,
     t: &Tokens,
     chosen: Option<Choice>,
     (ours_name, theirs_name): (&str, &str),
+    recorded: bool,
 ) -> Option<Choice> {
     let mut clicked = None;
-    for (choice, label) in [
+    let reused = recorded.then_some((Choice::Recorded, "Reused"));
+    for (choice, label) in reused.into_iter().chain([
         (Choice::Ours, ours_name),
         (Choice::Theirs, theirs_name),
         (Choice::OursThenTheirs, "Both (ours first)"),
         (Choice::TheirsThenOurs, "Both (theirs first)"),
-    ] {
+    ]) {
         let on = chosen == Some(choice);
         let text = if on {
             RichText::new(label).color(t.accent_text)

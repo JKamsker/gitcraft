@@ -373,6 +373,15 @@ error: failed to push some refs";
         "Push failed: error: failed to push some refs"
     );
     assert_eq!(headline("Fetch: done"), "Fetch: done");
+    let reused = "Merge x failed: CONFLICT (content): Merge conflict in a.rs
+CONFLICT (content): Merge conflict in b.rs
+Resolved 'a.rs' using previous resolution.
+Automatic merge failed";
+    assert_eq!(
+        headline(reused),
+        "Merge x failed: conflicts in 2 files (1 resolved as before: check it), resolve them in \
+         Changes"
+    );
 }
 
 #[test]
