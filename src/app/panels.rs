@@ -52,6 +52,10 @@ impl App {
             update: self.update_check(),
             check_updates_now: false,
             previous: self.previous_version.as_ref().map(|p| p.label().to_owned()),
+            previous_is_newer: self
+                .previous_version
+                .as_ref()
+                .is_some_and(update::Previous::is_newer),
             pinned: self.pinned_version.clone(),
             go_back: false,
             unpin: false,

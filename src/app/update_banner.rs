@@ -84,15 +84,21 @@ impl App {
     }
 
     /// Goes back to the version the last update replaced ("Go back to 0.3.3" in the settings)
-    /// and pins it: the window closes, which saves the tabs, and `main` starts that version.
+    /// and pins it, or forward again to the one gone back from, unpinned: the window closes, which saves the tabs, and `main` starts that version.
     pub(super) fn go_back(&mut self, ctx: &egui::Context) {
         match update::go_back() {
             Ok((program, previous)) => {
-                self.pinned_version = previous
-                    .version
-                    .unwrap_or_else(|| update::PIN_THIS.to_owned());
-                // Versions before pins existed skip this one instead.
-                self.skipped_version = update::CURRENT.to_owned();
+                if previous.is_newer() {
+                    // Forward again, to the version gone back from: no longer staying put.
+                    self.pinned_version.clear();
+                    self.skipped_version.clear();
+                } else {
+                    self.pinned_version = previous
+                        .version
+                        .unwrap_or_else(|| update::PIN_THIS.to_owned());
+                    // Versions before pins existed skip this one instead.
+                    self.skipped_version = update::CURRENT.to_owned();
+                }
                 self.update = None;
                 update::relaunch_after_exit(program);
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);

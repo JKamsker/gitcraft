@@ -241,6 +241,8 @@ pub fn previous() -> Option<Previous> {
     can_update()
         .then(|| previous::find(layout.path()))
         .flatten()
+        // The same version as this one (installed again by hand): nothing to go to.
+        .filter(|p| p.version.as_deref() != Some(super::CURRENT))
 }
 
 /// Puts the version kept by the last update back in place of this one ("Go back to 0.3.3"),

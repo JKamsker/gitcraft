@@ -38,6 +38,8 @@ pub struct SettingsView<'a> {
     pub check_updates_now: bool,
     /// The version the last update replaced, when it can be gone back to.
     pub previous: Option<String>,
+    /// `previous` is newer than this version: going to it is going forward again.
+    pub previous_is_newer: bool,
     /// The version gone back to and stayed on; empty when none.
     pub pinned: String,
     /// Set by the page: go back to `previous`.
