@@ -137,6 +137,17 @@ so your config, credentials and hooks apply as usual.
   and above the changed files of an open pull request) opens the worktree its branch is checked
   out in, or makes one beside the repository first: on the local branch, on a new one tracking
   the remote branch, or fetched from the forge for a fork that isn't a remote here.
+- Start work from an issue: _Start work from an issue…_ (the palette, or the button on the pull
+  requests' header) lists the open issues of the repository assigned to you (`gh issue list
+  --assignee @me`, `glab issue list --assignee=@me`, Forgejo's and Gitea's API with your login
+  for the host). Pick one, and gitcraft makes a branch named after it (`42-fix-login-crash`)
+  from the default branch as the remote has it, checked out here or in a new worktree beside the
+  repository. While that branch is checked out, a card above the graph keeps the issue in view:
+  its _Acceptance criteria_ section, else its task list, else its description, folded away with
+  a click. Which issue a branch is for is kept in the repository's git config
+  (`branch.<name>.gitcraft-issue`), so it works over WSL and SSH, every worktree sees it and git
+  renames or deletes it with the branch. _Create pull request…_ on that branch starts with the
+  issue's title and `Closes #42`.
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
 
 **Changes and commits** (right)

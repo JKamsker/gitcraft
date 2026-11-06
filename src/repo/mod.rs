@@ -17,6 +17,7 @@ mod file_text;
 mod file_view;
 mod graph_view;
 mod highlight;
+mod issue_work;
 mod keep_submodules;
 mod layout;
 mod load;
@@ -137,6 +138,8 @@ pub struct RepoTab {
     prs_loaded: Option<Instant>,
     /// The build status of the commits that show one.
     ci: ci_status::CiStatuses,
+    /// The issues branches were made for, and the list of those assigned to you.
+    issue_work: issue_work::IssueWork,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -299,6 +302,7 @@ impl RepoTab {
             pr_error: None,
             prs_loaded: None,
             ci: ci_status::CiStatuses::default(),
+            issue_work: Default::default(),
             selected: None,
             stash_view: None,
             scroll_to: None,
