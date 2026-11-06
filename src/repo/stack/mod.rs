@@ -4,6 +4,7 @@
 
 mod dialog;
 mod model;
+mod publish;
 mod restack;
 mod section;
 #[cfg(test)]
@@ -40,6 +41,13 @@ pub(crate) enum StackAct {
     ResumeRestack,
     /// Give up the restack that stopped: every branch back where it was.
     AbortRestack,
+    /// Preview publishing the pull requests of the stack the branch is in.
+    OpenPublish(String),
+    /// Open new pull requests as drafts, or not.
+    PublishDraft(bool),
+    /// Publish as previewed.
+    StartPublish,
+    ClosePublish,
 }
 
 /// The tab's stacks.
@@ -58,6 +66,8 @@ pub(crate) struct Stacks {
     pub pending: Option<stack::restack::Pending>,
     /// The restack being previewed.
     pub preview: Option<restack::RestackPreview>,
+    /// The pull requests of a stack being previewed.
+    pub publish: Option<publish::PublishPreview>,
 }
 
 impl Stacks {
@@ -68,7 +78,7 @@ impl Stacks {
 
     /// Whether one of its dialogs is open (the keys are left to it).
     pub fn modal_open(&self) -> bool {
-        self.dialog.is_some() || self.preview.is_some()
+        self.dialog.is_some() || self.preview.is_some() || self.publish.is_some()
     }
 
     /// The layer `branch` is, if it is one.
@@ -141,6 +151,14 @@ impl RepoTab {
             StackAct::CloseRestack => self.stacks.preview = None,
             StackAct::ResumeRestack => self.resume_restack(ctx),
             StackAct::AbortRestack => self.abort_restack(ctx),
+            StackAct::OpenPublish(branch) => self.open_publish(&branch, ctx),
+            StackAct::PublishDraft(draft) => {
+                if let Some(p) = &mut self.stacks.publish {
+                    p.draft = draft;
+                }
+            }
+            StackAct::StartPublish => self.start_publish(ctx),
+            StackAct::ClosePublish => self.stacks.publish = None,
         }
     }
 

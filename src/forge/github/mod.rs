@@ -58,7 +58,7 @@ impl Provider for GitHub {
                 "--limit",
                 "100",
                 "--json",
-                "number,title,headRefName,headRefOid,author,url,isDraft",
+                "number,title,headRefName,baseRefName,headRefOid,author,url,isDraft",
             ],
         )?;
         parse_list(&out)
@@ -73,6 +73,11 @@ impl Provider for GitHub {
             args.push("--draft");
         }
         gh(repo, &args).map(|out| out.trim().to_owned())
+    }
+
+    fn retarget(&self, repo: &Path, _: &Hosting, number: u64, base: &str) -> Result<(), String> {
+        let number = number.to_string();
+        gh(repo, &["pr", "edit", &number, "--base", base]).map(drop)
     }
 
     /// The authors' GitHub accounts, from the repository's latest commits (the API ties each
@@ -133,6 +138,7 @@ fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
             number: item.get("number").and_then(Value::as_u64).unwrap_or(0),
             title: at(item, "/title").to_owned(),
             branch: at(item, "/headRefName").to_owned(),
+            base: at(item, "/baseRefName").to_owned(),
             sha: at(item, "/headRefOid").to_owned(),
             author: login(item, "/author/login"),
             url: at(item, "/url").to_owned(),
@@ -169,7 +175,7 @@ mod tests {
 
     #[test]
     fn parses_pull_requests() {
-        let gh = r#"[{"number":7,"title":"Fix","headRefName":"fix/x","headRefOid":"c0ffee","author":{"login":"ana"},"url":"https://g/7","isDraft":true}]"#;
+        let gh = r#"[{"number":7,"title":"Fix","headRefName":"fix/x","baseRefName":"main","headRefOid":"c0ffee","author":{"login":"ana"},"url":"https://g/7","isDraft":true}]"#;
         let prs = parse_list(gh).unwrap_or_default();
         assert_eq!(prs.len(), 1);
         assert_eq!(
@@ -177,6 +183,7 @@ mod tests {
             (7, "fix/x", true)
         );
         assert_eq!(prs[0].sha, "c0ffee");
+        assert_eq!(prs[0].base, "main");
         assert!(parse_list("oops").is_err());
     }
 }

@@ -662,6 +662,7 @@ mod tests {
             number: 7,
             title: "merged since".to_owned(),
             branch: "feat".to_owned(),
+            base: "main".to_owned(),
             sha: String::new(),
             author: String::new(),
             url: String::new(),

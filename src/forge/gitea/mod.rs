@@ -82,6 +82,14 @@ impl Provider for GiteaFamily {
     }
 
     /// The accounts the latest commits belong to, as the API ties them to their emails.
+    fn retarget(&self, _: &Path, hosting: &Hosting, number: u64, base: &str) -> Result<(), String> {
+        let endpoint = format!("repos/{}/pulls/{number}", hosting.path);
+        self.api(hosting)
+            .send("PATCH", &endpoint, Some(&json!({ "base": base })))
+            .map(drop)
+            .map_err(String::from)
+    }
+
     fn avatars(&self, _: &Path, hosting: &Hosting, _: &[String]) -> Vec<(String, Hint)> {
         let endpoint = format!(
             "repos/{}/commits?limit=50&stat=false&verification=false&files=false",
@@ -173,6 +181,7 @@ fn parse_pull_request(item: &Value) -> PullRequest {
         number: item.get("number").and_then(Value::as_u64).unwrap_or(0),
         title: title.to_owned(),
         branch: at(item, "/head/ref").to_owned(),
+        base: at(item, "/base/ref").to_owned(),
         sha: at(item, "/head/sha").to_owned(),
         author: user(item, "/user/login"),
         url: at(item, "/html_url").to_owned(),
@@ -380,7 +389,7 @@ mod tests {
     fn reads_the_list_of_pull_requests() {
         let item = json!({
             "number": 4, "title": "Fix it", "html_url": "https://codeberg.org/o/r/pulls/4",
-            "head": {"ref": "fix", "sha": "abc"}, "user": {"login": "ana"}, "draft": false
+            "head": {"ref": "fix", "sha": "abc"}, "base": {"ref": "main"}, "user": {"login": "ana"}, "draft": false
         });
         let pr = parse_pull_request(&item);
         assert_eq!(
@@ -389,6 +398,7 @@ mod tests {
         );
         assert_eq!(pr.url, "https://codeberg.org/o/r/pulls/4");
         assert_eq!(pr.sha, "abc");
+        assert_eq!(pr.base, "main");
     }
 
     #[test]

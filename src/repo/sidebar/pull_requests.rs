@@ -474,6 +474,7 @@ mod tests {
             number: 1,
             title: String::new(),
             branch: branch.to_owned(),
+            base: "main".to_owned(),
             sha: sha.to_owned(),
             author: String::new(),
             url: String::new(),
