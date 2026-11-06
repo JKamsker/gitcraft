@@ -18,9 +18,7 @@ impl RepoTab {
                 self.close_pr();
                 self.ci_view = None;
                 self.select(row, ctx);
-                if !self.is_wip(row) && self.stash_at(row).is_none() {
-                    self.offer_hint(guide::Hint::CompareCommits, ctx);
-                }
+                self.hint_after_select(row, ctx);
             }
             Action::SelectHash(hash) => {
                 self.close_pr();
@@ -96,7 +94,11 @@ impl RepoTab {
             Action::Push => self.push(ctx),
             Action::Reload => self.reload(ctx),
             Action::LoadMore => self.load_more(ctx),
-            Action::Undo => self.undo(ctx),
+            Action::Undo => {
+                if !self.refuse_undo() {
+                    self.undo(ctx);
+                }
+            }
             Action::Redo => self.redo(ctx),
             Action::StashPush(message) => self.stash_push(&message, ctx),
             Action::OpenTab(path) => self.open_request = Some(OpenRequest::NewTab(path)),
@@ -107,7 +109,8 @@ impl RepoTab {
                 settings.set(ctx);
             }
             Action::BranchVisibility(change) => {
-                let hint = guide::visibility_hint(&change, &self.visibility);
+                let current = self.refs.current.as_deref();
+                let hint = guide::visibility_hint(&change, &self.visibility, current);
                 self.change_visibility(change, ctx);
                 if let Some(hint) = hint {
                     self.offer_hint(hint, ctx);

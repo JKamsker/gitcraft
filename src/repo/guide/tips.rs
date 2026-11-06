@@ -1,11 +1,11 @@
-//! The "Did you know" line: one point of the manual's features, a different one each day,
-//! short enough for one line.
+//! The "Did you know" line: one of the manual's tips, a different one each day, short enough
+//! for one line.
 
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Longer points are cut at the end of a sentence that fits, or left out.
-pub(crate) const MAX_TIP_CHARS: usize = 150;
+pub(crate) const MAX_TIP_CHARS: usize = 95;
 
 /// `point`, or its sentences that fit in `max` characters; `None` when not even the first one
 /// does (or it is blank).
@@ -37,10 +37,10 @@ pub(crate) fn candidates<'a>(points: impl IntoIterator<Item = &'a str>) -> Vec<S
         .collect()
 }
 
-/// The tips of the manual's features, made once.
+/// The manual's tips, made once.
 pub(crate) fn manual_tips() -> &'static [String] {
     static TIPS: OnceLock<Vec<String>> = OnceLock::new();
-    TIPS.get_or_init(|| candidates(crate::manual::feature_points()))
+    TIPS.get_or_init(|| candidates(crate::manual::tips().iter().copied()))
 }
 
 /// The tip for `seed`: the same one for the same seed, the next one for the next seed.
@@ -52,7 +52,8 @@ pub(crate) fn pick(tips: &[String], seed: u64) -> Option<&str> {
     tips.get(at).map(String::as_str)
 }
 
-/// The day `now` is in, counted from 1970: the tip changes once a day.
+/// The day `now` is in, counted from 1970 in UTC (there is no time-zone library to tell the
+/// local day by): the tip changes once a day, at midnight UTC.
 pub(crate) fn day_seed(now: SystemTime) -> u64 {
     now.duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs() / 86_400)
@@ -98,6 +99,8 @@ mod tests {
     fn the_manual_gives_tips_that_fit_on_one_line() {
         let tips = manual_tips();
         assert!(tips.len() > 10, "only {} tips", tips.len());
+        // Every one fits whole: none is cut or left out.
+        assert_eq!(tips.len(), crate::manual::tips().len());
         for tip in tips {
             assert!(!tip.trim().is_empty());
             assert!(tip.chars().count() <= MAX_TIP_CHARS, "too long: {tip}");
@@ -106,11 +109,9 @@ mod tests {
                 "written for macOS: {tip}"
             );
         }
-        // The very long point about remotes is cut, not dropped.
-        assert!(
-            tips.iter()
-                .any(|t| t.starts_with("Remote on the start page"))
-        );
+        for (tip, written) in tips.iter().zip(crate::manual::tips()) {
+            assert_eq!(*tip, written.replace("Ctrl", crate::manual::command()));
+        }
     }
 
     #[test]

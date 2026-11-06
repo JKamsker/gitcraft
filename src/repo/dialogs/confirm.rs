@@ -19,6 +19,7 @@ pub(super) fn confirm(
     use_alternative: &mut bool,
     refresh: Refresh,
     undo: &Undo,
+    safe: bool,
 ) -> Outcome {
     let t = Tokens::get(ui.ctx());
     ui.label(RichText::new(title).font(theme::semibold(15.0)));
@@ -31,13 +32,14 @@ pub(super) fn confirm(
     ui.add_space(14.0);
     let mut outcome = Outcome::Open;
     ui.horizontal(|ui| {
-        let danger = egui::Button::new(
-            RichText::new(button)
-                .color(egui::Color32::WHITE)
-                .font(theme::medium(12.5)),
-        )
-        .fill(t.danger)
-        .min_size(egui::vec2(90.0, 30.0));
+        let (fill, text) = if safe {
+            (t.accent, t.accent_text)
+        } else {
+            (t.danger, egui::Color32::WHITE)
+        };
+        let danger = egui::Button::new(RichText::new(button).color(text).font(theme::medium(12.5)))
+            .fill(fill)
+            .min_size(egui::vec2(90.0, 30.0));
         if ui.add(danger).clicked() {
             let steps = match (alternative, *use_alternative) {
                 (Some((_, alt)), true) => alt.clone(),

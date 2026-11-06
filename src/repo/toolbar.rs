@@ -32,8 +32,8 @@ impl RepoTab {
             widgets::toolbar_separator(ui);
             self.head_label(ui, idle, acts);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                self.hint_status(ui);
                 self.op_status(ui);
+                self.hint_status(ui);
             });
         });
     }

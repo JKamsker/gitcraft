@@ -50,6 +50,8 @@ pub enum Dialog {
         use_alternative: bool,
         refresh: Refresh,
         undo: Undo,
+        /// Nothing is lost: the button is the accent colour, not the danger one.
+        safe: bool,
     },
     Stash {
         message: String,
@@ -132,7 +134,16 @@ impl Dialog {
             use_alternative: false,
             refresh: Refresh::All,
             undo: Undo::None,
+            safe: false,
         }
+    }
+
+    /// A confirmation of something that loses nothing: its button is not the danger colour.
+    pub fn safe(mut self) -> Self {
+        if let Dialog::Confirm { safe, .. } = &mut self {
+            *safe = true;
+        }
+        self
     }
 
     /// Makes a confirmed operation undoable.
@@ -381,6 +392,7 @@ impl RepoTab {
                     use_alternative,
                     refresh,
                     undo,
+                    safe,
                 } => confirm::confirm(
                     ui,
                     title,
@@ -391,6 +403,7 @@ impl RepoTab {
                     use_alternative,
                     *refresh,
                     undo,
+                    *safe,
                 ),
             }
         });
