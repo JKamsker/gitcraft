@@ -221,7 +221,7 @@ impl PendingLaunches {
 
 /// `path` as a tab of it has it: resolved through links here (as the app opens folders),
 /// as written for one elsewhere.
-fn tab_form(path: &Path) -> PathBuf {
+pub(crate) fn tab_form(path: &Path) -> PathBuf {
     if remote::is_remote(path) {
         return path.to_owned();
     }
