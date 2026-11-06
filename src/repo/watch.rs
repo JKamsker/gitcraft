@@ -13,6 +13,8 @@ impl RepoTab {
     /// Setting that up walks every folder of the worktree (a big `node_modules` is tens of
     /// thousands), so it is done in the background; the watcher comes back as a message.
     pub(super) fn watch(&mut self, ctx: &egui::Context) {
+        self.watches += 1;
+        let watch = self.watches;
         let (tx, rx) = channel();
         self.fs_rx = Some(rx);
         let path = self.path.clone();
@@ -25,12 +27,12 @@ impl RepoTab {
             self.poller = Some(alive);
             let arrived = self.tx.clone();
             std::thread::spawn(move || {
-                super::watch_remote::poll(&path, &tx, &arrived, &events_ctx, &weak);
+                super::watch_remote::poll(&path, &tx, &arrived, watch, &events_ctx, &weak);
             });
             return;
         }
         spawn(&self.tx, ctx, move || {
-            Msg::Watcher(start_watcher(&path, tx, events_ctx).map(Box::new))
+            Msg::Watcher(watch, start_watcher(&path, tx, events_ctx).map(Box::new))
         });
     }
 }

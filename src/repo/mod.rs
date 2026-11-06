@@ -212,6 +212,16 @@ pub struct RepoTab {
     terminal_error: Option<String>,
 
     watcher: Option<notify::RecommendedWatcher>,
+    /// How many times the tab set up its watching: a watcher arriving for an earlier time is
+    /// not this one's (see `Msg::Watcher`).
+    watches: u64,
+    /// Suspended and shown again, not read again yet: the opening screen shows meanwhile, and
+    /// nothing is laid out from the empty history (see `lifecycle`).
+    resuming: bool,
+    /// The commit selected when the tab was suspended, selected again once read.
+    resume_select: Option<String>,
+    /// The diff open when the tab was suspended, opened again once read.
+    resume_diff: Option<DiffKey>,
     /// For a repository on another machine, which no watcher sees: what keeps its poller
     /// going (it stops once this is dropped).
     poller: Option<std::sync::Arc<()>>,
@@ -348,6 +358,10 @@ impl RepoTab {
             terminal_open: false,
             terminal_error: None,
             watcher: None,
+            watches: 0,
+            resuming: false,
+            resume_select: None,
+            resume_diff: None,
             poller: None,
             counting_worktrees: false,
             recount_worktrees: false,
@@ -372,7 +386,7 @@ impl RepoTab {
 
     /// Nothing read yet: the tab shows its opening screen.
     pub fn opening(&self) -> bool {
-        self.history_gen == 0 && self.load_error.is_none()
+        (self.history_gen == 0 && self.load_error.is_none()) || self.resuming
     }
 
     pub fn is_busy(&self) -> bool {

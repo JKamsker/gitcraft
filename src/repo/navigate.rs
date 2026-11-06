@@ -105,6 +105,11 @@ impl RepoTab {
 
     /// Selects `hash`, loading more history first if it's further down.
     pub(super) fn goto(&mut self, hash: &str, ctx: &egui::Context) {
+        // Nothing read to look in yet: once it is (see `rebuild`).
+        if self.sleeping() || self.resuming {
+            self.pending_goto = Some(hash.to_owned());
+            return;
+        }
         if self.index.contains_key(hash) {
             self.pending_goto = None;
             self.select_hash(hash, ctx);

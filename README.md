@@ -21,9 +21,11 @@ so your config, credentials and hooks apply as usual.
 - Changes made elsewhere (editor, terminal) show up by themselves: the folder is watched.
 - Lazy tabs: tabs restored on start read the repository and watch its folder only once they are
   first shown, so many saved tabs don't mean as many history loads and folder watchers at
-  startup. A tab left in the background for 10 minutes with nothing going on (no operation,
-  running terminal, typed message, open editor or unsent review) drops its graph and diff and
-  stops watching and fetching; shown again, it reads afresh and selects the same commit.
+  startup (nor background fetches until then). A tab left in the background for 30 minutes with
+  nothing going on (no operation, running terminal, typed message, open editor, unsent review,
+  pull request or builds view) drops its graph, diff and commit details and stops watching,
+  fetching and following builds; shown again, it reads afresh (the opening screen meanwhile),
+  then selects the same commit and opens the same diff if they are still there.
 - Repositories on another machine, in a WSL distribution or over SSH: the window stays here and
   git runs there (see below).
 

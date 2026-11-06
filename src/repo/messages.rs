@@ -39,7 +39,8 @@ pub(super) enum Msg {
     /// `RepoTab::count_worktrees`).
     WorktreeCounts(Vec<(std::path::PathBuf, usize)>),
     /// The worktree's watcher, set up in the background (`None` when it couldn't be).
-    Watcher(Option<Box<notify::RecommendedWatcher>>),
+    /// The watcher set up by the `watch` numbered so (see `RepoTab::watches`).
+    Watcher(u64, Option<Box<notify::RecommendedWatcher>>),
     /// A further page of history, read while `history_gen` was so: a reload since may have
     /// moved the commits it skipped, so then it no longer fits.
     More(u64, Result<Vec<Commit>, String>),
@@ -275,7 +276,7 @@ impl RepoTab {
         }
     }
 
-    fn handle(&mut self, msg: Msg, ctx: &egui::Context) {
+    pub(super) fn handle(&mut self, msg: Msg, ctx: &egui::Context) {
         match msg {
             Msg::Loaded(result) => self.loaded(result, ctx),
             Msg::Submodules(read, list) => {
@@ -299,9 +300,13 @@ impl RepoTab {
                 self.conflict_saved(path, saved, ctx)
             }
             Msg::Identity(identity) => self.identity = identity,
-            Msg::Watcher(watcher) => {
-                self.watcher = watcher.map(|w| *w);
-                self.watcher_arrived(ctx);
+            // One asked for before the tab was suspended (or watched again) sends to a channel
+            // no longer read: dropped, not kept.
+            Msg::Watcher(watch, watcher) => {
+                if watch == self.watches && !self.sleeping() {
+                    self.watcher = watcher.map(|w| *w);
+                    self.watcher_arrived(ctx);
+                }
             }
             Msg::RefsCheck(refs) => {
                 // Moved before the watcher could see it.
