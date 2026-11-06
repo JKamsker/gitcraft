@@ -47,7 +47,8 @@ fn open_inside(root: &Path, names: &[&str], max: u64) -> Option<std::fs::File> {
 
 /// Each folder opened without following a link and held open, so that it can be neither
 /// renamed nor deleted (no `FILE_SHARE_DELETE`) until the file is read: the path to the file
-/// stays the one checked. The file is opened without following a link either.
+/// stays the one checked. The file is opened without following a link either, and where it
+/// really is is then checked against where the repository's folder really is.
 #[cfg(windows)]
 fn open_inside(root: &Path, names: &[&str], max: u64) -> Option<std::fs::File> {
     use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
@@ -87,8 +88,57 @@ fn open_inside(root: &Path, names: &[&str], max: u64) -> Option<std::fs::File> {
     path.push(last);
     let file = open(&path, NO_FOLLOW)?;
     let meta = plain(&file)?;
+    if !meta.is_file() || meta.len() > max {
+        return None;
+    }
+    // And, whatever could still have been swapped above the repository's folder: where the
+    // opened file really is, asked of the system, must be inside the folder as it was opened.
+    let root_at = final_path(held.first()?)?;
+    let file_at = final_path(&file)?;
     drop(held);
-    (meta.is_file() && meta.len() <= max).then_some(file)
+    (file_at != root_at && file_at.starts_with(&root_at)).then_some(file)
+}
+
+/// Where the open `file` really is (`\\?\C:\…`, every link on the way resolved), as Windows
+/// says (`GetFinalPathNameByHandleW`); nothing when it can't say.
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn final_path(file: &std::fs::File) -> Option<std::path::PathBuf> {
+    use std::os::windows::ffi::OsStringExt;
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_NAME_NORMALIZED, GetFinalPathNameByHandleW, VOLUME_NAME_DOS,
+    };
+    let handle = file.as_raw_handle();
+    let mut buf: Vec<u16> = vec![0; 512];
+    // Twice at most: a first answer that the buffer is too small says how big it must be.
+    for _ in 0..3 {
+        let capacity = u32::try_from(buf.len()).ok()?;
+        // SAFETY: `handle` is the open handle of `file`, which outlives this call; `buf` is a
+        // live, writable buffer of exactly `capacity` u16s, and the call writes at most that
+        // many. Nothing else is read or kept.
+        let len = unsafe {
+            GetFinalPathNameByHandleW(
+                handle,
+                buf.as_mut_ptr(),
+                capacity,
+                FILE_NAME_NORMALIZED | VOLUME_NAME_DOS,
+            )
+        };
+        let len = usize::try_from(len).ok()?;
+        match len {
+            // Failed.
+            0 => return None,
+            // The path, without its terminating NUL.
+            n if n < buf.len() => {
+                buf.truncate(n);
+                return Some(std::ffi::OsString::from_wide(&buf).into());
+            }
+            // Too small: `n` is the size needed, its NUL included.
+            n => buf.resize(n, 0),
+        }
+    }
+    None
 }
 
 #[cfg(not(any(unix, windows)))]
