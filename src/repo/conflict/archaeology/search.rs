@@ -15,9 +15,14 @@ pub enum Stop {
 /// What the search found.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Outcome {
-    /// Ours `i` and theirs `j` (1-based) conflict, while `i` merges cleanly with theirs
-    /// `j - 1` and theirs `j` with ours `i - 1`.
-    Pair { ours: usize, theirs: usize },
+    /// Ours `i` and theirs `j` (1-based) conflict, while ours `i` merges cleanly with theirs
+    /// `j - 1`; `checked`: theirs `j` merges cleanly with ours `i - 1` too. When it doesn't
+    /// (a later commit didn't keep a conflict), an earlier pair conflicts as well.
+    Pair {
+        ours: usize,
+        theirs: usize,
+        checked: bool,
+    },
     /// Only one side changed the file since they diverged: no pair of its commits conflicts.
     OneSided,
     /// The two tips merge without a conflict in the file: it comes from elsewhere (what was
@@ -25,7 +30,7 @@ pub enum Outcome {
     TipsMergeCleanly,
 }
 
-/// The pair, testing at most about `2·log2(ours) + 2·log2(theirs)` merges.
+/// The pair, testing at most about `log2(ours) + log2(theirs) + 2` merges.
 pub fn first_pair(
     ours: usize,
     theirs: usize,
@@ -39,7 +44,12 @@ pub fn first_pair(
     }
     let i = first_true(ours, |i| conflicts(i, theirs))?;
     let j = first_true(theirs, |j| conflicts(i, j))?;
-    Ok(Outcome::Pair { ours: i, theirs: j })
+    let checked = i == 1 || !conflicts(i - 1, j)?;
+    Ok(Outcome::Pair {
+        ours: i,
+        theirs: j,
+        checked,
+    })
 }
 
 /// The smallest `k` in `1..=last` for which `test` holds, `test(last)` known to hold and
@@ -77,7 +87,11 @@ mod tests {
                 for b in 1..=n.min(12) {
                     assert_eq!(
                         first_pair(m, n, from(a, b)),
-                        Ok(Outcome::Pair { ours: a, theirs: b }),
+                        Ok(Outcome::Pair {
+                            ours: a,
+                            theirs: b,
+                            checked: true
+                        }),
                         "{m}×{n} from {a},{b}"
                     );
                 }
@@ -96,10 +110,26 @@ mod tests {
             found,
             Ok(Outcome::Pair {
                 ours: 700,
-                theirs: 3
+                theirs: 3,
+                checked: true
             })
         );
-        assert!(tested <= 21, "{tested}");
+        assert!(tested <= 22, "{tested}");
+    }
+
+    /// A history where a later commit doesn't keep a conflict: ours 1 conflicts with theirs 1
+    /// only, ours 2 with both. The pair found (2, 1) is said not to hold: (1, 1) conflicts too.
+    #[test]
+    fn a_pair_that_does_not_hold_is_said_so() {
+        let found = first_pair(2, 2, |i, j| Ok(i == 2 || j == 1));
+        assert_eq!(
+            found,
+            Ok(Outcome::Pair {
+                ours: 2,
+                theirs: 1,
+                checked: false
+            })
+        );
     }
 
     #[test]

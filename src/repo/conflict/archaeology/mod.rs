@@ -1,7 +1,7 @@
-//! Conflict archaeology: the conflict editor shows each side's commits that touched the file
-//! since the two diverged, and _Find where it started_ looks for the first pair of them whose
-//! merge conflicts in the file, by test merges (git-imerge style), in the background,
-//! bounded and cancelable.
+//! Conflict archaeology: the conflict editor shows each side's commits that touched the file,
+//! and _Find where it started_ looks for the first pair of them whose merge conflicts in the
+//! file, by test merges (git-imerge style), in the background, bounded and cancelable. A commit
+//! picked on each side can be test-merged too.
 
 mod git;
 mod search;
@@ -28,10 +28,12 @@ pub enum Read<T> {
 /// The pair of commits that first made the two sides conflict, or why there is none.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Found {
-    /// Indexes in [`Timelines::ours`] and [`Timelines::theirs`].
+    /// Indexes in [`Timelines::ours`] and [`Timelines::theirs`]; `checked`: the commits just
+    /// before each merge cleanly with the other (see [`search::Outcome::Pair`]).
     Pair {
         ours: usize,
         theirs: usize,
+        checked: bool,
     },
     OneSided,
     TipsMergeCleanly,
@@ -52,18 +54,29 @@ pub struct Search {
 pub struct History {
     pub timelines: Read<Timelines>,
     pub search: Option<Search>,
-    /// Folded away.
-    pub folded: bool,
-    /// The change of a commit to the file, shown under the timelines (its hash, and it).
-    pub change: Option<(String, Read<String>)>,
+    /// The commit picked on each side (indexes).
+    pub picked: (Option<usize>, Option<usize>),
+    /// Whether the two picked conflict, for the pair it was asked for.
+    pub pair_test: Option<((usize, usize), Read<bool>)>,
+    /// The change of a commit to the file, shown in place of the timelines: its hash, its
+    /// short hash, and it.
+    pub change: Option<(String, String, Read<String>)>,
 }
 
 impl History {
-    /// Stops the search, if one runs.
-    pub fn cancel(&self) {
-        if let Some(search) = &self.search {
+    /// Stops the search, if one runs: at once for the view, before its next test merge for
+    /// git.
+    pub fn cancel(&mut self) {
+        if let Some(search) = self.search.take() {
             search.cancel.store(true, Ordering::Relaxed);
         }
+    }
+
+    /// Whether a search runs.
+    pub fn searching(&self) -> bool {
+        self.search
+            .as_ref()
+            .is_some_and(|s| s.result == Read::Reading)
     }
 }
 
@@ -77,12 +90,23 @@ impl Drop for History {
 /// What the views ask of the archaeology.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Act {
-    /// Read each side's commits.
+    /// Read each side's commits (again, after a failure).
     Load,
     /// Look for the first conflicting pair.
     Find,
-    /// Show (or hide) what a commit changed in the file.
-    ShowChange(String),
+    /// Test-merge the commits picked on each side (indexes).
+    TestPair(usize, usize),
+    /// Show (or hide) what a commit changed in the file: its hash, its short hash.
+    ShowChange(String, String),
+}
+
+/// Whether the archaeology can look into the operation `state` stopped at (a stash or a patch
+/// brings no other branch).
+pub fn applies(state: Option<InProgress>) -> bool {
+    matches!(
+        state,
+        Some(InProgress::Merge | InProgress::Rebase | InProgress::CherryPick | InProgress::Revert)
+    )
 }
 
 /// The search, on what `timelines` lists: blocking, from the background. Each test merge
@@ -94,22 +118,28 @@ fn find(
     (cancel, merges): (&AtomicBool, &AtomicUsize),
     ctx: &egui::Context,
 ) -> Result<Found, Stop> {
+    let base = timelines.base.as_deref();
     let outcome = search::first_pair(timelines.ours.len(), timelines.theirs.len(), |i, j| {
         if cancel.load(Ordering::Relaxed) {
             return Err(Stop::Cancelled);
         }
-        let (Some(a), Some(b)) = (timelines.ours.get(i - 1), timelines.theirs.get(j - 1)) else {
+        let (Some(a), Some(b)) = (timelines.ours.get(i - 1), timelines.theirs_merged(j - 1)) else {
             return Err(Stop::Failed("the commits changed meanwhile".to_owned()));
         };
-        let conflicts = git::merge_conflicts(repo, &a.hash, &b.hash, path).map_err(Stop::Failed);
+        let conflicts = git::merge_conflicts(repo, (&a.hash, b), base, path).map_err(Stop::Failed);
         merges.fetch_add(1, Ordering::Relaxed);
         ctx.request_repaint();
         conflicts
     })?;
     Ok(match outcome {
-        Outcome::Pair { ours, theirs } => Found::Pair {
+        Outcome::Pair {
+            ours,
+            theirs,
+            checked,
+        } => Found::Pair {
             ours: ours - 1,
             theirs: theirs - 1,
+            checked,
         },
         Outcome::OneSided => Found::OneSided,
         Outcome::TipsMergeCleanly => Found::TipsMergeCleanly,
@@ -135,7 +165,7 @@ impl RepoTab {
         let history = &mut ed.history;
         match act {
             Act::Load => {
-                if history.timelines == Read::Reading {
+                if matches!(history.timelines, Read::Reading | Read::Done(_)) {
                     return;
                 }
                 history.timelines = Read::Reading;
@@ -157,46 +187,71 @@ impl RepoTab {
                 let Read::Done(timelines) = &history.timelines else {
                     return;
                 };
-                let timelines = timelines.clone();
-                if history
-                    .search
-                    .as_ref()
-                    .is_some_and(|s| s.result == Read::Reading)
-                {
+                if history.searching() {
                     return;
                 }
+                let timelines = timelines.clone();
                 let (cancel, merges) = (Arc::new(AtomicBool::new(false)), Arc::default());
                 history.search = Some(Search {
-                    cancel: cancel.clone(),
+                    cancel: Arc::clone(&cancel),
                     merges: Arc::clone(&merges),
                     result: Read::Reading,
                 });
-                let (file, repaint) = (path.clone(), ctx.clone());
+                let (file, repaint, mine) = (path.clone(), ctx.clone(), Arc::clone(&cancel));
                 self.then(
                     ctx,
                     move || find(&repo, &file, &timelines, (&cancel, &merges), &repaint),
                     move |tab, found, _| {
-                        if let Some(search) = tab
+                        // Only for this search: not one cancelled since, nor one started after.
+                        let Some(search) = tab
                             .history_for(generation, &path)
                             .and_then(|h| h.search.as_mut())
+                            .filter(|s| Arc::ptr_eq(&s.cancel, &mine))
+                        else {
+                            return;
+                        };
+                        search.result = match found {
+                            Ok(f) => Read::Done(f),
+                            Err(Stop::Cancelled) => Read::NotAsked,
+                            Err(Stop::Failed(e)) => Read::Failed(e),
+                        };
+                    },
+                );
+            }
+            Act::TestPair(i, j) => {
+                let Read::Done(timelines) = &history.timelines else {
+                    return;
+                };
+                let (Some(a), Some(b)) = (timelines.ours.get(i), timelines.theirs_merged(j)) else {
+                    return;
+                };
+                let (a, b, base) = (a.hash.clone(), b.to_owned(), timelines.base.clone());
+                history.pair_test = Some(((i, j), Read::Reading));
+                let file = path.clone();
+                self.then(
+                    ctx,
+                    move || git::merge_conflicts(&repo, (&a, &b), base.as_deref(), &file),
+                    move |tab, conflicts, _| {
+                        if let Some(test) = tab
+                            .history_for(generation, &path)
+                            .and_then(|h| h.pair_test.as_mut())
+                            .filter(|(pair, _)| *pair == (i, j))
                         {
-                            search.result = match found {
-                                Ok(f) => Read::Done(f),
-                                Err(Stop::Cancelled) => Read::NotAsked,
-                                Err(Stop::Failed(e)) => Read::Failed(e),
+                            test.1 = match conflicts {
+                                Ok(c) => Read::Done(c),
+                                Err(e) => Read::Failed(e),
                             };
                         }
                     },
                 );
             }
-            Act::ShowChange(hash) => {
-                if history.change.as_ref().is_some_and(|(h, _)| *h == hash) {
+            Act::ShowChange(hash, short) => {
+                if history.change.as_ref().is_some_and(|(h, _, _)| *h == hash) {
                     history.change = None;
                     return;
                 }
-                history.change = Some((hash.clone(), Read::Reading));
-                let file = path.clone();
-                let shown = hash.clone();
+                history.change = Some((hash.clone(), short, Read::Reading));
+                let (file, shown) = (path.clone(), hash.clone());
                 self.then(
                     ctx,
                     move || git::change(&repo, &shown, &file),
@@ -204,9 +259,9 @@ impl RepoTab {
                         if let Some(change) = tab
                             .history_for(generation, &path)
                             .and_then(|h| h.change.as_mut())
-                            .filter(|(h, _)| *h == hash)
+                            .filter(|(h, _, _)| *h == hash)
                         {
-                            change.1 = match read {
+                            change.2 = match read {
                                 Ok(text) => Read::Done(text),
                                 Err(e) => Read::Failed(e),
                             };
