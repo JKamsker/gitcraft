@@ -45,7 +45,7 @@ impl App {
     /// Opens the repository of the tab closed last whose folder is still there.
     pub(super) fn reopen_closed_tab(&mut self, ctx: &egui::Context) {
         while let Some(path) = self.closed.pop() {
-            if crate::remote::is_remote(&path) || path.is_dir() {
+            if reopenable(&path) {
                 self.open_repo(&path, ctx);
                 return;
             }
@@ -85,9 +85,25 @@ fn remember_closed(closed: &mut Vec<PathBuf>, path: &Path) {
     }
 }
 
+/// Whether a tab saved for `path` is opened again (on start, on a profile switch, on reopening
+/// a closed one): a folder here that is still there. One on another machine is kept unasked:
+/// asking would hold up the window for a connection. Its tab says so if it's gone.
+pub(super) fn reopenable(path: &std::path::Path) -> bool {
+    crate::remote::is_remote(path) || path.is_dir()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A tab on another machine is kept unasked (on a profile switch too); a folder here only
+    /// while it is there.
+    #[test]
+    fn tabs_elsewhere_are_reopened_unasked() {
+        assert!(reopenable(Path::new("ssh://build/home/me/app")));
+        assert!(reopenable(&std::env::temp_dir()));
+        assert!(!reopenable(Path::new("/nonexistent/gitcraft/repo")));
+    }
 
     #[test]
     fn the_last_closed_is_on_top_once() {

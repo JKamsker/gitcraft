@@ -180,9 +180,7 @@ impl App {
         let mut kept = Vec::new();
         if app.git_version.is_ok() {
             for path in saved.open {
-                // One on another machine is kept unasked: asking would wait for a connection
-                // before the window shows. Its tab says so if it's gone.
-                let is_dir = crate::remote::is_remote(&path) || path.is_dir();
+                let is_dir = tabs::reopenable(&path);
                 kept.push(is_dir);
                 if is_dir {
                     // Read once shown, or once the one shown is read: one at a time first.

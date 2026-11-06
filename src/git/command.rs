@@ -23,13 +23,21 @@ pub fn set_profile_config(path: Option<PathBuf>) {
 /// (signing settings, Mergiraf's set-up), which must never land in the profile's file, which is
 /// written over.
 fn user_global_config(args: &[&str]) -> bool {
-    let mut rest = args;
-    while let [flag, _, tail @ ..] = rest
-        && *flag == "-c"
-    {
-        rest = tail;
-    }
+    let rest = after_options(args);
     rest.first() == Some(&"config") && rest.contains(&"--global")
+}
+
+/// `args` from the subcommand on: past the options before it (`-c x=y`, `-C dir`,
+/// `--literal-pathspecs`…).
+fn after_options<'a>(args: &'a [&'a str]) -> &'a [&'a str] {
+    let mut rest = args;
+    loop {
+        match rest {
+            ["-c" | "-C", _, tail @ ..] => rest = tail,
+            [word, tail @ ..] if word.starts_with('-') => rest = tail,
+            _ => return rest,
+        }
+    }
 }
 
 /// Points `cmd` at the active profile's config, unless `args` is about the user's own.
@@ -149,19 +157,8 @@ fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Requ
 
 /// Whether the git command `args` (its options first) talks to a remote and may take minutes.
 fn goes_over_network(args: &[&str]) -> bool {
-    let mut words = args.iter().copied();
-    // Past the options before the subcommand (`-c x=y`, `--literal-pathspecs`…).
-    let subcommand = loop {
-        match words.next() {
-            Some("-c" | "-C") => {
-                words.next();
-            }
-            Some(word) if word.starts_with('-') => {}
-            other => break other,
-        }
-    };
     matches!(
-        subcommand,
+        after_options(args).first().copied(),
         Some("fetch" | "pull" | "push" | "clone" | "ls-remote" | "remote" | "submodule" | "lfs")
     )
 }
@@ -412,6 +409,15 @@ mod tests {
         assert!(!user_global_config(&["config", "user.name"]));
         assert!(!user_global_config(&["commit", "-m", "--global"]));
         assert!(!user_global_config(&["-c", "config"]));
+        // Whatever options come before the subcommand.
+        assert!(user_global_config(&["-C", "/r", "config", "--global", "x"]));
+        assert!(user_global_config(&[
+            "--literal-pathspecs",
+            "config",
+            "--global",
+            "x"
+        ]));
+        assert!(user_global_config(&["-ck=v", "config", "--global", "x"]));
         assert!(!user_global_config(&[]));
     }
 

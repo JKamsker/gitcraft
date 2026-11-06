@@ -81,7 +81,7 @@ impl App {
         self.closed.clear();
         let mut kept = Vec::new();
         for path in state.open {
-            let is_dir = path.is_dir();
+            let is_dir = super::tabs::reopenable(&path);
             kept.push(is_dir);
             if is_dir {
                 self.tabs
@@ -104,20 +104,18 @@ impl App {
         self.set_theme(ctx, state.theme);
     }
 
-    /// Switches to profile `id`: its settings, tabs and theme. Refused, with a toast, while a
-    /// tab has work that closing it would lose. Returns whether it switched.
-    pub(super) fn switch_profile(&mut self, id: u64, ctx: &egui::Context) -> bool {
-        let Some(next) = self
-            .settings
-            .user_profiles
-            .iter()
-            .find(|p| p.id == id)
-            .cloned()
-        else {
+    /// Whether the profile can be switched now. Not while a tab has work that closing it would
+    /// lose, nor while a repository is being cloned or connected to (it would open in the other
+    /// profile): a toast says why.
+    fn can_switch_profile(&mut self) -> bool {
+        if self.cloning.is_some() || !self.connecting.is_empty() {
+            self.toasts.push(Toast::new(
+                "A repository is still being cloned or connected to: wait for it before switching \
+                 profiles"
+                    .to_owned(),
+                true,
+            ));
             return false;
-        };
-        if id == self.settings.active_profile {
-            return true;
         }
         for tab in &mut self.tabs {
             if let Tab::Repo(r) = tab
@@ -134,6 +132,27 @@ impl App {
                 return false;
             }
         }
+        true
+    }
+
+    /// Switches to profile `id`: its settings, tabs and theme. Refused, with a toast, while a
+    /// tab has work that closing it would lose. Returns whether it switched.
+    pub(super) fn switch_profile(&mut self, id: u64, ctx: &egui::Context) -> bool {
+        let Some(next) = self
+            .settings
+            .user_profiles
+            .iter()
+            .find(|p| p.id == id)
+            .cloned()
+        else {
+            return false;
+        };
+        if id == self.settings.active_profile {
+            return true;
+        }
+        if !self.can_switch_profile() {
+            return false;
+        }
         let current = self.current_state();
         self.profile_states
             .insert(self.settings.active_profile, current);
@@ -147,8 +166,9 @@ impl App {
             });
         self.settings.active_profile = id;
         self.settings.set(ctx);
-        // The tabs opened next read the new profile's author themselves.
-        self.profile_git_seen.clear();
+        // The tabs opened next read the new profile's author themselves; a later change to it
+        // is noticed against what it is now.
+        self.profile_git_seen = settings::profiles::config_text(&next, &[]);
         self.restore_state(state, ctx);
         self.toasts.push(Toast::new(
             format!("Switched to the profile “{}”", next.title()),
@@ -164,6 +184,10 @@ impl App {
         } else {
             "New profile".to_owned()
         };
+        // Refused before it is added, so a refused switch leaves no profile behind.
+        if !self.can_switch_profile() {
+            return;
+        }
         let name = self.settings.new_profile_name(&base);
         let id = self.settings.add_profile(&name, copy);
         self.settings.set(ctx);

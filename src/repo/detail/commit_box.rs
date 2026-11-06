@@ -140,30 +140,41 @@ impl RepoTab {
         let elsewhere = crate::remote::parse(&self.path).map(|target| target.host.label());
         ui.horizontal(|ui| {
             let id = &self.identity;
-            let from_profile = elsewhere.is_none()
-                && !id.local
-                && !profile.author_name.trim().is_empty()
-                && id.name == profile.author_name.trim();
+            // Where the name and the email each come from: the repository's own config, the
+            // profile (here only), or the global config (that machine's, for one elsewhere).
+            let source = |local: bool, value: &str, profile_value: &str| {
+                let profile_value = profile_value.trim();
+                if local {
+                    "this repository".to_owned()
+                } else if elsewhere.is_none() && !profile_value.is_empty() && value == profile_value
+                {
+                    format!("profile {}", profile.title())
+                } else if let Some(host) = &elsewhere {
+                    format!("global ({host})")
+                } else {
+                    "global".to_owned()
+                }
+            };
             let who = if id.name.is_empty() {
                 "No identity set (git config user.name)".to_owned()
             } else {
-                let source = if id.local {
-                    " · this repository".to_owned()
-                } else if from_profile {
-                    format!(" · profile {}", profile.title())
-                } else if let Some(host) = &elsewhere {
-                    format!(" · global ({host})")
+                let name_from = source(id.local, &id.name, &profile.author_name);
+                let email_from = source(id.local_email, &id.email, &profile.author_email);
+                let source = if name_from == email_from {
+                    format!(" · {name_from}")
                 } else {
-                    " · global".to_owned()
+                    format!(" · name: {name_from}, email: {email_from}")
                 };
                 format!("as {} <{}>{source}", id.name, id.email)
             };
             let resp =
                 ui.add(egui::Label::new(RichText::new(who).color(t.text_faint).small()).truncate());
             if id.local || id.local_email {
-                resp.on_hover_text(
-                    "Set in this repository's own config, which wins over the profile's author",
-                );
+                resp.on_hover_text(if elsewhere.is_some() {
+                    "Set in this repository's own config, which wins over that machine's global one"
+                } else {
+                    "Set in this repository's own config, which wins over the profile's author"
+                });
             }
             // The saved identities, then the authors of the profiles, each once.
             let mut choices: Vec<(String, String, String)> = settings

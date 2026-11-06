@@ -91,8 +91,18 @@ fn global_files_from(env: impl Fn(&str) -> Option<OsString>) -> Vec<PathBuf> {
     if let Some(file) = var("GIT_CONFIG_GLOBAL") {
         return vec![PathBuf::from(file)];
     }
-    // Git for Windows uses USERPROFILE where HOME isn't set.
+    // Where HOME isn't set, Git for Windows takes HOMEDRIVE + HOMEPATH when that folder is
+    // there (a home share), else USERPROFILE.
+    let home_share = || {
+        if !cfg!(windows) {
+            return None;
+        }
+        let mut drive = var("HOMEDRIVE")?;
+        drive.push(var("HOMEPATH")?);
+        Some(drive).filter(|dir| Path::new(dir).is_dir())
+    };
     let home = var("HOME")
+        .or_else(home_share)
         .or_else(|| var("USERPROFILE"))
         .map(PathBuf::from);
     let xdg = var("XDG_CONFIG_HOME")
