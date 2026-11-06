@@ -264,7 +264,7 @@ impl<'a> Rows<'a> {
             ui, rect, data, i, side, scroll_x, &self.font, &self.t, picked, sel_chars,
         );
         if let Some(who) = data.authors.get(i).copied().flatten() {
-            crate::repo::authorship_view::stripe(ui.painter(), &self.t, rect, who);
+            crate::repo::authorship_view::stripe(ui.painter(), &self.t, rect, who, 4.0);
         }
         // Where the drag started and where the pointer is, in this line's text.
         if let Some((origin, galley)) = placed.filter(|_| kind.is_some_and(|k| side.shows(k))) {

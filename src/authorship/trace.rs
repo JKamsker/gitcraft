@@ -23,6 +23,11 @@ pub fn parse(text: &str) -> Option<(FileLines, Vec<String>)> {
             .filter_map(|l| serde_json::from_str(l.trim()).ok())
             .collect(),
     };
+    // A trace record says its version and has files; anything else is someone else's note.
+    let records: Vec<&serde_json::Value> = records
+        .iter()
+        .filter(|r| r.get("version").is_some() && r["files"].is_array())
+        .collect();
     let mut files = FileLines::default();
     let mut tools = Vec::new();
     for record in &records {

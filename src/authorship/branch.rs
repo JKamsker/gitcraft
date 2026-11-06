@@ -132,12 +132,14 @@ fn changes(patch: &str) -> Changes {
 }
 
 /// The figures of `branch` (a full ref) since it left `base`, `known` what the commits
-/// record (those not in it are read one by one).
+/// record; `complete`: `known` was read for every recent commit (one not in it records
+/// nothing), else those not in it are read one by one.
 pub fn figures(
     repo: &Path,
     branch: &str,
     base: &str,
     known: &HashMap<String, Attribution>,
+    complete: bool,
 ) -> Result<Figures, String> {
     let git = |args: &[&str]| {
         crate::git::run(Some(repo), args)
@@ -166,6 +168,9 @@ pub fn figures(
         if let Some(a) = known.get(hash) {
             return Some(a.clone());
         }
+        if complete {
+            return None;
+        }
         read.entry(hash.to_owned())
             .or_insert_with(|| load::one(repo, hash).ok().flatten())
             .clone()
@@ -182,7 +187,8 @@ pub fn figures(
             "--no-color",
             "--no-ext-diff",
             "--no-textconv",
-            "--no-renames",
+            // A file moved is no file rewritten: its lines aren't added or removed again.
+            "-M",
             "--src-prefix=a/",
             "--dst-prefix=b/",
             "--end-of-options",

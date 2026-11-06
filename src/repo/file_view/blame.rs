@@ -106,6 +106,7 @@ impl RepoTab {
                             &t,
                             edge,
                             a.line(&line.file, line.orig),
+                            0.0,
                         );
                     }
                     p.rect_filled(
