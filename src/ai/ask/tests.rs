@@ -45,7 +45,7 @@ fn ask_now(dir: &Path, settings: &AiSettings, timeout: Duration) -> Result<Answe
     ask(
         dir,
         settings,
-        &Question::CommitMessage,
+        &Question::CommitMessage { amend: false },
         timeout,
         &Cancel::new(),
     )
@@ -134,7 +134,13 @@ fn a_tool_can_be_stopped_with_what_it_started() {
         })
     };
     let started = Instant::now();
-    let answer = ask(&dir, &settings, &Question::CommitMessage, TIMEOUT, &cancel);
+    let answer = ask(
+        &dir,
+        &settings,
+        &Question::CommitMessage { amend: false },
+        TIMEOUT,
+        &cancel,
+    );
     let took = started.elapsed();
     let _ = stopper.join();
     let sleeper = std::fs::read_to_string(&pid_file).unwrap_or_default();
@@ -245,4 +251,18 @@ fn a_review_asks_about_what_the_branch_adds() {
     assert!(prompt.contains("fix: topic"));
     assert!(prompt.contains("+++ b/topic.txt"));
     assert!(!prompt.contains("grüße"));
+}
+
+/// A tool that answers but leaves something running that holds its output open still gives
+/// its answer, within moments, and what it left is stopped.
+#[test]
+fn a_tool_that_leaves_something_running_still_answers() {
+    let dir = repo("linger");
+    let settings = tool(&dir, "cat >/dev/null\necho 'fix: x'\nsleep 30 &");
+    let started = Instant::now();
+    let answer = ask_now(&dir, &settings, TIMEOUT);
+    let took = started.elapsed();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(answer.map(|a| a.text), Ok("fix: x".to_owned()));
+    assert!(took < Duration::from_secs(10), "{took:?}");
 }

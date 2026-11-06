@@ -152,6 +152,7 @@ fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Requ
         stdin: None,
         long: goes_over_network(args),
         timeout: None,
+        apart: false,
     }
 }
 

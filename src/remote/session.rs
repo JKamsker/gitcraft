@@ -54,6 +54,9 @@ pub struct Request {
     /// How long it may take before it is stopped; `None`: as long as its lane allows (see
     /// [`Request::time_limit`]).
     pub timeout: Option<std::time::Duration>,
+    /// It isn't git and may take minutes (an AI tool): run in shells apart from git's, quick
+    /// or long, so neither waits behind it.
+    pub apart: bool,
 }
 
 impl Request {
@@ -90,6 +93,7 @@ impl std::fmt::Debug for Request {
             .field("stdin", &self.stdin.as_ref().map(Vec::len))
             .field("long", &self.long)
             .field("timeout", &self.timeout)
+            .field("apart", &self.apart)
             .finish()
     }
 }
@@ -105,7 +109,13 @@ pub struct Output {
 /// Runs `req` on `host`, in one of the shells kept open there.
 pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
     super::ui_guard::off_ui_thread(&req.what())?;
-    let lane = if req.long { Lane::Long } else { Lane::Quick };
+    let lane = if req.apart {
+        Lane::Apart
+    } else if req.long {
+        Lane::Long
+    } else {
+        Lane::Quick
+    };
     let pool = pool(host, lane);
     loop {
         let mut taken = pool.take(host, lane)?;

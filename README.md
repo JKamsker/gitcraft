@@ -159,7 +159,8 @@ so your config, credentials and hooks apply as usual.
   commit box sends the staged diff to `claude -p`, `codex exec`, `gh copilot` or a command of
   your own (Settings → AI) and fills in the message; a message already typed is only replaced
   if you choose to. _Review this branch_ in a branch's menu does the same with what the branch
-  adds to main and shows the answer in a panel. The tool runs on the repository's machine (here,
+  adds to the branch pull requests go to (main, master or develop) and shows the answer in a
+  window. When amending, the message is written from the last commit with what is staged. The tool runs on the repository's machine (here,
   in WSL or over SSH) with its own sign-in, the prompt on its input: gitcraft keeps no API key.
   Off until you pick a tool; the tools installed there are found for you. The diff sent is cut
   to a size you set (64 KB at first), each file getting a fair share, lock files and what didn't
