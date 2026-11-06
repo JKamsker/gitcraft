@@ -34,7 +34,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Search messages, authors and hashes, or switch to Code to find the commits that added or removed some text.",
             "Drag the borders in the column header to resize; right-click it to pick the columns, make the graph column compact or reset the columns.",
             "Interactive rebase: reorder, reword, squash, fix up or drop commits, then start it.",
-            "Start hotfix from v2.3.1… in a version tag's menu makes hotfix/2.3.2 there; Finish hotfix… (its menu, or the palette) tags it, merges it into main (and develop, if used), deletes it and pushes it all, shown first and undone with Ctrl+Z.",
+            "Start hotfix from v2.3.1… in a version tag's menu makes hotfix/2.3.2 there; Finish hotfix… (its menu, or the palette) merges it into develop (if used) and main, tags main's merge, deletes it and pushes it all, shown first and undone with Ctrl+Z (also when it stops part-way).",
             "Cut release… in a commit's menu (or the palette) suggests the next version from the Conventional Commits since the last tag and drafts the notes; it can move the version in Cargo.toml / package.json and CHANGELOG.md, tag (annotated or signed), push and make the release on the forge with files, showing each step first. A step that fails can be resumed; Ctrl+Z undoes what was done here.",
         ],
     ),

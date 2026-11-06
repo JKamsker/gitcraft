@@ -106,6 +106,7 @@ fn a_hotfix_started_from_a_tag_is_finished_pushed_undone_and_redone() {
     settle(&mut tab, &ctx);
     let current = git::run(Some(&dir), &["branch", "--show-current"]).unwrap_or_default();
     let tag_at = git::resolve(&dir, "v2.3.2").ok();
+    let tag_object = git::run(Some(&dir), &["rev-parse", "refs/tags/v2.3.2"]).unwrap_or_default();
     let in_main = git::run(
         Some(&dir),
         &["merge-base", "--is-ancestor", &hotfix_head, "main"],
@@ -129,12 +130,11 @@ fn a_hotfix_started_from_a_tag_is_finished_pushed_undone_and_redone() {
     let tag_gone = git::resolve(&dir, "refs/tags/v2.3.2").is_err();
     tab.redo(&ctx);
     settle(&mut tab, &ctx);
-    let redone = git::resolve(&dir, "refs/tags/v2.3.2").is_ok()
-        && git::run(
-            Some(&dir),
-            &["merge-base", "--is-ancestor", &hotfix_head, "main"],
-        )
-        .is_ok();
+    // The very tag and merges that were pushed, not new ones.
+    let redone_tag = git::run(Some(&dir), &["rev-parse", "refs/tags/v2.3.2"]).unwrap_or_default();
+    let redone_main = git::resolve(&dir, "refs/heads/main").ok();
+    let redone_branch = git::run(Some(&dir), &["branch", "--show-current"]).unwrap_or_default();
+    let redone_gone = git::resolve(&dir, "refs/heads/hotfix/2.3.2").is_err();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::remove_dir_all(&bare);
     assert_eq!(named, Some(("hotfix/2.3.2".to_owned(), tag_target)));
@@ -144,7 +144,9 @@ fn a_hotfix_started_from_a_tag_is_finished_pushed_undone_and_redone() {
             .is_some_and(|c| c.tag == "v2.3.2" && c.develop && c.notes.contains("the crash"))
     );
     assert_eq!(current.trim(), "main");
-    assert_eq!(tag_at.as_deref(), Some(hotfix_head.as_str()));
+    // On main's merge, as git-flow tags it.
+    assert_eq!(tag_at, local_main);
+    assert!(!tag_object.trim().is_empty());
     assert!(in_main && in_develop && gone);
     assert_eq!(remote_main, local_main);
     assert!(remote_tag.is_some());
@@ -152,7 +154,119 @@ fn a_hotfix_started_from_a_tag_is_finished_pushed_undone_and_redone() {
     assert_eq!(main_back.as_deref(), Some(main_before.as_str()));
     assert_eq!(develop_back.as_deref(), Some(develop_before.as_str()));
     assert!(tag_gone);
-    assert!(redone);
+    assert_eq!(redone_tag.trim(), tag_object.trim());
+    assert_eq!(redone_main, local_main);
+    assert_eq!(redone_branch.trim(), "main");
+    assert!(redone_gone);
+}
+
+#[test]
+fn a_finish_that_stops_part_way_is_undoable() {
+    let (dir, bare) = project("stopped");
+    run(&dir, &["checkout", "-q", "-b", "hotfix/2.3.2", "v2.3.1"]);
+    commit(&dir, "app.txt", "one\nTWO\n", "fix: two");
+    run(&dir, &["branch", "--set-upstream-to=origin/main"]);
+    // Checking main out fails on this file, after develop is merged into.
+    let _ = std::fs::write(dir.join("only-main.txt"), "mine\n");
+    run(&dir, &["checkout", "-q", "main"]);
+    commit(&dir, "only-main.txt", "main's\n", "chore: main's file");
+    run(&dir, &["checkout", "-q", "hotfix/2.3.2"]);
+    let _ = std::fs::write(dir.join("only-main.txt"), "in the way\n");
+    let main_before = git::resolve(&dir, "refs/heads/main").unwrap_or_default();
+    let develop_before = git::resolve(&dir, "refs/heads/develop").unwrap_or_default();
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    tab.reload(&ctx);
+    settle(&mut tab, &ctx);
+    tab.hotfix_act(HotfixAct::OpenFinish, &ctx);
+    wait(&mut tab, &ctx, |t| {
+        t.hotfix.finish.as_ref().is_some_and(|f| f.plan.is_some())
+    });
+    let planned = tab
+        .hotfix
+        .finish
+        .as_ref()
+        .is_some_and(|f| matches!(f.plan, Some(Ok(_))));
+    if let Some(f) = &mut tab.hotfix.finish {
+        f.choices.push = false;
+    }
+    tab.hotfix_act(HotfixAct::Finish, &ctx);
+    settle(&mut tab, &ctx);
+    wait(&mut tab, &ctx, |t| {
+        t.undo_stack
+            .last()
+            .is_some_and(|e| e.label.contains("stopped part-way"))
+    });
+    let develop_merged =
+        git::resolve(&dir, "refs/heads/develop").ok() != Some(develop_before.clone());
+    let status = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    tab.undo(&ctx);
+    settle(&mut tab, &ctx);
+    let branch = git::run(Some(&dir), &["branch", "--show-current"]).unwrap_or_default();
+    let develop_back = git::resolve(&dir, "refs/heads/develop").ok();
+    let main_back = git::resolve(&dir, "refs/heads/main").ok();
+    let no_tag = git::resolve(&dir, "refs/tags/v2.3.2").is_err();
+    let upstream =
+        git::run(Some(&dir), &["config", "branch.hotfix/2.3.2.merge"]).unwrap_or_default();
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(&bare);
+    assert!(planned);
+    assert!(develop_merged);
+    assert!(status.contains("Ctrl+Z puts back what it did"), "{status}");
+    assert_eq!(branch.trim(), "hotfix/2.3.2");
+    assert_eq!(develop_back.as_deref(), Some(develop_before.as_str()));
+    assert_eq!(main_back.as_deref(), Some(main_before.as_str()));
+    assert!(no_tag);
+    assert_eq!(upstream.trim(), "refs/heads/main");
+}
+
+#[test]
+fn a_branch_checked_out_in_another_worktree_is_refused() {
+    let (dir, bare) = project("worktree");
+    run(&dir, &["checkout", "-q", "-b", "hotfix/2.3.2", "v2.3.1"]);
+    commit(&dir, "app.txt", "one\nTWO\n", "fix: two");
+    let other = folder("worktree-develop");
+    let _ = std::fs::remove_dir_all(&other);
+    run(
+        &dir,
+        &["worktree", "add", "-q", &other.to_string_lossy(), "develop"],
+    );
+    let plan = plan::plan(&dir, None);
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(&bare);
+    let _ = std::fs::remove_dir_all(&other);
+    assert!(plan.is_err_and(|e| e.contains("develop is checked out in another worktree")));
+}
+
+#[test]
+fn an_unticked_signature_is_not_made_where_tags_are_signed_by_default() {
+    let (dir, bare) = project("unsigned");
+    run(&dir, &["checkout", "-q", "-b", "hotfix/2.3.2", "v2.3.1"]);
+    commit(&dir, "app.txt", "one\nTWO\n", "fix: two");
+    run(&dir, &["config", "tag.gpgSign", "true"]);
+    run(&dir, &["config", "gpg.program", "false"]);
+    let plan = plan::plan(&dir, None);
+    assert!(plan.is_ok(), "{plan:?}");
+    let Ok(plan) = plan else { return };
+    let c = Choices {
+        tag: plan.tag.clone(),
+        notes: String::new(),
+        develop: false,
+        delete: false,
+        push: false,
+        sign: false,
+    };
+    assert!(plan.sign);
+    let steps = plan.steps(&c);
+    let mut ok = true;
+    for step in steps.iter().filter(|s| !s[0].starts_with('\u{0}')) {
+        let args: Vec<&str> = step.iter().map(String::as_str).collect();
+        ok &= git::run(Some(&dir), &args).is_ok();
+    }
+    let tagged = git::resolve(&dir, "refs/tags/v2.3.2").is_ok();
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(&bare);
+    assert!(ok && tagged);
 }
 
 #[test]
