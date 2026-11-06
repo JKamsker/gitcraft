@@ -202,6 +202,13 @@ so your config, credentials and hooks apply as usual.
     the text keeps its own spacing), so a paragraph only re-wrapped says _re-wrapped_ and
     marks nothing. Removed and added paragraphs show whole; long runs of unchanged ones fold
     (click to open).
+  - _By key_ (the list, for JSON, YAML and TOML): one row per key path that changed, such as
+    `server.timeout: 30 → 60`, keys added and removed, a value that became another kind
+    (`boolean → string`), and keys that only moved within their map listed apart from
+    changed values (_moved, same value_). List items are matched by content, so an item
+    inserted at the top doesn't make every one after it changed. Comments, quoting and
+    formatting don't count; JSON may have the comments and trailing commas of
+    JSON-with-comments files. A file that doesn't parse says on which side and line.
 - A Markdown file's diff has an eye button that renders it: the changes block by block (removed
   ones red, added ones green, the rest as they are) or, with _File_, the whole file. Images of
   the repository show as they are on each side of the change; any other image is a link, so a
