@@ -256,7 +256,8 @@ pub(super) fn fields_rows(card: &mut Card, edit: &mut Signing, salt: &str) -> bo
 const GLOBAL: &[&str] = &["--global"];
 
 /// The commit signing form. Choices are written at once, text fields when they lose focus.
-pub(super) fn signing_ui(ui: &mut Ui, filter: &Filter) {
+/// `overridden_by`: the profile in use, when it signs its own way, which wins over this form.
+pub(super) fn signing_ui(ui: &mut Ui, filter: &Filter, overridden_by: Option<&str>) {
     let t = Tokens::get(ui.ctx());
     let id = egui::Id::new("settings-signing");
     let mut form = ui
@@ -282,6 +283,18 @@ pub(super) fn signing_ui(ui: &mut Ui, filter: &Filter) {
              machine's own.",
         ),
         |card| {
+            if let Some(profile) = overridden_by {
+                card.full("profile own override", |ui| {
+                    ui.label(
+                        RichText::new(format!(
+                            "The profile “{profile}” signs its own way (Settings → Profile): \
+                             what is set here doesn't apply while it is in use."
+                        ))
+                        .color(t.warning)
+                        .small(),
+                    );
+                });
+            }
             commit |= fields_rows(card, &mut form.edit, "settings-signing");
             if let Some(e) = &form.error {
                 card.full("", |ui| ui.label(RichText::new(e).color(t.danger).small()));

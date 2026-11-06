@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::theme::Tokens;
 use layout::{Card, Filter, section};
 pub(crate) use page::show as show_page;
-pub use profile_page::{ProfileRequest, ProfileView, paint_badge};
+pub use profile_page::{ProfileRequest, SettingsView, paint_badge};
 pub use profiles::UserProfile;
 
 /// A name and email to commit with, applied per repository from its commit box.
@@ -332,7 +332,7 @@ impl Settings {
     }
 
     /// One page of the settings, or what a search matches on it (see [`layout::Filter`]).
-    fn page_ui(&mut self, ui: &mut Ui, page: Page, f: &Filter, view: &mut ProfileView) {
+    fn page_ui(&mut self, ui: &mut Ui, page: Page, f: &Filter, view: &mut SettingsView) {
         let t = Tokens::get(ui.ctx());
         match page {
             Page::Profile => self.profile_ui(ui, f, view),
@@ -566,7 +566,11 @@ impl Settings {
                     },
                 );
             }
-            Page::Signing => signing::signing_ui(ui, f),
+            Page::Signing => {
+                let profile = self.profile();
+                let overridden = profile.own_signing.then(|| profile.title().to_owned());
+                signing::signing_ui(ui, f, overridden.as_deref());
+            }
             Page::Terminal => {
                 section(ui, f, "Terminal", None, |card| {
                     card.row("Default shell", "bash zsh powershell cmd fish", |ui| {

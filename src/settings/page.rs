@@ -4,7 +4,7 @@
 use egui::{Align2, Id, Key, Modifiers, RichText, Sense, Stroke, Ui, vec2};
 
 use super::layout::Filter;
-use super::{Page, ProfileView, Settings};
+use super::{Page, Settings, SettingsView};
 use crate::theme::{self, Tokens};
 
 /// Width of the list of pages, and the room between it and the page; less in a small window.
@@ -53,10 +53,10 @@ fn search_id() -> Id {
 impl Settings {
     /// The settings tab. Returns true when a setting changed; what the Profile page asks the
     /// app to do is left in `view`.
-    pub fn page(&mut self, ui: &mut Ui, view_of_profile: &mut ProfileView) -> bool {
+    pub fn page(&mut self, ui: &mut Ui, app: &mut SettingsView) -> bool {
         let before = self.clone();
         let mut view: View = ui.data(|d| d.get_temp(view_id())).unwrap_or_default();
-        keys(ui, &mut view);
+        keys(ui, &mut view, app.dialog_open);
         // How many settings the search finds on each page.
         let counts: Vec<usize> = if view.query.trim().is_empty() {
             Vec::new()
@@ -65,7 +65,7 @@ impl Settings {
                 .iter()
                 .map(|&page| {
                     let filter = Filter::new(&view.query, page.title(), true);
-                    self.page_ui(ui, page, &filter, view_of_profile);
+                    self.page_ui(ui, page, &filter, app);
                     filter.found()
                 })
                 .collect()
@@ -98,10 +98,10 @@ impl Settings {
                                 ui,
                                 view.page,
                                 &Filter::new("", view.page.title(), false),
-                                view_of_profile,
+                                app,
                             );
                         } else {
-                            self.results(ui, &mut view, &counts, view_of_profile);
+                            self.results(ui, &mut view, &counts, app);
                         }
                         ui.add_space(40.0);
                     });
@@ -112,13 +112,7 @@ impl Settings {
     }
 
     /// What the search finds, under the title of each page it is on.
-    fn results(
-        &mut self,
-        ui: &mut Ui,
-        view: &mut View,
-        counts: &[usize],
-        view_of_profile: &mut ProfileView,
-    ) {
+    fn results(&mut self, ui: &mut Ui, view: &mut View, counts: &[usize], app: &mut SettingsView) {
         let t = Tokens::get(ui.ctx());
         title(ui, "Search results");
         let total: usize = counts.iter().sum();
@@ -152,12 +146,7 @@ impl Settings {
                 view.page = page;
                 view.query.clear();
             }
-            self.page_ui(
-                ui,
-                page,
-                &Filter::new(&query, page.title(), false),
-                view_of_profile,
-            );
+            self.page_ui(ui, page, &Filter::new(&query, page.title(), false), app);
         }
     }
 }
@@ -170,7 +159,15 @@ fn title(ui: &mut Ui, text: &str) {
 
 /// The settings' shortcuts: Ctrl+F searches, Esc clears the search, Alt+↑/↓ go through the
 /// pages.
-fn keys(ui: &mut Ui, view: &mut View) {
+fn keys(ui: &mut Ui, view: &mut View, dialog_open: bool) {
+    // A dialog over the page has the keys; so does a field of a page being typed in (Esc or
+    // leaving the page would leave it without its lost focus, which is when it is saved).
+    let typing = ui
+        .memory(|m| m.focused())
+        .is_some_and(|focused| focused != search_id());
+    if dialog_open || typing {
+        return;
+    }
     let popup_open = egui::Popup::is_any_open(ui.ctx());
     let (search, clear, up, down) = ui.input_mut(|i| {
         (

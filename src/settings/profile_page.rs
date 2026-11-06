@@ -23,12 +23,15 @@ pub enum ProfileRequest {
     Theme(ThemeKind),
 }
 
-/// What the Profile page needs of the app, and what it asks the app to do.
-pub struct ProfileView<'a> {
+/// What the settings page needs of the app, and what its Profile page asks the app to do.
+pub struct SettingsView<'a> {
     /// The app's theme, which is the profile's.
     pub theme: ThemeKind,
     /// What `git --version` said.
     pub git_version: &'a str,
+    /// A dialog is over the page (the manual, the palette, the clone or remote dialog): the
+    /// keys are the dialog's.
+    pub dialog_open: bool,
     /// Set by the page: profiles switch with the tabs, which are the app's.
     pub request: Option<ProfileRequest>,
 }
@@ -91,7 +94,7 @@ pub fn badge(ui: &mut Ui, size: f32, profile: &UserProfile) {
 
 impl Settings {
     /// The profile in use and its own settings, or what a search matches of them.
-    pub(super) fn profile_ui(&mut self, ui: &mut Ui, f: &Filter, view: &mut ProfileView) {
+    pub(super) fn profile_ui(&mut self, ui: &mut Ui, f: &Filter, view: &mut SettingsView) {
         let t = Tokens::get(ui.ctx());
         let current = self.profile();
         let mut request = None;
@@ -211,11 +214,24 @@ impl Settings {
                         "As in your global git config",
                     )
                     .on_hover_text("Set on the Commit signing page");
-                    ui.radio_value(&mut profile.own_signing, true, "Just for this profile");
+                    let own =
+                        ui.radio_value(&mut profile.own_signing, true, "Just for this profile");
+                    // Starts from how the global config signs, rather than over it with
+                    // nothing (openpgp, signing nothing).
+                    if own.changed() && profile.signing == signing::Signing::default() {
+                        profile.signing = signing::read(&["--global"]);
+                    }
                 });
             });
             if profile.own_signing {
+                let format = profile.signing.format().to_owned();
                 signing::fields_rows(card, &mut profile.signing, "settings-profile-signing");
+                // A key and a program are for one format: an SSH key file is no GPG key, and
+                // ssh-keygen doesn't sign as gpg.
+                if profile.signing.format() != format {
+                    profile.signing.key.clear();
+                    profile.signing.program.clear();
+                }
                 card.full("profile signing global override", |ui| {
                     layout::note(
                         ui,

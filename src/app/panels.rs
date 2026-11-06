@@ -41,9 +41,14 @@ impl App {
     pub(super) fn settings_page(&mut self, ui: &mut Ui) {
         let ctx = ui.ctx().clone();
         let version = self.git_version.clone().unwrap_or_default();
-        let mut view = crate::settings::ProfileView {
+        let mut view = crate::settings::SettingsView {
             theme: self.theme,
             git_version: &version,
+            dialog_open: self.clone_form.is_some()
+                || self.remote_form.is_some()
+                || self.askpass_open()
+                || self.palette.is_some()
+                || self.manual_open,
             request: None,
         };
         if self.settings.page(ui, &mut view) {

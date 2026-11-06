@@ -167,9 +167,10 @@ fn found(query: &str) -> Vec<(Page, usize)> {
             .iter()
             .map(|&page| {
                 let filter = Filter::new(query, page.title(), true);
-                let mut view = ProfileView {
+                let mut view = SettingsView {
                     theme: crate::theme::ThemeKind::Dark,
                     git_version: "2.45.0",
+                    dialog_open: false,
                     request: None,
                 };
                 settings.page_ui(ui, page, &filter, &mut view);
