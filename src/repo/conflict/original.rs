@@ -9,8 +9,8 @@ pub(super) enum IndexBases {
     /// Not asked: every conflict has its base in the file.
     NotNeeded,
     Loading,
-    /// The file's conflicts made again from the index: (ours, base, theirs) each.
-    Found(Vec<(String, String, String)>),
+    /// The file made again from the index, its conflicts with their bases.
+    Found(Vec<Segment>),
     /// Both sides added the file (add/add): there is no original.
     Added,
     Failed(String),
@@ -52,44 +52,57 @@ fn plain(text: &str) -> std::borrow::Cow<'_, str> {
     }
 }
 
-/// For each conflict of `segments` (in order) without a base of its own, where the same one is
-/// in `found` (the index's, in order): matched in order, a conflict the index doesn't have (the
-/// file edited since) left out.
-pub(super) fn match_found(
-    segments: &[Segment],
-    found: &[(String, String, String)],
-) -> Vec<Option<usize>> {
+/// For each conflict of `segments` (in order), its base in `found` (the file made again from
+/// the index, with bases): the run of `found`'s conflicts, and the text between them, that has
+/// the same two sides. git's own merge joins conflicts that only a line without letters or
+/// digits (`}`) keeps apart, which the rebuilt file keeps apart; a conflict found nowhere (the
+/// file edited since) has none.
+pub(super) fn match_bases(segments: &[Segment], found: &[Segment]) -> Vec<Option<String>> {
     let mut next = 0;
-    let mut matched = Vec::new();
-    for seg in segments {
-        let Segment::Conflict { ours, theirs, .. } = seg else {
-            continue;
-        };
+    let mut bases = Vec::new();
+    for (ours, _, theirs) in conflicts(segments) {
         let (ours, theirs) = (plain(ours), plain(theirs));
-        let at = found[next.min(found.len())..]
-            .iter()
-            .position(|(o, _, t)| plain(o) == ours && plain(t) == theirs)
-            .map(|i| i + next);
-        if let Some(i) = at {
-            next = i + 1;
+        let hit = (next..found.len())
+            .filter(|&i| matches!(found[i], Segment::Conflict { .. }))
+            .find_map(|start| span(found, start, &ours, &theirs));
+        if let Some((end, _)) = &hit {
+            next = *end;
         }
-        matched.push(at);
+        bases.push(hit.map(|(_, base)| base));
     }
-    matched
+    bases
 }
 
-/// The (ours, base, theirs) of each conflict in `text`, a file made again with its bases.
-pub(super) fn conflicts_with_base(text: &str) -> Vec<(String, String, String)> {
-    let (segments, _, _) = super::parse(text);
-    segments
-        .into_iter()
-        .filter_map(|seg| match seg {
-            Segment::Conflict { ours, base, theirs } => {
-                Some((ours, base.unwrap_or_default(), theirs))
+/// Whether the conflicts of `found` from `start` on, and the text between them, add up to
+/// `ours` and `theirs`: where that run ends, and its base.
+fn span(found: &[Segment], start: usize, ours: &str, theirs: &str) -> Option<(usize, String)> {
+    let (mut o, mut t, mut b) = (String::new(), String::new(), String::new());
+    for (i, seg) in found.iter().enumerate().skip(start) {
+        match seg {
+            Segment::Common(text) => {
+                let text = plain(text);
+                o.push_str(&text);
+                t.push_str(&text);
+                b.push_str(&text);
             }
-            Segment::Common(_) => None,
-        })
-        .collect()
+            Segment::Conflict {
+                ours: so,
+                base,
+                theirs: st,
+            } => {
+                o.push_str(&plain(so));
+                t.push_str(&plain(st));
+                b.push_str(&plain(base.as_deref().unwrap_or_default()));
+                if o == ours && t == theirs {
+                    return Some((i + 1, b));
+                }
+            }
+        }
+        if !ours.starts_with(&o) || !theirs.starts_with(&t) {
+            return None;
+        }
+    }
+    None
 }
 
 /// The lines of `text` without their line endings.
@@ -199,8 +212,8 @@ fn conflicts(segments: &[Segment]) -> impl Iterator<Item = (&str, Option<&str>, 
 #[derive(Debug)]
 pub(super) struct State {
     pub index: IndexBases,
-    /// For each conflict, the one of [`IndexBases::Found`] that is the same.
-    matched: Vec<Option<usize>>,
+    /// For each conflict, its base in [`IndexBases::Found`], when found there.
+    bases: Vec<Option<String>>,
     /// Which conflicts' Original sections are open.
     open: Vec<bool>,
     /// The changes of (ours, theirs) against the base, for the open sections that have one.
@@ -211,7 +224,7 @@ impl Default for State {
     fn default() -> Self {
         Self {
             index: IndexBases::NotNeeded,
-            matched: Vec::new(),
+            bases: Vec::new(),
             open: Vec::new(),
             diffs: Vec::new(),
         }
@@ -239,8 +252,8 @@ impl State {
         let n = conflicts(segments).count();
         self.open = vec![false; n];
         self.diffs = vec![None; n];
-        self.matched = match &self.index {
-            IndexBases::Found(found) => match_found(segments, found),
+        self.bases = match &self.index {
+            IndexBases::Found(found) => match_bases(segments, found),
             _ => vec![None; n],
         };
     }
@@ -263,10 +276,12 @@ impl State {
             IndexBases::NotNeeded | IndexBases::Loading => Original::Loading,
             IndexBases::Added => Original::Added,
             IndexBases::Failed(why) => Original::Unknown(why),
-            IndexBases::Found(found) => match self.matched.get(k).copied().flatten() {
-                Some(i) => Original::Text(&found[i].1),
+            IndexBases::Found(_) => match self.bases.get(k).and_then(Option::as_deref) {
+                Some(base) => Original::Text(base),
                 None => Original::Unknown(
-                    "this conflict is not the one git left (the file was edited since)",
+                    "this conflict doesn't match the one rebuilt from the index (the file may \
+                     have been edited since, or merged with options or a merge driver that \
+                     can't be repeated here)",
                 ),
             },
         }
@@ -316,7 +331,7 @@ pub(super) fn load(repo: &std::path::Path, path: &str) -> IndexBases {
         };
     }
     match crate::git::conflict_with_base(repo, path) {
-        Ok(text) => IndexBases::Found(conflicts_with_base(&text)),
+        Ok(text) => IndexBases::Found(super::parse(&text).0),
         Err(e) => IndexBases::Failed(e),
     }
 }
@@ -376,29 +391,40 @@ mod tests {
 
     #[test]
     fn conflicts_are_matched_with_the_index_in_order() {
-        let (segments, _, _) = super::super::parse(
+        let parse = |text: &str| super::super::parse(text).0;
+        let segments = parse(
             "<<<<<<< a\nx\r\n=======\ny\r\n>>>>>>> b\nmid\n<<<<<<< a\nedited\n=======\nq\n>>>>>>> b\n\
              <<<<<<< a\np\n=======\nq\n>>>>>>> b\n",
         );
-        let found = vec![
-            ("x\n".to_owned(), "base 1\n".to_owned(), "y\n".to_owned()),
-            ("o\n".to_owned(), "base 2\n".to_owned(), "q\n".to_owned()),
-            ("p\n".to_owned(), "base 3\n".to_owned(), "q\n".to_owned()),
-        ];
-        assert_eq!(match_found(&segments, &found), vec![Some(0), None, Some(2)]);
-        assert_eq!(match_found(&segments, &[]), vec![None, None, None]);
+        let found = parse(
+            "<<<<<<< o\nx\n||||||| b\nbase 1\n=======\ny\n>>>>>>> t\nmid\n\
+             <<<<<<< o\no\n||||||| b\nbase 2\n=======\nq\n>>>>>>> t\n\
+             <<<<<<< o\np\n||||||| b\nbase 3\n=======\nq\n>>>>>>> t\n",
+        );
+        assert_eq!(
+            match_bases(&segments, &found),
+            vec![
+                Some("base 1\n".to_owned()),
+                None,
+                Some("base 3\n".to_owned())
+            ]
+        );
+        assert_eq!(match_bases(&segments, &[]), vec![None, None, None]);
     }
 
+    /// git's merge keeps `A } B` / `X } Y` as one conflict; the rebuilt file has two, with the
+    /// `}` between them.
     #[test]
-    fn bases_read_from_a_zdiff3_file() {
-        let text = "a\n<<<<<<< ours\n||||||| base\nvalidate()\n=======\nvalidate(strict)\n>>>>>>> theirs\nb\n";
+    fn one_conflict_matches_a_run_of_rebuilt_ones() {
+        let parse = |text: &str| super::super::parse(text).0;
+        let segments = parse("<<<<<<< a\nA\n}\nB\n=======\nX\n}\nY\n>>>>>>> b\n");
+        let found = parse(
+            "<<<<<<< o\nA\n||||||| b\na\n=======\nX\n>>>>>>> t\n}\n\
+             <<<<<<< o\nB\n||||||| b\nb\n=======\nY\n>>>>>>> t\n",
+        );
         assert_eq!(
-            conflicts_with_base(text),
-            vec![(
-                String::new(),
-                "validate()\n".to_owned(),
-                "validate(strict)\n".to_owned()
-            )]
+            match_bases(&segments, &found),
+            vec![Some("a\n}\nb\n".to_owned())]
         );
     }
 }

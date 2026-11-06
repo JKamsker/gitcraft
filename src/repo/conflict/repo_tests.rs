@@ -182,6 +182,74 @@ fn bases_follow_the_conflicts_left() -> Result<(), String> {
     Ok(())
 }
 
+/// git's merge leaves `A } B` against `X } Y` as one conflict, which the file rebuilt from the
+/// index splits in two at the `}`: the card still finds its base.
+#[test]
+fn a_conflict_git_joined_still_has_its_base() -> Result<(), String> {
+    let dir = conflicted(
+        "original-joined",
+        &[("f.c", b"start\na\n}\nb\nend\n")],
+        &[("f.c", b"start\nA\n}\nB\nend\n")],
+        &[("f.c", b"start\nX\n}\nY\nend\n")],
+        "other",
+    )?;
+    let ed = editor_with_bases(&dir, "f.c")?;
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(ed.choices.len(), 1);
+    assert_eq!(base_of(&ed, 0).as_deref(), Some("a\n}\nb\n"));
+    Ok(())
+}
+
+/// Names a `.gitignore` covers: said in the preview, and Stage both still stages both before
+/// the old name goes, so the conflict is never resolved as a deletion with neither kept.
+#[test]
+fn keep_both_with_ignored_names() -> Result<(), String> {
+    let dir = conflicted(
+        "keep-both-ignored",
+        &[(".gitignore", b".env.*\n"), (".env", b"\x00base")],
+        &[(".env", b"\x00ours")],
+        &[(".env", b"\x00theirs")],
+        "feature",
+    )?;
+    let plan = keep_both::plan(&dir, ".env", Some(InProgress::Merge))?;
+    keep_both::write(&dir, &plan)?;
+    for step in keep_both::stage_steps(&plan) {
+        let args: Vec<&str> = step.iter().map(String::as_str).collect();
+        git::run(Some(&dir), &args)?;
+    }
+    let status = git::run(Some(&dir), &["status", "--porcelain", "-z", "--no-renames"])?;
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(plan.ours.target, ".env.main");
+    assert!(plan.ours.ignored && plan.theirs.ignored);
+    let mut entries: Vec<&str> = status.split('\0').filter(|e| !e.is_empty()).collect();
+    entries.sort_unstable();
+    assert_eq!(entries, vec!["A  .env.feature", "A  .env.main", "D  .env"]);
+    Ok(())
+}
+
+/// Each version is written as it would be checked out: through the filters its attributes
+/// name (here line endings; Git LFS's smudge works the same way).
+#[test]
+fn keep_both_writes_through_the_filters() -> Result<(), String> {
+    let dir = conflicted(
+        "keep-both-filters",
+        &[
+            (".gitattributes", b"*.dat eol=crlf\n"),
+            ("x.dat", b"base\n"),
+        ],
+        &[("x.dat", b"ours\n")],
+        &[("x.dat", b"theirs\n")],
+        "feature",
+    )?;
+    let plan = keep_both::plan(&dir, "x.dat", Some(InProgress::Merge))?;
+    keep_both::write(&dir, &plan)?;
+    let ours = std::fs::read(dir.join(&plan.ours.target));
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(ours.map_err(|e| e.to_string())?, b"ours\r\n");
+    assert_eq!(plan.ours.size, 6);
+    Ok(())
+}
+
 /// A binary conflict: both versions written beside it, named after their branches, with
 /// their origin and size; nothing staged until asked, then the conflict is resolved.
 #[test]
