@@ -103,6 +103,8 @@ struct Ran {
 struct Extra {
     pre: Vec<&'static str>,
     env: Vec<(&'static str, String)>,
+    /// What git reads on its input; nothing when `None`.
+    stdin: Option<Vec<u8>>,
 }
 
 /// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
@@ -120,15 +122,41 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
         cmd.env(name, value);
     }
     cmd.args(args);
-    let out = cmd
-        .output()
-        .map_err(|e| format!("could not run git: {e}"))?;
+    let out = match &extra.stdin {
+        Some(input) => output_with_input(cmd, input),
+        None => cmd.output(),
+    }
+    .map_err(|e| format!("could not run git: {e}"))?;
     Ok(Ran {
         code: out.status.code(),
         status: out.status.to_string(),
         stdout: out.stdout,
         stderr: out.stderr,
     })
+}
+
+/// Runs `cmd` with `input` on its standard input, written from a thread of its own so that a
+/// large input doesn't wait on output nobody reads yet.
+fn output_with_input(mut cmd: Command, input: &[u8]) -> std::io::Result<std::process::Output> {
+    use std::io::Write;
+    use std::process::Stdio;
+    let mut child = cmd
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let writer = child.stdin.take().map(|mut stdin| {
+        let input = input.to_vec();
+        // A git that stops reading early (an error) closes the pipe: what it said tells why.
+        std::thread::spawn(move || {
+            let _ = stdin.write_all(&input);
+        })
+    });
+    let out = child.wait_with_output();
+    if let Some(writer) = writer {
+        let _ = writer.join();
+    }
+    out
 }
 
 /// The request that runs git with `args` in `target`'s folder, on its machine.
@@ -149,7 +177,7 @@ fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Requ
             .chain(extra.env.iter().map(|(n, v)| ((*n).to_owned(), v.clone())))
             .collect(),
         unset: GIT_ENV_REMOVED.iter().map(|n| (*n).to_owned()).collect(),
-        stdin: None,
+        stdin: extra.stdin.clone(),
         long: goes_over_network(args),
         timeout: None,
     }
@@ -184,6 +212,16 @@ fn execute_there(target: &Target, extra: &Extra, args: &[&str]) -> Result<Ran, S
 /// Runs git in `dir` and returns stdout, or the error output.
 pub fn run(dir: Option<&Path>, args: &[&str]) -> Result<String, String> {
     run_ok_codes(dir, args, &[0])
+}
+
+/// [`run`], with `input` on git's standard input (`notes add -F -`: a text of any size, which
+/// a command line would limit).
+pub fn run_input(dir: Option<&Path>, args: &[&str], input: &str) -> Result<String, String> {
+    let extra = Extra {
+        stdin: Some(input.as_bytes().to_vec()),
+        ..Extra::default()
+    };
+    finish(execute(dir, &extra, args)?, args, &[0])
 }
 
 /// Runs git and returns stdout as raw bytes (file contents: images…).
@@ -271,6 +309,7 @@ fn unattended_extra(unix: bool) -> Extra {
     Extra {
         pre: vec!["-c", "credential.interactive=false", "-c", "core.askPass="],
         env,
+        stdin: None,
     }
 }
 
@@ -322,7 +361,12 @@ fn run_inner(
             .env
             .push(("GITCRAFT_GIT_PASSWORD", c.password.clone()));
     }
-    let out = execute(dir, &extra, args)?;
+    finish(execute(dir, &extra, args)?, args, ok)
+}
+
+/// What a git call that ended so gives: its output when its code is one of `ok`, otherwise
+/// what it said went wrong.
+fn finish(out: Ran, args: &[&str], ok: &[i32]) -> Result<String, String> {
     if out.code.is_some_and(|c| ok.contains(&c)) {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {
