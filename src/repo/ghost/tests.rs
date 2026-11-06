@@ -171,7 +171,7 @@ fn a_delete_ghost_lists_what_deleting_loses() -> Result<(), String> {
         },
     )?;
     assert_eq!(o.moves[0].to, None);
-    assert!(o.notes.iter().any(|n| n.contains("isn't merged")));
+    assert!(o.warnings.iter().any(|n| n.contains("isn't merged")));
     repo.git(&["branch", "-q", "-D", "feature"])?;
     assert_eq!(lost(&o), really_lost(&repo, &old)?);
     assert_eq!(o.lost.len(), 2);
@@ -565,7 +565,7 @@ fn delete_says_unpushed_is_unmerged() -> Result<(), String> {
         },
     )?;
     assert!(
-        o.notes.iter().any(|n| n.contains("isn't merged")),
+        o.warnings.iter().any(|n| n.contains("isn't merged")),
         "{:?}",
         o.notes
     );

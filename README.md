@@ -107,16 +107,18 @@ so your config, credentials and hooks apply as usual.
 - Quick edits from a commit's menu, for commits of the checked-out branch: _Edit commit
   message_, _Drop commit_, _Move commit up_ / _down_, each a rebase without the editor and undone
   with Ctrl+Z. What can't be done (a merge, merges after the commit) is greyed out with why.
-- Ghost run: rest the pointer on _Rebase_, _Reset hard_, _Pull_ (the toolbar button or a mode
-  in its menu), _Force push (with lease)_, _Delete_ (a branch) or _Drop commit_, or hold Alt over
-  one to skip the wait, and the graph draws the result before anything is done: the commits it
-  would make on top, faint with dashed lanes, the pills where they would point, the commits it
-  would leave on no branch crossed out. A strip above lists those commits with their authors,
-  the files of the working tree that would change, and the step that would conflict. It is
-  worked out in the background without touching refs, index, working tree or reflog:
-  `git replay` (git 2.44+) or `git merge-tree` (2.38+ / 2.40+) in memory, a scratch clone in the
-  temporary folder on an older git; a pull asks the remote what it has without updating any ref.
-  _Force push (with lease)…_ is in a local branch's menu when its upstream has commits it hasn't.
+- Ghost run: rest the pointer on a rebase entry (_Rebase main onto x_), the hard reset of
+  _Reset main to here_, _Pull_ (the toolbar button or a mode in its menu), _Force push to
+  origin/x (with lease)…_, _Delete…_ / _Delete locally and on origin…_ or _Drop commit_ (hold
+  Alt to skip the wait), and the graph draws the result before anything is done: the commits it
+  would make on top, faint with dashed lanes, the pills where they would point outlined, the
+  commits it would leave on no branch crossed out with their lanes faded. A strip over the foot
+  of the graph lists those commits with their authors, the files of the working tree that would
+  change, and the step that would conflict. It is worked out in the background without touching
+  refs, index, working tree or reflog: `git replay` (git 2.44+) or `git merge-tree` (2.40+;
+  merges from 2.38) in memory, or a scratch clone in the temporary folder on an older git; a
+  pull asks the remote what it has without updating any ref. _Force push to origin/x (with
+  lease)…_ is in a local branch's menu when its upstream has commits it hasn't.
 
 **Branches, remotes, worktrees, stashes, tags** (left)
 

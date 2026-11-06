@@ -42,7 +42,8 @@ impl RepoTab {
         // In a ghost run: a pill where the operation would put it, or one it would delete.
         let (moved, gone) = self.ghost.pill(&first.full_refs());
         if moved || gone {
-            rp.multiply_opacity(if gone { 0.5 } else { 0.8 });
+            // What is previewed: drawn in full even on a faded ghost row, marked instead.
+            rp.set_opacity(1.0);
         }
         let more = badges.len() - 1;
         let more_w = if more > 0 { 28.0 } else { 0.0 };
@@ -293,7 +294,6 @@ struct Marks {
     ci: Option<CheckState>,
 }
 
-/// Paints a pill with white text and icons, at most `max_w` wide; returns its rect.
 /// A ghost run's marks on a pill: a dashed outline where it would go, a line through one it
 /// would delete.
 fn ghost_pill_marks(p: &Painter, t: &Tokens, pill: Rect, moved: bool, gone: bool) {
@@ -314,16 +314,17 @@ fn ghost_pill_marks(p: &Painter, t: &Tokens, pill: Rect, moved: bool, gone: bool
         ));
     }
     if gone {
-        p.line_segment(
-            [
-                pos2(pill.left() + 3.0, pill.center().y),
-                pos2(pill.right() - 3.0, pill.center().y),
-            ],
-            Stroke::new(1.5, t.danger),
-        );
+        let ends = [
+            pos2(pill.left() + 2.0, pill.center().y),
+            pos2(pill.right() - 2.0, pill.center().y),
+        ];
+        // A halo of the background under the line keeps it apart from the pill's colour.
+        p.line_segment(ends, Stroke::new(4.0, t.dock));
+        p.line_segment(ends, Stroke::new(2.0, t.danger));
     }
 }
 
+/// Paints a pill with white text and icons, at most `max_w` wide; returns its rect.
 fn ref_pill(
     ui: &Ui,
     painter: &Painter,

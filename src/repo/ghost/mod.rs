@@ -180,6 +180,18 @@ impl Ghost {
         shown.swapped = false;
     }
 
+    /// How many rows the ghost graph adds above the rows in view (scrolled away so those don't
+    /// jump).
+    pub(crate) fn rows_above(&self) -> usize {
+        if self.shifted <= 0.0 {
+            return 0;
+        }
+        self.shown
+            .as_ref()
+            .and_then(|s| s.view.as_ref())
+            .map_or(0, |v| v.added)
+    }
+
     /// The scroll change the graph should make this frame.
     pub(crate) fn take_shift(&mut self) -> Option<Shift> {
         self.shift.take()
