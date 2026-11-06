@@ -164,6 +164,7 @@ impl RepoTab {
             acts.push(self.stop_bisect_action());
         }
         let ready = bisect.progress.is_some();
+        self.parallel_banner_button(ui, acts);
         if ui
             .add_enabled(idle && ready, egui::Button::new("Run a command…"))
             .on_hover_text("git bisect run: a command tests each commit for you")

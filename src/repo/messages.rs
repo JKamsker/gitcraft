@@ -261,6 +261,7 @@ impl RepoTab {
         }
 
         self.poll_ci(ctx);
+        self.poll_parallel(ctx);
         self.recount_siblings(ctx);
         self.poll_ci_view(ctx);
 

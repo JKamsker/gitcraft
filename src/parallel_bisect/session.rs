@@ -53,7 +53,7 @@ pub enum Event {
     Step(String),
     /// The commits that may still be the first bad one (first: the whole range).
     Remaining(Arc<HashSet<String>>),
-    /// A round of tests started: its number, about how many are left after it, its commits.
+    /// A round of tests started: its number, about how many more after it, its commits.
     Round {
         number: usize,
         rounds_left: usize,
@@ -210,7 +210,7 @@ fn prepared(
     stop: &AtomicBool,
 ) -> Result<Outcome, String> {
     let label = setup.machine.label();
-    out.step(format!("Getting {label} ready…"));
+    out.step(format!("Setting up on {label}…"));
     let mut ws = Workspace::open(&setup.repo, &setup.machine, setup.repo_there.as_deref())?;
     let result = run_in(&ws, setup, cache, out, stop);
     out.step("Removing the worktrees…");
@@ -451,7 +451,7 @@ impl Run<'_> {
             number += 1;
             self.out.send(Event::Round {
                 number,
-                rounds_left: self.search.rounds_left(k),
+                rounds_left: self.search.rounds_left(k).saturating_sub(1),
                 testing: jobs.iter().map(|j| j.hash.clone()).collect(),
             });
             if let Some(outcome) = self.round(jobs)? {

@@ -96,11 +96,7 @@ fn assert_clean(dir: &Path) -> Result<(), String> {
     let list = git::run(Some(dir), &["worktree", "list", "--porcelain"])?;
     let worktrees = list.lines().filter(|l| l.starts_with("worktree ")).count();
     assert_eq!(worktrees, 1, "{list}");
-    let common = git::run(
-        Some(dir),
-        &["rev-parse", "--path-format=absolute", "--git-common-dir"],
-    )?;
-    let base = PathBuf::from(common.trim()).join("gitcraft-bisect");
+    let (base, _) = workspace::base_for(dir, &Machine::Here)?;
     assert!(!base.exists(), "{} is still there", base.display());
     let refs = git::run(Some(dir), &["for-each-ref", "refs/gitcraft-bisect/"])?;
     assert!(refs.trim().is_empty(), "{refs}");
@@ -412,10 +408,10 @@ fn a_crashed_bisect_is_cleared_up_by_the_next() -> Result<(), String> {
     let dir = scratch("leftovers")?;
     let repo = Repo::with_culprit(&dir.join("repo"), 10, 4)?;
     let git = |args: &[&str]| git::run(Some(&repo.dir), args);
-    let base = repo.dir.join(".git").join("gitcraft-bisect");
+    let (base, _) = workspace::base_for(&repo.dir, &Machine::Here)?;
     let leave_behind = |at: i64| -> Result<(), String> {
         std::fs::create_dir_all(&base).map_err(|e| e.to_string())?;
-        let slot = sh_path(&base.join("1"));
+        let slot = sh_path(&base.join("bisect-1"));
         git(&["worktree", "add", "-q", "--detach", &slot, &repo.commits[2]])?;
         git(&[
             "update-ref",
@@ -431,7 +427,7 @@ fn a_crashed_bisect_is_cleared_up_by_the_next() -> Result<(), String> {
         matches!(&outcome, Outcome::Failed(e) if e.contains("another gitcraft window")),
         "{outcome:?}"
     );
-    assert!(base.join("1").exists());
+    assert!(base.join("bisect-1").exists());
     // Crashed long ago: cleared when the tab opens…
     std::fs::write(base.join("owner"), "gitcraft 1 1000\n").map_err(|e| e.to_string())?;
     workspace::clear_leftovers(&repo.dir);
@@ -540,6 +536,63 @@ fn finds_what_git_bisect_run_finds_across_merges() -> Result<(), String> {
         assert_eq!(outcome, Outcome::FirstBad(want.clone()), "k {k}");
     }
     repo.assert_clean()?;
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+/// On another machine, when one is named (skipped otherwise): `GITCRAFT_TEST_BISECT_SSH=<host>`
+/// or `GITCRAFT_TEST_BISECT_WSL=<distro>`. A repository here is bisected there, its commits
+/// sent to the copy gitcraft keeps there; then a run is cancelled. Nothing is left there but
+/// that copy.
+#[test]
+fn bisects_on_another_machine() -> Result<(), String> {
+    use crate::remote::Host;
+    let host = match (
+        std::env::var("GITCRAFT_TEST_BISECT_SSH"),
+        std::env::var("GITCRAFT_TEST_BISECT_WSL"),
+    ) {
+        (Ok(ssh), _) => Host::Ssh(ssh),
+        (_, Ok(wsl)) => Host::Wsl(wsl),
+        _ => return Ok(()),
+    };
+    let dir = scratch("elsewhere")?;
+    let repo = Repo::with_culprit(&dir.join("repo"), 40, 29)?;
+    let machine = Machine::There(host);
+    for k in [1, 4, 8] {
+        let setup = Setup {
+            machine: machine.clone(),
+            ..repo.setup("test ! -e bug", k)
+        };
+        let started = Instant::now();
+        let (outcome, _) = bisect(setup);
+        eprintln!("k {k}: {outcome:?} in {:?}", started.elapsed());
+        assert_eq!(outcome, Outcome::FirstBad(repo.commits[29].clone()));
+    }
+    let slow = Setup {
+        machine: machine.clone(),
+        ..repo.setup("sleep 6789", 4)
+    };
+    let (outcome, _) = bisect_with(slow, &TreeCache::default(), &mut |event, handle| {
+        if matches!(event, Event::Round { .. }) {
+            std::thread::sleep(Duration::from_secs(3));
+            handle.cancel();
+        }
+    });
+    assert_eq!(outcome, Outcome::Cancelled);
+    // Nothing of it left there: no worktree of the copy, no sleeping test.
+    let Machine::There(host) = &machine else {
+        return Ok(());
+    };
+    let req = crate::remote::Request {
+        script: concat!(
+            "for d in ~/.cache/gitcraft/bisect/*/; do case $d in */run-*/) echo \"left: $d\";; esac; done; ",
+            "ps -A -o args= | grep -x 'sleep 6789' || true"
+        )
+        .to_owned(),
+        ..crate::remote::Request::default()
+    };
+    let left = crate::remote::exec(host, &req)?;
+    assert_eq!(String::from_utf8_lossy(&left.stdout).trim(), "");
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())
 }
