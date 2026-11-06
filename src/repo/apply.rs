@@ -127,13 +127,19 @@ impl RepoTab {
                 }
             }
             Action::OpenPath(rel) => {
-                if let Err(e) = crate::remote::open_here(self.path.join(rel)) {
+                if let Err(e) = crate::remote::open_here(crate::remote::join(
+                    &self.path,
+                    &rel.to_string_lossy(),
+                )) {
                     self.status = Some((e, true));
                 }
             }
             Action::OpenInEditor(rel) => {
                 let editor = Settings::get(ctx).editor;
-                if let Err(e) = open_in_editor(&editor, &self.path.join(rel)) {
+                if let Err(e) = open_in_editor(
+                    &editor,
+                    &crate::remote::join(&self.path, &rel.to_string_lossy()),
+                ) {
                     self.status = Some((e, true));
                 }
             }

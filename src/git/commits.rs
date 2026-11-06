@@ -135,9 +135,23 @@ fn parse_record<S: AsRef<str>>(fields: &[S]) -> Option<Commit> {
 /// Older history page after page from one `git log` left running, as [`log`] gives it. A
 /// fresh `log --skip=n` would walk the n commits skipped (with `--date-order`, all history)
 /// again for every page.
+///
+/// For a repository on another machine, a page is a `log --skip=n` of its own instead, run in
+/// a shell kept open there: a `git log` left running would need a connection of its own, made
+/// again on every reload (well over a second over SSH), where the walk `--date-order` makes
+/// costs about what reading the first page does.
 pub struct LogStream {
     /// `None` for no revisions at all, which have no history (as with [`log`]).
     git: Option<RunningLog>,
+    /// For a repository on another machine (see above).
+    paged: Option<Paged>,
+}
+
+/// Where a paged history is (see [`LogStream`]).
+struct Paged {
+    repo: std::path::PathBuf,
+    from: Option<Vec<String>>,
+    skip: usize,
 }
 
 struct RunningLog {
@@ -154,7 +168,20 @@ impl LogStream {
     pub fn start(repo: &Path, from: Option<&[String]>, skip: usize) -> Result<Self, String> {
         // No revisions would make git log HEAD.
         if from.is_some_and(|revs| revs.is_empty()) {
-            return Ok(Self { git: None });
+            return Ok(Self {
+                git: None,
+                paged: None,
+            });
+        }
+        if crate::remote::is_remote(repo) {
+            return Ok(Self {
+                git: None,
+                paged: Some(Paged {
+                    repo: repo.to_owned(),
+                    from: from.map(<[String]>::to_vec),
+                    skip,
+                }),
+            });
         }
         let mut child = super::command::spawn_piped(repo, &log_args(from, skip, None).as_args())?;
         let out = child
@@ -176,12 +203,18 @@ impl LogStream {
                 out,
                 err,
             }),
+            paged: None,
         })
     }
 
     /// The next `n` commits; fewer at the end of history.
     pub fn next_page(&mut self, n: usize) -> Result<Vec<Commit>, String> {
         use std::io::BufRead;
+        if let Some(paged) = &mut self.paged {
+            let page = log(&paged.repo, paged.from.as_deref(), paged.skip, n)?;
+            paged.skip += page.len();
+            return Ok(page);
+        }
         let Some(git) = &mut self.git else {
             return Ok(Vec::new());
         };

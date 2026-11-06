@@ -105,13 +105,7 @@ pub fn toplevel(path: &Path) -> Result<PathBuf, String> {
     // Only the line end: a folder's name can end with a space.
     let top = out.trim_end_matches(['\n', '\r']);
     Ok(match crate::remote::parse(path) {
-        // A `\` in a name there would read as a folder separator here.
-        Some(_) if top.contains('\\') => {
-            return Err(format!(
-                "{top}: a folder whose path has a \\ can't be opened"
-            ));
-        }
-        // A path of that machine, in the form this app gives them.
+        // A path of that machine, in the form this app gives them (a `\` in a name kept).
         Some(target) => crate::remote::encode(&target.host, top),
         None => PathBuf::from(top),
     })

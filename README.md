@@ -33,9 +33,14 @@ so your config, credentials and hooks apply as usual.
   own git, config, credentials and hooks. Nothing has to be installed there but git and a POSIX
   `sh`.
 - A few shells per machine are kept open (`ssh -T host sh`, `wsl.exe -d distro --exec sh`), so a
-  command costs one round trip, not a new connection. SSH signs in with keys or an agent
-  (`BatchMode`): set up key login first; there is no password prompt. A host seen for the first
-  time is trusted by connecting to it once with `ssh` in a terminal.
+  command costs one round trip, not a new connection; history is read page by page in them
+  too. SSH signs in as it does in a terminal (keys, an agent, `~/.ssh/config`;
+  `GITCRAFT_SSH_CONFIG` names another config): what it asks — a password, a key's
+  passphrase, whether to trust a host seen for the first time — is asked in the window (ssh
+  runs gitcraft as its `SSH_ASKPASS`). A password or passphrase typed is kept for that machine
+  while gitcraft runs, so the other shells don't ask again, and forgotten as soon as ssh says
+  it was wrong.
+- Names with a `\` in them (Linux allows one) work like any other.
 - Network operations (fetch, pull, push, clone) run in shells of their own, so the reads never
   wait behind them. A command that hangs is stopped there, with what it started, after 5
   minutes (30 for network operations).

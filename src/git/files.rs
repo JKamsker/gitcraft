@@ -8,7 +8,7 @@ use super::{END_OPTS, FS, LITERAL_PATHS, NO_SIGNATURE, RS, UTF8, not_an_option, 
 /// `rev` is `None`.
 pub fn file_at(repo: &Path, rev: Option<&str>, path: &str) -> Result<Vec<u8>, String> {
     match rev {
-        None => worktree_file(&repo.join(path)).map_err(|e| format!("{path}: {e}")),
+        None => worktree_file(&crate::remote::join(repo, path)).map_err(|e| format!("{path}: {e}")),
         // The index as `:0:path`: `:path` of a file named `1:x` would be stage 1 of `x`.
         Some("") => run_bytes(Some(repo), &["show", END_OPTS, &format!(":0:{path}")]),
         Some(rev) => run_bytes(Some(repo), &["show", END_OPTS, &format!("{rev}:{path}")]),

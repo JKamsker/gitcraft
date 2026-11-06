@@ -219,7 +219,7 @@ fn is_link(file: &Path) -> bool {
 /// Writes `text`, the conflicts of `path` (in the repository at `repo`) solved, over it. On
 /// another machine, a round trip or two: in the background.
 pub fn save_solved(repo: &Path, path: &str, text: &str) -> Result<(), String> {
-    let file = repo.join(path);
+    let file = crate::remote::join(repo, path);
     // A link put there since it was opened is not written through.
     if is_link(&file) {
         return Err(format!("{path} is a symbolic link now: not saved"));
@@ -230,7 +230,7 @@ pub fn save_solved(repo: &Path, path: &str, text: &str) -> Result<(), String> {
 /// Whether `path` (in the repository at `repo`) is no longer `opened`, as it was opened. On
 /// another machine, a round trip: in the background.
 pub fn changed_on_disk(repo: &Path, path: &str, opened: &str) -> bool {
-    crate::git::worktree_file(&repo.join(path))
+    crate::git::worktree_file(&crate::remote::join(repo, path))
         .ok()
         .and_then(|bytes| String::from_utf8(bytes).ok())
         .as_deref()
@@ -242,10 +242,12 @@ impl ConflictEditor {
     pub fn open(repo: &Path, path: &str, state: Option<InProgress>) -> Option<Self> {
         // Never a link: a merge can leave one from the other side here, and saving would write
         // through it to wherever it points.
-        if is_link(&repo.join(path)) {
+        if is_link(&crate::remote::join(repo, path)) {
             return None;
         }
-        let text = String::from_utf8(crate::git::worktree_file(&repo.join(path)).ok()?).ok()?;
+        let text =
+            String::from_utf8(crate::git::worktree_file(&crate::remote::join(repo, path)).ok()?)
+                .ok()?;
         let (segments, ours_label, theirs_label) = parse(&text);
         let conflicts = segments
             .iter()

@@ -249,14 +249,24 @@ fn shell_command(host: &Host) -> Command {
     let mut cmd = match host {
         Host::Ssh(dest) => {
             let mut cmd = Command::new("ssh");
+            // No terminal, no `~.` escapes: the stream is the protocol.
+            cmd.args(["-T", "-e", "none"]);
+            // Its questions (a password, a passphrase, a new host key) asked in the window
+            // (see `askpass`); where that can't be, none asked: it fails, and says why.
+            match super::askpass::env_for(&host.label()) {
+                Some(env) => {
+                    cmd.envs(env);
+                }
+                None => {
+                    cmd.args(["-o", "BatchMode=yes"]);
+                }
+            }
+            // Another ssh config than `~/.ssh/config`, when the user names one.
+            if let Some(config) = std::env::var_os("GITCRAFT_SSH_CONFIG").filter(|c| !c.is_empty())
+            {
+                cmd.arg("-F").arg(config);
+            }
             cmd.args([
-                // No terminal, no `~.` escapes: the stream is the protocol.
-                "-T",
-                "-e",
-                "none",
-                // Never a password or host key prompt nobody would see: it fails, and says why.
-                "-o",
-                "BatchMode=yes",
                 "-o",
                 "ConnectTimeout=15",
                 // A dropped network ends the shell (and its waiting command) within ~45 s.

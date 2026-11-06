@@ -62,9 +62,7 @@ pub fn worktree_list(repo: &Path, current_changes: Option<usize>) -> Result<Vec<
     };
     // Elsewhere, git's paths are of that machine: in the form this app gives them.
     if let Some(target) = crate::remote::parse(repo) {
-        // A `\` in a name there would read as a folder separator here (`a\..\..\x` is another
-        // folder): such a worktree is left out rather than mistaken for another.
-        list.retain(|wt| !wt.path.to_string_lossy().contains('\\'));
+        // A `\` in a name there stays part of the name (see `remote::encode`).
         for wt in &mut list {
             wt.path = crate::remote::encode(&target.host, &wt.path.to_string_lossy());
         }

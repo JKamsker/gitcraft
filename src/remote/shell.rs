@@ -120,12 +120,16 @@ impl Shell {
             .write_all(setup_script().as_bytes())
             .and_then(|()| self.stdin.flush())
             .map_err(|e| lost(&e))?;
-        let deadline = Instant::now() + CONNECT_FOR;
+        let mut deadline = Instant::now() + CONNECT_FOR;
         loop {
             match self.read_line(Some(deadline)) {
                 Ok(line) if line.trim_ascii_end() == READY.as_bytes() => return Ok(()),
                 Ok(_) => {}
                 Err(ReadError::Closed) => return Err(lost(&"the connection closed")),
+                // The user is being asked something (a password): their time, not the network's.
+                Err(ReadError::TimedOut) if super::askpass::asked_lately(CONNECT_FOR) => {
+                    deadline = Instant::now() + CONNECT_FOR;
+                }
                 Err(ReadError::TimedOut) => return Err(lost(&"it didn't answer in time")),
             }
         }
@@ -287,14 +291,12 @@ impl Drop for Shell {
     }
 }
 
-/// What to do about what ssh said when it couldn't connect, for the two cases it can't solve
-/// itself here: a host it hasn't seen yet, and a sign-in that needs a password or passphrase
-/// (nobody can type one into a connection made in the background).
+/// What to make of what ssh said when it couldn't connect.
 fn connect_hint(said: &str) -> &'static str {
     if said.contains("Host key verification failed") {
-        " - connect once with ssh in a terminal to trust its host key"
+        " - its host key wasn't trusted"
     } else if said.contains("Permission denied") {
-        " - sign-in works with keys or an agent only (ssh-add, or a key without a passphrase)"
+        " - check the user, the key or the password"
     } else {
         ""
     }

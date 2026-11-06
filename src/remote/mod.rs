@@ -8,6 +8,7 @@
 //! - SSH: `ssh://<host>/home/me/repo`, `<host>` as `ssh` takes it: an alias of `~/.ssh/config`,
 //!   `user@host`, `user@host:port`. `ssh://<host>/~/repo` is under the remote home.
 
+pub mod askpass;
 mod discover;
 mod fs;
 mod pool;
@@ -69,10 +70,31 @@ pub fn parse(path: &Path) -> Option<Target> {
         };
         return Some(Target {
             host: Host::Ssh(host.to_owned()),
-            path: normalize(&path),
+            path: literal_backslashes(&normalize(&path)),
         });
     }
     wsl_target(&s)
+}
+
+/// What stands for a `\` that is part of a name there (Linux allows one) in the path this app
+/// gives it: here, every `\` is a folder separator (what `Path::join` puts). It is the character
+/// WSL itself shows such a name with on Windows, so a `\\wsl.localhost` path with one still
+/// opens.
+const LITERAL_BACKSLASH: char = '\u{F05C}';
+
+/// A path there, the stand-in of [`LITERAL_BACKSLASH`] made a `\` again.
+fn literal_backslashes(path: &str) -> String {
+    path.replace(LITERAL_BACKSLASH, "\\")
+}
+
+/// `base` (a folder) and `rel` (a path inside it as git prints it, `/` between names). For one
+/// on another machine, a `\` in a name stays part of the name (see [`LITERAL_BACKSLASH`]).
+pub fn join(base: &Path, rel: &str) -> PathBuf {
+    if is_remote(base) {
+        base.join(rel.replace('\\', &LITERAL_BACKSLASH.to_string()))
+    } else {
+        base.join(rel)
+    }
 }
 
 /// Whether `path` is a folder of another machine.
@@ -222,7 +244,7 @@ fn terminal_script(path: &str) -> String {
 
 /// The path this app gives `path` (absolute there, or under `~`) on `host`.
 pub fn encode(host: &Host, path: &str) -> PathBuf {
-    let path = normalize(path);
+    let path = normalize(&path.replace('\\', &LITERAL_BACKSLASH.to_string()));
     match host {
         Host::Ssh(host) if path.starts_with('~') => PathBuf::from(format!("ssh://{host}/{path}")),
         Host::Ssh(host) => PathBuf::from(format!("ssh://{host}{path}")),
@@ -238,7 +260,7 @@ pub fn encode(host: &Host, path: &str) -> PathBuf {
 pub fn resolve(repo: &Path, printed: &str) -> PathBuf {
     match parse(repo) {
         Some(t) if printed.starts_with('/') => encode(&t.host, printed),
-        _ => repo.join(printed),
+        _ => join(repo, printed),
     }
 }
 
@@ -344,7 +366,7 @@ fn wsl_target(s: &str) -> Option<Target> {
     let (distro, path) = rest.split_once('/').unwrap_or((rest, ""));
     valid_distro(distro).then(|| Target {
         host: Host::Wsl(distro.to_owned()),
-        path: normalize(&format!("/{path}")),
+        path: literal_backslashes(&normalize(&format!("/{path}"))),
     })
 }
 

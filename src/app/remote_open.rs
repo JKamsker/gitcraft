@@ -366,7 +366,7 @@ fn host_field(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) {
         }
     });
     ui.label(
-        RichText::new("Signs in with keys or an agent: there is no password prompt.")
+        RichText::new("Keys and an agent are used; a password or passphrase is asked for here.")
             .color(t.text_faint)
             .small(),
     );

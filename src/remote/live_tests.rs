@@ -30,6 +30,14 @@ fn read_like_a_tab(repo: &Path) -> Result<(), String> {
     let mut log = git::LogStream::start(repo, None, 0)?;
     let page = log.next_page(git::LOG_PAGE)?;
     timed("log page", at);
+    // The next page follows on from it, as one log of both would have them.
+    let at = Instant::now();
+    let more = log.next_page(10)?;
+    timed("next log page", at);
+    let whole = git::log(repo, None, 0, page.len() + more.len())?;
+    let paged: Vec<&str> = page.iter().chain(&more).map(|c| c.hash.as_str()).collect();
+    let at_once: Vec<&str> = whole.iter().map(|c| c.hash.as_str()).collect();
+    assert_eq!(paged, at_once);
     let at = Instant::now();
     let files = git::tree_files(repo, "HEAD")?;
     timed("tree", at);
@@ -196,6 +204,17 @@ fn work_in(repo: &PathBuf) -> Result<(), String> {
     git(&["apply", "--cached", &saved])?;
     assert_eq!(git(&["diff", "--cached", "--name-only"])?.trim(), "a.txt");
     git(&["commit", "-m", "second"])?;
+    // A name with a `\` in it (Linux allows one): read as itself.
+    write(&join(repo, r"a\b.txt"), b"odd\n").map_err(|e| e.to_string())?;
+    git(&["add", "--", r"a\b.txt"])?;
+    assert_eq!(git::file_at(repo, None, r"a\b.txt")?, b"odd\n");
+    assert_eq!(git::file_at(repo, Some(""), r"a\b.txt")?, b"odd\n");
+    git(&["commit", "-q", "-m", "odd name"])?;
+    // And a repository whose own folder has one: found as itself.
+    let odd = join(repo, r"sub\repo");
+    git::init(&odd)?;
+    assert_eq!(git::toplevel(&odd)?, odd);
+    assert!(parse(&odd).is_some_and(|t| t.path.ends_with(r"/sub\repo")));
     // `.gitignore` there, read and written there.
     assert!(git::add_to_gitignore(repo, "build/")?);
     let ignore = read_to_string(&repo.join(".gitignore")).map_err(|e| e.to_string())?;

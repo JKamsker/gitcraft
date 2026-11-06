@@ -13,6 +13,10 @@ use egui::{Event, Key, Modifiers, PointerButton, Pos2};
 use egui_kittest::Harness;
 
 fn main() {
+    // Also ssh's askpass program, as gitcraft itself is (see `remote::askpass`).
+    if let Some(code) = gitcraft::app::askpass_helper() {
+        std::process::exit(code);
+    }
     let mut args = std::env::args().skip(1);
     let (Some(repo), Some(out)) = (args.next(), args.next()) else {
         eprintln!(

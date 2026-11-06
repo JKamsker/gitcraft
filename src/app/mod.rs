@@ -1,5 +1,6 @@
 //! Window shell: git check, browser-like tabs, the start page and cloning.
 
+mod askpass_dialog;
 mod clone;
 mod home;
 mod palette;
@@ -88,6 +89,8 @@ pub struct App {
     remote_form: Option<RemoteForm>,
     /// Repositories on other machines being reached, each tab to open once it answers.
     connecting: Vec<Connecting>,
+    /// ssh's question being answered (a password, a new host key).
+    askpass: askpass_dialog::AskpassState,
     /// A newer release than this build.
     update: Option<update::Found>,
     update_rx: Option<Receiver<Result<Option<update::Found>, String>>>,
@@ -114,6 +117,8 @@ impl App {
     pub fn new(cc: &eframe::CreationContext<'_>, open_arg: Option<PathBuf>) -> Self {
         // The window's thread: it never waits for another machine (see `remote::ui_guard`).
         crate::remote::mark_ui_thread();
+        // ssh's questions (passwords, new host keys) come to this window.
+        crate::remote::askpass::set_repaint(cc.egui_ctx.clone());
         let saved: Saved = cc
             .storage
             .and_then(|s| eframe::get_value(s, eframe::APP_KEY))
@@ -150,6 +155,7 @@ impl App {
             cloning_form: None,
             remote_form: None,
             connecting: Vec::new(),
+            askpass: Default::default(),
             update: None,
             update_rx: None,
             update_looked: None,
@@ -295,6 +301,7 @@ impl App {
         // A focused text field or the terminal keeps these keys for itself.
         let modal_open = self.clone_form.is_some()
             || self.remote_form.is_some()
+            || self.askpass_open()
             || self.palette.is_some()
             || self.manual_open
             || ctx.egui_wants_keyboard_input();
@@ -344,12 +351,14 @@ impl App {
     fn active_tab_ui(&mut self, ui: &mut Ui, t: &Tokens) {
         let ctx = ui.ctx().clone();
         let active = self.active;
+        let asking = self.askpass_open();
         match self.tabs.get_mut(active) {
             Some(Tab::Repo(repo)) => {
                 repo.keys_blocked = self.palette.is_some()
                     || self.manual_open
                     || self.clone_form.is_some()
-                    || self.remote_form.is_some();
+                    || self.remote_form.is_some()
+                    || asking;
                 // Its widgets' state (scroll offsets, text fields' undo, open menus) is its own:
                 // every repository tab lays out the same widgets, which would otherwise share
                 // it with the tab shown before.
@@ -448,6 +457,7 @@ impl eframe::App for App {
         self.active_tab_ui(ui, &t);
         self.clone_dialog(&ctx);
         self.remote_dialog(&ctx);
+        self.askpass_dialog(&ctx);
         self.palette_ui(&ctx);
         self.manual_ui(&ctx);
         self.toast_finished(focused);
@@ -509,6 +519,13 @@ fn repo_root(path: &Path) -> Result<PathBuf, String> {
     }
     let root = std::fs::canonicalize(&root).unwrap_or(root);
     Ok(strip_verbatim(root))
+}
+
+/// When this process was started by ssh as its askpass program: asks the running app ssh's
+/// question and returns the exit code to end with, before any window is made. `None` for an
+/// ordinary start.
+pub fn askpass_helper() -> Option<i32> {
+    crate::remote::askpass::run_helper()
 }
 
 /// How many commands for a repository on another machine were asked from the window's thread

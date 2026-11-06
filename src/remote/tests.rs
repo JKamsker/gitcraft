@@ -133,6 +133,33 @@ fn encoding_and_parsing_go_back_and_forth() {
     }
 }
 
+/// A `\` that is part of a name there (Linux allows one) stays one, through the path this app
+/// gives it and the names joined to that; every other `\` is a separator here.
+#[test]
+fn backslashes_in_names_there_survive() {
+    for host in [
+        Host::Ssh("build".to_owned()),
+        Host::Wsl("Ubuntu".to_owned()),
+    ] {
+        if matches!(host, Host::Wsl(_)) && !cfg!(windows) {
+            continue;
+        }
+        let repo = encode(&host, r"/home/me/odd\repo");
+        assert_eq!(
+            parse(&repo).map(|t| t.path),
+            Some(r"/home/me/odd\repo".to_owned()),
+            "{host:?}"
+        );
+        let file = join(&repo, r"dir/a\b.txt");
+        assert_eq!(
+            parse(&file).map(|t| t.path),
+            Some(r"/home/me/odd\repo/dir/a\b.txt".to_owned()),
+            "{host:?}"
+        );
+        assert_eq!(git_path(&file), r"/home/me/odd\repo/dir/a\b.txt");
+    }
+}
+
 #[test]
 fn printed_paths_resolve_on_the_repository_machine() {
     let repo = PathBuf::from("ssh://build/home/me/repo");
