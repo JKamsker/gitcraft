@@ -17,7 +17,7 @@ use serde_json::json;
 use super::details::{self, thread_id};
 use super::post::GiteaTarget;
 use super::{Api, FORGEJO, GITEA, GiteaFamily, Login, create, list, retarget};
-use crate::forge::{self, Forge, Hosting, NewPullRequest, Provider};
+use crate::forge::{self, Forge, Found, Hosting, NewPullRequest, Provider};
 use crate::git;
 use crate::pr_post::{self, LineComment, MergeMethod, Suggestion, Target, Verdict};
 use crate::pull_request::{self, DiffSide, EntryKind, PrDetails, at};
@@ -704,6 +704,10 @@ impl Provider for AsAuthor<'_> {
         retarget(&self.0.author(), hosting, number, base)
     }
 
+    fn find(&self, _: &Path, hosting: &Hosting, branch: &str) -> Result<Option<Found>, String> {
+        super::find(&self.0.author(), hosting, branch)
+    }
+
     fn avatars(&self, _: &Path, _: &Hosting, _: &[String]) -> Vec<(String, crate::avatars::Hint)> {
         Vec::new()
     }
@@ -746,8 +750,8 @@ fn stacked(server: &Server, hosting: &Hosting, dir: &Path, name: &str) -> Result
     ];
     let provider = AsAuthor(server);
     let publish_now = || -> Result<(), String> {
-        let open = list(&server.author(), hosting)?;
-        let plans = plan(dir, &inputs, &open)?;
+        let find = |branch: &str| provider.find(dir, hosting, branch);
+        let plans = plan(dir, &inputs, &find)?;
         let report = publish(
             dir,
             &plans,
@@ -784,24 +788,33 @@ fn stacked(server: &Server, hosting: &Hosting, dir: &Path, name: &str) -> Result
     publish_now()?;
     let again = bases()?;
     ensure!(again == first, "published again as {again:?}");
-    // The lower one closed: the upper one goes into main.
+    // The lower one merged: the upper one goes into main.
     let low_pr = list(&server.author(), hosting)?
         .into_iter()
         .find(|p| p.branch == "stack-low")
         .ok_or("stack-low has no pull request")?;
-    server
-        .author()
-        .send(
-            "PATCH",
-            &format!("repos/{}/pulls/{}", hosting.path, low_pr.number),
-            Some(&json!({ "state": "closed" })),
-        )
-        .map_err(String::from)?;
+    let merge = format!("repos/{}/pulls/{}/merge", hosting.path, low_pr.number);
+    // The forge works out whether it can be merged in the background first.
+    eventually("the lower pull request to merge", || {
+        match server
+            .author()
+            .send("POST", &merge, Some(&json!({ "Do": "merge" })))
+        {
+            Ok(_) => Ok(Some(())),
+            Err(f) if f.status == Some(405) => Ok(None),
+            Err(f) => Err(String::from(f)),
+        }
+    })?;
     publish_now()?;
     let after = bases()?;
     ensure!(
         after == [pair("stack-high", "main")],
-        "after closing: {after:?}"
+        "after the merge: {after:?}"
     );
+    let parent = run(dir, &["config", "branch.stack-high.gitcraft-parent"])?;
+    ensure!(parent.trim() == "main", "stack-high is based on {parent}");
+    // Published again: the merged one isn't opened again.
+    publish_now()?;
+    ensure!(bases()? == after, "a merged layer was opened again");
     Ok(())
 }

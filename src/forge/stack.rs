@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use super::{Hosting, NewPullRequest, Provider, PullRequest};
+use super::{Found, Hosting, NewPullRequest, PrState, Provider};
 use crate::git::stack::{PARENT_KEY, config_key, local_ref, set_op};
 use crate::git::{self, Credentials};
 
@@ -20,14 +20,12 @@ pub struct LayerPlan {
     pub branch: String,
     /// The branch its pull request goes into.
     pub base: String,
-    /// Its parent before, when the parent's pull request is gone (merged or closed) and it
-    /// goes into the parent's base instead.
+    /// Its parent before, when the parent's pull request was merged and it goes into what
+    /// that one went into instead.
     pub reparent_from: Option<String>,
-    /// Its open pull request.
-    pub existing: Option<PullRequest>,
-    /// The pull request recorded for it, when that one isn't open any more.
-    pub gone: Option<u64>,
-    /// The title and description of one to open.
+    /// Its latest pull request (not a fork's), as the forge has it now.
+    pub found: Option<Found>,
+    /// The title of one to open: its oldest commit's subject, else its name.
     pub title: String,
     /// Its own commits' subjects, oldest first.
     pub commits: Vec<String>,
@@ -38,52 +36,62 @@ pub struct LayerPlan {
 /// What publishing does with a layer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Step {
-    /// Push, and open its pull request.
-    Create,
-    /// Push, and change where its pull request goes.
-    Retarget { from: String },
-    /// Push: its pull request goes where it should.
-    Push,
-    /// Nothing: its pull request is merged or closed.
-    Skip(u64),
+    /// Push, and open its pull request (`replaces`: one closed without merging before).
+    Create { replaces: Option<u64> },
+    /// Push, and change where its open pull request goes.
+    Retarget { number: u64, from: String },
+    /// Push: its open pull request goes where it should.
+    Push(u64),
+    /// Nothing: its pull request was merged.
+    Merged(u64),
+    /// Push, but open nothing: it has no commits of its own, which no forge takes.
+    Empty,
 }
 
 impl LayerPlan {
     pub fn step(&self) -> Step {
-        match (&self.existing, self.gone) {
-            (Some(pr), _) if pr.base != self.base => Step::Retarget {
-                from: pr.base.clone(),
+        match &self.found {
+            Some(f) if f.state == PrState::Merged => Step::Merged(f.pr.number),
+            Some(f) if f.state == PrState::Open && f.pr.base != self.base => Step::Retarget {
+                number: f.pr.number,
+                from: f.pr.base.clone(),
             },
-            (Some(_), _) => Step::Push,
-            (None, Some(n)) => Step::Skip(n),
-            (None, None) => Step::Create,
+            Some(f) if f.state == PrState::Open => Step::Push(f.pr.number),
+            _ if self.commits.is_empty() => Step::Empty,
+            Some(f) => Step::Create {
+                replaces: Some(f.pr.number),
+            },
+            None => Step::Create { replaces: None },
         }
     }
 }
 
-/// A layer of the stack: its branch, its recorded parent, and the stack's root for the bottom.
+/// A layer of the stack: its branch and its recorded parent.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Input {
     pub branch: String,
     pub parent: String,
 }
 
-/// Plans publishing `layers` (parents before the branches on them), `open` being the
-/// pull requests open now.
-pub fn plan(repo: &Path, layers: &[Input], open: &[PullRequest]) -> Result<Vec<LayerPlan>, String> {
+/// Plans publishing `layers` (parents before the branches on them), each one's pull request
+/// asked of the forge by `find` (see [`Provider::find`]).
+pub fn plan(
+    repo: &Path,
+    layers: &[Input],
+    find: &dyn Fn(&str) -> Result<Option<Found>, String>,
+) -> Result<Vec<LayerPlan>, String> {
     let mut out: Vec<LayerPlan> = Vec::new();
     for layer in layers {
-        let recorded = recorded_pr(repo, &layer.branch);
-        let existing = open
-            .iter()
-            .find(|p| p.branch == layer.branch)
-            .or_else(|| recorded.and_then(|n| open.iter().find(|p| p.number == n)))
-            .cloned();
-        let gone = recorded.filter(|_| existing.is_none());
-        // A parent whose pull request is gone: into what that one went into.
+        let found = find(&layer.branch)?;
+        // A parent whose pull request was merged: into what that one went into. Closed
+        // without merging, it is opened anew, and the ones above stay on it.
         let (base, reparent_from) = match out.iter().find(|p| p.branch == layer.parent) {
-            Some(parent) if parent.gone.is_some() => {
-                (parent.base.clone(), Some(layer.parent.clone()))
+            Some(parent) if matches!(parent.step(), Step::Merged(_)) => {
+                let into = parent
+                    .found
+                    .as_ref()
+                    .map_or(parent.base.clone(), |f| f.pr.base.clone());
+                (into, Some(layer.parent.clone()))
             }
             _ => (layer.parent.clone(), None),
         };
@@ -124,23 +132,12 @@ pub fn plan(repo: &Path, layers: &[Input], open: &[PullRequest]) -> Result<Vec<L
             branch: layer.branch.clone(),
             base,
             reparent_from,
-            existing,
-            gone,
+            found,
             commits,
             stat,
         });
     }
     Ok(out)
-}
-
-/// The pull request recorded for `branch`.
-fn recorded_pr(repo: &Path, branch: &str) -> Option<u64> {
-    let key = config_key(branch, PR_KEY);
-    git::run_ok_codes(Some(repo), &["config", "--local", "--get", &key], &[0, 1])
-        .ok()?
-        .trim()
-        .parse()
-        .ok()
 }
 
 /// How publishing went: what was done, in order, and where it stopped.
@@ -170,17 +167,19 @@ pub fn publish(repo: &Path, plans: &[LayerPlan], to: &Target) -> Report {
     // Pull requests by branch, as they are now, for the descriptions of the ones above.
     let mut numbers: Vec<(String, u64)> = plans
         .iter()
-        .filter_map(|p| Some((p.branch.clone(), p.existing.as_ref()?.number)))
+        .filter_map(|p| match p.step() {
+            Step::Push(n) | Step::Retarget { number: n, .. } => Some((p.branch.clone(), n)),
+            _ => None,
+        })
         .collect();
     for plan in plans {
         match publish_one(repo, plan, to, &numbers) {
-            Ok(Some((what, number))) => {
+            Ok((what, number)) => {
                 if let Some(n) = number {
                     numbers.push((plan.branch.clone(), n));
                 }
                 report.done.push((plan.branch.clone(), what));
             }
-            Ok(None) => {}
             Err(e) => {
                 report.failed = Some((plan.branch.clone(), e));
                 break;
@@ -190,29 +189,27 @@ pub fn publish(repo: &Path, plans: &[LayerPlan], to: &Target) -> Report {
     report
 }
 
-/// One layer: what was done (and the number of a pull request opened), `None` for nothing.
+/// One layer: what was done, and the number of its pull request when it has one.
 fn publish_one(
     repo: &Path,
     plan: &LayerPlan,
     to: &Target,
     numbers: &[(String, u64)],
-) -> Result<Option<(String, Option<u64>)>, String> {
+) -> Result<(String, Option<u64>), String> {
+    let noun = to.provider.noun();
     let step = plan.step();
-    if let Step::Skip(n) = step {
-        return Ok(Some((
-            format!("#{n} is merged or closed: left alone"),
-            None,
-        )));
+    if let Step::Merged(n) = step {
+        return Ok((format!("#{n} merged, left alone"), None));
     }
     if let Some(from) = &plan.reparent_from {
-        // Its parent's pull request is gone: based on what that one went into now.
+        // Its parent's pull request was merged: based on what that one went into now.
         let set = set_op(&config_key(&plan.branch, PARENT_KEY), &plan.base);
         let args: Vec<&str> = set.iter().map(String::as_str).collect();
         git::run(Some(repo), &args).map_err(|e| format!("couldn't move it off {from}: {e}"))?;
     }
     push(repo, &plan.branch, to)?;
     match step {
-        Step::Create => {
+        Step::Create { .. } => {
             let body = match numbers.iter().find(|(b, _)| *b == plan.base) {
                 Some((parent, n)) => format!("Depends on #{n} ({parent})."),
                 None => String::new(),
@@ -226,33 +223,39 @@ fn publish_one(
             };
             let said = to.provider.create(repo, to.hosting, &new)?;
             let number = number_in(&said);
-            // Recorded at once: run again, this is never opened a second time.
             if let Some(n) = number {
-                let set = set_op(&config_key(&plan.branch, PR_KEY), &n.to_string());
-                let args: Vec<&str> = set.iter().map(String::as_str).collect();
-                git::run(Some(repo), &args)?;
+                record(repo, &plan.branch, n)?;
             }
             let what = match number {
                 Some(n) => format!("opened #{n} into {}", plan.base),
-                None => format!("opened into {}: {said}", plan.base),
+                None => format!("opened into {} ({said})", plan.base),
             };
-            Ok(Some((what, number)))
+            Ok((what, number))
         }
-        Step::Retarget { from } => {
-            let pr = plan.existing.as_ref().ok_or("its pull request is gone")?;
+        Step::Retarget { number, from } => {
             to.provider
-                .retarget(repo, to.hosting, pr.number, &plan.base)?;
-            Ok(Some((
-                format!("#{} now into {} (was {from})", pr.number, plan.base),
-                None,
-            )))
+                .retarget(repo, to.hosting, number, &plan.base)
+                .map_err(|e| format!("pointing {noun} #{number} at {} failed: {e}", plan.base))?;
+            record(repo, &plan.branch, number)?;
+            Ok((
+                format!("#{number} now into {} (was {from})", plan.base),
+                Some(number),
+            ))
         }
-        Step::Push => {
-            let n = plan.existing.as_ref().map_or(0, |p| p.number);
-            Ok(Some((format!("#{n} updated"), None)))
+        Step::Push(number) => {
+            record(repo, &plan.branch, number)?;
+            Ok((format!("#{number} has the new commits"), Some(number)))
         }
-        Step::Skip(_) => Ok(None),
+        Step::Empty => Ok((format!("pushed, no {noun}: nothing of its own"), None)),
+        Step::Merged(_) => Ok((String::new(), None)),
     }
+}
+
+/// Records the number of `branch`'s pull request on it, as soon as it is known.
+fn record(repo: &Path, branch: &str, number: u64) -> Result<(), String> {
+    let set = set_op(&config_key(branch, PR_KEY), &number.to_string());
+    let args: Vec<&str> = set.iter().map(String::as_str).collect();
+    git::run(Some(repo), &args).map(drop)
 }
 
 /// Pushes `branch` to the forge's remote, setting it as its upstream.
@@ -266,7 +269,11 @@ fn push(repo: &Path, branch: &str, to: &Target) -> Result<(), String> {
             "push.default=simple",
             "push",
             "-u",
+            // A lease alone is checked against the remote-tracking branch, which the background
+            // fetch moves: also make sure what it holds is in the branch's own history, so a
+            // teammate's commits fetched but not taken in are never pushed over (git 2.30+).
             "--force-with-lease",
+            "--force-if-includes",
             to.remote,
             &local_ref(branch),
         ],
@@ -279,7 +286,10 @@ fn push(repo: &Path, branch: &str, to: &Target) -> Result<(), String> {
 /// The number of the pull request a forge said it opened: the last run of digits of its URL
 /// (`…/pull/12`, `…/merge_requests/12`, `…/pulls/12`).
 pub fn number_in(said: &str) -> Option<u64> {
-    let url = said.lines().rev().find(|l| l.contains("://"))?.trim();
+    let url = said
+        .split_whitespace()
+        .rev()
+        .find(|word| word.contains("://"))?;
     let tail: String = url
         .trim_end_matches('/')
         .chars()

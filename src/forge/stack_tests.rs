@@ -5,15 +5,16 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use super::stack::{Input, LayerPlan, PR_KEY, Step, Target, number_in, plan, publish};
-use super::{Forge, Hosting, NewPullRequest, Provider, PullRequest};
+use super::{Forge, Found, Hosting, NewPullRequest, PrState, Provider, PullRequest};
 use crate::avatars::Hint;
 use crate::git::stack::test_repo::TestRepo;
 use crate::git::stack::{config_key, recorded};
 
-/// A forge that keeps its pull requests in memory, and can be told to refuse a branch.
+/// A forge that keeps its pull requests (and their states) in memory, and can be told to
+/// refuse a branch.
 #[derive(Default)]
 struct FakeForge {
-    open: Mutex<Vec<PullRequest>>,
+    all: Mutex<Vec<(PullRequest, PrState)>>,
     created: Mutex<Vec<String>>,
     retargeted: Mutex<Vec<(u64, String)>>,
     refuse: Mutex<Option<String>>,
@@ -21,13 +22,45 @@ struct FakeForge {
 
 impl FakeForge {
     fn open(&self) -> Vec<PullRequest> {
-        self.open.lock().map(|l| l.clone()).unwrap_or_default()
+        self.all
+            .lock()
+            .map(|l| {
+                l.iter()
+                    .filter(|(_, s)| *s == PrState::Open)
+                    .map(|(p, _)| p.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
-    /// The pull request of `branch` merged: no longer open.
-    fn merge(&self, branch: &str) {
-        if let Ok(mut open) = self.open.lock() {
-            open.retain(|p| p.branch != branch);
+    /// The open pull request of `branch` merged, or closed without merging.
+    fn end(&self, branch: &str, state: PrState) {
+        if let Ok(mut all) = self.all.lock() {
+            for (p, s) in all.iter_mut() {
+                if p.branch == branch && *s == PrState::Open {
+                    *s = state;
+                }
+            }
+        }
+    }
+
+    /// A pull request made elsewhere (the web, a fork), in `state`.
+    fn add(&self, number: u64, branch: &str, base: &str, from_fork: bool, state: PrState) {
+        if let Ok(mut all) = self.all.lock() {
+            all.push((
+                PullRequest {
+                    number,
+                    title: branch.to_owned(),
+                    branch: branch.to_owned(),
+                    base: base.to_owned(),
+                    from_fork,
+                    sha: String::new(),
+                    author: "someone".to_owned(),
+                    url: format!("https://fake.example/o/r/pull/{number}"),
+                    draft: false,
+                },
+                state,
+            ));
         }
     }
 }
@@ -45,23 +78,42 @@ impl Provider for FakeForge {
         Ok(self.open())
     }
 
+    fn find(&self, _: &Path, _: &Hosting, branch: &str) -> Result<Option<Found>, String> {
+        let all = self.all.lock().map_err(|e| e.to_string())?;
+        // Newest first, as the forges answer.
+        let found = all
+            .iter()
+            .rev()
+            .filter(|(p, _)| p.branch == branch)
+            .map(|(pr, state)| Found {
+                pr: pr.clone(),
+                state: *state,
+            })
+            .collect();
+        Ok(super::pick_found(found))
+    }
+
     fn create(&self, _: &Path, _: &Hosting, new: &NewPullRequest) -> Result<String, String> {
         if self.refuse.lock().ok().and_then(|r| r.clone()).as_deref() == Some(new.branch) {
             return Err(format!("{} refused", new.branch));
         }
-        let mut open = self.open.lock().map_err(|e| e.to_string())?;
+        let mut all = self.all.lock().map_err(|e| e.to_string())?;
         let number = 10 + self.created.lock().map(|c| c.len()).unwrap_or(0) as u64;
         let url = format!("https://fake.example/o/r/pull/{number}");
-        open.push(PullRequest {
-            number,
-            title: new.title.to_owned(),
-            branch: new.branch.to_owned(),
-            base: new.base.to_owned(),
-            sha: String::new(),
-            author: "me".to_owned(),
-            url: url.clone(),
-            draft: new.draft,
-        });
+        all.push((
+            PullRequest {
+                number,
+                title: new.title.to_owned(),
+                branch: new.branch.to_owned(),
+                base: new.base.to_owned(),
+                from_fork: false,
+                sha: String::new(),
+                author: "me".to_owned(),
+                url: url.clone(),
+                draft: new.draft,
+            },
+            PrState::Open,
+        ));
         if let Ok(mut c) = self.created.lock() {
             c.push(format!("{}→{}:{}", new.branch, new.base, new.body));
         }
@@ -69,11 +121,11 @@ impl Provider for FakeForge {
     }
 
     fn retarget(&self, _: &Path, _: &Hosting, number: u64, base: &str) -> Result<(), String> {
-        let mut open = self.open.lock().map_err(|e| e.to_string())?;
-        let pr = open
+        let mut all = self.all.lock().map_err(|e| e.to_string())?;
+        let (pr, _) = all
             .iter_mut()
-            .find(|p| p.number == number)
-            .ok_or(format!("no pull request #{number}"))?;
+            .find(|(p, s)| p.number == number && *s == PrState::Open)
+            .ok_or(format!("no open pull request #{number}"))?;
         pr.base = base.to_owned();
         if let Ok(mut r) = self.retargeted.lock() {
             r.push((number, base.to_owned()));
@@ -131,8 +183,9 @@ fn run(
     forge: &FakeForge,
     draft: bool,
 ) -> Result<(Vec<LayerPlan>, super::stack::Report), String> {
-    let plans = plan(repo.path(), &inputs(repo)?, &forge.open())?;
     let hosting = hosting();
+    let find = |branch: &str| forge.find(repo.path(), &hosting, branch);
+    let plans = plan(repo.path(), &inputs(repo)?, &find)?;
     let report = publish(
         repo.path(),
         &plans,
@@ -169,7 +222,11 @@ fn a_stack_is_published_bottom_up_each_into_the_one_below() -> Result<(), String
     let forge = FakeForge::default();
     let (plans, report) = run(&repo, &forge, true)?;
     let _ = std::fs::remove_dir_all(&origin);
-    assert!(plans.iter().all(|p| p.step() == Step::Create));
+    assert!(
+        plans
+            .iter()
+            .all(|p| p.step() == Step::Create { replaces: None })
+    );
     assert_eq!(plans[1].title, "api");
     assert_eq!(plans[1].commits, ["api"]);
     assert!(
@@ -220,7 +277,7 @@ fn a_publish_that_stopped_is_run_again_without_duplicates() -> Result<(), String
     let (plans, report) = run(&repo, &forge, false)?;
     let _ = std::fs::remove_dir_all(&origin);
     assert_eq!(report.failed, None);
-    assert_eq!(plans[0].step(), Step::Push);
+    assert_eq!(plans[0].step(), Step::Push(10));
     assert_eq!(forge.open().len(), 3);
     assert_eq!(forge.created.lock().map(|c| c.len()).unwrap_or(0), 3);
     Ok(())
@@ -232,8 +289,8 @@ fn updating_pushes_restacked_layers_and_fixes_their_bases() -> Result<(), String
     let forge = FakeForge::default();
     run(&repo, &forge, false)?;
     // api's request pointed elsewhere by hand, and schema amended with api rebased onto it.
-    if let Ok(mut open) = forge.open.lock()
-        && let Some(api) = open.iter_mut().find(|p| p.branch == "api")
+    if let Ok(mut all) = forge.all.lock()
+        && let Some((api, _)) = all.iter_mut().find(|(p, _)| p.branch == "api")
     {
         api.base = "main".to_owned();
     }
@@ -248,6 +305,7 @@ fn updating_pushes_restacked_layers_and_fixes_their_bases() -> Result<(), String
     assert_eq!(
         plans[1].step(),
         Step::Retarget {
+            number: 11,
             from: "main".into()
         }
     );
@@ -269,11 +327,11 @@ fn when_a_lower_one_merges_the_one_above_is_retargeted() -> Result<(), String> {
     let (repo, origin) = stacked("publish merged")?;
     let forge = FakeForge::default();
     run(&repo, &forge, false)?;
-    forge.merge("schema");
+    forge.end("schema", PrState::Merged);
     let (plans, report) = run(&repo, &forge, false)?;
     let _ = std::fs::remove_dir_all(&origin);
     assert_eq!(report.failed, None, "{report:?}");
-    assert_eq!(plans[0].step(), Step::Skip(10));
+    assert_eq!(plans[0].step(), Step::Merged(10));
     assert_eq!(plans[1].reparent_from.as_deref(), Some("schema"));
     assert_eq!(bases(&forge), pairs(&[("api", "main"), ("ui", "api")]));
     // Recorded too: api is based on main now (its base stays schema's tip, for the restack).
@@ -297,5 +355,130 @@ fn reads_the_number_a_forge_answers_with() {
     );
     assert_eq!(number_in("https://codeberg.org/o/r/pulls/3"), Some(3));
     assert_eq!(number_in("done"), None);
+    assert_eq!(
+        number_in("https://github.com/o/r/pull/12 (draft)"),
+        Some(12)
+    );
+    assert_eq!(
+        number_in("https://ghe.example:8443/o/r/pull/5\nwarning: x"),
+        Some(5)
+    );
     assert_eq!(number_in(""), None);
+}
+
+#[test]
+fn a_lower_one_closed_without_merging_is_opened_anew_and_the_ones_above_stay() -> Result<(), String>
+{
+    let (repo, origin) = stacked("publish closed")?;
+    let forge = FakeForge::default();
+    run(&repo, &forge, false)?;
+    forge.end("schema", PrState::Closed);
+    let (plans, report) = run(&repo, &forge, false)?;
+    let _ = std::fs::remove_dir_all(&origin);
+    assert_eq!(report.failed, None, "{report:?}");
+    assert_eq!(plans[0].step(), Step::Create { replaces: Some(10) });
+    assert!(plans[1].reparent_from.is_none());
+    assert_eq!(
+        bases(&forge),
+        pairs(&[("api", "schema"), ("schema", "main"), ("ui", "api")])
+    );
+    let rec = recorded(repo.path())?;
+    assert_eq!(rec.get("api").map(|r| r.parent.as_str()), Some("schema"));
+    Ok(())
+}
+
+#[test]
+fn a_merge_seen_only_on_the_forge_is_taken_in_and_forks_are_ignored() -> Result<(), String> {
+    let (repo, origin) = stacked("publish unrecorded")?;
+    let forge = FakeForge::default();
+    // schema's request was opened and merged on the web; someone's fork proposes a branch
+    // called api too.
+    forge.add(3, "schema", "main", false, PrState::Merged);
+    forge.add(4, "api", "main", true, PrState::Open);
+    let (plans, report) = run(&repo, &forge, false)?;
+    let _ = std::fs::remove_dir_all(&origin);
+    assert_eq!(report.failed, None, "{report:?}");
+    assert_eq!(plans[0].step(), Step::Merged(3));
+    assert_eq!(plans[1].step(), Step::Create { replaces: None });
+    assert_eq!(plans[1].base, "main");
+    // The fork's request is left as it was; ours is opened beside it.
+    let open = forge.open();
+    assert!(
+        open.iter()
+            .any(|p| p.number == 4 && p.from_fork && p.base == "main")
+    );
+    assert!(
+        open.iter()
+            .any(|p| !p.from_fork && p.branch == "api" && p.base == "main")
+    );
+    assert_eq!(forge.created.lock().map(|c| c.len()).unwrap_or(0), 2);
+    Ok(())
+}
+
+#[test]
+fn a_layer_with_nothing_of_its_own_is_pushed_and_opens_nothing() -> Result<(), String> {
+    let (repo, origin) = stacked("publish empty")?;
+    // ui on api with no commit of its own.
+    repo.git(&["branch", "-f", "ui", "api"])?;
+    let forge = FakeForge::default();
+    let (plans, report) = run(&repo, &forge, false)?;
+    let pushed = repo.git(&["--git-dir", &origin.to_string_lossy(), "rev-parse", "ui"]);
+    let _ = std::fs::remove_dir_all(&origin);
+    assert_eq!(report.failed, None, "{report:?}");
+    assert_eq!(plans[2].step(), Step::Empty);
+    assert_eq!(pushed?.trim(), repo.tip("ui")?);
+    assert_eq!(forge.open().len(), 2);
+    Ok(())
+}
+
+#[test]
+fn a_teammates_commits_fetched_but_not_taken_in_are_never_pushed_over() -> Result<(), String> {
+    let (repo, origin) = stacked("publish lease")?;
+    let forge = FakeForge::default();
+    run(&repo, &forge, false)?;
+    // A teammate pushes onto api; the background fetch brings it in.
+    let mate = repo.dir.with_file_name(format!(
+        "{} mate",
+        repo.dir
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    ));
+    let _ = std::fs::remove_dir_all(&mate);
+    let result = (|| -> Result<(), String> {
+        crate::git::run(
+            None,
+            &[
+                "clone",
+                "-q",
+                "-b",
+                "api",
+                &origin.to_string_lossy(),
+                &mate.to_string_lossy(),
+            ],
+        )?;
+        let in_mate = |args: &[&str]| crate::git::run(Some(&mate), args);
+        in_mate(&["config", "user.name", "m"])?;
+        in_mate(&["config", "user.email", "m@m"])?;
+        in_mate(&["commit", "-q", "--allow-empty", "-m", "teammate's"])?;
+        in_mate(&["push", "-q", "origin", "api"])?;
+        let theirs = in_mate(&["rev-parse", "HEAD"])?.trim().to_owned();
+        repo.git(&["fetch", "-q", "origin"])?;
+        // Here, api is amended without taking theirs in.
+        repo.checkout("api")?;
+        repo.git(&["commit", "-q", "--amend", "-m", "api amended"])?;
+        repo.checkout("main")?;
+        let (_, report) = run(&repo, &forge, false)?;
+        assert_eq!(
+            report.failed.as_ref().map(|f| f.0.as_str()),
+            Some("api"),
+            "{report:?}"
+        );
+        let remote_api = repo.git(&["--git-dir", &origin.to_string_lossy(), "rev-parse", "api"])?;
+        assert_eq!(remote_api.trim(), theirs);
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&mate);
+    let _ = std::fs::remove_dir_all(&origin);
+    result
 }

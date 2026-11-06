@@ -24,7 +24,7 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 
 use super::http::{Api, Login};
-use super::{Forge, Hosting, NewPullRequest, Pages, Provider, PullRequest};
+use super::{Forge, Hosting, NewPullRequest, Pages, PrState, Provider, PullRequest};
 use crate::avatars::Hint;
 use crate::pr_post::Target;
 use crate::pull_request::{PrDetails, at};
@@ -81,11 +81,20 @@ impl Provider for GiteaFamily {
         create(&self.api(hosting), hosting, new)
     }
 
-    /// The accounts the latest commits belong to, as the API ties them to their emails.
     fn retarget(&self, _: &Path, hosting: &Hosting, number: u64, base: &str) -> Result<(), String> {
         retarget(&self.api(hosting), hosting, number, base)
     }
 
+    fn find(
+        &self,
+        _: &Path,
+        hosting: &Hosting,
+        branch: &str,
+    ) -> Result<Option<super::Found>, String> {
+        find(&self.api(hosting), hosting, branch)
+    }
+
+    /// The accounts the latest commits belong to, as the API ties them to their emails.
     fn avatars(&self, _: &Path, hosting: &Hosting, _: &[String]) -> Vec<(String, Hint)> {
         let endpoint = format!(
             "repos/{}/commits?limit=50&stat=false&verification=false&files=false",
@@ -120,6 +129,33 @@ fn list(api: &Api, hosting: &Hosting) -> Result<Vec<PullRequest>, String> {
     let endpoint = format!("repos/{}/pulls?state=open&sort=recentupdate", hosting.path);
     let items = api.get_all(&endpoint, 100)?;
     Ok(items.iter().map(parse_pull_request).collect())
+}
+
+/// How many of the pull requests updated last are looked through for a branch's: the API
+/// can't be asked by branch.
+const FIND_IN: usize = 300;
+
+/// The latest pull request proposing `branch` of this repository, whatever its state.
+fn find(api: &Api, hosting: &Hosting, branch: &str) -> Result<Option<super::Found>, String> {
+    let endpoint = format!("repos/{}/pulls?state=all&sort=recentupdate", hosting.path);
+    let items = api.get_all(&endpoint, FIND_IN)?;
+    let found = items
+        .iter()
+        .filter(|item| at(item, "/head/ref") == branch)
+        .map(|item| {
+            let merged = item.get("merged").and_then(Value::as_bool).unwrap_or(false);
+            let state = match at(item, "/state") {
+                _ if merged => PrState::Merged,
+                "open" => PrState::Open,
+                _ => PrState::Closed,
+            };
+            super::Found {
+                pr: parse_pull_request(item),
+                state,
+            }
+        })
+        .collect();
+    Ok(super::pick_found(found))
 }
 
 /// Points pull request `number` at `base`.
@@ -186,6 +222,7 @@ fn parse_pull_request(item: &Value) -> PullRequest {
         title: title.to_owned(),
         branch: at(item, "/head/ref").to_owned(),
         base: at(item, "/base/ref").to_owned(),
+        from_fork: item.pointer("/head/repo_id") != item.pointer("/base/repo_id"),
         sha: at(item, "/head/sha").to_owned(),
         author: user(item, "/user/login"),
         url: at(item, "/html_url").to_owned(),
