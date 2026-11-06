@@ -12,7 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// This run's marker.
 pub(crate) struct Session {
     file: Option<(PathBuf, File)>,
-    /// A run before this one ended without closing.
+    /// A run before this one ended without closing (until said).
     pub unclean: bool,
 }
 
@@ -58,15 +58,18 @@ fn clear_left_behind(folder: &Path) -> bool {
     let mut found = false;
     for entry in list.flatten() {
         let path = entry.path();
-        if path.extension().is_none_or(|e| e != "lock") {
-            continue;
-        }
+        // A `.starting` one is a marker being made, or one a crash interrupted while it was.
+        let marker = match path.extension().and_then(|e| e.to_str()) {
+            Some("lock") => true,
+            Some("starting") => false,
+            _ => continue,
+        };
         let Ok(file) = File::options().read(true).write(true).open(&path) else {
             continue;
         };
         match file.try_lock() {
             Ok(()) => {
-                found = true;
+                found |= marker;
                 drop(file);
                 let _ = fs::remove_file(&path);
             }
@@ -79,19 +82,28 @@ fn clear_left_behind(folder: &Path) -> bool {
 }
 
 /// This run's marker, locked until the process ends. `None` when it can't be made: crashes
-/// then go unnoticed, which is all that is lost.
+/// then go unnoticed, which is all that is lost. It is made and locked under a name other
+/// runs don't look at, and only then named as a marker: another gitcraft starting at the same
+/// moment never finds it unlocked and takes it for a crash.
 fn create(folder: &Path) -> Option<(PathBuf, File)> {
     fs::create_dir_all(folder).ok()?;
     let started = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    let path = folder.join(format!("{}-{started}.lock", std::process::id()));
-    let mut file = File::create(&path).ok()?;
+    let name = format!("{}-{started}", std::process::id());
+    let starting = folder.join(format!("{name}.starting"));
+    let path = folder.join(format!("{name}.lock"));
+    let mut file = File::create(&starting).ok()?;
     if file.try_lock().is_err() {
-        let _ = fs::remove_file(&path);
+        let _ = fs::remove_file(&starting);
         return None;
     }
     let _ = writeln!(file, "gitcraft {} running", std::process::id());
+    if fs::rename(&starting, &path).is_err() {
+        drop(file);
+        let _ = fs::remove_file(&starting);
+        return None;
+    }
     Some((path, file))
 }

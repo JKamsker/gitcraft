@@ -76,6 +76,7 @@ impl App {
     fn restore_state(&mut self, state: ProfileState, ctx: &egui::Context) {
         let settings_open = self.tabs.iter().any(|t| matches!(t, Tab::Settings));
         let settings_active = matches!(self.tabs.get(self.active), Some(Tab::Settings));
+        self.save_all_tabs();
         self.tabs.clear();
         self.tab_drag = None;
         self.closed.clear();

@@ -83,6 +83,8 @@ impl App {
         let Some(Tab::Repo(current)) = self.tabs.get_mut(self.active) else {
             return;
         };
+        // The view going away: what it typed is saved before it does.
+        super::draft_saving::save_now(current);
         let came_back = parked.is_some();
         let mut next = parked.unwrap_or_else(|| Box::new(RepoTab::new(root.clone(), ctx)));
         next.continue_from(current);

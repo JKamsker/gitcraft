@@ -23,8 +23,10 @@ use serde::{Deserialize, Serialize};
 
 pub(crate) use keeper::Keeper;
 pub(crate) use session::Session;
+pub(crate) use writer::Notice;
 
-/// The version of the files' format; a file of another version is left alone.
+/// The version of the files' format; a file of another version is left alone (until something
+/// new is typed for its repository).
 const FORMAT: u32 = 1;
 
 /// Everything kept for one repository.
@@ -142,9 +144,9 @@ pub(crate) fn save(repo: &Path, drafts: RepoDrafts) {
     writer::shared().save(repo, drafts);
 }
 
-/// Why saving drafts last failed, once.
-pub(crate) fn take_error() -> Option<String> {
-    writer::shared().take_error()
+/// What to say about saving drafts (a failure, or drafts cut down), once.
+pub(crate) fn take_notice() -> Option<Notice> {
+    writer::shared().take_notice()
 }
 
 /// Waits (up to `timeout`) for the drafts given to [`save`] to be on disk: at exit.
@@ -161,9 +163,21 @@ pub(crate) fn from_disk(repo: &Path) -> RepoDrafts {
         .unwrap_or_default()
 }
 
+/// Set by [`turn_off`]: this process keeps nothing.
+static OFF: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Keeps no drafts and no session marker in this process, from now on (before the window is
+/// made): for tools driving the window, which mustn't read or write the user's.
+pub(crate) fn turn_off() {
+    OFF.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// gitcraft's data folder, where the drafts and the session markers are kept. A folder of its
 /// own per test run, so tests never touch the user's.
 fn data_dir() -> Option<PathBuf> {
+    if OFF.load(std::sync::atomic::Ordering::Relaxed) {
+        return None;
+    }
     if cfg!(test) {
         static DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
         return Some(

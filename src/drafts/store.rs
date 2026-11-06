@@ -58,18 +58,27 @@ pub(super) fn read(file: &Path, repo: &Path) -> Result<RepoDrafts, String> {
         .read_to_end(&mut bytes)
         .map_err(|e| format!("{}: {e}", file.display()))?;
     if bytes.len() > MAX_FILE {
-        return Err(format!(
-            "{} is larger than {} MB, so it wasn't read",
-            file.display(),
-            MAX_FILE / (1024 * 1024)
-        ));
+        let why = format!("it is larger than {} MB", MAX_FILE / (1024 * 1024));
+        return Err(set_aside(file, &why));
     }
     let parsed: DraftFile = serde_json::from_slice(&bytes)
-        .map_err(|e| format!("{} is damaged ({e}), so it wasn't read", file.display()))?;
+        .map_err(|e| set_aside(file, &format!("it is damaged ({e})")))?;
     if parsed.format != FORMAT || parsed.repo != repo {
         return Ok(RepoDrafts::default());
     }
     Ok(parsed.drafts)
+}
+
+/// Moves `file`, which can't be read for `why`, out of the way (the next save would replace
+/// it), and says where it is now.
+fn set_aside(file: &Path, why: &str) -> String {
+    let mut name = file.as_os_str().to_owned();
+    name.push(".damaged");
+    let aside = PathBuf::from(name);
+    match fs::rename(file, &aside) {
+        Ok(()) => format!("{why}; it was moved to {}", aside.display()),
+        Err(_) => format!("{why}: {}", file.display()),
+    }
 }
 
 /// Writes `bytes` to `file` whole or not at all.
