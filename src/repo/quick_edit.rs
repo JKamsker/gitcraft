@@ -54,7 +54,7 @@ impl Edit {
 
 /// The checked-out branch from HEAD down its first parents, newest first, as far as `commits`
 /// are loaded.
-fn first_parents<'a, C: std::borrow::Borrow<Commit>>(
+pub(super) fn first_parents<'a, C: std::borrow::Borrow<Commit>>(
     commits: &'a [C],
     index: &HashMap<String, usize>,
     head: &str,
@@ -74,7 +74,7 @@ fn first_parents<'a, C: std::borrow::Borrow<Commit>>(
 
 /// Why `edit` can't be done to `hash`, if it can't. `line`: the checked-out branch from HEAD
 /// down its first parents.
-fn refusal(edit: Edit, line: &[&Commit], hash: &str) -> Option<&'static str> {
+pub(super) fn refusal(edit: Edit, line: &[&Commit], hash: &str) -> Option<&'static str> {
     let Some(pos) = line.iter().position(|c| c.hash == hash) else {
         return Some("Only commits of the checked-out branch can be edited here");
     };

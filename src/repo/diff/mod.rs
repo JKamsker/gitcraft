@@ -28,7 +28,8 @@ use images::{is_image, load_images, renamed_from};
 pub use lfs::LfsPair;
 use lfs::lfs_pair;
 pub use parse::parse;
-use parse::{is_new_file, pair_lines, patch_header};
+pub(in crate::repo) use parse::patch_header;
+use parse::{is_new_file, pair_lines};
 pub use patch::{hunk_changes, partial_patch};
 pub(super) use select::TextSel;
 

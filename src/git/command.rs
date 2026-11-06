@@ -323,6 +323,26 @@ fn run_inner(
             .push(("GITCRAFT_GIT_PASSWORD", c.password.clone()));
     }
     let out = execute(dir, &extra, args)?;
+    finish(out, args, ok)
+}
+
+/// [`run`] with variables for git on top of the usual ones, here or on the machine git runs on
+/// for `dir`: a scratch index (`GIT_INDEX_FILE`), the author of a commit being made.
+pub fn run_env(
+    dir: &Path,
+    env: &[(&'static str, String)],
+    args: &[&str],
+) -> Result<String, String> {
+    let extra = Extra {
+        pre: Vec::new(),
+        env: env.to_vec(),
+    };
+    finish(execute(Some(dir), &extra, args)?, args, &[0])
+}
+
+/// What a call that ended as `out` gives: its output when its exit code is one of `ok`, else
+/// what it said went wrong.
+fn finish(out: Ran, args: &[&str], ok: &[i32]) -> Result<String, String> {
     if out.code.is_some_and(|c| ok.contains(&c)) {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {
