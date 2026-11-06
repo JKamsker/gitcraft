@@ -70,7 +70,7 @@ pub fn object_size(repo: &Path, oid: &str) -> Result<u64, String> {
     let out = run(Some(repo), &["cat-file", "-s", oid])?;
     out.trim()
         .parse()
-        .map_err(|_| format!("git gave no size for {oid}: {}", out.trim()))
+        .map_err(|_| format!("could not read the size of object {oid}"))
 }
 
 /// `path`'s conflict made again from its stages in the index, in the zdiff3 style: each

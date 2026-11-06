@@ -199,8 +199,8 @@ fn keep_both_writes_each_version_beside_it() -> Result<(), String> {
     let plan = keep_both::plan(&dir, path, Some(InProgress::Merge))?;
     assert_eq!(plan.ours.target, "assets/logo é.main.png");
     assert_eq!(plan.theirs.target, "assets/logo é.feature-x.png");
-    assert_eq!(plan.ours.origin, "Ours, main");
-    assert_eq!(plan.theirs.origin, "Theirs, feature/x");
+    assert_eq!(plan.ours.origin, "Ours (main)");
+    assert_eq!(plan.theirs.origin, "Theirs (feature/x)");
     assert_eq!(
         (plan.ours.size, plan.theirs.size),
         (ours.len() as u64, theirs.len() as u64)
@@ -259,9 +259,9 @@ fn keep_both_never_overwrites() -> Result<(), String> {
     let untracked = std::fs::read_to_string(dir.join("logo.main.png"));
     let _ = std::fs::remove_dir_all(&dir);
     assert!(
-        written
-            .as_ref()
-            .is_err_and(|e| e.contains("nothing was overwritten")),
+        written.as_ref().is_err_and(
+            |e| e.contains("nothing was overwritten") && e.contains("logo.feature-x-2.png")
+        ),
         "{written:?}"
     );
     assert!(!first_left, "the first file is taken back");
@@ -315,8 +315,8 @@ fn keep_both_during_a_rebase() -> Result<(), String> {
     let plan = plan?;
     assert_eq!(plan.ours.target, "a.main.dat");
     assert_eq!(plan.theirs.target, "a.topic.dat");
-    assert_eq!(plan.ours.origin, "Upstream, main");
-    assert_eq!(plan.theirs.origin, "Your commit, topic");
+    assert_eq!(plan.ours.origin, "Upstream (main)");
+    assert_eq!(plan.theirs.origin, "Your commit (topic)");
     Ok(())
 }
 

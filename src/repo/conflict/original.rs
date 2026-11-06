@@ -180,7 +180,7 @@ pub(super) fn summary(lines: &Lines) -> String {
         (0, r) => format!("deleted {}", n(r)),
         (a, 0) => format!("inserted {}", n(a)),
         (a, r) if same == 0 => format!("replaced all {} with {}", n(r), n(a)),
-        (a, r) => format!("inserted {}, deleted {r}", n(a)),
+        (a, r) => format!("inserted {}, deleted {}", n(a), n(r)),
     }
 }
 
@@ -351,7 +351,7 @@ mod tests {
             kinds(&changed),
             " check(x)|-validate(x)|+validate(x, strict)| save(x)"
         );
-        assert_eq!(summary(&changed), "inserted 1 line, deleted 1");
+        assert_eq!(summary(&changed), "inserted 1 line, deleted 1 line");
         assert_eq!(summary(&changes(base, base)), "unchanged");
         assert_eq!(summary(&changes(base, "")), "deleted all 3 lines");
         assert_eq!(summary(&changes("", "ünï\n")), "inserted 1 line");
