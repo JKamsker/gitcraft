@@ -34,31 +34,84 @@ pub fn is_zip(bytes: &[u8]) -> bool {
     bytes.starts_with(b"PK\x03\x04") || bytes.starts_with(b"PK\x05\x06")
 }
 
+/// An archive's central directory as far as it could be read.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Directory {
+    pub members: Vec<Member>,
+    /// Whether every entry it says it has was read (`false`: it is damaged past some, or has
+    /// more than gitcraft lists).
+    pub complete: bool,
+    /// Names given to more than one member: the first of each is the one read and compared.
+    pub duplicates: Vec<String>,
+}
+
 /// The members of the archive, from its central directory; `None` when it has none that can
 /// be read.
 pub fn members(bytes: &[u8]) -> Option<Vec<Member>> {
-    // The end-of-central-directory record: in the last 64 KB + 22 bytes.
+    let d = directory(bytes)?;
+    (!d.members.is_empty() || d.complete).then_some(d.members)
+}
+
+/// Where the end-of-central-directory record is: in the last 64 KB + 22 bytes, the last whose
+/// comment ends the file (a comment may hold the signature too); else the last pointing at a
+/// central directory (some files have bytes after the archive); else the last.
+fn find_eocd(bytes: &[u8]) -> Option<usize> {
     let from = bytes.len().saturating_sub(65_557);
-    let eocd = (from..bytes.len().saturating_sub(21))
+    let candidates: Vec<usize> = (from..bytes.len().saturating_sub(21))
         .rev()
-        .find(|&i| bytes[i..].starts_with(b"PK\x05\x06"))?;
+        .filter(|&i| bytes[i..].starts_with(b"PK\x05\x06"))
+        .collect();
+    let ends_file = |&&i: &&usize| {
+        u16_at(bytes, i + 20).is_some_and(|c| i + 22 + usize::from(c) == bytes.len())
+    };
+    let points_at_directory = |&&i: &&usize| {
+        let count = u16_at(bytes, i + 10).unwrap_or(0);
+        u32_at(bytes, i + 16).is_some_and(|at| {
+            count == 0
+                || bytes
+                    .get(at as usize..)
+                    .is_some_and(|b| b.starts_with(b"PK\x01\x02"))
+        })
+    };
+    candidates
+        .iter()
+        .find(ends_file)
+        .or_else(|| candidates.iter().find(points_at_directory))
+        .or(candidates.first())
+        .copied()
+}
+
+/// The archive's central directory; `None` when it has no end record.
+pub fn directory(bytes: &[u8]) -> Option<Directory> {
+    let eocd = find_eocd(bytes)?;
     let count = usize::from(u16_at(bytes, eocd + 10)?);
     let mut at = u32_at(bytes, eocd + 16)? as usize;
     let mut out = Vec::new();
     let mut offsets = std::collections::HashSet::new();
+    let mut names = std::collections::HashSet::new();
+    let mut duplicates = Vec::new();
+    let mut complete = count <= MAX_MEMBERS;
     for _ in 0..count.min(MAX_MEMBERS) {
         // What was read so far stays listed when the rest is broken.
         let Some(member) = entry(bytes, at) else {
+            complete = false;
             break;
         };
         let (m, next) = member;
         // Two entries for one member: a trick to inflate the same data again and again.
         if offsets.insert(m.offset) {
+            if !names.insert(m.name.clone()) && !duplicates.contains(&m.name) {
+                duplicates.push(m.name.clone());
+            }
             out.push(m);
         }
         at = next;
     }
-    (!out.is_empty() || count == 0).then_some(out)
+    Some(Directory {
+        members: out,
+        complete,
+        duplicates,
+    })
 }
 
 /// The central directory entry at `at`, and where the next one starts.
@@ -110,20 +163,20 @@ impl<'a> Reader<'a> {
         Some(data)
     }
 
-    /// The contents of the member named `name`, if the archive has it.
+    /// The contents of the (first) member named `name`, if the archive has it.
     pub fn read_named(&mut self, members: &[Member], name: &str) -> Option<Vec<u8>> {
         let m = members.iter().find(|m| m.name == name)?;
         self.read(m)
     }
 }
 
-/// The contents of `member` (stored or deflated), at most [`MAX_INFLATED`] bytes.
+/// The contents of `member` (stored or deflated), when at most [`MAX_INFLATED`] bytes.
 #[cfg(test)]
 pub fn read(bytes: &[u8], member: &Member) -> Option<Vec<u8>> {
     read_limited(bytes, member, MAX_INFLATED)
 }
 
-/// The contents of `member`, at most `limit` bytes.
+/// The contents of `member`, when at most `limit` bytes; `None` when larger or unreadable.
 fn read_limited(bytes: &[u8], member: &Member, limit: usize) -> Option<Vec<u8>> {
     let at = usize::try_from(member.offset).ok()?;
     if !bytes.get(at..)?.starts_with(b"PK\x03\x04") {
@@ -135,7 +188,8 @@ fn read_limited(bytes: &[u8], member: &Member, limit: usize) -> Option<Vec<u8>> 
     let len = usize::try_from(member.compressed).ok()?;
     let data = bytes.get(start..start.checked_add(len)?)?;
     match member.method {
-        0 => Some(data.get(..data.len().min(limit))?.to_vec()),
+        // Past the limit it isn't read at all: a cut member would pass for the whole.
+        0 => (data.len() <= limit).then(|| data.to_vec()),
         8 => miniz_oxide::inflate::decompress_to_vec_with_limit(data, limit).ok(),
         _ => None,
     }
@@ -277,5 +331,69 @@ pub(crate) mod tests {
         let n = zip.len();
         zip[n - 6..n - 2].copy_from_slice(&u32::MAX.to_le_bytes());
         assert_eq!(members(&zip), None);
+    }
+
+    /// `zip` with the central directory entry of `name` given compression `method`.
+    pub(crate) fn with_method(mut zip: Vec<u8>, name: &str, method: u16) -> Vec<u8> {
+        let mut at = 0;
+        while let Some(i) = zip[at..].windows(4).position(|w| w == b"PK\x01\x02") {
+            let e = at + i;
+            let len = usize::from(u16_at(&zip, e + 28).unwrap_or(0));
+            if zip.get(e + 46..e + 46 + len) == Some(name.as_bytes()) {
+                zip[e + 10..e + 12].copy_from_slice(&method.to_le_bytes());
+            }
+            at = e + 4;
+        }
+        zip
+    }
+
+    /// A signature in the archive's comment isn't taken for its end record.
+    #[test]
+    fn end_record_in_the_comment() -> Result<(), String> {
+        let mut zip = make_zip(&[("a.txt", b"hello", false)]);
+        let mut fake = b"PK\x05\x06".to_vec();
+        fake.extend([0u8; 16]);
+        fake.extend(99u16.to_le_bytes());
+        let n = zip.len();
+        zip[n - 2..].copy_from_slice(&(fake.len() as u16).to_le_bytes());
+        zip.extend(&fake);
+        let d = directory(&zip).ok_or("no directory")?;
+        if d.members.len() != 1 || !d.complete {
+            return Err(format!("{d:?}"));
+        }
+        Ok(())
+    }
+
+    /// A directory cut short, more entries said than there are, is incomplete; names given
+    /// twice are told; a stored member past the limit isn't read cut.
+    #[test]
+    fn damaged_directories_and_cut_members() -> Result<(), String> {
+        let mut zip = make_zip(&[("a", b"x", false), ("b", b"y", false)]);
+        let n = zip.len();
+        zip[n - 12..n - 10].copy_from_slice(&3u16.to_le_bytes());
+        let d = directory(&zip).ok_or("no directory")?;
+        if d.complete || d.members.len() != 2 {
+            return Err(format!("not incomplete: {d:?}"));
+        }
+        let twice = make_zip(&[
+            ("a", b"one", false),
+            ("a", b"two!", false),
+            ("b", b"", false),
+        ]);
+        let d = directory(&twice).ok_or("no directory")?;
+        if d.duplicates != ["a"] || !d.complete {
+            return Err(format!("duplicates: {d:?}"));
+        }
+        let mut r = Reader::new(&twice);
+        if r.read_named(&d.members, "a").as_deref() != Some(&b"one"[..]) {
+            return Err("not the first".into());
+        }
+        let stored = make_zip(&[("big", &[b'x'; 100], false)]);
+        let list = members(&stored).unwrap_or_default();
+        let m = list.first().ok_or("no member")?;
+        if read_limited(&stored, m, 99).is_some() || read_limited(&stored, m, 100).is_none() {
+            return Err("a stored member past the limit was read".into());
+        }
+        Ok(())
     }
 }

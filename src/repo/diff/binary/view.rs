@@ -4,7 +4,7 @@
 use egui::{RichText, Ui};
 
 use super::{BinaryPair, HEX_BYTES, MAX_READ, MemberChange, Side};
-use crate::git::human_size;
+use crate::git::{Area, human_size};
 use crate::icons;
 use crate::repo::diff::line_diff::Edit;
 use crate::repo::widgets;
@@ -44,13 +44,13 @@ pub(in crate::repo::diff) fn binary_view(ui: &mut Ui, pair: &BinaryPair, id: &st
             if has_bytes(pair) {
                 options.push((Show::Hex, "Bytes", true));
             }
-            if let Some(note) = &pair.text_note {
+            for note in [&pair.text_note, &pair.members_note].into_iter().flatten() {
                 ui.label(RichText::new(note).color(t.text_dim).small());
             }
             if options.is_empty() {
                 if [&pair.old, &pair.new]
                     .iter()
-                    .any(|s| s.as_ref().is_some_and(|s| s.kind.is_none()))
+                    .any(|s| s.as_ref().is_some_and(|s| s.kind.is_none() && !s.failed))
                 {
                     let text = format!(
                         "Too big to show: gitcraft reads files up to {}.",
@@ -109,6 +109,9 @@ pub(super) fn size_change(old: u64, new: u64) -> String {
 
 /// A side's size as the table says it: "12.0 KB", "70.2 MB, not read (over 64 MB)".
 pub(super) fn size_text(s: &Side) -> String {
+    if s.failed {
+        return "couldn't be read".to_owned();
+    }
     let limit = human_size(MAX_READ);
     match (s.size, s.kind.is_some()) {
         (Some(n), true) => human_size(n),
@@ -383,8 +386,8 @@ fn hex(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
 }
 
 /// A line above a diff git made through the file's `textconv` program: the text is that
-/// program's; in the working tree (`work`) it is staged as a whole file.
-pub(in crate::repo::diff) fn textconv_note(ui: &mut Ui, program: &str, work: bool) {
+/// program's; in the working tree (`area`) it is staged, unstaged or discarded as a whole file.
+pub(in crate::repo::diff) fn textconv_note(ui: &mut Ui, program: &str, area: Option<Area>) {
     let t = Tokens::get(ui.ctx());
     egui::Frame::new()
         .fill(t.chrome)
@@ -409,12 +412,18 @@ pub(in crate::repo::diff) fn textconv_note(ui: &mut Ui, program: &str, work: boo
                         .color(t.text_dim),
                 )
                 .on_hover_text(program);
-                let rest = if work {
-                    "not the file's own lines. Stage or discard it as a whole file."
-                } else {
-                    "not the file's own lines."
-                };
+                let rest = textconv_rest(area);
                 ui.label(RichText::new(rest).color(t.text_dim).small());
             });
         });
+}
+
+/// What the textconv line says after the program: what can be done with the file in `area`.
+pub(super) fn textconv_rest(area: Option<Area>) -> &'static str {
+    match area {
+        Some(Area::Staged) => "not the file's own lines. Unstage it as a whole file.",
+        Some(Area::Conflicted) => "not the file's own lines. Mark it resolved as a whole file.",
+        Some(_) => "not the file's own lines. Stage or discard it as a whole file.",
+        None => "not the file's own lines.",
+    }
 }
