@@ -75,6 +75,25 @@ fn is_oid(s: &str) -> bool {
     matches!(s.len(), 40 | 64) && s.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
+/// Whether `repo` is a partial clone (`git clone --filter`), whose missing files a merge in
+/// memory would download from the remote: a preview must not do that behind the user's back.
+pub fn partial_clone(repo: &std::path::Path) -> bool {
+    super::run(Some(repo), &["config", "--get", "extensions.partialClone"])
+        .is_ok_and(|s| !s.trim().is_empty())
+}
+
+/// Refuses to work in a partial clone (see [`partial_clone`]).
+fn not_partial(repo: &std::path::Path) -> Result<(), String> {
+    if partial_clone(repo) {
+        Err(
+            "this is a partial clone: working it out would download files from the remote"
+                .to_owned(),
+        )
+    } else {
+        Ok(())
+    }
+}
+
 /// The full object name `rev` resolves to, as a commit.
 fn commit_oid(repo: &std::path::Path, rev: &str) -> Result<String, String> {
     super::resolve(repo, rev)

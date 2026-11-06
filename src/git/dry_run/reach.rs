@@ -21,6 +21,7 @@ pub struct Merge {
 pub fn merge(repo: &Path, ours: &str, theirs: &str, version: GitVersion) -> Result<Merge, String> {
     // Names may mean something else (or nothing) in a scratch clone: their commits don't.
     let (ours, theirs) = (&commit_oid(repo, ours)?, &commit_oid(repo, theirs)?);
+    super::not_partial(repo)?;
     if !version.has_merge_tree() {
         return scratch::merge(repo, ours, theirs);
     }

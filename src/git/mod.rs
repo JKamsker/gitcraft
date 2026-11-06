@@ -4,10 +4,10 @@
 mod command;
 mod commits;
 mod diff;
+pub mod dry_run;
 mod files;
 mod lfs;
 mod refs;
-pub mod simulate;
 mod status;
 mod submodule;
 mod worktree;

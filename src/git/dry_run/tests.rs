@@ -383,3 +383,24 @@ fn a_scratch_replay_works_from_a_worktree_and_leaves_nothing() -> Result<(), Str
     assert_eq!(after, before);
     Ok(())
 }
+
+/// In a partial clone a merge in memory would download what it lacks: refused, with why.
+#[test]
+fn a_partial_clone_is_not_simulated() -> Result<(), String> {
+    let (repo, _) = diverged("partial")?;
+    repo.git(&["config", "extensions.partialClone", "origin"])?;
+    let picks = rebase_picks(&repo.dir, "main", "feature")?;
+    let real = real_version(&repo)?;
+    let replayed = replay(
+        &repo.dir,
+        "main",
+        ("main", "refs/heads/feature"),
+        &picks,
+        real,
+        &no_cancel,
+    );
+    let merged = merge(&repo.dir, "main", "feature", real);
+    assert!(replayed.is_err_and(|e| e.contains("partial clone")));
+    assert!(merged.is_err_and(|e| e.contains("partial clone")));
+    Ok(())
+}

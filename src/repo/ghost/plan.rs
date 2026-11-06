@@ -1,12 +1,12 @@
 //! Working out, in the background, what a ghost run shows: where the refs go, the commits it
 //! makes and those it leaves on no ref, the files of the working tree that change, and where
-//! it stops on a conflict. Nothing here changes the repository (see [`git::simulate`]).
+//! it stops on a conflict. Nothing here changes the repository (see [`git::dry_run`]).
 
 use std::collections::HashSet;
 use std::path::Path;
 
 use super::op::{Facts, GhostOp, Upstream, short};
-use crate::git::simulate::{self, CANCELLED, Engine, GitVersion};
+use crate::git::dry_run::{self, CANCELLED, Engine, GitVersion};
 use crate::git::{self, Branch, ChangedFile, Commit};
 use crate::repo::pull::PullMode;
 
@@ -124,14 +124,14 @@ impl Ctx<'_> {
         let onto_oid = git::resolve(self.repo, onto)?;
         let head = branch.target.as_str();
         let mut out = Outcome::default();
-        if simulate::is_ancestor(self.repo, &onto_oid, head) {
+        if dry_run::is_ancestor(self.repo, &onto_oid, head) {
             out.notes
                 .push("Already up to date: nothing to replay, nothing changes.".to_owned());
             return Ok(out);
         }
         self.check()?;
         let tip = local_ref(&branch.name);
-        let picks = simulate::rebase_picks(self.repo, onto, &tip)?;
+        let picks = dry_run::rebase_picks(self.repo, onto, &tip)?;
         if self.facts.dirty {
             out.refused = Some(
                 "git rebase refuses to start with uncommitted changes: commit or stash them first"
@@ -212,12 +212,12 @@ impl Ctx<'_> {
         )?;
         out.created = fetched;
         self.check()?;
-        if simulate::is_ancestor(self.repo, &new, &head) {
+        if dry_run::is_ancestor(self.repo, &new, &head) {
             out.notes
                 .push("Already up to date: the branch has everything its remote has.".to_owned());
             return Ok(out);
         }
-        if simulate::is_ancestor(self.repo, &head, &new) {
+        if dry_run::is_ancestor(self.repo, &head, &new) {
             out.moves.push(RefMove {
                 full: local_ref(&branch.name),
                 from: Some(head.clone()),
@@ -246,7 +246,7 @@ impl Ctx<'_> {
                 }
                 let fork = self.fork_point(&up, &new, &head);
                 self.check()?;
-                let picks = simulate::rebase_picks(self.repo, &fork, &local_ref(&branch.name))?;
+                let picks = dry_run::rebase_picks(self.repo, &fork, &local_ref(&branch.name))?;
                 self.rewrite(
                     &Rewrite {
                         branch,
@@ -270,7 +270,7 @@ impl Ctx<'_> {
         mut out: Outcome,
     ) -> Result<Outcome, String> {
         let head = branch.target.as_str();
-        let merged = simulate::merge(self.repo, head, new, self.version)?;
+        let merged = dry_run::merge(self.repo, head, new, self.version)?;
         out.engine = Some(merged.engine);
         out.tree = Some(merged.tree.clone()).filter(|t| !t.is_empty());
         if !merged.conflicts.is_empty() {
@@ -421,11 +421,11 @@ impl Ctx<'_> {
             from_remote: true,
             ..Outcome::default()
         };
-        let leaving = simulate::leaving(self.repo, &old, &new, LOST_LIMIT + 1)?;
+        let leaving = dry_run::leaving(self.repo, &old, &new, LOST_LIMIT + 1)?;
         out.lost_more = leaving.len() > LOST_LIMIT;
         out.lost = git::commits_of(self.repo, &leaving[..leaving.len().min(LOST_LIMIT)])?;
         self.check()?;
-        out.vanish = simulate::unreachable(self.repo, &[old], &[new], &[tracking], LOST_LIMIT)?
+        out.vanish = dry_run::unreachable(self.repo, &[old], &[new], &[tracking], LOST_LIMIT)?
             .into_iter()
             .collect();
         if out.lost.is_empty() {
@@ -468,9 +468,9 @@ impl Ctx<'_> {
         self.lose(&mut out, &old, &[], &moved)?;
         self.check()?;
         let head = self.facts.refs.head.as_str();
-        let merged = simulate::is_ancestor(self.repo, &branch.target, head)
+        let merged = dry_run::is_ancestor(self.repo, &branch.target, head)
             || up.as_ref().is_some_and(|u| {
-                simulate::is_ancestor(self.repo, &branch.target, &u.tracking.target)
+                dry_run::is_ancestor(self.repo, &branch.target, &u.tracking.target)
             });
         if !merged {
             out.notes.push(format!(
@@ -536,7 +536,7 @@ impl Ctx<'_> {
     /// it leaves behind and the files that change.
     fn rewrite(&self, w: &Rewrite<'_>, out: &mut Outcome) -> Result<(), String> {
         let tip = local_ref(&w.branch.name);
-        let replay = simulate::replay(
+        let replay = dry_run::replay(
             self.repo,
             w.onto,
             (w.base, &tip),
@@ -637,7 +637,7 @@ impl Ctx<'_> {
         new: &[String],
         moved: &[String],
     ) -> Result<(), String> {
-        let hashes = simulate::unreachable(self.repo, old, new, moved, LOST_LIMIT + 1)?;
+        let hashes = dry_run::unreachable(self.repo, old, new, moved, LOST_LIMIT + 1)?;
         out.lost_more = hashes.len() > LOST_LIMIT;
         let listed = &hashes[..hashes.len().min(LOST_LIMIT)];
         out.lost = git::commits_of(self.repo, listed)?;

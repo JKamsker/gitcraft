@@ -4,8 +4,8 @@
 
 use super::op::{Facts, GhostOp};
 use super::plan::{Outcome, plan};
-use crate::git::simulate::GitVersion;
-use crate::git::simulate::tests::TestRepo;
+use crate::git::dry_run::GitVersion;
+use crate::git::dry_run::tests::TestRepo;
 use crate::git::{self};
 use crate::repo::pull::PullMode;
 
@@ -323,7 +323,7 @@ fn a_cancelled_ghost_run_stops() -> Result<(), String> {
         label: "main".to_owned(),
     };
     let out = plan(&repo.dir, &op, &facts, GitVersion(2, 41, 0), &|| true);
-    assert_eq!(out.err().as_deref(), Some(crate::git::simulate::CANCELLED));
+    assert_eq!(out.err().as_deref(), Some(crate::git::dry_run::CANCELLED));
     Ok(())
 }
 
