@@ -121,6 +121,15 @@ so your config, credentials and hooks apply as usual.
 - Worktrees: a yellow dot in place of the folder icon marks the others with uncommitted changes,
   here and in the switcher. Add (existing or new branch), open in the same tab (the tab then shows the branch, a searchable switcher and a button to close the worktree, and what you left keeps running; can be turned off in Settings) or a new one, open a terminal there, lock, remove,
   prune.
+- Scope drift (a linked worktree's menu → _Scope drift…_): what the worktree changed since it
+  left the main branch (committed, uncommitted and new files), set against its task: the text
+  written in the window (kept in the worktree's own git folder, never committed) or, without
+  one, the issue its branch names (`fix/123-login`, `issue-77`; read through `gh` / `glab`). Exact
+  figures first: _14 files changed, 9 files in 5 folders the task doesn't mention, added 2
+  dependencies (Cargo, npm, Python, Go, Ruby, Composer), changed 3 public signatures, 40%
+  formatting only_. Each item opens the worktree's changes and the item's first file. _Ask a
+  coding agent_ optionally runs `claude -p` (or `codex exec`) here with the task and the paths,
+  no file contents, for a second opinion.
 - Submodules (shown when the repository has any): each with its commit and whether it is
   modified, not initialised or out of date. Update one or all (`git submodule update --init
   --recursive`), open one in a new tab (or double-click it), show it in its folder. _Keep
