@@ -48,7 +48,7 @@ impl RepoTab {
                     undo: restore.clone(),
                     redo: redo_delete(&b.name, ops(&[&["branch", "-D", "--", &b.name]])),
                 })
-                .preview_of(self.delete_preview(&b.target, vec![local_ref.clone()])),
+                .preview_of(self.delete_preview(&[&b.target], vec![local_ref.clone()])),
             ));
         }
         // Where the upstream is, on the remote and here.
@@ -103,8 +103,9 @@ impl RepoTab {
                     undo,
                     redo: redo_delete(&b.name, delete("-D")),
                 })
+                // Commits pushed there that this branch hasn't go with the remote branch too.
                 .preview_of(self.delete_preview(
-                    &b.target,
+                    &[&b.target, &tracked.target],
                     vec![local_ref, format!("refs/remotes/{}", tracked.name)],
                 )),
             ));

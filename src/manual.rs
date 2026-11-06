@@ -56,7 +56,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Settings → Commit signing sets the format, key and program git signs with, and whether it signs commits and tags by default, in your global git config; Settings → Profile can sign just for the profile instead.",
             "Double-click a commit's message in the right pane to edit it (any commit of the checked-out branch with no merges after it).",
             "Undo and redo commits, merges, rebases, resets, checkouts, branches, tags and stashes.",
-            "Before a reset, deleting a branch (here or on a remote), dropping a commit or discarding a file, the dialog says what it will do: the commits leaving the branch, each marked still on another branch or only here; the uncommitted files lost; whether those commits were pushed, so that a force push will be needed; the git commands it runs (folded); and whether Ctrl+Z restores it.",
+            "Before a reset, deleting a branch (here or on a remote), dropping a commit or discarding a file, the dialog says what it will do: the commits leaving the branch (for a delete, those the checked-out branch hasn't), each marked still on another branch or only here; the files whose uncommitted changes are lost; whether the commits it rewrites were pushed, so that a force push will be needed; the git commands it runs (folded); and whether Ctrl+Z restores it.",
         ],
     ),
     (

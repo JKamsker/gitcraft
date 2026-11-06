@@ -404,7 +404,11 @@ fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<Action>) {
                         upstream.map(str::to_owned),
                         mode == "--hard",
                     ),
-                    format!("Leaving {target}"),
+                    if mode == "--hard" {
+                        format!("Leaving {target}")
+                    } else {
+                        format!("Leaving {target}, changes kept")
+                    },
                 ),
             ));
         }

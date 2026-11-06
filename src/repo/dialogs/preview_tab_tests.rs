@@ -219,10 +219,10 @@ fn the_dialog_shows_the_preview_and_confirms_its_action() {
         "only here",
         "still on feat",
         "and 340 more, 12 of them only here",
-        "a force push will be needed",
+        "pushing it again will need a force push",
         "Uncommitted changes lost (1)",
         "src/ünï code.rs",
-        "+Z brings the commits back, not the uncommitted changes.",
+        "+Z moves the branch back, not the uncommitted changes.",
     ] {
         assert!(
             harness.query_all_by_label_contains(text).next().is_some(),

@@ -31,6 +31,8 @@ pub(crate) struct WhatItDoes {
     pub(crate) ask: PreviewAsk,
     /// Over the commits leaving: `Leaving main`.
     pub(crate) heading: String,
+    /// Over the files lost: `Uncommitted changes lost`.
+    pub(crate) files_heading: String,
     pub(crate) state: PreviewState,
     /// An action to take in place of the dialog's ops, which works out its commands when it
     /// runs (a rebase's todo list), with how to show them.
@@ -42,6 +44,7 @@ impl WhatItDoes {
         WhatItDoes {
             ask,
             heading,
+            files_heading: "Uncommitted changes lost".to_owned(),
             state: PreviewState::Unread,
             instead: None,
         }
@@ -96,19 +99,19 @@ impl RepoTab {
             .map(|r| format!("refs/remotes/{}", r.name))
     }
 
-    /// What deleting the refs `moving`, at `tip`, would change: the commits HEAD hasn't.
+    /// What deleting the refs `moving`, at `tips`, would change: the commits HEAD hasn't.
     pub(in crate::repo) fn delete_preview(
         &self,
-        tip: &str,
+        tips: &[&str],
         moving: Vec<String>,
     ) -> (PreviewAsk, String) {
         let heading = if self.refs.head.is_empty() {
             "Its commits".to_owned()
         } else {
             let head = self.refs.current.as_deref().unwrap_or("HEAD");
-            format!("Not on {head}")
+            format!("Commits not on {head}")
         };
-        (PreviewAsk::delete(tip, &self.refs.head, moving), heading)
+        (PreviewAsk::delete(tips, &self.refs.head, moving), heading)
     }
 
     /// Puts the preview read as `asked` in the dialog, if it is still the one waiting for it.
@@ -166,12 +169,17 @@ pub(super) fn show(ui: &mut Ui, preview: &WhatItDoes) {
             egui::ScrollArea::vertical()
                 .max_height(260.0)
                 .auto_shrink([false, true])
-                .show(ui, |ui| ready(ui, &preview.heading, found, &t));
+                .show(ui, |ui| ready(ui, preview, found, &t));
         }
     }
 }
 
-fn ready(ui: &mut Ui, heading: &str, found: &Preview, t: &Tokens) {
+fn ready(ui: &mut Ui, preview: &WhatItDoes, found: &Preview, t: &Tokens) {
+    let heading = &preview.heading;
+    if preview.ask.leaving.is_some() && found.leaving_total == 0 {
+        // Said, so that an empty list doesn't read as a preview that didn't work.
+        section(ui, &format!("{heading}: none"));
+    }
     if found.leaving_total > 0 {
         section(ui, &format!("{heading} ({})", found.leaving_total));
         for c in &found.leaving {
@@ -201,7 +209,7 @@ fn ready(ui: &mut Ui, heading: &str, found: &Preview, t: &Tokens) {
     if found.lost_total > 0 {
         section(
             ui,
-            &format!("Uncommitted changes lost ({})", found.lost_total),
+            &format!("{} ({})", preview.files_heading, found.lost_total),
         );
         for path in &found.lost_files {
             ui.add(egui::Label::new(RichText::new(path).font(theme::mono(11.5))).truncate());
@@ -255,18 +263,25 @@ fn more_commits(more: usize, only_here: usize) -> String {
     }
 }
 
+/// The commits counted are those the operation rewrites: for a dropped commit, it and every
+/// one after it, more than the list shows.
 fn pushed_note(upstream: &str, commits: usize) -> String {
     let which = if commits == 1 {
-        "1 of these commits is".to_owned()
+        "1 commit this rewrites is".to_owned()
     } else {
-        format!("{commits} of these commits are")
+        format!("{commits} commits this rewrites are")
     };
-    format!("Already pushed: {which} on {upstream}, so a force push will be needed.")
+    format!("Already pushed: {which} on {upstream}, so pushing it again will need a force push.")
 }
 
 /// The commands, folded: `ops` (the expectation steps, which run no git, left out), or
 /// `described` for an operation that works its commands out when it runs.
-pub(super) fn commands(ui: &mut Ui, ops: &[Vec<String>], described: Option<&[String]>) {
+pub(super) fn commands(
+    ui: &mut Ui,
+    title: &str,
+    ops: &[Vec<String>],
+    described: Option<&[String]>,
+) {
     let lines: Vec<String> = match described {
         Some(lines) => lines.to_vec(),
         None => ops
@@ -280,7 +295,8 @@ pub(super) fn commands(ui: &mut Ui, ops: &[Vec<String>], described: Option<&[Str
     }
     ui.add_space(8.0);
     egui::CollapsingHeader::new(RichText::new("Git commands").font(theme::medium(12.0)))
-        .id_salt("confirm-commands")
+        // Folded again for another kind of dialog.
+        .id_salt(("confirm-commands", title))
         .default_open(false)
         .show(ui, |ui| {
             for line in &lines {
@@ -311,14 +327,19 @@ fn quoted(arg: &str) -> String {
 
 /// Whether Ctrl+Z brings back what the operation takes, said when it does.
 pub(super) fn undo_note(ui: &mut Ui, undo: &Undo, preview: &WhatItDoes) {
-    let lost_files = match &preview.state {
-        PreviewState::Ready(found) => found.lost_total > 0,
-        _ => false,
-    };
-    if let Some(note) = undo_text(undo, lost_files) {
+    if let Some(note) = undo_text(undo, may_lose_files(preview)) {
         let t = Tokens::get(ui.ctx());
         ui.add_space(8.0);
         ui.add(egui::Label::new(RichText::new(note).color(t.success)).wrap());
+    }
+}
+
+/// Whether the operation loses uncommitted files, as far as is known: until read, a hard reset
+/// may, and the undo note must not promise what it can't keep.
+fn may_lose_files(preview: &WhatItDoes) -> bool {
+    match &preview.state {
+        PreviewState::Ready(found) => found.lost_total > 0,
+        _ => matches!(preview.ask.files, LostFiles::HardReset(_)),
     }
 }
 
@@ -329,7 +350,7 @@ fn undo_text(undo: &Undo, lost_files: bool) -> Option<String> {
     match undo {
         Undo::None => None,
         Undo::HeadMove { .. } if lost_files => Some(format!(
-            "{key}+Z brings the commits back, not the uncommitted changes."
+            "{key}+Z moves the branch back, not the uncommitted changes."
         )),
         Undo::HeadMove { .. } | Undo::Custom { .. } => Some(format!("{key}+Z restores this.")),
     }
@@ -368,9 +389,10 @@ mod tests {
     fn the_force_push_note_counts() {
         assert_eq!(
             pushed_note("origin/main", 1),
-            "Already pushed: 1 of these commits is on origin/main, so a force push will be needed."
+            "Already pushed: 1 commit this rewrites is on origin/main, so pushing it again will \
+             need a force push."
         );
-        assert!(pushed_note("origin/main", 3).contains("3 of these commits are"));
+        assert!(pushed_note("origin/main", 3).contains("3 commits this rewrites are"));
     }
 
     #[test]
@@ -384,7 +406,7 @@ mod tests {
         assert_eq!(
             undo_text(&Undo::HeadMove { mode: "--keep" }, true),
             Some(format!(
-                "{key}+Z brings the commits back, not the uncommitted changes."
+                "{key}+Z moves the branch back, not the uncommitted changes."
             ))
         );
         let custom = Undo::Custom {
@@ -392,6 +414,27 @@ mod tests {
             redo: Vec::new(),
         };
         assert!(undo_text(&custom, true).is_some());
+    }
+
+    /// While a hard reset's preview loads, or when it couldn't be read, the files it may lose
+    /// are not promised back.
+    #[test]
+    fn a_hard_reset_promises_no_files_back_before_it_knows() {
+        let mut preview = WhatItDoes::new(
+            PreviewAsk::reset("main", "h", "t", None, true),
+            String::new(),
+        );
+        preview.state = PreviewState::Loading(1);
+        assert!(may_lose_files(&preview));
+        preview.state = PreviewState::Failed("offline".to_owned());
+        assert!(may_lose_files(&preview));
+        preview.state = PreviewState::Ready(Preview::default());
+        assert!(!may_lose_files(&preview));
+        let soft = WhatItDoes::new(
+            PreviewAsk::reset("main", "h", "t", None, false),
+            String::new(),
+        );
+        assert!(!may_lose_files(&soft));
     }
 
     #[test]
