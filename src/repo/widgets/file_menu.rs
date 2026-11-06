@@ -1,6 +1,6 @@
 //! The right-click menu of a file, and the `.gitignore` lines it offers.
 
-use egui::Response;
+use egui::{Response, Ui};
 
 use super::file_row::split_dir;
 use crate::repo::Action;
@@ -16,6 +16,18 @@ pub fn file_menu(
     rev: Option<&str>,
     ignorable: bool,
     acts: &mut Vec<Action>,
+) {
+    file_menu_with(resp, path, rev, ignorable, acts, |_, _| {});
+}
+
+/// [`file_menu`] with `more` entries at its end (a working-tree file's stash entries).
+pub fn file_menu_with(
+    resp: &Response,
+    path: &str,
+    rev: Option<&str>,
+    ignorable: bool,
+    acts: &mut Vec<Action>,
+    more: impl FnOnce(&mut Ui, &mut Vec<Action>),
 ) {
     egui::Popup::context_menu(resp)
         .style(crate::theme::menu_style)
@@ -70,6 +82,7 @@ pub fn file_menu(
             if ui.button("Copy path").clicked() {
                 ui.ctx().copy_text(path.to_owned());
             }
+            more(ui, acts);
         });
 }
 

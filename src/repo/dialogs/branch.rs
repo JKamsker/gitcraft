@@ -1,4 +1,4 @@
-//! Dialogs that create or rename a branch, create a tag, or stash the changes.
+//! Dialogs that create or rename a branch, or create a tag.
 
 use egui::Ui;
 
@@ -72,20 +72,6 @@ fn create_branch_undo(name: &str, at: &str, checkout: bool, previous: &str) -> V
         name.to_owned(),
     ]);
     undo
-}
-
-pub(super) fn stash(ui: &mut Ui, enter: bool, message: &mut String, focus: &mut bool) -> Outcome {
-    let t = Tokens::get(ui.ctx());
-    title(
-        ui,
-        "Stash changes",
-        "Puts every change, untracked files included, aside and cleans the working tree.",
-        &t,
-    );
-    field(ui, message, "Message (optional)", focus);
-    buttons(ui, "Stash", true, enter, || {
-        Action::StashPush(message.trim().to_owned())
-    })
 }
 
 /// A tag at `at`, annotated when it has a message, and pushed to `remote` when asked.

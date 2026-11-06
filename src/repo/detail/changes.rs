@@ -3,6 +3,7 @@
 
 use egui::{Align2, RichText, Sense, Ui, pos2, vec2};
 
+use super::stash_picks::stash_menu_items;
 use crate::git::{Area, InProgress, StatusFile};
 use crate::icons;
 use crate::repo::diff::{literal_path, unstage_args};
@@ -33,6 +34,7 @@ impl RepoTab {
                 if let Some(state) = self.work.in_progress {
                     self.in_progress_banner(ui, acts, state);
                 }
+                self.stash_picks_bar(ui, acts);
                 if !self.work.conflicted.is_empty() {
                     self.conflicted_list(ui, acts);
                 }
@@ -87,7 +89,7 @@ impl RepoTab {
                     "Mark resolved",
                     vec![vec!["--literal-pathspecs", "add", "--", &f.path]],
                 )),
-                RowClick::None => {}
+                RowClick::None | RowClick::Pick => {}
             },
         );
     }
@@ -117,7 +119,7 @@ impl RepoTab {
                     "Stage",
                     vec![vec!["--literal-pathspecs", "add", "--", &f.path]],
                 )),
-                RowClick::None => {}
+                RowClick::None | RowClick::Pick => {}
             },
         );
         if unstaged.is_empty() {
@@ -151,7 +153,7 @@ impl RepoTab {
                     ops: vec![unstage_args(head, &f.path)],
                     refresh: Refresh::Status,
                 }),
-                RowClick::None => {}
+                RowClick::None | RowClick::Pick => {}
             },
         );
         if staged.is_empty() {
@@ -180,9 +182,9 @@ impl RepoTab {
                 files,
                 |f| &f.path,
                 &selected,
-                &mut |ui, indent, f| {
-                    let click = self.work_row(ui, acts, f, indent, buttons);
-                    on(acts, f, click);
+                &mut |ui, indent, f| match self.work_row(ui, acts, f, indent, buttons) {
+                    RowClick::Pick => acts.push(Action::PickToStash(f.path.clone())),
+                    click => on(acts, f, click),
                 },
             );
         });
@@ -198,7 +200,8 @@ impl RepoTab {
         buttons: &[(&str, &str)],
     ) -> RowClick {
         let key = DiffKey::Work(f.clone());
-        let selected = self.open_key() == Some(&key);
+        let picked = &self.stash_picks.picked;
+        let selected = self.open_key() == Some(&key) || picked.contains(&f.path);
         let buttons = if self.busy_op.is_none() { buttons } else { &[] };
         let r = widgets::file_row(
             ui,
@@ -209,11 +212,21 @@ impl RepoTab {
             selected,
             RowExtra::Buttons(buttons),
         );
+        let stash = |ui: &mut Ui, acts: &mut Vec<Action>| {
+            ui.separator();
+            stash_menu_items(ui, &f.path, picked, acts);
+        };
         if f.code != 'D' {
-            widgets::file_menu(&r.row, &f.path, None, true, acts);
+            widgets::file_menu_with(&r.row, &f.path, None, true, acts, stash);
+        } else {
+            // A deleted file has nothing to open, but can be stashed.
+            egui::Popup::context_menu(&r.row)
+                .style(theme::menu_style)
+                .show(|ui| stash_menu_items(ui, &f.path, picked, acts));
         }
         match r.button {
             Some(i) => RowClick::Button(i),
+            None if r.row.clicked() && ui.input(|i| i.modifiers.command) => RowClick::Pick,
             None if r.row.clicked() => RowClick::Open,
             None => RowClick::None,
         }
@@ -224,6 +237,8 @@ enum RowClick {
     None,
     Open,
     Button(usize),
+    /// Ctrl+click (Cmd on macOS): picked to stash, or unpicked.
+    Pick,
 }
 
 fn stage_action(label: &str, steps: Vec<Vec<&str>>) -> Action {
@@ -443,5 +458,92 @@ mod tests {
         frame(&tab, Vec::new());
         assert!(opened, "the right-click opened no menu");
         assert!(!egui::Popup::is_any_open(&ctx));
+    }
+
+    /// Ctrl+click (Cmd on macOS) on a file picks it to stash instead of opening its diff;
+    /// picked, it shows selected.
+    #[test]
+    fn ctrl_click_picks_a_file_to_stash() {
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let mut tab = RepoTab::new_deferred("/nonexistent/pick-test".into(), &ctx);
+        tab.work.unstaged = vec![
+            changed("a b.txt", Area::Unstaged),
+            changed("\u{fc}.txt", Area::Unstaged),
+        ];
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(320.0, 600.0));
+        let first = pos2(100.0, 30.0 + widgets::ROW_H * 0.5);
+        let frame = |tab: &RepoTab, events: Vec<egui::Event>, modifiers| {
+            let mut acts = Vec::new();
+            let input = egui::RawInput {
+                screen_rect: Some(screen),
+                events: [egui::Event::ModifiersChanged(modifiers)]
+                    .into_iter()
+                    .chain(events)
+                    .collect(),
+                ..Default::default()
+            };
+            ctx.run_ui(input, |ui| {
+                egui::CentralPanel::default()
+                    .frame(egui::Frame::NONE)
+                    .show(ui, |ui| {
+                        ui.spacing_mut().item_spacing.y = 0.0;
+                        tab.unstaged_list(ui, &mut acts);
+                    });
+            })
+            .drop_without_applying_deltas();
+            acts
+        };
+        let click = |modifiers| {
+            [true, false].map(|pressed| egui::Event::PointerButton {
+                pos: first,
+                button: egui::PointerButton::Primary,
+                pressed,
+                modifiers,
+            })
+        };
+        let command = egui::Modifiers::COMMAND;
+        frame(&tab, vec![egui::Event::PointerMoved(first)], command);
+        let acts = frame(&tab, click(command).to_vec(), command);
+        assert!(
+            matches!(acts.as_slice(), [Action::PickToStash(p)] if p == "a b.txt"),
+            "a Ctrl+click did not pick the file"
+        );
+        // A plain click still opens the diff.
+        let plain = egui::Modifiers::NONE;
+        frame(&tab, vec![egui::Event::PointerMoved(first)], plain);
+        let acts = frame(&tab, click(plain).to_vec(), plain);
+        assert!(matches!(acts.as_slice(), [Action::OpenDiff(_)]));
+    }
+
+    /// The stash dialog opened from the toolbar with files picked offers them, chosen.
+    #[test]
+    fn the_stash_dialog_offers_the_files_picked() {
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let mut tab = RepoTab::new_deferred("/nonexistent/pick-dialog".into(), &ctx);
+        tab.work.unstaged = vec![changed("a.txt", Area::Unstaged)];
+        tab.stash_picks.toggle("a.txt");
+        tab.dialog = Some(Dialog::stash());
+        let input = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                vec2(800.0, 600.0),
+            )),
+            ..Default::default()
+        };
+        let mut acts = Vec::new();
+        ctx.run_ui(input, |ui| tab.dialogs(ui.ctx(), &mut acts))
+            .drop_without_applying_deltas();
+        let files = crate::repo::partial_stash::StashMode::Files(vec!["a.txt".to_owned()]);
+        assert!(
+            matches!(&tab.dialog, Some(Dialog::Stash(d)) if d.request().mode == files),
+            "the picked file isn't what the dialog stashes"
+        );
+        // Its git is being asked whether it stashes only what is staged.
+        assert_ne!(
+            tab.stash_picks.staged,
+            crate::repo::partial_stash::StagedSupport::Unknown
+        );
     }
 }

@@ -1,0 +1,419 @@
+//! Stashing some of the changes: the files picked, only what is staged, or a snapshot that
+//! saves a stash and leaves every change where it is. Each goes through the undo history: undo
+//! pops the stash back (or, for a snapshot, drops it), redo makes it again.
+
+use std::collections::{BTreeSet, HashSet};
+use std::path::Path;
+use std::time::Instant;
+
+use super::diff::literal_path;
+use super::messages::spawn_or;
+use super::operations::{expect_ref, is_expectation, run_steps_counted, stash_push_args};
+use super::{Msg, OpKind, Refresh, RepoTab, Undo, ops};
+use crate::git::{self, WorkStatus};
+
+/// What gets stashed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum StashMode {
+    /// Every change (`git stash push`).
+    Everything,
+    /// These files only (`git stash push -- <paths>`).
+    Files(Vec<String>),
+    /// Only what is staged (`git stash push --staged`, git 2.35+).
+    Staged,
+    /// Every change saved as a stash, the working tree and index left as they are.
+    Snapshot,
+}
+
+/// A stash asked for in the dialog.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct StashRequest {
+    pub(crate) mode: StashMode,
+    /// Optional; git names the stash after the last commit without one.
+    pub(crate) message: String,
+    /// Untracked files go too (for a mode that can take them; picked ones always do).
+    pub(crate) untracked: bool,
+}
+
+impl StashRequest {
+    /// Every change, untracked files included: what the toolbar's Stash did all along.
+    #[cfg(test)]
+    pub(crate) fn everything(message: &str) -> Self {
+        StashRequest {
+            mode: StashMode::Everything,
+            message: message.to_owned(),
+            untracked: true,
+        }
+    }
+
+    /// The name of the operation, in the status line and the undo history.
+    pub(crate) fn label(&self) -> &'static str {
+        match self.mode {
+            StashMode::Everything => "Stash",
+            StashMode::Files(_) => "Stash files",
+            StashMode::Staged => "Stash staged",
+            StashMode::Snapshot => "Snapshot",
+        }
+    }
+}
+
+/// Whether the repository's git can stash only the staged changes, once asked.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) enum StagedSupport {
+    #[default]
+    Unknown,
+    Checking,
+    Known(Result<(), String>),
+}
+
+/// A tab's part in this: the files picked to stash (Ctrl+click in the changes), and whether
+/// its git can stash only what is staged.
+#[derive(Default)]
+pub(crate) struct StashPicks {
+    pub(crate) picked: BTreeSet<String>,
+    pub(crate) staged: StagedSupport,
+}
+
+impl StashPicks {
+    /// Picks or unpicks `path`.
+    pub(crate) fn toggle(&mut self, path: &str) {
+        if !self.picked.remove(path) {
+            self.picked.insert(path.to_owned());
+        }
+    }
+
+    /// Forgets the picked files that have no changes any more (stashed, committed, discarded).
+    pub(crate) fn keep_changed(&mut self, work: &WorkStatus) {
+        if self.picked.is_empty() {
+            return;
+        }
+        let changed: HashSet<&str> = all_files(work).map(|f| f.path.as_str()).collect();
+        self.picked.retain(|p| changed.contains(p.as_str()));
+    }
+}
+
+fn all_files(work: &WorkStatus) -> impl Iterator<Item = &git::StatusFile> {
+    work.conflicted
+        .iter()
+        .chain(&work.staged)
+        .chain(&work.unstaged)
+}
+
+/// Why git can't stash just `paths` as they are in `work`, if it can't: `git stash push --
+/// <paths>` refuses a path only HEAD knows (a staged deletion, the old side of a staged rename),
+/// and with untracked files it does so after saving the stash, the changes left in place.
+pub(crate) fn files_problem(paths: &[String], work: &WorkStatus) -> Option<String> {
+    if paths.is_empty() {
+        return Some("Pick the files to stash first (Ctrl+click them in the changes)".into());
+    }
+    for path in paths {
+        let mut entries = all_files(work).filter(|f| &f.path == path).peekable();
+        if entries.peek().is_none() {
+            return Some(format!("“{path}” has no changes any more"));
+        }
+        for f in entries {
+            if f.area == git::Area::Conflicted {
+                return Some(format!("“{path}” has conflicts: resolve them first"));
+            }
+            if let Some(old) = &f.old_path {
+                return Some(format!(
+                    "“{old}” → “{path}” is a staged rename, which git can't stash by file \
+                     name: unstage it first, or stash only what is staged"
+                ));
+            }
+            if f.area == git::Area::Staged && f.code == 'D' {
+                return Some(format!(
+                    "The deletion of “{path}” is staged, which git can't stash by file name: \
+                     unstage it first, or stash only what is staged"
+                ));
+            }
+        }
+    }
+    None
+}
+
+/// Whether any of `paths` is untracked (it then needs `--include-untracked`).
+pub(crate) fn has_untracked(paths: &[String], work: &WorkStatus) -> bool {
+    work.unstaged
+        .iter()
+        .any(|f| f.area == git::Area::Untracked && paths.contains(&f.path))
+}
+
+/// The `git stash push` that makes the stash `request` asks for, or why it can't be made.
+pub(crate) fn push_args(request: &StashRequest, work: &WorkStatus) -> Result<Vec<String>, String> {
+    let mut args = vec!["stash".to_owned(), "push".to_owned()];
+    let paths = match &request.mode {
+        StashMode::Snapshot => return Err("A snapshot isn't made with git stash push".into()),
+        StashMode::Everything => {
+            if work.is_clean() {
+                return Err("There are no changes to stash".into());
+            }
+            if request.untracked {
+                args = stash_push_args().map(str::to_owned).to_vec();
+            }
+            None
+        }
+        StashMode::Staged => {
+            if work.staged.is_empty() {
+                return Err("Nothing is staged".into());
+            }
+            args.push("--staged".to_owned());
+            None
+        }
+        StashMode::Files(paths) => {
+            if let Some(problem) = files_problem(paths, work) {
+                return Err(problem);
+            }
+            if has_untracked(paths, work) {
+                args.push("--include-untracked".to_owned());
+            }
+            Some(paths)
+        }
+    };
+    let message = request.message.trim();
+    if !message.is_empty() {
+        args.extend(["-m".to_owned(), message.to_owned()]);
+    }
+    if let Some(paths) = paths {
+        args.push("--".to_owned());
+        let unique: BTreeSet<&String> = paths.iter().collect();
+        args.extend(unique.into_iter().map(|p| literal_path(p)));
+    }
+    Ok(args)
+}
+
+/// Popping the stash back, but only while it is still the newest one.
+fn pop_undo() -> Vec<Vec<String>> {
+    [expect_ref("refs/stash")]
+        .into_iter()
+        .chain(ops(&[&["stash", "pop", "--index"]]))
+        .collect()
+}
+
+/// Makes the undo of a stash of only what is staged put the staged changes back with `git
+/// apply` (the working tree first, then the index), then drop the stash: `git stash pop --index`
+/// refuses while the files it changes have other changes, which a file staged in part always
+/// has. The patch is made as `git stash` made the one it took out with (one line of context), so
+/// that it goes back in where that came out. Left as it is (popping) when the patch can't be
+/// kept (it isn't text git can read back).
+fn reapply_staged_undo(path: &Path, undo: &mut Vec<Vec<String>>) {
+    let patch = git::run_bytes(
+        Some(path),
+        &[
+            "diff-tree",
+            "-p",
+            "--binary",
+            "--full-index",
+            "--no-color",
+            "-U1",
+            "stash@{0}^1",
+            "stash@{0}^2",
+            "--",
+        ],
+    );
+    let Some(patch) = patch.ok().and_then(|p| String::from_utf8(p).ok()) else {
+        return;
+    };
+    let Ok(file) = git::save_patch_for(path, &patch) else {
+        return;
+    };
+    // The check that the stash is still the newest stays first.
+    undo.retain(|step| is_expectation(step));
+    undo.extend(ops(&[
+        &["apply", "--whitespace=nowarn", &file],
+        &["apply", "--cached", "--whitespace=nowarn", &file],
+        &["stash", "drop", "-q"],
+    ]));
+}
+
+/// `git stash store` of a snapshot, as its redo runs it again.
+fn store_args(snapshot: &git::Snapshot) -> Vec<String> {
+    ops(&[&["stash", "store", "-m", &snapshot.message, &snapshot.commit]]).concat()
+}
+
+/// Makes the stash `request` asks for, in the background, and keeps its undo.
+pub(crate) fn run_push(
+    path: &Path,
+    args: Vec<String>,
+    head: String,
+    roll_back_staged: bool,
+) -> (Result<String, String>, OpKind) {
+    let undo = Undo::Custom {
+        undo: pop_undo(),
+        redo: vec![args.clone()],
+    };
+    let before = git::resolve(path, "refs/stash").ok();
+    let (result, mut kind, _) =
+        run_steps_counted(path, &[args], OpKind::Normal(undo, head), None, false);
+    if roll_back_staged
+        && result.is_ok()
+        && let OpKind::Normal(Undo::Custom { undo, .. }, _) = &mut kind
+    {
+        reapply_staged_undo(path, undo);
+    }
+    let result = match result {
+        Ok(out) if out.contains("No local changes to save") => {
+            Err("there are no local changes to stash".to_owned())
+        }
+        Err(e) if e.trim() == "No staged changes" => Err("nothing is staged".to_owned()),
+        Err(e) => Err(after_failed_push(
+            path,
+            before.as_deref(),
+            &e,
+            roll_back_staged,
+        )),
+        ok => ok,
+    };
+    (result, kind)
+}
+
+/// What to say when `git stash push` failed: git can save the stash and then fail to take the
+/// changes out (a staged binary file, unstaged changes next to staged ones). Stashing only what
+/// is staged takes them out with one `git apply`, which changes nothing when it fails: that
+/// stash is dropped again, so nothing happened. Otherwise it stays, and the message says so.
+fn after_failed_push(path: &Path, before: Option<&str>, e: &str, roll_back_staged: bool) -> String {
+    let Ok(now) = git::resolve(path, "refs/stash") else {
+        return e.to_owned();
+    };
+    if before == Some(now.as_str()) {
+        return e.to_owned();
+    }
+    // The stash of what is staged has the index as its tree: the index is untouched still.
+    let untouched = git::run(Some(path), &["diff", "--cached", "--quiet", &now, "--"]).is_ok();
+    if roll_back_staged
+        && untouched
+        && git::run(Some(path), &["stash", "drop", "-q", "stash@{0}"]).is_ok()
+    {
+        let why = if e.contains("binary patch") {
+            "git can't take only the staged part of a binary file out of the working tree. \
+             Pick the files and stash them, or stash everything"
+        } else {
+            "git couldn't take the staged changes out of the working tree, perhaps because \
+             unstaged changes touch the same lines. Pick the files and stash them, or stash \
+             everything"
+        };
+        return format!("nothing was stashed: {why} (git said: {})", e.trim());
+    }
+    format!(
+        "git saved the stash ({}), then stopped: {}. The changes are in that stash and may \
+         still be in the working tree too: check them before you pop or drop it",
+        super::short(&now),
+        e.trim()
+    )
+}
+
+/// Saves a snapshot in the background (see [`git::snapshot`]) and stores it as the newest stash.
+fn run_snapshot(
+    path: &Path,
+    message: &str,
+    untracked: bool,
+    head: String,
+) -> (Result<String, String>, OpKind) {
+    let snapshot = match git::snapshot(path, message, untracked) {
+        Ok(Some(s)) => s,
+        Ok(None) if untracked => {
+            return (
+                Err("there are no local changes to save".to_owned()),
+                OpKind::plain(),
+            );
+        }
+        Ok(None) => {
+            return (
+                Err(
+                    "no tracked file has changes (tick Include untracked files to save the \
+                     new ones)"
+                        .to_owned(),
+                ),
+                OpKind::plain(),
+            );
+        }
+        Err(e) => return (Err(e), OpKind::plain()),
+    };
+    let store = vec![store_args(&snapshot)];
+    let undo = Undo::Custom {
+        undo: [expect_ref("refs/stash")]
+            .into_iter()
+            .chain(ops(&[&["stash", "drop", "-q"]]))
+            .collect(),
+        redo: store.clone(),
+    };
+    let (result, kind, _) =
+        run_steps_counted(path, &store, OpKind::Normal(undo, head), None, false);
+    (result, kind)
+}
+
+impl RepoTab {
+    /// Makes the stash asked for in the dialog (or the palette), in the background.
+    pub(super) fn stash(&mut self, request: StashRequest, ctx: &egui::Context) {
+        if self.busy_op.is_some() {
+            return;
+        }
+        let label = request.label();
+        let head = self.refs.head.clone();
+        if request.mode == StashMode::Snapshot {
+            let StashRequest {
+                message, untracked, ..
+            } = request;
+            return self.stash_job(label, ctx, move |path| {
+                run_snapshot(path, &message, untracked, head)
+            });
+        }
+        match push_args(&request, &self.work) {
+            Ok(args) => {
+                let staged = request.mode == StashMode::Staged;
+                self.stash_job(label, ctx, move |path| run_push(path, args, head, staged));
+            }
+            Err(e) => self.status = Some((format!("{label} failed: {e}"), true)),
+        }
+    }
+
+    /// Runs `job` in the background as the tab's operation `label`, then takes in how it ended
+    /// like any other operation (status line, undo, reload).
+    fn stash_job(
+        &mut self,
+        label: &'static str,
+        ctx: &egui::Context,
+        job: impl FnOnce(&Path) -> (Result<String, String>, OpKind) + Send + 'static,
+    ) {
+        self.busy_op = Some(label.to_owned());
+        self.op_started = Some(Instant::now());
+        self.status = None;
+        // Nothing here signs in: an operation run again after signing in must not be this one.
+        self.last_op = None;
+        let path = self.path.clone();
+        let failed = move |e| done(label, Err(e), OpKind::plain());
+        spawn_or(&self.tx, ctx, failed, move || {
+            let (result, kind) = job(&path);
+            done(label, result, kind)
+        });
+    }
+
+    /// Starts asking the repository's git whether it can stash only the staged changes, unless
+    /// it was asked already.
+    pub(super) fn check_staged_stash(&mut self, ctx: &egui::Context) {
+        if self.stash_picks.staged != StagedSupport::Unknown {
+            return;
+        }
+        self.stash_picks.staged = StagedSupport::Checking;
+        let path = self.path.clone();
+        self.then(
+            ctx,
+            move || git::staged_stash_support(&path),
+            |tab, found, _| tab.stash_picks.staged = StagedSupport::Known(found),
+        );
+    }
+}
+
+fn done(label: &str, result: Result<String, String>, kind: OpKind) -> Msg {
+    Msg::OpDone {
+        label: label.to_owned(),
+        result,
+        refresh: Refresh::All,
+        kind,
+        quiet: false,
+        stopped: 0,
+    }
+}
+
+#[cfg(test)]
+mod tests;

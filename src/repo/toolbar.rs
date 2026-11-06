@@ -118,7 +118,9 @@ impl RepoTab {
             acts.push(Action::Dialog(Dialog::create_branch(&head, "HEAD")));
         }
         if icons::tool_button(ui, "archive", "Stash", idle && !self.work.is_clean())
-            .on_hover_text("Stash all changes, untracked files included")
+            .on_hover_text(
+                "Stash changes: everything, the files picked, only what is staged, or a snapshot",
+            )
             .on_disabled_hover_text("No changes to stash")
             .clicked()
         {

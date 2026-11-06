@@ -2,11 +2,12 @@
 
 use std::path::PathBuf;
 
+use super::dialogs::StashChoice;
 use super::pull::PullMode;
 use super::toolbar::reveal_label;
 use super::{
     Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view, ops,
-    pr_review, quick_edit,
+    partial_stash, pr_review, quick_edit,
 };
 use crate::git::{self, InProgress};
 use crate::terminal::ShellSpec;
@@ -65,7 +66,11 @@ pub(crate) enum Action {
     LoadMore,
     Undo,
     Redo,
-    StashPush(String),
+    /// Stash everything, some files or what is staged, or save a snapshot.
+    Stash(partial_stash::StashRequest),
+    /// Pick a working-tree file to stash, or unpick it.
+    PickToStash(String),
+    ClearStashPicks,
     /// Open a folder (a worktree) in its own tab.
     OpenTab(PathBuf),
     /// Open a worktree the way the settings say: in this tab, or in its own.
@@ -332,6 +337,16 @@ impl RepoTab {
                 "Stash changes".into(),
                 "stash".into(),
                 Action::Dialog(Dialog::stash()),
+            ),
+            (
+                "Stash only staged changes".into(),
+                "stash".into(),
+                Action::Dialog(Dialog::stash_as(StashChoice::Staged)),
+            ),
+            (
+                "Snapshot: stash and keep the changes".into(),
+                "stash".into(),
+                Action::Dialog(Dialog::stash_as(StashChoice::Snapshot)),
             ),
             (
                 "Search commits".into(),
