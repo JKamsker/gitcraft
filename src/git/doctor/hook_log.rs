@@ -7,8 +7,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::SystemTime;
 
-/// Most runs kept, in all repositories together.
-const KEPT: usize = 40;
+/// Most runs kept per repository, and in all.
+const KEPT: usize = 12;
+const KEPT_ALL: usize = 60;
 /// Most bytes of output kept per run (the end of it, where a hook's verdict is).
 const MAX_OUTPUT: usize = 16 * 1024;
 
@@ -50,14 +51,21 @@ pub(crate) fn record(dir: Option<&Path>, args: &[&str], ok: bool, stderr: &[u8])
     if !HOOK_COMMANDS.contains(&command) {
         return;
     }
-    let text = String::from_utf8_lossy(stderr);
+    let text = clean(&String::from_utf8_lossy(stderr));
     let text = text.trim();
     if text.is_empty() {
         return;
     }
     let output = tail(text, MAX_OUTPUT);
     if let Ok(mut runs) = RUNS.lock() {
-        if runs.len() == KEPT {
+        // The oldest of this repository's, so one busy repository doesn't push out the
+        // others'; and the oldest of all past the overall limit.
+        if runs.iter().filter(|r| r.repo == dir).count() >= KEPT
+            && let Some(at) = runs.iter().position(|r| r.repo == dir)
+        {
+            runs.remove(at);
+        }
+        if runs.len() >= KEPT_ALL {
             runs.pop_front();
         }
         runs.push_back(Run {
@@ -94,6 +102,57 @@ fn subcommand<'a>(args: &[&'a str]) -> Option<&'a str> {
             [] => return None,
         }
     }
+}
+
+/// `text` as it is shown: colour codes taken out, and the password or token of any
+/// `scheme://user:secret@host` hidden (a hook may echo the remote's URL as configured).
+pub fn clean(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        // CSI sequences: ESC [ … final byte.
+        if c == '\x1b' {
+            if chars.peek() == Some(&'[') {
+                chars.next();
+                for c in chars.by_ref() {
+                    if ('@'..='~').contains(&c) {
+                        break;
+                    }
+                }
+            }
+            continue;
+        }
+        out.push(c);
+    }
+    hide_credentials(&out)
+}
+
+/// `scheme://user:secret@` → `scheme://user:***@`, `scheme://token@` → `scheme://***@`.
+fn hide_credentials(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find("://") {
+        let (before, after) = rest.split_at(at + 3);
+        out.push_str(before);
+        let end = after
+            .find(|c: char| c.is_whitespace() || matches!(c, '/' | '"' | '\'' | '<' | '>'))
+            .unwrap_or(after.len());
+        let authority = &after[..end];
+        match authority.rfind('@') {
+            Some(at) => {
+                let user = &authority[..at];
+                match user.split_once(':') {
+                    Some((name, _)) => out.push_str(&format!("{name}:***")),
+                    None => out.push_str("***"),
+                }
+                out.push_str(&authority[at..]);
+            }
+            None => out.push_str(authority),
+        }
+        rest = &after[end..];
+    }
+    out.push_str(rest);
+    out
 }
 
 /// The last `max` bytes of `text`, on a character boundary, marked as cut.
@@ -134,6 +193,34 @@ mod tests {
         assert_eq!(runs[0].command, "commit");
         assert!(!runs[0].ok);
         assert_eq!(runs[0].output, "pre-commit: lint failed");
+    }
+
+    #[test]
+    fn colours_and_secrets_are_taken_out() {
+        assert_eq!(clean("\x1b[31merror\x1b[0m: x"), "error: x");
+        assert_eq!(
+            clean("To https://ana:s3cret@github.com/o/r.git\n"),
+            "To https://ana:***@github.com/o/r.git\n"
+        );
+        assert_eq!(
+            clean("remote https://ghp_token@host/r and ssh://git@host:22/r"),
+            "remote https://***@host/r and ssh://***@host:22/r"
+        );
+        assert_eq!(clean("no url here"), "no url here");
+        assert_eq!(clean("://@"), "://***@");
+    }
+
+    #[test]
+    fn one_repository_does_not_push_out_the_others() {
+        let busy = PathBuf::from(format!("/hook-log-busy-{}", std::process::id()));
+        let quiet = PathBuf::from(format!("/hook-log-quiet-{}", std::process::id()));
+        record(Some(&quiet), &["commit"], true, b"kept");
+        for i in 0..(KEPT + 5) {
+            record(Some(&busy), &["push"], true, format!("run {i}").as_bytes());
+        }
+        assert_eq!(runs(&busy).len(), KEPT);
+        assert_eq!(runs(&busy)[0].output, format!("run {}", KEPT + 4));
+        assert_eq!(runs(&quiet).len(), 1);
     }
 
     #[test]

@@ -30,17 +30,26 @@ pub(super) fn ui(ui: &mut Ui, state: &HooksState, locked: bool, acts: &mut Vec<A
     match &state.fixed {
         Some(Ok(done)) => {
             ui.add_space(6.0);
-            ui.label(RichText::new(done).color(t.success));
+            ui.add(egui::Label::new(RichText::new(done).color(t.success)).wrap());
         }
         Some(Err(e)) => {
             ui.add_space(6.0);
-            ui.label(RichText::new(e).color(t.danger));
+            ui.add(egui::Label::new(RichText::new(e).color(t.danger)).wrap());
         }
         None => {}
     }
     if let Some(found) = reading(ui, &state.found) {
         folder_card(ui, found);
-        hooks_card(ui, found, state.fixing || locked, acts);
+        if !found.disabled {
+            let why = if state.fixing {
+                Some("A fix is being made")
+            } else if locked {
+                Some("Wait for the running operation")
+            } else {
+                None
+            };
+            hooks_card(ui, found, why, acts);
+        }
     }
     output_card(ui, &state.runs);
 }
@@ -50,7 +59,8 @@ fn folder_card(ui: &mut Ui, found: &Hooks) {
     let t = Tokens::get(ui.ctx());
     card(ui, "Hooks folder", None, |ui| {
         ui.label(code(&found.folder).color(t.text));
-        match &found.hooks_path {
+        match found.hooks_path.as_deref() {
+            Some("") => {}
             Some(path) => dim(
                 ui,
                 format!("Set by core.hooksPath ({path}), instead of .git/hooks."),
@@ -60,36 +70,50 @@ fn folder_card(ui: &mut Ui, found: &Hooks) {
                 "The repository's own (.git/hooks): no core.hooksPath is set.",
             ),
         }
-        if found.missing {
-            ui.label(RichText::new("This folder doesn't exist: no hook runs.").color(t.warning));
-        }
-        if found.samples > 0 {
-            faint(
+        if found.disabled {
+            warn(
                 ui,
-                format!(
-                    "{} .sample files: examples git ships, never run.",
-                    found.samples
-                ),
+                "core.hooksPath is set to nothing: git runs no hook at all. Unset it (Which \
+                 configuration wins) to run the hooks again.",
             );
+        } else if found.missing {
+            let next = if found.hooks_path.is_some() {
+                " Whatever set core.hooksPath (a hook manager?) isn't installed: run its install \
+                 step, or unset core.hooksPath."
+            } else {
+                ""
+            };
+            warn(
+                ui,
+                &format!("This folder doesn't exist (or isn't a folder): no hook runs.{next}"),
+            );
+        }
+        match found.samples {
+            0 => {}
+            1 => faint(ui, "1 .sample file: an example git ships, never run."),
+            n => faint(
+                ui,
+                format!("{n} .sample files: examples git ships, never run."),
+            ),
         }
         for m in &found.managers {
             ui.add_space(4.0);
             ui.horizontal_wrapped(|ui| {
                 widgets::chip(ui, m.label(), t.accent);
-                dim(
-                    ui,
-                    format!(
-                        "manages the hooks here: change them in {}, which it installs from.",
-                        m.configured_in()
-                    ),
-                );
+                dim(ui, format!("manages the hooks here: {}", m.advice()));
             });
         }
     });
 }
 
-/// The active hooks, what runs each, and their problems.
-fn hooks_card(ui: &mut Ui, found: &Hooks, locked: bool, acts: &mut Vec<Action>) {
+fn warn(ui: &mut Ui, text: &str) {
+    let t = Tokens::get(ui.ctx());
+    ui.add(egui::Label::new(RichText::new(text).color(t.warning)).wrap());
+}
+
+/// The active hooks, what runs each, and their problems; the files that never run apart.
+fn hooks_card(ui: &mut Ui, found: &Hooks, locked: Option<&str>, acts: &mut Vec<Action>) {
+    let t = Tokens::get(ui.ctx());
     let title = match found.active.len() {
         0 => "No active hooks".to_owned(),
         1 => "1 hook".to_owned(),
@@ -98,7 +122,6 @@ fn hooks_card(ui: &mut Ui, found: &Hooks, locked: bool, acts: &mut Vec<Action>) 
     card(ui, &title, None, |ui| {
         if found.active.is_empty() {
             faint(ui, "No hook runs: every operation goes ahead without one.");
-            return;
         }
         for (i, hook) in found.active.iter().enumerate() {
             if i > 0 {
@@ -106,13 +129,32 @@ fn hooks_card(ui: &mut Ui, found: &Hooks, locked: bool, acts: &mut Vec<Action>) 
             }
             hook_row(ui, hook, locked, acts);
         }
+        if !found.others.is_empty() {
+            ui.add_space(8.0);
+            ui.label(
+                RichText::new("Other files (never run)")
+                    .font(crate::theme::semibold(12.5))
+                    .color(t.text_dim),
+            );
+            faint(
+                ui,
+                "Git runs no hook of these names: a typo, or a copy kept aside.",
+            );
+            ui.horizontal_wrapped(|ui| {
+                for other in &found.others {
+                    ui.label(code(&other.name).color(t.text_faint));
+                }
+            });
+        }
     });
 }
 
-fn hook_row(ui: &mut Ui, hook: &Hook, locked: bool, acts: &mut Vec<Action>) {
+fn hook_row(ui: &mut Ui, hook: &Hook, locked: Option<&str>, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
+    // The path it is fixed by: a husky script's from the top, else its name in the folder.
+    let target = hook.file.clone().unwrap_or_else(|| hook.name.clone());
     ui.horizontal_wrapped(|ui| {
-        ui.label(code(&hook.name).color(t.text));
+        ui.label(code(&target).color(t.text));
         if let Some(on) = hook.runs_on {
             ui.label(RichText::new(format!("runs on {on}")).color(t.text_dim));
         }
@@ -125,25 +167,20 @@ fn hook_row(ui: &mut Ui, hook: &Hook, locked: bool, acts: &mut Vec<Action>) {
     });
     for problem in &hook.problems {
         ui.horizontal_wrapped(|ui| {
-            let color = match problem {
-                Problem::UnknownName => t.text_faint,
-                _ => t.warning,
-            };
-            ui.add(egui::Label::new(RichText::new(problem.describe()).color(color)).wrap());
+            ui.add(egui::Label::new(RichText::new(problem.describe()).color(t.warning)).wrap());
             let fix = match problem {
-                Problem::NotExecutable => Some((
-                    "Make executable",
-                    HooksAct::MakeExecutable(hook.name.clone()),
-                )),
+                Problem::NotExecutable => {
+                    Some(("Make executable", HooksAct::MakeExecutable(target.clone())))
+                }
                 Problem::CrlfShebang | Problem::CrlfLines => {
-                    Some(("Convert to LF", HooksAct::ToLf(hook.name.clone())))
+                    Some(("Convert to LF", HooksAct::ToLf(target.clone())))
                 }
                 _ => None,
             };
             if let Some((label, a)) = fix
                 && ui
-                    .add_enabled(!locked, egui::Button::new(label))
-                    .on_disabled_hover_text("Wait for the running operation")
+                    .add_enabled(locked.is_none(), egui::Button::new(label))
+                    .on_disabled_hover_text(locked.unwrap_or_default())
                     .clicked()
             {
                 acts.push(act(a));
@@ -152,21 +189,23 @@ fn hook_row(ui: &mut Ui, hook: &Hook, locked: bool, acts: &mut Vec<Action>) {
     }
 }
 
-/// What the commands that run hooks printed in this session.
+/// What the commands that run hooks printed.
 fn output_card(ui: &mut Ui, runs: &[Run]) {
     let t = Tokens::get(ui.ctx());
     card(
         ui,
         "Output of the last operations",
         Some(
-            "What git and its hooks printed while committing, merging, pushing, checking out… \
-             in this repository since gitcraft started. Kept in memory only.",
+            "What git and its hooks printed during the last operations gitcraft ran in this \
+             repository (commit, merge, push, checkout…), the last dozen. Kept in memory only, \
+             with passwords in URLs hidden.",
         ),
         |ui| {
             if runs.is_empty() {
                 faint(
                     ui,
-                    "Nothing yet: no operation that runs hooks printed anything.",
+                    "Nothing yet: no operation gitcraft ran that runs hooks printed anything \
+                     (what runs in the terminal isn't kept).",
                 );
                 return;
             }

@@ -53,7 +53,7 @@ impl Section {
     fn icon(self) -> &'static str {
         match self {
             Section::Ignore => "eye",
-            Section::Hooks => "flask-conical",
+            Section::Hooks => "git-merge",
             Section::Config => "settings",
             Section::Flags => "eye-off",
         }

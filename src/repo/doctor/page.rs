@@ -19,6 +19,7 @@ impl RepoTab {
     pub(in crate::repo) fn doctor_ui(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let ctx = ui.ctx().clone();
         self.doctor_poll(&ctx);
+        self.hooks_poll();
         let busy = self.busy_op.is_some();
         let Some(doctor) = self.doctor.as_deref_mut() else {
             return;

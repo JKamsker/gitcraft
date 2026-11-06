@@ -16,10 +16,13 @@ pub const KNOWN: &[(&str, &str)] = &[
     ("pre-applypatch", "git am"),
     ("post-applypatch", "git am"),
     ("pre-commit", "git commit"),
-    ("pre-merge-commit", "git merge"),
-    ("prepare-commit-msg", "git commit, merge"),
+    ("pre-merge-commit", "git merge, pull"),
+    (
+        "prepare-commit-msg",
+        "git commit, merge, cherry-pick, revert, rebase",
+    ),
     ("commit-msg", "git commit, merge"),
-    ("post-commit", "git commit"),
+    ("post-commit", "git commit, cherry-pick, revert, rebase"),
     ("pre-rebase", "git rebase"),
     ("post-checkout", "git checkout, switch, clone, worktree add"),
     ("post-merge", "git merge, pull"),
@@ -62,27 +65,31 @@ pub enum Problem {
     MissingInterpreter(String),
     /// Git runs no hook of that name (a typo, a backup such as `pre-commit.old`).
     UnknownName,
+    /// A folder with a hook's name: git tries to run it, and the operation fails.
+    IsFolder,
 }
 
 impl Problem {
     pub fn describe(&self) -> String {
         match self {
-            Problem::NotExecutable => {
-                "Not executable: git skips it. Make it executable (chmod +x).".to_owned()
-            }
+            Problem::NotExecutable => "Not executable: git skips it, prints a hint and goes \
+                                       ahead without it. Make it executable (chmod +x)."
+                .to_owned(),
+            Problem::IsFolder => "A folder with a hook's name: git tries to run it and the \
+                                  operation fails (\"cannot exec … Permission denied\"). Remove or \
+                                  rename it."
+                .to_owned(),
             Problem::CrlfShebang => "Its #! line ends in CRLF: the system looks for an \
-                                     interpreter whose name ends in a carriage return, and \
-                                     the hook fails with \"bad interpreter\". Save it with LF \
-                                     line endings."
+                                     interpreter whose name ends in a carriage return, and git \
+                                     fails with \"cannot exec … No such file or directory\". \
+                                     Save it with LF line endings."
                 .to_owned(),
-            Problem::CrlfLines => "CRLF line endings: shells read the carriage returns as part \
-                                   of each command. Save it with LF line endings."
+            Problem::CrlfLines => "CRLF line endings near the top: the shell reads the carriage \
+                                   returns as part of each command. Save it with LF line endings."
                 .to_owned(),
-            Problem::NoShebang => {
-                "No #! line: it may not run at all. Start it with #!/bin/sh (or the interpreter it \
-                 needs)."
-                    .to_owned()
-            }
+            Problem::NoShebang => "No #! line: Git for Windows can't tell what runs it. Start it \
+                                   with #!/bin/sh (or the interpreter it needs)."
+                .to_owned(),
             Problem::MissingInterpreter(i) => {
                 format!("Its interpreter, {i}, isn't installed where git runs.")
             }
@@ -98,6 +105,9 @@ impl Problem {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Hook {
     pub name: String,
+    /// Where it is when not in the hooks folder itself (`.husky/pre-commit`, which husky's
+    /// stub of that name runs).
+    pub file: Option<String>,
     /// What runs it, `None` for a name git doesn't know.
     pub runs_on: Option<&'static str>,
     /// The interpreter its `#!` line names (`sh`, `node`, `python3`…).
@@ -122,12 +132,18 @@ impl Manager {
         }
     }
 
-    /// Where its own configuration is, which is what to change rather than the hooks.
-    pub fn configured_in(self) -> &'static str {
+    /// What to change rather than the hooks it writes.
+    pub fn advice(self) -> &'static str {
         match self {
-            Manager::Husky => ".husky/ (and package.json's prepare script)",
-            Manager::Lefthook => "lefthook.yml",
-            Manager::PreCommit => ".pre-commit-config.yaml",
+            Manager::Husky => {
+                "the hooks in .husky/_ are husky's stubs, rewritten on install: \
+                               edit the scripts in .husky/ (checked below)."
+            }
+            Manager::Lefthook => "edit lefthook.yml; lefthook install writes the hooks again.",
+            Manager::PreCommit => {
+                "edit .pre-commit-config.yaml; its hooks read it each time \
+                                   they run."
+            }
         }
     }
 }
@@ -139,9 +155,14 @@ pub struct Hooks {
     pub folder: String,
     /// `core.hooksPath` when it is set (else the folder is `.git/hooks`).
     pub hooks_path: Option<String>,
-    /// The folder doesn't exist.
+    /// The folder doesn't exist (or isn't a folder).
     pub missing: bool,
+    /// `core.hooksPath` is set to nothing: git runs no hook at all.
+    pub disabled: bool,
+    /// The files git runs as hooks (a hook's name), and the scripts husky's stubs run.
     pub active: Vec<Hook>,
+    /// Other files of the folder (`pre-commit.old`, typos): never run.
+    pub others: Vec<Hook>,
     /// How many `.sample` files there are (never run).
     pub samples: usize,
     pub managers: Vec<Manager>,
@@ -151,6 +172,8 @@ pub struct Hooks {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Scanned {
     pub name: String,
+    /// A folder (only listed for a hook's name).
+    pub folder: bool,
     pub executable: bool,
     /// Its first bytes.
     pub head: Vec<u8>,
@@ -164,16 +187,34 @@ pub fn hooks(repo: &Path) -> Result<Hooks, String> {
     let printed = run(Some(repo), &["rev-parse", "--git-path", "hooks"])
         .map_err(|e| format!("Could not find the hooks folder: {e}"))?;
     let folder = printed.trim_end_matches(['\n', '\r']).to_owned();
+    // Unset (`None`) and set to nothing (hooks turned off) are told apart.
     let hooks_path = run(Some(repo), &["config", "--get", "core.hooksPath"])
         .ok()
-        .map(|v| v.trim_end_matches(['\n', '\r']).to_owned())
-        .filter(|v| !v.is_empty());
+        .map(|v| v.trim_end_matches(['\n', '\r']).to_owned());
+    if hooks_path.as_deref() == Some("") {
+        return Ok(Hooks {
+            folder,
+            hooks_path,
+            disabled: true,
+            ..Hooks::default()
+        });
+    }
     let location = crate::remote::resolve(repo, &folder);
     let scanned = scan(&location)?;
     let missing = scanned.is_none();
     let scanned = scanned.unwrap_or_default();
+    let managers = managers(repo, &folder, hooks_path.as_deref(), &scanned);
+    // husky's stubs (`.husky/_/pre-commit`) run `.husky/pre-commit`: those are checked too.
+    let husky_scripts = if folder.trim_end_matches('/').ends_with(".husky/_") {
+        let parent =
+            crate::remote::resolve(repo, folder.trim_end_matches('/').trim_end_matches("/_"));
+        scan(&parent)?.unwrap_or_default()
+    } else {
+        Vec::new()
+    };
     let interpreters: Vec<String> = scanned
         .iter()
+        .chain(&husky_scripts)
         .filter_map(|s| interpreter(&s.head))
         .collect();
     let found = installed(&location, &interpreters);
@@ -181,20 +222,43 @@ pub fn hooks(repo: &Path) -> Result<Hooks, String> {
         .iter()
         .filter(|s| s.name.ends_with(".sample"))
         .count();
-    let active = scanned
+    let exec_counts = executable_bit_counts(repo);
+    let (active, others) = scanned
         .iter()
-        .filter(|s| !s.name.ends_with(".sample"))
-        .map(|s| check(s, &found, executable_bit_counts(repo)))
-        .collect();
-    let managers = managers(repo, &folder, hooks_path.as_deref(), &scanned);
+        .filter(|s| !s.name.ends_with(".sample") && !helper_file(&s.name))
+        .map(|s| check(s, &found, exec_counts))
+        .partition(|h| h.runs_on.is_some());
+    let mut active: Vec<Hook> = active;
+    let husky_dir = folder
+        .trim_end_matches('/')
+        .trim_end_matches("/_")
+        .to_owned();
+    for script in husky_scripts
+        .iter()
+        .filter(|s| runs_on(&s.name).is_some() && !s.folder)
+    {
+        // husky runs them with `sh -e`: neither the bit nor a #! line matters.
+        let mut hook = check(script, &found, false);
+        hook.problems.retain(|p| !matches!(p, Problem::NoShebang));
+        hook.file = Some(format!("{husky_dir}/{}", script.name));
+        active.push(hook);
+    }
     Ok(Hooks {
         folder,
         hooks_path,
         missing,
+        disabled: false,
         active,
+        others,
         samples,
         managers,
     })
+}
+
+/// Files hook managers keep beside the hooks, which aren't hooks (husky's `h` and
+/// `husky.sh`), and hidden files (husky's `.gitignore`).
+fn helper_file(name: &str) -> bool {
+    name.starts_with('.') || matches!(name, "h" | "husky.sh")
 }
 
 /// Whether git looks at the executable bit where it runs: everywhere but Windows (Git for
@@ -203,38 +267,61 @@ fn executable_bit_counts(repo: &Path) -> bool {
     cfg!(unix) || crate::remote::is_remote(repo)
 }
 
-/// The problems of one scanned file.
+/// The problems of one scanned file. `exec_counts`: git looks at the executable bit where it
+/// runs (everywhere but Git for Windows, which also needs a `#!` line to run a script).
 pub fn check(s: &Scanned, installed: &[String], exec_counts: bool) -> Hook {
-    let mut problems = Vec::new();
     let runs_on = runs_on(&s.name);
-    if runs_on.is_none() {
-        problems.push(Problem::UnknownName);
-    }
-    if exec_counts && !s.executable {
-        problems.push(Problem::NotExecutable);
-    }
-    let first_line_end = s.head.iter().position(|&b| b == b'\n');
     let interpreter = interpreter(&s.head);
-    if s.head.starts_with(b"#!") {
-        if first_line_end.is_some_and(|end| end > 0 && s.head[end - 1] == b'\r') {
-            problems.push(Problem::CrlfShebang);
-        } else if s.head.windows(2).any(|w| w == b"\r\n") {
-            problems.push(Problem::CrlfLines);
+    let mut problems = Vec::new();
+    if runs_on.is_none() {
+        // Never run: nothing else about it matters.
+        problems.push(Problem::UnknownName);
+    } else if s.folder {
+        problems.push(Problem::IsFolder);
+    } else {
+        if exec_counts && !s.executable {
+            problems.push(Problem::NotExecutable);
         }
-    } else if !s.head.is_empty() {
-        problems.push(Problem::NoShebang);
-    }
-    if let Some(i) = &interpreter
-        && !installed.contains(i)
-    {
-        problems.push(Problem::MissingInterpreter(i.clone()));
+        let first_line_end = s.head.iter().position(|&b| b == b'\n');
+        if s.head.starts_with(b"#!") {
+            let shell = interpreter.as_deref().is_none_or(is_shell);
+            if first_line_end.is_some_and(|end| end > 0 && s.head[end - 1] == b'\r') {
+                problems.push(Problem::CrlfShebang);
+            } else if shell && s.head.windows(2).any(|w| w == b"\r\n") {
+                problems.push(Problem::CrlfLines);
+            }
+        } else if !exec_counts && !s.head.is_empty() && !is_binary(&s.head) {
+            // Elsewhere git runs a script without one with /bin/sh.
+            problems.push(Problem::NoShebang);
+        }
+        if let Some(i) = &interpreter
+            && !installed.contains(i)
+        {
+            problems.push(Problem::MissingInterpreter(i.clone()));
+        }
     }
     Hook {
         name: s.name.clone(),
+        file: None,
         runs_on,
         interpreter,
         problems,
     }
+}
+
+/// A shell, which reads a carriage return as part of a command (`node`, `python` don't care).
+fn is_shell(program: &str) -> bool {
+    let name = program.rsplit('/').next().unwrap_or(program);
+    matches!(name, "sh" | "bash" | "dash" | "zsh" | "ksh" | "ash")
+}
+
+/// A compiled program: ELF, Mach-O (both orders, universal) or a Windows executable.
+fn is_binary(head: &[u8]) -> bool {
+    head.starts_with(b"\x7fELF")
+        || head.starts_with(&[0xcf, 0xfa, 0xed, 0xfe])
+        || head.starts_with(&[0xfe, 0xed, 0xfa, 0xcf])
+        || head.starts_with(&[0xca, 0xfe, 0xba, 0xbe])
+        || head.starts_with(b"MZ")
 }
 
 /// The program a `#!` line names: the one `env` is told to find (`#!/usr/bin/env node` →
@@ -247,8 +334,20 @@ pub fn interpreter(head: &[u8]) -> Option<String> {
     let mut words = line.trim_end_matches('\r').split_whitespace();
     let program = words.next()?;
     if program.ends_with("/env") {
-        // `env -S x y` and `env x`.
-        words.find(|w| !w.starts_with('-')).map(str::to_owned)
+        // `env x`, `env -S x y`, `env -S VAR=1 x`, `env -u NAME x`.
+        let mut skip_next = false;
+        words
+            .find(|w| {
+                if std::mem::take(&mut skip_next) {
+                    return false;
+                }
+                if matches!(*w, "-u" | "--unset" | "-C" | "--chdir") {
+                    skip_next = true;
+                    return false;
+                }
+                !w.starts_with('-') && !w.contains('=')
+            })
+            .map(str::to_owned)
     } else {
         Some(program.to_owned())
     }
@@ -265,7 +364,15 @@ fn scan(location: &Path) -> Result<Option<Vec<Scanned>>, String> {
 fn scan_here(dir: &Path) -> Result<Option<Vec<Scanned>>, String> {
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        // Gone, or not a folder (`core.hooksPath=/dev/null`): no hook runs.
+        Err(e)
+            if matches!(
+                e.kind(),
+                std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
+            ) =>
+        {
+            return Ok(None);
+        }
         Err(e) => return Err(format!("Could not read {}: {e}", dir.display())),
     };
     let mut out = Vec::new();
@@ -275,12 +382,20 @@ fn scan_here(dir: &Path) -> Result<Option<Vec<Scanned>>, String> {
         let Ok(meta) = std::fs::metadata(&path) else {
             continue;
         };
-        if !meta.is_file() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let folder = meta.is_dir();
+        // A folder matters only when git would try to run it.
+        if !meta.is_file() && !(folder && runs_on(&name).is_some()) {
             continue;
         }
-        let head = read_head(&path).unwrap_or_default();
+        let head = if folder {
+            Vec::new()
+        } else {
+            read_head(&path).unwrap_or_default()
+        };
         out.push(Scanned {
-            name: entry.file_name().to_string_lossy().into_owned(),
+            name,
+            folder,
             executable: is_executable(&meta),
             head,
         });
@@ -301,7 +416,8 @@ fn read_head(path: &Path) -> std::io::Result<Vec<u8>> {
 #[cfg(unix)]
 fn is_executable(meta: &std::fs::Metadata) -> bool {
     use std::os::unix::fs::PermissionsExt;
-    meta.permissions().mode() & 0o111 != 0
+    // The owner's bit: gitcraft runs git as the files' owner.
+    meta.permissions().mode() & 0o100 != 0
 }
 
 #[cfg(not(unix))]
@@ -315,11 +431,13 @@ fn scan_there(t: &crate::remote::Target) -> Result<Option<Vec<Scanned>>, String>
     let script = format!(
         concat!(
             "cd {} 2>/dev/null || exit 3\n",
+            "command -v base64 >/dev/null 2>&1 || {{ echo 'base64 is missing' >&2; exit 4; }}\n",
             "for f in * .[!.]*; do\n",
-            "  [ -f \"$f\" ] || continue\n",
+            "  [ -e \"$f\" ] || continue\n",
+            "  d=0; [ -d \"$f\" ] && d=1\n",
             "  x=0; [ -x \"$f\" ] && x=1\n",
-            "  printf '%s\\n%s\\n' \"$(printf '%s' \"$f\" | base64 | tr -d '\\n')\" \"$x\"\n",
-            "  head -c {} \"$f\" | base64 | tr -d '\\n'; printf '\\n'\n",
+            "  printf '%s\\n%s%s\\n' \"$(printf '%s' \"$f\" | base64 | tr -d '\\n')\" \"$d\" \"$x\"\n",
+            "  if [ $d = 0 ]; then head -c {} < \"$f\" | base64 | tr -d '\\n'; fi; printf '\\n'\n",
             "done\n",
         ),
         crate::remote::sh_path(&t.path),
@@ -343,8 +461,9 @@ fn scan_there(t: &crate::remote::Target) -> Result<Option<Vec<Scanned>>, String>
     }
 }
 
-/// Reads what [`scan_there`]'s script prints: per file three lines, its name in base64,
-/// `1` or `0` for executable, its first bytes in base64.
+/// Reads what [`scan_there`]'s script prints: per entry three lines, its name in base64, two
+/// digits (a folder, executable), its first bytes in base64. Folders are kept only with a
+/// hook's name.
 pub fn parse_scan(out: &str) -> Vec<Scanned> {
     let b64 = base64::engine::general_purpose::STANDARD;
     let lines: Vec<&str> = out.lines().collect();
@@ -352,9 +471,14 @@ pub fn parse_scan(out: &str) -> Vec<Scanned> {
         .chunks_exact(3)
         .filter_map(|c| {
             let name = String::from_utf8(b64.decode(c[0]).ok()?).ok()?;
+            let folder = c[1].starts_with('1');
+            if folder && runs_on(&name).is_none() {
+                return None;
+            }
             Some(Scanned {
                 name,
-                executable: c[1] == "1",
+                folder,
+                executable: c[1].ends_with('1'),
                 head: b64.decode(c[2]).unwrap_or_default(),
             })
         })
@@ -383,7 +507,15 @@ fn installed_here(program: &str) -> bool {
         // Git for Windows maps /bin/sh, /usr/bin/… onto its own: not checked there.
         return cfg!(windows) || Path::new(program).is_file();
     }
-    let Some(paths) = std::env::var_os("PATH") else {
+    // Git for Windows runs hooks with its own sh, bash and perl, which needn't be on PATH.
+    if cfg!(windows) && matches!(program, "sh" | "bash" | "perl") {
+        return true;
+    }
+    // The PATH git is run with (on macOS, the login shell's).
+    let Some(paths) = crate::shell_path::path()
+        .cloned()
+        .or_else(|| std::env::var_os("PATH"))
+    else {
         return false;
     };
     let names: Vec<String> = if cfg!(windows) {
@@ -427,6 +559,11 @@ fn installed_there(t: &crate::remote::Target, wanted: &[&String]) -> Vec<String>
 /// Fixes a hook that isn't executable (`chmod +x`), on whichever machine it is.
 pub fn make_executable(file: &Path) -> Result<(), String> {
     let failed = |e: String| format!("Could not make {} executable: {e}", file.display());
+    if crate::remote::try_is_link(file).map_err(|e| failed(e.to_string()))? {
+        return Err(failed(
+            "it is a symbolic link: change the file it points to".to_owned(),
+        ));
+    }
     match crate::remote::parse(file) {
         Some(t) => {
             let out = crate::remote::exec(
@@ -555,6 +692,7 @@ mod tests {
     fn scanned(name: &str, executable: bool, head: &[u8]) -> Scanned {
         Scanned {
             name: name.into(),
+            folder: false,
             executable,
             head: head.to_vec(),
         }
@@ -569,6 +707,14 @@ mod tests {
             Some("python3".into())
         );
         assert_eq!(interpreter(b"#! /bin/bash\r\n"), Some("/bin/bash".into()));
+        assert_eq!(
+            interpreter(b"#!/usr/bin/env -S VAR=1 node\n"),
+            Some("node".into())
+        );
+        assert_eq!(
+            interpreter(b"#!/usr/bin/env -u X node\n"),
+            Some("node".into())
+        );
         assert_eq!(interpreter(b"echo hi\n"), None);
         assert_eq!(interpreter(b"#!\n"), None);
         assert_eq!(interpreter(b""), None);
@@ -626,25 +772,49 @@ mod tests {
             true,
         );
         assert_eq!(old.problems, [Problem::UnknownName]);
-        let bare = check(&scanned("post-merge", true, b"echo hi\n"), &[], true);
+        // Without a #! line git runs it with /bin/sh; Git for Windows can't.
+        let sh = check(&scanned("post-merge", true, b"echo hi\n"), &[], true);
+        assert!(sh.problems.is_empty());
+        let bare = check(&scanned("post-merge", true, b"echo hi\n"), &[], false);
         assert_eq!(bare.problems, [Problem::NoShebang]);
+        // A compiled program needs none.
+        let elf = check(&scanned("post-merge", true, b"\x7fELF\x02"), &[], false);
+        assert!(elf.problems.is_empty());
+        // CRLF below the #! line only matters to a shell.
+        let node = check(
+            &scanned("pre-push", true, b"#!/usr/bin/env node\nx\r\n"),
+            &["node".into()],
+            true,
+        );
+        assert!(node.problems.is_empty());
+        // A name git never runs: only that is said, whatever else is wrong with it.
+        let other = check(&scanned(".gitignore", false, b"*\r\n"), &[], true);
+        assert_eq!(other.problems, [Problem::UnknownName]);
+        let folder = Scanned {
+            folder: true,
+            ..scanned("pre-commit", true, b"")
+        };
+        assert_eq!(check(&folder, &[], true).problems, [Problem::IsFolder]);
     }
 
     #[test]
     fn the_remote_scan_is_read() {
         let b64 = base64::engine::general_purpose::STANDARD;
         let out = format!(
-            "{}\n1\n{}\n{}\n0\n\nbroken\n",
+            "{}\n01\n{}\n{}\n00\n\n{}\n11\n\n{}\n11\n\nbroken\n",
             b64.encode("pré commit"),
             b64.encode(b"#!/bin/sh\n"),
             b64.encode("empty"),
+            b64.encode("zz-folder"),
+            b64.encode("pre-push"),
         );
         let list = parse_scan(&out);
-        assert_eq!(list.len(), 2);
-        assert_eq!(list[0].name, "empty");
-        assert!(!list[0].executable && list[0].head.is_empty());
-        assert_eq!(list[1].name, "pré commit");
-        assert_eq!(list[1].head, b"#!/bin/sh\n");
+        // The folder named as a hook is kept, the other one isn't.
+        assert_eq!(list.len(), 3);
+        assert!(list.iter().any(|s| s.name == "pre-push" && s.folder));
+        let named = |n: &str| list.iter().find(|s| s.name == n);
+        assert!(named("empty").is_some_and(|s| !s.executable && s.head.is_empty()));
+        assert!(named("pré commit").is_some_and(|s| s.executable && s.head == b"#!/bin/sh\n"));
         assert!(parse_scan("").is_empty());
     }
 

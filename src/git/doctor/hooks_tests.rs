@@ -51,9 +51,11 @@ fn hooks_and_their_problems_are_found() -> Result<(), String> {
             found
                 .active
                 .iter()
+                .chain(&found.others)
                 .find(|h| h.name == name)
                 .map(|h| h.problems.clone())
         };
+        assert!(found.others.iter().all(|h| h.runs_on.is_none()));
         assert_eq!(problems("pre-commit"), Some(Vec::new()));
         assert_eq!(problems("commit-msg"), Some(vec![Problem::CrlfShebang]));
         if cfg!(unix) {
@@ -119,9 +121,17 @@ fn a_hooks_path_and_its_manager() -> Result<(), String> {
         git(&dir, &["config", "core.hooksPath", ".husky/_"])?;
         let found = hooks::hooks(&dir)?;
         assert_eq!(found.hooks_path.as_deref(), Some(".husky/_"));
-        // Not made yet (husky makes it on install): said so, not an error.
-        assert!(found.missing && found.active.is_empty());
+        // Not made yet (husky makes it on install): said so, not an error. The script husky's
+        // stub would run is checked all the same.
+        assert!(found.missing);
         assert_eq!(found.managers, [Manager::Husky]);
+        let script = found.active.iter().find(|h| h.name == "pre-commit");
+        assert!(
+            script.is_some_and(
+                |h| h.file.as_deref() == Some(".husky/pre-commit") && h.problems.is_empty()
+            ),
+            "{found:?}"
+        );
 
         git(&dir, &["config", "core.hooksPath", "my hooks"])?;
         hook(
@@ -135,6 +145,37 @@ fn a_hooks_path_and_its_manager() -> Result<(), String> {
         assert!(!found.missing);
         assert_eq!(found.active.len(), 1);
         assert!(found.managers.contains(&Manager::PreCommit));
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}
+
+#[test]
+fn hooks_turned_off_and_a_folder_named_as_a_hook() -> Result<(), String> {
+    let dir = repo("hooks-off", &[("README.md", b"x\n")])?;
+    let result = (|| {
+        // Set to nothing: git runs no hook, and the work tree isn't taken for a hooks folder.
+        git(&dir, &["config", "core.hooksPath", ""])?;
+        let off = hooks::hooks(&dir)?;
+        assert!(
+            off.disabled && off.active.is_empty() && off.others.is_empty(),
+            "{off:?}"
+        );
+        // Not a folder: no hook runs, not an error.
+        if cfg!(unix) {
+            git(&dir, &["config", "core.hooksPath", "/dev/null"])?;
+            let null = hooks::hooks(&dir)?;
+            assert!(null.missing && !null.disabled);
+        }
+        git(&dir, &["config", "--unset", "core.hooksPath"])?;
+        std::fs::create_dir_all(dir.join(".git/hooks/pre-commit")).map_err(|e| e.to_string())?;
+        let found = hooks::hooks(&dir)?;
+        let folder = found.active.iter().find(|h| h.name == "pre-commit");
+        assert_eq!(
+            folder.map(|h| h.problems.clone()),
+            Some(vec![Problem::IsFolder])
+        );
         Ok(())
     })();
     let _ = std::fs::remove_dir_all(&dir);
