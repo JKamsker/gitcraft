@@ -175,6 +175,9 @@ impl RepoTab {
         if ui.button("Copy name").clicked() {
             ui.ctx().copy_text(b.name.clone());
         }
+        if let Some((menu, target)) = self.branch_link_menu(&b.name) {
+            menu.items(ui, "branch", &target, acts);
+        }
         ui.separator();
         self.visibility_items(ui, acts, &remote_ref(&b.name), false);
         ui.separator();

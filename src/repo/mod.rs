@@ -15,6 +15,7 @@ mod dialogs;
 mod diff;
 mod file_text;
 mod file_view;
+mod forge_link;
 mod graph_view;
 mod highlight;
 mod keep_submodules;

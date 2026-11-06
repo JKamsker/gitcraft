@@ -4,6 +4,7 @@
 use egui::{FontId, Galley, Pos2, Rect, Sense, Stroke, Ui, pos2, vec2};
 
 use super::jump::{change_at, offset_of};
+use super::link::{LineLinks, note_right_click};
 use super::map::change_map;
 use super::paint::{filler, hunk_button, paint_line};
 use super::select::{Hit, Side, TextSel, copy_selection, drag_selection};
@@ -45,6 +46,8 @@ pub(super) struct Rows<'a> {
     /// Each with whether the pointer is over that line's half, not only at its height.
     pointer_hits: Vec<(Hit, bool)>,
     text_hover: bool,
+    /// Where the lines' menu links to, for a commit's diff.
+    pub(super) links: Option<&'a LineLinks<'a>>,
 }
 
 impl<'a> Rows<'a> {
@@ -80,6 +83,7 @@ impl<'a> Rows<'a> {
             press_hit: None,
             pointer_hits: Vec::new(),
             text_hover: false,
+            links: None,
         }
     }
 
@@ -191,7 +195,21 @@ impl<'a> Rows<'a> {
         if self.text_hover || text_drag.dragged() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::Text);
         }
-        copy_selection(ui, &text_drag, sel, &data.lines, &data.uncut);
+        if text_drag.secondary_clicked() {
+            let hit = self
+                .pointer_hits
+                .iter()
+                .find(|(_, over)| *over)
+                .or(self.pointer_hits.first())
+                .map(|&((i, side, _), _)| (i, side));
+            note_right_click(ui, path, hit);
+        }
+        let links = self.links;
+        copy_selection(ui, &text_drag, sel, &data.lines, &data.uncut, |ui| {
+            if let Some(links) = links {
+                links.items(ui, &data.lines, sel, acts);
+            }
+        });
         sel
     }
 
