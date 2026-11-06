@@ -85,6 +85,8 @@ pub struct RunSummary {
     pub failed: Vec<(String, String)>,
     /// It was stopped before testing them all.
     pub stopped: bool,
+    /// A scratch worktree couldn't be removed afterwards: why.
+    pub cleanup: Option<String>,
 }
 
 /// Stops a run (every command it has going, and those it would start), from any thread.
@@ -266,7 +268,7 @@ pub fn run_tests(
     }
     // Made empty, at a commit that is there: each test checks its own out.
     let Some(start) = queue.iter().find(|j| is_commit(repo, &j.commit)) else {
-        return Err("none of the commits to test is in the repository".to_owned());
+        return Err("None of the commits to test is in the repository".to_owned());
     };
     let start = start.commit.clone();
     let mut scratches = Vec::new();
@@ -303,9 +305,7 @@ pub fn run_tests(
         .into_inner()
         .map_err(|_| "a test worker failed".to_owned())?;
     summary.stopped = stop.stopped();
-    if let Some(e) = cleanup.into_iter().next() {
-        summary.failed.push((String::new(), e));
-    }
+    summary.cleanup = cleanup.into_iter().next();
     Ok(summary)
 }
 

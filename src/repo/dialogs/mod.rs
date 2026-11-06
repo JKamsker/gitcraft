@@ -301,6 +301,7 @@ impl RepoTab {
             Some(target) => format!("on {}", target.host.label()),
             None => "on this machine".to_owned(),
         };
+        let is_remote = crate::remote::is_remote(&self.path);
         let Some(dialog) = &mut self.dialog else {
             return;
         };
@@ -438,9 +439,15 @@ impl RepoTab {
                     start,
                     stored,
                     focus,
-                } => {
-                    test_commits::test_commits(ui, enter, &machine, start, stored.as_deref(), focus)
-                }
+                } => test_commits::test_commits(
+                    ui,
+                    enter,
+                    &machine,
+                    is_remote,
+                    start,
+                    stored.as_deref(),
+                    focus,
+                ),
                 Dialog::Confirm {
                     title,
                     body,

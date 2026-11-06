@@ -335,31 +335,64 @@ fn a_huge_range_is_refused() -> Result<(), String> {
     Ok(())
 }
 
-/// A scratch worktree left by a gitcraft that is gone is removed when the next is made.
+/// A scratch worktree left by a gitcraft of this machine that is gone is removed when the
+/// next is made; a worktree of the user's in a folder that happens to have the same name, or
+/// one named otherwise in the scratch folder, never is.
 #[test]
-fn worktrees_left_by_a_crash_are_swept() -> Result<(), String> {
+fn worktrees_left_by_a_crash_are_swept_and_nothing_else() -> Result<(), String> {
     let (repo, _) = branch_with_a_break("sweep", 1, 9)?;
-    let common = common_dir(repo.path())?;
+    let root = scratch_root(repo.path())?;
+    let me = super::scratch::tests_machine();
     // A process that can't be running: pid numbers stop well before this.
-    let left = common.join(SCRATCH_DIR).join("test-4000000000-0");
-    repo.git(&[
-        "worktree",
-        "add",
-        "-q",
-        "--detach",
-        &left.to_string_lossy(),
-        "main",
-    ])?;
-    assert_eq!(repo.worktree_count()?, 2);
-    // Hidden from the worktrees the window lists.
-    assert_eq!(git::worktree_list(repo.path(), None)?.len(), 1);
+    let left = root.join(format!("test-{me}-4000000000-0"));
+    let other_machine = root.join("test-elsewhere-4000000000-1");
+    let odd = root.join("wip");
+    let users = repo
+        .path()
+        .with_extension("mine")
+        .join(SCRATCH_DIR)
+        .join("wip");
+    for path in [&left, &other_machine, &odd, &users] {
+        repo.git(&[
+            "worktree",
+            "add",
+            "-q",
+            "--detach",
+            &path.to_string_lossy(),
+            "main",
+        ])?;
+    }
+    std::fs::write(users.join("precious.txt"), "keep me").map_err(|e| e.to_string())?;
+    assert_eq!(repo.worktree_count()?, 5);
+    // gitcraft's own are hidden from the worktrees the window lists; the user's aren't.
+    assert_eq!(git::worktree_list(repo.path(), None)?.len(), 3);
     let scratch = Scratch::add_empty(repo.path(), "test", "main")?;
-    assert_eq!(repo.worktree_count()?, 2);
+    // The left-over one went; the new one is out of the user's checkout.
+    assert_eq!(repo.worktree_count()?, 5);
+    assert!(!scratch.path.starts_with(repo.path()));
+    assert!(users.join("precious.txt").exists());
     scratch.remove()?;
-    assert_eq!(repo.worktree_count()?, 1);
+    assert_eq!(repo.worktree_count()?, 4);
     // Dropped without being removed, it goes too.
     drop(Scratch::add_empty(repo.path(), "test", "main")?);
-    assert_eq!(repo.worktree_count()?, 1);
+    assert_eq!(repo.worktree_count()?, 4);
+    let _ = std::fs::remove_dir_all(repo.path().with_extension("mine"));
+    for path in [&other_machine, &odd] {
+        repo.git(&["worktree", "remove", "--force", &path.to_string_lossy()])?;
+    }
+    Ok(())
+}
+
+/// A test at an old commit doesn't see the files of the user's checkout: nothing of it is in
+/// a parent folder of the scratch worktree.
+#[test]
+fn a_test_does_not_see_the_user_s_checkout() -> Result<(), String> {
+    let (repo, _) = branch_with_a_break("leak", 2, 9)?;
+    std::fs::write(repo.path().join("only-in-checkout.txt"), "x").map_err(|e| e.to_string())?;
+    let command = "d=$(pwd); while [ \"$d\" != / ]; do test ! -e \"$d/only-in-checkout.txt\" || exit 1; \
+                   d=$(dirname \"$d\"); done";
+    let (summary, _) = run_branch(&repo, &plan(command, 1))?;
+    assert_eq!((summary.good, summary.bad), (2, 0));
     Ok(())
 }
 

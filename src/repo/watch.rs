@@ -138,7 +138,8 @@ pub(super) fn fs_change(path: &Path, git_dirs: &[PathBuf]) -> Option<FsChange> {
         if inside == "index" {
             Some(FsChange::Index)
         } else {
-            (inside.starts_with("refs")
+            // Notes (the test lane's results, written once per test) change nothing shown.
+            ((inside.starts_with("refs") && !inside.starts_with("refs/notes/"))
                 || inside.starts_with("reftable")
                 || inside == "HEAD"
                 || inside == "packed-refs"

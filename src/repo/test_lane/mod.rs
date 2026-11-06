@@ -21,7 +21,7 @@ use crate::settings::Settings;
 
 /// What the header's menu and the settings say of the lane.
 pub(crate) const TEST_LANE_TIP: &str =
-    "A pass / fail dot by each commit for the test command; Test commits… fills it in";
+    "A pass / fail square by each commit for the test command; Test commits… fills it in";
 
 /// A run that takes longer than this gets a notification when it ends.
 const LONG_RUN: Duration = Duration::from_secs(4);
@@ -115,8 +115,10 @@ pub(super) struct LaneRun {
     good: usize,
     bad: usize,
     failed: usize,
-    /// The first commit that failed, oldest first.
-    first_bad: Option<String>,
+    /// The oldest commit that failed, with its place in the run's order.
+    first_bad: Option<(usize, String)>,
+    /// Each tree's place in the run's order, oldest first.
+    order: HashMap<String, usize>,
     stop: RunStop,
     started: Instant,
     ended: Option<Result<RunSummary, String>>,
@@ -306,6 +308,7 @@ impl RepoTab {
             bad: 0,
             failed: 0,
             first_bad: None,
+            order: HashMap::new(),
             stop: stop.clone(),
             started: Instant::now(),
             ended: None,
@@ -344,7 +347,11 @@ impl RepoTab {
         let Some(run) = self.test_lane.run.as_mut().filter(|r| r.id == id) else {
             return;
         };
-        run.total = Some(trees.len());
+        for (i, tree) in trees.iter().enumerate() {
+            run.order.entry(tree.clone()).or_insert(i);
+        }
+        // Two commits with the same tree are tested once.
+        run.total = Some(run.order.len());
         run.queued = trees.into_iter().collect();
     }
 
@@ -370,7 +377,11 @@ impl RepoTab {
                     Some(Verdict::Good) => run.good += 1,
                     Some(Verdict::Bad) => {
                         run.bad += 1;
-                        run.first_bad.get_or_insert_with(|| commit.clone());
+                        // Results come as they finish: the oldest is kept.
+                        let at = run.order.get(&tree).copied().unwrap_or(usize::MAX);
+                        if run.first_bad.as_ref().is_none_or(|(first, _)| at < *first) {
+                            run.first_bad = Some((at, commit.clone()));
+                        }
                     }
                     None => run.failed += 1,
                 }
@@ -425,8 +436,9 @@ impl RepoTab {
         if ui
             .add_enabled(!running, egui::Button::new("Test commits up to here…"))
             .on_hover_text(
-                "Runs a test command at each commit from the base branch to this one, in \
-                 scratch worktrees, and shows a pass / fail dot by each",
+                "Runs a test command at each commit from the base branch to this one (just this \
+                 one when it is on the base branch), in scratch worktrees, and shows a pass / \
+                 fail square by each",
             )
             .on_disabled_hover_text("Tests are running: stop them first")
             .clicked()
@@ -451,7 +463,7 @@ fn run_in_background(
     send: &(impl Fn(ToTab) + Sync),
     id: u64,
 ) -> Result<RunSummary, String> {
-    if stored != Some(command) {
+    if stored.map(str::trim) != Some(command) {
         if start.forget && stored.is_some() {
             git::forget_results(path, git::DEFAULT_TEST)?;
         }
@@ -463,19 +475,32 @@ fn run_in_background(
     let plan = TestPlan {
         name: git::DEFAULT_TEST.to_owned(),
         command: command.to_owned(),
-        workers: start.workers,
+        workers: workers_for(path, start.workers),
         retest: start.retest,
     };
     let tell = |event: TestEvent| send(Box::new(move |tab, _| tab.tests_event(id, event)));
     git::run_tests(path, jobs, &plan, stop, &tell)
 }
 
+/// How many commits are tested at once in `repo` when `asked` are: on another machine, at
+/// most [`REMOTE_WORKERS`], so that the shells kept open there stay free for the tab's reads.
+pub(crate) fn workers_for(repo: &std::path::Path, asked: usize) -> usize {
+    if crate::remote::is_remote(repo) {
+        asked.min(REMOTE_WORKERS)
+    } else {
+        asked
+    }
+}
+
+/// The most commits tested at once on another machine.
+pub(crate) const REMOTE_WORKERS: usize = 4;
+
 /// What the status line says when the run of `range` ended so, and whether it is bad news.
 pub(crate) fn ended_message(range: &str, result: &Result<RunSummary, String>) -> (String, bool) {
     match result {
-        Err(e) => (format!("Testing {range} failed: {e}"), true),
+        Err(e) => (format!("Couldn't test {range}: {e}"), true),
         Ok(s) => {
-            let tested = s.good + s.bad;
+            let tested = s.good + s.bad - s.known;
             let mut parts = vec![format!("{} passed", s.good)];
             if s.bad > 0 {
                 parts.push(format!("{} failed", s.bad));
@@ -484,13 +509,20 @@ pub(crate) fn ended_message(range: &str, result: &Result<RunSummary, String>) ->
                 parts.push(format!("{} couldn't be tested", s.failed.len()));
             }
             let noun = if tested == 1 { "commit" } else { "commits" };
-            let head = if s.stopped {
+            let mut head = if s.stopped {
                 format!("Testing {range} stopped after {tested} {noun}")
             } else {
                 format!("Tested {tested} {noun} of {range}")
             };
-            let bad = s.bad > 0 || !s.failed.is_empty();
-            (format!("{head}: {}", parts.join(", ")), bad)
+            if s.known > 0 {
+                head.push_str(&format!(" ({} had a result already)", s.known));
+            }
+            let mut said = format!("{head}: {}", parts.join(", "));
+            if let Some(e) = &s.cleanup {
+                said.push_str(&format!(". Couldn't remove a scratch worktree: {e}"));
+            }
+            let bad = s.bad > 0 || !s.failed.is_empty() || s.cleanup.is_some();
+            (said, bad)
         }
     }
 }
@@ -509,7 +541,8 @@ pub(crate) fn dot_tip(state: DotState, command: Option<&str>, tree: &str, ran: b
         DotState::Good | DotState::Bad if ran => "\nClick to see what it printed",
         DotState::Failed => "\nClick to see why",
         DotState::Good | DotState::Bad => {
-            "\nStored result (kept by tree in refs/notes/tests/default, shared with git-test)"
+            "\nA stored result (kept by tree in refs/notes/tests/default, shared with git-test); \
+             tested before this session, so there is no output to show"
         }
         _ => "",
     };

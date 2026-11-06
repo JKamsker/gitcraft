@@ -115,8 +115,9 @@ so your config, credentials and hooks apply as usual.
   changes or conflicts, or a merge, rebase, cherry-pick or revert is in progress.
 - Test lane: _Test commits up to here…_ in a commit's menu (or _Test commits…_ in the palette)
   runs a command such as `cargo test` at each commit from the base branch, on the repository's
-  machine, in scratch worktrees, several at once and in the background. A pass / fail square by
-  each commit fills in as results come; click one for what the test printed. Results are kept
+  machine, in scratch worktrees in its temporary folder, several at once and in the background. A
+  pass / fail square by each commit (with a tick or a cross) fills in as results come; click one
+  for what the test printed. Results are kept
   by tree in git notes in git-test's format (`refs/notes/tests/default`, `test.default.command`),
   so `git test` and gitcraft share them and a rebase that keeps a commit's files keeps its
   result.

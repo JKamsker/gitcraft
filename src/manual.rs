@@ -56,10 +56,10 @@ const FEATURES: &[(&str, &[&str])] = &[
     (
         "Tests over history",
         &[
-            "Right-click a commit and choose Test commits up to here… (or Test commits… in the palette) to run a command, such as cargo test, at each commit from the base branch to it. It runs on the repository's machine (here, in WSL or over SSH), in scratch worktrees inside the git folder, several commits at once, in the background: you can keep working. Exit code 0 passes; any other fails.",
-            "The graph then has a test lane: a small square by each commit, green when it passed, red when it failed, outlined while it waits or runs. Hover it for what it means; click it to see the last lines the test printed, with Copy. Right-click the column header (or Settings → Columns) to show or hide the lane.",
-            "A banner over the graph shows how far the run got, with Stop, then how it went and the oldest commit that failed (a click selects it).",
-            "Results are kept by tree in git notes, as git-test keeps them (refs/notes/tests/default, the command in test.default.command), so git test on the command line and gitcraft share them. A rebase that keeps a commit's files keeps its square, and a tree tested once is not tested again unless you tick Test again those with a result. Changing the command can forget the old one's results.",
+            "Right-click a commit and choose Test commits up to here… (or Test commits… in the palette) to run a command, such as cargo test, at each commit from the base branch to it. It runs on the repository's machine (here, in WSL or over SSH), in scratch worktrees in that machine's temporary folder, several commits at once (at most 4 on another machine), in the background: you can keep working. Exit code 0 passes; any other fails.",
+            "The graph then has a test lane: a small square by each commit, green with a tick when it passed, red with a cross when it failed, outlined while it waits or runs, amber with a dot when it couldn't be tested. Hover it for what it means; click it to see the last lines the test printed, with Copy (for tests run since gitcraft started: a result from before, or from git test, has no output to show). Right-click the column header (or Settings → Columns) to show or hide the lane; the flask over it opens Test commits….",
+            "A banner over the graph shows how far the run got, with Stop (tests that finished keep their result), then how it went and the oldest commit that failed (a click selects it).",
+            "Results are kept by tree in git notes, as git-test keeps them (refs/notes/tests/default, the command in test.default.command), so git test on the command line and gitcraft share them. A rebase that keeps a commit's files keeps its square, and a tree tested once is not tested again unless you tick Test again commits that have a result. Changing the command can forget the old one's results.",
         ],
     ),
     (
