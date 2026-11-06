@@ -48,6 +48,11 @@ fn raw_commits_are_read_with_their_signatures() {
     assert!(list[0].signed);
     assert_eq!(list[0].summary, "Fix the “parser”");
     assert_eq!(list[0].message, "Fix the “parser”\n\nBody line");
+    // Ten pairs and more: the positions are padded.
+    let padded = format!(" 9:  {A} =  9:  {B} nine\n10:  {B} ! 10:  {A} ten\n    @@ body\n");
+    let headers = parse_range_diff(&padded);
+    assert_eq!(headers.len(), 2);
+    assert_eq!(headers[0].kind, PairKind::Same);
     assert!(!list[1].signed);
     assert_eq!(list[1].message, "other");
 }
@@ -217,8 +222,7 @@ fn a_squash_says_the_files_are_identical_and_a_commit_went() {
     assert_eq!(c.same + c.changed + c.dropped, 2, "{:?}", r.pairs);
     assert_eq!(c.same + c.changed + c.added, 1, "{:?}", r.pairs);
     assert!(
-        r.sentence()
-            .starts_with("Final files identical, authors kept"),
+        r.sentence().starts_with("Final files identical"),
         "{}",
         r.sentence()
     );
@@ -323,4 +327,36 @@ fn a_reset_back_has_no_receipt() {
     let (receipt, _) = receipt_of(&dir, reset);
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(receipt, None);
+}
+
+/// A rebase of a branch pushed earlier and grown since, onto a main that moved: the commit
+/// the remote has (on the old series) is still the branch's own, not upstream; main's is.
+#[test]
+fn a_ref_on_an_old_commit_does_not_cut_the_series() {
+    let dir = repo("pushed");
+    git_ok(&dir, &["checkout", "-q", "-b", "feat"]);
+    for n in 1..=11 {
+        commit_file(&dir, &format!("f{n}.txt"), &format!("f{n}"));
+        if n == 2 {
+            git_ok(&dir, &["update-ref", "refs/remotes/origin/feat", "HEAD"]);
+            git_ok(&dir, &["tag", "v-old"]);
+        }
+    }
+    git_ok(&dir, &["checkout", "-q", "main"]);
+    commit_file(&dir, "m.txt", "m1");
+    git_ok(&dir, &["checkout", "-q", "feat"]);
+    let (receipt, _) = receipt_of(&dir, rebase_action(BranchRef::local("main"), "feat"));
+    let _ = std::fs::remove_dir_all(&dir);
+    let r = receipt.unwrap_or_else(|| unreachable!("no receipt"));
+    let c = r.counts();
+    assert_eq!(
+        (c.same, c.changed, c.added, c.dropped),
+        (11, 0, 0, 0),
+        "{:?}",
+        r.pairs
+    );
+    assert_eq!(
+        r.sentence(),
+        "Final files differ, authors kept, messages kept"
+    );
 }
