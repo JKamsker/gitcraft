@@ -99,6 +99,25 @@ impl Provider for GiteaFamily {
     fn pages(&self) -> Option<&dyn Pages> {
         Some(self)
     }
+
+    fn create_release(
+        &self,
+        _: &Path,
+        hosting: &Hosting,
+        new: &super::NewRelease,
+    ) -> Result<String, String> {
+        create_release(&self.api(hosting), hosting, new)
+    }
+
+    fn upload_assets(
+        &self,
+        _: &Path,
+        hosting: &Hosting,
+        tag: &str,
+        files: &[PathBuf],
+    ) -> Result<(), String> {
+        upload_assets(&self.api(hosting), hosting, tag, files)
+    }
 }
 
 impl Pages for GiteaFamily {
@@ -151,6 +170,57 @@ fn create(api: &Api, hosting: &Hosting, new: &NewPullRequest) -> Result<String, 
         )),
         url => Ok(url.to_owned()),
     }
+}
+
+/// Makes the release of the pushed tag `new.tag`; its web page.
+fn create_release(api: &Api, hosting: &Hosting, new: &super::NewRelease) -> Result<String, String> {
+    let answer = api.send(
+        "POST",
+        &format!("repos/{}/releases", hosting.path),
+        Some(&json!({
+            "tag_name": new.tag,
+            "name": new.title,
+            "body": new.notes,
+            "prerelease": new.prerelease,
+            "draft": false,
+        })),
+    )?;
+    Ok(at(&answer, "/html_url").to_owned())
+}
+
+/// Sends each of `files` to the release of `tag`, found by its tag.
+fn upload_assets(api: &Api, hosting: &Hosting, tag: &str, files: &[PathBuf]) -> Result<(), String> {
+    let release = api.get(&format!("repos/{}/releases/tags/{tag}", hosting.path))?;
+    let id = release
+        .get("id")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| format!("{} didn't say which release {tag} is", api.name()))?;
+    for file in files {
+        let name = file
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "file".to_owned());
+        let bytes =
+            std::fs::read(file).map_err(|e| format!("Couldn't read {}: {e}", file.display()))?;
+        let query: String = name
+            .bytes()
+            .map(|b| {
+                if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) {
+                    (b as char).to_string()
+                } else {
+                    format!("%{b:02X}")
+                }
+            })
+            .collect();
+        api.upload(
+            &format!("repos/{}/releases/{id}/assets?name={query}", hosting.path),
+            "attachment",
+            &name,
+            &bytes,
+        )
+        .map_err(|e| format!("Couldn't attach {name}: {}", e.message))?;
+    }
+    Ok(())
 }
 
 /// Whether a title marks its pull request a draft (work in progress), as both forges read it.

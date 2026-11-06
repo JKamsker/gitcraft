@@ -56,6 +56,37 @@ impl Provider for GitLab {
         self.run(repo, &args).map(|out| out.trim().to_owned())
     }
 
+    fn create_release(
+        &self,
+        repo: &Path,
+        hosting: &Hosting,
+        new: &super::NewRelease,
+    ) -> Result<String, String> {
+        self.run(
+            repo,
+            &[
+                "release", "create", new.tag, "--name", new.title, "--notes", new.notes,
+            ],
+        )?;
+        Ok(format!(
+            "{}/{}/-/releases/{}",
+            hosting.web, hosting.path, new.tag
+        ))
+    }
+
+    fn upload_assets(
+        &self,
+        repo: &Path,
+        _: &Hosting,
+        tag: &str,
+        files: &[std::path::PathBuf],
+    ) -> Result<(), String> {
+        let paths = super::path_args(files);
+        let mut args = vec!["release", "upload", tag];
+        args.extend(paths.iter().map(String::as_str));
+        self.run(repo, &args).map(|_| ())
+    }
+
     /// The host's own avatar API, asked by email.
     fn avatars(&self, _: &Path, hosting: &Hosting, emails: &[String]) -> Vec<(String, Hint)> {
         let api = api_authority(hosting);
