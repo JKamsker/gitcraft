@@ -122,7 +122,7 @@ fn line_buttons(
         draft.focus_line = true;
     }
     if draft.posting {
-        ui.spinner();
+        ui.add(crate::spinner::Spinner::new());
     }
 }
 

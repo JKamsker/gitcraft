@@ -108,7 +108,7 @@ pub(crate) fn show(
     let t = Tokens::get(ui.ctx());
     let data = match text {
         None => {
-            ui.centered_and_justified(|ui| ui.spinner());
+            ui.centered_and_justified(|ui| ui.add(crate::spinner::Spinner::new()));
             return;
         }
         Some(Err(e)) => {

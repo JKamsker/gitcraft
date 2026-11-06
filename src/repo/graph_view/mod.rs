@@ -59,7 +59,7 @@ impl RepoTab {
         if self.commits.is_empty() {
             ui.centered_and_justified(|ui| {
                 if self.loading {
-                    ui.spinner();
+                    ui.add(crate::spinner::Spinner::new());
                 } else {
                     ui.label(
                         egui::RichText::new("This repository has no commits yet.")

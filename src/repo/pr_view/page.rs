@@ -26,7 +26,7 @@ impl RepoTab {
         match &view.details {
             None => {
                 ui.add_space(40.0);
-                ui.vertical_centered(|ui| ui.spinner());
+                ui.vertical_centered(|ui| ui.add(crate::spinner::Spinner::new()));
             }
             Some(Err(e)) => {
                 ui.add_space(20.0);
@@ -88,7 +88,7 @@ impl RepoTab {
         match &view.files {
             None => {
                 ui.add_space(20.0);
-                ui.vertical_centered(|ui| ui.spinner());
+                ui.vertical_centered(|ui| ui.add(crate::spinner::Spinner::new()));
             }
             Some(Err(e)) => {
                 egui::Frame::new()
@@ -135,7 +135,7 @@ fn page_header(ui: &mut Ui, view: &PrView, acts: &mut Vec<Action>) {
             acts.push(Action::OpenUrl(url));
         }
         if loading {
-            ui.spinner();
+            ui.add(crate::spinner::Spinner::new());
         } else if icons::small_button(ui, "refresh-cw", "Load again").clicked() {
             acts.push(Action::ReloadPr);
         }
@@ -348,7 +348,7 @@ fn checks(ui: &mut Ui, d: &PrDetails, acts: &mut Vec<Action>) {
             CheckState::Failed => icons::paint(ui, icon, "x", 13.0, t.danger),
             CheckState::Skipped => icons::paint(ui, icon, "minus", 13.0, t.text_faint),
             CheckState::Running => {
-                egui::Spinner::new().size(11.0).paint_at(ui, icon);
+                crate::spinner::Spinner::new().size(11.0).paint_at(ui, icon);
             }
         }
         let painter = ui.painter_at(rect);

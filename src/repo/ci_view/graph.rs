@@ -227,7 +227,7 @@ pub(super) fn state_icon(ui: &Ui, rect: Rect, state: CheckState) {
         CheckState::Failed => icons::paint(ui, rect, "x", 13.0, color),
         CheckState::Skipped => icons::paint(ui, rect, "minus", 13.0, color),
         CheckState::Running => {
-            egui::Spinner::new()
+            crate::spinner::Spinner::new()
                 .size(11.0)
                 .color(color)
                 .paint_at(ui, rect);

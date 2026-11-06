@@ -140,7 +140,7 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
                 acts.push(Action::Pr(PrAct::CancelMerge));
             }
             if draft.posting {
-                ui.spinner();
+                ui.add(crate::spinner::Spinner::new());
             }
         });
         if std::mem::take(&mut draft.reveal_merge) {

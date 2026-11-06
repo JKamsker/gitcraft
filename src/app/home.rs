@@ -84,7 +84,7 @@ impl App {
                     if let Some((dest, _)) = &self.cloning {
                         ui.add_space(12.0);
                         ui.horizontal(|ui| {
-                            ui.spinner();
+                            ui.add(crate::spinner::Spinner::new());
                             ui.label(format!("Cloning into {}…", dest.display()));
                         });
                     }

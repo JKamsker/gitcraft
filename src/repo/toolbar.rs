@@ -230,9 +230,9 @@ impl RepoTab {
         }
         if let Some(op) = &self.busy_op {
             ui.label(egui::RichText::new(format!("{op}…")).color(t.text_dim));
-            ui.spinner();
+            ui.add(crate::spinner::Spinner::new());
         } else if self.loading {
-            ui.spinner();
+            ui.add(crate::spinner::Spinner::new());
         }
     }
 }

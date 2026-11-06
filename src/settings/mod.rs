@@ -199,7 +199,7 @@ impl Settings {
             match &job {
                 Job::Idle => {}
                 Job::Running(doing) => {
-                    ui.spinner();
+                    ui.add(crate::spinner::Spinner::new());
                     ui.label(RichText::new(*doing).color(t.text_faint).small());
                 }
                 Job::Done(done) => {

@@ -24,7 +24,7 @@ impl RepoTab {
         match &c.data {
             None => {
                 ui.add_space(20.0);
-                ui.vertical_centered(|ui| ui.spinner());
+                ui.vertical_centered(|ui| ui.add(crate::spinner::Spinner::new()));
             }
             Some(Err(e)) => {
                 ui.horizontal(|ui| {

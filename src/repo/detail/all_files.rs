@@ -75,7 +75,7 @@ impl RepoTab {
             Some(files) if self.all_files.of.as_ref() == Some(&detail.hash) => files,
             _ => {
                 ui.add_space(12.0);
-                ui.vertical_centered(|ui| ui.spinner());
+                ui.vertical_centered(|ui| ui.add(crate::spinner::Spinner::new()));
                 return;
             }
         };

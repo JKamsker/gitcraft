@@ -1,0 +1,6 @@
+disallowed-types = [
+    { path = "egui::Spinner", reason = "it redraws the window every frame; use crate::spinner::Spinner" },
+]
+disallowed-methods = [
+    { path = "egui::Ui::spinner", reason = "it redraws the window every frame; use crate::spinner::Spinner" },
+]

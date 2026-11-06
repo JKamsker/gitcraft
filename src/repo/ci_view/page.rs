@@ -28,7 +28,7 @@ impl RepoTab {
         let runs = match &view.runs {
             None => {
                 ui.add_space(40.0);
-                ui.vertical_centered(|ui| ui.spinner());
+                ui.vertical_centered(|ui| ui.add(crate::spinner::Spinner::new()));
                 return;
             }
             Some(Err(e)) => {
@@ -72,7 +72,7 @@ fn page_header(ui: &mut Ui, view: &CiView, title: &str, acts: &mut Vec<Action>) 
             acts.push(Action::OpenUrl(url));
         }
         if view.loading {
-            ui.spinner();
+            ui.add(crate::spinner::Spinner::new());
         } else if icons::small_button(ui, "refresh-cw", "Load again").clicked() {
             acts.push(Action::Ci(CiAct::Reload));
         }
@@ -97,7 +97,7 @@ fn page(ui: &mut Ui, view: &CiView, runs: &[Run], acts: &mut Vec<Action>) {
     section(ui, "JOBS");
     match jobs {
         None => {
-            ui.spinner();
+            ui.add(crate::spinner::Spinner::new());
         }
         Some(Err(e)) => {
             ui.colored_label(t.danger, e);
@@ -121,7 +121,7 @@ fn page(ui: &mut Ui, view: &CiView, runs: &[Run], acts: &mut Vec<Action>) {
         section(ui, "LOG OF THE FAILED JOBS");
         match log {
             None => {
-                ui.spinner();
+                ui.add(crate::spinner::Spinner::new());
             }
             Some(Err(e)) => {
                 ui.colored_label(t.danger, e);
@@ -251,7 +251,7 @@ fn run_actions(ui: &mut Ui, view: &CiView, run: &Run, jobs: &[Job], acts: &mut V
             }
         }
         if view.acting {
-            ui.spinner();
+            ui.add(crate::spinner::Spinner::new());
         }
     });
 }

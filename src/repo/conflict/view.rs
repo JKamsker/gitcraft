@@ -76,7 +76,7 @@ impl ConflictEditor {
             && crate::mergiraf::found(ui.ctx()).is_some();
         if offer_mergiraf {
             if self.solving {
-                ui.spinner();
+                ui.add(crate::spinner::Spinner::new());
             } else if ui
                 .add_enabled(idle, egui::Button::new("Solve with Mergiraf"))
                 .on_hover_text(

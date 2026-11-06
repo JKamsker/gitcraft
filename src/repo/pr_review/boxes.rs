@@ -104,7 +104,7 @@ fn verdict_buttons(
         pr_acts(acts, PrAct::DiscardPending);
     }
     if draft.posting {
-        ui.spinner();
+        ui.add(crate::spinner::Spinner::new());
     }
 }
 

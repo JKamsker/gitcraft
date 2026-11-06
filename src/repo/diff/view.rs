@@ -339,7 +339,7 @@ fn ready_data<'a>(
 ) -> Option<&'a DiffData> {
     let data = match &view.data {
         None => {
-            ui.centered_and_justified(|ui| ui.spinner());
+            ui.centered_and_justified(|ui| ui.add(crate::spinner::Spinner::new()));
             return None;
         }
         Some(Err(e)) => {

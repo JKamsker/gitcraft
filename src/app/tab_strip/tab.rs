@@ -111,7 +111,9 @@ pub(super) fn tab_ui(ui: &mut Ui, placed: Placed<'_>, env: &mut TabEnv<'_>) {
 
     let close_rect = Rect::from_center_size(pos2(rect.right() - 15.0, y), vec2(18.0, 18.0));
     if busy {
-        egui::Spinner::new().size(11.0).paint_at(ui, close_rect);
+        crate::spinner::Spinner::new()
+            .size(11.0)
+            .paint_at(ui, close_rect);
     } else if (active || hovered) && close_button(ui, close_rect, resp.id, t, env.dragging) {
         env.actions.close = Some(i);
     }

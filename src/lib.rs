@@ -17,6 +17,7 @@ mod pull_request;
 mod repo;
 mod settings;
 mod shell_path;
+mod spinner;
 mod tab_look;
 mod terminal;
 mod theme;

@@ -94,7 +94,7 @@ impl RepoTab {
                     .color(t.text_faint),
             );
             ui.add_space(18.0);
-            ui.add(egui::Spinner::new().size(22.0));
+            ui.add(crate::spinner::Spinner::new().size(22.0));
             ui.add_space(10.0);
             ui.label(
                 egui::RichText::new("Reading branches and history…")

@@ -46,7 +46,7 @@ impl RepoTab {
         let Some(view) = &self.file_view else { return };
         let commits = match &view.history {
             None => {
-                ui.centered_and_justified(|ui| ui.spinner());
+                ui.centered_and_justified(|ui| ui.add(crate::spinner::Spinner::new()));
                 return;
             }
             Some(Err(e)) => {
