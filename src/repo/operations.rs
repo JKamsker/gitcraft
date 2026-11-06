@@ -446,7 +446,7 @@ fn expected_symref(op: &[String]) -> Option<(&str, &str)> {
 }
 
 /// Whether `op` is a step that runs nothing, only checks.
-fn is_expectation(op: &[String]) -> bool {
+pub(in crate::repo) fn is_expectation(op: &[String]) -> bool {
     expected_ref(op).is_some() || expected_symref(op).is_some()
 }
 
