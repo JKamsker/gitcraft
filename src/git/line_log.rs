@@ -282,6 +282,9 @@ pub(crate) fn parse_line_log(out: &str, path: &str) -> Vec<FileCommit> {
         if line.starts_with("diff ") {
             in_header = true;
         } else if in_header && let Some(name) = line.strip_prefix("+++ ") {
+            // Some versions of git end a name with a space in it with a tab, as GNU diff does.
+            // A tab of the name itself would be quoted (`\t`).
+            let name = name.strip_suffix('\t').unwrap_or(name);
             if let Some(name) = unquote_path(name).strip_prefix("b/") {
                 commit.path = name.to_owned();
             }
@@ -392,6 +395,15 @@ mod tests {
         let h = parse_line_log(&out, "real.txt");
         assert_eq!(h[0].path, "real.txt");
         assert_eq!(h[0].lines, vec![(2, 2)]);
+    }
+
+    #[test]
+    fn the_tab_after_a_name_with_a_space_is_not_part_of_it() {
+        let out = format!(
+            "{RS}aaa{FS}Ann{FS}a@x{FS}1{FS}S\n\ndiff --git a/big: file.txt b/big: file.txt\n\
+             --- a/big: file.txt\t\n+++ b/big: file.txt\t\n@@ -1 +1 @@\n-a\n+b\n"
+        );
+        assert_eq!(parse_line_log(&out, "x")[0].path, "big: file.txt");
     }
 
     #[test]
