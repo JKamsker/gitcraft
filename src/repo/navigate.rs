@@ -63,6 +63,7 @@ impl RepoTab {
         self.reword = None;
         self.detail_error = None;
         self.detail_hash = Some(hash.clone());
+        self.load_extras(&hash, ctx);
         let path = self.path.clone();
         spawn(&self.tx, ctx, move || {
             let detail = git::commit_detail(&path, &hash);

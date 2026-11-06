@@ -56,6 +56,9 @@ impl RepoTab {
             .then(|| self.ci.by_sha.get(&detail.hash));
         // Taken out while the pane borrows `self`; put back after it.
         let mut reword = self.reword.take();
+        let mut extras = std::mem::take(&mut self.extras);
+        let mut extras_cmds = Vec::new();
+        let remotes: Vec<String> = self.remotes.iter().map(|r| r.name.clone()).collect();
         let head = &self.refs.head;
         // A commit of the checked-out branch: double-click its message to edit it (the root
         // commit has no parent to rebase from).
@@ -83,6 +86,9 @@ impl RepoTab {
                         author_line(ui, detail);
                         ui.add_space(10.0);
                         meta_grid(ui, acts, detail, builds);
+                        if stash.is_none() {
+                            extras.ui(ui, &detail.hash, &remotes, idle, &mut extras_cmds);
+                        }
                     });
 
                 let note = (detail.parents.len() > 1).then_some("vs. first parent");
@@ -111,6 +117,8 @@ impl RepoTab {
                 }
             });
         self.reword = reword;
+        self.extras = extras;
+        self.extras_cmds(extras_cmds, acts, ui.ctx());
     }
 }
 

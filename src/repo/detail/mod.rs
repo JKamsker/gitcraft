@@ -5,8 +5,10 @@ mod changes;
 mod commit;
 mod commit_box;
 mod compare;
+mod extras;
 
 pub(super) use all_files::AllFiles;
+pub(super) use extras::Extras;
 
 use egui::{Align2, Sense, Ui, pos2, vec2};
 

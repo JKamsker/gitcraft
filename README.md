@@ -193,6 +193,14 @@ so your config, credentials and hooks apply as usual.
   file's menu).
 - _View all files_ under a commit's files lists every file of the commit, not only those it
   changed; click one to read it as it was in that commit.
+- A commit's details fold out four more sections, each read in the background once the commit
+  is selected: its **Signature** (valid, invalid, unknown key, unsigned or not checked, for GPG,
+  SSH and X.509, with the signer, the key and git's own output; history is read with signature
+  checks off, so only the commit selected is checked), where it is **Contained in** (the
+  branches and tags that have it and the first release after it, `describe --contains`), its
+  **Notes** (add, edit and delete git notes in any namespace; fetch or push a namespace from a
+  remote) and its **Backlinks** (later commits that mention its hash: reverts, cherry-picks and
+  trailers such as `Fixes:` apart from plain mentions; click one to open it).
 
 **Toolbar, terminal, app**
 
@@ -375,6 +383,7 @@ was made this way, on a demo repository.
 | `src/repo/worktree_tab.rs` | worktrees in the same tab: parked views, the tab's chip and switcher |
 | `src/repo/graph_view.rs` | commit graph, pills, search bar, commit menu                                       |
 | `src/repo/detail.rs`     | commit / stash detail, changes and commit box                                      |
+| `src/repo/detail/extras/` | a commit's signature, containing branches and tags, notes and backlinks          |
 | `src/repo/diff.rs`       | diff loading, pairing and the diff view (unified, split, images)                   |
 | `src/repo/highlight.rs`  | syntax colours (syntect)                                                           |
 | `src/vscode_theme.rs`    | VS Code's current colour theme as a syntect theme                                  |

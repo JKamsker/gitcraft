@@ -350,7 +350,9 @@ impl RepoTab {
         // page being read from it is in).
         self.log_stream = Default::default();
         self.loading_more = false;
+        let refs_moved = loaded.refs != self.refs;
         self.refs = loaded.refs;
+        self.extras_after_reload(refs_moved, ctx);
         self.has_more = loaded.history.len() >= loaded.requested;
         self.history = loaded.history;
         // A status read since this reload started is newer.
