@@ -776,7 +776,28 @@ fn work_arrives_in_a_clone_made_for_it() -> Result<(), String> {
     let landed = run(&plan, &job())?;
     assert_eq!(here(&landed.folder), made);
     assert_eq!(state_of(&made)?, state_of(&src)?);
-    assert!(files_of(&made)? == files_of(&src)?);
+    // A clone takes this machine's own settings: on Windows (the CI runner's global
+    // `core.autocrlf=true`) its text files are checked out with CRLF, as any clone's would be.
+    let lf = |files: Files| -> Files {
+        files
+            .into_iter()
+            .map(|(name, (bytes, exec, link))| {
+                let bytes = if cfg!(windows) {
+                    let mut out = Vec::with_capacity(bytes.len());
+                    for (i, &b) in bytes.iter().enumerate() {
+                        if !(b == b'\r' && bytes.get(i + 1) == Some(&b'\n')) {
+                            out.push(b);
+                        }
+                    }
+                    out
+                } else {
+                    bytes
+                };
+                (name, (bytes, exec, link))
+            })
+            .collect()
+    };
+    assert!(lf(files_of(&made)?) == lf(files_of(&src)?));
     assert_eq!(
         git(&made, &["symbolic-ref", "--short", "HEAD"])?.trim(),
         "main"
