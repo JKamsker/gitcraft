@@ -75,6 +75,9 @@ pub(crate) struct RebaseEditor {
     /// Its rebase is being prepared (on another machine, in the background): it can't be
     /// started again, nor changed, meanwhile.
     pub starting: bool,
+    /// Every commit is made again (`--no-ff`), even one already on its parent: commits a
+    /// rewrite prepared with `commit-tree` are then signed and hooked like any other.
+    pub no_ff: bool,
 }
 
 impl RebaseEditor {
@@ -97,6 +100,7 @@ impl RebaseEditor {
             head,
             id: IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             starting: false,
+            no_ff: false,
         }
     }
 
@@ -202,15 +206,18 @@ impl RebaseEditor {
 
     /// The rebase, its todo list copied from `todo_file` (quoted for `sh`).
     fn rebase_args(&self, todo_file: &str) -> Vec<String> {
-        vec![
+        let mut args = vec![
             "-c".to_owned(),
             format!("sequence.editor=cp {todo_file}"),
             "rebase".to_owned(),
             "-i".to_owned(),
             "--autostash".to_owned(),
-            "--end-of-options".to_owned(),
-            self.onto.clone(),
-        ]
+        ];
+        if self.no_ff {
+            args.push("--no-ff".to_owned());
+        }
+        args.extend(["--end-of-options".to_owned(), self.onto.clone()]);
+        args
     }
 }
 

@@ -48,6 +48,8 @@ impl RepoTab {
                     self.conflict_view(ui, &mut acts);
                 } else if self.rebase.is_some() {
                     self.rebase_view(ui, &mut acts);
+                } else if self.split.is_some() {
+                    self.split_view(ui, &mut acts);
                 } else if self.diff.is_some() && !self.history_beside_diff() {
                     self.diff_view(ui, &mut acts);
                 } else if self.file_view.is_some() {
@@ -125,6 +127,8 @@ impl RepoTab {
                 acts.push(Action::CloseDiff);
             } else if esc && self.rebase.is_some() {
                 acts.push(Action::CloseRebase);
+            } else if esc && self.split.is_some() {
+                acts.push(Action::CloseSplit);
             } else if esc && self.file_view.is_some() {
                 acts.push(Action::CloseFileView);
             } else if esc && self.ci_view.is_some() {
@@ -136,8 +140,10 @@ impl RepoTab {
             } else if esc && self.search.open {
                 acts.push(Action::ToggleSearch);
             }
-            let diff_shown =
-                self.diff.is_some() && self.conflict.is_none() && self.rebase.is_none();
+            let diff_shown = self.diff.is_some()
+                && self.conflict.is_none()
+                && self.rebase.is_none()
+                && self.split.is_none();
             if let Some(delta) = ctx.input(change_step).filter(|_| diff_shown) {
                 acts.push(Action::DiffStep(delta));
             }

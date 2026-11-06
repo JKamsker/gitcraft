@@ -156,6 +156,12 @@ pub(crate) enum Action {
     },
     RunRebase,
     CloseRebase,
+    /// Open the split editor on a commit of the checked-out branch.
+    OpenSplit(String),
+    /// Prepare the split being edited and show each new commit's patch.
+    CheckSplit,
+    RunSplit,
+    CloseSplit,
     /// Remember these HTTPS credentials and run the operation that needed them again.
     SignIn(git::Credentials),
     /// Ask before deleting the local tag `name` (at the commit `target`), once what it points

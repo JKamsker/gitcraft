@@ -36,6 +36,7 @@ mod rewrite;
 mod samples;
 mod sidebar;
 mod state;
+mod surgery;
 mod terminals;
 #[cfg(test)]
 mod tests;
@@ -158,6 +159,8 @@ pub struct RepoTab {
     compare_requests: u64,
     file_view: Option<file_view::FileView>,
     rebase: Option<rebase::RebaseEditor>,
+    /// A commit being split (`surgery`).
+    split: Option<Box<surgery::SplitEditor>>,
     /// The selected commit's message, being edited in the right pane.
     reword: Option<Reword>,
     /// HTTPS credentials typed in this session, used for every later git command of the tab.
@@ -314,6 +317,7 @@ impl RepoTab {
             compare_requests: 0,
             file_view: None,
             rebase: None,
+            split: None,
             reword: None,
             credentials: None,
             last_op: None,

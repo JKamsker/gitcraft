@@ -274,7 +274,7 @@ impl RepoTab {
         }
     }
 
-    fn handle(&mut self, msg: Msg, ctx: &egui::Context) {
+    pub(super) fn handle(&mut self, msg: Msg, ctx: &egui::Context) {
         match msg {
             Msg::Loaded(result) => self.loaded(result, ctx),
             Msg::Submodules(read, list) => {

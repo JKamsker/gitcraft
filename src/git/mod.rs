@@ -9,6 +9,7 @@ mod lfs;
 mod refs;
 mod status;
 mod submodule;
+mod trees;
 mod worktree;
 
 pub use self::command::*;
@@ -19,6 +20,7 @@ pub use self::lfs::*;
 pub use self::refs::*;
 pub use self::status::*;
 pub use self::submodule::*;
+pub use self::trees::*;
 pub use self::worktree::*;
 
 use std::path::{Path, PathBuf};
