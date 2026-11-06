@@ -58,6 +58,8 @@ pub struct History {
     pub picked: (Option<usize>, Option<usize>),
     /// Whether the two picked conflict, for the pair it was asked for.
     pub pair_test: Option<((usize, usize), Read<bool>)>,
+    /// The pairs being test-merged: not merged again while they are.
+    pub testing: Vec<(usize, usize)>,
     /// The change of a commit to the file, shown in place of the timelines: its hash, its
     /// short hash, and it.
     pub change: Option<(String, String, Read<String>)>,
@@ -225,21 +227,24 @@ impl RepoTab {
                 let (Some(a), Some(b)) = (timelines.ours.get(i), timelines.theirs_merged(j)) else {
                     return;
                 };
-                // That pair already being tested: not a second merge of it.
-                if history.pair_test == Some(((i, j), Read::Reading)) {
+                let (a, b, base) = (a.hash.clone(), b.to_owned(), timelines.base.clone());
+                // Already being tested: shown as such, not merged a second time.
+                let again = history.testing.contains(&(i, j));
+                history.pair_test = Some(((i, j), Read::Reading));
+                if again {
                     return;
                 }
-                let (a, b, base) = (a.hash.clone(), b.to_owned(), timelines.base.clone());
-                history.pair_test = Some(((i, j), Read::Reading));
+                history.testing.push((i, j));
                 let file = path.clone();
                 self.then(
                     ctx,
                     move || git::merge_conflicts(&repo, (&a, &b), base.as_deref(), &file),
                     move |tab, conflicts, _| {
-                        if let Some(test) = tab
-                            .history_for(generation, &path)
-                            .and_then(|h| h.pair_test.as_mut())
-                            .filter(|(pair, _)| *pair == (i, j))
+                        let Some(h) = tab.history_for(generation, &path) else {
+                            return;
+                        };
+                        h.testing.retain(|p| *p != (i, j));
+                        if let Some(test) = h.pair_test.as_mut().filter(|(pair, _)| *pair == (i, j))
                         {
                             test.1 = match conflicts {
                                 Ok(c) => Read::Done(c),
