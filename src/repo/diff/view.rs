@@ -13,7 +13,9 @@ use crate::icons;
 use crate::pull_request::DiffSide;
 use crate::repo::pr_review::{self, PrDraft};
 use crate::repo::pr_view::{self, PrView};
-use crate::repo::{Action, DiffKey, DiffView, Refresh, RepoTab, file_text, ops, short, widgets};
+use crate::repo::{
+    Action, DiffKey, DiffView, Refresh, RepoTab, file_text, fold, ops, short, widgets,
+};
 use crate::settings::Settings;
 use crate::theme::{self, Tokens};
 
@@ -65,6 +67,16 @@ impl RepoTab {
             file_text::show(ui, ("diff_file", &path), view.file.as_ref());
             return;
         }
+        if let Some(reason) = self.fold_reason(view, &settings, acts) {
+            let data = match &view.data {
+                Some(Ok(data)) => Some(data),
+                _ => None,
+            };
+            if fold::folded_diff(ui, &path, data, reason) {
+                acts.push(Action::UnfoldDiff);
+            }
+            return;
+        }
         let Some(data) = ready_data(ui, view, ignore_ws, &t) else {
             return;
         };
@@ -88,6 +100,7 @@ impl RepoTab {
             view.text_sel = sel;
             view.scroll = offset;
             view.jump = None;
+            view.scroll_to = None;
             if let Some(i) = jumped {
                 view.at_change = Some((i, offset));
             }
@@ -99,6 +112,27 @@ impl RepoTab {
                 view.pick_line(i, shift);
             }
         }
+    }
+
+    /// Why the diff shown starts folded, while it does (a conflicted file never does). Asks
+    /// what `.gitattributes` says of it the first time.
+    fn fold_reason(
+        &self,
+        view: &DiffView,
+        settings: &Settings,
+        acts: &mut Vec<Action>,
+    ) -> Option<fold::FoldReason> {
+        let conflicted = matches!(&view.key, DiffKey::Work(f) if f.area == Area::Conflicted);
+        let rules = fold::Rules::from_settings(settings);
+        if view.unfolded || conflicted || !rules.on {
+            return None;
+        }
+        let path = view.key.path();
+        let unknown = self.folding.unknown([path]);
+        if !unknown.is_empty() {
+            acts.push(Action::FoldAttributes(unknown));
+        }
+        self.folding.reason(&rules, path)
     }
 
     /// The file shown and where its diff comes from.
@@ -176,6 +210,8 @@ impl RepoTab {
                         ui.add_space(8.0);
                         if !as_file && !rendered {
                             view_options(ui, &t, (split, ignore_ws, whole_file), acts);
+                            ui.add_space(4.0);
+                            super::algorithm::algorithm_menu(ui, path, acts);
                             ui.add_space(8.0);
                             change_steps(ui, acts);
                             ui.add_space(8.0);

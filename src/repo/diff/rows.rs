@@ -148,6 +148,9 @@ impl<'a> Rows<'a> {
         }
         if let Some(change) = self.jumped.and_then(|i| changes.get(i)) {
             scroll = scroll.vertical_scroll_offset(offset_of(change.start));
+        } else if let Some(offset) = self.view.scroll_to {
+            // Back where it was, read another way.
+            scroll = scroll.vertical_scroll_offset(offset);
         }
         let out = ui.scope_builder(egui::UiBuilder::new().max_rect(body), |ui| {
             scroll.show_rows(ui, LINE_H, count, |ui, range| {
