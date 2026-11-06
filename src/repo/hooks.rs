@@ -13,9 +13,32 @@ pub(super) struct SkipHooks {
 }
 
 impl SkipHooks {
+    /// The commit box's commit, `ops`, with `--no-verify` on its commit step when it skips
+    /// hooks; unticked once used. Only for that commit: a reword or a squash, also `git
+    /// commit`, runs its hooks whatever the box says.
+    pub fn commit_steps(&mut self, ops: Vec<Vec<String>>) -> Vec<Vec<String>> {
+        let mut only = SkipHooks {
+            commit: self.commit,
+            push: false,
+        };
+        self.commit = false;
+        only.apply(ops)
+    }
+
+    /// The push `ops` (see [`RepoTab::push_skipping_hooks`]), with `--no-verify` on its push
+    /// step when it skips hooks.
+    pub fn push_steps(&mut self, ops: Vec<Vec<String>>) -> Vec<Vec<String>> {
+        let mut only = SkipHooks {
+            commit: false,
+            push: self.push,
+        };
+        self.push = false;
+        only.apply(ops)
+    }
+
     /// `ops` with `--no-verify` on their commit steps when the commit skips hooks,
     /// and on their push steps when the push does; each of the two is off again once used.
-    pub fn apply(&mut self, mut ops: Vec<Vec<String>>) -> Vec<Vec<String>> {
+    fn apply(&mut self, mut ops: Vec<Vec<String>>) -> Vec<Vec<String>> {
         let mut used = SkipHooks::default();
         for step in &mut ops {
             let Some(at) = subcommand_at(step) else {
@@ -132,6 +155,22 @@ mod tests {
         let commit = waiting.apply(ops(&[&["commit", "-m", "push"]]));
         assert_eq!(commit, ops(&[&["commit", "-m", "push"]]));
         assert!(waiting.push);
+    }
+
+    /// A reword (`commit --amend --only`) runs like any operation: the commit box's tick is
+    /// not for it, and stays for the commit it was ticked for.
+    #[test]
+    fn another_commit_step_neither_skips_nor_uses_the_tick() {
+        let mut skip = SkipHooks {
+            commit: true,
+            push: false,
+        };
+        let reword = ops(&[&["commit", "--amend", "--only", "-m", "new"]]);
+        assert_eq!(skip.push_steps(reword.clone()), reword);
+        assert!(skip.commit);
+        let commit = skip.commit_steps(ops(&[&["commit", "-m", "x"]]));
+        assert_eq!(commit, ops(&[&["commit", "--no-verify", "-m", "x"]]));
+        assert!(!skip.commit);
     }
 
     #[test]

@@ -175,16 +175,37 @@ impl RepoTab {
             return;
         }
         self.detached.checking = true;
-        let (path, head) = (self.path.clone(), self.refs.head.clone());
+        let path = self.path.clone();
         let target = leave.target().to_owned();
         self.then(
             ctx,
-            move || git::left_behind(&path, &target),
+            // HEAD as it is now, read along: a commit made since the reload is among the
+            // commits listed, and is the one a kept branch goes on. A panic still answers, so
+            // that checkouts aren't held back for good.
+            move || {
+                let listed = std::panic::catch_unwind(|| {
+                    let now = git::head(&path);
+                    git::left_behind(&path, &target).map(|commits| (now, commits))
+                });
+                listed.unwrap_or_else(|_| Err("the listing stopped unexpectedly".to_owned()))
+            },
             move |tab, found, ctx| {
                 tab.detached.checking = false;
+                // Something started meanwhile (a commit…): what was listed may be out of date,
+                // and the checkout wouldn't start anyway.
+                if let Some(busy) = &tab.busy_op {
+                    tab.status = Some((
+                        format!(
+                            "Didn't check out {}: {busy} started meanwhile",
+                            leave.label()
+                        ),
+                        true,
+                    ));
+                    return;
+                }
                 match found {
-                    Ok(commits) if commits.is_empty() => tab.leave_now(leave, ctx),
-                    Ok(commits) => {
+                    Ok((_, commits)) if commits.is_empty() => tab.leave_now(leave, ctx),
+                    Ok((head, commits)) => {
                         tab.dialog = Some(Dialog::KeepDetached(Box::new(KeepDialog {
                             name: suggested_name(&head),
                             commits,
