@@ -54,6 +54,15 @@ pub fn file_menu(
                     tab: FileTab::Blame,
                 });
             }
+            if ui
+                .button("Ignore rules and attributes")
+                .on_hover_text("Why it is ignored or not, and how git treats it")
+                .clicked()
+            {
+                acts.push(Action::Doctor(crate::repo::doctor::DoctorAct::Ignore(
+                    crate::repo::doctor::IgnoreAct::Explain(path.to_owned()),
+                )));
+            }
             if ignorable {
                 ui.menu_button("Ignore", |ui| {
                     for (label, pattern, untrack) in ignore_patterns(path) {

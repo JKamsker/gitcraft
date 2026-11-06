@@ -198,6 +198,17 @@ so your config, credentials and hooks apply as usual.
 
 - A page in the big area, its sections listed on the left as in Settings; Esc closes it.
   Everything is read in the background, and changes run as the tab's operations.
+- _Ignore rules and attributes_ (also _Ignore rules and attributes_ in a file's menu): for a
+  path, the rule responsible (`git check-ignore -v`), shown as ignoring it, taking it back
+  with `!`, or not applying because the file is tracked; its line endings in the repository
+  and the working tree (`git ls-files --eol`), with a note when they differ and no attribute
+  pins them (where CRLF churn comes from); its attributes (`git check-attr -a`) in words (text
+  or binary, LFS, merge and diff drivers), and a warning for a merge, diff or filter driver an
+  attribute names but the configuration doesn't define (git quietly does without it). The
+  ignored files are listed; each `.gitignore`, `.git/info/exclude` and `core.excludesFile` can
+  be edited, with a preview of the files the change would start or stop ignoring (by that
+  file's rules alone, and tracked files it matches, which stay tracked); saving refuses a file
+  changed meanwhile or one that is a symbolic link.
 - _Which configuration wins_: the settings that explain why git behaves differently here (pull
   strategy, push, signing, line endings, file handling, performance…), each with the value in
   effect and its scope and file (`git config --list --show-origin --show-scope --includes`).
@@ -402,7 +413,7 @@ was made this way, on a demo repository.
 | `src/vscode_theme.rs`    | VS Code's current colour theme as a syntect theme                                  |
 | `src/repo/conflict.rs`   | three-pane conflict editor                                                         |
 | `src/repo/doctor/`       | the repository doctor: its page, sections and what they ask the tab to do          |
-| `src/git/doctor/`        | what the doctor reads and changes: config origins, hidden flags                    |
+| `src/git/doctor/`        | what the doctor reads and changes: config origins, hidden flags, ignore rules and attributes |
 | `src/mergiraf.rs` | Mergiraf, run as the user's own command when it is installed |
 | `src/repo/rebase.rs`     | interactive rebase editor and its todo list                                        |
 | `src/repo/file_view.rs`  | a file's history, blame and contents at a commit                                   |

@@ -75,6 +75,7 @@ fn section_ui(
 ) {
     let locked = busy || doctor.waiting;
     match doctor.section {
+        Section::Ignore => super::ignore_section::ui(ui, &mut doctor.ignore, acts),
         Section::Config => {
             let env = super::config_section::Env::new(worktrees, remote, locked);
             super::config_section::ui(ui, &mut doctor.config, env, acts)

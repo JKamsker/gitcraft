@@ -191,3 +191,93 @@ fn the_doctor_waits_for_an_open_editor() -> Result<(), String> {
     assert!(tab.status.as_ref().is_some_and(|(_, err)| *err));
     Ok(())
 }
+
+#[test]
+fn a_file_is_explained_and_its_rules_edited_through_the_tab() -> Result<(), String> {
+    use super::IgnoreAct;
+    let dir = git::doctor::tests::repo(
+        "tab-ignore",
+        &[
+            (".gitignore", b"*.log\n"),
+            (".gitattributes", b"*.bin binary\n"),
+        ],
+    )?;
+    let ctx = egui::Context::default();
+    crate::theme::install_fonts(&ctx);
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let result = (|| {
+        write(&dir.join("a b.log"), b"x\n")?;
+        write(&dir.join("x.tmp"), b"x\n")?;
+        // From a file's menu: the section opens on its own.
+        tab.apply(
+            Action::Doctor(DoctorAct::Ignore(IgnoreAct::Explain("a b.log".into()))),
+            &ctx,
+        );
+        let explained = |t: &RepoTab| {
+            t.doctor
+                .as_ref()
+                .and_then(|d| d.ignore.explained.as_ref())
+                .and_then(|(_, r)| r.as_ref())
+                .and_then(|r| r.as_ref().ok())
+                .cloned()
+        };
+        wait(&mut tab, &ctx, |t| {
+            explained(t).is_some()
+                && t.doctor
+                    .as_ref()
+                    .is_some_and(|d| d.ignore.files.is_some() && d.ignore.ignored.is_some())
+        })?;
+        assert!(
+            tab.doctor
+                .as_ref()
+                .is_some_and(|d| d.section == Section::Ignore)
+        );
+        let e = explained(&tab).ok_or("not explained")?;
+        assert!(e.ignored());
+        assert_eq!(e.rule.map(|r| r.pattern), Some("*.log".to_owned()));
+
+        // Edit the top .gitignore: preview, then save.
+        tab.apply(Action::Doctor(DoctorAct::Ignore(IgnoreAct::Edit(0))), &ctx);
+        wait(&mut tab, &ctx, |t| {
+            t.doctor
+                .as_ref()
+                .and_then(|d| d.ignore.editing.as_ref())
+                .is_some_and(|e| e.original.is_some())
+        })?;
+        if let Some(e) = tab.doctor.as_mut().and_then(|d| d.ignore.editing.as_mut()) {
+            e.text = "*.tmp\n".into();
+        }
+        tab.apply(Action::Doctor(DoctorAct::Ignore(IgnoreAct::Preview)), &ctx);
+        wait(&mut tab, &ctx, |t| {
+            t.doctor
+                .as_ref()
+                .and_then(|d| d.ignore.editing.as_ref())
+                .is_some_and(|e| matches!(e.preview, Some(Some(_))))
+        })?;
+        let preview = tab
+            .doctor
+            .as_ref()
+            .and_then(|d| d.ignore.editing.as_ref())
+            .and_then(|e| e.preview.clone())
+            .flatten()
+            .ok_or("no preview")??;
+        assert_eq!(preview.newly_ignored, ["x.tmp"]);
+        assert_eq!(preview.no_longer_ignored, ["a b.log"]);
+        tab.apply(Action::Doctor(DoctorAct::Ignore(IgnoreAct::Save)), &ctx);
+        wait(&mut tab, &ctx, |t| {
+            t.doctor
+                .as_ref()
+                .and_then(|d| d.ignore.editing.as_ref())
+                .is_some_and(|e| e.saved.is_some())
+        })?;
+        let saved = std::fs::read_to_string(dir.join(".gitignore")).map_err(|e| e.to_string())?;
+        assert_eq!(saved, "*.tmp\n");
+        // The explanation is read again: no longer ignored.
+        wait(&mut tab, &ctx, |t| {
+            explained(t).is_some_and(|e| !e.ignored())
+        })?;
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}
