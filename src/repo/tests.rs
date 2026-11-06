@@ -668,7 +668,10 @@ fn dropped_patches_are_applied() {
     // A second one while the first is applied is refused, not lost silently.
     let second = tab.apply_dropped_patch(diff_file.clone(), &ctx);
     let diff_outcome = dropped_outcome(&mut tab, &ctx);
-    let applied = std::fs::read_to_string(&file).unwrap_or_default();
+    // Git on Windows may check files out with CRLF (core.autocrlf): compare the lines.
+    let applied = std::fs::read_to_string(&file)
+        .unwrap_or_default()
+        .replace("\r\n", "\n");
     // Applied twice: it doesn't apply any more.
     let again = tab.apply_dropped_patch(diff_file, &ctx);
     let again_outcome = dropped_outcome(&mut tab, &ctx);

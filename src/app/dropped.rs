@@ -401,8 +401,14 @@ mod tests {
         queue.push(bad.clone(), a.clone());
         queue.push(good.clone(), a.clone());
         let said = drain(&mut queue, &mut tabs, &ctx);
-        let in_a = std::fs::read_to_string(a.join("f.txt")).unwrap_or_default();
-        let in_b = std::fs::read_to_string(b.join("f.txt")).unwrap_or_default();
+        // Git on Windows may check files out with CRLF (core.autocrlf): compare the lines.
+        let read = |p: PathBuf| {
+            std::fs::read_to_string(p)
+                .unwrap_or_default()
+                .replace("\r\n", "\n")
+        };
+        let in_a = read(a.join("f.txt"));
+        let in_b = read(b.join("f.txt"));
         // Dropped on B, whose tab is then closed.
         queue.push(good, b.clone());
         tabs.pop();
