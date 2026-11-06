@@ -1,6 +1,9 @@
 //! Interactive rebase: the commits after a base, newest on top like the graph, each picked,
-//! reworded, squashed, fixed up or dropped, and reordered. Starting it writes git's todo list
-//! and hands it over as `sequence.editor`; rewords become an `exec git commit --amend -F`.
+//! reworded, squashed, fixed up, dropped or stopped at to be edited, and reordered (by drag
+//! and drop or with the keyboard, see [`rows`]). Starting it writes git's todo list and hands
+//! it over as `sequence.editor`; rewords become an `exec git commit --amend -F`.
+
+mod rows;
 
 use std::path::{Path, PathBuf};
 
@@ -19,12 +22,15 @@ pub(crate) enum Step {
     Squash,
     Fixup,
     Drop,
+    /// Stop after the commit, to amend it (`edit`): Commit in the changes pane goes on.
+    Edit,
 }
 
 impl Step {
-    const ALL: [Step; 5] = [
+    const ALL: [Step; 6] = [
         Step::Pick,
         Step::Reword,
+        Step::Edit,
         Step::Squash,
         Step::Fixup,
         Step::Drop,
@@ -37,6 +43,7 @@ impl Step {
             Step::Squash => "Squash",
             Step::Fixup => "Fixup",
             Step::Drop => "Drop",
+            Step::Edit => "Edit",
         }
     }
 
@@ -47,6 +54,7 @@ impl Step {
             Step::Squash => "Meld into the commit below, keeping both messages",
             Step::Fixup => "Meld into the commit below, dropping this message",
             Step::Drop => "Remove the commit and its changes",
+            Step::Edit => "Stop after this commit to change it, then Continue",
         }
     }
 }
@@ -75,6 +83,8 @@ pub(crate) struct RebaseEditor {
     /// Its rebase is being prepared (on another machine, in the background): it can't be
     /// started again, nor changed, meanwhile.
     pub starting: bool,
+    /// The row the keys act on (an index into `entries`), once one was clicked.
+    pub selected: Option<usize>,
 }
 
 impl RebaseEditor {
@@ -97,6 +107,7 @@ impl RebaseEditor {
             head,
             id: IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             starting: false,
+            selected: None,
         }
     }
 
@@ -252,6 +263,7 @@ fn todo(entries: &[Entry], message_file: impl Fn(usize) -> Option<String>) -> St
             Step::Squash => "squash",
             Step::Fixup => "fixup",
             Step::Drop => "drop",
+            Step::Edit => "edit",
         };
         out.push_str(&format!("{verb} {} {}\n", e.commit.hash, e.commit.summary));
         if let Some(file) = message_file(i) {
@@ -283,6 +295,8 @@ impl RepoTab {
             .clone()
             .unwrap_or_else(|| "HEAD".to_owned());
         let head = self.refs.head.clone();
+        let keys_free =
+            self.dialog.is_none() && !self.keys_blocked && !ui.ctx().egui_wants_keyboard_input();
         let Some(editor) = &mut self.rebase else {
             return;
         };
@@ -327,7 +341,7 @@ impl RepoTab {
                             let n = editor.entries.len();
                             ui.label(
                                 egui::RichText::new(format!(
-                                    "{n} commit{}, newest on top · Ctrl+Z undoes the rebase",
+                                    "{n} commit{}, newest on top · drag a row by its handle or Alt+↑/↓ to reorder · P R E S F D set the selected row's action · Ctrl+Z undoes the rebase",
                                     if n == 1 { "" } else { "s" }
                                 ))
                                 .color(t.text_dim),
@@ -355,99 +369,9 @@ impl RepoTab {
                 });
             });
 
-        let n = editor.entries.len();
-        let mut swap: Option<(usize, usize)> = None;
-        // What is being started is what is shown.
-        let starting = editor.starting;
-        egui::ScrollArea::vertical()
-            .id_salt("rebase_list")
-            .auto_shrink(false)
-            .show(ui, |ui| {
-                if starting {
-                    ui.disable();
-                }
-                ui.add_space(6.0);
-                // Newest first, like the graph; `i` indexes git's oldest-first order.
-                for i in (0..n).rev() {
-                    let Some(e) = editor.entries.get_mut(i) else {
-                        continue;
-                    };
-                    ui.push_id(&e.commit.hash, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.add_space(8.0);
-                            ui.add_enabled_ui(i + 1 < n, |ui| {
-                                if icons::small_button(ui, "chevron-up", "Move up (later)")
-                                    .clicked()
-                                {
-                                    swap = Some((i, i + 1));
-                                }
-                            });
-                            ui.add_enabled_ui(i > 0, |ui| {
-                                if icons::small_button(ui, "chevron-down", "Move down (earlier)")
-                                    .clicked()
-                                {
-                                    swap = Some((i, i - 1));
-                                }
-                            });
-                            egui::ComboBox::from_id_salt("step")
-                                .width(84.0)
-                                .selected_text(e.step.label())
-                                .show_ui(ui, |ui| {
-                                    for step in Step::ALL {
-                                        ui.selectable_value(&mut e.step, step, step.label())
-                                            .on_hover_text(step.explain());
-                                    }
-                                });
-                            let dim = e.step == Step::Drop;
-                            ui.label(
-                                egui::RichText::new(short(&e.commit.hash))
-                                    .font(theme::mono(11.5))
-                                    .color(t.text_faint),
-                            );
-                            let (rect, _) = ui
-                                .allocate_exact_size(egui::vec2(20.0, 20.0), egui::Sense::hover());
-                            widgets::avatar(
-                                ui,
-                                rect.center(),
-                                9.0,
-                                &e.commit.author,
-                                &e.commit.email,
-                            );
-                            let mut text = egui::RichText::new(&e.commit.summary).color(if dim {
-                                t.text_faint
-                            } else {
-                                t.text
-                            });
-                            if dim {
-                                text = text.strikethrough();
-                            }
-                            ui.label(text);
-                            if matches!(e.step, Step::Squash | Step::Fixup) {
-                                ui.label(
-                                    egui::RichText::new("↓ into the commit below")
-                                        .color(t.accent)
-                                        .small(),
-                                );
-                            }
-                        });
-                        if e.step == Step::Reword {
-                            ui.horizontal(|ui| {
-                                ui.add_space(70.0);
-                                ui.add(
-                                    egui::TextEdit::multiline(&mut e.message)
-                                        .desired_rows(3)
-                                        .desired_width(ui.available_width() - 16.0),
-                                );
-                            });
-                        }
-                    });
-                    ui.add_space(2.0);
-                    ui.separator();
-                }
-            });
-        if let Some((a, b)) = swap {
-            editor.entries.swap(a, b);
-        }
+        // The row keys act on this frame, unless something else has the keyboard.
+        let focus = editor.keys(ui, keys_free);
+        editor.list(ui, focus);
     }
 }
 

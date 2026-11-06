@@ -102,8 +102,10 @@ so your config, credentials and hooks apply as usual.
   `git format-patch` into commits (`git am`) and puts any other diff on the working tree
   (`git apply`). Ctrl+Z undoes either.
 - Interactive rebase: the commits to rewrite, newest on top; pick, reword (edit the message in
-  place), squash, fix up or drop each one, move them up and down, then _Start rebase_. Ctrl+Z
-  undoes it.
+  place), edit (stop there to change the commit; _Commit_ amends it and goes on), squash, fix up
+  or drop each one, then _Start rebase_. Drag a row by its handle to move it, or click a row and
+  use the keys: P, R, E, S, F, D set its action, ↑ / ↓ select another, Alt+↑ / Alt+↓ move it.
+  Ctrl+Z undoes it.
 - Quick edits from a commit's menu, for commits of the checked-out branch: _Edit commit
   message_, _Drop commit_, _Move commit up_ / _down_, each a rebase without the editor and undone
   with Ctrl+Z. What can't be done (a merge, merges after the commit) is greyed out with why.
@@ -380,7 +382,7 @@ was made this way, on a demo repository.
 | `src/vscode_theme.rs`    | VS Code's current colour theme as a syntect theme                                  |
 | `src/repo/conflict.rs`   | three-pane conflict editor                                                         |
 | `src/mergiraf.rs` | Mergiraf, run as the user's own command when it is installed |
-| `src/repo/rebase.rs`     | interactive rebase editor and its todo list                                        |
+| `src/repo/rebase.rs`     | interactive rebase editor and its todo list (`rebase/rows.rs`: its rows, drag, keys) |
 | `src/repo/file_view.rs`  | a file's history, blame and contents at a commit                                   |
 | `src/repo/file_text.rs`  | a whole file at a commit, coloured, for the file view and diffs                    |
 | `src/repo/dialogs.rs`    | branch, tag, stash, remote, worktree, pull request and confirm dialogs             |
