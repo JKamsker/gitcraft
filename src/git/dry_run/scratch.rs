@@ -118,6 +118,12 @@ impl Drop for Scratch {
 /// Removes the scratch clones a gitcraft that ended mid-way left in the temporary folder: those
 /// of other runs, older than a day.
 fn sweep_stale() {
+    // Once a run is enough: the temporary folder can be large.
+    static SWEPT: std::sync::Once = std::sync::Once::new();
+    SWEPT.call_once(sweep_now);
+}
+
+fn sweep_now() {
     let ours = format!("{PREFIX}{}-", std::process::id());
     let day = std::time::Duration::from_secs(24 * 3600);
     let Ok(entries) = std::fs::read_dir(std::env::temp_dir()) else {

@@ -18,7 +18,6 @@ fn facts(repo: &TestRepo) -> Result<Facts, String> {
             .map(|r| r.name)
             .collect(),
         dirty: super::op::tracked_changes(&status),
-        credentials: None,
     })
 }
 
@@ -242,19 +241,18 @@ fn a_pull_ghost_is_what_pulling_does() -> Result<(), String> {
     r.other.git(&["tag", "v1"])?;
     r.other.git(&["push", "-q", "origin", "main", "v1"])?;
     let theirs = r.other.rev("HEAD")?;
-    // Up to date as far as this clone knows: only the remote has the new commit.
+    // Only the remote has the new commit: a hover never asks it (the network could hang or
+    // ask for a key), so the preview is of what was last fetched, and says so.
+    let unfetched = ghost(&r.here, &GhostOp::Pull(PullMode::FastForwardOnly))?;
+    assert!(unfetched.moves.is_empty());
+    assert!(unfetched.notes.iter().any(|n| n.contains("last fetch")));
+    let missing = r
+        .here
+        .git(&["cat-file", "-e", &format!("{theirs}^{{commit}}")]);
+    assert!(missing.is_err(), "the preview fetched");
+    r.here.git(&["fetch", "-q", "origin"])?;
     let ff = ghost(&r.here, &GhostOp::Pull(PullMode::FastForwardOnly))?;
     assert_eq!(moved_to(&ff, "refs/heads/main"), Some(theirs.clone()));
-    assert_eq!(
-        moved_to(&ff, "refs/remotes/origin/main"),
-        Some(theirs.clone())
-    );
-    assert_eq!(ff.created.len(), 1);
-    assert!(
-        r.here
-            .git(&["rev-parse", "-q", "--verify", "refs/tags/v1"])
-            .is_err()
-    );
     // Diverged: each mode as it would go.
     r.here.commit(&[("c", "mine\n")], "mine")?;
     let refused = ghost(&r.here, &GhostOp::Pull(PullMode::FastForwardOnly))?;
@@ -515,6 +513,7 @@ fn a_pull_rebase_leaves_out_what_upstream_picked() -> Result<(), String> {
     r.other.commit(&[("a", "3\n")], "theirs on top")?;
     r.other.git(&["push", "-q", "origin", "main"])?;
     r.here.commit(&[("c", "c\n")], "more of mine")?;
+    r.here.git(&["fetch", "-q", "origin"])?;
     let o = ghost(&r.here, &GhostOp::Pull(PullMode::Rebase))?;
     assert!(o.conflict.is_none(), "{:?}", o.conflict);
     r.here.git(&["pull", "-q", "--rebase"])?;
@@ -570,5 +569,49 @@ fn delete_says_unpushed_is_unmerged() -> Result<(), String> {
         o.notes
     );
     assert!(r.here.git(&["branch", "-d", "feat"]).is_err());
+    Ok(())
+}
+
+/// A hover that ends before its result is drawn takes back the scroll it would have made,
+/// rather than leaving it for the graph's next frame.
+#[test]
+fn an_ended_hover_leaves_no_scroll_behind() {
+    let mut ghost = super::Ghost {
+        shift: Some(super::Shift::In(12)),
+        ..Default::default()
+    };
+    ghost.end();
+    assert_eq!(ghost.take_shift(), None);
+}
+
+/// The key of an outcome changes when a tracked file changes (a rebase then refuses), not when
+/// an untracked file appears.
+#[test]
+fn the_key_follows_what_a_rebase_checks() -> Result<(), String> {
+    let repo = diverged("ghost-key")?;
+    let ctx = egui::Context::default();
+    let mut tab = crate::repo::RepoTab::new(repo.dir.clone(), &ctx);
+    wait(&mut tab, &ctx, |t| t.history_gen > 0 && !t.loading);
+    let op = GhostOp::Rebase {
+        onto: "refs/heads/main".to_owned(),
+        label: "main".to_owned(),
+    };
+    let clean = tab.ghost_key(op.clone());
+    let file = |path: &str, code, area| crate::git::StatusFile {
+        path: path.to_owned(),
+        old_path: None,
+        code,
+        area,
+    };
+    tab.work
+        .unstaged
+        .push(file("notes.txt", '?', crate::git::Area::Untracked));
+    let with_untracked = tab.ghost_key(op.clone());
+    tab.work
+        .unstaged
+        .push(file("b", 'M', crate::git::Area::Unstaged));
+    let with_tracked = tab.ghost_key(op);
+    assert_eq!(clean, with_untracked);
+    assert_ne!(clean, with_tracked);
     Ok(())
 }

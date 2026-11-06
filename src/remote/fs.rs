@@ -329,7 +329,15 @@ fn scratch_script(remove: Option<&str>) -> String {
         "if [ -L \"$d\" ] || [ ! -O \"$d\" ]; then echo \"$d isn't gitcraft's\" >&2; exit 1; fi\n",
     );
     match remove {
-        None => format!("{private}mktemp -d \"$d/scratch.XXXXXXXX\""),
+        // Those a run that ended mid-way left (a dropped connection) go after a day.
+        None => format!(
+            concat!(
+                "{private}",
+                "find \"$d\" -mindepth 1 -maxdepth 1 -name 'scratch.*' -mtime +0 -exec rm -rf {{}} + 2>/dev/null\n",
+                "mktemp -d \"$d/scratch.XXXXXXXX\"",
+            ),
+            private = private,
+        ),
         Some(path) => format!(
             concat!(
                 "{private}p={path}\n",
