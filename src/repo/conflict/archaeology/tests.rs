@@ -613,3 +613,54 @@ fn a_picked_first_commit_says_there_is_no_history() -> Result<(), String> {
     assert!(t.is_err_and(|e| e.contains("no parent")));
     Ok(())
 }
+
+/// Pair A, then B, then A again while A still runs: A is merged once, and its answer still
+/// lands when it comes.
+#[test]
+fn a_pair_in_flight_is_not_merged_twice() -> Result<(), String> {
+    let path = "f.txt";
+    let dir = constructed("inflight", path)?;
+    let _ = git(&dir, &["merge", "side"]);
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    tab.work.in_progress = Some(InProgress::Merge);
+    let file = StatusFile {
+        path: path.to_owned(),
+        old_path: None,
+        code: 'U',
+        area: Area::Conflicted,
+    };
+    tab.open_diff(DiffKey::Work(file), &ctx);
+    tab.archaeology_act(Act::Load, &ctx);
+    wait(&mut tab, &ctx, |tab| {
+        tab.conflict
+            .as_ref()
+            .is_some_and(|ed| matches!(ed.history.timelines, Read::Done(_)))
+    });
+    // Answers caught, to count the merges started.
+    let (tx, rx) = std::sync::mpsc::channel();
+    tab.tx = tx;
+    tab.archaeology_act(Act::TestPair(2, 1), &ctx);
+    tab.archaeology_act(Act::TestPair(0, 0), &ctx);
+    tab.archaeology_act(Act::TestPair(2, 1), &ctx);
+    let mut answers = Vec::new();
+    while let Ok(msg) = rx.recv_timeout(std::time::Duration::from_secs(5)) {
+        answers.push(msg);
+    }
+    for msg in std::mem::take(&mut answers).into_iter().rev() {
+        if let crate::repo::messages::Msg::Then(then) = msg {
+            then(&mut tab, &ctx);
+            answers.push(crate::repo::messages::Msg::JobPanicked(String::new()));
+        }
+    }
+    let shown = tab
+        .conflict
+        .as_ref()
+        .and_then(|ed| ed.history.pair_test.clone());
+    let left = tab.conflict.as_ref().map(|ed| ed.history.testing.len());
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(answers.len(), 2, "two merges, not three");
+    assert_eq!(shown, Some(((2, 1), Read::Done(true))));
+    assert_eq!(left, Some(0));
+    Ok(())
+}
