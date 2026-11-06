@@ -30,9 +30,10 @@ impl Tree {
         }
     }
 
-    /// How many of its layers need restacking.
-    pub fn stale(&self) -> usize {
-        self.rows.iter().filter(|(_, l)| l.needs_restack()).count()
+    /// How many of its layers need restacking, and how many have lost their parent.
+    pub fn stale(&self) -> (usize, usize) {
+        let count = |f: fn(&Layer) -> bool| self.rows.iter().filter(|(_, l)| f(l)).count();
+        (count(Layer::needs_restack), count(|l| l.parent_missing))
     }
 }
 
@@ -72,6 +73,20 @@ fn push_children(layers: &[Layer], parent: &str, depth: usize, rows: &mut Vec<(u
         rows.push((depth, child.clone()));
         push_children(layers, &child.branch, depth + 1, rows);
     }
+}
+
+/// The layers `trees` leaves out: those in a loop (edited into the config by hand), or on
+/// one.
+pub(crate) fn looped(layers: &[Layer]) -> Vec<String> {
+    let placed: Vec<String> = trees(layers)
+        .into_iter()
+        .flat_map(|t| t.rows.into_iter().map(|(_, l)| l.branch))
+        .collect();
+    layers
+        .iter()
+        .filter(|l| !placed.contains(&l.branch))
+        .map(|l| l.branch.clone())
+        .collect()
 }
 
 /// The branches from the bottom of `branch`'s stack up to it: `[main, schema, api]` for `api`.
@@ -121,7 +136,7 @@ mod tests {
         assert_eq!(got[0].root, "main");
         assert_eq!(names(&got[0].rows), [(1, "schema"), (2, "api"), (3, "ui")]);
         assert_eq!(got[0].title(), "main → schema → api → ui");
-        assert_eq!(got[0].stale(), 1);
+        assert_eq!(got[0].stale(), (1, 0));
         assert_eq!(chain(&layers, "api"), ["main", "schema", "api"]);
         assert_eq!(chain(&layers, "main"), ["main"]);
     }
@@ -155,6 +170,8 @@ mod tests {
         let got = trees(&layers);
         assert_eq!(got.len(), 1);
         assert_eq!(names(&got[0].rows), [(1, "c")]);
+        assert_eq!(looped(&layers), ["a", "b"]);
+        assert!(looped(&layers[2..]).is_empty());
         assert_eq!(chain(&layers, "a"), ["b", "a"]);
     }
 }

@@ -124,3 +124,42 @@ fn branches_without_history_in_common_are_refused() -> Result<(), String> {
     assert!(stack::recorded(repo.path())?.is_empty());
     Ok(())
 }
+
+/// What is recorded is read again before an operation, not taken from the last read: a
+/// parent recorded since (here, outside the tab) is what undo puts back.
+#[test]
+fn removing_reads_what_is_recorded_now_for_its_undo() -> Result<(), String> {
+    let repo = TestRepo::new("tab fresh read")?;
+    repo.stack(&["api"])?;
+    let ctx = egui::Context::default();
+    let mut tab = open(&repo, &ctx)?;
+    // Changed behind the tab's back: based on main still, at another base.
+    repo.steps(&stack::set_parent_ops("api", "main", "1234567"))?;
+    let before = stack::recorded(repo.path())?.get("api").cloned();
+    tab.apply(Action::Stack(StackAct::RemoveParent("api".into())), &ctx);
+    settle(&mut tab, &ctx, |t| {
+        t.stacks.layer("api").is_none() && t.status.is_some()
+    })?;
+    assert!(stack::recorded(repo.path())?.is_empty());
+    tab.apply(Action::Undo, &ctx);
+    settle(&mut tab, &ctx, |t| t.stacks.layer("api").is_some())?;
+    assert_eq!(stack::recorded(repo.path())?.get("api").cloned(), before);
+    Ok(())
+}
+
+/// An operation started while the parent was being looked up is not dropped silently.
+#[test]
+fn an_operation_that_cannot_start_says_so() -> Result<(), String> {
+    let repo = TestRepo::new("tab busy")?;
+    let ctx = egui::Context::default();
+    let mut tab = open(&repo, &ctx)?;
+    tab.busy_op = Some("Fetch".to_owned());
+    tab.run_stack_op("Base a on main".to_owned(), Vec::new(), Vec::new(), &ctx);
+    let status = tab.status.clone().unwrap_or_default();
+    assert!(
+        status.1 && status.0.contains("once Fetch is done"),
+        "{status:?}"
+    );
+    tab.busy_op = None;
+    Ok(())
+}

@@ -114,9 +114,10 @@ pub fn restore_ops(branch: &str, before: Option<&Recorded>) -> Vec<Vec<String>> 
     }
 }
 
-/// `git config --local key value`.
+/// `git config --local --replace-all key value`: one value however many the key had (a plain
+/// set refuses a key set more than once by hand).
 pub fn set_op(key: &str, value: &str) -> Vec<String> {
-    ["config", "--local", key, value]
+    ["config", "--local", "--replace-all", key, value]
         .map(str::to_owned)
         .to_vec()
 }
@@ -136,17 +137,38 @@ fn unset_ops(key: &str) -> Vec<Vec<String>> {
 /// is based (through any number of layers) on it.
 pub fn would_loop(recorded: &BTreeMap<String, Recorded>, branch: &str, parent: &str) -> bool {
     let mut at = parent;
-    // Bounded: a loop already in the config (edited by hand) must not hang this.
-    for _ in 0..=recorded.len() {
+    let mut seen: Vec<&str> = Vec::new();
+    loop {
         if at == branch {
             return true;
         }
+        // A loop already in the config (edited by hand) that `branch` isn't part of.
+        if seen.contains(&at) {
+            return false;
+        }
+        seen.push(at);
         match recorded.get(at) {
             Some(r) => at = &r.parent,
             None => return false,
         }
     }
-    true
+}
+
+/// The branches recorded as based on `parent`.
+pub fn children(recorded: &BTreeMap<String, Recorded>, parent: &str) -> Vec<String> {
+    recorded
+        .iter()
+        .filter(|(_, r)| r.parent == parent)
+        .map(|(b, _)| b.clone())
+        .collect()
+}
+
+/// The steps that make the layers on `old` layers on `new` instead: what renaming `old` needs.
+pub fn reparent_ops(children: &[String], new: &str) -> Vec<Vec<String>> {
+    children
+        .iter()
+        .map(|child| set_op(&config_key(child, PARENT_KEY), new))
+        .collect()
 }
 
 /// One layer of a stack as it is now.
@@ -180,11 +202,12 @@ pub fn layers(
     recorded: &BTreeMap<String, Recorded>,
     local: &[String],
 ) -> Result<Vec<Layer>, String> {
-    let mut out = Vec::new();
-    for (branch, r) in recorded {
-        if !local.contains(branch) {
-            continue;
-        }
+    let present: Vec<(&String, &Recorded)> = recorded
+        .iter()
+        .filter(|(branch, _)| local.contains(branch))
+        .collect();
+    // Side by side: on another machine each count is a round trip.
+    let counted = in_parallel(&present, |(branch, r)| {
         let parent_missing = !local.contains(&r.parent);
         let (behind, own) = if parent_missing {
             // Counted from the commit it was based on, if that is still there.
@@ -195,16 +218,37 @@ pub fn layers(
         } else {
             count_apart(repo, &local_ref(&r.parent), &local_ref(branch))?
         };
-        out.push(Layer {
-            branch: branch.clone(),
+        Ok(Layer {
+            branch: (*branch).clone(),
             parent: r.parent.clone(),
             base: r.base.clone(),
             own,
             behind: if parent_missing { 0 } else { behind },
             parent_missing,
+        })
+    });
+    counted.into_iter().collect()
+}
+
+/// How many git commands [`in_parallel`] runs at once.
+const PARALLEL: usize = 8;
+
+/// `work` on each of `items`, a few at a time on threads of their own, the answers in order.
+pub(crate) fn in_parallel<T: Sync, R: Send>(items: &[T], work: impl Fn(&T) -> R + Sync) -> Vec<R> {
+    let mut out = Vec::with_capacity(items.len());
+    for chunk in items.chunks(PARALLEL) {
+        std::thread::scope(|scope| {
+            let running: Vec<_> = chunk
+                .iter()
+                .map(|item| scope.spawn(|| work(item)))
+                .collect();
+            for (item, job) in chunk.iter().zip(running) {
+                // A job that panicked is done again here, where the panic shows.
+                out.push(job.join().unwrap_or_else(|_| work(item)));
+            }
         });
     }
-    Ok(out)
+    out
 }
 
 /// The commit `branch` forks from `parent` at: what it is based on when it is made a layer.

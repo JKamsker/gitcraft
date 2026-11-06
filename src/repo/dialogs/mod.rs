@@ -280,6 +280,8 @@ impl RepoTab {
             .current
             .clone()
             .unwrap_or_else(|| self.refs.head.clone());
+        // The layers of stacks a renamed branch takes along.
+        let stack_parents = &self.stacks.recorded;
         let response = modal.show(ctx, |ui| {
             ui.set_width(380.0);
             let enter = ui.input(|i| i.key_pressed(Key::Enter));
@@ -331,7 +333,8 @@ impl RepoTab {
                     focus,
                 } => branch::tag(ui, enter, at, at_label, name, message, remote, push, focus),
                 Dialog::RenameBranch { old, new, focus } => {
-                    branch::rename_branch(ui, enter, old, new, focus)
+                    let children = crate::git::stack::children(stack_parents, old);
+                    branch::rename_branch(ui, enter, old, new, focus, &children)
                 }
                 Dialog::Remote {
                     original,

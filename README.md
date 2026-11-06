@@ -123,7 +123,9 @@ so your config, credentials and hooks apply as usual.
   local branch it forks from last. _STACKS_ then shows each stack as `main → schema → api → ui`,
   every layer with the commits it adds, its pull request and a warning when its parent moved on
   (amended, rebased, new commits) and it needs restacking; a branch pill's tooltip in the graph
-  names its stack. Undoable, and _Remove from its stack_ takes a branch out.
+  names its stack. _Changes api adds to schema_ in a layer's menu shows only its own changes.
+  Undoable; _Remove from its stack_ takes a branch out, and renaming a branch takes the layers on
+  it along.
 - Remotes: add, edit (name and URL), fetch one, remove; their branches below each.
 - Worktrees: a yellow dot in place of the folder icon marks the others with uncommitted changes,
   here and in the switcher. Add (existing or new branch), open in the same tab (the tab then shows the branch, a searchable switcher and a button to close the worktree, and what you left keeps running; can be turned off in Settings) or a new one, open a terminal there, lock, remove,

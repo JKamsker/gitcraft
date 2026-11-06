@@ -13,8 +13,9 @@ pub(crate) struct BasedOn {
     pub branch: String,
     /// The parent picked (empty: none yet).
     pub choice: String,
-    /// What history suggests: `None` while it is being looked for.
-    pub suggestion: Option<Option<String>>,
+    /// What history suggests: `None` while it is being looked for, then the branch (if any),
+    /// or why history couldn't be read.
+    pub suggestion: Option<Result<Option<String>, String>>,
     /// Which dialog this is: a suggestion found for one closed since isn't taken.
     id: u64,
 }
@@ -24,11 +25,13 @@ impl RepoTab {
     pub(super) fn open_based_on(&mut self, branch: String, ctx: &egui::Context) {
         static IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         let id = IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        // A recorded parent that is gone isn't offered: the suggestion takes its place.
         let choice = self
             .stacks
             .recorded
             .get(&branch)
             .map(|r| r.parent.clone())
+            .filter(|p| self.refs.local.iter().any(|b| b.name == *p))
             .unwrap_or_default();
         self.stacks.dialog = Some(BasedOn {
             branch: branch.clone(),
@@ -40,11 +43,13 @@ impl RepoTab {
         let recorded = self.stacks.recorded.clone();
         self.then(
             ctx,
-            move || stack::suggest_parent(&path, &branch, &recorded).unwrap_or_default(),
+            move || stack::suggest_parent(&path, &branch, &recorded),
             move |tab, found, _| {
                 if let Some(dialog) = tab.stacks.dialog.as_mut().filter(|d| d.id == id) {
-                    if dialog.choice.is_empty() {
-                        dialog.choice = found.clone().unwrap_or_default();
+                    if dialog.choice.is_empty()
+                        && let Ok(Some(name)) = &found
+                    {
+                        dialog.choice = name.clone();
                     }
                     dialog.suggestion = Some(found);
                 }
@@ -90,8 +95,8 @@ impl RepoTab {
                 ui.add_space(6.0);
                 ui.label(
                     RichText::new(
-                        "The branch it is a layer on in a stack. Restacking replays its own \
-                         commits onto that branch's tip, and its pull request goes into it.",
+                        "The branch it is a layer on in a stack: STACKS then shows the commits \
+                         it adds, and warns when that branch moves on.",
                     )
                     .color(t.text_dim),
                 );
@@ -120,43 +125,58 @@ impl RepoTab {
                         ui.add(crate::spinner::Spinner::new());
                         ui.label(RichText::new("Looking at history…").color(t.text_faint));
                     }
-                    Some(Some(name)) => {
+                    Some(Ok(Some(name))) => {
                         ui.label(
                             RichText::new(format!("Suggested from history: {name}"))
                                 .color(t.text_faint),
                         );
-                        if *name != dialog.choice && ui.small_button("Use it").clicked() {
+                        if *name != dialog.choice && ui.small_button("Use").clicked() {
                             acts.push(Action::Stack(StackAct::PickParent(name.clone())));
                         }
                     }
-                    Some(None) => {
+                    Some(Ok(None)) => {
                         ui.label(
                             RichText::new("No other branch shares history with it.")
                                 .color(t.text_faint),
                         );
                     }
+                    Some(Err(e)) => {
+                        ui.label(
+                            RichText::new(format!("Couldn't look at history: {e}"))
+                                .color(t.warning),
+                        );
+                    }
                 });
                 if let Some(r) = current {
-                    ui.label(
-                        RichText::new(format!("Recorded now: based on {}", r.parent))
-                            .color(t.text_faint),
-                    );
+                    let gone = !self.refs.local.iter().any(|b| b.name == r.parent);
+                    let (text, color) = if gone {
+                        (
+                            format!("Now based on {}, which is gone", r.parent),
+                            t.warning,
+                        )
+                    } else {
+                        (format!("Now based on {}", r.parent), t.text_faint)
+                    };
+                    ui.label(RichText::new(text).color(color));
                 }
                 ui.add_space(14.0);
                 let mut done = false;
+                // Enter picks in the list while it is open, and sets the parent only after.
+                let enter =
+                    !egui::Popup::is_any_open(ui.ctx()) && ui.input(|i| i.key_pressed(Key::Enter));
                 ui.horizontal(|ui| {
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let can = idle && !dialog.choice.is_empty();
-                        let enter = ui.input(|i| i.key_pressed(Key::Enter));
-                        if widgets::primary_button(ui, "Set parent", can, 110.0).clicked()
-                            || (can && enter)
-                        {
-                            done = true;
-                        }
-                        if ui.button("Cancel").clicked() {
-                            acts.push(Action::Stack(StackAct::CloseDialog));
-                        }
-                    });
+                    let can = idle && !dialog.choice.is_empty();
+                    if widgets::primary_button(ui, "Set parent", can, 90.0).clicked()
+                        || (can && enter)
+                    {
+                        done = true;
+                    }
+                    if ui
+                        .add(egui::Button::new("Cancel").min_size(egui::vec2(80.0, 30.0)))
+                        .clicked()
+                    {
+                        acts.push(Action::Stack(StackAct::CloseDialog));
+                    }
                 });
                 if done {
                     acts.push(Action::Stack(StackAct::SetParent {
