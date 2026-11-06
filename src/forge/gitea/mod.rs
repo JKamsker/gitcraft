@@ -1,6 +1,6 @@
 //! Forgejo and Gitea. Forgejo started as Gitea and keeps its API, so one module serves both: the
-//! list of pull requests, opening one, and the page of one in full ([`details`], [`post`]), all
-//! through the REST API at `https://host/api/v1`.
+//! list of pull requests, opening one, the page of one in full ([`details`], [`post`]) and the
+//! issues assigned to the user ([`issues`]), all through the REST API at `https://host/api/v1`.
 //!
 //! The login is one the user already has for the host, looked for in this order:
 //! 1. `GITEA_SERVER_URL` and `GITEA_SERVER_TOKEN` in the environment (as `tea` reads them), when
@@ -12,6 +12,7 @@
 //! Without one, public repositories can still be read.
 
 mod details;
+mod issues;
 #[cfg(test)]
 mod live;
 mod post;
@@ -24,7 +25,7 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 
 use super::http::{Api, Login};
-use super::{Forge, Hosting, NewPullRequest, Pages, Provider, PullRequest};
+use super::{Forge, Hosting, Issue, NewPullRequest, Pages, Provider, PullRequest};
 use crate::avatars::Hint;
 use crate::pr_post::Target;
 use crate::pull_request::{PrDetails, at};
@@ -79,6 +80,10 @@ impl Provider for GiteaFamily {
 
     fn create(&self, _: &Path, hosting: &Hosting, new: &NewPullRequest) -> Result<String, String> {
         create(&self.api(hosting), hosting, new)
+    }
+
+    fn assigned_issues(&self, _: &Path, hosting: &Hosting) -> Result<Vec<Issue>, String> {
+        issues::assigned(&self.api(hosting), hosting)
     }
 
     /// The accounts the latest commits belong to, as the API ties them to their emails.
