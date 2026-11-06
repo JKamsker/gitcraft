@@ -5,6 +5,7 @@ use std::io::{ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc::{Sender, channel};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -18,12 +19,21 @@ const READ_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Connections served at once; more are closed unread. A start sends one request and is done:
 /// more than this at once is no gitcraft's.
+/// How long a request waits for the window to take it before it is answered all the same (it
+/// stays queued: a window that is minimized may draw only now and then). Until then, a window
+/// closing answers it "closing", and the start that sent it takes over.
+#[cfg(not(test))]
+const WINDOW_WAIT: Duration = Duration::from_secs(3);
+#[cfg(test)]
+const WINDOW_WAIT: Duration = Duration::from_millis(1500);
+
 pub(super) const MAX_CONNECTIONS: usize = 8;
 
 #[derive(Default)]
 struct State {
-    /// What later starts asked, the oldest first, until the window takes it.
-    requests: Vec<Request>,
+    /// What later starts asked, the oldest first, until the window takes it, each with where
+    /// to say that it was taken.
+    requests: Vec<(Request, Sender<Reply>)>,
     /// The window closed: nothing more is taken.
     closing: bool,
     repaint: Option<egui::Context>,
@@ -76,7 +86,12 @@ impl Primary {
                 token: shared.token.clone(),
                 pid: std::process::id(),
             };
-            if let Err(e) = discovery::write(dir, &found) {
+            // Once more after a moment: a virus scanner may hold the file for an instant.
+            let written = discovery::write(dir, &found).or_else(|_| {
+                std::thread::sleep(Duration::from_millis(100));
+                discovery::write(dir, &found)
+            });
+            if let Err(e) = written {
                 eprintln!("gitcraft: later starts can't find this window: {e}");
             }
         }
@@ -107,13 +122,34 @@ impl Primary {
 
     /// What later starts asked since the last call, the oldest first.
     pub fn take_requests(&self) -> Vec<Request> {
-        std::mem::take(&mut lock(&self.shared.state).requests)
+        let taken = std::mem::take(&mut lock(&self.shared.state).requests);
+        taken
+            .into_iter()
+            .map(|(request, taken)| {
+                let _ = taken.send(Reply::Ok);
+                request
+            })
+            .collect()
     }
 
     /// The window is closing: later requests are answered "closing" (the start that sent one
     /// waits for the lock, see [`Self::shut_down`]).
     pub fn closing(&self) {
-        lock(&self.shared.state).closing = true;
+        let left = {
+            let mut state = lock(&self.shared.state);
+            state.closing = true;
+            std::mem::take(&mut state.requests)
+        };
+        // Not taken by the window: their starts wait for the lock instead.
+        for (_, taken) in left {
+            let _ = taken.send(Reply::Closing);
+        }
+    }
+
+    /// How many requests wait for the window (for tests).
+    #[cfg(test)]
+    pub fn waiting(&self) -> usize {
+        lock(&self.shared.state).requests.len()
     }
 
     /// The window closed and what it keeps is on disk: the file naming this instance goes, and
@@ -215,18 +251,20 @@ fn serve(shared: &Shared, mut stream: TcpStream) -> std::io::Result<()> {
     stream.write_all(message::encode_reply(&reply).as_bytes())
 }
 
-/// Keeps `request` for the window, unless it is closing.
+/// Keeps `request` for the window, unless it is closing, and waits a while for the window to
+/// take it.
 fn take(shared: &Shared, request: Request) -> Reply {
+    let (tx, rx) = channel();
     let repaint = {
         let mut state = lock(&shared.state);
         if state.closing {
             return Reply::Closing;
         }
-        state.requests.push(request);
+        state.requests.push((request, tx));
         state.repaint.clone()
     };
     if let Some(ctx) = repaint {
         ctx.request_repaint();
     }
-    Reply::Ok
+    rx.recv_timeout(WINDOW_WAIT).unwrap_or(Reply::Ok)
 }
