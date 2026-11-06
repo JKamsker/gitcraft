@@ -163,11 +163,14 @@ const BATCH: usize = 150;
 /// Deleting the branches `chosen` here, and with `on_remote` the branches they track there too,
 /// as one undoable operation: `(steps, undo)`.
 ///
-/// Nothing runs unless every branch is still where it was offered. The remote branches go
-/// first, one atomic push per remote, each only while it is where it was last fetched: a
-/// refused push leaves everything as it was. Then the branches here, with `-D`: the chosen ones
-/// may be squash-merged or stale, which `-d` refuses. Undo pushes the remote ones back, makes
-/// the branches again and has them track what they tracked.
+/// A failed operation has no undo, so whatever could refuse is asked before anything is
+/// deleted: every branch must still be where it was offered; `git branch -f <it> <its commit>`,
+/// which changes nothing, must go through (git refuses it, as it refuses `-D`, for a branch
+/// checked out, rebased or bisected in any worktree); and every remote's push must go through
+/// as a dry run (each remote branch where it was last fetched). Then the remote branches go,
+/// one atomic push per remote, then the branches here with `-D`: the chosen ones may be
+/// squash-merged or stale, which `-d` refuses. Undo pushes the remote ones back, makes the
+/// branches again and has them track what they tracked.
 pub(in crate::repo) fn delete_many(
     chosen: &[&Candidate],
     on_remote: bool,
@@ -181,14 +184,23 @@ pub(in crate::repo) fn delete_many(
     } else {
         Vec::new()
     };
+    let probes = chosen
+        .iter()
+        .flat_map(|c| ops(&[&["branch", "-f", "--", &c.name, &c.target]]));
+    let mut dry = Vec::new();
     let mut there = Vec::new();
     let mut back = Vec::new();
     for (remote, list) in &remotes {
         for part in list.chunks(BATCH) {
-            there.push(push_delete(remote, part));
+            let push = push_delete(remote, part);
+            let mut trial = push.clone();
+            trial.insert(1, "--dry-run".to_owned());
+            dry.push(trial);
+            there.push(push);
             back.push(push_back(remote, part));
         }
     }
+    let guards: Vec<Vec<String>> = guards.into_iter().chain(probes).chain(dry).collect();
     let names: Vec<&str> = chosen.iter().map(|c| c.name.as_str()).collect();
     let here: Vec<Vec<String>> = names
         .chunks(BATCH)

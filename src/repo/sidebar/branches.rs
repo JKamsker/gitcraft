@@ -132,6 +132,9 @@ impl RepoTab {
         if let Some(status) = ci {
             tip.push_str(&format!("\nCI: {}", ci_status::state_word(status.state)));
         }
+        if pinned {
+            tip.push_str("\nPinned to top");
+        }
         for reason in reasons.iter().filter(|r| **r != Reason::UpstreamGone) {
             tip.push_str(&format!("\n{}", capitalise(&reason.describe())));
         }

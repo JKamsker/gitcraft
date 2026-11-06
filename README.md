@@ -116,12 +116,14 @@ so your config, credentials and hooks apply as usual.
 - _Pin to top_ (a branch's menu) keeps a branch at the top of _Local_; _Name_ / _Recent_ in the
   panel's header sorts the others by name or by their last commit, newest first. Both are kept
   per repository.
-- _Merged_ and _Stale_ marks on the branches whose work is in the default branch (merged,
-  rebased or cherry-picked, or squash-merged by a pull request) or that had no commit for 90
-  days (Settings → Git), next to _gone_ for an upstream deleted on the remote. The brush in the
-  panel's header (or _Select stale or merged branches…_ in the palette) lists them with why, the
-  merged ones ticked, and deletes the ticked ones here, and on the remote if asked, in one undoable
-  go. It never offers the checked-out branch, the default one, or one checked out in a worktree.
+- _merged_ and _stale_ marks on the branches whose work is in the default branch (merged,
+  rebased or cherry-picked, or squash-merged by a pull request into it) or that had no commit
+  for 90 days (Settings → Git), next to _gone_ for an upstream deleted on the remote. The brush
+  in the panel's header (or _Select stale or merged branches…_ in the palette) lists them, and
+  those gone, with why; only the merged ones start ticked. It deletes the ticked ones here, and
+  if asked their branches of the same name on the remote, in one go that Undo brings back, after
+  checking that nothing would be refused. It never offers the checked-out branch, the default
+  one, or one checked out in a worktree.
 - Hide a branch from the graph with the eye on its row (on hover), or _Solo_ some from their
   menu to see only those; the graph then has just the commits of the branches it shows and the
   checked-out one. _Viewing 12 of 55_ at the top says how many it shows, with _Show all_. Kept

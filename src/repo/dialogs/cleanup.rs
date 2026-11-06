@@ -45,16 +45,35 @@ impl CleanupDialog {
             .collect()
     }
 
+    /// Whether it opened while which branches are merged was still being read.
+    pub(crate) fn is_checking(&self) -> bool {
+        self.checking
+    }
+
+    /// The ticked branches whose remote branch would go too, and the remotes they are on.
+    fn on_remotes(&self) -> (usize, Vec<&str>) {
+        let mut remotes: Vec<&str> = Vec::new();
+        let mut count = 0;
+        for (remote, _, _) in self.chosen().iter().filter_map(|c| c.remote.as_ref()) {
+            count += 1;
+            if !remotes.contains(&remote.as_str()) {
+                remotes.push(remote);
+            }
+        }
+        (count, remotes)
+    }
+
     /// The operation deleting the ticked branches.
     pub(crate) fn action(&self) -> Option<Action> {
         let chosen = self.chosen();
         if chosen.is_empty() {
             return None;
         }
-        let on_remote = self.on_remote && chosen.iter().any(|c| c.remote.is_some());
+        let (there, remotes) = self.on_remotes();
+        let on_remote = self.on_remote && there > 0;
         let (ops, undo) = delete_many(&chosen, on_remote);
         Some(Action::UndoableOps {
-            label: delete_label(chosen.len(), on_remote),
+            label: delete_label(chosen.len(), on_remote.then_some((there, &remotes[..]))),
             ops,
             refresh: Refresh::All,
             undo,
@@ -62,17 +81,25 @@ impl CleanupDialog {
     }
 }
 
-/// What the button and the undo entry say: "Delete 3 branches", "… here and on the remote".
-fn delete_label(count: usize, on_remote: bool) -> String {
-    let what = if count == 1 {
+/// "3 branches", "1 branch".
+fn branches(count: usize) -> String {
+    if count == 1 {
         "1 branch".to_owned()
     } else {
         format!("{count} branches")
-    };
-    if on_remote {
-        format!("Delete {what} here and on the remote")
-    } else {
-        format!("Delete {what}")
+    }
+}
+
+/// What the button and the undo entry say: "Delete 3 branches", "Delete 3 branches (1 on
+/// origin too)".
+fn delete_label(count: usize, there: Option<(usize, &[&str])>) -> String {
+    match there {
+        Some((n, remotes)) => format!(
+            "Delete {} ({n} on {} too)",
+            branches(count),
+            remotes.join(", ")
+        ),
+        None => format!("Delete {}", branches(count)),
     }
 }
 
@@ -84,8 +111,9 @@ pub(super) fn cleanup(ui: &mut Ui, dialog: &mut CleanupDialog) -> Outcome {
     ui.add(
         egui::Label::new(
             RichText::new(
-                "The ticked branches are deleted. Never the checked-out branch, the default \
-                 branch or one checked out in a worktree. Undo brings them back.",
+                "The ticked branches are deleted; Undo brings them back. The checked-out \
+                 branch, the default branch and branches checked out in a worktree are never \
+                 listed.",
             )
             .color(t.text_dim),
         )
@@ -96,14 +124,19 @@ pub(super) fn cleanup(ui: &mut Ui, dialog: &mut CleanupDialog) -> Outcome {
         ui.add(egui::Label::new(RichText::new(e).color(t.danger)).wrap());
     } else if dialog.checking {
         ui.add_space(6.0);
-        ui.label(
-            RichText::new("Still checking which branches are merged: open this again in a moment.")
-                .color(t.warning),
-        );
+        ui.horizontal(|ui| {
+            ui.add(crate::spinner::Spinner::new());
+            ui.label(
+                RichText::new("Checking which branches are merged; the list fills in when done.")
+                    .color(t.text_dim),
+            );
+        });
     }
     ui.add_space(10.0);
     if dialog.rows.is_empty() {
-        ui.label("No branch is merged, stale or deleted on its remote.");
+        if !dialog.checking {
+            ui.label("No branch is merged, stale or deleted on its remote.");
+        }
         ui.add_space(14.0);
         return if cancel_button(ui) {
             Outcome::Cancel
@@ -113,25 +146,28 @@ pub(super) fn cleanup(ui: &mut Ui, dialog: &mut CleanupDialog) -> Outcome {
     }
     select_buttons(ui, &mut dialog.rows);
     checklist(ui, &mut dialog.rows, &t);
-    let (count, remote_count) = {
-        let chosen = dialog.chosen();
-        (
-            chosen.len(),
-            chosen.iter().filter(|c| c.remote.is_some()).count(),
+    let count = dialog.chosen().len();
+    let (there, remotes) = dialog.on_remotes();
+    let remotes: Vec<String> = remotes.into_iter().map(str::to_owned).collect();
+    let remotes: Vec<&str> = remotes.iter().map(String::as_str).collect();
+    ui.add_space(8.0);
+    let also = if remotes.is_empty() {
+        "Also delete their branches on the remote".to_owned()
+    } else {
+        format!(
+            "Also delete {} of the same name on {}",
+            branches(there),
+            remotes.join(", ")
         )
     };
-    ui.add_space(8.0);
-    ui.add_enabled(
-        remote_count > 0,
-        egui::Checkbox::new(
-            &mut dialog.on_remote,
-            format!("Also delete them on the remote ({remote_count})"),
-        ),
-    )
-    .on_hover_text("Deleting a branch on the remote changes it for everyone")
-    .on_disabled_hover_text("None of the ticked branches is on a remote");
+    ui.add_enabled(there > 0, egui::Checkbox::new(&mut dialog.on_remote, also))
+        .on_hover_text(
+            "Deleting a branch on the remote changes it for everyone. Only a remote branch \
+             named like the local one goes, never the default branch.",
+        )
+        .on_disabled_hover_text("None of the ticked branches has a branch of its name on a remote");
     ui.add_space(14.0);
-    let on_remote = dialog.on_remote && remote_count > 0;
+    let on_remote = (dialog.on_remote && there > 0).then_some((there, &remotes[..]));
     let mut outcome = Outcome::Open;
     ui.horizontal(|ui| {
         let danger = egui::Button::new(
@@ -176,17 +212,23 @@ fn checklist(ui: &mut Ui, rows: &mut [(Candidate, bool)], t: &Tokens) {
         .auto_shrink([false, true])
         .show(ui, |ui| {
             for (c, on) in rows.iter_mut() {
-                ui.checkbox(on, RichText::new(&c.name).font(theme::medium(12.5)))
-                    .on_hover_text(&c.name);
                 let mut why: Vec<String> = c.reasons.iter().map(|r| r.describe()).collect();
                 if let Some((remote, name, _)) = &c.remote {
-                    why.push(format!("on {remote} as {name}"));
+                    why.push(format!("also on {remote}/{name}"));
                 }
+                let why = why.join(" · ");
+                ui.horizontal(|ui| {
+                    ui.checkbox(on, "");
+                    ui.add(
+                        egui::Label::new(RichText::new(&c.name).font(theme::medium(12.5)))
+                            .truncate(),
+                    )
+                    .on_hover_text(format!("{}\n{why}", c.name));
+                });
                 ui.horizontal(|ui| {
                     ui.add_space(26.0);
                     ui.add(
-                        egui::Label::new(RichText::new(why.join(" · ")).color(t.text_dim).small())
-                            .truncate(),
+                        egui::Label::new(RichText::new(&why).color(t.text_dim).small()).truncate(),
                     );
                 });
                 ui.add_space(4.0);
@@ -210,7 +252,7 @@ mod tests {
     }
 
     #[test]
-    fn merged_ones_start_ticked_and_stale_ones_not() {
+    fn only_merged_ones_start_ticked() {
         let merged = Reason::Merged(Merged::Into("main".to_owned()));
         let dialog = CleanupDialog::new(
             vec![
@@ -227,7 +269,7 @@ mod tests {
             None,
         );
         let ticked: Vec<&str> = dialog.chosen().iter().map(|c| c.name.as_str()).collect();
-        assert_eq!(ticked, ["done", "gone-old"]);
+        assert_eq!(ticked, ["done"]);
     }
 
     #[test]
@@ -251,10 +293,14 @@ mod tests {
 
     #[test]
     fn labels_count_the_branches() {
-        assert_eq!(delete_label(1, false), "Delete 1 branch");
+        assert_eq!(delete_label(1, None), "Delete 1 branch");
         assert_eq!(
-            delete_label(12, true),
-            "Delete 12 branches here and on the remote"
+            delete_label(12, Some((1, &["origin"]))),
+            "Delete 12 branches (1 on origin too)"
+        );
+        assert_eq!(
+            delete_label(3, Some((2, &["origin", "fork"]))),
+            "Delete 3 branches (2 on origin, fork too)"
         );
     }
 }
