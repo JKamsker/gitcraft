@@ -4,6 +4,7 @@ mod clone;
 mod home;
 mod palette;
 mod panels;
+mod remote_open;
 mod tab_strip;
 mod tabs;
 #[cfg(test)]
@@ -28,6 +29,7 @@ use crate::update;
 use clone::CloneForm;
 use palette::Palette;
 use panels::Toast;
+use remote_open::{Connecting, RemoteForm};
 use tab_strip::TabDrag;
 
 const MAX_RECENT: usize = 12;
@@ -82,6 +84,10 @@ pub struct App {
     cloning: Option<(PathBuf, Receiver<Result<(), String>>)>,
     /// The form of the running clone, back on screen if it needs credentials.
     cloning_form: Option<CloneForm>,
+    /// The dialog that opens a repository in WSL or over SSH.
+    remote_form: Option<RemoteForm>,
+    /// A repository on another machine being reached, its tab to open once it answers.
+    connecting: Option<Connecting>,
     /// A newer release than this build.
     update: Option<update::Found>,
     update_rx: Option<Receiver<Result<Option<update::Found>, String>>>,
@@ -140,6 +146,8 @@ impl App {
             clone_form: None,
             cloning: None,
             cloning_form: None,
+            remote_form: None,
+            connecting: None,
             update: None,
             update_rx: None,
             update_looked: None,
@@ -152,7 +160,9 @@ impl App {
         let mut kept = Vec::new();
         if app.git_version.is_ok() {
             for path in saved.open {
-                let is_dir = path.is_dir();
+                // One on another machine is kept unasked: asking would wait for a connection
+                // before the window shows. Its tab says so if it's gone.
+                let is_dir = crate::remote::is_remote(&path) || path.is_dir();
                 kept.push(is_dir);
                 if is_dir {
                     // Read once shown, or once the one shown is read: one at a time first.
@@ -178,15 +188,30 @@ impl App {
         self.open_repo(path, ctx);
     }
 
-    /// Opens `path` in the active tab if it's a start page, otherwise in a new tab.
+    /// Opens `path` in the active tab if it's a start page, otherwise in a new tab. One on
+    /// another machine opens once it is reached, in the background.
     fn open_repo(&mut self, path: &Path, ctx: &egui::Context) {
-        let root = match repo_root(path) {
-            Ok(root) => root,
-            Err(e) => {
-                self.error = Some(e);
+        if crate::remote::is_remote(path) {
+            // Already open: no need to reach it first.
+            if let Some(i) = self
+                .tabs
+                .iter()
+                .position(|t| matches!(t, Tab::Repo(r) if r.path == path))
+            {
+                self.active = i;
                 return;
             }
-        };
+            self.connect(path.to_owned(), None, ctx);
+            return;
+        }
+        match repo_root(path) {
+            Ok(root) => self.open_root(root, ctx),
+            Err(e) => self.error = Some(e),
+        }
+    }
+
+    /// Opens the repository whose top folder is `root` (see [`Self::open_repo`]).
+    fn open_root(&mut self, root: PathBuf, ctx: &egui::Context) {
         self.remember(&root);
         self.error = None;
 
@@ -258,6 +283,7 @@ impl App {
     fn shortcuts(&mut self, ctx: &egui::Context) -> bool {
         // A focused text field or the terminal keeps these keys for itself.
         let modal_open = self.clone_form.is_some()
+            || self.remote_form.is_some()
             || self.palette.is_some()
             || self.manual_open
             || ctx.egui_wants_keyboard_input();
@@ -309,8 +335,10 @@ impl App {
         let active = self.active;
         match self.tabs.get_mut(active) {
             Some(Tab::Repo(repo)) => {
-                repo.keys_blocked =
-                    self.palette.is_some() || self.manual_open || self.clone_form.is_some();
+                repo.keys_blocked = self.palette.is_some()
+                    || self.manual_open
+                    || self.clone_form.is_some()
+                    || self.remote_form.is_some();
                 // Its widgets' state (scroll offsets, text fields' undo, open menus) is its own:
                 // every repository tab lays out the same widgets, which would otherwise share
                 // it with the tab shown before.
@@ -361,6 +389,7 @@ impl eframe::App for App {
             return;
         }
         self.poll_clone(&ctx);
+        self.poll_connecting(&ctx);
         self.poll_update(&ctx);
         let focused = self.shortcuts(&ctx);
 
@@ -407,6 +436,7 @@ impl eframe::App for App {
 
         self.active_tab_ui(ui, &t);
         self.clone_dialog(&ctx);
+        self.remote_dialog(&ctx);
         self.palette_ui(&ctx);
         self.manual_ui(&ctx);
         self.toast_finished(focused);
@@ -462,6 +492,10 @@ fn repo_scope(path: &Path) -> egui::Id {
 /// The top of the repository `path` is in, in the form tabs are told apart by.
 fn repo_root(path: &Path) -> Result<PathBuf, String> {
     let root = git::toplevel(path)?;
+    // Already in its one form; resolving it here would mean nothing.
+    if crate::remote::is_remote(&root) {
+        return Ok(root);
+    }
     let root = std::fs::canonicalize(&root).unwrap_or(root);
     Ok(strip_verbatim(root))
 }

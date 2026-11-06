@@ -22,6 +22,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "One tab per repository. Changes made elsewhere (editor, terminal) show up by themselves.",
             "Right-click a tab to give it its own icon and highlight colour.",
             "Drag a tab along the strip to reorder the tabs.",
+            "Remote on the start page opens a repository in WSL or over SSH: git runs there, this window shows it. The toolbar names the machine; the terminal opens a shell there. SSH signs in with keys or an agent.",
         ],
     ),
     (

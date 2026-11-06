@@ -218,6 +218,11 @@ pub fn use_in_merges(ctx: &egui::Context, on: bool) {
 /// with every conflict it could solve solved, the others still marked. The file itself is left
 /// as it is.
 pub fn solve(repo: &Path, path: &str) -> Result<String, String> {
+    if crate::remote::is_remote(repo) {
+        return Err(
+            "Mergiraf runs on this machine and can't read a repository on another one".to_owned(),
+        );
+    }
     let found = current().found.ok_or("Mergiraf isn't installed")?;
     let out = quiet(Command::new(&found.program))
         .current_dir(repo)

@@ -81,7 +81,25 @@ pub(crate) fn tool_with_input(
     input: Option<&str>,
 ) -> Result<String, String> {
     let mut cmd = tool_command(forge);
-    cmd.current_dir(repo).args(args);
+    match crate::remote::parse(repo) {
+        None => {
+            cmd.current_dir(repo).args(args);
+        }
+        // The tool runs here, where the user signed in to it, about the repository there:
+        // named rather than found from the folder, which it can't read.
+        Some(_) => {
+            let (host, path) = remote_location(repo, forge)?;
+            cmd.current_dir(std::env::temp_dir()).args(args);
+            match forge {
+                Forge::GitHub => {
+                    cmd.env("GH_REPO", format!("{host}/{path}"));
+                }
+                Forge::GitLab => {
+                    cmd.env("GITLAB_HOST", &host).args(["--repo", &path]);
+                }
+            }
+        }
+    }
     let not_installed = |_| {
         format!(
             "{} isn't installed: gitcraft uses it for {}s",
@@ -111,6 +129,32 @@ pub(crate) fn tool_with_input(
     } else {
         Err(failure(forge, &out))
     }
+}
+
+/// The web host and `owner/repo` of the remote the forge is found from (see [`detect`]), for a
+/// repository on another machine; asked there once per repository.
+fn remote_location(repo: &Path, forge: Forge) -> Result<(String, String), String> {
+    use std::sync::{Mutex, OnceLock};
+    type Known = Mutex<HashMap<std::path::PathBuf, (String, String)>>;
+    static KNOWN: OnceLock<Known> = OnceLock::new();
+    let known = KNOWN.get_or_init(Known::default);
+    let lock = || {
+        known
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    };
+    if let Some(found) = lock().get(repo) {
+        return Ok(found.clone());
+    }
+    let remotes = crate::git::remotes(repo)?;
+    let found = remotes
+        .iter()
+        .find(|r| r.name == "origin")
+        .or_else(|| remotes.first())
+        .and_then(|r| location(&r.url))
+        .ok_or_else(|| format!("{} needs a remote with an owner/repo URL", forge.tool()))?;
+    lock().insert(repo.to_owned(), found.clone());
+    Ok(found)
 }
 
 /// The forge's tool, set to answer this repository in plain JSON.

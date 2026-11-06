@@ -20,6 +20,10 @@ pub fn file_at(repo: &Path, rev: Option<&str>, path: &str) -> Result<Vec<u8>, St
 /// leaves the other side's link in place when it conflicts with a file (`x -> /dev/zero`):
 /// read through, the app would never stop reading it. Anything else but a file is refused.
 pub fn worktree_file(file: &Path) -> std::io::Result<Vec<u8>> {
+    // In WSL or over SSH: the same, read there.
+    if let Some(read) = crate::remote::worktree_file(file) {
+        return read;
+    }
     let meta = std::fs::symlink_metadata(file)?;
     if meta.file_type().is_symlink() {
         return Ok(std::fs::read_link(file)?
@@ -64,13 +68,13 @@ pub fn tree_files(repo: &Path, rev: &str) -> Result<Vec<String>, String> {
 /// when it was already there.
 pub fn add_to_gitignore(repo: &Path, pattern: &str) -> Result<bool, String> {
     let file = repo.join(".gitignore");
-    let existing = match std::fs::read_to_string(&file) {
+    let existing = match crate::remote::read_to_string(&file) {
         Ok(s) => s,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
         Err(e) => return Err(format!("could not read .gitignore: {e}")),
     };
     match gitignore_with(&existing, pattern) {
-        Some(updated) => std::fs::write(&file, updated)
+        Some(updated) => crate::remote::write(&file, updated.as_bytes())
             .map(|_| true)
             .map_err(|e| format!("could not write .gitignore: {e}")),
         None => Ok(false),

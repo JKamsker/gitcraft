@@ -62,11 +62,12 @@ impl App {
 
                     ui.horizontal(|ui| {
                         ui.spacing_mut().item_spacing.x = 12.0;
-                        let w = (ui.available_width() - 24.0) / 3.0;
+                        let w = (ui.available_width() - 36.0) / 4.0;
                         for (i, (icon, title, sub)) in [
                             ("folder-open", "Open", "An existing local repository"),
                             ("folder-plus", "Create", "A new repository (git init)"),
                             ("log-in", "Clone", "Copy a remote repository"),
+                            ("server", "Remote", "In WSL or over SSH"),
                         ]
                         .into_iter()
                         .enumerate()
@@ -86,6 +87,13 @@ impl App {
                         ui.horizontal(|ui| {
                             ui.add(crate::spinner::Spinner::new());
                             ui.label(format!("Cloning into {}…", dest.display()));
+                        });
+                    }
+                    if let Some(connecting) = &self.connecting {
+                        ui.add_space(12.0);
+                        ui.horizontal(|ui| {
+                            ui.add(crate::spinner::Spinner::new());
+                            ui.label(format!("Connecting to {}…", connecting.label));
                         });
                     }
 
@@ -114,7 +122,8 @@ impl App {
         match action {
             Some(0) => self.pick_existing(&ctx),
             Some(1) => self.pick_new(&ctx),
-            Some(_) => self.start_clone(),
+            Some(2) => self.start_clone(),
+            Some(_) => self.start_open_remote(&ctx),
             None => {}
         }
         if let Some(path) = open {
@@ -222,10 +231,15 @@ fn recent_row(ui: &mut Ui, path: &Path) -> Option<RecentClick> {
         ui.painter().rect_filled(rect, t.radius, t.hover);
     }
     let y = rect.center().y;
+    // One on another machine says which.
     icons::paint(
         ui,
         Rect::from_center_size(pos2(rect.left() + 20.0, y), vec2(18.0, 18.0)),
-        "folder-git-2",
+        if crate::remote::is_remote(path) {
+            "server"
+        } else {
+            "folder-git-2"
+        },
         16.0,
         t.icon,
     );
@@ -245,7 +259,7 @@ fn recent_row(ui: &mut Ui, path: &Path) -> Option<RecentClick> {
     p.text(
         pos2(rect.left() + 40.0, y + 8.0),
         Align2::LEFT_CENTER,
-        path.display().to_string(),
+        crate::remote::display(path),
         egui::FontId::proportional(11.0),
         t.text_faint,
     );
@@ -271,8 +285,5 @@ fn recent_row(ui: &mut Ui, path: &Path) -> Option<RecentClick> {
 }
 
 fn same_path(a: &Path, b: &Path) -> bool {
-    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
-        (Ok(a), Ok(b)) => a == b,
-        _ => a == b,
-    }
+    crate::remote::same_dir(a, b)
 }

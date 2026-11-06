@@ -38,6 +38,8 @@ pub struct ConflictEditor {
     rebase: bool,
     /// Mergiraf is working on the file.
     pub solving: bool,
+    /// The file is on another machine, where this machine's Mergiraf can't read it.
+    remote: bool,
     /// How many conflicts the file has on disk, which Mergiraf starts from.
     pub on_disk: usize,
     /// The file as it was opened: while it stays so, a refresh keeps the choices made.
@@ -211,7 +213,28 @@ fn unresolved_in(result: &str, segments: &[Segment]) -> usize {
 
 /// Whether `file` is a symbolic link (not what it points to).
 fn is_link(file: &Path) -> bool {
-    std::fs::symlink_metadata(file).is_ok_and(|m| m.file_type().is_symlink())
+    crate::remote::is_link(file)
+}
+
+/// Writes `text`, the conflicts of `path` (in the repository at `repo`) solved, over it. On
+/// another machine, a round trip or two: in the background.
+pub fn save_solved(repo: &Path, path: &str, text: &str) -> Result<(), String> {
+    let file = repo.join(path);
+    // A link put there since it was opened is not written through.
+    if is_link(&file) {
+        return Err(format!("{path} is a symbolic link now: not saved"));
+    }
+    crate::remote::write(&file, text.as_bytes()).map_err(|e| format!("Could not save {path}: {e}"))
+}
+
+/// Whether `path` (in the repository at `repo`) is no longer `opened`, as it was opened. On
+/// another machine, a round trip: in the background.
+pub fn changed_on_disk(repo: &Path, path: &str, opened: &str) -> bool {
+    crate::git::worktree_file(&repo.join(path))
+        .ok()
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+        .as_deref()
+        != Some(opened)
 }
 
 impl ConflictEditor {
@@ -242,17 +265,19 @@ impl ConflictEditor {
             theirs_label,
             rebase: state == Some(InProgress::Rebase),
             solving: false,
+            remote: crate::remote::is_remote(repo),
             on_disk: conflicts,
         })
     }
 
     /// Whether the file in the repository at `repo` is no longer as it was opened.
     pub fn changed_on_disk(&self, repo: &Path) -> bool {
-        crate::git::worktree_file(&repo.join(&self.path))
-            .ok()
-            .and_then(|bytes| String::from_utf8(bytes).ok())
-            .as_ref()
-            != Some(&self.opened)
+        changed_on_disk(repo, &self.path, &self.opened)
+    }
+
+    /// The file as it was opened (for [`changed_on_disk`] in the background).
+    pub fn opened(&self) -> &str {
+        &self.opened
     }
 
     /// Takes `text`, the file with some of its conflicts solved elsewhere (by Mergiraf): the
@@ -298,6 +323,12 @@ impl ConflictEditor {
     }
 
     pub fn save(&self, repo: &Path) -> Result<(), String> {
+        let text = self.solved()?;
+        save_solved(repo, &self.path, &text)
+    }
+
+    /// The file with every conflict solved, as it is to be saved; or how many are left.
+    pub fn solved(&self) -> Result<String, String> {
         let left = self.unresolved();
         if left > 0 {
             return Err(format!(
@@ -306,12 +337,7 @@ impl ConflictEditor {
                 self.path
             ));
         }
-        let file = repo.join(&self.path);
-        // A link put there since it was opened is not written through.
-        if is_link(&file) {
-            return Err(format!("{} is a symbolic link now: not saved", self.path));
-        }
-        std::fs::write(file, &self.result).map_err(|e| format!("Could not save {}: {e}", self.path))
+        Ok(self.result.clone())
     }
 
     /// Names for the two sides as the user thinks of them.
@@ -405,6 +431,7 @@ mod tests {
             theirs_label: t,
             rebase: false,
             solving: false,
+            remote: false,
             on_disk: 1,
         };
         assert_eq!(ed.unresolved(), 1);
@@ -429,6 +456,7 @@ mod tests {
             theirs_label,
             rebase: false,
             solving: false,
+            remote: false,
             on_disk: conflicts,
         }
     }

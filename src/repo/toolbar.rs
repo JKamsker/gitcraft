@@ -155,14 +155,28 @@ impl RepoTab {
                         acts.push(Action::OpenUrl(url.clone()));
                     }
                 }
-                if ui.button(reveal_label()).clicked() {
+                // Over SSH, nothing of this machine can open the folder.
+                let here = crate::remote::openable_here(&self.path);
+                let why = here.as_ref().err().cloned().unwrap_or_default();
+                if ui
+                    .add_enabled(here.is_ok(), egui::Button::new(reveal_label()))
+                    .on_disabled_hover_text(&why)
+                    .clicked()
+                {
                     acts.push(Action::OpenPath(PathBuf::new()));
                 }
-                if ui.button("Open in editor").clicked() {
+                if ui
+                    .add_enabled(here.is_ok(), egui::Button::new("Open in editor"))
+                    .on_disabled_hover_text(&why)
+                    .clicked()
+                {
                     acts.push(Action::OpenInEditor(PathBuf::new()));
                 }
                 if ui.button("Copy path").clicked() {
-                    ui.ctx().copy_text(self.path.display().to_string());
+                    // Elsewhere, the path there: what a shell on that machine takes.
+                    let path = crate::remote::parse(&self.path)
+                        .map_or_else(|| self.path.display().to_string(), |t| t.path);
+                    ui.ctx().copy_text(path);
                 }
             });
     }
@@ -170,6 +184,15 @@ impl RepoTab {
     /// The checked-out branch (or detached HEAD), and a merge or rebase in progress.
     fn head_label(&self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
+        // A repository on another machine says which, first.
+        if let Some(target) = crate::remote::parse(&self.path) {
+            widgets::chip(ui, &target.host.label(), t.accent).on_hover_text(format!(
+                "git runs on {}, in {}",
+                target.host.label(),
+                target.path
+            ));
+            ui.add_space(6.0);
+        }
         match &self.refs.current {
             Some(branch) => {
                 icons::inline(ui, "git-branch", 14.0, t.text_dim);

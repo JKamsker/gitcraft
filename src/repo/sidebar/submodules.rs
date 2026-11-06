@@ -73,8 +73,15 @@ impl RepoTab {
         {
             acts.push(Action::OpenTab(folder.clone()));
         }
+        // Not asked of another machine every frame: in WSL it's there once cloned, over SSH
+        // this machine can't open it.
+        let revealable = if crate::remote::is_remote(&folder) {
+            cloned && crate::remote::openable_here(&folder).is_ok()
+        } else {
+            folder.is_dir()
+        };
         if ui
-            .add_enabled(folder.is_dir(), egui::Button::new(reveal_label()))
+            .add_enabled(revealable, egui::Button::new(reveal_label()))
             .clicked()
         {
             acts.push(Action::OpenPath(sub.path.clone().into()));

@@ -1,6 +1,7 @@
 //! Reading the repository in the background and rebuilding the graph rows from what was read.
 
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -67,13 +68,19 @@ impl RepoTab {
                             let changes = Some(work.changed_files());
                             // Very old gits have no `worktree list`; the section just stays
                             // empty.
-                            let worktrees = git::worktrees(path, changes).unwrap_or_default();
+                            // Elsewhere, the others are counted after the tab shows.
+                            let worktrees = if crate::remote::is_remote(path) {
+                                git::worktree_list(path, changes)
+                            } else {
+                                git::worktrees(path, changes)
+                            };
+                            let worktrees = worktrees.unwrap_or_default();
                             Ok::<_, String>((work, worktrees))
                         });
                         let stashes = scope.spawn(|| git::stashes(path).unwrap_or_default());
                         let remotes = scope.spawn(|| git::remotes(path).unwrap_or_default());
                         let submodules = scope.spawn(|| git::submodules(path).unwrap_or_default());
-                        let lfs = scope.spawn(|| git::uses_lfs(path) && git::lfs_installed());
+                        let lfs = scope.spawn(|| git::uses_lfs(path) && git::lfs_installed(path));
                         let identity = git::identity(path);
                         let join = |e| format!("Reading the repository failed: {e:?}");
                         let history: Vec<Arc<Commit>> = history
@@ -130,6 +137,50 @@ impl RepoTab {
             self.recheck_after_load = true;
         } else {
             self.recheck(ctx);
+        }
+    }
+
+    /// Counts, in the background, the changes of the worktrees the last read left uncounted (on
+    /// another machine, where that takes a while), one count at a time.
+    /// Every count is made again (those shown are the last ones, kept until then); a read
+    /// coming in while one runs counts again after it.
+    fn count_worktrees(&mut self, ctx: &egui::Context) {
+        if !crate::remote::is_remote(&self.path) {
+            return;
+        }
+        if self.counting_worktrees {
+            self.recount_worktrees = true;
+            return;
+        }
+        let mut list = self.worktrees.clone();
+        for wt in list.iter_mut().filter(|w| !w.current) {
+            wt.changes = None;
+        }
+        if !list.iter().any(git::Worktree::needs_count) {
+            return;
+        }
+        self.counting_worktrees = true;
+        let path = self.path.clone();
+        spawn(&self.tx, ctx, move || {
+            git::count_changes(&path, &mut list);
+            Msg::WorktreeCounts(
+                list.into_iter()
+                    .filter_map(|w| Some((w.path, w.changes?)))
+                    .collect(),
+            )
+        });
+    }
+
+    /// Takes in the counts of [`Self::count_worktrees`].
+    pub(super) fn worktrees_counted(&mut self, counts: Vec<(PathBuf, usize)>, ctx: &egui::Context) {
+        self.counting_worktrees = false;
+        for wt in self.worktrees.iter_mut().filter(|w| !w.current) {
+            if let Some((_, n)) = counts.iter().find(|(p, _)| *p == wt.path) {
+                wt.changes = Some(*n);
+            }
+        }
+        if std::mem::take(&mut self.recount_worktrees) {
+            self.count_worktrees(ctx);
         }
     }
 
@@ -251,12 +302,25 @@ impl RepoTab {
         if Self::newer(loaded.read, &mut self.work_read) {
             self.work = loaded.work;
         }
+        // The last counts of worktrees this read left uncounted (on another machine) stay
+        // until they are counted again.
+        let counted: Vec<(PathBuf, Option<usize>)> = self
+            .worktrees
+            .iter()
+            .map(|w| (w.path.clone(), w.changes))
+            .collect();
         self.worktrees = loaded.worktrees;
+        for wt in self.worktrees.iter_mut().filter(|w| w.needs_count()) {
+            if let Some((_, changes)) = counted.iter().find(|(p, _)| *p == wt.path) {
+                wt.changes = *changes;
+            }
+        }
         // This worktree's count is that of the working tree kept, which may be newer.
         let changes = self.work.changed_files();
         if let Some(here) = self.worktrees.iter_mut().find(|wt| wt.current) {
             here.changes = Some(changes);
         }
+        self.count_worktrees(ctx);
         self.take_visibility(loaded.log_from, ctx);
         // Stash numbers shift when one is pushed or dropped; follow the commit.
         let viewed = self
@@ -455,10 +519,23 @@ impl RepoTab {
         let key = DiffKey::Work(file.clone());
         // The conflict editor keeps what was chosen (or Mergiraf's answer) while the file
         // is as it was opened.
+        // Elsewhere, kept, and looked at in the background (see `conflict_changed`).
+        let remote = crate::remote::is_remote(&self.path);
         let editing = self
             .conflict
             .as_ref()
-            .is_some_and(|ed| ed.path == file.path && !ed.changed_on_disk(&self.path));
+            .is_some_and(|ed| ed.path == file.path && (remote || !ed.changed_on_disk(&self.path)));
+        if remote
+            && editing
+            && let Some(ed) = &self.conflict
+        {
+            let (repo, path, opened) = (self.path.clone(), ed.path.clone(), ed.opened().to_owned());
+            spawn(&self.tx, ctx, move || {
+                let changed = super::conflict::changed_on_disk(&repo, &path, &opened);
+                // Nothing to say when it didn't.
+                Msg::ConflictChanged(changed.then_some(path))
+            });
+        }
         if still && (file.area != git::Area::Conflicted || editing) {
             // Shown as it was until the new diff is read (no flicker after staging lines).
             self.refresh_diff(ctx);

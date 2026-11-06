@@ -126,6 +126,18 @@ impl RepoTab {
             return;
         }
         self.conflict = match &key {
+            // Elsewhere, read in the background (see `conflict_opened`).
+            DiffKey::Work(file)
+                if file.area == git::Area::Conflicted && crate::remote::is_remote(&self.path) =>
+            {
+                let (repo, path, state) =
+                    (self.path.clone(), file.path.clone(), self.work.in_progress);
+                spawn(&self.tx, ctx, move || {
+                    let editor = conflict::ConflictEditor::open(&repo, &path, state);
+                    Msg::ConflictOpened(path, editor.map(Box::new))
+                });
+                None
+            }
             DiffKey::Work(file) if file.area == git::Area::Conflicted => {
                 conflict::ConflictEditor::open(&self.path, &file.path, self.work.in_progress)
             }
@@ -133,6 +145,38 @@ impl RepoTab {
         };
         self.diff = Some(DiffView::new(key));
         self.refresh_diff(ctx);
+    }
+
+    /// The conflict editor of `path`, read in the background, if its diff is still the one open.
+    pub(super) fn conflict_opened(
+        &mut self,
+        path: String,
+        editor: Option<Box<conflict::ConflictEditor>>,
+    ) {
+        let open = matches!(&self.diff, Some(DiffView { key: DiffKey::Work(file), .. })
+            if file.path == path && file.area == git::Area::Conflicted);
+        if open {
+            self.conflict = editor.map(|e| *e);
+        }
+    }
+
+    /// The file of the open conflict editor changed on disk (seen in the background): opened
+    /// again from what is there now.
+    pub(super) fn conflict_changed(&mut self, path: String, ctx: &egui::Context) {
+        if self.conflict.as_ref().is_none_or(|ed| ed.path != path) {
+            return;
+        }
+        let Some(DiffView {
+            key: DiffKey::Work(file),
+            ..
+        }) = &self.diff
+        else {
+            return;
+        };
+        let key = DiffKey::Work(file.clone());
+        self.diff = None;
+        self.conflict = None;
+        self.open_diff(key, ctx);
     }
 
     /// Reads the open diff again, showing the old one meanwhile.

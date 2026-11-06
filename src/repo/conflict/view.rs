@@ -73,6 +73,7 @@ impl ConflictEditor {
             ("--ours", "--theirs")
         };
         let offer_mergiraf = crate::settings::Settings::get(ui.ctx()).mergiraf
+            && !self.remote
             && crate::mergiraf::found(ui.ctx()).is_some();
         if offer_mergiraf {
             if self.solving {

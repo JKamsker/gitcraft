@@ -10,9 +10,12 @@ use crate::git;
 impl RepoTab {
     /// Asks where to save the patch of commit `hash`, then writes it there.
     pub(super) fn save_patch(&mut self, hash: String, summary: &str, ctx: &egui::Context) {
-        let Some(file) = rfd::FileDialog::new()
-            .set_title("Save patch")
-            .set_directory(&self.path)
+        let mut dialog = rfd::FileDialog::new().set_title("Save patch");
+        // Saved on this machine: next to the repository when it is here (or in WSL).
+        if crate::remote::openable_here(&self.path).is_ok() {
+            dialog = dialog.set_directory(&self.path);
+        }
+        let Some(file) = dialog
             .set_file_name(patch_file_name(summary))
             .add_filter("Patch", &["patch"])
             .save_file()
@@ -38,9 +41,11 @@ impl RepoTab {
 
     /// Asks for a patch file and applies it, undoably.
     pub(super) fn apply_patch(&mut self, ctx: &egui::Context) {
-        let Some(file) = rfd::FileDialog::new()
-            .set_title("Apply patch")
-            .set_directory(&self.path)
+        let mut dialog = rfd::FileDialog::new().set_title("Apply patch");
+        if crate::remote::openable_here(&self.path).is_ok() {
+            dialog = dialog.set_directory(&self.path);
+        }
+        let Some(file) = dialog
             .add_filter("Patch", &["patch", "diff", "eml", "mbox"])
             .add_filter("All files", &["*"])
             .pick_file()
@@ -55,7 +60,19 @@ impl RepoTab {
             }
         };
         let label = format!("Apply {}", file_name(&file));
-        let file = file.to_string_lossy().into_owned();
+        // For a repository on another machine, git there reads a copy put there.
+        let file = match crate::remote::parse(&self.path) {
+            Some(target) => {
+                match crate::remote::host_temp_file(&target, "apply.patch", text.as_bytes()) {
+                    Ok(there) => there,
+                    Err(e) => {
+                        self.status = Some((format!("Apply patch: {e}"), true));
+                        return;
+                    }
+                }
+            }
+            None => file.to_string_lossy().into_owned(),
+        };
         if is_mail(&text) {
             self.run_undoable(
                 &label,

@@ -247,6 +247,15 @@ pub fn work_diff(repo: &Path, file: &StatusFile, opts: DiffOptions) -> Result<St
     run(Some(repo), &args)
 }
 
+/// [`save_patch`] where git runs for `repo`, and the file's path as git there is given it: for
+/// a repository in WSL or over SSH, a file on that machine.
+pub fn save_patch_for(repo: &Path, patch: &str) -> Result<String, String> {
+    match crate::remote::parse(repo) {
+        Some(target) => crate::remote::host_temp_file(&target, "patch.patch", patch.as_bytes()),
+        None => save_patch(patch).map(|p| p.to_string_lossy().into_owned()),
+    }
+}
+
 /// Saves `patch` to a temporary file for `git apply`, which reads it from there (so the
 /// operation is a plain list of git commands, which undo can replay). Patches older than a day
 /// are cleared on the way.

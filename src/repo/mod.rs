@@ -39,6 +39,7 @@ mod terminals;
 mod tests;
 mod toolbar;
 mod watch;
+mod watch_remote;
 pub(crate) mod widgets;
 pub(crate) mod worktree_tab;
 
@@ -202,6 +203,13 @@ pub struct RepoTab {
     terminal_error: Option<String>,
 
     watcher: Option<notify::RecommendedWatcher>,
+    /// For a repository on another machine, which no watcher sees: what keeps its poller
+    /// going (it stops once this is dropped).
+    poller: Option<std::sync::Arc<()>>,
+    /// The worktrees' changes are being counted (see `count_worktrees`).
+    counting_worktrees: bool,
+    /// A read came in while they were counted: they are counted again after.
+    recount_worktrees: bool,
     fs_rx: Option<Receiver<watch::FsChange>>,
     /// A change on disk not yet reloaded: (inside .git, when).
     fs_pending: Option<(watch::FsChange, Instant)>,
@@ -325,6 +333,9 @@ impl RepoTab {
             terminal_open: false,
             terminal_error: None,
             watcher: None,
+            poller: None,
+            counting_worktrees: false,
+            recount_worktrees: false,
             fs_rx: None,
             fs_pending: None,
             queued: Vec::new(),

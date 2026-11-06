@@ -45,7 +45,7 @@ impl App {
     /// Opens the repository of the tab closed last whose folder is still there.
     pub(super) fn reopen_closed_tab(&mut self, ctx: &egui::Context) {
         while let Some(path) = self.closed.pop() {
-            if path.is_dir() {
+            if crate::remote::is_remote(&path) || path.is_dir() {
                 self.open_repo(&path, ctx);
                 return;
             }

@@ -107,10 +107,11 @@ pub fn status(repo: &Path) -> Result<WorkStatus, String> {
 fn in_progress(repo: &Path) -> Option<InProgress> {
     for dir in ["rebase-merge", "rebase-apply"] {
         if let Ok(path) = run(Some(repo), &["rev-parse", "--git-path", dir])
-            && repo.join(path.trim()).is_dir()
+            && crate::remote::is_dir(&crate::remote::resolve(repo, path.trim()))
         {
             // `git am` keeps its state there too, marked by this file.
-            let am = repo.join(path.trim()).join("applying").is_file();
+            let state = crate::remote::resolve(repo, path.trim());
+            let am = crate::remote::is_file(&state.join("applying"));
             return Some(if am {
                 InProgress::Am
             } else {
@@ -131,7 +132,7 @@ fn in_progress(repo: &Path) -> Option<InProgress> {
 /// The message git prepared for the commit that ends the operation in progress.
 fn prepared_message(repo: &Path) -> Option<String> {
     let path = run(Some(repo), &["rev-parse", "--git-path", "MERGE_MSG"]).ok()?;
-    let message = std::fs::read_to_string(repo.join(path.trim())).ok()?;
+    let message = crate::remote::read_to_string(&crate::remote::resolve(repo, path.trim())).ok()?;
     // Drop git's `#` comment lines.
     Some(
         message

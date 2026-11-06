@@ -15,6 +15,27 @@ so your config, credentials and hooks apply as usual.
 - Browser-like tabs, one per repository (Ctrl+T, Ctrl+W, middle-click; Ctrl+Shift+T reopens a
   closed one). Open tabs, recents, theme and settings are remembered.
 - Changes made elsewhere (editor, terminal) show up by themselves: the folder is watched.
+- Repositories on another machine, in a WSL distribution or over SSH: the window stays here and
+  git runs there (see below).
+
+**Remote repositories (WSL, SSH)**
+
+- Start page → _Remote_ (or the palette's _Open remote repository_): pick a WSL distribution
+  or an SSH host (the hosts of `~/.ssh/config` are offered), and the repository's folder there
+  (`/home/me/repo` or `~/repo`). A `\wsl.localhost\…` folder chosen with _Open_ is a WSL
+  repository too, and `gitcraft ssh://host/path/to/repo` opens one from the command line.
+- git, and every file read or written in the repository (diffs of the working tree, staging
+  lines, the conflict editor, `.gitignore`, rebase todo lists), runs on that machine, with its
+  own git, config, credentials and hooks. Nothing has to be installed there but git and a POSIX
+  `sh`.
+- A few shells per machine are kept open (`ssh -T host sh`, `wsl.exe -d distro --exec sh`), so a
+  command costs one round trip, not a new connection. SSH signs in with keys or an agent
+  (`BatchMode`): set up key login first; there is no password prompt.
+- Changes made there show up by themselves: the repository is looked at every few seconds.
+- The terminal opens a shell on that machine, in the repository. Pull requests and builds use
+  `gh` / `glab` of this machine, told which repository.
+- Over SSH, programs of this machine can't open the files (reveal in the file manager, open in
+  editor, Mergiraf). In WSL they can, through `\wsl.localhost`.
 
 **Graph**
 
@@ -202,6 +223,15 @@ Linux needs the usual eframe system packages (e.g. `libxkbcommon-dev`, `libgtk-3
 file dialogs, `libdbus-1-dev` for notifications). Pull requests need the GitHub CLI (`gh`) or
 GitLab CLI (`glab`), logged in.
 
+### Remote repositories, against real machines
+
+The tests of `src/remote/live_tests.rs` run only when given a machine:
+
+```sh
+GITCRAFT_TEST_SSH='build-host:~/repos/some-repo' cargo test live_tests -- --nocapture  # reads it
+GITCRAFT_TEST_WSL=Ubuntu cargo test live_tests -- --nocapture  # works in a scratch repo in /tmp
+```
+
 ### Looking at the UI headlessly
 
 `examples/ui_shot.rs` drives the app without a window (egui_kittest) and saves PNGs:
@@ -230,6 +260,7 @@ was made this way, on a demo repository.
 | `src/update.rs`          | new-release check                                                                  |
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |
 | `src/shell_path.rs`      | on macOS, the login shell's PATH for the commands gitcraft starts                  |
+| `src/remote.rs` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
 | `src/settings.rs`        | user settings and their form                                                       |
 | `src/manual.rs`          | the manual (F1): features and keyboard shortcuts                                   |
 | `src/theme.rs`           | colour tokens, fonts, egui style (PhotoCraft's Pro themes)                         |

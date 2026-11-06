@@ -72,7 +72,7 @@ impl RepoTab {
             if let Some(problem) = editor.problem() {
                 return Err(problem);
             }
-            Ok((editor.command()?, editor.head))
+            Ok((editor.command(&self.path)?, editor.head))
         });
         match result {
             // Started while something else ran: say so rather than drop it.
@@ -175,7 +175,7 @@ impl RepoTab {
             self.status = Some((why, true));
             return;
         }
-        match editor.command() {
+        match editor.command(&self.path) {
             Ok(command) => {
                 let label = format!("Interactive rebase onto {}", editor.onto_label);
                 let guards = [self.same_branch(), expect_ref_at("HEAD", &editor.head)];

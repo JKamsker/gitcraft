@@ -126,7 +126,13 @@ impl RepoTab {
                 }
             }
             Action::OpenPath(rel) => {
-                let _ = open::that_detached(self.path.join(rel));
+                let path = self.path.join(rel);
+                match crate::remote::openable_here(&path) {
+                    Ok(()) => {
+                        let _ = open::that_detached(path);
+                    }
+                    Err(e) => self.status = Some((e, true)),
+                }
             }
             Action::OpenInEditor(rel) => {
                 let editor = Settings::get(ctx).editor;
@@ -281,8 +287,8 @@ impl RepoTab {
         let Some(patch) = diff::partial_patch(&data.header, &data.lines, lines, pick) else {
             return;
         };
-        let patch = match git::save_patch(&patch) {
-            Ok(p) => p.to_string_lossy().into_owned(),
+        let patch = match git::save_patch_for(&self.path, &patch) {
+            Ok(p) => p,
             Err(e) => {
                 self.status = Some((e, true));
                 return;
@@ -352,17 +358,40 @@ impl RepoTab {
     /// Writes the conflict editor's file and marks it resolved.
     fn save_conflict(&mut self, ctx: &egui::Context) {
         let Some(editor) = &self.conflict else { return };
-        match editor.save(&self.path) {
-            Ok(()) => {
-                let file = editor.path.clone();
-                self.run_ops(
-                    "Mark resolved",
-                    ops(&[&["--literal-pathspecs", "add", "--", &file]]),
-                    Refresh::Status,
-                    OpKind::plain(),
-                    ctx,
-                );
+        // Elsewhere, written in the background (see `conflict_saved`).
+        if crate::remote::is_remote(&self.path) {
+            match editor.solved() {
+                Ok(text) => {
+                    let (repo, path) = (self.path.clone(), editor.path.clone());
+                    spawn(&self.tx, ctx, move || {
+                        let saved = super::conflict::save_solved(&repo, &path, &text);
+                        Msg::ConflictSaved(path, saved)
+                    });
+                }
+                Err(e) => self.status = Some((e, true)),
             }
+            return;
+        }
+        let saved = editor.save(&self.path);
+        let file = editor.path.clone();
+        self.conflict_saved(file, saved, ctx);
+    }
+
+    /// Marks `file` resolved once its conflicts were saved.
+    pub(super) fn conflict_saved(
+        &mut self,
+        file: String,
+        saved: Result<(), String>,
+        ctx: &egui::Context,
+    ) {
+        match saved {
+            Ok(()) => self.run_ops(
+                "Mark resolved",
+                ops(&[&["--literal-pathspecs", "add", "--", &file]]),
+                Refresh::Status,
+                OpKind::plain(),
+                ctx,
+            ),
             Err(e) => self.status = Some((e, true)),
         }
     }
@@ -371,6 +400,7 @@ impl RepoTab {
 /// Runs the user's editor command with `path` (through `cmd` on Windows, where editors are
 /// usually `.cmd` scripts).
 pub(crate) fn open_in_editor(editor: &str, path: &Path) -> Result<(), String> {
+    crate::remote::openable_here(path)?;
     let editor = if editor.trim().is_empty() {
         "code"
     } else {

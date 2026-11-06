@@ -17,8 +17,8 @@ pub struct LfsPointer {
 /// Whether the repository keeps files in LFS: its `.gitattributes` sends some through the lfs
 /// filter, or it has an `.lfsconfig`.
 pub fn uses_lfs(repo: &Path) -> bool {
-    repo.join(".lfsconfig").is_file()
-        || std::fs::read_to_string(repo.join(".gitattributes"))
+    crate::remote::is_file(&repo.join(".lfsconfig"))
+        || crate::remote::read_to_string(&repo.join(".gitattributes"))
             .is_ok_and(|text| attributes_use_lfs(&text))
 }
 
@@ -30,10 +30,30 @@ pub(super) fn attributes_use_lfs(text: &str) -> bool {
         .any(|l| l.split_whitespace().skip(1).any(|a| a == "filter=lfs"))
 }
 
-/// Whether git-lfs is installed (`git lfs version` works); asked once.
-pub fn lfs_installed() -> bool {
+/// Whether git-lfs is installed where git runs for `repo` (`git lfs version` works); asked once
+/// per machine.
+pub fn lfs_installed(repo: &Path) -> bool {
+    use std::collections::HashMap;
+    use std::sync::Mutex;
     static FOUND: OnceLock<bool> = OnceLock::new();
-    *FOUND.get_or_init(|| run(None, &["lfs", "version"]).is_ok())
+    static FOUND_THERE: OnceLock<Mutex<HashMap<crate::remote::Host, bool>>> = OnceLock::new();
+    let Some(target) = crate::remote::parse(repo) else {
+        return *FOUND.get_or_init(|| run(None, &["lfs", "version"]).is_ok());
+    };
+    let there = FOUND_THERE.get_or_init(Mutex::default);
+    let known = there
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .get(&target.host)
+        .copied();
+    known.unwrap_or_else(|| {
+        let found = run(Some(repo), &["lfs", "version"]).is_ok();
+        there
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(target.host, found);
+        found
+    })
 }
 
 /// The LFS pointer in a file's text, if the text is one: `version https://git-lfs…`, then

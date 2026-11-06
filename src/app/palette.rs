@@ -33,6 +33,7 @@ enum AppCommand {
     Open,
     Create,
     Clone,
+    OpenRemote,
     Settings,
     Manual,
     Theme(ThemeKind),
@@ -78,6 +79,11 @@ impl App {
                 Entry::App(AppCommand::Clone),
             ),
             (
+                "Open remote repository (WSL, SSH)…".to_owned(),
+                "app".to_owned(),
+                Entry::App(AppCommand::OpenRemote),
+            ),
+            (
                 "Settings".to_owned(),
                 "app".to_owned(),
                 Entry::App(AppCommand::Settings),
@@ -120,6 +126,7 @@ impl App {
             Entry::App(AppCommand::Open) => self.pick_existing(ctx),
             Entry::App(AppCommand::Create) => self.pick_new(ctx),
             Entry::App(AppCommand::Clone) => self.start_clone(),
+            Entry::App(AppCommand::OpenRemote) => self.start_open_remote(ctx),
             Entry::App(AppCommand::Settings) => self.open_settings(),
             Entry::App(AppCommand::Manual) => self.manual_open = true,
             Entry::App(AppCommand::Theme(kind)) => self.set_theme(ctx, kind),

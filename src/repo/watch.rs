@@ -17,6 +17,15 @@ impl RepoTab {
         self.fs_rx = Some(rx);
         let path = self.path.clone();
         let events_ctx = ctx.clone();
+        // Elsewhere, there is nothing to watch from here: asked over and over instead.
+        if crate::remote::is_remote(&path) {
+            let alive = std::sync::Arc::new(());
+            let weak = std::sync::Arc::downgrade(&alive);
+            self.poller = Some(alive);
+            std::thread::spawn(move || super::watch_remote::poll(&path, &tx, &events_ctx, &weak));
+            spawn(&self.tx, ctx, || Msg::Watcher(None));
+            return;
+        }
         spawn(&self.tx, ctx, move || {
             Msg::Watcher(start_watcher(&path, tx, events_ctx).map(Box::new))
         });

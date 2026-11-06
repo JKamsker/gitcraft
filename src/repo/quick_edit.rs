@@ -230,7 +230,7 @@ impl RepoTab {
         let label = format!("{} {}", edit.label(), short(&hash));
         let command = result
             .and_then(|commits| plan(edit, &hash, commits))
-            .and_then(|editor| Ok((editor.command()?, editor.head)));
+            .and_then(|editor| Ok((editor.command(&self.path)?, editor.head)));
         match command {
             // Started while something else ran: say so rather than drop it.
             Ok(_) if self.busy_op.is_some() => {

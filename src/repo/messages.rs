@@ -20,6 +20,15 @@ pub(super) enum Msg {
     Submodules(u64, Vec<git::Submodule>),
     /// The refs as they are now, to compare with those read (see `RepoTab::recheck`).
     RefsCheck(Result<git::Refs, String>),
+    /// A conflict editor read in the background (for a repository on another machine).
+    ConflictOpened(String, Option<Box<super::conflict::ConflictEditor>>),
+    /// The file of the open conflict editor changed on disk (`None`: it didn't).
+    ConflictChanged(Option<String>),
+    /// A conflict editor's file written in the background, to be marked resolved.
+    ConflictSaved(String, Result<(), String>),
+    /// The changes of each worktree (by its path) counted after a read (see
+    /// `RepoTab::count_worktrees`).
+    WorktreeCounts(Vec<(std::path::PathBuf, usize)>),
     /// The worktree's watcher, set up in the background (`None` when it couldn't be).
     Watcher(Option<Box<notify::RecommendedWatcher>>),
     /// A further page of history, read while `history_gen` was so: a reload since may have
@@ -227,6 +236,11 @@ impl RepoTab {
                     self.submodules = list;
                 }
             }
+            Msg::WorktreeCounts(counts) => self.worktrees_counted(counts, ctx),
+            Msg::ConflictOpened(path, editor) => self.conflict_opened(path, editor),
+            Msg::ConflictChanged(Some(path)) => self.conflict_changed(path, ctx),
+            Msg::ConflictChanged(None) => {}
+            Msg::ConflictSaved(path, saved) => self.conflict_saved(path, saved, ctx),
             Msg::Watcher(watcher) => {
                 self.watcher = watcher.map(|w| *w);
                 self.watcher_arrived(ctx);
