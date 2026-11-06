@@ -53,10 +53,10 @@ impl FoldReason {
     pub(in crate::repo) fn label(self) -> &'static str {
         match self {
             FoldReason::Generated => "generated",
-            FoldReason::NoDiff => "-diff in .gitattributes",
+            FoldReason::NoDiff => "marked -diff",
             FoldReason::Lockfile => "lockfile",
             FoldReason::Minified => "minified",
-            FoldReason::Pattern => "folded by a pattern in Settings",
+            FoldReason::Pattern => "matches a pattern of Settings → Git → Diffs",
         }
     }
 }
@@ -121,8 +121,13 @@ impl Rules {
 }
 
 /// A pattern without a `/` matches the file's name; one with a `/` its path from the top of
-/// the repository (a leading `/` ignored), where `*` stays within a folder and `**` doesn't.
+/// the repository (a leading `/` ignored), where `*` stays within a folder and `**` doesn't;
+/// one ending in `/` everything in that folder.
 fn pattern_matches(pattern: &str, path: &str, name: &str) -> bool {
+    // `vendor/`: everything in that folder, as `.gitignore` reads it.
+    if let Some(folder) = pattern.strip_suffix('/') {
+        return pattern_matches(&format!("{folder}/**"), path, name);
+    }
     match pattern.strip_prefix('/') {
         Some(rooted) => glob(rooted.as_bytes(), path.as_bytes()),
         None if pattern.contains('/') => glob(pattern.as_bytes(), path.as_bytes()),

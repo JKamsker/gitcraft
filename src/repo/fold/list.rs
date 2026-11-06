@@ -43,15 +43,8 @@ pub(in crate::repo) fn split<'a, T>(
             reasons: Vec::new(),
         };
     }
-    // The list itself (where it is, how long, its ends), what is known and the settings.
-    let key = id.with((
-        files.as_ptr() as usize,
-        files.len(),
-        files.first().map(&path),
-        files.last().map(&path),
-        folding.generation,
-        rules,
-    ));
+    // The list itself, what is known and the settings.
+    let key = id.with((list_fingerprint(files, &path), folding.generation, rules));
     let memo_id = id.with("fold-memo");
     let memo = ui
         .data(|d| d.get_temp::<Memo>(memo_id))
@@ -92,6 +85,25 @@ pub(in crate::repo) fn split<'a, T>(
         folded: folded.iter().map(|&(i, _)| &files[i]).collect(),
         reasons: folded.iter().map(|&(_, r)| r).collect(),
     }
+}
+
+/// Lists longer than this are told apart by some of their paths, not all, every frame.
+const ALL_PATHS_UP_TO: usize = 4096;
+
+/// What tells a list from another one shown in the same place: where it is, its length, and
+/// its paths (every one in a list of up to [`ALL_PATHS_UP_TO`], else as many spread over it).
+pub(super) fn list_fingerprint<T>(files: &[T], path: impl Fn(&T) -> &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    (files.as_ptr() as usize, files.len()).hash(&mut h);
+    let step = files.len().div_ceil(ALL_PATHS_UP_TO).max(1);
+    for f in files.iter().step_by(step) {
+        path(f).hash(&mut h);
+    }
+    if let Some(last) = files.last() {
+        path(last).hash(&mut h);
+    }
+    h.finish()
 }
 
 impl<T> FoldGroup<'_, T> {

@@ -84,6 +84,9 @@ pub struct DiffData {
     pub partial: bool,
     /// The file is new: it has no old side, so it shows unified even side by side.
     pub new_file: bool,
+    /// The lines added and removed; `None` when there are none to count (a binary file, one
+    /// git doesn't diff), as `--numstat` says of those.
+    pub line_counts: (Option<u32>, Option<u32>),
     /// Characters in the longest line, for the width to scroll (counted once, not every frame).
     longest: usize,
     /// The lines cut to be shown, as they were: what copying them copies.
@@ -187,7 +190,9 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         .map(|l| l.text.chars().count())
         .max()
         .unwrap_or(0);
+    let line_counts = count_lines(&lines);
     Ok(DiffData {
+        line_counts,
         lines,
         spans,
         changed,
@@ -201,6 +206,19 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         uncut,
         map: Default::default(),
     })
+}
+
+/// The lines `lines` adds and removes; `None` when it has none to count (a binary file, one
+/// git doesn't diff).
+fn count_lines(lines: &[DiffLine]) -> (Option<u32>, Option<u32>) {
+    if lines.iter().all(|l| l.kind == Kind::Meta) {
+        return (None, None);
+    }
+    let count = |kind| {
+        let n = lines.iter().filter(|l| l.kind == kind).count();
+        Some(u32::try_from(n).unwrap_or(u32::MAX))
+    };
+    (count(Kind::Add), count(Kind::Del))
 }
 
 /// Whether hunks and lines of this diff can be picked on their own.

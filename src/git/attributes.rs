@@ -24,18 +24,27 @@ pub enum FoldAttr {
 /// line on Windows (32 767 characters), and of what a remote shell is sent at once.
 const CHUNK_BYTES: usize = 16 * 1024;
 
-/// What the attributes of `paths` (relative to the repository) say about folding them. Paths
-/// are asked in a few commands rather than one per file.
-pub fn fold_attributes(repo: &Path, paths: &[String]) -> Result<HashMap<String, FoldAttr>, String> {
+/// What the attributes of `paths` (relative to the repository) say about folding them, and
+/// the error that left some of them unread. Paths are asked in a few commands rather than one
+/// per file; between two, `go_on` says whether the answer is still wanted.
+pub fn fold_attributes(
+    repo: &Path,
+    paths: &[String],
+    go_on: &dyn Fn() -> bool,
+) -> (HashMap<String, FoldAttr>, Option<String>) {
     let mut found = HashMap::with_capacity(paths.len());
     for chunk in chunks(paths, CHUNK_BYTES) {
+        if !go_on() {
+            break;
+        }
         let mut args = vec!["check-attr", "-z", "linguist-generated", "diff", "--"];
         args.extend(chunk.iter().map(String::as_str));
-        let out =
-            run(Some(repo), &args).map_err(|e| format!("Couldn't read .gitattributes: {e}"))?;
-        found.extend(parse_check_attr(&out));
+        match run(Some(repo), &args) {
+            Ok(out) => found.extend(parse_check_attr(&out)),
+            Err(e) => return (found, Some(format!("Couldn't read .gitattributes: {e}"))),
+        }
     }
-    Ok(found)
+    (found, None)
 }
 
 /// `paths` in runs of at most `max` bytes (a longer path alone).

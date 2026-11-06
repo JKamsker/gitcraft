@@ -39,7 +39,7 @@ impl DiffAlgorithm {
     /// What it does, for its tooltip.
     pub fn about(self) -> &'static str {
         match self {
-            DiffAlgorithm::Myers => "git's default: fast, pairs the longest common runs",
+            DiffAlgorithm::Myers => "The classic algorithm, fast: pairs the longest common runs",
             DiffAlgorithm::Minimal => "Myers, taking the time to find the smallest diff",
             DiffAlgorithm::Patience => {
                 "Pairs lines that appear once on each side first, so braces and blank lines \
@@ -60,8 +60,9 @@ impl DiffAlgorithm {
     }
 }
 
-/// The file type a choice of algorithm is kept for: the lowercased extension (`rs` for
-/// `src/Main.RS`), or the whole lowercased name when there is none (`makefile`, `.bashrc`).
+/// The file type a choice of algorithm is kept for: `*.` and the lowercased extension
+/// (`*.rs` for `src/Main.RS`), or the whole lowercased name when there is none (`makefile`,
+/// `.bashrc`), so a file named `json` is not taken for every `.json` file.
 pub fn file_type(path: &str) -> String {
     let name = path
         .trim_end_matches('/')
@@ -69,7 +70,9 @@ pub fn file_type(path: &str) -> String {
         .next()
         .unwrap_or(path);
     match name.rsplit_once('.') {
-        Some((stem, ext)) if !stem.is_empty() && !ext.is_empty() => ext.to_lowercase(),
+        Some((stem, ext)) if !stem.is_empty() && !ext.is_empty() => {
+            format!("*.{}", ext.to_lowercase())
+        }
         _ => name.to_lowercase(),
     }
 }
@@ -80,12 +83,14 @@ mod tests {
 
     #[test]
     fn file_types_are_extensions_or_names() {
-        assert_eq!(file_type("src/Main.RS"), "rs");
-        assert_eq!(file_type("archive.tar.gz"), "gz");
+        assert_eq!(file_type("src/Main.RS"), "*.rs");
+        assert_eq!(file_type("archive.tar.gz"), "*.gz");
+        // A file named like an extension is not every file with that extension.
+        assert_ne!(file_type("json"), file_type("a.json"));
         assert_eq!(file_type("Makefile"), "makefile");
         assert_eq!(file_type("home/.bashrc"), ".bashrc");
         assert_eq!(file_type("dir.d/README"), "readme");
-        assert_eq!(file_type("ünï cödé/Straße.TXT"), "txt");
+        assert_eq!(file_type("ünï cödé/Straße.TXT"), "*.txt");
         assert_eq!(file_type("trailing."), "trailing.");
         assert_eq!(file_type(""), "");
     }

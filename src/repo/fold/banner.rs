@@ -4,21 +4,8 @@
 use egui::{RichText, Ui};
 
 use super::{FoldReason, stats_line};
-use crate::repo::diff::{DiffData, Kind};
+use crate::repo::diff::DiffData;
 use crate::theme::Tokens;
-
-/// The lines `data` adds and removes; `None` when it has no lines to count (a binary file,
-/// one git doesn't diff), as `--numstat` says of those.
-pub(in crate::repo) fn line_counts(data: &DiffData) -> (Option<u32>, Option<u32>) {
-    if data.lines.iter().all(|l| l.kind == Kind::Meta) {
-        return (None, None);
-    }
-    let count = |kind| {
-        let n = data.lines.iter().filter(|l| l.kind == kind).count();
-        Some(u32::try_from(n).unwrap_or(u32::MAX))
-    };
-    (count(Kind::Add), count(Kind::Del))
-}
 
 /// Shows the folded diff of the file at `path` in place of its lines (`data`: once read, for
 /// its counts). True when it was opened.
@@ -41,7 +28,7 @@ pub(in crate::repo) fn folded_diff(
         ui.add_space(4.0);
         let line = match data {
             Some(data) => {
-                let (added, removed) = line_counts(data);
+                let (added, removed) = data.line_counts;
                 stats_line(added, removed, reason)
             }
             None => reason.label().to_owned(),

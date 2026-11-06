@@ -36,12 +36,17 @@ impl RepoTab {
         let as_file = self.diff_as_file;
         // A Markdown file can show rendered: `Some(whether it does)`.
         let markdown = rendered::is_markdown(&path).then_some(self.diff_rendered);
+        let folded = if as_file || markdown == Some(true) {
+            None
+        } else {
+            self.fold_reason(view, &settings, acts)
+        };
         let clear = self.diff_header(
             ui,
             view,
             (&path, &origin),
             partial,
-            (split, ignore_ws, whole_file, as_file),
+            (split, ignore_ws, whole_file, as_file, folded.is_some()),
             markdown,
             acts,
         );
@@ -67,7 +72,7 @@ impl RepoTab {
             file_text::show(ui, ("diff_file", &path), view.file.as_ref());
             return;
         }
-        if let Some(reason) = self.fold_reason(view, &settings, acts) {
+        if let Some(reason) = folded {
             let data = match &view.data {
                 Some(Ok(data)) => Some(data),
                 _ => None,
@@ -114,8 +119,8 @@ impl RepoTab {
         }
     }
 
-    /// Why the diff shown starts folded, while it does (a conflicted file never does). Asks
-    /// what `.gitattributes` says of it the first time.
+    /// Why the diff shown starts folded, while it does (a conflicted file never does, nor one
+    /// opened from a file list). Asks what `.gitattributes` says of it the first time.
     fn fold_reason(
         &self,
         view: &DiffView,
@@ -132,7 +137,13 @@ impl RepoTab {
         if !unknown.is_empty() {
             acts.push(Action::FoldAttributes(unknown));
         }
-        self.folding.reason(&rules, path)
+        let reason = self.folding.reason(&rules, path);
+        if reason.is_none() && !self.folding.knows(path) && matches!(view.data, Some(Ok(_))) {
+            // Its lines show before its attributes are known: they stay, rather than fold
+            // away under the reader when the answer comes.
+            acts.push(Action::UnfoldDiff);
+        }
+        reason
     }
 
     /// The file shown and where its diff comes from.
@@ -156,7 +167,7 @@ impl RepoTab {
     }
 
     /// Header: file, where it comes from, options, actions, close. `opts`: (side by side,
-    /// ignore whitespace, whole file, the file instead of the diff); `markdown`: for a Markdown
+    /// ignore whitespace, whole file, the file instead of the diff, folded); `markdown`: for a Markdown
     /// file, whether it shows rendered. True when the picked lines are to be cleared.
     #[allow(clippy::too_many_arguments)]
     fn diff_header(
@@ -165,7 +176,7 @@ impl RepoTab {
         view: &DiffView,
         (path, origin): (&str, &str),
         partial: bool,
-        (split, ignore_ws, whole_file, as_file): (bool, bool, bool, bool),
+        (split, ignore_ws, whole_file, as_file, folded): (bool, bool, bool, bool, bool),
         markdown: Option<bool>,
         acts: &mut Vec<Action>,
     ) -> bool {
@@ -208,7 +219,8 @@ impl RepoTab {
                             clear = self.file_actions(ui, view, file, partial, acts);
                         }
                         ui.add_space(8.0);
-                        if !as_file && !rendered {
+                        // A folded diff shows no lines to arrange.
+                        if !as_file && !rendered && !folded {
                             view_options(ui, &t, (split, ignore_ws, whole_file), acts);
                             ui.add_space(4.0);
                             super::algorithm::algorithm_menu(ui, path, acts);
