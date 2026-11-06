@@ -33,6 +33,7 @@ impl RepoTab {
                 if let Some(state) = self.work.in_progress {
                     self.in_progress_banner(ui, acts, state);
                 }
+                self.unity_banners(ui, acts);
                 if !self.work.conflicted.is_empty() {
                     self.conflicted_list(ui, acts);
                 }

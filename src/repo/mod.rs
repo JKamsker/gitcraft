@@ -40,6 +40,7 @@ mod terminals;
 #[cfg(test)]
 mod tests;
 mod toolbar;
+mod unity;
 mod watch;
 mod watch_remote;
 pub(crate) mod widgets;
@@ -129,6 +130,8 @@ pub struct RepoTab {
     submodules: Vec<Submodule>,
     /// It keeps files in Git LFS, and git-lfs is installed.
     lfs: bool,
+    /// Its Unity project, if it has one.
+    unity: unity::UnityState,
     identity: Identity,
     /// Where `origin` is hosted, when it's on a forge gitcraft knows.
     hosting: Option<Hosting>,
@@ -293,6 +296,7 @@ impl RepoTab {
             remotes: Vec::new(),
             submodules: Vec::new(),
             lfs: false,
+            unity: Default::default(),
             identity: Identity::default(),
             hosting: None,
             prs: Vec::new(),

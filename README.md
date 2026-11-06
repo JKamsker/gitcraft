@@ -166,6 +166,15 @@ so your config, credentials and hooks apply as usual.
 - A file kept in Git LFS shows as its LFS objects before and after, with their sizes, rather
   than the text of the pointer git stores. With git-lfs installed, the palette (Ctrl+P) of a
   repository that uses LFS has _LFS: Fetch_ and _LFS: Pull_.
+- Unity projects (at the root or one folder down) are recognised. _Unity: Project set-up…_ in
+  the palette checks that assets are saved as text (Force Text) and `.meta` files are visible,
+  that `.gitattributes` merges Unity's YAML with Smart Merge and keeps its binaries in LFS, and
+  that `Library`, `Temp`, `Logs` and the other generated folders are ignored, adding the
+  missing lines on request. It finds UnityYAMLMerge in Unity Hub's editors (or one you choose)
+  and registers it as the repository's merge driver; a conflicted scene or prefab then has
+  _Solve with UnityYAMLMerge_ in the conflict editor, which shows the result before saving.
+  Above the changes, an asset or folder staged without its `.meta` (or a `.meta` without its
+  asset, or one deleted without the other) is flagged, with a button to stage the other half.
 - The arrows in a diff's header (F7 / Shift+F7, or Alt+↓ / Alt+↑) jump to the next and previous
   change. The strip beside the scrollbar marks where the changes are, removals red and additions
   green; click a mark to jump to its change, or anywhere else on the strip to scroll there.

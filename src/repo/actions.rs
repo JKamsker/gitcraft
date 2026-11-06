@@ -120,6 +120,8 @@ pub(crate) enum Action {
     /// The commit pane lists every file of the commit, or only those it changed.
     ViewAllFiles(bool),
     SaveConflict,
+    /// Something done for the repository's Unity project.
+    Unity(super::unity::UnityAct),
     /// Let Mergiraf solve what it can of the open conflict.
     SolveWithMergiraf,
     /// A file's history, blame or contents in the central pane (`rev`: the commit they are at).
@@ -375,6 +377,13 @@ impl RepoTab {
                 "Update submodules".into(),
                 "submodule".into(),
                 super::keep_submodules::update_all(),
+            ));
+        }
+        if self.unity.project().is_some() {
+            items.push((
+                "Unity: Project set-up…".into(),
+                "settings".into(),
+                Action::Unity(super::unity::UnityAct::OpenPanel),
             ));
         }
         if self.lfs {

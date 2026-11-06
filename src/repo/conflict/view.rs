@@ -13,13 +13,17 @@ impl RepoTab {
     pub(in crate::repo) fn conflict_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         let idle = self.busy_op.is_none();
+        let smart = self
+            .conflict
+            .as_ref()
+            .is_some_and(|ed| self.unity.offers_smart_merge(&ed.path));
         let Some(ed) = &mut self.conflict else { return };
         let (ours_name, theirs_name) = ed.side_names();
         let left = ed.unresolved();
         // While it is written (on another machine), what is saved is what is shown.
         let editable = !ed.saving;
 
-        ed.header(ui, &t, idle && editable, left, acts);
+        ed.header(ui, &t, (idle && editable, smart), left, acts);
         ed.result_panel(ui, &t, editable);
         ed.conflict_list(ui, &t, (&ours_name, &theirs_name), editable);
     }
@@ -27,7 +31,15 @@ impl RepoTab {
 
 impl ConflictEditor {
     /// Header: the file, how many conflicts are resolved, save, the whole-file actions, close.
-    fn header(&self, ui: &mut Ui, t: &Tokens, idle: bool, left: usize, acts: &mut Vec<Action>) {
+    /// `smart`: Unity's Smart Merge is offered for the file.
+    fn header(
+        &self,
+        ui: &mut Ui,
+        t: &Tokens,
+        (idle, smart): (bool, bool),
+        left: usize,
+        acts: &mut Vec<Action>,
+    ) {
         let total = self.choices.len();
         egui::Frame::new()
             .fill(t.chrome)
@@ -61,9 +73,29 @@ impl ConflictEditor {
                             acts.push(Action::SaveConflict);
                         }
                         self.whole_file_buttons(ui, idle, acts);
+                        if smart {
+                            self.smart_merge_button(ui, idle, acts);
+                        }
                     });
                 });
             });
+    }
+
+    /// Solve with UnityYAMLMerge, for a Unity YAML file of a Unity project.
+    fn smart_merge_button(&self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
+        if self.solving {
+            ui.add(crate::spinner::Spinner::new());
+            return;
+        }
+        let r = ui
+            .add_enabled(idle, egui::Button::new("Solve with UnityYAMLMerge"))
+            .on_hover_text(
+                "Let Unity's Smart Merge merge the scene or prefab by its structure. Nothing is \
+                 saved before you check the result.",
+            );
+        if r.clicked() {
+            acts.push(Action::Unity(crate::repo::unity::UnityAct::SolveConflict));
+        }
     }
 
     /// Mergiraf when it's set up, and the whole file from either side.
