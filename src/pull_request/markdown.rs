@@ -123,7 +123,8 @@ pub fn images_to_links_except(body: &str, trusted: &dyn Fn(&str) -> bool) -> Str
         }
         text = next;
     }
-    text.replace("![", "[")
+    // Still images after all those passes: no `![` is left to start one.
+    text.replace("![", "\\![")
 }
 
 const MAX_IMAGE_PASSES: usize = 8;
@@ -144,7 +145,16 @@ fn image_pass(body: &str, trusted: &dyn Fn(&str) -> bool) -> String {
         let Some(before) = body.get(copied..range.start) else {
             continue;
         };
-        out.push_str(before);
+        // A `!` right before the image's own (`!![x](…)`) would make the link an image again:
+        // it stays, escaped.
+        match before.strip_suffix('!') {
+            // Not one escaped already (after an odd number of `\`).
+            Some(rest) if rest.chars().rev().take_while(|&c| c == '\\').count() % 2 == 0 => {
+                out.push_str(rest);
+                out.push_str("\\!");
+            }
+            _ => out.push_str(before),
+        }
         out.push_str(&link_markdown(&label, &dest_url));
         copied = range.end;
     }
@@ -213,6 +223,38 @@ mod tests {
         assert_eq!(safe_markdown(body, "github.com"), body);
         let raw = "![shot](https://raw.githubusercontent.com/me/r/1/a.png)";
         assert_eq!(safe_markdown(raw, "github.com"), raw);
+    }
+
+    /// Every image in `text` as the viewer parses it.
+    fn images_in(text: &str) -> Vec<String> {
+        use pulldown_cmark::{Event, Parser, Tag};
+        Parser::new_ext(text, markdown_options())
+            .filter_map(|e| match e {
+                Event::Start(Tag::Image { dest_url, .. }) => Some(dest_url.to_string()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// `!`s before an image don't make its link an image again, however many there are.
+    #[test]
+    fn bangs_before_an_image_leave_no_image() {
+        for n in [1, 2, 9, 10, 20, 30, 64] {
+            let body = format!("{}[x](https://evil.example/a.png)", "!".repeat(n));
+            let safe = safe_markdown(&body, "github.com");
+            assert!(images_in(&safe).is_empty(), "{n}: {safe}");
+            assert!(safe.contains("https://evil.example/a.png"), "{n}: {safe}");
+            let local = images_to_links_except(&body, &|_| false);
+            assert!(images_in(&local).is_empty(), "{n}: {local}");
+        }
+        // An escaped `!` before a link is no image: left as it is.
+        let escaped = "\\![x](https://evil.example/a.png)";
+        assert_eq!(safe_markdown(escaped, "github.com"), escaped);
+        // After an escaped `\`, the `!` starts an image: the link keeps it escaped.
+        let after = "\\\\![x](https://evil.example/a.png)";
+        assert!(images_in(after).len() == 1);
+        let safe = safe_markdown(after, "github.com");
+        assert!(images_in(&safe).is_empty(), "{safe}");
     }
 
     #[test]

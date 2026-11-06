@@ -286,32 +286,38 @@ impl RepoTab {
     /// fork that isn't a remote here is fetched from the forge into a branch of its own (named
     /// `pr-N` when one of the name is already another).
     fn pr_worktree_plan(&self, number: u64, branch: &str, sha: &str) -> PrWorktree {
-        let local = self.refs.local.iter().find(|b| b.name == branch);
-        let remote = self.remote_branch_of(branch, sha);
-        let mut fetch = None;
-        let name = if remote.is_some() || local.is_some_and(|b| sha.is_empty() || b.target == sha) {
-            branch.to_owned()
+        // A branch is the pull request's only when it is at its commit (any, when that isn't
+        // known): a fork's `main` is not ours.
+        let at = |target: &str| sha.is_empty() || target == sha;
+        let local_named = |name: &str| self.refs.local.iter().find(|b| b.name == name);
+        let own_name = format!("pr-{number}");
+        let local = local_named(branch);
+        let remote = self.remote_branch_of(branch, sha).filter(|b| at(&b.target));
+        // What the forge says is a name only where git takes it as one (never an option).
+        let usable = plain_branch_name(branch);
+        enum Source<'a> {
+            Local(String),
+            Track(&'a Branch),
+            FromRemote(&'a Branch),
+            Fetch,
+        }
+        let (name, source) = if let Some(b) = local.filter(|b| usable && at(&b.target)) {
+            (b.name.clone(), Source::Local(b.name.clone()))
+        } else if local_named(&own_name).is_some_and(|b| at(&b.target)) {
+            (own_name.clone(), Source::Local(own_name.clone()))
+        } else if let Some(remote) = remote.filter(|_| usable && local.is_none()) {
+            (branch.to_owned(), Source::Track(remote))
+        } else if let Some(remote) = remote {
+            (own_name.clone(), Source::FromRemote(remote))
+        } else if usable && local.is_none() {
+            (branch.to_owned(), Source::Fetch)
         } else {
-            let name = if local.is_some() {
-                format!("pr-{number}")
-            } else {
-                branch.to_owned()
-            };
-            let pull_ref = match self.forge() {
-                Some(Forge::GitLab) => format!("refs/merge-requests/{number}/head"),
-                _ => format!("refs/pull/{number}/head"),
-            };
-            let from = self.default_remote().unwrap_or_else(|| "origin".to_owned());
-            fetch = Some(vec![
-                "fetch".to_owned(),
-                from,
-                format!("+{pull_ref}:refs/heads/{name}"),
-            ]);
-            name
+            (own_name.clone(), Source::Fetch)
         };
         if let Some(wt) = self
             .worktrees
             .iter()
+            .filter(|w| w.prunable.is_none())
             .find(|w| w.branch.as_deref() == Some(name.as_str()))
         {
             return if wt.current {
@@ -323,22 +329,51 @@ impl RepoTab {
         let path = self.free_folder(&self.worktree_folder(&name));
         // As git of the repository's machine names it.
         let path_arg = crate::remote::git_path(&path);
-        let add: Vec<String> = match (fetch.is_some(), local.is_some(), remote) {
-            (false, false, Some(remote)) => vec![
-                "worktree".into(),
-                "add".into(),
-                "--track".into(),
-                "-b".into(),
-                name.clone(),
-                path_arg,
-                remote.name.clone(),
-            ],
-            _ => vec!["worktree".into(), "add".into(), path_arg, name.clone()],
-        };
-        PrWorktree::Create {
-            ops: fetch.into_iter().chain([add]).collect(),
-            path,
+        let strings =
+            |args: &[&str]| -> Vec<String> { args.iter().map(|a| (*a).to_owned()).collect() };
+        // A worktree whose folder was deleted by hand still holds its branch for git.
+        let mut ops = vec![strings(&["worktree", "prune"])];
+        match source {
+            Source::Local(name) => {
+                ops.push(strings(&["worktree", "add", "--", &path_arg, &name]));
+            }
+            Source::Track(remote) => ops.push(strings(&[
+                "worktree",
+                "add",
+                "--track",
+                "-b",
+                &name,
+                "--",
+                &path_arg,
+                &remote.name,
+            ])),
+            Source::FromRemote(remote) => ops.push(strings(&[
+                "worktree",
+                "add",
+                "-b",
+                &name,
+                "--",
+                &path_arg,
+                &remote.name,
+            ])),
+            Source::Fetch => {
+                let pull_ref = match self.forge() {
+                    Some(Forge::GitLab) => format!("refs/merge-requests/{number}/head"),
+                    _ => format!("refs/pull/{number}/head"),
+                };
+                let from = self.default_remote().unwrap_or_else(|| "origin".to_owned());
+                // Not forced: a `pr-N` of the user's own that went elsewhere is refused by git
+                // rather than overwritten.
+                ops.push(strings(&[
+                    "fetch",
+                    "--",
+                    &from,
+                    &format!("{pull_ref}:refs/heads/{name}"),
+                ]));
+                ops.push(strings(&["worktree", "add", "--", &path_arg, &name]));
+            }
         }
+        PrWorktree::Create { ops, path }
     }
 
     /// The folder a worktree on `branch` goes in, beside the main one: `app` + `feature/x` →
@@ -389,6 +424,23 @@ impl RepoTab {
             .find(|p| !taken(p))
             .unwrap_or_else(|| path.to_path_buf())
     }
+}
+
+/// Whether `name` (a pull request's branch, as the forge says it) is a branch name git takes
+/// as it is (`git check-ref-format --branch`), and never as an option.
+fn plain_branch_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name.starts_with(['-', '/', '.'])
+        && !name.ends_with(['/', '.'])
+        && !name.ends_with(".lock")
+        && !name.contains("..")
+        && !name.contains("//")
+        && !name.contains("@{")
+        && !name.contains("/.")
+        && name != "@"
+        && !name
+            .chars()
+            .any(|c| c.is_control() || matches!(c, ' ' | '~' | '^' | ':' | '?' | '*' | '[' | '\\'))
 }
 
 /// How to get to a pull request's worktree.
@@ -486,7 +538,10 @@ mod tests {
         assert_eq!(
             tab.pr_worktree_plan(3, "feat", "f"),
             PrWorktree::Create {
-                ops: vec![strings(&["worktree", "add", "/home/me/app-feat-2", "feat"])],
+                ops: vec![
+                    strings(&["worktree", "prune"]),
+                    strings(&["worktree", "add", "--", "/home/me/app-feat-2", "feat"]),
+                ],
                 path: PathBuf::from("ssh://build/home/me/app-feat-2"),
             }
         );
@@ -511,6 +566,7 @@ mod tests {
             branch("main", "m"),
             branch("mine", "x"),
             branch("feat", "f"),
+            branch("pr-9", "elsewhere"),
         ];
         tab.refs.remotes = vec![(
             "origin".to_owned(),
@@ -521,23 +577,48 @@ mod tests {
             worktree("/nonexistent/r/app-mine", "mine", false),
         ];
         let folder = |name: &str| PathBuf::from(format!("/nonexistent/r/app-{name}"));
+        let prune = strings(&["worktree", "prune"]);
+        let add = |name: &str| {
+            strings(&[
+                "worktree",
+                "add",
+                "--",
+                &format!("/nonexistent/r/app-{name}"),
+                name,
+            ])
+        };
         // Checked out here, or in another worktree.
         assert_eq!(tab.pr_worktree_plan(1, "main", "m"), PrWorktree::Here);
         assert_eq!(
             tab.pr_worktree_plan(2, "mine", "x"),
             PrWorktree::Open(folder("mine"))
         );
-        // A local branch: a worktree on it.
+        // A local branch at the pull request's commit: a worktree on it.
+        assert_eq!(
+            tab.pr_worktree_plan(3, "feat", "f"),
+            PrWorktree::Create {
+                ops: vec![prune.clone(), add("feat")],
+                path: folder("feat"),
+            }
+        );
+        // The remote branch is at it and the local one isn't: a branch of its own from the
+        // remote one, the local one left alone.
         assert_eq!(
             tab.pr_worktree_plan(3, "feat", "f2"),
             PrWorktree::Create {
-                ops: vec![strings(&[
-                    "worktree",
-                    "add",
-                    "/nonexistent/r/app-feat",
-                    "feat"
-                ])],
-                path: folder("feat"),
+                ops: vec![
+                    prune.clone(),
+                    strings(&[
+                        "worktree",
+                        "add",
+                        "-b",
+                        "pr-3",
+                        "--",
+                        "/nonexistent/r/app-pr-3",
+                        "origin/feat",
+                    ]),
+                ],
+                path: folder("pr-3"),
             }
         );
         // Only on the remote: a local branch tracking it, made with the worktree.
@@ -545,51 +626,83 @@ mod tests {
         assert_eq!(
             tab.pr_worktree_plan(4, "fix/x", "fx"),
             PrWorktree::Create {
-                ops: vec![strings(&[
-                    "worktree",
-                    "add",
-                    "--track",
-                    "-b",
-                    "fix/x",
-                    "/nonexistent/r/app-fix-x",
-                    "origin/fix/x",
-                ])],
+                ops: vec![
+                    prune.clone(),
+                    strings(&[
+                        "worktree",
+                        "add",
+                        "--track",
+                        "-b",
+                        "fix/x",
+                        "--",
+                        "/nonexistent/r/app-fix-x",
+                        "origin/fix/x",
+                    ]),
+                ],
                 path: folder("fix-x"),
             }
         );
-        // From a fork that isn't a remote: fetched from the pull request's ref, into a branch of
-        // its own when a local one has its name.
+        // From a fork that isn't a remote: fetched from the pull request's ref (never forced).
+        let fetch = |n: u64, name: &str| {
+            strings(&[
+                "fetch",
+                "--",
+                "origin",
+                &format!("refs/pull/{n}/head:refs/heads/{name}"),
+            ])
+        };
         assert_eq!(
             tab.pr_worktree_plan(5, "topic", "t"),
             PrWorktree::Create {
-                ops: vec![
-                    strings(&["fetch", "origin", "+refs/pull/5/head:refs/heads/topic"]),
-                    strings(&["worktree", "add", "/nonexistent/r/app-topic", "topic"]),
-                ],
+                ops: vec![prune.clone(), fetch(5, "topic"), add("topic")],
                 path: folder("topic"),
             }
         );
-        tab.refs.remotes[0].1.retain(|b| b.name != "origin/main");
+        // A fork's `main`, though ours is a branch here and on origin: not ours, fetched into a
+        // branch of its own.
         assert_eq!(
             tab.pr_worktree_plan(6, "main", "fork-main"),
             PrWorktree::Create {
-                ops: vec![
-                    strings(&["fetch", "origin", "+refs/pull/6/head:refs/heads/pr-6"]),
-                    strings(&["worktree", "add", "/nonexistent/r/app-pr-6", "pr-6"]),
-                ],
+                ops: vec![prune.clone(), fetch(6, "pr-6"), add("pr-6")],
                 path: folder("pr-6"),
             }
         );
+        // A branch name git would take as an option never reaches it as one.
+        assert_eq!(
+            tab.pr_worktree_plan(8, "-Bvictim", "v"),
+            PrWorktree::Create {
+                ops: vec![prune.clone(), fetch(8, "pr-8"), add("pr-8")],
+                path: folder("pr-8"),
+            }
+        );
+        // A `pr-N` of the user's own elsewhere: fetched into without force, which git refuses.
+        assert!(matches!(
+            tab.pr_worktree_plan(9, "-x", "new"),
+            PrWorktree::Create { ops, .. } if ops[1] == fetch(9, "pr-9")
+        ));
         // Forgejo and Gitea keep them where GitHub does; GitLab, under its own name.
         tab.hosting = Some(hosting(Forge::Forgejo));
         assert!(matches!(
             tab.pr_worktree_plan(7, "topic", "t"),
-            PrWorktree::Create { ops, .. } if ops[0][2] == "+refs/pull/7/head:refs/heads/topic"
+            PrWorktree::Create { ops, .. } if ops[1][3] == "refs/pull/7/head:refs/heads/topic"
         ));
         tab.hosting = Some(hosting(Forge::GitLab));
         assert!(matches!(
             tab.pr_worktree_plan(7, "topic", "t"),
-            PrWorktree::Create { ops, .. } if ops[0][2] == "+refs/merge-requests/7/head:refs/heads/topic"
+            PrWorktree::Create { ops, .. } if ops[1][3] == "refs/merge-requests/7/head:refs/heads/topic"
         ));
+    }
+
+    #[test]
+    fn only_plain_branch_names_are_taken_as_they_are() {
+        for good in ["main", "fix/x", "feature-1", "a.b"] {
+            assert!(plain_branch_name(good), "{good}");
+        }
+        for bad in [
+            "", "-Bx", "--force", "a..b", "a b", "a:b", "a~1", "x.lock", "/a", "a/", "a//b", "@",
+            "a@{1}", "a/.b", ".a", "a\\b",
+        ] {
+            assert!(!plain_branch_name(bad), "{bad}");
+        }
     }
 }
