@@ -78,7 +78,7 @@ struct Section {
 fn probes() -> Vec<(&'static str, Vec<String>)> {
     let words = |args: &[&str]| args.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();
     vec![
-        ("branch", words(&["symbolic-ref", "-q", "--short", "HEAD"])),
+        ("branch", words(&["symbolic-ref", "-q", "HEAD"])),
         (
             "head",
             words(&["rev-parse", "-q", "--verify", "--short", "HEAD"]),
@@ -88,7 +88,9 @@ fn probes() -> Vec<(&'static str, Vec<String>)> {
             vec![
                 "for-each-ref".to_owned(),
                 "--sort=-committerdate".to_owned(),
-                format!("--format=%(refname){FS}%(upstream:short){FS}%(upstream:track)"),
+                format!(
+                    "--format=%(refname){FS}%(upstream:short){FS}%(upstream:track){FS}%(upstream)"
+                ),
                 "refs/heads".to_owned(),
             ],
         ),
@@ -237,6 +239,7 @@ fn script() -> String {
     };
     let mut s = String::from(concat!(
         "d=$(mktemp -d \"${TMPDIR:-/tmp}/gitcraft-look.XXXXXX\") || exit 1\n",
+        "trap 'rm -rf \"$d\"' EXIT HUP INT TERM\n",
         "s() { k=$1; shift\n",
         "  if \"$@\" >\"$d/o\" 2>\"$d/e\" </dev/null; then c=0; else c=$?; mv \"$d/e\" \"$d/o\"; fi\n",
         "  printf '\\036%s %s %s\\n' \"$c\" \"$(wc -c <\"$d/o\" | tr -d ' ')\" \"$k\"; cat \"$d/o\"; }\n",
@@ -253,16 +256,17 @@ fn script() -> String {
         concat!(
             "if [ -n \"$(git remote 2>/dev/null)\" ]; then\n",
             "  n=0; tab=$(printf '\\t')\n",
-            "  git for-each-ref --sort=-committerdate '--format=%(refname)%09%(upstream)' refs/heads 2>/dev/null |\n",
-            "  while IFS=\"$tab\" read -r r u; do\n",
-            "    [ -z \"$u\" ] || continue\n",
+            "  git for-each-ref --sort=-committerdate '--format=%(refname)%09%(upstream)%09%(upstream:track)' refs/heads 2>/dev/null |\n",
+            "  while IFS=\"$tab\" read -r r u t; do\n",
+            "    case \"$u\" in refs/remotes/*) [ \"$t\" = '[gone]' ] || continue;; esac\n",
             "    [ \"$n\" -lt {max_b} ] || break; n=$((n + 1))\n",
             "    s \"count:${{r#refs/heads/}}\" git rev-list --count \"$r\" --not --remotes\n",
             "  done\n",
             "fi\n",
             "top=$(git rev-parse --show-toplevel 2>/dev/null)\n",
             "n=0\n",
-            "git worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p' |\n",
+            "git worktree list --porcelain 2>/dev/null |\n",
+            "awk '/^worktree /{{p=substr($0,10)}} /^bare$/{{p=\"\"}} /^$/{{if(p!=\"\")print p; p=\"\"}} END{{if(p!=\"\")print p}}' |\n",
             "while IFS= read -r p; do\n",
             "  [ \"$p\" = \"$top\" ] && continue\n",
             "  [ \"$n\" -lt {max_w} ] || break; n=$((n + 1))\n",
@@ -307,13 +311,14 @@ fn split_sections(mut bytes: &[u8]) -> Vec<Section> {
     sections
 }
 
-/// The branches whose commits on no remote are counted: those with no upstream, the most
-/// recently committed to first, at most [`MAX_COUNTED_BRANCHES`].
+/// The branches whose commits on no remote are counted: those not tracking a remote's branch
+/// (none, or one of this repository) and those whose remote branch is gone, the most recently
+/// committed to first, at most [`MAX_COUNTED_BRANCHES`].
 fn branches_to_count(refs: &str) -> Vec<String> {
     read_refs(refs)
         .into_iter()
-        .filter(|(_, upstream, _)| upstream.is_empty())
-        .map(|(name, _, _)| name)
+        .filter(|r| !r.tracks_remote() || r.gone())
+        .map(|r| r.name)
         .take(MAX_COUNTED_BRANCHES)
         .collect()
 }
@@ -329,16 +334,51 @@ fn other_worktrees(listed: &str, top: &str) -> Vec<String> {
         .collect()
 }
 
-/// `for-each-ref`'s lines as (branch, upstream, track).
-fn read_refs(refs: &str) -> Vec<(String, String, String)> {
+/// A local branch as `for-each-ref` gave it.
+struct LocalRef {
+    name: String,
+    /// Its upstream, short (`origin/main`, or `main` for a branch of this repository).
+    upstream: String,
+    /// `[ahead 1, behind 2]`, `[gone]`.
+    track: String,
+    /// Its upstream in full (`refs/remotes/origin/main`).
+    upstream_ref: String,
+}
+
+impl LocalRef {
+    fn tracks_remote(&self) -> bool {
+        self.upstream_ref.starts_with("refs/remotes/")
+    }
+
+    fn gone(&self) -> bool {
+        self.track == "[gone]"
+    }
+
+    fn ahead_behind(&self) -> (u32, u32) {
+        crate::git::Branch {
+            name: self.name.clone(),
+            target: String::new(),
+            is_head: false,
+            upstream: self.upstream.clone(),
+            track: self.track.clone(),
+        }
+        .ahead_behind()
+    }
+}
+
+/// `for-each-ref`'s lines.
+fn read_refs(refs: &str) -> Vec<LocalRef> {
     refs.lines()
         .filter_map(|line| {
             let mut f = line.split(FS);
-            let full = f.next()?;
-            let name = full.strip_prefix("refs/heads/")?.to_owned();
-            let upstream = f.next().unwrap_or_default().to_owned();
-            let track = f.next().unwrap_or_default().to_owned();
-            Some((name, upstream, track))
+            let name = f.next()?.strip_prefix("refs/heads/")?.to_owned();
+            let mut next = || f.next().unwrap_or_default().to_owned();
+            Some(LocalRef {
+                name,
+                upstream: next(),
+                track: next(),
+                upstream_ref: next(),
+            })
         })
         .collect()
 }
@@ -367,7 +407,10 @@ fn parse(sections: &[Section], path: impl Fn(&str) -> PathBuf) -> Result<Overvie
         });
     }
     let line = |key: &str| text(find(sections, key)).trim().to_owned();
-    let branch = Some(line("branch")).filter(|b| !b.is_empty());
+    // In full: `--short` would make it `heads/main` when a tag is called `main` too.
+    let branch = line("branch")
+        .strip_prefix("refs/heads/")
+        .map(str::to_owned);
     let refs = read_refs(&text(find(sections, "refs")));
     let mut o = Overview {
         head: line("head"),
@@ -380,25 +423,18 @@ fn parse(sections: &[Section], path: impl Fn(&str) -> PathBuf) -> Result<Overvie
             .collect(),
         ..Overview::default()
     };
-    for (name, upstream, track) in &refs {
-        let tracked = crate::git::Branch {
-            name: name.clone(),
-            target: String::new(),
-            is_head: false,
-            upstream: upstream.clone(),
-            track: track.clone(),
-        };
-        let (ahead, behind) = tracked.ahead_behind();
-        if branch.as_deref() == Some(name.as_str()) {
-            o.upstream = upstream.clone();
+    for r in &refs {
+        let (ahead, behind) = r.ahead_behind();
+        if branch.as_deref() == Some(r.name.as_str()) {
+            o.upstream = r.upstream.clone();
             (o.ahead, o.behind) = (ahead, behind);
         }
-        if tracked.upstream_gone() {
-            o.gone.push(name.clone());
-        } else if !upstream.is_empty() && ahead > 0 {
+        if r.gone() {
+            o.gone.push(r.name.clone());
+        } else if r.tracks_remote() && ahead > 0 {
             o.unpushed.push(Unpushed {
-                branch: name.clone(),
-                upstream: Some(upstream.clone()),
+                branch: r.name.clone(),
+                upstream: Some(r.upstream.clone()),
                 commits: ahead,
             });
         }

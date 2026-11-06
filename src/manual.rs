@@ -19,7 +19,8 @@ const FEATURES: &[(&str, &[&str])] = &[
         "Repositories and tabs",
         &[
             "Open, create or clone a repository from the start page; recent ones are listed there.",
-            "Workspaces (start page, +): named groups of repositories, here or on other machines. Each shows every repository's branch, uncommitted files, ahead / behind and when it last fetched; the refresh button looks again, the cloud fetches them all (asking no password: a remote that needs one says so), the folder opens them all in tabs. + on a workspace adds an open or recent repository, or another folder; ✕ on a row takes it out; the gear renames or deletes the workspace.",
+            "Workspaces (+ beside WORKSPACES on the start page): named groups of repositories, here or on other machines. Each row shows the branch, uncommitted files, ahead / behind and when it last fetched; click it to open that repository, hover it to see why a look or fetch failed. One on another machine is looked at unasked only while gitcraft is connected there.",
+            "On a workspace: + adds an open or recent repository, or another folder; ↻ looks again (connecting where needed); the cloud fetches them all, asking for no password (one that needs a sign-in says so); the folder opens them all in tabs; the gear renames or deletes it. ✕ on a row (on hover) takes it out.",
             "One tab per repository. Changes made elsewhere (editor, terminal) show up by themselves.",
             "Right-click a tab to give it its own icon and highlight colour.",
             "Drag a tab along the strip to reorder the tabs.",

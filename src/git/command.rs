@@ -103,6 +103,8 @@ struct Ran {
 struct Extra {
     pre: Vec<&'static str>,
     env: Vec<(&'static str, String)>,
+    /// How long it may run on another machine before it is stopped there.
+    timeout: Option<std::time::Duration>,
 }
 
 /// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
@@ -151,7 +153,7 @@ fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Requ
         unset: GIT_ENV_REMOVED.iter().map(|n| (*n).to_owned()).collect(),
         stdin: None,
         long: goes_over_network(args),
-        timeout: None,
+        timeout: extra.timeout,
     }
 }
 
@@ -263,6 +265,17 @@ pub fn run_unattended(
     run_inner(dir, args, &[0], creds, true)
 }
 
+/// [`run_unattended`] (with no credentials typed in) that, on another machine, is stopped there
+/// after `limit`: for what runs for many repositories at once, which gives up on each after a
+/// while and must not leave it running.
+pub fn run_unattended_within(
+    dir: &Path,
+    args: &[&str],
+    limit: std::time::Duration,
+) -> Result<String, String> {
+    run_inner_extra(Some(dir), args, &[0], None, true, Some(limit))
+}
+
 /// What sets git (before its subcommand) to open no sign-in window: no credential helper window
 /// (Git Credential Manager and git ≥ 2.46 heed `credential.interactive`), nor git's askpass
 /// program. git reads `GIT_ASKPASS` before `core.askPass` and `SSH_ASKPASS`, so an inherited one
@@ -282,6 +295,7 @@ fn unattended_extra(unix: bool) -> Extra {
     Extra {
         pre: vec!["-c", "credential.interactive=false", "-c", "core.askPass="],
         env,
+        timeout: None,
     }
 }
 
@@ -318,12 +332,24 @@ fn run_inner(
     creds: Option<&Credentials>,
     quiet: bool,
 ) -> Result<String, String> {
+    run_inner_extra(dir, args, ok, creds, quiet, None)
+}
+
+fn run_inner_extra(
+    dir: Option<&Path>,
+    args: &[&str],
+    ok: &[i32],
+    creds: Option<&Credentials>,
+    quiet: bool,
+    timeout: Option<std::time::Duration>,
+) -> Result<String, String> {
     let mut extra = Extra::default();
     if quiet {
         // Unix on the machine git runs on: another one is always Linux (WSL, an SSH server).
         let unix = cfg!(unix) || dir.is_some_and(remote::is_remote);
         extra = unattended_extra(unix);
     }
+    extra.timeout = timeout;
     if let Some(c) = creds {
         extra.pre.extend(["-c", ENV_HELPER]);
         extra
