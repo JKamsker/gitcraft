@@ -32,6 +32,8 @@ pub(crate) mod pull;
 mod quick_edit;
 mod rebase;
 mod rewrite;
+#[cfg(test)]
+mod samples;
 mod sidebar;
 mod state;
 mod terminals;
@@ -39,6 +41,7 @@ mod terminals;
 mod tests;
 mod toolbar;
 mod watch;
+mod watch_remote;
 pub(crate) mod widgets;
 pub(crate) mod worktree_tab;
 
@@ -169,6 +172,9 @@ pub struct RepoTab {
     /// Whether the commit pane lists every file of the commit, and those read.
     all_files: detail::AllFiles,
     conflict: Option<conflict::ConflictEditor>,
+    /// How many times a conflict editor was opened in the tab: the one open is the latest, and
+    /// what is read in the background for an earlier one is not taken for it.
+    conflict_generation: u64,
 
     commit_summary: String,
     commit_body: String,
@@ -203,6 +209,15 @@ pub struct RepoTab {
     terminal_error: Option<String>,
 
     watcher: Option<notify::RecommendedWatcher>,
+    /// For a repository on another machine, which no watcher sees: what keeps its poller
+    /// going (it stops once this is dropped).
+    poller: Option<std::sync::Arc<()>>,
+    /// The worktrees' changes are being counted (see `count_worktrees`).
+    counting_worktrees: bool,
+    /// A read came in while they were counted: they are counted again after.
+    recount_worktrees: bool,
+    /// When they were last counted (see `recount_siblings`).
+    counted_at: Instant,
     fs_rx: Option<Receiver<watch::FsChange>>,
     /// A change on disk not yet reloaded: (inside .git, when).
     fs_pending: Option<(watch::FsChange, Instant)>,
@@ -303,6 +318,7 @@ impl RepoTab {
             diff_as_file: false,
             all_files: Default::default(),
             conflict: None,
+            conflict_generation: 0,
             commit_summary: String::new(),
             commit_body: String::new(),
             amend: false,
@@ -326,6 +342,10 @@ impl RepoTab {
             terminal_open: false,
             terminal_error: None,
             watcher: None,
+            poller: None,
+            counting_worktrees: false,
+            recount_worktrees: false,
+            counted_at: Instant::now(),
             fs_rx: None,
             fs_pending: None,
             queued: Vec::new(),

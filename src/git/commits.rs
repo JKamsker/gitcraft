@@ -135,13 +135,28 @@ fn parse_record<S: AsRef<str>>(fields: &[S]) -> Option<Commit> {
 /// Older history page after page from one `git log` left running, as [`log`] gives it. A
 /// fresh `log --skip=n` would walk the n commits skipped (with `--date-order`, all history)
 /// again for every page.
+///
+/// For a repository on another machine, a page is a `log --skip=n` of its own instead, run in
+/// a shell kept open there: a `git log` left running would need a connection of its own, made
+/// again on every reload (well over a second over SSH), where the walk `--date-order` makes
+/// costs about what reading the first page does.
 pub struct LogStream {
     /// `None` for no revisions at all, which have no history (as with [`log`]).
     git: Option<RunningLog>,
+    /// For a repository on another machine (see above).
+    paged: Option<Paged>,
+}
+
+/// Where a paged history is (see [`LogStream`]).
+struct Paged {
+    repo: std::path::PathBuf,
+    from: Option<Vec<String>>,
+    skip: usize,
 }
 
 struct RunningLog {
-    child: std::process::Child,
+    /// Taken when it is dropped (see `Drop`).
+    child: Option<std::process::Child>,
     out: std::io::BufReader<std::process::ChildStdout>,
     /// What git says on its error output, read as it comes (unread, a full pipe would stop
     /// git, and with it the output read here).
@@ -153,7 +168,20 @@ impl LogStream {
     pub fn start(repo: &Path, from: Option<&[String]>, skip: usize) -> Result<Self, String> {
         // No revisions would make git log HEAD.
         if from.is_some_and(|revs| revs.is_empty()) {
-            return Ok(Self { git: None });
+            return Ok(Self {
+                git: None,
+                paged: None,
+            });
+        }
+        if crate::remote::is_remote(repo) {
+            return Ok(Self {
+                git: None,
+                paged: Some(Paged {
+                    repo: repo.to_owned(),
+                    from: from.map(<[String]>::to_vec),
+                    skip,
+                }),
+            });
         }
         let mut child = super::command::spawn_piped(repo, &log_args(from, skip, None).as_args())?;
         let out = child
@@ -170,13 +198,23 @@ impl LogStream {
             })
         });
         Ok(Self {
-            git: Some(RunningLog { child, out, err }),
+            git: Some(RunningLog {
+                child: Some(child),
+                out,
+                err,
+            }),
+            paged: None,
         })
     }
 
     /// The next `n` commits; fewer at the end of history.
     pub fn next_page(&mut self, n: usize) -> Result<Vec<Commit>, String> {
         use std::io::BufRead;
+        if let Some(paged) = &mut self.paged {
+            let page = log(&paged.repo, paged.from.as_deref(), paged.skip, n)?;
+            paged.skip += page.len();
+            return Ok(page);
+        }
         let Some(git) = &mut self.git else {
             return Ok(Vec::new());
         };
@@ -208,6 +246,8 @@ impl RunningLog {
     fn check_exit(&mut self) -> Result<(), String> {
         let status = self
             .child
+            .as_mut()
+            .ok_or("could not run git")?
             .wait()
             .map_err(|e| format!("could not run git: {e}"))?;
         let err = self
@@ -232,8 +272,14 @@ impl Drop for RunningLog {
     fn drop(&mut self) {
         // Not needed any more (history reloaded, the tab closed): don't leave it waiting. Its
         // error output then ends, and with it the thread reading that.
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        // Ended in the background: dropped on the window's thread (a reload), it doesn't wait
+        // for a process to go, even a quick one.
+        if let Some(mut child) = self.child.take() {
+            let _ = child.kill();
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
+        }
     }
 }
 

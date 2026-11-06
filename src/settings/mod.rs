@@ -225,7 +225,8 @@ impl Settings {
                 )
                 .on_hover_text(
                     "Git merges, rebases and cherry-picks go through Mergiraf, in every \
-                     repository and in the terminal too, so fewer conflicts are left at all. \
+                     repository on this machine and in the terminal too, so fewer conflicts \
+                     are left at all (not in WSL or over SSH, where git is that machine's). \
                      Sets merge.mergiraf in your global git config and adds a marked block to \
                      your global attributes file (also merge.conflictStyle = diff3, if you set \
                      none); unticking takes them out again.",

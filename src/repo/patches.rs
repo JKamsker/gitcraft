@@ -10,9 +10,13 @@ use crate::git;
 impl RepoTab {
     /// Asks where to save the patch of commit `hash`, then writes it there.
     pub(super) fn save_patch(&mut self, hash: String, summary: &str, ctx: &egui::Context) {
-        let Some(file) = rfd::FileDialog::new()
-            .set_title("Save patch")
-            .set_directory(&self.path)
+        let mut dialog = rfd::FileDialog::new().set_title("Save patch");
+        // Saved on this machine: next to the repository when it is here (a folder in WSL
+        // would make the dialog wait for WSL).
+        if !crate::remote::is_remote(&self.path) {
+            dialog = dialog.set_directory(&self.path);
+        }
+        let Some(file) = dialog
             .set_file_name(patch_file_name(summary))
             .add_filter("Patch", &["patch"])
             .save_file()
@@ -38,28 +42,51 @@ impl RepoTab {
 
     /// Asks for a patch file and applies it, undoably.
     pub(super) fn apply_patch(&mut self, ctx: &egui::Context) {
-        let Some(file) = rfd::FileDialog::new()
-            .set_title("Apply patch")
-            .set_directory(&self.path)
+        let mut dialog = rfd::FileDialog::new().set_title("Apply patch");
+        if !crate::remote::is_remote(&self.path) {
+            dialog = dialog.set_directory(&self.path);
+        }
+        let Some(file) = dialog
             .add_filter("Patch", &["patch", "diff", "eml", "mbox"])
             .add_filter("All files", &["*"])
             .pick_file()
         else {
             return;
         };
-        let text = match std::fs::read(&file) {
-            Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+        // Copied as it is (a patch can carry bytes of any encoding); read as text only to tell
+        // a mail from a bare diff.
+        let bytes = match std::fs::read(&file) {
+            Ok(bytes) => bytes,
             Err(e) => {
                 self.status = Some((format!("Apply patch: could not read it: {e}"), true));
                 return;
             }
         };
         let label = format!("Apply {}", file_name(&file));
-        let file = file.to_string_lossy().into_owned();
-        if is_mail(&text) {
+        let mail = is_mail(&String::from_utf8_lossy(&bytes));
+        // For a repository on another machine, git there reads a copy put there (in the
+        // background).
+        let repo = self.path.clone();
+        self.here_or_later(
+            ctx,
+            move || match crate::remote::parse(&repo) {
+                Some(target) => crate::remote::host_temp_file(&target, "apply.patch", &bytes),
+                None => Ok(file.to_string_lossy().into_owned()),
+            },
+            move |tab, file, ctx| match file {
+                Ok(file) => tab.apply_patch_file(&label, &file, mail, ctx),
+                Err(e) => tab.status = Some((format!("Apply patch: {e}"), true)),
+            },
+        );
+    }
+
+    /// Applies the patch at `file` (as git reads it), as commits when it is a `mail`.
+    fn apply_patch_file(&mut self, label: &str, file: &str, mail: bool, ctx: &egui::Context) {
+        let label = label.to_owned();
+        if mail {
             self.run_undoable(
                 &label,
-                ops(&[&["am", "--3way", &file]]),
+                ops(&[&["am", "--3way", file]]),
                 Refresh::All,
                 Undo::HeadMove { mode: "--keep" },
                 ctx,
@@ -67,11 +94,11 @@ impl RepoTab {
         } else {
             self.run_undoable(
                 &label,
-                ops(&[&["apply", &file]]),
+                ops(&[&["apply", file]]),
                 Refresh::All,
                 Undo::Custom {
-                    undo: ops(&[&["apply", "-R", &file]]),
-                    redo: ops(&[&["apply", &file]]),
+                    undo: ops(&[&["apply", "-R", file]]),
+                    redo: ops(&[&["apply", file]]),
                 },
                 ctx,
             );

@@ -16,10 +16,12 @@ impl RepoTab {
         let Some(ed) = &mut self.conflict else { return };
         let (ours_name, theirs_name) = ed.side_names();
         let left = ed.unresolved();
+        // While it is written (on another machine), what is saved is what is shown.
+        let editable = !ed.saving;
 
-        ed.header(ui, &t, idle, left, acts);
-        ed.result_panel(ui, &t);
-        ed.conflict_list(ui, &t, (&ours_name, &theirs_name));
+        ed.header(ui, &t, idle && editable, left, acts);
+        ed.result_panel(ui, &t, editable);
+        ed.conflict_list(ui, &t, (&ours_name, &theirs_name), editable);
     }
 }
 
@@ -72,6 +74,7 @@ impl ConflictEditor {
         } else {
             ("--ours", "--theirs")
         };
+        // Also for a repository elsewhere: Mergiraf solves a copy of the file here.
         let offer_mergiraf = crate::settings::Settings::get(ui.ctx()).mergiraf
             && crate::mergiraf::found(ui.ctx()).is_some();
         if offer_mergiraf {
@@ -110,8 +113,8 @@ impl ConflictEditor {
         }
     }
 
-    /// Bottom: the result, editable by hand.
-    fn result_panel(&mut self, ui: &mut Ui, t: &Tokens) {
+    /// Bottom: the result, editable by hand (unless being saved).
+    fn result_panel(&mut self, ui: &mut Ui, t: &Tokens, editable: bool) {
         egui::Panel::bottom("conflict_result")
             .resizable(true)
             .default_size(ui.available_height() * 0.42)
@@ -122,6 +125,9 @@ impl ConflictEditor {
                     .inner_margin(egui::Margin::symmetric(10, 8)),
             )
             .show(ui, |ui| {
+                if !editable {
+                    ui.disable();
+                }
                 ui.horizontal(|ui| {
                     ui.label(
                         RichText::new("RESULT")
@@ -162,13 +168,17 @@ impl ConflictEditor {
             });
     }
 
-    /// Top: each conflict, ours | theirs, with the choice buttons. `names`: the two sides'.
-    fn conflict_list(&mut self, ui: &mut Ui, t: &Tokens, names: (&str, &str)) {
+    /// Top: each conflict, ours | theirs, with the choice buttons (unless being saved).
+    /// `names`: the two sides'.
+    fn conflict_list(&mut self, ui: &mut Ui, t: &Tokens, names: (&str, &str), editable: bool) {
         let total = self.choices.len();
         egui::ScrollArea::vertical()
             .id_salt("conflict_list")
             .auto_shrink(false)
             .show(ui, |ui| {
+                if !editable {
+                    ui.disable();
+                }
                 let mut k = 0;
                 let mut pick = None;
                 for seg in &self.segments {

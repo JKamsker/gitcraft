@@ -13,6 +13,10 @@ use egui::{Event, Key, Modifiers, PointerButton, Pos2};
 use egui_kittest::Harness;
 
 fn main() {
+    // Also ssh's askpass program, as gitcraft itself is (see `remote::askpass`).
+    if let Some(code) = gitcraft::app::askpass_helper() {
+        std::process::exit(code);
+    }
     let mut args = std::env::args().skip(1);
     let (Some(repo), Some(out)) = (args.next(), args.next()) else {
         eprintln!(
@@ -202,6 +206,11 @@ fn main() {
             other => eprintln!("unknown step {other}"),
         }
     }
+    // Commands for another machine asked from the window's thread (each would have frozen it).
+    println!(
+        "asked of another machine on the window's thread: {}",
+        gitcraft::app::refused_on_ui_thread()
+    );
 }
 
 /// Steps frames for `ms` of real time, so background git work can land.

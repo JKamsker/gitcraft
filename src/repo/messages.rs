@@ -13,6 +13,9 @@ use crate::forge::{Hosting, PullRequest};
 use crate::git::{self, Commit, CommitDetail, WorkStatus};
 use crate::settings::Settings;
 
+/// What a background job leaves to do on the UI thread, with the tab (see `RepoTab::then`).
+pub(super) type Continuation = Box<dyn FnOnce(&mut RepoTab, &egui::Context) + Send>;
+
 /// Results coming back from background git calls.
 pub(super) enum Msg {
     Loaded(Result<Box<Loaded>, String>),
@@ -20,6 +23,19 @@ pub(super) enum Msg {
     Submodules(u64, Vec<git::Submodule>),
     /// The refs as they are now, to compare with those read (see `RepoTab::recheck`).
     RefsCheck(Result<git::Refs, String>),
+    /// What to do on the UI thread with what a background job found (see `RepoTab::then`).
+    Then(Continuation),
+    /// A conflict editor read in the background (for a repository on another machine), for
+    /// the opening numbered so (see `RepoTab::conflict_generation`).
+    ConflictOpened(u64, String, Option<Box<super::conflict::ConflictEditor>>),
+    /// The file of the conflict editor opened so changed on disk (`None`: it didn't, or it
+    /// couldn't be read).
+    ConflictChanged(u64, Option<String>),
+    /// A conflict editor's file written in the background, to be marked resolved.
+    ConflictSaved(String, Result<(), String>),
+    /// The changes of each worktree (by its path) counted after a read (see
+    /// `RepoTab::count_worktrees`).
+    WorktreeCounts(Vec<(std::path::PathBuf, usize)>),
     /// The worktree's watcher, set up in the background (`None` when it couldn't be).
     Watcher(Option<Box<notify::RecommendedWatcher>>),
     /// A further page of history, read while `history_gen` was so: a reload since may have
@@ -109,6 +125,37 @@ pub(super) fn spawn(
     job: impl FnOnce() -> Msg + Send + 'static,
 ) {
     spawn_or(tx, ctx, Msg::JobPanicked, job);
+}
+
+impl RepoTab {
+    /// Runs `work` in the background, then `then` with what it gave, on the UI thread.
+    pub(super) fn then<T: Send + 'static>(
+        &self,
+        ctx: &egui::Context,
+        work: impl FnOnce() -> T + Send + 'static,
+        then: impl FnOnce(&mut RepoTab, T, &egui::Context) + Send + 'static,
+    ) {
+        spawn(&self.tx, ctx, move || {
+            let found = work();
+            Msg::Then(Box::new(move |tab, ctx| then(tab, found, ctx)))
+        });
+    }
+
+    /// [`Self::then`] for a repository on another machine, where `work` is a round trip or
+    /// more (and may wait for a connection); for one here, right away, as it always was.
+    pub(super) fn here_or_later<T: Send + 'static>(
+        &mut self,
+        ctx: &egui::Context,
+        work: impl FnOnce() -> T + Send + 'static,
+        then: impl FnOnce(&mut RepoTab, T, &egui::Context) + Send + 'static,
+    ) {
+        if crate::remote::is_remote(&self.path) {
+            self.then(ctx, work, then);
+        } else {
+            let found = work();
+            then(self, found, ctx);
+        }
+    }
 }
 
 /// [`spawn`], sending what `failed` makes of what `job` said if it panics: the message it
@@ -209,6 +256,7 @@ impl RepoTab {
         }
 
         self.poll_ci(ctx);
+        self.recount_siblings(ctx);
         self.poll_ci_view(ctx);
 
         // Debounced search while typing.
@@ -228,6 +276,21 @@ impl RepoTab {
                 if Self::newer(read, &mut self.submodules_read) {
                     self.submodules = list;
                 }
+            }
+            Msg::WorktreeCounts(counts) => self.worktrees_counted(counts, ctx),
+            Msg::ConflictOpened(generation, path, editor) => {
+                self.conflict_opened(generation, path, editor)
+            }
+            Msg::ConflictChanged(generation, Some(path)) => {
+                self.conflict_changed(generation, path, ctx)
+            }
+            Msg::ConflictChanged(_, None) => {}
+            Msg::ConflictSaved(path, saved) => {
+                // Editable again (if still open), whatever came of it.
+                if let Some(ed) = self.conflict.as_mut().filter(|ed| ed.path == path) {
+                    ed.saving = false;
+                }
+                self.conflict_saved(path, saved, ctx)
             }
             Msg::Watcher(watcher) => {
                 self.watcher = watcher.map(|w| *w);
@@ -346,6 +409,7 @@ impl RepoTab {
             }
             Msg::Mergiraf(path, result) => self.mergiraf_done(path, result),
             Msg::JobPanicked(e) => self.status = Some((e, true)),
+            Msg::Then(then) => then(self, ctx),
             Msg::Search(query, code, result) => self.search_done(query, code, result, ctx),
             // Asked before the list asked for last (one read before a merge answering after
             // the one read since), or of the forge the remotes no longer point to.

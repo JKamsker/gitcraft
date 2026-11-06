@@ -17,6 +17,18 @@ impl RepoTab {
         self.fs_rx = Some(rx);
         let path = self.path.clone();
         let events_ctx = ctx.clone();
+        // Elsewhere, there is nothing to watch from here: asked over and over instead. The
+        // poller says it has arrived (`Msg::Watcher`) once it has a first look to compare with.
+        if crate::remote::is_remote(&path) {
+            let alive = std::sync::Arc::new(());
+            let weak = std::sync::Arc::downgrade(&alive);
+            self.poller = Some(alive);
+            let arrived = self.tx.clone();
+            std::thread::spawn(move || {
+                super::watch_remote::poll(&path, &tx, &arrived, &events_ctx, &weak);
+            });
+            return;
+        }
         spawn(&self.tx, ctx, move || {
             Msg::Watcher(start_watcher(&path, tx, events_ctx).map(Box::new))
         });

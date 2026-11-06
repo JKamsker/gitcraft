@@ -35,8 +35,17 @@ impl Dialog {
             } else {
                 format!("{repo_name}-{}", name.trim().replace(['/', '\\', ' '], "-"))
             };
-            let parent = repo.parent().unwrap_or(repo.as_path());
-            *path = parent.join(folder).display().to_string();
+            // Beside it on its machine: for one elsewhere, a path there.
+            *path = match crate::remote::parse(repo) {
+                Some(target) => {
+                    let parent = crate::remote::parent_there(&target.path);
+                    format!("{}/{folder}", parent.trim_end_matches('/'))
+                }
+                None => {
+                    let parent = repo.parent().unwrap_or(repo.as_path());
+                    parent.join(folder).display().to_string()
+                }
+            };
         }
     }
 }
@@ -59,6 +68,7 @@ pub(super) fn free_branches<'a>(local: &'a [Branch], worktrees: &[Worktree]) -> 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn add_worktree(
     ui: &mut Ui,
+    repo: &std::path::Path,
     enter: bool,
     free: &[&str],
     path: &mut String,
@@ -90,16 +100,21 @@ pub(super) fn add_worktree(
         changed |= branch_choice(ui, branch, free);
     }
     ui.add_space(8.0);
-    folder_field(ui, path, path_edited);
+    folder_field(ui, repo, path, path_edited);
+    // As git of the repository's machine takes it (a path there, for one elsewhere).
+    let folder = crate::remote::folder_for_git(repo, path);
+    if let (Err(why), true) = (&folder, usable(path)) {
+        ui.colored_label(t.danger, why);
+    }
     ui.add_space(12.0);
     let name_ok = if *new_branch {
         usable(new_name)
     } else {
         usable(branch)
     };
-    let valid = name_ok && usable(path);
+    let valid = name_ok && usable(path) && folder.is_ok();
     let outcome = buttons(ui, "Add", valid, enter, || {
-        let path = path.trim().to_owned();
+        let path = folder.clone().unwrap_or_default();
         let args: Vec<String> = if *new_branch {
             vec![
                 "worktree".into(),
@@ -169,8 +184,9 @@ fn branch_choice(ui: &mut Ui, branch: &mut String, free: &[&str]) -> bool {
     changed
 }
 
-/// Where the worktree goes, typed or picked.
-fn folder_field(ui: &mut Ui, path: &mut String, path_edited: &mut bool) {
+/// Where the worktree goes, typed or picked (picked only where this machine can see the
+/// repository's folders: here, or in WSL).
+fn folder_field(ui: &mut Ui, repo: &std::path::Path, path: &mut String, path_edited: &mut bool) {
     let t = Tokens::get(ui.ctx());
     ui.label(RichText::new("Folder").color(t.text_dim).small());
     ui.horizontal(|ui| {
@@ -182,14 +198,26 @@ fn folder_field(ui: &mut Ui, path: &mut String, path_edited: &mut bool) {
         if edit.changed() {
             *path_edited = true;
         }
+        let can_pick = crate::remote::openable_here(repo).is_ok();
         if ui
-            .add(egui::Button::new("Browse…").min_size(egui::vec2(80.0, 28.0)))
+            .add_enabled(
+                can_pick,
+                egui::Button::new("Browse…").min_size(egui::vec2(80.0, 28.0)),
+            )
+            .on_disabled_hover_text("Type a path on that machine")
             .clicked()
             && let Some(dir) = rfd::FileDialog::new()
                 .set_title("Worktree folder")
                 .pick_folder()
         {
-            *path = dir.display().to_string();
+            // In WSL, a path there when it is of the repository's distribution; one of another
+            // stays as picked, so the field says why it can't be used (see `folder_for_git`).
+            let picked = dir.display().to_string();
+            *path = if crate::remote::is_remote(repo) {
+                crate::remote::folder_for_git(repo, &picked).unwrap_or(picked)
+            } else {
+                picked
+            };
             *path_edited = true;
         }
     });

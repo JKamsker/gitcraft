@@ -13,6 +13,7 @@ impl RepoTab {
         // A rebase or patch stopped on conflicts: the button continues it.
         let continuing = self.work.in_progress.filter(|s| s.continues());
         let rebasing = continuing.is_some();
+        let mut amend_started = false;
         ui.horizontal(|ui| {
             ui.label(
                 RichText::new(match continuing {
@@ -31,16 +32,27 @@ impl RepoTab {
                     .on_hover_text(
                         "Rewrite the last commit with the staged changes and this message",
                     );
-                if amend.changed() && self.amend && self.commit_summary.trim().is_empty() {
-                    // Start from the message being amended.
-                    if let Ok(msg) = crate::git::head_message(&self.path) {
-                        let (summary, body) = msg.split_once('\n').unwrap_or((msg.as_str(), ""));
-                        self.commit_summary = summary.trim().to_owned();
-                        self.commit_body = body.trim().to_owned();
-                    }
-                }
+                amend_started =
+                    amend.changed() && self.amend && self.commit_summary.trim().is_empty();
             });
         });
+        if amend_started {
+            // Start from the message being amended (read in the background for a repository
+            // on another machine), unless one was typed meanwhile.
+            let repo = self.path.clone();
+            self.here_or_later(
+                ui.ctx(),
+                move || crate::git::head_message(&repo),
+                |tab, msg, _| {
+                    let Ok(msg) = msg else { return };
+                    if tab.amend && tab.commit_summary.trim().is_empty() {
+                        let (summary, body) = msg.split_once('\n').unwrap_or((msg.as_str(), ""));
+                        tab.commit_summary = summary.trim().to_owned();
+                        tab.commit_body = body.trim().to_owned();
+                    }
+                },
+            );
+        }
         if self.amend {
             let pushed = self
                 .refs

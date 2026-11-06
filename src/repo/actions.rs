@@ -143,6 +143,12 @@ pub(crate) enum Action {
     CloseRebase,
     /// Remember these HTTPS credentials and run the operation that needed them again.
     SignIn(git::Credentials),
+    /// Ask before deleting the local tag `name` (at the commit `target`), once what it points
+    /// at is known (read in the background for a repository on another machine).
+    DeleteTag {
+        name: String,
+        target: String,
+    },
     /// Add `pattern` to `.gitignore`; stop tracking `path` if git tracks it.
     Ignore {
         pattern: String,

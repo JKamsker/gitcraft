@@ -15,6 +15,53 @@ so your config, credentials and hooks apply as usual.
 - Browser-like tabs, one per repository (Ctrl+T, Ctrl+W, middle-click; Ctrl+Shift+T reopens a
   closed one). Open tabs, recents, theme and settings are remembered.
 - Changes made elsewhere (editor, terminal) show up by themselves: the folder is watched.
+- Repositories on another machine, in a WSL distribution or over SSH: the window stays here and
+  git runs there (see below).
+
+**Remote repositories (WSL, SSH)**
+
+- Start page → _Remote_ (or the palette's _Open remote repository_): pick a WSL distribution
+  or an SSH host (the hosts of `~/.ssh/config` are offered), and the repository's folder there
+  (`/home/me/repo` or `~/repo`), typed or found with _Browse…_, which lists that machine's
+  folders and marks its repositories. A `\\wsl.localhost\…` folder chosen with _Open_ is a WSL
+  repository too, and `gitcraft ssh://host/path/to/repo` opens one from the command line.
+- The window never waits for that machine: everything asked of it is asked in the background,
+  and a slow or unreachable machine only shows as work still going on (anything asked of it
+  from the window's thread is refused rather than run, and a test drives the window against a
+  WSL repository to keep it so).
+- git, and every file read or written in the repository (diffs of the working tree, staging
+  lines, the conflict editor, `.gitignore`, rebase todo lists), runs on that machine, with its
+  own git, config, credentials and hooks. Nothing has to be installed there but git and a POSIX
+  `sh` with the tools any Linux, BSD or macOS has: `mktemp -d` (each shell's temporary
+  folder), `base64 -d` (what a command reads, a patch or a file's new contents), `cat` and
+  `wc` (passing output back), `stat` (GNU or BSD: noticing changes), and `ps` with `awk`
+  (stopping a command that hung, and all it started).
+- A few shells per machine are kept open (`ssh -T host sh`, `wsl.exe -d distro --exec sh`), so a
+  command costs one round trip, not a new connection; history is read page by page in them
+  too. SSH signs in as it does in a terminal (keys, an agent, `~/.ssh/config`;
+  `GITCRAFT_SSH_CONFIG` names another config): what it asks — a password, a key's
+  passphrase, whether to trust a host seen for the first time — is asked in the window (ssh
+  runs gitcraft as its `SSH_ASKPASS`). A password or passphrase typed is kept for that machine
+  while gitcraft runs, so the other shells don't ask again, and forgotten as soon as ssh says
+  it was wrong. Tick **Remember connection** to keep it after a restart too: once ssh has
+  signed in with it (a wrong one is never saved), it is saved encrypted in the system's
+  credential store (Windows Credential Manager, the macOS Keychain, the Secret Service on
+  Linux), never in gitcraft's own files, and forgotten when it stops working or with
+  **Forget saved SSH sign-ins** in the command palette.
+- Names with a `\` in them (Linux allows one) work like any other.
+- Network operations (fetch, pull, push, clone) run in shells of their own, so the reads never
+  wait behind them. A command that hangs is stopped there, with what it started, after 5
+  minutes (30 for network operations).
+- Changes made there show up by themselves: the repository is looked at every few seconds
+  (every 15 while the window isn't focused).
+- The terminal opens a shell on that machine, in the repository, whatever the login shell
+  (bash, zsh, fish, csh…). Pull requests and builds use `gh` / `glab` of this machine, told
+  which repository, and only for github.com, gitlab.com or a host they're signed in to.
+  Forgejo and Gitea are asked from this machine too, with this machine's login for the host.
+- Over SSH, programs of this machine can't open the files (reveal in the file manager, open in
+  editor, Mergiraf). In WSL they can, through `\\wsl.localhost`.
+- Settings that write this machine's global git config (commit signing, Mergiraf) don't apply
+  there: that machine's own git config does.
 
 **Graph**
 
@@ -238,6 +285,19 @@ cargo test --lib forge::gitea::live -- --ignored --nocapture
 
 A plain `cargo test` skips them.
 
+### Remote repositories, against real machines
+
+The tests of `src/remote/live_tests.rs` run only when given a machine:
+
+```sh
+GITCRAFT_TEST_SSH='build-host:~/repos/some-repo' cargo test live_tests -- --nocapture  # reads it
+GITCRAFT_TEST_WSL=Ubuntu cargo test live_tests -- --nocapture  # works in a scratch repo in /tmp
+GITCRAFT_TEST_WSL=Ubuntu cargo test never_holds_up_the_window  # drives the window against one
+```
+
+`cargo run --example ui_shot` ends by saying how many commands for another machine were asked
+from the window's thread (each is a bug: refused, it would have frozen the window).
+
 ### Looking at the UI headlessly
 
 `examples/ui_shot.rs` drives the app without a window (egui_kittest) and saves PNGs:
@@ -272,6 +332,7 @@ was made this way, on a demo repository.
 | `src/update.rs`          | new-release check                                                                  |
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |
 | `src/shell_path.rs`      | on macOS, the login shell's PATH for the commands gitcraft starts                  |
+| `src/remote.rs` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
 | `src/settings.rs`        | user settings and their form                                                       |
 | `src/manual.rs`          | the manual (F1): features and keyboard shortcuts                                   |
 | `src/theme.rs`           | colour tokens, fonts, egui style (PhotoCraft's Pro themes)                         |

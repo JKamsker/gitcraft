@@ -23,8 +23,24 @@ impl RepoTab {
         cwd: Option<PathBuf>,
         ctx: &egui::Context,
     ) {
-        let shell = shell.unwrap_or_else(|| crate::terminal::default_shell(ctx));
         let cwd = cwd.unwrap_or_else(|| self.path.clone());
+        // A folder on another machine: a shell there (the shell picked is one of this machine),
+        // started from a folder of this one.
+        let (shell, cwd) = match crate::remote::parse(&cwd) {
+            Some(target) => {
+                let (program, args, label) = crate::remote::terminal_command(&target);
+                let shell = ShellSpec {
+                    label,
+                    program,
+                    args,
+                };
+                (shell, std::env::temp_dir())
+            }
+            None => (
+                shell.unwrap_or_else(|| crate::terminal::default_shell(ctx)),
+                cwd,
+            ),
+        };
         match Terminal::spawn(&cwd, &shell, ctx) {
             Ok(term) => {
                 self.terminals.push(term);

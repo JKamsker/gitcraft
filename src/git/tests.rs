@@ -256,3 +256,11 @@ fn messages_in_utf8_whatever_the_log_encoding() -> Result<(), String> {
     assert_eq!(stashed?[0].message, "stäsh");
     Ok(())
 }
+
+/// A clone on another machine runs from where its destination can be named as git takes it.
+#[test]
+fn a_clone_elsewhere_names_its_folder_from_there() {
+    assert_eq!(clone_from("~/repos/x"), ("~", "repos/x".to_owned()));
+    assert_eq!(clone_from("~"), ("~", ".".to_owned()));
+    assert_eq!(clone_from("/srv/x"), ("/", "/srv/x".to_owned()));
+}

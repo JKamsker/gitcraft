@@ -98,21 +98,36 @@ impl RepoTab {
             .add_enabled(idle, egui::Button::new("Delete tag…"))
             .clicked()
         {
-            let object = tag_object(&self.path, &tag.name);
-            acts.push(Action::Dialog(
-                Dialog::confirm(
-                    "Delete tag",
-                    format!("Delete the local tag “{}”?", tag.name),
-                    "Delete",
-                    delete_tag(&tag.name, object.as_deref()),
-                    None,
-                )
-                .undo(delete_tag_undo(
-                    &tag.name,
-                    object.as_deref().unwrap_or(&tag.target),
-                )),
-            ));
+            acts.push(Action::DeleteTag {
+                name: tag.name.clone(),
+                target: tag.target.clone(),
+            });
         }
+    }
+
+    /// Asks before deleting the tag `name` (at the commit `target`), with what it points at
+    /// read first: in the background for a repository on another machine.
+    pub(crate) fn delete_tag(&mut self, name: String, target: String, ctx: &egui::Context) {
+        let repo = self.path.clone();
+        self.here_or_later(
+            ctx,
+            move || {
+                let object = tag_object(&repo, &name);
+                (name, object)
+            },
+            move |tab, (name, object), _| {
+                tab.dialog = Some(
+                    Dialog::confirm(
+                        "Delete tag",
+                        format!("Delete the local tag “{name}”?"),
+                        "Delete",
+                        delete_tag(&name, object.as_deref()),
+                        None,
+                    )
+                    .undo(delete_tag_undo(&name, object.as_deref().unwrap_or(&target))),
+                );
+            },
+        );
     }
 }
 
