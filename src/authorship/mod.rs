@@ -80,11 +80,15 @@ impl Attribution {
 
     /// A short description for a hover: _Agent-written (Claude), from git-ai notes_.
     pub fn describe(&self) -> String {
-        let what = match self.who {
-            Who::Agent => "Agent-written",
-            Who::Mixed => "Written by a person and an agent",
-            Who::Human => "Written by a person",
-            Who::Unknown => "Author not recorded",
+        // Line by line, a commit may record only some of its lines: it has agent lines, it
+        // isn't said to be all an agent's.
+        let what = match (self.who, self.lines.is_empty()) {
+            (Who::Agent, true) => "Agent-written",
+            (Who::Agent, false) => "Has agent-written lines",
+            (Who::Mixed, true) => "Co-written by a person and an agent",
+            (Who::Mixed, false) => "Has lines by agents and by people",
+            (Who::Human, _) => "Written by a person",
+            (Who::Unknown, _) => "Author not recorded",
         };
         let agents = if self.agents.is_empty() {
             String::new()
@@ -117,7 +121,10 @@ pub fn attribute(
     git_ai: Option<&str>,
     agent_trace: Option<&str>,
 ) -> Option<Attribution> {
-    if let Some(note) = git_ai.and_then(gitai::parse) {
+    // A note that attributes nothing leaves the word to the commit's author and trailers.
+    if let Some(note) = git_ai.and_then(gitai::parse)
+        && overall(&note.files) != Who::Unknown
+    {
         return Some(Attribution {
             who: overall(&note.files),
             agents: note.tools,
@@ -125,7 +132,9 @@ pub fn attribute(
             lines: note.files,
         });
     }
-    if let Some((lines, tools)) = agent_trace.and_then(trace::parse) {
+    if let Some((lines, tools)) = agent_trace.and_then(trace::parse)
+        && overall(&lines) != Who::Unknown
+    {
         return Some(Attribution {
             who: overall(&lines),
             agents: tools,

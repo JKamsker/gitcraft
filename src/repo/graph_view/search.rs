@@ -46,6 +46,7 @@ impl RepoTab {
                             .on_hover_text(tip)
                             .clicked()
                         {
+                            self.authorship.filter = false;
                             acts.push(Action::SearchCode(on));
                         }
                     }

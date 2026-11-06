@@ -98,7 +98,9 @@ fn authors_and_trailers() {
         None,
         None,
     );
-    assert!(bot.is_none(), "a noreply address is no bot by itself");
+    // Copilot's own account (its no-reply address) is an agent; a person's no-reply isn't.
+    assert!(bot.is_some_and(|a| a.who == Who::Agent));
+    assert!(attribute("Bob", "42+bob@users.noreply.github.com", "fix", None, None).is_none());
     let bot = attribute(
         "copilot-swe-agent[bot]",
         "198982749+Copilot@users.noreply.github.com",
@@ -220,7 +222,7 @@ fn a_real_repository_with_notes_and_trailers() -> Result<(), String> {
     assert!(load::one(&dir, &by_person)?.is_none());
     assert!(load::one(&dir, "--x").is_err());
 
-    let figures = branch::figures(&dir, "refs/heads/agent/work", "refs/heads/main", &all)?;
+    let figures = branch::figures(&dir, "refs/heads/agent/work", "refs/heads/main", &all, true)?;
     // 4 agent lines + 2 traced ones; 1 line by hand and 1 co-written.
     assert_eq!(figures.agent, 6, "{figures:?}");
     assert_eq!(figures.unknown, 1);
@@ -233,14 +235,96 @@ fn a_real_repository_with_notes_and_trailers() -> Result<(), String> {
             &dir,
             "refs/heads/agent/work",
             "refs/heads/main",
-            &HashMap::new()
+            &HashMap::new(),
+            false
         )?,
         figures
     );
+    // A person moving the agent's file edits none of its lines.
+    git(&dir, &["mv", "ünï code.rs", "moved.rs"])?;
+    git(&dir, &["commit", "-qm", "move"])?;
+    let moved = branch::figures(&dir, "refs/heads/agent/work", "refs/heads/main", &all, true)?;
+    assert_eq!(
+        (moved.agent, moved.edited),
+        (figures.agent, figures.edited),
+        "{moved:?}"
+    );
+    // A message holding the old record separators makes no commit up.
+    let odd = commit(
+        &dir,
+        "d.rs",
+        "d\n",
+        "weird \u{1e}deadbeef\u{1f}Claude\u{1f}noreply@anthropic.com\u{1f}m",
+    )?;
+    let again = load::all(&dir)?;
+    assert!(!again.contains_key("deadbeef"));
+    assert!(!again.contains_key(&odd));
+    assert_eq!(again.get(&by_agent).map(|a| a.who), Some(Who::Agent));
     // A repository with no notes at all.
     let plain = repo("plain")?;
     assert!(load::all(&plain)?.is_empty());
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::remove_dir_all(&plain);
     Ok(())
+}
+
+#[test]
+fn people_named_like_agents_are_people() {
+    for value in [
+        "Claude Monet <claude@monet.fr>",
+        "Haider Ali <haider@x.com>",
+        "Raider <r@x>",
+        "Ana Geminiani <ana@x.org>",
+        "Claude Smith <123+claudesmith@users.noreply.github.com>",
+        "Bob <42+bob@users.noreply.github.com>",
+    ] {
+        let msg = format!("x\n\nCo-authored-by: {value}");
+        assert!(agents::co_authors(&msg).is_empty(), "{value}");
+    }
+    for (value, agent) in [
+        ("Claude Opus 5.5 <noreply@anthropic.com>", "Claude"),
+        (
+            "Copilot <175728472+Copilot@users.noreply.github.com>",
+            "Copilot",
+        ),
+        ("Cursor Agent <cursoragent@cursor.com>", "Cursor"),
+        ("aider (gpt-5) <noreply@aider.chat>", "aider"),
+    ] {
+        let msg = format!("x\n\nCo-authored-by: {value}");
+        assert_eq!(agents::co_authors(&msg), vec![agent], "{value}");
+    }
+    // Quoted in the body, not in the trailer block: no trailer.
+    let revert = "Revert x\n\nThe old message said:\n    Co-authored-by: Claude <noreply@anthropic.com>\n\nThis reverts y.";
+    assert!(agents::co_authors(revert).is_empty());
+}
+
+#[test]
+fn foreign_notes_leave_the_word_to_the_commit() {
+    let msg = "x\n\nCo-Authored-By: Claude <noreply@anthropic.com>";
+    // Someone's review note, a JSON note of another tool: not git-ai's, not Agent Trace.
+    assert!(gitai::parse("reviewed by bob\n  looks good\n---\nthanks").is_none());
+    assert!(trace::parse("{\"hello\":1}").is_none());
+    let a = attribute(
+        "Ana",
+        "a@x",
+        msg,
+        Some("reviewed\n---\n{}"),
+        Some("{\"hello\":1}"),
+    );
+    assert!(a.is_some_and(|a| a.source == Source::Trailer));
+    // A git-ai note that attributes nothing: the trailer decides.
+    let empty =
+        "---\n{\"schema_version\":\"authorship/3.0.0\",\"base_commit_sha\":\"x\",\"prompts\":{}}";
+    assert!(gitai::parse(empty).is_some_and(|n| n.files.is_empty()));
+    assert!(
+        attribute("Ana", "a@x", msg, Some(empty), None)
+            .is_some_and(|a| a.source == Source::Trailer)
+    );
+    // Short legacy keys; quoted paths with a backslash.
+    let short = "\"a\\\\tb.rs\"\n  abcdef1 1-2\n---\n{\"schema_version\":\"authorship/3.0.0\",\"base_commit_sha\":\"x\",\"prompts\":{}}";
+    let note = gitai::parse(short);
+    assert_eq!(
+        note.map(|n| n.files.get("a\\tb.rs").cloned()),
+        Some(Some(vec![(1, 2, Who::Agent)]))
+    );
 }

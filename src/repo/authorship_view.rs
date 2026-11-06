@@ -27,11 +27,22 @@ pub(crate) struct Lens {
 }
 
 /// What the attribution of a commit not in the map is, from its own message as the graph has
-/// it (the trailers of commits past those read).
+/// it (the trailers of commits past those read). Cheap when there is none (every frame, every
+/// row): nothing allocated unless a trailer or a bot is there.
 fn from_message(commit: &Commit) -> Option<Attribution> {
-    // The graph keeps the message on one line: each `Co-authored-by:` taken up to its `>`.
+    let trailer = commit
+        .body
+        .as_bytes()
+        .windows(15)
+        .any(|w| w.eq_ignore_ascii_case(b"co-authored-by:"));
+    if !trailer {
+        return authorship::agents::author_agent(&commit.author, &commit.email)
+            .map(|_| authorship::attribute(&commit.author, &commit.email, "", None, None))?;
+    }
+    // The graph keeps the message on one line: each `Co-authored-by:` taken up to its `>`, as
+    // a trailer block of its own.
     let lower = commit.body.to_lowercase();
-    let mut message = String::new();
+    let mut message = String::from("x\n\n");
     for (at, _) in lower.match_indices("co-authored-by:") {
         let rest = &commit.body[at..];
         let end = rest.find('>').map_or(rest.len(), |e| e + 1);
@@ -42,12 +53,17 @@ fn from_message(commit: &Commit) -> Option<Attribution> {
 }
 
 impl Lens {
-    /// What is known of `commit`.
-    pub(crate) fn of(&self, commit: &Commit) -> Option<Attribution> {
-        self.map
-            .get(&commit.hash)
-            .cloned()
-            .or_else(|| from_message(commit))
+    /// What is known of `commit` (borrowed from the map when it is in it).
+    pub(crate) fn of(&self, commit: &Commit) -> Option<std::borrow::Cow<'_, Attribution>> {
+        match self.map.get(&commit.hash) {
+            Some(a) => Some(std::borrow::Cow::Borrowed(a)),
+            None => from_message(commit).map(std::borrow::Cow::Owned),
+        }
+    }
+
+    /// Whether everything recent was read: a commit not in the map records nothing.
+    pub(crate) fn complete(&self) -> bool {
+        self.read_for.is_some()
     }
 }
 
@@ -56,17 +72,20 @@ pub(crate) fn color(t: &Tokens, who: Who) -> Option<Color32> {
     match who {
         Who::Agent => Some(t.accent),
         Who::Mixed => Some(t.warning),
-        Who::Human => Some(t.success),
+        // Not green: it would vanish on the green of added lines.
+        Who::Human => Some(t.text_faint),
         Who::Unknown => None,
     }
 }
 
-/// A 3 px stripe at the left of `rect` in the colour of `who`.
-pub(crate) fn stripe(painter: &Painter, t: &Tokens, rect: Rect, who: Who) {
+/// A 2 px stripe in the colour of `who`, `inset` in from the left of `rect` (past the bar that
+/// marks picked lines).
+pub(crate) fn stripe(painter: &Painter, t: &Tokens, rect: Rect, who: Who, inset: f32) {
     if let Some(c) = color(t, who) {
+        let at = pos2(rect.left() + inset, rect.top() + 1.0);
         painter.rect_filled(
-            Rect::from_min_size(rect.min, vec2(3.0, rect.height())),
-            0.0,
+            Rect::from_min_size(at, vec2(2.0, rect.height() - 2.0)),
+            1.0,
             c,
         );
     }
@@ -121,7 +140,7 @@ impl RepoTab {
                         tab.authorship.read_for = Some(refs);
                         tab.authorship.map = Arc::new(map);
                         if tab.authorship.filter {
-                            tab.filter_agent_commits(ctx);
+                            tab.filter_agent_commits(false, ctx);
                         }
                     }
                     Ok(None) => {}
@@ -134,8 +153,9 @@ impl RepoTab {
         );
     }
 
-    /// The search bar's results become the agent-written commits of the history loaded.
-    pub(crate) fn filter_agent_commits(&mut self, ctx: &egui::Context) {
+    /// The search bar's results become the agent-written commits of the history loaded; `jump`
+    /// goes to the first (when turned on), else the one shown stays (a reload).
+    pub(crate) fn filter_agent_commits(&mut self, jump: bool, ctx: &egui::Context) {
         let found: Vec<String> = self
             .commits
             .iter()
@@ -146,15 +166,22 @@ impl RepoTab {
             })
             .map(|c| c.hash.clone())
             .collect();
+        let shown = self.search.results.get(self.search.current).cloned();
         self.search.query.clear();
         self.search.edited = None;
         self.search.running = false;
         self.search.searched = AGENT_FILTER.to_owned();
         self.search.matches = found.iter().cloned().collect();
         self.search.results = found;
-        self.search.current = 0;
-        if let Some(first) = self.search.results.first().cloned() {
-            self.goto(&first, ctx);
+        if jump {
+            self.search.current = 0;
+            if let Some(first) = self.search.results.first().cloned() {
+                self.goto(&first, ctx);
+            }
+        } else {
+            self.search.current = shown
+                .and_then(|h| self.search.results.iter().position(|r| *r == h))
+                .unwrap_or(0);
         }
     }
 
@@ -162,7 +189,7 @@ impl RepoTab {
     pub(crate) fn toggle_agent_filter(&mut self, on: bool, ctx: &egui::Context) {
         self.authorship.filter = on;
         if on {
-            self.filter_agent_commits(ctx);
+            self.filter_agent_commits(true, ctx);
         } else if self.search.searched == AGENT_FILTER {
             self.search.searched.clear();
             self.search.results.clear();
@@ -173,13 +200,15 @@ impl RepoTab {
     /// Works out a branch's figures in the background and says them.
     pub(crate) fn branch_authorship(&mut self, branch: &str, ctx: &egui::Context) {
         let full = super::branch_visibility::local_ref(branch);
-        // The main worktree's commit, unless that is the branch itself: then the default one.
+        // The default branch (the remote's, or main / master); without one, the main worktree's
+        // commit unless that is the branch itself.
         let main = self
             .worktrees
             .iter()
             .find(|w| w.main && w.branch.as_deref() != Some(branch))
             .map(|w| w.head.clone())
             .filter(|h| !h.is_empty());
+        let complete = self.authorship.complete();
         let known = self.authorship.map.clone();
         let repo = self.path.clone();
         let name = branch.to_owned();
@@ -187,10 +216,11 @@ impl RepoTab {
         self.then(
             ctx,
             move || {
-                let base = main
-                    .or_else(|| default_branch(&repo, &full))
+                let base = default_branch(&repo, &full)
+                    .or(main)
                     .ok_or_else(|| format!("There is no main branch to set {name} against"))?;
-                authorship::branch::figures(&repo, &full, &base, &known).map(|f| f.headline(&name))
+                authorship::branch::figures(&repo, &full, &base, &known, complete)
+                    .map(|f| f.headline(&name))
             },
             |tab, said, _| {
                 tab.status = Some(match said {
@@ -223,8 +253,8 @@ pub(crate) fn filter_toggle(ui: &mut Ui, on: bool, acts: &mut Vec<Action>) {
     if ui
         .selectable_label(on, "Agent-written")
         .on_hover_text(
-            "Only the commits an agent wrote or co-wrote, as they record it (git-ai notes, \
-             Agent Trace, an agent's account or Co-authored-by trailer)",
+            "Step through the commits an agent wrote or co-wrote, as they record it (git-ai \
+             notes, Agent Trace, an agent's account or Co-authored-by trailer)",
         )
         .clicked()
     {
@@ -302,6 +332,15 @@ mod tests {
         let mut want = vec![agent.clone(), trailer.clone()];
         want.sort();
         assert_eq!(found, want);
+        // A reload keeps the one shown; closing the search turns the filter off.
+        tab.search.current = 1;
+        let shown = tab.search.results[1].clone();
+        tab.filter_agent_commits(false, &ctx);
+        assert_eq!(tab.search.results[tab.search.current], shown);
+        tab.search.open = true;
+        tab.toggle_search();
+        assert!(!tab.authorship.filter && tab.search.results.is_empty());
+        tab.apply(Action::AgentFilter(true), &ctx);
         tab.apply(Action::AgentFilter(false), &ctx);
         assert!(tab.search.results.is_empty());
 

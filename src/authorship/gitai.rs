@@ -14,16 +14,14 @@ pub struct Note {
 
 /// Reads a note; `None` when it isn't one of git-ai's.
 pub fn parse(text: &str) -> Option<Note> {
-    let (attestation, meta) = match text.split_once("\n---\n") {
-        Some((a, m)) => (a, m),
-        None => text.strip_suffix("\n---").map(|a| (a, ""))?,
+    // A note listing no file starts with its divider.
+    let (attestation, meta) = match text.strip_prefix("---\n") {
+        Some(meta) => ("", meta),
+        None => text.split_once("\n---\n")?,
     };
-    let meta: serde_json::Value = serde_json::from_str(meta.trim()).unwrap_or_default();
-    if meta
-        .get("schema_version")
-        .and_then(|v| v.as_str())
-        .is_some_and(|v| !v.starts_with("authorship/"))
-    {
+    let meta: serde_json::Value = serde_json::from_str(meta.trim()).ok()?;
+    let schema = meta.get("schema_version").and_then(|v| v.as_str())?;
+    if !schema.starts_with("authorship/") {
         return None;
     }
     let mut note = Note::default();
@@ -62,7 +60,9 @@ fn who_of(key: &str, meta: &serde_json::Value) -> Who {
     // `s_…::t_…` resolves through `sessions`, a legacy key through `prompts`; both are AI.
     let session = key.split("::").next().unwrap_or(key);
     let known = meta["sessions"].get(session).is_some() || meta["prompts"].get(key).is_some();
-    if known || key.starts_with("s_") || key.len() == 16 {
+    // Legacy prompt keys: hex, 16 characters (7 accepted, as the standard asks).
+    let legacy = (7..=16).contains(&key.len()) && key.bytes().all(|b| b.is_ascii_hexdigit());
+    if known || key.starts_with("s_") || legacy {
         Who::Agent
     } else {
         Who::Unknown
@@ -83,14 +83,24 @@ fn parse_ranges(text: &str) -> Vec<(u32, u32)> {
         .collect()
 }
 
-/// A path written in double quotes (it has spaces, tabs or a line break).
+/// A path written in double quotes (it has spaces, tabs or a line break): `\"` and `\\` undone.
 fn unquote(path: &str) -> String {
-    match path.strip_prefix('"').and_then(|p| p.strip_suffix('"')) {
-        Some(inner) => inner
-            .replace("\\\"", "\"")
-            .replace("\\t", "\t")
-            .replace("\\n", "\n")
-            .replace("\\\\", "\\"),
-        None => path.to_owned(),
+    let Some(inner) = path.strip_prefix('"').and_then(|p| p.strip_suffix('"')) else {
+        return path.to_owned();
+    };
+    let mut out = String::with_capacity(inner.len());
+    let mut chars = inner.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('t') => out.push('\t'),
+            Some('n') => out.push('\n'),
+            Some(other) => out.push(other),
+            None => out.push('\\'),
+        }
     }
+    out
 }

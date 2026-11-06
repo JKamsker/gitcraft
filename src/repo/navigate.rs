@@ -482,6 +482,7 @@ impl RepoTab {
         self.search.open = !self.search.open;
         self.search.focus = self.search.open;
         if !self.search.open {
+            self.authorship.filter = false;
             self.search.running = false;
             // Nor does a query typed just before closing start a search once it's closed.
             self.search.edited = None;
