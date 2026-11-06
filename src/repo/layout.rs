@@ -48,8 +48,6 @@ impl RepoTab {
                     self.conflict_view(ui, &mut acts);
                 } else if self.rebase.is_some() {
                     self.rebase_view(ui, &mut acts);
-                } else if self.timeline_view.is_some() {
-                    self.timeline_view_ui(ui, &mut acts);
                 } else if self.diff.is_some() && !self.history_beside_diff() {
                     self.diff_view(ui, &mut acts);
                 } else if self.file_view.is_some() {
@@ -58,6 +56,8 @@ impl RepoTab {
                     self.ci_view_ui(ui, &mut acts);
                 } else if self.pr_view.is_some() {
                     self.pr_view_ui(ui, &mut acts);
+                } else if self.timeline_view.is_some() {
+                    self.timeline_view_ui(ui, &mut acts);
                 } else {
                     self.graph_view(ui, &mut acts);
                 }
@@ -122,9 +122,7 @@ impl RepoTab {
                     i.modifiers.command && i.key_pressed(Key::F),
                 )
             });
-            if esc && self.timeline_view.is_some() && self.rebase.is_none() {
-                acts.push(Action::ToggleTimeline);
-            } else if esc && self.diff.is_some() && self.line_comment_open() {
+            if esc && self.diff.is_some() && self.line_comment_open() {
                 acts.push(Action::Pr(pr_review::PrAct::CloseLine));
             } else if esc && self.diff.is_some() {
                 acts.push(Action::CloseDiff);
@@ -136,6 +134,8 @@ impl RepoTab {
                 acts.push(Action::CloseCi);
             } else if esc && self.pr_view.is_some() {
                 acts.push(Action::ClosePr);
+            } else if esc && self.timeline_view.is_some() {
+                acts.push(Action::ToggleTimeline);
             } else if esc && self.compare.is_some() {
                 acts.push(Action::CloseCompare);
             } else if esc && self.search.open {

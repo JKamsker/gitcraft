@@ -3,12 +3,14 @@
 
 use egui::{Pos2, RichText, Stroke, Ui, pos2};
 
-use super::{Entry, Origin, RefState, snapshot, tree};
+use super::{Entry, Origin, snapshot, tree};
 use crate::repo::{Action, RepoTab, short, widgets};
 use crate::theme::{self, Tokens};
 
 const ROW_H: f32 = 26.0;
 const LANE_W: f32 = 14.0;
+/// Lanes drawn at most; further ones are drawn in the last.
+const MAX_LANES: usize = 10;
 
 /// What the timeline view asks for.
 pub(crate) enum TimelineAct {
@@ -28,6 +30,9 @@ pub(crate) enum TimelineAct {
         branch: String,
         commit: String,
     },
+    /// Ask before forgetting all but the newest entries (all with 0).
+    AskForget(usize),
+    CancelForget,
     /// Forget all but the newest entries (all with 0).
     Forget(usize),
 }
@@ -39,17 +44,36 @@ pub(crate) struct TimelineView {
     pub(crate) selected: Option<Option<u64>>,
     /// A jump asked for, waiting to be confirmed.
     pub(crate) confirm: Option<Option<u64>>,
+    /// Forgetting asked for (how many to keep), waiting to be confirmed.
+    pub(crate) forget: Option<usize>,
 }
 
 impl RepoTab {
+    /// Shows the timeline in the big area in place of a diff, a file, a pull request or builds,
+    /// or closes it. Not over a conflict or the rebase editor, which come first.
     pub(in crate::repo) fn toggle_timeline(&mut self) {
-        self.timeline_view = match self.timeline_view.take() {
-            Some(_) => None,
-            None => Some(TimelineView {
-                selected: Some(self.timeline.current),
-                confirm: None,
-            }),
-        };
+        if self.timeline_view.take().is_some() {
+            return;
+        }
+        if self.conflict.is_some() || self.rebase.is_some() {
+            self.status = Some((
+                "Finish or close the conflict or the rebase editor first to see the timeline"
+                    .to_owned(),
+                true,
+            ));
+            return;
+        }
+        self.diff = None;
+        self.file_view = None;
+        self.ci_view = None;
+        if self.pr_view.is_some() {
+            self.close_pr();
+        }
+        self.timeline_view = Some(TimelineView {
+            selected: None,
+            confirm: None,
+            forget: None,
+        });
     }
 
     pub(in crate::repo) fn timeline_act(&mut self, act: TimelineAct, ctx: &egui::Context) {
@@ -71,8 +95,11 @@ impl RepoTab {
             TimelineAct::BranchAt { branch, commit } => {
                 self.branch_at_old_tip(&branch, &commit, ctx);
             }
+            TimelineAct::AskForget(keep) => view.forget = Some(keep),
+            TimelineAct::CancelForget => view.forget = None,
             TimelineAct::Forget(keep) => {
                 view.selected = None;
+                view.forget = None;
                 self.forget_timeline(keep, ctx);
             }
         }
@@ -87,16 +114,20 @@ impl RepoTab {
                 acts.push(Action::ToggleTimeline);
             }
             ui.menu_button(RichText::new("Forget…").size(12.0), |ui| {
-                if ui.button("Forget all but the newest 50").clicked() {
-                    acts.push(Action::Timeline(TimelineAct::Forget(50)));
+                if ui
+                    .button("Forget all but the newest 50 (and the way to where you are)")
+                    .clicked()
+                {
+                    acts.push(Action::Timeline(TimelineAct::AskForget(50)));
                 }
                 if ui.button("Forget the whole timeline").clicked() {
-                    acts.push(Action::Timeline(TimelineAct::Forget(0)));
+                    acts.push(Action::Timeline(TimelineAct::AskForget(0)));
                 }
             });
+            let cmd = crate::manual::command();
             ui.label(
                 RichText::new(format!(
-                    "{count} {} · Ctrl+Z / Ctrl+Y walk it",
+                    "{count} {} · {cmd}+Z / {cmd}+Y step back / forward",
                     if count == 1 { "entry" } else { "entries" }
                 ))
                 .size(11.5)
@@ -109,6 +140,9 @@ impl RepoTab {
                 ui.add_space(10.0);
                 ui.label(RichText::new(e).size(12.0).color(t.warning));
             });
+        }
+        if let Some(keep) = self.timeline_view.as_ref().and_then(|v| v.forget) {
+            self.forget_confirm(ui, keep, acts);
         }
         if count == 0 {
             ui.add_space(30.0);
@@ -159,6 +193,45 @@ impl RepoTab {
             });
     }
 
+    /// Asks before forgetting: what can't be reached any more, and what doesn't change.
+    fn forget_confirm(&self, ui: &mut Ui, keep: usize, acts: &mut Vec<Action>) {
+        let t = Tokens::get(ui.ctx());
+        let path = self.timeline.path_to(self.timeline.current);
+        let cut = self.timeline.entries.len().saturating_sub(keep);
+        let gone = if keep == 0 {
+            self.timeline.entries.len()
+        } else {
+            self.timeline.entries[..cut]
+                .iter()
+                .filter(|e| !path.contains(&e.id))
+                .count()
+        };
+        let what = if gone == 1 { "entry" } else { "entries" };
+        egui::Frame::new()
+            .fill(t.card)
+            .stroke(Stroke::new(1.0, t.field_border))
+            .corner_radius(t.radius)
+            .inner_margin(egui::Margin::same(10))
+            .outer_margin(egui::Margin::same(8))
+            .show(ui, |ui| {
+                ui.label(
+                    RichText::new(format!(
+                        "Forget {gone} {what}? Undo won't reach them any more, and the old commits only they kept can be removed by git gc. Your branches don't change."
+                    ))
+                    .color(t.text),
+                );
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    if widgets::primary_button(ui, "Forget", gone > 0, 80.0).clicked() {
+                        acts.push(Action::Timeline(TimelineAct::Forget(keep)));
+                    }
+                    if ui.button("Cancel").clicked() {
+                        acts.push(Action::Timeline(TimelineAct::CancelForget));
+                    }
+                });
+            });
+    }
+
     /// The tree, a row per entry, newest first.
     fn tree_rows(&self, ui: &mut Ui, selected: Option<u64>, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
@@ -167,7 +240,8 @@ impl RepoTab {
         let lines = ui.painter().add(egui::Shape::Noop);
         let now = crate::git::now();
         let mut centers: Vec<Pos2> = Vec::with_capacity(rows.len());
-        let graph_w = lanes as f32 * LANE_W + 8.0;
+        let shown_lanes = lanes.min(MAX_LANES);
+        let graph_w = shown_lanes as f32 * LANE_W + 8.0;
         for row in &rows {
             let entry = row.id.and_then(|id| self.timeline.get(id));
             let (rect, resp) = widgets::keyed_row(ui, ROW_H, ("timeline_row", row.id));
@@ -177,7 +251,7 @@ impl RepoTab {
                 ui.painter().rect_filled(rect, 0.0, t.hover);
             }
             let center = pos2(
-                rect.left() + 8.0 + row.lane as f32 * LANE_W + LANE_W / 2.0,
+                rect.left() + 8.0 + row.lane.min(MAX_LANES - 1) as f32 * LANE_W + LANE_W / 2.0,
                 rect.center().y,
             );
             centers.push(center);
@@ -198,7 +272,7 @@ impl RepoTab {
             let text_x = rect.left() + 8.0 + graph_w;
             let (label, faint) = match entry {
                 Some(e) => (e.label.clone(), !on_path),
-                None => ("Start".to_owned(), false),
+                None => ("Before the oldest entry".to_owned(), false),
             };
             let label_color = if faint { t.text_faint } else { t.text };
             let when = entry.map(|e| crate::git::relative_time(e.time, now));
@@ -222,7 +296,7 @@ impl RepoTab {
             }
             if entry.is_some_and(|e| e.origin == Origin::Outside) {
                 let galley = ui.painter().layout_no_wrap(
-                    "outside".to_owned(),
+                    "elsewhere".to_owned(),
                     theme::medium(10.5),
                     t.warning,
                 );
@@ -249,12 +323,13 @@ impl RepoTab {
                     "{}\n{}",
                     e.label,
                     if e.origin == Origin::Outside {
-                        "Made outside gitcraft"
+                        "Made outside gitcraft (terminal, another app, or while it was closed)"
                     } else {
                         "Made in gitcraft"
                     }
                 ),
-                None => "Before every entry of the timeline".to_owned(),
+                None => "The branches as they were before the oldest entry still in the timeline"
+                    .to_owned(),
             });
             if resp.clicked() {
                 acts.push(Action::Timeline(TimelineAct::Select(row.id)));
@@ -291,10 +366,12 @@ impl RepoTab {
         let t = Tokens::get(ui.ctx());
         let confirm = self.timeline_view.as_ref().and_then(|v| v.confirm);
         let Some(entry) = id.and_then(|id| self.timeline.get(id)) else {
-            heading(ui, "Start");
+            heading(ui, "Before the oldest entry");
             ui.label(
-                RichText::new("The repository as it was before every entry of the timeline.")
-                    .color(t.text_dim),
+                RichText::new(
+                    "The branches as they were before the oldest entry still in the timeline.",
+                )
+                .color(t.text_dim),
             );
             ui.add_space(10.0);
             self.jump_controls(ui, None, idle, confirm, acts);
@@ -304,7 +381,9 @@ impl RepoTab {
         let now = crate::git::now();
         let who = match entry.origin {
             Origin::Gitcraft => "Made in gitcraft",
-            Origin::Outside => "Made outside gitcraft (terminal, another app), seen on a reload",
+            Origin::Outside => {
+                "Made outside gitcraft (terminal, another app, or while gitcraft was closed)"
+            }
         };
         ui.label(
             RichText::new(format!(
@@ -317,9 +396,9 @@ impl RepoTab {
         let state = if self.timeline.current == Some(entry.id) {
             ("The repository is here now", t.success)
         } else if self.timeline.is_done(entry.id) {
-            ("Done: what came after it is too", t.text_dim)
+            ("Done: the repository is past this point", t.text_dim)
         } else {
-            ("Undone, or on another branch of the tree", t.warning)
+            ("Undone, or on a side path of the tree", t.warning)
         };
         ui.label(RichText::new(state.0).size(12.0).color(state.1));
         ui.add_space(10.0);
@@ -351,7 +430,7 @@ impl RepoTab {
                 .on_disabled_hover_text(if here {
                     "The repository is here already"
                 } else {
-                    "Wait for the operation running to end"
+                    "Wait until the current git operation finishes"
                 });
             if button.clicked() {
                 acts.push(Action::Timeline(TimelineAct::AskJump(id)));
@@ -361,7 +440,7 @@ impl RepoTab {
         let Some((_, target)) = self.jump_target(id) else {
             return;
         };
-        let now = RefState::of(&self.refs);
+        let now = self.ref_state();
         let lines = snapshot::describe(&now, &target);
         egui::Frame::new()
             .fill(t.card)
@@ -372,7 +451,7 @@ impl RepoTab {
                 if lines.is_empty() {
                     ui.label(
                         RichText::new(
-                            "The branches are as it left them already: only the timeline moves.",
+                            "Nothing changes in the repository: only the marker in the timeline moves.",
                         )
                         .color(t.text_dim),
                     );
@@ -387,8 +466,8 @@ impl RepoTab {
                     }
                     ui.label(
                         RichText::new(
-                            "Uncommitted changes are kept (git refuses where they'd be lost). \
-                             Stashes and tags stay as they are.",
+                            "Changes in files are kept; staged ones end up unstaged, and git \
+                             refuses where they'd be lost. Stashes and tags stay as they are.",
                         )
                         .size(11.5)
                         .color(t.text_faint),
@@ -439,7 +518,11 @@ impl RepoTab {
                     let back = format!("Put {} back at {}", change.name, short(&change.old));
                     if ui
                         .add_enabled(idle, egui::Button::new(back).small())
-                        .on_hover_text("Moves the branch to its commit from before this entry")
+                        .on_hover_text(format!(
+                            "Moves {} back to {} (resets it if it is checked out; uncommitted changes are kept). Undo undoes it.",
+                            change.name,
+                            short(&change.old)
+                        ))
                         .clicked()
                     {
                         acts.push(Action::Timeline(TimelineAct::PutBack {

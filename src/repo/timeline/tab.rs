@@ -42,9 +42,11 @@ impl RepoTab {
         }
     }
 
-    /// An operation starts: what is read until it ends is only part of it.
-    pub(in crate::repo) fn timeline_op_started(&mut self, quiet: bool) {
-        if quiet {
+    /// An operation starts: what is read until it ends is only part of it. One that only
+    /// changes the working tree or the index (`Refresh::Status`: staging) moves no branch, and
+    /// leaves the timeline alone.
+    pub(in crate::repo) fn timeline_op_started(&mut self, quiet: bool, refresh: Refresh) {
+        if quiet || refresh == Refresh::Status {
             return;
         }
         // The one before still waits for its read: it is taken in with this one's.
@@ -86,11 +88,25 @@ impl RepoTab {
                 undo,
             },
         };
-        if refresh == Refresh::Status && self.timeline.backlog.is_empty() {
-            // No read of the branches follows: nothing moved them.
-            self.timeline.awaiting = Awaiting::Nothing;
-            if let Some(state) = self.timeline.seen.clone() {
-                self.resolve(then, state, ctx);
+        if refresh == Refresh::Status {
+            // No read of the branches follows, and it moved none: only one that can be undone
+            // is an entry, at once.
+            if let (
+                Ended::New {
+                    label,
+                    undo: Some(undo),
+                },
+                Some(state),
+            ) = (then, self.timeline.seen.clone())
+            {
+                self.record(
+                    label,
+                    Origin::Gitcraft,
+                    state.clone(),
+                    state,
+                    Some(undo),
+                    ctx,
+                );
             }
             return;
         }
@@ -102,7 +118,7 @@ impl RepoTab {
 
     /// The branches as the read numbered `read` found them.
     pub(in crate::repo) fn timeline_read(&mut self, read: u64, ctx: &egui::Context) {
-        let state = RefState::of(&self.refs);
+        let state = self.ref_state();
         if !self.timeline.loaded {
             self.timeline.early_read = Some((read, state));
             return;
@@ -118,29 +134,37 @@ impl RepoTab {
                 self.timeline.awaiting = awaiting;
             }
             Awaiting::Ended { then, .. } => {
+                // Those that ended before it, whose own reads were missed: each is an entry,
+                // the first with what they all moved.
                 for earlier in std::mem::take(&mut self.timeline.backlog) {
-                    self.resolve(earlier, state.clone(), ctx);
+                    self.resolve(earlier, state.clone(), true, ctx);
                 }
-                self.resolve(then, state, ctx);
+                self.resolve(then, state, false, ctx);
             }
             Awaiting::Nothing => self.observe(state, ctx),
         }
     }
 
-    /// What an operation that ended did, now that `state` says where the branches are.
-    fn resolve(&mut self, then: Ended, state: RefState, ctx: &egui::Context) {
+    /// What an operation that ended did, now that `state` says where the branches are; with
+    /// `always`, it is an entry even if nothing it did shows any more.
+    fn resolve(&mut self, then: Ended, state: RefState, always: bool, ctx: &egui::Context) {
         let before = self.timeline.seen.clone().unwrap_or_else(|| state.clone());
+        let before = self.without_elsewhere(&before, &state);
+        let seen_changed = self.timeline.seen.as_ref() != Some(&state);
         self.timeline.seen = Some(state.clone());
         match then {
             Ended::New { label, undo } => {
-                if undo.is_some() || before != state {
+                if always || undo.is_some() || before != state {
                     self.record(label, Origin::Gitcraft, before, state, undo, ctx);
-                    return;
+                } else if seen_changed {
+                    self.save_timeline(ctx);
                 }
             }
-            Ended::Moved { to, undo } => self.timeline.move_to(to, undo),
+            Ended::Moved { to, undo } => {
+                self.timeline.move_to(to, undo);
+                self.save_timeline(ctx);
+            }
         }
-        self.save_timeline(ctx);
     }
 
     /// A read with no operation of gitcraft's behind it: what differs from the last one was
@@ -150,6 +174,7 @@ impl RepoTab {
             self.save_timeline(ctx);
             return;
         };
+        let before = self.without_elsewhere(&before, &state);
         if before != state {
             let label = observe::fallback_label(&super::changes(&before, &state));
             self.record(label, Origin::Outside, before, state, None, ctx);
@@ -271,7 +296,7 @@ impl RepoTab {
     /// Undoes the entry the repository is in: with its commands when gitcraft made it, else by
     /// putting the branches back as they were before it.
     pub(in crate::repo) fn undo(&mut self, ctx: &egui::Context) {
-        if self.busy_op.is_some() || self.timeline_unsettled("Undo") {
+        if self.busy_op.is_some() || self.timeline_unsettled("Undo", crate::repo::Action::Undo) {
             return;
         }
         let Some(entry) = self.timeline.current_entry().cloned() else {
@@ -285,9 +310,7 @@ impl RepoTab {
                 self.run_ops(&label, steps, Refresh::All, OpKind::Undo(undo), ctx);
             }
             None => {
-                let target = self
-                    .timeline
-                    .state_at(&RefState::of(&self.refs), entry.parent);
+                let target = self.timeline.state_at(&self.ref_state(), entry.parent);
                 self.restore(&label, &target, entry.parent, ctx);
             }
         }
@@ -295,7 +318,7 @@ impl RepoTab {
 
     /// Redoes the entry below the current one that was last undone (or made).
     pub(in crate::repo) fn redo(&mut self, ctx: &egui::Context) {
-        if self.busy_op.is_some() || self.timeline_unsettled("Redo") {
+        if self.busy_op.is_some() || self.timeline_unsettled("Redo", crate::repo::Action::Redo) {
             return;
         }
         let Some(entry) = self.timeline.redo_target().cloned() else {
@@ -309,9 +332,7 @@ impl RepoTab {
                 self.run_ops(&label, steps, Refresh::All, OpKind::Redo(undo), ctx);
             }
             None => {
-                let target = self
-                    .timeline
-                    .state_at(&RefState::of(&self.refs), Some(entry.id));
+                let target = self.timeline.state_at(&self.ref_state(), Some(entry.id));
                 self.restore(&label, &target, Some(entry.id), ctx);
             }
         }
@@ -320,26 +341,70 @@ impl RepoTab {
     /// Goes to entry `to`'s state (`None`: the one before every entry), wherever it is in the
     /// tree: the branches and HEAD are put back as it left them.
     pub(in crate::repo) fn jump(&mut self, to: Option<u64>, ctx: &egui::Context) {
-        if self.busy_op.is_some() || self.timeline_unsettled("Going there") {
+        let again = crate::repo::Action::Timeline(super::view::TimelineAct::Jump(to));
+        if self.busy_op.is_some() || self.timeline_unsettled("Going there", again) {
             return;
         }
         let Some((label, target)) = self.jump_target(to) else {
             return;
         };
+        if let Some(skipped) = self
+            .timeline
+            .command_only_between(self.timeline.current, to)
+        {
+            self.status = Some((
+                format!(
+                    "{label}: that would skip “{skipped}”, which moved no branch: step through it \
+                     with {cmd}+Z / {cmd}+Y instead",
+                    cmd = crate::manual::command()
+                ),
+                true,
+            ));
+            return;
+        }
         self.restore(&label, &target, to, ctx);
     }
 
     /// Whether the timeline doesn't know yet where the last operation left the repository (its
     /// read hasn't come in): then `what` waits, and says so.
-    fn timeline_unsettled(&mut self, what: &str) -> bool {
+    fn timeline_unsettled(&mut self, what: &str, again: crate::repo::Action) -> bool {
         let unsettled = self.timeline.awaiting != Awaiting::Nothing || !self.timeline.loaded;
-        if unsettled {
+        if !unsettled {
+            return false;
+        }
+        if self.loading || !self.timeline.loaded {
+            // Asked again on the next frame, until the read under way is in.
+            self.queued.push(again);
             self.status = Some((
-                format!("{what}: the repository is being read again, try once more in a moment"),
+                format!("{what}: waiting for the repository to be read again…"),
+                false,
+            ));
+        } else {
+            // No read under way (the last one failed): it would wait for good.
+            self.status = Some((
+                format!("{what}: the repository couldn't be read again; reload it (F5) first"),
                 true,
             ));
         }
-        unsettled
+        true
+    }
+
+    /// HEAD and the local branches as the tab last read them.
+    pub(in crate::repo) fn ref_state(&self) -> RefState {
+        RefState::of(&self.refs)
+    }
+
+    /// `before` with the branches checked out in other worktrees as `after` has them: they move
+    /// with the work done there, which is on those worktrees' timelines, not this one's.
+    fn without_elsewhere(&self, before: &RefState, after: &RefState) -> RefState {
+        let mut before = before.clone();
+        for branch in self.other_worktree_branches() {
+            match after.branches.get(&branch) {
+                Some(commit) => before.branches.insert(branch, commit.clone()),
+                None => before.branches.remove(&branch),
+            };
+        }
+        before
     }
 
     /// What going to `to` is called, and the state it puts back.
@@ -348,13 +413,13 @@ impl RepoTab {
             Some(id) => format!("Go to “{}”", self.timeline.get(id)?.label),
             None => "Go to before the timeline".to_owned(),
         };
-        let now = RefState::of(&self.refs);
+        let now = self.ref_state();
         Some((label, self.timeline.state_at(&now, to)))
     }
 
     /// Puts the branches and HEAD as `target` has them; once done, the timeline is at `to`.
     fn restore(&mut self, label: &str, target: &RefState, to: Option<u64>, ctx: &egui::Context) {
-        let now = RefState::of(&self.refs);
+        let now = self.ref_state();
         match snapshot::restore_steps(&now, target, &self.other_worktree_branches()) {
             Ok(steps) => {
                 self.timeline.jump = Some((label.to_owned(), to));
@@ -374,7 +439,7 @@ impl RepoTab {
         if self.busy_op.is_some() {
             return;
         }
-        let now = RefState::of(&self.refs);
+        let now = self.ref_state();
         let mut target = now.clone();
         target.branches.insert(branch.to_owned(), commit.to_owned());
         let label = format!("Put {branch} back at {}", crate::repo::short(commit));
