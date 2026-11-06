@@ -210,7 +210,7 @@ impl RepoTab {
             RowExtra::Buttons(buttons),
         );
         if f.code != 'D' {
-            widgets::file_menu(&r.row, &f.path, None, true, acts);
+            widgets::file_menu(&r.row, &f.path, None, true, Some(&key), acts);
         }
         match r.button {
             Some(i) => RowClick::Button(i),

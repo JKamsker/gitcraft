@@ -184,6 +184,18 @@ so your config, credentials and hooks apply as usual.
   before you check the result. Settings → Git installs it in one click and can have git merge
   with it everywhere ([docs/mergiraf.md](docs/mergiraf.md)). gitcraft only runs the `mergiraf`
   program: it neither bundles nor links Mergiraf (GPL-3.0), so gitcraft's licence is unchanged.
+- External diff and merge tools: _Open in diff tool_ in a file's right-click menu (working tree,
+  staged, a commit's file, a comparison) shows its diff in one; _Resolve in merge tool_ on a
+  conflicted file (or _Merge tool_ in the conflict editor) resolves it in one. Settings → Git →
+  External tools picks each: the tool git's `diff.tool` / `merge.tool` names
+  (`git difftool --tool=… -y`, `git mergetool --tool=… -y`), or Beyond Compare, Araxis, VS
+  Code, Meld, KDiff3, P4Merge or WinMerge, with their program when it isn't found by itself.
+  The view refreshes when the tool closes. The file counts as resolved only when the tool
+  reports success, as git decides it: from its exit code with `mergetool.<tool>.trustExitCode`,
+  otherwise from whether the file was saved; `mergetool.keepBackup` says whether the `.orig`
+  copy is kept. In WSL a preset is the Windows program, given the files through their
+  `\\wsl.localhost` paths; over SSH the tool runs on that machine and has to be installed
+  there. Tools that need a terminal (vimdiff) are left to the terminal panel.
 - A merge, rebase, cherry-pick, revert or patch stopped on conflicts shows a banner with
   _Abort_; the commit box finishes it (_Continue rebase_ during a rebase, _Continue patch_ while
   `git am` applies one).
@@ -216,8 +228,8 @@ so your config, credentials and hooks apply as usual.
 - Settings (Ctrl+, or the gear in the title bar), in pages listed on the left: the profile in
   use and what is its own, zoom, branch column width, graph columns, avatars, notifications,
   update check (with a Check for updates button), background fetch, keeping submodules up to
-  date, editor command, default shell and terminal font size, saved identities, SSH sign-ins,
-  and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
+  date, editor command, external diff and merge tools, default shell and terminal font size,
+  saved identities, SSH sign-ins, and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
   Alt+↓ go through the pages.
 - Commit signing in Settings → Commit signing: the format (OpenPGP, SSH or X.509), signing key
   and program, and whether commits and tags are signed by default. These are your global git
@@ -379,6 +391,7 @@ was made this way, on a demo repository.
 | `src/repo/highlight.rs`  | syntax colours (syntect)                                                           |
 | `src/vscode_theme.rs`    | VS Code's current colour theme as a syntect theme                                  |
 | `src/repo/conflict.rs`   | three-pane conflict editor                                                         |
+| `src/git/external_tool/` | external diff and merge tools: presets, how git starts them (here, in WSL, over SSH), how a merge ended |
 | `src/mergiraf.rs` | Mergiraf, run as the user's own command when it is installed |
 | `src/repo/rebase.rs`     | interactive rebase editor and its todo list                                        |
 | `src/repo/file_view.rs`  | a file's history, blame and contents at a commit                                   |

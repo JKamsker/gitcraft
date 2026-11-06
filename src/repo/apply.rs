@@ -148,6 +148,8 @@ impl RepoTab {
                     self.status = Some((e, true));
                 }
             }
+            Action::OpenInDiffTool(key) => self.open_in_diff_tool(key, ctx),
+            Action::ResolveInMergeTool(path) => self.resolve_in_merge_tool(path, ctx),
             Action::SetIdentity(name, email) => self.run_ops(
                 "Set identity",
                 ops(&[

@@ -1,5 +1,6 @@
 //! User settings: stored with the app state, readable from anywhere through the egui context.
 
+mod external_tools;
 mod layout;
 mod page;
 mod profile_page;
@@ -86,6 +87,11 @@ pub struct Settings {
     pub vscode_colors: bool,
     /// Offer Mergiraf in the conflict editor, when it is installed.
     pub mergiraf: bool,
+    /// The diff tool _Open in diff tool_ starts (git's `diff.tool` unless a preset is chosen).
+    pub diff_tool: crate::git::external_tool::ToolChoice,
+    /// The merge tool _Resolve in merge tool_ starts (git's `merge.tool` unless a preset is
+    /// chosen).
+    pub merge_tool: crate::git::external_tool::ToolChoice,
     /// After a checkout, pull, merge or rebase, update the submodules to the commits it records.
     pub keep_submodules: bool,
     /// Saved as `profiles` by the versions before profiles were what they are now.
@@ -132,6 +138,8 @@ impl Default for Settings {
             download_updates: true,
             vscode_colors: true,
             mergiraf: true,
+            diff_tool: Default::default(),
+            merge_tool: Default::default(),
             keep_submodules: false,
             identities: Vec::new(),
             user_profiles: vec![UserProfile::default()],
@@ -577,6 +585,13 @@ impl Settings {
                         },
                     );
                 });
+                section(
+                    ui,
+                    f,
+                    "External tools",
+                    Some(external_tools::INTRO),
+                    |card| self.external_tools_ui(card),
+                );
                 section(
                     ui,
                     f,
