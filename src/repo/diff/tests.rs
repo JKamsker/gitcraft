@@ -8,7 +8,7 @@ use super::images::image_id;
 use super::jump::{change_at, changes, offset_of, step};
 use super::map::change_runs;
 use super::paint::line_job;
-use super::parse::{changed_ranges, hunk_start, meta};
+use super::parse::{changed_ranges, hunk_start, is_new_file, meta};
 use super::select::Side;
 use super::*;
 use crate::theme;
@@ -212,6 +212,21 @@ fn combined_conflict_diff() {
     assert_eq!(lines[1].text, "<<<<<<< HEAD");
     assert_eq!(lines[3].kind, Kind::Context);
     assert_eq!(lines[3].old, None);
+}
+
+/// A new file shows unified even side by side: it has no old side to put beside it.
+#[test]
+fn new_files_are_told_apart() {
+    let added = "diff --git a/x b/x\nnew file mode 100644\nindex 0000000..e69de29\n--- /dev/null\n+++ b/x\n@@ -0,0 +1 @@\n+a\n";
+    let untracked = "diff --git a/x b/x\n--- /dev/null\n+++ b/x\n@@ -0,0 +1 @@\n+a\n";
+    let changed = "diff --git a/x b/x\nindex 1..2 100644\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n--- /dev/null\n+new file mode 1\n";
+    let deleted =
+        "diff --git a/x b/x\ndeleted file mode 100644\n--- a/x\n+++ /dev/null\n@@ -1 +0,0 @@\n-a\n";
+    assert!(is_new_file(added));
+    assert!(is_new_file(untracked));
+    // The same words as lines of the file don't count.
+    assert!(!is_new_file(changed));
+    assert!(!is_new_file(deleted));
 }
 
 #[test]

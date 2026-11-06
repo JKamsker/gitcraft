@@ -57,6 +57,7 @@ impl RepoTab {
             line_comment_panel(ui, &t, pr, draft, data, acts);
         }
 
+        let split = data.shows_split(split);
         let shift = ui.input(|i| i.modifiers.shift);
         let mut rows = Rows::new(ui, view, data, review.as_ref(), partial, split);
         let sel = rows.show(ui, &path, acts);
