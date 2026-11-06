@@ -179,6 +179,8 @@ pub struct RepoTab {
     conflict_generation: u64,
     /// Whether conflict resolutions are remembered here (git rerere), and which it reused.
     rerere: conflict::rerere::Rerere,
+    /// Conflict decisions taken as a file's save started, stored once it is saved.
+    decisions_pending: Option<conflict::decisions::Pending>,
 
     commit_summary: String,
     commit_body: String,
@@ -327,6 +329,7 @@ impl RepoTab {
             conflict: None,
             conflict_generation: 0,
             rerere: Default::default(),
+            decisions_pending: None,
             commit_summary: String::new(),
             commit_body: String::new(),
             amend: false,

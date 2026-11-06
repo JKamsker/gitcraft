@@ -1,6 +1,6 @@
 //! Conflict decisions kept in git: each one a blob (JSON) under
 //! `refs/gitcraft/conflict-decisions/<key>`, so that they stay with the repository, are never
-//! pushed unless asked, and can travel with a push or fetch of those refs. Blocking: from the
+//! pushed unless asked, and can travel with the palette's sync. Blocking: from the
 //! background.
 
 use std::collections::HashMap;
@@ -8,28 +8,28 @@ use std::path::Path;
 
 use super::record::Decision;
 use crate::git;
-use crate::repo::ops;
 
 /// Where the decisions are kept.
 pub const REFS: &str = "refs/gitcraft/conflict-decisions/";
 
-/// The refspec that moves every decision, replacing what the other side has for the same
-/// conflict (they are blobs: there is no fast-forward between two of them).
-const REFSPEC: &str = "+refs/gitcraft/conflict-decisions/*:refs/gitcraft/conflict-decisions/*";
+/// Where a remote's decisions are fetched to, before the newer of each pair is kept.
+const FETCHED: &str = "refs/gitcraft/fetched-decisions/";
+
+/// The largest decision read: a bigger blob (fetched from elsewhere) is left out.
+const MAX_BLOB: usize = 1 << 20;
 
 /// Whether `key` can name a decision (what [`super::record::key`] makes).
 fn valid_key(key: &str) -> bool {
     key.len() == 32 && key.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
-/// The decisions stored for `keys`, by key, in one call. Those stored in a form this version
-/// can't read are left out.
-pub fn load(repo: &Path, keys: &[String]) -> Result<HashMap<String, Decision>, String> {
-    let wanted: Vec<&String> = keys.iter().filter(|k| valid_key(k)).collect();
-    if wanted.is_empty() {
+/// The decisions stored under `names` (`<prefix><key>` each), by key, in one call. Those
+/// stored in a form this version can't read are left out.
+fn read(repo: &Path, prefix: &str, keys: &[&String]) -> Result<HashMap<String, Decision>, String> {
+    if keys.is_empty() {
         return Ok(HashMap::new());
     }
-    let input: String = wanted.iter().map(|k| format!("{REFS}{k}\n")).collect();
+    let input: String = keys.iter().map(|k| format!("{prefix}{k}\n")).collect();
     let out = git::run_captured(repo, &["cat-file", "--batch"], Some(input.as_bytes()))?;
     if out.code != Some(0) {
         return Err(format!(
@@ -37,33 +37,42 @@ pub fn load(repo: &Path, keys: &[String]) -> Result<HashMap<String, Decision>, S
             out.stderr.trim()
         ));
     }
-    Ok(parse_batch(&out.stdout, &wanted))
+    Ok(parse_batch(&out.raw, keys))
 }
 
-/// `cat-file --batch` output for the refs of `keys`, in order: `<oid> blob <size>\n<data>\n`,
-/// or `<ref> missing\n`.
-fn parse_batch(out: &str, keys: &[&String]) -> HashMap<String, Decision> {
+/// The decisions stored for `keys`, by key, in one call.
+pub fn load(repo: &Path, keys: &[String]) -> Result<HashMap<String, Decision>, String> {
+    let wanted: Vec<&String> = keys.iter().filter(|k| valid_key(k)).collect();
+    read(repo, REFS, &wanted)
+}
+
+/// `cat-file --batch` output for the refs of `keys`, in order: `<oid> <type> <size>\n<data>\n`,
+/// or `<ref> missing\n`. Sizes count bytes: read as bytes, each blob decoded on its own, so
+/// that one that isn't text (or a tree) leaves the others as they are.
+fn parse_batch(out: &[u8], keys: &[&String]) -> HashMap<String, Decision> {
     let mut found = HashMap::new();
     let mut rest = out;
     for key in keys {
-        let Some((header, after)) = rest.split_once('\n') else {
+        let Some(end) = rest.iter().position(|&b| b == b'\n') else {
             break;
         };
+        let header = String::from_utf8_lossy(&rest[..end]).into_owned();
+        rest = &rest[end + 1..];
         let mut words = header.split(' ');
         let (_, kind, size) = (words.next(), words.next(), words.next());
         let Some(size) = size.and_then(|s| s.parse::<usize>().ok()) else {
             // `missing` (or `ambiguous`): nothing stored for it.
-            rest = after;
             continue;
         };
-        let Some(data) = after.get(..size) else {
+        let Some(data) = rest.get(..size) else {
             break;
         };
-        rest = after
-            .get(size..)
-            .map_or("", |r| r.strip_prefix('\n').unwrap_or(r));
+        rest = rest.get(size..).unwrap_or_default();
+        rest = rest.strip_prefix(b"\n").unwrap_or(rest);
         if kind == Some("blob")
-            && let Ok(decision) = serde_json::from_str::<Decision>(data)
+            && size <= MAX_BLOB
+            && let Ok(text) = std::str::from_utf8(data)
+            && let Ok(decision) = serde_json::from_str::<Decision>(text)
         {
             found.insert((*key).clone(), decision);
         }
@@ -95,14 +104,65 @@ pub fn save(repo: &Path, key: &str, decision: &Decision) -> Result<(), String> {
         .map_err(|e| format!("Could not store the decision: {e}"))
 }
 
-/// The git steps that send every decision to `remote`.
-pub fn push_ops(remote: &str) -> Vec<Vec<String>> {
-    ops(&[&["push", remote, REFSPEC]])
+/// The keys of the decisions under `prefix`.
+fn keys_under(repo: &Path, prefix: &str) -> Result<Vec<String>, String> {
+    let out = git::run(Some(repo), &["for-each-ref", "--format=%(refname)", prefix])?;
+    Ok(out
+        .lines()
+        .filter_map(|r| r.strip_prefix(prefix))
+        .filter(|k| valid_key(k))
+        .map(str::to_owned)
+        .collect())
 }
 
-/// The git steps that bring `remote`'s decisions here.
-pub fn fetch_ops(remote: &str) -> Vec<Vec<String>> {
-    ops(&[&["fetch", remote, REFSPEC]])
+/// Brings `remote`'s decisions here: fetched aside first, then, for each conflict, the newer
+/// of the two kept (a decision made here since isn't lost). With `send`, then sends them all
+/// to it, over its own (which were just taken in). Says what was done.
+pub fn sync(repo: &Path, remote: &str, send: bool) -> Result<String, String> {
+    let aside = format!("{FETCHED}{remote}/");
+    let refspec = format!("+{REFS}*:{aside}*");
+    git::run(Some(repo), &["fetch", "--no-tags", remote, &refspec])
+        .map_err(|e| format!("Could not get the conflict decisions from {remote}: {e}"))?;
+    let theirs_keys = keys_under(repo, &aside)?;
+    let theirs_refs: Vec<&String> = theirs_keys.iter().collect();
+    let theirs = read(repo, &aside, &theirs_refs)?;
+    let ours = read(repo, REFS, &theirs_refs)?;
+    let mut taken = 0;
+    for (key, decision) in &theirs {
+        if ours.get(key).is_none_or(|mine| decision.at > mine.at) {
+            git::run(
+                Some(repo),
+                &[
+                    "update-ref",
+                    &format!("{REFS}{key}"),
+                    &format!("{aside}{key}"),
+                ],
+            )?;
+            taken += 1;
+        }
+    }
+    for key in &theirs_keys {
+        let _ = git::run(Some(repo), &["update-ref", "-d", &format!("{aside}{key}")]);
+    }
+    let got = match taken {
+        0 => format!("No newer conflict decisions on {remote}"),
+        1 => format!("Took 1 newer conflict decision from {remote}"),
+        n => format!("Took {n} newer conflict decisions from {remote}"),
+    };
+    if !send {
+        return Ok(got);
+    }
+    let mine = keys_under(repo, REFS)?;
+    if mine.is_empty() {
+        return Ok(format!("{got}; no conflict decisions to send"));
+    }
+    git::run(Some(repo), &["push", remote, &format!("+{REFS}*:{REFS}*")])
+        .map_err(|e| format!("{got}, but could not send them to {remote}: {e}"))?;
+    Ok(format!(
+        "{got}; sent {} conflict decision{} to {remote}",
+        mine.len(),
+        if mine.len() == 1 { "" } else { "s" }
+    ))
 }
 
 #[cfg(test)]
@@ -119,17 +179,21 @@ mod tests {
 
     #[test]
     fn batch_output_with_missing_and_odd_entries() {
-        let a = "a".repeat(32);
-        let b = "b".repeat(32);
-        let c = "c".repeat(32);
-        let json = r#"{"path":"p","resolution":"r\n","ours":"o","theirs":"t"}"#;
-        let out = format!(
-            "{REFS}{a} missing\n0123 blob {}\n{json}\n0456 blob 3\nnot\n",
-            json.len()
+        let (a, b, c, d) = (
+            "a".repeat(32),
+            "b".repeat(32),
+            "c".repeat(32),
+            "d".repeat(32),
         );
-        let found = parse_batch(&out, &[&a, &b, &c]);
+        let json = r#"{"path":"p","resolution":"r\n","ours":"o","theirs":"t"}"#;
+        let mut out = format!("{REFS}{a} missing\n").into_bytes();
+        // Not text: its size in bytes still tells where the next one starts.
+        out.extend(b"0001 blob 4\n\xff\xfe\xfd\xfc\n");
+        out.extend(format!("0123 blob {}\n{json}\n", json.len()).into_bytes());
+        out.extend(b"0456 tree 3\n\x00\x01\x02\n");
+        let found = parse_batch(&out, &[&a, &b, &c, &d]);
         assert_eq!(found.len(), 1);
-        assert_eq!(found.get(&b).map(|d| d.resolution.as_str()), Some("r\n"));
-        assert!(parse_batch("", &[&a]).is_empty());
+        assert_eq!(found.get(&c).map(|d| d.resolution.as_str()), Some("r\n"));
+        assert!(parse_batch(b"", &[&a]).is_empty());
     }
 }

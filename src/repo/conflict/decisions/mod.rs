@@ -10,6 +10,7 @@ pub mod store;
 pub(in crate::repo) mod view;
 
 pub use self::memo::Memo;
+use self::memo::ToRecord;
 use self::record::{Decision, TestRun};
 use crate::git;
 use crate::repo::RepoTab;
@@ -19,15 +20,31 @@ use crate::repo::RepoTab;
 pub enum Act {
     /// Read the decisions stored for the open editor's conflicts.
     Load,
-    /// Send every decision to the remote, or bring the remote's here.
-    Push(String),
-    Fetch(String),
+    /// Bring the remote's decisions here (the newer of two for the same conflict wins), and
+    /// with `true` send them all back to it.
+    Sync(String, bool),
+}
+
+/// Decisions to store once their file is saved: taken as the save starts, so that what is
+/// stored is what was saved, whatever the editor shows by the time it is written.
+pub struct Pending {
+    pub path: String,
+    pub decisions: ToRecord,
+    pub run_tests: bool,
+    /// How many other files still had conflicts as it was saved (a test may fail for them).
+    pub others_conflicted: usize,
+}
+
+/// What a test's command runs as: without the variables gitcraft gives git itself (no editor,
+/// no prompts, no optional locks), so that it runs as it would in a terminal.
+fn as_typed(command: &str) -> String {
+    format!("unset GIT_EDITOR GIT_TERMINAL_PROMPT GIT_OPTIONAL_LOCKS; {command}")
 }
 
 /// How running `command` (a decision's test) went, in the repository's top folder.
 /// Blocking: from the background.
 pub fn run_test(repo: &std::path::Path, command: &str) -> Result<TestRun, String> {
-    let alias = format!("alias.{}=!{command}", git::USER_COMMAND_ALIAS);
+    let alias = format!("alias.{}=!{}", git::USER_COMMAND_ALIAS, as_typed(command));
     let out = git::run_captured(repo, &["-c", &alias, git::USER_COMMAND_ALIAS], None)?;
     let both = match (out.stdout.trim().is_empty(), out.stderr.trim().is_empty()) {
         (_, true) => out.stdout,
@@ -46,80 +63,109 @@ fn test_message(command: &str, run: &Result<TestRun, String>) -> (String, bool) 
     match run {
         Ok(r) if r.passed => (format!("Test “{command}” passes"), false),
         Ok(r) => {
-            let last = r.output.lines().last().unwrap_or("no output");
+            let last = r
+                .output
+                .lines()
+                .rev()
+                .find(|l| !l.trim().is_empty())
+                .unwrap_or("no output");
             (format!("Test “{command}” fails: {last}"), true)
         }
         Err(e) => (format!("Test “{command}” could not run: {e}"), true),
     }
 }
 
-/// Stores `decisions` and, when `run_tests`, runs each different test once, keeping how it
-/// went with every decision that has it. Blocking: from the background. Says what happened.
-fn record_and_test(
-    repo: &std::path::Path,
-    mut decisions: Vec<(String, Decision)>,
-    run_tests: bool,
-) -> Vec<(String, bool)> {
+/// Stores the decisions of `pending`, then, when asked, runs each different test once and
+/// keeps how it went with every decision that has it (stored again). Stored first: a test
+/// that never ends loses no note. Blocking: from the background. Says what happened.
+fn record_and_test(repo: &std::path::Path, pending: Pending) -> Vec<(String, bool)> {
+    let Pending {
+        mut decisions,
+        run_tests,
+        others_conflicted,
+        ..
+    } = pending;
     let mut said = Vec::new();
-    if run_tests {
-        let mut commands: Vec<String> = decisions
-            .iter()
-            .map(|(_, d)| d.test.clone())
-            .filter(|t| !t.is_empty())
-            .collect();
-        commands.dedup();
-        commands.sort();
-        commands.dedup();
-        for command in commands {
-            let run = run_test(repo, &command);
-            said.push(test_message(&command, &run));
-            if let Ok(run) = run {
-                for (_, d) in decisions.iter_mut().filter(|(_, d)| d.test == command) {
-                    d.last_test = Some(run.clone());
-                }
+    let stored = store_all(repo, &decisions, &mut said);
+    if stored > 0 {
+        said.push((
+            match stored {
+                1 => "Kept the decision".to_owned(),
+                n => format!("Kept {n} decisions"),
+            },
+            false,
+        ));
+    }
+    if !run_tests {
+        return said;
+    }
+    let mut commands: Vec<String> = decisions
+        .iter()
+        .map(|(_, d)| d.test.clone())
+        .filter(|t| !t.is_empty())
+        .collect();
+    commands.sort();
+    commands.dedup();
+    for command in commands {
+        let run = run_test(repo, &command);
+        let (mut text, bad) = test_message(&command, &run);
+        if bad && others_conflicted > 0 {
+            text.push_str(&format!(
+                " ({others_conflicted} other file{} still had conflicts)",
+                if others_conflicted == 1 { "" } else { "s" }
+            ));
+        }
+        said.push((text, bad));
+        if let Ok(run) = run {
+            for (_, d) in decisions.iter_mut().filter(|(_, d)| d.test == command) {
+                d.last_test = Some(run.clone());
             }
         }
     }
+    store_all(repo, &decisions, &mut said);
+    said
+}
+
+/// Stores each of `decisions`; says what couldn't be. Returns how many were.
+fn store_all(
+    repo: &std::path::Path,
+    decisions: &[(String, Decision)],
+    said: &mut Vec<(String, bool)>,
+) -> usize {
     let mut stored = 0;
-    for (key, decision) in &decisions {
+    for (key, decision) in decisions {
         match store::save(repo, key, decision) {
             Ok(()) => stored += 1,
             Err(e) => said.push((e, true)),
         }
     }
-    if stored > 0 {
-        said.insert(
-            0,
-            (
-                match stored {
-                    1 => "Kept the decision and its reason".to_owned(),
-                    n => format!("Kept {n} decisions and their reasons"),
-                },
-                false,
-            ),
-        );
-    }
-    said
+    stored
 }
 
 impl RepoTab {
     pub(in crate::repo) fn decisions_act(&mut self, act: Act, ctx: &egui::Context) {
         match act {
             Act::Load => self.load_decisions(ctx),
-            Act::Push(remote) => self.run_ops(
-                &format!("Send conflict decisions to {remote}"),
-                store::push_ops(&remote),
-                crate::repo::Refresh::Status,
-                crate::repo::OpKind::plain(),
-                ctx,
-            ),
-            Act::Fetch(remote) => self.run_ops(
-                &format!("Fetch conflict decisions from {remote}"),
-                store::fetch_ops(&remote),
-                crate::repo::Refresh::Status,
-                crate::repo::OpKind::plain(),
-                ctx,
-            ),
+            Act::Sync(remote, send) => {
+                let repo = self.path.clone();
+                self.status = Some((
+                    format!(
+                        "{} conflict decisions with {remote}…",
+                        if send { "Sending" } else { "Fetching" }
+                    ),
+                    false,
+                ));
+                self.then(
+                    ctx,
+                    move || store::sync(&repo, &remote, send),
+                    |tab, said, _| {
+                        tab.status = Some(match said {
+                            Ok(text) => (text, false),
+                            Err(e) => (e, true),
+                        });
+                    },
+                );
+            }
         }
     }
 
@@ -135,27 +181,31 @@ impl RepoTab {
         let (generation, path) = (ed.generation, ed.path.clone());
         self.then(
             ctx,
-            move || store::load(&repo, &keys).map(|found| (keys, found)),
+            {
+                let keys = keys.clone();
+                move || store::load(&repo, &keys)
+            },
             move |tab, read, _| {
-                let Some(ed) = tab
-                    .conflict
-                    .as_mut()
-                    .filter(|ed| ed.generation == generation && ed.path == path)
-                else {
+                // Still that editor, with those conflicts (Mergiraf may have solved some).
+                let Some(ed) = tab.conflict.as_mut().filter(|ed| {
+                    ed.generation == generation
+                        && ed.path == path
+                        && ed.memo.spots.iter().map(|s| &s.key).eq(keys.iter())
+                }) else {
                     return;
                 };
                 match read {
-                    Ok((keys, mut found)) => {
+                    Ok(mut found) => {
                         let found = keys.iter().map(|k| found.remove(k)).collect();
                         let applied = ed.take_offers(found);
                         if applied > 0 {
                             tab.status = Some((
                                 match applied {
-                                    1 => "Applied a decision you made before: check it, then save"
+                                    1 => "Applied a decision made before: check it, then save"
                                         .to_owned(),
                                     n => format!(
-                                        "Applied {n} decisions you made before: check them, \
-                                         then save"
+                                        "Applied {n} decisions made before: check them, then \
+                                         save"
                                     ),
                                 },
                                 false,
@@ -173,43 +223,59 @@ impl RepoTab {
         );
     }
 
-    /// Once the editor's file is saved: stores the decisions written for it and runs their
-    /// tests when asked, in the background.
-    pub(in crate::repo) fn record_decisions(&mut self, path: &str, ctx: &egui::Context) {
-        let Some(ed) = self.conflict.as_ref().filter(|ed| ed.path == path) else {
+    /// As the editor's file is about to be saved: what of its decisions is to be stored once
+    /// it is (see [`Pending`]). `false`: they can't be told apart, and the save goes on
+    /// without them (said in the toolbar).
+    pub(in crate::repo) fn prepare_decisions(&mut self) {
+        let Some(ed) = self.conflict.as_ref() else {
             return;
         };
-        let decisions = match ed.to_record("", git::now()) {
-            Ok(d) if d.is_empty() => return,
-            Ok(d) => d,
+        self.decisions_pending = match ed.to_record("", git::now()) {
+            Ok(decisions) if decisions.is_empty() => None,
+            Ok(decisions) => Some(Pending {
+                path: ed.path.clone(),
+                run_tests: ed.memo.run_tests && ed.has_tests(),
+                others_conflicted: self
+                    .work
+                    .conflicted
+                    .iter()
+                    .filter(|f| f.path != ed.path)
+                    .count(),
+                decisions,
+            }),
             Err(e) => {
                 self.status = Some((e, true));
-                return;
+                None
             }
         };
-        let run_tests = ed.memo.run_tests && ed.has_tests();
+    }
+
+    /// Once `path` was saved: stores the decisions taken for it as the save started, and runs
+    /// their tests when asked, in the background.
+    pub(in crate::repo) fn record_decisions(&mut self, path: &str, ctx: &egui::Context) {
+        let Some(pending) = self.decisions_pending.take_if(|p| p.path == path) else {
+            return;
+        };
+        if pending.run_tests {
+            self.status = Some(("Kept the decisions; running their tests…".to_owned(), false));
+        }
         let repo = self.path.clone();
         self.then(
             ctx,
             move || {
-                // Who commits here: who made the decisions.
+                // Who commits here wrote the notes; a decision used again keeps its author.
                 let by = git::identity(&repo).name;
-                let decisions = decisions
-                    .into_iter()
-                    .map(|(k, d)| {
-                        (
-                            k,
-                            Decision {
-                                by: by.clone(),
-                                ..d
-                            },
-                        )
-                    })
-                    .collect();
-                record_and_test(&repo, decisions, run_tests)
+                let mut pending = pending;
+                for (_, d) in pending
+                    .decisions
+                    .iter_mut()
+                    .filter(|(_, d)| d.by.is_empty())
+                {
+                    d.by.clone_from(&by);
+                }
+                record_and_test(&repo, pending)
             },
             |tab, said, _| {
-                // The worst news shown, the rest joined after it.
                 if said.is_empty() {
                     return;
                 }
@@ -224,7 +290,8 @@ impl RepoTab {
         );
     }
 
-    /// The palette's commands for decisions: send them to the default remote, bring its own.
+    /// The palette's commands for decisions: bring the default remote's here, or send them
+    /// there too.
     pub(in crate::repo) fn decision_palette_items(
         &self,
     ) -> Vec<(String, String, crate::repo::Action)> {
@@ -235,12 +302,12 @@ impl RepoTab {
             (
                 format!("Send conflict decisions to {remote}"),
                 "conflicts".into(),
-                crate::repo::Action::Decisions(Act::Push(remote.clone())),
+                crate::repo::Action::Decisions(Act::Sync(remote.clone(), true)),
             ),
             (
-                format!("Fetch conflict decisions from {remote}"),
+                format!("Get conflict decisions from {remote}"),
                 "conflicts".into(),
-                crate::repo::Action::Decisions(Act::Fetch(remote)),
+                crate::repo::Action::Decisions(Act::Sync(remote, false)),
             ),
         ]
     }

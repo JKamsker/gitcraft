@@ -384,11 +384,14 @@ impl ConflictEditor {
         self.choices = vec![None; left];
         self.recorded = vec![None; left];
         self.reused = None;
-        // Other conflicts: the decisions are read again for them.
-        self.memo = Default::default();
+        // Other conflicts: the decisions are read again for them; the notes written for those
+        // still there are kept.
+        let before = self.decision_spots();
+        let memo = std::mem::take(&mut self.memo);
         self.segments = segments;
         self.result = text;
         self.manual = false;
+        self.carry_drafts(&before, memo);
         left
     }
 

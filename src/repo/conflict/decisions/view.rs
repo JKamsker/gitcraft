@@ -6,16 +6,26 @@ use egui::{RichText, Stroke, Ui};
 use super::memo::{Draft, Memo, Offer, one_line};
 use crate::theme::{self, Tokens};
 
-/// Under conflict `k`'s sides: its offered decision and its note. `applied`: the conflict is
-/// resolved with the offered decision's text. Returns whether "use this decision" was clicked.
+/// What was clicked on a conflict's decision.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::repo) enum Pick {
+    /// Resolve the conflict with the decision's text.
+    Use,
+    /// Take its note and test as the user's own.
+    TakeNote,
+}
+
+/// Under conflict `k`'s sides: its offered decision and its note. `state`: the conflict is
+/// resolved with the offered decision's text, the result is edited by hand.
 pub(in crate::repo) fn card(
     ui: &mut Ui,
     t: &Tokens,
     k: usize,
     memo: &mut Memo,
-    applied: bool,
-) -> bool {
-    let mut used = false;
+    state: (bool, bool),
+) -> Option<Pick> {
+    let mut pick = None;
+    let draft_empty = memo.drafts.get(k).is_none_or(Draft::is_empty);
     if let Some(offer) = memo
         .offers
         .as_mut()
@@ -23,13 +33,13 @@ pub(in crate::repo) fn card(
         .and_then(Option::as_mut)
     {
         ui.add_space(4.0);
-        used = offer_box(ui, t, k, offer, applied);
+        pick = offer_box(ui, t, k, offer, (state, draft_empty));
     }
     if let Some(draft) = memo.drafts.get_mut(k) {
         ui.add_space(4.0);
         draft_ui(ui, t, k, draft);
     }
-    used
+    pick
 }
 
 /// "3 days ago", or nothing for a time not known.
@@ -60,9 +70,16 @@ pub(in crate::repo) fn test_line(offer: &Offer) -> Option<(String, Option<bool>)
     })
 }
 
-/// The decision made before for conflict `k`. Returns whether it was asked to be used.
-fn offer_box(ui: &mut Ui, t: &Tokens, k: usize, offer: &mut Offer, applied: bool) -> bool {
-    let mut used = false;
+/// The decision made before for conflict `k`; `applied`: it resolves the conflict now,
+/// `manual`: the result is edited by hand, `draft_empty`: no note written for it yet.
+fn offer_box(
+    ui: &mut Ui,
+    t: &Tokens,
+    k: usize,
+    offer: &mut Offer,
+    ((applied, manual), draft_empty): ((bool, bool), bool),
+) -> Option<Pick> {
+    let mut pick = None;
     let border = if offer.stale { t.warning } else { t.accent };
     egui::Frame::new()
         .fill(t.card)
@@ -107,7 +124,32 @@ fn offer_box(ui: &mut Ui, t: &Tokens, k: usize, offer: &mut Offer, applied: bool
                     Some(false) => t.danger,
                     None => t.text_dim,
                 };
-                ui.label(RichText::new(line).color(color).small());
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(line).color(color).small());
+                    let has_output = offer
+                        .decision
+                        .last_test
+                        .as_ref()
+                        .is_some_and(|r| !r.output.is_empty());
+                    if has_output {
+                        ui.toggle_value(&mut offer.show_output, "Output");
+                    }
+                });
+                if offer.show_output
+                    && let Some(run) = &offer.decision.last_test
+                {
+                    egui::ScrollArea::both()
+                        .id_salt(("decision-output", k))
+                        .max_height(140.0)
+                        .show(ui, |ui| {
+                            ui.add(
+                                egui::Label::new(
+                                    RichText::new(&run.output).font(theme::mono(11.0)),
+                                )
+                                .extend(),
+                            );
+                        });
+                }
             }
             if offer.stale {
                 ui.label(
@@ -118,17 +160,36 @@ fn offer_box(ui: &mut Ui, t: &Tokens, k: usize, offer: &mut Offer, applied: bool
                     .small(),
                 );
             }
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 if !applied {
                     let label = if offer.stale {
                         "Use it anyway"
                     } else {
                         "Use this decision"
                     };
-                    used = ui
-                        .button(label)
+                    if ui
+                        .add_enabled(!manual, egui::Button::new(label))
                         .on_hover_text("Resolve this conflict with the text decided before")
-                        .clicked();
+                        .on_disabled_hover_text(
+                            "The result is edited by hand: Back to choices first",
+                        )
+                        .clicked()
+                    {
+                        pick = Some(Pick::Use);
+                    }
+                }
+                let has_note = !offer.decision.note.is_empty() || !offer.decision.test.is_empty();
+                if draft_empty
+                    && has_note
+                    && ui
+                        .small_button("Keep its note and test")
+                        .on_hover_text(
+                            "Take its reason and test as yours for this resolution: kept when \
+                             you save, and the test run then if you ask",
+                        )
+                        .clicked()
+                {
+                    pick = Some(Pick::TakeNote);
                 }
                 if offer.stale {
                     ui.toggle_value(&mut offer.show_context, "What changed around it");
@@ -138,7 +199,7 @@ fn offer_box(ui: &mut Ui, t: &Tokens, k: usize, offer: &mut Offer, applied: bool
                 context_ui(ui, t, k, offer);
             }
         });
-    used
+    pick
 }
 
 /// The lines around the conflict when the decision was made (`then`), beside those now.
@@ -184,11 +245,13 @@ fn draft_ui(ui: &mut Ui, t: &Tokens, k: usize, draft: &mut Draft) {
             draft.open = true;
         }
         if !draft.is_empty() {
-            ui.label(
-                RichText::new(format!("Kept when saved: “{}”", draft.note.trim()))
-                    .color(t.text_faint)
-                    .small(),
-            );
+            let note = draft.note.trim();
+            let kept = if note.is_empty() {
+                format!("Kept when saved: the test “{}”", one_line(&draft.test))
+            } else {
+                format!("Kept when saved: “{note}”")
+            };
+            ui.label(RichText::new(kept).color(t.text_faint).small());
         }
         return;
     }
@@ -230,20 +293,22 @@ pub(in crate::repo) fn run_tests_switch(ui: &mut Ui, memo: &mut Memo, has_tests:
     if !has_tests {
         return;
     }
-    let mut tests: Vec<String> = memo
-        .drafts
-        .iter()
-        .map(|d| one_line(&d.test))
-        .filter(|c| !c.is_empty())
-        .collect();
-    tests.sort();
-    tests.dedup();
-    ui.checkbox(&mut memo.run_tests, "Run the tests after saving")
-        .on_hover_text(format!(
-            "Runs, in the repository's folder, once the file is saved:\n{}\nHow each went is \
-             kept with its decision.",
-            tests.join("\n")
-        ));
+    let drafts = &memo.drafts;
+    ui.checkbox(&mut memo.run_tests, "Test after saving")
+        .on_hover_ui(|ui| {
+            let mut tests: Vec<String> = drafts
+                .iter()
+                .map(|d| one_line(&d.test))
+                .filter(|c| !c.is_empty())
+                .collect();
+            tests.sort();
+            tests.dedup();
+            ui.label(format!(
+                "Runs the tests you wrote, in the repository's folder, once the file is \
+                 saved:\n{}\nHow each went is kept with its decision.",
+                tests.join("\n")
+            ));
+        });
 }
 
 #[cfg(test)]
@@ -261,6 +326,7 @@ mod tests {
             stale: false,
             show_context: false,
             now: Default::default(),
+            show_output: false,
         };
         assert_eq!(
             test_line(&offer),
