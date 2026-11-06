@@ -183,7 +183,10 @@ impl RepoTab {
             } => self.set_diff_options(split, ignore_ws, whole_file, ctx),
             Action::DiffAsFile(on) => self.show_diff_as_file(on, ctx),
             Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
+            Action::DiffRich(kind) => self.show_diff_rich(kind, ctx),
+            Action::DiffGoToLine { old, new } => self.diff_go_to_line(old, new),
             Action::DiffStep(delta) => {
+                let rich = self.diff_rich_kind().is_some();
                 let rendered = self.diff_rendered
                     && self
                         .diff
@@ -192,7 +195,7 @@ impl RepoTab {
                 if let Some(view) = self
                     .diff
                     .as_mut()
-                    .filter(|_| !self.diff_as_file && !rendered)
+                    .filter(|_| !self.diff_as_file && !rendered && !rich)
                 {
                     view.step_change(Settings::get(ctx).diff_split, delta);
                 }

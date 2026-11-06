@@ -17,6 +17,7 @@ mod paint;
 mod parse;
 mod patch;
 pub(super) mod rendered;
+pub(super) mod rich;
 mod rows;
 mod select;
 #[cfg(test)]

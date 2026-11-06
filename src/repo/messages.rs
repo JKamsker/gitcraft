@@ -55,6 +55,12 @@ pub(super) enum Msg {
     /// The Markdown file of the diff rendered, read along with the diff request numbered so.
     /// The diff's request, and which reading of it.
     DiffRendered((u64, u64), Box<Result<diff::rendered::RenderedMd, String>>),
+    /// The diff read as a rich view, along with the diff request numbered so.
+    DiffRich(
+        (u64, u64),
+        diff::rich::RichKind,
+        Box<Result<diff::rich::Rich, String>>,
+    ),
     FileHistory(String, Option<String>, Result<Vec<git::FileCommit>, String>),
     Blame(String, Option<String>, Result<file_view::BlameData, String>),
     /// A file as it is at a revision, for the file view.
@@ -394,6 +400,11 @@ impl RepoTab {
             Msg::DiffFile(request, result) => {
                 if let Some(view) = &mut self.diff {
                     view.file_arrived(request, result);
+                }
+            }
+            Msg::DiffRich(request, kind, result) => {
+                if let Some(view) = &mut self.diff {
+                    view.rich_arrived(request, kind, *result);
                 }
             }
             Msg::DiffRendered(request, result) => {
