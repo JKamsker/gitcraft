@@ -42,9 +42,6 @@ fn a_word_diff_keeps_the_common_words() {
     assert!(d.contains(&(Change::Added, "high")));
     assert_eq!(words::similarity(&old, &old), 1.0);
     assert_eq!(words::similarity(&[], &[]), 1.0);
-    assert!(words::spaced("word", "next"));
-    assert!(!words::spaced("word", ","));
-    assert!(!words::spaced("(", "word"));
 }
 
 #[test]
@@ -84,8 +81,8 @@ fn an_edited_paragraph_shows_its_changed_words() {
         return;
     };
     assert_eq!((*old, *new), (3, 3));
-    assert!(words.contains(&(Change::Removed, "cat".to_owned())));
-    assert!(words.contains(&(Change::Added, "dog".to_owned())));
+    assert!(words.contains(&(Change::Removed, " cat".to_owned())));
+    assert!(words.contains(&(Change::Added, " dog".to_owned())));
     assert!(words.iter().filter(|(c, _)| *c != Change::Kept).count() == 2);
 }
 
@@ -198,9 +195,9 @@ fn sides_are_read_from_commits_the_index_and_the_working_tree() -> Result<(), St
             area,
         })
     };
-    let unstaged = read_sides(&dir, &work(Area::Unstaged));
+    let unstaged = read_sides(&dir, &work(Area::Unstaged), None);
     git::run(Some(&dir), &["add", "-A"])?;
-    let staged = read_sides(&dir, &work(Area::Staged));
+    let staged = read_sides(&dir, &work(Area::Staged), None);
     git::run(Some(&dir), &["commit", "-qm", "two"])?;
     let head = git::head(&dir);
     let commit = read_sides(
@@ -209,6 +206,7 @@ fn sides_are_read_from_commits_the_index_and_the_working_tree() -> Result<(), St
             hash: head.clone(),
             path: name.to_owned(),
         },
+        None,
     );
     let first = git::run(Some(&dir), &["rev-list", "--max-parents=0", "HEAD"])?;
     let root = read_sides(
@@ -217,6 +215,7 @@ fn sides_are_read_from_commits_the_index_and_the_working_tree() -> Result<(), St
             hash: first.trim().to_owned(),
             path: name.to_owned(),
         },
+        None,
     );
     let _ = std::fs::write(dir.join("latin.txt"), b"caf\xe9\n");
     let latin = load(
@@ -228,6 +227,7 @@ fn sides_are_read_from_commits_the_index_and_the_working_tree() -> Result<(), St
             area: Area::Untracked,
         }),
         RichKind::Prose,
+        None,
     );
     let _ = std::fs::remove_dir_all(&dir);
     let edited = Sides {
@@ -266,7 +266,6 @@ fn the_prose_view_shows_changes_and_goes_back_to_the_line() {
         });
     harness.run();
     assert!(harness.query_by_label_contains("A new one.").is_some());
-    assert!(harness.query_by_label_contains("added").is_some());
     harness.get_by_label_contains("A new one.").click();
     harness.run();
     assert!(acts.borrow().iter().any(|a| matches!(
@@ -276,4 +275,123 @@ fn the_prose_view_shows_changes_and_goes_back_to_the_line() {
             new: Some(5)
         }
     )));
+}
+
+/// An edited paragraph reads as written: abbreviations, paths and links stay whole.
+#[test]
+fn edited_text_keeps_its_own_spacing() {
+    let old = "See e.g. https://x.com/a/b and [the docs](d.md), please.";
+    let new = "See e.g. https://x.com/a/c and [the docs](d.md), thanks.";
+    let words = words::diff_text(old, new);
+    let new_side: String = words
+        .iter()
+        .filter(|(c, _)| *c != Change::Removed)
+        .map(|(_, w)| w.as_str())
+        .collect();
+    assert_eq!(new_side, new);
+    let old_side: String = words
+        .iter()
+        .filter(|(c, _)| *c != Change::Added)
+        .map(|(_, w)| w.as_str())
+        .collect();
+    assert_eq!(old_side, old);
+    // Re-wrapped lines read as one flow; a list item keeps its line.
+    let flowed: String = words::diff_text("a\nb", "a\nb\n- item")
+        .into_iter()
+        .map(|(_, w)| w)
+        .collect();
+    assert_eq!(flowed, "a b\n- item");
+}
+
+/// One word changed in a paragraph of thousands is still that paragraph edited.
+#[test]
+fn a_small_edit_in_a_long_paragraph_is_still_an_edit() {
+    let old: String = (0..3000).map(|n| format!("word{n} ")).collect();
+    let new = old.replace("word1500 ", "changed ");
+    let d = prose::diff(&sides(&old, &new));
+    assert_eq!(d.parts.len(), 1);
+    let Part::Changed { words, .. } = &d.parts[0] else {
+        return;
+    };
+    assert_eq!(words.iter().filter(|(c, _)| *c != Change::Kept).count(), 2);
+}
+
+#[test]
+fn a_file_missing_on_a_side_is_told_from_a_failure() {
+    assert!(missing("fatal: path 'a.md' does not exist in 'abc^'"));
+    assert!(missing("fatal: invalid object name 'abc^'."));
+    assert!(missing("a.md: No such file or directory (os error 2)"));
+    assert!(!missing(
+        "ssh: connect to host example.com port 22: Connection refused"
+    ));
+}
+
+#[test]
+fn combining_marks_stay_in_their_word() {
+    assert_eq!(words::words("Cafe\u{301} ok"), ["Cafe\u{301}", "ok"]);
+    assert_eq!(words::words("नमस्ते दुनिया"), ["नमस्ते", "दुनिया"]);
+    assert_eq!(words::words("\u{feff}Hello"), ["Hello"]);
+    assert_eq!(words::words("a—b"), ["a", "—", "b"]);
+}
+
+/// Many long paragraphs all rewritten don't take seconds to pair.
+#[test]
+fn pairing_a_huge_rewrite_stays_bounded() {
+    let para = |seed: usize| -> String {
+        (0..1900)
+            .map(|n| format!("w{}x{} ", seed, n))
+            .collect::<String>()
+            + "\n\n"
+    };
+    let old: String = (0..120).map(para).collect();
+    let new: String = (1000..1120).map(para).collect();
+    let started = std::time::Instant::now();
+    let d = prose::diff(&sides(&old, &new));
+    assert!(started.elapsed() < std::time::Duration::from_secs(20));
+    assert_eq!(d.parts.len(), 240);
+}
+
+/// A file renamed and edited in a commit reads its old side under its old name.
+#[test]
+fn a_renamed_file_reads_its_old_name_before_the_change() -> Result<(), String> {
+    use crate::git::{self, DiffOptions};
+    let dir = std::env::temp_dir().join(format!("gitcraft-rich-rename-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::create_dir_all(&dir);
+    for args in [
+        &["init", "-q"][..],
+        &["config", "user.name", "t"],
+        &["config", "user.email", "t@t"],
+        &["config", "commit.gpgSign", "false"],
+    ] {
+        git::run(Some(&dir), args)?;
+    }
+    let body: String = (0..30)
+        .map(|n| format!("Paragraph number {n} of the guide.\n\n"))
+        .collect();
+    let _ = std::fs::write(dir.join("old.md"), &body);
+    git::run(Some(&dir), &["add", "-A"])?;
+    git::run(Some(&dir), &["commit", "-qm", "one"])?;
+    git::run(Some(&dir), &["mv", "old.md", "new.md"])?;
+    let _ = std::fs::write(dir.join("new.md"), body.replace("number 7", "number seven"));
+    git::run(Some(&dir), &["commit", "-qam", "two"])?;
+    let key = DiffKey::Commit {
+        hash: git::head(&dir),
+        path: "new.md".to_owned(),
+    };
+    let data = crate::repo::diff::load(&dir, &key, DiffOptions::default(), true)?;
+    let old_path = super::super::images::renamed_from(&data.header).map(str::to_owned);
+    let rich = load(&dir, &key, RichKind::Prose, old_path.as_deref());
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(old_path.as_deref(), Some("old.md"));
+    let Ok(Rich::Ready(RichDiff::Prose(d))) = rich else {
+        return Err("not read as prose".to_owned());
+    };
+    let edited = d
+        .parts
+        .iter()
+        .filter(|p| !matches!(p, Part::Kept { .. }))
+        .count();
+    assert_eq!(edited, 1);
+    Ok(())
 }

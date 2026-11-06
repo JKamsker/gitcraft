@@ -215,7 +215,6 @@ impl RepoTab {
         });
         self.load_diff_file(ctx);
         self.load_diff_rendered(ctx);
-        self.load_diff_rich(ctx);
     }
 
     /// Renders the Markdown file of the open diff, when diffs show Markdown rendered.

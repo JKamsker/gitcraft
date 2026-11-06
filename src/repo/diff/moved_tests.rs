@@ -322,6 +322,7 @@ fn data_of(text: &str) -> DiffData {
         context: None,
         new_file: false,
         longest: 0,
+        source: 0,
         uncut: Default::default(),
         map: Default::default(),
         lines,

@@ -186,7 +186,11 @@ impl RepoTab {
             Action::DiffRich(kind) => self.show_diff_rich(kind, ctx),
             Action::DiffGoToLine { old, new } => self.diff_go_to_line(old, new),
             Action::DiffStep(delta) => {
-                let rich = self.diff_rich_kind().is_some();
+                // Shown in place of the lines (not fallen back to them).
+                let rich = self.diff_rich_kind().is_some()
+                    && self.diff.as_ref().is_some_and(|v| {
+                        matches!(&v.rich, Some((_, Ok(diff::rich::Rich::Ready(_)))))
+                    });
                 let rendered = self.diff_rendered
                     && self
                         .diff

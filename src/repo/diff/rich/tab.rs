@@ -9,7 +9,7 @@ use crate::repo::{DiffView, RepoTab};
 impl RepoTab {
     /// The rich view the open diff shows, if one is on and its file can be read that way.
     pub(in crate::repo) fn diff_rich_kind(&self) -> Option<RichKind> {
-        let kind = self.diff_rich?;
+        let kind = self.diff_rich.filter(|_| !self.diff_as_file)?;
         let view = self.diff.as_ref()?;
         RichKind::of(view.key.path())
             .contains(&kind)
@@ -27,8 +27,13 @@ impl RepoTab {
         view.rich_load += 1;
         let ids = (view.request, view.rich_load);
         let (key, path) = (view.key.clone(), self.path.clone());
+        // A file renamed by the change is read under its old name before it.
+        let old_path = match &view.data {
+            Some(Ok(d)) => super::super::images::renamed_from(&d.header).map(str::to_owned),
+            _ => None,
+        };
         spawn(&self.tx, ctx, move || {
-            let result = super::load(&path, &key, kind);
+            let result = super::load(&path, &key, kind, old_path.as_deref());
             Msg::DiffRich(ids, kind, Box::new(result))
         });
     }
@@ -39,6 +44,7 @@ impl RepoTab {
         // One reading at a time: the Markdown rendered gives way.
         if kind.is_some() {
             self.diff_rendered = false;
+            self.diff_as_file = false;
         }
         if let Some(view) = &mut self.diff {
             view.rich = None;
@@ -73,6 +79,8 @@ impl DiffView {
     ) {
         if request == self.request && load == self.rich_load {
             self.rich = Some((kind, result));
+            // What was opened and measured was of the reading before.
+            self.rich_state = RichState::default();
         }
     }
 }
