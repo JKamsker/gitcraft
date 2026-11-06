@@ -2,6 +2,7 @@
 
 mod branch;
 mod confirm;
+mod custom;
 mod remote;
 mod upstream;
 mod worktree;
@@ -9,6 +10,8 @@ mod worktree;
 use std::path::{Path, PathBuf};
 
 use egui::{Key, RichText};
+
+pub use custom::CustomDialog;
 
 use super::widgets;
 use super::{Action, Refresh, RepoTab, Undo};
@@ -103,6 +106,8 @@ pub enum Dialog {
         draft: bool,
         focus: bool,
     },
+    /// A custom command's prompts, or a repository's commands to trust.
+    Custom(Box<CustomDialog>),
 }
 
 impl Dialog {
@@ -372,6 +377,7 @@ impl RepoTab {
                     draft,
                     focus,
                 } => remote::create_pr(ui, noun, branch, base, title, body, draft, focus),
+                Dialog::Custom(custom) => custom::custom(ui, enter, custom),
                 Dialog::Confirm {
                     title,
                     body,

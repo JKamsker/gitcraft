@@ -185,6 +185,12 @@ impl RepoTab {
         self.visibility_items(ui, acts, &local_ref(&b.name), b.is_head);
         ui.separator();
         self.delete_items(ui, acts, b, idle);
+        crate::repo::custom_commands::menu_items(
+            ui,
+            crate::custom_commands::Placement::Branch,
+            self.branch_scope(&b.name, &b.target, None),
+            acts,
+        );
     }
 
     /// Check out `b`, here or in a new worktree; or open the worktree it is checked out in.
