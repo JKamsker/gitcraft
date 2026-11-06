@@ -177,9 +177,12 @@ impl Api {
         .into_bytes();
         body.extend_from_slice(bytes);
         body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+        // A big file takes its time: half a minute, and more for each 50 KB.
+        let time = std::time::Duration::from_secs(30 + bytes.len() as u64 / 51_200);
         let mut request = self
             .agent
             .request("POST", &url)
+            .timeout(time)
             .set("Accept", "application/json")
             .set(
                 "Content-Type",

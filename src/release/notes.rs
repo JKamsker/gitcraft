@@ -27,8 +27,10 @@ pub(crate) fn notes(changes: &[Change], link: &dyn Fn(u64) -> Option<String>) ->
     }
     for (title, kinds) in GROUPS {
         let known = |c: &&&Change| GROUPS.iter().any(|(_, k)| k.contains(&c.kind.as_str()));
+        // A breaking change is listed under Breaking changes only.
         let in_group: Vec<&&Change> = changes
             .iter()
+            .filter(|c| !c.breaking)
             .filter(|c| {
                 if kinds.is_empty() {
                     !known(c)
@@ -97,7 +99,7 @@ mod tests {
             "### Breaking changes\n\n- drop the old API (cccccccc)\n\n\
              ### Features\n\n- **ui:** dark mode ([#12](https://x/pull/12))\n\n\
              ### Bug fixes\n\n- crash on ü (bbbbbbbb)\n\n\
-             ### Other changes\n\n- drop the old API (cccccccc)\n- Update readme (eeeeeeee)"
+             ### Other changes\n\n- Update readme (eeeeeeee)"
         );
         assert_eq!(notes(&[], &link), "");
         let unlinked = notes(&changes[..1], &|_| None);

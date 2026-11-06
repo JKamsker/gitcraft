@@ -44,6 +44,8 @@ pub(crate) enum Status {
     Waiting,
     Running,
     Done,
+    /// Left out after it failed.
+    Skipped,
     Failed(String),
 }
 
@@ -62,12 +64,16 @@ impl Run {
     }
 
     fn finished(&self) -> bool {
-        self.steps.iter().all(|(_, s)| *s == Status::Done)
+        self.steps
+            .iter()
+            .all(|(_, s)| matches!(s, Status::Done | Status::Skipped))
     }
 
-    /// The first step not done.
+    /// The first step not done (nor skipped).
     fn next(&self) -> Option<usize> {
-        self.steps.iter().position(|(_, s)| *s != Status::Done)
+        self.steps
+            .iter()
+            .position(|(_, s)| !matches!(s, Status::Done | Status::Skipped))
     }
 }
 
@@ -80,6 +86,8 @@ pub(crate) enum ReleaseAct {
     Run,
     AddAssets,
     RemoveAsset(usize),
+    /// Mark the step that failed done, to go on without it.
+    Skip,
 }
 
 impl RepoTab {
@@ -111,6 +119,17 @@ impl RepoTab {
                             view.form.assets.push(f);
                         }
                     }
+                }
+            }
+            ReleaseAct::Skip => {
+                if let Some(run) = self.release.as_mut().and_then(|r| r.run.as_mut())
+                    && !run.running()
+                    && let Some(step) = run
+                        .steps
+                        .iter_mut()
+                        .find(|(_, s)| matches!(s, Status::Failed(_)))
+                {
+                    step.1 = Status::Skipped;
                 }
             }
             ReleaseAct::RemoveAsset(i) => {
@@ -202,7 +221,24 @@ impl RepoTab {
             .unwrap_or_default();
         self.busy_op = Some(label);
         self.op_started = Some(std::time::Instant::now());
-        self.next_release_step(ctx);
+        // What the steps done left must still be there (an undo may have taken it back).
+        let Some(run) = self.release.as_ref().and_then(|v| v.run.as_ref()) else {
+            return;
+        };
+        let (plan, done) = (run.plan.clone(), run.done.clone());
+        let repo = self.path.clone();
+        self.then(
+            ctx,
+            move || still_there(&repo, &plan, &done),
+            |tab, gone, ctx| match gone {
+                None => tab.next_release_step(ctx),
+                Some(why) => {
+                    tab.busy_op = None;
+                    tab.op_started = None;
+                    tab.status = Some((why, true));
+                }
+            },
+        );
     }
 
     /// Runs the first step not done, then the next, until one fails or all are done.
@@ -250,8 +286,19 @@ impl RepoTab {
                         tab.next_release_step(ctx);
                     }
                     Err(e) => {
+                        let auth = crate::git::is_auth_error(&e);
                         run.steps[i].1 = Status::Failed(e);
                         tab.release_stopped(ctx);
+                        // Signing in, then Resume, pushes with what was typed.
+                        if auth {
+                            let url = tab
+                                .default_remote()
+                                .and_then(|r| tab.remotes.iter().find(|x| x.name == r))
+                                .map(|r| r.url.clone())
+                                .unwrap_or_default();
+                            tab.last_op = None;
+                            tab.dialog = Some(super::Dialog::credentials(&url, false));
+                        }
                     }
                 }
             },
@@ -262,7 +309,7 @@ impl RepoTab {
     /// tab is free again and reads the repository.
     fn release_stopped(&mut self, ctx: &Context) {
         self.busy_op = None;
-        self.op_started = None;
+        let started = self.op_started.take();
         let Some(run) = self.release.as_mut().and_then(|v| v.run.as_mut()) else {
             return;
         };
@@ -281,6 +328,9 @@ impl RepoTab {
                 self.undo_stack.pop();
             }
             self.undo_stack.push(entry);
+            if self.undo_stack.len() > 50 {
+                self.undo_stack.remove(0);
+            }
             self.redo_stack.clear();
             run.recorded = true;
         }
@@ -290,11 +340,15 @@ impl RepoTab {
         });
         self.status = Some(match failed {
             Some((step, e)) => (format!("{label}: {} failed: {e}", step.label()), true),
-            None => (format!("Released {}", run.plan.tag), false),
+            None if run.finished() => (format!("Released {}", run.plan.tag), false),
+            None => (format!("{label}: stopped"), false),
         });
-        if run.finished() {
-            self.finished
-                .push((format!("{} · Released {}", self.name, run.plan.tag), false));
+        let long = started.is_some_and(|t| t.elapsed() > std::time::Duration::from_secs(4));
+        if long {
+            self.finished.push(match &self.status {
+                Some((text, failed)) => (format!("{} · {text}", self.name), *failed),
+                None => (format!("{} · {label}", self.name), false),
+            });
         }
         self.reload(ctx);
     }
@@ -314,6 +368,10 @@ fn plan_of(draft: &Draft, form: &Form) -> Plan {
         .flatten()
         .filter(|_| draft.manifest_note.is_none())
         .map(|branch| release::Bump {
+            remote_ref: draft
+                .remote_ref
+                .clone()
+                .unwrap_or_else(|| format!("refs/heads/{branch}")),
             branch,
             version,
             manifests: if form.bump {
@@ -353,8 +411,9 @@ pub(crate) fn undo(plan: &Plan, done: &Done) -> (Vec<Vec<String>>, Vec<Vec<Strin
     let tag_ref = format!("refs/tags/{}", plan.tag);
     let mut undo = Vec::new();
     let mut redo = Vec::new();
-    if let Some(object) = &done.tag_object {
-        undo.push(expect_ref_at(&tag_ref, object));
+    // The tag checked by its commit (what the check reads), put back as its object.
+    if let Some(commit) = &done.tag_commit {
+        undo.push(expect_ref_at(&tag_ref, commit));
     }
     if let (Some(bump), Some(commit)) = (&plan.bump, &done.bump_commit) {
         let branch = format!("refs/heads/{}", bump.branch);
@@ -374,4 +433,40 @@ pub(crate) fn undo(plan: &Plan, done: &Done) -> (Vec<Vec<String>>, Vec<Vec<Strin
         redo.push(s(&["update-ref", &tag_ref, object, ""]));
     }
     (undo, redo)
+}
+
+/// Why what the steps done left isn't there any more (`None`: it is), before resuming.
+fn still_there(repo: &std::path::Path, plan: &Plan, done: &Done) -> Option<String> {
+    use crate::git;
+    if let Some(commit) = &done.tag_commit
+        && git::resolve(repo, &format!("refs/tags/{}", plan.tag))
+            .ok()
+            .as_ref()
+            != Some(commit)
+    {
+        return Some(format!(
+            "{} isn't the tag the release made any more (undone?): close this and cut the \
+             release again",
+            plan.tag
+        ));
+    }
+    if let (Some(bump), Some(commit)) = (&plan.bump, &done.bump_commit)
+        && git::run(
+            Some(repo),
+            &[
+                "merge-base",
+                "--is-ancestor",
+                commit,
+                &format!("refs/heads/{}", bump.branch),
+            ],
+        )
+        .is_err()
+    {
+        return Some(format!(
+            "The version commit isn't on {} any more (undone?): close this and cut the \
+             release again",
+            bump.branch
+        ));
+    }
+    None
 }

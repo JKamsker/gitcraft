@@ -31,6 +31,7 @@ fn project(name: &str) -> (PathBuf, PathBuf) {
     run(&dir, &["config", "user.name", "Zoë"]);
     run(&dir, &["config", "user.email", "zoe@example.org"]);
     run(&dir, &["config", "tag.gpgSign", "false"]);
+    run(&dir, &["config", "commit.gpgSign", "false"]);
     let _ = std::fs::write(
         dir.join("package.json"),
         "{\n  \"name\": \"app\",\n  \"version\": \"2.3.1\"\n}\n",
@@ -98,6 +99,8 @@ fn a_release_cut_from_the_dialog_is_undone_and_redone_here() {
     tab.redo(&ctx);
     wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
     let tag_back = git::resolve(&dir, "refs/tags/v2.3.2").is_ok();
+    // Put back as the annotated tag it was, its notes with it.
+    let kind = git::run(Some(&dir), &["cat-file", "-t", "refs/tags/v2.3.2"]).unwrap_or_default();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::remove_dir_all(&bare);
     // No forge here: nothing to publish.
@@ -110,6 +113,7 @@ fn a_release_cut_from_the_dialog_is_undone_and_redone_here() {
     assert!(tag_gone);
     assert_eq!(subject.trim(), "fix: the crash");
     assert!(tag_back);
+    assert_eq!(kind.trim(), "tag");
 }
 
 #[test]
@@ -141,4 +145,34 @@ fn a_failed_push_is_resumed_and_the_undo_covers_it_all() {
     assert!(remote_tag);
     assert_eq!(entries, 1);
     assert_eq!(entries_after, 1, "resumed, the same entry");
+}
+
+/// Undone while the dialog waits on a failed step, Resume says so rather than push what is
+/// gone; Skip leaves a step out and goes on.
+#[test]
+fn resume_after_an_undo_refuses_and_skip_goes_on() {
+    let (dir, bare) = project("undone");
+    let ctx = egui::Context::default();
+    let mut tab = open(&dir, &ctx);
+    if let Some(r) = &mut tab.release {
+        r.form.bump = false;
+    }
+    let moved = bare.with_extension("moved");
+    let _ = std::fs::rename(&bare, &moved);
+    tab.release_act(ReleaseAct::Run, &ctx);
+    wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
+    // The tag taken back by hand meanwhile.
+    run(&dir, &["tag", "-d", "v2.3.2"]);
+    let _ = std::fs::rename(&moved, &bare);
+    tab.release_act(ReleaseAct::Run, &ctx);
+    wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
+    let refused = tab.status.clone();
+    let remote_tag = git::resolve(&bare, "refs/tags/v2.3.2").is_ok();
+    tab.release_act(ReleaseAct::Skip, &ctx);
+    let after_skip = statuses(&tab);
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(&bare);
+    assert!(refused.is_some_and(|(s, err)| err && s.contains("isn't the tag")));
+    assert!(!remote_tag);
+    assert_eq!(after_skip, [Status::Done, Status::Skipped]);
 }
