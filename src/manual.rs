@@ -72,6 +72,16 @@ const FEATURES: &[(&str, &[&str])] = &[
             "A terminal panel with tabs, in the repository's folder.",
         ],
     ),
+    (
+        "Custom commands",
+        &[
+            "Settings → Custom commands adds commands of your own to a commit's, a branch's or a file's menu, or to the palette (Ctrl+P).",
+            "A command line is run with sh on the repository's machine (here, in WSL or over SSH), in its folder. It gets $SHA, $SHORT_SHA, $BRANCH, $REMOTE, $FILE and $REPO as shell variables, never pasted into its text: write \"$FILE\" and a name with spaces, quotes or $(…) stays one word.",
+            "Prompts ask for a text or a branch first, each given to the command as its own variable ($MESSAGE…). Ask before running shows the command line before it runs.",
+            "Its output goes to a toast (its last lines, red when it fails) or to a terminal tab of its own, where it can be watched and answered; Enter closes it.",
+            "A repository can bring its own in .gitcraft/commands.json. They are offered only once you have read the file (Review repository commands… in a menu or the palette) and trusted it, and asked about again whenever it changes. Settings → Custom commands lists the repositories trusted, to forget them.",
+        ],
+    ),
 ];
 
 /// Keyboard and mouse shortcuts: (keys, what they do). `Cmd` stands for Ctrl outside macOS.

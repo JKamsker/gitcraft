@@ -197,6 +197,12 @@ impl RepoTab {
                 None,
             )));
         }
+        crate::repo::custom_commands::menu_items(
+            ui,
+            crate::custom_commands::Placement::Branch,
+            self.branch_scope(&b.name, &b.target, Some(remote)),
+            acts,
+        );
     }
 }
 

@@ -243,6 +243,51 @@ fn terminal_script(path: &str) -> String {
     format!("exec sh -c '{SCRIPT}' sh {encoded}")
 }
 
+/// What a terminal of this machine runs to run the `sh` script `script` on `t`'s machine, in
+/// `t`'s folder: (program, arguments, label). Like [`terminal_command`], the script and the
+/// folder go in base64, which no shell (ssh's login shell, wsl.exe's quoting) makes more of.
+pub fn terminal_running(t: &Target, script: &str) -> (String, Vec<String>, String) {
+    use base64::Engine;
+    let b64 = |s: &str| base64::engine::general_purpose::STANDARD.encode(s);
+    const RUN: &str = concat!(
+        "p=$(printf %s \"$1\" | base64 -d); ",
+        "case $p in \"~\"|\"~/\"*) p=\"$HOME${p#\"~\"}\";; esac; ",
+        "cd -- \"$p\" || exit; ",
+        "s=$(printf %s \"$2\" | base64 -d); ",
+        "exec sh -c \"$s\"",
+    );
+    let (path, script) = (b64(&t.path), b64(script));
+    match &t.host {
+        Host::Wsl(distro) => (
+            "wsl.exe".to_owned(),
+            [
+                "-d",
+                distro.as_str(),
+                "--exec",
+                "sh",
+                "-c",
+                RUN,
+                "sh",
+                path.as_str(),
+                script.as_str(),
+            ]
+            .map(str::to_owned)
+            .to_vec(),
+            distro.clone(),
+        ),
+        Host::Ssh(dest) => (
+            "ssh".to_owned(),
+            vec![
+                "-t".to_owned(),
+                "--".to_owned(),
+                ssh_destination(dest),
+                format!("exec sh -c '{RUN}' sh {path} {script}"),
+            ],
+            t.host.label(),
+        ),
+    }
+}
+
 /// The path this app gives `path` (absolute there, or under `~`) on `host`.
 pub fn encode(host: &Host, path: &str) -> PathBuf {
     let path = normalize(&path.replace('\\', &LITERAL_BACKSLASH.to_string()));
