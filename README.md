@@ -160,8 +160,9 @@ so your config, credentials and hooks apply as usual.
 
 **Diffs and conflicts** (centre)
 
-- Unified or side by side, syntax colours, the changed part of each line marked, whitespace
-  changes optional, images shown before / after. Esc closes.
+- Unified or side by side (a new file takes the whole width, with no empty old side), syntax
+  colours, the changed part of each line marked, whitespace changes optional, images shown
+  before / after. Esc closes.
 - A file kept in Git LFS shows as its LFS objects before and after, with their sizes, rather
   than the text of the pointer git stores. With git-lfs installed, the palette (Ctrl+P) of a
   repository that uses LFS has _LFS: Fetch_ and _LFS: Pull_.

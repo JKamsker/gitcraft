@@ -66,7 +66,7 @@ impl DiffView {
     /// side-by-side view).
     pub(in crate::repo) fn step_change(&mut self, split: bool, delta: i32) {
         let Some(Ok(data)) = &self.data else { return };
-        let (_, changes) = data.runs(split);
+        let (_, changes) = data.runs(data.shows_split(split));
         if let Some(i) = step(changes, self.scroll, self.at_change, delta) {
             self.jump = Some(i);
         }

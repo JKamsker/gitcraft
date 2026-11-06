@@ -28,7 +28,7 @@ use images::{is_image, load_images, renamed_from};
 pub use lfs::LfsPair;
 use lfs::lfs_pair;
 pub use parse::parse;
-use parse::{pair_lines, patch_header};
+use parse::{is_new_file, pair_lines, patch_header};
 pub use patch::{hunk_changes, partial_patch};
 pub(super) use select::TextSel;
 
@@ -76,6 +76,8 @@ pub struct DiffData {
     pub header: String,
     /// Hunks and lines can be staged, unstaged or discarded on their own.
     pub partial: bool,
+    /// The file is new: it has no old side, so it shows unified even side by side.
+    pub new_file: bool,
     /// Characters in the longest line, for the width to scroll (counted once, not every frame).
     longest: usize,
     /// The lines cut to be shown, as they were: what copying them copies.
@@ -86,6 +88,12 @@ pub struct DiffData {
 }
 
 impl DiffData {
+    /// Whether the lines show side by side when that's the setting (`split`): a new file takes
+    /// the whole width, rather than half of it next to an empty old side.
+    pub(in crate::repo::diff) fn shows_split(&self, split: bool) -> bool {
+        split && !self.new_file
+    }
+
     /// The runs of changed rows shown unified or side by side (`split`), and the changes they
     /// make (see [`jump::changes`]).
     pub(in crate::repo::diff) fn runs(
@@ -148,6 +156,7 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
     let lines = parse(&text);
     let header = patch_header(&text);
     let partial = can_pick(key, opts, &header, &lines);
+    let new_file = is_new_file(&text);
     let lfs = lfs_pair(&lines);
     // An image in LFS: git has only its pointer.
     let image = if is_image(&path) && lfs.is_none() {
@@ -181,6 +190,7 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         lfs,
         header,
         partial,
+        new_file,
         longest,
         uncut,
         map: Default::default(),
