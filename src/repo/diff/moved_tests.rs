@@ -394,3 +394,24 @@ fn the_open_block_survives_a_reload() {
     view.arrived(request, Ok(data_of("@@ -1,1 +1,1 @@\n-x = 1\n+x = 2\n")));
     assert!(view.moved.is_none());
 }
+
+/// A block joined across a few edited lines never takes in a line another block moved.
+#[test]
+fn blocks_never_share_a_line() {
+    let text = "@@ -1,6 +1,6 @@\n-alpha_line_with_enough_letters_one\n-gap_del_unmatched_zzzzzzzzzzzzzzzz\n-beta_line_with_enough_letters_two\n ctx\n+alpha_line_with_enough_letters_one\n+gamma_line_with_enough_letters_three\n+beta_line_with_enough_letters_two\n ctx\n-gamma_line_with_enough_letters_three\n ctx\n";
+    let lines = parse(text);
+    let moves = detect(&lines);
+    let mut seen = std::collections::HashSet::new();
+    for block in &moves.blocks {
+        for i in block.del.clone().chain(block.add.clone()) {
+            assert!(seen.insert(i), "line {i} in two blocks: {:?}", moves.blocks);
+        }
+    }
+    let gamma = lines
+        .iter()
+        .position(|l| l.kind == Kind::Add && l.text.starts_with("gamma"))
+        .unwrap_or(0);
+    let (b, same) = moves.at(gamma).unwrap_or((usize::MAX, false));
+    assert!(same);
+    assert!(moves.blocks[b].exact);
+}
