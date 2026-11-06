@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use super::parse::{header_paths, unquote};
+use super::parse::{header_paths, names, unquote};
 use super::*;
 
 #[test]
@@ -36,11 +36,22 @@ fn conflict_markers() {
         "=======",
         ">>>>>>> abc (side)",
         "||||||| base",
+        // `conflict-marker-size=10`.
+        "<<<<<<<<<< ecfb012 (m)",
+        "==========",
     ] {
         assert!(is_conflict_marker(marker), "{marker}");
     }
     assert!(is_conflict_marker("=======\r"));
-    for not in ["<<<<<<<<", "======= x", "== =", "", "<<<<<<<x", " ======="] {
+    for not in [
+        "<<<<<<",
+        "======",
+        "======= x",
+        "== =",
+        "",
+        "<<<<<<<x",
+        " =======",
+    ] {
         assert!(!is_conflict_marker(not), "{not}");
     }
 }
@@ -117,7 +128,8 @@ fn reads_the_files_of_a_remerge_diff() {
     let f = &remerge.files[0];
     assert_eq!((f.path.as_str(), f.status), ("f.txt", 'M'));
     assert_eq!((f.added, f.removed), (1, 5));
-    assert!(f.resolves_markers && f.conflicted());
+    assert!(f.conflicted() && !f.edited());
+    assert_eq!((f.resolving_hunks, f.edited_hunks), (1, 0));
     assert_eq!(f.conflicts, ["CONFLICT (content): Merge conflict in f.txt"]);
     // Edited beyond the merge: a line that looks like a header is still a line.
     let evil = &remerge.files[1];
@@ -127,7 +139,8 @@ fn reads_the_files_of_a_remerge_diff() {
     // A conflict resolved with the file as git left it: no lines, only the message.
     let kept = &remerge.files[2];
     assert_eq!(kept.path, "gone");
-    assert!(kept.conflicted() && !kept.resolves_markers);
+    assert!(kept.conflicted() && !kept.edited());
+    assert_eq!((kept.resolving_hunks, kept.edited_hunks), (0, 0));
     assert_eq!((kept.added, kept.removed), (0, 0));
     let deleted = &remerge.files[3];
     assert_eq!((deleted.path.as_str(), deleted.status), ("ü.txt", 'D'));
@@ -248,14 +261,14 @@ fn a_resolved_conflict_and_an_extra_edit() {
     );
     let hash = head(&dir);
     let found = remerge(&dir, &hash);
-    let patch = remerge_file_diff(&dir, &hash, names[0], None, false);
-    let other = remerge_file_diff(&dir, &hash, names[1], None, false);
+    let patch = remerge_file_diff(&dir, &hash, names[0], None, DiffOptions::default());
+    let other = remerge_file_diff(&dir, &hash, names[1], None, DiffOptions::default());
     let _ = std::fs::remove_dir_all(&dir);
 
     let found = found.unwrap_or_default();
     assert_eq!(found.files.len(), 2, "{found:?}");
     let resolved = found.files.iter().find(|f| f.path == names[0]);
-    assert!(resolved.is_some_and(|f| f.resolves_markers && !f.conflicts.is_empty()));
+    assert!(resolved.is_some_and(|f| f.resolving_hunks == 1 && !f.conflicts.is_empty()));
     let evil = found.files.iter().find(|f| f.path == names[1]);
     assert!(evil.is_some_and(|f| !f.conflicted() && f.added == 1 && f.removed == 0));
     let patch = patch.unwrap_or_default();
@@ -299,7 +312,7 @@ fn a_conflict_kept_as_git_left_it() {
     git(&dir, &["commit", "-q", "--no-edit"]);
     let hash = head(&dir);
     let found = remerge(&dir, &hash);
-    let patch = remerge_file_diff(&dir, &hash, "f", None, false);
+    let patch = remerge_file_diff(&dir, &hash, "f", None, DiffOptions::default());
     let _ = std::fs::remove_dir_all(&dir);
     let found = found.unwrap_or_default();
     assert_eq!(found.files.len(), 1, "{found:?}");
@@ -334,4 +347,231 @@ fn a_hash_that_is_no_commit_says_why() {
     let err = remerge(&dir, "0123456789abcdef0123456789abcdef01234567");
     let _ = std::fs::remove_dir_all(&dir);
     assert!(err.is_err_and(|e| e.starts_with("Could not redo the merge")));
+}
+
+#[test]
+fn an_edit_beside_a_resolution_is_counted_as_one() {
+    let text = "\
+diff --git a/f b/f
+remerge CONFLICT (content): Merge conflict in f
+--- a/f
++++ b/f
+@@ -1,5 +1,1 @@
+-<<<<<<< a
+-A
+-=======
+-B
+->>>>>>> b
++AB
+@@ -40 +36,2 @@
+ z
++evil
+";
+    let remerge = parse_remerge(text);
+    let f = &remerge.files[0];
+    assert!(f.conflicted() && f.edited());
+    assert_eq!((f.resolving_hunks, f.edited_hunks), (1, 1));
+    assert_eq!(remerge.conflicted().count(), 1);
+    assert_eq!(remerge.edited().count(), 1);
+}
+
+#[test]
+fn a_marker_like_line_of_a_file_without_conflicts_is_an_edit() {
+    // A setext heading's underline changed by a clean merge's extra edit.
+    let text = "diff --git a/README.rst b/README.rst\n--- a/README.rst\n+++ b/README.rst\n\
+                @@ -1,2 +1,2 @@\n Title\n-=======\n+-----\n";
+    let remerge = parse_remerge(text);
+    assert_eq!(remerge.conflicted().count(), 0);
+    assert_eq!(remerge.files[0].edited_hunks, 1);
+}
+
+#[test]
+fn files_a_conflict_over_several_paths_names_are_its_resolution() {
+    let text = "\
+diff --git a/rr.txt b/rr.txt
+remerge CONFLICT (rename/rename): rr.txt renamed to rr_main.txt in HEAD and to rr_side.txt in side.
+diff --git a/rr_side.txt b/rr_side.txt
+deleted file mode 100644
+--- a/rr_side.txt
++++ /dev/null
+@@ -1 +0,0 @@
+-x
+diff --git a/rr.txt.bak b/rr.txt.bak
+--- a/rr.txt.bak
++++ b/rr.txt.bak
+@@ -1 +1 @@
+-a
++b
+";
+    let remerge = parse_remerge(text);
+    let side = &remerge.files[1];
+    assert!(side.conflicted() && !side.edited(), "{side:?}");
+    assert_eq!(side.resolving_hunks, 1);
+    // Only a whole name counts: `rr.txt` isn't `rr.txt.bak`.
+    assert!(!remerge.files[2].conflicted());
+    assert!(!names("x rr.txt.bak y", "rr.txt"));
+    assert!(names("in rr.txt.", "rr.txt"));
+}
+
+#[test]
+fn a_type_change_is_one_file() {
+    let text = "\
+diff --git a/link b/link
+remerge CONFLICT (distinct types): link had different types on each side.
+deleted file mode 120000
+--- a/link
++++ /dev/null
+@@ -1 +0,0 @@
+-target
+diff --git a/link b/link
+new file mode 100644
+--- /dev/null
++++ b/link
+@@ -0,0 +1 @@
++text
+";
+    let remerge = parse_remerge(text);
+    assert_eq!(remerge.files.len(), 1);
+    let f = &remerge.files[0];
+    assert_eq!((f.status, f.added, f.removed), ('T', 1, 1));
+    assert_eq!(f.resolving_hunks, 2);
+}
+
+/// Merges `side` into `main`, both having changed `path` from `a\nb\nc\n`, resolved as
+/// `resolved`; the merge's hash.
+fn resolved_merge(dir: &Path, path: &str, resolved: &str) -> String {
+    conflicting_branches(dir, path);
+    merge(dir, "side");
+    commit(dir, &[(path, resolved)], "merge");
+    head(dir)
+}
+
+#[test]
+fn a_bigger_marker_size_is_still_a_resolution() {
+    let dir = repo_with("marker-size", &[("f.txt", "a\nb\nc\n")]);
+    if !have_remerge(&dir) {
+        let _ = std::fs::remove_dir_all(&dir);
+        return;
+    }
+    commit(
+        &dir,
+        &[(".gitattributes", "f.txt conflict-marker-size=10\n")],
+        "attrs",
+    );
+    let hash = resolved_merge(&dir, "f.txt", "a\nR\nc\n");
+    let found = remerge(&dir, &hash);
+    let _ = std::fs::remove_dir_all(&dir);
+    let found = found.unwrap_or_default();
+    let f = &found.files[0];
+    assert_eq!((f.resolving_hunks, f.edited_hunks), (1, 0), "{f:?}");
+}
+
+#[test]
+fn a_modify_delete_conflict_resolved_by_deleting() {
+    let dir = repo_with("deleted", &[("f", "x\n"), ("keep", "k\n")]);
+    if !have_remerge(&dir) {
+        let _ = std::fs::remove_dir_all(&dir);
+        return;
+    }
+    git(&dir, &["checkout", "-q", "-b", "side"]);
+    git(&dir, &["rm", "-q", "f"]);
+    git(&dir, &["commit", "-q", "-m", "delete"]);
+    git(&dir, &["checkout", "-q", "main"]);
+    commit(&dir, &[("f", "y\n")], "modify");
+    merge(&dir, "side");
+    git(&dir, &["rm", "-q", "f"]);
+    git(&dir, &["commit", "-q", "--no-edit"]);
+    let found = remerge(&dir, &head(&dir));
+    let _ = std::fs::remove_dir_all(&dir);
+    let found = found.unwrap_or_default();
+    assert_eq!(found.files.len(), 1, "{found:?}");
+    let f = &found.files[0];
+    assert_eq!(f.status, 'D');
+    assert!(f.conflicted() && !f.edited(), "{f:?}");
+}
+
+#[test]
+fn a_rename_rename_conflict_resolved_by_keeping_one_name() {
+    let dir = repo_with("rename-rename", &[("rr.txt", "one\ntwo\nthree\n")]);
+    if !have_remerge(&dir) {
+        let _ = std::fs::remove_dir_all(&dir);
+        return;
+    }
+    git(&dir, &["checkout", "-q", "-b", "side"]);
+    git(&dir, &["mv", "rr.txt", "rr_side.txt"]);
+    git(&dir, &["commit", "-q", "-m", "side"]);
+    git(&dir, &["checkout", "-q", "main"]);
+    git(&dir, &["mv", "rr.txt", "rr_main.txt"]);
+    git(&dir, &["commit", "-q", "-m", "main"]);
+    merge(&dir, "side");
+    let _ = run(Some(&dir), &["rm", "-q", "--cached", "rr.txt"]);
+    let _ = run(Some(&dir), &["rm", "-q", "-f", "rr_side.txt"]);
+    git(&dir, &["add", "-A"]);
+    git(&dir, &["commit", "-q", "--no-edit"]);
+    let found = remerge(&dir, &head(&dir));
+    let _ = std::fs::remove_dir_all(&dir);
+    let found = found.unwrap_or_default();
+    assert!(!found.is_clean(), "{found:?}");
+    assert_eq!(found.edited().count(), 0, "{found:?}");
+}
+
+#[test]
+fn a_clean_merge_with_a_heading_edited_into_it() {
+    let dir = repo_with("setext", &[("README.rst", "Title\n=======\n\nText\n")]);
+    if !have_remerge(&dir) {
+        let _ = std::fs::remove_dir_all(&dir);
+        return;
+    }
+    git(&dir, &["checkout", "-q", "-b", "side"]);
+    commit(&dir, &[("side.txt", "s\n")], "side");
+    git(&dir, &["checkout", "-q", "main"]);
+    commit(&dir, &[("main.txt", "m\n")], "main");
+    merge(&dir, "side");
+    let _ = std::fs::write(dir.join("README.rst"), "Title\n-----\n\nText\n");
+    git(&dir, &["commit", "-q", "-a", "--amend", "--no-edit"]);
+    let found = remerge(&dir, &head(&dir));
+    let _ = std::fs::remove_dir_all(&dir);
+    let found = found.unwrap_or_default();
+    assert_eq!(found.conflicted().count(), 0, "{found:?}");
+    assert_eq!(found.edited().count(), 1, "{found:?}");
+}
+
+#[test]
+fn the_whole_file_and_merge_drivers() {
+    let dir = repo_with("whole", &[("f.txt", "a\nb\nc\nd\ne\nf\ng\nh\ni\n")]);
+    if !have_remerge(&dir) {
+        let _ = std::fs::remove_dir_all(&dir);
+        return;
+    }
+    assert!(!has_merge_drivers(&dir));
+    let with = |second: &str| format!("a\n{second}\nc\nd\ne\nf\ng\nh\ni\n");
+    git(&dir, &["checkout", "-q", "-b", "side"]);
+    commit(&dir, &[("f.txt", &with("SIDE"))], "side");
+    git(&dir, &["checkout", "-q", "main"]);
+    commit(&dir, &[("f.txt", &with("MAIN"))], "main");
+    merge(&dir, "side");
+    commit(&dir, &[("f.txt", &with("R"))], "merge");
+    let hash = head(&dir);
+    let whole = DiffOptions {
+        whole_file: true,
+        ..Default::default()
+    };
+    let patch = remerge_file_diff(&dir, &hash, "f.txt", None, whole);
+    git(&dir, &["config", "merge.mine.driver", "true"]);
+    let drivers = has_merge_drivers(&dir);
+    let _ = std::fs::remove_dir_all(&dir);
+    let patch = patch.unwrap_or_default();
+    // The last line, far from the change, is there as context.
+    assert!(patch.contains("+R\n") && patch.ends_with(" i\n"), "{patch}");
+    assert!(drivers);
+}
+
+#[test]
+fn errors_say_what_to_do() {
+    let dir = repo_with("read-only", &[("f", "x\n")]);
+    let read_only = explain(&dir, "fatal: unable to create temporary object directory");
+    let short = explain(&dir, "fatal: bad object 0123");
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(read_only.contains("read-only"), "{read_only}");
+    assert!(short.contains("fetching more history"), "{short}");
 }

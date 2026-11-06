@@ -220,11 +220,7 @@ impl RepoTab {
     /// Renders the Markdown file of the open diff, when diffs show Markdown rendered.
     pub(super) fn load_diff_rendered(&mut self, ctx: &egui::Context) {
         let rendered = self.diff_rendered;
-        let Some(view) = self
-            .diff
-            .as_mut()
-            .filter(|v| rendered && diff::rendered::is_markdown(v.key.path()))
-        else {
+        let Some(view) = self.diff.as_mut().filter(|v| rendered && v.key.renders()) else {
             return;
         };
         view.rendered_load += 1;

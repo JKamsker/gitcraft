@@ -184,11 +184,8 @@ impl RepoTab {
             Action::DiffAsFile(on) => self.show_diff_as_file(on, ctx),
             Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
             Action::DiffStep(delta) => {
-                let rendered = self.diff_rendered
-                    && self
-                        .diff
-                        .as_ref()
-                        .is_some_and(|v| diff::rendered::is_markdown(v.key.path()));
+                let rendered =
+                    self.diff_rendered && self.diff.as_ref().is_some_and(|v| v.key.renders());
                 if let Some(view) = self
                     .diff
                     .as_mut()
@@ -198,7 +195,14 @@ impl RepoTab {
                 }
             }
             Action::ViewAllFiles(on) => self.all_files.on = on,
-            Action::ShowRemerge(on) => self.remerges.on = on,
+            Action::ShowRemerge(on) => {
+                self.remerges.on = on;
+                // Its files are no longer listed: their diff goes with them.
+                if !on && matches!(&self.diff, Some(v) if matches!(v.key, DiffKey::Remerge { .. }))
+                {
+                    self.diff = None;
+                }
+            }
             Action::FileView { path, rev, tab } => self.open_file_view(path, rev, tab, ctx),
             Action::CloseFileView => self.file_view = None,
             Action::InteractiveRebase { onto, label } => self.interactive_rebase(onto, label, ctx),

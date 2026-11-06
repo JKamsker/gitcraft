@@ -41,7 +41,7 @@ const FEATURES: &[(&str, &[&str])] = &[
         &[
             "Ctrl+click a second commit to list the files that differ between the two (the changes row is the working tree).",
             "On a branch's menu, “Changes x adds to main” shows what it changed since they diverged, like a pull request; “Compare main with x” shows every difference.",
-            "On a merge, tick What this merge resolved to see only what differs from the merge git would have made: how its conflicts were resolved (hunks marked “resolves a conflict”) and anything edited beyond the merge. A “resolved” or “edited” badge on a merge row in the graph says it has some; click it to see them. Needs git 2.36 or newer; git can't redo octopus merges (more than two parents).",
+            "On a merge, tick “What this merge resolved” to see only what differs from the merge git makes of its parents: how its conflicts were resolved (hunks marked “resolves a conflict”) and anything changed beyond that, by hand or by a merge made with other options (“edited beyond the merge”). A “resolved” or “edited” badge on a merge row of the graph says it has some; click it to see them. The merges shown are redone in the background for the badges, except in a repository with merge drivers of its own. Needs git 2.36 or newer; git can't redo octopus merges (more than two parents).",
         ],
     ),
     (

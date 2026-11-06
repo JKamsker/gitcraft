@@ -157,14 +157,15 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
             hash,
             path,
             old_path,
+            ..
         } => (
-            git::remerge_file_diff(repo, hash, path, old_path.as_deref(), opts.ignore_ws)?,
+            git::remerge_file_diff(repo, hash, path, old_path.as_deref(), opts)?,
             path.clone(),
         ),
     };
     let mut lines = parse(&text);
-    if matches!(key, DiffKey::Remerge { .. }) {
-        lines = remerge::label(&text, lines);
+    if let DiffKey::Remerge { conflicts, .. } = key {
+        lines = remerge::label(conflicts, lines, opts.ignore_ws);
     }
     let header = patch_header(&text);
     let partial = can_pick(key, opts, &header, &lines);

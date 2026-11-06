@@ -80,11 +80,14 @@ pub(crate) enum DiffKey {
         path: String,
     },
     /// A file of what the merge `hash` resolved: git's own merge of its parents against the
-    /// one recorded (see [`crate::git::remerge`]). `old_path`: its name in git's merge.
+    /// one recorded (see [`crate::git::remerge`]). `old_path`: its name in git's merge;
+    /// `conflicts`: what git said of the file's conflicts, as read with the whole merge (a
+    /// conflict over several paths is said under one of them only).
     Remerge {
         hash: String,
         path: String,
         old_path: Option<String>,
+        conflicts: Vec<String>,
     },
 }
 
@@ -97,6 +100,12 @@ impl DiffKey {
             | DiffKey::Remerge { path, .. } => path,
             DiffKey::Work(file) => &file.path,
         }
+    }
+
+    /// Whether the diff can show its Markdown file rendered: not one of what a merge resolved,
+    /// whose old side (git's own merge) was never written anywhere to render.
+    pub(super) fn renders(&self) -> bool {
+        super::diff::rendered::is_markdown(self.path()) && !matches!(self, DiffKey::Remerge { .. })
     }
 }
 

@@ -105,9 +105,13 @@ impl RepoTab {
             self.wip_description(&painter, &t, &row);
         } else {
             let ci = self.ci_status(&commit.hash);
-            let resolved = self.remerge_badge(commit);
             let dot_w = if ci.is_some() { 14.0 } else { 0.0 };
-            let badge_w = resolved.map_or(0.0, |b| b.width(&painter) + 6.0);
+            // Only where the description has room for it beside some of the summary.
+            let room = rect.right() - cols.trailing() - dot_w - (gx + cols.graph);
+            let resolved = self
+                .remerge_badge(commit)
+                .and_then(|b| b.fit(&painter, room).map(|(label, w)| (b, label, w)));
+            let badge_w = resolved.map_or(0.0, |(_, _, w)| w + 6.0);
             description(ui, &painter, &t, &row, is_match, dot_w + badge_w);
             trailing_columns(ui, &painter, &t, &row, now);
             if let Some(status) = ci {

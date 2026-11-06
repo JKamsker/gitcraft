@@ -33,10 +33,7 @@ impl RepoTab {
         );
         let as_file = self.diff_as_file;
         // A Markdown file can show rendered: `Some(whether it does)`.
-        // Not what a merge resolved: git's own merge, its old side, can't be rendered.
-        let markdown = (rendered::is_markdown(&path)
-            && !matches!(view.key, DiffKey::Remerge { .. }))
-        .then_some(self.diff_rendered);
+        let markdown = view.key.renders().then_some(self.diff_rendered);
         let clear = self.diff_header(
             ui,
             view,

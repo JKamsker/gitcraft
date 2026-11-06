@@ -201,8 +201,25 @@ fn the_window_shows_what_merges_resolved() {
     // Never redone: git can't.
     assert_eq!(badge(&m.octopus), None);
     assert!(tab.remerges.of(&m.octopus).is_none());
-    assert!(harness.query_by_label("resolved").is_some());
-    assert!(harness.query_by_label("edited").is_some());
+    // Read out with what they mean.
+    for label in ["resolved", "resolved + edited", "edited"] {
+        eprintln!("DBG {label}: {}", harness.query_by_label(label).is_some());
+    }
+    for n in harness.query_all_by_label_contains("differs") {
+        eprintln!("DBG node: {:?}", n);
+    }
+    assert!(
+        harness
+            .query_by_label_contains("conflicts resolved in 1 file")
+            .is_some()
+    );
+    // The resolved merge's and the evil one's.
+    assert_eq!(
+        harness
+            .query_all_by_label_contains("1 file changed beyond")
+            .count(),
+        2
+    );
 
     // The resolved merge: the box, ticked, lists the conflict and the extra edit apart.
     select(&mut harness, &m.resolved);
@@ -228,6 +245,9 @@ fn the_window_shows_what_merges_resolved() {
         hash: m.resolved.clone(),
         path: CONFLICTED.to_owned(),
         old_path: None,
+        conflicts: vec![format!(
+            "CONFLICT (content): Merge conflict in {CONFLICTED}"
+        )],
     };
     harness.state_mut().queue(Action::OpenDiff(key));
     assert!(run_until(&mut harness, |t| t
@@ -295,6 +315,7 @@ fn the_extra_edit_of_a_merge_is_labelled_as_such() {
         hash: m.evil.clone(),
         path: "other.txt".to_owned(),
         old_path: None,
+        conflicts: Vec::new(),
     };
     let data = diff::load(&m.dir, &key, DiffOptions::default(), true);
     let found = git::remerge(&m.dir, &m.evil);
@@ -316,6 +337,7 @@ fn the_extra_edit_of_a_merge_is_labelled_as_such() {
                 status: 'M',
                 path: "other.txt".to_owned(),
                 added: 1,
+                edited_hunks: 1,
                 ..Default::default()
             }]
         }
@@ -346,4 +368,50 @@ fn badges_are_read_a_few_at_a_time() {
     };
     assert!(old.next_batch(&shown).is_empty());
     assert_eq!(old.unsupported(), Some("old"));
+}
+
+#[test]
+fn failures_are_tried_again_and_drivers_stop_the_badges() {
+    let mut remerges = super::Remerges {
+        support: Some(Err("could not reach the machine".to_owned())),
+        ..Default::default()
+    };
+    remerges.arrived("bad".to_owned(), Err("connection lost".to_owned()));
+    remerges.arrived("good".to_owned(), Ok(Remerge::default()));
+    remerges.forget_failures();
+    assert!(remerges.support.is_none());
+    assert!(remerges.of("bad").is_none());
+    assert!(remerges.of("good").is_some());
+    // Merge drivers of the repository's own: nothing redone unasked.
+    remerges.support = Some(Ok(()));
+    remerges.drivers = true;
+    assert!(remerges.next_batch(&["h".to_owned()]).is_empty());
+}
+
+#[test]
+fn unticking_the_box_closes_a_diff_of_what_the_merge_resolved() {
+    let m = merges_repo("untick");
+    let ctx = egui::Context::default();
+    let tab = RepoTab::new_deferred(m.dir.clone(), &ctx);
+    let mut harness = egui_kittest::Harness::builder()
+        .with_size([1400.0, 860.0])
+        .build_ui_state(|ui, tab: &mut RepoTab| tab.ui(ui), tab);
+    crate::theme::install_fonts(&harness.ctx);
+    crate::theme::apply(&harness.ctx, crate::theme::ThemeKind::Dark);
+    let opened = run_until(&mut harness, |t| !t.opening() && t.settled());
+    let key = DiffKey::Remerge {
+        hash: m.resolved.clone(),
+        path: CONFLICTED.to_owned(),
+        old_path: None,
+        conflicts: Vec::new(),
+    };
+    let tab = harness.state_mut();
+    tab.diff = Some(crate::repo::DiffView::new(key));
+    tab.queue(Action::ShowRemerge(true));
+    tab.queue(Action::ShowRemerge(false));
+    harness.run_steps(2);
+    let _ = std::fs::remove_dir_all(&m.dir);
+    assert!(opened);
+    assert!(!harness.state().remerges.on);
+    assert!(harness.state().diff.is_none());
 }

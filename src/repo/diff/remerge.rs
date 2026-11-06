@@ -3,48 +3,56 @@
 
 use super::parse::meta;
 use super::{DiffLine, Kind};
-use crate::git::is_conflict_marker;
+use crate::git::{hunk_resolves, is_conflict_marker};
 
-/// The label of a hunk that takes away conflict markers git left.
+/// The label of a hunk that resolves a conflict.
 pub(super) const RESOLVES: &str = "resolves a conflict";
 /// The label of a hunk that changes what git merged without a conflict.
 pub(super) const EDITED: &str = "edited beyond the merge";
 
-/// Where the diff comes from, for its header.
+/// Where the diff comes from, for its header: git's own merge of the parents, then the
+/// recorded one.
 pub(super) fn origin(hash: &str) -> String {
-    format!("Resolved in merge {}", hash.get(..8).unwrap_or(hash))
+    format!("git's merge → merge {}", hash.get(..8).unwrap_or(hash))
 }
 
-/// `lines` of the remerge diff `text`, after what git said of the file's conflicts, each hunk
-/// header saying whether it resolves a conflict or edits beyond the merge.
-pub(super) fn label(text: &str, lines: Vec<DiffLine>) -> Vec<DiffLine> {
-    let mut out: Vec<DiffLine> = messages(text).map(meta).collect();
+/// `lines` of a file's remerge diff, after what git said of its `conflicts`, each hunk header
+/// saying whether it resolves a conflict or edits beyond the merge (`ignore_ws`: the diff was
+/// read without whitespace changes).
+pub(super) fn label(conflicts: &[String], lines: Vec<DiffLine>, ignore_ws: bool) -> Vec<DiffLine> {
+    let mut out: Vec<DiffLine> = conflicts.iter().map(|c| meta(c)).collect();
     if lines.is_empty() && !out.is_empty() {
-        out.push(meta(
-            "The recorded merge keeps this file as git's own merge leaves it: no line differs.",
-        ));
+        out.push(meta(if ignore_ws {
+            "No line differs from git's own merge but in whitespace."
+        } else {
+            "The recorded merge keeps this file as git's own merge leaves it: no line differs."
+        }));
     }
     let hunks: Vec<usize> = (0..lines.len())
         .filter(|&i| lines[i].kind == Kind::Hunk)
         .collect();
+    let marked: Vec<bool> = hunks
+        .iter()
+        .enumerate()
+        .map(|(n, &start)| {
+            let end = hunks.get(n + 1).copied().unwrap_or(lines.len());
+            lines[start + 1..end]
+                .iter()
+                .any(|l| l.kind == Kind::Del && is_conflict_marker(&l.text))
+        })
+        .collect();
+    let any_marked = marked.contains(&true);
     let mut lines = lines;
-    for (n, &start) in hunks.iter().enumerate() {
-        let end = hunks.get(n + 1).copied().unwrap_or(lines.len());
-        let resolves = lines[start + 1..end]
-            .iter()
-            .any(|l| l.kind == Kind::Del && is_conflict_marker(&l.text));
-        let what = if resolves { RESOLVES } else { EDITED };
+    for (&start, &marked) in hunks.iter().zip(&marked) {
+        let what = if hunk_resolves(conflicts, marked, any_marked) {
+            RESOLVES
+        } else {
+            EDITED
+        };
         lines[start].text = format!("{}   · {what}", lines[start].text);
     }
     out.extend(lines);
     out
-}
-
-/// What git said of the conflicts in the file (`CONFLICT (content): …`), before its first hunk.
-fn messages(text: &str) -> impl Iterator<Item = &str> {
-    text.split_terminator('\n')
-        .take_while(|l| !l.starts_with("@@"))
-        .filter_map(|l| l.strip_prefix("remerge "))
 }
 
 #[cfg(test)]
@@ -72,9 +80,13 @@ index a2ad40a..8bcb16a 100644
 +extra
 ";
 
+    fn content() -> Vec<String> {
+        vec!["CONFLICT (content): Merge conflict in f.txt".to_owned()]
+    }
+
     #[test]
     fn hunks_say_what_they_are() {
-        let lines = label(RESOLVED_AND_EDITED, parse(RESOLVED_AND_EDITED));
+        let lines = label(&content(), parse(RESOLVED_AND_EDITED), false);
         assert_eq!(lines[0].kind, Kind::Meta);
         assert_eq!(lines[0].text, "CONFLICT (content): Merge conflict in f.txt");
         let hunks: Vec<&str> = lines
@@ -84,6 +96,7 @@ index a2ad40a..8bcb16a 100644
             .collect();
         assert_eq!(hunks.len(), 2);
         assert!(hunks[0].starts_with("@@ -1,7 +1,3 @@") && hunks[0].ends_with(RESOLVES));
+        // Away from the markers, in the same file: an edit beyond the merge.
         assert!(hunks[1].contains("fn tail") && hunks[1].ends_with(EDITED));
         // The line numbers still count from the hunk's own header.
         let resolved = lines.iter().find(|l| l.text == "RESOLVED");
@@ -92,25 +105,49 @@ index a2ad40a..8bcb16a 100644
 
     #[test]
     fn says_which_merge_it_is() {
-        assert_eq!(origin("0123456789abcdef"), "Resolved in merge 01234567");
-        assert_eq!(origin("abc"), "Resolved in merge abc");
+        assert_eq!(origin("0123456789abcdef"), "git's merge → merge 01234567");
+        assert_eq!(origin("abc"), "git's merge → merge abc");
     }
 
     #[test]
     fn a_file_kept_as_git_left_it_says_so() {
-        let text = "diff --git a/f b/f\nremerge CONFLICT (modify/delete): f deleted in x\n";
-        let lines = label(text, parse(text));
+        let conflicts = vec!["CONFLICT (modify/delete): f deleted in x".to_owned()];
+        // A conflict over several paths git printed nothing for with the path alone.
+        let lines = label(&conflicts, parse(""), false);
         assert_eq!(lines.len(), 2);
         assert!(lines.iter().all(|l| l.kind == Kind::Meta));
         assert!(lines[1].text.contains("no line differs"));
+        let lines = label(&conflicts, parse(""), true);
+        assert!(lines[1].text.contains("whitespace"));
         // Nothing at all: nothing to say.
-        assert!(label("", parse("")).is_empty());
+        assert!(label(&[], parse(""), false).is_empty());
     }
 
     #[test]
-    fn an_added_marker_is_not_a_resolution() {
-        let text = "diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -1 +1,2 @@\n x\n+=======\n";
-        let lines = label(text, parse(text));
+    fn a_conflict_not_of_lines_is_resolved_by_any_hunk() {
+        let conflicts =
+            vec!["CONFLICT (modify/delete): f deleted in a and modified in b".to_owned()];
+        let text = "diff --git a/f b/f\n--- a/f\n+++ /dev/null\n@@ -1 +0,0 @@\n-x\n";
+        let lines = label(&conflicts, parse(text), false);
+        assert!(lines[1].text.ends_with(RESOLVES), "{:?}", lines[1]);
+        // A content conflict whose markers git couldn't write (a link): resolved there too.
+        let text = "diff --git a/l b/l\n--- a/l\n+++ b/l\n@@ -1 +1 @@\n-one\n+two\n";
+        let lines = label(&content(), parse(text), false);
+        assert!(lines[1].text.ends_with(RESOLVES), "{:?}", lines[1]);
+    }
+
+    #[test]
+    fn markers_in_a_file_without_conflicts_are_text() {
+        // A setext heading's underline, or an added marker: an edit, not a resolution.
+        let text = "diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -1,2 +1,2 @@\n T\n-=======\n+-----\n";
+        let lines = label(&[], parse(text), false);
         assert!(lines[0].text.ends_with(EDITED), "{:?}", lines[0]);
+        let text = "diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -1 +1,2 @@\n x\n+=======\n";
+        let lines = label(&content(), parse(text), false);
+        assert!(
+            lines[1].text.ends_with(RESOLVES),
+            "no hunk marked: {:?}",
+            lines[1]
+        );
     }
 }
