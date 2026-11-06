@@ -216,11 +216,11 @@ so your config, credentials and hooks apply as usual.
 - Settings (Ctrl+, or the gear in the title bar), in pages listed on the left: the profile in
   use and what is its own, zoom, branch column width, graph columns, avatars, notifications,
   update check, background fetch, keeping submodules up to date, editor command, default shell
-  and terminal font size, saved identities, and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it);
-  Alt+↑ / Alt+↓ go through the pages.
-- Commit signing in Settings → Commit signing: the format (OpenPGP, SSH or X.509), signing key and program, and
-  whether commits and tags are signed by default. These are your global git config's
-  `gpg.format`, `user.signingkey`, `gpg.program` (`gpg.ssh.program`, `gpg.x509.program`),
+  and terminal font size, saved identities, SSH sign-ins, and every keyboard shortcut. Ctrl+F
+  searches all pages at once (Esc clears it); Alt+↑ / Alt+↓ go through the pages.
+- Commit signing in Settings → Commit signing: the format (OpenPGP, SSH or X.509), signing key
+  and program, and whether commits and tags are signed by default. These are your global git
+  config's `gpg.format`, `user.signingkey`, `gpg.program` (`gpg.ssh.program`, `gpg.x509.program`),
   `commit.gpgSign` and `tag.gpgSign`, shown as they are set and written back there; git does
   the signing as usual. A profile can sign its own way instead (Settings → Profile).
 - How a profile's git author and signing reach git: gitcraft writes them to a config file of the
@@ -242,7 +242,9 @@ so your config, credentials and hooks apply as usual.
 ## Download
 
 Ready-made builds for Windows, Linux (x86-64) and macOS (Apple silicon and Intel) are on the
-[releases page](https://github.com/Vancete/gitcraft/releases). Git must be installed.
+[releases page](https://github.com/Vancete/gitcraft/releases). Git must be installed. New
+releases are built for Windows and Linux only for now: the release workflow's macOS job is off
+until GitHub's macOS runners pick it up again, so on a Mac build from source (below) meanwhile.
 
 - **Windows:** `gitcraft-…-setup.exe` installs it for your user (no administrator rights), with a
   Start menu entry, an optional desktop icon, _Open in gitcraft_ on folders and an uninstaller.

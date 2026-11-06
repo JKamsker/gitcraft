@@ -44,7 +44,8 @@ jobs:
       fail-fast: false
       matrix:
         # macOS is off for now: hosted macOS runners are often not assigned at all, which leaves
-        # pull requests red over a job that never ran. The release workflow still tests on macOS.
+        # pull requests red over a job that never ran. The release workflow's macOS build is off
+        # for the same reason for now.
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:

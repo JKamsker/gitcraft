@@ -438,9 +438,9 @@ impl Settings {
                             }
                         },
                     );
-                    card.row("Avatars", "github gitlab gravatar pictures authors", |ui| {
-                        ui.checkbox(&mut self.avatars, "Load from GitHub, GitLab or Gravatar")
-                            .on_hover_text("On a GitHub repository, its commit list says which account each author is; on GitLab, the host is asked by email. Other authors: an MD5 hash of the email goes to gravatar.com. Cached on disk.");
+                    card.row("Avatars", "github gitlab forgejo gitea forge gravatar pictures authors", |ui| {
+                        ui.checkbox(&mut self.avatars, "Load from the forge or Gravatar")
+                            .on_hover_text("On a GitHub, Forgejo or Gitea repository, its commit list says which account each author is; on GitLab, the host is asked by email. Other authors: an MD5 hash of the email goes to gravatar.com. Cached on disk.");
                     });
                 });
             }

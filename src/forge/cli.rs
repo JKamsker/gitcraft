@@ -28,6 +28,18 @@ pub(super) fn run_with_input(
         // named rather than found from the folder, which it can't read.
         let forge = forge_of(tool)?;
         let (host, path) = remote_location(repo, forge)?;
+        // The hosts the arguments name (`--hostname`, `-R host/owner/repo`) were read when the
+        // tab loaded: only the one just checked, so a changed `origin` can't send the tool, and
+        // a token, to the one before.
+        if let Some(other) = named_hosts(args)
+            .into_iter()
+            .find(|named| !same_host(named, &host))
+        {
+            return Err(format!(
+                "{tool} was to go to {other}, but the repository's remote is now on {host}: \
+                 refresh the tab"
+            ));
+        }
         cmd.current_dir(std::env::temp_dir()).args(args);
         match forge {
             Forge::GitLab => {
@@ -108,16 +120,52 @@ fn remote_location(repo: &Path, forge: Forge) -> Result<(String, String), String
         _ => "gh",
     };
     let (host, path) = tool_location(forge, url)
+        .filter(|(_, path)| plain_path(path))
         .ok_or_else(|| format!("{tool} needs a remote with an owner/repo URL"))?;
     // Named to the tool, a host is used whether or not the user signed in to it (in a folder,
     // the tool skips remotes on hosts it doesn't know): only the forge's own or one signed in
     // to, so a repository can't send the tool, and a token, to a host of its choosing.
-    if !trusted_host(forge, tool, &host) {
+    if !trusted_host(forge, tool, &host)? {
         return Err(format!(
             "{tool} isn't signed in to {host}: `{tool} auth login --hostname {host}` to use it",
         ));
     }
     Ok((host, path))
+}
+
+/// Whether `path` is a plain `owner/repo` (`group/sub/repo`): never a URL, an `scp`-style
+/// address or an option, which `glab --repo` would take as another host.
+fn plain_path(path: &str) -> bool {
+    path.contains('/')
+        && path.split('/').all(|part| {
+            !part.is_empty()
+                && !part.starts_with(['-', '.'])
+                && part
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        })
+}
+
+/// The hosts `args` name: the value of `--hostname`, and the host of a `-R` / `--repo` of the
+/// form `host/owner/repo`.
+fn named_hosts(args: &[&str]) -> Vec<String> {
+    let mut hosts = Vec::new();
+    for pair in args.windows(2) {
+        match pair[0] {
+            "--hostname" => hosts.push(pair[1].to_owned()),
+            "-R" | "--repo" if pair[1].matches('/').count() >= 2 => {
+                hosts.push(pair[1].split('/').next().unwrap_or_default().to_owned());
+            }
+            _ => {}
+        }
+    }
+    hosts
+}
+
+/// Whether two hosts are the same, ports aside (`glab api --hostname` takes none).
+fn same_host(a: &str, b: &str) -> bool {
+    let name = |h: &str| h.split(':').next().unwrap_or(h).to_lowercase();
+    name(a) == name(b)
 }
 
 /// The host and `owner/repo` the tool is given for remote `url`: GitLab's host with the port of
@@ -152,7 +200,8 @@ const NOT_SIGNED_IN_FOR: Duration = Duration::from_secs(60);
 /// Whether `forge`'s tool may be pointed at `host`: the forge's own host, or one the tool is
 /// signed in to. A host that isn't a plain name (`a.b:8443` at most) never is. What the tool
 /// said is remembered: yes while the app runs, no for [`NOT_SIGNED_IN_FOR`].
-fn trusted_host(forge: Forge, tool: &str, host: &str) -> bool {
+/// An error when the tool can't be run at all (not installed).
+fn trusted_host(forge: Forge, tool: &str, host: &str) -> Result<bool, String> {
     use std::sync::{Mutex, OnceLock};
     type Known = Mutex<HashMap<(Forge, String), (bool, Instant)>>;
     static KNOWN: OnceLock<Known> = OnceLock::new();
@@ -162,14 +211,14 @@ fn trusted_host(forge: Forge, tool: &str, host: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':'))
         && !host.starts_with(['-', '.']);
     if !plain {
-        return false;
+        return Ok(false);
     }
     let own = match forge {
         Forge::GitLab => "gitlab.com",
         _ => "github.com",
     };
     if host.eq_ignore_ascii_case(own) {
-        return true;
+        return Ok(true);
     }
     let known = KNOWN.get_or_init(Known::default);
     let lock = || {
@@ -181,36 +230,37 @@ fn trusted_host(forge: Forge, tool: &str, host: &str) -> bool {
     if let Some(&(signed_in, at)) = lock().get(&key)
         && (signed_in || at.elapsed() < NOT_SIGNED_IN_FOR)
     {
-        return signed_in;
+        return Ok(signed_in);
     }
-    let signed_in = signed_in_to(tool, host);
+    let signed_in = signed_in_to(tool, host)?;
     lock().insert(key, (signed_in, Instant::now()));
-    signed_in
+    Ok(signed_in)
 }
 
 /// Whether `tool` says it is signed in to `host`; no when it doesn't say so within
 /// [`AUTH_CHECK_FOR`] (it is stopped).
-fn signed_in_to(tool: &str, host: &str) -> bool {
+fn signed_in_to(tool: &str, host: &str) -> Result<bool, String> {
     let mut cmd = tool_command(tool);
     cmd.args(["auth", "status", "--hostname", host])
         .current_dir(std::env::temp_dir())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
-    let Ok(mut child) = cmd.spawn() else {
-        return false;
-    };
+    let mut child = cmd.spawn().map_err(|e| match e.kind() {
+        std::io::ErrorKind::NotFound => format!("{tool} isn't installed"),
+        _ => format!("couldn't run {tool}: {e}"),
+    })?;
     let until = Instant::now() + AUTH_CHECK_FOR;
     loop {
         match child.try_wait() {
-            Ok(Some(status)) => return status.success(),
+            Ok(Some(status)) => return Ok(status.success()),
             Ok(None) if Instant::now() < until => {
                 std::thread::sleep(Duration::from_millis(50));
             }
             _ => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return false;
+                return Ok(false);
             }
         }
     }
@@ -231,7 +281,12 @@ fn tool_command(tool: &str) -> Command {
     // remote's.
     cmd.env_remove("GH_REPO")
         .env_remove("GH_HOST")
-        .env_remove("GITLAB_HOST");
+        .env_remove("GITLAB_HOST")
+        // glab's own names for the same: the repository, the host, a fork's head project.
+        .env_remove("GITLAB_REPO")
+        .env_remove("GITLAB_URI")
+        .env_remove("GL_HOST")
+        .env_remove("GITLAB_HEAD_REPO");
     crate::shell_path::apply(&mut cmd);
     #[cfg(windows)]
     {
@@ -282,6 +337,45 @@ mod tests {
         );
     }
 
+    /// A repository's remote names a plain project, never another host by way of its path.
+    #[test]
+    fn only_plain_paths_reach_the_tools() {
+        assert!(plain_path("team/app"));
+        assert!(plain_path("group/sub/my.app"));
+        for bad in [
+            "https://evil.example/x/y",
+            "git@evil.example:x/y",
+            "other.corp/g/p:1",
+            "-x/y",
+            "app",
+            "a//b",
+        ] {
+            assert!(!plain_path(bad), "{bad}");
+        }
+        let (_, path) = tool_location(
+            Forge::GitLab,
+            "https://gitlab.com/https://evil.example/x/y.git",
+        )
+        .unwrap_or_default();
+        assert!(!plain_path(&path), "{path}");
+    }
+
+    /// The hosts the arguments send the tool to, which must be the remote's own.
+    #[test]
+    fn the_hosts_arguments_name_are_found() {
+        assert_eq!(
+            named_hosts(&["api", "graphql", "--hostname", "ghe.example.org", "-f", "q"]),
+            ["ghe.example.org"]
+        );
+        assert_eq!(
+            named_hosts(&["run", "list", "-R", "ghe.example.org/o/r"]),
+            ["ghe.example.org"]
+        );
+        assert!(named_hosts(&["run", "list", "-R", "o/r"]).is_empty());
+        assert!(same_host("git.example.org:8443", "git.example.org"));
+        assert!(!same_host("github.evil.example", "github.com"));
+    }
+
     /// `glab api` would refuse `--repo`; the commands about a project take it.
     #[test]
     fn only_glab_commands_about_a_project_take_repo() {
@@ -314,6 +408,10 @@ mod tests {
                 "GH_REPO",
                 "GH_HOST",
                 "GITLAB_HOST",
+                "GITLAB_REPO",
+                "GITLAB_URI",
+                "GL_HOST",
+                "GITLAB_HEAD_REPO",
             ] {
                 assert_eq!(envs.get(removed), Some(&None), "{removed}");
             }
