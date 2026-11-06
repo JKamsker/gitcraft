@@ -9,17 +9,21 @@ use crate::theme::{self, Tokens};
 /// The list being edited, one entry per line.
 pub(crate) struct FenceEditor {
     text: String,
+    targets: fence::Targets,
     /// What saving said (an error when `true`).
     said: Option<(String, bool)>,
+    /// Saving, or reading the saved list (nothing can be edited before it is in: saving an
+    /// empty box would wipe it).
     saving: bool,
 }
 
 impl FenceEditor {
-    fn new(list: &[String]) -> Self {
+    fn loading() -> Self {
         Self {
-            text: list.join("\n"),
+            text: String::new(),
+            targets: fence::Targets::default(),
             said: None,
-            saving: false,
+            saving: true,
         }
     }
 
@@ -47,10 +51,34 @@ impl FenceEditor {
 }
 
 impl RepoTab {
-    pub(crate) fn open_fence(&mut self) {
-        if self.fence.editor.is_none() {
-            self.fence.editor = Some(FenceEditor::new(&self.fence.list));
+    /// Opens the window, with the list as it is saved now (read first).
+    pub(crate) fn open_fence(&mut self, ctx: &egui::Context) {
+        if self.fence.editor.is_some() {
+            return;
         }
+        self.fence.editor = Some(FenceEditor::loading());
+        let repo = self.path.clone();
+        self.then(
+            ctx,
+            move || fence::read(&repo).map(|list| (list, fence::read_targets(&repo))),
+            |tab, read, _| {
+                let Some(editor) = &mut tab.fence.editor else {
+                    return;
+                };
+                editor.saving = false;
+                match read {
+                    Ok((list, targets)) => {
+                        editor.text = list.join("\n");
+                        editor.targets = targets;
+                    }
+                    // Nothing to edit from: closed, with why.
+                    Err(e) => {
+                        tab.fence.editor = None;
+                        tab.status = Some((e, true));
+                    }
+                }
+            },
+        );
     }
 
     /// Saves the list, writes it into the agents' configs of every worktree, and checks the
@@ -62,7 +90,7 @@ impl RepoTab {
         editor.saving = true;
         editor.said = None;
         let entries = editor.entries();
-        let old = fence::parse_list(&self.fence.list);
+        let targets = editor.targets;
         let roots: Vec<std::path::PathBuf> = self
             .worktrees
             .iter()
@@ -72,7 +100,7 @@ impl RepoTab {
         let repo = self.path.clone();
         self.then(
             ctx,
-            move || save(&repo, &entries, &old, &roots),
+            move || save(&repo, &entries, targets, &roots),
             |tab, said, ctx| {
                 if let Some(editor) = &mut tab.fence.editor {
                     editor.saving = false;
@@ -102,7 +130,7 @@ impl RepoTab {
             .backdrop_color(egui::Color32::from_black_alpha(110))
             .show(ctx, |ui| {
                 ui.set_width(480.0);
-                (save, close) = body(ui, editor);
+                (save, close) = body(ui, editor, &self.fence.write_errors);
             });
         if close || (response.should_close() && !editor.saving) {
             self.fence.editor = None;
@@ -112,21 +140,21 @@ impl RepoTab {
     }
 }
 
-fn body(ui: &mut egui::Ui, editor: &mut FenceEditor) -> (bool, bool) {
+fn body(ui: &mut egui::Ui, editor: &mut FenceEditor, write_errors: &[String]) -> (bool, bool) {
     let t = Tokens::get(ui.ctx());
     ui.label(RichText::new("Agent fence").font(theme::semibold(15.0)));
     ui.add_space(4.0);
     ui.label(
         RichText::new(format!(
-            "Paths agents must stay out of, one per line, as in .gitignore (secrets/, .env, \
-             *.pem, /Cargo.lock). Saved in this repository's git config, shared by its \
-             worktrees, and written into each worktree's agent configs: Claude Code's deny \
-             rules ({}), {}, and a section of {} (Codex). Rules can leak, so every linked \
-             worktree is checked too: one whose changes, untracked or ignored files touch the \
-             fence turns red, and merging its branch needs a confirmation.",
-            fence::CLAUDE,
-            fence::CURSOR,
-            fence::AGENTS
+            "Paths agents must stay out of, one per line, in .gitignore's syntax without \
+             exceptions (secrets/, .env, *.pem, /Cargo.lock), any case. Saved in this \
+             repository's git config, shared by its worktrees, and written into each \
+             worktree's Claude Code deny rules ({}, kept out of git), now and for worktrees \
+             added later. Rules can leak, so every linked worktree is checked too: one whose \
+             commits, changes, untracked or ignored files touch the fence (or that can't be \
+             checked) turns red. A merge, fast-forward or rebase onto any branch is checked \
+             first and asks when its commits or its worktree touched the fence.",
+            fence::CLAUDE
         ))
         .size(12.0)
         .color(t.text_dim),
@@ -140,6 +168,23 @@ fn body(ui: &mut egui::Ui, editor: &mut FenceEditor) -> (bool, bool) {
             .desired_width(f32::INFINITY)
             .hint_text(".env\nsecrets/\n.github/workflows/"),
     );
+    ui.add_space(6.0);
+    ui.add_enabled_ui(!editor.saving, |ui| {
+        ui.checkbox(
+            &mut editor.targets.cursor,
+            format!("Also write {}", fence::CURSOR),
+        )
+        .on_hover_text(
+            "A block of its own; a file the repository may track, so it shows as changed",
+        );
+        ui.checkbox(
+            &mut editor.targets.agents_md,
+            format!("Also write a section of {} (Codex)", fence::AGENTS),
+        )
+        .on_hover_text(
+            "A section of its own; a file the repository usually tracks, so it shows as changed",
+        );
+    });
     ui.add_space(8.0);
     let mut save = false;
     let mut close = false;
@@ -165,6 +210,17 @@ fn body(ui: &mut egui::Ui, editor: &mut FenceEditor) -> (bool, bool) {
                 .clicked();
         });
     });
+    if !write_errors.is_empty() {
+        ui.add_space(8.0);
+        ui.label(
+            RichText::new(format!(
+                "Not written into every worktree's configs:\n{}",
+                write_errors.join("\n")
+            ))
+            .size(12.0)
+            .color(t.danger),
+        );
+    }
     if let Some((said, error)) = &editor.said {
         ui.add_space(8.0);
         let color = if *error { t.danger } else { t.text_dim };
@@ -173,23 +229,22 @@ fn body(ui: &mut egui::Ui, editor: &mut FenceEditor) -> (bool, bool) {
     (save, close)
 }
 
-/// Saves `entries` as the list of `repo` and writes them into the agents' configs of each of
-/// `roots` (the worktrees), `old` being what was written before. What to tell, and whether
-/// it is an error.
+/// Saves `entries` as the list of `repo` (and `targets`) and writes them into the agents'
+/// configs of each of `roots` (the worktrees). What to tell, and whether it is an error.
 fn save(
     repo: &std::path::Path,
     entries: &[String],
-    old: &[fence::Pattern],
+    targets: fence::Targets,
     roots: &[std::path::PathBuf],
 ) -> (String, bool) {
-    if let Err(e) = fence::write(repo, entries) {
+    if let Err(e) = fence::write(repo, entries).and_then(|()| fence::write_targets(repo, targets)) {
         return (e, true);
     }
     let new = fence::parse_list(entries);
     let mut written = 0;
     let mut errors = Vec::new();
     for root in roots {
-        match fence::write_all(root, old, &new) {
+        match fence::write_all(root, &new, targets) {
             Ok(files) => written += files.len(),
             Err(e) => errors.push(format!("{}: {e}", crate::remote::display(root))),
         }
@@ -220,5 +275,13 @@ pub(super) fn save_for_test(
     entries: &[String],
     roots: &[std::path::PathBuf],
 ) -> (String, bool) {
-    save(repo, entries, &[], roots)
+    save(
+        repo,
+        entries,
+        fence::Targets {
+            cursor: true,
+            agents_md: true,
+        },
+        roots,
+    )
 }

@@ -39,6 +39,16 @@ pub fn read(repo: &Path) -> Result<Vec<String>, String> {
 /// Replaces the list with `entries` (empty ones dropped).
 pub fn write(repo: &Path, entries: &[String]) -> Result<(), String> {
     let failed = |e: String| format!("Could not save the agent fence: {e}");
+    // Checked before anything is unset: a refused entry leaves the list as it was.
+    if let Some(bad) = entries.iter().find(|e| e.contains('\n')) {
+        return Err(failed(format!("{bad:?} has a line break")));
+    }
+    if let Some(why) = entries
+        .iter()
+        .find_map(|e| super::pattern::Pattern::check(e))
+    {
+        return Err(failed(why));
+    }
     // 5: there was nothing to unset.
     crate::git::run_ok_codes(
         Some(repo),
@@ -47,10 +57,41 @@ pub fn write(repo: &Path, entries: &[String]) -> Result<(), String> {
     )
     .map_err(failed)?;
     for entry in entries.iter().map(|e| e.trim()).filter(|e| !e.is_empty()) {
-        if entry.contains('\n') {
-            return Err(failed(format!("{entry:?} has a line break")));
-        }
         crate::git::run(Some(repo), &["config", "--local", "--add", KEY, entry]).map_err(failed)?;
+    }
+    Ok(())
+}
+
+const TARGETS: &str = "gitcraft.fenceWrite";
+
+/// Which configurations besides Claude Code's the fence is written into (none unless asked:
+/// `.cursorignore` and `AGENTS.md` are files a repository usually tracks).
+pub fn read_targets(repo: &Path) -> super::configs::Targets {
+    let values = crate::git::run_ok_codes(
+        Some(repo),
+        &["config", "--local", "--get-all", TARGETS],
+        &[0, 1],
+    )
+    .unwrap_or_default();
+    super::configs::Targets {
+        cursor: values.lines().any(|l| l.trim() == "cursor"),
+        agents_md: values.lines().any(|l| l.trim() == "agents"),
+    }
+}
+
+pub fn write_targets(repo: &Path, targets: super::configs::Targets) -> Result<(), String> {
+    let failed = |e: String| format!("Could not save where the fence is written: {e}");
+    crate::git::run_ok_codes(
+        Some(repo),
+        &["config", "--local", "--unset-all", TARGETS],
+        &[0, 5],
+    )
+    .map_err(failed)?;
+    for (on, value) in [(targets.cursor, "cursor"), (targets.agents_md, "agents")] {
+        if on {
+            crate::git::run(Some(repo), &["config", "--local", "--add", TARGETS, value])
+                .map_err(failed)?;
+        }
     }
     Ok(())
 }

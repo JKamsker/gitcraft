@@ -84,18 +84,21 @@ fn a_worktree_touching_the_fence_turns_red_and_its_merge_asks_first() -> Result<
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].path, "Cargo.lock");
 
-    // Merging the branch asks first; once confirmed it goes through; another branch doesn't ask.
-    let gated = tab.fence_gate(merge_action(BranchRef::local("agent/lock"), "main"));
-    let Action::Dialog(Dialog::Confirm {
+    // Merging the branch is checked in the background, then asks.
+    tab.apply(merge_action(BranchRef::local("agent/lock"), "main"), &ctx);
+    until(&mut tab, &ctx, |t| t.dialog.is_some())?;
+    let Some(Dialog::Confirm {
         title, body, ops, ..
-    }) = gated
+    }) = tab.dialog.take()
     else {
         return Err("a confirmation".into());
     };
+    assert!(title.ends_with("(past the agent fence)"), "{title}");
     assert!(
         body.contains("Cargo.lock (committed; fence: Cargo.lock)"),
         "{body}"
     );
+    // Confirmed, it goes through the gate.
     let confirmed = Action::UndoableOps {
         label: title,
         ops,
@@ -103,23 +106,39 @@ fn a_worktree_touching_the_fence_turns_red_and_its_merge_asks_first() -> Result<
         undo: crate::repo::Undo::None,
     };
     assert!(matches!(
-        tab.fence_gate(confirmed),
-        Action::UndoableOps { .. }
+        tab.fence_gate(confirmed, &ctx),
+        Some(Action::UndoableOps { .. })
     ));
+    // The same branch once its worktree is gone: its commits still ask.
+    tab.worktrees.retain(|w| w.main);
+    assert!(
+        tab.fence_gate(merge_action(BranchRef::local("agent/lock"), "main"), &ctx)
+            .is_none()
+    );
+    until(&mut tab, &ctx, |t| t.dialog.is_some())?;
+    tab.dialog = None;
+    tab.worktrees = git::worktrees(&dir, None)?;
+    // A branch that touched nothing: checked, then run with no question.
     run(&dir, &["branch", "other"])?;
-    let other = tab.fence_gate(merge_action(BranchRef::local("other"), "main"));
-    assert!(matches!(other, Action::UndoableOps { .. }));
-    let ff = tab.fence_gate(crate::repo::fast_forward_action(
-        BranchRef::local("agent/lock"),
-        "main",
-    ));
-    assert!(matches!(ff, Action::Dialog(_)));
+    assert!(
+        tab.fence_gate(merge_action(BranchRef::local("other"), "main"), &ctx)
+            .is_none()
+    );
+    until(&mut tab, &ctx, |t| {
+        t.busy_op.is_some() || t.status.is_none()
+    })?;
+    assert!(tab.dialog.is_none());
+    // A worktree that couldn't be checked is red too.
+    tab.fence.found.insert(wt_path.clone(), Err("lost".into()));
+    assert!(tab.fence.red(&wt_path));
+    tab.check_fence(&ctx);
+    until(&mut tab, &ctx, |t| !t.fence.checking)?;
 
     // The list emptied: the worktree is clean again.
     crate::fence::write(&dir, &[])?;
     tab.check_fence(&ctx);
     until(&mut tab, &ctx, |t| !t.fence.checking)?;
-    assert!(tab.fence.violations(&wt_path).is_empty());
+    assert!(tab.fence.violations(&wt_path).is_empty() && !tab.fence.red(&wt_path));
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::remove_dir_all(dir.with_extension("wt"));
     Ok(())
