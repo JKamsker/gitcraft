@@ -1,11 +1,19 @@
 //! Three-pane conflict editor: each conflict's "ours" and "theirs" side by side with buttons to
 //! pick a side (or both), and the resulting file below, editable by hand.
 
+mod keep_both;
+mod keep_both_view;
+mod original;
+mod original_view;
+#[cfg(test)]
+mod repo_tests;
 mod view;
 
 use std::path::Path;
 
 use crate::git::InProgress;
+
+pub use keep_both_view::KeepBoth;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Segment {
@@ -48,6 +56,8 @@ pub struct ConflictEditor {
     /// Being written on another machine, in the background: neither edited nor saved again
     /// until that is done, so an older save can't land after a newer one.
     pub saving: bool,
+    /// Each conflict's original (its base) and the cards that show it.
+    original: original::State,
 }
 
 /// Whether `line` (without its line ending) is git's `kind` conflict marker: exactly seven
@@ -308,6 +318,7 @@ impl ConflictEditor {
         Some(Self {
             path: path.to_owned(),
             choices: vec![None; conflicts],
+            original: original::State::new(&segments),
             segments,
             opened: text.clone(),
             result: text,
@@ -347,9 +358,23 @@ impl ConflictEditor {
         }
         self.choices = vec![None; left];
         self.segments = segments;
+        self.original.reset(&self.segments);
         self.result = text;
         self.manual = false;
         left
+    }
+
+    /// Whether the index is still to be asked for the bases of the conflicts.
+    pub fn wants_bases(&self) -> bool {
+        self.original.index == original::IndexBases::Loading
+    }
+
+    /// Asks the index of `repo` for the bases of the conflicts (blocking: in the background).
+    pub fn read_bases(&mut self, repo: &Path) {
+        if self.wants_bases() {
+            let bases = original::load(repo, &self.path);
+            self.original.set_index(bases, &self.segments);
+        }
     }
 
     fn choose(&mut self, k: usize, choice: Choice) {
@@ -487,6 +512,7 @@ mod tests {
             on_disk: 1,
             generation: 0,
             saving: false,
+            original: original::State::default(),
         };
         assert_eq!(ed.unresolved(), 1);
         ed.choose(0, Choice::Ours);
@@ -513,6 +539,7 @@ mod tests {
             on_disk: conflicts,
             generation: 0,
             saving: false,
+            original: original::State::default(),
         }
     }
 
