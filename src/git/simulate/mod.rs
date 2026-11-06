@@ -325,16 +325,18 @@ fn pick(repo: &Path, rev: &str) -> Result<Pick, String> {
 fn parse_picks(out: &str) -> Vec<Pick> {
     let fields: Vec<&str> = out.split('\0').collect();
     fields
-        .chunks_exact(3)
-        .filter_map(|record| {
-            let hash = record[0].trim().to_owned();
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .filter_map(|[hash, parents, summary]| {
+            let hash = hash.trim().to_owned();
             if hash.is_empty() {
                 return None;
             }
             Some(Pick {
                 hash,
-                parent: record[1].split_whitespace().next().map(str::to_owned),
-                summary: record[2].to_owned(),
+                parent: parents.split_whitespace().next().map(str::to_owned),
+                summary: (*summary).to_owned(),
             })
         })
         .collect()
