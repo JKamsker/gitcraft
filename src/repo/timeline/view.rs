@@ -41,6 +41,8 @@ pub(crate) enum TimelineAct {
     RemoveName(String),
     /// Play the later commits again on the new branch.
     RunRemove,
+    /// Ask before throwing away an attempt that stopped on a conflict (`false`: don't).
+    AskDiscard(bool),
     /// Throw away an attempt that stopped on a conflict.
     DiscardRemove,
     CloseRemove,
@@ -110,6 +112,7 @@ impl RepoTab {
             TimelineAct::AskRemove(id) => self.ask_remove(id, ctx),
             TimelineAct::RemoveName(name) => self.set_remove_name(name),
             TimelineAct::RunRemove => self.run_remove(ctx),
+            TimelineAct::AskDiscard(ask) => self.confirm_discard(ask),
             TimelineAct::DiscardRemove => self.discard_remove(ctx),
             TimelineAct::CloseRemove => view.remove = None,
             TimelineAct::AskForget(keep) => view.forget = Some(keep),

@@ -48,6 +48,8 @@ pub(crate) enum Outcome {
         files: Vec<String>,
         /// Later commits still to play after it.
         left: usize,
+        /// Where the new branch stopped: once it moved on, the worktree has work in it.
+        stopped_at: String,
     },
 }
 
@@ -75,6 +77,19 @@ pub(crate) fn plan(repo: &Path, entry: &Entry, now: &str) -> Result<Plan, String
     };
     if now.is_empty() {
         return Err(format!("{branch} doesn't exist any more"));
+    }
+    for commit in [&old, &new] {
+        if git::run(
+            Some(repo),
+            &["cat-file", "-e", &format!("{commit}^{{commit}}")],
+        )
+        .is_err()
+        {
+            return Err(format!(
+                "Commit {} isn't in the repository any more (collected by git gc)",
+                crate::repo::short(commit)
+            ));
+        }
     }
     if !is_ancestor(repo, &old, &new) {
         return Err(format!(
@@ -168,8 +183,12 @@ pub(crate) fn folder(repo: &Path, name: &str) -> (String, PathBuf) {
         .chars()
         .map(|c| if c == '/' || c == '\\' { '-' } else { c })
         .collect();
-    let arg = format!("../{base}-{safe}");
-    (arg.clone(), crate::remote::join(repo, &arg))
+    let folder = format!("{base}-{safe}");
+    let path = match repo.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => crate::remote::join(parent, &folder),
+        _ => crate::remote::join(repo, &format!("../{folder}")),
+    };
+    (format!("../{folder}"), path)
 }
 
 /// Plays `plan`'s later commits again on its branch as it was before the entry, on the new
@@ -177,11 +196,33 @@ pub(crate) fn folder(repo: &Path, name: &str) -> (String, PathBuf) {
 /// stays; stopped on a conflict, both stay, to resolve there.
 pub(crate) fn replay(repo: &Path, plan: &Plan, name: &str) -> Result<Outcome, String> {
     let (arg, path) = folder(repo, name);
-    git::run(
+    let tip = |rev: &str| {
+        git::run(Some(repo), &["rev-parse", "--verify", "-q", rev])
+            .map(|s| s.trim().to_owned())
+            .ok()
+    };
+    if tip(&format!("refs/heads/{name}")).is_some() {
+        return Err(format!("A branch {name} exists already: pick another name"));
+    }
+    // What was shown is what is played: commits made on the branch since would be left out.
+    if tip(&format!("refs/heads/{}", plan.branch)).as_deref() != Some(plan.now.as_str()) {
+        return Err(format!(
+            "{} has moved since this was worked out: ask again to see what would be played",
+            plan.branch
+        ));
+    }
+    if let Err(e) = git::run(
         Some(repo),
         &["worktree", "add", "-q", "-b", name, "--", &arg, &plan.old],
-    )
-    .map_err(|e| format!("The worktree to play the commits in couldn't be made: {e}"))?;
+    ) {
+        // git makes the branch before the folder (and a hook may fail after both): neither
+        // is left behind. The branch didn't exist before: it is this attempt's.
+        let _ = git::run(Some(repo), &["worktree", "remove", "--force", "--", &arg]);
+        let _ = git::run(Some(repo), &["branch", "-D", "--", name]);
+        return Err(format!(
+            "The worktree to play the commits in couldn't be made in {arg}: {e}"
+        ));
+    }
     let in_worktree = |args: &[&str]| -> Result<String, String> {
         let mut full = vec!["-C", arg.as_str()];
         full.extend_from_slice(args);
@@ -203,7 +244,8 @@ pub(crate) fn replay(repo: &Path, plan: &Plan, name: &str) -> Result<Outcome, St
                 .filter(|s| !s.is_empty());
             let Some(commit) = stopped else {
                 // Not a conflict: nothing is left behind.
-                let _ = discard(repo, &arg, name);
+                let _ = git::run(Some(repo), &["worktree", "remove", "--force", "--", &arg]);
+                let _ = git::run(Some(repo), &["branch", "-D", "--", name]);
                 return Err(format!("Playing the later commits again failed: {e}"));
             };
             let files = in_worktree(&["diff", "--name-only", "-z", "--diff-filter=U"])
@@ -212,6 +254,9 @@ pub(crate) fn replay(repo: &Path, plan: &Plan, name: &str) -> Result<Outcome, St
                 .filter(|f| !f.is_empty())
                 .map(str::to_owned)
                 .collect();
+            let stopped_at = in_worktree(&["rev-parse", "HEAD"])
+                .map(|s| s.trim().to_owned())
+                .unwrap_or_default();
             let summary = in_worktree(&["log", "-1", "--format=%s", &commit, "--"])
                 .map(|s| s.trim().to_owned())
                 .unwrap_or_default();
@@ -228,6 +273,7 @@ pub(crate) fn replay(repo: &Path, plan: &Plan, name: &str) -> Result<Outcome, St
                 summary,
                 files,
                 left,
+                stopped_at,
             });
         }
     }
@@ -241,8 +287,33 @@ pub(crate) fn replay(repo: &Path, plan: &Plan, name: &str) -> Result<Outcome, St
     })
 }
 
-/// Throws away an attempt that stopped on a conflict: its worktree and its branch.
-pub(crate) fn discard(repo: &Path, folder_arg: &str, name: &str) -> Result<(), String> {
+/// Throws away an attempt that stopped on a conflict: its worktree and its branch; unless work
+/// was done there since (the cherry-pick continued or given up, commits made), which this would
+/// throw away too.
+pub(crate) fn discard(
+    repo: &Path,
+    folder_arg: &str,
+    name: &str,
+    stopped_at: &str,
+) -> Result<(), String> {
+    let in_worktree = |args: &[&str]| {
+        let mut full = vec!["-C", folder_arg];
+        full.extend_from_slice(args);
+        git::run(Some(repo), &full).map(|s| s.trim().to_owned())
+    };
+    let picking = in_worktree(&["rev-parse", "--verify", "-q", "CHERRY_PICK_HEAD"]).is_ok();
+    let branch = git::run(
+        Some(repo),
+        &["rev-parse", "--verify", "-q", &format!("refs/heads/{name}")],
+    )
+    .map(|s| s.trim().to_owned())
+    .unwrap_or_default();
+    if !picking || branch != stopped_at {
+        return Err(format!(
+            "Work was done in {folder_arg} since (the cherry-pick went on, or commits were made): \
+             nothing is thrown away. Remove the worktree and {name} yourself if you don't want them"
+        ));
+    }
     git::run(
         Some(repo),
         &["worktree", "remove", "--force", "--", folder_arg],

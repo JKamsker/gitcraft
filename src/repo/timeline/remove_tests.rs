@@ -84,7 +84,7 @@ fn a_commit_in_the_middle_comes_out_and_the_later_one_stays() {
     assert!(one && !gone && kept);
     assert_eq!(main, three);
     assert_eq!(worktrees, 1, "the worktree it played in is left");
-    assert!(label.is_some_and(|l| l.starts_with("Remove “Commit “two””")));
+    assert!(label.is_some_and(|l| l.starts_with("Remove “Commit “two”” from main, as ")));
     assert!(after_undo.is_err());
 }
 
@@ -122,6 +122,7 @@ fn a_later_commit_that_conflicts_is_shown_and_can_be_discarded() {
         Some(&folder),
         &["rev-parse", "-q", "--verify", "CHERRY_PICK_HEAD"],
     );
+    tab.apply(Action::Timeline(TimelineAct::AskDiscard(true)), &ctx);
     act(&mut tab, &ctx, Action::Timeline(TimelineAct::DiscardRemove));
     let folder_left = folder.exists();
     let branch_left = git::resolve(&dir, &format!("refs/heads/{branch}"));
@@ -191,4 +192,72 @@ fn what_cannot_be_removed_says_why() {
     assert!(error(rewrite).contains("didn't only make commits"));
     assert!(error(merged).contains("merge commit"));
     assert!(error(gone).contains("aren't on main any more"));
+}
+
+/// Work done in the worktree after it stopped is not thrown away by Discard; and a branch
+/// moved since the plan was read, or a folder in the way, stop it before anything is left
+/// behind.
+#[test]
+fn nothing_is_lost_or_left_behind() {
+    let dir = repo("remove-safe");
+    let ctx = egui::Context::default();
+    let mut tab = open(&dir, &ctx);
+    commit(&mut tab, &ctx, "f.txt", "a");
+    commit(&mut tab, &ctx, "f.txt", "b");
+    let middle = tab.timeline.current.unwrap_or_default();
+    commit(&mut tab, &ctx, "f.txt", "c");
+    let _ = ask(&mut tab, &ctx, middle);
+    let Some(RemoveState::Finished {
+        outcome: Outcome::Conflict { branch, folder, .. },
+        ..
+    }) = run(&mut tab, &ctx)
+    else {
+        unreachable!("no conflict");
+    };
+    // Resolved there and continued.
+    let _ = std::fs::write(folder.join("f.txt"), "resolved\n");
+    git_ok(&folder, &["add", "f.txt"]);
+    git_ok(
+        &folder,
+        &["-c", "core.editor=true", "cherry-pick", "--continue"],
+    );
+    tab.apply(Action::Timeline(TimelineAct::AskDiscard(true)), &ctx);
+    act(&mut tab, &ctx, Action::Timeline(TimelineAct::DiscardRemove));
+    let refused = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    let kept = git::resolve(&dir, &format!("refs/heads/{branch}")).is_ok() && folder.exists();
+    let _ = git::run(
+        Some(&dir),
+        &["worktree", "remove", "--force", &folder.to_string_lossy()],
+    );
+    let _ = std::fs::remove_dir_all(&folder);
+
+    // The branch moves after the plan is read: nothing is made.
+    let _ = ask(&mut tab, &ctx, middle);
+    git_ok(&dir, &["commit", "-q", "--allow-empty", "-m", "since"]);
+    let moved = run(&mut tab, &ctx);
+    // A folder in the way: no branch is left behind.
+    tab.reload(&ctx);
+    assert!(wait(&mut tab, &ctx, settled));
+    let planned = ask(&mut tab, &ctx, middle);
+    let Some(RemoveState::Planned { name, .. }) = planned else {
+        unreachable!("{planned:?}");
+    };
+    let (_, in_the_way) = super::remove::folder(&dir, &name);
+    let _ = std::fs::create_dir_all(&in_the_way);
+    let _ = std::fs::write(in_the_way.join("x"), "x");
+    let blocked = run(&mut tab, &ctx);
+    let left = git::resolve(&dir, &format!("refs/heads/{name}"));
+    let _ = std::fs::remove_dir_all(&in_the_way);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(refused.contains("Work was done"), "{refused}");
+    assert!(kept);
+    assert!(
+        matches!(&moved, Some(RemoveState::Failed { error, .. }) if error.contains("has moved since")),
+        "{moved:?}"
+    );
+    assert!(
+        matches!(blocked, Some(RemoveState::Failed { .. })),
+        "{blocked:?}"
+    );
+    assert!(left.is_err(), "the branch was left behind");
 }

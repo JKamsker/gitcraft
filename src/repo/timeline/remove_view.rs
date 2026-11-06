@@ -68,7 +68,9 @@ impl RepoTab {
                     close_button(ui, acts);
                 }
                 RemoveState::Planned { plan, name } => planned(ui, plan, name, idle, acts),
-                RemoveState::Finished { outcome, .. } => finished(ui, outcome, idle, acts),
+                RemoveState::Finished {
+                    outcome, confirm, ..
+                } => finished(ui, outcome, *confirm, idle, acts),
             });
     }
 }
@@ -122,7 +124,7 @@ fn planned(ui: &mut Ui, plan: &Plan, name: &str, idle: bool, acts: &mut Vec<Acti
 }
 
 /// How it went, and what can be done next.
-fn finished(ui: &mut Ui, outcome: &Outcome, idle: bool, acts: &mut Vec<Action>) {
+fn finished(ui: &mut Ui, outcome: &Outcome, confirm: bool, idle: bool, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
     match outcome {
         Outcome::Done { branch, tip } => {
@@ -162,10 +164,17 @@ fn finished(ui: &mut Ui, outcome: &Outcome, idle: bool, acts: &mut Vec<Action>) 
                         .color(t.text_dim),
                 );
             }
+            if files.is_empty() {
+                ui.label(
+                    RichText::new("(no file is left unmerged: look in the worktree)")
+                        .color(t.text_faint),
+                );
+            }
             ui.label(
                 RichText::new(format!(
                     "{branch} has the commits before it, in the worktree {}. Resolve the \
-                     conflicts there and continue the cherry-pick{}.",
+                     conflicts there and continue the cherry-pick{}; once done, remove that \
+                     worktree from the sidebar (the branch stays).",
                     crate::remote::display(folder),
                     match left {
                         0 => String::new(),
@@ -176,17 +185,36 @@ fn finished(ui: &mut Ui, outcome: &Outcome, idle: bool, acts: &mut Vec<Action>) 
                 .size(12.0)
                 .color(t.text_dim),
             );
+            if confirm {
+                ui.label(
+                    RichText::new(format!(
+                        "Remove the worktree and the branch {branch}? Nothing is removed if work \
+                         was done there since."
+                    ))
+                    .color(t.text),
+                );
+                ui.horizontal(|ui| {
+                    if widgets::primary_button(ui, "Discard", idle, 80.0).clicked() {
+                        acts.push(Action::Timeline(TimelineAct::DiscardRemove));
+                    }
+                    if ui.button("Cancel").clicked() {
+                        acts.push(Action::Timeline(TimelineAct::AskDiscard(false)));
+                    }
+                });
+                return;
+            }
             ui.horizontal(|ui| {
                 if ui.button("Open the worktree").clicked() {
                     acts.push(Action::OpenWorktree(folder.clone()));
                 }
                 if ui
-                    .add_enabled(idle, egui::Button::new("Discard this attempt"))
+                    .add_enabled(idle, egui::Button::new("Discard this attempt…"))
                     .on_hover_text(format!("Removes the worktree and the branch {branch}"))
                     .clicked()
                 {
-                    acts.push(Action::Timeline(TimelineAct::DiscardRemove));
+                    acts.push(Action::Timeline(TimelineAct::AskDiscard(true)));
                 }
+                close_button(ui, acts);
             });
         }
     }
