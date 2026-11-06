@@ -6,7 +6,9 @@
 mod images;
 mod jump;
 mod lfs;
+pub(super) mod line_diff;
 mod map;
+mod notebook;
 mod paint;
 mod parse;
 mod patch;
@@ -72,6 +74,8 @@ pub struct DiffData {
     pub image: Option<ImagePair>,
     /// The file is kept in Git LFS: the objects before and after, shown instead of the lines.
     pub lfs: Option<LfsPair>,
+    /// A Jupyter notebook: its cells compared, shown instead of its JSON unless that is picked.
+    pub notebook: Option<notebook::NotebookData>,
     /// The patch's file header (`diff --git`, `index`, `---`, `+++`), for partial patches.
     pub header: String,
     /// Hunks and lines can be staged, unstaged or discarded on their own.
@@ -164,6 +168,9 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
     } else {
         None
     };
+    let notebook = (notebook::is_notebook(&path) && lfs.is_none())
+        .then(|| notebook::load(repo, key, &path, renamed_from(&text)))
+        .flatten();
     let mut spans = highlight_sides(&path, &lines, dark);
     let (mut changed, split) = pair_lines(&lines);
     let mut lines = lines;
@@ -188,6 +195,7 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         split,
         image,
         lfs,
+        notebook,
         header,
         partial,
         new_file,
