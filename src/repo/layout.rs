@@ -62,6 +62,7 @@ impl RepoTab {
             });
 
         self.dialogs(&ctx, &mut acts);
+        self.lfs_locks_ui(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
         }

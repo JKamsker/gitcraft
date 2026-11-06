@@ -120,6 +120,8 @@ pub(crate) enum Action {
     /// The commit pane lists every file of the commit, or only those it changed.
     ViewAllFiles(bool),
     SaveConflict,
+    /// Something done with the Git LFS file locks.
+    LfsLocks(super::lfs_locks::LockAct),
     /// Let Mergiraf solve what it can of the open conflict.
     SolveWithMergiraf,
     /// A file's history, blame or contents in the central pane (`rev`: the commit they are at).
@@ -392,6 +394,11 @@ impl RepoTab {
                     },
                 ));
             }
+            items.push((
+                "LFS: Locks…".into(),
+                "remote".into(),
+                Action::LfsLocks(super::lfs_locks::LockAct::OpenPanel),
+            ));
         }
         if !self.refs.head.is_empty() && self.ci_project().is_some() {
             items.push((
