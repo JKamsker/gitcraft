@@ -4,6 +4,7 @@ mod askpass_dialog;
 mod clone;
 mod handoff;
 mod home;
+mod launch;
 mod palette;
 mod panels;
 mod profiles;
@@ -123,11 +124,19 @@ pub struct App {
     /// The folders of the last repository tabs closed, the last one at the end.
     closed: Vec<PathBuf>,
     tab_drag: Option<TabDrag>,
+    /// What gitcraft was started for, being carried out.
+    launching: launch::Launching,
 }
 
 impl App {
     /// `open_arg`: a repository passed on the command line, opened (or focused) on start.
     pub fn new(cc: &eframe::CreationContext<'_>, open_arg: Option<PathBuf>) -> Self {
+        Self::launched(cc, open_arg.map(crate::launch::Command::Open))
+    }
+
+    /// The window, carrying out `cmd` from the command line (`gitcraft log <file>`…): its
+    /// relative paths are taken from the current folder.
+    pub fn launched(cc: &eframe::CreationContext<'_>, cmd: Option<crate::launch::Command>) -> Self {
         // The window's thread: it never waits for another machine (see `remote::ui_guard`).
         crate::remote::mark_ui_thread();
         // ssh's questions (passwords, new host keys) come to this window.
@@ -167,6 +176,7 @@ impl App {
             toasts: Vec::new(),
             closed: Vec::new(),
             tab_drag: None,
+            launching: Default::default(),
             error: None,
             was_focused: true,
             clone_form: None,
@@ -202,10 +212,11 @@ impl App {
             app.tabs.push(Tab::Home);
         }
         app.active = active_among_kept(&kept, saved.active).min(app.tabs.len() - 1);
-        if let Some(path) = open_arg
+        if let Some(cmd) = cmd
             && app.git_version.is_ok()
         {
-            app.open_repo(&path, ctx);
+            let cwd = std::env::current_dir().unwrap_or_default();
+            app.launch(cmd, cwd, ctx);
         }
         app
     }
@@ -487,6 +498,7 @@ impl eframe::App for App {
         }
         self.poll_clone(&ctx);
         self.poll_connecting(&ctx);
+        self.poll_launch(&ctx);
         self.poll_update(&ctx);
         self.notice_profile_git(&ctx);
         let focused = self.shortcuts(&ctx);
@@ -582,13 +594,7 @@ fn repo_scope(path: &Path) -> egui::Id {
 
 /// The top of the repository `path` is in, in the form tabs are told apart by.
 fn repo_root(path: &Path) -> Result<PathBuf, String> {
-    let root = git::toplevel(path)?;
-    // Already in its one form; resolving it here would mean nothing.
-    if crate::remote::is_remote(&root) {
-        return Ok(root);
-    }
-    let root = std::fs::canonicalize(&root).unwrap_or(root);
-    Ok(strip_verbatim(root))
+    crate::launch::resolve::repo_root(path)
 }
 
 /// When this process was started by ssh as its askpass program: asks the running app ssh's
@@ -615,10 +621,20 @@ pub fn warm_up() {
 
 pub use crate::instance::Start;
 
-/// Settles, before any window is made, whether this start opens the window or hands `open_arg`
-/// to the gitcraft already running (see `crate::instance`).
-pub fn single_instance(open_arg: Option<&Path>) -> Start {
-    crate::instance::start(open_arg)
+/// Settles, before any window is made, whether this start opens the window or hands what it was
+/// started for (a folder, or a command line such as `log <file>`) to the gitcraft already running
+/// (see `crate::instance`).
+pub fn single_instance(
+    launch: Option<&crate::launch::Command>,
+    args: &[std::ffi::OsString],
+) -> Start {
+    use crate::launch::Command;
+    match launch {
+        None => crate::instance::start(None),
+        Some(Command::Open(path)) => crate::instance::start(Some(path)),
+        // `log <file>`…: the command line as typed, read again by the running window.
+        Some(_) => crate::instance::start_launch(args),
+    }
 }
 
 /// Tells the user why this start ends without a window: in a dialog, and on stderr for a start
@@ -663,7 +679,7 @@ pub fn window_icon() -> egui::IconData {
 }
 
 /// `canonicalize` on Windows returns `\\?\C:\…`; show and store the familiar form.
-fn strip_verbatim(path: PathBuf) -> PathBuf {
+pub(crate) fn strip_verbatim(path: PathBuf) -> PathBuf {
     let s = path.to_string_lossy();
     match s.strip_prefix(r"\\?\") {
         Some(rest) if !rest.starts_with("UNC") => PathBuf::from(rest),

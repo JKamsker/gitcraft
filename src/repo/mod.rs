@@ -14,7 +14,7 @@ mod detail;
 mod dialogs;
 mod diff;
 mod file_text;
-mod file_view;
+pub(crate) mod file_view;
 pub(crate) mod graph_view;
 pub(crate) mod highlight;
 mod keep_submodules;
@@ -370,6 +370,12 @@ impl RepoTab {
         if std::mem::take(&mut self.deferred) {
             self.reload(ctx);
         }
+    }
+
+    /// The file whose history, blame or contents the big area shows, if one is.
+    #[cfg(test)]
+    pub(crate) fn file_view_path(&self) -> Option<String> {
+        self.file_view.as_ref().map(|v| v.path.clone())
     }
 
     /// Nothing read yet: the tab shows its opening screen.

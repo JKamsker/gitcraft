@@ -355,6 +355,21 @@ impl Settings {
                             "When a long operation ends in the background",
                         );
                     });
+                    if let Some(bundle) = crate::finder_actions::bundle() {
+                        card.row("Finder", "finder quick action services history blame menu", |ui| {
+                            if crate::finder_actions::installed() {
+                                if ui.button("Remove History and Blame").clicked() {
+                                    let _ = crate::finder_actions::uninstall();
+                                }
+                            } else if ui.button("Add History and Blame").clicked() {
+                                let _ = crate::finder_actions::install(&bundle);
+                            }
+                            layout::note(
+                                ui,
+                                "History in gitcraft and Blame in gitcraft in Finder's menu of files (Quick Actions)",
+                            );
+                        });
+                    }
                     if let Some(appimage) = crate::desktop_entry::appimage() {
                         card.row(
                             "Applications menu",

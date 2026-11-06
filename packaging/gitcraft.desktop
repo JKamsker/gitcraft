@@ -7,3 +7,12 @@ Terminal=false
 Categories=Development;RevisionControl;
 Icon=gitcraft
 StartupWMClass=gitcraft
+Actions=history;blame;
+
+[Desktop Action history]
+Name=History in gitcraft
+Exec=gitcraft log %f
+
+[Desktop Action blame]
+Name=Blame in gitcraft
+Exec=gitcraft blame -- %f

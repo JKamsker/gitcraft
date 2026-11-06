@@ -102,7 +102,16 @@ fn entry(appimage: &Path) -> String {
          Terminal=false\n\
          Categories=Development;RevisionControl;\n\
          Icon=gitcraft\n\
-         StartupWMClass=gitcraft\n",
+         StartupWMClass=gitcraft\n\
+         Actions=history;blame;\n\
+         \n\
+         [Desktop Action history]\n\
+         Name=History in gitcraft\n\
+         Exec={exec} log %f\n\
+         \n\
+         [Desktop Action blame]\n\
+         Name=Blame in gitcraft\n\
+         Exec={exec} blame -- %f\n",
         escape_value(&appimage.to_string_lossy())
     )
 }
@@ -158,6 +167,8 @@ mod tests {
         assert!(ok);
         assert!(text.contains("Exec=\"/opt/gitcraft-v0.2.0.AppImage\" %f\n"));
         assert!(text.contains("TryExec=/opt/gitcraft-v0.2.0.AppImage\n"));
+        assert!(text.contains("Exec=\"/opt/gitcraft-v0.2.0.AppImage\" log %f\n"));
+        assert!(text.contains("Exec=\"/opt/gitcraft-v0.2.0.AppImage\" blame -- %f\n"));
         assert_eq!(icon, ICON.len() as u64);
         assert_ne!(text, entry(Path::new("/opt/gitcraft-v0.2.1.AppImage")));
     }

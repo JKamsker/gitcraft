@@ -33,6 +33,11 @@ pub enum Request {
     /// Open (or switch to) the repository at this path, then come to the front: an absolute
     /// folder of this machine, or one elsewhere (`ssh://…`, `\\wsl.localhost\…`).
     Open(PathBuf),
+    /// Do what the command line `args` asks (`log <file>`, `blame <file>:<line>`, see
+    /// `crate::launch`), its relative paths read against `cwd`, the start's folder. Read
+    /// again on arrival, as the start read them: only a request `crate::launch` takes is
+    /// taken.
+    Launch { cwd: PathBuf, args: Vec<String> },
 }
 
 impl Request {
@@ -40,6 +45,7 @@ impl Request {
         match self {
             Request::Focus => "focus",
             Request::Open(_) => "open",
+            Request::Launch { .. } => "launch",
         }
     }
 }
@@ -69,8 +75,15 @@ pub enum Reply {
 /// `request` for the instance whose token is `token`, as the line sent.
 pub fn encode_request(token: &str, request: &Request) -> String {
     let mut value = json!({ "v": VERSION, "token": token, "kind": request.kind() });
-    if let (Request::Open(path), Some(object)) = (request, value.as_object_mut()) {
-        object.insert("path".to_owned(), path.to_string_lossy().into());
+    match (request, value.as_object_mut()) {
+        (Request::Open(path), Some(object)) => {
+            object.insert("path".to_owned(), path.to_string_lossy().into());
+        }
+        (Request::Launch { cwd, args }, Some(object)) => {
+            object.insert("cwd".to_owned(), cwd.to_string_lossy().into());
+            object.insert("args".to_owned(), args.clone().into());
+        }
+        _ => {}
     }
     format!("{value}\n")
 }
@@ -104,6 +117,20 @@ pub fn decode_request(line: &str, token: &str) -> Result<Request, Refusal> {
                 .map(Request::Open)
                 .map_err(Refusal::Unusable)
         }
+        Some("launch") => {
+            let cwd = object.get("cwd").and_then(Value::as_str).unwrap_or("");
+            let cwd = valid_path(cwd).map_err(Refusal::Unusable)?;
+            let args = object
+                .get("args")
+                .and_then(Value::as_array)
+                .ok_or_else(|| Refusal::Unusable("no command line".to_owned()))?
+                .iter()
+                .map(|a| a.as_str().map(str::to_owned))
+                .collect::<Option<Vec<String>>>()
+                .ok_or_else(|| Refusal::Unusable("the command line isn't text".to_owned()))?;
+            valid_args(&args).map_err(Refusal::Unusable)?;
+            Ok(Request::Launch { cwd, args })
+        }
         Some(kind) => Err(Refusal::Unusable(format!(
             "this gitcraft can't do \"{kind}\""
         ))),
@@ -129,6 +156,28 @@ pub fn valid_path(path: &str) -> Result<PathBuf, String> {
         return Err(format!("{path} is not an absolute path"));
     }
     Ok(parsed.to_owned())
+}
+
+/// The most arguments a command line handed over has (`blame -- <file>` is three).
+const MAX_ARGS: usize = 4;
+
+/// `args` as a command line to carry out: few, short, without control characters, and one
+/// that `crate::launch` reads as something to do.
+pub fn valid_args(args: &[String]) -> Result<(), String> {
+    if args.is_empty() || args.len() > MAX_ARGS {
+        return Err("not a command line gitcraft takes".to_owned());
+    }
+    if args
+        .iter()
+        .any(|a| a.len() > MAX_PATH || a.chars().any(char::is_control))
+    {
+        return Err("the command line has control characters or is too long".to_owned());
+    }
+    match crate::launch::parse(args.iter().map(std::ffi::OsString::from)) {
+        crate::launch::Parsed::Run(Some(_)) => Ok(()),
+        crate::launch::Parsed::Fail(why) => Err(why),
+        _ => Err("not a command line gitcraft takes".to_owned()),
+    }
 }
 
 /// `reply` as the line sent.
@@ -178,6 +227,10 @@ mod tests {
             Request::Focus,
             Request::Open(absolute()),
             Request::Open(PathBuf::from("ssh://build/home/me/app")),
+            Request::Launch {
+                cwd: absolute(),
+                args: vec!["blame".into(), "src/my file ü.rs:40".into()],
+            },
         ] {
             let line = encode_request(TOKEN, &request);
             assert!(line.ends_with('\n') && line.matches('\n').count() == 1);
@@ -193,6 +246,38 @@ mod tests {
             decode_request(&line, TOKEN),
             Err(Refusal::Unusable(_))
         ));
+    }
+
+    #[test]
+    fn a_command_line_is_taken_only_as_gitcraft_reads_one() {
+        let launch = |cwd: &str, args: &[&str]| {
+            let line = encode_request(
+                TOKEN,
+                &Request::Launch {
+                    cwd: PathBuf::from(cwd),
+                    args: args.iter().map(|a| (*a).to_owned()).collect(),
+                },
+            );
+            decode_request(&line, TOKEN)
+        };
+        let cwd = absolute();
+        let cwd = cwd.to_string_lossy();
+        assert!(launch(&cwd, &["log", "a.rs"]).is_ok());
+        // Refused: a revision git would take for an option, a relative folder, no command,
+        // too many arguments, a line break.
+        for (cwd, args) in [
+            (&*cwd, &["show", "--output=/tmp/x"][..]),
+            ("relative/dir", &["log", "a.rs"]),
+            (&*cwd, &[]),
+            (&*cwd, &["log", "a", "b", "c", "d"]),
+            (&*cwd, &["log", "a\nb"]),
+            (&*cwd, &["--frobnicate"]),
+        ] {
+            assert!(
+                matches!(launch(cwd, args), Err(Refusal::Unusable(_))),
+                "{cwd} {args:?}"
+            );
+        }
     }
 
     #[test]
