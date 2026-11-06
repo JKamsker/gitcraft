@@ -88,9 +88,11 @@ impl RepoTab {
         self.drop_zone_with(ui, &payload, band, &target, offers, hovered, acts);
     }
 
-    /// While something is dragged with the pointer near the top or bottom of the graph's
-    /// visible part (`ui` being the scrolled list), scrolls that way, faster nearer the edge.
-    pub(super) fn drag_auto_scroll(&self, ui: &Ui) {
+    /// While something is dragged with the pointer near the top or bottom of the visible part
+    /// of a scrolled list (`ui`: the graph's, the left pane's), scrolls that way, faster nearer
+    /// the edge. egui leaves the mouse wheel alone during a drag, so this is how a target out
+    /// of sight is reached.
+    pub(in crate::repo) fn drag_auto_scroll(&self, ui: &Ui) {
         if self.dragged(ui.ctx()).is_none() {
             return;
         }

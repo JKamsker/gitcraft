@@ -67,13 +67,15 @@ impl RepoTab {
             [pos2(end, mid), pos2(node_x.min(gx + cols.graph), mid)],
             Stroke::new(1.5, row.color.gamma_multiply(0.8)),
         );
-        let stack_open = more_rect.is_some_and(|more| {
-            let at = pos2(rect.left() + 2.0, mid - 16.0);
-            self.ref_stack(ui, &badges, row.i, more, at, cols, row.color, acts)
-        });
+        // Not during a drag: the list would cover the rows below, which then take no drop.
+        let dragging = self.dragged(ui.ctx()).is_some();
+        let stack_open = !dragging
+            && more_rect.is_some_and(|more| {
+                let at = pos2(rect.left() + 2.0, mid - 16.0);
+                self.ref_stack(ui, &badges, row.i, more, at, cols, row.color, acts)
+            });
         let refs_cell = Rect::from_min_max(rect.min, pos2(gx, rect.bottom()));
         // No tooltip in the way of a drag.
-        let dragging = self.dragged(ui.ctx()).is_some();
         if !stack_open && !dragging && ui.rect_contains_pointer(refs_cell) {
             let lines: Vec<String> = badges.iter().map(Badge::describe).collect();
             let drag = if first.kind == BadgeKind::Branch {

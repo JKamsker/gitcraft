@@ -176,13 +176,15 @@ impl RepoTab {
                     }
                 });
             });
+        // Esc closes it also while a text field has the keys, which the tab's shortcuts skip.
+        let esc = ctx.input(|i| i.key_pressed(egui::Key::Escape));
         let pressed_elsewhere = ctx.input(|i| {
             i.pointer.any_pressed()
                 && i.pointer
                     .interact_pos()
                     .is_some_and(|p| !shown.response.rect.contains(p))
         });
-        if chosen || pressed_elsewhere {
+        if chosen || pressed_elsewhere || esc {
             self.drop_menu = None;
         }
     }
@@ -206,5 +208,60 @@ fn item_icon(ui: &mut Ui, item: &DragItem, t: &Tokens) {
                 Stroke::new(2.0, t.icon),
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::repo::drag_drop::{DragBranch, Rev};
+
+    /// Esc closes the drop menu even while a text field has the keys (the tab's shortcuts
+    /// then don't see it).
+    #[test]
+    fn escape_closes_the_drop_menu() {
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let mut tab = RepoTab::new_deferred("/nonexistent/drop-menu-test".into(), &ctx);
+        let feature = DragBranch {
+            name: "feature".into(),
+            remote: false,
+            tip: "f".repeat(40),
+        };
+        let offer = Offer::Merge {
+            from: Rev::Branch {
+                name: "feature".into(),
+                remote: false,
+            },
+            into: "main".into(),
+        };
+        tab.drop_menu = Some(DropMenu::new(
+            Pos2::new(100.0, 100.0),
+            &DragItem::Branch(feature.clone()),
+            &DropTarget::Branch(feature),
+            vec![offer],
+        ));
+        let frame = |tab: &mut RepoTab, events: Vec<egui::Event>| {
+            let input = egui::RawInput {
+                events,
+                ..Default::default()
+            };
+            ctx.run_ui(input, |ui| tab.drag_overlay(ui.ctx(), &mut Vec::new()))
+                .drop_without_applying_deltas();
+        };
+        frame(&mut tab, Vec::new());
+        let open = tab.drop_menu.is_some();
+        frame(
+            &mut tab,
+            vec![egui::Event::Key {
+                key: egui::Key::Escape,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: egui::Modifiers::NONE,
+            }],
+        );
+        assert!(open);
+        assert!(tab.drop_menu.is_none());
     }
 }
