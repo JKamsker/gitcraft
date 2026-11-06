@@ -200,7 +200,7 @@ impl RepoTab {
                     None,
                 )
                 .preview_of(
-                    self.delete_preview(&b.target, vec![format!("refs/remotes/{}", b.name)]),
+                    self.delete_preview(&[&b.target], vec![format!("refs/remotes/{}", b.name)]),
                 ),
             ));
         }

@@ -192,14 +192,15 @@ impl RepoTab {
         let short = short(hash);
         let described = vec![
             format!("git rebase -i --autostash {short}^"),
-            format!("    drop {short} {}", commit.summary),
+            format!("todo: drop {short} {}", commit.summary),
         ];
         Action::Dialog(
             Dialog::confirm(
                 "Drop commit",
                 format!(
                     "Remove {short} ({}) and its changes from {branch}? The commits after it \
-                     are made again on top of its parent.",
+                     are replayed on its parent; if one conflicts, the rebase stops for you to \
+                     resolve it.",
                     commit.summary
                 ),
                 "Drop",

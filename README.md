@@ -158,11 +158,12 @@ so your config, credentials and hooks apply as usual.
 - Undo / redo (Ctrl+Z / Ctrl+Y) of commits, amends, merges, rebases, pulls, resets,
   cherry-picks, reverts, checkouts, branch create / rename / delete, tags and stashes.
 - _What will this do_: before a reset, deleting a branch (here, on the remote or both),
-  dropping a commit or discarding a file, the dialog lists the commits leaving the branch, each
-  marked _still on x_ or _only here_; the uncommitted files that will be lost; _already pushed,
-  a force push will be needed_ when the commits are on the upstream; the git commands it runs,
-  folded; and _Ctrl+Z restores this_ when undo covers it. It is read in the background (also
-  for repositories in WSL or over SSH), long lists end with _and 340 more_.
+  dropping a commit or discarding a file, the dialog lists the commits leaving the branch (for a
+  delete, those the checked-out branch hasn't), each marked _still on x_ or _only here_; the
+  files whose uncommitted changes will be lost; that a force push will be needed when the
+  commits rewritten are already on the upstream; the git commands it runs, folded; and
+  _Ctrl+Z restores this_ when undo covers it. It is read in the background (also for
+  repositories in WSL or over SSH); long lists end with _and 340 more_.
 
 **Diffs and conflicts** (centre)
 
@@ -389,7 +390,8 @@ was made this way, on a demo repository.
 | `src/repo/rebase.rs`     | interactive rebase editor and its todo list                                        |
 | `src/repo/file_view.rs`  | a file's history, blame and contents at a commit                                   |
 | `src/repo/file_text.rs`  | a whole file at a commit, coloured, for the file view and diffs                    |
-| `src/repo/dialogs.rs`    | branch, tag, stash, remote, worktree, pull request and confirm dialogs (with what a destructive operation will do) |
+| `src/repo/dialogs.rs`    | branch, tag, stash, remote, worktree, pull request and confirm dialogs             |
+| `src/git/preview.rs`     | what a destructive operation would change, read before it runs                     |
 | `src/repo/widgets.rs`    | shared painted widgets (panel headers, file rows, avatars, tabs)                   |
 | `src/app.rs`             | window shell: tabs, start page, cloning, palette, settings, toasts                 |
 

@@ -152,6 +152,14 @@ impl Dialog {
         self
     }
 
+    /// What the preview calls the files lost (`Unstaged changes lost`).
+    pub fn files_heading(mut self, heading: &str) -> Self {
+        if let Dialog::Confirm { preview, .. } = &mut self {
+            heading.clone_into(&mut preview.files_heading);
+        }
+        self
+    }
+
     /// [`Self::preview`] of an (ask, heading) pair.
     pub fn preview_of(self, (ask, heading): (crate::git::PreviewAsk, String)) -> Self {
         self.preview(ask, heading)

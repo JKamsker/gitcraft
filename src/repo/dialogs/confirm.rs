@@ -42,7 +42,7 @@ pub(super) fn confirm(
         _ => asked.ops,
     };
     let described = preview.instead.as_ref().map(|i| i.described.as_slice());
-    preview::commands(ui, steps, described);
+    preview::commands(ui, asked.title, steps, described);
     preview::undo_note(ui, asked.undo, preview);
     ui.add_space(14.0);
     let mut outcome = Outcome::Open;
