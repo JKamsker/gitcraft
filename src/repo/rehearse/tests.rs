@@ -181,3 +181,50 @@ fn applying_after_a_branch_moved_is_refused() -> Result<(), String> {
     assert!(tab.rehearsing.run.is_some());
     Ok(())
 }
+
+/// Uncommitted changes: the rehearsal was of the commits alone, so applying refuses.
+#[test]
+fn applying_with_uncommitted_changes_is_refused() -> Result<(), String> {
+    let ctx = egui::Context::default();
+    let repo = diverged("dirty", false)?;
+    let mut tab = open(&repo, &ctx)?;
+    act(&mut tab, &ctx, both(None))?;
+    let tip = repo.rev("feature")?;
+    std::fs::write(repo.path().join("f.txt"), "changed\n").map_err(|e| e.to_string())?;
+    tab.reload(&ctx);
+    settle(&mut tab, &ctx)?;
+    act(&mut tab, &ctx, RehearseAct::Apply(RehearseKind::Rebase))?;
+    let (said, bad) = tab.status.clone().ok_or("nothing said")?;
+    assert!(bad);
+    assert!(
+        said.starts_with("Commit or stash your changes first"),
+        "{said}"
+    );
+    assert_eq!(repo.rev("feature")?, tip);
+    assert!(tab.rehearsing.run.is_some());
+    Ok(())
+}
+
+/// The window closed while an apply is checked: it stays until the answer, which then acts
+/// on its own rehearsal only.
+#[test]
+fn an_apply_being_checked_keeps_its_window() -> Result<(), String> {
+    let ctx = egui::Context::default();
+    let repo = diverged("closing", false)?;
+    let mut tab = open(&repo, &ctx)?;
+    act(&mut tab, &ctx, both(None))?;
+    tab.apply(
+        Action::Rehearse(RehearseAct::Apply(RehearseKind::Merge)),
+        &ctx,
+    );
+    tab.apply(Action::Rehearse(RehearseAct::Close), &ctx);
+    assert!(tab.rehearsing.run.is_some());
+    settle(&mut tab, &ctx)?;
+    // It merged.
+    assert_eq!(
+        repo.git(&["rev-list", "--count", "--min-parents=2", "feature"])?
+            .trim(),
+        "1"
+    );
+    Ok(())
+}

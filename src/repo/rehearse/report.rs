@@ -12,13 +12,17 @@ pub(crate) fn heading(kind: RehearseKind, branch: &str, other: &str) -> String {
     }
 }
 
-/// How it went: `Stops at commit 3 of 5 (1a2b3c4d Parse headers): 2 conflicts`.
-pub(crate) fn played_line(played: &Played) -> String {
+/// How the `kind` went: `Stops at commit 3 of 5 (1a2b3c4d Parse headers): 2 conflicts`.
+pub(crate) fn played_line(kind: RehearseKind, played: &Played) -> String {
     match played {
         Played::UpToDate => "Nothing to do: the branch has it all already".to_owned(),
         Played::FastForward { tip, .. } => {
             format!("Goes through: a fast-forward to {}", short(tip))
         }
+        Played::Clean { commits, .. } if kind == RehearseKind::Merge => match commits {
+            1 => "Goes through cleanly: a merge commit, bringing in 1 commit".to_owned(),
+            n => format!("Goes through cleanly: a merge commit, bringing in {n} commits"),
+        },
         Played::Clean { commits, .. } => match commits {
             0 => "Goes through: the branch moves onto it, no commit to replay".to_owned(),
             1 => "Goes through cleanly: 1 commit".to_owned(),
@@ -115,7 +119,7 @@ mod tests {
             conflicts: vec!["a".into(), "b".into()],
         };
         assert_eq!(
-            played_line(&stopped),
+            played_line(RehearseKind::Rebase, &stopped),
             "Stops at commit 7 of 12 (01234567 Parse headers): 2 conflicts"
         );
         let merge = Played::Stopped {
@@ -125,7 +129,21 @@ mod tests {
             summary: String::new(),
             conflicts: vec!["ü x.txt".into()],
         };
-        assert_eq!(played_line(&merge), "Stops with 1 conflict");
+        assert_eq!(
+            played_line(RehearseKind::Merge, &merge),
+            "Stops with 1 conflict"
+        );
+        assert_eq!(
+            played_line(
+                RehearseKind::Merge,
+                &Played::Clean {
+                    tip: "t".into(),
+                    tree: "x".into(),
+                    commits: 4
+                }
+            ),
+            "Goes through cleanly: a merge commit, bringing in 4 commits"
+        );
     }
 
     #[test]
@@ -135,11 +153,20 @@ mod tests {
             tree: "x".into(),
             commits,
         };
-        assert_eq!(played_line(&clean(1)), "Goes through cleanly: 1 commit");
-        assert_eq!(played_line(&clean(12)), "Goes through cleanly: 12 commits");
-        assert!(played_line(&clean(0)).contains("no commit to replay"));
-        assert!(played_line(&Played::UpToDate).starts_with("Nothing to do"));
-        assert_eq!(played_line(&Played::Failed("hook".into())), "Fails: hook");
+        assert_eq!(
+            played_line(RehearseKind::Rebase, &clean(1)),
+            "Goes through cleanly: 1 commit"
+        );
+        assert_eq!(
+            played_line(RehearseKind::Rebase, &clean(12)),
+            "Goes through cleanly: 12 commits"
+        );
+        assert!(played_line(RehearseKind::Rebase, &clean(0)).contains("no commit to replay"));
+        assert!(played_line(RehearseKind::Rebase, &Played::UpToDate).starts_with("Nothing to do"));
+        assert_eq!(
+            played_line(RehearseKind::Rebase, &Played::Failed("hook".into())),
+            "Fails: hook"
+        );
     }
 
     #[test]

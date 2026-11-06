@@ -37,7 +37,8 @@ pub enum Played {
     UpToDate,
     /// The merge only moves the branch forward, to `tip`.
     FastForward { tip: String, tree: String },
-    /// It went through: the branch would be at `tip`, `commits` replayed (1 for a merge).
+    /// It went through: the branch would be at `tip`, `commits` replayed (for a merge: the
+    /// commits it brings in, besides the merge commit).
     Clean {
         tip: String,
         tree: String,
@@ -92,9 +93,14 @@ pub struct Rehearsal {
     pub tested: Option<Tested>,
 }
 
-/// What scratch commits are made with: never signed (no key prompt for a rehearsal), never
-/// with an editor.
-const SCRATCH_CONFIG: [&str; 2] = ["-c", "commit.gpgSign=false"];
+/// What scratch commits are made with: never signed (no key prompt for a rehearsal), and a
+/// rebase never moves other branches along (`rebase.updateRefs`): the refs are the user's.
+const SCRATCH_CONFIG: [&str; 4] = [
+    "-c",
+    "commit.gpgSign=false",
+    "-c",
+    "rebase.updateRefs=false",
+];
 
 /// Who scratch commits are made as when git knows nobody.
 const FALLBACK_IDENTITY: [&str; 4] = [
@@ -124,7 +130,8 @@ pub fn rehearse(repo: &Path, spec: &RehearseSpec, stop: &RunStop) -> Result<Rehe
         .as_deref()
         .filter(|c| !c.trim().is_empty())
         .map(|command| test_result(repo, &scratch.path, command, &played, stop));
-    scratch.remove()?;
+    // A worktree that couldn't be removed doesn't make the rehearsal's finding any less true.
+    let _ = scratch.remove();
     if stop.stopped() {
         return Err("stopped".to_owned());
     }
@@ -295,7 +302,15 @@ fn play_merge(dir: &Path, pre: &[&str], tip: &str, other: &str) -> Played {
             Ok(tree) => Played::FastForward { tip: head, tree },
             Err(e) => Played::Failed(e),
         },
-        Ok(_) => clean(dir, &head, tip),
+        // The merge commit itself is not one it brings in.
+        Ok(_) => match clean(dir, &head, tip) {
+            Played::Clean { tip, tree, commits } => Played::Clean {
+                tip,
+                tree,
+                commits: commits.saturating_sub(1),
+            },
+            other => other,
+        },
         Err(e) => {
             let conflicts = conflicts(dir);
             if conflicts.is_empty() {
@@ -368,6 +383,14 @@ fn short(hash: &str) -> &str {
 /// else what moved, said for the user.
 pub fn unmoved(repo: &Path, rehearsal: &Rehearsal) -> Result<(), String> {
     let spec = &rehearsal.spec;
+    // The operation acts on what is checked out: it must still be the branch rehearsed.
+    let head = crate::git::run(Some(repo), &["symbolic-ref", "-q", "HEAD"]).unwrap_or_default();
+    if head.trim() != spec.branch {
+        return Err(format!(
+            "{} is no longer checked out: rehearse again",
+            short_ref(&spec.branch)
+        ));
+    }
     for (rev, then) in [
         (&spec.branch, &rehearsal.branch_tip),
         (&spec.other, &rehearsal.other_tip),
