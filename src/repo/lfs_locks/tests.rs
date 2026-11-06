@@ -145,15 +145,18 @@ fn banners_name_the_right_files() {
 }
 
 /// Polls the tab, as its frames do, until `done` holds (or some seconds pass).
-fn wait(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&RepoTab) -> bool) {
-    for _ in 0..400 {
+/// Polls the tab until `done`, for up to 30 s (git-lfs is slow on Windows runners); whether
+/// it got there.
+fn wait(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&RepoTab) -> bool) -> bool {
+    for _ in 0..1200 {
         tab.poll(ctx);
         tab.lfs_locks_tick(ctx);
         if done(tab) {
-            return;
+            return true;
         }
         std::thread::sleep(std::time::Duration::from_millis(25));
     }
+    false
 }
 
 fn idle(tab: &RepoTab) -> bool {
@@ -244,7 +247,17 @@ fn locks_in_the_tab() -> Result<(), String> {
     wait(&mut tab, &ctx, |t| t.work_read != before);
     tab.locks_after_push("Push tag v1", &ctx);
     tab.locks_after_push("Push", &ctx);
-    wait(&mut tab, &ctx, |t| idle(t) && !t.lfs_locks.offer.is_empty());
+    let offered = wait(&mut tab, &ctx, |t| idle(t) && !t.lfs_locks.offer.is_empty());
+    let changed: Vec<&str> = tab.changed_files().map(|f| f.path.as_str()).collect();
+    assert!(
+        offered,
+        "no offer after the push: pushed {:?}, changed {changed:?}, locks {:?}, error {:?}, status {:?}, pushed by git {:?}",
+        tab.lfs_locks.pushed,
+        tab.lfs_locks.locks,
+        tab.lfs_locks.error,
+        tab.status,
+        git::pushed_paths(&dir)
+    );
     let offered: Vec<String> = tab.lfs_locks.offer.iter().map(|l| l.path.clone()).collect();
     assert_eq!(offered, ["mine.psd"]);
     let locks = tab
