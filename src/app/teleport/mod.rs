@@ -10,7 +10,7 @@ use std::sync::mpsc::{Receiver, TryRecvError, channel};
 use super::panels::Toast;
 use super::{App, Tab};
 use crate::remote;
-use crate::teleport::{self, Destination, Job, Landed, Machine, Plan, Source};
+use crate::teleport::{self, Destination, Failed, Job, Landed, Machine, Plan, Source};
 
 /// Where on the picked machine the work goes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -71,7 +71,7 @@ impl<T> Loading<T> {
 /// A teleport under way.
 struct Running {
     job: Arc<Job>,
-    rx: Receiver<Result<Landed, String>>,
+    rx: Receiver<Result<Landed, Failed>>,
     machine: Machine,
 }
 
@@ -83,12 +83,18 @@ pub(super) struct TeleportForm {
     distros: Option<Receiver<Vec<String>>>,
     wsl: Vec<String>,
     ssh_hosts: Vec<String>,
+    /// An SSH host typed (one not in `~/.ssh/config`).
+    typed_host: String,
     /// Folders known on any machine (recent and open repositories), where clones are looked for.
     known: Vec<PathBuf>,
     machine: Option<Machine>,
+    /// The picked machine's home folder, where a clone or a new repository goes by default.
+    home: Loading<String>,
     /// The clones of the project found on `machine`.
     clones: Loading<Vec<PathBuf>>,
     place: Place,
+    /// The user picked the place: the clones found later don't change it.
+    place_picked: bool,
     /// Paths on the picked machine, as typed.
     other_repo: String,
     new_repo: String,
@@ -117,10 +123,13 @@ impl TeleportForm {
             distros: Some(rx),
             wsl: Vec::new(),
             ssh_hosts: remote::ssh_config_hosts(),
+            typed_host: String::new(),
             known,
             machine: None,
+            home: Loading::Ready(String::new()),
             clones: Loading::Ready(Vec::new()),
             place: Place::Create,
+            place_picked: false,
             other_repo: String::new(),
             new_repo: String::new(),
             clone_url: String::new(),
@@ -132,7 +141,8 @@ impl TeleportForm {
         }
     }
 
-    /// Takes in what the background answered: the source, the distributions, the clones.
+    /// Takes in what the background answered: the source, the distributions, the machine's
+    /// home, the clones.
     fn poll(&mut self) {
         let was_waiting = matches!(self.info, Loading::Waiting(_));
         self.info.poll();
@@ -152,10 +162,18 @@ impl TeleportForm {
             self.wsl = distros;
             self.distros = None;
         }
+        let was_asking = matches!(self.home, Loading::Waiting(_));
+        self.home.poll();
+        if was_asking && let Some(home) = self.home.ready() {
+            if self.new_repo.is_empty() {
+                self.new_repo = join_there(self.machine.as_ref(), home, &self.project_name());
+            }
+            self.derive_folder();
+        }
         let was_looking = matches!(self.clones, Loading::Waiting(_));
         self.clones.poll();
         if was_looking {
-            if self.clones.ready().is_some_and(|c| !c.is_empty()) {
+            if !self.place_picked && self.clones.ready().is_some_and(|c| !c.is_empty()) {
                 self.place = Place::Found(0);
             }
             self.derive_folder();
@@ -167,8 +185,25 @@ impl TeleportForm {
         teleport::machines(&self.source, &self.wsl, &self.ssh_hosts, &self.known)
     }
 
+    /// Whether the background is still finding something the form needs.
+    fn looking(&self) -> bool {
+        matches!(self.clones, Loading::Waiting(_)) || matches!(self.home, Loading::Waiting(_))
+    }
+
+    /// The project's name, for a clone or a new repository: the remote's, else the folder's.
+    fn project_name(&self) -> String {
+        let from_url = crate::git::clone_dir_name(&self.clone_url);
+        if !from_url.is_empty() {
+            return from_url;
+        }
+        self.source.file_name().map_or_else(
+            || "repository".to_owned(),
+            |n| n.to_string_lossy().into_owned(),
+        )
+    }
+
     /// Picks `machine`: the clones of the project there are looked for among the folders known
-    /// on it, and the paths offered are of that machine.
+    /// on it, its home folder is asked, and the paths offered are of that machine.
     fn pick(&mut self, machine: Machine, ctx: &egui::Context) {
         if self.machine.as_ref() == Some(&machine) {
             return;
@@ -185,21 +220,15 @@ impl TeleportForm {
             .map(|i| i.remotes.iter().map(|(_, url)| url.clone()).collect())
             .unwrap_or_default();
         self.clones = Loading::start(ctx, move || Ok(teleport::find_clones(&candidates, &urls)));
+        let asked = machine.clone();
+        self.home = Loading::start(ctx, move || teleport::home_of(&asked));
         self.place = if self.clone_url.is_empty() {
             Place::Create
         } else {
             Place::Clone
         };
-        let name = self.source.file_name().map_or_else(
-            || "repository".to_owned(),
-            |n| n.to_string_lossy().into_owned(),
-        );
-        self.new_repo = match &machine {
-            Machine::There(_) => format!("~/{name}"),
-            Machine::Here => home_dir()
-                .map(|h| h.join(&name).display().to_string())
-                .unwrap_or(name),
-        };
+        self.place_picked = false;
+        self.new_repo.clear();
         self.other_repo.clear();
         self.folder_edited = false;
         self.error = None;
@@ -236,46 +265,61 @@ impl TeleportForm {
             .unwrap_or_default();
     }
 
-    /// The plan the form says, or why it says none.
-    fn plan(&self) -> Result<Plan, String> {
+    /// `typed` (a field of the form, `what` it is) as a folder of the picked machine, or why it
+    /// isn't one: a full path there; `~/…` over SSH, where the home folder is asked for it.
+    fn folder_there(&self, typed: &str, what: &str) -> Result<PathBuf, String> {
         let machine = self
             .machine
             .as_ref()
             .ok_or("Pick a machine to teleport to.")?;
-        let there = |s: &str, what: &str| -> Result<PathBuf, String> {
-            let s = s.trim();
-            let fits = match machine {
-                Machine::There(_) => s.starts_with('/') || s == "~" || s.starts_with("~/"),
-                Machine::Here => !s.is_empty() && !remote::is_remote(Path::new(s)),
-            };
-            if fits {
-                Ok(machine.path(s))
-            } else {
-                Err(match machine {
-                    Machine::There(_) => {
-                        format!(
-                            "{what} is a path on {}: /home/me/x or ~/x.",
-                            machine.label()
-                        )
-                    }
-                    Machine::Here => format!("{what} is a folder of this machine."),
-                })
+        let s = typed.trim();
+        if s.is_empty() {
+            return Err(format!("Type a folder for {what}."));
+        }
+        let fits = match machine {
+            Machine::There(remote::Host::Ssh(_)) => {
+                s.starts_with('/') || s == "~" || s.starts_with("~/")
             }
+            Machine::There(remote::Host::Wsl(_)) => s.starts_with('/'),
+            Machine::Here => Path::new(s).is_absolute() && !remote::is_remote(Path::new(s)),
         };
+        if fits {
+            return Ok(machine.path(s));
+        }
+        Err(match machine {
+            Machine::There(remote::Host::Ssh(_)) => format!(
+                "Give {what} as a full path on {}: /home/me/x or ~/x.",
+                machine.label()
+            ),
+            Machine::There(remote::Host::Wsl(_)) => format!(
+                "Give {what} as a full path on {}: /home/me/x.",
+                machine.label()
+            ),
+            Machine::Here => format!("Give {what} as a full path on this machine."),
+        })
+    }
+
+    /// The plan the form says, or why it says none.
+    fn plan(&self) -> Result<Plan, String> {
         let destination = match self.place {
-            Place::Found(_) | Place::Other => {
-                let repo = self.repo_path().ok_or("Name the repository there.")?;
-                Destination::Repo(repo)
+            Place::Found(_) => Destination::Repo(
+                self.repo_path()
+                    .ok_or("Pick the repository the work goes in.")?,
+            ),
+            Place::Other => {
+                Destination::Repo(self.folder_there(&self.other_repo, "the repository there")?)
             }
             Place::Clone => Destination::Clone {
                 url: self.clone_url.trim().to_owned(),
-                path: there(&self.new_repo, "The clone's folder")?,
+                path: self.folder_there(&self.new_repo, "the clone")?,
             },
-            Place::Create => Destination::Create(there(&self.new_repo, "The new repository")?),
+            Place::Create => {
+                Destination::Create(self.folder_there(&self.new_repo, "the new repository")?)
+            }
         };
         let folder = match self.place {
             Place::Create => PathBuf::new(),
-            _ => there(&self.folder, "The new worktree")?,
+            _ => self.folder_there(&self.folder, "the new worktree")?,
         };
         let branch = self.branch.trim();
         Ok(Plan {
@@ -287,9 +331,15 @@ impl TeleportForm {
         })
     }
 
+    /// Whether Teleport can be pressed: the source is read, a machine picked, and what the
+    /// form waits for (the clones there, its home folder) has come.
+    fn can_start(&self) -> bool {
+        self.info.ready().is_some() && self.machine.is_some() && !self.looking()
+    }
+
     /// Starts the teleport the form says, in the background.
     fn start(&mut self, ctx: &egui::Context) {
-        if self.running.is_some() {
+        if self.running.is_some() || !self.can_start() {
             return;
         }
         let plan = match self.plan() {
@@ -311,12 +361,33 @@ impl TeleportForm {
             let landed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 teleport::run(&plan, &worker)
             }))
-            .unwrap_or_else(|_| Err("The teleport stopped unexpectedly.".to_owned()));
+            .unwrap_or_else(|_| Err(stopped()));
             let _ = tx.send(landed);
             ctx2.request_repaint();
         });
         self.error = None;
         self.running = Some(Running { job, rx, machine });
+    }
+
+    /// Back to the form after a teleport that failed, saying why.
+    fn failed(&mut self, failed: Failed) {
+        self.error = Some(format!("Teleport failed: {}", failed.message));
+    }
+}
+
+/// A teleport whose thread ended without saying how.
+fn stopped() -> Failed {
+    Failed {
+        message: "it stopped unexpectedly.".to_owned(),
+        cancelled: false,
+    }
+}
+
+/// `name` in the folder `home` of `machine`, as a path there.
+fn join_there(machine: Option<&Machine>, home: &str, name: &str) -> String {
+    match machine {
+        Some(Machine::There(_)) => format!("{}/{name}", home.trim_end_matches('/')),
+        _ => Path::new(home).join(name).display().to_string(),
     }
 }
 
@@ -345,10 +416,7 @@ impl App {
         form.poll();
         let ended = form.running.as_ref().and_then(|r| match r.rx.try_recv() {
             Ok(result) => Some((result, r.machine.clone())),
-            Err(TryRecvError::Disconnected) => Some((
-                Err("The teleport stopped unexpectedly.".to_owned()),
-                r.machine.clone(),
-            )),
+            Err(TryRecvError::Disconnected) => Some((Err(stopped()), r.machine.clone())),
             Err(TryRecvError::Empty) => None,
         });
         if let Some((result, machine)) = ended {
@@ -358,17 +426,28 @@ impl App {
                     self.teleport = None;
                     self.landed(landed, &machine, ctx);
                 }
-                Err(e) if e == teleport::CANCELLED => {
+                Err(failed) if failed.cancelled => {
                     self.teleport = None;
-                    self.toasts.push(Toast::new(e, false));
+                    self.toasts.push(Toast::new(failed.message, false));
                 }
-                Err(e) => form.error = Some(e),
+                Err(failed) => form.failed(failed),
             }
             return;
         }
         if view::show(form, ctx) {
             self.teleport = None;
         }
+    }
+
+    /// When the window closes: a running teleport is stopped and given a while to take back
+    /// what it made (a temporary ref in the source, a half-made worktree there), as ending
+    /// the process would leave them.
+    pub(super) fn stop_teleport(&mut self) {
+        let Some(running) = self.teleport.as_mut().and_then(|f| f.running.take()) else {
+            return;
+        };
+        running.job.cancel();
+        let _ = running.rx.recv_timeout(std::time::Duration::from_secs(20));
     }
 
     /// Says where the work arrived, and opens it.
@@ -386,12 +465,6 @@ impl App {
         self.toasts.push(Toast::new(text, false));
         self.open_repo(&landed.folder, ctx);
     }
-}
-
-fn home_dir() -> Option<PathBuf> {
-    std::env::var_os("USERPROFILE")
-        .or_else(|| std::env::var_os("HOME"))
-        .map(PathBuf::from)
 }
 
 #[cfg(all(test, unix))]

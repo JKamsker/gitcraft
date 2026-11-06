@@ -541,6 +541,10 @@ impl eframe::App for App {
         self.toasts_ui(&ctx);
     }
 
+    fn on_exit(&mut self) {
+        self.stop_teleport();
+    }
+
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         // Index of the active tab among the saved (repo) tabs.
         let (open, active) = self.open_repos();
