@@ -116,7 +116,14 @@ impl RepoTab {
                     };
                     let code = change.map_or(' ', |f| f.status);
                     let r = widgets::file_row(ui, code, path, None, indent, shown(path), extra);
-                    widgets::file_menu(&r.row, path, Some(&detail.hash), false, acts);
+                    // The checkout's files only, and not over a changed file's stats.
+                    if change.is_none() && self.is_checkout(Some(&detail.hash)) {
+                        self.pointer_mark(ui, &r.row, path);
+                    }
+                    let lfs = |ui: &mut Ui, acts: &mut Vec<Action>| {
+                        self.storage_menu_items(ui, path, Some(&detail.hash), acts);
+                    };
+                    widgets::file_menu_with(&r.row, path, Some(&detail.hash), false, lfs, acts);
                     if r.row.clicked() {
                         acts.push(Action::FileView {
                             path: path.clone(),

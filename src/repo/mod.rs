@@ -19,6 +19,7 @@ mod graph_view;
 mod highlight;
 mod keep_submodules;
 mod layout;
+mod lfs_storage;
 mod load;
 mod messages;
 mod navigate;
@@ -129,6 +130,8 @@ pub struct RepoTab {
     submodules: Vec<Submodule>,
     /// It keeps files in Git LFS, and git-lfs is installed.
     lfs: bool,
+    /// What it keeps in LFS on disk, and what is only pointers.
+    lfs_storage: lfs_storage::StorageState,
     identity: Identity,
     /// Where `origin` is hosted, when it's on a forge gitcraft knows.
     hosting: Option<Hosting>,
@@ -293,6 +296,7 @@ impl RepoTab {
             remotes: Vec::new(),
             submodules: Vec::new(),
             lfs: false,
+            lfs_storage: Default::default(),
             identity: Identity::default(),
             hosting: None,
             prs: Vec::new(),

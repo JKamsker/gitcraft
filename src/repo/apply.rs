@@ -248,6 +248,7 @@ impl RepoTab {
                 self.search.focus = true;
             }
             Action::SolveWithMergiraf => self.solve_with_mergiraf(ctx),
+            Action::LfsStorage(act) => self.apply_storage_act(act, ctx),
             Action::SaveConflict => self.save_conflict(ctx),
         }
     }
