@@ -106,6 +106,16 @@ fn the_panel_lists_each_package_and_reports_the_one_picked() {
     };
     assert!(report.files.iter().any(|(f, _)| f == "Cargo.toml"));
     assert!(!report.files.iter().any(|(f, _)| f.contains("debug.log")));
+    // The registry is asked once the files are in (refused offline, still said).
+    wait(&mut tab, &ctx, |t| {
+        t.package.as_ref().is_some_and(|v| v.published.is_some())
+    });
+    assert!(tab.package.as_ref().is_some_and(|v| v.published.is_some()));
+    // Refresh reads it all again and keeps the package picked.
+    tab.package_act(PackageAct::Refresh, &ctx);
+    assert!(tab.package.as_ref().is_some_and(|v| v.report.is_none()));
+    wait(&mut tab, &ctx, reported);
+    assert!(tab.package.as_ref().is_some_and(|v| v.selected == 1));
     tab.package_act(PackageAct::Close, &ctx);
     assert!(tab.package.is_none());
     let _ = std::fs::remove_dir_all(&dir);

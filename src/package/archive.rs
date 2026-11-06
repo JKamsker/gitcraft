@@ -6,14 +6,30 @@ use std::io::Read;
 /// How big a download is let be.
 const MAX: u64 = 200 * 1024 * 1024;
 
+/// What is said of an archive bigger than [`MAX`].
+pub(crate) fn too_big() -> String {
+    format!(
+        "the archive is bigger than {}: not compared",
+        crate::git::human_size(MAX)
+    )
+}
+
+/// How big a download may be.
+pub(crate) const fn max() -> u64 {
+    MAX
+}
+
 /// The paths of the files in the gzip'd tar `bytes`, without their first folder (`app-1.2.3/`,
 /// `package/`).
 pub(crate) fn list(bytes: &[u8]) -> Result<Vec<String>, String> {
     let mut tar = Vec::new();
     flate2::read::GzDecoder::new(bytes)
-        .take(MAX)
+        .take(MAX + 1)
         .read_to_end(&mut tar)
         .map_err(|e| format!("not a gzip'd archive: {e}"))?;
+    if tar.len() as u64 > MAX {
+        return Err(too_big());
+    }
     let mut out = Vec::new();
     let mut at = 0;
     // A long name (GNU's `L` entry, or a pax `path`) for the entry that follows.
@@ -50,7 +66,12 @@ pub(crate) fn list(bytes: &[u8]) -> Result<Vec<String>, String> {
             }
             b'0' | 0 | b'7' => {
                 let name = long.take().unwrap_or_else(|| {
-                    let prefix = field(345, 155);
+                    // ustar's prefix; old GNU headers keep times there.
+                    let prefix = if &header[257..262] == b"ustar" && header[262] == 0 {
+                        field(345, 155)
+                    } else {
+                        String::new()
+                    };
                     let name = field(0, 100);
                     if prefix.is_empty() {
                         name

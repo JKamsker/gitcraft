@@ -12,7 +12,7 @@ pub(crate) use cli::tool_location;
 mod gitea;
 mod github;
 mod gitlab;
-mod http;
+pub(crate) mod http;
 
 use std::collections::HashMap;
 use std::path::Path;

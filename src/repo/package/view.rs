@@ -3,11 +3,11 @@
 use egui::{Context, RichText, Ui};
 
 use super::{PackageAct, PackageView};
-use crate::package::{Note, Report};
+use crate::package::{Note, Published, Report};
 use crate::repo::{Action, RepoTab};
 use crate::theme::{self, Tokens};
 
-/// How many files of a list are shown; the rest are counted.
+/// How many rows of a list are shown; the rest are counted.
 const SHOWN: usize = 400;
 
 impl RepoTab {
@@ -40,19 +40,23 @@ fn contents(ui: &mut Ui, view: &PackageView, room: f32, acts: &mut Vec<Action>) 
     let list = match &view.packages {
         None => {
             ui.add(crate::spinner::Spinner::new());
-            close(ui, acts);
+            buttons(ui, acts, false);
             return;
         }
         Some(Err(e)) => {
-            ui.colored_label(t.warning, e);
-            close(ui, acts);
+            ui.colored_label(t.danger, format!("Couldn't find the packages: {e}"));
+            buttons(ui, acts, true);
             return;
         }
         Some(Ok(list)) if list.is_empty() => {
             ui.label(
-                RichText::new("No package of the repository can be published.").color(t.text_dim),
+                RichText::new(
+                    "Nothing here is published: package.json is private, or every crate has \
+                     publish = false.",
+                )
+                .color(t.text_dim),
             );
-            close(ui, acts);
+            buttons(ui, acts, true);
             return;
         }
         Some(Ok(list)) => list,
@@ -77,10 +81,10 @@ fn contents(ui: &mut Ui, view: &PackageView, room: f32, acts: &mut Vec<Action>) 
     });
     ui.label(
         RichText::new(format!(
-            "As {} says it, in {}",
+            "From {}, run in {}",
             pkg.ecosystem.tool(),
             if pkg.dir.is_empty() {
-                "the repository's top"
+                "the repository's root"
             } else {
                 &pkg.dir
             }
@@ -93,7 +97,7 @@ fn contents(ui: &mut Ui, view: &PackageView, room: f32, acts: &mut Vec<Action>) 
         None => {
             ui.add(crate::spinner::Spinner::new());
             ui.label(
-                RichText::new("Asking the tool and the registry…")
+                RichText::new(format!("Asking {}…", pkg.ecosystem.tool()))
                     .color(t.text_faint)
                     .small(),
             );
@@ -105,45 +109,60 @@ fn contents(ui: &mut Ui, view: &PackageView, room: f32, acts: &mut Vec<Action>) 
             egui::ScrollArea::vertical()
                 .max_height(room)
                 .auto_shrink([false, true])
-                .show(ui, |ui| report_ui(ui, report, pkg.ecosystem.registry()));
+                .show(ui, |ui| {
+                    report_ui(
+                        ui,
+                        report,
+                        view.published.as_ref(),
+                        pkg.ecosystem.registry(),
+                    );
+                });
         }
     }
-    close(ui, acts);
+    buttons(ui, acts, view.report.is_some());
 }
 
-fn report_ui(ui: &mut Ui, report: &Report, registry: &str) {
+fn report_ui(
+    ui: &mut Ui,
+    report: &Report,
+    published: Option<&Result<Option<Published>, String>>,
+    registry: &str,
+) {
     let t = Tokens::get(ui.ctx());
+    if let Some(hint) = &report.hint {
+        ui.add(egui::Label::new(RichText::new(hint).color(t.warning).small()).wrap());
+    }
     notes(
         ui,
         "LOOKS SHIPPED BY ACCIDENT",
         &report.accidental,
         t.warning,
     );
-    notes(ui, "LEFT OUT", &report.missing, t.warning);
+    notes(ui, "USUALLY SHIPPED, LEFT OUT", &report.missing, t.warning);
     heading(ui, &format!("COMPARED WITH {}", registry.to_uppercase()));
-    match &report.published {
-        Ok(None) => faint(ui, "Never published there."),
-        Err(e) => faint(ui, &format!("Couldn't compare: {e}")),
-        Ok(Some(p)) => {
+    match published {
+        None => {
+            ui.horizontal(|ui| {
+                ui.add(crate::spinner::Spinner::new());
+                faint(ui, &format!("Asking {registry}…"));
+            });
+        }
+        Some(Ok(None)) => faint(ui, &format!("Never published on {registry}.")),
+        Some(Err(e)) => faint(ui, &format!("Couldn't compare: {e}")),
+        Some(Ok(Some(p))) => {
             if p.added.is_empty() && p.gone.is_empty() {
-                faint(ui, &format!("The same files as {} published.", p.version));
+                faint(ui, &format!("Same files as {} on {registry}.", p.version));
             }
             for f in p.added.iter().take(SHOWN) {
-                line(
-                    ui,
-                    &format!("+ {f}"),
-                    t.success,
-                    &format!("New since {}", p.version),
-                );
+                let tip = format!("New since {}", p.version);
+                line(ui, &format!("+ {f}"), t.success, &tip);
             }
+            more(ui, p.added.len());
             for f in p.gone.iter().take(SHOWN) {
-                line(
-                    ui,
-                    &format!("− {f}"),
-                    t.danger,
-                    &format!("In {}, not in this one", p.version),
-                );
+                let tip = format!("In {}, not in this one", p.version);
+                line(ui, &format!("− {f}"), t.danger, &tip);
             }
+            more(ui, p.gone.len());
         }
     }
     heading(ui, &format!("FILES ({})", report.files.len()));
@@ -154,18 +173,24 @@ fn report_ui(ui: &mut Ui, report: &Report, registry: &str) {
         };
         line(ui, &text, t.text_dim, "");
     }
-    if report.files.len() > SHOWN {
-        faint(ui, &format!("and {} more", report.files.len() - SHOWN));
-    }
+    more(ui, report.files.len());
 }
 
 fn notes(ui: &mut Ui, title: &str, notes: &[Note], color: egui::Color32) {
     heading(ui, &format!("{title} ({})", notes.len()));
     if notes.is_empty() {
-        faint(ui, "Nothing.");
+        faint(ui, "None found.");
     }
-    for n in notes {
+    for n in notes.iter().take(SHOWN) {
         line(ui, &format!("{} — {}", n.path, n.why), color, "");
+    }
+    more(ui, notes.len());
+}
+
+/// The count of the rows of a list of `len` not shown.
+fn more(ui: &mut Ui, len: usize) {
+    if len > SHOWN {
+        faint(ui, &format!("and {} more", len - SHOWN));
     }
 }
 
@@ -192,12 +217,26 @@ fn faint(ui: &mut Ui, text: &str) {
     ui.label(RichText::new(text).color(t.text_faint));
 }
 
-fn close(ui: &mut Ui, acts: &mut Vec<Action>) {
+/// Refresh (once there is something to read again) and Close.
+fn buttons(ui: &mut Ui, acts: &mut Vec<Action>, refresh: bool) {
     ui.add_space(10.0);
-    if ui
-        .add(egui::Button::new("Close").min_size(egui::vec2(80.0, 30.0)))
-        .clicked()
-    {
-        acts.push(Action::Package(PackageAct::Close));
-    }
+    ui.horizontal(|ui| {
+        if ui
+            .add_enabled(
+                refresh,
+                egui::Button::new("Refresh").min_size(egui::vec2(80.0, 30.0)),
+            )
+            .on_hover_text("Lists the packages and their files again, after a change to them")
+            .clicked()
+        {
+            acts.push(Action::Package(PackageAct::Refresh));
+        }
+        if ui
+            .add(egui::Button::new("Close").min_size(egui::vec2(80.0, 30.0)))
+            .on_hover_text("Esc")
+            .clicked()
+        {
+            acts.push(Action::Package(PackageAct::Close));
+        }
+    });
 }
