@@ -20,7 +20,7 @@ pub(super) struct PickerState {
 
 impl RepoTab {
     pub(super) fn picker_button(&mut self, ui: &mut Ui) {
-        let style = Store::load(ui.ctx()).style;
+        let style = Store::style(ui.ctx());
         if style == PrefixStyle::Off {
             return;
         }

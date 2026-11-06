@@ -68,7 +68,7 @@ impl RepoTab {
         let rest_id = ui.id().with("message_rest");
         let rest: f32 = ui.data(|d| d.get_temp(rest_id)).unwrap_or(0.0);
         let issue_rules = super::compose::issue_links::rules_for(
-            &super::compose::store::Store::load(ui.ctx()).issue_rules,
+            &super::compose::store::Store::issue_rules(ui.ctx()),
             self.hosting.as_ref(),
         );
         egui::ScrollArea::vertical()

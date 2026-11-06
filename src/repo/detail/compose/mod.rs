@@ -35,6 +35,15 @@ pub(in crate::repo) struct Compose {
     notice: Option<String>,
     /// The repository's `commit.template`, as last read.
     template: Option<String>,
+    /// The message as the prefill put it in, and whether a template was in it: while the box
+    /// still holds just that, amending, a merge's message or a template may take its place,
+    /// and an unchanged template isn't committed (as git refuses it).
+    prefilled: Option<(String, bool)>,
+    /// What the box held before a template or the hook replaced it, for _Undo_.
+    replaced: Option<String>,
+    /// The completion candidates, and the status read and earlier prefixes they were made
+    /// from.
+    candidates: Option<(u64, bool, Candidates)>,
     /// The repository's authors, once asked for (`None` while they are read).
     authors: Option<Result<Vec<Author>, String>>,
     authors_asked: bool,
@@ -58,6 +67,9 @@ impl Default for Compose {
             prefilling: false,
             notice: None,
             template: None,
+            prefilled: None,
+            replaced: None,
+            candidates: None,
             authors: None,
             authors_asked: false,
             used: None,
@@ -77,6 +89,8 @@ impl Compose {
     /// earlier subjects and authors are read again when next needed.
     pub fn committed(&mut self) {
         self.prefill_due = true;
+        self.prefilled = None;
+        self.replaced = None;
         self.used = None;
         self.used_asked = false;
         self.authors = None;
@@ -87,7 +101,13 @@ impl Compose {
 /// `text` split as the commit box holds it: the summary (first line) and the description.
 pub fn split_message(text: &str) -> (String, String) {
     let (summary, body) = text.split_once('\n').unwrap_or((text, ""));
-    (summary.trim().to_owned(), body.trim().to_owned())
+    let mut summary = summary.trim().to_owned();
+    // A prefix waiting for its text (`feat:` from a template, whose space git's cleanup took
+    // away) gets the space back, so that typing goes after it.
+    if summary.ends_with(':') {
+        summary.push(' ');
+    }
+    (summary, body.trim().to_owned())
 }
 
 /// The summary and description as one message, as `git commit -m … -m …` makes it.
@@ -102,7 +122,7 @@ pub fn join_message(summary: &str, body: &str) -> String {
 
 /// What the box starts from: the template, then what `prepare-commit-msg` makes of it.
 /// Returns the message (`None`: nothing to put in), the template read, and what went wrong.
-pub fn prefill(repo: &Path) -> Prefilled {
+pub fn prefill(repo: &Path, run_hook: bool) -> Prefilled {
     let mut problems = Vec::new();
     let template = git::commit_template(repo).unwrap_or_else(|e| {
         problems.push(e);
@@ -114,10 +134,14 @@ pub fn prefill(repo: &Path) -> Prefilled {
     } else {
         MessageSource::Empty
     };
-    let hooked = git::prepare_commit_msg(repo, &seed, &source).unwrap_or_else(|e| {
-        problems.push(e);
+    let hooked = if run_hook {
+        git::prepare_commit_msg(repo, &seed, &source).unwrap_or_else(|e| {
+            problems.push(e);
+            None
+        })
+    } else {
         None
-    });
+    };
     let message = hooked.or_else(|| template.clone());
     Prefilled {
         message: message.filter(|m| !m.trim().is_empty()),
@@ -138,12 +162,48 @@ impl RepoTab {
         self.commit_summary.trim().is_empty() && self.commit_body.trim().is_empty()
     }
 
-    /// Puts `text` in the box, in place of what was there.
+    fn current_message(&self) -> String {
+        join_message(&self.commit_summary, &self.commit_body)
+    }
+
+    /// Whether the box holds just what the prefill put there (nothing typed since).
+    pub(in crate::repo) fn unedited_prefill(&self) -> bool {
+        self.compose
+            .prefilled
+            .as_ref()
+            .is_some_and(|(text, _)| *text == self.current_message())
+    }
+
+    /// Whether the box holds an unchanged template: committing it is refused, as git does.
+    pub(in crate::repo) fn unedited_template(&self) -> bool {
+        self.unedited_prefill()
+            && self
+                .compose
+                .prefilled
+                .as_ref()
+                .is_some_and(|(_, template)| *template)
+    }
+
+    /// Puts `text` in the box, in place of what was there (kept for _Undo_ when it was
+    /// something else than an unedited prefill).
     fn set_message(&mut self, text: &str) {
+        let before = self.current_message();
+        if !before.is_empty() && !self.unedited_prefill() {
+            self.compose.replaced = Some(before);
+        }
         let (summary, body) = split_message(text);
         self.commit_summary = summary;
         self.commit_body = body;
         self.compose.completion = None;
+        self.compose.prefilled = None;
+    }
+
+    /// Puts a message git prepared (the commit being amended, a merge's) in the box when it is
+    /// empty or holds an unedited prefill.
+    pub(in crate::repo) fn take_message(&mut self, text: &str) {
+        if self.message_is_empty() || self.unedited_prefill() {
+            self.set_message(text);
+        }
     }
 
     /// Starts the box from the template and the hook, in the background, when it is due and
@@ -154,6 +214,7 @@ impl RepoTab {
         let continuing = self.work.in_progress.is_some_and(|s| s.continues());
         if !c.prefill_due
             || c.prefilling
+            || self.work_read == 0
             || self.amend
             || continuing
             || self.busy_op.is_some()
@@ -165,20 +226,27 @@ impl RepoTab {
         self.compose.prefill_due = false;
         self.compose.prefilling = true;
         let repo = self.path.clone();
+        let run_hook = !store::Store::load(ctx).no_hook_prefill;
         self.then(
             ctx,
-            move || prefill(&repo),
+            move || prefill(&repo, run_hook),
             |tab, found, _| {
                 tab.compose.prefilling = false;
-                tab.compose.template = found.template;
                 tab.compose.notice =
                     (!found.problems.is_empty()).then(|| found.problems.join("\n"));
+                // Unless something else came first: typing, amending, a merge's message.
+                let continuing = tab.work.in_progress.is_some_and(|s| s.continues());
                 if let Some(message) = found.message
                     && tab.message_is_empty()
                     && !tab.amend
+                    && !continuing
+                    && tab.work.prepared_message.is_none()
                 {
                     tab.set_message(&message);
+                    let template = found.template.is_some();
+                    tab.compose.prefilled = Some((tab.current_message(), template));
                 }
+                tab.compose.template = found.template;
             },
         );
     }
@@ -197,15 +265,25 @@ impl RepoTab {
             MessageSource::Merge
         } else if seed.is_empty() {
             MessageSource::Empty
-        } else {
+        } else if self.unedited_template() {
             MessageSource::Template
+        } else {
+            MessageSource::Message
         };
+        let before = seed.clone();
         self.then(
             ctx,
             move || git::prepare_commit_msg(&repo, &seed, &source),
-            |tab, result, _| {
+            move |tab, result, _| {
                 tab.compose.prefilling = false;
                 match result {
+                    // Not over what was typed while it ran.
+                    Ok(Some(_)) if tab.current_message() != before => {
+                        tab.compose.notice = Some(
+                            "The message changed while prepare-commit-msg ran: run it again"
+                                .to_owned(),
+                        );
+                    }
                     Ok(Some(message)) => {
                         tab.compose.notice = None;
                         tab.set_message(&message);
@@ -221,7 +299,8 @@ impl RepoTab {
     }
 
     /// The types and scopes of earlier commits and the changed files, for completion; the
-    /// earlier ones are read in the background the first time.
+    /// earlier ones are read in the background the first time. Made again only when the status
+    /// or what was read changed, not on every frame.
     fn completion_candidates(&mut self, ctx: &egui::Context) -> Candidates {
         if !self.compose.used_asked {
             self.compose.used_asked = true;
@@ -229,8 +308,18 @@ impl RepoTab {
             self.then(
                 ctx,
                 move || prefix::used_prefixes(&git::recent_subjects(&repo)),
-                |tab, used, _| tab.compose.used = Some(used),
+                |tab, used, _| {
+                    tab.compose.used = Some(used);
+                    tab.compose.candidates = None;
+                },
             );
+        }
+        let types = store::Store::style(ctx) == store::PrefixStyle::Conventional;
+        if let Some((read, with_types, cands)) = self.compose.candidates.take()
+            && read == self.work_read
+            && with_types == types
+        {
+            return cands;
         }
         let (kinds, scopes) = self.compose.used.clone().unwrap_or_default();
         let mut files: Vec<String> = (self.work.staged.iter())
@@ -244,6 +333,7 @@ impl RepoTab {
             files,
             kinds,
             scopes,
+            types,
         }
     }
 
@@ -289,6 +379,7 @@ impl RepoTab {
             })
             .inner;
         self.compose.completion = open;
+        self.compose.candidates = Some((self.work_read, cands.types, cands));
         (summary, body)
     }
 
@@ -311,10 +402,30 @@ impl RepoTab {
 
     /// What went wrong with the template or the hook, under the message, until dismissed.
     pub(in crate::repo) fn compose_notice(&mut self, ui: &mut Ui) {
+        let t = Tokens::get(ui.ctx());
+        if self.compose.replaced.is_some() {
+            ui.horizontal(|ui| {
+                ui.label(
+                    RichText::new("The message was replaced.")
+                        .color(t.text_faint)
+                        .small(),
+                );
+                if ui.small_button("Undo").clicked()
+                    && let Some(before) = self.compose.replaced.take()
+                {
+                    let (summary, body) = split_message(&before);
+                    self.commit_summary = summary;
+                    self.commit_body = body;
+                    self.compose.prefilled = None;
+                }
+                if crate::icons::small_button(ui, "x", "Dismiss").clicked() {
+                    self.compose.replaced = None;
+                }
+            });
+        }
         let Some(notice) = self.compose.notice.clone() else {
             return;
         };
-        let t = Tokens::get(ui.ctx());
         ui.horizontal(|ui| {
             if crate::icons::small_button(ui, "x", "Dismiss").clicked() {
                 self.compose.notice = None;

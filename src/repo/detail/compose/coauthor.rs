@@ -47,7 +47,7 @@ impl RepoTab {
             .show(|ui| {
                 let field = ui.add(
                     egui::TextEdit::singleline(filter)
-                        .hint_text("Name or email")
+                        .hint_text("Name or email; Enter adds the first")
                         .desired_width(f32::INFINITY),
                 );
                 if b.clicked() {
@@ -72,7 +72,10 @@ impl RepoTab {
                                     let text = format!("{} <{}>", a.name, a.email);
                                     let r =
                                         ui.add_enabled(!busy, egui::Button::new(text).truncate());
-                                    if r.on_hover_text(format!("{} commits", a.commits)).clicked() {
+                                    let plural = if a.commits == 1 { "" } else { "s" };
+                                    if r.on_hover_text(format!("{} commit{plural}", a.commits))
+                                        .clicked()
+                                    {
                                         picked = Some(a.clone());
                                     }
                                 }

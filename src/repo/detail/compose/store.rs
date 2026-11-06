@@ -62,6 +62,9 @@ pub struct Store {
     pub style: PrefixStyle,
     /// Issue links, besides `#12` to the forge's issue 12.
     pub issue_rules: Vec<IssueRule>,
+    /// The empty box is started from the template only, without running
+    /// `prepare-commit-msg` (which git runs again when committing).
+    pub no_hook_prefill: bool,
 }
 
 /// Where a template is kept.
@@ -84,6 +87,20 @@ impl Store {
     pub fn load(ctx: &egui::Context) -> Store {
         ctx.data_mut(|d| d.get_persisted::<Store>(id()))
             .unwrap_or_default()
+    }
+
+    /// The picker's style, read without copying the templates.
+    pub fn style(ctx: &egui::Context) -> PrefixStyle {
+        ctx.data_mut(|d| d.get_persisted_mut_or_default::<Store>(id()).style)
+    }
+
+    /// The issue link rules, read without copying the templates.
+    pub fn issue_rules(ctx: &egui::Context) -> Vec<IssueRule> {
+        ctx.data_mut(|d| {
+            d.get_persisted_mut_or_default::<Store>(id())
+                .issue_rules
+                .clone()
+        })
     }
 
     pub fn save(&self, ctx: &egui::Context) {

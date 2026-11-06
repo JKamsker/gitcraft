@@ -20,6 +20,8 @@ pub struct Candidates {
     pub files: Vec<String>,
     pub kinds: Vec<String>,
     pub scopes: Vec<String>,
+    /// Types and scopes are offered (the picker is on Conventional Commits).
+    pub types: bool,
 }
 
 /// Which message field is typed in.
@@ -63,11 +65,12 @@ pub fn suggest(text: &str, cursor: usize, field: Field, cands: &Candidates) -> S
         return none;
     }
     let before: String = chars[..start].iter().collect();
-    let items = if field == Field::Summary && before.is_empty() {
+    let summary = field == Field::Summary && cands.types;
+    let items = if summary && before.is_empty() {
         let kinds = cands.kinds.iter().map(String::as_str);
         let builtin = TYPES.iter().map(|(k, _)| *k);
         matching(&word, kinds.chain(builtin))
-    } else if field == Field::Summary && in_scope(&before) {
+    } else if summary && in_scope(&before) {
         matching(&word, cands.scopes.iter().map(String::as_str))
     } else if word.chars().count() >= MIN_FOR_FILES {
         files_matching(&word, &cands.files)
@@ -99,7 +102,11 @@ fn matching<'a>(word: &str, from: impl Iterator<Item = &'a str>) -> Vec<String> 
     let lower = word.to_lowercase();
     let mut out: Vec<String> = Vec::new();
     for w in from {
-        if w != word && w.to_lowercase().starts_with(&lower) && !out.iter().any(|o| o == w) {
+        // What is typed in full (in any case) isn't offered: Tab then moves on as usual.
+        if !w.eq_ignore_ascii_case(word)
+            && w.to_lowercase().starts_with(&lower)
+            && !out.iter().any(|o| o == w)
+        {
             out.push(w.to_owned());
             if out.len() >= MAX_SHOWN {
                 break;
@@ -123,7 +130,7 @@ fn files_matching(word: &str, files: &[String]) -> Vec<String> {
         } else {
             continue;
         };
-        if pick != word && !out.iter().any(|o| o == pick) {
+        if pick.to_lowercase() != lower && !out.iter().any(|o| o == pick) {
             out.push(pick.to_owned());
             if out.len() >= MAX_SHOWN {
                 break;
@@ -259,7 +266,7 @@ fn list(ui: &Ui, field: &Response, s: &Suggestions) -> Option<String> {
                     }
                 }
                 ui.label(
-                    RichText::new("Tab to complete, Esc to close")
+                    RichText::new("↑ ↓ to choose, Tab to complete, Esc to close")
                         .color(t.text_faint)
                         .small(),
                 );
@@ -297,6 +304,7 @@ mod tests {
             ],
             kinds: vec!["feat".into(), "fix".into(), "fixup".into()],
             scopes: vec!["ui".into(), "git".into(), "graph".into()],
+            types: true,
         }
     }
 
@@ -311,8 +319,20 @@ mod tests {
         // Not in the description, nor after the first word.
         assert!(items("fi", Field::Body).is_empty());
         assert!(items("x fi", Field::Summary).is_empty());
-        // What is typed in full isn't offered again.
+        // What is typed in full isn't offered again, in any case.
         assert_eq!(items("fix", Field::Summary), ["fixup"]);
+        assert_eq!(items("Docs", Field::Summary), Vec::<String>::new());
+        // Not with the picker on Gitmoji or off.
+        let no_types = Candidates {
+            types: false,
+            ..cands()
+        };
+        assert!(suggest("fi", 2, Field::Summary, &no_types).items.is_empty());
+        assert!(
+            suggest("feat(g", 6, Field::Summary, &no_types)
+                .items
+                .is_empty()
+        );
     }
 
     #[test]

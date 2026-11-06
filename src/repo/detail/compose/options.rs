@@ -20,14 +20,15 @@ impl RepoTab {
     pub(super) fn options_button(&mut self, ui: &mut Ui) {
         let b = icons::small_button(ui, "settings", "Message options");
         let ctx = ui.ctx().clone();
-        let mut store = Store::load(&ctx);
-        let before = store.clone();
         let draft = &mut self.compose.rule;
         let forge = self.hosting.as_ref().map(issue_links::forge_rule);
         egui::Popup::menu(&b)
             .width(340.0)
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
             .show(|ui| {
+                // Read only while it shows, not on every frame.
+                let mut store = Store::load(&ctx);
+                let before = store.clone();
                 let t = Tokens::get(ui.ctx());
                 ui.label(
                     RichText::new("Type / scope picker")
@@ -40,11 +41,20 @@ impl RepoTab {
                     }
                 });
                 ui.separator();
+                let mut run_hook = !store.no_hook_prefill;
+                ui.checkbox(&mut run_hook, "Prefill from prepare-commit-msg")
+                    .on_hover_text(
+                        "Runs the repository's prepare-commit-msg hook to start an empty \
+                         message. git runs the hook again when committing: untick this if \
+                         yours adds its text twice.",
+                    );
+                store.no_hook_prefill = !run_hook;
+                ui.separator();
                 rules_ui(ui, &mut store.issue_rules, draft, forge.as_ref());
+                if store != before {
+                    store.save(&ctx);
+                }
             });
-        if store != before {
-            store.save(&ctx);
-        }
     }
 }
 
@@ -81,16 +91,19 @@ fn rules_ui(
     if let Some(i) = remove {
         rules.remove(i);
     }
-    ui.add(
+    let pattern = ui.add(
         egui::TextEdit::singleline(&mut draft.rule.pattern)
             .hint_text(r"Pattern, e.g. \bJIRA-\d+\b")
             .desired_width(f32::INFINITY),
     );
-    ui.add(
+    let url = ui.add(
         egui::TextEdit::singleline(&mut draft.rule.url)
             .hint_text("URL, e.g. https://jira.example.com/browse/$0")
             .desired_width(f32::INFINITY),
     );
+    if pattern.changed() || url.changed() {
+        draft.error = None;
+    }
     ui.horizontal(|ui| {
         if ui.button("Add").clicked() {
             match add_rule(rules, &draft.rule) {
@@ -99,7 +112,7 @@ fn rules_ui(
             }
         }
         ui.label(
-            RichText::new("$0 is what matched, $1, $2… its groups")
+            RichText::new("$0 is what matched, $1, $2… (or ${1}) its groups")
                 .color(t.text_faint)
                 .small(),
         );

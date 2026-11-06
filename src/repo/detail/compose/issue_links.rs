@@ -75,6 +75,30 @@ pub fn check(rule: &IssueRule) -> Result<(), String> {
     Ok(())
 }
 
+/// `template` with `$1` written `${1}`, so that what follows a group's number (`$1_$2`)
+/// isn't read as part of its name.
+fn braced_groups(template: &str) -> String {
+    let mut out = String::with_capacity(template.len() + 8);
+    let mut chars = template.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '$' && chars.peek().is_some_and(char::is_ascii_digit) {
+            let mut digits = String::new();
+            while let Some(d) = chars.next_if(char::is_ascii_digit) {
+                digits.push(d);
+            }
+            out.push_str(&format!("${{{digits}}}"));
+        } else {
+            out.push(c);
+            // `$$` is a literal `$`: what follows it isn't a group.
+            if c == '$' && chars.peek() == Some(&'$') {
+                out.push('$');
+                chars.next();
+            }
+        }
+    }
+    out
+}
+
 /// The links of `message` by `rules`, in the order they appear, each text once.
 pub fn find(message: &str, rules: &[IssueRule]) -> Vec<IssueLink> {
     let mut found: Vec<(usize, IssueLink)> = Vec::new();
@@ -86,7 +110,7 @@ pub fn find(message: &str, rules: &[IssueRule]) -> Vec<IssueLink> {
                 continue;
             }
             let mut url = String::new();
-            caps.expand(&rule.url, &mut url);
+            caps.expand(&braced_groups(&rule.url), &mut url);
             let url = url.trim().to_owned();
             // Only a web page: a pattern can't make a link that runs something.
             if crate::pull_request::is_web_url(&url) {
@@ -114,13 +138,19 @@ pub fn rules_for(own: &[IssueRule], hosting: Option<&Hosting>) -> Vec<IssueRule>
 
 /// A row of links for the references in `message`, if it has any.
 pub fn links_row(ui: &mut Ui, message: &str, rules: &[IssueRule]) {
-    // Found once per message and rules, not on every frame.
-    let id = egui::Id::new(("issue-links", message, rules));
-    let links = match ui.ctx().data(|d| d.get_temp::<Vec<IssueLink>>(id)) {
-        Some(links) => links,
+    // Found once per message and rules, not on every frame; only the last one is kept.
+    let slot = egui::Id::new("issue-links");
+    let key = egui::Id::new((message, rules));
+    let cached = ui
+        .ctx()
+        .data(|d| d.get_temp::<(egui::Id, Vec<IssueLink>)>(slot))
+        .filter(|(k, _)| *k == key);
+    let links = match cached {
+        Some((_, links)) => links,
         None => {
             let links = find(message, rules);
-            ui.ctx().data_mut(|d| d.insert_temp(id, links.clone()));
+            ui.ctx()
+                .data_mut(|d| d.insert_temp(slot, (key, links.clone())));
             links
         }
     };
@@ -188,6 +218,8 @@ mod tests {
         assert_eq!(texts, ["JIRA-12", "OPS-7"]);
         assert_eq!(links[1].url, "https://jira.example.com/browse/OPS-7");
         assert!(find("", &rules).is_empty());
+        let under = [rule(r"(\w+)-(\d+)", "https://x.example/$1_$2/$$1")];
+        assert_eq!(find("AB-3", &under)[0].url, "https://x.example/AB_3/$1");
     }
 
     #[test]
