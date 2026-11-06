@@ -108,7 +108,8 @@ so your config, credentials and hooks apply as usual.
   hunks or lines out to two or more new commits (up to 9), each with its own message. _Check
   split_ makes the new commits without touching the working tree and shows each one's patch;
   _Split commit_ puts them in place of the old one (together they are exactly the old commit) and
-  replays the commits after it. Ctrl+Z undoes it. Merges after the commit are refused.
+  replays the commits after it. Ctrl+Z undoes it. A merge, merges after the commit, and the
+  first commit are greyed out with why.
 - Quick edits from a commit's menu, for commits of the checked-out branch: _Edit commit
   message_, _Drop commit_, _Move commit up_ / _down_, each a rebase without the editor and undone
   with Ctrl+Z. What can't be done (a merge, merges after the commit) is greyed out with why.

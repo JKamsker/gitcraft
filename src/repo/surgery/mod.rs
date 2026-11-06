@@ -98,8 +98,10 @@ impl RepoTab {
     }
 
     /// Reads the commits after `onto` in the background, has `plan` make the todo list of
-    /// them, and runs the rebase, `after` it the steps that finish the rewrite. It refuses once
-    /// the branch checked out is another or HEAD moved since that read; undone as one step.
+    /// them (it may make commits too: it runs there), and runs the rebase, `after` it the steps
+    /// that finish the rewrite. It refuses once the branch checked out is another or HEAD moved
+    /// since that read; undone as one step. `started` hears whether it started, or why not.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn rewrite_with(
         &mut self,
         label: String,
@@ -107,6 +109,7 @@ impl RepoTab {
         plan: impl FnOnce(Vec<Entry>) -> Result<Vec<Entry>, String> + Send + 'static,
         after: Vec<Vec<String>>,
         undo: Undo,
+        started: impl FnOnce(&mut RepoTab, Result<(), String>) + Send + 'static,
         ctx: &egui::Context,
     ) {
         let path = self.path.clone();
@@ -119,13 +122,11 @@ impl RepoTab {
             },
             move |tab, result: Result<(Vec<String>, String), String>, ctx| match result {
                 Ok(_) if tab.busy_op.is_some() => {
-                    tab.status = Some((
-                        format!(
-                            "{label}: {} is still running, try again when it's done",
-                            tab.busy_op.as_deref().unwrap_or_default()
-                        ),
-                        true,
-                    ));
+                    let why = format!(
+                        "{} is still running, try again when it's done",
+                        tab.busy_op.as_deref().unwrap_or_default()
+                    );
+                    started(tab, Err(why));
                 }
                 Ok((command, head)) => {
                     let steps = [
@@ -133,9 +134,10 @@ impl RepoTab {
                         after,
                     ]
                     .concat();
+                    started(tab, Ok(()));
                     tab.run_undoable(&label, steps, Refresh::All, undo, ctx);
                 }
-                Err(e) => tab.status = Some((format!("{label}: {e}"), true)),
+                Err(e) => started(tab, Err(e)),
             },
         );
     }

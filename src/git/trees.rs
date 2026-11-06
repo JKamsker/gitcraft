@@ -126,12 +126,30 @@ pub fn tree_after(repo: &Path, base: &str, patches: &[String]) -> Result<String,
                 &env,
                 &["apply", "--cached", "--whitespace=nowarn", patch],
             )
-            .map_err(|e| format!("patch {} does not apply: {e}", n + 1))?;
+            .map_err(|e| {
+                if patches.len() == 1 {
+                    format!("its patch does not apply: {e}")
+                } else {
+                    format!("patch {} does not apply: {e}", n + 1)
+                }
+            })?;
         }
         Ok(run_env(repo, &env, &["write-tree"])?.trim().to_owned())
     })();
-    if crate::remote::parse(repo).is_none() {
-        let _ = std::fs::remove_file(&scratch);
+    match crate::remote::parse(repo) {
+        None => {
+            let _ = std::fs::remove_file(&scratch);
+        }
+        // Where git ran: an index is as big as the repository's file list.
+        Some(target) => {
+            let _ = crate::remote::exec(
+                &target.host,
+                &crate::remote::Request {
+                    script: format!("rm -f {}", crate::remote::sh_quote(&scratch)),
+                    ..crate::remote::Request::default()
+                },
+            );
+        }
     }
     result
 }

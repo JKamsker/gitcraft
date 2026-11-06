@@ -137,18 +137,29 @@ fn a_split_commit_adds_up_to_the_old_one_and_undo_brings_it_back() {
         s.assign_line(0, zwei, 0);
         s.assign_line(0, two, 0);
         s.groups[0].subject = "zwei".to_owned();
-        s.groups[1].subject = "neun und ünïcode".to_owned();
+        s.groups[1].subject = "neun".to_owned();
     }
     assert_eq!(draw(&mut tab, &ctx), 0);
     check(&mut tab, &ctx);
     assert_eq!(draw(&mut tab, &ctx), 0);
-    let first_patch = tab
+    let preview: Vec<String> = tab
         .split
         .as_ref()
         .and_then(|s| s.checked.as_ref())
-        .map(|c| c.patches[0].0.clone())
+        .map(|c| c.preview.lines.iter().map(|(_, l)| l.clone()).collect())
         .unwrap_or_default();
-    assert!(first_patch.contains("+zwei") && !first_patch.contains("neun"));
+    let second = preview
+        .iter()
+        .skip(1)
+        .position(|l| l.contains("ünï cödé.txt") && !l.starts_with("diff"))
+        .unwrap_or(preview.len());
+    let first: Vec<&String> = preview.iter().take(second + 1).collect();
+    assert!(first.iter().any(|l| *l == "+zwei") && !first.iter().any(|l| *l == "+neun"));
+    // A message edited after checking goes in as it is then.
+    if let Some(s) = tab.split.as_mut() {
+        s.groups[1].subject = "neun und ünïcode".to_owned();
+    }
+    assert!(tab.split.as_ref().is_some_and(|s| s.checked.is_some()));
     // Nothing on disk changed by checking.
     assert_eq!(git_out(&dir, &["rev-parse", "HEAD"]), before);
     tab.run_split(&ctx);
@@ -274,4 +285,65 @@ fn a_commit_made_after_checking_is_kept() {
     let _ = std::fs::remove_dir_all(&dir);
     assert!(status.as_ref().is_some_and(|s| !s.1), "{status:?}");
     assert_eq!(subjects, ["newer", "B", "A", "base", "root"]);
+}
+
+#[test]
+fn a_split_that_can_not_start_keeps_the_editor_and_says_why() {
+    let dir = repo(
+        "split-refused",
+        "printf 'a\\nb\\n' > f && git add -A && git commit -q -m base \
+         && printf 'A\\nB\\n' > f && git commit -q -am both",
+    );
+    let (mut tab, ctx) = opened(&dir);
+    open(&mut tab, &ctx, "HEAD");
+    let a = line(&tab, 0, "A");
+    if let Some(s) = tab.split.as_mut() {
+        s.assign_line(0, a, 0);
+        s.groups[1].subject = "B".to_owned();
+    }
+    check(&mut tab, &ctx);
+    // The commit is gone from the branch meanwhile (reset in the terminal).
+    sh(&dir, "git reset -q --hard HEAD~1");
+    tab.run_split(&ctx);
+    pump(&mut tab, &ctx, |t| {
+        t.split.as_ref().is_some_and(|s| !s.busy)
+    });
+    let error = tab.split.as_ref().and_then(|s| s.error.clone());
+    let subjects = subjects(&dir);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        error.is_some_and(|e| e.contains("no longer")),
+        "{:?}",
+        tab.split.as_ref().map(|s| &s.error)
+    );
+    assert!(tab.split.as_ref().is_some_and(|s| s.checked.is_some()));
+    assert_eq!(subjects, ["base", "root"]);
+}
+
+#[test]
+fn a_check_for_an_editor_closed_since_does_not_land_in_a_new_one() {
+    let dir = repo(
+        "split-stale",
+        "printf 'a\\nb\\n' > f && git add -A && git commit -q -m base \
+         && printf 'A\\nB\\n' > f && git commit -q -am both",
+    );
+    let (mut tab, ctx) = opened(&dir);
+    open(&mut tab, &ctx, "HEAD");
+    let a = line(&tab, 0, "A");
+    if let Some(s) = tab.split.as_mut() {
+        s.assign_line(0, a, 0);
+        s.groups[1].subject = "B".to_owned();
+    }
+    tab.check_split(&ctx);
+    tab.split = None;
+    open(&mut tab, &ctx, "HEAD");
+    // Long enough for the first check to come back.
+    let until = Instant::now() + Duration::from_secs(3);
+    while Instant::now() < until {
+        if let Ok(msg) = tab.rx.recv_timeout(Duration::from_millis(100)) {
+            tab.handle(msg, &ctx);
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(tab.split.as_ref().is_some_and(|s| s.checked.is_none()));
 }

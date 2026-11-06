@@ -1,25 +1,18 @@
 //! The split editor in the big area: the new commits and their messages on the left, the old
 //! commit's files on the right with a chip per change saying which commit it goes to (click a
-//! file, a hunk header or a line to give it to the selected commit), then each new commit's
-//! patch to check before splitting.
+//! file, a hunk header or a line to give it to the selected commit; 1–9 select a commit), then
+//! each new commit's patch to check before splitting.
 
-use egui::{Color32, RichText, Sense, Stroke, Ui};
+use egui::{Color32, Key, RichText, Sense, Stroke, Ui};
 
-use super::{MAX_GROUPS, SplitEditor};
+use super::preview::Look;
+use super::{MAX_GROUPS, Row, SplitEditor};
 use crate::icons;
 use crate::repo::diff::Kind;
 use crate::repo::{Action, RepoTab, short, widgets};
 use crate::theme::{self, Tokens};
 
 const ROW_H: f32 = 20.0;
-
-/// A row of the list of the old commit's changes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Row {
-    File(usize),
-    /// Line `1` of file `0`.
-    Line(usize, usize),
-}
 
 /// What a click in the list asks for.
 enum Click {
@@ -34,29 +27,28 @@ fn color(t: &Tokens, g: usize) -> Color32 {
     t.lane(g)
 }
 
-impl SplitEditor {
-    fn rows(&self) -> Vec<Row> {
-        let mut rows = Vec::new();
-        for (f, file) in self.files.iter().enumerate() {
-            rows.push(Row::File(f));
-            if !self.folded.contains(&f) {
-                rows.extend((0..file.lines.len()).map(|i| Row::Line(f, i)));
-            }
-        }
-        rows
+/// Black or white, whichever reads better on `fill`.
+fn ink_on(fill: Color32) -> Color32 {
+    let [r, g, b, _] = fill.to_array();
+    let luma = 0.299 * f32::from(r) + 0.587 * f32::from(g) + 0.114 * f32::from(b);
+    if luma > 150.0 {
+        Color32::BLACK
+    } else {
+        Color32::WHITE
     }
 }
 
 /// A chip with the number of new commit `g`, filled with its colour.
 fn chip(ui: &mut Ui, t: &Tokens, g: usize) {
     let (rect, _) = ui.allocate_exact_size(egui::vec2(18.0, 15.0), Sense::hover());
-    ui.painter().rect_filled(rect, t.radius_sm, color(t, g));
+    let fill = color(t, g);
+    ui.painter().rect_filled(rect, t.radius_sm, fill);
     ui.painter().text(
         rect.center(),
         egui::Align2::CENTER_CENTER,
         (g + 1).to_string(),
         theme::semibold(10.5),
-        Color32::WHITE,
+        ink_on(fill),
     );
 }
 
@@ -64,9 +56,14 @@ impl RepoTab {
     pub(in crate::repo) fn split_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         let idle = self.busy_op.is_none();
+        let keys_free =
+            self.dialog.is_none() && !self.keys_blocked && !ui.ctx().egui_wants_keyboard_input();
         let Some(editor) = self.split.as_deref_mut() else {
             return;
         };
+        if keys_free {
+            pick_with_keys(ui, editor);
+        }
         header(ui, &t, editor, acts);
         footer(ui, &t, editor, idle, acts);
         egui::Panel::left("split_groups")
@@ -92,6 +89,26 @@ impl RepoTab {
     }
 }
 
+/// 1–9 select the commit clicks go to.
+fn pick_with_keys(ui: &Ui, editor: &mut SplitEditor) {
+    const DIGITS: [Key; 9] = [
+        Key::Num1,
+        Key::Num2,
+        Key::Num3,
+        Key::Num4,
+        Key::Num5,
+        Key::Num6,
+        Key::Num7,
+        Key::Num8,
+        Key::Num9,
+    ];
+    for (g, key) in DIGITS.into_iter().enumerate() {
+        if g < editor.groups.len() && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, key)) {
+            editor.active = g;
+        }
+    }
+}
+
 fn header(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, acts: &mut Vec<Action>) {
     egui::Frame::new()
         .fill(t.chrome)
@@ -99,7 +116,7 @@ fn header(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, acts: &mut Vec<Action>)
         .stroke(Stroke::new(1.0, t.separator))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                icons::inline(ui, "git-branch-plus", 16.0, t.icon);
+                icons::inline(ui, "rows-2", 16.0, t.icon);
                 ui.label(
                     RichText::new(format!(
                         "Split {} · {}",
@@ -127,57 +144,69 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor, idle: bool, acts: &
                 .stroke(Stroke::new(1.0, t.separator)),
         )
         .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                let note = match (&editor.error, &problem, &editor.checked) {
-                    (Some(e), _, _) => RichText::new(format!("Can't split it so: {e}")).color(t.danger),
-                    (None, Some(p), _) => RichText::new(p).color(t.danger),
-                    (None, None, Some(c)) => RichText::new(format!(
-                        "Checked: {} commits, together exactly the old one. Splitting replays the commits after it · Ctrl+Z undoes it",
-                        c.commits.len()
-                    ))
-                    .color(t.text_dim),
-                    (None, None, None) => {
-                        RichText::new("Check the split to see each new commit's patch").color(t.text_dim)
-                    }
-                };
-                ui.add(egui::Label::new(note).truncate());
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if editor.busy {
-                        ui.add(crate::spinner::Spinner::new());
-                    }
-                    if editor.checked.is_some() {
-                        if widgets::primary_button(ui, "Split commit", idle && !editor.busy, 120.0)
-                            .clicked()
-                        {
-                            acts.push(Action::RunSplit);
-                        }
-                        if ui.add_enabled(!editor.busy, egui::Button::new("Back")).clicked() {
-                            editor.checked = None;
-                        }
-                    } else if widgets::primary_button(
-                        ui,
-                        "Check split",
-                        problem.is_none() && !editor.busy,
-                        120.0,
-                    )
-                    .clicked()
+            // The buttons first, from the right: the note takes what is left, cut short, all
+            // of it in its tooltip.
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if editor.checked.is_some() {
+                    if widgets::primary_button(ui, "Split commit", idle && !editor.busy, 120.0)
+                        .clicked()
                     {
-                        acts.push(Action::CheckSplit);
+                        acts.push(Action::RunSplit);
                     }
-                    if ui.button("Cancel").clicked() {
-                        acts.push(Action::CloseSplit);
+                    if ui
+                        .add_enabled(!editor.busy, egui::Button::new("Back"))
+                        .clicked()
+                    {
+                        editor.checked = None;
                     }
+                } else if widgets::primary_button(
+                    ui,
+                    "Check split",
+                    problem.is_none() && !editor.busy,
+                    120.0,
+                )
+                .clicked()
+                {
+                    acts.push(Action::CheckSplit);
+                }
+                if ui.button("Cancel").clicked() {
+                    acts.push(Action::CloseSplit);
+                }
+                if editor.busy {
+                    ui.add(crate::spinner::Spinner::new());
+                }
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    let (text, color) = note(t, editor, problem);
+                    ui.add(egui::Label::new(RichText::new(&text).color(color)).truncate())
+                        .on_hover_text(text);
                 });
             });
         });
 }
 
+/// What the footer says, and in which colour.
+fn note(t: &Tokens, editor: &SplitEditor, problem: Option<(String, bool)>) -> (String, Color32) {
+    match (&editor.error, problem, &editor.checked) {
+        (Some(e), _, _) => (format!("Can't split it this way: {e}"), t.danger),
+        (None, Some((p, hint)), _) => (p, if hint { t.text_dim } else { t.danger }),
+        (None, None, Some(c)) => (
+            format!(
+                "Checked: {} commits, together exactly the old one. Splitting replays the commits after it · Ctrl+Z undoes it",
+                c.trees.len().saturating_sub(1)
+            ),
+            t.text_dim,
+        ),
+        (None, None, None) => (
+            "Check the split to see each new commit's patch".to_owned(),
+            t.text_dim,
+        ),
+    }
+}
+
 /// The new commits: each with its colour, number of changes and message; the selected one
 /// gets what is clicked.
 fn groups(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
-    let counts = editor.counts();
     let mut remove = None;
-    let before = editor.groups.clone();
     egui::ScrollArea::vertical()
         .id_salt("split_groups_list")
         .auto_shrink(false)
@@ -186,70 +215,20 @@ fn groups(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
                 ui.disable();
             }
             ui.label(
-                RichText::new("Select a commit, then click files, hunks or lines on the right to put them in it.")
-                    .color(t.text_dim)
-                    .small(),
+                RichText::new(
+                    "Select a commit (or press its number), then click files, hunks or lines on the right to put them in it.",
+                )
+                .color(t.text_dim)
+                .small(),
             );
             ui.add_space(6.0);
             let n = editor.groups.len();
             for g in 0..n {
-                let selected = editor.active == g;
-                let frame = egui::Frame::new()
-                    .fill(if selected { t.row_selected } else { t.field })
-                    .stroke(Stroke::new(1.0, if selected { color(t, g) } else { t.field_border }))
-                    .corner_radius(t.radius)
-                    .inner_margin(egui::Margin::same(8));
-                let shown = frame.show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        chip(ui, t, g);
-                        let count = counts.get(g).copied().unwrap_or(0);
-                        let title = ui.add(
-                            egui::Label::new(
-                                RichText::new(format!(
-                                    "Commit {} · {count} change{}",
-                                    g + 1,
-                                    if count == 1 { "" } else { "s" }
-                                ))
-                                .font(theme::medium(12.5)),
-                            )
-                            .sense(Sense::click()),
-                        );
-                        if title.clicked() {
-                            editor.active = g;
-                        }
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if n > 2
-                                && icons::small_button(ui, "x", "Take this commit out: its changes go to the one before")
-                                    .clicked()
-                            {
-                                remove = Some(g);
-                            }
-                        });
-                    });
-                    let Some(group) = editor.groups.get_mut(g) else {
-                        return false;
-                    };
-                    let subject = ui.add(
-                        egui::TextEdit::singleline(&mut group.subject)
-                            .hint_text("Summary (required)")
-                            .desired_width(f32::INFINITY),
-                    );
-                    let body = ui.add(
-                        egui::TextEdit::multiline(&mut group.body)
-                            .hint_text("Description")
-                            .desired_rows(2)
-                            .desired_width(f32::INFINITY),
-                    );
-                    subject.gained_focus() || body.gained_focus()
+                ui.push_id(("split_group", editor.id, g), |ui| {
+                    if group_card(ui, t, editor, g, &mut remove) {
+                        editor.active = g;
+                    }
                 });
-                let picked = shown.inner
-                    || shown
-                        .response
-                        .interact(Sense::click())
-                        .clicked();
-                if picked {
-                    editor.active = g;
-                }
                 ui.add_space(6.0);
             }
             if ui
@@ -262,36 +241,116 @@ fn groups(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
         });
     if let Some(g) = remove {
         editor.remove_group(g);
-    } else if editor.groups != before {
-        // The checked commits carry the messages they were made with.
-        editor.checked = None;
     }
+}
+
+/// New commit `g`'s card; whether it was clicked (or typed in), which selects it.
+fn group_card(
+    ui: &mut Ui,
+    t: &Tokens,
+    editor: &mut SplitEditor,
+    g: usize,
+    remove: &mut Option<usize>,
+) -> bool {
+    let n = editor.groups.len();
+    let selected = editor.active == g;
+    let count = editor.counts.get(g).copied().unwrap_or(0);
+    let frame = egui::Frame::new()
+        .fill(if selected { t.row_selected } else { t.field })
+        .stroke(Stroke::new(
+            1.0,
+            if selected {
+                color(t, g)
+            } else {
+                t.field_border
+            },
+        ))
+        .corner_radius(t.radius)
+        .inner_margin(egui::Margin::same(8));
+    let shown = frame.show(ui, |ui| {
+        let mut picked = false;
+        ui.horizontal(|ui| {
+            chip(ui, t, g);
+            let title = ui.add(
+                egui::Label::new(
+                    RichText::new(format!(
+                        "Commit {} · {count} change{}",
+                        g + 1,
+                        if count == 1 { "" } else { "s" }
+                    ))
+                    .font(theme::medium(12.5)),
+                )
+                .selectable(false)
+                .sense(Sense::click()),
+            );
+            picked |= title.clicked();
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let heir = SplitEditor::heir(g);
+                let tip = if heir == g {
+                    "Take this commit out: its changes go to the one after it".to_owned()
+                } else {
+                    format!(
+                        "Take this commit out: its changes go to commit {}",
+                        heir + 1
+                    )
+                };
+                if n > 2 && icons::small_button(ui, "x", &tip).clicked() {
+                    *remove = Some(g);
+                }
+            });
+        });
+        let Some(group) = editor.groups.get_mut(g) else {
+            return picked;
+        };
+        let subject = ui.add(
+            egui::TextEdit::singleline(&mut group.subject)
+                .hint_text("Summary (required)")
+                .desired_width(f32::INFINITY),
+        );
+        let body = ui.add(
+            egui::TextEdit::multiline(&mut group.body)
+                .hint_text("Description")
+                .desired_rows(2)
+                .desired_width(f32::INFINITY),
+        );
+        picked || subject.gained_focus() || body.gained_focus()
+    });
+    shown.inner || shown.response.interact(Sense::click()).clicked()
 }
 
 /// The old commit's files and lines, each change with the chip of the commit it goes to.
 fn changes(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
-    let rows = editor.rows();
     let mut click = None;
     let active = editor.active;
+    ui.horizontal(|ui| {
+        ui.add_space(8.0);
+        ui.label(RichText::new("Clicks go to").color(t.text_dim));
+        chip(ui, t, active);
+        let subject = editor
+            .groups
+            .get(active)
+            .map(|g| g.subject.trim())
+            .filter(|s| !s.is_empty())
+            .unwrap_or("(no summary yet)");
+        ui.add(egui::Label::new(RichText::new(subject).color(t.text)).truncate());
+    });
+    let rows = std::mem::take(&mut editor.rows);
     egui::ScrollArea::both()
-        .id_salt("split_changes")
+        .id_salt(("split_changes", editor.id))
         .auto_shrink(false)
         .show_rows(ui, ROW_H, rows.len(), |ui, range| {
             if editor.busy {
                 ui.disable();
             }
-            for row in &rows[range] {
+            for row in rows.get(range).unwrap_or_default() {
                 if let Some(c) = draw_row(ui, t, editor, *row) {
                     click = Some(c);
                 }
             }
         });
+    editor.rows = rows;
     match click {
-        Some(Click::Fold(f)) => {
-            if !editor.folded.remove(&f) {
-                editor.folded.insert(f);
-            }
-        }
+        Some(Click::Fold(f)) => editor.toggle_fold(f),
         Some(Click::File(f)) => editor.assign_file(f, active),
         Some(Click::Hunk(f, h)) => editor.assign_hunk(f, h, active),
         Some(Click::Line(f, i)) => editor.assign_line(f, i, active),
@@ -308,10 +367,12 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
             .layout(egui::Layout::left_to_right(egui::Align::Center)),
     );
     let ui = &mut child;
+    let target = editor.active + 1;
     match row {
         Row::File(f) => {
             let file = editor.files.get(f)?;
-            ui.painter().rect_filled(rect, 0.0, t.chrome);
+            ui.painter()
+                .rect_filled(rect, 0.0, if resp.hovered() { t.hover } else { t.chrome });
             let folded = editor.folded.contains(&f);
             let fold = icons::small_button(
                 ui,
@@ -326,9 +387,11 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
                     "Fold its lines"
                 },
             );
-            let mut owners: Vec<usize> = file
-                .units()
-                .iter()
+            let mut owners: Vec<usize> = editor
+                .units
+                .get(f)
+                .into_iter()
+                .flatten()
                 .map(|&u| editor.group_of(f, u))
                 .collect();
             owners.sort_unstable();
@@ -351,26 +414,28 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
             if fold.clicked() {
                 return Some(Click::Fold(f));
             }
-            let resp = resp.on_hover_text("Click to put the whole file in the selected commit");
+            let resp = resp.on_hover_text(format!("Put the whole file in commit {target}"));
             resp.clicked().then_some(Click::File(f))
         }
         Row::Line(f, i) => {
             let file = editor.files.get(f)?;
             let line = file.lines.get(i)?;
             let changed = matches!(line.kind, Kind::Add | Kind::Del);
+            let whole = file.whole.is_some();
+            let clickable = whole || changed || line.kind == Kind::Hunk;
             let fill = match line.kind {
                 Kind::Add => t.diff_add_bg,
                 Kind::Del => t.diff_del_bg,
                 _ => Color32::TRANSPARENT,
             };
             ui.painter().rect_filled(rect, 0.0, fill);
+            if clickable && resp.hovered() {
+                ui.painter()
+                    .rect_filled(rect, 0.0, t.hover.gamma_multiply(0.6));
+            }
             ui.add_space(26.0);
-            if changed || (file.whole.is_some() && line.kind != Kind::Hunk) {
-                chip(
-                    ui,
-                    t,
-                    editor.group_of(f, if file.whole.is_some() { 0 } else { i }),
-                );
+            if changed || (whole && line.kind != Kind::Hunk) {
+                chip(ui, t, editor.group_of(f, if whole { 0 } else { i }));
             } else {
                 ui.add_space(18.0);
             }
@@ -379,8 +444,7 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
             let (mark, color) = match line.kind {
                 Kind::Add => ("+", t.text),
                 Kind::Del => ("-", t.text),
-                Kind::Hunk => ("", t.text_faint),
-                Kind::Meta => ("", t.text_faint),
+                Kind::Hunk | Kind::Meta => ("", t.text_faint),
                 Kind::Context => (" ", t.text_dim),
             };
             ui.label(
@@ -397,86 +461,88 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
                 .selectable(false)
                 .extend(),
             );
-            if !resp.clicked() {
-                return None;
-            }
-            if file.whole.is_some() {
-                Some(Click::File(f))
+            let what = if whole {
+                Some(("the whole file", Click::File(f)))
             } else if line.kind == Kind::Hunk {
-                Some(Click::Hunk(f, i))
+                Some(("this hunk", Click::Hunk(f, i)))
             } else if changed {
-                Some(Click::Line(f, i))
+                Some(("this line", Click::Line(f, i)))
             } else {
                 None
-            }
+            };
+            let (name, click) = what?;
+            let resp = resp.on_hover_text(format!("Put {name} in commit {target}"));
+            resp.clicked().then_some(click)
         }
     }
 }
 
-/// Each new commit's patch, as checked.
+/// Each new commit's patch, as checked, a screenful at a time.
 fn patches(ui: &mut Ui, t: &Tokens, editor: &SplitEditor) {
     let Some(checked) = &editor.checked else {
         return;
     };
+    let lines = &checked.preview.lines;
     egui::ScrollArea::both()
-        .id_salt("split_patches")
+        .id_salt(("split_patches", editor.id))
         .auto_shrink(false)
-        .show(ui, |ui| {
-            ui.add_space(8.0);
-            for (g, (patch, files)) in checked.patches.iter().enumerate() {
-                let subject = editor
-                    .groups
-                    .get(g)
-                    .map(|g| g.subject.as_str())
-                    .unwrap_or_default();
-                ui.horizontal(|ui| {
-                    ui.add_space(8.0);
-                    chip(ui, t, g);
-                    ui.label(RichText::new(subject).font(theme::medium(13.0)));
-                    ui.label(
-                        RichText::new(format!(
-                            "· {} file{}",
-                            files.len(),
-                            if files.len() == 1 { "" } else { "s" }
-                        ))
-                        .color(t.text_dim),
-                    );
-                });
-                egui::CollapsingHeader::new(
-                    RichText::new(files.join(", ")).color(t.text_dim).small(),
-                )
-                .id_salt(("split_patch", g))
-                .default_open(checked.patches.len() <= 3)
-                .show(ui, |ui| patch_text(ui, t, patch));
-                ui.add_space(10.0);
+        .show_rows(ui, ROW_H, lines.len(), |ui, range| {
+            for (look, text) in lines.get(range).unwrap_or_default() {
+                preview_line(ui, t, editor, *look, text);
             }
         });
 }
 
-/// A patch's lines, coloured. Very long ones are cut: they're for reading over, not applying.
-fn patch_text(ui: &mut Ui, t: &Tokens, patch: &str) {
-    const MAX: usize = 4000;
-    let mut lines = patch.lines();
-    for line in lines.by_ref().take(MAX) {
-        let (fill, color) = if line.starts_with("+++") || line.starts_with("---") {
-            (Color32::TRANSPARENT, t.text_faint)
-        } else if line.starts_with('+') {
-            (t.diff_add_bg, t.text)
-        } else if line.starts_with('-') {
-            (t.diff_del_bg, t.text)
-        } else if line.starts_with("@@") || line.starts_with("diff ") {
-            (Color32::TRANSPARENT, t.accent)
-        } else {
-            (Color32::TRANSPARENT, t.text_dim)
-        };
-        egui::Frame::new().fill(fill).show(ui, |ui| {
-            ui.add(
-                egui::Label::new(RichText::new(line).font(theme::mono(12.0)).color(color)).extend(),
-            );
-        });
-    }
-    let rest = lines.count();
-    if rest > 0 {
-        ui.label(RichText::new(format!("… {rest} more lines")).color(t.text_faint));
+fn preview_line(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, look: Look, text: &str) {
+    let width = ui.available_width().max(400.0);
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, ROW_H), Sense::hover());
+    let mut child = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(rect)
+            .layout(egui::Layout::left_to_right(egui::Align::Center)),
+    );
+    let ui = &mut child;
+    let mono = |color: Color32| RichText::new(text).font(theme::mono(12.0)).color(color);
+    let label = match look {
+        Look::Commit(g, files) => {
+            ui.painter().rect_filled(rect, 0.0, t.chrome);
+            ui.add_space(8.0);
+            chip(ui, t, g);
+            let subject = editor
+                .groups
+                .get(g)
+                .map(|g| g.subject.as_str())
+                .unwrap_or_default();
+            ui.label(RichText::new(subject).font(theme::medium(13.0)));
+            RichText::new(format!(
+                "· {files} file{}: {text}",
+                if files == 1 { "" } else { "s" }
+            ))
+            .color(t.text_dim)
+        }
+        Look::Header => mono(t.accent),
+        Look::Meta => mono(t.text_faint),
+        Look::Context => mono(t.text_dim),
+        Look::Add | Look::Del => {
+            let fill = if look == Look::Add {
+                t.diff_add_bg
+            } else {
+                t.diff_del_bg
+            };
+            ui.painter().rect_filled(rect, 0.0, fill);
+            mono(t.text)
+        }
+    };
+    ui.add(egui::Label::new(label).selectable(false).extend());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn chip_numbers_read_on_light_and_dark_colours() {
+        assert_eq!(ink_on(Color32::from_rgb(250, 200, 60)), Color32::BLACK);
+        assert_eq!(ink_on(Color32::from_rgb(40, 60, 160)), Color32::WHITE);
     }
 }
