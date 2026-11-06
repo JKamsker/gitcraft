@@ -4,6 +4,7 @@
 mod actions;
 mod agents;
 mod apply;
+mod bakeoff;
 mod branch_tree;
 mod branch_visibility;
 mod ci_status;
@@ -241,6 +242,8 @@ pub struct RepoTab {
     pub keys_blocked: bool,
     /// Agent tasks, the worktree setup recipe and their dialogs.
     agents: agents::AgentsState,
+    /// The bake-off of attempts shown in the big area, and its picker.
+    bakeoff: bakeoff::BakeoffState,
     /// Long operations that just ended, its own and its parked worktrees': (message, failed),
     /// for a notification each (taken by `App`).
     pub finished: Vec<(String, bool)>,
@@ -363,6 +366,7 @@ impl RepoTab {
             parked_status: Vec::new(),
             keys_blocked: false,
             agents: Default::default(),
+            bakeoff: Default::default(),
             finished: Vec::new(),
         };
         tab.watch(ctx);

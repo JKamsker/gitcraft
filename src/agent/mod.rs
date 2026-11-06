@@ -5,15 +5,16 @@
 //! all its worktrees and never committed. Everything here runs on the repository's machine,
 //! WSL and SSH included: files through [`crate::remote`], git through [`crate::git`].
 
+pub(crate) mod bakeoff;
 mod files;
 pub(crate) mod launch;
 pub(crate) mod recipe;
-mod sh;
+pub(crate) mod sh;
 pub(crate) mod tasks;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use files::{read_json, write_json};
+pub(crate) use files::{read_json, repo_file, write_json};
 pub(crate) use launch::{Launch, PendingLaunches};
 pub(crate) use recipe::Recipe;
 pub(crate) use tasks::{AgentCli, AgentTask};

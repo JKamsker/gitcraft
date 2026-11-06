@@ -53,6 +53,7 @@ impl RepoTab {
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),
             Action::Agent(act) => self.agent_act(act, ctx),
+            Action::Bake(act) => self.bake_act(act, ctx),
             Action::CloseDiff => {
                 self.diff = None;
                 self.conflict = None;

@@ -14,7 +14,7 @@ use crate::remote::{self, Host};
 use crate::terminal::ShellSpec;
 
 /// What a new worktree's terminal runs before the shell.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Launch {
     /// The terminal tab's name.
     pub label: String,
@@ -23,6 +23,8 @@ pub(crate) struct Launch {
     pub recipe: Recipe,
     /// The agent's command line, started once the recipe went through.
     pub agent: Option<String>,
+    /// A script of gitcraft's own run after that (a bake-off's build), before the shell.
+    pub run: Option<String>,
 }
 
 impl Launch {
@@ -58,6 +60,10 @@ impl Launch {
                 )),
                 sh::quote(&format!("starting {}", self.label)),
             ));
+        }
+        if let Some(run) = &self.run {
+            s.push_str(run);
+            s.push('\n');
         }
         s.push_str(&format!("exec {shell}\n"));
         s

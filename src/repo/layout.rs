@@ -55,6 +55,8 @@ impl RepoTab {
                     self.file_view(ui, &mut acts);
                 } else if self.ci_view.is_some() {
                     self.ci_view_ui(ui, &mut acts);
+                } else if self.bakeoff.view.is_some() {
+                    self.bakeoff_view(ui, &mut acts);
                 } else if self.pr_view.is_some() {
                     self.pr_view_ui(ui, &mut acts);
                 } else {
@@ -64,6 +66,7 @@ impl RepoTab {
 
         self.dialogs(&ctx, &mut acts);
         self.agent_dialogs(&ctx, &mut acts);
+        self.bakeoff_dialog(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
         }
@@ -129,6 +132,8 @@ impl RepoTab {
                 acts.push(Action::CloseRebase);
             } else if esc && self.file_view.is_some() {
                 acts.push(Action::CloseFileView);
+            } else if esc && self.bakeoff.view.is_some() {
+                acts.push(Action::Bake(super::bakeoff::BakeAct::Close));
             } else if esc && self.ci_view.is_some() {
                 acts.push(Action::CloseCi);
             } else if esc && self.pr_view.is_some() {

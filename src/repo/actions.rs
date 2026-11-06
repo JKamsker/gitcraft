@@ -40,6 +40,8 @@ pub(crate) enum Action {
     Ci(ci_view::CiAct),
     /// Agent tasks and the worktree setup recipe.
     Agent(super::agents::AgentAct),
+    /// The bake-off of attempts.
+    Bake(super::bakeoff::BakeAct),
     CloseDiff,
     Ops {
         label: String,
@@ -358,6 +360,11 @@ impl RepoTab {
                 "Start agent task…".into(),
                 "agent".into(),
                 Action::Agent(super::agents::AgentAct::OpenStart),
+            ),
+            (
+                "Bake-off: compare attempts…".into(),
+                "agent".into(),
+                Action::Bake(super::bakeoff::BakeAct::OpenPicker),
             ),
             (
                 "Worktree setup…".into(),

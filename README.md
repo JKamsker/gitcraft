@@ -211,6 +211,14 @@ so your config, credentials and hooks apply as usual.
   (`npm ci`). A step that fails says so; the setup command and the agent are then not run. It runs with `sh` on the repository's machine (Git's own `sh` on Windows),
   WSL and SSH included; the script it makes can be read in the editor, and tried on a worktree
   before saving. Kept in `.git/gitcraft/`, never committed.
+- _Bake-off: compare attempts…_ (palette): pick 2–4 worktrees or branches that tried the same
+  task (the agent tasks come picked). A grid compares them with the commit they all start from:
+  the files each touched, its size, the dependencies it adds (Cargo, npm, Go, Python, Ruby,
+  Composer manifests) and whether it builds (a command you type, run in a terminal in each
+  worktree). A worktree's uncommitted work is compared too, read through an index of
+  gitcraft's own. Click a file to see it side by side across the attempts; take it whole from
+  one, or tick hunks of several, and _Assemble_ makes a new branch from the base with what you
+  picked, without checking anything out. Hunks that change the same lines can't both be taken.
 
 **Toolbar, terminal, app**
 
@@ -379,6 +387,8 @@ was made this way, on a demo repository.
 | `src/remote/` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
 | `src/agent/` | coding agents: the worktree setup recipe, the agent tasks, the terminal script that runs them |
 | `src/repo/agents/` | the AGENTS section and the agent task and setup recipe dialogs |
+| `src/agent/bakeoff/` | bake-off: comparing attempts, new dependencies, hunks, assembling a branch, builds |
+| `src/repo/bakeoff/` | the bake-off page and its attempt picker |
 | `src/settings/`          | user settings, profiles, and the settings pages                                    |
 | `src/manual.rs`          | the manual (F1): features and keyboard shortcuts                                   |
 | `src/theme.rs`           | colour tokens, fonts, egui style (PhotoCraft's Pro themes)                         |
