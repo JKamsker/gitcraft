@@ -64,6 +64,13 @@ pub(crate) struct Outcome {
     pub(crate) tree: Option<String>,
     /// Why git would refuse it outright, as it stands.
     pub(crate) refused: Option<String>,
+    /// What to be wary of: work thrown away, a remote that couldn't be asked, a delete that
+    /// needs forcing.
+    pub(crate) warnings: Vec<String>,
+    /// It throws away the uncommitted changes: the changes row goes too.
+    pub(crate) discards_work: bool,
+    /// The commit it takes out (Drop commit).
+    pub(crate) dropped: Option<Commit>,
     pub(crate) notes: Vec<String>,
     /// What the commits were replayed or merged on, when they were.
     pub(crate) engine: Option<Engine>,
@@ -138,7 +145,7 @@ impl Ctx<'_> {
                 );
             } else {
                 out.refused = Some(
-                    "git rebase refuses to start with uncommitted changes: commit or stash them first"
+                    "the rebase refuses to start with uncommitted changes: commit or stash them first"
                         .to_owned(),
                 );
             }
@@ -191,7 +198,8 @@ impl Ctx<'_> {
         // From the working tree to `to`: what the reset does to each file.
         out.files = Some(reversed(git::diff_files(self.repo, &to, None)?));
         if self.facts.dirty {
-            out.notes.push(
+            out.discards_work = true;
+            out.warnings.push(
                 "Uncommitted changes to these files are thrown away, and can't be brought back."
                     .to_owned(),
             );
@@ -208,7 +216,7 @@ impl Ctx<'_> {
             )
         })?;
         let mut out = Outcome::default();
-        let new = self.remote_tip(&up, &mut out.notes);
+        let new = self.remote_tip(&up, &mut out.warnings);
         self.check()?;
         let head = branch.target.clone();
         let tracking = up.tracking.target.clone();
@@ -268,9 +276,14 @@ impl Ctx<'_> {
         }
         match mode {
             PullMode::FastForwardOnly => {
+                let fetched = if new != tracking {
+                    format!(" (only {} moves, with what it fetches)", up.tracking.name)
+                } else {
+                    String::new()
+                };
                 out.refused = Some(format!(
-                    "{} and {} have diverged: a fast-forward-only pull refuses; only {} moves",
-                    branch.name, up.tracking.name, up.tracking.name
+                    "{} and {} have diverged, so a fast-forward-only pull refuses{fetched}",
+                    branch.name, up.tracking.name
                 ));
                 Ok(out)
             }
@@ -321,12 +334,15 @@ impl Ctx<'_> {
             });
             return Ok(out);
         }
+        let you = git::identity(self.repo);
         out.created.insert(
             0,
             Commit {
                 hash: GHOST_MERGE.to_owned(),
                 parents: vec![head.to_owned(), new.to_owned()],
                 summary: format!("Merge branch '{}' of {}", up.name, up.remote),
+                author: you.name,
+                email: you.email,
                 time: git::now(),
                 ..Commit::default()
             },
@@ -347,11 +363,11 @@ impl Ctx<'_> {
     /// The commit the upstream's branch is at on the remote, asked without changing any ref:
     /// `ls-remote`, then its objects fetched into nothing (no ref, no FETCH_HEAD, no tags). The
     /// remote-tracking branch as last fetched when the remote can't be asked.
-    fn remote_tip(&self, up: &Upstream<'_>, notes: &mut Vec<String>) -> String {
+    fn remote_tip(&self, up: &Upstream<'_>, warnings: &mut Vec<String>) -> String {
         let known = up.tracking.target.clone();
         let mut as_fetched = |why: String| {
-            notes.push(format!(
-                "{why}: shown as of the last fetch of {}.",
+            warnings.push(format!(
+                "{why}. Shown as of the last fetch of {}.",
                 up.remote
             ));
             known.clone()
@@ -378,7 +394,11 @@ impl Ctx<'_> {
                 .find_map(|l| l.split_once('\t').filter(|(_, r)| *r == branch_ref))
                 .map(|(oid, _)| oid.trim().to_owned()),
             Err(e) => {
-                return as_fetched(format!("Couldn't reach {} ({})", up.remote, first_line(&e)));
+                return as_fetched(format!(
+                    "The pull would fail now: couldn't reach {} ({})",
+                    up.remote,
+                    first_line(&e)
+                ));
             }
         };
         let Some(oid) = oid else {
@@ -410,7 +430,7 @@ impl Ctx<'_> {
             Ok(_) if self.has_commit(&oid) => oid,
             Ok(_) => as_fetched(format!("{}'s new commits didn't come", up.remote)),
             Err(e) => as_fetched(format!(
-                "Couldn't fetch from {} ({})",
+                "The pull would fail now: couldn't fetch from {} ({})",
                 up.remote,
                 first_line(&e)
             )),
@@ -534,8 +554,13 @@ impl Ctx<'_> {
         let into = up.as_ref().map_or(head, |u| u.tracking.target.as_str());
         let merged = dry_run::is_ancestor(self.repo, &branch.target, into);
         if !merged {
-            out.notes.push(format!(
-                "{name} isn't merged: Delete refuses, and Force (-D) leaves its own commits on no branch."
+            let what = if up.is_some() {
+                "its upstream"
+            } else {
+                "the checked-out branch"
+            };
+            out.warnings.push(format!(
+                "{name} isn't merged into {what}: Delete refuses unless Force (-D) is ticked, which leaves its own commits on no branch."
             ));
         }
         Ok(out)
@@ -574,7 +599,12 @@ impl Ctx<'_> {
         if merges.trim() != "0" {
             return Err("merges came after the commit, which this would flatten".to_owned());
         }
-        let mut out = Outcome::default();
+        let mut out = Outcome {
+            dropped: git::commits_of(self.repo, std::slice::from_ref(&hash))?
+                .into_iter()
+                .next(),
+            ..Outcome::default()
+        };
         if self.facts.dirty {
             out.notes
                 .push("Uncommitted changes are stashed first and put back after.".to_owned());
@@ -671,6 +701,13 @@ impl Ctx<'_> {
                 files,
             });
             out.notes.push(why.to_owned());
+            let waits = out.created.iter().take(out.copies).next().map_or_else(
+                || short(&replay.onto).to_owned(),
+                |c| short(&c.hash).to_owned(),
+            );
+            out.notes.push(format!(
+                "Meanwhile HEAD is detached at {waits}, mid-rebase."
+            ));
             return Ok(());
         }
         let head = w.branch.target.clone();

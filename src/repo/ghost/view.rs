@@ -31,6 +31,10 @@ pub(crate) struct RowGhost {
     pub(crate) through: Vec<usize>,
     /// The lanes coming into the row's dot from a new commit above.
     pub(crate) incoming: Vec<usize>,
+    /// The lanes crossing the row from a commit it would leave on no ref: they go with it.
+    pub(crate) going_through: Vec<usize>,
+    /// The lanes coming into the row's dot from a commit above that goes.
+    pub(crate) going_incoming: Vec<usize>,
 }
 
 /// The ghost graph, in the form the graph view draws (its rows, layout and index), with how
@@ -144,7 +148,12 @@ pub(crate) fn build(rows: &[Arc<Commit>], outcome: &Outcome, head_ref: Option<&s
     let mut kinds = Vec::with_capacity(commits.capacity());
     if let Some(wip) = wip {
         commits.push(edit(wip));
-        kinds.push(Kind::Real);
+        // A hard reset throws the uncommitted changes away.
+        kinds.push(if outcome.discards_work {
+            Kind::Going
+        } else {
+            Kind::Real
+        });
     }
     for c in &outcome.created {
         commits.push(edit(&Arc::new(c.clone())));
@@ -178,6 +187,7 @@ pub(crate) fn build(rows: &[Arc<Commit>], outcome: &Outcome, head_ref: Option<&s
 /// a lane a new commit opens towards its parent is a ghost lane down to that parent's dot.
 fn ghost_lanes(graph: &Graph, kinds: &[Kind]) -> Vec<RowGhost> {
     let mut ghost: Vec<bool> = vec![false; graph.width + 1];
+    let mut going: Vec<bool> = vec![false; graph.width + 1];
     let mut out = Vec::with_capacity(graph.rows.len());
     for (row, &kind) in graph.rows.iter().zip(kinds) {
         let is = |lanes: &[usize], ghost: &[bool]| -> Vec<usize> {
@@ -189,24 +199,32 @@ fn ghost_lanes(graph: &Graph, kinds: &[Kind]) -> Vec<RowGhost> {
         };
         let through = is(&row.through, &ghost);
         let incoming = is(&row.incoming, &ghost);
+        let going_through = is(&row.through, &going);
+        let going_incoming = is(&row.incoming, &going);
         for &l in &row.incoming {
-            if let Some(g) = ghost.get_mut(l) {
-                *g = false;
+            for lanes in [&mut ghost, &mut going] {
+                if let Some(g) = lanes.get_mut(l) {
+                    *g = false;
+                }
             }
         }
-        let new = kind == Kind::New;
+        let (new, gone) = (kind == Kind::New, kind == Kind::Going);
         for (n, &l) in row.outgoing.iter().enumerate() {
             if l >= ghost.len() {
                 ghost.resize(l + 1, false);
+                going.resize(l + 1, false);
             }
             // A lane already running down (another child's) stays real if that one is.
             let shared = n > 0 && row.through.contains(&l);
             ghost[l] = if shared { ghost[l] && new } else { new };
+            going[l] = if shared { going[l] && gone } else { gone };
         }
         out.push(RowGhost {
             kind,
             through,
             incoming,
+            going_through,
+            going_incoming,
         });
     }
     out
@@ -295,6 +313,13 @@ mod tests {
         assert_eq!(view.commits.len(), list.len());
         assert_eq!(view.added, 0);
         assert_eq!(view.commits[0].parents, ["f1"]);
+        assert_eq!(view.rows[0].kind, Kind::Real);
+        let discarding = Outcome {
+            discards_work: true,
+            ..outcome.clone()
+        };
+        let view_discarding = build(&list, &discarding, Some("refs/heads/feature"));
+        assert_eq!(view_discarding.rows[0].kind, Kind::Going);
         let f1 = view.index["f1"];
         assert_eq!(view.commits[f1].refs, ["HEAD -> feature"]);
         assert_eq!(view.rows[view.index["f2"]].kind, Kind::Going);
@@ -303,6 +328,10 @@ mod tests {
                 .iter()
                 .all(|r| r.through.is_empty() && r.incoming.is_empty())
         );
+        // The lane from f2 down to f1 goes with f2: faded through m1, into f1's dot.
+        let lane = view.graph.rows[view.index["f2"]].col;
+        assert!(view.rows[view.index["m1"]].going_through.contains(&lane));
+        assert!(view.rows[f1].going_incoming.contains(&lane));
     }
 
     /// A deleted branch keeps its pill where it is, struck out; a remote one (`origin/x`) moved

@@ -1,4 +1,5 @@
-//! The strip above the graph during a ghost run: what the operation would do, in words.
+//! The strip over the foot of the graph during a ghost run: what the operation would do, in
+//! words.
 
 use egui::{RichText, Ui};
 
@@ -13,18 +14,28 @@ use crate::theme::{self, Tokens};
 const LISTED: usize = 5;
 
 impl RepoTab {
-    /// The strip, while a ghost run is on.
-    pub(in crate::repo) fn ghost_strip(&self, ui: &mut Ui) {
+    /// The strip, `width` wide, while a ghost run is on.
+    pub(in crate::repo) fn ghost_strip(&self, ui: &mut Ui, width: f32) {
         let Some(state) = self.ghost_strip_state() else {
             return;
         };
+        let above = self.ghost.rows_above();
         let t = Tokens::get(ui.ctx());
         egui::Frame::new()
             .fill(t.card)
             .stroke(egui::Stroke::new(1.0, t.accent.gamma_multiply(0.6)))
             .inner_margin(egui::Margin::symmetric(10, 6))
+            .corner_radius(egui::CornerRadius::same(t.radius as u8))
+            .shadow(egui::Shadow {
+                offset: [0, 2],
+                blur: 10,
+                spread: 0,
+                color: t.shadow,
+            })
             .show(ui, |ui| {
-                ui.set_width(ui.available_width());
+                let inner = (width - 22.0).max(120.0);
+                ui.set_width(inner);
+                ui.set_max_width(inner);
                 ui.spacing_mut().item_spacing.y = 3.0;
                 let title = match &state {
                     Strip::Working(title) | Strip::Ready(title, _) | Strip::Failed(title, _) => {
@@ -52,13 +63,24 @@ impl RepoTab {
                         dim(ui, &t, "Working out what it would do…");
                     }
                     Strip::Failed(_, why) => {
-                        line(
+                        alert(
                             ui,
+                            &t,
                             t.danger,
-                            &format!("Can't preview it: {}", one_line(why)),
+                            &format!("Can't preview it. {}", sentence(one_line(why))),
                         );
                     }
                     Strip::Ready(_, outcome) => outcome_lines(ui, &t, outcome),
+                }
+                if above > 0 {
+                    dim(
+                        ui,
+                        &t,
+                        &format!(
+                            "↑ {} above the rows in view.",
+                            plural(above, "new commit is", "new commits are")
+                        ),
+                    );
                 }
             });
     }
@@ -67,7 +89,10 @@ impl RepoTab {
 /// What `outcome` does, a line each.
 fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
     if let Some(why) = &o.refused {
-        line(ui, t.danger, why);
+        alert(ui, t, t.danger, &sentence(why));
+    }
+    for warning in &o.warnings {
+        alert(ui, t, t.warning, warning);
     }
     if let Some(c) = &o.conflict {
         let what = match &c.commit {
@@ -84,7 +109,14 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
         } else {
             format!("conflicts in {}", listed(&c.files, |f| f.clone()))
         };
-        line(ui, t.danger, &format!("{what}: {why}"));
+        alert(ui, t, t.danger, &format!("{what}, {why}."));
+    }
+    if let Some(dropped) = &o.dropped {
+        line(
+            ui,
+            t.text,
+            &format!("Drops {} — {}", describe(dropped), dropped.author),
+        );
     }
     let fetched = o.created.len() - o.copies;
     let mut made = Vec::new();
@@ -117,12 +149,12 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
             ui,
             t.text_dim,
             &format!(
-                "Working tree: {} change: {}",
-                plural(files.len(), "file", "files"),
+                "Files of the working tree that change ({}): {}",
+                files.len(),
                 listed(files, |f| format!("{} {}", f.status, f.path))
             ),
         ),
-        Some(_) => dim(ui, t, "Working tree: no file changes."),
+        Some(_) => dim(ui, t, "No file of the working tree changes."),
         None => {}
     }
     for note in &o.notes {
@@ -140,32 +172,37 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
 /// The commits the operation leaves on no ref (or takes off the remote's branch), with who
 /// made them.
 fn lost_line(ui: &mut Ui, t: &Tokens, o: &Outcome) {
-    let more = if o.lost_more { " and more" } else { "" };
-    let count = plural(o.lost.len(), "commit", "commits");
+    let count = if o.lost_more {
+        format!("more than {} commits", o.lost.len())
+    } else {
+        plural(o.lost.len(), "commit", "commits")
+    };
     let names = listed(&o.lost, |c| format!("{} — {}", describe(c), c.author));
     let (color, text) = if o.from_remote {
         (
             t.warning,
-            format!("Leaving the remote's branch: {count}{more}: {names}"),
+            format!("Leaving the remote's branch ({count}): {names}"),
         )
     } else if o.replaced == o.lost.len() && !o.lost_more {
+        let originals = if o.replaced == 1 {
+            "the original is"
+        } else {
+            "the originals are"
+        };
         (
             t.text_dim,
-            format!("Replaced by the new copies (the originals are left on no branch): {names}"),
+            format!("Replaced by new copies ({count}; {originals} left on no branch): {names}"),
         )
     } else if o.replaced > 0 {
         (
             t.warning,
             format!(
-                "Left on no branch: {count}{more} ({} replaced by the new copies): {names}",
+                "Left on no branch ({count}, {} of them replaced by new copies): {names}",
                 o.replaced
             ),
         )
     } else {
-        (
-            t.warning,
-            format!("Left on no branch: {count}{more}: {names}"),
-        )
+        (t.warning, format!("Left on no branch ({count}): {names}"))
     };
     line(ui, color, &text);
 }
@@ -181,6 +218,24 @@ fn shown(hash: &str) -> String {
 
 fn line(ui: &mut Ui, color: egui::Color32, text: &str) {
     ui.label(RichText::new(text).size(12.0).color(color));
+}
+
+/// A line that needs attention: an alert icon in `color`, the text in the theme's text colour
+/// (a red or orange text is hard to read on some themes' cards).
+fn alert(ui: &mut Ui, t: &Tokens, color: egui::Color32, text: &str) {
+    ui.horizontal_wrapped(|ui| {
+        icons::inline(ui, "circle-alert", 13.0, color);
+        ui.label(RichText::new(text).size(12.0).color(t.text));
+    });
+}
+
+/// `text` as a sentence: its first letter upper case.
+fn sentence(text: &str) -> String {
+    let mut chars = text.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => String::new(),
+    }
 }
 
 fn dim(ui: &mut Ui, t: &Tokens, text: &str) {
@@ -215,5 +270,6 @@ mod tests {
         assert_eq!(listed(&items[..2], String::clone), "1, 2");
         assert_eq!(plural(1, "file", "files"), "1 file");
         assert_eq!(plural(3, "file", "files"), "3 files");
+        assert_eq!(sentence("x isn't merged"), "X isn't merged");
     }
 }

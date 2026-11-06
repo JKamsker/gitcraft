@@ -35,11 +35,17 @@ impl RepoTab {
             new || ghost.is_some_and(|g| lanes(g).contains(&lane))
         };
 
+        // The lanes of commits it would leave on no ref go with them: faded.
+        let going = |lanes: fn(&RowGhost) -> &Vec<usize>, lane: usize| {
+            ghost.is_some_and(|g| lanes(g).contains(&lane))
+        };
         for &lane in &graph_row.through {
             if lane < lanes {
                 let ends = [pos2(x(lane), top), pos2(x(lane), bottom)];
                 if ghost_lane(|g| &g.through, lane) {
                     dashed(&gp, &ends, t.lane(lane), width);
+                } else if going(|g| &g.going_through, lane) {
+                    gp.line_segment(ends, Stroke::new(width, t.lane(lane).gamma_multiply(GOING)));
                 } else {
                     gp.line_segment(ends, Stroke::new(width, t.lane(lane)));
                 }
@@ -49,6 +55,8 @@ impl RepoTab {
             let end = pos2(x(lane), top);
             if ghost_lane(|g| &g.incoming, lane) {
                 dashed(&gp, &edge_points(node, end), t.lane(lane), width);
+            } else if going(|g| &g.going_incoming, lane) {
+                edge(&gp, node, end, t.lane(lane).gamma_multiply(GOING), width);
             } else {
                 edge(&gp, node, end, t.lane(lane), width);
             }
@@ -97,15 +105,29 @@ impl RepoTab {
             }
             // One it would leave on no ref: crossed out.
             Some(Kind::Going) => {
-                let stroke = Stroke::new(1.8, t.danger);
-                let d = 5.0;
-                gp.line_segment([node + vec2(-d, -d), node + vec2(d, d)], stroke);
-                gp.line_segment([node + vec2(-d, d), node + vec2(d, -d)], stroke);
+                // In full, over the faded row, on a halo of the background.
+                let mut gp = gp.clone();
+                gp.set_opacity(1.0);
+                let d = 6.0;
+                let arms = [
+                    [node + vec2(-d, -d), node + vec2(d, d)],
+                    [node + vec2(-d, d), node + vec2(d, -d)],
+                ];
+                for arm in arms {
+                    gp.line_segment(arm, Stroke::new(4.5, t.dock));
+                }
+                for arm in arms {
+                    gp.line_segment(arm, Stroke::new(2.0, t.danger));
+                }
             }
             _ => {}
         }
     }
 }
+
+/// How much of its colour a lane keeps that leads only to commits a ghost run would leave on
+/// no ref.
+const GOING: f32 = 0.3;
 
 /// A ghost lane along `points`: dashed and translucent.
 fn dashed(p: &Painter, points: &[Pos2], color: Color32, width: f32) {

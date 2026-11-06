@@ -332,11 +332,16 @@ impl RepoTab {
             acts.push(Action::Dialog(Dialog::confirm(
                 "Force push",
                 format!(
-                    "Replace “{name}” on {remote} with {}? The {behind} commit{} it has that {} \
-                     hasn't leave it, for everyone.",
+                    "Replace “{name}” on {remote} with {}? {} it has that {} hasn't {} it, for \
+                     everyone.",
                     b.name,
-                    if behind == 1 { "" } else { "s" },
-                    b.name
+                    if behind == 1 {
+                        "The commit".to_owned()
+                    } else {
+                        format!("The {behind} commits")
+                    },
+                    b.name,
+                    if behind == 1 { "leaves" } else { "leave" },
                 ),
                 "Force push",
                 ops(&[&[

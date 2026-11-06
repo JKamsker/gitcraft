@@ -258,7 +258,12 @@ fn trailing_columns(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, now: i64)
         painter.text(
             pos2(rect.right() - cols.trailing(), mid),
             Align2::LEFT_CENTER,
-            commit.hash.get(..7).unwrap_or(&commit.hash),
+            // A ghost run's merge has no commit yet, so no hash.
+            if commit.hash.starts_with('\0') {
+                "—"
+            } else {
+                commit.hash.get(..7).unwrap_or(&commit.hash)
+            },
             theme::mono(11.0),
             t.text_faint,
         );

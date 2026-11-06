@@ -53,7 +53,7 @@ impl RepoTab {
     /// The graph, or during a ghost run the graph as the operation would leave it (see
     /// [`super::ghost`]), with the strip that says what it would do above it.
     pub(super) fn graph_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
-        self.ghost_strip(ui);
+        let area = ui.available_rect_before_wrap();
         let ghost = self
             .ghost
             .swap_in(&mut self.commits, &mut self.graph, &mut self.index);
@@ -65,6 +65,14 @@ impl RepoTab {
                 .swap_out(&mut self.commits, &mut self.graph, &mut self.index);
             self.selected = selected;
         }
+        // Over the graph's foot rather than above it: the rows (and the menu open on one)
+        // don't move as it comes and goes, or grows when the result is in.
+        egui::Area::new(ui.id().with("ghost-strip"))
+            .order(egui::Order::Middle)
+            .interactable(false)
+            .pivot(Align2::LEFT_BOTTOM)
+            .fixed_pos(area.left_bottom() + vec2(8.0, -8.0))
+            .show(ui.ctx(), |ui| self.ghost_strip(ui, area.width() - 16.0));
     }
 
     fn graph_rows_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
