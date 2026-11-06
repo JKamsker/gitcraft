@@ -111,6 +111,17 @@ impl ConflictEditor {
                 });
             }
         }
+        if ui
+            .add_enabled(idle, egui::Button::new("Merge tool"))
+            .on_hover_text(
+                "Resolve this file in the merge tool of Settings → Git → External tools \
+                 instead; it is marked resolved when the tool reports success. Choices made \
+                 here and not saved are left out.",
+            )
+            .clicked()
+        {
+            acts.push(Action::ResolveInMergeTool(self.path.clone()));
+        }
     }
 
     /// Bottom: the result, editable by hand (unless being saved).

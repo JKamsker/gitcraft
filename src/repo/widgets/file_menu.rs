@@ -3,18 +3,21 @@
 use egui::Response;
 
 use super::file_row::split_dir;
-use crate::repo::Action;
+use crate::repo::external_tools::{ToolItem, tool_item};
 use crate::repo::file_view::FileTab;
+use crate::repo::{Action, DiffKey};
 
 /// Right-click menu for a file of the working tree or a commit: open it, its folder, copy path.
 /// Right-click menu of a file. `rev`: the commit it is shown in (it is viewed as it is there,
 /// history and blame start there);
-/// `ignorable`: a working-tree file that can be added to `.gitignore`.
+/// `ignorable`: a working-tree file that can be added to `.gitignore`; `diff`: the diff the
+/// row stands for, which an external diff or merge tool can open.
 pub fn file_menu(
     resp: &Response,
     path: &str,
     rev: Option<&str>,
     ignorable: bool,
+    diff: Option<&DiffKey>,
     acts: &mut Vec<Action>,
 ) {
     egui::Popup::context_menu(resp)
@@ -26,6 +29,9 @@ pub fn file_menu(
             }
             if ui.button("Open in editor").clicked() {
                 acts.push(Action::OpenInEditor(rel.clone()));
+            }
+            if let Some(key) = diff {
+                tool_items(ui, key, acts);
             }
             if ui.button(crate::repo::reveal_label()).clicked() {
                 acts.push(Action::OpenPath(
@@ -71,6 +77,37 @@ pub fn file_menu(
                 ui.ctx().copy_text(path.to_owned());
             }
         });
+}
+
+/// _Open in diff tool_ or, for a conflicted file, _Resolve in merge tool_.
+fn tool_items(ui: &mut egui::Ui, key: &DiffKey, acts: &mut Vec<Action>) {
+    match tool_item(key) {
+        ToolItem::OpenInDiffTool => {
+            if ui
+                .button("Open in diff tool")
+                .on_hover_text(
+                    "Shows this diff in the diff tool of Settings → Git → External tools. Over \
+                     SSH the tool runs on that machine.",
+                )
+                .clicked()
+            {
+                acts.push(Action::OpenInDiffTool(key.clone()));
+            }
+        }
+        ToolItem::ResolveInMergeTool => {
+            if ui
+                .button("Resolve in merge tool")
+                .on_hover_text(
+                    "Opens the conflict in the merge tool of Settings → Git → External tools; \
+                     the file is marked resolved when the tool reports success.",
+                )
+                .clicked()
+            {
+                acts.push(Action::ResolveInMergeTool(key.path().to_owned()));
+            }
+        }
+        ToolItem::None => {}
+    }
 }
 
 /// The ways to ignore `path`: (menu label, `.gitignore` line, what to stop tracking).

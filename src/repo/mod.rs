@@ -13,6 +13,7 @@ mod conflict;
 mod detail;
 mod dialogs;
 mod diff;
+mod external_tools;
 mod file_text;
 mod file_view;
 mod graph_view;
