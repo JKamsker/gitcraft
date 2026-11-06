@@ -69,7 +69,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Conflicts open in a three-pane editor with Ours, Theirs and Both for each conflict.",
             "Right-click a file for its history, its blame or the whole file as it is at the commit.",
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
-            "Ctrl+F in a diff, a file or a blame finds in it (in the graph it searches the commits): every match is marked, Enter and Shift+Enter (or F3 and Shift+F3) go to the next and previous one. Aa matches case, ab only whole words, .* takes the text as a regular expression.",
+            "Ctrl+F in a diff, a file or a blame finds in it (in the graph it searches the commits): every match is marked, Enter and Shift+Enter (or F3 and Shift+F3) go to the next and previous one. Aa matches case, ab matches whole words only, .* takes the text as a regular expression.",
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",
             "Right-click a pull request and choose Open in worktree to work on its branch in a worktree of its own, made for it when there is none.",
             "A terminal panel with tabs, in the repository's folder.",
@@ -99,7 +99,7 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("Enter / Shift+Enter", "Next / previous search result"),
             ("Cmd+click", "Compare with the selected commit"),
             ("Double-click a pill", "Check out that branch or tag"),
-            ("Esc", "Close the diff, comparison or search"),
+            ("Esc", "Close the find bar, diff, comparison or search"),
         ],
     ),
     (
@@ -119,8 +119,11 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
     (
         "Find in a diff, file or blame",
         &[
-            ("Cmd+F", "Find in what is shown"),
-            ("Enter / Shift+Enter", "Next / previous match"),
+            ("Cmd+F", "Find in the diff, file or blame shown"),
+            (
+                "Enter / Shift+Enter",
+                "Next / previous match (while the find bar is open)",
+            ),
             ("F3 / Shift+F3", "Next / previous match"),
             ("Esc", "Close the find bar"),
         ],

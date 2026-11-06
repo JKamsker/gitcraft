@@ -3,9 +3,10 @@
 
 use egui::{Key, Modifiers};
 
-use crate::repo::RepoTab;
+use super::bar::FIELD_ID;
 use crate::repo::diff::rendered;
 use crate::repo::file_view::FileTab;
+use crate::repo::{DiffKey, RepoTab};
 
 /// What the central pane shows that the find bar can search.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -36,8 +37,11 @@ impl RepoTab {
         }
         // A diff shows whenever there is one: on its own, or beside its file's history.
         if let Some(diff) = &self.diff {
-            let (path, _) = self.diff_origin(&diff.key);
-            return if rendered::is_markdown(&path) && self.diff_rendered {
+            let path = match &diff.key {
+                DiffKey::Commit { path, .. } | DiffKey::Range { path, .. } => path,
+                DiffKey::Work(file) => &file.path,
+            };
+            return if rendered::is_markdown(path) && self.diff_rendered {
                 None
             } else if self.diff_as_file {
                 Some(FindIn::File)
@@ -55,7 +59,7 @@ impl RepoTab {
     /// The find bar's keys, before the tab's own: Ctrl+F opens it where there's something to
     /// search (and is then not the commit search's), F3 / Shift+F3 and, with nothing else
     /// taking the keyboard, Enter / Shift+Enter step, Esc closes it. `free`: no dialog, no text
-    /// field has the keyboard.
+    /// field has the keyboard. While another field has it (the terminal), its keys are its own.
     pub(in crate::repo) fn find_keys(&mut self, ctx: &egui::Context, free: bool) {
         if self.dialog.is_some() || self.keys_blocked {
             return;
@@ -68,8 +72,14 @@ impl RepoTab {
             return;
         };
         let open = self.find.open;
+        // Typing in the find bar itself; any other field (the terminal, the commit message)
+        // keeps its keys.
+        let in_bar = ctx.memory(|m| m.focused()) == Some(egui::Id::new(FIELD_ID));
+        if !free && !in_bar {
+            return;
+        }
         ctx.input_mut(|i| {
-            if (free || open) && i.consume_key(Modifiers::COMMAND, Key::F) {
+            if i.consume_key(Modifiers::COMMAND, Key::F) {
                 self.find.show();
             }
             if !open {

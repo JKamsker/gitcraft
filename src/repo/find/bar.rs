@@ -17,6 +17,7 @@ impl Find {
         if !self.open {
             return;
         }
+        self.drop_unsearched();
         let t = Tokens::get(ui.ctx());
         egui::Frame::new()
             .fill(t.chrome)
@@ -27,37 +28,42 @@ impl Find {
                     icons::inline(ui, "search", 14.0, t.text_faint);
                     self.field(ui, what);
                     self.toggles(ui);
-                    if let Some((text, error)) = self.summary() {
-                        let color = if error { t.danger } else { t.text_dim };
-                        let label = ui.label(RichText::new(text).color(color).small());
-                        if self.capped() {
-                            label.on_hover_text(format!(
-                                "Only the first {MAX_HITS} matches are found; type more to \
-                                 narrow it down"
-                            ));
-                        }
-                    }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", "Close (Esc)").clicked() {
-                            self.close();
-                        }
-                        if icons::small_button(ui, "chevron-down", "Next match (Enter, F3)")
-                            .clicked()
-                        {
-                            self.step(1);
-                        }
-                        if icons::small_button(
-                            ui,
-                            "chevron-up",
-                            "Previous match (Shift+Enter, Shift+F3)",
-                        )
-                        .clicked()
-                        {
-                            self.step(-1);
+                        self.buttons(ui);
+                        // Whatever room is left, cut short rather than pushing the buttons out.
+                        if let Some((text, error)) = self.summary() {
+                            let color = if error { t.danger } else { t.text_dim };
+                            let label = ui.add(
+                                egui::Label::new(RichText::new(&text).color(color).small())
+                                    .truncate(),
+                            );
+                            if self.capped() {
+                                label.on_hover_text(format!(
+                                    "Stopped at the first {} matches; type more to narrow the \
+                                     search",
+                                    thousands(MAX_HITS)
+                                ));
+                            } else if error {
+                                label.on_hover_text(text);
+                            }
                         }
                     });
                 });
             });
+    }
+
+    /// Close, next and previous, laid out right to left.
+    fn buttons(&mut self, ui: &mut Ui) {
+        if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+            self.close();
+        }
+        if icons::small_button(ui, "chevron-down", "Next match (Enter, F3)").clicked() {
+            self.step(1);
+        }
+        if icons::small_button(ui, "chevron-up", "Previous match (Shift+Enter, Shift+F3)").clicked()
+        {
+            self.step(-1);
+        }
     }
 
     /// The text field; Enter / Shift+Enter in it step, Esc closes the bar.
@@ -116,7 +122,32 @@ impl Find {
             }
             if r.clicked() {
                 *on = !*on;
+                // Back to the field, to go on typing (its text not selected).
+                ui.memory_mut(|m| m.request_focus(egui::Id::new(FIELD_ID)));
             }
         }
+    }
+}
+
+/// `100000` as `100,000`.
+fn thousands(n: usize) -> String {
+    let digits = n.to_string();
+    let mut out = String::new();
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn thousands_are_grouped() {
+        assert_eq!(super::thousands(100_000), "100,000");
+        assert_eq!(super::thousands(999), "999");
+        assert_eq!(super::thousands(1_234_567), "1,234,567");
     }
 }

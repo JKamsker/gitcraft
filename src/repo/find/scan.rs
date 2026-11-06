@@ -6,6 +6,7 @@ use std::ops::Range;
 use std::time::{Duration, Instant};
 
 use super::matcher::{Matcher, Query};
+use crate::repo::highlight::MAX_LINE_CHARS;
 
 /// The time a frame spends searching at most.
 pub(super) const BUDGET: Duration = Duration::from_millis(4);
@@ -26,10 +27,10 @@ pub(crate) struct SourceKey {
 /// The view the lines are of.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Source {
-    /// A diff's lines (by the read they come from).
-    Diff(u64),
+    /// A diff's lines (by its file).
+    Diff(String),
     /// The file of a diff switched to File.
-    DiffFile(u64),
+    DiffFile(String),
     Blame {
         path: String,
         rev: Option<String>,
@@ -94,6 +95,11 @@ impl Scan {
             let end = (self.next + CHUNK).min(self.total);
             for i in self.next..end {
                 let Some(text) = line(i) else { continue };
+                // A line cut to be shown has a note on its end, which isn't searched.
+                let text = text
+                    .char_indices()
+                    .nth(MAX_LINE_CHARS)
+                    .map_or(text, |(at, _)| &text[..at]);
                 let mut hits = matcher.find(text);
                 if hits.is_empty() {
                     continue;
@@ -137,7 +143,7 @@ mod tests {
 
     fn key(len: usize) -> SourceKey {
         SourceKey {
-            what: Source::Diff(1),
+            what: Source::Diff("a".into()),
             at: 0,
             len,
         }

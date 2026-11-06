@@ -166,13 +166,8 @@ impl<'a> Rows<'a> {
             scroll = scroll.vertical_scroll_offset(offset_of(change.start));
         }
         if let (Some(find), Some(hit)) = (self.find, self.reveal) {
-            let (y, x) = find.offsets_for(&hit, char_w);
-            if let Some(y) = y {
-                scroll = scroll.vertical_scroll_offset(y);
-            }
-            if let Some(x) = x {
-                scroll = scroll.horizontal_scroll_offset(x);
-            }
+            let text = data.lines.get(hit.line).map_or("", |l| l.text.as_str());
+            scroll = find.scroll_to(scroll, &hit, text, char_w);
         }
         let out = ui.scope_builder(egui::UiBuilder::new().max_rect(body), |ui| {
             scroll.show_rows(ui, LINE_H, count, |ui, range| {
