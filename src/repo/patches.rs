@@ -53,6 +53,37 @@ impl RepoTab {
         else {
             return;
         };
+        self.apply_patch_from(file, ctx);
+    }
+
+    /// Applies the patch file `file` (of this machine) to the repository, undoably: a mail as
+    /// commits (`git am`), a bare diff on the working tree (`git apply`). For a patch dropped on
+    /// the window; the outcome shows in the tab's status line.
+    pub fn apply_dropped_patch(&mut self, file: PathBuf, ctx: &egui::Context) {
+        if let Some(busy) = &self.busy_op {
+            self.status = Some((
+                format!("Apply {}: wait until {busy} is done", file_name(&file)),
+                true,
+            ));
+            return;
+        }
+        self.status = None;
+        self.apply_patch_from(file, ctx);
+    }
+
+    /// Whether a patch given to [`Self::apply_dropped_patch`] is still being applied (or put on
+    /// the repository's machine first), or the tab is busy otherwise: another has to wait.
+    pub fn applying_patch(&self) -> bool {
+        self.patch_pending || self.is_busy()
+    }
+
+    /// Whether the last thing done in the tab failed (its status line says why).
+    pub fn last_failed(&self) -> bool {
+        matches!(self.status, Some((_, true)))
+    }
+
+    /// Reads `file` and applies it (see [`Self::apply_dropped_patch`]).
+    fn apply_patch_from(&mut self, file: PathBuf, ctx: &egui::Context) {
         // Copied as it is (a patch can carry bytes of any encoding); read as text only to tell
         // a mail from a bare diff.
         let bytes = match std::fs::read(&file) {
@@ -67,15 +98,19 @@ impl RepoTab {
         // For a repository on another machine, git there reads a copy put there (in the
         // background).
         let repo = self.path.clone();
+        self.patch_pending = true;
         self.here_or_later(
             ctx,
             move || match crate::remote::parse(&repo) {
                 Some(target) => crate::remote::host_temp_file(&target, "apply.patch", &bytes),
                 None => Ok(file.to_string_lossy().into_owned()),
             },
-            move |tab, file, ctx| match file {
-                Ok(file) => tab.apply_patch_file(&label, &file, mail, ctx),
-                Err(e) => tab.status = Some((format!("Apply patch: {e}"), true)),
+            move |tab, file, ctx| {
+                tab.patch_pending = false;
+                match file {
+                    Ok(file) => tab.apply_patch_file(&label, &file, mail, ctx),
+                    Err(e) => tab.status = Some((format!("Apply patch: {e}"), true)),
+                }
             },
         );
     }

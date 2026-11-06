@@ -11,7 +11,12 @@ so your config, credentials and hooks apply as usual.
 **Repositories and tabs**
 
 - Start page: checks that `git` is installed; open, create (`git init`) or clone a repository;
-  recent repositories.
+  recent repositories, each with its branch, a dot for uncommitted changes and when it was last
+  opened (read in the background). Type to filter them, ↑ / ↓ and Enter to open one.
+- Drop a folder on the window to open it, or a `.patch` / `.diff` / `.eml` / `.mbox` on a
+  repository tab to apply it.
+- _Scan a folder for repositories_ finds the repositories a few folders down and lists them to
+  open or add to the recent list.
 - Browser-like tabs, one per repository (Ctrl+T, Ctrl+W, middle-click; Ctrl+Shift+T reopens a
   closed one). Open tabs, recents, theme and settings are remembered.
 - Profiles, as in GitKraken: switch between them from the title bar (or the palette). Each has

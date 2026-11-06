@@ -628,3 +628,51 @@ fn an_operation_that_panics_leaves_the_tab_idle() {
     );
     assert_eq!(job_status.as_deref(), Some("Internal error: bang"));
 }
+
+/// A patch dropped on the window goes through the same path as _Apply patch_: a bare diff onto
+/// the working tree, a mail as a commit; a file that isn't there says so.
+#[test]
+fn dropped_patches_are_applied() {
+    use super::RepoTab;
+    let dir = repo("dropped patch");
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let file = dir.join("notes ü.txt");
+    let _ = std::fs::write(&file, "one\n");
+    assert!(git::run(Some(&dir), &["add", "-A"]).is_ok());
+    assert!(git::run(Some(&dir), &["commit", "-q", "-m", "notes"]).is_ok());
+    // A diff, made and then undone, to apply again.
+    let _ = std::fs::write(&file, "one\ntwo\n");
+    let diff = git::run(Some(&dir), &["diff"]).unwrap_or_default();
+    assert!(git::run(Some(&dir), &["checkout", "--", "."]).is_ok());
+    let patches = std::env::temp_dir().join(format!("gitcraft-drop é {}", std::process::id()));
+    let _ = std::fs::create_dir_all(&patches);
+    let diff_file = patches.join("change.DIFF");
+    let _ = std::fs::write(&diff_file, &diff);
+    tab.apply_dropped_patch(diff_file, &ctx);
+    finish(&mut tab, &ctx);
+    let applied = std::fs::read_to_string(&file).unwrap_or_default();
+    let diff_failed = tab.last_failed();
+    // A mail: a commit, made and taken back, to apply again.
+    assert!(git::run(Some(&dir), &["commit", "-q", "-am", "two lines"]).is_ok());
+    let mail = git::run_bytes(Some(&dir), &["format-patch", "-1", "--stdout"]).unwrap_or_default();
+    assert!(git::run(Some(&dir), &["reset", "-q", "--hard", "HEAD~1"]).is_ok());
+    let mail_file = patches.join("0001-two lines.patch");
+    let _ = std::fs::write(&mail_file, mail);
+    tab.apply_dropped_patch(mail_file, &ctx);
+    finish(&mut tab, &ctx);
+    let subject = git::run(Some(&dir), &["log", "-1", "--format=%s"]).unwrap_or_default();
+    let mail_failed = tab.last_failed();
+    // Gone before it was applied.
+    tab.apply_dropped_patch(patches.join("gone.patch"), &ctx);
+    let gone_failed = tab.last_failed();
+    let pending_after = tab.patch_pending;
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(&patches);
+    assert_eq!(applied, "one\ntwo\n");
+    assert!(!diff_failed);
+    assert_eq!(subject.trim(), "two lines");
+    assert!(!mail_failed);
+    assert!(gone_failed);
+    assert!(!pending_after);
+}

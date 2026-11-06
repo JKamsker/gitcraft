@@ -5,14 +5,13 @@ use std::path::Path;
 use egui::{Align2, Rect, RichText, Sense, Stroke, Ui, pos2, vec2};
 
 use super::App;
+use super::home_recent::RecentClick;
 use crate::git;
 use crate::icons;
 use crate::theme::{self, Tokens};
 
-enum RecentClick {
-    Open,
-    Forget,
-}
+/// The space kept between an action card's subtitle and its sides.
+const CARD_TEXT_MARGIN: f32 = 12.0;
 
 impl App {
     pub(super) fn pick_existing(&mut self, ctx: &egui::Context) {
@@ -88,6 +87,10 @@ impl App {
                             }
                         }
                     });
+                    ui.add_space(10.0);
+                    if ui.link("Scan a folder for repositories…").clicked() {
+                        action = Some(4);
+                    }
 
                     if let Some(err) = &self.error {
                         ui.add_space(12.0);
@@ -111,19 +114,10 @@ impl App {
                     if !self.recent.is_empty() {
                         ui.add_space(30.0);
                         ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
-                            ui.label(
-                                RichText::new("RECENT")
-                                    .font(theme::semibold(10.5))
-                                    .color(t.text_faint),
-                            );
-                            ui.add_space(4.0);
-                            ui.spacing_mut().item_spacing.y = 2.0;
-                            for (i, path) in self.recent.iter().enumerate() {
-                                match recent_row(ui, path) {
-                                    Some(RecentClick::Open) => open = Some(path.clone()),
-                                    Some(RecentClick::Forget) => forget = Some(i),
-                                    None => {}
-                                }
+                            match self.recent_section(ui, &t) {
+                                Some(RecentClick::Open(path)) => open = Some(path),
+                                Some(RecentClick::Forget(i)) => forget = Some(i),
+                                None => {}
                             }
                         });
                     }
@@ -134,7 +128,8 @@ impl App {
             Some(0) => self.pick_existing(&ctx),
             Some(1) => self.pick_new(&ctx),
             Some(2) => self.start_clone(),
-            Some(_) => self.start_open_remote(&ctx),
+            Some(3) => self.start_open_remote(&ctx),
+            Some(_) => self.start_repo_scan(&ctx),
             None => {}
         }
         if let Some(path) = open {
@@ -195,7 +190,7 @@ impl App {
 /// A large clickable card on the start page.
 fn action_card(ui: &mut Ui, width: f32, icon: &str, title: &str, subtitle: &str) -> egui::Response {
     let t = Tokens::get(ui.ctx());
-    let (rect, resp) = ui.allocate_exact_size(vec2(width, 116.0), Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(vec2(width, 122.0), Sense::click());
     let fill = if resp.hovered() { t.hover } else { t.card };
     let stroke = if resp.hovered() {
         t.accent
@@ -224,77 +219,76 @@ fn action_card(ui: &mut Ui, width: f32, icon: &str, title: &str, subtitle: &str)
         theme::semibold(14.0),
         t.text,
     );
-    p.text(
-        pos2(rect.center().x, rect.top() + 90.0),
-        Align2::CENTER_CENTER,
-        subtitle,
-        egui::FontId::proportional(11.5),
-        t.text_dim,
+    // Wrapped (two lines at most, then cut with "…") inside the card, clear of its sides.
+    let galley = p.layout_job(subtitle_job(subtitle, width, t.text_dim));
+    let top = rect.top() + 82.0;
+    let pos = pos2(
+        rect.center().x - galley.rect.center().x,
+        top - galley.rect.top(),
     );
+    p.galley(pos, galley, t.text_dim);
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
-fn recent_row(ui: &mut Ui, path: &Path) -> Option<RecentClick> {
-    let t = Tokens::get(ui.ctx());
-    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 40.0), Sense::click());
-    let hovered = resp.hovered();
-    if hovered {
-        ui.painter().rect_filled(rect, t.radius, t.hover);
-    }
-    let y = rect.center().y;
-    // One on another machine says which.
-    icons::paint(
-        ui,
-        Rect::from_center_size(pos2(rect.left() + 20.0, y), vec2(18.0, 18.0)),
-        if crate::remote::is_remote(path) {
-            "server"
-        } else {
-            "folder-git-2"
-        },
-        16.0,
-        t.icon,
+/// An action card's subtitle, laid out to fit a card `card_width` wide.
+fn subtitle_job(subtitle: &str, card_width: f32, color: egui::Color32) -> egui::text::LayoutJob {
+    let mut job = egui::text::LayoutJob::single_section(
+        subtitle.to_owned(),
+        egui::TextFormat::simple(egui::FontId::proportional(11.5), color),
     );
-    let name = path
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    // Leave room for the remove button; long paths are cut at the row's edge.
-    let p = ui.painter_at(rect.with_max_x(rect.right() - 36.0));
-    p.text(
-        pos2(rect.left() + 40.0, y - 8.0),
-        Align2::LEFT_CENTER,
-        name,
-        theme::medium(12.5),
-        t.text,
-    );
-    p.text(
-        pos2(rect.left() + 40.0, y + 8.0),
-        Align2::LEFT_CENTER,
-        crate::remote::display(path),
-        egui::FontId::proportional(11.0),
-        t.text_faint,
-    );
-    let mut forget = false;
-    if hovered || ui.rect_contains_pointer(rect) {
-        let x_rect = Rect::from_center_size(pos2(rect.right() - 18.0, y), vec2(20.0, 20.0));
-        let x = ui
-            .interact(x_rect, resp.id.with("forget"), Sense::click())
-            .on_hover_text("Remove from list");
-        if x.hovered() {
-            ui.painter().rect_filled(x_rect, t.radius_sm, t.pressed);
-        }
-        icons::paint(ui, x_rect, "x", 12.0, t.text_faint);
-        forget = x.clicked();
-    }
-    if forget {
-        Some(RecentClick::Forget)
-    } else if resp.clicked() {
-        Some(RecentClick::Open)
-    } else {
-        None
-    }
+    job.wrap = egui::text::TextWrapping {
+        max_width: subtitle_width(card_width),
+        max_rows: 2,
+        break_anywhere: false,
+        overflow_character: Some('…'),
+    };
+    job.halign = egui::Align::Center;
+    job
+}
+
+/// How wide an action card's subtitle may be.
+fn subtitle_width(card_width: f32) -> f32 {
+    (card_width - 2.0 * CARD_TEXT_MARGIN).max(1.0)
 }
 
 fn same_path(a: &Path, b: &Path) -> bool {
     crate::remote::same_dir(a, b)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A card's subtitle keeps clear of the card's sides: wrapped, then cut, never wider.
+    #[test]
+    fn card_subtitles_stay_inside_their_card() {
+        let ctx = egui::Context::default();
+        let cases = [
+            (151.0, "An existing local repository"),
+            (
+                90.0,
+                "A new repository (git init) with a much longer subtitle",
+            ),
+            (40.0, "Größe 日本語 repository"),
+            (151.0, ""),
+        ];
+        let mut laid_out = Vec::new();
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            for (width, text) in cases {
+                let job = subtitle_job(text, width, egui::Color32::WHITE);
+                let galley = ui.fonts_mut(|f| f.layout_job(job));
+                laid_out.push((width, text, galley.rect.width(), galley.rows.len()));
+            }
+        });
+        // Nothing renders here: the font texture is left unapplied on purpose.
+        output.textures_delta.clear();
+        assert_eq!(laid_out.len(), cases.len());
+        for (width, text, wide, rows) in laid_out {
+            assert!(
+                wide <= subtitle_width(width) + 0.5,
+                "{text:?} at {width}: {wide}"
+            );
+            assert!(rows <= 2, "{text:?}: {rows} rows");
+        }
+    }
 }
