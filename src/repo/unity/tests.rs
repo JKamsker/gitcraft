@@ -49,11 +49,12 @@ fn meta_problems_in_words() {
     };
     assert_eq!(
         describe(&p(MetaKind::AddedWithoutMeta)),
-        "Assets/a.png is staged without Assets/a.png.meta"
+        "Assets/a.png has no Assets/a.png.meta staged: others get a new GUID for it and its \
+         references break."
     );
     assert_eq!(
         describe(&p(MetaKind::DeletedWithoutMeta)),
-        "Assets/a.png is deleted but Assets/a.png.meta stays"
+        "Assets/a.png is deleted but Assets/a.png.meta stays: Unity will warn about the leftover."
     );
 }
 
@@ -72,23 +73,29 @@ fn idle(tab: &RepoTab) -> bool {
     tab.unity.busy.is_none() && tab.busy_op.is_none() && !tab.unity.checking
 }
 
-/// A Unity project at the root: found, checked, fixed from the panel's actions; an asset staged
-/// without its `.meta` flagged, and the `.meta` staged from the banner's action.
+/// A Unity project before its first commit: found and checked; the panel's fixes applied;
+/// an asset staged without its `.meta` flagged and fixed from the banner; an asset deleted
+/// without its `.meta` fixed by deleting it too; the hint turned off for the repository.
 #[test]
 fn unity_in_the_tab() -> Result<(), String> {
     let dir = git::unity_tests::unity_repo("tab", "")?;
-    git::run(Some(&dir), &["commit", "-q", "--allow-empty", "-m", "base"])?;
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new(dir.clone(), &ctx);
     wait(&mut tab, &ctx, |t| matches!(t.unity.setup, Some(Ok(_))));
     assert_eq!(tab.unity.project().map(|p| p.root.as_str()), Some(""));
     assert!(matches!(&tab.unity.setup, Some(Ok(s)) if s.force_text == Some(false)));
+    assert_eq!(
+        tab.unity.hint().as_deref(),
+        Some("assets aren't saved as text")
+    );
 
     tab.apply(Action::Unity(UnityAct::OpenPanel), &ctx);
-    wait(&mut tab, &ctx, |t| matches!(t.unity.setup, Some(Ok(_))));
-    tab.apply(Action::Unity(UnityAct::AddAttributes), &ctx);
+    wait(&mut tab, &ctx, |t| idle(t) && !t.unity.stale);
+    tab.apply(Action::Unity(UnityAct::AddAttributes { lfs: false }), &ctx);
     wait(&mut tab, &ctx, |t| {
-        idle(t) && matches!(t.unity.setup, Some(Ok(_)))
+        idle(t)
+            && !t.unity.stale
+            && matches!(&t.unity.setup, Some(Ok(s)) if s.missing_yaml.is_empty())
     });
     tab.apply(Action::Unity(UnityAct::AddIgnores), &ctx);
     wait(&mut tab, &ctx, |t| {
@@ -98,9 +105,16 @@ fn unity_in_the_tab() -> Result<(), String> {
         Some(Ok(s)) => s.clone(),
         other => return Err(format!("not checked: {other:?}")),
     };
-    assert!(setup.missing_attributes.is_empty());
+    assert!(setup.missing_yaml.is_empty());
+    assert!(
+        !setup.missing_lfs.is_empty(),
+        "LFS lines only when asked for"
+    );
     assert!(setup.unignored.is_empty());
-    assert!(!setup.all_good(), "Force Text is the editor's to set");
+    assert_eq!(
+        setup.needs_fixing().as_deref(),
+        Some("assets aren't saved as text")
+    );
 
     // An asset staged alone; its .meta left unstaged.
     std::fs::write(dir.join("Assets/Hero Ü.png"), "p").map_err(|e| e.to_string())?;
@@ -113,15 +127,46 @@ fn unity_in_the_tab() -> Result<(), String> {
     wait(&mut tab, &ctx, |t| !t.unity.meta.is_empty());
     let partners: Vec<String> = tab.unity.meta.iter().map(|m| m.partner.clone()).collect();
     assert_eq!(partners, ["Assets/Hero Ü.png.meta"]);
-    let stage = tab.stage_partners_action().ok_or("nothing to stage")?;
+    let fixes = tab.meta_fixes();
+    assert_eq!(
+        fixes.iter().map(|(l, _)| *l).collect::<Vec<_>>(),
+        ["Stage the missing halves"]
+    );
+    let (_, stage) = fixes.into_iter().next().ok_or("no fix")?;
     tab.apply(stage, &ctx);
     wait(&mut tab, &ctx, |t| {
         t.busy_op.is_none() && t.unity.meta.is_empty() && !t.unity.meta_running
     });
     assert!(tab.unity.meta.is_empty());
-    let staged = git::run(Some(&dir), &["diff", "--cached", "--name-only", "-z"])?;
-    assert!(staged.split('\0').any(|p| p == "Assets/Hero Ü.png.meta"));
+    git::run(Some(&dir), &["commit", "-qm", "hero"])?;
+
+    // The asset deleted, its .meta left: deleted too from the banner.
+    git::run(
+        Some(&dir),
+        &["--literal-pathspecs", "rm", "-q", "--", "Assets/Hero Ü.png"],
+    )?;
+    tab.reload_status(&ctx);
+    wait(&mut tab, &ctx, |t| !t.unity.meta.is_empty());
+    let fixes = tab.meta_fixes();
+    assert_eq!(
+        fixes.iter().map(|(l, _)| *l).collect::<Vec<_>>(),
+        ["Delete the .meta too"]
+    );
+    let (_, delete) = fixes.into_iter().next().ok_or("no fix")?;
+    tab.apply(delete, &ctx);
+    wait(&mut tab, &ctx, |t| {
+        t.busy_op.is_none() && t.unity.meta.is_empty() && !t.unity.meta_running
+    });
+    assert!(!dir.join("Assets/Hero Ü.png.meta").exists());
+
+    tab.apply(Action::Unity(UnityAct::DismissHint), &ctx);
+    assert_eq!(tab.unity.hint(), None);
+    wait(&mut tab, &ctx, |t| {
+        git::run(Some(&t.path), &["config", "--get", "gitcraft.unityHint"]).is_ok()
+    });
+    let off = git::run(Some(&dir), &["config", "--get", "gitcraft.unityHint"])?;
     let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(off.trim(), "false");
     Ok(())
 }
 
@@ -134,8 +179,9 @@ fn smart_merge_in_the_conflict_editor() -> Result<(), String> {
     let dir = git::unity_tests::unity_repo("merge", "")?;
     let tool = dir.with_extension("tools").join("UnityYAMLMerge");
     let _ = std::fs::create_dir_all(tool.parent().ok_or("no folder")?);
-    // merge -p BASE THEIRS OURS MERGED: their version, as Smart Merge might choose.
-    std::fs::write(&tool, "#!/bin/sh\ncp \"$4\" \"$6\"\n").map_err(|e| e.to_string())?;
+    // merge -p --fallback none BASE THEIRS OURS MERGED: their version, as Smart Merge might
+    // choose.
+    std::fs::write(&tool, "#!/bin/sh\ncp \"$6\" \"$8\"\n").map_err(|e| e.to_string())?;
     std::fs::set_permissions(&tool, std::fs::Permissions::from_mode(0o755))
         .map_err(|e| e.to_string())?;
     git::run(
@@ -167,7 +213,8 @@ fn smart_merge_in_the_conflict_editor() -> Result<(), String> {
     assert_eq!(tab.unity.tool.as_deref(), Some(tool.as_path()));
     tab.conflict =
         crate::repo::conflict::ConflictEditor::open(&dir, scene, Some(git::InProgress::Merge));
-    assert!(tab.unity.offers_smart_merge(scene));
+    assert_eq!(tab.unity.smart_merge_for(scene), Some(true));
+    assert_eq!(tab.unity.smart_merge_for("Assets/a.png"), None);
     tab.apply(Action::Unity(UnityAct::SolveConflict), &ctx);
     wait(&mut tab, &ctx, |t| {
         t.conflict.as_ref().is_some_and(|c| !c.solving)
@@ -179,7 +226,7 @@ fn smart_merge_in_the_conflict_editor() -> Result<(), String> {
     wait(&mut tab, &ctx, |t| idle(t) && t.unity.driver.is_some());
     let driver = tab.unity.driver.clone().unwrap_or_default();
     assert!(
-        driver.ends_with("UnityYAMLMerge' merge -p %O %B %A %A"),
+        driver.ends_with("UnityYAMLMerge' merge -p --fallback none %O %B %A %A"),
         "{driver}"
     );
     let _ = std::fs::remove_dir_all(&dir);
@@ -213,6 +260,6 @@ fn no_unity_project_nothing_offered() -> Result<(), String> {
     wait(&mut tab, &ctx, |t| t.unity.detected_for.is_some());
     let _ = std::fs::remove_dir_all(&dir);
     assert!(tab.unity.project().is_none());
-    assert!(!tab.unity.offers_smart_merge("Assets/a.unity"));
+    assert_eq!(tab.unity.smart_merge_for("Assets/a.unity"), None);
     Ok(())
 }

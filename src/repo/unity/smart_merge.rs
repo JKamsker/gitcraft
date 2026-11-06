@@ -121,7 +121,7 @@ pub(super) fn register(repo: &Path, tool: &Path) -> Result<(), String> {
         ),
         (
             format!("merge.{DRIVER}.driver"),
-            format!("{t} merge -p %O %B %A %A"),
+            format!("{t} merge -p --fallback none %O %B %A %A"),
         ),
         (format!("merge.{DRIVER}.recursive"), "binary".to_owned()),
         (
@@ -148,6 +148,40 @@ pub(super) fn registered(repo: &Path) -> Option<String> {
     .ok()
     .map(|v| v.trim().to_owned())
     .filter(|v| !v.is_empty())
+}
+
+/// How long UnityYAMLMerge may take before it is stopped.
+const SOLVE_FOR: std::time::Duration = std::time::Duration::from_secs(120);
+
+/// Runs `cmd` (no input, nothing read from its output but its errors), stopped after `limit`.
+fn run_for(cmd: &mut Command, limit: std::time::Duration) -> Result<std::process::Output, String> {
+    use std::process::Stdio;
+    let mut child = cmd
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Could not run UnityYAMLMerge: {e}"))?;
+    let started = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                return child
+                    .wait_with_output()
+                    .map_err(|e| format!("UnityYAMLMerge: {e}"));
+            }
+            Ok(None) if started.elapsed() > limit => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!(
+                    "UnityYAMLMerge didn't finish in {} s and was stopped",
+                    limit.as_secs()
+                ));
+            }
+            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(50)),
+            Err(e) => return Err(format!("UnityYAMLMerge: {e}")),
+        }
+    }
 }
 
 /// UnityYAMLMerge's take on the conflicted `path`: its three versions (base, ours, theirs)
@@ -179,12 +213,11 @@ pub(super) fn solve(repo: &Path, path: &str, tool: &Path) -> Result<String, Stri
             use std::os::windows::process::CommandExt;
             cmd.creation_flags(0x0800_0000);
         }
-        let out = cmd
-            .arg("merge")
-            .arg("-p")
-            .args(&files)
-            .output()
-            .map_err(|e| format!("Could not run UnityYAMLMerge: {e}"))?;
+        // No fallback tool: on what it can't merge it would open a merge window of its own.
+        let out = run_for(
+            cmd.args(["merge", "-p", "--fallback", "none"]).args(&files),
+            SOLVE_FOR,
+        )?;
         let merged =
             std::fs::read(&files[3]).map_err(|e| format!("UnityYAMLMerge left no result: {e}"))?;
         let text = String::from_utf8_lossy(&merged).into_owned();

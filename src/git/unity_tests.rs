@@ -35,27 +35,62 @@ fn settings_read_from_unity_files() {
 }
 
 #[test]
-fn recommended_attributes_missing() {
-    let attrs =
-        "*.unity merge=unityyamlmerge eol=lf\n# *.prefab merge=unityyamlmerge\n*.png filter=lfs\n";
-    let missing = missing_patterns(attrs);
-    assert!(!missing.contains(&"*.unity".to_owned()));
-    assert!(
-        missing.contains(&"*.prefab".to_owned()),
-        "a comment is no line"
-    );
-    assert!(!missing.contains(&"*.png".to_owned()));
+fn what_needs_fixing_first() {
+    let fine = UnitySetup {
+        force_text: Some(true),
+        vcs_mode: Some("Visible Meta Files".into()),
+        missing_lfs: vec!["*.png".into()],
+        unignored: vec!["Obj".into()],
+        ..Default::default()
+    };
+    // LFS is the repository's choice; Obj alone isn't worth a hint.
+    assert_eq!(fine.needs_fixing(), None);
+    assert_eq!(fine.visible_meta(), Some(true));
+    let perforce = UnitySetup {
+        vcs_mode: Some("Perforce".into()),
+        ..fine.clone()
+    };
+    assert_eq!(perforce.visible_meta(), Some(true));
+    let hidden = UnitySetup {
+        vcs_mode: Some("Hidden Meta Files".into()),
+        ..fine.clone()
+    };
     assert_eq!(
-        missing_patterns("").len(),
-        UNITY_YAML.len() + UNITY_BINARY.len()
+        hidden.needs_fixing().as_deref(),
+        Some(".meta files are hidden")
     );
-    let block = attributes_block(&["*.prefab".to_owned(), "*.fbx".to_owned()]);
-    assert!(block.contains("*.prefab merge=unityyamlmerge eol=lf\n"));
-    assert!(block.contains("*.fbx filter=lfs diff=lfs merge=lfs -text\n"));
+    let library = UnitySetup {
+        unignored: vec!["Library".into()],
+        ..fine.clone()
+    };
+    assert_eq!(
+        library.needs_fixing().as_deref(),
+        Some("Library isn't ignored")
+    );
+    let tracked = UnitySetup {
+        tracked_generated: vec!["Temp".into()],
+        ..library.clone()
+    };
+    assert_eq!(
+        tracked.needs_fixing().as_deref(),
+        Some("Temp has files committed")
+    );
+    let no_yaml = UnitySetup {
+        missing_yaml: UNITY_YAML.iter().map(|p| (*p).to_owned()).collect(),
+        ..fine
+    };
+    assert!(
+        no_yaml
+            .needs_fixing()
+            .is_some_and(|s| s.contains("Smart Merge"))
+    );
 }
 
 #[test]
-fn ignore_lines_for_the_project_folder() {
+fn attribute_and_ignore_lines() {
+    let block = attributes_block(&["*.prefab".to_owned(), "*.fbx".to_owned()]);
+    assert!(block.contains("*.prefab merge=unityyamlmerge eol=lf\n"));
+    assert!(block.contains("*.fbx filter=lfs diff=lfs merge=lfs -text\n"));
     let block = ignore_block(
         &project("My Game/"),
         &["Library".to_owned(), "UserSettings".to_owned()],
@@ -63,6 +98,9 @@ fn ignore_lines_for_the_project_folder() {
     assert!(block.contains("/My Game/[Ll]ibrary/\n"));
     assert!(block.contains("/My Game/[Uu]serSettings/\n"));
     assert!(ignore_block(&project(""), &["Temp".to_owned()]).contains("/[Tt]emp/\n"));
+    // A folder whose name looks like a pattern matches only itself.
+    let odd = ignore_block(&project("Game [Unity]/"), &["Temp".to_owned()]);
+    assert!(odd.contains("/Game \\[Unity\\]/[Tt]emp/\n"), "{odd}");
 }
 
 #[test]
@@ -81,15 +119,15 @@ fn every_asset_and_folder_needs_its_meta() {
         staged("Assets/Old Folder.meta", 'A'),
     ];
     // In the index: the metas of the deleted prefab and the kept anim, and a folder.
-    let tracked = |p: &str| {
+    let index = IndexListing::of(
         [
             "Assets/Gone.prefab.meta",
             "Assets/Kept.anim",
-            "Assets/Old Folder/",
+            "Assets/Old Folder/x.png",
         ]
-        .contains(&p)
-    };
-    let problems: Vec<(String, MetaKind)> = meta_problems(&p, &files, &tracked)
+        .map(str::to_owned),
+    );
+    let problems: Vec<(String, MetaKind)> = meta_problems(&p, &files, &|p| index.has(p))
         .into_iter()
         .map(|m| (m.partner, m.kind))
         .collect();
@@ -115,17 +153,23 @@ fn every_asset_and_folder_needs_its_meta() {
             ("Assets/Orphan.asset".to_owned(), MetaKind::MetaWithoutAsset),
         ]
     );
-    let asked = meta_candidates(&p, &files);
-    for wanted in [
-        "Assets/Hero.png.meta",
-        "Assets/New Folder.meta",
-        "Assets/Orphan.asset/",
-        "Assets/Gone.prefab.meta",
-    ] {
-        assert!(asked.contains(&wanted.to_owned()), "{wanted}");
-    }
-    assert!(!asked.iter().any(|p| p.starts_with("Packages")));
-    assert!(meta_problems(&p, &[], &tracked).is_empty());
+    assert!(meta_problems(&p, &[], &|p| index.has(p)).is_empty());
+}
+
+#[test]
+fn what_unity_makes_no_meta_for_isnt_flagged() {
+    let p = project("");
+    let files = [
+        staged("Assets/.gitkeep", 'A'),
+        staged("Assets/Samples~/x.cs", 'A'),
+        staged("Assets/Docs~/readme.md", 'A'),
+        staged("Assets/CVS/Entries", 'A'),
+        staged("Assets/scratch.tmp", 'A'),
+        staged("Assets/.hidden/y.png", 'A'),
+    ];
+    assert!(meta_problems(&p, &files, &|_| false).is_empty());
+    assert!(skipped_by_unity("Assets/a/b~/c.png", "Assets/"));
+    assert!(!skipped_by_unity("Assets/a/b/c.png", "Assets/"));
 }
 
 #[test]
@@ -138,6 +182,23 @@ fn a_project_in_a_folder_checks_its_own_assets() {
     let problems = meta_problems(&p, &files, &|_| false);
     let partners: Vec<&str> = problems.iter().map(|m| m.partner.as_str()).collect();
     assert_eq!(partners, ["Game/Assets/y.png.meta"]);
+}
+
+#[test]
+fn the_index_listing_knows_files_and_folders() {
+    let index = IndexListing::of(["Assets/a/b/c.png".to_owned(), "Assets/d.png".to_owned()]);
+    assert!(index.has("Assets/d.png"));
+    assert!(index.has("Assets/a/"));
+    assert!(index.has("Assets/a/b/"));
+    assert!(!index.has("Assets/a"));
+    assert!(!index.has("Assets/e/"));
+    let attrs = parse_attrs("a.png\0filter\0lfs\0a.png\0merge\0unspecified\0");
+    assert_eq!(
+        attrs
+            .get(&("a.png".into(), "filter".into()))
+            .map(String::as_str),
+        Some("lfs")
+    );
 }
 
 fn git(dir: &Path, args: &[&str]) -> Result<String, String> {
@@ -175,33 +236,42 @@ pub(crate) fn unity_repo(name: &str, root: &str) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
-/// A project in a folder with a space is found, untracked; its settings and the repository's
-/// files are checked; the fixes are appended and then nothing is missing.
+/// A project in a folder with a space is found, untracked; its settings and what git does with
+/// its files are checked (attributes in the project's own folder count); the fixes are appended
+/// and then nothing is missing; a committed Library is found and taken out of git.
 #[test]
 fn a_project_found_and_checked() -> Result<(), String> {
     let dir = unity_repo("found", "My Game/")?;
     let found = unity_project(&dir)?.ok_or("not found")?;
     assert_eq!(found.root, "My Game/");
     assert_eq!(found.version.as_deref(), Some("2022.3.10f1"));
+    // Attributes kept in the project's folder, in upper case for PNGs.
+    std::fs::write(
+        dir.join("My Game/.gitattributes"),
+        "*.unity merge=unityyamlmerge eol=lf\n*.[pP][nN][gG] filter=lfs diff=lfs merge=lfs -text\n",
+    )
+    .map_err(|e| e.to_string())?;
     let setup = unity_setup(&dir, &found)?;
     assert_eq!(setup.force_text, Some(false));
-    assert_eq!(setup.visible_meta, Some(true));
+    assert_eq!(setup.visible_meta(), Some(true));
+    assert!(!setup.missing_yaml.contains(&"*.unity".to_owned()));
+    assert!(setup.missing_yaml.contains(&"*.prefab".to_owned()));
+    assert!(!setup.missing_lfs.contains(&"*.png".to_owned()));
     assert_eq!(setup.unignored.len(), UNITY_IGNORED.len());
-    assert!(!setup.all_good());
+    assert!(setup.tracked_generated.is_empty());
 
     std::fs::write(dir.join(".gitignore"), "*.log\r\n").map_err(|e| e.to_string())?;
-    append_block(
-        &dir,
-        ".gitattributes",
-        &attributes_block(&setup.missing_attributes),
-    )?;
+    let missing: Vec<String> = setup
+        .missing_yaml
+        .iter()
+        .chain(&setup.missing_lfs)
+        .cloned()
+        .collect();
+    append_block(&dir, ".gitattributes", &attributes_block(&missing))?;
     append_block(&dir, ".gitignore", &ignore_block(&found, &setup.unignored))?;
     let setup = unity_setup(&dir, &found)?;
-    assert!(
-        setup.missing_attributes.is_empty(),
-        "{:?}",
-        setup.missing_attributes
-    );
+    assert!(setup.missing_yaml.is_empty(), "{:?}", setup.missing_yaml);
+    assert!(setup.missing_lfs.is_empty(), "{:?}", setup.missing_lfs);
     assert!(setup.unignored.is_empty(), "{:?}", setup.unignored);
     let ignore = std::fs::read_to_string(dir.join(".gitignore")).map_err(|e| e.to_string())?;
     assert!(ignore.starts_with("*.log\r\n\r\n# Unity"), "{ignore:?}");
@@ -209,19 +279,26 @@ fn a_project_found_and_checked() -> Result<(), String> {
     let attrs = std::fs::read_to_string(dir.join(".gitattributes")).map_err(|e| e.to_string())?;
     assert!(attrs.starts_with("# Unity"), "{attrs:?}");
 
-    // The index answers which partners exist, a folder by what is inside it.
+    // Library committed before it was ignored.
+    std::fs::create_dir_all(dir.join("My Game/Library")).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join("My Game/Library/cache.bin"), "c").map_err(|e| e.to_string())?;
+    git(&dir, &["add", "-f", "--", "My Game/Library/cache.bin"])?;
+    assert_eq!(unity_setup(&dir, &found)?.tracked_generated, ["Library"]);
+    untrack_generated(&dir, &found, &["Library".to_owned()])?;
+    assert!(unity_setup(&dir, &found)?.tracked_generated.is_empty());
+    assert!(
+        dir.join("My Game/Library/cache.bin").exists(),
+        "kept on disk"
+    );
+
+    // The index under Assets/, in one listing.
     std::fs::create_dir_all(dir.join("My Game/Assets/Art")).map_err(|e| e.to_string())?;
     std::fs::write(dir.join("My Game/Assets/Art/ü x.png"), "p").map_err(|e| e.to_string())?;
     git(&dir, &["add", "--", "My Game/Assets/Art/ü x.png"])?;
-    let asked = [
-        "My Game/Assets/Art/".to_owned(),
-        "My Game/Assets/Art/ü x.png".to_owned(),
-        "My Game/Assets/Art.meta".to_owned(),
-    ];
-    let found_in_index = in_index(&dir, &asked)?;
-    assert!(found_in_index.contains("My Game/Assets/Art/"));
-    assert!(found_in_index.contains("My Game/Assets/Art/ü x.png"));
-    assert!(!found_in_index.contains("My Game/Assets/Art.meta"));
+    let index = index_under(&dir, "My Game/Assets/")?;
+    assert!(index.has("My Game/Assets/Art/"));
+    assert!(index.has("My Game/Assets/Art/ü x.png"));
+    assert!(!index.has("My Game/Assets/Art.meta"));
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())
 }
