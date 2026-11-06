@@ -66,6 +66,12 @@ impl Plan {
         if let Some(why) = blocked(read.staged, read.branch.as_deref(), read.in_progress) {
             return Err(why);
         }
+        if read.root && read.shallow {
+            return Err(format!(
+                "This clone is shallow: the commits before {} aren't here to rebase onto",
+                short(&read.target)
+            ));
+        }
         if !read.ancestor {
             return Err(format!(
                 "{} is not on the checked-out branch",
@@ -174,7 +180,12 @@ impl Plan {
     /// Fold now: the commit, then `rebase` (the command [`Self::editor`] gives), undone with a
     /// soft reset, which puts the branch back and leaves the changes staged.
     pub(crate) fn fold_steps(&self, rebase: Vec<String>) -> (Vec<Vec<String>>, Undo) {
-        let steps = [self.guards().to_vec(), vec![self.fixup_commit(), rebase]].concat();
+        let check = VERIFY.map(str::to_owned).to_vec();
+        let steps = [
+            self.guards().to_vec(),
+            vec![self.fixup_commit(), rebase, check],
+        ]
+        .concat();
         (steps, Undo::HeadMove { mode: "--soft" })
     }
 
@@ -187,6 +198,24 @@ impl Plan {
             read: None,
         }
     }
+}
+
+/// Checks, once the rebase is done, that the branch ends where the fixup commit did
+/// (`ORIG_HEAD`, which the rebase set to it): staged changes that undo what a later commit does
+/// meld into nothing, and that later commit then brings its change back, the rebase succeeding
+/// all the same. Failing, the fold is taken back ([`Stopped::put_back_steps`]).
+const VERIFY: [&str; 6] = [
+    "diff",
+    "--quiet",
+    "--no-ext-diff",
+    "ORIG_HEAD",
+    "HEAD",
+    "--",
+];
+
+/// Whether `error` is the check of [`VERIFY`] failing: the trees differ.
+pub(crate) fn lost_in_rebase(error: &str) -> bool {
+    error.starts_with(&format!("git {} failed", VERIFY.join(" ")))
 }
 
 /// A fold whose rebase stopped (on a conflict): aborting it goes back to before the fold,
@@ -207,6 +236,19 @@ impl Stopped {
     /// is no longer stopped (done or aborted elsewhere, or it never got as far as the rebase).
     pub(crate) fn over(&self, read: u64, state: Option<InProgress>) -> bool {
         self.read.is_some_and(|r| read >= r) && state != Some(InProgress::Rebase)
+    }
+
+    /// Taking back a fold whose result lost some of the staged changes: the branch, the files
+    /// and the index back to the fixup commit (`ORIG_HEAD`, the files changed by the rebase put
+    /// back, the other changes kept), then HEAD back to before it, the changes staged again.
+    pub(crate) fn put_back_steps(&self) -> Vec<Vec<String>> {
+        vec![
+            expect_symref("HEAD", &format!("refs/heads/{}", self.branch)),
+            ["reset", "-q", "--keep", "ORIG_HEAD"]
+                .map(str::to_owned)
+                .to_vec(),
+            soft_reset(&self.before),
+        ]
     }
 
     /// Aborting: the rebase, then the fixup commit it goes back to, its changes staged again.
@@ -361,6 +403,9 @@ mod tests {
         let mut not_ancestor = read("x", &[]);
         not_ancestor.ancestor = false;
         assert!(refused(not_ancestor).contains("not on the checked-out branch"));
+        let mut cut = read("a", &["a", "b"]);
+        (cut.root, cut.shallow) = (true, true);
+        assert!(refused(cut).contains("shallow"));
         let mut detached = read("b", &["b", "c"]);
         detached.branch = None;
         assert!(refused(detached).contains("detached"));
@@ -437,7 +482,11 @@ mod tests {
         assert_eq!(steps[1], expect_ref_at("HEAD", "c"));
         assert_eq!(steps[2], ["commit", "--fixup=b"]);
         assert_eq!(steps[3], ["rebase"]);
+        assert_eq!(steps[4], VERIFY);
         assert_eq!(undo, Undo::HeadMove { mode: "--soft" });
+        let failed = format!("git {} failed (exit status: 1)", VERIFY.join(" "));
+        assert!(lost_in_rebase(&failed));
+        assert!(!lost_in_rebase("CONFLICT (content): Merge conflict in f"));
         let kept = Plan {
             keep_fixup: true,
             ..p

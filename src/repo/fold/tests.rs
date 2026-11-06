@@ -73,13 +73,13 @@ fn tab(dir: &Path, ctx: &egui::Context) -> RepoTab {
     tab
 }
 
-/// Takes in what the tab's background work sends until it has nothing more to read.
+/// Takes in what the tab's background work sends until it has nothing more to read or run.
 fn settle(tab: &mut RepoTab, ctx: &egui::Context) {
     let start = Instant::now();
     while start.elapsed() < Duration::from_secs(30) {
         match tab.rx.recv_timeout(Duration::from_millis(300)) {
             Ok(msg) => tab.handle(msg, ctx),
-            Err(_) if !tab.loading => return,
+            Err(_) if !tab.loading && tab.busy_op.is_none() => return,
             Err(_) => {}
         }
     }
@@ -645,5 +645,36 @@ fn a_rebase_that_never_started_leaves_an_undoable_fixup_commit() {
     assert_eq!(staged(&dir), was_staged);
     done(redo(&mut tab, &ctx));
     assert_eq!(git::head(&dir), fixup);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Staged changes that undo what a later commit does would meld into nothing, the later commit
+/// bringing its change back: the fold is taken back, the branch, files and index as before.
+#[test]
+fn staged_changes_a_later_commit_would_undo_are_never_lost() {
+    // c4 changes f1.txt; staged, it goes back to what c1 made. And c2's file deleted.
+    let dir = repo("undone-later", 3);
+    write(&dir, "f1.txt", "three\n");
+    git_ok(&dir, &["commit", "-q", "-am", "c4"]);
+    let ctx = egui::Context::default();
+    let mut tab = tab(&dir, &ctx);
+    let before = git::head(&dir);
+    write(&dir, "f1.txt", "1\n");
+    git_ok(&dir, &["add", "f1.txt"]);
+    git_ok(&dir, &["rm", "-q", "f2.txt"]);
+    write(&dir, "f3.txt", "3 unstaged\n");
+    let was_staged = staged(&dir);
+
+    let result = fold(&mut tab, &ctx, "HEAD~3", false);
+    assert!(matches!(result, Some(Err(_))), "{result:?}");
+    // The going back ran on its own, right after (taken in while settling).
+    assert_eq!(git::head(&dir), before);
+    assert_eq!(staged(&dir), was_staged);
+    assert_eq!(read(&dir, "f1.txt"), "1\n");
+    assert!(!dir.join("f2.txt").exists());
+    assert_eq!(read(&dir, "f3.txt"), "3 unstaged\n");
+    assert_eq!(git::in_progress(&dir), Ok(None));
+    let said = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    assert!(said.contains("nothing was changed"), "{said}");
     let _ = std::fs::remove_dir_all(&dir);
 }

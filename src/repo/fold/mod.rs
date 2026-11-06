@@ -30,6 +30,8 @@ pub(super) struct FoldState {
     running: Option<Stopped>,
     /// The fold whose rebase stopped, until it is continued to the end or aborted.
     stopped: Option<Stopped>,
+    /// The fold being taken back because its result lost some of the staged changes.
+    putting_back: Option<Stopped>,
 }
 
 impl RepoTab {
@@ -198,9 +200,50 @@ impl RepoTab {
     /// Takes in how an operation ended, for a fold: one that failed may have stopped in its
     /// rebase, to be continued or aborted; continued to the end or aborted, it is over.
     /// Called before the reload after the operation starts.
-    pub(super) fn fold_op_done(&mut self, label: &str, result: &Result<String, String>) {
+    pub(super) fn fold_op_done(
+        &mut self,
+        label: &str,
+        result: &Result<String, String>,
+        ctx: &egui::Context,
+    ) {
         let ok = result.is_ok();
+        if let Some(back) = self
+            .fold
+            .putting_back
+            .take_if(|r| put_back_label(r) == label)
+        {
+            self.status = Some(match result {
+                Ok(_) => (
+                    format!(
+                        "{}: nothing was changed. The staged changes undo what a later commit \
+                         does, so they would have been lost in the commit; they are staged as \
+                         before.",
+                        back.label
+                    ),
+                    true,
+                ),
+                Err(e) => (
+                    format!(
+                        "{}: the result lost some of the staged changes, and going back failed \
+                         ({e}). They are all in ORIG_HEAD, the fixup! commit.",
+                        back.label
+                    ),
+                    true,
+                ),
+            });
+            return;
+        }
         if let Some(mut running) = self.fold.running.take_if(|r| r.label == label) {
+            if let Err(e) = result
+                && plan::lost_in_rebase(e)
+            {
+                // Done, but not as staged: taken back at once, before anything else runs.
+                let steps = running.put_back_steps();
+                let back = put_back_label(&running);
+                self.fold.putting_back = Some(running);
+                self.run_ops(&back, steps, Refresh::All, OpKind::plain(), ctx);
+                return;
+            }
             if let Err(e) = result {
                 // The changes are in the fixup commit the rebase stopped on, not lost: say how
                 // to go on rather than only that it failed.
@@ -255,8 +298,8 @@ impl RepoTab {
         self.redo_stack.clear();
         self.status = Some((
             format!(
-                "{}: the rebase didn't run, so the changes are in a fixup! commit on top. \
-                 Ctrl+Z stages them again.",
+                "{}: the rebase didn't run, so the changes are in a commit on top. Ctrl+Z \
+                 stages them again.",
                 stopped.label
             ),
             true,
@@ -301,6 +344,10 @@ impl RepoTab {
         self.fold_stopped_here(state)
             .map(|s| (s.label.clone(), s.continue_kind()))
     }
+}
+
+fn put_back_label(stopped: &Stopped) -> String {
+    format!("Take back {}", stopped.label.replacen("Fold", "fold", 1))
 }
 
 fn abort_label(stopped: &Stopped) -> String {
