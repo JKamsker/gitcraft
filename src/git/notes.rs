@@ -61,10 +61,12 @@ pub fn notes_ref(name: &str) -> Result<String, String> {
     if short.is_empty() {
         return bad("it is empty");
     }
-    if short.starts_with('-') || short.starts_with('/') || short.ends_with('/') {
-        return bad("it can't start with “-” or “/”, nor end with “/”");
+    if short.starts_with('/') || short.ends_with('/') {
+        return bad("it can't start or end with “/”");
     }
-    if short.chars().any(|c| c.is_whitespace() || c.is_control()) {
+    // As git: a space or a control character, not other spaces (it is given as `--ref=`, so
+    // a leading `-` is fine too).
+    if short.chars().any(|c| c == ' ' || c.is_control()) {
         return bad("it can't have spaces");
     }
     if short.chars().any(|c| "~^:?*[\\".contains(c)) {
@@ -173,8 +175,10 @@ mod tests {
             Ok("refs/notes/review/ci")
         );
         assert_eq!(notes_ref(" büro ").as_deref(), Ok("refs/notes/büro"));
+        assert_eq!(notes_ref("-x").as_deref(), Ok("refs/notes/-x"));
+        assert_eq!(notes_ref("a\u{a0}b").as_deref(), Ok("refs/notes/a\u{a0}b"));
         for bad in [
-            "", "  ", "-x", "a b", "a..b", "a:b", "x.lock", ".hidden", "a/", "/a", "a//b", "a~1",
+            "", "  ", "a b", "a\tb", "a..b", "a:b", "x.lock", ".hidden", "a/", "/a", "a//b", "a~1",
             "a^", "a*", "a@{1}", "a.", "a\\b",
         ] {
             assert!(notes_ref(bad).is_err(), "{bad:?}");

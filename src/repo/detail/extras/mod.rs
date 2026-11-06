@@ -113,6 +113,7 @@ impl RepoTab {
         if let (Some(old), Some(namespace), Some(draft)) =
             (&self.extras.hash, &notes.namespace, &notes.draft)
             && !draft.trim().is_empty()
+            && !notes.saving
         {
             self.extras
                 .drafts
@@ -152,6 +153,7 @@ impl RepoTab {
             self.extras.notes.namespace.clone(),
             self.extras.notes.draft.take(),
         ) && !draft.trim().is_empty()
+            && !self.extras.notes.saving
         {
             self.extras.drafts.insert((hash, namespace), draft);
         }
@@ -337,14 +339,23 @@ impl RepoTab {
         notes.confirm_delete = false;
         let path = self.path.clone();
         let asked = hash.clone();
+        let written = text.clone();
+        let ns = namespace.clone();
         self.then(
             ctx,
             move || match text {
-                Some(text) => git::write_note(&path, &namespace, &asked, &text),
-                None => git::remove_note(&path, &namespace, &asked),
+                Some(text) => git::write_note(&path, &ns, &asked, &text),
+                None => git::remove_note(&path, &ns, &asked),
             },
             move |tab, result, ctx| {
                 if tab.extras.hash.as_deref() != Some(hash.as_str()) {
+                    // Another commit is shown: a note that couldn't be saved waits for it.
+                    if let Err(e) = result {
+                        if let Some(text) = written {
+                            tab.extras.drafts.insert((hash, namespace), text);
+                        }
+                        tab.status = Some((e, true));
+                    }
                     return;
                 }
                 let notes = &mut tab.extras.notes;
