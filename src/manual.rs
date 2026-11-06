@@ -33,7 +33,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Right-click a commit or a pill for branches, tags, merge, rebase, cherry-pick, revert, reset and more.",
             "Search messages, authors and hashes, or switch to Code to find the commits that added or removed some text.",
             "Search operators narrow a search and combine with each other and with text: author: and committer: (name or email), path: (a file or folder; *.md works), after: and before: (2024-05-01, 2024-05, 2w, 3m, 1y, today, yesterday; by commit date), message:, contents: (git log -S), regex: (git log -G), merges: and -merges:. Quote values with spaces: author:\"Jane Doe\". Letter case is ignored for A–Z.",
-            "Typing an operator lists suggestions: authors and committers from history (as .mailmap names them), files and folders of the checked-out commit, dates. ↑ / ↓ highlight one, Tab or Enter puts it in. A search written wrong says why under the field.",
+            "Typing an operator lists suggestions: authors and committers from history (as .mailmap names them), files and folders of the checked-out commit, dates. ↑ / ↓ highlight one, Tab or Enter puts it in, Esc closes the list. A search written wrong says why under the field.",
             "Drag the borders in the column header to resize; right-click it to pick the columns, make the graph column compact or reset the columns.",
             "Interactive rebase: reorder, reword, squash, fix up or drop commits, then start it.",
         ],

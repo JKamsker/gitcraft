@@ -126,7 +126,11 @@ fn mistakes_are_explained_where_they_are() {
     let cases: &[(&str, &str, usize)] = &[
         ("author:", "author: needs a name or an email", 0),
         ("fix path:", "path: needs a file or a folder", 4),
-        ("é after:", "after: needs a date", 2),
+        (
+            "é after:",
+            "after: needs a date such as 2024-05-01 or 2w right after the colon",
+            2,
+        ),
         ("author:\"Jane", "quote is not closed", 7),
         ("author:\"Jane\"Doe", "space after the closing quote", 7),
         ("author:a x \"two words", "quote is not closed", 11),
@@ -142,6 +146,7 @@ fn mistakes_are_explained_where_they_are() {
         ("after:2024-05-01 before:2024-05-01", "must be earlier", 0),
         ("author:a\0b", "NUL", 7),
     ];
+    assert!(!error("before:").message.contains("quote"));
     for (query, message, at) in cases {
         let e = error(query);
         assert!(e.message.contains(message), "{query}: {}", e.message);

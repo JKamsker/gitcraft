@@ -131,10 +131,15 @@ impl<'a> Parser<'a> {
         }
         let value = token.value.clone();
         if value.is_empty() {
+            let quoting = if matches!(op, Operator::After | Operator::Before) {
+                ""
+            } else {
+                " (quote it if it has spaces)"
+            };
             return Err(self.error(
                 start,
                 format!(
-                    "{name}: needs {} right after the colon (quote it if it has spaces)",
+                    "{name}: needs {} right after the colon{quoting}",
                     op.needs()
                 ),
             ));
