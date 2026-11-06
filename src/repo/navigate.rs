@@ -125,6 +125,9 @@ impl RepoTab {
             self.conflict = None;
             return;
         }
+        // A new opening: what is still on its way for an earlier one is not for this one.
+        self.conflict_generation += 1;
+        let generation = self.conflict_generation;
         self.conflict = match &key {
             // Elsewhere, read in the background (see `conflict_opened`).
             DiffKey::Work(file)
@@ -134,12 +137,17 @@ impl RepoTab {
                     (self.path.clone(), file.path.clone(), self.work.in_progress);
                 spawn(&self.tx, ctx, move || {
                     let editor = conflict::ConflictEditor::open(&repo, &path, state);
-                    Msg::ConflictOpened(path, editor.map(Box::new))
+                    Msg::ConflictOpened(generation, path, editor.map(Box::new))
                 });
                 None
             }
             DiffKey::Work(file) if file.area == git::Area::Conflicted => {
-                conflict::ConflictEditor::open(&self.path, &file.path, self.work.in_progress)
+                conflict::ConflictEditor::open(&self.path, &file.path, self.work.in_progress).map(
+                    |mut ed| {
+                        ed.generation = generation;
+                        ed
+                    },
+                )
             }
             _ => None,
         };
@@ -147,23 +155,34 @@ impl RepoTab {
         self.refresh_diff(ctx);
     }
 
-    /// The conflict editor of `path`, read in the background, if its diff is still the one open.
+    /// The conflict editor of `path`, read in the background for the opening numbered
+    /// `generation`, if that is still the latest and its diff the one open: one read for an
+    /// opening closed since would replace (or reset) the editor opened after it.
     pub(super) fn conflict_opened(
         &mut self,
+        generation: u64,
         path: String,
         editor: Option<Box<conflict::ConflictEditor>>,
     ) {
         let open = matches!(&self.diff, Some(DiffView { key: DiffKey::Work(file), .. })
             if file.path == path && file.area == git::Area::Conflicted);
-        if open {
-            self.conflict = editor.map(|e| *e);
+        if open && generation == self.conflict_generation {
+            self.conflict = editor.map(|e| {
+                let mut ed = *e;
+                ed.generation = generation;
+                ed
+            });
         }
     }
 
-    /// The file of the open conflict editor changed on disk (seen in the background): opened
-    /// again from what is there now.
-    pub(super) fn conflict_changed(&mut self, path: String, ctx: &egui::Context) {
-        if self.conflict.as_ref().is_none_or(|ed| ed.path != path) {
+    /// The file of the conflict editor opened as `generation` changed on disk (seen in the
+    /// background): opened again from what is there now, if that editor is still the one open.
+    pub(super) fn conflict_changed(&mut self, generation: u64, path: String, ctx: &egui::Context) {
+        if self
+            .conflict
+            .as_ref()
+            .is_none_or(|ed| ed.path != path || ed.generation != generation || ed.saving)
+        {
             return;
         }
         let Some(DiffView {

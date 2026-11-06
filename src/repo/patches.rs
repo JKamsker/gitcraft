@@ -53,24 +53,24 @@ impl RepoTab {
         else {
             return;
         };
-        let text = match std::fs::read(&file) {
-            Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+        // Copied as it is (a patch can carry bytes of any encoding); read as text only to tell
+        // a mail from a bare diff.
+        let bytes = match std::fs::read(&file) {
+            Ok(bytes) => bytes,
             Err(e) => {
                 self.status = Some((format!("Apply patch: could not read it: {e}"), true));
                 return;
             }
         };
         let label = format!("Apply {}", file_name(&file));
-        let mail = is_mail(&text);
+        let mail = is_mail(&String::from_utf8_lossy(&bytes));
         // For a repository on another machine, git there reads a copy put there (in the
         // background).
         let repo = self.path.clone();
         self.here_or_later(
             ctx,
             move || match crate::remote::parse(&repo) {
-                Some(target) => {
-                    crate::remote::host_temp_file(&target, "apply.patch", text.as_bytes())
-                }
+                Some(target) => crate::remote::host_temp_file(&target, "apply.patch", &bytes),
                 None => Ok(file.to_string_lossy().into_owned()),
             },
             move |tab, file, ctx| match file {

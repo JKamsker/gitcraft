@@ -69,10 +69,17 @@ pub(crate) struct RebaseEditor {
     /// HEAD when the commits were read: the todo list replaces the branch's commits with
     /// these, so one made since (a commit, a pull) would be dropped.
     pub head: String,
+    /// Which editor this is (each one opened has its own): a rebase prepared for one closed
+    /// since never starts.
+    pub id: u64,
+    /// Its rebase is being prepared (on another machine, in the background): it can't be
+    /// started again, nor changed, meanwhile.
+    pub starting: bool,
 }
 
 impl RebaseEditor {
     pub fn new(onto: String, onto_label: String, commits: Vec<RebaseCommit>) -> Self {
+        static IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         // `git log --reverse onto..HEAD`: HEAD comes last.
         let head = commits.last().map(|c| c.hash.clone()).unwrap_or_default();
         let entries = commits
@@ -88,6 +95,8 @@ impl RebaseEditor {
             onto_label,
             entries,
             head,
+            id: IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            starting: false,
         }
     }
 
@@ -326,10 +335,13 @@ impl RepoTab {
                         }
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if editor.starting {
+                            ui.add(crate::spinner::Spinner::new());
+                        }
                         if widgets::primary_button(
                             ui,
                             "Start rebase",
-                            idle && problem.is_none(),
+                            idle && problem.is_none() && !editor.starting,
                             120.0,
                         )
                         .clicked()
@@ -345,10 +357,15 @@ impl RepoTab {
 
         let n = editor.entries.len();
         let mut swap: Option<(usize, usize)> = None;
+        // What is being started is what is shown.
+        let starting = editor.starting;
         egui::ScrollArea::vertical()
             .id_salt("rebase_list")
             .auto_shrink(false)
             .show(ui, |ui| {
+                if starting {
+                    ui.disable();
+                }
                 ui.add_space(6.0);
                 // Newest first, like the graph; `i` indexes git's oldest-first order.
                 for i in (0..n).rev() {

@@ -171,6 +171,9 @@ pub struct RepoTab {
     /// Whether the commit pane lists every file of the commit, and those read.
     all_files: detail::AllFiles,
     conflict: Option<conflict::ConflictEditor>,
+    /// How many times a conflict editor was opened in the tab: the one open is the latest, and
+    /// what is read in the background for an earlier one is not taken for it.
+    conflict_generation: u64,
 
     commit_summary: String,
     commit_body: String,
@@ -314,6 +317,7 @@ impl RepoTab {
             diff_as_file: false,
             all_files: Default::default(),
             conflict: None,
+            conflict_generation: 0,
             commit_summary: String::new(),
             commit_body: String::new(),
             amend: false,

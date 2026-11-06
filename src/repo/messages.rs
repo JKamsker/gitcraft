@@ -25,10 +25,12 @@ pub(super) enum Msg {
     RefsCheck(Result<git::Refs, String>),
     /// What to do on the UI thread with what a background job found (see `RepoTab::then`).
     Then(Continuation),
-    /// A conflict editor read in the background (for a repository on another machine).
-    ConflictOpened(String, Option<Box<super::conflict::ConflictEditor>>),
-    /// The file of the open conflict editor changed on disk (`None`: it didn't).
-    ConflictChanged(Option<String>),
+    /// A conflict editor read in the background (for a repository on another machine), for
+    /// the opening numbered so (see `RepoTab::conflict_generation`).
+    ConflictOpened(u64, String, Option<Box<super::conflict::ConflictEditor>>),
+    /// The file of the conflict editor opened so changed on disk (`None`: it didn't, or it
+    /// couldn't be read).
+    ConflictChanged(u64, Option<String>),
     /// A conflict editor's file written in the background, to be marked resolved.
     ConflictSaved(String, Result<(), String>),
     /// The changes of each worktree (by its path) counted after a read (see
@@ -274,10 +276,20 @@ impl RepoTab {
                 }
             }
             Msg::WorktreeCounts(counts) => self.worktrees_counted(counts, ctx),
-            Msg::ConflictOpened(path, editor) => self.conflict_opened(path, editor),
-            Msg::ConflictChanged(Some(path)) => self.conflict_changed(path, ctx),
-            Msg::ConflictChanged(None) => {}
-            Msg::ConflictSaved(path, saved) => self.conflict_saved(path, saved, ctx),
+            Msg::ConflictOpened(generation, path, editor) => {
+                self.conflict_opened(generation, path, editor)
+            }
+            Msg::ConflictChanged(generation, Some(path)) => {
+                self.conflict_changed(generation, path, ctx)
+            }
+            Msg::ConflictChanged(_, None) => {}
+            Msg::ConflictSaved(path, saved) => {
+                // Editable again (if still open), whatever came of it.
+                if let Some(ed) = self.conflict.as_mut().filter(|ed| ed.path == path) {
+                    ed.saving = false;
+                }
+                self.conflict_saved(path, saved, ctx)
+            }
             Msg::Watcher(watcher) => {
                 self.watcher = watcher.map(|w| *w);
                 self.watcher_arrived(ctx);

@@ -566,10 +566,12 @@ impl RepoTab {
             && let Some(ed) = &self.conflict
         {
             let (repo, path, opened) = (self.path.clone(), ed.path.clone(), ed.opened().to_owned());
+            let generation = ed.generation;
             spawn(&self.tx, ctx, move || {
                 let changed = super::conflict::changed_on_disk(&repo, &path, &opened);
-                // Nothing to say when it didn't.
-                Msg::ConflictChanged(changed.then_some(path))
+                // Nothing to say when it didn't, nor when it couldn't be read: a dropped
+                // connection is no reason to drop the choices made.
+                Msg::ConflictChanged(generation, (changed == Some(true)).then_some(path))
             });
         }
         if still && (file.area != git::Area::Conflicted || editing) {

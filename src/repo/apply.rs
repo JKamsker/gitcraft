@@ -268,8 +268,9 @@ impl RepoTab {
             Err(e) => self.status = Some((e, true)),
             Ok(added) => {
                 if tracked {
-                    self.run_ops(
+                    self.run_prepared(
                         &format!("Ignore {pattern}"),
+                        &format!("{pattern} is in .gitignore, but {path} is still tracked"),
                         ops(&[&[
                             "--literal-pathspecs",
                             "rm",
@@ -347,16 +348,24 @@ impl RepoTab {
         };
         let mut args = pick.args().to_vec();
         args.push(&patch);
-        if pick == diff::Pick::Discard {
+        let kind = if pick == diff::Pick::Discard {
             // Applying the same patch forward brings the lines back.
             let undo = Undo::Custom {
                 undo: ops(&[&["apply", &patch]]),
                 redo: ops(&[&args]),
             };
-            self.run_undoable(label, ops(&[&args]), Refresh::Status, undo, ctx);
+            OpKind::Normal(undo, self.refs.head.clone())
         } else {
-            self.run_ops(label, ops(&[&args]), Refresh::Status, OpKind::plain(), ctx);
-        }
+            OpKind::plain()
+        };
+        self.run_prepared(
+            label,
+            &format!("{label}: not done"),
+            ops(&[&args]),
+            Refresh::Status,
+            kind,
+            ctx,
+        );
     }
 
     /// Asks Mergiraf to solve what it can of the open conflict.
@@ -401,11 +410,18 @@ impl RepoTab {
 
     /// Writes the conflict editor's file and marks it resolved.
     fn save_conflict(&mut self, ctx: &egui::Context) {
-        let Some(editor) = &self.conflict else { return };
-        // Elsewhere, written in the background (see `conflict_saved`).
+        let Some(editor) = &mut self.conflict else {
+            return;
+        };
+        // Elsewhere, written in the background (see `conflict_saved`), one save at a time: the
+        // editor waits (see `ConflictEditor::saving`) so a later one can't be overtaken.
         if crate::remote::is_remote(&self.path) {
+            if editor.saving {
+                return;
+            }
             match editor.solved() {
                 Ok(text) => {
+                    editor.saving = true;
                     let (repo, path) = (self.path.clone(), editor.path.clone());
                     spawn(&self.tx, ctx, move || {
                         let saved = super::conflict::save_solved(&repo, &path, &text);
@@ -429,8 +445,9 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         match saved {
-            Ok(()) => self.run_ops(
+            Ok(()) => self.run_prepared(
                 "Mark resolved",
+                &format!("Saved {file}, but not marked resolved"),
                 ops(&[&["--literal-pathspecs", "add", "--", &file]]),
                 Refresh::Status,
                 OpKind::plain(),
@@ -438,6 +455,29 @@ impl RepoTab {
             ),
             Err(e) => self.status = Some((e, true)),
         }
+    }
+
+    /// Runs `ops`, the git step that follows what was just done (on another machine, in the
+    /// background meanwhile). When another operation started in the meantime, it can't: the
+    /// user is told (`left`: what is left undone) rather than left to think it ran.
+    #[allow(clippy::too_many_arguments)]
+    fn run_prepared(
+        &mut self,
+        label: &str,
+        left: &str,
+        ops: Vec<Vec<String>>,
+        refresh: Refresh,
+        kind: OpKind,
+        ctx: &egui::Context,
+    ) {
+        if let Some(busy) = &self.busy_op {
+            self.status = Some((
+                format!("{left}: {busy} was still running. Try again once it's done."),
+                true,
+            ));
+            return;
+        }
+        self.run_ops(label, ops, refresh, kind, ctx);
     }
 }
 
