@@ -6,13 +6,13 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use egui::{Color32, Galley, Rect, RichText, Sense, Ui, pos2, vec2};
+use egui::{Color32, Galley, Rect, Sense, Ui, pos2, vec2};
 
 use super::{App, Tab};
 use crate::icons;
 use crate::repo::worktree_tab::{self, Chip};
 use crate::tab_look::TabLook;
-use crate::theme::{self, ThemeKind, Tokens};
+use crate::theme::{self, Tokens};
 
 const TAB_H: f32 = 40.0;
 /// Space between tabs.
@@ -240,20 +240,18 @@ impl App {
             self.open_palette();
         }
         let resp = icons::bar_button(ui, "palette", "Theme");
+        let mut pick = None;
         egui::Popup::menu(&resp)
             .style(theme::menu_style)
-            .show(|ui| {
-                ui.label(
-                    RichText::new("THEME")
-                        .font(theme::semibold(10.5))
-                        .color(t.text_faint),
-                );
-                for kind in ThemeKind::ALL {
-                    if ui.radio(self.theme == kind, kind.label()).clicked() {
-                        self.set_theme(ui.ctx(), kind);
-                    }
-                }
-            });
+            .show(|ui| pick = crate::settings::theme_menu(ui, &self.theme));
+        match pick {
+            Some(crate::settings::ThemePick::Theme(id)) => self.set_theme(ui.ctx(), id),
+            Some(crate::settings::ThemePick::Browse) => {
+                crate::settings::show_page(ui.ctx(), crate::settings::Page::Appearance);
+                self.open_settings();
+            }
+            None => {}
+        }
         if icons::bar_button(ui, "book-open", "Manual and keyboard shortcuts (F1)").clicked() {
             self.manual_open = true;
         }

@@ -42,7 +42,7 @@ impl App {
         let ctx = ui.ctx().clone();
         let version = self.git_version.clone().unwrap_or_default();
         let mut view = crate::settings::SettingsView {
-            theme: self.theme,
+            theme: self.theme.clone(),
             git_version: &version,
             dialog_open: self.clone_form.is_some()
                 || self.remote_form.is_some()
@@ -53,8 +53,12 @@ impl App {
             check_updates_now: false,
             request: None,
         };
+        let tweaks = self.settings.theme_tweaks;
         if self.settings.page(ui, &mut view) {
             self.settings.set(&ctx);
+            if self.settings.theme_tweaks != tweaks {
+                self.apply_theme(&ctx);
+            }
         }
         let check_now = view.check_updates_now;
         if let Some(request) = view.request {

@@ -21,6 +21,9 @@ pub struct EditorTheme {
     pub name: String,
     pub dark: bool,
     pub theme: Theme,
+    /// Its workbench colours (`editor.background`, `sideBar.background`, ...), for the
+    /// "Follow VS Code" theme of the interface.
+    pub workbench: serde_json::Map<String, serde_json::Value>,
 }
 
 static ENABLED: AtomicBool = AtomicBool::new(true);
@@ -87,5 +90,25 @@ fn load(editor: &Editor) -> Option<EditorTheme> {
     };
     let mut theme = build(&name, &colors, &rules);
     default_foreground(&mut theme, dark);
-    Some(EditorTheme { theme, name, dark })
+    Some(EditorTheme {
+        theme,
+        name,
+        dark,
+        workbench: colors,
+    })
+}
+
+/// A VS Code theme file's workbench colours and whether it is dark (`None`: it doesn't say),
+/// following its `include`s. For theme files imported into gitcraft.
+pub fn read_workbench(
+    path: &std::path::Path,
+) -> Option<(serde_json::Map<String, serde_json::Value>, Option<bool>)> {
+    let (colors, _, kind) = read_theme(path, 0)?;
+    let dark = kind.map(|k| !matches!(k.as_str(), "light" | "hcLight"));
+    Some((colors, dark))
+}
+
+/// A JSON file that may have comments and trailing commas, as VS Code allows.
+pub fn read_json(path: &std::path::Path) -> Option<serde_json::Value> {
+    read_jsonc(path)
 }

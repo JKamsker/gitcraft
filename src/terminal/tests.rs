@@ -86,7 +86,7 @@ fn clipboard_controls() {
 
 #[test]
 fn indexed_colours() {
-    let p = Palette::new(&Tokens::for_kind(crate::theme::ThemeKind::Dark));
+    let p = Palette::new(&Tokens::default());
     assert_eq!(
         p.color(vt100::Color::Idx(16)),
         Some(Color32::from_rgb(0, 0, 0))

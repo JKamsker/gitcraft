@@ -219,6 +219,13 @@ so your config, credentials and hooks apply as usual.
   date, editor command, default shell and terminal font size, saved identities, SSH sign-ins,
   and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
   Alt+↓ go through the pages.
+- Previews beside the settings: point at a setting and a panel on the right (above the page in
+  a narrow window) draws what it does with the values set now, as the app draws it. The branch
+  column measured on a small graph with long branch names cut to fit, the columns at their
+  widths, standard and compact lanes side by side, the lane colours, each way of pulling as a
+  before-and-after graph, the terminal with the shell's prompt at its font size, unified and
+  side-by-side diffs, context or the whole file, files in folders or in one list, code colours,
+  avatars, and the whole window in a theme.
 - Commit signing in Settings → Commit signing: the format (OpenPGP, SSH or X.509), signing key
   and program, and whether commits and tags are signed by default. These are your global git
   config's `gpg.format`, `user.signingkey`, `gpg.program` (`gpg.ssh.program`, `gpg.x509.program`),
@@ -238,7 +245,29 @@ so your config, credentials and hooks apply as usual.
   instead. Looking and downloading can each be turned off.
 - Toasts, and a desktop notification when a long operation ends while the window is in the
   background.
-- Themes: Dark, Medium Gray and Light, from PhotoCraft's Pro palettes.
+- Themes (Settings → Appearance, the palette icon in the title bar, or _Theme:_ in the command
+  palette), each profile its own:
+  - 40 built in: gitcraft's Dark, Medium Gray and Light (PhotoCraft's Pro palettes), High
+    Contrast Dark and Light, and the published palettes of Catppuccin (Mocha, Macchiato, Frappé,
+    Latte), Tokyo Night (Night, Storm, Day), Rosé Pine (main, Moon, Dawn), Kanagawa (Wave,
+    Dragon, Lotus), Everforest (Dark, Light), Dracula, Nord, Gruvbox (Dark, Light), Solarized
+    (Dark, Light), One Dark and One Light, GitHub (Dark, Light), Ayu (Dark, Mirage, Light),
+    Monokai, Monokai Pro, Night Owl, Material Palenight, Tomorrow Night, Horizon and
+    SynthWave '84. A theme colours everything: panels, text, the graph's lanes and pills, diffs
+    and the terminal's 16 colours. A test keeps every one's text readable (WCAG contrast).
+  - A gallery of thumbnails; pointing at one shows the whole window in it before choosing.
+  - _Follow VS Code_: the interface takes the workbench colours of the theme VS Code (or
+    Insiders, VSCodium) is using, and changes with it.
+  - Themes from the internet: _Import theme file…_ takes a VS Code colour theme (`.json`, from an
+    extension's `themes` folder or sites such as vscodethemes.com), a Base16 or Base24 scheme
+    (`.yaml`, e.g. the tinted-theming collection) or a theme saved by gitcraft, and copies it
+    into gitcraft's `themes` folder.
+  - Your own: _Save a copy to edit_ writes the theme in use, every colour by name, as a file in
+    that folder (`extends` names a theme to start from, so a file can set only an accent). Edit
+    it in any editor and the window follows as you save; a file that doesn't read says why
+    under the buttons.
+  - For any theme: your own accent colour, rounder or square corners, and the graph's lanes in
+    the theme's hues, gitcraft's classic ones or colour-blind-safe ones (Okabe–Ito).
 
 ## Download
 
@@ -359,9 +388,9 @@ was made this way, on a demo repository.
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |
 | `src/shell_path.rs`      | on macOS, the login shell's PATH for the commands gitcraft starts                  |
 | `src/remote/` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
-| `src/settings/`          | user settings, profiles, and the settings pages                                    |
+| `src/settings/`          | user settings, profiles, the settings pages, the theme gallery and the previews    |
 | `src/manual.rs`          | the manual (F1): features and keyboard shortcuts                                   |
-| `src/theme.rs`           | colour tokens, fonts, egui style (PhotoCraft's Pro themes)                         |
+| `src/theme/`             | colour tokens, fonts, egui style; themes: catalogue, palettes, theme files         |
 | `src/icons.rs`           | embedded Lucide SVG icons, tinted                                                  |
 | `src/terminal.rs`        | integrated terminal: pty, VT parsing (`vt100`), painting, keys, selection          |
 | `src/repo/mod.rs`        | one repository tab: state, background git work, undo / redo, toolbar               |
