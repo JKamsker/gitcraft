@@ -55,6 +55,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Profiles (title bar, or Settings → Profile): each has its own tabs, recent repositories, theme, git author and commit signing. A repository's own git config (user.name, user.email, signing) still wins over the profile's.",
             "Settings → Commit signing sets the format, key and program git signs with, and whether it signs commits and tags by default, in your global git config; Settings → Profile can sign just for the profile instead.",
             "Double-click a commit's message in the right pane to edit it (any commit of the checked-out branch with no merges after it).",
+            "Below a commit's hash, click a section to fold it out: Signature (valid, invalid, unknown key, unsigned or not checked, with the signer and git's output), Contained in (its branches and tags, and the first release after it), Notes (add, edit or delete a note in the namespace picked; Fetch and Push share that namespace with a remote) and Backlinks (later commits that revert it, cherry-pick it, name it in a trailer such as Fixes: or just mention its hash; click one to open it).",
             "Undo and redo commits, merges, rebases, resets, checkouts, branches, tags and stashes.",
         ],
     ),

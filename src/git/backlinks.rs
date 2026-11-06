@@ -269,7 +269,7 @@ mod tests {
     fn records_skip_the_commit_itself_and_keep_the_subject() {
         let me = format!("{H}\0a\0d\0Mentions {H}\0");
         assert_eq!(parse_record(&me, H), None);
-        let other = "fedcba9876543210fedcba9876543210fedcba98\0Zoë\02026-01-01 10:00\0Revert \"x\"\n\nThis reverts commit 0123456789ab.\n\0";
+        let other = "fedcba9876543210fedcba9876543210fedcba98\0Zoë\x002026-01-01 10:00\0Revert \"x\"\n\nThis reverts commit 0123456789ab.\n\0";
         let link = parse_record(other, H);
         assert_eq!(
             link.as_ref()
