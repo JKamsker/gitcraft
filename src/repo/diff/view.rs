@@ -5,9 +5,11 @@ use egui::{Sense, Stroke, Ui};
 
 use super::images::image_view;
 use super::lfs::lfs_view;
+use super::link::LineLinks;
 use super::rendered;
 use super::rows::Rows;
 use super::{DiffData, Kind, Pick, unstage_args};
+use crate::forge::links::Target;
 use crate::git::{Area, StatusFile};
 use crate::icons;
 use crate::pull_request::DiffSide;
@@ -62,7 +64,23 @@ impl RepoTab {
             return;
         }
         if as_file {
-            file_text::show(ui, ("diff_file", &path), view.file.as_ref());
+            let before = matches!(&view.file, Some(Ok(f)) if f.before);
+            let rev = sides(&view.key).map(|(new, old)| if before { old } else { new });
+            let menu = || self.link_menu(None);
+            let mut link = |ui: &mut Ui, lines| {
+                if let (Some(rev), Some(menu)) = (&rev, menu()) {
+                    let target = Target::File {
+                        rev: rev.clone(),
+                        path: path.clone(),
+                        lines: Some(lines),
+                    };
+                    menu.items(ui, &lines.label(), &target, acts);
+                }
+            };
+            let links = rev
+                .is_some()
+                .then_some(&mut link as file_text::LineMenu<'_>);
+            file_text::show(ui, ("diff_file", &path), view.file.as_ref(), links);
             return;
         }
         let Some(data) = ready_data(ui, view, ignore_ws, &t) else {
@@ -80,7 +98,15 @@ impl RepoTab {
 
         let split = data.shows_split(split);
         let shift = ui.input(|i| i.modifiers.shift);
+        let menu = || self.link_menu(None);
+        let links = sides(&view.key).map(|(new, old)| LineLinks {
+            path: path.clone(),
+            new,
+            old,
+            menu: &menu,
+        });
         let mut rows = Rows::new(ui, view, data, review.as_ref(), partial, split);
+        rows.links = links.as_ref();
         let sel = rows.show(ui, &path, acts);
         let (clicked, offset, jumped) = (rows.clicked, rows.offset, rows.jumped);
 
@@ -155,7 +181,13 @@ impl RepoTab {
                         DiffKey::Range { to: None, .. } => (None, false),
                         DiffKey::Work(_) => (None, true),
                     };
-                    widgets::file_menu(&title, path, rev, ignorable, acts);
+                    // Linked as it is in the last commit: a new file isn't there yet.
+                    let links = || {
+                        self.link_menu(None).filter(|_| {
+                            !matches!(&view.key, DiffKey::Work(f) if matches!(f.code, 'A' | '?'))
+                        })
+                    };
+                    widgets::file_menu(&title, path, rev, ignorable, &links, acts);
                     widgets::chip(ui, origin, t.text_dim);
                     let before = if rendered {
                         matches!(&view.rendered, Some(Ok(md)) if md.before)
@@ -293,6 +325,18 @@ impl DiffView {
                 self.anchor = Some(i);
             }
         }
+    }
+}
+
+/// The revisions of a commit's diff (or a comparison of two) its lines can link to: the file
+/// after the change, and before it. `None` for changes not committed, which no forge has.
+fn sides(key: &DiffKey) -> Option<(String, String)> {
+    match key {
+        DiffKey::Commit { hash, .. } => Some((hash.clone(), format!("{hash}^"))),
+        DiffKey::Range {
+            from, to: Some(to), ..
+        } => Some((to.clone(), from.clone())),
+        DiffKey::Range { to: None, .. } | DiffKey::Work(_) => None,
     }
 }
 

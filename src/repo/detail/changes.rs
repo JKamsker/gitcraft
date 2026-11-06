@@ -210,7 +210,12 @@ impl RepoTab {
             RowExtra::Buttons(buttons),
         );
         if f.code != 'D' {
-            widgets::file_menu(&r.row, &f.path, None, true, acts);
+            // Linked as it is in the last commit: a new file isn't there yet.
+            let links = || {
+                self.link_menu(None)
+                    .filter(|_| !matches!(f.code, 'A' | '?'))
+            };
+            widgets::file_menu(&r.row, &f.path, None, true, &links, acts);
         }
         match r.button {
             Some(i) => RowClick::Button(i),

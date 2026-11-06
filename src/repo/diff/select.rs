@@ -47,6 +47,12 @@ impl TextSel {
         (self.side == Side::Unified) != split
     }
 
+    /// The first and last rows it is on.
+    pub(super) fn rows(&self) -> (usize, usize) {
+        let (start, end) = self.ordered();
+        (start.0, end.0)
+    }
+
     fn ordered(&self) -> ((usize, usize), (usize, usize)) {
         (self.anchor.min(self.cursor), self.anchor.max(self.cursor))
     }
@@ -126,13 +132,15 @@ pub(super) fn drag_selection(
     sel
 }
 
-/// Ctrl+C and the "Copy" of the context menu on the lines (`drag`) copy the selected text.
+/// Ctrl+C and the "Copy" of the context menu on the lines (`drag`) copy the selected text;
+/// `more` adds to that menu.
 pub(super) fn copy_selection(
     ui: &Ui,
     drag: &egui::Response,
     sel: Option<TextSel>,
     lines: &[DiffLine],
     uncut: &HashMap<usize, String>,
+    more: impl FnOnce(&mut Ui),
 ) {
     // Put together only when asked for: a selection can span thousands of lines.
     let selected_text = || sel.map(|s| s.text(lines, uncut)).filter(|s| !s.is_empty());
@@ -153,5 +161,6 @@ pub(super) fn copy_selection(
             {
                 ui.ctx().copy_text(text.clone());
             }
+            more(ui);
         });
 }

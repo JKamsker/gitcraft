@@ -7,6 +7,7 @@ use egui::{Align2, Rect, Sense, Ui, pos2, vec2};
 
 use super::DiffKey;
 use super::highlight::{self, Spans};
+use crate::forge::links::Lines;
 use crate::git::{self, Area};
 use crate::theme::{self, Tokens};
 
@@ -99,12 +100,19 @@ pub(crate) fn load_for_diff(repo: &Path, key: &DiffKey, dark: bool) -> Result<Fi
     }
 }
 
+/// What a right-click on the lines picked adds to their menu, given the lines.
+pub(crate) type LineMenu<'a> = &'a mut dyn FnMut(&mut Ui, Lines);
+
 /// The file, or a spinner, the error or a note in its place. `id`: what keeps its scrolling.
+/// `links`: the entries of the lines' right-click menu for the lines picked (a click picks one,
+/// Shift+click a range); without it, lines can't be picked.
 pub(crate) fn show(
     ui: &mut Ui,
     id: impl std::hash::Hash + std::fmt::Debug,
     text: Option<&Result<FileText, String>>,
+    mut links: Option<LineMenu<'_>>,
 ) {
+    let picked_id = egui::Id::new(("file_text_picked", &id));
     let t = Tokens::get(ui.ctx());
     let data = match text {
         None => {
@@ -140,6 +148,15 @@ pub(crate) fn show(
         .x;
     let width = (NUM_W + 16.0 + data.longest as f32 * char_w + 24.0).max(ui.available_width());
     ui.spacing_mut().item_spacing.y = 0.0;
+    let sense = if links.is_some() {
+        Sense::click()
+    } else {
+        Sense::hover()
+    };
+    let mut picked = ui
+        .data(|d| d.get_temp::<Picked>(picked_id))
+        .filter(|p| p.last() < data.lines.len());
+    let shift = ui.input(|i| i.modifiers.shift);
     egui::ScrollArea::both()
         .id_salt(("file_text", id))
         .auto_shrink(false)
@@ -148,8 +165,19 @@ pub(crate) fn show(
                 let Some(line) = data.lines.get(i) else {
                     continue;
                 };
-                let (rect, _) = ui.allocate_exact_size(vec2(width, LINE_H), Sense::hover());
+                let (rect, resp) = ui.allocate_exact_size(vec2(width, LINE_H), sense);
+                if let Some(links) = links.as_deref_mut() {
+                    picked = pick_line(picked, i, &resp, shift);
+                    if let Some(lines) = picked.and_then(|p| p.lines()) {
+                        egui::Popup::context_menu(&resp)
+                            .style(theme::menu_style)
+                            .show(|ui| links(ui, lines));
+                    }
+                }
                 let p = ui.painter().with_clip_rect(rect.intersect(ui.clip_rect()));
+                if picked.is_some_and(|p| p.contains(i)) {
+                    p.rect_filled(rect, 0.0, t.row_selected);
+                }
                 let gutter = Rect::from_min_size(rect.min, vec2(NUM_W, LINE_H));
                 p.rect_filled(gutter, 0.0, t.card.gamma_multiply(0.6));
                 let mid = rect.center().y;
@@ -190,11 +218,138 @@ pub(crate) fn show(
                 }
             }
         });
+    if links.is_some() {
+        ui.data_mut(|d| match picked {
+            Some(p) => {
+                d.insert_temp(picked_id, p);
+            }
+            None => d.remove::<Picked>(picked_id),
+        });
+    }
+}
+
+/// The lines picked in a file shown: from the one clicked first to the one Shift+clicked.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Picked {
+    anchor: usize,
+    cursor: usize,
+}
+
+impl Picked {
+    fn contains(self, i: usize) -> bool {
+        (self.anchor.min(self.cursor)..=self.last()).contains(&i)
+    }
+
+    fn last(self) -> usize {
+        self.anchor.max(self.cursor)
+    }
+
+    /// The lines as the file numbers them, from 1.
+    fn lines(self) -> Option<Lines> {
+        let number = |i: usize| u32::try_from(i + 1).ok();
+        Lines::new(number(self.anchor)?, number(self.cursor)?)
+    }
+}
+
+/// The lines picked after a click on line `i` (`resp`): a click picks it (again: unpicks it),
+/// Shift+click picks up to it, a right-click outside those picked picks it for the menu.
+fn pick_line(
+    picked: Option<Picked>,
+    i: usize,
+    resp: &egui::Response,
+    shift: bool,
+) -> Option<Picked> {
+    let one = Some(Picked {
+        anchor: i,
+        cursor: i,
+    });
+    if resp.clicked() {
+        return match picked {
+            Some(p) if shift => Some(Picked { cursor: i, ..p }),
+            Some(p) if p.anchor == i && p.cursor == i => None,
+            _ => one,
+        };
+    }
+    if resp.secondary_clicked() && !picked.is_some_and(|p| p.contains(i)) {
+        return one;
+    }
+    picked
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Clicking line 2, Shift+clicking line 4 and right-clicking line 3 opens the lines' menu
+    /// for lines 2–4; right-clicking a line outside them then opens it for that line alone.
+    #[test]
+    fn lines_picked_are_what_the_menu_links_to() {
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let text: Result<FileText, String> = Ok(FileText::new(
+            b"one\ntwo\nthree\nfour\nfive\n",
+            "f.txt",
+            true,
+        ));
+        let screen = Rect::from_min_size(pos2(0.0, 0.0), vec2(400.0, 300.0));
+        let row = |n: f32| pos2(200.0, LINE_H * (n - 0.5));
+        let mut asked: Vec<Lines> = Vec::new();
+        let frame = |mut events: Vec<egui::Event>, shift: bool, asked: &mut Vec<Lines>| {
+            let modifiers = if shift {
+                egui::Modifiers::SHIFT
+            } else {
+                egui::Modifiers::NONE
+            };
+            events.insert(0, egui::Event::ModifiersChanged(modifiers));
+            let input = egui::RawInput {
+                screen_rect: Some(screen),
+                events,
+                ..Default::default()
+            };
+            ctx.run_ui(input, |ui| {
+                egui::CentralPanel::default()
+                    .frame(egui::Frame::NONE)
+                    .show(ui, |ui| {
+                        let mut menu = |_: &mut Ui, lines: Lines| asked.push(lines);
+                        show(ui, "test", Some(&text), Some(&mut menu));
+                    });
+            })
+            .drop_without_applying_deltas();
+        };
+        let click = |at, button, shift: bool| {
+            let modifiers = if shift {
+                egui::Modifiers::SHIFT
+            } else {
+                egui::Modifiers::NONE
+            };
+            [true, false]
+                .map(|pressed| egui::Event::PointerButton {
+                    pos: at,
+                    button,
+                    pressed,
+                    modifiers,
+                })
+                .to_vec()
+        };
+        let primary = egui::PointerButton::Primary;
+        let secondary = egui::PointerButton::Secondary;
+        for (at, button, shift) in [
+            (row(2.0), primary, false),
+            (row(4.0), primary, true),
+            (row(3.0), secondary, false),
+        ] {
+            frame(vec![egui::Event::PointerMoved(at)], shift, &mut asked);
+            frame(click(at, button, shift), shift, &mut asked);
+        }
+        frame(Vec::new(), false, &mut asked);
+        assert_eq!(asked.last(), Lines::new(2, 4).as_ref(), "{asked:?}");
+
+        // Away from the menu, a right-click on line 5: that line alone.
+        frame(vec![egui::Event::PointerMoved(row(5.0))], false, &mut asked);
+        frame(click(row(5.0), secondary, false), false, &mut asked);
+        frame(Vec::new(), false, &mut asked);
+        assert_eq!(asked.last(), Lines::new(5, 5).as_ref(), "{asked:?}");
+    }
 
     #[test]
     fn lines_lose_their_endings_and_tabs() {

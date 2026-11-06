@@ -116,7 +116,8 @@ impl RepoTab {
                     };
                     let code = change.map_or(' ', |f| f.status);
                     let r = widgets::file_row(ui, code, path, None, indent, shown(path), extra);
-                    widgets::file_menu(&r.row, path, Some(&detail.hash), false, acts);
+                    let links = || self.link_menu(None);
+                    widgets::file_menu(&r.row, path, Some(&detail.hash), false, &links, acts);
                     if r.row.clicked() {
                         acts.push(Action::FileView {
                             path: path.clone(),
