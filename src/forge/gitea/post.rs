@@ -7,6 +7,7 @@ use serde_json::{Value, json};
 
 use super::details::parse_thread_id;
 use super::{Api, Hosting};
+use crate::forge::http::Failure;
 use crate::pr_post::{
     LineComment, MergeMethod, Suggestion, Target, Verdict, apply_lines, check_path, decode_file,
     encode_path, may_delete_branch,
@@ -226,10 +227,21 @@ impl Target for GiteaTarget {
     }
 
     fn merge(&self, method: MergeMethod, delete_branch: bool) -> Result<(), String> {
-        self.post(
-            &self.pulls("/merge"),
-            &merge_payload(&self.head_oid, method),
-        )?;
+        let payload = merge_payload(&self.head_oid, method);
+        // While the server is still testing whether it merges (it does again after a push, a
+        // review…), it answers "Please try again later": so it is, a few times. The merge names
+        // its commit, so trying again never merges anything else.
+        let mut tries = 0;
+        loop {
+            match self.api.send("POST", &self.pulls("/merge"), Some(&payload)) {
+                Ok(_) => break,
+                Err(failure) if still_checking(&failure) && tries < MERGE_TRIES => {
+                    tries += 1;
+                    std::thread::sleep(MERGE_RETRY_AFTER);
+                }
+                Err(failure) => return Err(failure.into()),
+            }
+        }
         if delete_branch {
             let endpoint = format!(
                 "repos/{}/branches/{}",
@@ -325,6 +337,15 @@ pub(super) fn review_payload(
 
 /// What `POST …/pulls/N/merge` is sent. The commit is named, so that nothing pushed since the page
 /// was read gets merged unseen; the branch is deleted apart, once that's known to be safe.
+/// How often a merge is tried again while the server is still testing it, and how long apart.
+const MERGE_TRIES: u32 = 10;
+const MERGE_RETRY_AFTER: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// Whether the server refused a merge only because it is still testing whether it merges.
+fn still_checking(failure: &Failure) -> bool {
+    failure.status == Some(405) && failure.message.to_lowercase().contains("try again later")
+}
+
 pub(super) fn merge_payload(head_oid: &str, method: MergeMethod) -> Value {
     let method = match method {
         MergeMethod::Merge => "merge",
@@ -342,6 +363,25 @@ fn branch_tip(branch: &Value) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Only "still testing it" is waited out; any other refusal of a merge is said at once.
+    #[test]
+    fn a_merge_is_tried_again_only_while_the_server_tests_it() {
+        let failure = |status, message: &str| Failure {
+            status,
+            message: message.to_owned(),
+        };
+        assert!(still_checking(&failure(
+            Some(405),
+            "Gitea: Please try again later (HTTP 405)"
+        )));
+        assert!(!still_checking(&failure(Some(405), "Not allowed to merge")));
+        assert!(!still_checking(&failure(
+            Some(409),
+            "Please try again later"
+        )));
+        assert!(!still_checking(&failure(None, "try again later")));
+    }
 
     fn line(path: &str, line: u64, side: DiffSide, body: &str) -> LineComment {
         LineComment {
