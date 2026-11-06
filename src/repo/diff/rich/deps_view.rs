@@ -123,16 +123,19 @@ fn row(ui: &mut Ui, t: &Tokens, diff: &DepsDiff, d: &DepChange, acts: &mut Vec<A
         acts.push(Action::DiffGoToLine { old, new });
     }
     ui.add_space(8.0);
-    if let Some(v) = d.new.as_ref().or(d.old.as_ref()) {
-        let (url, site) = diff.ecosystem.registry(&d.name, v);
+    // Links for packages of a registry, not the project's own.
+    let (old_reg, new_reg) = &d.registry;
+    if let Some((name, v)) = new_reg.as_ref().or(old_reg.as_ref()) {
+        let (url, site) = diff.ecosystem.registry(name, v);
         if ui.link(site).on_hover_text(&url).clicked() {
             ui.ctx().open_url(egui::OpenUrl::new_tab(url));
         }
     }
-    if let (Some(o), Some(n)) = (&d.old, &d.new)
+    if let (Some((on, o)), Some((nn, n))) = (old_reg, new_reg)
+        && on == nn
         && o != n
     {
-        let (url, site) = diff.ecosystem.changes(&d.name, o, n);
+        let (url, site) = diff.ecosystem.changes(nn, o, n);
         if ui
             .link("what changed")
             .on_hover_text(format!("{site}: {url}"))

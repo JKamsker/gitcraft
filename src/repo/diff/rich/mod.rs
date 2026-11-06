@@ -102,7 +102,7 @@ impl RichKind {
                 "Show the changes by key: the keys added, removed, changed and moved"
             }
             (RichKind::Deps, false) => {
-                "Show the dependency changes: packages upgraded, added and removed"
+                "Show the dependency changes: packages upgraded, downgraded, added, removed and relicensed"
             }
             (RichKind::Api, false) => {
                 "Show the API contract changes: what breaks the API's clients, and what was added"

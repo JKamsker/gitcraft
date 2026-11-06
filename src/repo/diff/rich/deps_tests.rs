@@ -151,7 +151,18 @@ fn versions_compare_by_number() {
     assert_eq!(version_cmp("1.10.0", "1.9.0"), Greater);
     assert_eq!(version_cmp("v0.20.0", "v0.3.0"), Greater);
     assert_eq!(version_cmp("2.0.0", "2.0.0"), Equal);
-    assert_eq!(version_cmp("1.0.0-beta", "1.0.0"), Greater);
+    // A pre-release comes before its release.
+    assert_eq!(version_cmp("1.0.0-beta", "1.0.0"), Less);
+    assert_eq!(version_cmp("1.0.0-rc.10", "1.0.0-rc.9"), Greater);
+    assert_eq!(version_cmp("2.0.0rc1", "2.0.0"), Less);
+    assert_eq!(version_cmp("1.2.3+build.5", "1.2.3"), Equal);
+    assert_eq!(
+        version_cmp(
+            "v0.0.0-20231001000000-abcdef",
+            "v0.0.0-20230101000000-123456"
+        ),
+        Greater
+    );
 }
 
 #[test]
@@ -161,6 +172,7 @@ fn many_versions_of_one_package_are_added_and_removed() {
         version: v.to_owned(),
         license: None,
         line: 1,
+        registry: None,
     };
     let c = deps::compare(
         &[p("1.0.0"), p("2.0.0")],
@@ -274,5 +286,69 @@ fn dependency_changes_from_a_repository_and_the_view() -> Result<(), String> {
             new: Some(3)
         }
     )));
+    Ok(())
+}
+
+/// What a review of the first version found read wrongly.
+#[test]
+fn copies_peers_old_pnpm_go_sum_git_aliases_and_local_packages() -> Result<(), String> {
+    // npm: one version installed in two places, upgraded in both, is one upgrade.
+    let npm = |v: &str| {
+        format!(
+            r#"{{"lockfileVersion": 3, "packages": {{"": {{"version": "1.0.0"}}, "node_modules/a/node_modules/foo": {{"version": "{v}"}}, "node_modules/b/node_modules/foo": {{"version": "{v}"}}, "packages/web": {{"name": "web", "version": "0.1.0"}}}}}}"#
+        )
+    };
+    let d = deps::diff("package-lock.json", &sides(&npm("2.0.0"), &npm("2.1.0")))?;
+    assert_eq!(said(&d.changes), ["Upgraded foo 2.0.0 2.1.0"]);
+    // A workspace package of the project: no registry links.
+    let ws = deps::packages("package-lock.json", &npm("1.0.0"))?;
+    assert!(ws.iter().any(|p| p.name == "web" && p.registry.is_none()));
+    // pnpm 5: `name/version_peers`.
+    let pnpm = |v: &str| {
+        format!(
+            "lockfileVersion: 5.4\npackages:\n  /foo/{v}_react@18.2.0:\n    resolution: {{integrity: x}}\n  /@s/bar/{v}_react@18.2.0:\n    resolution: {{integrity: y}}\n"
+        )
+    };
+    let d = deps::diff("pnpm-lock.yaml", &sides(&pnpm("1.0.0"), &pnpm("1.1.0")))?;
+    assert_eq!(
+        said(&d.changes),
+        ["Upgraded @s/bar 1.0.0 1.1.0", "Upgraded foo 1.0.0 1.1.0"]
+    );
+    // go.sum keeps the old version's go.mod line: still an upgrade.
+    let old = "golang.org/x/text v0.3.7 h1:a=\ngolang.org/x/text v0.3.7/go.mod h1:b=\n";
+    let new = "golang.org/x/text v0.3.7/go.mod h1:b=\ngolang.org/x/text v0.14.0 h1:c=\ngolang.org/x/text v0.14.0/go.mod h1:d=\n";
+    let d = deps::diff("go.sum", &sides(old, new))?;
+    assert_eq!(
+        said(&d.changes),
+        ["Upgraded golang.org/x/text v0.3.7 v0.14.0"]
+    );
+    // A git dependency moved to another commit, same version: seen.
+    let git = |rev: &str| {
+        format!(
+            "[[package]]\nname = \"dep\"\nversion = \"0.1.0\"\nsource = \"git+https://example.com/dep#{rev}\"\n\n[[package]]\nname = \"app\"\nversion = \"0.2.0\"\n"
+        )
+    };
+    let d = deps::diff("Cargo.lock", &sides(&git("aaaaaaaa1"), &git("bbbbbbbb2")))?;
+    assert_eq!(
+        said(&d.changes),
+        ["Upgraded dep 0.1.0 (git aaaaaaa) 0.1.0 (git bbbbbbb)"]
+    );
+    assert_eq!(d.changes[0].registry, (None, None));
+    let app = deps::packages("Cargo.lock", &git("a"))?;
+    assert!(app.iter().any(|p| p.name == "app" && p.registry.is_none()));
+    // npm v1 aliases link to the package they stand for.
+    let alias = r#"{"lockfileVersion": 1, "dependencies": {"foo": {"version": "npm:bar@1.2.0"}}}"#;
+    let pkgs = deps::packages("package-lock.json", alias)?;
+    assert_eq!(
+        pkgs[0].registry,
+        Some(("bar".to_owned(), "1.2.0".to_owned()))
+    );
+    // A pre-release to its release is an upgrade.
+    let rc = CARGO_OLD.replace("1.0.100", "1.0.0-rc.1");
+    let d = deps::diff(
+        "Cargo.lock",
+        &sides(&rc, &CARGO_OLD.replace("1.0.100", "1.0.0")),
+    )?;
+    assert_eq!(said(&d.changes), ["Upgraded serde 1.0.0-rc.1 1.0.0"]);
     Ok(())
 }
