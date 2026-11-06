@@ -36,6 +36,14 @@ pub struct SettingsView<'a> {
     pub update: super::UpdateCheck,
     /// Set by the page: look for a newer version now.
     pub check_updates_now: bool,
+    /// The version the last update replaced, when it can be gone back to.
+    pub previous: Option<String>,
+    /// The version gone back to and stayed on; empty when none.
+    pub pinned: String,
+    /// Set by the page: go back to `previous`.
+    pub go_back: bool,
+    /// Set by the page: unpin `pinned`.
+    pub unpin: bool,
     /// Set by the page: profiles switch with the tabs, which are the app's.
     pub request: Option<ProfileRequest>,
 }

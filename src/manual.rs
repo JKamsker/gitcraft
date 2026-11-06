@@ -44,6 +44,13 @@ const FEATURES: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "Updates",
+        &[
+            "A new version shows in a bar under the tabs: Update now restarts as it, with the tabs kept.",
+            "An update keeps the version it replaced: Settings → General → Updates → Go back to x.y.z restarts as that version and stays on it until you click Unpin there.",
+        ],
+    ),
+    (
         "Changes and commits",
         &[
             "Stage, unstage or discard whole files from the right pane.",

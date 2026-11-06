@@ -1,6 +1,7 @@
 //! Downloading a release into a folder of its own ("parking" it), and putting it in place of
 //! this copy of gitcraft. That's a rename, which Windows allows of a running program (not an
-//! overwrite): the running one moves aside to `<name>.old` and the parked one takes its name.
+//! overwrite): the running one moves aside, to be kept as `<name>.previous` (see `previous`),
+//! and the parked one takes its name.
 //! The window then closes, having saved its state, and the new version starts.
 
 use std::fs;
@@ -10,6 +11,7 @@ use std::process::Command;
 use std::sync::Mutex;
 use std::time::Duration;
 
+use super::previous::{self, Previous, aside, remove};
 use super::{REPO, Release};
 
 /// A release's download is refused past this size.
@@ -221,29 +223,37 @@ fn unpack(archive: &Path, dir: &Path) -> Result<(), String> {
     }
 }
 
-/// Puts the parked version `new` in place of this copy of gitcraft. Returns what to start.
+/// Puts the parked version `new` in place of this copy of gitcraft, keeping this one to go
+/// back to. Returns what to start.
 pub fn install(new: &Path) -> Result<PathBuf, String> {
     let layout = Layout::get().ok_or("This copy of gitcraft isn't updated")?;
     let target = layout.path();
-    let old = aside(target);
-    remove(&old);
-    fs::rename(target, &old)
-        .map_err(|e| format!("Could not move {} aside: {e}", target.display()))?;
-    if let Err(e) = move_into(new, target) {
-        let _ = fs::rename(&old, target);
-        return Err(format!("Could not put the new version in place: {e}"));
-    }
+    previous::replace_keeping(target, new, super::CURRENT, move_into)?;
     if let Some(parking) = parking() {
         remove(&parking);
     }
     Ok(target.to_owned())
 }
 
-/// Where the running version moves to while the new one takes its place.
-fn aside(target: &Path) -> PathBuf {
-    let mut name = target.file_name().unwrap_or_default().to_owned();
-    name.push(".old");
-    target.with_file_name(name)
+/// The version an update replaced, kept to go back to, if this copy can go back to it.
+pub fn previous() -> Option<Previous> {
+    let layout = Layout::get()?;
+    can_update()
+        .then(|| previous::find(layout.path()))
+        .flatten()
+}
+
+/// Puts the version kept by the last update back in place of this one ("Go back to 0.3.3"),
+/// keeping this one in its stead. Returns what to start, and the version gone back to.
+pub fn go_back() -> Result<(PathBuf, Previous), String> {
+    let layout = Layout::get().ok_or("This copy of gitcraft isn't updated")?;
+    let target = layout.path();
+    let previous = previous::swap_back(target, super::CURRENT)?;
+    // A newer release parked for this version isn't one to offer the one gone back to.
+    if let Some(parking) = parking() {
+        remove(&parking);
+    }
+    Ok((target.to_owned(), previous))
 }
 
 /// A rename, or a copy when the parking is on another drive than gitcraft.
@@ -265,15 +275,8 @@ fn move_into(from: &Path, to: &Path) -> Result<(), String> {
     })
 }
 
-fn remove(path: &Path) {
-    if path.is_dir() {
-        let _ = fs::remove_dir_all(path);
-    } else {
-        let _ = fs::remove_file(path);
-    }
-}
-
-/// Removes the version an update moved aside. It may still be closing: tried for a while.
+/// Removes a version an update moved aside and couldn't keep (see `previous`). It may still be
+/// closing: tried for a while.
 pub fn clean_up() {
     let Some(layout) = Layout::get() else { return };
     let old = aside(layout.path());
