@@ -246,7 +246,10 @@ pub fn lfs_prune_plan(repo: &Path) -> Result<PrunePlan, String> {
 pub(crate) fn parse_prune(out: &str) -> Option<PrunePlan> {
     let mut plan = PrunePlan::default();
     let mut summary = false;
-    for line in out.lines().filter_map(|l| l.trim().strip_prefix("prune: ")) {
+    // Some builds (Windows) print the lines without the `prune: ` prefix, and progress
+    // updates in place with carriage returns.
+    let lines = out.split(['\n', '\r']).map(str::trim);
+    for line in lines.map(|l| l.strip_prefix("prune: ").unwrap_or(l)) {
         if line.contains("local object") {
             summary = true;
             for part in line.split(',') {

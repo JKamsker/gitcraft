@@ -92,6 +92,17 @@ fn prune_plans() {
         Some(PrunePlan::default())
     );
     assert_eq!(parse_prune("something else"), None);
+    // As git-lfs on Windows prints it: no prefix, progress updated in place.
+    let windows = "1 local object, 0 retained\r3 local objects, 2 retained, done.\r\n\
+                   1 file would be pruned (300 B), done.\r\n";
+    assert_eq!(
+        parse_prune(windows).map(|p| (p.local, p.retained, p.objects, p.bytes)),
+        Some((3, 2, 1, 300))
+    );
+    assert_eq!(
+        parse_prune("1 local object, 2 retained, done.").map(|p| p.objects),
+        Some(0)
+    );
 }
 
 #[test]
