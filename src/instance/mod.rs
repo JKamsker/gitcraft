@@ -27,8 +27,8 @@ use std::path::Path;
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
-pub use message::Request;
-use server::Primary;
+pub use message::{AgentCall, Request};
+pub use server::Primary;
 
 /// How long a start waits for the running instance to answer before it gives up.
 const PATIENCE: Duration = Duration::from_secs(10);
@@ -84,6 +84,54 @@ pub fn take_requests() -> Vec<Request> {
         .get()
         .map(Primary::take_requests)
         .unwrap_or_default()
+}
+
+/// Agents' calls since the last call (see `crate::mcp`), the oldest first.
+pub fn take_agent_calls() -> Vec<crate::mcp::link::Incoming> {
+    PRIMARY
+        .get()
+        .map(Primary::take_agent_calls)
+        .unwrap_or_default()
+}
+
+/// Hands an agent's `call` to the running instance whose data folder is `dir`, and waits up to
+/// `wait` for how it ended (see `client::call_agent`).
+pub fn call_agent(
+    dir: &Path,
+    call: &AgentCall,
+    wait: Duration,
+    cancelled: &dyn Fn() -> bool,
+) -> crate::mcp::wire::Reply {
+    use crate::mcp::wire::{Outcome, Reply};
+    let not_running = || {
+        Reply::new(
+            Outcome::NotOpen,
+            format!(
+                "gitcraft isn't running. Ask the user to start gitcraft and open {} in it, then \
+                 try again.",
+                call.repo
+            ),
+        )
+    };
+    // Its file is only believed while a process holds the lock: one left by a crash isn't.
+    match lock::try_take(dir) {
+        lock::Lock::Held(_) => return not_running(),
+        lock::Lock::Taken | lock::Lock::Unavailable(_) => {}
+    }
+    let Some(found) = discovery::read(dir) else {
+        return not_running();
+    };
+    client::call_agent(&found, call, wait, cancelled)
+        .unwrap_or_else(|e| Reply::new(Outcome::Failed, e))
+}
+
+/// A running instance in `dir`, for tests that need a window to talk to (see
+/// `mcp::link::stand_in`): `None` when another process is the running instance there.
+pub fn primary_in(dir: &Path) -> Option<Primary> {
+    match lock::try_take(dir) {
+        lock::Lock::Held(held) => Some(Primary::start(dir, held)),
+        _ => None,
+    }
 }
 
 /// The window is closing: what later starts ask is no longer taken (they wait for the next

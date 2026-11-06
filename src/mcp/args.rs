@@ -97,7 +97,7 @@ impl<'a> Args<'a> {
 
 /// The most paths one call may name, and their length all together.
 pub const MAX_PATHS: usize = 500;
-const MAX_PATHS_BYTES: usize = 256 * 1024;
+const MAX_PATHS_BYTES: usize = 32 * 1024;
 
 /// Longest a name or revision may be.
 const MAX_NAME: usize = 255;
@@ -189,8 +189,9 @@ pub fn message(text: &str) -> Result<&str, String> {
     if text.is_empty() {
         return Err("the commit message can't be empty".to_owned());
     }
-    if text.len() > 64 * 1024 {
-        return Err("the commit message is longer than 64 KB".to_owned());
+    // What goes to the window must fit in one of its request lines (64 KB).
+    if text.len() > 32 * 1024 {
+        return Err("the commit message is longer than 32 KB".to_owned());
     }
     if text.contains('\0') {
         return Err("the commit message can't hold a NUL character".to_owned());
@@ -290,7 +291,7 @@ mod tests {
         assert_eq!(message("  Fix it \n"), Ok("Fix it"));
         assert!(message(" \n ").is_err());
         assert!(message("a\0b").is_err());
-        assert!(message(&"x".repeat(70_000)).is_err());
+        assert!(message(&"x".repeat(40_000)).is_err());
     }
 
     #[test]
@@ -327,7 +328,7 @@ mod tests {
         assert!(refused(json!(["ok", "../no"])));
         assert!(refused(json!([1])));
         assert!(refused(json!(vec!["a"; MAX_PATHS + 1])));
-        assert!(refused(json!(vec!["x".repeat(4000); 100])));
+        assert!(refused(json!(vec!["x".repeat(4000); 10])));
         assert!(!refused(json!(["a", "b/c"])));
     }
 

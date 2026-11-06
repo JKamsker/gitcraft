@@ -18,6 +18,9 @@ impl App {
     pub(super) fn handle_handoff(&mut self, request: Request, ctx: &egui::Context) {
         match request {
             Request::Focus => {}
+            // Never queued here: an agent's call goes to the tab of its repository, with its
+            // answer (see `take_agent_calls`).
+            Request::Agent(_) => return,
             Request::Open(path) => {
                 // Without git there's nothing to open it with: the window says so already.
                 if self.git_version.is_ok() {

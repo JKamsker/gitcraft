@@ -1,15 +1,10 @@
-//! What `gitcraft mcp` and the window say to each other over [`super::link`]: one request line,
-//! one reply line, both JSON and versioned, so that either side can grow without the other
-//! misreading it.
+//! What an agent asks the window for, and how it ended: carried in the single-instance
+//! channel's `agent` requests (see `crate::instance::message`).
 //!
 //! The request says what the agent asks for ([`WriteOp`]), never how risky it is: the window
 //! decides itself which operations wait for the user's approval.
 
 use serde::{Deserialize, Serialize};
-
-/// The version of the format below. A window answers a request of another version with
-/// [`Outcome::BadRequest`], naming the one it speaks.
-pub const VERSION: u32 = 1;
 
 /// How a reset moves the branch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -109,17 +104,6 @@ impl WriteOp {
     }
 }
 
-/// One request: the proof that the asker holds the window's token (see `link`), the
-/// repository (as gitcraft names it: see `app::repo_root`), who asks, and what.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Request {
-    pub v: u32,
-    pub proof: String,
-    pub repo: String,
-    pub agent: String,
-    pub op: WriteOp,
-}
-
 /// How a request ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -140,7 +124,6 @@ pub enum Outcome {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Reply {
-    pub v: u32,
     pub outcome: Outcome,
     pub message: String,
 }
@@ -148,7 +131,6 @@ pub struct Reply {
 impl Reply {
     pub fn new(outcome: Outcome, message: impl Into<String>) -> Self {
         Self {
-            v: VERSION,
             outcome,
             message: message.into(),
         }
