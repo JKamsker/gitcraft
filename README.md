@@ -39,10 +39,11 @@ so your config, credentials and hooks apply as usual.
   passphrase, whether to trust a host seen for the first time — is asked in the window (ssh
   runs gitcraft as its `SSH_ASKPASS`). A password or passphrase typed is kept for that machine
   while gitcraft runs, so the other shells don't ask again, and forgotten as soon as ssh says
-  it was wrong. Tick **Remember connection** to keep it after a restart too: it is saved
-  encrypted in the system's credential store (Windows Credential Manager, the macOS Keychain,
-  the Secret Service on Linux), never in gitcraft's own files, and forgotten when it stops
-  working or with **Forget saved SSH sign-ins** in the command palette.
+  it was wrong. Tick **Remember connection** to keep it after a restart too: once ssh has
+  signed in with it (a wrong one is never saved), it is saved encrypted in the system's
+  credential store (Windows Credential Manager, the macOS Keychain, the Secret Service on
+  Linux), never in gitcraft's own files, and forgotten when it stops working or with
+  **Forget saved SSH sign-ins** in the command palette.
 - Names with a `\` in them (Linux allows one) work like any other.
 - Network operations (fetch, pull, push, clone) run in shells of their own, so the reads never
   wait behind them. A command that hangs is stopped there, with what it started, after 5

@@ -173,7 +173,7 @@ fn stop(host: Host, pid: u32) {
 /// (a long `git log`): from the command's first byte on, what a login printed skipped.
 pub fn spawn(host: &Host, req: &Request) -> Result<Child, String> {
     super::ui_guard::off_ui_thread(&req.what())?;
-    let mut cmd = shell_command(host);
+    let (mut cmd, attempt) = shell_command(host);
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -200,6 +200,9 @@ pub fn spawn(host: &Host, req: &Request) -> Result<Child, String> {
         let said = said.replace('\0', "");
         return Err(format!("could not reach {}: {}", host.label(), said.trim()));
     }
+    if let Some(attempt) = attempt {
+        attempt.connected();
+    }
     Ok(child)
 }
 
@@ -224,7 +227,13 @@ fn skip_to_ready(stdout: &mut std::process::ChildStdout) -> bool {
 
 /// A new shell kept open on `host`.
 pub(super) fn start_shell(host: &Host) -> Result<Shell, String> {
-    Shell::start(shell_command(host), &host.label())
+    let (cmd, attempt) = shell_command(host);
+    let shell = Shell::start(cmd, &host.label())?;
+    // Signed in: a password to remember is kept now (a failed start drops it).
+    if let Some(attempt) = attempt {
+        attempt.connected();
+    }
+    Ok(shell)
 }
 
 /// What a new shell is sent first: its temporary folder (removed when the shell ends, also on
@@ -244,8 +253,10 @@ pub(super) fn setup_script() -> String {
     )
 }
 
-/// The process that runs `sh` on `host`, reading its script from its input.
-fn shell_command(host: &Host) -> Command {
+/// The process that runs `sh` on `host`, reading its script from its input, and (over SSH)
+/// the attempt to tell once it has signed in.
+fn shell_command(host: &Host) -> (Command, Option<super::askpass::Attempt>) {
+    let mut attempt = None;
     let mut cmd = match host {
         Host::Ssh(dest) => {
             let mut cmd = Command::new("ssh");
@@ -254,8 +265,9 @@ fn shell_command(host: &Host) -> Command {
             // Its questions (a password, a passphrase, a new host key) asked in the window
             // (see `askpass`); where that can't be, none asked: it fails, and says why.
             match super::askpass::env_for(&host.label()) {
-                Some(env) => {
+                Some((env, started)) => {
                     cmd.envs(env);
+                    attempt = Some(started);
                 }
                 None => {
                     cmd.args(["-o", "BatchMode=yes"]);
@@ -292,7 +304,7 @@ fn shell_command(host: &Host) -> Command {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
-    cmd
+    (cmd, attempt)
 }
 
 fn start_error(host: &Host, e: &std::io::Error) -> String {

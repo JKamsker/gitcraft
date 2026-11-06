@@ -8,8 +8,9 @@
 //! back. A password or passphrase typed is remembered for the machine while the app runs, so
 //! the other shells kept open there don't ask again; one ssh asks again, and it was wrong: it
 //! is forgotten, and the question shown again. Typed with "Remember connection", it is also
-//! kept in the system's credential store (see [`super::vault`]) and given from there after a
-//! restart, until it is wrong or forgotten.
+//! kept in the system's credential store (see [`super::vault`]), but only once the ssh given
+//! it has signed in (see [`Attempt`]), and given from there after a restart, until it is wrong
+//! or forgotten.
 
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Write};
@@ -103,7 +104,52 @@ struct State {
     last_asked: Option<Instant>,
     /// What the window is to say (a secret that couldn't be kept), the oldest first.
     notices: Vec<String>,
+    /// Secrets typed with "Remember connection", by the session given them: kept in the
+    /// system's store once that ssh has connected (see [`Attempt`]), dropped if it doesn't.
+    to_keep: HashMap<u64, Vec<ToKeep>>,
     repaint: Option<egui::Context>,
+}
+
+/// A secret to keep once the connection it was given to is made.
+struct ToKeep {
+    host: String,
+    prompt: String,
+    secret: String,
+}
+
+/// One ssh started, until it is known whether it connected. What it was given to remember is
+/// kept only once it has ([`Attempt::connected`]); dropped without, it is not.
+pub(super) struct Attempt {
+    session: u64,
+}
+
+impl Attempt {
+    /// The ssh signed in (its shell answered): what it was given to remember is kept now, in
+    /// the system's store (blocking: never on the window's thread).
+    pub(super) fn connected(self) {
+        let Some(server) = server() else { return };
+        let kept = lock(&server.state)
+            .to_keep
+            .remove(&self.session)
+            .unwrap_or_default();
+        for k in kept {
+            if let Err(e) = super::vault::keep(&k.host, &k.prompt, &k.secret) {
+                tell(
+                    server,
+                    format!("{}: the password couldn't be saved ({e}).", k.host),
+                );
+            }
+        }
+    }
+}
+
+impl Drop for Attempt {
+    fn drop(&mut self) {
+        // Not connected (or kept already): nothing of it is kept.
+        if let Some(server) = server() {
+            lock(&server.state).to_keep.remove(&self.session);
+        }
+    }
 }
 
 struct Server {
@@ -160,8 +206,9 @@ pub fn set_repaint(ctx: egui::Context) {
 }
 
 /// The program and environment an ssh connecting to `host` is started with, so that its
-/// questions come to the window; `None` when there's no way to (no listener could be made).
-pub(super) fn env_for(host_label: &str) -> Option<Vec<(&'static str, String)>> {
+/// questions come to the window, and the attempt to tell once it has connected; `None` when
+/// there's no way to (no listener could be made).
+pub(super) fn env_for(host_label: &str) -> Option<(Vec<(&'static str, String)>, Attempt)> {
     static SESSIONS: AtomicU64 = AtomicU64::new(1);
     let server = server()?;
     let program = std::env::current_exe().ok()?;
@@ -169,11 +216,12 @@ pub(super) fn env_for(host_label: &str) -> Option<Vec<(&'static str, String)>> {
     lock(&server.state)
         .sessions
         .insert(session, host_label.to_owned());
-    Some(vec![
+    let env = vec![
         ("SSH_ASKPASS", program.display().to_string()),
         ("SSH_ASKPASS_REQUIRE", "force".to_owned()),
         (ENV, format!("{} {} {session}", server.port, server.token)),
-    ])
+    ];
+    Some((env, Attempt { session }))
 }
 
 /// Whether ssh asked something lately (or waits for an answer): a connection being made then
@@ -316,8 +364,11 @@ fn ask(server: &Server, session: u64, kind: Kind, prompt: String, id: u64) -> Op
     if kind == Kind::Secret {
         match known(server, session, &host, &prompt) {
             Known::Use(secret) => return Some(secret),
-            // Kept too? Then that was wrong: forgotten there as well.
-            Known::Wrong => forgotten = super::vault::forget(&host, &prompt),
+            // Not to be kept, nor kept any longer if it was.
+            Known::Wrong => {
+                forget_to_keep(server, session, &prompt);
+                forgotten = super::vault::forget(&host, &prompt);
+            }
             Known::Nothing => {
                 if let Some(saved) = super::vault::recall(&host, &prompt) {
                     remember(server, session, &host, &prompt, &saved);
@@ -348,14 +399,26 @@ fn ask(server: &Server, session: u64, kind: Kind, prompt: String, id: u64) -> Op
     let (answer, keep) = rx.recv().ok().flatten()?;
     if kind == Kind::Secret {
         remember(server, session, &host, &prompt, &answer);
-        if keep && let Err(e) = super::vault::keep(&host, &prompt, &answer) {
-            tell(
-                server,
-                format!("{host}: the password couldn't be saved ({e})."),
-            );
+        // Kept only once this ssh has connected with it (see `Attempt`): a wrong one never is.
+        if keep {
+            let mut state = lock(&server.state);
+            let list = state.to_keep.entry(session).or_default();
+            list.retain(|k| k.prompt != prompt);
+            list.push(ToKeep {
+                host,
+                prompt,
+                secret: answer.clone(),
+            });
         }
     }
     Some(answer)
+}
+
+/// `session`'s answer to `prompt` was wrong: not to be kept.
+fn forget_to_keep(server: &Server, session: u64, prompt: &str) {
+    if let Some(list) = lock(&server.state).to_keep.get_mut(&session) {
+        list.retain(|k| k.prompt != prompt);
+    }
 }
 
 /// What is known of `prompt`'s answer for `session`'s ssh to `host`. Asked again by the same
@@ -444,13 +507,36 @@ pub fn run_helper() -> Option<i32> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::vault;
     use super::*;
 
     /// What `env_for` gives ssh as `GITCRAFT_ASKPASS`.
     fn session_for(host: &str) -> String {
-        env_for(host)
-            .and_then(|env| env.into_iter().find(|(k, _)| *k == ENV).map(|(_, v)| v))
-            .unwrap_or_default()
+        start_for(host).0
+    }
+
+    /// An ssh started for `host`: what it is given as `GITCRAFT_ASKPASS`, and its attempt.
+    fn start_for(host: &str) -> (String, Option<Attempt>) {
+        match env_for(host) {
+            Some((env, attempt)) => (
+                env.into_iter()
+                    .find(|(k, _)| *k == ENV)
+                    .map(|(_, v)| v)
+                    .unwrap_or_default(),
+                Some(attempt),
+            ),
+            None => (String::new(), None),
+        }
+    }
+
+    /// Answers `prompt` asked by the ssh `found` names with `secret`, ticking "Remember
+    /// connection".
+    fn type_and_remember(found: &str, prompt: &str, secret: &str) -> Option<String> {
+        let asked = ask_in_background(found.to_owned(), prompt, Kind::Secret);
+        if let Some(q) = loop_until_shown(prompt) {
+            answer_and_remember(q.id, secret.to_owned());
+        }
+        asked.join().ok().flatten()
     }
 
     /// Answers the next question shown whose prompt is `prompt` with `answer`; the question.
@@ -518,22 +604,22 @@ mod tests {
         }
     }
 
-    /// Kept with "Remember connection", a secret is given after a restart without asking;
-    /// wrong, it is forgotten there too, and the user told so when asked again.
+    /// Kept with "Remember connection" once its ssh connected, a secret is given after a
+    /// restart without asking; wrong, it is forgotten there too, and the user told so.
     #[test]
     fn a_remembered_secret_outlives_the_app_until_it_is_wrong() {
         let (host, prompt) = ("SSH · four", "me@four's password: (kept)");
-        let asked = ask_in_background(session_for(host), prompt, Kind::Secret);
-        let shown = loop_until_shown(prompt);
-        assert_eq!(shown.as_ref().map(|q| q.forgotten), Some(false));
-        if let Some(q) = shown {
-            answer_and_remember(q.id, "kept".to_owned());
-        }
-        assert_eq!(asked.join().ok().flatten(), Some("kept".to_owned()));
+        let (found, attempt) = start_for(host);
         assert_eq!(
-            super::super::vault::recall(host, prompt),
+            type_and_remember(&found, prompt, "kept"),
             Some("kept".to_owned())
         );
+        // Not kept before the connection is made.
+        assert_eq!(vault::recall(host, prompt), None);
+        if let Some(attempt) = attempt {
+            attempt.connected();
+        }
+        assert_eq!(vault::recall(host, prompt), Some("kept".to_owned()));
 
         restart_for(host);
         let after = session_for(host);
@@ -545,13 +631,63 @@ mod tests {
         let again = ask_in_background(after, prompt, Kind::Secret);
         let shown = loop_until_shown(prompt);
         assert_eq!(shown.as_ref().map(|q| q.forgotten), Some(true));
-        assert_eq!(super::super::vault::recall(host, prompt), None);
+        assert_eq!(vault::recall(host, prompt), None);
         if let Some(q) = shown {
             answer(q.id, Some("right".to_owned()));
         }
         assert_eq!(again.join().ok().flatten(), Some("right".to_owned()));
         // Typed without remembering: not kept.
-        assert_eq!(super::super::vault::recall(host, prompt), None);
+        assert_eq!(vault::recall(host, prompt), None);
+    }
+
+    /// A connection that isn't made keeps nothing, even ticked.
+    #[test]
+    fn a_secret_is_not_kept_for_a_connection_that_failed() {
+        let (host, prompt) = ("SSH · five", "me@five's password: (failed)");
+        let (found, attempt) = start_for(host);
+        assert_eq!(
+            type_and_remember(&found, prompt, "typo"),
+            Some("typo".to_owned())
+        );
+        drop(attempt);
+        assert_eq!(vault::recall(host, prompt), None);
+    }
+
+    /// Wrong, then right, in one connection: the right one is kept, the wrong one never.
+    #[test]
+    fn only_the_secret_that_signed_in_is_kept() {
+        let (host, prompt) = ("SSH · six", "me@six's password: (retyped)");
+        let (found, attempt) = start_for(host);
+        assert_eq!(
+            type_and_remember(&found, prompt, "wrong"),
+            Some("wrong".to_owned())
+        );
+        // ssh asks again: that was wrong. Typed again, not ticked this time.
+        let again = ask_in_background(found, prompt, Kind::Secret);
+        if let Some(q) = loop_until_shown(prompt) {
+            answer(q.id, Some("right".to_owned()));
+        }
+        assert_eq!(again.join().ok().flatten(), Some("right".to_owned()));
+        if let Some(attempt) = attempt {
+            attempt.connected();
+        }
+        assert_eq!(vault::recall(host, prompt), None);
+
+        // Wrong ticked, then right ticked: the right one.
+        let (found, attempt) = start_for(host);
+        restart_for(host);
+        assert_eq!(
+            type_and_remember(&found, prompt, "wrong"),
+            Some("wrong".to_owned())
+        );
+        assert_eq!(
+            type_and_remember(&found, prompt, "right"),
+            Some("right".to_owned())
+        );
+        if let Some(attempt) = attempt {
+            attempt.connected();
+        }
+        assert_eq!(vault::recall(host, prompt), Some("right".to_owned()));
     }
 
     /// The next question shown whose prompt is `prompt`, unanswered.
