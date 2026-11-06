@@ -12,11 +12,11 @@ mod tests;
 use serde::{Deserialize, Serialize};
 
 pub use program::{Scope, captured_program, terminal_program, toast_text, variables};
-#[cfg(test)]
-use repo_file::parse_repo_file;
 pub use repo_file::{
     FILE as REPO_FILE, MAX_BYTES as REPO_FILE_MAX, RepoFile, TrustedFile, is_trusted, trust,
 };
+#[cfg(test)]
+use repo_file::{digest, parse_repo_file};
 
 /// Where a command is offered.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -139,28 +139,54 @@ impl Default for CustomCommand {
 
 /// The variables gitcraft sets itself, in the order the settings list them.
 pub const BUILT_IN: [(&str, &str); 6] = [
-    ("SHA", "the commit's full hash"),
+    (
+        "SHA",
+        "the commit's full hash (HEAD outside a commit's menu)",
+    ),
     ("SHORT_SHA", "its first 8 characters"),
     (
         "BRANCH",
-        "the branch (the checked-out one outside a branch's menu)",
+        "the branch: the menu's (origin/x for a remote one), the commit's pill, else the checked-out one",
     ),
     (
         "REMOTE",
-        "the branch's remote (its upstream's, else origin)",
+        "that branch's remote: a remote branch's own, a local one's upstream's, else origin",
     ),
-    ("FILE", "the file, relative to the repository"),
+    (
+        "FILE",
+        "the file, relative to the repository (only in a file's menu)",
+    ),
     ("REPO", "the repository's folder, on its machine"),
 ];
 
 /// Variables a prompt can't be given: those the shell, git or gitcraft rely on (`PATH`,
 /// `IFS`, `HOME`…), which an answer would change for the whole command.
-const RESERVED: [&str; 12] = [
-    "PATH", "HOME", "IFS", "SHELL", "ENV", "PWD", "OLDPWD", "USER", "LANG", "TERM", "CDPATH", "PS4",
+const RESERVED: [&str; 20] = [
+    "PATH",
+    "HOME",
+    "IFS",
+    "SHELL",
+    "ENV",
+    "PWD",
+    "OLDPWD",
+    "USER",
+    "LANG",
+    "TERM",
+    "CDPATH",
+    "PS4",
+    // Read-only in bash (`sh` on Git for Windows and macOS), or what tools rely on.
+    "UID",
+    "EUID",
+    "PPID",
+    "SHELLOPTS",
+    "POSIXLY_CORRECT",
+    "TMPDIR",
+    "EDITOR",
+    "PAGER",
 ];
 
 /// Prefixes of the variables a prompt can't be given: git's, the loader's, ssh's, gitcraft's.
-const RESERVED_PREFIXES: [&str; 6] = ["GIT_", "LD_", "DYLD_", "SSH_", "GITCRAFT_", "LC_"];
+const RESERVED_PREFIXES: [&str; 7] = ["GIT_", "LD_", "DYLD_", "SSH_", "GITCRAFT_", "LC_", "BASH"];
 
 /// Why `name` can't be a prompt's variable, if it can't: `A`–`Z`, digits and `_`, starting
 /// with a letter, at most 32 characters, and none of gitcraft's own nor a reserved one.

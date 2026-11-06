@@ -23,8 +23,8 @@ pub enum CustomDialog {
         branches: Vec<String>,
         focus: bool,
     },
-    /// Show a repository's command file, to trust it.
-    Review(RepoFile),
+    /// Show a repository's command file (of the repository named so), to trust it.
+    Review { repo: String, file: RepoFile },
 }
 
 impl CustomDialog {
@@ -39,8 +39,8 @@ impl CustomDialog {
         }
     }
 
-    pub fn review(file: RepoFile) -> Self {
-        CustomDialog::Review(file)
+    pub fn review(repo: String, file: RepoFile) -> Self {
+        CustomDialog::Review { repo, file }
     }
 }
 
@@ -53,7 +53,7 @@ pub(super) fn custom(ui: &mut Ui, enter: bool, dialog: &mut CustomDialog) -> Out
             branches,
             focus,
         } => ask(ui, enter, command, scope, answers, branches, focus),
-        CustomDialog::Review(file) => review(ui, file),
+        CustomDialog::Review { repo, file } => review(ui, repo, file),
     }
 }
 
@@ -93,7 +93,9 @@ fn ask(
     ui.label(RichText::new("Runs").color(t.text_dim).small());
     command_line(ui, "custom-ask", &command.command);
     ui.add_space(12.0);
-    // Enter in a multi-line answer isn't asked for: every answer is one line.
+    // Enter runs it only from an answer typed: a confirmation alone wants a click, so that a
+    // stray Enter never runs a command.
+    let enter = enter && !command.prompts.is_empty();
     buttons(ui, "Run", true, enter, || {
         Action::Custom(CustomAct::Run {
             command: Box::new(command.clone()),
@@ -103,13 +105,18 @@ fn ask(
     })
 }
 
-/// "abc12345 · main · src/x.rs": what the command is about, for under its name.
+/// "abc12345 · main · origin · src/x.rs": what the command is about, for under its name.
 fn about(scope: &Scope) -> String {
     let short: String = scope.sha.chars().take(8).collect();
-    let parts: Vec<&str> = [short.as_str(), scope.branch.as_str(), scope.file.as_str()]
-        .into_iter()
-        .filter(|p| !p.is_empty())
-        .collect();
+    let parts: Vec<&str> = [
+        short.as_str(),
+        scope.branch.as_str(),
+        scope.remote.as_str(),
+        scope.file.as_str(),
+    ]
+    .into_iter()
+    .filter(|p| !p.is_empty())
+    .collect();
     if parts.is_empty() {
         "Custom command".to_owned()
     } else {
@@ -158,16 +165,17 @@ fn command_line(ui: &mut Ui, id: impl std::hash::Hash + std::fmt::Debug, text: &
         });
 }
 
-/// The repository's commands, each with its command line, and whether to trust them.
-fn review(ui: &mut Ui, file: &RepoFile) -> Outcome {
+/// The repository's commands, each with what it asks, whether it asks before running, and
+/// its command line; and whether to trust them.
+fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
     let t = Tokens::get(ui.ctx());
     ui.set_width(520.0);
     title(
         ui,
         "Repository commands",
         &format!(
-            "{} adds these. They run on this repository's machine as you: use them only if \
-             you trust whoever can change this file.",
+            "These come from {} in {repo}. They run on the repository's machine as you: \
+             trust them only if you trust whoever can change this file.",
             cc::REPO_FILE
         ),
         &t,
@@ -192,25 +200,46 @@ fn review(ui: &mut Ui, file: &RepoFile) -> Outcome {
                 ui.label(RichText::new("It lists no commands.").color(t.text_dim));
             }
             for (i, c) in commands.iter().enumerate() {
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new(c.name.trim()).font(theme::semibold(13.0)));
+                ui.add(
+                    egui::Label::new(RichText::new(c.name.trim()).font(theme::semibold(13.0)))
+                        .wrap(),
+                );
+                ui.label(
+                    RichText::new(format!(
+                        "{} · output: {}",
+                        c.placement.label(),
+                        c.output.label()
+                    ))
+                    .color(t.text_faint)
+                    .small(),
+                );
+                if !c.confirm && c.prompts.is_empty() {
                     ui.label(
-                        RichText::new(format!(
-                            "{} · output: {}",
-                            c.placement.label(),
-                            c.output.label()
-                        ))
-                        .color(t.text_faint)
-                        .small(),
+                        RichText::new("Runs at once when picked, without asking")
+                            .color(t.danger)
+                            .small(),
                     );
-                });
+                }
+                for p in &c.prompts {
+                    let mut asks = format!("Asks for ${} ({})", p.variable, p.kind.label());
+                    if !p.label.trim().is_empty() {
+                        asks.push_str(&format!(": {}", p.label.trim()));
+                    }
+                    if !p.default.is_empty() {
+                        asks.push_str(&format!(", “{}” by default", p.default));
+                    }
+                    ui.label(RichText::new(asks).color(t.text_dim).small());
+                }
                 command_line(ui, ("custom-review", i), &c.command);
                 ui.add_space(8.0);
             }
         });
     ui.add_space(8.0);
-    let text = file.text.clone();
+    let (digest, count) = (file.digest.clone(), commands.len());
     buttons(ui, "Trust and use", true, false, move || {
-        Action::Custom(CustomAct::Trust(text))
+        Action::Custom(CustomAct::Trust {
+            digest,
+            commands: count,
+        })
     })
 }

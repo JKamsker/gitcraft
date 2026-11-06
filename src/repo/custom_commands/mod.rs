@@ -22,6 +22,10 @@ pub(crate) struct TabCommands {
     file: Option<RepoFile>,
     /// What was last said in a toast about an untrusted file, not to say it at every read.
     announced: Option<String>,
+    /// Numbers the reads of the file: an answer older than one already taken is dropped.
+    reads: u64,
+    /// The read the file shown comes from.
+    read: u64,
     /// What the menus offered when the tab was last drawn, for the palette.
     published: Arc<Published>,
 }
@@ -41,10 +45,11 @@ pub(crate) enum CustomAct {
     },
     /// Show the repository's file, to trust it.
     Review,
-    /// Trust the repository's file as it reads now (`text`).
-    Trust(String),
-    /// The repository's file was read: its text, or `None` when there is none.
-    FileRead(Result<Option<String>, String>),
+    /// Trust the repository's file as it was shown: its digest, and how many commands it has.
+    Trust { digest: String, commands: usize },
+    /// The repository's file was read (by the read numbered so): its text, or `None` when
+    /// there is none.
+    FileRead(u64, Result<Option<String>, String>),
 }
 
 /// What the menus of the tab drawn offer, for menus drawn away from the tab (a file's).
@@ -97,7 +102,7 @@ pub(crate) fn menu_items(ui: &mut Ui, placement: Placement, scope: Scope, acts: 
         && ui
             .button("Review repository commands…")
             .on_hover_text(format!(
-                "{} has commands not trusted yet: read them first",
+                "{} has commands not trusted yet (or can't be read): see them first",
                 cc::REPO_FILE
             ))
             .clicked()
@@ -132,9 +137,10 @@ impl RepoTab {
     fn trusted_repo_commands(&self, trusted: &[cc::TrustedFile]) -> &[CustomCommand] {
         match &self.custom.file {
             Some(RepoFile {
-                text,
+                digest,
                 commands: Ok(list),
-            }) if cc::is_trusted(trusted, &self.trust_key(), text) => list,
+                ..
+            }) if cc::is_trusted(trusted, &self.trust_key(), digest) => list,
             _ => &[],
         }
     }
@@ -144,7 +150,7 @@ impl RepoTab {
         self.custom
             .file
             .as_ref()
-            .is_some_and(|f| !cc::is_trusted(trusted, &self.trust_key(), &f.text))
+            .is_some_and(|f| !cc::is_trusted(trusted, &self.trust_key(), &f.digest))
     }
 
     /// What a trust is kept under: the repository's folder, as gitcraft opens it.
@@ -173,6 +179,24 @@ impl RepoTab {
             branch,
             file: String::new(),
         }
+    }
+
+    /// The scope of a commit's menu: the commit, and the branch of its pill (with that branch's
+    /// remote: a remote branch's own) when it has one.
+    pub(super) fn commit_scope(&self, sha: &str, branch: Option<&str>) -> Scope {
+        let Some(branch) = branch.filter(|b| !b.is_empty()) else {
+            return Scope {
+                sha: sha.to_owned(),
+                ..Scope::default()
+            };
+        };
+        let local = self.refs.local.iter().any(|b| b.name == branch);
+        let remote = if local {
+            None
+        } else {
+            self.split_upstream(branch).map(|(remote, _)| remote)
+        };
+        self.branch_scope(branch, sha, remote.as_deref())
     }
 
     /// The scope of a branch's menu: its tip, its name, its remote.
@@ -235,12 +259,14 @@ impl RepoTab {
     }
 
     /// Reads the repository's command file again, in the background.
-    pub(super) fn read_custom_commands(&self, ctx: &egui::Context) {
+    pub(super) fn read_custom_commands(&mut self, ctx: &egui::Context) {
+        self.custom.reads += 1;
+        let number = self.custom.reads;
         let repo = self.path.clone();
         self.then(
             ctx,
             move || read_file(&repo),
-            |tab, read, ctx| tab.custom_act(CustomAct::FileRead(read), ctx),
+            move |tab, read, ctx| tab.custom_act(CustomAct::FileRead(number, read), ctx),
         );
     }
 
@@ -263,21 +289,34 @@ impl RepoTab {
             } => self.run_custom(&command, &scope, &answers, ctx),
             CustomAct::Review => {
                 if let Some(file) = &self.custom.file {
+                    let repo = crate::remote::display(&self.path);
                     self.dialog = Some(Dialog::Custom(Box::new(
-                        super::dialogs::CustomDialog::review(file.clone()),
+                        super::dialogs::CustomDialog::review(repo, file.clone()),
                     )));
                 }
             }
-            CustomAct::Trust(text) => {
+            CustomAct::Trust { digest, commands } => {
                 let mut settings = Settings::get(ctx);
                 cc::trust(
                     &mut settings.trusted_command_files,
                     &self.trust_key(),
-                    &text,
+                    &digest,
                 );
                 settings.set(ctx);
+                self.finished.push((
+                    format!(
+                        "{}: {commands} repository command(s) now offered",
+                        self.name
+                    ),
+                    false,
+                ));
             }
-            CustomAct::FileRead(read) => self.custom_file_read(read, ctx),
+            CustomAct::FileRead(number, read) => {
+                if number > self.custom.read {
+                    self.custom.read = number;
+                    self.custom_file_read(read, ctx);
+                }
+            }
         }
     }
 
@@ -286,10 +325,7 @@ impl RepoTab {
         let file = match read {
             Ok(text) => text.map(RepoFile::new),
             // Not readable: shown as a file whose commands can't be used, to say why.
-            Err(e) => Some(RepoFile {
-                text: String::new(),
-                commands: Err(e),
-            }),
+            Err(e) => Some(RepoFile::unreadable(e)),
         };
         self.custom.file = file;
         let trusted = Settings::get(ctx).trusted_command_files;
@@ -298,16 +334,26 @@ impl RepoTab {
             .file
             .as_ref()
             .filter(|_| self.needs_review(&trusted))
-            .map(|f| f.text.clone());
+            .map(|f| f.digest.clone());
         if pending.is_some() && pending != self.custom.announced {
-            self.finished.push((
+            let broken = self
+                .custom
+                .file
+                .as_ref()
+                .is_some_and(|f| f.commands.is_err());
+            let text = if broken {
                 format!(
-                    "{} has its own custom commands: review them (palette or a menu) to use \
-                     them",
+                    "{}: {} can't be used. Review repository commands… says why",
+                    self.name,
+                    cc::REPO_FILE
+                )
+            } else {
+                format!(
+                    "{} has its own custom commands: review them (palette or a menu) to use them",
                     self.name
-                ),
-                false,
-            ));
+                )
+            };
+            self.finished.push((text, broken));
         }
         self.custom.announced = pending;
     }

@@ -180,6 +180,14 @@ const SHELL_ALIAS: &str = "gitcraft-run";
 /// Windows), in the top folder of the working tree, with the script as its one argument.
 const SHELL_ALIAS_DEF: &str = "alias.gitcraft-run=!f() { eval \"$1\"; }; f";
 
+/// [`SHELL_ALIAS_DEF`] for a script handed over in [`SHELL_SCRIPT_VAR`]: in the environment,
+/// not on a command line, where anyone on that machine could read it (`ps`) with the answers
+/// it holds.
+const SHELL_ALIAS_ENV_DEF: &str = "alias.gitcraft-run=!eval \"$GITCRAFT_SCRIPT\"";
+
+/// The variable [`run_shell`] hands its script over in.
+const SHELL_SCRIPT_VAR: &str = "GITCRAFT_SCRIPT";
+
 /// How a shell script ended, and what it printed.
 pub struct ShellRun {
     pub code: i32,
@@ -193,10 +201,10 @@ pub struct ShellRun {
 /// `Err` only when it couldn't be run.
 pub fn run_shell(dir: &Path, script: &str) -> Result<ShellRun, String> {
     let extra = Extra {
-        pre: vec!["-c", SHELL_ALIAS_DEF],
-        env: Vec::new(),
+        pre: vec!["-c", SHELL_ALIAS_ENV_DEF],
+        env: vec![(SHELL_SCRIPT_VAR, script.to_owned())],
     };
-    let out = execute(Some(dir), &extra, &[SHELL_ALIAS, script])?;
+    let out = execute(Some(dir), &extra, &[SHELL_ALIAS])?;
     Ok(ShellRun {
         // Ended by a signal: no code, but not a success.
         code: out.code.unwrap_or(-1),
