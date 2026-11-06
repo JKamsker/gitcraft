@@ -158,6 +158,12 @@ fn stop(host: Host, pid: u32) {
     });
 }
 
+/// Stops the process `pid` on `host` and everything it started (see [`stop`]): a command the
+/// user asked to stop.
+pub fn stop_process(host: &Host, pid: u32) {
+    stop(host.clone(), pid);
+}
+
 /// The script [`stop`] runs: `pid` and its descendants (from `ps`, which every system has with
 /// these options), else `pid` alone.
 fn stop_script(pid: u32) -> String {
