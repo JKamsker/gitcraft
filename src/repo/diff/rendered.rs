@@ -162,10 +162,10 @@ impl Images {
             return None;
         }
         self.tried += 1;
-        if side.rev.is_none() && !working_tree_file_inside(repo, &path) {
-            return None;
-        }
-        let bytes = git::file_at(repo, side.rev.as_deref(), &path).ok()?;
+        let bytes = match side.rev {
+            None => working_tree_image(repo, &path)?,
+            Some(_) => git::file_at(repo, side.rev.as_deref(), &path).ok()?,
+        };
         if bytes.is_empty() || bytes.len() > MAX_IMAGE_BYTES {
             return None;
         }
@@ -445,15 +445,23 @@ fn markdown(ui: &mut Ui, cache: &mut CommonMarkCache, text: &str, width: f32) {
         .show(ui, cache, text);
 }
 
+/// The working tree's image `path` (a path in the repository, `/` between names), when it is a
+/// plain file of the repository (see [`working_tree_file_inside`]). On another machine, checked
+/// and read there in one go, never more than an image's limit.
+fn working_tree_image(repo: &Path, path: &str) -> Option<Vec<u8>> {
+    if let Some(read) = crate::remote::read_within(repo, path, MAX_IMAGE_BYTES as u64) {
+        return read.ok().flatten();
+    }
+    if !working_tree_file_inside(repo, path) {
+        return None;
+    }
+    git::file_at(repo, None, path).ok()
+}
+
 /// Whether the working tree's `path` (a path in the repository, `/` between names) is a file
 /// of the repository here, not reached through a folder that is a link (`docs/l -> /` would
-/// read anything), nor larger than an image is taken. For a repository on another machine,
-/// asked there.
+/// read anything), nor larger than an image is taken.
 fn working_tree_file_inside(repo: &Path, path: &str) -> bool {
-    // On another machine, checked there the same way, before anything is read from it.
-    if let Some(checked) = crate::remote::file_within(repo, path, MAX_IMAGE_BYTES as u64) {
-        return checked.unwrap_or(false);
-    }
     let mut at = repo.to_path_buf();
     let names: Vec<&str> = path.split('/').filter(|n| !n.is_empty()).collect();
     for (i, name) in names.iter().enumerate() {

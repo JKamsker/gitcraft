@@ -140,20 +140,25 @@ pub fn try_is_link(path: &Path) -> io::Result<bool> {
     test(path, "-L")
 }
 
-/// Whether `rel` (a path in the repository at `repo`, `/` between names) is a file of it on
-/// that machine: not reached through a folder that is a link, and at most `max` bytes. `None`
-/// for a repository here. One round trip, so not on the window's thread.
-pub fn file_within(repo: &Path, rel: &str, max: u64) -> Option<io::Result<bool>> {
+/// The file `rel` (a path in the repository at `repo`, `/` between names) as it is on that
+/// machine, when it is a plain file of the repository there: not a link, not reached through a
+/// folder that is a link, and at most `max` bytes; `Ok(None)` when it isn't. Checked and read
+/// in one script, and never more than `max + 1` bytes read: a file that grew is refused, not
+/// sent. `None` for a repository here. One round trip, so not on the window's thread.
+pub fn read_within(repo: &Path, rel: &str, max: u64) -> Option<io::Result<Option<Vec<u8>>>> {
     let t = parse(repo)?;
-    let Some(script) = file_within_script(&t.path, rel, max) else {
-        return Some(Ok(false));
+    let Some(script) = read_within_script(&t.path, rel, max) else {
+        return Some(Ok(None));
     };
-    Some(run(&t, script, None).map(|out| out.code == 0))
+    Some(
+        run(&t, script, None)
+            .map(|out| (out.code == 0 && out.stdout.len() as u64 <= max).then_some(out.stdout)),
+    )
 }
 
-/// The script [`file_within`] runs in `repo` (a path there): exit code 0 when `rel` is such a
-/// file. `None` for an empty path.
-fn file_within_script(repo: &str, rel: &str, max: u64) -> Option<String> {
+/// The script [`read_within`] runs in `repo` (a path there): the file on its output, exit code
+/// 0, when `rel` is such a file. `None` for an empty path.
+fn read_within_script(repo: &str, rel: &str, max: u64) -> Option<String> {
     let names: Vec<&str> = rel.split('/').filter(|n| !n.is_empty()).collect();
     if names.is_empty() {
         return None;
@@ -168,14 +173,15 @@ fn file_within_script(repo: &str, rel: &str, max: u64) -> Option<String> {
     let file = sh_quote(&names.join("/"));
     script.push_str(&format!(
         concat!(
-            "[ -L {f} ] && exit 0\n",
+            "[ -L {f} ] && exit 1\n",
             "[ -f {f} ] || exit 1\n",
             "size=$(wc -c < {f}) || exit 1\n",
             "[ \"$size\" -le {max} ] || exit 1\n",
-            "exit 0\n"
+            "exec head -c {more} -- {f}\n"
         ),
         f = file,
         max = max,
+        more = max + 1,
     ));
     Some(script)
 }
@@ -292,32 +298,37 @@ pub fn host_temp_file(t: &Target, suffix: &str, bytes: &[u8]) -> Result<String, 
 mod tests {
     use super::*;
 
-    /// The check run on another machine, run here by `sh` the same way: a linked folder, a
-    /// missing file and a file too large are refused.
+    /// The script run on another machine, run here by `sh` the same way: a linked folder, a
+    /// missing file, a file too large and a link are refused; a plain file is read.
     #[test]
-    fn the_check_of_a_file_there_refuses_what_it_should() -> Result<(), String> {
+    fn a_file_there_is_read_only_when_plain_inside_and_small() -> Result<(), String> {
         let dir = std::env::temp_dir().join(format!("gitcraft-within-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("docs")).map_err(|e| e.to_string())?;
         std::fs::write(dir.join("docs/s.png"), "picture").map_err(|e| e.to_string())?;
         std::os::unix::fs::symlink("/", dir.join("docs/l")).map_err(|e| e.to_string())?;
         let repo = dir.display().to_string();
-        let ok = |rel: &str, max: u64| {
-            let script = file_within_script(&repo, rel, max).unwrap_or_default();
+        std::os::unix::fs::symlink("s.png", dir.join("docs/link.png"))
+            .map_err(|e| e.to_string())?;
+        let read = |rel: &str, max: u64| {
+            let script = read_within_script(&repo, rel, max).unwrap_or_default();
             std::process::Command::new("sh")
                 .args(["-c", &script])
-                .status()
-                .is_ok_and(|s| s.success())
+                .output()
+                .ok()
+                .filter(|out| out.status.success())
+                .map(|out| out.stdout)
         };
         let found = (
-            ok("docs/s.png", 100),
-            ok("docs/l/etc/hostname", 1 << 20),
-            ok("docs/none.png", 100),
-            ok("docs/s.png", 3),
+            read("docs/s.png", 100),
+            read("docs/l/etc/hostname", 1 << 20),
+            read("docs/none.png", 100),
+            read("docs/s.png", 3),
+            read("docs/link.png", 100),
         );
         let _ = std::fs::remove_dir_all(&dir);
-        assert_eq!(found, (true, false, false, false));
-        assert!(file_within_script(&repo, "", 1).is_none());
+        assert_eq!(found, (Some(b"picture".to_vec()), None, None, None, None));
+        assert!(read_within_script(&repo, "", 1).is_none());
         Ok(())
     }
 }
