@@ -351,6 +351,7 @@ impl RepoTab {
         self.log_stream = Default::default();
         self.loading_more = false;
         self.refs = loaded.refs;
+        self.timeline_read(loaded.read, ctx);
         self.has_more = loaded.history.len() >= loaded.requested;
         self.history = loaded.history;
         // A status read since this reload started is newer.

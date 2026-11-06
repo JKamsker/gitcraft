@@ -157,6 +157,14 @@ so your config, credentials and hooks apply as usual.
   to switch a repository to; _Use the profile's author_ takes the repository's own out again.
 - Undo / redo (Ctrl+Z / Ctrl+Y) of commits, amends, merges, rebases, pulls, resets,
   cherry-picks, reverts, checkouts, branch create / rename / delete, tags and stashes.
+- **Timeline and undo tree** (Ctrl+Shift+Z, or the clock in the toolbar): every operation of
+  gitcraft's, with the branches before and after it and the files it changed, kept across
+  restarts (open yesterday's rebase and get the old branch tip back as a branch, or put the
+  branch back). Branch moves made elsewhere (the terminal, another client, while gitcraft was
+  closed) show up too, named from the reflog. Undo three steps and do something new: the undone
+  steps stay as a branch of the tree, and _Go here_ jumps to any entry, uncommitted changes kept.
+  The commits it needs stay under `refs/gitcraft/undo/*`, so `git gc` doesn't prune them; the
+  oldest entries go past 300, or with _Forget…_.
 
 **Diffs and conflicts** (centre)
 
@@ -196,7 +204,7 @@ so your config, credentials and hooks apply as usual.
 
 **Toolbar, terminal, app**
 
-- Undo, redo, Fetch, Pull and Push (with incoming / outgoing counts), new branch, stash, terminal,
+- Undo, redo, the timeline, Fetch, Pull and Push (with incoming / outgoing counts), new branch, stash, terminal,
   search, open the folder (Explorer / Finder, your editor), refresh (F5).
 - Pull's arrow (or a right-click on it) sets what it does: fast-forward, merging when the branch
   has diverged; fast-forward only; or rebase. Also in Settings, and the menu has _Fetch all_.
@@ -365,6 +373,7 @@ was made this way, on a demo repository.
 | `src/icons.rs`           | embedded Lucide SVG icons, tinted                                                  |
 | `src/terminal.rs`        | integrated terminal: pty, VT parsing (`vt100`), painting, keys, selection          |
 | `src/repo/mod.rs`        | one repository tab: state, background git work, undo / redo, toolbar               |
+| `src/repo/timeline/`     | the timeline and undo tree: entries kept on disk, changes seen made elsewhere, jumps, the refs that keep old tips |
 | `src/repo/sidebar.rs`    | branches, remotes, worktrees, stashes, pull requests, tags                         |
 | `src/repo/pr_view.rs` | a pull request in the big area, its changed files on the right |
 | `src/repo/pr_review.rs` | comments and reviews being written, and the threads on lines of a diff |

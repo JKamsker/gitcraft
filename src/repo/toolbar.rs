@@ -37,29 +37,37 @@ impl RepoTab {
         });
     }
 
-    /// Undo and redo, with what they'd undo or redo as tooltips.
+    /// Undo and redo, with what they'd undo or redo as tooltips, and the undo tree.
     fn history_buttons(&self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
-        let undo_tip = match self.undo_stack.last() {
+        let undo = self.timeline.current_entry();
+        let undo_tip = match undo {
             Some(e) => format!("Undo {} (Ctrl+Z)", e.label),
             None => "Nothing to undo".to_owned(),
         };
-        if icons::tool_button(ui, "undo-2", "", idle && !self.undo_stack.is_empty())
+        if icons::tool_button(ui, "undo-2", "", idle && undo.is_some())
             .on_hover_text(undo_tip)
             .on_disabled_hover_text("Nothing to undo")
             .clicked()
         {
             acts.push(Action::Undo);
         }
-        let redo_tip = match self.redo_stack.last() {
+        let redo = self.timeline.redo_target();
+        let redo_tip = match redo {
             Some(e) => format!("Redo {} (Ctrl+Y)", e.label),
             None => "Nothing to redo".to_owned(),
         };
-        if icons::tool_button(ui, "redo-2", "", idle && !self.redo_stack.is_empty())
+        if icons::tool_button(ui, "redo-2", "", idle && redo.is_some())
             .on_hover_text(redo_tip)
             .on_disabled_hover_text("Nothing to redo")
             .clicked()
         {
             acts.push(Action::Redo);
+        }
+        if icons::tool_button(ui, "history", "", true)
+            .on_hover_text("Timeline and undo tree (Ctrl+Shift+Z)")
+            .clicked()
+        {
+            acts.push(Action::ToggleTimeline);
         }
     }
 

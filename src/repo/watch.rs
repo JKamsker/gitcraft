@@ -133,12 +133,13 @@ impl FsChange {
 /// outside the worktree that are watched too.
 pub(super) fn fs_change(path: &Path, git_dirs: &[PathBuf]) -> Option<FsChange> {
     // Objects and logs call for nothing. FETCH_HEAD (every fetch, even one that brings
-    // nothing) and ORIG_HEAD (written along with HEAD) say nothing the refs don't.
+    // nothing) and ORIG_HEAD (written along with HEAD) say nothing the refs don't, nor what
+    // gitcraft keeps from gc under `refs/gitcraft/` (see `timeline::snapshot`).
     let relevant = |inside: &str| {
         if inside == "index" {
             Some(FsChange::Index)
         } else {
-            (inside.starts_with("refs")
+            ((inside.starts_with("refs") && !inside.starts_with(super::timeline::snapshot::ROOT))
                 || inside.starts_with("reftable")
                 || inside == "HEAD"
                 || inside == "packed-refs"

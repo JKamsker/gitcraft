@@ -90,6 +90,8 @@ impl RepoTab {
             Action::LoadMore => self.load_more(ctx),
             Action::Undo => self.undo(ctx),
             Action::Redo => self.redo(ctx),
+            Action::ToggleTimeline => self.toggle_timeline(),
+            Action::Timeline(act) => self.timeline_act(act, ctx),
             Action::StashPush(message) => self.stash_push(&message, ctx),
             Action::OpenTab(path) => self.open_request = Some(OpenRequest::NewTab(path)),
             Action::OpenWorktree(path) => self.open_request = Some(OpenRequest::Worktree(path)),
