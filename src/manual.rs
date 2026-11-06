@@ -26,6 +26,16 @@ const FEATURES: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "Command palette",
+        &[
+            "Ctrl+P lists every action; type a few letters of one. The best matches come first: letters at the start of words or in a row, like reb for Rebase or cp for Cherry-pick. The letters typed are highlighted.",
+            "What you ran lately is listed first, and kept across restarts.",
+            "With a commit selected, its actions come first: Cherry-pick, Revert, Reset to here, Interactive rebase onto it, a branch, tag or patch from it. With a file's diff open: stage, unstage or discard it, view it, its history or blame.",
+            "Merge, rebase, check out, compare or push pick the branch in a second step, with its own search. Esc, or Backspace in its empty field, goes back.",
+            "Typing a branch's name offers to check it out.",
+        ],
+    ),
+    (
         "Graph",
         &[
             "Every branch with its pill on its latest commit: solid for the checked-out one, a laptop when it is local, a cloud when a remote has it.",
@@ -84,7 +94,10 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("Cmd+T", "New tab"),
             ("Cmd+W", "Close the tab (or middle-click it)"),
             ("Cmd+Shift+T", "Reopen the tab closed last"),
-            ("Cmd+P", "Command palette: every action and branch"),
+            (
+                "Cmd+P",
+                "Command palette: every action, ranked by what is typed",
+            ),
             ("Cmd+,", "Settings"),
             ("F5", "Reload the repository"),
             ("F1", "This manual"),

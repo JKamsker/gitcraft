@@ -226,7 +226,7 @@ enum RowClick {
     Button(usize),
 }
 
-fn stage_action(label: &str, steps: Vec<Vec<&str>>) -> Action {
+pub(in crate::repo) fn stage_action(label: &str, steps: Vec<Vec<&str>>) -> Action {
     Action::Ops {
         label: label.to_owned(),
         ops: steps
@@ -257,7 +257,7 @@ fn unstage_all_args(head: &str) -> Vec<&'static str> {
     }
 }
 
-fn discard_dialog(f: &StatusFile) -> Dialog {
+pub(in crate::repo) fn discard_dialog(f: &StatusFile) -> Dialog {
     if f.area == Area::Untracked {
         Dialog::confirm(
             "Delete new file",

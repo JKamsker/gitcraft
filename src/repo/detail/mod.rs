@@ -7,6 +7,7 @@ mod commit_box;
 mod compare;
 
 pub(super) use all_files::AllFiles;
+pub(super) use changes::{discard_dialog, stage_action};
 
 use egui::{Align2, Sense, Ui, pos2, vec2};
 

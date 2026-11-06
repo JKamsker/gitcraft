@@ -207,7 +207,15 @@ so your config, credentials and hooks apply as usual.
 - Terminal panel with tabs: PowerShell, cmd, Git Bash, WSL… on Windows, your shells elsewhere, in a
   real pseudo-terminal (ConPTY on Windows) with colours, scrollback, mouse selection and copy
   (Ctrl+C with a selection, Ctrl+Shift+C or right-click).
-- Command palette (Ctrl+P): every action and branch, fuzzy matched.
+- Command palette (Ctrl+P): every action, ranked by how well it matches what you type (word
+  starts, letters in a row, the start of the entry: `reb` finds _Rebase main onto…_ first, `cp`
+  _Cherry-pick_), the letters you typed highlighted, and what you ran lately on top (remembered
+  across restarts). What can be done with the selected commit (_Cherry-pick a301da9c_, _Revert_,
+  _Reset main to here…_) or with the open file (_Stage_, _Blame_, _File history_) comes first.
+  Verbs that need a branch (_Merge into main…_, _Rebase main onto…_, _Check out a branch…_,
+  _Compare main with…_) list the branches in a second step with their own search, so thousands
+  of branches don't flood the list; Esc or Backspace in its empty field goes back. Typing a
+  branch's name in the first step still offers to check it out.
 - Manual (F1, or the book in the title bar): what each part does and every keyboard shortcut.
 - Avatars: on a GitHub repository, the authors' GitHub accounts (through `gh` when installed, else
   GitHub's API); on Forgejo and Gitea, the accounts the host ties the commits to; on GitLab, the
@@ -414,7 +422,10 @@ was made this way, on a demo repository.
 | `src/repo/file_text.rs`  | a whole file at a commit, coloured, for the file view and diffs                    |
 | `src/repo/dialogs.rs`    | branch, tag, stash, remote, worktree, pull request and confirm dialogs             |
 | `src/repo/widgets.rs`    | shared painted widgets (panel headers, file rows, avatars, tabs)                   |
+| `src/repo/palette.rs`    | what the command palette offers a repository: commands, the selection's actions, verbs that pick a branch |
+| `src/repo/commit_actions.rs` | cherry-pick, revert and reset of a commit, for its menu and the palette   |
 | `src/app.rs`             | window shell: tabs, start page, cloning, palette, settings, toasts                 |
+| `src/app/palette.rs`     | the command palette: scored matching, recently used entries, the second step     |
 
 Assets and their licences: [ATTRIBUTION.md](ATTRIBUTION.md).
 

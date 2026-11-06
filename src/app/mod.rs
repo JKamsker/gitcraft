@@ -58,6 +58,8 @@ struct Saved {
     /// What the profiles not in use had open; `open`, `active`, `recent` and `theme` are the
     /// profile's in use.
     profile_states: profiles::ProfileStates,
+    /// The command palette's entries run lately.
+    palette_recent: palette::recent::Recent,
 }
 
 enum Tab {
@@ -118,6 +120,7 @@ pub struct App {
     profile_git_seen: String,
     manual_open: bool,
     palette: Option<Palette>,
+    palette_recent: palette::recent::Recent,
     toasts: Vec<Toast>,
     /// The folders of the last repository tabs closed, the last one at the end.
     closed: Vec<PathBuf>,
@@ -161,6 +164,7 @@ impl App {
             profile_git_seen: String::new(),
             manual_open: false,
             palette: None,
+            palette_recent: saved.palette_recent,
             toasts: Vec::new(),
             closed: Vec::new(),
             tab_drag: None,
@@ -551,6 +555,7 @@ impl eframe::App for App {
             skipped_version: self.skipped_version.clone(),
             tab_looks: self.tab_looks.clone(),
             profile_states: self.profile_states.clone(),
+            palette_recent: self.palette_recent.clone(),
         };
         eframe::set_value(storage, eframe::APP_KEY, &saved);
     }
