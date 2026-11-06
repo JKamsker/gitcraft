@@ -338,3 +338,60 @@ fn slow_senders_dont_lock_later_starts_out() -> Result<(), String> {
     drop(slow);
     std::fs::remove_dir_all(&dir).map_err(|e| e.to_string())
 }
+
+/// A request the window hadn't taken yet when it closed is answered "closing", not "taken":
+/// its start waits for the lock and opens the window itself, rather than end with nothing.
+#[test]
+fn a_request_not_taken_before_the_window_closes_is_not_lost() -> Result<(), String> {
+    let dir = temp_dir("lost");
+    let first = primary(&dir)?;
+    let path = absolute("late-repo");
+    let late = {
+        let (dir, path) = (dir.clone(), path.clone());
+        std::thread::spawn(move || claim(&dir, &Ok(Request::Open(path)), Duration::from_secs(10)))
+    };
+    for _ in 0..500 {
+        if first.waiting() > 0 {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert_eq!(first.waiting(), 1);
+    first.shut_down();
+    let late = late.join().map_err(|_| "the start panicked".to_owned())?;
+    let Claim::Primary(second) = late else {
+        return Err(format!("the late start: {}", describe(&late)));
+    };
+    second.shut_down();
+    std::fs::remove_dir_all(&dir).map_err(|e| e.to_string())
+}
+
+/// Taken by the window, a request is answered at once.
+#[test]
+fn a_request_taken_by_the_window_is_answered_at_once() -> Result<(), String> {
+    let dir = temp_dir("taken");
+    let first = Arc::new(primary(&dir)?);
+    let window = {
+        let first = Arc::clone(&first);
+        std::thread::spawn(move || {
+            for _ in 0..400 {
+                if !first.take_requests().is_empty() {
+                    return true;
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            false
+        })
+    };
+    let started = std::time::Instant::now();
+    let second = claim(&dir, &Ok(Request::Focus), SHORT);
+    assert!(matches!(second, Claim::HandedOver), "{}", describe(&second));
+    assert!(
+        started.elapsed() < Duration::from_millis(1000),
+        "{:?}",
+        started.elapsed()
+    );
+    assert_eq!(window.join().ok(), Some(true));
+    first.shut_down();
+    std::fs::remove_dir_all(&dir).map_err(|e| e.to_string())
+}
