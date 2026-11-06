@@ -160,27 +160,51 @@ pub fn read_within(repo: &Path, rel: &str, max: u64) -> Option<io::Result<Option
 /// 0, when `rel` is such a file. `None` for an empty path.
 fn read_within_script(repo: &str, rel: &str, max: u64) -> Option<String> {
     let names: Vec<&str> = rel.split('/').filter(|n| !n.is_empty()).collect();
-    if names.is_empty() {
+    if names.is_empty() || names.iter().any(|n| matches!(*n, "." | "..")) {
         return None;
     }
-    let mut script = format!("cd -- {} || exit 1\n", sh_path(repo));
-    for i in 1..names.len() {
+    let (last, folders) = names.split_last()?;
+    // Into each folder in turn, by where it really is (`-P`), and then checked to be where it
+    // should be: a folder swapped for a link meanwhile shows in `pwd -P`. The shell's folder,
+    // once in it, stays that folder whatever is renamed.
+    let mut script = format!(
+        concat!(
+            "cd -P -- {} || exit 1\n",
+            "root=$(pwd -P) || exit 1\n",
+            "[ \"$root\" = / ] && root=\n",
+        ),
+        sh_path(repo)
+    );
+    let mut at = String::new();
+    for name in folders {
+        at.push('/');
+        at.push_str(name);
+        let q = sh_quote(name);
         script.push_str(&format!(
-            "[ -L {} ] && exit 1\n",
-            sh_quote(&names[..i].join("/"))
+            concat!(
+                "[ -L {q} ] && exit 1\n",
+                "cd -P -- {q} || exit 1\n",
+                "[ \"$(pwd -P)\" = \"$root\"{at} ] || exit 1\n",
+            ),
+            q = q,
+            at = sh_quote(&at),
         ));
     }
-    let file = sh_quote(&names.join("/"));
+    // The file: opened once, then what was opened is checked where the system says (Linux,
+    // which WSL and most SSH hosts are), else by its name.
     script.push_str(&format!(
         concat!(
             "[ -L {f} ] && exit 1\n",
             "[ -f {f} ] || exit 1\n",
-            "size=$(wc -c < {f}) || exit 1\n",
-            "[ \"$size\" -le {max} ] || exit 1\n",
-            "exec head -c {more} -- {f}\n"
+            "exec 3< {f} || exit 1\n",
+            "if [ -e /proc/self/fd/3 ]; then\n",
+            "  [ \"$(readlink /proc/self/fd/3)\" = \"$(pwd -P)\"/{f} ] || exit 1\n",
+            "else\n",
+            "  [ -L {f} ] && exit 1\n",
+            "fi\n",
+            "exec head -c {more} <&3\n"
         ),
-        f = file,
-        max = max,
+        f = sh_quote(last),
         more = max + 1,
     ));
     Some(script)
@@ -316,7 +340,7 @@ mod tests {
                 .args(["-c", &script])
                 .output()
                 .ok()
-                .filter(|out| out.status.success())
+                .filter(|out| out.status.success() && out.stdout.len() as u64 <= max)
                 .map(|out| out.stdout)
         };
         let found = (
@@ -329,6 +353,57 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(found, (Some(b"picture".to_vec()), None, None, None, None));
         assert!(read_within_script(&repo, "", 1).is_none());
+        assert!(read_within_script(&repo, "docs/../x", 1).is_none());
+        Ok(())
+    }
+
+    /// A folder swapped for a link while the script reads: what is outside is never read,
+    /// whichever moment the swap falls on.
+    #[test]
+    fn a_folder_swapped_for_a_link_meanwhile_is_never_read_there() -> Result<(), String> {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+        let base =
+            std::env::temp_dir().join(format!("gitcraft-within-swap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let (dir, outside) = (base.join("repo"), base.join("outside"));
+        for d in [dir.join("docs"), outside.join("docs")] {
+            std::fs::create_dir_all(d).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(dir.join("docs/s.png"), "picture").map_err(|e| e.to_string())?;
+        std::fs::write(outside.join("docs/s.png"), "secret").map_err(|e| e.to_string())?;
+        let stop = Arc::new(AtomicBool::new(false));
+        let swaps = Arc::new(AtomicUsize::new(0));
+        let swapper = {
+            let (dir, outside) = (dir.clone(), outside.clone());
+            let (stop, swaps) = (stop.clone(), swaps.clone());
+            std::thread::spawn(move || {
+                let (real, moved) = (dir.join("docs"), dir.join("docs-real"));
+                while !stop.load(Ordering::Relaxed) {
+                    let _ = std::fs::rename(&real, &moved);
+                    let _ = std::os::unix::fs::symlink(outside.join("docs"), &real);
+                    let _ = std::fs::remove_file(&real);
+                    let _ = std::fs::rename(&moved, &real);
+                    swaps.fetch_add(1, Ordering::Relaxed);
+                }
+            })
+        };
+        let script =
+            read_within_script(&dir.display().to_string(), "docs/s.png", 100).unwrap_or_default();
+        let (mut leaked, mut reads) = (0, 0);
+        while reads < 300 || swaps.load(Ordering::Relaxed) < 300 {
+            let out = std::process::Command::new("sh")
+                .args(["-c", &script])
+                .output();
+            if out.is_ok_and(|o| o.status.success() && o.stdout == b"secret") {
+                leaked += 1;
+            }
+            reads += 1;
+        }
+        stop.store(true, Ordering::Relaxed);
+        let _ = swapper.join();
+        let _ = std::fs::remove_dir_all(&base);
+        assert_eq!(leaked, 0);
         Ok(())
     }
 }
