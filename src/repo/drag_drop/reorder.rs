@@ -55,7 +55,7 @@ impl CommitDrop {
             Place::Above => format!("Move {} above {target}", short(&self.hash)),
             Place::Below => format!("Move {} below {target}", short(&self.hash)),
             Place::Squash => format!("Squash {} into {target}", short(&self.hash)),
-            Place::Fixup => format!("Fix up {} into {target}", short(&self.hash)),
+            Place::Fixup => format!("Fixup {} into {target}", short(&self.hash)),
         }
     }
 
@@ -65,7 +65,7 @@ impl CommitDrop {
             Place::Above => ("Move", "above"),
             Place::Below => ("Move", "below"),
             Place::Squash => ("Squash", "into"),
-            Place::Fixup => ("Fix up", "into"),
+            Place::Fixup => ("Fixup", "into"),
         };
         format!(
             "{verb} {} {word} {}",

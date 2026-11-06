@@ -110,12 +110,13 @@ impl RepoTab {
         }
         let r = match elsewhere {
             Some(wt) => r.on_hover_text(format!(
-                "{}\n{tip}\nChecked out in worktree {}\nDouble-click to open it",
+                "{}\n{tip}\nChecked out in worktree {}\nDouble-click to open it, or drag onto \
+                 a branch or a commit",
                 b.name,
                 wt.path.display()
             )),
             None => r.on_hover_text(format!(
-                "{}\n{tip}\nDouble-click to check out, or drag onto another branch",
+                "{}\n{tip}\nDouble-click to check out, or drag onto a branch or a commit",
                 b.name
             )),
         };

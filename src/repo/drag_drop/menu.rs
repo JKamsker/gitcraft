@@ -97,6 +97,7 @@ impl RepoTab {
                 Some(Hover {
                     first: Some(first),
                     more,
+                    ..
                 }),
             ) => {
                 let hint = match more {
@@ -105,7 +106,10 @@ impl RepoTab {
                 };
                 (hint, t.accent)
             }
-            (None, Some(_)) => ("Nothing to do here".to_owned(), t.text_faint),
+            (None, Some(hover)) => (
+                hover.why.unwrap_or_else(|| "Nothing to do here".to_owned()),
+                t.text_faint,
+            ),
             (None, None) => (
                 "Drop on a branch or a commit · Esc cancels".to_owned(),
                 t.text_faint,
@@ -142,6 +146,7 @@ impl RepoTab {
         };
         let t = Tokens::get(ctx);
         let idle = self.busy_op.is_none();
+        let blocked = self.drop_blocked();
         let mut chosen = false;
         let shown = egui::Area::new(egui::Id::new("drop-menu"))
             .order(egui::Order::Foreground)
@@ -162,7 +167,8 @@ impl RepoTab {
                     for offer in &menu.offers {
                         let button = ui
                             .add_enabled(idle, egui::Button::new(offer.label()))
-                            .on_hover_text(offer.explain());
+                            .on_hover_text(offer.explain())
+                            .on_disabled_hover_text(blocked.as_deref().unwrap_or_default());
                         if button.clicked() {
                             acts.push(offer.action());
                             chosen = true;

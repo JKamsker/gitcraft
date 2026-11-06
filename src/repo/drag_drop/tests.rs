@@ -328,7 +328,7 @@ fn a_commit_dropped_on_another_of_the_branch_moves_there_and_undo_puts_it_back()
             format!("Move {} above {} “a”", short(&c), short(&a)),
             move_below.clone(),
             format!("Squash {} into {} “a”", short(&c), short(&a)),
-            format!("Fix up {} into {} “a”", short(&c), short(&a)),
+            format!("Fixup {} into {} “a”", short(&c), short(&a)),
         ]
     );
     choose(&mut tab, &ctx, &offers, &move_below);
@@ -365,7 +365,7 @@ fn a_commit_dropped_on_another_of_the_branch_is_squashed_into_it() {
     let target = DropTarget::Commit(commit_item(&tab, &squashed_a));
     let offers = offered(&tab, item, &target);
     let fixup = format!(
-        "Fix up {} into {} “a”",
+        "Fixup {} into {} “a”",
         short(&tip(&dir, "main")),
         short(&squashed_a)
     );

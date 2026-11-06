@@ -76,9 +76,13 @@ impl RepoTab {
         let dragging = self.dragged(ui.ctx()).is_some();
         if !stack_open && !dragging && ui.rect_contains_pointer(refs_cell) {
             let lines: Vec<String> = badges.iter().map(Badge::describe).collect();
+            let drag = if first.kind == BadgeKind::Branch {
+                "Double-click a pill to check it out, or drag it onto a branch or a commit"
+            } else {
+                "Double-click a pill to check it out; drag the row to cherry-pick or move the commit"
+            };
             let resp = resp.on_hover_text(format!(
-                "{}\nTip commit by {} · {}\nDouble-click a pill to check it out, or drag it \
-                 onto another branch",
+                "{}\nTip commit by {} · {}\n{drag}",
                 lines.join("\n"),
                 row.commit.author,
                 row.commit.date

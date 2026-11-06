@@ -164,20 +164,39 @@ impl Offer {
         }
     }
 
-    /// What the entry does, for its tooltip.
-    pub(crate) fn explain(&self) -> &'static str {
+    /// What the entry does, naming the branch it changes, for its tooltip.
+    pub(crate) fn explain(&self) -> String {
         match self {
-            Offer::Merge { .. } => "A merge commit bringing its changes in (git merge)",
-            Offer::Rebase { .. } => "Replay the branch's own commits on top of it (git rebase)",
-            Offer::InteractiveRebase { .. } => {
-                "Reorder, reword, squash or drop the commits first, then rebase"
-            }
+            Offer::Merge { from, into } => format!(
+                "Changes {into}: a merge commit bringing in {}'s changes (git merge)",
+                from.label()
+            ),
+            Offer::Rebase { branch, onto } => format!(
+                "Changes {branch}: replays its own commits on top of {} (git rebase)",
+                onto.label()
+            ),
+            Offer::InteractiveRebase { branch, .. } => format!(
+                "Changes {branch}: reorder, reword, squash or drop its commits first, then rebase"
+            ),
             Offer::FastForward {
-                checked_out: false, ..
-            } => "Move the branch forward without checking it out",
-            Offer::FastForward { .. } => "Move the branch forward; nothing to merge",
-            Offer::CherryPick { .. } => "Copy the commit's changes onto it as a new commit",
-            Offer::Rewrite(drop) => drop.place.explain(),
+                branch,
+                to,
+                checked_out: false,
+                ..
+            } => format!(
+                "Moves {branch} forward to {} without checking it out; {} stays as it is",
+                to.label(),
+                to.label()
+            ),
+            Offer::FastForward { branch, to, .. } => format!(
+                "Moves {branch} forward to {}: it has nothing {} lacks",
+                to.label(),
+                to.label()
+            ),
+            Offer::CherryPick { onto, .. } => {
+                format!("Copies the commit's changes onto {onto} as a new commit")
+            }
+            Offer::Rewrite(drop) => drop.place.explain().to_owned(),
         }
     }
 }
