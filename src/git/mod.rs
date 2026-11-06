@@ -96,12 +96,16 @@ pub fn clone(
     result.map(|_| ())
 }
 
-/// Whether `dest` is there (`None`: it couldn't be told).
+/// Whether anything is at `dest`: a folder, a file or a link, even a broken one (`None`: it
+/// couldn't be told).
 fn dest_exists(dest: &Path) -> Option<bool> {
     if crate::remote::is_remote(dest) {
-        crate::remote::try_is_dir(dest).ok()
+        let dir = crate::remote::try_is_dir(dest).ok()?;
+        let file = crate::remote::try_is_file(dest).ok()?;
+        let link = crate::remote::try_is_link(dest).ok()?;
+        Some(dir || file || link)
     } else {
-        Some(dest.exists())
+        Some(dest.symlink_metadata().is_ok())
     }
 }
 

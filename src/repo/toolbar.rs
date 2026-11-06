@@ -44,9 +44,14 @@ impl RepoTab {
             None => "Nothing to undo".to_owned(),
         };
         let waits = self.waits_text();
+        let why = |nothing: bool, none: &str| match &waits {
+            _ if nothing => none.to_owned(),
+            Some(w) => w.clone(),
+            None => none.to_owned(),
+        };
         if icons::tool_button(ui, "undo-2", "", idle && !self.undo_stack.is_empty())
             .on_hover_text(undo_tip)
-            .on_disabled_hover_text(waits.as_deref().unwrap_or("Nothing to undo"))
+            .on_disabled_hover_text(why(self.undo_stack.is_empty(), "Nothing to undo"))
             .clicked()
         {
             acts.push(Action::Undo);
@@ -57,7 +62,7 @@ impl RepoTab {
         };
         if icons::tool_button(ui, "redo-2", "", idle && !self.redo_stack.is_empty())
             .on_hover_text(redo_tip)
-            .on_disabled_hover_text(waits.as_deref().unwrap_or("Nothing to redo"))
+            .on_disabled_hover_text(why(self.redo_stack.is_empty(), "Nothing to redo"))
             .clicked()
         {
             acts.push(Action::Redo);
@@ -71,7 +76,12 @@ impl RepoTab {
         let no_remote = "This repository has no remote";
         let waits = self
             .waits_text()
-            .map(|w| format!("\n{w} (it starts after)"))
+            .map(|_| {
+                format!(
+                    "\nClick now and it starts after {}",
+                    self.busy_op.as_deref().unwrap_or_default()
+                )
+            })
             .unwrap_or_default();
         let fetched = format!(
             "Fetch all remotes (git fetch --all --prune)\nLast fetched {} ago{waits}",
@@ -125,14 +135,22 @@ impl RepoTab {
         let waits = self.waits_text();
         if icons::tool_button(ui, "git-branch-plus", "Branch", idle && !head.is_empty())
             .on_hover_text("Create a branch at HEAD")
-            .on_disabled_hover_text(waits.as_deref().unwrap_or("No commit to branch from yet"))
+            .on_disabled_hover_text(match &waits {
+                _ if head.is_empty() => "No commit to branch from yet".to_owned(),
+                Some(w) => w.clone(),
+                None => String::new(),
+            })
             .clicked()
         {
             acts.push(Action::Dialog(Dialog::create_branch(&head, "HEAD")));
         }
         if icons::tool_button(ui, "archive", "Stash", idle && !self.work.is_clean())
             .on_hover_text("Stash all changes, untracked files included")
-            .on_disabled_hover_text(waits.as_deref().unwrap_or("No changes to stash"))
+            .on_disabled_hover_text(match &waits {
+                _ if self.work.is_clean() => "No changes to stash".to_owned(),
+                Some(w) => w.clone(),
+                None => String::new(),
+            })
             .clicked()
         {
             acts.push(Action::Dialog(Dialog::stash()));
@@ -277,7 +295,11 @@ impl RepoTab {
         if self.can_cancel()
             && ui
                 .button("Cancel")
-                .on_hover_text(format!("Stop {op}, and what it started"))
+                .on_hover_text(if self.waiting.is_empty() {
+                    format!("Stop {op}, and what it started")
+                } else {
+                    format!("Stop {op}, and what it started; what waits for it won't run")
+                })
                 .clicked()
         {
             acts.push(Action::CancelOp);
@@ -296,9 +318,10 @@ impl RepoTab {
         }
         ui.add(crate::spinner::Spinner::new());
         if !self.waiting.is_empty() {
-            let names: Vec<&str> = self.waiting.iter().map(|w| w.label.as_str()).collect();
-            widgets::chip(ui, &format!("{} waiting", names.len()), t.text_dim)
-                .on_hover_text(format!("Run next, in this order: {}", names.join(", ")));
+            let names: Vec<&str> = self.waiting.iter().map(|w| w.label()).collect();
+            widgets::chip(ui, &format!("then {}", names.join(", ")), t.text_dim).on_hover_text(
+                format!("Start after {op}, in this order. Cancel or a failure drops them."),
+            );
         }
     }
 
@@ -306,7 +329,7 @@ impl RepoTab {
     fn waits_text(&self) -> Option<String> {
         self.busy_op
             .as_ref()
-            .map(|op| format!("Waits for {op} to finish"))
+            .map(|op| format!("Available once {op} is done"))
     }
 }
 

@@ -84,12 +84,15 @@ fn with_progress(args: &[&str]) -> Vec<String> {
 /// number of git there.
 const PID_MARKER: &str = "__GITCRAFT_GIT_PID__";
 
-/// The request that runs git with `args` in `target`'s folder, saying its process number first.
+/// The request that runs git with `args` in `target`'s folder, saying its process number
+/// first: a shell that prints its own and then becomes git (`exec`), so that the marker comes
+/// before anything git says, and what came before it (a server's login banner) is told apart.
 fn watched_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Request {
     let mut req = super::remote_request(target, extra, args);
     let git = req.script.strip_prefix("exec ").unwrap_or(&req.script);
-    req.script =
-        format!("{git} &\np=$!\nprintf '\\n%s %s\\n' {PID_MARKER} \"$p\" >&2\nwait \"$p\"");
+    req.script = format!(
+        "exec sh -c 'printf \"\\n%s %s\\n\" {PID_MARKER} \"$$\" >&2; exec \"$@\"' sh {git}"
+    );
     req
 }
 
@@ -103,6 +106,12 @@ struct Ended {
 
 /// How often the command is looked at (cancelled? ended?).
 const POLL: Duration = Duration::from_millis(40);
+
+/// How long the output of a command that ended is waited for.
+const DRAIN_FOR: Duration = Duration::from_secs(10);
+
+/// How long a cancelled command on another machine is given to say its process number.
+const PID_WAIT: Duration = Duration::from_secs(5);
 
 /// Runs the git command `args` in `dir` (on whichever machine it is), as [`super::run_with`]
 /// does (or [`super::run_unattended`] when `quiet`), following it through `control`: its
@@ -138,7 +147,11 @@ pub fn run_watched(
     }
     if let Some(t) = &target
         && ended.code == Some(1)
-        && remote::is_missing_folder(ended.stderr.as_bytes())
+        // After whatever the connection printed first (a login banner).
+        && ended
+            .stderr
+            .lines()
+            .any(|l| remote::is_missing_folder(l.as_bytes()))
     {
         return Err(format!("{} isn't a folder on {}", t.path, t.host.label()));
     }
@@ -193,24 +206,25 @@ fn follow(
     }
     let deadline = host.map(|_| Instant::now() + remote::NETWORK_LIMIT);
     let status = loop {
-        let pid = || Some(remote_pid.load(Ordering::SeqCst)).filter(|p| *p != 0);
+        // Ended first: what it did stands, even when Cancel came meanwhile.
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => {}
+            Err(e) => return Err(format!("could not follow git: {e}")),
+        }
         if control.is_cancelled() {
-            stop(&mut child, host, pid());
+            stop(&mut child, host, &remote_pid);
             return Err(CANCELLED.to_owned());
         }
         if deadline.is_some_and(|d| Instant::now() > d) {
-            stop(&mut child, host, pid());
+            stop(&mut child, host, &remote_pid);
             let minutes = remote::NETWORK_LIMIT.as_secs().div_ceil(60);
             let place = host.map(Host::label).unwrap_or_default();
             return Err(format!(
                 "git didn't finish within {minutes} minutes on {place} and was stopped"
             ));
         }
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) => std::thread::sleep(POLL),
-            Err(e) => return Err(format!("could not follow git: {e}")),
-        }
+        std::thread::sleep(POLL);
     };
     let code = status.code();
     Ok(Ended {
@@ -219,8 +233,11 @@ fn follow(
             Some(_) => format!("exit status: {}", code.unwrap_or(-1)),
             None => status.to_string(),
         },
-        stdout: out_rx.recv().unwrap_or_default(),
-        stderr: err_rx.recv().unwrap_or_default(),
+        // Something git left running (a hook's background job) may hold the pipes open.
+        stdout: out_rx.recv_timeout(DRAIN_FOR).unwrap_or_default(),
+        stderr: err_rx.recv_timeout(DRAIN_FOR).unwrap_or_else(|_| {
+            "(git ended, but something it started kept its output open)".to_owned()
+        }),
     })
 }
 
@@ -256,11 +273,22 @@ fn read_errors(
 
 /// Stops `child` and what it started: on another machine (`host`) the command there by its
 /// process number, here the whole tree of processes; then the process itself.
-fn stop(child: &mut Child, host: Option<&Host>, remote_pid: Option<u32>) {
+///
+/// Elsewhere, the process number may not have come yet: it is waited for a moment (the local
+/// ssh alone, killed, would leave git running there). The command there is stopped before this
+/// returns, so that what follows (removing a cancelled clone, the next operation) doesn't race
+/// it.
+fn stop(child: &mut Child, host: Option<&Host>, remote_pid: &AtomicU32) {
     match host {
         Some(host) => {
-            if let Some(pid) = remote_pid {
-                remote::stop(host.clone(), pid);
+            let start = Instant::now();
+            let mut pid = remote_pid.load(Ordering::SeqCst);
+            while pid == 0 && start.elapsed() < PID_WAIT && matches!(child.try_wait(), Ok(None)) {
+                std::thread::sleep(POLL);
+                pid = remote_pid.load(Ordering::SeqCst);
+            }
+            if pid != 0 {
+                remote::stop_now(host, pid);
             }
         }
         None => stop_here(child.id()),

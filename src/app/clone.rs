@@ -122,7 +122,7 @@ impl App {
         // (and its tab) would never come.
         if let Some(running) = &self.cloning {
             form.error = Some(format!(
-                "Wait for the clone into {} to finish (or cancel it)",
+                "Wait for the clone into {} to finish, or cancel it on the start page",
                 running.dest.display()
             ));
             return;
@@ -171,7 +171,7 @@ impl App {
         self.cloning = None;
         match result {
             Err(_) if cancelled => {
-                self.error = Some(format!("Clone into {} cancelled", dest.display()));
+                self.error = Some(format!("Clone into {}: cancelled", dest.display()));
             }
             // On another machine, it opens once reached again, the credentials along.
             Ok(()) if crate::remote::is_remote(&dest) => {
@@ -237,7 +237,7 @@ pub(super) fn cloning_line(ui: &mut Ui, cloning: &Cloning) {
         if !cancelled
             && ui
                 .button("Cancel")
-                .on_hover_text("Stop the clone; the folder it was making is removed")
+                .on_hover_text("Stop the clone and remove what it cloned so far")
                 .clicked()
         {
             cloning.control.cancel();

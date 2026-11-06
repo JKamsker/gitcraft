@@ -203,12 +203,15 @@ so your config, credentials and hooks apply as usual.
   has diverged; fast-forward only; or rebase. Also in Settings, and the menu has _Fetch all_.
 - Fetch, pull, push and clone show how far git is ("Receiving objects: 45%", from git's own
   `--progress`) beside the spinner and as a thin bar under the toolbar, with _Cancel_: it
-  stops git and everything git started (`git-remote-https`, `ssh`; on another machine, the
-  command there, as a command that hangs is stopped), runs none of the later steps, and leaves
-  undo as it was. A cancelled clone removes the folder it was making; a lock file a stopped git
-  couldn't remove (`index.lock`…) is named in the status line. Fetch, Pull and Push stay
+  stops git and everything git started (`git-remote-https`, `ssh`; on another machine, the git
+  command there is stopped the same way as one that hangs), runs none of the later steps, and
+  leaves undo as it was. A cancelled clone removes what it had cloned; a lock file a stopped
+  git couldn't remove (`index.lock`…) is named in the toolbar's message, and a pull stopped
+  while merging or rebasing leaves that in progress, with _Abort_. Fetch, Pull and Push stay
   clickable while something runs and start once it is done (up to three wait, in order; the
-  toolbar says how many); the other buttons say what they wait for.
+  toolbar says which, and Cancel or a failure drops them, saying so). Anything else asked for
+  meanwhile is not started and says why, and the toolbar's other buttons say what they wait
+  for.
 - Background fetch every few minutes (Settings; 0 turns it off).
 - HTTPS sign-in: when a remote wants a username and password (or token) and no credential helper
   provides them, a dialog asks and the operation runs again. They stay in memory for the tab;

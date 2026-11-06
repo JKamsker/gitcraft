@@ -13,6 +13,13 @@ use crate::settings::Settings;
 impl RepoTab {
     pub(crate) fn apply(&mut self, action: Action, ctx: &egui::Context) {
         let plain = OpKind::plain();
+        // Fetch, Pull and Push asked for while something runs start once it is done.
+        if self.busy_op.is_some()
+            && let Some(waiter) = super::running::Waiter::of(&action, ctx)
+        {
+            self.wait_for_running(waiter);
+            return;
+        }
         match action {
             Action::Select(row) => {
                 self.close_pr();

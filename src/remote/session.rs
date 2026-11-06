@@ -147,16 +147,19 @@ pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
 /// good. The processes are listed first, as one stopped leaves what it started to another
 /// parent.
 pub fn stop(host: Host, pid: u32) {
-    std::thread::spawn(move || {
-        let _ = exec(
-            &host,
-            &Request {
-                script: stop_script(pid),
-                timeout: Some(Duration::from_secs(30)),
-                ..Request::default()
-            },
-        );
-    });
+    std::thread::spawn(move || stop_now(&host, pid));
+}
+
+/// [`stop`], waiting until it is done (from a thread that may wait).
+pub fn stop_now(host: &Host, pid: u32) {
+    let _ = exec(
+        host,
+        &Request {
+            script: stop_script(pid),
+            timeout: Some(Duration::from_secs(30)),
+            ..Request::default()
+        },
+    );
 }
 
 /// The script [`stop`] runs (and a command stopped here, on Unix): `pid` and its descendants (from `ps`, which every system has with
