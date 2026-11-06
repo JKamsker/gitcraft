@@ -323,6 +323,22 @@ fn run_inner(
             .push(("GITCRAFT_GIT_PASSWORD", c.password.clone()));
     }
     let out = execute(dir, &extra, args)?;
+    outcome(out, args, ok)
+}
+
+/// [`run`] with `GIT_INDEX_FILE` set to `index`, a path on the machine git runs on: for work
+/// on a copy of the index (or a new one) that leaves the repository's own index alone.
+pub fn run_with_index(dir: &Path, index: &str, args: &[&str]) -> Result<String, String> {
+    let extra = Extra {
+        env: vec![("GIT_INDEX_FILE", index.to_owned())],
+        ..Extra::default()
+    };
+    let out = execute(Some(dir), &extra, args)?;
+    outcome(out, args, &[0])
+}
+
+/// Stdout when git exited with one of the codes `ok`, else what it said.
+fn outcome(out: Ran, args: &[&str], ok: &[i32]) -> Result<String, String> {
     if out.code.is_some_and(|c| ok.contains(&c)) {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {

@@ -242,5 +242,34 @@ fn work_in(repo: &PathBuf) -> Result<(), String> {
     read_like_a_tab(repo)?;
     // The working tree's file, read as the tab reads it, is what was written there.
     assert_eq!(git::file_at(repo, None, "a.txt")?, b"1\nX\n3\n");
+    snapshot_there(repo)?;
+    Ok(())
+}
+
+/// A snapshot made there: its copy of the index made and removed there, the files untouched.
+fn snapshot_there(repo: &Path) -> Result<(), String> {
+    let git = |args: &[&str]| git::run(Some(repo), args);
+    write(&repo.join("a.txt"), b"snap\n").map_err(|e| e.to_string())?;
+    write(&repo.join("new file.txt"), b"new\n").map_err(|e| e.to_string())?;
+    let status = git(&["status", "--porcelain", "-z"])?;
+    let made = git::snapshot(repo, "live", true)?.ok_or("nothing to snapshot")?;
+    git(&["stash", "store", "-m", &made.message, &made.commit])?;
+    assert_eq!(git(&["status", "--porcelain", "-z"])?, status);
+    let git_dir = git(&["rev-parse", "--absolute-git-dir"])?;
+    let host = parse(repo).ok_or("not remote")?.host;
+    let listed = exec(
+        &host,
+        &Request {
+            script: format!("ls -a -- {}", sh_quote(git_dir.trim())),
+            ..Request::default()
+        },
+    )?;
+    let left = String::from_utf8_lossy(&listed.stdout);
+    assert!(!left.contains("gitcraft-snapshot"), "{left}");
+    assert_eq!(
+        git(&["ls-tree", "-r", "--name-only", "stash@{0}^3"])?.trim(),
+        "new file.txt"
+    );
+    git(&["stash", "drop", "-q"])?;
     Ok(())
 }

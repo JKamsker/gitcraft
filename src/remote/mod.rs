@@ -21,8 +21,9 @@ use std::path::{Path, PathBuf};
 
 pub use discover::{ssh_config_hosts, wsl_distros};
 pub use fs::{
-    create_dir_all, host_temp_file, is_file, is_link, is_same_dir_as, read_to_string, read_within,
-    same_dir, try_is_dir, try_is_file, try_is_link, worktree_file, write,
+    copy_keeping_time, create_dir_all, host_temp_file, is_file, is_link, is_same_dir_as,
+    read_to_string, read_within, remove_file, same_dir, try_is_dir, try_is_file, try_is_link,
+    worktree_file, write,
 };
 pub use session::{Output, Request, exec, is_missing_folder, spawn};
 pub use ui_guard::{mark_ui_thread, refused_on_ui_thread};
