@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 use super::gh_with_input;
 use crate::pr_post::{
     LineComment, MergeMethod, Suggestion, Target, Verdict, apply_lines, decode_file, encode_path,
+    may_delete_branch,
 };
 use crate::pull_request::{DiffSide, PrDetails, repo_of_url};
 
@@ -55,34 +56,17 @@ fn branch_was_gone(error: &str) -> bool {
     error.contains("Reference does not exist")
 }
 
+/// Whether asking for a ref failed for want of it.
+fn ref_not_found(error: &str) -> bool {
+    error.contains("(HTTP 404)")
+}
+
 /// The commit a branch is on, from what GitHub answers when asked for its ref.
 fn ref_tip(answer: &str) -> Option<String> {
     let v: Value = serde_json::from_str(answer).ok()?;
     v.pointer("/object/sha")
         .and_then(Value::as_str)
         .map(str::to_owned)
-}
-
-/// Whether the branch of a merged pull request goes, from what asking for its ref answered: only
-/// while it's still on the merged commit. One that couldn't be checked is kept.
-fn branch_to_delete(answer: Result<&str, &str>, head_oid: &str) -> Result<bool, String> {
-    match answer {
-        Ok(answer) => match ref_tip(answer) {
-            Some(tip) if tip == head_oid => Ok(true),
-            Some(_) => {
-                Err("It's merged, but the branch has new commits, so it was kept".to_owned())
-            }
-            None => Err(
-                "It's merged, but the branch was kept: GitHub didn't say which commit it's on"
-                    .to_owned(),
-            ),
-        },
-        // Gone already: nothing to delete.
-        Err(e) if e.contains("HTTP 404") => Ok(false),
-        Err(e) => Err(format!(
-            "It's merged, but the branch was kept, as its commit couldn't be checked: {e}"
-        )),
-    }
 }
 
 /// A pull request on GitHub to say something on.
@@ -296,17 +280,19 @@ impl Target for GitHubTarget {
         )?;
         if delete_branch {
             let branch = encode_path(&self.head_branch);
-            // Commits pushed since the merge would lose their branch. GitHub deletes without
-            // asking which commit it's on, so this is checked first; a push can still come in
-            // between, just in a much smaller window.
-            let answer = self.api(
+            // GitHub deletes without asking which commit it's on, so this is checked first; a
+            // push can still come in between, just in a much smaller window.
+            let tip = match self.api(
                 "GET",
                 &format!("repos/{}/git/ref/heads/{branch}", self.path),
                 None,
-            );
-            if !branch_to_delete(answer.as_deref().map_err(String::as_str), &self.head_oid)? {
-                return Ok(());
-            }
+            ) {
+                Ok(answer) => ref_tip(&answer),
+                // Gone already: that's what deleting it wanted.
+                Err(e) if ref_not_found(&e) => return Ok(()),
+                Err(_) => None,
+            };
+            may_delete_branch(tip.as_deref(), &self.head_oid)?;
             let endpoint = format!("repos/{}/git/refs/heads/{branch}", self.path);
             if let Err(e) = self.api("DELETE", &endpoint, None)
                 && !branch_was_gone(&e)
@@ -424,27 +410,18 @@ mod tests {
     }
 
     #[test]
+    fn a_ref_that_isnt_there_is_told_from_other_failures() {
+        assert!(ref_not_found("gh: Not Found (HTTP 404)"));
+        assert!(!ref_not_found("gh: Bad credentials (HTTP 401)"));
+        assert!(!ref_not_found("error connecting to api.github.com"));
+    }
+
+    #[test]
     fn reads_which_commit_a_branch_is_on() {
         let answer = r#"{"ref":"refs/heads/b","object":{"sha":"abc123","type":"commit"}}"#;
         assert_eq!(ref_tip(answer).as_deref(), Some("abc123"));
         assert_eq!(ref_tip(r#"{"message":"Not Found"}"#), None);
         assert_eq!(ref_tip("not json"), None);
-    }
-
-    #[test]
-    fn a_merged_branch_goes_only_while_on_the_merged_commit() {
-        let on = r#"{"object":{"sha":"abc"}}"#;
-        assert_eq!(branch_to_delete(Ok(on), "abc"), Ok(true));
-        let moved = r#"{"object":{"sha":"def"}}"#;
-        assert!(branch_to_delete(Ok(moved), "abc").is_err_and(|e| e.contains("new commits")));
-        assert_eq!(
-            branch_to_delete(Err("gh: Not Found (HTTP 404)"), "abc"),
-            Ok(false)
-        );
-        // Not knowing which commit it's on, it isn't deleted.
-        assert!(branch_to_delete(Err("gh: Bad credentials (HTTP 401)"), "abc").is_err());
-        assert!(branch_to_delete(Err("connection reset"), "abc").is_err());
-        assert!(branch_to_delete(Ok("not json"), "abc").is_err());
     }
 
     fn target_without_extras() -> GitHubTarget {

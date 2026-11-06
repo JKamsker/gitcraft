@@ -105,6 +105,8 @@ jobs:
         env:
           FORGE_WORK: ${{ runner.temp }}/forges
         run: |
+          # A server that failed before making its folder left no log.
+          shopt -s nullglob
           for log in "$FORGE_WORK"/*/log/*; do
             echo "::group::$log"
             cat "$log"

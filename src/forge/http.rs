@@ -48,7 +48,11 @@ pub(super) struct Api {
     /// "Forgejo", "Gitea": who errors come from.
     name: &'static str,
     host: String,
+    /// `https://host[:port]`, as the login was found for.
+    web: String,
     login: Option<Login>,
+    /// Told the server's `web` when it refused the login, so that it isn't sent again.
+    on_refused: Option<fn(&str)>,
     agent: ureq::Agent,
 }
 
@@ -62,12 +66,20 @@ impl Api {
             base: format!("{}/api/v1", web.trim_end_matches('/')),
             name,
             host: host.to_owned(),
+            web: web.trim_end_matches('/').to_owned(),
             login,
+            on_refused: None,
             agent: ureq::AgentBuilder::new()
                 .timeout(Duration::from_secs(20))
                 .user_agent(concat!("gitcraft/", env!("CARGO_PKG_VERSION")))
                 .build(),
         }
+    }
+
+    /// Calls `forget` with the server's address when it refuses the login.
+    pub fn on_refused(mut self, forget: fn(&str)) -> Api {
+        self.on_refused = Some(forget);
+        self
     }
 
     /// Whether a login goes along with the requests.
@@ -138,6 +150,12 @@ impl Api {
                 serde_json::from_str(&text).map_err(|_| self.unexpected("JSON"))
             }
             Err(ureq::Error::Status(status, response)) => {
+                if status == 401
+                    && self.login.is_some()
+                    && let Some(forget) = self.on_refused
+                {
+                    forget(&self.web);
+                }
                 let text = response.into_string().unwrap_or_default();
                 Err(Failure {
                     status: Some(status),

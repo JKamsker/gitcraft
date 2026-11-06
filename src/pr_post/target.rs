@@ -81,6 +81,20 @@ pub(crate) fn decode_file(file: &Value, forge: &str) -> Result<String, String> {
     String::from_utf8(bytes).map_err(|_| "It isn't a text file".to_owned())
 }
 
+/// Whether a pull request's branch may go after its merge, from the commit it's on now (`None`
+/// when that couldn't be read): only when it's still the merged one. Commits pushed since would
+/// lose their branch, and a tip nobody could read may be one of those.
+pub(crate) fn may_delete_branch(tip: Option<&str>, merged: &str) -> Result<(), String> {
+    match tip {
+        Some(tip) if tip == merged => Ok(()),
+        Some(_) => Err("It's merged, but the branch has new commits, so it was kept".to_owned()),
+        None => Err(
+            "It's merged, but which commit the branch is on couldn't be read, so it was kept"
+                .to_owned(),
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,6 +106,13 @@ mod tests {
         assert!(decode_file(&large, "GitHub").is_err_and(|e| e.contains("too large")));
         let small = json!({"content": "aGk=\n", "encoding": "base64"});
         assert_eq!(decode_file(&small, "Forgejo").as_deref(), Ok("hi"));
+    }
+
+    #[test]
+    fn a_branch_goes_only_while_it_is_on_the_merged_commit() {
+        assert_eq!(may_delete_branch(Some("abc"), "abc"), Ok(()));
+        assert!(may_delete_branch(Some("def"), "abc").is_err_and(|e| e.contains("new commits")));
+        assert!(may_delete_branch(None, "abc").is_err_and(|e| e.contains("couldn't be read")));
     }
 
     #[test]

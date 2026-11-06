@@ -18,7 +18,6 @@ use crate::pull_request::{
 };
 
 /// Everything the API was asked for one pull request.
-#[derive(Default)]
 pub(super) struct Answers {
     pub pr: Value,
     pub repo: Value,
@@ -27,7 +26,8 @@ pub(super) struct Answers {
     /// Each review, with its comments on lines.
     pub reviews: Vec<(Value, Vec<Value>)>,
     pub commits: Vec<Value>,
-    pub status: Value,
+    /// The statuses of the last commit, or why they couldn't be read.
+    pub status: Result<Value, String>,
 }
 
 pub(super) fn read(
@@ -48,11 +48,14 @@ pub(super) fn read(
                 250,
             )
             .unwrap_or_default(),
-        // A commit without statuses can be answered with an error: it just has no checks.
-        status: api
-            .get(&format!("repos/{path}/commits/{head}/status"))
-            .unwrap_or_default(),
-        ..Answers::default()
+        status: match api.get(&format!("repos/{path}/commits/{head}/status")) {
+            // A commit nothing reported on can be one the forge has no statuses for at all.
+            Err(failure) if failure.status == Some(404) => Ok(Value::Null),
+            status => status.map_err(String::from),
+        },
+        repo: Value::Null,
+        viewer: None,
+        reviews: Vec::new(),
     };
     // What the page needs to review and merge. Without it, the pull request still shows.
     let extras = (|| -> Result<(), String> {
@@ -200,10 +203,13 @@ pub(super) fn assemble(answers: &Answers, forge: Forge, web: &str) -> PrDetails 
             .iter()
             .map(|label| at(label, "/name").to_owned())
             .collect(),
-        checks: items(&answers.status, "/statuses")
-            .iter()
-            .map(|status| check(status, web))
-            .collect(),
+        checks: answers.status.as_ref().map_or(Vec::new(), |status| {
+            items(status, "/statuses")
+                .iter()
+                .map(|status| check(status, web))
+                .collect()
+        }),
+        checks_error: answers.status.as_ref().err().cloned(),
         commits: commits(&answers.commits, &text("/head/sha")),
         timeline,
         inline_error: None,
@@ -475,13 +481,13 @@ mod tests {
                 json!({"sha": "h0", "commit": {"message": "feat: search", "author": {"name": "Ana B"}},
                        "author": null}),
             ],
-            status: json!({"statuses": [
+            status: Ok(json!({"statuses": [
                 {"context": "ci / test", "status": "success", "description": "Passed",
                  "target_url": "/o/r/actions/runs/1/jobs/0"},
                 {"context": "ci / lint", "status": "failure", "target_url": "https://ci/2"},
                 {"context": "ci / e2e", "status": "pending"},
                 {"context": "ci / docs", "status": "warning"}
-            ]}),
+            ]})),
         }
     }
 
@@ -549,6 +555,16 @@ mod tests {
             "https://codeberg.org/o/r/actions/runs/1/jobs/0"
         );
         assert_eq!(pr.checks[0].detail, "Passed");
+    }
+
+    #[test]
+    fn statuses_that_couldnt_be_read_are_no_empty_list() {
+        let mut a = answers();
+        a.status = Err("Forgejo: HTTP 500".to_owned());
+        let pr = assemble(&a, Forge::Forgejo, WEB);
+        assert!(pr.checks.is_empty());
+        assert_eq!(pr.checks_error.as_deref(), Some("Forgejo: HTTP 500"));
+        assert_eq!(parsed().checks_error, None);
     }
 
     #[test]

@@ -10,7 +10,7 @@ use crate::pull_request::DiffSide;
 pub(crate) use suggestion::apply_lines;
 pub use suggestion::{Suggestion, shown_suggestion};
 pub use target::Target;
-pub(crate) use target::{decode_file, encode_path};
+pub(crate) use target::{decode_file, encode_path, may_delete_branch};
 
 /// What a review says about the pull request as a whole.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

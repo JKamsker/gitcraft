@@ -280,10 +280,16 @@ impl RepoTab {
         // the same numbers, and a list asked of the old one is not to be taken in.
         let moved = loaded.remotes != self.remotes;
         self.remotes = loaded.remotes;
-        if loaded.hosting != self.hosting || moved {
+        let rehosted = loaded.hosting != self.hosting;
+        if rehosted || moved {
             self.hosting = loaded.hosting;
             self.prs.clear();
             self.prs_loaded = None;
+        }
+        if rehosted {
+            // The page shown is another repository's now: what it would send would go to this
+            // one, under that pull request's number.
+            self.close_pr();
         }
         if self
             .prs_loaded

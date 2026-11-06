@@ -250,7 +250,9 @@ fn post_job(
                 Box::new(move |t| {
                     t.apply_suggestion(&suggestion)?;
                     if resolve {
-                        t.set_resolved(&thread, true)?;
+                        t.set_resolved(&thread, true).map_err(|e| {
+                            format!("The change is committed, but the thread wasn't resolved: {e}")
+                        })?;
                     }
                     Ok(())
                 }),

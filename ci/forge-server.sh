@@ -15,6 +15,11 @@
 # FORGE_WORK where the servers' data goes.
 set -euo pipefail
 
+if [ "$(uname -s)" != Linux ]; then
+  echo "ci/forge-server.sh runs the Linux releases only: run it on Linux (or in WSL)." >&2
+  exit 1
+fi
+
 kind=${1:?forgejo or gitea}
 port=${2:?port}
 env_file=${3:-/dev/stdout}
@@ -55,8 +60,17 @@ if [ ! -x "$bin" ]; then
 fi
 
 work="${FORGE_WORK:-${TMPDIR:-/tmp}/gitcraft-forges}/$kind-$port"
+# A server this script started here before goes first. The pid is checked to still be that
+# server, which runs with this folder as its work path: an old pid can belong to anything by now.
 if [ -f "$work/pid" ]; then
-  kill "$(cat "$work/pid")" 2>/dev/null || true
+  old=$(cat "$work/pid")
+  if tr '\0' ' ' 2>/dev/null <"/proc/$old/cmdline" | grep -qF -- "--work-path $work "; then
+    kill "$old" 2>/dev/null || true
+    for _ in $(seq 1 30); do
+      kill -0 "$old" 2>/dev/null || break
+      sleep 1
+    done
+  fi
 fi
 rm -rf "$work"
 mkdir -p "$work/custom/conf" "$work/data" "$work/repos" "$work/log"
@@ -134,7 +148,8 @@ token() {
 author_token=$(token author)
 reviewer_token=$(token reviewer)
 
-forge web >"$work/log/web" 2>&1 &
+# The binary itself, not the function: then `$!` is the server's pid, not a subshell's.
+"$bin" --work-path "$work" --config "$ini" web >"$work/log/web" 2>&1 &
 echo $! >"$work/pid"
 for _ in $(seq 1 60); do
   if curl -fsS "$root/api/v1/version" >/dev/null 2>&1; then

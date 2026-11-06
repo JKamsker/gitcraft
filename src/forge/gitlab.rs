@@ -31,8 +31,8 @@ impl Provider for GitLab {
     }
 
     fn list(&self, repo: &Path, _: &Hosting) -> Result<Vec<PullRequest>, String> {
-        // As many as of GitHub's: glab's own page holds only 30.
-        let args = ["mr", "list", "--per-page", "100", "--output", "json"];
+        // glab gives 30 at a time otherwise; 100, as GitHub's and Forgejo's lists have.
+        let args = ["mr", "list", "--output", "json", "--per-page", "100"];
         parse_list(&self.run(repo, &args)?)
     }
 

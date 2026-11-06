@@ -19,7 +19,12 @@ pub(super) fn run_with_input(
 ) -> Result<String, String> {
     let mut cmd = tool_command(tool);
     cmd.current_dir(repo).args(args);
-    let not_installed = |_| format!("{tool} isn't installed: gitcraft uses it for {noun}s");
+    let not_installed = |e: std::io::Error| match e.kind() {
+        std::io::ErrorKind::NotFound if repo.is_dir() => {
+            format!("{tool} isn't installed: gitcraft uses it for {noun}s")
+        }
+        _ => format!("couldn't run {tool} in {}: {e}", repo.display()),
+    };
     let out = match input {
         None => cmd.output().map_err(not_installed)?,
         Some(input) => {

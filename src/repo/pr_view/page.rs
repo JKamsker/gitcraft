@@ -303,6 +303,10 @@ fn chips(ui: &mut Ui, d: &PrDetails) {
 
 fn checks(ui: &mut Ui, d: &PrDetails, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
+    if let Some(e) = &d.checks_error {
+        ui.colored_label(t.warning, format!("Couldn't read the checks: {e}"));
+        return;
+    }
     if d.checks.is_empty() {
         ui.label(
             RichText::new("No checks ran on this pull request.")
