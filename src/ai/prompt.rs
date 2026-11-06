@@ -114,21 +114,79 @@ fn file_diff(text: &str) -> FileDiff<'_> {
 
 /// The path of a file with no `---` / `+++` lines (binary, a mode change, a pure rename):
 /// from its `diff --git a/x b/x` line.
+/// A rename or copy says its new name on a line of its own; else the header names the file
+/// twice, `a/X b/X`, which is split in the middle (a name may hold ` b/` itself).
 fn header_path(text: &str) -> String {
+    let named = text.lines().find_map(|l| {
+        l.strip_prefix("rename to ")
+            .or_else(|| l.strip_prefix("copy to "))
+    });
+    if let Some(name) = named {
+        return unquote(name);
+    }
     let first = text.lines().next().unwrap_or_default();
     let rest = first.strip_prefix("diff --git ").unwrap_or(first);
+    if rest.len() % 2 == 1 {
+        let half = rest.len() / 2;
+        if rest.is_char_boundary(half) && rest[half..].starts_with(' ') {
+            let (old, new) = (&rest[..half], &rest[half + 1..]);
+            if let (Some(o), Some(n)) = (old.strip_prefix("a/"), new.strip_prefix("b/"))
+                && o == n
+            {
+                return n.to_owned();
+            }
+        }
+    }
     match rest.rfind(" b/").or_else(|| rest.rfind(" \"b/")) {
-        Some(i) => unquote(&rest[i + 1..]).trim_start_matches("b/").to_owned(),
+        Some(i) => {
+            let name = unquote(&rest[i + 1..]);
+            name.strip_prefix("b/").unwrap_or(&name).to_owned()
+        }
         None => rest.to_owned(),
     }
 }
 
-/// A path as git prints it, its quotes taken off (git quotes names with odd characters).
-fn unquote(p: &str) -> &str {
+/// A path as git prints it: a quoted one (a name with `"`, `\`, a tab or a newline) with its
+/// quotes taken off and its escapes read.
+fn unquote(p: &str) -> String {
     let p = p.trim_end_matches(['\t', '\r']);
-    p.strip_prefix('"')
-        .and_then(|p| p.strip_suffix('"'))
-        .unwrap_or(p)
+    match p.strip_prefix('"').and_then(|p| p.strip_suffix('"')) {
+        Some(inner) => unescape(inner),
+        None => p.to_owned(),
+    }
+}
+
+/// `\"`, `\\`, `\t`, `\n` and octal bytes (`\303\274`) as git writes them in a quoted name.
+fn unescape(s: &str) -> String {
+    let mut bytes = Vec::with_capacity(s.len());
+    let mut it = s.bytes().peekable();
+    while let Some(b) = it.next() {
+        if b != b'\\' {
+            bytes.push(b);
+            continue;
+        }
+        match it.next() {
+            Some(b't') => bytes.push(b'\t'),
+            Some(b'n') => bytes.push(b'\n'),
+            Some(b'r') => bytes.push(b'\r'),
+            Some(d @ b'0'..=b'7') => {
+                let mut value = u32::from(d - b'0');
+                for _ in 0..2 {
+                    match it.peek() {
+                        Some(&d @ b'0'..=b'7') => {
+                            value = value * 8 + u32::from(d - b'0');
+                            it.next();
+                        }
+                        _ => break,
+                    }
+                }
+                bytes.push(value as u8);
+            }
+            Some(other) => bytes.push(other),
+            None => bytes.push(b'\\'),
+        }
+    }
+    String::from_utf8_lossy(&bytes).into_owned()
 }
 
 /// Whether `path` is a lock file a package manager writes.
@@ -274,6 +332,10 @@ pub fn left_out_text(left_out: &[LeftOut]) -> String {
         s.push_str("These files' diffs are cut short (only their start is below):\n");
         for l in cut.iter().take(MAX_LISTED) {
             s.push_str(&line(l));
+        }
+        let more = cut.len().saturating_sub(MAX_LISTED);
+        if more > 0 {
+            s.push_str(&format!("- and {more} more file{}\n", plural(more)));
         }
     }
     s
@@ -425,7 +487,13 @@ pub fn review_prompt(settings: &AiSettings, input: &ReviewInput<'_>) -> Prompt {
 pub fn clean_answer(raw: &str) -> String {
     let plain = strip_escapes(raw).replace('\r', "");
     let mut text = plain.trim();
-    if text.starts_with("```") && text.ends_with("```") && text.len() > 6 {
+    // Only one block wrapping it all: a review's Markdown may start and end with blocks of
+    // its own.
+    if text.starts_with("```")
+        && text.ends_with("```")
+        && text.len() > 6
+        && !text[3..text.len() - 3].contains("```")
+    {
         let inner = &text[3..text.len() - 3];
         // The fence's language word, on its line.
         text = inner
@@ -489,7 +557,12 @@ pub fn split_message(answer: &str) -> (String, String) {
         }
     }
     let summary = lines.next().unwrap_or_default().trim();
-    let summary = summary.trim_matches(|c| c == '`' || c == '"').trim();
+    // Quotes or backticks around the whole of it, not one at an end (`fix: handle `None``).
+    let summary = ['`', '"']
+        .iter()
+        .find_map(|&q| summary.strip_prefix(q)?.strip_suffix(q))
+        .unwrap_or(summary)
+        .trim();
     let body: Vec<&str> = lines.collect();
     let body = body.join("\n");
     (summary.to_owned(), body.trim().to_owned())
@@ -532,13 +605,25 @@ mod tests {
     fn odd_names_are_read_from_the_diff() {
         // git quotes names with a tab, a quote or (with core.quotePath) any non-ASCII.
         let quoted = "diff --git \"a/t\\tb\" \"b/t\\tb\"\n--- \"a/t\\tb\"\n+++ \"b/t\\tb\"\n@@ -1 +1 @@\n-x\n+y\n";
-        assert_eq!(split_files(quoted)[0].path, "t\\tb");
+        assert_eq!(split_files(quoted)[0].path, "t\tb");
         let unicode = file("ünï cødé/файл.txt", 1);
         assert_eq!(split_files(&unicode)[0].path, "ünï cødé/файл.txt");
         // A binary file has no --- / +++ lines.
         let binary = "diff --git a/img/a b.png b/img/a b.png\nnew file mode 100644\nBinary files /dev/null and b/img/a b.png differ\n";
         assert_eq!(split_files(binary)[0].path, "img/a b.png");
         assert!(split_files("").is_empty());
+    }
+
+    /// Found in review: names with ` b/` in them, renames, and quoted names with escapes.
+    #[test]
+    fn names_are_read_whole_and_unescaped() {
+        let mode = "diff --git a/x b/y.png b/x b/y.png\nold mode 100644\nnew mode 100755\n";
+        assert_eq!(split_files(mode)[0].path, "x b/y.png");
+        let rename = "diff --git a/old b/x b/new b/x\nsimilarity index 100%\nrename from old b/x\nrename to new b/x\n";
+        assert_eq!(split_files(rename)[0].path, "new b/x");
+        let quoted = "diff --git \"a/q\\\"x\" \"b/q\\\"x\"\n--- \"a/q\\\"x\"\n+++ \"b/q\\\"x\"\n@@ -1 +1 @@\n-a\n+b\n";
+        assert_eq!(split_files(quoted)[0].path, "q\"x");
+        assert_eq!(unescape("\\303\\274ber\\ttab"), "über\ttab");
     }
 
     #[test]
@@ -724,6 +809,9 @@ mod tests {
         );
         assert_eq!(clean_answer("```text\nfix: y\n\nwhy\n```"), "fix: y\n\nwhy");
         assert_eq!(clean_answer("\u{1b}]0;title\u{7}ok"), "ok");
+        // A review that starts and ends with blocks of its own keeps them.
+        let review = "```rust\nfoo\n```\nWhy\n```rust\nbar\n```";
+        assert_eq!(clean_answer(review), review);
         assert_eq!(clean_answer("  \n "), "");
     }
 
@@ -738,5 +826,8 @@ mod tests {
             ("fix: ü".to_owned(), String::new())
         );
         assert_eq!(split_message(""), (String::new(), String::new()));
+        // A backtick at one end belongs to the summary.
+        assert_eq!(split_message("fix: handle `None`").0, "fix: handle `None`");
+        assert_eq!(split_message("\"feat: quoted\"").0, "feat: quoted");
     }
 }
