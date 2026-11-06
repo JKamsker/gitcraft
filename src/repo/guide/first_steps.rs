@@ -2,8 +2,7 @@
 //! Decided from what was read of the repository alone, so that it can be tested without a
 //! window.
 
-use crate::git::{Refs, Remote, WorkStatus};
-use crate::repo::{Undo, operations::expect_ref, ops};
+use crate::git::{Identity, Refs, Remote, WorkStatus};
 
 /// A repository with at most this many commits, nothing of it published yet, still shows the
 /// first steps (below its commits); past that, it is not new any more.
@@ -21,11 +20,19 @@ pub(crate) struct Facts {
     pub on_branch: bool,
     /// The checked-out branch tracks a remote branch, or some remote branch is known already.
     pub published: bool,
+    /// git knows who commits: a name and an email.
+    pub has_identity: bool,
 }
 
 impl Facts {
     /// The facts of a repository as the tab read it.
-    pub(crate) fn read(commits: usize, refs: &Refs, work: &WorkStatus, remotes: &[Remote]) -> Self {
+    pub(crate) fn read(
+        commits: usize,
+        refs: &Refs,
+        work: &WorkStatus,
+        remotes: &[Remote],
+        identity: &Identity,
+    ) -> Self {
         let upstream = refs
             .current
             .as_ref()
@@ -38,9 +45,16 @@ impl Facts {
             remotes: remotes.len(),
             on_branch: refs.current.is_some(),
             published: upstream || remote_branches,
+            has_identity: !identity.name.trim().is_empty() && !identity.email.trim().is_empty(),
         }
     }
 }
+
+/// Why Publish waits for the first commit.
+pub(crate) const NEEDS_COMMIT: &str = "Needs the first commit";
+/// Why the first commit waits for an identity.
+pub(crate) const NEEDS_IDENTITY: &str =
+    "Set your name and email first (Settings → Profile, or git config user.name / user.email)";
 
 /// Where a step stands.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -77,7 +91,7 @@ pub(crate) fn first_steps(f: &Facts) -> Option<FirstSteps> {
         }
     };
     let publish = if f.commits == 0 {
-        StepState::Blocked("Make the first commit first")
+        StepState::Blocked(NEEDS_COMMIT)
     } else if f.remotes == 0 {
         StepState::Blocked("Add a remote first")
     } else if !f.on_branch {
@@ -87,29 +101,15 @@ pub(crate) fn first_steps(f: &Facts) -> Option<FirstSteps> {
     };
     Some(FirstSteps {
         empty: f.commits == 0,
-        first_commit: done_if(f.commits > 0),
+        first_commit: if f.commits == 0 && !f.has_identity {
+            StepState::Blocked(NEEDS_IDENTITY)
+        } else {
+            done_if(f.commits > 0)
+        },
         nothing_to_commit: f.commits == 0 && !f.has_changes,
         add_remote: done_if(f.remotes > 0),
         publish,
     })
-}
-
-/// The message of the empty first commit.
-pub(crate) const EMPTY_COMMIT_MESSAGE: &str = "Initial commit";
-
-/// The empty first commit: what it runs, and how it is undone (the branch it made deleted
-/// again, back to no commits, as long as that branch is still at it) and redone.
-pub(crate) fn empty_commit_steps() -> (Vec<Vec<String>>, Undo) {
-    let commit = ops(&[&["commit", "--allow-empty", "-m", EMPTY_COMMIT_MESSAGE]]);
-    let undo = [expect_ref("HEAD")]
-        .into_iter()
-        .chain(ops(&[&["update-ref", "-d", "HEAD"]]))
-        .collect();
-    let how = Undo::Custom {
-        undo,
-        redo: commit.clone(),
-    };
-    (commit, how)
 }
 
 /// What the tests take for steps that should be there but are not: nothing in it passes.
@@ -133,7 +133,25 @@ mod tests {
             remotes,
             on_branch: commits > 0,
             published,
+            has_identity: true,
         }
+    }
+
+    #[test]
+    fn without_an_identity_the_first_commit_waits_for_one() {
+        let nobody = Facts {
+            has_identity: false,
+            ..facts(0, true, 0, false)
+        };
+        let steps = first_steps(&nobody).unwrap_or(MISSING);
+        assert_eq!(steps.first_commit, StepState::Blocked(NEEDS_IDENTITY));
+        // Once committed (in the terminal, say), it is done whoever committed.
+        let committed = Facts {
+            has_identity: false,
+            ..facts(1, false, 0, false)
+        };
+        let steps = first_steps(&committed).unwrap_or(MISSING);
+        assert_eq!(steps.first_commit, StepState::Done);
     }
 
     #[test]
@@ -143,10 +161,7 @@ mod tests {
         assert_eq!(steps.first_commit, StepState::Todo);
         assert!(steps.nothing_to_commit);
         assert_eq!(steps.add_remote, StepState::Todo);
-        assert_eq!(
-            steps.publish,
-            StepState::Blocked("Make the first commit first")
-        );
+        assert_eq!(steps.publish, StepState::Blocked(NEEDS_COMMIT));
     }
 
     #[test]
@@ -160,10 +175,7 @@ mod tests {
     fn a_remote_marks_its_step_done_and_publish_still_waits_for_a_commit() {
         let steps = first_steps(&facts(0, false, 2, false)).unwrap_or(MISSING);
         assert_eq!(steps.add_remote, StepState::Done);
-        assert_eq!(
-            steps.publish,
-            StepState::Blocked("Make the first commit first")
-        );
+        assert_eq!(steps.publish, StepState::Blocked(NEEDS_COMMIT));
     }
 
     #[test]
@@ -199,21 +211,5 @@ mod tests {
         );
         assert_eq!(first_steps(&facts(5_000, true, 3, false)), None);
         assert_eq!(first_steps(&facts(usize::MAX, false, 0, false)), None);
-    }
-
-    #[test]
-    fn the_empty_commit_is_undone_by_deleting_the_branch_it_made() {
-        let (commit, undo) = empty_commit_steps();
-        assert_eq!(
-            commit,
-            ops(&[&["commit", "--allow-empty", "-m", "Initial commit"]])
-        );
-        assert!(matches!(undo, Undo::Custom { .. }));
-        let Undo::Custom { undo, redo } = undo else {
-            return;
-        };
-        assert_eq!(undo.first(), Some(&expect_ref("HEAD")));
-        assert_eq!(undo.last(), ops(&[&["update-ref", "-d", "HEAD"]]).first());
-        assert_eq!(redo, commit);
     }
 }

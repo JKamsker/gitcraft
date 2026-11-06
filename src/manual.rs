@@ -23,8 +23,8 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Right-click a tab to give it its own icon and highlight colour.",
             "Drag a tab along the strip to reorder the tabs.",
             "A repository with no commits shows its first steps in the graph: make the first commit, add a remote, publish.",
-            "Tips like this one show under the graph, a different one each day. A hint also shows once, the first time you do something that has a shortcut nearby.",
-            "The ✕ of the tips turns them off; Settings → General → Tips brings them back, and the hints already seen too.",
+            "A “Did you know” tip shows under the graph, a different one each day; a hint shows once, the first time you do something with a shortcut nearby.",
+            "The eye beside a tip turns tips and hints off; Settings → General → Tips turns them back on and can show the hints seen again.",
             "Remote on the start page opens a repository in WSL or over SSH: git runs there, this window shows it. Browse… lists that machine's folders, its repositories marked. The toolbar names the machine; the terminal opens a shell there. What ssh asks (a password, a passphrase, a new host key) is asked in this window; Remember connection keeps a password encrypted in the system's credential store, and Forget saved SSH sign-ins (Ctrl+P) removes them.",
         ],
     ),
@@ -77,12 +77,35 @@ const FEATURES: &[(&str, &[&str])] = &[
     ),
 ];
 
-/// Every point of [`FEATURES`], in order, as written (with `Ctrl`): what the "Did you know"
-/// tips are drawn from.
-pub(crate) fn feature_points() -> impl Iterator<Item = &'static str> {
-    FEATURES
-        .iter()
-        .flat_map(|(_, points)| points.iter().copied())
+/// The "Did you know" tips under the graph: features above, each said in one short line of its
+/// own (`Ctrl` as written in them). Keep them in step with [`FEATURES`].
+const TIPS: &[&str] = &[
+    "Double-click a branch pill to check that branch out.",
+    "Ctrl+click a second commit to list the files that differ between the two.",
+    "A branch's menu has “Changes x adds to main”: what it changed, like a pull request.",
+    "Hover a branch and click its eye to hide it from the graph; Solo shows only that one.",
+    "Right-click a commit or a pill for merge, rebase, cherry-pick, revert, reset and more.",
+    "Search can look in the code: switch it to Code to find the commits that added some text.",
+    "Right-click the graph's column header to pick its columns or make the graph compact.",
+    "In a diff, click the lines you want to stage, unstage or discard only those.",
+    "F7 and Alt+↓ go to the next change of a diff; Shift+F7 and Alt+↑ to the previous one.",
+    "Double-click a commit's message in the right pane to edit it.",
+    "Ctrl+Z undoes commits, merges, rebases, resets, checkouts, branches, tags and stashes.",
+    "Ctrl+P opens the command palette: every action, and every branch to check out.",
+    "Right-click a file for its history, its blame or the whole file at that commit.",
+    "Switch a diff from Diff to File to read the whole file.",
+    "Conflicts open in a three-pane editor with Ours, Theirs and Both for each one.",
+    "Profiles each have their own tabs, theme, git author and commit signing.",
+    "Right-click a tab to give it its own icon and highlight colour.",
+    "Ctrl+Shift+T reopens the tab closed last.",
+    "Remote on the start page opens a repository in WSL or over SSH.",
+    "A pull request's menu has Open in worktree, to work on it in a folder of its own.",
+    "Interactive rebase reorders, rewords, squashes or drops commits.",
+];
+
+/// The "Did you know" tips, as written (with `Ctrl`).
+pub(crate) fn tips() -> &'static [&'static str] {
+    TIPS
 }
 
 /// Keyboard and mouse shortcuts: (keys, what they do). `Cmd` stands for Ctrl outside macOS.

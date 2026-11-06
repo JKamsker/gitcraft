@@ -21,7 +21,7 @@ impl Settings {
                 {
                     self.seen_hints.clear();
                 }
-                layout::note(ui, format!("{seen} seen"));
+                layout::note(ui, format!("{seen} hints seen"));
             }
         });
     }

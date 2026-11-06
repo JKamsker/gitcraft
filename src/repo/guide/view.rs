@@ -4,7 +4,8 @@
 use egui::{RichText, Ui};
 
 use super::GuideAct;
-use super::first_steps::{EMPTY_COMMIT_MESSAGE, FirstSteps, StepState, empty_commit_steps};
+use super::empty_commit::EMPTY_COMMIT_MESSAGE;
+use super::first_steps::{FirstSteps, StepState};
 use crate::icons;
 use crate::repo::{Action, Dialog, RepoTab, widgets};
 use crate::theme::{self, Tokens};
@@ -56,7 +57,9 @@ impl RepoTab {
                                     ui.add_space(6.0);
                                     hide = ui
                                         .link(RichText::new("Hide these steps").small())
-                                        .on_hover_text("For this tab, until it is opened again")
+                                        .on_hover_text(
+                                            "Hidden until this repository is opened again",
+                                        )
                                         .clicked();
                                 }
                             });
@@ -98,11 +101,12 @@ fn first_commit_step(ui: &mut Ui, steps: FirstSteps, idle: bool, acts: &mut Vec<
     let explain = match steps.first_commit {
         StepState::Done => "Done.",
         _ if steps.nothing_to_commit => {
-            "Nothing to commit yet: files put in the repository's folder show up here by \
-             themselves. Or start with an empty commit."
+            "Nothing to commit yet: files put in the repository's folder show up at the top of \
+             the graph by themselves. Or start with an empty commit."
         }
         _ => "Your files are ready: write a summary and commit them.",
     };
+    let can = idle && steps.first_commit == StepState::Todo;
     step(
         ui,
         1,
@@ -112,27 +116,13 @@ fn first_commit_step(ui: &mut Ui, steps: FirstSteps, idle: bool, acts: &mut Vec<
         |ui| {
             if steps.nothing_to_commit {
                 if ui
-                    .add_enabled(idle, egui::Button::new("Make an empty commit…"))
+                    .add_enabled(can, egui::Button::new("Make an empty commit…"))
                     .on_hover_text(format!("A commit with no files, “{EMPTY_COMMIT_MESSAGE}”"))
                     .clicked()
                 {
-                    let (commit, undo) = empty_commit_steps();
-                    acts.push(Action::Dialog(
-                        Dialog::confirm(
-                            "Empty first commit",
-                            format!(
-                                "Make a commit with no files in it, “{EMPTY_COMMIT_MESSAGE}”, so \
-                             that the repository has a branch to publish and to start others \
-                             from? Undo takes it back."
-                            ),
-                            "Commit",
-                            commit,
-                            None,
-                        )
-                        .undo(undo),
-                    ));
+                    acts.push(Action::Guide(GuideAct::EmptyCommit));
                 }
-            } else if widgets::primary_button(ui, "Write the message", idle, 0.0)
+            } else if widgets::primary_button(ui, "Write the message", can, 0.0)
                 .on_hover_text("Opens the changes in the right pane, at the commit summary")
                 .clicked()
             {

@@ -80,7 +80,10 @@ impl RepoTab {
                 .margin(egui::Margin::symmetric(8, 6)),
         );
         // Asked for by the guide's "Make the first commit".
-        if std::mem::take(&mut self.guide.focus_summary) {
+        if self
+            .guide
+            .take_focus_summary(ui.ctx().cumulative_frame_nr())
+        {
             summary.request_focus();
             summary.scroll_to_me(None);
         }
