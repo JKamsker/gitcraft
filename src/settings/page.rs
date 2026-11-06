@@ -7,10 +7,14 @@ use super::layout::Filter;
 use super::{Page, Settings};
 use crate::theme::{self, Tokens};
 
-/// Width of the list of pages.
-const NAV_WIDTH: f32 = 210.0;
-/// Room between the list and the page.
-const GAP: f32 = 36.0;
+/// Width of the list of pages, and the room between it and the page; less in a small window.
+fn nav_size(available: f32) -> (f32, f32) {
+    if available < 1000.0 {
+        (170.0, 20.0)
+    } else {
+        (210.0, 36.0)
+    }
+}
 /// Widest a page gets.
 const CONTENT_WIDTH: f32 = 720.0;
 /// Room above the page's title and the list's.
@@ -51,14 +55,15 @@ impl Settings {
                 .collect()
         };
 
-        let side = ((ui.available_width() - (NAV_WIDTH + GAP + CONTENT_WIDTH)) / 2.0).max(16.0);
+        let (nav_width, gap) = nav_size(ui.available_width());
+        let side = ((ui.available_width() - (nav_width + gap + CONTENT_WIDTH)) / 2.0).max(16.0);
         ui.horizontal_top(|ui| {
             ui.add_space(side);
             ui.vertical(|ui| {
-                ui.set_width(NAV_WIDTH);
+                ui.set_width(nav_width);
                 nav(ui, &mut view, &counts);
             });
-            ui.add_space(GAP);
+            ui.add_space(gap);
             let salt = if counts.is_empty() {
                 Id::new(("settings-page", view.page as u8))
             } else {
@@ -173,7 +178,7 @@ fn nav(ui: &mut Ui, view: &mut View, counts: &[usize]) {
     for (i, &page) in Page::ALL.iter().enumerate() {
         let count = counts.get(i).copied();
         let selected = !searching && page == view.page;
-        let (rect, resp) = ui.allocate_exact_size(vec2(NAV_WIDTH, 32.0), Sense::click());
+        let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 32.0), Sense::click());
         let fill = if selected {
             t.hover
         } else if resp.hovered() {
@@ -264,7 +269,7 @@ fn search_field(ui: &mut Ui, query: &mut String) {
                         egui::TextEdit::singleline(query)
                             .id(search_id())
                             .frame(egui::Frame::NONE)
-                            .hint_text("Search settings")
+                            .hint_text("Search")
                             .margin(vec2(0.0, 3.0))
                             .desired_width(ui.available_width()),
                     );

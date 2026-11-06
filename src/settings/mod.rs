@@ -311,7 +311,7 @@ impl Settings {
                     card.row("Channel", "main dev releases builds", |ui| {
                         ui.add_enabled_ui(self.check_updates, |ui| {
                             egui::ComboBox::from_id_salt("settings-update-channel")
-                                .width(COMBO_WIDTH)
+                                .width(layout::fit(ui, COMBO_WIDTH))
                                 .selected_text(self.update_channel.label())
                                 .show_ui(ui, |ui| {
                                     for channel in crate::update::Channel::ALL {
@@ -329,7 +329,7 @@ impl Settings {
             Page::Appearance => {
                 section(ui, f, "Appearance", None, |card| {
                     card.row("Zoom", "scale size interface ui", |ui| {
-                        ui.spacing_mut().slider_width = SLIDER_WIDTH;
+                        ui.spacing_mut().slider_width = layout::fit(ui, SLIDER_WIDTH + 70.0) - 70.0;
                         ui.add(layout::slider(
                             egui::Slider::new(&mut self.ui_scale, 0.7..=2.0)
                                 .step_by(0.05)
@@ -367,7 +367,7 @@ impl Settings {
             Page::Graph => {
                 section(ui, f, "Commit graph", None, |card| {
                     card.row("Branch column width", "refs tags pills", |ui| {
-                        ui.spacing_mut().slider_width = SLIDER_WIDTH;
+                        ui.spacing_mut().slider_width = layout::fit(ui, SLIDER_WIDTH + 70.0) - 70.0;
                         ui.add(layout::slider(
                             egui::Slider::new(&mut self.refs_width, 210.0..=2000.0)
                                 .step_by(10.0)
@@ -415,7 +415,7 @@ impl Settings {
                     );
                     card.row("Pull", "fast-forward rebase merge", |ui| {
                         egui::ComboBox::from_id_salt("settings-pull")
-                            .width(COMBO_WIDTH)
+                            .width(layout::fit(ui, COMBO_WIDTH))
                             .selected_text(self.pull_mode.label())
                             .show_ui(ui, |ui| {
                                 for mode in crate::repo::pull::PullMode::ALL {
@@ -439,7 +439,7 @@ impl Settings {
                             ui.add(
                                 layout::field(&mut self.editor)
                                     .hint_text("code")
-                                    .desired_width(FIELD_WIDTH),
+                                    .desired_width(layout::fit(ui, FIELD_WIDTH)),
                             )
                             .on_hover_text("Run with a folder or file path, e.g. code, subl, idea");
                         },
@@ -464,7 +464,7 @@ impl Settings {
                             .map(|s| s.label.clone())
                             .unwrap_or_else(|| "System default".to_owned());
                         egui::ComboBox::from_id_salt("settings-shell")
-                            .width(COMBO_WIDTH)
+                            .width(layout::fit(ui, COMBO_WIDTH))
                             .selected_text(current)
                             .show_ui(ui, |ui| {
                                 ui.selectable_value(
@@ -482,7 +482,7 @@ impl Settings {
                             });
                     });
                     card.row("Font size", "text", |ui| {
-                        ui.spacing_mut().slider_width = SLIDER_WIDTH;
+                        ui.spacing_mut().slider_width = layout::fit(ui, SLIDER_WIDTH + 70.0) - 70.0;
                         ui.add(layout::slider(
                             egui::Slider::new(&mut self.terminal_font, 9.0..=20.0)
                                 .step_by(0.5)
@@ -504,18 +504,20 @@ impl Settings {
                             let found_by = format!("{} {} {}", p.label, p.name, p.email);
                             card.full(&found_by, |ui| {
                                 ui.horizontal(|ui| {
+                                    // Shares of the row, less the gaps and the remove button.
+                                    let room = ui.available_width() - 60.0;
                                     ui.add(
                                         layout::field(&mut p.label)
                                             .hint_text("Work")
-                                            .desired_width(110.0),
+                                            .desired_width((room * 0.2).min(110.0)),
                                     );
                                     ui.add(
                                         layout::field(&mut p.name)
                                             .hint_text("Name")
-                                            .desired_width(170.0),
+                                            .desired_width((room * 0.32).min(170.0)),
                                     );
                                     // The email takes what is left, the remove button at the end.
-                                    let rest = (ui.available_width() - 32.0).max(120.0);
+                                    let rest = (ui.available_width() - 32.0).max(60.0);
                                     ui.add(
                                         layout::field(&mut p.email)
                                             .hint_text("email@example.com")
@@ -551,10 +553,11 @@ impl Settings {
                             let combo = combo.replace("Cmd", crate::manual::command());
                             card.full(&format!("{combo} {what} keys keyboard"), |ui| {
                                 ui.horizontal(|ui| {
+                                    let width = layout::label_width(ui);
                                     let start = ui.cursor().left();
                                     crate::manual::key_combo(ui, &combo);
                                     let used = ui.cursor().left() - start;
-                                    ui.add_space((layout::LABEL_WIDTH + 8.0 - used).max(8.0));
+                                    ui.add_space((width + 8.0 - used).max(8.0));
                                     ui.label(RichText::new(*what).color(t.text_dim));
                                 });
                             });
