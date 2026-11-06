@@ -381,6 +381,7 @@ impl RepoTab {
             here.changes = Some(changes);
         }
         self.count_worktrees(ctx);
+        self.read_stacks(ctx);
         self.take_visibility(loaded.log_from, ctx);
         // Stash numbers shift when one is pushed or dropped; follow the commit.
         let viewed = self
