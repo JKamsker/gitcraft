@@ -5,6 +5,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant};
 
 use base64::Engine;
 
@@ -36,13 +37,26 @@ impl Launch {
         ));
         s.push_str(&self.recipe.script());
         if let Some(agent) = &self.agent {
+            let program = agent.split_whitespace().next().unwrap_or(agent);
+            let place = if remote::is_remote(&self.worktree) {
+                "the repository's machine"
+            } else {
+                "this machine"
+            };
             s.push_str(&format!(
-                "if [ \"$gitcraft_failed\" = 0 ]; then\n  gitcraft_say {}\n  {agent}\n\
-                 else\n  gitcraft_say {}\nfi\n",
-                sh::quote(&format!("starting {agent}")),
+                "if [ \"$gitcraft_failed\" != 0 ]; then\n  gitcraft_say {}\n\
+                 elif ! command -v {} >/dev/null 2>&1; then\n  gitcraft_say {}\n\
+                 else\n  gitcraft_say {}\n  {agent}\nfi\n",
                 sh::quote(&format!(
-                    "the agent was not started; start it yourself with: {agent}"
+                    "{} was not started; start it yourself with: {agent}",
+                    self.label
                 )),
+                sh::quote(program),
+                sh::quote(&format!(
+                    "{program} isn't installed on {place} (not found on its PATH): install it, \
+                     then start it with: {agent}"
+                )),
+                sh::quote(&format!("starting {}", self.label)),
             ));
         }
         s.push_str(&format!("exec {shell}\n"));
@@ -129,13 +143,15 @@ fn ssh_words(script: &str) -> String {
 pub(crate) fn sh_beside_git(exec_path: &str) -> Vec<PathBuf> {
     let exec = Path::new(exec_path.trim());
     let mut out = Vec::new();
+    // `bin\sh.exe` first: it puts Git's own tools (`mktemp`, `base64`) on the PATH, which
+    // `usr\bin\sh.exe` run by itself doesn't.
     for up in [3, 2] {
         let mut root = exec;
         for _ in 0..up {
             root = root.parent().unwrap_or(root);
         }
-        out.push(root.join("usr").join("bin").join("sh.exe"));
         out.push(root.join("bin").join("sh.exe"));
+        out.push(root.join("usr").join("bin").join("sh.exe"));
     }
     out
 }
@@ -163,39 +179,82 @@ pub(crate) fn windows_sh() -> Result<String, String> {
 }
 
 /// Launches waiting for the tab of their worktree to take them: a worktree opened right after
-/// it is made gets a tab of its own, which starts its terminal there.
+/// it is made gets a tab of its own, which starts its terminal there. One that no tab takes in
+/// a while (the worktree couldn't be opened) is dropped, never started later by surprise.
 pub(crate) struct PendingLaunches;
 
-static PENDING: Mutex<Vec<Launch>> = Mutex::new(Vec::new());
+/// How long a launch waits for its tab.
+const PENDING_FOR: Duration = Duration::from_secs(120);
+
+/// Each with its worktree's folder in the form tabs have it, worked out when it was queued.
+static PENDING: Mutex<Vec<(PathBuf, Instant, Launch)>> = Mutex::new(Vec::new());
 /// Whether [`PENDING`] has any, so that a tab looks without taking the lock every frame.
 static ANY: AtomicBool = AtomicBool::new(false);
 
 impl PendingLaunches {
+    /// Queues `launch` for the tab of its worktree. Resolves the folder here (through links):
+    /// a tab's own folder is resolved so too, and is then only compared with, every frame.
     pub fn queue(launch: Launch) {
+        let key = tab_form(&launch.worktree);
         if let Ok(mut list) = PENDING.lock() {
-            list.push(launch);
+            list.retain(|(_, at, _)| at.elapsed() < PENDING_FOR);
+            list.push((key, Instant::now(), launch));
             ANY.store(true, Ordering::Relaxed);
         }
     }
 
-    /// The launch waiting for the worktree at `path`, if one is.
+    /// The launch waiting for the worktree at `path` (a tab's folder), if one is.
     pub fn take(path: &Path) -> Option<Launch> {
         if !ANY.load(Ordering::Relaxed) {
             return None;
         }
         let mut list = PENDING.lock().ok()?;
-        let i = list.iter().position(|l| same_worktree(&l.worktree, path))?;
-        let launch = list.remove(i);
+        list.retain(|(_, at, _)| at.elapsed() < PENDING_FOR);
+        let found = list
+            .iter()
+            .position(|(key, _, _)| same_written(key, path))
+            .map(|i| list.remove(i).2);
         ANY.store(!list.is_empty(), Ordering::Relaxed);
-        Some(launch)
+        found
     }
 }
 
-/// Whether two paths are the same worktree's: as written for one elsewhere (see
-/// [`remote::same_dir`]), here also through links, and without a `/` at the end.
-fn same_worktree(a: &Path, b: &Path) -> bool {
-    let trim = |p: &Path| PathBuf::from(p.to_string_lossy().trim_end_matches(['/', '\\']));
-    remote::same_dir(&trim(a), &trim(b))
+/// `path` as a tab of it has it: resolved through links here (as the app opens folders),
+/// as written for one elsewhere.
+fn tab_form(path: &Path) -> PathBuf {
+    if remote::is_remote(path) {
+        return path.to_owned();
+    }
+    match std::fs::canonicalize(path) {
+        Ok(real) => {
+            let s = real.to_string_lossy();
+            // Windows' `\\?\C:\…` as the app writes it, `C:\…`.
+            match s.strip_prefix(r"\\?\") {
+                Some(rest) if !rest.starts_with("UNC") => PathBuf::from(rest),
+                _ => real,
+            }
+        }
+        Err(_) => path.to_owned(),
+    }
+}
+
+/// Whether two paths are written alike, but for a separator at the end.
+fn same_written(a: &Path, b: &Path) -> bool {
+    a.to_string_lossy().trim_end_matches(['/', '\\'])
+        == b.to_string_lossy().trim_end_matches(['/', '\\'])
+}
+
+/// Finds Git's `sh` in the background ahead of the first launch, which then needn't ask git on
+/// the window's thread. Only on Windows, the only place it is needed.
+pub(crate) fn warm_up() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    if cfg!(windows) {
+        ONCE.call_once(|| {
+            std::thread::spawn(|| {
+                let _ = windows_sh();
+            });
+        });
+    }
 }
 
 #[cfg(test)]

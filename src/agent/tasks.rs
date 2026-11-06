@@ -107,14 +107,29 @@ struct TaskList {
     tasks: Vec<AgentTask>,
 }
 
+/// Held while the list is read or changed: tabs of the same repository read and change it on
+/// threads of their own, and a change is a read and a write.
+static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn locked() -> std::sync::MutexGuard<'static, ()> {
+    LOCK.lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 /// The repository's agent tasks, oldest first.
 pub(crate) fn load(repo: &Path) -> Result<Vec<AgentTask>, String> {
+    let _held = locked();
+    read(repo)
+}
+
+fn read(repo: &Path) -> Result<Vec<AgentTask>, String> {
     super::read_json::<TaskList>(repo, FILE).map(|list| list.tasks)
 }
 
 /// Adds `task` to the repository's list (in place of one in the same folder).
 pub(crate) fn add(repo: &Path, task: AgentTask) -> Result<Vec<AgentTask>, String> {
-    let mut tasks = load(repo)?;
+    let _held = locked();
+    let mut tasks = read(repo)?;
     tasks.retain(|t| t.path != task.path);
     tasks.push(task);
     save(repo, tasks)
@@ -122,7 +137,8 @@ pub(crate) fn add(repo: &Path, task: AgentTask) -> Result<Vec<AgentTask>, String
 
 /// Takes the task of the worktree at `path` off the list (the worktree stays).
 pub(crate) fn remove(repo: &Path, path: &str) -> Result<Vec<AgentTask>, String> {
-    let mut tasks = load(repo)?;
+    let _held = locked();
+    let mut tasks = read(repo)?;
     tasks.retain(|t| t.path != path);
     save(repo, tasks)
 }

@@ -2,16 +2,10 @@
 
 pub(super) use crate::remote::sh_quote as quote;
 
-/// `name=$(cat <<'X' … X)`: `text` given to the shell as it is, newlines and quotes included,
-/// under a delimiter that is none of its lines. (`$(…)` drops the newlines at its end.)
+/// `name='text'`: `text` given to the shell as it is, newlines and quotes included. (Not a
+/// heredoc inside `$(…)`, which bash 3.2, macOS's `/bin/sh`, misreads around a lone `'` or `)`.)
 pub(super) fn assign_verbatim(name: &str, text: &str) -> String {
-    let mut delimiter = "GITCRAFT_END".to_owned();
-    let mut n = 0;
-    while text.lines().any(|line| line == delimiter) {
-        n += 1;
-        delimiter = format!("GITCRAFT_END_{n}");
-    }
-    format!("{name}=$(cat <<'{delimiter}'\n{text}\n{delimiter}\n)\n")
+    format!("{name}={}\n", quote(text))
 }
 
 /// `value` between double quotes, where `$NAME`, `$((…))` and `$(…)` still expand: only `"` and
@@ -31,6 +25,9 @@ pub(super) fn double_quoted(value: &str) -> String {
 
 /// Whether `name` can be an environment variable's name in `sh`.
 pub(super) fn valid_name(name: &str) -> bool {
+    if reserved(name) {
+        return false;
+    }
     let mut chars = name.chars();
     chars
         .next()
@@ -38,15 +35,18 @@ pub(super) fn valid_name(name: &str) -> bool {
         && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
+/// Names the scripts use themselves, or that change how `sh` reads them.
+pub(super) fn reserved(name: &str) -> bool {
+    name.to_ascii_lowercase().starts_with("gitcraft_") || matches!(name, "IFS" | "PS4")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn a_delimiter_never_ends_the_text_early() {
-        let text = "echo a\nGITCRAFT_END\nGITCRAFT_END_1";
-        let script = assign_verbatim("x", text);
-        assert!(script.contains("<<'GITCRAFT_END_2'"), "{script}");
+    fn text_is_assigned_as_it_is() {
+        assert_eq!(assign_verbatim("x", "it's\n)"), "x='it'\\''s\n)'\n");
     }
 
     #[test]
@@ -57,6 +57,9 @@ mod tests {
         assert!(!valid_name(""));
         assert!(!valid_name("A-B"));
         assert!(!valid_name("Ä"));
+        assert!(!valid_name("gitcraft_failed"));
+        assert!(!valid_name("GITCRAFT_WORKTREE_INDEX"));
+        assert!(!valid_name("IFS"));
     }
 
     #[test]

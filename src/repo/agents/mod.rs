@@ -109,18 +109,20 @@ impl RepoTab {
     /// Every frame: a launch waiting for this worktree starts its terminal, and the tasks are
     /// read again when the worktrees changed.
     pub(super) fn agents_frame(&mut self, ctx: &egui::Context) {
+        crate::agent::launch::warm_up();
         if let Some(launch) = PendingLaunches::take(&self.path) {
             self.start_launch(launch, ctx);
         }
-        let folders: Vec<PathBuf> = self.worktrees.iter().map(|w| w.path.clone()).collect();
-        if self.agents.reading
-            || self.history_gen == 0
-            || self.agents.read_for.as_ref() == Some(&folders)
-        {
+        let same = self
+            .agents
+            .read_for
+            .as_ref()
+            .is_some_and(|read| read.iter().eq(self.worktrees.iter().map(|w| &w.path)));
+        if self.agents.reading || self.history_gen == 0 || same {
             return;
         }
         self.agents.reading = true;
-        self.agents.read_for = Some(folders);
+        self.agents.read_for = Some(self.worktrees.iter().map(|w| w.path.clone()).collect());
         let repo = self.path.clone();
         self.then(
             ctx,
@@ -244,7 +246,7 @@ impl RepoTab {
 
     fn start_agent_task(&mut self, new: start::NewTask, ctx: &egui::Context) {
         if self.busy_op.is_some() {
-            self.status = Some(("Wait for the operation running to end".to_owned(), true));
+            self.status = Some(("Wait for the running operation to finish".to_owned(), true));
             return;
         }
         self.agents.dialog = None;

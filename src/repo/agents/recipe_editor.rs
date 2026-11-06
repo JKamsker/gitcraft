@@ -65,8 +65,8 @@ impl RecipeForm {
         ui.label(RichText::new("Worktree setup recipe").font(theme::semibold(15.0)));
         ui.label(
             RichText::new(
-                "Runs in every new worktree of this repository, for an agent or not: in a \
-                 terminal, with sh, on the repository's machine.",
+                "Runs in every worktree gitcraft makes for this repository, for an agent or \
+                 not: in a terminal, with sh, on the repository's machine.",
             )
             .color(t.text_dim),
         );
@@ -109,13 +109,22 @@ impl RecipeForm {
             if crate::repo::primary_button(ui, "Save", valid, 90.0).clicked() {
                 act = Some(AgentAct::SaveRecipe(recipe.clone()));
             }
+            let why_not = if !in_linked {
+                Some("Open a linked worktree of this repository to try the recipe on it")
+            } else if recipe.is_empty() {
+                Some("The recipe is empty: nothing to run")
+            } else if !valid {
+                Some("Fix what is shown in red first")
+            } else {
+                None
+            };
             if ui
                 .add_enabled(
-                    valid && in_linked && !recipe.is_empty(),
+                    why_not.is_none(),
                     egui::Button::new("Run in this worktree").min_size(egui::vec2(80.0, 30.0)),
                 )
                 .on_hover_text("Runs it as typed, in a terminal of this worktree (it isn't saved)")
-                .on_disabled_hover_text("Open a linked worktree to try the recipe on it")
+                .on_disabled_hover_text(why_not.unwrap_or_default())
                 .clicked()
             {
                 act = Some(AgentAct::RunRecipeHere(recipe));
