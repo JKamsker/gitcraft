@@ -83,6 +83,13 @@ impl Picker {
                     });
                     ui.label(RichText::new(kind).small().color(t.text_faint));
                 }
+                let shown = self
+                    .candidates
+                    .iter()
+                    .any(|(a, _)| a.name.to_lowercase().contains(&query));
+                if !shown && !self.candidates.is_empty() {
+                    ui.label(RichText::new("No match").color(t.text_faint));
+                }
                 if self.candidates.is_empty() {
                     ui.label(
                         RichText::new("No worktrees or other branches to compare")

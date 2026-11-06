@@ -40,6 +40,18 @@ pub(crate) struct Bakeoff {
     polled: Option<Instant>,
     assembling: bool,
     note: Option<(String, bool)>,
+    /// Numbers the comparisons asked for: an older answer doesn't replace a newer one.
+    request: u64,
+    /// The attempts' trees the picks were made for.
+    picked_trees: Vec<String>,
+    /// Every file an attempt touched, and which touched it: worked out once per comparison.
+    rows: Vec<(String, Vec<bool>)>,
+    /// Where each build leaves its status, once one was started.
+    statuses: Vec<Option<PathBuf>>,
+    /// The commit _Assemble_ made last, to show in the graph.
+    made: Option<String>,
+    /// Close was asked for once with picks made: a second time drops them.
+    confirm_close: bool,
 }
 
 /// Each attempt's take on the file shown, or why it couldn't be read.
@@ -49,6 +61,21 @@ type Sides = Result<Vec<Side>, String>;
 pub(crate) struct Side {
     patch: String,
     hunks: Vec<Hunk>,
+}
+
+impl Side {
+    /// What the attempt did to the file, as its patch says.
+    fn kind(&self) -> &'static str {
+        if self.patch.trim().is_empty() {
+            "unchanged"
+        } else if self.patch.contains("\ndeleted file mode") {
+            "deleted"
+        } else if self.patch.contains("\nnew file mode") {
+            "added"
+        } else {
+            "changed"
+        }
+    }
 }
 
 /// What the bake-off views ask for.
@@ -66,6 +93,8 @@ pub(crate) enum BakeAct {
     Assemble,
     Build(usize),
     BuildAll,
+    /// Shows the commit _Assemble_ made in the graph.
+    ShowMade,
 }
 
 impl Bakeoff {
@@ -88,6 +117,12 @@ impl Bakeoff {
             polled: None,
             assembling: false,
             note: None,
+            request: 0,
+            picked_trees: Vec::new(),
+            rows: Vec::new(),
+            statuses: vec![None; n],
+            made: None,
+            confirm_close: false,
         }
     }
 }
@@ -108,10 +143,33 @@ impl RepoTab {
                 self.close_pr();
                 self.ci_view = None;
                 self.diff = None;
+                self.file_view = None;
                 self.bakeoff.view = Some(Box::new(Bakeoff::new(attempts, command)));
                 self.load_bakeoff(ctx);
             }
-            BakeAct::Close => self.bakeoff.view = None,
+            BakeAct::Close => {
+                if let Some(view) = &mut self.bakeoff.view
+                    && !view.picks.is_empty()
+                    && !view.confirm_close
+                {
+                    view.confirm_close = true;
+                    let n = view.picks.len();
+                    view.note = Some((
+                        format!(
+                            "{n} file{} picked and not assembled: close again to drop them",
+                            if n == 1 { "" } else { "s" }
+                        ),
+                        true,
+                    ));
+                } else {
+                    self.bakeoff.view = None;
+                }
+            }
+            BakeAct::ShowMade => {
+                if let Some(commit) = self.bakeoff.view.take().and_then(|v| v.made) {
+                    self.goto(&commit, ctx);
+                }
+            }
             BakeAct::Refresh => self.load_bakeoff(ctx),
             BakeAct::OpenFile(path) => self.open_bakeoff_file(path, ctx),
             BakeAct::CloseFile => {
@@ -119,7 +177,10 @@ impl RepoTab {
                     view.file = None;
                 }
             }
-            BakeAct::TakeFile(path, n) => self.pick(path, |_| Some(Take::File(n))),
+            // A second click takes it back.
+            BakeAct::TakeFile(path, n) => self.pick(path, |take| {
+                (take != Some(Take::File(n))).then_some(Take::File(n))
+            }),
             BakeAct::ToggleHunk(path, n, i) => self.pick(path, |take| {
                 let mut list = match take {
                     Some(Take::Hunks(list)) => list,
@@ -136,8 +197,12 @@ impl RepoTab {
             BakeAct::Assemble => self.assemble(ctx),
             BakeAct::Build(n) => self.build(n, ctx),
             BakeAct::BuildAll => {
-                let n = self.bakeoff.view.as_ref().map_or(0, |v| v.attempts.len());
-                for i in 0..n {
+                let idle: Vec<usize> = self.bakeoff.view.as_ref().map_or_else(Vec::new, |v| {
+                    (0..v.attempts.len())
+                        .filter(|i| v.builds.get(*i) != Some(&Some(Built::Running)))
+                        .collect()
+                });
+                for i in idle {
                     self.build(i, ctx);
                 }
             }
@@ -151,6 +216,7 @@ impl RepoTab {
                 view.picks.insert(path, take);
             }
             view.note = None;
+            view.confirm_close = false;
         }
     }
 
@@ -160,6 +226,8 @@ impl RepoTab {
         };
         view.comparison = None;
         view.file = None;
+        view.request += 1;
+        let request = view.request;
         let attempts = view.attempts.clone();
         let repo = self.path.clone();
         self.then(
@@ -169,25 +237,33 @@ impl RepoTab {
                     crate::agent::read_json(&repo, build::COMMAND_FILE).unwrap_or_default();
                 (logic::compare(&repo, &attempts), command)
             },
-            |tab, (result, command), _| {
-                if let Some(view) = &mut tab.bakeoff.view {
-                    if view.build_command.is_empty() {
-                        view.build_command = command;
-                    }
-                    // Picks made for other trees no longer fit.
-                    let moved = match (&view.comparison, &result) {
-                        (Some(Ok(old)), Ok(new)) => old
-                            .attempts
-                            .iter()
-                            .map(|a| &a.tree)
-                            .ne(new.attempts.iter().map(|a| &a.tree)),
-                        _ => true,
-                    };
-                    if moved {
-                        view.picks.clear();
-                    }
-                    view.comparison = Some(result);
+            move |tab, (result, command), _| {
+                let Some(view) = &mut tab.bakeoff.view else {
+                    return;
+                };
+                if view.request != request {
+                    return;
                 }
+                if view.build_command.is_empty() {
+                    view.build_command = command;
+                }
+                // Picks made for other trees no longer fit.
+                if let Ok(new) = &result {
+                    let trees: Vec<String> = new.attempts.iter().map(|a| a.tree.clone()).collect();
+                    if trees != view.picked_trees {
+                        if !view.picks.is_empty() {
+                            view.note = Some((
+                                "Picks cleared: the attempts changed since they were made"
+                                    .to_owned(),
+                                true,
+                            ));
+                        }
+                        view.picks.clear();
+                        view.picked_trees = trees;
+                    }
+                    view.rows = new.files();
+                }
+                view.comparison = Some(result);
             },
         );
     }
@@ -256,13 +332,15 @@ impl RepoTab {
                 if let Some(view) = &mut tab.bakeoff.view {
                     view.assembling = false;
                     view.note = Some(match &result {
-                        Ok((branch, commit)) => (
-                            format!(
-                                "Made {branch} at {}: check it out or compare it from the graph",
-                                crate::repo::short(commit)
-                            ),
-                            false,
-                        ),
+                        Ok((branch, commit)) => {
+                            view.made = Some(commit.clone());
+                            // Another go at it needs a name of its own.
+                            view.branch = next_name(branch);
+                            (
+                                format!("Made {branch} at {}", crate::repo::short(commit)),
+                                false,
+                            )
+                        }
                         Err(e) => (e.clone(), true),
                     });
                 }
@@ -316,6 +394,11 @@ impl RepoTab {
             move |tab, status, ctx| match status {
                 Ok(status) => {
                     let there = build::for_sh(&status);
+                    if let Some(view) = &mut tab.bakeoff.view
+                        && let Some(slot) = view.statuses.get_mut(n)
+                    {
+                        *slot = Some(status);
+                    }
                     tab.start_launch(
                         Launch {
                             label: format!("build · {name}"),
@@ -346,10 +429,10 @@ impl RepoTab {
         let running: Vec<(usize, PathBuf)> = view
             .builds
             .iter()
-            .zip(&view.attempts)
+            .zip(&view.statuses)
             .enumerate()
             .filter(|(_, (b, _))| **b == Some(Built::Running))
-            .filter_map(|(i, (_, a))| a.worktree.clone().map(|w| (i, w)))
+            .filter_map(|(i, (_, file))| file.clone().map(|f| (i, f)))
             .collect();
         if running.is_empty() || view.polled.is_some_and(|t| t.elapsed() < BUILD_POLL) {
             if !running.is_empty() {
@@ -358,16 +441,13 @@ impl RepoTab {
             return;
         }
         view.polled = Some(Instant::now());
-        let repo = self.path.clone();
         self.then(
             ctx,
             move || {
                 running
                     .into_iter()
-                    .map(|(i, wt)| {
-                        let text = build::status_file(&repo, &wt)
-                            .ok()
-                            .and_then(|f| crate::remote::read_to_string(&f).ok());
+                    .map(|(i, file)| {
+                        let text = crate::remote::read_to_string(&file).ok();
                         (i, build::read_status(text.as_deref()))
                     })
                     .collect::<Vec<_>>()
@@ -384,6 +464,16 @@ impl RepoTab {
                 }
             },
         );
+    }
+}
+
+/// The name for another go after `branch` was made: `x` → `x-2`, `x-2` → `x-3`.
+fn next_name(branch: &str) -> String {
+    match branch.rsplit_once('-') {
+        Some((stem, n)) if n.parse::<u32>().is_ok_and(|n| n >= 2) => {
+            format!("{stem}-{}", n.parse::<u32>().unwrap_or(1) + 1)
+        }
+        _ => format!("{branch}-2"),
     }
 }
 

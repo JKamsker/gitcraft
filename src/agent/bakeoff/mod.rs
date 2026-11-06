@@ -41,6 +41,8 @@ pub(crate) struct Compared {
     pub new_deps: Vec<String>,
     /// It has uncommitted changes, compared too.
     pub uncommitted: bool,
+    /// It doesn't fork from the others at the base (it started from another commit).
+    pub forked_elsewhere: bool,
 }
 
 /// What comparing the attempts found.
@@ -98,13 +100,53 @@ pub(crate) fn compare(repo: &Path, attempts: &[Attempt]) -> Result<Comparison, S
         })?
         .trim()
         .to_owned();
-    // Each attempt's own fork point with the first one: all the same when they started together.
-    let same_base = commits.iter().skip(1).all(|c| {
-        git::run(Some(repo), &["merge-base", &commits[0], c]).is_ok_and(|b| b.trim() == base)
-    });
+    // Started together: every two of them fork at the base. One whose fork with any other is
+    // later (it started from a newer commit) shows more than it did.
+    let mut elsewhere = vec![false; commits.len()];
+    for i in 0..commits.len() {
+        for j in i + 1..commits.len() {
+            let fork = git::run(Some(repo), &["merge-base", &commits[i], &commits[j]]);
+            if !fork.is_ok_and(|b| b.trim() == base) {
+                elsewhere[i] = true;
+                elsewhere[j] = true;
+            }
+        }
+    }
+    // One that started from a newer commit of another branch (`main` moved on): some of its
+    // commits since the base are on a branch that is none of the attempts.
+    let excludes: Vec<String> = attempts
+        .iter()
+        .map(|a| format!("--exclude={}", a.rev))
+        .collect();
+    for (i, commit) in commits.iter().enumerate() {
+        let count = |extra: &[&str]| {
+            let mut args = vec![
+                "rev-list",
+                "--count",
+                commit.as_str(),
+                "--not",
+                base.as_str(),
+            ];
+            args.extend_from_slice(extra);
+            git::run(Some(repo), &args).map(|n| n.trim().to_owned())
+        };
+        let own: Vec<&str> = excludes
+            .iter()
+            .map(String::as_str)
+            .chain(["--branches"])
+            .collect();
+        if let (Ok(all), Ok(only)) = (count(&[]), count(&own))
+            && all != only
+        {
+            elsewhere[i] = true;
+        }
+    }
+    let same_base = !elsewhere.contains(&true);
     let mut compared = Vec::new();
-    for (attempt, commit) in attempts.iter().zip(&commits) {
-        compared.push(compare_one(repo, attempt, commit, &base)?);
+    for ((attempt, commit), elsewhere) in attempts.iter().zip(&commits).zip(elsewhere) {
+        let mut one = compare_one(repo, attempt, commit, &base)?;
+        one.forked_elsewhere = elsewhere;
+        compared.push(one);
     }
     Ok(Comparison {
         base,
@@ -133,27 +175,17 @@ fn compare_one(
 ) -> Result<Compared, String> {
     let committed = tree_of(repo, commit)?;
     let tree = match &attempt.worktree {
-        Some(wt) => snapshot(wt).map_err(|e| format!("{}: {e}", attempt.name))?,
+        Some(wt) => {
+            crate::agent::snapshot::take(wt).map_err(|e| format!("{}: {e}", attempt.name))?
+        }
         None => committed.clone(),
     };
-    let files = git::diff_files(repo, base, Some(&tree))?;
+    let files = changed_files(repo, base, &tree)?;
     let added = files.iter().filter_map(|f| f.added).sum();
     let removed = files.iter().filter_map(|f| f.removed).sum();
     let mut new_deps = Vec::new();
     for file in files.iter().filter(|f| deps::is_manifest(&f.path)) {
-        let patch = git::run(
-            Some(repo),
-            &[
-                "diff",
-                "--no-color",
-                "--no-ext-diff",
-                "-U0",
-                base,
-                &tree,
-                "--",
-                &file.path,
-            ],
-        )?;
+        let patch = diff(repo, &["-U0", base, &tree, "--", &file.path])?;
         for name in deps::added(&file.path, &patch) {
             new_deps.push(format!("{}: {name}", file.path));
         }
@@ -165,7 +197,56 @@ fn compare_one(
         added,
         removed,
         new_deps,
+        forked_elsewhere: false,
     })
+}
+
+/// `git diff` of the bake-off: paths taken as they are (`:x`, `*.rs` are names), no renames
+/// (a file moved is the old one deleted and the new one added, which is what assembling
+/// takes), no hunks joined across unchanged lines, no textconv or external diff (the hunks go
+/// back into files as they are).
+pub(crate) fn diff(repo: &Path, args: &[&str]) -> Result<String, String> {
+    let mut all = vec![
+        "--literal-pathspecs",
+        "diff",
+        "--no-color",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--no-renames",
+        "--inter-hunk-context=0",
+    ];
+    all.extend_from_slice(args);
+    git::run(Some(repo), &all)
+}
+
+/// The files that differ from `base` to `tree`, with their line counts.
+fn changed_files(repo: &Path, base: &str, tree: &str) -> Result<Vec<ChangedFile>, String> {
+    let status = diff(repo, &["--name-status", "-z", base, tree, "--"])?;
+    let counts = diff(repo, &["--numstat", "-z", base, tree, "--"])?;
+    let mut files = Vec::new();
+    let mut words = status.split('\0').filter(|w| !w.is_empty());
+    while let (Some(kind), Some(path)) = (words.next(), words.next()) {
+        files.push(ChangedFile {
+            status: kind.chars().next().unwrap_or('M'),
+            path: path.to_owned(),
+            old_path: None,
+            added: None,
+            removed: None,
+        });
+    }
+    // `added\tremoved\tpath\0`; `-` for a binary file.
+    for record in counts.split('\0').filter(|r| !r.is_empty()) {
+        let mut parts = record.splitn(3, '\t');
+        let (Some(added), Some(removed), Some(path)) = (parts.next(), parts.next(), parts.next())
+        else {
+            continue;
+        };
+        if let Some(file) = files.iter_mut().find(|f| f.path == path) {
+            file.added = added.parse().ok();
+            file.removed = removed.parse().ok();
+        }
+    }
+    Ok(files)
 }
 
 pub(crate) fn tree_of(repo: &Path, rev: &str) -> Result<String, String> {
@@ -175,27 +256,6 @@ pub(crate) fn tree_of(repo: &Path, rev: &str) -> Result<String, String> {
     )
     .map(|s| s.trim().to_owned())
     .map_err(|_| format!("{rev} has no tree"))
-}
-
-/// The tree of the worktree at `wt` as it is now, untracked files git doesn't ignore included,
-/// written through an index of gitcraft's own: the worktree's own index and files stay as they
-/// are.
-pub(crate) fn snapshot(wt: &Path) -> Result<String, String> {
-    let index = git::run(
-        Some(wt),
-        &["rev-parse", "--git-path", "gitcraft-snapshot.index"],
-    )?;
-    let index = index.trim_end_matches(['\n', '\r']).to_owned();
-    let env = [("GIT_INDEX_FILE", index.as_str())];
-    let step = |args: &[&str]| git::run_env(Some(wt), args, &env);
-    step(&["read-tree", "HEAD"])?;
-    step(&["add", "-A", "--", "."])?;
-    let tree = step(&["write-tree"])?.trim().to_owned();
-    // Not left behind where it is on this machine (elsewhere it is overwritten the next time).
-    if !crate::remote::is_remote(wt) {
-        let _ = std::fs::remove_file(crate::remote::join(wt, &index));
-    }
-    Ok(tree)
 }
 
 /// A file as it is in `tree`, `None` when it isn't there.
@@ -214,17 +274,5 @@ pub(crate) fn file_patch(
     tree: &str,
     path: &str,
 ) -> Result<String, String> {
-    git::run(
-        Some(repo),
-        &[
-            "diff",
-            "--no-color",
-            "--no-ext-diff",
-            "--no-renames",
-            base,
-            tree,
-            "--",
-            path,
-        ],
-    )
+    diff(repo, &[base, tree, "--", path])
 }

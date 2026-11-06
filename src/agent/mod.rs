@@ -10,6 +10,7 @@ mod files;
 pub(crate) mod launch;
 pub(crate) mod recipe;
 pub(crate) mod sh;
+pub(crate) mod snapshot;
 pub(crate) mod tasks;
 #[cfg(test)]
 mod tests;

@@ -35,6 +35,10 @@ pub(crate) fn parse(patch: &str) -> Vec<Hunk> {
     let mut out: Vec<Hunk> = Vec::new();
     let mut last = ' ';
     for line in patch.split_terminator('\n') {
+        // Only the first file of the patch (a type change is two: the old and the new one).
+        if line.starts_with("diff --git") && !out.is_empty() {
+            break;
+        }
         // A `\r` at the end belongs to the file's line (CRLF files), not to the patch.
         if let Some(header) = line.strip_prefix("@@ ") {
             let header = header.trim_end_matches('\r');

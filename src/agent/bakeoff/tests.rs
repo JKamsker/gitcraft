@@ -274,3 +274,89 @@ fn a_build_leaves_its_exit_status_for_the_grid() -> Result<(), String> {
     assert_eq!(read_status(None), Built::Running);
     Ok(())
 }
+
+/// What the review found: a rename, names that look like pathspec magic, a user's
+/// `diff.interHunkContext`, an executable new file, a file deleted hunk by hunk, an attempt
+/// that started from a newer commit.
+#[test]
+fn renames_odd_names_config_and_modes_are_assembled_right() -> Result<(), String> {
+    let fx = fixture("odd");
+    let repo = &fx.repo;
+    git_ok(repo, &["config", "diff.interHunkContext", "5"]);
+    git_ok(repo, &["checkout", "-q", "-b", "odd", "main"]);
+    git_ok(repo, &["mv", "c.txt", "moved.txt"]);
+    write(&repo.join(":memo"), "m\n");
+    write(&repo.join("run.sh"), "#!/bin/sh\necho hi\n");
+    // Two changes three lines apart: one hunk each, whatever interHunkContext says.
+    write(&repo.join("a.txt"), "ONE\n2\n3\n4\nFIVE\n");
+    git_ok(repo, &["add", "-A"]);
+    git_ok(repo, &["update-index", "--chmod=+x", "run.sh"]);
+    git_ok(repo, &["commit", "-qm", "odd"]);
+    // The file on disk isn't executable, which its index entry now says it is.
+    git_ok(repo, &["checkout", "-q", "-f", "main"]);
+    let pair = vec![
+        attempts(&fx)[0].clone(),
+        Attempt {
+            name: "odd".to_owned(),
+            rev: "odd".to_owned(),
+            worktree: None,
+        },
+    ];
+    let cmp = compare(repo, &pair)?;
+    let odd = &cmp.attempts[1];
+    let status = |path: &str| odd.files.iter().find(|f| f.path == path).map(|f| f.status);
+    assert_eq!(status("c.txt"), Some('D'), "a rename is the old file gone");
+    assert_eq!(status("moved.txt"), Some('A'));
+    assert_eq!(status(":memo"), Some('A'));
+    let trees: Vec<String> = cmp.attempts.iter().map(|a| a.tree.clone()).collect();
+    assert_eq!(file_hunks(repo, &cmp.base, &trees[1], "a.txt")?.len(), 2);
+    let plan = Plan {
+        base: cmp.base.clone(),
+        trees,
+        names: vec!["try-a".to_owned(), "odd".to_owned()],
+        picks: vec![
+            (":memo".to_owned(), Take::File(1)),
+            ("moved.txt".to_owned(), Take::File(1)),
+            ("c.txt".to_owned(), Take::Hunks(vec![(1, 0)])),
+            ("run.sh".to_owned(), Take::Hunks(vec![(1, 0)])),
+            ("a.txt".to_owned(), Take::Hunks(vec![(1, 1)])),
+        ],
+        branch: "odd-best".to_owned(),
+    };
+    assemble(repo, &plan)?;
+    let tree = git_ok(repo, &["ls-tree", "-r", "odd-best"]);
+    assert!(tree.contains("\t:memo\n"), "{tree}");
+    assert!(tree.contains("\tmoved.txt\n"), "{tree}");
+    assert!(
+        !tree.contains("\tc.txt\n"),
+        "deleted, as every hunk of its deletion was taken: {tree}"
+    );
+    assert!(
+        tree.contains("100755 blob") && tree.contains("\trun.sh\n"),
+        "{tree}"
+    );
+    assert_eq!(
+        git_ok(repo, &["show", "odd-best:a.txt"]),
+        "1\n2\n3\n4\nFIVE\n"
+    );
+
+    // An attempt from a newer commit: not the same base, and that attempt is named.
+    git_ok(
+        repo,
+        &["commit", "-q", "--allow-empty", "-m", "upstream moved"],
+    );
+    git_ok(repo, &["branch", "late"]);
+    let three = vec![
+        attempts(&fx)[0].clone(),
+        attempts(&fx)[1].clone(),
+        Attempt {
+            name: "late".to_owned(),
+            rev: "late".to_owned(),
+            worktree: None,
+        },
+    ];
+    let cmp = compare(repo, &three)?;
+    assert!(!cmp.same_base);
+    assert!(cmp.attempts.iter().any(|a| a.forked_elsewhere));
+    Ok(())
+}
