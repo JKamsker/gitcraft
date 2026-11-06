@@ -59,7 +59,12 @@ impl RawLock {
     fn into_lock(self, ours: Option<bool>) -> LfsLock {
         LfsLock {
             id: self.id,
-            path: self.path.replace('\\', "/"),
+            // git-lfs on Windows may say `a\\b`; elsewhere a backslash is part of a name.
+            path: if cfg!(windows) {
+                self.path.replace('\\', "/")
+            } else {
+                self.path
+            },
             owner: self.owner.map(|o| o.name).unwrap_or_default(),
             locked_at: self.locked_at.as_deref().and_then(parse_rfc3339),
             ours,
@@ -254,13 +259,63 @@ fn split_pattern(line: &str) -> Option<(&str, &str)> {
 /// counted. Asked in batches, so that a long list of changes stays within a command line.
 pub fn lockable_paths(repo: &Path, paths: &[String]) -> Result<Vec<String>, String> {
     let mut found = Vec::new();
-    for chunk in paths.chunks(200) {
+    for batch in batches(paths, ARGS_BUDGET) {
         let mut args = vec!["check-attr", "-z", "lockable", "--"];
-        args.extend(chunk.iter().map(String::as_str));
+        args.extend(batch.iter().map(String::as_str));
         let out = super::run(Some(repo), &args)?;
         found.extend(parse_check_attr(&out));
     }
     Ok(found)
+}
+
+/// How many bytes of paths one command line takes: well within Windows' 32 767 characters.
+const ARGS_BUDGET: usize = 16 * 1024;
+
+/// `paths` in runs whose lengths add up to at most `budget` (a longer path on its own).
+pub(crate) fn batches(paths: &[String], budget: usize) -> Vec<&[String]> {
+    let mut out = Vec::new();
+    let (mut start, mut used) = (0, 0);
+    for (i, p) in paths.iter().enumerate() {
+        let len = p.len() + 3;
+        if used + len > budget && i > start {
+            out.push(&paths[start..i]);
+            (start, used) = (i, 0);
+        }
+        used += len;
+    }
+    if start < paths.len() {
+        out.push(&paths[start..]);
+    }
+    out
+}
+
+/// The files the last push of the checked-out branch carried: what changed between where its
+/// remote branch was before (its reflog) and where it is now. None for a first push, whose
+/// remote branch has no before.
+pub fn pushed_paths(repo: &Path) -> Result<Vec<String>, String> {
+    let Ok(before) = super::run(
+        Some(repo),
+        &["rev-parse", "--verify", "-q", "@{upstream}@{1}"],
+    ) else {
+        return Ok(Vec::new());
+    };
+    let out = super::run(
+        Some(repo),
+        &[
+            "diff",
+            "--name-only",
+            "-z",
+            "--no-renames",
+            before.trim(),
+            "@{upstream}",
+            "--",
+        ],
+    )?;
+    Ok(out
+        .split('\0')
+        .filter(|p| !p.is_empty())
+        .map(str::to_owned)
+        .collect())
 }
 
 /// `git check-attr -z`: `path NUL attribute NUL value NUL`, again and again; the paths whose
@@ -291,7 +346,13 @@ pub(crate) fn parse_rfc3339(s: &str) -> Option<i64> {
         .next()
         .map(|s| s.split('.').next().unwrap_or("0").parse().ok())
         .unwrap_or(Some(0))?;
-    if !(1..=12).contains(&m) || !(1..=31).contains(&day) || h > 23 || min > 59 || sec > 60 {
+    if !(0..=9999).contains(&y)
+        || !(1..=12).contains(&m)
+        || !(1..=31).contains(&day)
+        || h > 23
+        || min > 59
+        || sec > 60
+    {
         return None;
     }
     Some(days_from_civil(y, m, day) * 86_400 + h * 3_600 + min * 60 + sec - offset)
@@ -324,18 +385,6 @@ fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     let doy = (153 * mp + 2) / 5 + d - 1;
     let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
     era * 146_097 + doe - 719_468
-}
-
-/// "2 d", "5 h", "3 min", "now": how long a lock has been held, short enough for a file row.
-pub fn held_for(locked_at: i64, now: i64) -> String {
-    let secs = now.saturating_sub(locked_at).max(0);
-    match secs {
-        0..60 => "now".to_owned(),
-        60..3_600 => format!("{} min", secs / 60),
-        3_600..86_400 => format!("{} h", secs / 3_600),
-        86_400..31_557_600 => format!("{} d", secs / 86_400),
-        _ => format!("{} y", secs / 31_557_600),
-    }
 }
 
 #[cfg(test)]

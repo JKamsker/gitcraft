@@ -156,7 +156,7 @@ impl RepoTab {
                         DiffKey::Work(_) => (None, true),
                     };
                     let locks = |ui: &mut Ui, acts: &mut Vec<Action>| {
-                        self.lock_menu_items(ui, path, acts);
+                        self.lock_menu_items(ui, path, rev, acts);
                     };
                     widgets::file_menu_with(&title, path, rev, ignorable, locks, acts);
                     widgets::chip(ui, origin, t.text_dim);

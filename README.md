@@ -166,13 +166,16 @@ so your config, credentials and hooks apply as usual.
 - A file kept in Git LFS shows as its LFS objects before and after, with their sizes, rather
   than the text of the pointer git stores. With git-lfs installed, the palette (Ctrl+P) of a
   repository that uses LFS has _LFS: Fetch_ and _LFS: Pull_.
-- LFS file locks: a padlock on a file's row says who holds its lock and since when ("Locked by
-  Ana · 2 d"); _Lock_ and _Unlock_ are in a file's menu. _LFS: Locks…_ in the palette lists
-  every lock, filters them by path or owner, unlocks several at once, force-unlocks someone
-  else's (for admins), and makes a pattern lockable (`git lfs track --lockable`). A changed file
-  someone else holds is flagged above the changes (the push would be refused), as is a changed
-  lockable file nobody holds; after a push, gitcraft offers to give back the locks on files
-  with no changes left.
+- LFS file locks: a padlock on a file's row shows who holds its lock (hover it for since when);
+  _Lock_ and _Unlock_ are in the menu of a file of the working tree or the checked-out commit.
+  _LFS: Locks…_ in the palette lists every lock, filters them by path or owner, unlocks several
+  at once, force-unlocks someone else's (admins only) and makes a pattern lockable
+  (`git lfs track --lockable`; commit `.gitattributes` to share it). Above the changes, a
+  changed file someone else holds is flagged (the push would be refused), as are changed
+  lockable files nobody holds, with _Lock all_. After a push of the checked-out branch,
+  gitcraft offers to give back your locks on the files it carried that have no changes left.
+  Locks are read when the tab opens and every few minutes while background fetching is on
+  (Settings), and whenever the panel opens.
 - The arrows in a diff's header (F7 / Shift+F7, or Alt+↓ / Alt+↑) jump to the next and previous
   change. The strip beside the scrollbar marks where the changes are, removals red and additions
   green; click a mark to jump to its change, or anywhere else on the strip to scroll there.

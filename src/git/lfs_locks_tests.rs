@@ -29,7 +29,12 @@ fn listed_locks_are_nobodys_for_sure() -> Result<(), String> {
     assert!(parse_listed("")?.is_empty());
     assert!(parse_listed("[]")?.is_empty());
     let locks = parse_listed(r#"[{"id":"7","path":"ü\\x.png","owner":{"name":"Zoë"}}]"#)?;
-    assert_eq!(locks[0].path, "ü/x.png");
+    let expected = if cfg!(windows) {
+        "ü/x.png"
+    } else {
+        "ü\\x.png"
+    };
+    assert_eq!(locks[0].path, expected);
     assert_eq!(locks[0].ours, None);
     assert_eq!(locks[0].locked_at, None);
     assert!(!locks[0].theirs());
@@ -56,16 +61,6 @@ fn rfc3339_times() {
     ] {
         assert_eq!(parse_rfc3339(bad), None, "{bad}");
     }
-}
-
-#[test]
-fn how_long_a_lock_is_held() {
-    assert_eq!(held_for(100, 100), "now");
-    assert_eq!(held_for(100, 50), "now");
-    assert_eq!(held_for(0, 125), "2 min");
-    assert_eq!(held_for(0, 3 * 3600), "3 h");
-    assert_eq!(held_for(0, 2 * 86_400 + 5), "2 d");
-    assert_eq!(held_for(0, 3 * 31_557_600), "3 y");
 }
 
 #[test]
@@ -181,4 +176,15 @@ fn unlocking_several_names_what_stayed() -> Result<(), String> {
 fn an_empty_lockable_pattern_is_refused() {
     let dir = std::env::temp_dir();
     assert!(track_lockable(&dir, "  ").is_err());
+}
+
+#[test]
+fn paths_in_batches_that_fit_a_command_line() {
+    let paths: Vec<String> = (0..10).map(|i| format!("{i:0>7}")).collect();
+    let sizes: Vec<usize> = batches(&paths, 30).iter().map(|b| b.len()).collect();
+    assert_eq!(sizes, [3, 3, 3, 1]);
+    let long = vec!["x".repeat(100), "y".to_owned()];
+    let sizes: Vec<usize> = batches(&long, 30).iter().map(|b| b.len()).collect();
+    assert_eq!(sizes, [1, 1]);
+    assert!(batches(&[], 30).is_empty());
 }
