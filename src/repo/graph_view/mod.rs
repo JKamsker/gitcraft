@@ -56,7 +56,13 @@ impl RepoTab {
             });
             return;
         }
+        self.tip_bar(ui);
+        let first_steps = self.first_steps();
         if self.commits.is_empty() {
+            if let Some(steps) = first_steps {
+                self.first_steps_view(ui, steps, acts);
+                return;
+            }
             ui.centered_and_justified(|ui| {
                 if self.loading {
                     ui.add(crate::spinner::Spinner::new());
@@ -107,6 +113,11 @@ impl RepoTab {
         let idle = self.busy_op.is_none();
         let now = git::now();
         let total = self.commits.len() + usize::from(self.has_more);
+        // A new repository's first steps go under its few rows.
+        let first_steps = first_steps.filter(|_| !self.guide.steps_hidden);
+        if first_steps.is_some() {
+            scroll = scroll.max_height(total as f32 * ROW_PITCH);
+        }
         let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
             // Near the end: fetch the next page of history.
             if range.end + 40 >= self.commits.len() && self.has_more && !self.loading_more {
@@ -130,6 +141,9 @@ impl RepoTab {
             }
         });
         ui.data_mut(|d| d.insert_temp(offset_id, out.state.offset.y));
+        if let Some(steps) = first_steps {
+            self.first_steps_view(ui, steps, acts);
+        }
     }
 
     /// Up and down select the row above or below the selected one.

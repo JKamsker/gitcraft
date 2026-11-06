@@ -79,6 +79,11 @@ impl RepoTab {
                 .desired_width(f32::INFINITY)
                 .margin(egui::Margin::symmetric(8, 6)),
         );
+        // Asked for by the guide's "Make the first commit".
+        if std::mem::take(&mut self.guide.focus_summary) {
+            summary.request_focus();
+            summary.scroll_to_me(None);
+        }
         let body = ui.add_enabled(
             !rebasing,
             egui::TextEdit::multiline(&mut self.commit_body)
