@@ -309,3 +309,48 @@ fn a_file_is_explained_and_its_rules_edited_through_the_tab() -> Result<(), Stri
     let _ = std::fs::remove_dir_all(&dir);
     result
 }
+
+#[cfg(unix)]
+#[test]
+fn a_hook_is_fixed_in_one_click_through_the_tab() -> Result<(), String> {
+    use super::HooksAct;
+    use std::os::unix::fs::PermissionsExt;
+    let dir = git::doctor::tests::repo("tab-hooks", &[])?;
+    let ctx = egui::Context::default();
+    crate::theme::install_fonts(&ctx);
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let result = (|| {
+        let hook = dir.join(".git/hooks/pre-push");
+        write(&hook, b"#!/bin/sh\r\nexit 0\r\n")?;
+        std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o644))
+            .map_err(|e| e.to_string())?;
+        tab.apply(Action::OpenDoctor(Section::Hooks), &ctx);
+        let problems = |t: &RepoTab| {
+            t.doctor
+                .as_ref()
+                .and_then(|d| d.hooks.found.as_ref())
+                .and_then(|f| f.as_ref().ok())
+                .and_then(|f| f.active.iter().find(|h| h.name == "pre-push"))
+                .map(|h| h.problems.len())
+        };
+        wait(&mut tab, &ctx, |t| problems(t).is_some())?;
+        assert_eq!(problems(&tab), Some(2));
+        tab.apply(
+            Action::Doctor(DoctorAct::Hooks(HooksAct::MakeExecutable(
+                "pre-push".into(),
+            ))),
+            &ctx,
+        );
+        wait(&mut tab, &ctx, |t| problems(t) == Some(1))?;
+        tab.apply(
+            Action::Doctor(DoctorAct::Hooks(HooksAct::ToLf("pre-push".into()))),
+            &ctx,
+        );
+        wait(&mut tab, &ctx, |t| problems(t) == Some(0))?;
+        let text = std::fs::read(&hook).map_err(|e| e.to_string())?;
+        assert_eq!(text, b"#!/bin/sh\nexit 0\n");
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}

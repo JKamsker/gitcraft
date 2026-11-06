@@ -215,6 +215,15 @@ so your config, credentials and hooks apply as usual.
   file's line endings, refuses a file changed meanwhile (_Read it again_ keeps your text) or a
   symbolic link, and asks once more for a file outside the repository; closing the doctor
   with unsaved edits asks first.
+- _Hooks_: the folder git runs hooks from (`git rev-parse --git-path hooks`, so
+  `core.hooksPath` too), every hook in it with the operations that run it, and what keeps one
+  from running: not executable (git skips it), CRLF line endings (a `#!/bin/sh\r` line fails
+  with "bad interpreter"), an interpreter its `#!` line names that isn't installed where git
+  runs, no `#!` line, a name git doesn't run (`pre-commit.old`). _Make executable_ and _Convert
+  to LF_ fix those in one click. husky, lefthook and pre-commit are recognised, with the file
+  their hooks come from. What git and its hooks printed during commits, merges, pushes,
+  checkouts, rebases… (the error output, also when the operation succeeded) is kept in memory,
+  per repository, to read after. On WSL and SSH the folder is read in one round trip there.
 - _Which configuration wins_: the settings that explain why git behaves differently here (pull
   strategy, push, signing, line endings, file handling, performance…), each with the value in
   effect and its scope and file (`git config --list --show-origin --show-scope --includes`).
@@ -419,7 +428,7 @@ was made this way, on a demo repository.
 | `src/vscode_theme.rs`    | VS Code's current colour theme as a syntect theme                                  |
 | `src/repo/conflict.rs`   | three-pane conflict editor                                                         |
 | `src/repo/doctor/`       | the repository doctor: its page, sections and what they ask the tab to do          |
-| `src/git/doctor/`        | what the doctor reads and changes: config origins, hidden flags, ignore rules and attributes |
+| `src/git/doctor/`        | what the doctor reads and changes: config origins, hidden flags, ignore rules and attributes, hooks and what they printed |
 | `src/mergiraf.rs` | Mergiraf, run as the user's own command when it is installed |
 | `src/repo/rebase.rs`     | interactive rebase editor and its todo list                                        |
 | `src/repo/file_view.rs`  | a file's history, blame and contents at a commit                                   |

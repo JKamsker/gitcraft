@@ -6,6 +6,8 @@
 
 mod config_section;
 mod flags_section;
+mod hooks;
+mod hooks_section;
 mod ignore;
 mod ignore_section;
 mod page;
@@ -13,6 +15,8 @@ mod page;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
+pub(crate) use hooks::HooksAct;
+use hooks::HooksState;
 pub(crate) use ignore::IgnoreAct;
 use ignore::IgnoreState;
 
@@ -24,16 +28,23 @@ use crate::git::doctor::flags::{self, Flag, Flagged, Sparse};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Section {
     Ignore,
+    Hooks,
     Config,
     Flags,
 }
 
 impl Section {
-    pub(crate) const ALL: [Section; 3] = [Section::Ignore, Section::Config, Section::Flags];
+    pub(crate) const ALL: [Section; 4] = [
+        Section::Ignore,
+        Section::Hooks,
+        Section::Config,
+        Section::Flags,
+    ];
 
     pub(crate) fn title(self) -> &'static str {
         match self {
             Section::Ignore => "Ignore rules and attributes",
+            Section::Hooks => "Hooks",
             Section::Config => "Which configuration wins",
             Section::Flags => "Hidden changes",
         }
@@ -42,6 +53,7 @@ impl Section {
     fn icon(self) -> &'static str {
         match self {
             Section::Ignore => "eye",
+            Section::Hooks => "flask-conical",
             Section::Config => "settings",
             Section::Flags => "eye-off",
         }
@@ -65,6 +77,8 @@ pub(crate) enum DoctorAct {
     CompareWorktrees(&'static str),
     /// Something done in the ignore-and-attributes section.
     Ignore(IgnoreAct),
+    /// Something done in the hooks section.
+    Hooks(HooksAct),
     /// Close the doctor, asking first when edited rules aren't saved.
     Close,
     /// Keep editing (`false`) or drop the edits and close (`true`).
@@ -138,6 +152,7 @@ pub(crate) struct DoctorView {
     /// Closing was asked for with rules edited and not saved: asking whether to drop them.
     closing: bool,
     ignore: IgnoreState,
+    hooks: HooksState,
     config: ConfigState,
     flags: FlagsState,
 }
@@ -172,6 +187,7 @@ impl RepoTab {
                 confirm: None,
                 closing: false,
                 ignore: IgnoreState::default(),
+                hooks: HooksState::default(),
                 config: ConfigState::default(),
                 flags: FlagsState::default(),
             })
@@ -220,6 +236,7 @@ impl RepoTab {
             }
             DoctorAct::CompareWorktrees(key) => self.compare_worktrees(key, ctx),
             DoctorAct::Ignore(act) => self.ignore_act(act, ctx),
+            DoctorAct::Hooks(act) => self.hooks_act(act, ctx),
             DoctorAct::Close => match &mut self.doctor {
                 Some(d) if d.ignore.unsaved() => d.closing = true,
                 _ => self.doctor = None,
@@ -258,6 +275,7 @@ impl RepoTab {
         let read = doctor.read;
         match doctor.section {
             Section::Ignore => self.load_ignore(read, ctx),
+            Section::Hooks => self.load_hooks(read, ctx),
             Section::Config => {
                 doctor.config.origins = None;
                 doctor.config.worktrees = None;

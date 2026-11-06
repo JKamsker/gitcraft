@@ -329,7 +329,10 @@ fn run_inner(
             .push(("GITCRAFT_GIT_PASSWORD", c.password.clone()));
     }
     let out = execute(dir, &extra, args)?;
-    if out.code.is_some_and(|c| ok.contains(&c)) {
+    // For the doctor: what hooks print is lost once the command succeeds.
+    let succeeded = out.code.is_some_and(|c| ok.contains(&c));
+    super::doctor::hook_log::record(dir, args, succeeded, &out.stderr);
+    if succeeded {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {
         // Merges and pulls report conflicts on stdout and the summary on stderr.
