@@ -381,7 +381,7 @@ impl RepoTab {
         }
         if self.unity.project().is_some() {
             items.push((
-                "Unity: Project set-up…".into(),
+                "Unity: Set-up…".into(),
                 "settings".into(),
                 Action::Unity(super::unity::UnityAct::OpenPanel),
             ));

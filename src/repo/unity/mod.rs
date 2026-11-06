@@ -12,17 +12,24 @@ mod tests;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use super::{Action, Refresh, RepoTab};
-use crate::git::{self, MetaProblem, UnityProject, UnitySetup};
+use super::{Action, Refresh, RepoTab, ops};
+use crate::git::{self, MetaKind, MetaProblem, UnityProject, UnitySetup};
+
+/// The repository's own config key that turns the set-up hint off.
+const HINT_KEY: &str = "gitcraft.unityHint";
 
 /// What the tab knows of its Unity project.
 #[derive(Default)]
 pub(in crate::repo) struct UnityState {
     project: Option<UnityProject>,
-    /// The checkout it was looked for at (HEAD), and whether a look is running.
+    /// The checkout it was looked for at (HEAD, or "unborn" before the first commit), and
+    /// whether a look is running.
     detected_for: Option<String>,
     detecting: bool,
+    /// The set-up as last checked; `stale`: it is to be checked again (it stays shown
+    /// meanwhile).
     setup: Option<Result<UnitySetup, String>>,
+    stale: bool,
     checking: bool,
     /// UnityYAMLMerge, here; and the merge driver the repository registers, if any.
     tool: Option<PathBuf>,
@@ -34,9 +41,10 @@ pub(in crate::repo) struct UnityState {
     meta_running: bool,
     meta_again: bool,
     panel_open: bool,
+    /// What is being done, as the panel says it ("Adding lines to .gitattributes").
     busy: Option<String>,
-    /// The hint that the set-up needs fixing was dismissed, for this tab.
-    hint_dismissed: bool,
+    /// The set-up hint was turned off for this repository (`gitcraft.unityHint false`).
+    hint_off: bool,
 }
 
 /// What the views ask of the Unity support.
@@ -46,13 +54,19 @@ pub(crate) enum UnityAct {
     ClosePanel,
     /// Check the set-up again.
     Check,
-    AddAttributes,
+    /// Add the Smart Merge lines (`lfs: false`) or the LFS lines to `.gitattributes`.
+    AddAttributes {
+        lfs: bool,
+    },
     AddIgnores,
+    /// Take the generated folders committed by mistake out of the index.
+    UntrackGenerated,
     /// Pick UnityYAMLMerge by hand.
     ChooseTool,
     RegisterDriver,
     /// Let UnityYAMLMerge solve the open conflict.
     SolveConflict,
+    /// Turn the set-up hint off for this repository.
     DismissHint,
 }
 
@@ -61,9 +75,18 @@ impl UnityState {
         self.project.as_ref()
     }
 
-    /// Whether the conflict editor offers Smart Merge for `path`.
-    pub(in crate::repo) fn offers_smart_merge(&self, path: &str) -> bool {
-        self.project.is_some() && self.tool.is_some() && smart_merge::is_unity_yaml(path)
+    /// For a Unity YAML file of the project: whether the conflict editor can solve it with
+    /// Smart Merge (UnityYAMLMerge was found); `None` for any other file.
+    pub(in crate::repo) fn smart_merge_for(&self, path: &str) -> Option<bool> {
+        (self.project.is_some() && smart_merge::is_unity_yaml(path)).then_some(self.tool.is_some())
+    }
+
+    /// What the set-up hint names, when it shows.
+    fn hint(&self) -> Option<String> {
+        match &self.setup {
+            Some(Ok(s)) if !self.hint_off => s.needs_fixing(),
+            _ => None,
+        }
     }
 }
 
@@ -80,8 +103,14 @@ fn caught<T>(work: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
     })
 }
 
-/// What was found when looking for the project: it, and UnityYAMLMerge and the driver.
-type Found = (Option<UnityProject>, Option<PathBuf>, Option<String>);
+/// What was found when looking for the project.
+#[derive(Default)]
+struct Found {
+    project: Option<UnityProject>,
+    tool: Option<PathBuf>,
+    driver: Option<String>,
+    hint_off: bool,
+}
 
 impl RepoTab {
     /// Every frame: the reads that are due, then the panel, if open.
@@ -90,20 +119,29 @@ impl RepoTab {
         self.unity_panel(ctx, acts);
     }
 
-    /// Looks for the project when another commit is checked out; checks its set-up once found;
-    /// checks the `.meta` pairs when the working tree was read again.
+    /// The checkout the project is looked for at: HEAD, or "unborn" before the first commit.
+    fn checkout_key(&self) -> String {
+        if self.refs.head.is_empty() {
+            "unborn".to_owned()
+        } else {
+            self.refs.head.clone()
+        }
+    }
+
+    /// Looks for the project, and checks its set-up again, whenever another commit is checked
+    /// out; checks the `.meta` pairs when the working tree was read again.
     pub(in crate::repo) fn unity_tick(&mut self, ctx: &egui::Context) {
-        if self.loading || self.refs.head.is_empty() {
+        if self.loading {
             return;
         }
-        let state = &self.unity;
-        if state.detected_for.as_deref() != Some(self.refs.head.as_str()) && !state.detecting {
-            self.detect_unity(ctx);
+        let key = self.checkout_key();
+        if self.unity.detected_for.as_deref() != Some(key.as_str()) && !self.unity.detecting {
+            self.detect_unity(key, ctx);
         }
         if self.unity.project.is_none() {
             return;
         }
-        if self.unity.setup.is_none() && !self.unity.checking {
+        if (self.unity.setup.is_none() || self.unity.stale) && !self.unity.checking {
             self.check_unity(ctx);
         }
         if self.unity.meta_for != Some(self.work_read) {
@@ -111,43 +149,28 @@ impl RepoTab {
         }
     }
 
-    fn detect_unity(&mut self, ctx: &egui::Context) {
+    fn detect_unity(&mut self, key: String, ctx: &egui::Context) {
         self.unity.detecting = true;
-        let head = self.refs.head.clone();
         let path = self.path.clone();
         self.then(
             ctx,
-            move || {
-                caught(|| {
-                    let project = git::unity_project(&path)?;
-                    let (tool, driver) = match &project {
-                        Some(p) => {
-                            let configured =
-                                git::run(Some(&path), &["config", "--get", smart_merge::TOOL_KEY])
-                                    .ok()
-                                    .map(|v| v.trim().to_owned());
-                            let tool =
-                                smart_merge::find_tool(p.version.as_deref(), configured.as_deref());
-                            (tool, smart_merge::registered(&path))
-                        }
-                        None => (None, None),
-                    };
-                    Ok::<Found, String>((project, tool, driver))
-                })
-            },
+            move || caught(|| find(&path)),
             move |tab, found, _| {
                 let state = &mut tab.unity;
                 state.detecting = false;
-                state.detected_for = Some(head);
-                let (project, tool, driver) = found.unwrap_or_default();
-                if project != state.project {
+                state.detected_for = Some(key);
+                let found = found.unwrap_or_default();
+                if found.project != state.project {
                     state.setup = None;
                     state.meta.clear();
                     state.meta_for = None;
                 }
-                state.project = project;
-                state.tool = tool;
-                state.driver = driver;
+                // Another checkout may have other settings and attributes.
+                state.stale = true;
+                state.project = found.project;
+                state.tool = found.tool;
+                state.driver = found.driver;
+                state.hint_off = found.hint_off;
             },
         );
     }
@@ -157,6 +180,7 @@ impl RepoTab {
             return;
         };
         self.unity.checking = true;
+        self.unity.stale = false;
         let path = self.path.clone();
         self.then(
             ctx,
@@ -168,7 +192,8 @@ impl RepoTab {
         );
     }
 
-    /// Checks the `.meta` pairs of the staged changes; one check at a time.
+    /// Checks the `.meta` pairs of the staged changes under `Assets/`, against one listing of
+    /// the index there; one check at a time.
     fn check_metas(&mut self, ctx: &egui::Context) {
         if self.unity.meta_running {
             self.unity.meta_again = true;
@@ -179,9 +204,21 @@ impl RepoTab {
         let Some(project) = self.unity.project.clone() else {
             return;
         };
-        let staged = self.work.staged.clone();
-        let candidates = git::meta_candidates(&project, &staged);
-        if candidates.is_empty() {
+        let assets = project.path("Assets/");
+        let staged: Vec<git::StatusFile> = self
+            .work
+            .staged
+            .iter()
+            .filter(|f| {
+                matches!(f.code, 'A' | 'R' | 'C' | 'D')
+                    && (f.path.starts_with(&assets)
+                        || f.old_path
+                            .as_deref()
+                            .is_some_and(|p| p.starts_with(&assets)))
+            })
+            .cloned()
+            .collect();
+        if staged.is_empty() {
             self.unity.meta.clear();
             return;
         }
@@ -191,10 +228,8 @@ impl RepoTab {
             ctx,
             move || {
                 caught(|| {
-                    let tracked = git::in_index(&path, &candidates)?;
-                    Ok(git::meta_problems(&project, &staged, &|p| {
-                        tracked.contains(p)
-                    }))
+                    let index = git::index_under(&path, &assets)?;
+                    Ok(git::meta_problems(&project, &staged, &|p| index.has(p)))
                 })
             },
             move |tab, problems, ctx| {
@@ -216,33 +251,41 @@ impl RepoTab {
         match act {
             UnityAct::OpenPanel => {
                 self.unity.panel_open = true;
-                self.unity.setup = None;
+                self.unity.stale = true;
             }
             UnityAct::ClosePanel => self.unity.panel_open = false,
-            UnityAct::Check => {
-                self.unity.setup = None;
-                self.unity.detected_for = None;
+            UnityAct::Check => self.unity.detected_for = None,
+            UnityAct::DismissHint => {
+                self.unity.hint_off = true;
+                let path = self.path.clone();
+                self.then(
+                    ctx,
+                    move || git::run(Some(&path), &["config", "--local", HINT_KEY, "false"]),
+                    |_, _, _| {},
+                );
             }
-            UnityAct::DismissHint => self.unity.hint_dismissed = true,
-            UnityAct::AddAttributes => self.add_attributes(ctx),
+            UnityAct::AddAttributes { lfs } => self.add_attributes(lfs, ctx),
             UnityAct::AddIgnores => self.add_ignores(ctx),
+            UnityAct::UntrackGenerated => self.untrack_generated(ctx),
             UnityAct::ChooseTool => self.choose_tool(ctx),
             UnityAct::RegisterDriver => self.register_driver(ctx),
             UnityAct::SolveConflict => self.smart_merge_conflict(ctx),
         }
     }
 
-    /// Runs `work` in the background, says how it went, then checks the set-up again.
+    /// Runs `work` in the background (`doing` says what, while it runs), says what it did
+    /// (`done`) or why it failed, then looks at the project again.
     fn unity_job(
         &mut self,
-        label: String,
+        (doing, done): (&str, String),
         ctx: &egui::Context,
         work: impl FnOnce(&std::path::Path) -> Result<(), String> + Send + 'static,
     ) {
         if self.unity.busy.is_some() {
             return;
         }
-        self.unity.busy = Some(label.clone());
+        self.unity.busy = Some(doing.to_owned());
+        let failed = format!("{doing} failed");
         let path = self.path.clone();
         self.then(
             ctx,
@@ -250,22 +293,33 @@ impl RepoTab {
             move |tab, result, ctx| {
                 tab.unity.busy = None;
                 tab.status = Some(match result {
-                    Ok(()) => (format!("{label}: done"), false),
-                    Err(e) => (format!("{label} failed: {e}"), true),
+                    Ok(()) => (done, false),
+                    Err(e) => (format!("{failed}: {e}"), true),
                 });
-                tab.unity.setup = None;
                 tab.unity.detected_for = None;
                 tab.reload_status(ctx);
             },
         );
     }
 
-    fn add_attributes(&mut self, ctx: &egui::Context) {
+    fn add_attributes(&mut self, lfs: bool, ctx: &egui::Context) {
         let Some(Ok(setup)) = &self.unity.setup else {
             return;
         };
-        let block = git::attributes_block(&setup.missing_attributes);
-        self.unity_job("Add Unity's .gitattributes".to_owned(), ctx, move |repo| {
+        let missing = if lfs {
+            setup.missing_lfs.clone()
+        } else {
+            setup.missing_yaml.clone()
+        };
+        if missing.is_empty() {
+            return;
+        }
+        let block = git::attributes_block(&missing);
+        let done = format!(
+            "Added {} lines to .gitattributes: commit it to share them",
+            missing.len()
+        );
+        self.unity_job(("Adding lines to .gitattributes", done), ctx, move |repo| {
             git::append_block(repo, ".gitattributes", &block)
         });
     }
@@ -275,20 +329,41 @@ impl RepoTab {
             return;
         };
         let block = git::ignore_block(project, &setup.unignored);
+        let done = format!(
+            "Ignored {}: commit .gitignore to share it",
+            setup.unignored.join(", ")
+        );
+        self.unity_job(("Adding lines to .gitignore", done), ctx, move |repo| {
+            git::append_block(repo, ".gitignore", &block)
+        });
+    }
+
+    fn untrack_generated(&mut self, ctx: &egui::Context) {
+        let (Some(Ok(setup)), Some(project)) = (&self.unity.setup, self.unity.project.clone())
+        else {
+            return;
+        };
+        let folders = setup.tracked_generated.clone();
+        let done = format!(
+            "{} taken out of git (kept on disk): commit to share it",
+            folders.join(", ")
+        );
         self.unity_job(
-            "Ignore Unity's generated folders".to_owned(),
+            ("Taking generated folders out of git", done),
             ctx,
-            move |repo| git::append_block(repo, ".gitignore", &block),
+            move |repo| git::untrack_generated(repo, &project, &folders),
         );
     }
 
     /// Asks for UnityYAMLMerge with a file dialog (as the app's other dialogs are asked), and
     /// keeps the choice in the repository's config.
     fn choose_tool(&mut self, ctx: &egui::Context) {
-        let Some(file) = rfd::FileDialog::new()
-            .set_title("UnityYAMLMerge (in the editor's Tools folder)")
-            .pick_file()
-        else {
+        let title = if cfg!(target_os = "macos") {
+            "UnityYAMLMerge (in Unity.app/Contents/Tools)"
+        } else {
+            "UnityYAMLMerge (in the editor's Editor/Data/Tools folder)"
+        };
+        let Some(file) = rfd::FileDialog::new().set_title(title).pick_file() else {
             return;
         };
         let name = file.file_name().map(|n| n.to_string_lossy().to_lowercase());
@@ -297,7 +372,8 @@ impl RepoTab {
             return;
         }
         let value = file.to_string_lossy().into_owned();
-        self.unity_job("Choose UnityYAMLMerge".to_owned(), ctx, move |repo| {
+        let done = format!("Using UnityYAMLMerge at {value}");
+        self.unity_job(("Saving the choice", done), ctx, move |repo| {
             git::run(
                 Some(repo),
                 &["config", "--local", smart_merge::TOOL_KEY, &value],
@@ -314,7 +390,8 @@ impl RepoTab {
             ));
             return;
         };
-        self.unity_job("Register Unity Smart Merge".to_owned(), ctx, move |repo| {
+        let done = "Registered UnityYAMLMerge as this repository's merge driver".to_owned();
+        self.unity_job(("Registering UnityYAMLMerge", done), ctx, move |repo| {
             smart_merge::register(repo, &tool)
         });
     }
@@ -322,7 +399,10 @@ impl RepoTab {
     /// Lets UnityYAMLMerge solve the open conflict; its result goes into the conflict editor.
     fn smart_merge_conflict(&mut self, ctx: &egui::Context) {
         let Some(tool) = self.unity.tool.clone() else {
-            self.status = Some(("UnityYAMLMerge wasn't found".to_owned(), true));
+            self.status = Some((
+                "UnityYAMLMerge wasn't found: choose it in Unity set-up…".to_owned(),
+                true,
+            ));
             return;
         };
         let Some(ed) = self.conflict.as_mut().filter(|ed| !ed.solving) else {
@@ -332,68 +412,127 @@ impl RepoTab {
         let (repo, file) = (self.path.clone(), ed.path.clone());
         self.then(
             ctx,
-            move || caught(|| smart_merge::solve(&repo, &file, &tool)).map(|t| (file, t)),
-            |tab, result, _| tab.smart_merge_done(result),
+            move || {
+                let result = caught(|| smart_merge::solve(&repo, &file, &tool));
+                (file, result)
+            },
+            |tab, (path, result), _| tab.smart_merge_done(&path, result),
         );
     }
 
-    fn smart_merge_done(&mut self, result: Result<(String, String), String>) {
-        let Some(ed) = self.conflict.as_mut() else {
+    /// Takes UnityYAMLMerge's answer into the conflict editor, if it is still on that file.
+    fn smart_merge_done(&mut self, path: &str, result: Result<String, String>) {
+        let Some(ed) = self.conflict.as_mut().filter(|ed| ed.path == path) else {
             return;
         };
-        let (path, text) = match result {
-            Ok(done) => done,
+        ed.solving = false;
+        let text = match result {
+            Ok(text) => text,
             Err(e) => {
-                ed.solving = false;
                 self.status = Some((e, true));
                 return;
             }
         };
-        if ed.path != path {
-            return;
-        }
-        ed.solving = false;
-        let before = ed.on_disk;
         let left = ed.take_solved(text);
-        let solved = before.saturating_sub(left);
-        self.status = Some(match (solved, left) {
-            (_, 0) => (
+        self.status = Some(match left {
+            0 => (
                 format!("UnityYAMLMerge merged {path}: check the result, then save"),
                 false,
             ),
-            (0, _) => (
-                format!("UnityYAMLMerge could not solve the conflicts in {path}"),
-                true,
-            ),
-            _ => (
-                format!(
-                    "UnityYAMLMerge solved {solved} of {before} conflicts in {path}; {left} left to choose"
-                ),
+            n => (
+                format!("UnityYAMLMerge left {n} conflicts in {path} to choose"),
                 false,
             ),
         });
     }
 
-    /// Stages the `.meta` files (or assets) the staged changes are missing, those that have
-    /// changes to stage.
-    pub(in crate::repo) fn stage_partners_action(&self) -> Option<Action> {
-        let unstaged: HashSet<&str> = self.work.unstaged.iter().map(|f| f.path.as_str()).collect();
-        let partners: Vec<&str> = self
-            .unity
-            .meta
-            .iter()
-            .map(|p| p.partner.as_str())
-            .filter(|p| unstaged.contains(p))
-            .collect();
-        if partners.is_empty() {
-            return None;
+    /// The fixes for the `.meta` problems, each with its button's label: stage the missing
+    /// halves that are there to stage, delete the `.meta` of a deleted asset too, keep the
+    /// `.meta` of a kept asset.
+    pub(in crate::repo) fn meta_fixes(&self) -> Vec<(&'static str, Action)> {
+        let changed: HashSet<&str> = self.work.unstaged.iter().map(|f| f.path.as_str()).collect();
+        let of = |kinds: &[MetaKind], partner: bool| -> Vec<&str> {
+            self.unity
+                .meta
+                .iter()
+                .filter(|p| kinds.contains(&p.kind))
+                .map(|p| {
+                    if partner {
+                        p.partner.as_str()
+                    } else {
+                        p.path.as_str()
+                    }
+                })
+                .collect()
+        };
+        let mut fixes = Vec::new();
+        let stage: Vec<&str> = of(
+            &[MetaKind::AddedWithoutMeta, MetaKind::MetaWithoutAsset],
+            true,
+        )
+        .into_iter()
+        .filter(|p| changed.contains(p))
+        .collect();
+        if !stage.is_empty() {
+            let mut add = vec!["--literal-pathspecs", "add", "--"];
+            add.extend(stage);
+            fixes.push((
+                "Stage the missing halves",
+                op("Stage the missing halves", &add),
+            ));
         }
-        let mut add = vec!["--literal-pathspecs", "add", "--"];
-        add.extend(partners);
-        Some(Action::Ops {
-            label: "Stage the .meta files".to_owned(),
-            ops: super::ops(&[&add]),
-            refresh: Refresh::Status,
-        })
+        let delete = of(&[MetaKind::DeletedWithoutMeta], true);
+        if !delete.is_empty() {
+            let mut rm = vec!["--literal-pathspecs", "rm", "-q", "--"];
+            rm.extend(delete);
+            fixes.push((
+                "Delete the .meta too",
+                op("Delete the .meta files too", &rm),
+            ));
+        }
+        let restore = of(&[MetaKind::MetaDeletedAssetKept], false);
+        if !restore.is_empty() {
+            let mut back = vec![
+                "--literal-pathspecs",
+                "restore",
+                "--source=HEAD",
+                "--staged",
+                "--worktree",
+                "--",
+            ];
+            back.extend(restore);
+            fixes.push(("Keep the .meta", op("Keep the .meta files", &back)));
+        }
+        fixes
+    }
+}
+
+/// Looks for the project, UnityYAMLMerge, the registered driver and whether the hint is off.
+fn find(path: &std::path::Path) -> Result<Found, String> {
+    let Some(project) = git::unity_project(path)? else {
+        return Ok(Found::default());
+    };
+    let config = |k: &str| {
+        git::run(Some(path), &["config", "--get", k])
+            .ok()
+            .map(|v| v.trim().to_owned())
+    };
+    let tool = smart_merge::find_tool(
+        project.version.as_deref(),
+        config(smart_merge::TOOL_KEY).as_deref(),
+    );
+    Ok(Found {
+        driver: smart_merge::registered(path),
+        hint_off: config(HINT_KEY).as_deref() == Some("false"),
+        project: Some(project),
+        tool,
+    })
+}
+
+fn op(label: &str, args: &[&str]) -> Action {
+    Action::Ops {
+        label: label.to_owned(),
+        ops: ops(&[args]),
+        refresh: Refresh::Status,
     }
 }

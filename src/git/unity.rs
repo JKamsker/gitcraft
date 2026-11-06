@@ -123,8 +123,6 @@ pub const UNITY_IGNORED: &[&str] = &[
     "Library",
     "Temp",
     "Obj",
-    "Build",
-    "Builds",
     "Logs",
     "UserSettings",
     "MemoryCaptures",
@@ -136,30 +134,60 @@ pub struct UnitySetup {
     /// Assets are saved as text (`Force Text`), which git can diff and merge; `None` when the
     /// settings can't be read.
     pub force_text: Option<bool>,
-    /// `.meta` files are visible, so they are committed with their assets.
-    pub visible_meta: Option<bool>,
-    /// Recommended `.gitattributes` patterns that are missing.
-    pub missing_attributes: Vec<String>,
+    /// The editor's version-control mode ("Visible Meta Files", "Hidden Meta Files",
+    /// "Perforce"…), when it says.
+    pub vcs_mode: Option<String>,
+    /// Unity's YAML types git doesn't merge with Smart Merge (`merge=unityyamlmerge`).
+    pub missing_yaml: Vec<String>,
+    /// Unity's usual binary types git doesn't keep in LFS.
+    pub missing_lfs: Vec<String>,
     /// Folders Unity makes that git doesn't ignore.
     pub unignored: Vec<String>,
+    /// Folders Unity makes that have files committed in them.
+    pub tracked_generated: Vec<String>,
 }
 
 impl UnitySetup {
-    pub fn all_good(&self) -> bool {
-        self.force_text != Some(false)
-            && self.visible_meta != Some(false)
-            && self.missing_attributes.is_empty()
-            && self.unignored.is_empty()
+    /// `.meta` files are visible to git (Visible Meta Files; Perforce and Plastic modes keep
+    /// them visible too).
+    pub fn visible_meta(&self) -> Option<bool> {
+        self.vcs_mode.as_deref().map(|m| !m.contains("Hidden"))
+    }
+
+    /// The first thing that really needs fixing for git, in words; `None` when nothing does.
+    /// LFS is the repository's choice and doesn't count.
+    pub fn needs_fixing(&self) -> Option<String> {
+        if self.force_text == Some(false) {
+            return Some("assets aren't saved as text".to_owned());
+        }
+        if self.visible_meta() == Some(false) {
+            return Some(".meta files are hidden".to_owned());
+        }
+        if let Some(d) = self.tracked_generated.first() {
+            return Some(format!("{d} has files committed"));
+        }
+        if let Some(d) = self
+            .unignored
+            .iter()
+            .find(|d| matches!(d.as_str(), "Library" | "Temp"))
+        {
+            return Some(format!("{d} isn't ignored"));
+        }
+        if self.missing_yaml.len() == UNITY_YAML.len() {
+            return Some("scenes and prefabs aren't merged with Smart Merge".to_owned());
+        }
+        None
     }
 }
 
-/// Checks the project's settings and the repository's `.gitattributes` and `.gitignore`.
+/// Checks the project's settings, and what git does with its files (`git check-attr`,
+/// `check-ignore`, `ls-files`, every attributes and ignore file counted).
 pub fn unity_setup(repo: &Path, project: &UnityProject) -> Result<UnitySetup, String> {
     let read = |rel: &str| crate::remote::read_to_string(&crate::remote::join(repo, rel)).ok();
     let editor = read(&project.path("ProjectSettings/EditorSettings.asset"));
     let vcs = read(&project.path("ProjectSettings/VersionControlSettings.asset"));
     let force_text = editor.as_deref().and_then(serialization_is_text);
-    let visible_meta = vcs
+    let vcs_mode = vcs
         .as_deref()
         .and_then(|t| setting(t, "m_Mode"))
         .or_else(|| {
@@ -167,15 +195,15 @@ pub fn unity_setup(repo: &Path, project: &UnityProject) -> Result<UnitySetup, St
                 .as_deref()
                 .and_then(|t| setting(t, "m_ExternalVersionControlSupport"))
         })
-        .map(|mode| mode.contains("Visible Meta Files"));
-    let attributes = read(".gitattributes").unwrap_or_default();
-    let missing_attributes = missing_patterns(&attributes);
-    let unignored = unignored_folders(repo, project)?;
+        .map(str::to_owned);
+    let (missing_yaml, missing_lfs) = missing_attributes(repo, project)?;
     Ok(UnitySetup {
         force_text,
-        visible_meta,
-        missing_attributes,
-        unignored,
+        vcs_mode,
+        missing_yaml,
+        missing_lfs,
+        unignored: unignored_folders(repo, project)?,
+        tracked_generated: tracked_generated(repo, project)?,
     })
 }
 
@@ -191,19 +219,52 @@ pub(crate) fn serialization_is_text(editor_settings: &str) -> Option<bool> {
     setting(editor_settings, "m_SerializationMode").map(|v| v == "2")
 }
 
-/// The recommended patterns `.gitattributes` has no line for.
-pub(crate) fn missing_patterns(attributes: &str) -> Vec<String> {
-    let present: HashSet<&str> = attributes
-        .lines()
-        .map(str::trim)
-        .filter(|l| !l.starts_with('#'))
-        .filter_map(|l| l.split_whitespace().next())
-        .collect();
-    UNITY_YAML
-        .iter()
-        .chain(UNITY_BINARY)
-        .filter(|p| !present.contains(**p))
-        .map(|p| (*p).to_owned())
+/// The probe file of `pattern` (`*.png`) in the project's `Assets/`.
+fn probe(project: &UnityProject, pattern: &str) -> String {
+    project.path(&format!(
+        "Assets/gitcraft-probe{}",
+        pattern.trim_start_matches('*')
+    ))
+}
+
+/// The YAML and binary patterns git gives no Smart Merge and no LFS, asked of git for a file
+/// of each type.
+fn missing_attributes(
+    repo: &Path,
+    project: &UnityProject,
+) -> Result<(Vec<String>, Vec<String>), String> {
+    let patterns: Vec<&str> = UNITY_YAML.iter().chain(UNITY_BINARY).copied().collect();
+    let probes: Vec<String> = patterns.iter().map(|p| probe(project, p)).collect();
+    let mut args = vec!["check-attr", "-z", "merge", "filter", "--"];
+    args.extend(probes.iter().map(String::as_str));
+    let out = super::run(Some(repo), &args)?;
+    let attrs = parse_attrs(&out);
+    let value = |probe: &str, attr: &str| {
+        attrs
+            .get(&(probe.to_owned(), attr.to_owned()))
+            .cloned()
+            .unwrap_or_default()
+    };
+    let mut yaml = Vec::new();
+    let mut lfs = Vec::new();
+    for (pattern, probe) in patterns.iter().zip(&probes) {
+        if UNITY_YAML.contains(pattern) {
+            if value(probe, "merge") != "unityyamlmerge" {
+                yaml.push((*pattern).to_owned());
+            }
+        } else if value(probe, "filter") != "lfs" {
+            lfs.push((*pattern).to_owned());
+        }
+    }
+    Ok((yaml, lfs))
+}
+
+/// `git check-attr -z`: path, attribute, value, again and again.
+pub(crate) fn parse_attrs(out: &str) -> std::collections::HashMap<(String, String), String> {
+    out.split('\0')
+        .collect::<Vec<_>>()
+        .chunks_exact(3)
+        .map(|f| ((f[0].to_owned(), f[1].to_owned()), f[2].to_owned()))
         .collect()
 }
 
@@ -235,6 +296,39 @@ fn unignored_folders(repo: &Path, project: &UnityProject) -> Result<Vec<String>,
         .collect())
 }
 
+/// The folders Unity makes that have files in the index.
+fn tracked_generated(repo: &Path, project: &UnityProject) -> Result<Vec<String>, String> {
+    let specs: Vec<String> = UNITY_IGNORED
+        .iter()
+        .map(|d| format!(":(literal){}", project.path(&format!("{d}/"))))
+        .collect();
+    let mut args = vec!["ls-files", "-z", "--"];
+    args.extend(specs.iter().map(String::as_str));
+    let out = super::run(Some(repo), &args)?;
+    let found: HashSet<&str> = out
+        .split('\0')
+        .filter_map(|p| p.strip_prefix(project.root.as_str())?.split('/').next())
+        .collect();
+    Ok(UNITY_IGNORED
+        .iter()
+        .filter(|d| found.contains(**d))
+        .map(|d| (*d).to_owned())
+        .collect())
+}
+
+/// Takes the folders `folders` of the project out of the index, keeping them on disk
+/// (`git rm -r --cached`).
+pub fn untrack_generated(
+    repo: &Path,
+    project: &UnityProject,
+    folders: &[String],
+) -> Result<(), String> {
+    let paths: Vec<String> = folders.iter().map(|d| project.path(d)).collect();
+    let mut args = vec!["--literal-pathspecs", "rm", "-r", "-q", "--cached", "--"];
+    args.extend(paths.iter().map(String::as_str));
+    super::run(Some(repo), &args).map(|_| ())
+}
+
 /// The lines to add to `.gitattributes` for `missing`, as a block of their own.
 pub fn attributes_block(missing: &[String]) -> String {
     let mut block = String::from("\n# Unity (added by gitcraft)\n");
@@ -260,9 +354,21 @@ pub fn ignore_block(project: &UnityProject, folders: &[String]) -> String {
                 }
             })
             .collect();
-        block.push_str(&format!("/{}{pattern}/\n", project.root));
+        block.push_str(&format!("/{}{pattern}/\n", escape_glob(&project.root)));
     }
     block
+}
+
+/// `path` with the characters of a pattern escaped, so that it matches only itself.
+fn escape_glob(path: &str) -> String {
+    let mut out = String::with_capacity(path.len());
+    for c in path.chars() {
+        if matches!(c, '*' | '?' | '[' | ']' | '\\') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
 }
 
 /// Adds `block` at the end of the file `rel` of the repository (made when missing), with a line
@@ -314,6 +420,20 @@ pub enum MetaKind {
     MetaDeletedAssetKept,
 }
 
+/// Whether Unity makes no `.meta` for `path` (under `assets`): a hidden name (`.x`), one
+/// ending in `~` (`Samples~`), a `cvs` folder or a `.tmp` file, there or in a folder above.
+pub(crate) fn skipped_by_unity(path: &str, assets: &str) -> bool {
+    let Some(rest) = path.strip_prefix(assets) else {
+        return true;
+    };
+    rest.split('/').any(|name| {
+        name.starts_with('.')
+            || name.ends_with('~')
+            || name.eq_ignore_ascii_case("cvs")
+            || name.to_ascii_lowercase().ends_with(".tmp")
+    })
+}
+
 /// What is wrong with the `.meta` pairs of the staged changes under the project's `Assets/`;
 /// `tracked` says whether a path is in the index (staged or committed).
 pub fn meta_problems(
@@ -339,7 +459,10 @@ pub fn meta_problems(
         .collect();
     let mut problems = Vec::new();
     let mut folders_seen = HashSet::new();
-    for path in added.iter().copied().filter(|p| p.starts_with(&assets)) {
+    let ours = |p: &&str| {
+        p.starts_with(&assets) && !skipped_by_unity(p.strip_suffix(".meta").unwrap_or(p), &assets)
+    };
+    for path in added.iter().copied().filter(ours) {
         let push = |problems: &mut Vec<MetaProblem>, path: &str, partner: String, kind| {
             problems.push(MetaProblem {
                 path: path.to_owned(),
@@ -376,7 +499,7 @@ pub fn meta_problems(
             dir = parent;
         }
     }
-    for path in deleted.iter().copied().filter(|p| p.starts_with(&assets)) {
+    for path in deleted.iter().copied().filter(ours) {
         if let Some(asset) = path.strip_suffix(".meta") {
             if !deleted.contains(asset) && tracked(asset) && !added.contains(path) {
                 problems.push(MetaProblem {
@@ -407,55 +530,45 @@ fn is_folder_meta(asset: &str, added: &HashSet<&str>, tracked: &dyn Fn(&str) -> 
     added.iter().any(|p| p.starts_with(&inside)) || tracked(&inside)
 }
 
-/// The paths [`meta_problems`] asks `tracked` about, for [`in_index`] to answer in one go.
-pub fn meta_candidates(project: &UnityProject, staged: &[StatusFile]) -> Vec<String> {
-    let assets = project.path("Assets/");
-    let mut out = HashSet::new();
-    for f in staged
-        .iter()
-        .filter(|f| matches!(f.code, 'A' | 'R' | 'C' | 'D'))
-    {
-        let paths = std::iter::once(f.path.as_str()).chain(f.old_path.as_deref());
-        for path in paths.filter(|p| p.starts_with(&assets)) {
-            if let Some(asset) = path.strip_suffix(".meta") {
-                out.insert(asset.to_owned());
-                out.insert(format!("{asset}/"));
-                continue;
-            }
-            out.insert(format!("{path}.meta"));
-            let mut dir = path;
-            while let Some((parent, _)) = dir.rsplit_once('/') {
-                if parent.len() < assets.len() {
-                    break;
-                }
-                out.insert(format!("{parent}.meta"));
-                dir = parent;
-            }
-        }
-    }
-    let mut out: Vec<String> = out.into_iter().collect();
-    out.sort();
-    out
+/// What the index holds under a folder: its files, and every folder they are in.
+#[derive(Clone, Debug, Default)]
+pub struct IndexListing {
+    files: HashSet<String>,
+    folders: HashSet<String>,
 }
 
-/// The paths of `candidates` that are in the index (`git ls-files`), and the folders among
-/// them (a candidate ending in `/` is in the index when something inside it is).
-pub fn in_index(repo: &Path, candidates: &[String]) -> Result<HashSet<String>, String> {
-    let mut found = HashSet::new();
-    for batch in candidates.chunks(100) {
-        let mut args = vec!["ls-files", "-z", "--"];
-        let literal: Vec<String> = batch.iter().map(|c| format!(":(literal){c}")).collect();
-        args.extend(literal.iter().map(String::as_str));
-        let out = run(Some(repo), &args)?;
-        for listed in out.split('\0').filter(|p| !p.is_empty()) {
-            for c in batch {
-                if listed == c || (c.ends_with('/') && listed.starts_with(c.as_str())) {
-                    found.insert(c.clone());
-                }
-            }
+impl IndexListing {
+    /// Whether the index has `path`, or, for a path ending in `/`, anything in that folder.
+    pub fn has(&self, path: &str) -> bool {
+        match path.strip_suffix('/') {
+            Some(dir) => self.folders.contains(dir),
+            None => self.files.contains(path),
         }
     }
-    Ok(found)
+
+    pub(crate) fn of(files: impl IntoIterator<Item = String>) -> Self {
+        let mut listing = IndexListing::default();
+        for f in files {
+            let mut dir = f.as_str();
+            while let Some((parent, _)) = dir.rsplit_once('/') {
+                if !listing.folders.insert(parent.to_owned()) {
+                    break;
+                }
+                dir = parent;
+            }
+            listing.files.insert(f);
+        }
+        listing
+    }
+}
+
+/// What the index holds under `folder` (`Game/Assets/`): one `git ls-files`.
+pub fn index_under(repo: &Path, folder: &str) -> Result<IndexListing, String> {
+    let spec = format!(":(literal){folder}");
+    let out = run(Some(repo), &["ls-files", "-z", "--", &spec])?;
+    Ok(IndexListing::of(
+        out.split('\0').filter(|p| !p.is_empty()).map(str::to_owned),
+    ))
 }
 
 #[cfg(test)]

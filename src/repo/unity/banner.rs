@@ -9,17 +9,30 @@ use crate::icons;
 use crate::repo::{Action, RepoTab};
 use crate::theme::Tokens;
 
-/// One `.meta` problem in words.
+/// How many problems the banner's tooltip lists.
+const LISTED: usize = 15;
+
+/// One `.meta` problem in words, with what follows from it.
 pub(super) fn describe(p: &MetaProblem) -> String {
     match p.kind {
-        MetaKind::AddedWithoutMeta => format!("{} is staged without {}", p.path, p.partner),
-        MetaKind::DeletedWithoutMeta => {
-            format!("{} is deleted but {} stays", p.path, p.partner)
-        }
-        MetaKind::MetaWithoutAsset => format!("{} is staged without {}", p.path, p.partner),
-        MetaKind::MetaDeletedAssetKept => {
-            format!("{} is deleted but {} stays", p.path, p.partner)
-        }
+        MetaKind::AddedWithoutMeta => format!(
+            "{} has no {} staged: others get a new GUID for it and its references break.",
+            p.path, p.partner
+        ),
+        MetaKind::DeletedWithoutMeta => format!(
+            "{} is deleted but {} stays: Unity will warn about the leftover.",
+            p.path, p.partner
+        ),
+        MetaKind::MetaWithoutAsset => format!(
+            "{} is staged without {}: if that is an empty folder, git keeps no empty folders \
+             (add a file to it, or leave its .meta out); else Unity deletes the .meta.",
+            p.path, p.partner
+        ),
+        MetaKind::MetaDeletedAssetKept => format!(
+            "{} is deleted but {} stays: Unity makes a new one, with a new GUID, and its \
+             references break.",
+            p.path, p.partner
+        ),
     }
 }
 
@@ -32,34 +45,44 @@ impl RepoTab {
         let t = Tokens::get(ui.ctx());
         if !state.meta.is_empty() {
             let text = match state.meta.as_slice() {
-                [one] => format!(
-                    "Unity: {}. Committed so, its references break for everyone else.",
-                    describe(one)
-                ),
+                [one] => format!("Unity: {}", describe(one)),
                 many => format!(
-                    "Unity: {} staged assets and .meta files are missing their other half \
-                     (first: {}). Committed so, their references break for everyone else.",
+                    "Unity: {} assets and .meta files don't match ({} and more; hover to see \
+                     them all).",
                     many.len(),
-                    describe(&many[0])
+                    many[0].path
                 ),
             };
-            let stage = self.stage_partners_action();
+            let list: Vec<String> = state.meta.iter().take(LISTED).map(describe).collect();
+            let more = state.meta.len().saturating_sub(LISTED);
+            let fixes = self.meta_fixes();
             let idle = self.busy_op.is_none();
-            strip(ui, &t, t.warning, &text, |ui| {
-                if let Some(stage) = stage
-                    && ui
-                        .add_enabled(idle, egui::Button::new("Stage the other halves"))
-                        .clicked()
-                {
-                    acts.push(stage);
+            let r = strip(ui, &t, t.warning, &text, |ui| {
+                for (label, action) in fixes {
+                    if ui.add_enabled(idle, egui::Button::new(label)).clicked() {
+                        acts.push(action);
+                    }
                 }
             });
+            if state.meta.len() > 1 {
+                r.on_hover_ui(|ui| {
+                    for line in &list {
+                        ui.label(line);
+                    }
+                    if more > 0 {
+                        ui.label(format!("and {more} more"));
+                    }
+                });
+            }
         }
-        let needs_setup = matches!(&state.setup, Some(Ok(s)) if !s.all_good());
-        if needs_setup && !state.hint_dismissed {
-            let text = "This Unity project isn't fully set up for git.";
-            strip(ui, &t, t.accent, text, |ui| {
-                if ui.button("Dismiss").clicked() {
+        if let Some(problem) = state.hint() {
+            let text = format!("This Unity project isn't fully set up for git: {problem}.");
+            strip(ui, &t, t.accent, &text, |ui| {
+                if ui
+                    .button("Don't show again")
+                    .on_hover_text("For this repository (gitcraft.unityHint in its config)")
+                    .clicked()
+                {
                     acts.push(Action::Unity(UnityAct::DismissHint));
                 }
                 if ui.button("Unity set-up…").clicked() {
@@ -71,7 +94,13 @@ impl RepoTab {
 }
 
 /// A tinted strip with the Unity icon and `text`, and `buttons` below it on the right.
-fn strip(ui: &mut Ui, t: &Tokens, color: egui::Color32, text: &str, buttons: impl FnOnce(&mut Ui)) {
+fn strip(
+    ui: &mut Ui,
+    t: &Tokens,
+    color: egui::Color32,
+    text: &str,
+    buttons: impl FnOnce(&mut Ui),
+) -> egui::Response {
     egui::Frame::new()
         .fill(color.gamma_multiply(0.14))
         .inner_margin(egui::Margin::symmetric(12, 8))
@@ -85,5 +114,6 @@ fn strip(ui: &mut Ui, t: &Tokens, color: egui::Color32, text: &str, buttons: imp
             ui.horizontal(|ui| {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), buttons);
             });
-        });
+        })
+        .response
 }
