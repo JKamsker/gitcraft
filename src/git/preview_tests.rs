@@ -49,7 +49,7 @@ fn reset_of_main(head: &str, to: &str, upstream: Option<&str>) -> PreviewAsk {
         moving: vec!["refs/heads/main".to_owned()],
         rewritten: Some(range),
         upstream: upstream.map(str::to_owned),
-        files: LostFiles::Tracked,
+        files: LostFiles::HardReset(Some(to.to_owned())),
     }
 }
 
@@ -132,7 +132,7 @@ fn reset_to_the_root_commit_and_on_a_detached_head() -> Result<(), String> {
         moving: vec!["HEAD".to_owned()],
         rewritten: Some(range),
         upstream: None,
-        files: LostFiles::Tracked,
+        files: LostFiles::HardReset(None),
     };
     let found = preview(&dir, &ask)?;
     assert_eq!(
@@ -218,7 +218,7 @@ fn an_empty_repository() -> Result<(), String> {
     write(&dir, "first file.txt", "x\n")?;
     git(&dir, &["add", "-A"])?;
     let ask = PreviewAsk {
-        files: LostFiles::Tracked,
+        files: LostFiles::HardReset(None),
         ..PreviewAsk::nothing()
     };
     assert_eq!(preview(&dir, &ask)?.lost_files, ["first file.txt"]);
@@ -297,12 +297,144 @@ fn many_lost_files_are_capped() -> Result<(), String> {
         write(&dir, &format!("f{i:02}.txt"), "2\n")?;
     }
     let ask = PreviewAsk {
-        files: LostFiles::Tracked,
+        files: LostFiles::HardReset(None),
         ..PreviewAsk::nothing()
     };
     let found = preview(&dir, &ask)?;
     assert_eq!(found.lost_files.len(), PREVIEW_SHOWN);
     assert_eq!(found.lost_total, 40);
     assert_eq!(found.lost_files[0], "f00.txt");
+    Ok(())
+}
+
+/// Untracked and ignored files a hard reset writes over (the target has a file there) are lost
+/// too; others, and what is inside submodules, stay.
+#[test]
+fn a_hard_reset_counts_the_untracked_files_it_writes_over() -> Result<(), String> {
+    let dir = repo("overwrite")?;
+    write(&dir, ".gitignore", "*.log\n")?;
+    std::fs::create_dir_all(dir.join("new dir")).map_err(|e| e.to_string())?;
+    for path in ["precious.txt", "build.log", "new dir/inner.txt"] {
+        write(&dir, path, "v1\n")?;
+    }
+    git(&dir, &["add", "-A"])?;
+    git(&dir, &["add", "-f", "build.log"])?;
+    let old = commit(&dir, "has them")?;
+    git(
+        &dir,
+        &[
+            "rm",
+            "-q",
+            "-r",
+            "--cached",
+            "precious.txt",
+            "build.log",
+            "new dir",
+        ],
+    )?;
+    let head = commit(&dir, "drops them")?;
+    // Still on disk, untracked (or ignored) now, and changed.
+    for path in ["precious.txt", "build.log", "new dir/inner.txt"] {
+        write(&dir, path, "PRECIOUS\n")?;
+    }
+    write(&dir, "other.txt", "stays\n")?;
+    let found = preview(&dir, &reset_of_main(&head, &old, None))?;
+    assert_eq!(
+        found.lost_files,
+        ["build.log", "new dir/inner.txt", "precious.txt"]
+    );
+    Ok(())
+}
+
+/// Changed files inside a submodule are not what a reset of the repository throws away.
+#[test]
+fn a_hard_reset_leaves_submodule_contents_out() -> Result<(), String> {
+    let sub = repo("submodule-inner")?;
+    commit(&sub, "inner")?;
+    let dir = repo("submodule-outer")?;
+    let url = sub.to_string_lossy().into_owned();
+    git(
+        &dir,
+        &[
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "-q",
+            "add",
+            &url,
+            "sub",
+        ],
+    )?;
+    let head = commit(&dir, "with a submodule")?;
+    write(&dir.join("sub"), "dirty.txt", "x\n")?;
+    git(&dir.join("sub"), &["add", "-A"])?;
+    let found = preview(&dir, &reset_of_main(&head, &head, None))?;
+    assert!(found.lost_files.is_empty(), "{:?}", found.lost_files);
+    Ok(())
+}
+
+/// Deleting a branch here and on the remote: commits someone pushed there that the branch
+/// here hasn't leave too.
+#[test]
+fn deleting_both_lists_what_only_the_remote_branch_has() -> Result<(), String> {
+    let dir = repo("both")?;
+    let base = commit(&dir, "base")?;
+    git(&dir, &["checkout", "-q", "-b", "feat"])?;
+    let local = commit(&dir, "f1")?;
+    let remote = commit(&dir, "remote only")?;
+    git(&dir, &["update-ref", "refs/remotes/origin/feat", &remote])?;
+    git(&dir, &["reset", "-q", "--hard", &local])?;
+    git(&dir, &["checkout", "-q", "main"])?;
+    let ask = PreviewAsk::delete(
+        &[&local, &remote],
+        &base,
+        vec![
+            "refs/heads/feat".to_owned(),
+            "refs/remotes/origin/feat".to_owned(),
+        ],
+    );
+    let found = preview(&dir, &ask)?;
+    // Made in the same second: in either order.
+    let mut leaving = kept(&found);
+    leaving.sort_by_key(|(summary, _)| *summary);
+    assert_eq!(
+        leaving,
+        [("f1", &Kept::OnlyHere), ("remote only", &Kept::OnlyHere)]
+    );
+    Ok(())
+}
+
+/// `origin/HEAD` only points at a remote branch: deleting that branch leaves its commits on no
+/// ref, whatever the symref says.
+#[test]
+fn origin_head_keeps_nothing() -> Result<(), String> {
+    let dir = repo("origin-head")?;
+    let base = commit(&dir, "base")?;
+    let tip = commit(&dir, "on the remote")?;
+    git(&dir, &["update-ref", "refs/remotes/origin/dev", &tip])?;
+    git(
+        &dir,
+        &[
+            "symbolic-ref",
+            "refs/remotes/origin/HEAD",
+            "refs/remotes/origin/dev",
+        ],
+    )?;
+    git(&dir, &["reset", "-q", "--hard", &base])?;
+    let ask = PreviewAsk::delete(&[&tip], &base, vec!["refs/remotes/origin/dev".to_owned()]);
+    let found = preview(&dir, &ask)?;
+    assert_eq!(kept(&found), [("on the remote", &Kept::OnlyHere)]);
+    Ok(())
+}
+
+/// A branch whose name looks like a tag's or a remote branch's is named as the branch it is.
+#[test]
+fn a_branch_named_like_a_tag_is_still_a_branch() -> Result<(), String> {
+    let dir = repo("odd-names")?;
+    let base = commit(&dir, "base")?;
+    let head = commit(&dir, "kept")?;
+    git(&dir, &["branch", "tags/v9"])?;
+    let found = preview(&dir, &reset_of_main(&head, &base, None))?;
+    assert_eq!(kept(&found), [("kept", &Kept::On("tags/v9".to_owned()))]);
     Ok(())
 }
