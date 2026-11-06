@@ -368,6 +368,58 @@ mod tests {
         assert_ne!(id, other_id);
     }
 
+    /// A row set to Edit (its E key) stops the rebase after that commit; what is staged then
+    /// goes into it when Commit continues, and the commits after it are replayed on top.
+    #[test]
+    fn an_edit_step_stops_there_and_commit_amends_it() {
+        let dir = repo("rebase-edit");
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+        tab.refs.head = git::head(&dir);
+        tab.refs.current = Some("main".to_owned());
+        let commits = git::rebase_commits(&dir, "HEAD~2").unwrap_or_default();
+        let mut editor =
+            rebase::RebaseEditor::new("HEAD~2".to_owned(), "HEAD~2".to_owned(), commits);
+        editor.selected = Some(0);
+        editor.press(egui::Key::E, false);
+        tab.rebase = Some(editor);
+        tab.run_rebase(&ctx);
+        let stopped = op_result(&tab);
+        let state = git::status(&dir).map(|w| w.in_progress);
+        let file = dir.join("añadido café.txt");
+        let wrote = std::fs::write(&file, "edited\n");
+        let staged = git::run(Some(&dir), &["add", "-A"]);
+        tab.work = git::status(&dir).unwrap_or_default();
+        tab.busy_op = None;
+        tab.commit(&ctx);
+        let continued = op_result(&tab);
+        let after = git::status(&dir).map(|w| w.in_progress);
+        let base_files = git::run(
+            Some(&dir),
+            &[
+                "-c",
+                "core.quotePath=false",
+                "show",
+                "--name-only",
+                "--format=",
+                "HEAD~1",
+            ],
+        );
+        let top = subject(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(matches!(stopped, Some(Ok(_))), "{stopped:?}");
+        assert_eq!(state, Ok(Some(git::InProgress::Rebase)));
+        assert!(wrote.is_ok() && staged.is_ok());
+        assert!(matches!(continued, Some(Ok(_))), "{continued:?}");
+        assert_eq!(after, Ok(None));
+        // The change went into "base", and "read" is replayed after it.
+        assert!(
+            base_files.is_ok_and(|f| f.contains("añadido café.txt")),
+            "the edited commit holds the staged file"
+        );
+        assert_eq!(top, "read");
+    }
+
     /// Editing the message of what the tab thinks is the latest commit, after another was made
     /// on top: that one keeps its own message.
     #[test]
