@@ -167,12 +167,13 @@ so your config, credentials and hooks apply as usual.
   cherry-pick…), from which commit to which, and the commit's summary.
 - Select an entry to see its commit in the right pane, and in the graph when it is there.
   _Create branch here_ (or a double-click) gets it back without touching anything else; or
-  cherry-pick it, check it out detached, copy its SHA. Resetting the checked-out branch to it is
+  cherry-pick it, check it out detached, copy its hash. Resetting the checked-out branch to it is
   in its menu, behind the usual confirmation.
 - _Find lost commits_ scans for the commits no branch, tag or stash reaches any more, even once
-  their reflog has expired (dropped stashes too), newest first, with the same buttons
-  (`git fsck --unreachable --no-reflogs`, in the background: it reads every object, so it can be
-  cancelled).
+  their reflog has expired, newest first, with the same buttons; a dropped stash comes back with
+  _Apply stash_ (`git fsck --unreachable --no-reflogs`, in the background: it reads every
+  object, so it can be cancelled). Its tab only says what it does: the scan waits to be asked.
+  A commit taken back (a branch made there) drops off the list.
 
 **Diffs and conflicts** (centre)
 

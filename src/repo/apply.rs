@@ -53,7 +53,7 @@ impl RepoTab {
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),
             Action::Reflog(act) => self.reflog_act(act, ctx),
-            Action::CloseReflog => self.reflog = None,
+            Action::CloseReflog => self.close_reflog(ctx),
             Action::CloseDiff => {
                 self.diff = None;
                 self.conflict = None;

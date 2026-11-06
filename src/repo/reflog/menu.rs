@@ -34,22 +34,43 @@ pub(super) fn checkout(pick: &Pick) -> Action {
     Action::Checkout(pick.hash.clone())
 }
 
-/// Why the commit can't be cherry-picked, if it can't.
-fn no_cherry_pick(pick: &Pick, head: &str) -> Option<&'static str> {
+/// Applies a dropped stash back, its staged changes staged again.
+pub(super) fn apply_stash(pick: &Pick) -> Action {
+    Action::Ops {
+        label: format!("Apply stash {}", short(&pick.hash)),
+        ops: ops(&[&["stash", "apply", "--index", &pick.hash]]),
+        refresh: Refresh::All,
+    }
+}
+
+/// Why the commit can't be cherry-picked, if it can't; `in_head`: what is checked out has it.
+fn no_cherry_pick(pick: &Pick, head: &str, in_head: bool) -> Option<&'static str> {
     if pick.hash == head {
         Some("It is the commit checked out")
+    } else if pick.stash {
+        Some("A dropped stash: apply it instead")
     } else if pick.merge {
         Some("A merge commit is cherry-picked from the terminal, choosing its parent (-m)")
+    } else if in_head {
+        Some("What is checked out has it already")
     } else {
         None
     }
 }
 
+const BUSY: &str = "An operation is running";
+const CHERRY_PICK_TIP: &str = "Apply its changes on top of what is checked out, as a new commit";
+
 impl RepoTab {
+    /// Whether the detail pane says what is checked out has `pick` (read for the selected one).
+    fn in_head(&self, pick: &Pick) -> bool {
+        self.detail
+            .as_ref()
+            .is_some_and(|d| d.hash == pick.hash && d.in_head)
+    }
+
     /// The buttons under the list, for the commit selected.
     pub(super) fn reflog_buttons(&self, ui: &mut Ui, pick: &Pick, acts: &mut Vec<Action>) {
-        let idle = self.busy_op.is_none();
-        let head = self.refs.head.as_str();
         if widgets::primary_button(ui, "Create branch here…", true, 0.0)
             .on_hover_text(
                 "A new branch at this commit; nothing else changes (also a double-click)",
@@ -58,32 +79,7 @@ impl RepoTab {
         {
             acts.push(create_branch(pick));
         }
-        let why = no_cherry_pick(pick, head);
-        if ui
-            .add_enabled(idle && why.is_none(), egui::Button::new("Cherry-pick"))
-            .on_hover_text("Apply its changes on the checked-out branch as a new commit")
-            .on_disabled_hover_text(why.unwrap_or("An operation is running"))
-            .clicked()
-        {
-            acts.push(cherry_pick(pick));
-        }
-        if ui
-            .add_enabled(
-                idle && pick.hash != head,
-                egui::Button::new("Check out (detached)"),
-            )
-            .on_disabled_hover_text(if pick.hash == head {
-                "It is the commit checked out"
-            } else {
-                "An operation is running"
-            })
-            .clicked()
-        {
-            acts.push(checkout(pick));
-        }
-        if ui.button("Copy SHA").clicked() {
-            ui.ctx().copy_text(pick.hash.clone());
-        }
+        self.recover_items(ui, pick, acts);
         let more = crate::icons::small_button(ui, "chevron-down", "More");
         egui::Popup::menu(&more)
             .style(crate::theme::menu_style)
@@ -97,26 +93,7 @@ impl RepoTab {
         if ui.button("Create branch here…").clicked() {
             acts.push(create_branch(pick));
         }
-        let why = no_cherry_pick(pick, head);
-        if ui
-            .add_enabled(idle && why.is_none(), egui::Button::new("Cherry-pick"))
-            .on_disabled_hover_text(why.unwrap_or("An operation is running"))
-            .clicked()
-        {
-            acts.push(cherry_pick(pick));
-        }
-        if ui
-            .add_enabled(
-                idle && pick.hash != head,
-                egui::Button::new("Check out (detached)"),
-            )
-            .clicked()
-        {
-            acts.push(checkout(pick));
-        }
-        if ui.button("Copy SHA").clicked() {
-            ui.ctx().copy_text(pick.hash.clone());
-        }
+        self.recover_items(ui, pick, acts);
         if self.graph_has(&pick.hash) && ui.button("Show in graph").clicked() {
             acts.push(Action::SelectHash(pick.hash.clone()));
         }
@@ -133,12 +110,64 @@ impl RepoTab {
             target: &target,
             head,
         };
-        let can_reset = idle && !head.is_empty() && pick.hash != head;
-        ui.add_enabled_ui(can_reset, |ui| {
+        let why = if head.is_empty() {
+            Some("Nothing is checked out yet")
+        } else if pick.hash == head {
+            Some("It is the commit checked out")
+        } else if !idle {
+            Some(BUSY)
+        } else {
+            None
+        };
+        ui.add_enabled_ui(why.is_none(), |ui| {
             ui.menu_button(format!("Reset {target} to here"), |ui| {
                 reset_items(ui, &rewrite, acts);
-            });
+            })
+            .response
+            .on_disabled_hover_text(why.unwrap_or(BUSY));
         });
+    }
+
+    /// Apply (a dropped stash), cherry-pick, check out and copy, as buttons or menu entries.
+    fn recover_items(&self, ui: &mut Ui, pick: &Pick, acts: &mut Vec<Action>) {
+        let idle = self.busy_op.is_none();
+        let head = self.refs.head.as_str();
+        if pick.stash
+            && ui
+                .add_enabled(idle, egui::Button::new("Apply stash"))
+                .on_hover_text("Put its changes back on the working tree (git stash apply)")
+                .on_disabled_hover_text(BUSY)
+                .clicked()
+        {
+            acts.push(apply_stash(pick));
+        }
+        let why = no_cherry_pick(pick, head, self.in_head(pick));
+        if ui
+            .add_enabled(idle && why.is_none(), egui::Button::new("Cherry-pick"))
+            .on_hover_text(CHERRY_PICK_TIP)
+            .on_disabled_hover_text(why.unwrap_or(BUSY))
+            .clicked()
+        {
+            acts.push(cherry_pick(pick));
+        }
+        if ui
+            .add_enabled(
+                idle && pick.hash != head,
+                egui::Button::new("Check out (detached)"),
+            )
+            .on_hover_text("Check out this commit, on no branch")
+            .on_disabled_hover_text(if pick.hash == head {
+                "It is the commit checked out"
+            } else {
+                BUSY
+            })
+            .clicked()
+        {
+            acts.push(checkout(pick));
+        }
+        if ui.button("Copy commit hash").clicked() {
+            ui.ctx().copy_text(pick.hash.clone());
+        }
     }
 
     /// Whether the graph has a row for `hash` (in the history read so far).
@@ -156,6 +185,7 @@ mod tests {
             hash: hash.to_owned(),
             summary: "s".to_owned(),
             merge,
+            stash: false,
         }
     }
 
@@ -170,8 +200,21 @@ mod tests {
 
     #[test]
     fn merges_and_the_checked_out_commit_are_not_cherry_picked() {
-        assert!(no_cherry_pick(&pick("a", false), "b").is_none());
-        assert!(no_cherry_pick(&pick("a", true), "b").is_some());
-        assert!(no_cherry_pick(&pick("a", false), "a").is_some());
+        assert!(no_cherry_pick(&pick("a", false), "b", false).is_none());
+        assert!(no_cherry_pick(&pick("a", true), "b", false).is_some());
+        assert!(no_cherry_pick(&pick("a", false), "a", false).is_some());
+        // What is checked out has it already: it would come out empty.
+        assert!(no_cherry_pick(&pick("a", false), "b", true).is_some());
+        let stash = Pick {
+            stash: true,
+            ..pick("s", true)
+        };
+        assert_eq!(
+            no_cherry_pick(&stash, "b", false),
+            Some("A dropped stash: apply it instead")
+        );
+        assert!(
+            matches!(apply_stash(&stash), Action::Ops { ops, .. } if ops == [["stash", "apply", "--index", "s"]])
+        );
     }
 }

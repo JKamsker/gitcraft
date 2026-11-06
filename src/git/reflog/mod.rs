@@ -89,6 +89,11 @@ pub fn reflog(
     ))
 }
 
+/// The number of an entry, from its selector (`HEAD@{3}` → 3).
+pub fn reflog_number(selector: &str) -> Option<usize> {
+    parse::selector_index(selector)
+}
+
 /// `refs/heads/main` → `main`.
 fn short_ref(reference: &str) -> &str {
     reference.strip_prefix("refs/heads/").unwrap_or(reference)
@@ -145,6 +150,22 @@ fn parse_entry(record: &[&str; FIELDS], selector: &str) -> Option<ReflogEntry> {
     })
 }
 
+/// Whether `entry` can have moved the ref from `before`. git keeps where each entry moved from,
+/// but `log -g` doesn't print it: it is taken from the entry before, which isn't always it (a
+/// branch moved from another worktree adds nothing to this one's HEAD reflog). A commit made
+/// on top of what was there says so itself: its first parent. Other moves can't be checked.
+fn made_on(entry: &ReflogEntry, before: &str) -> bool {
+    let on_top = matches!(
+        entry.message.kind,
+        ReflogKind::Commit | ReflogKind::CherryPick | ReflogKind::Revert | ReflogKind::Am
+    ) || entry.message.action == "commit (merge)";
+    match entry.message.kind {
+        ReflogKind::Initial => false,
+        _ if on_top => entry.parents.first().is_some_and(|p| p == before),
+        _ => true,
+    }
+}
+
 /// The first `limit` of `entries` (one more was read), each with where it moved from: the
 /// commit of the entry before it, unless entries between the two were left out (see
 /// [`reflog`]), which leaves that unknown.
@@ -156,8 +177,8 @@ fn page(mut entries: Vec<ReflogEntry>, limit: usize) -> ReflogPage {
             (number(&entries[i - 1]), number(&entries[i])),
             (Some(newer), Some(older)) if older == newer + 1
         );
-        if adjacent {
-            let before = entries[i].new.clone();
+        let before = entries[i].new.clone();
+        if adjacent && made_on(&entries[i - 1], &before) {
             entries[i - 1].old = Some(before);
         }
     }

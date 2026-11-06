@@ -45,6 +45,8 @@ impl Source {
 /// What the view asks for.
 pub(crate) enum ReflogAct {
     Show(Source),
+    /// Show the lost commits, scanning for them unless that was done already.
+    FindLost,
     /// The entry (or lost commit) at this place in the list.
     Select(usize),
     LoadMore,
@@ -59,6 +61,8 @@ pub(crate) struct Pick {
     pub(crate) hash: String,
     pub(crate) summary: String,
     pub(crate) merge: bool,
+    /// A dropped stash, applied back rather than made a branch of.
+    pub(crate) stash: bool,
 }
 
 impl Pick {
@@ -67,6 +71,7 @@ impl Pick {
             hash: e.new.clone(),
             summary: e.summary.clone(),
             merge: e.parents.len() > 1,
+            stash: false,
         }
     }
 
@@ -75,6 +80,7 @@ impl Pick {
             hash: c.hash.clone(),
             summary: c.summary.clone(),
             merge: c.parents.len() > 1,
+            stash: c.stash,
         }
     }
 }
@@ -108,12 +114,11 @@ pub(crate) struct ReflogView {
     scan: Option<Scan>,
     /// The place of the entry (or lost commit) selected in the list shown.
     selected: Option<usize>,
-    /// The refs the reflog was read with: once they move, it is read again.
-    seen: RefsKey,
+    /// The scan that was cancelled or let go of, while its thread still runs: over SSH or in
+    /// WSL, cancelling ends the connection, but git there may go on until it is done, so no
+    /// other scan is started beside it.
+    ending: std::sync::Weak<()>,
 }
-
-/// Where HEAD and the local branches are: what moves a reflog.
-type RefsKey = (String, Option<String>, Vec<(String, String)>);
 
 impl ReflogView {
     fn new(source: Source) -> Self {
@@ -127,11 +132,11 @@ impl ReflogView {
             lost: None,
             scan: None,
             selected: None,
-            seen: Default::default(),
+            ending: std::sync::Weak::new(),
         }
     }
 
-    fn lost_commits(&self) -> Option<&[LostCommit]> {
+    pub(in crate::repo) fn lost_commits(&self) -> Option<&[LostCommit]> {
         self.lost.as_ref()?.as_ref().ok().map(Vec::as_slice)
     }
 
@@ -160,6 +165,10 @@ impl RepoTab {
             self.status = Some((format!("Finish or close the {editor} first"), true));
             return;
         }
+        let switched = self.reflog.as_ref().is_some_and(|v| v.source != source);
+        if switched {
+            self.leave_off_graph_commit(ctx);
+        }
         // It sits on the graph: what covers that goes.
         self.close_pr();
         self.ci_view = None;
@@ -168,21 +177,60 @@ impl RepoTab {
         let view = self
             .reflog
             .get_or_insert_with(|| ReflogView::new(source.clone()));
-        let switched = view.source != source;
         view.source = source;
         if switched {
             view.selected = None;
+            // Another reflog's entries are not shown under this one's name meanwhile.
+            view.entries.clear();
+            view.more = false;
         }
-        match &view.source {
-            Source::Ref(_) if switched || view.entries.is_empty() => self.read_reflog(ctx),
-            Source::Lost if view.lost.is_none() && view.scan.is_none() => self.start_scan(ctx),
-            _ => {}
+        // The lost commits wait for Find lost commits: the scan reads every object.
+        if matches!(view.source, Source::Ref(_)) && (switched || view.entries.is_empty()) {
+            self.read_reflog(ctx);
+        }
+    }
+
+    /// Closes the view; a commit it showed that the graph doesn't have leaves the detail pane.
+    pub(super) fn close_reflog(&mut self, ctx: &egui::Context) {
+        self.leave_off_graph_commit(ctx);
+        self.reflog = None;
+    }
+
+    /// When the detail pane shows a commit of the view that no graph row is, the graph's own
+    /// selection again: the changes, or HEAD.
+    fn leave_off_graph_commit(&mut self, ctx: &egui::Context) {
+        if self.reflog_commit_off_graph().is_none() {
+            return;
+        }
+        if let Some(view) = &mut self.reflog {
+            view.selected = None;
+        }
+        let row = self
+            .index
+            .get(super::WIP_HASH)
+            .or_else(|| self.index.get(&self.refs.head))
+            .copied();
+        match row {
+            Some(row) => {
+                self.select(row, ctx);
+                self.scroll_to = Some(row);
+            }
+            None => {
+                self.detail = None;
+                self.detail_hash = None;
+            }
         }
     }
 
     pub(super) fn reflog_act(&mut self, act: ReflogAct, ctx: &egui::Context) {
         match act {
             ReflogAct::Show(source) => self.open_reflog(source, ctx),
+            ReflogAct::FindLost => {
+                self.open_reflog(Source::Lost, ctx);
+                if self.reflog.as_ref().is_some_and(|v| v.lost.is_none()) {
+                    self.start_scan(ctx);
+                }
+            }
             ReflogAct::Select(i) => self.select_in_reflog(i, ctx),
             ReflogAct::LoadMore => self.read_more_reflog(ctx),
             ReflogAct::Reload => match self.reflog.as_ref().map(|v| &v.source) {
@@ -204,35 +252,23 @@ impl RepoTab {
         }
     }
 
-    fn refs_key(&self) -> RefsKey {
-        (
-            self.refs.head.clone(),
-            self.refs.current.clone(),
-            self.refs
-                .local
-                .iter()
-                .map(|b| (b.name.clone(), b.target.clone()))
-                .collect(),
-        )
-    }
-
     /// Reads the reflog shown again from its newest entry.
     fn read_reflog(&mut self, ctx: &egui::Context) {
-        let seen = self.refs_key();
         let Some(view) = &mut self.reflog else { return };
         let Source::Ref(reference) = view.source.clone() else {
             return;
         };
-        view.seen = seen;
         view.loading = true;
         view.error = None;
         view.request = next_request();
         let request = view.request;
+        // As far as it was read: a reload doesn't send a deep-scrolled list back to its top.
+        let count = view.entries.len().max(git::REFLOG_PAGE);
         let path = self.path.clone();
         self.then(
             ctx,
-            move || git::reflog(&path, &reference, 0, git::REFLOG_PAGE),
-            move |tab, page, _| tab.reflog_read(request, 0, page),
+            move || git::reflog(&path, &reference, 0, count),
+            move |tab, page, ctx| tab.reflog_read(request, 0, page, ctx),
         );
     }
 
@@ -252,12 +288,18 @@ impl RepoTab {
         self.then(
             ctx,
             move || git::reflog(&path, &reference, skip, git::REFLOG_PAGE),
-            move |tab, page, _| tab.reflog_read(request, skip, page),
+            move |tab, page, ctx| tab.reflog_read(request, skip, page, ctx),
         );
     }
 
     /// Takes in the page read from entry `skip` on, for the read numbered `request`.
-    fn reflog_read(&mut self, request: u64, skip: usize, page: Result<git::ReflogPage, String>) {
+    fn reflog_read(
+        &mut self,
+        request: u64,
+        skip: usize,
+        page: Result<git::ReflogPage, String>,
+        ctx: &egui::Context,
+    ) {
         let Some(view) = &mut self.reflog else { return };
         if view.request != request {
             return;
@@ -268,6 +310,12 @@ impl RepoTab {
                 let kept = view.selected.and_then(|i| view.entries.get(i)).cloned();
                 if skip == 0 {
                     view.entries = page.entries;
+                } else if !follows(&view.entries[..skip.min(view.entries.len())], &page.entries) {
+                    // Entries were added or expired since the pages before were read: those
+                    // after them are numbered otherwise now. Read it all again.
+                    view.entries.truncate(skip);
+                    self.read_reflog(ctx);
+                    return;
                 } else {
                     view.entries.truncate(skip);
                     view.entries.extend(page.entries);
@@ -282,10 +330,20 @@ impl RepoTab {
     }
 
     fn start_scan(&mut self, ctx: &egui::Context) {
+        let remote = crate::remote::is_remote(&self.path);
         let Some(view) = &mut self.reflog else { return };
         if view.scan.is_some() {
             return;
         }
+        if remote && view.ending.upgrade().is_some() {
+            self.status = Some((
+                "The last scan is still ending on that machine; try again in a moment".to_owned(),
+                true,
+            ));
+            return;
+        }
+        let running = std::sync::Arc::new(());
+        view.ending = std::sync::Arc::downgrade(&running);
         let cancel = git::Cancel::default();
         let request = next_request();
         view.scan = Some(Scan {
@@ -296,7 +354,11 @@ impl RepoTab {
         let path = self.path.clone();
         self.then(
             ctx,
-            move || git::lost_commits(&path, &cancel),
+            move || {
+                let found = git::lost_commits(&path, &cancel);
+                drop(running);
+                found
+            },
             move |tab, found, _| tab.scan_done(request, found),
         );
     }
@@ -352,25 +414,82 @@ impl RepoTab {
             .then_some(pick.hash)
     }
 
-    /// After a reload: the reflog shown is read again if HEAD or a branch moved.
+    /// After a reload: the reflog shown is read again (most commands add to it, some without
+    /// moving any ref), and lost commits the graph now has (made a branch of…) are no longer
+    /// listed.
     pub(super) fn reflog_after_reload(&mut self, ctx: &egui::Context) {
-        let key = self.refs_key();
         let Some(view) = &mut self.reflog else { return };
-        if matches!(view.source, Source::Ref(_)) && view.seen != key {
+        if let Some(Ok(lost)) = &mut view.lost {
+            let kept = (view.source == Source::Lost)
+                .then(|| {
+                    view.selected
+                        .and_then(|i| lost.get(i))
+                        .map(|c| c.hash.clone())
+                })
+                .flatten();
+            lost.retain(|c| !self.index.contains_key(&c.hash));
+            if view.source == Source::Lost {
+                view.selected = kept.and_then(|h| lost.iter().position(|c| c.hash == h));
+            }
+        }
+        if let Source::Ref(r) = &view.source {
             // A branch deleted meanwhile has no reflog left: back to HEAD's.
-            if let Source::Ref(r) = &view.source
-                && let Some(name) = r.strip_prefix("refs/heads/")
-                && !key.2.iter().any(|(n, _)| n == name)
+            if let Some(name) = r.strip_prefix("refs/heads/")
+                && !self.refs.local.iter().any(|b| b.name == name)
             {
                 view.source = Source::head();
                 view.selected = None;
+                view.entries.clear();
             }
             self.read_reflog(ctx);
         }
     }
 }
 
+/// Whether `page` is the page after `shown`: its first entry numbered after their last one, and
+/// it is where that one came from when that is known.
+fn follows(shown: &[ReflogEntry], page: &[ReflogEntry]) -> bool {
+    let (Some(last), Some(first)) = (shown.last(), page.first()) else {
+        return true;
+    };
+    let number = |e: &ReflogEntry| git::reflog_number(&e.selector);
+    let after = matches!((number(last), number(first)), (Some(a), Some(b)) if b > a);
+    after && last.old.as_ref().is_none_or(|old| *old == first.new)
+}
+
 /// Whether two reads of a reflog found the same entry (its number moves as entries are added).
 fn same(a: &ReflogEntry, b: &ReflogEntry) -> bool {
     a.new == b.new && a.time == b.time && a.message == b.message
+}
+
+#[cfg(test)]
+mod follow_tests {
+    use super::follows;
+    use crate::git::{ReflogEntry, parse_message};
+
+    fn entry(n: usize, new: &str, old: Option<&str>) -> ReflogEntry {
+        ReflogEntry {
+            selector: format!("HEAD@{{{n}}}"),
+            time: 0,
+            date: String::new(),
+            new: new.to_owned(),
+            old: old.map(str::to_owned),
+            parents: Vec::new(),
+            message: parse_message("commit: x"),
+            summary: String::new(),
+        }
+    }
+
+    /// A page read after entries were added on top starts with one already shown.
+    #[test]
+    fn a_page_follows_only_where_the_last_one_ended() {
+        let shown = [entry(0, "a", Some("b")), entry(1, "b", Some("c"))];
+        assert!(follows(&shown, &[entry(2, "c", None)]));
+        // Renumbered: the entry after is shown again.
+        assert!(!follows(&shown, &[entry(1, "b", None)]));
+        // Expired in between: not where the last one came from.
+        assert!(!follows(&shown, &[entry(2, "d", None)]));
+        assert!(follows(&[], &[entry(5, "x", None)]));
+        assert!(follows(&shown, &[]));
+    }
 }
