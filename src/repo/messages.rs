@@ -322,7 +322,6 @@ impl RepoTab {
                     }
                     let wip_row_changed = work.is_clean() != self.work.is_clean();
                     self.work = work;
-                    self.fold_status_read(read);
                     if wip_row_changed {
                         self.rebuild(ctx);
                     } else {

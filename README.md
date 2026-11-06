@@ -155,16 +155,17 @@ so your config, credentials and hooks apply as usual.
   (warns when the commit is already pushed), the identity you commit as (and whether it is the
   repository's own, the profile's or the global one), and saved identities or profile authors
   to switch a repository to; _Use the profile's author_ takes the repository's own out again.
-- _Fold staged changes into this commit_ (a commit's menu in the graph, or _Fold into…_ beside
-  _Amend_): the staged changes go into an older commit of the checked-out branch. The dialog
+- _Fold staged changes into this commit_ (a commit's menu in the graph, or _Fold…_ beside
+  _Amend last commit_): the staged changes go into an older commit of the checked-out branch. The dialog
   first shows that commit and the commits after it that get rewritten, and warns when any of
   them is already pushed (a force push will be needed). The changes are committed as
   `fixup! <summary>` (with your hooks and signing) and melded in by a rebase without the
   editor; unstaged and untracked changes stay as they are. _Keep as fixup! commit for later_
   leaves the `fixup!` commit on top instead, for a later `git rebase -i --autosquash`. A
   conflict stops it like any rebase: _Continue rebase_ finishes it, _Abort_ goes back to
-  before the fold. Ctrl+Z undoes the whole of it, the changes staged again. Not with nothing
-  staged, a detached HEAD, merges after the commit, or while a rebase or merge is going on.
+  before the fold. Ctrl+Z undoes the whole of it, the changes staged again. It is greyed out
+  with why when nothing is staged, HEAD is detached, the commit is a merge or has merges after
+  it, or another operation (rebase, merge, cherry-pick…) is in progress.
 - Undo / redo (Ctrl+Z / Ctrl+Y) of commits, amends, merges, rebases, folds, pulls, resets,
   cherry-picks, reverts, checkouts, branch create / rename / delete, tags and stashes.
 

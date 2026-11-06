@@ -52,8 +52,13 @@ impl RepoTab {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
                     icons::inline(ui, "circle-alert", 16.0, t.warning);
+                    // A fold stopped on a conflict says so: its changes are in the rebase.
+                    let what = match self.fold_stopped_here(state) {
+                        Some(fold) => format!("{} in progress (rebase)", fold.label),
+                        None => format!("{} in progress", state.label()),
+                    };
                     ui.label(
-                        RichText::new(format!("{} in progress", state.label()))
+                        RichText::new(what)
                             .color(t.warning)
                             .font(theme::medium(12.5)),
                     );
