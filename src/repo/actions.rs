@@ -372,7 +372,7 @@ impl RepoTab {
                 Action::OpenUrl(url),
             ));
         }
-        if let Some(on) = self.rerere.enabled {
+        if let Some(on) = self.rerere.enabled() {
             items.push((
                 if on {
                     "Stop remembering conflict resolutions (rerere)"

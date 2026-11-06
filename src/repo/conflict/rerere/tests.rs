@@ -4,9 +4,10 @@
 use std::path::{Path, PathBuf};
 
 use super::super::Segment;
+use super::commands;
 use super::*;
 use crate::git::{Area, StatusFile};
-use crate::repo::{DiffKey, OpKind, Refresh};
+use crate::repo::{DiffKey, OpKind, Refresh, ops};
 
 /// A fresh repository named after `name`, with one commit.
 fn repo(name: &str) -> Result<PathBuf, String> {
@@ -40,10 +41,7 @@ fn write(dir: &Path, path: &str, text: &str) -> Result<(), String> {
 
 /// `path` changed one way on `main` and another on `side`, with rerere on: `main` checked out.
 fn diverged(dir: &Path, path: &str) -> Result<(), String> {
-    for step in switch_ops(true) {
-        let args: Vec<&str> = step.iter().map(String::as_str).collect();
-        git(dir, &args)?;
-    }
+    commands::switch(dir, true)?;
     write(dir, path, "top\nold\nbottom\n")?;
     git(dir, &["add", "-A"])?;
     git(dir, &["commit", "-qm", "add"])?;
@@ -71,40 +69,57 @@ fn record(dir: &Path, path: &str, resolved: &str) -> Result<(), String> {
 #[test]
 fn the_switch_turns_rerere_on_and_off_here() -> Result<(), String> {
     let dir = repo("switch")?;
-    let on_before = enabled(&dir);
-    for step in switch_ops(true) {
-        let args: Vec<&str> = step.iter().map(String::as_str).collect();
-        git(&dir, &args)?;
-    }
-    let on = enabled(&dir);
+    let before = setup(&dir);
+    commands::switch(&dir, true)?;
+    let on = setup(&dir);
     let auto = git(&dir, &["config", "--local", "rerere.autoUpdate"]);
-    for step in switch_ops(false) {
-        let args: Vec<&str> = step.iter().map(String::as_str).collect();
-        git(&dir, &args)?;
-    }
-    let off = enabled(&dir);
-    // Unset, with an rr-cache folder: on, as git has it.
+    commands::switch(&dir, false)?;
+    let off = setup(&dir);
+    let auto_after = git(&dir, &["config", "--local", "rerere.autoUpdate"]);
+    // Unset, with an rr-cache folder: on, as git has it; staging by itself, said so.
     git(&dir, &["config", "--local", "--unset", "rerere.enabled"])?;
+    git(&dir, &["config", "--local", "rerere.autoUpdate", "true"])?;
     std::fs::create_dir_all(dir.join(".git").join("rr-cache")).map_err(|e| e.to_string())?;
-    let by_cache = enabled(&dir);
+    let by_cache = setup(&dir);
+    // A value git can't read: said, not taken for off.
+    git(&dir, &["config", "--local", "rerere.enabled", "maybe"])?;
+    let broken = setup(&dir);
     let _ = std::fs::remove_dir_all(&dir);
-    assert_eq!(on_before, Ok(false));
-    assert_eq!(on, Ok(true));
+    let state = |on, stages| Ok(Setup { on, stages });
+    assert_eq!(before, state(false, false));
+    assert_eq!(on, state(true, false));
     assert_eq!(auto.map(|s| s.trim().to_owned()), Ok("false".to_owned()));
-    assert_eq!(off, Ok(false));
-    assert_eq!(by_cache, Ok(true));
+    assert_eq!(off, state(false, false));
+    assert!(auto_after.is_err(), "{auto_after:?}");
+    assert_eq!(by_cache, state(true, true));
+    assert!(broken.is_err_and(|e| e.contains("rerere.enabled")));
+    Ok(())
+}
+
+/// Turned on in the middle of a conflict, that conflict is remembered too.
+#[test]
+fn turning_it_on_during_a_conflict_remembers_that_one() -> Result<(), String> {
+    let dir = repo("midway")?;
+    let path = "f.txt";
+    diverged(&dir, path)?;
+    commands::switch(&dir, false)?;
+    let _ = git(&dir, &["merge", "side"]);
+    commands::switch(&dir, true)?;
+    write(&dir, path, "top\nlate\nbottom\n")?;
+    git(&dir, &["add", "-A"])?;
+    git(&dir, &["commit", "-qm", "merged"])?;
+    git(&dir, &["reset", "-q", "--hard", "HEAD~1"])?;
+    let again = git(&dir, &["merge", "side"]).err().unwrap_or_default();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(reused_in(&again).contains(path), "{again}");
     Ok(())
 }
 
 #[test]
-fn reused_files_are_read_from_gits_output() {
-    let out = "Auto-merging a b/ü.txt\nCONFLICT (content): Merge conflict in a b/ü.txt\n\
-               Resolved 'a b/ü.txt' using previous resolution.\nStaged 'c' using previous \
-               resolution.\nRecorded preimage for 'd'\nAutomatic merge failed";
-    let found: Vec<String> = reused_in(out).into_iter().collect();
-    assert_eq!(found, ["a b/ü.txt", "c"]);
+fn reused_files_are_counted() {
+    let out = "Resolved 'a b/ü.txt' using previous resolution.\nStaged 'c' using previous \
+               resolution.";
     assert_eq!(reused_count(out), 2);
-    assert_eq!(reused_count("CONFLICT (content): Merge conflict in x"), 0);
     assert_eq!(reused_count(""), 0);
 }
 
@@ -207,10 +222,11 @@ fn forgetting_brings_the_conflict_back_for_good() -> Result<(), String> {
     Ok(())
 }
 
-/// Added on both sides: no base to rebuild the conflict from, nothing opened.
+/// Added on both sides: rebuilt with the empty file as its base, the reused text shown.
 #[test]
-fn a_file_added_on_both_sides_is_not_rebuilt() -> Result<(), String> {
+fn a_file_added_on_both_sides_is_rebuilt() -> Result<(), String> {
     let dir = repo("addadd")?;
+    commands::switch(&dir, true)?;
     git(&dir, &["checkout", "-qb", "side"])?;
     write(&dir, "n", "theirs\n")?;
     git(&dir, &["add", "-A"])?;
@@ -219,11 +235,100 @@ fn a_file_added_on_both_sides_is_not_rebuilt() -> Result<(), String> {
     write(&dir, "n", "ours\n")?;
     git(&dir, &["add", "-A"])?;
     git(&dir, &["commit", "-qm", "main"])?;
-    let _ = git(&dir, &["merge", "side"]);
-    write(&dir, "n", "both\n")?;
-    let rebuilt = preimage(&dir, "n", Some(InProgress::Merge));
+    record(&dir, "n", "both\n")?;
+    let again = git(&dir, &["merge", "side"]).err().unwrap_or_default();
+    let editor = open_reused(&dir, "n", Some(InProgress::Merge), true);
     let _ = std::fs::remove_dir_all(&dir);
-    assert_eq!(rebuilt, Ok(None));
+    assert!(reused_in(&again).contains("n"), "{again}");
+    let ed = editor?.ok_or("not opened")?;
+    assert_eq!(ed.recorded(0), Some("both\n"));
+    Ok(())
+}
+
+/// A conflicted file without markers that git doesn't merge with the usual markers (another
+/// marker size, `-merge`, a filter) or that is binary isn't rebuilt: no editor that would take
+/// marker-like lines for resolved text.
+#[test]
+fn files_merged_otherwise_are_not_rebuilt() -> Result<(), String> {
+    for (name, attributes, ours) in [
+        (
+            "marker-size",
+            "f conflict-marker-size=10\n",
+            "top\nours\nbottom\n",
+        ),
+        ("no-merge", "f -merge\n", "top\nours\nbottom\n"),
+        (
+            "filtered",
+            "f filter=gitcraft-none\n",
+            "top\nours\nbottom\n",
+        ),
+        ("binary", "", "top\n\0ours\nbottom\n"),
+    ] {
+        let dir = repo(name)?;
+        write(&dir, ".gitattributes", attributes)?;
+        write(&dir, "f", "top\nold\nbottom\n")?;
+        git(&dir, &["add", "-A"])?;
+        git(&dir, &["commit", "-qm", "add"])?;
+        git(&dir, &["checkout", "-qb", "side"])?;
+        write(&dir, "f", &ours.replace("ours", "theirs"))?;
+        git(&dir, &["commit", "-qam", "side"])?;
+        git(&dir, &["checkout", "-q", "main"])?;
+        write(&dir, "f", ours)?;
+        git(&dir, &["commit", "-qam", "main"])?;
+        let _ = git(&dir, &["merge", "side"]);
+        // Without markers of the usual size, whatever git left.
+        write(
+            &dir,
+            "f",
+            "top\n<<<<<<<<<< HEAD\nours\n==========\nx\n>>>>>>>>>> side\nbottom\n",
+        )?;
+        let opened = open_reused(&dir, "f", Some(InProgress::Merge), false);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(
+            matches!(opened, Ok(None)),
+            "{name}: {:?}",
+            opened.map(|e| e.map(|e| e.result))
+        );
+    }
+    Ok(())
+}
+
+/// Checked out with CRLF line ends while the index keeps LF: the reused text is still found
+/// conflict by conflict, and choosing a side keeps CRLF.
+#[test]
+fn crlf_checkouts_are_split_too() -> Result<(), String> {
+    let dir = repo("crlf")?;
+    write(&dir, ".gitattributes", "*.txt text eol=crlf\n")?;
+    git(&dir, &["add", "-A"])?;
+    git(&dir, &["commit", "-qm", "attributes"])?;
+    let path = "f.txt";
+    diverged(&dir, path)?;
+    record(&dir, path, "top\r\nkept\r\nbottom\r\n")?;
+    let _ = git(&dir, &["merge", "side"]);
+    let editor = open_reused(&dir, path, Some(InProgress::Merge), true);
+    let _ = std::fs::remove_dir_all(&dir);
+    let mut ed = editor?.ok_or("not opened")?;
+    assert!(!ed.manual);
+    assert_eq!(ed.recorded(0), Some("kept\r\n"));
+    ed.choose(0, Choice::Theirs);
+    assert_eq!(ed.result, "top\r\ntheirs\r\nbottom\r\n");
+    Ok(())
+}
+
+/// A file that can't be rebuilt isn't tried again on every refresh, until the next operation.
+#[test]
+fn an_unopenable_file_is_not_tried_again_until_the_next_operation() -> Result<(), String> {
+    let dir = repo("unopenable")?;
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let _ = std::fs::remove_dir_all(&dir);
+    let generation = tab.conflict_generation;
+    tab.reused_opened(generation, "f".to_owned(), Ok(None));
+    assert!(tab.rerere.unopenable.contains("f"));
+    tab.reused_opened(generation, "g".to_owned(), Err("too old".to_owned()));
+    assert_eq!(tab.status, Some(("too old".to_owned(), true)));
+    tab.note_reused(None);
+    assert!(tab.rerere.unopenable.is_empty());
     Ok(())
 }
 
@@ -270,8 +375,14 @@ fn the_tab_opens_a_reused_resolution_and_forgets_it() -> Result<(), String> {
         .conflict
         .as_ref()
         .map(|ed| (ed.reused, ed.recorded(0).map(str::to_owned)));
-    tab.rerere.enabled = Some(true);
-    tab.rerere_act(RerereAct::Forget(path.to_owned()), &ctx);
+    // What the banner's confirmation runs.
+    tab.run_ops(
+        "Forget",
+        forget_ops(path, true),
+        Refresh::Status,
+        OpKind::plain(),
+        &ctx,
+    );
     wait(&mut tab, &ctx, |tab| tab.busy_op.is_none());
     let after = std::fs::read_to_string(dir.join(path)).map_err(|e| e.to_string());
     let _ = std::fs::remove_dir_all(&dir);
@@ -280,7 +391,6 @@ fn the_tab_opens_a_reused_resolution_and_forgets_it() -> Result<(), String> {
         opened,
         Some((Some(Reused::Rerere), Some("kept\n".to_owned())))
     );
-    assert!(!tab.rerere.reused.contains(path));
     assert!(after?.contains("<<<<<<< "));
     Ok(())
 }
@@ -298,7 +408,10 @@ fn the_editor_shows_what_was_reused() -> Result<(), String> {
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
     let _ = std::fs::remove_dir_all(&dir);
     tab.conflict = Some(ed);
-    tab.rerere.enabled = Some(true);
+    tab.rerere.setup = Some(Setup {
+        on: true,
+        stages: false,
+    });
     let state = (tab, Vec::<crate::repo::Action>::new(), false);
     let mut harness = egui_kittest::Harness::new_ui_state(
         |ui, (tab, acts, fonts): &mut (RepoTab, Vec<crate::repo::Action>, bool)| {
@@ -313,17 +426,16 @@ fn the_editor_shows_what_was_reused() -> Result<(), String> {
         state,
     );
     harness.run();
-    harness.get_by_label_contains("git reused how you resolved");
-    harness.get_by_label("Reused resolution");
-    harness
-        .get_by_label("Forget it and bring the conflicts back")
-        .click();
+    harness.get_by_label_contains("Resolved as you did before");
+    harness.get_by_label_contains("Reused: the text now in place");
+    harness.get_by_label("Forget this resolution").click();
     harness.run();
     harness.get_by_label("Remember resolutions").click();
     harness.run();
     let acts = &harness.state().1;
     assert!(acts.iter().any(|a| matches!(a,
-        crate::repo::Action::Rerere(RerereAct::Forget(p)) if p == "dír/f.txt")));
+        crate::repo::Action::Dialog(crate::repo::Dialog::Confirm { body, .. })
+            if body.contains("dír/f.txt"))));
     assert!(
         acts.iter()
             .any(|a| matches!(a, crate::repo::Action::Rerere(RerereAct::SetEnabled(false))))

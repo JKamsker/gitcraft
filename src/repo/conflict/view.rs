@@ -13,31 +13,25 @@ impl RepoTab {
     pub(in crate::repo) fn conflict_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         let idle = self.busy_op.is_none();
-        let rerere = self.rerere.enabled;
+        let rerere = self.rerere.setup;
+        // The switch waits for what is being read or set, and for the operation running.
+        let switchable = idle && !self.rerere.busy;
         let Some(ed) = &mut self.conflict else { return };
         let (ours_name, theirs_name) = ed.side_names();
         let left = ed.unresolved();
         // While it is written (on another machine), what is saved is what is shown.
         let editable = !ed.saving;
 
-        ed.header(ui, &t, (idle && editable, rerere), left, acts);
-        ed.reused_banner(ui, &t, idle, rerere, acts);
-        ed.result_panel(ui, &t, editable);
+        ed.header(ui, &t, idle && editable, left, acts);
+        ed.reused_banner(ui, &t, idle, acts);
+        ed.result_panel(ui, &t, editable, (rerere, switchable), acts);
         ed.conflict_list(ui, &t, (&ours_name, &theirs_name), editable);
     }
 }
 
 impl ConflictEditor {
     /// Header: the file, how many conflicts are resolved, save, the whole-file actions, close.
-    /// `rerere`: whether resolutions are remembered here.
-    fn header(
-        &self,
-        ui: &mut Ui,
-        t: &Tokens,
-        (idle, rerere): (bool, Option<bool>),
-        left: usize,
-        acts: &mut Vec<Action>,
-    ) {
+    fn header(&self, ui: &mut Ui, t: &Tokens, idle: bool, left: usize, acts: &mut Vec<Action>) {
         let total = self.choices.len();
         egui::Frame::new()
             .fill(t.chrome)
@@ -71,7 +65,6 @@ impl ConflictEditor {
                             acts.push(Action::SaveConflict);
                         }
                         self.whole_file_buttons(ui, idle, acts);
-                        super::reused::rerere_switch(ui, rerere, acts);
                     });
                 });
             });
@@ -127,7 +120,15 @@ impl ConflictEditor {
     }
 
     /// Bottom: the result, editable by hand (unless being saved).
-    fn result_panel(&mut self, ui: &mut Ui, t: &Tokens, editable: bool) {
+    /// `rerere`: how rerere is set up here, and whether its switch can be used now.
+    fn result_panel(
+        &mut self,
+        ui: &mut Ui,
+        t: &Tokens,
+        editable: bool,
+        rerere: (Option<super::rerere::Setup>, bool),
+        acts: &mut Vec<Action>,
+    ) {
         egui::Panel::bottom("conflict_result")
             .resizable(true)
             .default_size(ui.available_height() * 0.42)
@@ -148,16 +149,29 @@ impl ConflictEditor {
                             .color(t.text_faint),
                     );
                     if self.manual {
-                        ui.label(RichText::new("edited by hand").color(t.warning).small())
-                            .on_hover_text(
+                        let (label, tip) = if self.reused.is_some() {
+                            (
+                                "the whole file, as it is",
+                                "It can't be matched conflict by conflict: \"Back to choices\" \
+                                 drops it and brings the conflict markers back",
+                            )
+                        } else {
+                            (
+                                "edited by hand",
                                 "Choices no longer change the result: \"Back to choices\" \
                                  applies them, and drops the edits",
-                            );
+                            )
+                        };
+                        ui.label(RichText::new(label).color(t.warning).small())
+                            .on_hover_text(tip);
                         if ui.small_button("Back to choices").clicked() {
                             self.manual = false;
                             self.result = self.rendered();
                         }
                     }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        super::reused::rerere_switch(ui, rerere, acts);
+                    });
                 });
                 egui::ScrollArea::both()
                     .id_salt("conflict_result_scroll")
@@ -269,7 +283,15 @@ fn choice_buttons(
             RichText::new(label)
         };
         let b = egui::Button::new(text).fill(if on { t.accent } else { t.field });
-        if ui.add(b).clicked() {
+        let response = ui.add(b);
+        let response = if choice == Choice::Recorded {
+            response.on_hover_text(
+                "The text git put in place of this conflict, as you resolved it before",
+            )
+        } else {
+            response
+        };
+        if response.clicked() {
             clicked = Some(choice);
         }
     }
