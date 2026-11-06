@@ -125,7 +125,11 @@ pub(crate) fn detect(dir: &Path) -> Mode {
         return Mode::Installed;
     }
     // macOS runs a quarantined app from a random read-only copy, away from the marker.
-    if dir.to_string_lossy().contains("/AppTranslocation/") {
+    if dir
+        .to_string_lossy()
+        .replace('\\', "/")
+        .contains("/AppTranslocation/")
+    {
         return Mode::Unusable(TRANSLOCATED.to_owned());
     }
     match usable(&data) {
