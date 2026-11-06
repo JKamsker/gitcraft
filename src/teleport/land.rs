@@ -46,14 +46,14 @@ pub(super) struct Target {
     /// The folder the work lands in: a new worktree, or the repository's own working tree.
     pub(super) folder: PathBuf,
     pub(super) branch: BranchPlan,
-    /// Made for this teleport ([`Destination::Create`]): removed if it fails.
+    /// Made for this teleport (made from the bundle, or cloned): removed if it fails. The work
+    /// lands in its own working tree.
     fresh: bool,
-    /// Cloned for this teleport: kept if it fails, as a clone is costly to make again.
-    pub(super) cloned: bool,
     /// What was done there, taken back unless it [`Self::landed`].
     worktree_added: bool,
     branch_made: Option<String>,
-    branch_moved: Option<(String, String)>,
+    /// A branch moved on: its name, where it was, where it was put.
+    branch_moved: Option<(String, String, String)>,
     landed: bool,
 }
 
@@ -69,28 +69,16 @@ impl Target {
     /// `src`: same kind of hashes, a branch name that can be used there, a free folder.
     pub(super) fn prepare(dest: &Destination, src: &Source, want: &Wanted) -> Result<Self, String> {
         match dest {
-            Destination::Repo(path) => Self::existing(git::toplevel(path)?, src, want, false),
-            Destination::Clone { url, path } => {
-                let machine = Machine::of(path);
-                if files::exists(path)? {
-                    return Err(format!(
-                        "{} is already there on {}: pick another folder.",
-                        crate::remote::git_path(path),
-                        machine.label()
-                    ));
-                }
-                git::clone(url, path, None)
-                    .map_err(|e| format!("Could not clone {url} on {}: {e}", machine.label()))?;
-                Self::existing(git::toplevel(path)?, src, want, true)
-            }
+            Destination::Repo(path) => Self::existing(git::toplevel(path)?, src, want),
+            Destination::Clone { url, path } => Self::clone(url, path, src, want),
             Destination::Create(path) => Self::create(path, src, want),
         }
     }
 
-    fn existing(repo: PathBuf, src: &Source, want: &Wanted, cloned: bool) -> Result<Self, String> {
+    fn existing(repo: PathBuf, src: &Source, want: &Wanted) -> Result<Self, String> {
         let machine = Machine::of(&repo);
         same_hashes(&repo, src, &machine)?;
-        let branch = branch_plan(&repo, src, want.branch, &machine)?;
+        let branch = branch_plan(&repo, src, want.branch, &machine, false)?;
         if files::exists(want.folder)? {
             return Err(format!(
                 "{} is already there on {}: pick another folder.",
@@ -104,7 +92,6 @@ impl Target {
             folder: want.folder.to_path_buf(),
             branch,
             fresh: false,
-            cloned,
             worktree_added: false,
             branch_made: None,
             branch_moved: None,
@@ -132,7 +119,6 @@ impl Target {
             folder: path.to_path_buf(),
             branch,
             fresh: true,
-            cloned: false,
             worktree_added: false,
             branch_made: None,
             branch_moved: None,
@@ -158,11 +144,41 @@ impl Target {
         Ok(target)
     }
 
+    /// A clone of the project at `path` made for the work, nothing checked out (the work is,
+    /// in its own working tree): removed again if the teleport fails.
+    fn clone(url: &str, path: &Path, src: &Source, want: &Wanted) -> Result<Self, String> {
+        let machine = Machine::of(path);
+        if files::exists(path)? {
+            return Err(format!(
+                "{} is already there on {}: pick another folder.",
+                crate::remote::git_path(path),
+                machine.label()
+            ));
+        }
+        // Removed again (when dropped) from here on, if what follows fails.
+        let mut target = Self {
+            machine,
+            repo: path.to_path_buf(),
+            folder: path.to_path_buf(),
+            branch: BranchPlan::Detached,
+            fresh: true,
+            worktree_added: false,
+            branch_made: None,
+            branch_moved: None,
+            landed: false,
+        };
+        git::clone_with(url, path, None, &["--no-checkout"])
+            .map_err(|e| format!("Could not clone {url} on {}: {e}", target.label()))?;
+        target.repo = git::toplevel(path)?;
+        target.folder = target.repo.clone();
+        same_hashes(&target.repo, src, &target.machine)?;
+        // Its own working tree is empty: the branch it names is free to take.
+        target.branch = branch_plan(&target.repo, src, want.branch, &target.machine, true)?;
+        Ok(target)
+    }
+
     /// The commits the other machine has (its refs' tips), which the bundle can leave out.
     pub(super) fn tips(&self) -> Result<Vec<String>, String> {
-        if self.fresh {
-            return Ok(Vec::new());
-        }
         let out = git::run(
             Some(&self.repo),
             &["for-each-ref", "--format=%(objectname) %(*objectname)"],
@@ -190,7 +206,7 @@ impl Target {
         .map_err(|e| format!("The bundle couldn't be unpacked on {}: {e}", self.label()))?;
         if !source::has_commit(&self.repo, &snap.worktree) {
             return Err(format!(
-                "The bundle didn't hold the work on {}: nothing was changed there.",
+                "The bundle that arrived on {} didn't hold the work.",
                 self.label()
             ));
         }
@@ -219,6 +235,22 @@ impl Target {
     /// The branch where it goes and a new worktree for it, nothing checked out yet.
     fn add_worktree(&mut self, head: &str) -> Result<(), String> {
         let folder = crate::remote::git_path(&self.folder);
+        // Checked again now, minutes after `prepare`: what came meanwhile is never taken back
+        // as if this had made it.
+        if files::exists(&self.folder)? {
+            return Err(format!(
+                "{folder} appeared on {} meanwhile: pick another folder.",
+                self.label()
+            ));
+        }
+        if let BranchPlan::New(name) = &self.branch
+            && source::has_commit(&self.repo, &format!("refs/heads/{name}"))
+        {
+            return Err(format!(
+                "{name} appeared on {} meanwhile: pick another branch name.",
+                self.label()
+            ));
+        }
         let mut args = vec!["worktree", "add", "--no-checkout"];
         match &self.branch {
             BranchPlan::New(name) => {
@@ -230,7 +262,7 @@ impl Target {
                     Some(&self.repo),
                     &["update-ref", &format!("refs/heads/{name}"), head, from],
                 )?;
-                self.branch_moved = Some((name.clone(), from.clone()));
+                self.branch_moved = Some((name.clone(), from.clone(), head.to_owned()));
                 args.extend(["--", &folder, name]);
             }
             BranchPlan::Detached => args.extend(["--detach", "--", &folder, head]),
@@ -241,7 +273,8 @@ impl Target {
         {
             self.branch_made = Some(name.clone());
         }
-        // A worktree git began to make and then failed counts too: it is taken back.
+        // A worktree git began to make and then failed counts too (the folder wasn't there just
+        // before): it is taken back.
         self.worktree_added = added.is_ok() || files::exists(&self.folder).unwrap_or(false);
         added.map(|_| ())
     }
@@ -255,11 +288,20 @@ impl Target {
                     &["update-ref", "--no-deref", "HEAD", head],
                 )?;
             }
-            BranchPlan::New(name)
-            | BranchPlan::Same(name)
-            | BranchPlan::FastForward { name, .. } => {
+            BranchPlan::New(name) => {
                 let full = format!("refs/heads/{name}");
                 git::run(Some(&self.repo), &["update-ref", &full, head, ""])?;
+                git::run(Some(&self.repo), &["symbolic-ref", "HEAD", &full])?;
+            }
+            BranchPlan::Same(name) => {
+                git::run(
+                    Some(&self.repo),
+                    &["symbolic-ref", "HEAD", &format!("refs/heads/{name}")],
+                )?;
+            }
+            BranchPlan::FastForward { name, from } => {
+                let full = format!("refs/heads/{name}");
+                git::run(Some(&self.repo), &["update-ref", &full, head, from])?;
                 git::run(Some(&self.repo), &["symbolic-ref", "HEAD", &full])?;
             }
         }
@@ -269,9 +311,11 @@ impl Target {
     /// The working tree and the index as they were on the source.
     fn restore(&self, snap: &Snapshot) -> Result<(), String> {
         let here = Some(self.folder.as_path());
-        // Files kept in Git LFS come as their pointers: `LFS: Pull` fetches them.
+        // Files kept in Git LFS come as their pointers: `LFS: Pull` fetches them. Writing a
+        // large working tree to a slow disk may take minutes.
         let skip_lfs = Call {
             env: vec![("GIT_LFS_SKIP_SMUDGE", "1".to_owned())],
+            long: true,
             ..Call::default()
         };
         let tree = |commit: &str| format!("{commit}^{{tree}}");
@@ -284,7 +328,14 @@ impl Target {
         if !snap.intent_to_add.is_empty() {
             git::run_call(
                 here,
-                &["add", "-N", "--pathspec-from-file=-", "--pathspec-file-nul"],
+                // Names, not patterns: a file called `*.c` is that file only.
+                &[
+                    "--literal-pathspecs",
+                    "add",
+                    "-N",
+                    "--pathspec-from-file=-",
+                    "--pathspec-file-nul",
+                ],
                 Call {
                     stdin: Some(protocol::nul_list(&snap.intent_to_add)),
                     ..Call::default()
@@ -339,10 +390,11 @@ impl Target {
         if let Some(name) = self.branch_made.take() {
             let _ = git::run(Some(&self.repo), &["branch", "-D", "--", &name]);
         }
-        if let Some((name, from)) = self.branch_moved.take() {
+        // Only from where this put it: a branch moved since (a pull in its tab) stays.
+        if let Some((name, from, to)) = self.branch_moved.take() {
             let _ = git::run(
                 Some(&self.repo),
-                &["update-ref", &format!("refs/heads/{name}"), &from],
+                &["update-ref", &format!("refs/heads/{name}"), &from, &to],
             );
         }
     }
@@ -391,13 +443,18 @@ fn branch_plan(
     src: &Source,
     branch: Option<&str>,
     machine: &Machine,
+    main_is_free: bool,
 ) -> Result<BranchPlan, String> {
     let Some(name) = branch else {
         return Ok(BranchPlan::Detached);
     };
     check_branch_name(repo, name, machine)?;
     let worktrees = git::worktree_list(repo, None)?;
-    if let Some(wt) = worktrees.iter().find(|w| w.branch.as_deref() == Some(name)) {
+    if let Some(wt) = worktrees
+        .iter()
+        .filter(|w| !(main_is_free && w.main))
+        .find(|w| w.branch.as_deref() == Some(name))
+    {
         return Err(format!(
             "{name} is checked out on {} already, in {}: pick another branch name.",
             machine.label(),

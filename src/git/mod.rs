@@ -61,13 +61,27 @@ fn not_an_option(rev: &str) -> Result<&str, String> {
 /// `git clone url dest`, run from `dest`'s parent.
 /// For a `dest` in WSL or over SSH, git there clones it, from that machine's home folder.
 pub fn clone(url: &str, dest: &Path, creds: Option<&Credentials>) -> Result<(), String> {
-    if let Some(target) = crate::remote::parse(dest) {
-        let (from, there) = clone_from(&target.path);
-        let from = crate::remote::encode(&target.host, from);
-        return run_with(Some(&from), &["clone", "--", url, &there], creds).map(|_| ());
-    }
-    let dest = dest.to_string_lossy();
-    run_with(None, &["clone", "--", url, &dest], creds).map(|_| ())
+    clone_with(url, dest, creds, &[])
+}
+
+/// [`clone`] with `options` (`--no-checkout`) before the URL.
+pub fn clone_with(
+    url: &str,
+    dest: &Path,
+    creds: Option<&Credentials>,
+    options: &[&str],
+) -> Result<(), String> {
+    let (from, there) = match crate::remote::parse(dest) {
+        Some(target) => {
+            let (from, there) = clone_from(&target.path);
+            (Some(crate::remote::encode(&target.host, from)), there)
+        }
+        None => (None, dest.to_string_lossy().into_owned()),
+    };
+    let mut args = vec!["clone"];
+    args.extend_from_slice(options);
+    args.extend(["--", url, &there]);
+    run_with(from.as_deref(), &args, creds).map(|_| ())
 }
 
 /// Where git clones into `dest` (a path on another machine) from, and `dest` as it is given:

@@ -56,6 +56,16 @@ pub fn inspect(repo: &Path) -> Result<Source, String> {
     if !unmerged.is_empty() {
         return Err("Some files have conflicts: resolve them first.".to_owned());
     }
+    if git_text(&repo, &["rev-parse", "--is-shallow-repository"]).is_ok_and(|s| s.trim() == "true")
+    {
+        return Err(
+            "This is a shallow clone: its history stops short, and the repository there would \
+             be missing the commits it builds on. Fetch the whole history first (git fetch \
+             --unshallow)."
+                .to_owned(),
+        );
+    }
+    refuse_hidden_changes(&repo)?;
     let staged = git::run_bytes(Some(&repo), &["ls-files", "-s", "-z"])?;
     if staged
         .split(|&b| b == 0)
@@ -81,6 +91,29 @@ pub fn inspect(repo: &Path) -> Result<Source, String> {
         remotes,
         object_format,
     })
+}
+
+/// Files git is told to look away from (`update-index --assume-unchanged`, or
+/// `--skip-worktree` outside a sparse checkout): `add -A` doesn't see their changes, which
+/// would stay behind without a word.
+fn refuse_hidden_changes(repo: &Path) -> Result<(), String> {
+    let listed = git::run_bytes(Some(repo), &["ls-files", "-v", "-z"])?;
+    let sparse = git_text(repo, &["config", "--bool", "core.sparseCheckout"])
+        .is_ok_and(|v| v.trim() == "true");
+    for entry in listed.split(|&b| b == 0).filter(|e| e.len() > 2) {
+        let path = String::from_utf8_lossy(&entry[2..]);
+        let hidden = match entry[0] {
+            b'S' => !sparse,
+            tag => tag.is_ascii_lowercase(),
+        };
+        if hidden {
+            return Err(format!(
+                "{path} is marked so that git doesn't look at its changes (assume-unchanged \
+                 or skip-worktree), and they wouldn't be carried. Clear the mark first."
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// `sha1` or `sha256` (git before 2.29 knows only the first, and doesn't answer).
@@ -123,7 +156,8 @@ pub struct Snapshot {
     /// The commit of the working tree, on the index's.
     pub worktree: String,
     /// Files added with `add -N` (intent to add): in no tree of the index, but known to it.
-    pub intent_to_add: Vec<String>,
+    /// As git names them, byte for byte.
+    pub intent_to_add: Vec<Vec<u8>>,
     /// Some committed files are kept in Git LFS: on the other machine they arrive as their
     /// pointers.
     pub lfs: bool,
@@ -187,12 +221,29 @@ impl Snapshot {
 
     /// The trees, their commits, the checks on what they hold, then the ref.
     fn write(&mut self, src: &Source) -> Result<(), String> {
+        // The index copied is of the commit the checks were made for: one made or checked out
+        // since (in a terminal) would be told apart wrongly into staged changes.
+        let head_now = self.git_line(&["rev-parse", "--verify", "-q", "HEAD^{commit}"]);
+        let branch_now = git_text(&self.repo, &["symbolic-ref", "-q", "--short", "HEAD"])
+            .ok()
+            .map(|b| b.trim().to_owned())
+            .filter(|b| !b.is_empty());
+        if head_now.as_deref() != Ok(src.head.as_str()) || branch_now != src.branch {
+            return Err(
+                "The checked-out commit changed while the teleport got ready: try again."
+                    .to_owned(),
+            );
+        }
         let index_tree = self.git_line(&["write-tree"])?;
-        self.intent_to_add = protocol::parse_paths(&self.git(
+        self.intent_to_add = protocol::parse_raw_paths(&self.git(
             &["diff-files", "--name-only", "-z", "--diff-filter=A"],
             None,
         )?);
-        self.git(&["add", "-A"], None)?;
+        // Before `add -A`, whose LFS filter would put their contents in this repository's LFS
+        // store.
+        self.check_lfs()?;
+        self.git(&["add", "-A"], None)
+            .map_err(|e| format!("Couldn't take a snapshot of the working tree: {e}"))?;
         let worktree_tree = self.git_line(&["write-tree"])?;
         let message = "gitcraft teleport: staged changes";
         self.index = self.git_line(&[
@@ -214,7 +265,6 @@ impl Snapshot {
             &worktree_tree,
         ])?;
         self.refuse_nested_repositories(&src.head)?;
-        self.check_lfs(&src.head)?;
         self.git(&["update-ref", &self.ref_name, &self.worktree, ""], None)?;
         Ok(())
     }
@@ -243,16 +293,24 @@ impl Snapshot {
 
     /// Changed files kept in Git LFS: their contents are in this machine's LFS store only, and
     /// would arrive as pointers to nothing. Committed ones arrive as pointers, fetched there.
-    fn check_lfs(&mut self, head: &str) -> Result<(), String> {
-        if !git::uses_lfs(&self.repo) {
-            return Ok(());
-        }
-        self.lfs = true;
-        let mut changed = Vec::new();
-        for (from, to) in [(head, self.index.as_str()), (head, self.worktree.as_str())] {
-            let out = self.git(&["diff-tree", "-r", "-z", "--name-only", from, to], None)?;
-            changed.extend(protocol::parse_paths(&out));
-        }
+    /// Asked of git for every changed path, so that any `.gitattributes` (a folder's own,
+    /// `info/attributes`, the user's) counts.
+    fn check_lfs(&mut self) -> Result<(), String> {
+        self.lfs = git::uses_lfs(&self.repo);
+        let mut changed = protocol::parse_raw_paths(&self.git(
+            &["diff-index", "--cached", "--name-only", "-z", "HEAD"],
+            None,
+        )?);
+        changed.extend(protocol::parse_raw_paths(&self.git(
+            &[
+                "ls-files",
+                "-z",
+                "--modified",
+                "--others",
+                "--exclude-standard",
+            ],
+            None,
+        )?));
         changed.sort();
         changed.dedup();
         if changed.is_empty() {

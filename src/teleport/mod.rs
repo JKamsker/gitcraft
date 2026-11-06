@@ -29,7 +29,7 @@ use std::sync::{Condvar, Mutex, PoisonError};
 pub use land::Destination;
 pub(crate) use protocol::LARGE;
 pub use source::{Source, inspect};
-pub(crate) use urls::find_clones;
+pub(crate) use urls::{find_clones, shown_url};
 
 use crate::remote::{self, Host};
 
@@ -61,6 +61,17 @@ impl Machine {
             Self::Here => PathBuf::from(there),
             Self::There(host) => remote::encode(host, there),
         }
+    }
+}
+
+/// The home folder of `machine`, as a path there: asks it, for one elsewhere.
+pub fn home_of(machine: &Machine) -> Result<String, String> {
+    match machine {
+        Machine::Here => std::env::var_os("USERPROFILE")
+            .or_else(|| std::env::var_os("HOME"))
+            .map(|h| PathBuf::from(h).display().to_string())
+            .ok_or_else(|| "could not find the home folder".to_owned()),
+        Machine::There(host) => files::home(host),
     }
 }
 
@@ -153,6 +164,8 @@ pub struct Landed {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Step {
     Checking,
+    /// Making the clone the work goes in.
+    Cloning,
     Snapshot,
     Bundling,
     /// The bundle is this large: waiting for the user to say whether to send it.
@@ -170,6 +183,7 @@ impl Step {
     pub fn label(self) -> String {
         match self {
             Step::Checking => "Checking both machines…".to_owned(),
+            Step::Cloning => "Cloning the project there…".to_owned(),
             Step::Snapshot => "Taking a snapshot of the work…".to_owned(),
             Step::Bundling => "Bundling the commits…".to_owned(),
             Step::Confirm(size) => format!("The bundle is {}.", protocol::size_label(size)),
@@ -181,6 +195,12 @@ impl Step {
             Step::Landing => "Unpacking and checking out…".to_owned(),
             Step::CleaningUp => "Cleaning up…".to_owned(),
         }
+    }
+
+    /// Whether cancelling still stops it: once the bundle is being unpacked there, it runs
+    /// to its end (or its failure, which takes back what it made).
+    pub fn stoppable(self) -> bool {
+        !matches!(self, Step::Landing | Step::CleaningUp)
     }
 }
 
@@ -214,6 +234,11 @@ impl Job {
     pub fn cancel(&self) {
         self.cancel.store(true, Ordering::Relaxed);
         self.answer(false);
+    }
+
+    /// Whether it was asked to stop.
+    pub fn cancelled(&self) -> bool {
+        self.cancel.load(Ordering::Relaxed)
     }
 
     /// Whether to send a large bundle.
@@ -272,9 +297,31 @@ fn new_id() -> String {
     )
 }
 
+/// How a teleport ended without landing.
+#[derive(Clone, Debug)]
+pub struct Failed {
+    /// What the user is told: why, and what was left.
+    pub message: String,
+    /// The user stopped it.
+    pub cancelled: bool,
+}
+
+impl From<Failed> for String {
+    fn from(failed: Failed) -> Self {
+        failed.message
+    }
+}
+
 /// Carries out `plan`, saying in `job` where it is. Never on the window's thread: it waits for
-/// both machines and for the user. What it made is taken back if it fails.
-pub fn run(plan: &Plan, job: &Job) -> Result<Landed, String> {
+/// both machines and for the user. What it made is taken back if it fails, a clone too.
+pub fn run(plan: &Plan, job: &Job) -> Result<Landed, Failed> {
+    attempt(plan, job).map_err(|message| Failed {
+        cancelled: message == CANCELLED,
+        message,
+    })
+}
+
+fn attempt(plan: &Plan, job: &Job) -> Result<Landed, String> {
     job.set(Step::Checking);
     let src = source::inspect(&plan.source)?;
     job.go_on()?;
@@ -297,18 +344,14 @@ pub fn run(plan: &Plan, job: &Job) -> Result<Landed, String> {
         branch: plan.branch.as_deref(),
         folder: &folder,
     };
+    if matches!(destination, Destination::Clone { .. }) {
+        job.set(Step::Cloning);
+    }
     // Taken back when dropped, unless it landed.
     let mut target = land::Target::prepare(&destination, &src, &want)?;
     let landed = carry(plan, job, &src, &mut target);
     job.set(Step::CleaningUp);
-    match landed {
-        Ok(landed) => Ok(landed),
-        Err(e) if target.cloned => Err(format!(
-            "{e} The clone in {} stays.",
-            remote::git_path(&target.repo)
-        )),
-        Err(e) => Err(e),
-    }
+    landed
 }
 
 /// The folder a destination is about.
@@ -357,7 +400,8 @@ fn carry(
     }
     if snap.lfs {
         notes.push(
-            "Files kept in Git LFS arrived as pointers: LFS: Pull fetches their contents."
+            "Files kept in Git LFS arrived as their pointers; the palette's LFS: Pull fetches \
+             those that were pushed."
                 .to_owned(),
         );
     }
@@ -390,7 +434,7 @@ fn send(machine: &Machine, id: &str, bundle: &[u8], job: &Job) -> Result<files::
     let arrived = upload.size()?;
     if arrived != total {
         return Err(format!(
-            "Only {} of the bundle's {} arrived on {}: nothing was changed there.",
+            "Only {} of the bundle's {} arrived on {}.",
             protocol::size_label(arrived),
             protocol::size_label(total),
             machine.label()

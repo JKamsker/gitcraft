@@ -103,19 +103,19 @@ pub(super) fn parse_lfs_paths(out: &[u8]) -> Vec<String> {
         .collect()
 }
 
-/// NUL-separated paths (`--name-only -z`), the empty ones left out.
-pub(super) fn parse_paths(out: &[u8]) -> Vec<String> {
+/// NUL-separated paths as git printed them, byte for byte (a name needn't be UTF-8).
+pub(super) fn parse_raw_paths(out: &[u8]) -> Vec<Vec<u8>> {
     out.split(|&b| b == 0)
         .filter(|p| !p.is_empty())
-        .map(|p| String::from_utf8_lossy(p).into_owned())
+        .map(<[u8]>::to_vec)
         .collect()
 }
 
 /// Paths as NUL-separated input (`--stdin -z`, `--pathspec-from-file=- --pathspec-file-nul`).
-pub(super) fn nul_list(paths: &[String]) -> Vec<u8> {
+pub(super) fn nul_list<P: AsRef<[u8]>>(paths: &[P]) -> Vec<u8> {
     let mut out = Vec::new();
     for path in paths {
-        out.extend_from_slice(path.as_bytes());
+        out.extend_from_slice(path.as_ref());
         out.push(0);
     }
     out

@@ -46,6 +46,25 @@ fn bare_host(authority: &str) -> String {
     host.to_lowercase()
 }
 
+/// `url` as it is shown: without a user name or token in it (`https://token@host/…`).
+pub(crate) fn shown_url(url: &str) -> String {
+    let url = url.trim();
+    let Some((scheme, rest)) = url.split_once("://") else {
+        return url.to_owned();
+    };
+    let (authority, path) = rest.split_once('/').map_or((rest, ""), |(a, p)| (a, p));
+    let host = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
+    // Only a password or token is hidden: `ssh://git@host` says who signs in, not a secret.
+    let keep_user = authority
+        .rsplit_once('@')
+        .is_some_and(|(user, _)| !user.contains(':') && scheme.starts_with("ssh"));
+    if keep_user || !authority.contains('@') {
+        url.to_owned()
+    } else {
+        format!("{scheme}://{host}/{path}")
+    }
+}
+
 /// Whether some URL of `theirs` names a project of `ours`.
 pub(crate) fn same_project(ours: &[String], theirs: &[String]) -> bool {
     let ours: Vec<String> = ours.iter().map(|u| project_key(u)).collect();
@@ -99,6 +118,20 @@ mod tests {
             project_key("ssh://git@[::1]:2222/o/r.git"),
             "::1/o/r",
             "an IPv6 host"
+        );
+    }
+
+    #[test]
+    fn tokens_are_not_shown() {
+        assert_eq!(
+            shown_url("https://ghp_secret@github.com/o/r.git"),
+            "https://github.com/o/r.git"
+        );
+        assert_eq!(shown_url("https://me:pw@host/o/r"), "https://host/o/r");
+        assert_eq!(shown_url("ssh://git@host/o/r"), "ssh://git@host/o/r");
+        assert_eq!(
+            shown_url("git@github.com:o/r.git"),
+            "git@github.com:o/r.git"
         );
     }
 
