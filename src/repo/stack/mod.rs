@@ -45,6 +45,8 @@ pub(crate) enum StackAct {
     OpenPublish(String),
     /// Open new pull requests as drafts, or not.
     PublishDraft(bool),
+    /// The title of the new pull request of the layer at that place in the preview.
+    PublishTitle(usize, String),
     /// Publish as previewed.
     StartPublish,
     ClosePublish,
@@ -155,6 +157,14 @@ impl RepoTab {
             StackAct::PublishDraft(draft) => {
                 if let Some(p) = &mut self.stacks.publish {
                     p.draft = draft;
+                }
+            }
+            StackAct::PublishTitle(i, title) => {
+                let plans = self.stacks.publish.as_mut().and_then(|p| p.plans.as_mut());
+                if let Some(Ok(plans)) = plans
+                    && let Some(plan) = plans.get_mut(i)
+                {
+                    plan.title = title;
                 }
             }
             StackAct::StartPublish => self.start_publish(ctx),

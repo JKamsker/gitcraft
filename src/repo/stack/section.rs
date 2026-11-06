@@ -65,7 +65,7 @@ impl RepoTab {
             if !tree.rows.iter().any(|(_, l)| shown(l)) {
                 continue;
             }
-            let r = title_row(ui, tree);
+            let r = title_row(ui, tree, self.forge().map(|f| f.noun()));
             if let Some(forge) = self.forge() {
                 egui::Popup::context_menu(&r)
                     .style(crate::theme::menu_style)
@@ -396,7 +396,8 @@ impl RepoTab {
 }
 
 /// A stack's title: `main → schema → api → ui`, and how many need restacking.
-fn title_row(ui: &mut Ui, tree: &Tree) -> Response {
+/// `noun`: what the forge calls its pull requests, when there is one to publish them on.
+fn title_row(ui: &mut Ui, tree: &Tree, noun: Option<&str>) -> Response {
     let t = Tokens::get(ui.ctx());
     let (rect, resp) = widgets::keyed_row(ui, ROW_H, ("stack-title", &tree.root));
     let painter = ui.painter_at(rect);
@@ -429,7 +430,10 @@ fn title_row(ui: &mut Ui, tree: &Tree) -> Response {
             theme::medium(11.5),
             t.text_dim,
         );
-    resp.on_hover_text(format!("{title}\nRight-click to publish them"))
+    match noun {
+        Some(noun) => resp.on_hover_text(format!("{title}\nRight-click to publish its {noun}s")),
+        None => resp.on_hover_text(title),
+    }
 }
 
 /// `noun` with a capital first letter: "Merge request".

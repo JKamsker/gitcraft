@@ -9,7 +9,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use super::{Hosting, NewPullRequest, Pages, Provider, PullRequest, cli};
+use super::{Found, Hosting, NewPullRequest, Pages, PrState, Provider, PullRequest, cli};
 use crate::avatars::Hint;
 use crate::pr_post::Target;
 use crate::pull_request::{PrDetails, at};
@@ -58,7 +58,7 @@ impl Provider for GitHub {
                 "--limit",
                 "100",
                 "--json",
-                "number,title,headRefName,baseRefName,headRefOid,author,url,isDraft",
+                "number,title,headRefName,baseRefName,headRefOid,author,url,isDraft,isCrossRepository",
             ],
         )?;
         parse_list(&out)
@@ -78,6 +78,42 @@ impl Provider for GitHub {
     fn retarget(&self, repo: &Path, _: &Hosting, number: u64, base: &str) -> Result<(), String> {
         let number = number.to_string();
         gh(repo, &["pr", "edit", &number, "--base", base]).map(drop)
+    }
+
+    fn find(&self, repo: &Path, _: &Hosting, branch: &str) -> Result<Option<Found>, String> {
+        let out = gh(
+            repo,
+            &[
+                "pr",
+                "list",
+                "--head",
+                branch,
+                "--state",
+                "all",
+                "--limit",
+                "20",
+                "--json",
+                "number,title,headRefName,baseRefName,headRefOid,author,url,isDraft,isCrossRepository,state",
+            ],
+        )?;
+        let states: Vec<PrState> = serde_json::from_str::<Value>(&out)
+            .ok()
+            .and_then(|v| v.as_array().cloned())
+            .unwrap_or_default()
+            .iter()
+            .map(|item| match at(item, "/state") {
+                "OPEN" => PrState::Open,
+                "MERGED" => PrState::Merged,
+                _ => PrState::Closed,
+            })
+            .collect();
+        let found = parse_list(&out)?
+            .into_iter()
+            .zip(states)
+            .filter(|(pr, _)| pr.branch == branch)
+            .map(|(pr, state)| Found { pr, state })
+            .collect();
+        Ok(super::pick_found(found))
     }
 
     /// The authors' GitHub accounts, from the repository's latest commits (the API ties each
@@ -139,6 +175,10 @@ fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
             title: at(item, "/title").to_owned(),
             branch: at(item, "/headRefName").to_owned(),
             base: at(item, "/baseRefName").to_owned(),
+            from_fork: item
+                .get("isCrossRepository")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
             sha: at(item, "/headRefOid").to_owned(),
             author: login(item, "/author/login"),
             url: at(item, "/url").to_owned(),

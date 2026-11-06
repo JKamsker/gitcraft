@@ -5,6 +5,7 @@ use egui::RichText;
 
 use super::{StackAct, trees};
 use crate::forge::stack::{self, Input, LayerPlan, Report, Step, Target};
+use crate::repo::actions::{BranchRef, compare_branches_action};
 use crate::repo::messages::{Msg, spawn_or};
 use crate::repo::{Action, OpKind, Refresh, RepoTab, widgets};
 use crate::theme::{self, Tokens};
@@ -25,7 +26,7 @@ impl RepoTab {
     pub(super) fn open_publish(&mut self, branch: &str, ctx: &egui::Context) {
         let (Some(hosting), Some(_)) = (self.hosting.clone(), self.default_remote()) else {
             self.status = Some((
-                "This repository isn't on a forge gitcraft knows: there is nowhere to publish."
+                "This repository isn't on a forge gitcraft knows: there is nowhere to publish to."
                     .to_owned(),
                 true,
             ));
@@ -67,9 +68,10 @@ impl RepoTab {
         self.then(
             ctx,
             move || {
-                // Asked now: the list the tab shows may be minutes old.
-                let open = hosting.forge.provider().list(&path, &hosting)?;
-                stack::plan(&path, &inputs, &open)
+                // Each branch's pull request asked of the forge now, whatever its state.
+                let provider = hosting.forge.provider();
+                let find = |branch: &str| provider.find(&path, &hosting, branch);
+                stack::plan(&path, &inputs, &find)
             },
             move |tab, found, _| {
                 if let Some(p) = tab.stacks.publish.as_mut().filter(|p| p.id == id) {
@@ -135,19 +137,41 @@ impl RepoTab {
 
     /// Takes in how publishing went.
     fn publish_done(&mut self, noun: &str, total: usize, report: Report, ctx: &egui::Context) {
+        if let Some((_, e)) = &report.failed
+            && crate::git::is_auth_error(e)
+        {
+            // Asked to sign in, as any push that needs it is (the layers done stay done).
+            let label = format!("Publish {noun}s");
+            self.op_done(
+                label,
+                Err(e.clone()),
+                Refresh::All,
+                OpKind::plain(),
+                false,
+                ctx,
+            );
+            return;
+        }
         self.busy_op = None;
-        self.op_started = None;
+        let long = self
+            .op_started
+            .take()
+            .is_some_and(|t| t.elapsed() > crate::repo::operations::LONG_OP);
         self.status = Some(match &report.failed {
             None => (summary(noun, &report), false),
             Some((branch, e)) => (
                 format!(
-                    "Published {} of {total} {noun}s, then {branch} failed: {e}. Publish again \
-                     to go on: what was done is kept, nothing is opened twice.",
+                    "{} of {total} done, then {branch} failed: {e}. Publish again to go on: \
+                     what was done stays, no {noun} is opened twice.",
                     report.done.len()
                 ),
                 true,
             ),
         });
+        if long && let Some((message, failed)) = self.status.clone() {
+            self.finished
+                .push((format!("{} · {message}", self.name), failed));
+        }
         // Asked again now, whenever they were last.
         self.prs_loaded = None;
         self.load_prs(ctx);
@@ -180,9 +204,9 @@ impl RepoTab {
                 ui.add_space(6.0);
                 ui.label(
                     RichText::new(format!(
-                        "Each branch is pushed (with a lease), bottom first, and its {noun} goes \
-                         into the branch below it. Run again later to update them all: nothing \
-                         is opened twice."
+                        "Each branch is pushed, bottom first, and its {noun} goes into the branch \
+                         below it. Publish again later to update them all: none is opened twice, \
+                         and a branch is never pushed over commits it doesn't have."
                     ))
                     .color(t.text_dim),
                 );
@@ -208,11 +232,14 @@ impl RepoTab {
                         egui::ScrollArea::vertical()
                             .max_height(360.0)
                             .show(ui, |ui| {
-                                for plan in plans {
-                                    plan_row(ui, &t, noun, plan);
+                                for (i, plan) in plans.iter().enumerate() {
+                                    plan_row(ui, &t, noun, i, plan, idle, acts);
                                 }
                             });
-                        if plans.iter().any(|p| p.step() == Step::Create) {
+                        if plans
+                            .iter()
+                            .any(|p| matches!(p.step(), Step::Create { .. }))
+                        {
                             ui.add_space(6.0);
                             ui.checkbox(&mut draft, format!("Open new {noun}s as drafts"));
                         }
@@ -249,46 +276,84 @@ impl RepoTab {
     }
 }
 
-/// One layer of the preview: the branch, where its pull request goes, what happens to it, and
-/// its patch (commits, files changed).
-fn plan_row(ui: &mut egui::Ui, t: &Tokens, noun: &str, plan: &LayerPlan) {
-    let (what, color) = match plan.step() {
-        Step::Create => (format!("new {noun} into {}", plan.base), t.accent),
-        Step::Retarget { from } => (
+/// One layer of the preview: the branch, where its pull request goes, what happens to it
+/// (the title of a new one, which can be changed), and its patch: commits, files changed, and
+/// a button for its changes in full.
+fn plan_row(
+    ui: &mut egui::Ui,
+    t: &Tokens,
+    noun: &str,
+    i: usize,
+    plan: &LayerPlan,
+    idle: bool,
+    acts: &mut Vec<Action>,
+) {
+    let step = plan.step();
+    let (what, color) = match &step {
+        Step::Create { replaces: None } => (format!("new {noun} into {}", plan.base), t.accent),
+        Step::Create { replaces: Some(n) } => (
             format!(
-                "#{} into {} (now {from})",
-                plan.existing.as_ref().map_or(0, |p| p.number),
+                "new {noun} into {} (#{n} was closed without merging)",
                 plan.base
             ),
+            t.accent,
+        ),
+        Step::Retarget { number, from } => (
+            format!("#{number}: into {} instead of {from}", plan.base),
             t.warning,
         ),
-        Step::Push => (
-            format!(
-                "#{} into {}: push",
-                plan.existing.as_ref().map_or(0, |p| p.number),
-                plan.base
-            ),
-            t.text_dim,
-        ),
-        Step::Skip(n) => (
-            format!("#{n} is merged or closed: left alone"),
+        Step::Push(n) => (format!("#{n}: push the new commits"), t.text_dim),
+        Step::Merged(n) => (format!("#{n} is merged: left alone"), t.text_faint),
+        Step::Empty => (
+            format!("nothing of its own: pushed, no {noun}"),
             t.text_faint,
         ),
     };
     ui.horizontal_wrapped(|ui| {
         ui.label(RichText::new(&plan.branch).font(theme::medium(12.5)));
         ui.label(RichText::new(what).color(color));
+        if !matches!(step, Step::Merged(_))
+            && ui
+                .small_button("Changes")
+                .on_hover_text(format!(
+                    "What {} adds to {}, in full",
+                    plan.branch, plan.base
+                ))
+                .clicked()
+        {
+            acts.push(Action::Stack(StackAct::ClosePublish));
+            acts.push(compare_branches_action(
+                BranchRef::local(&plan.base),
+                BranchRef::local(&plan.branch),
+                true,
+            ));
+        }
     });
+    if matches!(step, Step::Create { .. }) {
+        let mut title = plan.title.clone();
+        ui.horizontal(|ui| {
+            ui.add_space(12.0);
+            ui.add_enabled(
+                idle,
+                egui::TextEdit::singleline(&mut title)
+                    .hint_text("Title")
+                    .desired_width(ui.available_width() - 8.0),
+            );
+        });
+        if title != plan.title {
+            acts.push(Action::Stack(StackAct::PublishTitle(i, title)));
+        }
+    }
     if let Some(from) = &plan.reparent_from {
         ui.label(
             RichText::new(format!(
-                "   {from}'s {noun} is merged or closed: {} goes into {} now",
+                "   {from}'s {noun} was merged: {} goes into {} now",
                 plan.branch, plan.base
             ))
             .color(t.text_faint),
         );
     }
-    if !matches!(plan.step(), Step::Skip(_)) {
+    if !matches!(step, Step::Merged(_)) {
         let n = plan.commits.len();
         let mut patch = format!("   {n} commit{}", if n == 1 { "" } else { "s" });
         if !plan.stat.is_empty() {
@@ -321,7 +386,7 @@ fn summary(noun: &str, report: &Report) -> String {
     let parts: Vec<String> = report
         .done
         .iter()
-        .map(|(branch, what)| format!("{branch}: {what}"))
+        .map(|(branch, what)| format!("{branch} ({what})"))
         .collect();
-    format!("Published: {}", parts.join(" · "))
+    format!("Published {noun}s: {}", parts.join(", "))
 }
