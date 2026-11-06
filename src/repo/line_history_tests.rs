@@ -82,6 +82,21 @@ fn lines_on_disk_or_staged_are_found_in_head_first() -> Result<(), String> {
 }
 
 #[test]
+fn lines_of_a_file_renamed_but_not_committed_are_found_under_its_old_name() -> Result<(), String> {
+    let dir = history_repo("line-history-renamed")?;
+    must(&dir, &["mv", PATH, "moved.txt"])?;
+    // Staged as it was, and edited on disk since: line 7 is HEAD's 6 (old 5, "five").
+    let staged = git::line_history(&dir, &LinesAt::Index, "moved.txt", (6, 6))?;
+    assert_eq!(summaries(&staged), ["five", "one"]);
+    let text = std::fs::read_to_string(dir.join("moved.txt")).map_err(|e| e.to_string())?;
+    write(&dir, "moved.txt", &format!("added\n{text}"))?;
+    let on_disk = git::line_history(&dir, &LinesAt::WorkTree, "moved.txt", (7, 7))?;
+    assert_eq!(summaries(&on_disk), ["five", "one"]);
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+#[test]
 fn lines_past_the_end_and_files_not_there_say_so() -> Result<(), String> {
     let dir = scratch(
         "line-history-errors",

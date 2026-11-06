@@ -90,7 +90,7 @@ pub fn picked_lines(
     chosen: &BTreeSet<usize>,
 ) -> Result<PickedLines, &'static str> {
     let Some(((new_at, new_path), (old_at, old_path))) = sides(key, old_path) else {
-        return Err("A file that isn't committed has no history yet");
+        return Err("Untracked and conflicted files have no line history");
     };
     match numbers(lines, sel, chosen) {
         (Some(range), _) => Ok(PickedLines {
@@ -103,7 +103,7 @@ pub fn picked_lines(
             at: old_at,
             range,
         }),
-        (None, None) => Err("Select some lines first: drag over them, or click changed lines"),
+        (None, None) => Err("Select some lines first: drag over their text"),
     }
 }
 

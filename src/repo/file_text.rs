@@ -272,11 +272,26 @@ pub(crate) fn show(
                 }
             }
         });
+    // Ctrl+C copies the lines picked.
+    let copy = !ui.ctx().egui_wants_keyboard_input()
+        && ui.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Copy)));
+    if copy && let Some(picked) = pick {
+        ui.ctx().copy_text(picked_text(data, picked));
+    }
     ui.data_mut(|d| {
         d.insert_temp(pick_id, pick);
         d.insert_temp(drag_id, dragging);
     });
     asked
+}
+
+/// The text of the lines `picked`, one per line.
+fn picked_text(data: &FileText, picked: LinePick) -> String {
+    let (a, b) = picked.range();
+    data.lines
+        .get(a..=b.min(data.lines.len().saturating_sub(1)))
+        .map(|l| l.join("\n"))
+        .unwrap_or_default()
 }
 
 /// The right-click menu of the lines `picked`: their history, or copying them.
@@ -296,10 +311,14 @@ fn lines_menu(
             } else {
                 format!("lines {start}–{end}")
             };
+            if ui.button("Copy").clicked() {
+                ui.ctx().copy_text(picked_text(data, picked));
+            }
             match history {
                 Ok(()) => {
                     let b = ui.button("History of these lines").on_hover_text(format!(
-                        "Every commit that changed {which}, followed through renames"
+                        "Every commit up to this version that changed {which}, followed back \
+                         through earlier edits and renames"
                     ));
                     if b.clicked() {
                         *asked = Some((start, end));
@@ -309,14 +328,6 @@ fn lines_menu(
                     ui.add_enabled(false, egui::Button::new("History of these lines"))
                         .on_disabled_hover_text(why);
                 }
-            }
-            if ui.button(format!("Copy {which}")).clicked() {
-                let (a, b) = picked.range();
-                let text = data
-                    .lines
-                    .get(a..=b.min(data.lines.len().saturating_sub(1)));
-                ui.ctx()
-                    .copy_text(text.map(|l| l.join("\n")).unwrap_or_default());
             }
         });
 }

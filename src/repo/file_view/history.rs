@@ -128,9 +128,11 @@ impl RepoTab {
                         FontId::proportional(12.5),
                         t.text,
                     );
-                    let resp = resp.on_hover_text(
-                        "Click: this commit's changes to the file, or the file as it was\nDouble-click: show the commit in the graph",
-                    );
+                    let resp = resp.on_hover_text(if view.lines.is_some() {
+                        "Click: what this commit did to the lines (numbered as they were in it)\nDouble-click: show the commit in the graph"
+                    } else {
+                        "Click: this commit's changes to the file, or the file as it was\nDouble-click: show the commit in the graph"
+                    });
                     if resp.double_clicked() {
                         acts.push(Action::CloseFileView);
                         acts.push(Action::SelectHash(c.hash.clone()));

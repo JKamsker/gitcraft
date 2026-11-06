@@ -199,7 +199,10 @@ fn prepare(
     let picks = pickable && can_pick(&header, &lines);
     let partial =
         picks && matches!(key, DiffKey::Work(f) if matches!(f.area, Area::Staged | Area::Unstaged));
-    let revertable = picks && matches!(key, DiffKey::Commit { .. });
+    // Not a submodule's change, which `git apply` would report done and leave as it was.
+    let revertable = picks
+        && matches!(key, DiffKey::Commit { .. })
+        && git::check_revertable(text, &path).is_ok();
     let new_file = is_new_file(text);
     let lfs = lfs_pair(&lines);
     // An image in LFS: git has only its pointer.

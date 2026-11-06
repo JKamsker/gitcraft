@@ -26,7 +26,10 @@ impl RepoTab {
         let (path, origin) = self.diff_origin(&view.key);
         let partial = matches!(&view.data, Some(Ok(d)) if d.partial) && idle;
         // Lines and hunks can be picked: to stage, unstage or discard, or to revert.
-        let pickable = matches!(&view.data, Some(Ok(d)) if d.partial || d.revertable) && idle;
+        // A stash's changes aren't a commit's to revert.
+        let revert = self.stash_view.is_none();
+        let pickable =
+            matches!(&view.data, Some(Ok(d)) if d.partial || d.revertable && revert) && idle;
         let settings = Settings::get(ui.ctx());
         let (split, ignore_ws, whole_file) = (
             settings.diff_split,
@@ -72,8 +75,9 @@ impl RepoTab {
             let pick = |range| picked_in_file(&view.key, old_path.as_deref(), before, range);
             let history = pick((1, 1))
                 .map(|_| ())
-                .ok_or("A file that isn't committed has no history yet");
-            let id = ("diff_file", &path);
+                .ok_or("Untracked and conflicted files have no line history");
+            // Lines picked in one version aren't those of another one of the same file.
+            let id = ("diff_file", &path, format!("{:?}", view.key));
             if let Some(p) = file_text::show(ui, id, view.file.as_ref(), history).and_then(pick) {
                 acts.push(Action::LineHistory {
                     path: p.path,
@@ -174,7 +178,7 @@ impl RepoTab {
                         DiffKey::Work(_) => (None, true),
                     };
                     match &view.key {
-                        DiffKey::Commit { hash, .. } => {
+                        DiffKey::Commit { hash, .. } if self.stash_view.is_none() => {
                             widgets::commit_file_menu(&title, path, hash, acts)
                         }
                         _ => widgets::file_menu(&title, path, rev, ignorable, acts),
@@ -201,6 +205,7 @@ impl RepoTab {
                         }
                         if let DiffKey::Commit { hash, path } = &view.key
                             && view.lines.is_none()
+                            && self.stash_view.is_none()
                         {
                             let lines = !as_file && !rendered;
                             clear = self.commit_actions(ui, view, (hash, path), lines, acts);
@@ -315,7 +320,7 @@ impl RepoTab {
                 .add_enabled(idle, egui::Button::new(format!("Revert {chosen} {noun}")))
                 .on_hover_text(
                     "Undo only the lines clicked in the working tree, to look over before \
-                     committing",
+                     committing. Revert changes to this file is in the file name's menu.",
                 );
             if b.clicked() {
                 acts.push(Action::PickLines {

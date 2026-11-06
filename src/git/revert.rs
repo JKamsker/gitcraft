@@ -33,8 +33,8 @@ pub fn check_revertable(patch: &str, path: &str) -> Result<(), String> {
     }
     if is_binary_patch(patch) {
         return Err(format!(
-            "Can't revert {path}: it is a binary file, and git can only reverse-apply changes \
-             to text. Use View file on the commit before it to see the old version."
+            "Can't revert {path}: it is a binary file. Use View file on the commit before it to \
+             get the old version."
         ));
     }
     if patch_header(patch).any(|l| l.starts_with("Subproject commit") || l == "new mode 160000")
@@ -117,8 +117,9 @@ fn three_way_outcome(err: &str) -> Result<Reverted, String> {
     };
     if let Some(file) = named(": does not match index") {
         return Err(format!(
-            "{file} has changed since that commit, and has changes that aren't staged. Stage or \
-             stash them first: merging the revert in needs the file as it is staged."
+            "{file} has changed since that commit, and has unstaged changes (an earlier revert \
+             counts). Stage or stash them, then revert again: the 3-way merge starts from the \
+             file as staged."
         ));
     }
     if let Some(file) = named(": does not exist in index") {

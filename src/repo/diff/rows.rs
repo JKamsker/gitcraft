@@ -45,6 +45,9 @@ pub(super) struct Rows<'a> {
     /// Each with whether the pointer is over that line's half, not only at its height.
     pointer_hits: Vec<(Hit, bool)>,
     text_hover: bool,
+    /// The changed lines that can be clicked: they take the right-click over them, so they
+    /// open the lines' menu too.
+    picks: Vec<egui::Response>,
 }
 
 impl<'a> Rows<'a> {
@@ -81,6 +84,7 @@ impl<'a> Rows<'a> {
             press_hit: None,
             pointer_hits: Vec::new(),
             text_hover: false,
+            picks: Vec::new(),
         }
     }
 
@@ -207,9 +211,11 @@ impl<'a> Rows<'a> {
                 range: p.range,
             })
         };
+        let picks = std::mem::take(&mut self.picks);
         copy_selection(
             ui,
             &text_drag,
+            &picks,
             sel,
             &data.lines,
             &data.uncut,
@@ -298,9 +304,12 @@ impl<'a> Rows<'a> {
             let resp = ui
                 .interact(rect, ui.id().with(("diff_line", i)), Sense::click())
                 .on_hover_cursor(egui::CursorIcon::PointingHand);
-            if resp.clicked() {
+            // A right-click on a changed line not picked picks it, for its menu to be about it.
+            let unpicked = !self.view.chosen.contains(&i) && self.text_sel.is_none();
+            if resp.clicked() || resp.secondary_clicked() && unpicked {
                 self.clicked = Some(i);
             }
+            self.picks.push(resp);
         }
         if kind == Some(Kind::Hunk) && !self.hunk_picks.is_empty() {
             self.hunk_buttons(ui, rect, i, acts);
