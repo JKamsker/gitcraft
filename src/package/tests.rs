@@ -75,7 +75,7 @@ fn a_cargo_workspace_is_listed_with_what_is_left_out_and_shipped_by_accident() {
         .as_ref()
         .ok()
         .and_then(|p| p.iter().find(|p| p.name == "gitcraft-test-app").cloned());
-    let report = app.as_ref().map(|p| report(&dir, p, false));
+    let report = app.as_ref().map(|p| report(&dir, p));
     let _ = std::fs::remove_dir_all(&dir);
     assert!(packages.is_ok(), "{packages:?}");
     let names: Vec<(String, String)> = packages
@@ -96,7 +96,47 @@ fn a_cargo_workspace_is_listed_with_what_is_left_out_and_shipped_by_accident() {
     let accidental: Vec<&str> = report.accidental.iter().map(|n| n.path.as_str()).collect();
     assert!(accidental.contains(&".env"), "{accidental:?}");
     assert!(accidental.contains(&"notes ü.txt"), "{accidental:?}");
-    assert_eq!(report.published, Ok(None));
+    assert_eq!(report.hint, None);
+    // The member ships the workspace's README, untracked in its folder and named from outside
+    // it: neither left out nor an accident.
+    let tool = packages_of(&dir_tool());
+    assert!(tool.is_some(), "the tool's report");
+    let Some(tool) = tool else { return };
+    let shipped: Vec<&str> = tool.files.iter().map(|(f, _)| f.as_str()).collect();
+    assert!(shipped.contains(&"README.md"), "{shipped:?}");
+    assert!(
+        !tool.accidental.iter().any(|n| n.path == "README.md"),
+        "{:?}",
+        tool.accidental
+    );
+    assert!(
+        !tool.missing.iter().any(|n| n.path.contains("README")),
+        "{:?}",
+        tool.missing
+    );
+}
+
+/// A workspace whose member names the workspace's README.
+fn dir_tool() -> PathBuf {
+    let dir = cargo_project();
+    write(
+        &dir,
+        "crates/tool/Cargo.toml",
+        "[package]\nname = \"gitcraft-test-tool\"\nversion = \"0.1.0\"\nedition = \"2021\"\nlicense = \"MIT\"\nreadme = \"../../README.md\"\n",
+    );
+    git(&dir, &["commit", "-q", "-am", "readme"]);
+    dir
+}
+
+/// The report of the workspace member `gitcraft-test-tool` in `dir` (removed after).
+fn packages_of(dir: &Path) -> Option<Report> {
+    let tool = packages(dir)
+        .ok()?
+        .into_iter()
+        .find(|p| p.name == "gitcraft-test-tool")?;
+    let report = report(dir, &tool).ok();
+    let _ = std::fs::remove_dir_all(dir);
+    report
 }
 
 #[test]
@@ -118,7 +158,7 @@ fn an_npm_project_is_listed_when_npm_is_installed() {
         return;
     }
     let pkg = packages(&dir).ok().and_then(|p| p.into_iter().next());
-    let report = pkg.as_ref().map(|p| report(&dir, p, false));
+    let report = pkg.as_ref().map(|p| report(&dir, p));
     let _ = std::fs::remove_dir_all(&dir);
     assert!(matches!(report, Some(Ok(_))), "{report:?}");
     let Some(Ok(report)) = report else { return };

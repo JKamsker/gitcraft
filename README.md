@@ -157,13 +157,15 @@ so your config, credentials and hooks apply as usual.
   to switch a repository to; _Use the profile's author_ takes the repository's own out again.
 - Undo / redo (Ctrl+Z / Ctrl+Y) of commits, amends, merges, rebases, pulls, resets,
   cherry-picks, reverts, checkouts, branch create / rename / delete, tags and stashes.
-- _What a package will publish_ (Ctrl+P) lists the files `cargo package --list` or
-  `npm pack --dry-run --ignore-scripts` would ship for a crate or npm package of the repository
-  (each of a workspace's members), run where the repository is (here, in WSL or over SSH). It
-  flags what looks shipped by accident (`.env`, keys, logs, build output, editor folders), what
-  is left out that a package usually wants (the README and licence, a crate's `src/` files, the
-  files the manifest names: `readme`, `main`, `bin`…), and the files new or gone since the version on
-  crates.io or npm.
+- _What a package will publish_ (from the palette, Ctrl+P) lists the files
+  `cargo package --list` or `npm pack --dry-run --ignore-scripts` would ship for each crate of
+  the repository's Cargo workspace and its top `package.json`, run where the repository is
+  (here, in WSL or over SSH). It flags what looks shipped by accident (`.env`, keys, logs, build
+  output, editor folders, a crate's files git doesn't track, big files), what is left out that a package
+  usually wants (the README and licence, a crate's `src/` files, the files the manifest names:
+  `readme`, `main`, `bin`…), and, asked of the registry once the files are listed, the files new
+  or gone since the version on crates.io or npm (not compared for a package published to
+  another registry). Refresh reads it again after a change.
 
 **Diffs and conflicts** (centre)
 

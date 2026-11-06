@@ -52,21 +52,56 @@ pub(crate) fn run(dir: &Path, program: &str, args: &[&str]) -> Result<String, St
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x0800_0000);
     }
-    match cmd.output() {
-        Ok(out) => finish(
-            program,
-            out.status.success(),
-            &out.stdout,
-            &out.stderr,
-            false,
-        ),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(missing(program)),
-        Err(e) => Err(format!("Couldn't run {program}: {e}")),
+    cmd.stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    let mut child = match cmd.spawn() {
+        Ok(child) => child,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Err(missing(program)),
+        Err(e) => return Err(format!("Couldn't run {program}: {e}")),
+    };
+    // Read as it comes, so that a full pipe never holds the tool up.
+    fn drain<R: std::io::Read + Send + 'static>(
+        pipe: Option<R>,
+    ) -> std::thread::JoinHandle<Vec<u8>> {
+        std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            if let Some(mut pipe) = pipe {
+                let _ = pipe.read_to_end(&mut bytes);
+            }
+            bytes
+        })
     }
+    let stdout = drain(child.stdout.take());
+    let stderr = drain(child.stderr.take());
+    let until = std::time::Instant::now() + TIME;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if std::time::Instant::now() < until => {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!(
+                    "{program} took longer than {} minutes (waiting for a lock, or the network?): \
+                     stopped",
+                    TIME.as_secs() / 60
+                ));
+            }
+            Err(e) => return Err(format!("Couldn't run {program}: {e}")),
+        }
+    };
+    let out = stdout.join().unwrap_or_default();
+    let err = stderr.join().unwrap_or_default();
+    finish(program, status.success(), &out, &err, false)
 }
 
 fn missing(program: &str) -> String {
-    format!("{program} isn't installed where the repository is: it says what a package holds")
+    format!(
+        "{program} wasn't found where the repository is (not installed, or not on its PATH): \
+         it is what lists the package's files"
+    )
 }
 
 fn finish(

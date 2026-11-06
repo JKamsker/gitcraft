@@ -51,6 +51,9 @@ pub(crate) struct Package {
     pub version: String,
     /// Its folder in the repository (empty: the top).
     pub dir: String,
+    /// The registry it is published to when it isn't crates.io's or npm's own: then it is not
+    /// compared.
+    pub registry: Option<String>,
 }
 
 /// The version published, and how the package differs from it.
@@ -67,13 +70,13 @@ pub(crate) struct Report {
     pub files: Vec<(String, Option<u64>)>,
     pub missing: Vec<Note>,
     pub accidental: Vec<Note>,
-    /// `Ok(None)`: never published.
-    pub published: Result<Option<Published>, String>,
+    /// What the listing can't account for (npm's build scripts it doesn't run).
+    pub hint: Option<String>,
 }
 
-/// The packages the repository has: those of the manifests committed at HEAD.
+/// The packages the repository has: those of the manifests at its top.
 pub(crate) fn packages(repo: &Path) -> Result<Vec<Package>, String> {
-    let has = |file: &str| crate::git::file_at(repo, Some("HEAD"), file).is_ok();
+    let has = |file: &str| crate::remote::read_to_string(&crate::remote::join(repo, file)).is_ok();
     let (cargo, npm) = (has("Cargo.toml"), has("package.json"));
     if !cargo && !npm {
         return Err("No Cargo.toml or package.json at the top of the repository".to_owned());
@@ -81,8 +84,9 @@ pub(crate) fn packages(repo: &Path) -> Result<Vec<Package>, String> {
     tools::packages(repo, cargo, npm)
 }
 
-/// Works out the report of `pkg`; `online`: compare with what the registry has.
-pub(crate) fn report(repo: &Path, pkg: &Package, online: bool) -> Result<Report, String> {
+/// Works out the report of `pkg`, from its tool and git (the registry is asked apart:
+/// [`published`]).
+pub(crate) fn report(repo: &Path, pkg: &Package) -> Result<Report, String> {
     let files = tools::files(repo, pkg)?;
     let tracked = tracked(repo, &pkg.dir)?;
     let manifest_path = if pkg.dir.is_empty() {
@@ -92,20 +96,26 @@ pub(crate) fn report(repo: &Path, pkg: &Package, online: bool) -> Result<Report,
     };
     let manifest = crate::remote::read_to_string(&crate::remote::join(repo, &manifest_path))
         .unwrap_or_default();
-    let published = if online {
-        published(pkg, &files)
-    } else {
-        Ok(None)
-    };
     Ok(Report {
         missing: check::missing(pkg.ecosystem, &files, &tracked, &manifest),
         accidental: check::accidental(pkg.ecosystem, &files, &tracked),
+        hint: check::hint(pkg.ecosystem, &manifest),
         files,
-        published,
     })
 }
 
-fn published(pkg: &Package, files: &[(String, Option<u64>)]) -> Result<Option<Published>, String> {
+/// How `files` (of `pkg`) differ from the version on the registry; `Ok(None)`: never
+/// published there.
+pub(crate) fn published(
+    pkg: &Package,
+    files: &[(String, Option<u64>)],
+) -> Result<Option<Published>, String> {
+    if let Some(registry) = &pkg.registry {
+        return Err(format!(
+            "published to {registry}, not {}: not compared",
+            pkg.ecosystem.registry()
+        ));
+    }
     let Some((version, url)) = tools::published(pkg)? else {
         return Ok(None);
     };

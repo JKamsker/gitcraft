@@ -9,7 +9,7 @@ mod view;
 use egui::Context;
 
 use super::RepoTab;
-use crate::package::{self, Package, Report};
+use crate::package::{self, Package, Published, Report};
 
 /// The panel, while it is open.
 pub(crate) struct PackageView {
@@ -18,6 +18,9 @@ pub(crate) struct PackageView {
     selected: usize,
     /// The report of the package selected; `None` while it is worked out.
     report: Option<Result<Report, String>>,
+    /// How it compares with the registry's version, asked once the report is in (`None`
+    /// meanwhile); `Ok(None)`: never published there.
+    published: Option<Result<Option<Published>, String>>,
     /// Numbers the reports asked for: only the latest is shown.
     request: u64,
 }
@@ -26,29 +29,52 @@ pub(crate) struct PackageView {
 pub(crate) enum PackageAct {
     Open,
     Select(usize),
+    /// The packages and the report read again (after a change to the files).
+    Refresh,
     Close,
+}
+
+/// The panel, if `request` is still its latest.
+fn current(tab: &mut RepoTab, request: u64) -> Option<&mut PackageView> {
+    tab.package.as_mut().filter(|v| v.request == request)
+}
+
+/// A number no request of any panel had: one asked before a panel was closed and opened again
+/// is never taken for the new one's.
+fn next_request() -> u64 {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
 impl RepoTab {
     pub(super) fn package_act(&mut self, act: PackageAct, ctx: &Context) {
         match act {
-            PackageAct::Open => {
+            PackageAct::Open | PackageAct::Refresh => {
+                let selected = match (&act, &self.package) {
+                    (PackageAct::Refresh, Some(view)) => view.selected,
+                    _ => 0,
+                };
+                let request = next_request();
                 self.package = Some(PackageView {
                     packages: None,
-                    selected: 0,
+                    selected,
                     report: None,
-                    request: 0,
+                    published: None,
+                    request,
                 });
                 let repo = self.path.clone();
                 self.then(
                     ctx,
                     move || package::packages(&repo),
-                    |tab, found, ctx| {
+                    move |tab, found, ctx| {
                         let Some(view) = &mut tab.package else { return };
-                        let any = found.as_ref().is_ok_and(|p| !p.is_empty());
+                        if view.request != request {
+                            return;
+                        }
+                        let count = found.as_ref().map_or(0, Vec::len);
                         view.packages = Some(found);
-                        if any {
-                            tab.package_act(PackageAct::Select(0), ctx);
+                        if count > 0 {
+                            tab.package_act(PackageAct::Select(selected.min(count - 1)), ctx);
                         }
                     },
                 );
@@ -65,18 +91,39 @@ impl RepoTab {
                 };
                 view.selected = i;
                 view.report = None;
-                view.request += 1;
+                view.published = None;
+                view.request = next_request();
                 let request = view.request;
                 let repo = self.path.clone();
                 self.then(
                     ctx,
-                    move || package::report(&repo, &pkg, true),
-                    move |tab, report, _| {
-                        if let Some(view) = &mut tab.package
-                            && view.request == request
-                        {
-                            view.report = Some(report);
-                        }
+                    move || package::report(&repo, &pkg).map(|r| (r, pkg)),
+                    move |tab, report, ctx| {
+                        let Some(view) = current(tab, request) else {
+                            return;
+                        };
+                        let report = match report {
+                            Ok((report, pkg)) => {
+                                let files = report.files.clone();
+                                view.report = Some(Ok(report));
+                                (pkg, files)
+                            }
+                            Err(e) => {
+                                view.report = Some(Err(e));
+                                return;
+                            }
+                        };
+                        // The registry apart: it can be slow, the files are there meanwhile.
+                        let (pkg, files) = report;
+                        tab.then(
+                            ctx,
+                            move || package::published(&pkg, &files),
+                            move |tab, published, _| {
+                                if let Some(view) = current(tab, request) {
+                                    view.published = Some(published);
+                                }
+                            },
+                        );
                     },
                 );
             }

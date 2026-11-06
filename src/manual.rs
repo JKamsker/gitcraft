@@ -75,7 +75,7 @@ const FEATURES: &[(&str, &[&str])] = &[
     (
         "Packages",
         &[
-            "What a package will publish (Ctrl+P) lists the files cargo package --list or npm pack --dry-run would ship for each crate or npm package of the repository, what looks shipped by accident (.env, keys, logs, build output), what a package usually wants and leaves out (its README, LICENSE, main file), and the files new or gone since the version on crates.io or npm.",
+            "What a package will publish (from the palette, Ctrl+P) lists the files cargo package --list or npm pack --dry-run --ignore-scripts would ship for each crate of the workspace and the top package.json, what looks shipped by accident (.env, keys, logs, build output), what a package usually wants and leaves out (its README, LICENSE, main file), and the files new or gone since the version on crates.io or npm.",
         ],
     ),
 ];

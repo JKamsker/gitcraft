@@ -229,7 +229,7 @@ impl Api {
 }
 
 /// `builder` going through the proxy the environment sets for `web`, as git and curl pick it.
-fn with_proxy(builder: ureq::AgentBuilder, web: &str) -> ureq::AgentBuilder {
+pub(crate) fn with_proxy(builder: ureq::AgentBuilder, web: &str) -> ureq::AgentBuilder {
     let proxy = proxy_for(web, |name| {
         std::env::var(name).ok().filter(|v| !v.is_empty())
     });

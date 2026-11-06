@@ -83,12 +83,23 @@ pub(crate) fn accidental(
 ) -> Vec<Note> {
     let mut out = Vec::new();
     for (path, size) in files {
-        let why = if let Some(why) = suspicious(path) {
+        // npm ships node_modules only for bundled dependencies, and built files git ignores
+        // (`dist/`) through `files` on purpose; cargo copies a workspace's README and licence
+        // into each member.
+        let untracked = match eco {
+            Ecosystem::Npm => false,
+            Ecosystem::Cargo => {
+                !generated(eco, path) && !top_doc(path) && !tracked.iter().any(|t| t == path)
+            }
+        };
+        let why = if eco == Ecosystem::Npm && path.starts_with("node_modules/") {
+            continue;
+        } else if let Some(why) = suspicious(path) {
             why.to_owned()
-        } else if !generated(eco, path) && !tracked.iter().any(|t| t == path) {
+        } else if untracked {
             "git doesn't track it: a leftover of this folder".to_owned()
         } else if let Some(size) = size.filter(|s| *s >= BIG) {
-            format!("{} — big for a package", crate::git::human_size(size))
+            format!("big for a package ({})", crate::git::human_size(size))
         } else {
             continue;
         };
@@ -118,9 +129,14 @@ pub(crate) fn missing(
             });
         }
     };
+    // `readme = false`: no README wanted.
+    let no_readme = eco == Ecosystem::Cargo && toml_raw(manifest, "readme") == Some("false");
     for t in tracked.iter().filter(|t| !t.contains('/')) {
         let upper = t.to_uppercase();
         if upper.starts_with("README") {
+            if no_readme {
+                continue;
+            }
             note(t, "the README: the registry's page shows it");
         } else if upper.starts_with("LICENSE")
             || upper.starts_with("LICENCE")
@@ -141,7 +157,13 @@ pub(crate) fn missing(
             }
             for key in ["readme", "license-file"] {
                 if let Some(path) = toml_string(manifest, key) {
-                    note(&path, &format!("Cargo.toml names it ({key})"));
+                    // One outside the package's folder is shipped at its top, by its name.
+                    let shipped_as = if path.starts_with("../") {
+                        path.rsplit('/').next().unwrap_or(&path).to_owned()
+                    } else {
+                        path.trim_start_matches("./").to_owned()
+                    };
+                    note(&shipped_as, &format!("Cargo.toml names it ({key})"));
                 }
             }
         }
@@ -169,6 +191,49 @@ pub(crate) fn missing(
         }
     }
     out
+}
+
+/// A README or licence at a package's top, which cargo may copy from the workspace.
+fn top_doc(path: &str) -> bool {
+    let upper = path.to_uppercase();
+    !path.contains('/')
+        && ["README", "LICENSE", "LICENCE", "COPYING"]
+            .iter()
+            .any(|p| upper.starts_with(p))
+}
+
+/// What the listing can't see: npm's build scripts, which a real publish runs first.
+pub(crate) fn hint(eco: Ecosystem, manifest: &str) -> Option<String> {
+    if eco != Ecosystem::Npm {
+        return None;
+    }
+    let v: serde_json::Value = serde_json::from_str(manifest).unwrap_or_default();
+    let script = ["prepack", "prepare", "prepublishOnly"]
+        .into_iter()
+        .find(|s| v.pointer(&format!("/scripts/{s}")).is_some())?;
+    Some(format!(
+        "package.json has a {script} script, which npm publish runs first and this listing \
+         doesn't: files it builds may show as left out or gone until it has run"
+    ))
+}
+
+/// A value of `[package]` in `Cargo.toml` as written (`false`, `"README.md"`).
+fn toml_raw<'a>(text: &'a str, key: &str) -> Option<&'a str> {
+    let mut in_package = false;
+    for line in text.lines() {
+        let t = line.trim();
+        if t.starts_with('[') {
+            in_package = t.split('#').next().unwrap_or(t).trim() == "[package]";
+            continue;
+        }
+        let Some((k, v)) = t.split_once('=').filter(|_| in_package) else {
+            continue;
+        };
+        if k.trim() == key {
+            return Some(v.split('#').next().unwrap_or(v).trim());
+        }
+    }
+    None
 }
 
 /// A string value of `[package]` in `Cargo.toml`.
@@ -297,6 +362,36 @@ mod tests {
         );
         let paths: Vec<&str> = notes.iter().map(|n| n.path.as_str()).collect();
         assert_eq!(paths, ["dist/index.d.ts", "bin/x.js"]);
+    }
+
+    #[test]
+    fn what_npm_and_cargo_ship_on_purpose_is_not_flagged() {
+        // Built files git ignores, and bundled dependencies.
+        let npm = accidental(
+            Ecosystem::Npm,
+            &f(&["dist/index.js", "node_modules/dep/index.js", "package.json"]),
+            &s(&["package.json"]),
+        );
+        assert_eq!(npm, []);
+        // A workspace's README and licence, copied into a member.
+        let cargo = accidental(
+            Ecosystem::Cargo,
+            &f(&["README.md", "LICENSE-MIT", "src/lib.rs", "Cargo.toml"]),
+            &s(&["src/lib.rs"]),
+        );
+        assert_eq!(cargo, []);
+        // `readme = false`: no README wanted.
+        let none = missing(
+            Ecosystem::Cargo,
+            &f(&["src/lib.rs"]),
+            &s(&["README.md", "src/lib.rs"]),
+            "[package]\nname = \"x\"\nreadme = false\n",
+        );
+        assert_eq!(none, []);
+        // npm's build scripts, which the listing doesn't run.
+        let built = hint(Ecosystem::Npm, r#"{"scripts": {"prepack": "tsc"}}"#);
+        assert!(built.is_some_and(|h| h.contains("prepack")));
+        assert_eq!(hint(Ecosystem::Npm, r#"{"scripts": {"test": "x"}}"#), None);
     }
 
     #[test]
