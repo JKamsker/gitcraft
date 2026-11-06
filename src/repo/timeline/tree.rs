@@ -1,6 +1,7 @@
 //! Laying the timeline out as a tree, newest first, the way Vim's undotree does: an entry
 //! stays in its parent's lane when it is that parent's first child, and a later child (made
-//! after undoing) starts a lane of its own to the right.
+//! after undoing) starts a lane to the right: the first one with nothing in it newer than the
+//! parent, so that lanes are used again rather than piling up.
 
 use std::collections::HashMap;
 
@@ -20,7 +21,8 @@ pub(crate) struct Row {
 pub(crate) fn layout(timeline: &Timeline) -> (Vec<Row>, usize) {
     let mut lanes: HashMap<u64, usize> = HashMap::new();
     let mut first_child: HashMap<Option<u64>, u64> = HashMap::new();
-    let mut used = 0usize;
+    // The newest entry in each lane so far.
+    let mut newest: Vec<u64> = Vec::new();
     // Oldest first, so that a parent has its lane before its children.
     for e in &timeline.entries {
         let parent = e.parent.filter(|p| lanes.contains_key(p));
@@ -32,13 +34,22 @@ pub(crate) fn layout(timeline: &Timeline) -> (Vec<Row>, usize) {
                     None => 0,
                 }
             }
+            // A free lane: everything in it is older than the parent, so below its row.
             Some(_) => {
-                used += 1;
-                used
+                // A first-level one hangs from the bottom row: a lane of its own.
+                let after = parent.unwrap_or(0);
+                (1..newest.len())
+                    .find(|l| newest.get(*l).is_some_and(|n| *n < after))
+                    .unwrap_or(newest.len().max(1))
             }
         };
+        if newest.len() <= lane {
+            newest.resize(lane + 1, 0);
+        }
+        newest[lane] = e.id;
         lanes.insert(e.id, lane);
     }
+    let used = newest.len().saturating_sub(1);
     let count = timeline.entries.len();
     if count == 0 {
         return (Vec::new(), 0);

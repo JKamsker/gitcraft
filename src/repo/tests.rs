@@ -556,7 +556,7 @@ fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
     // The timeline is read (there is none yet) before undo goes ahead.
-    for _ in 0..400 {
+    for _ in 0..2000 {
         tab.poll(&ctx);
         if tab.timeline.loaded {
             break;

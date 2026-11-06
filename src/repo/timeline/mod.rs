@@ -245,6 +245,9 @@ pub(crate) struct Timeline {
     pub(super) jump: Option<(String, Option<u64>)>,
     /// The file on disk couldn't be read: it isn't written over.
     pub(super) read_only: bool,
+    /// The first-level entry redo goes to from before them all (the one last undone from, or
+    /// made).
+    pub(crate) root_redo: Option<u64>,
 }
 
 impl Timeline {
@@ -270,7 +273,7 @@ impl Timeline {
     pub(crate) fn redo_target(&self) -> Option<&Entry> {
         let preferred = match self.current {
             Some(id) => self.get(id).and_then(|e| e.redo_child),
-            None => self.root_redo(),
+            None => self.root_redo.or_else(|| self.root_redo()),
         };
         preferred
             .and_then(|id| self.get(id))
@@ -325,6 +328,23 @@ impl Timeline {
         state
     }
 
+    /// The first entry on the way from `from` to `to` that only commands undo and redo (a
+    /// stash, a tag: it moved no branch), which a jump, putting back branches, would skip.
+    pub(crate) fn command_only_between(
+        &self,
+        from: Option<u64>,
+        to: Option<u64>,
+    ) -> Option<String> {
+        let (a, b) = (self.path_to(from), self.path_to(to));
+        let shared = a.iter().zip(&b).take_while(|(x, y)| x == y).count();
+        a[shared..]
+            .iter()
+            .chain(&b[shared..])
+            .filter_map(|id| self.get(*id))
+            .find(|e| e.undo.is_some() && e.changes().is_empty())
+            .map(|e| e.label.clone())
+    }
+
     /// Whether the repository is in `id`'s state or one after it on the same path: it was not
     /// undone (or was redone).
     pub(crate) fn is_done(&self, id: u64) -> bool {
@@ -333,9 +353,12 @@ impl Timeline {
 
     /// Adds an entry under the current one and makes it current; returns its id.
     pub(crate) fn push(&mut self, mut entry: Entry) -> u64 {
+        // Past every id used, and past the time in milliseconds: another gitcraft on the same
+        // folder (whose refs share the namespace) doesn't hand out the same.
         self.next_id = self
             .next_id
             .max(self.entries.iter().map(|e| e.id).max().unwrap_or(0))
+            .max(now_millis())
             + 1;
         let id = self.next_id;
         entry.id = id;
@@ -343,8 +366,9 @@ impl Timeline {
         if let Some(undo) = &mut entry.undo {
             undo.id = id;
         }
-        if let Some(parent) = entry.parent.and_then(|p| self.get_mut(p)) {
-            parent.redo_child = Some(id);
+        match entry.parent.and_then(|p| self.get_mut(p)) {
+            Some(parent) => parent.redo_child = Some(id),
+            None => self.root_redo = Some(id),
         }
         self.entries.push(entry);
         self.current = Some(id);
@@ -365,9 +389,11 @@ impl Timeline {
         // Undone one step: redo comes back here.
         if let Some(from) = from
             && self.get(from).is_some_and(|e| e.parent == to)
-            && let Some(parent) = to.and_then(|p| self.get_mut(p))
         {
-            parent.redo_child = Some(from);
+            match to.and_then(|p| self.get_mut(p)) {
+                Some(parent) => parent.redo_child = Some(from),
+                None => self.root_redo = Some(from),
+            }
         }
         self.current = to.filter(|id| self.get(*id).is_some());
     }
@@ -402,6 +428,9 @@ impl Timeline {
                     e.redo_child = None;
                 }
             }
+            if self.root_redo == Some(id) {
+                self.root_redo = None;
+            }
             if self.current == Some(id) {
                 self.current = gone.parent;
             }
@@ -431,6 +460,7 @@ impl Timeline {
         self.entries = saved.entries;
         self.current = saved.current.filter(|id| self.get(*id).is_some());
         self.seen = saved.seen;
+        self.root_redo = saved.root_redo.filter(|id| self.get(*id).is_some());
         self.next_id = saved
             .next_id
             .max(self.entries.iter().map(|e| e.id).max().unwrap_or(0));
@@ -474,4 +504,11 @@ impl Timeline {
         self.loaded = true;
         self.cap();
     }
+}
+
+/// Milliseconds since the epoch.
+fn now_millis() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX / 2))
 }

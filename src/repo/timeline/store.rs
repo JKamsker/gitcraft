@@ -24,6 +24,8 @@ pub(crate) struct Saved {
     pub(crate) current: Option<u64>,
     pub(crate) seen: Option<RefState>,
     pub(crate) next_id: u64,
+    #[serde(default)]
+    pub(crate) root_redo: Option<u64>,
 }
 
 impl Saved {
@@ -35,6 +37,7 @@ impl Saved {
             current: timeline.current,
             seen: timeline.seen.clone(),
             next_id: timeline.next_id,
+            root_redo: timeline.root_redo,
         }
     }
 }
@@ -133,7 +136,8 @@ pub(crate) fn save_to(path: &Path, saved: &Saved, generation: u64) -> Result<(),
     }
     let text =
         serde_json::to_string(saved).map_err(|e| format!("The timeline can't be kept: {e}"))?;
-    let part = path.with_extension("json.part");
+    // Its own part file: another gitcraft writing the same timeline can't interleave with it.
+    let part = path.with_extension(format!("json.{}.part", std::process::id()));
     std::fs::write(&part, text).map_err(fail)?;
     std::fs::rename(&part, path).map_err(fail)?;
     map.insert(path.to_owned(), generation);

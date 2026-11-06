@@ -152,12 +152,32 @@ pub(crate) fn restore_steps(
     }
     if !target.branch.is_empty() && !target.branches.contains_key(&target.branch) {
         return Err(format!(
-            "{} had no commit yet then: there is nothing to go back to",
+            "{} had no commit yet then: pick a later entry, or use New branch there",
             target.branch
         ));
     }
     if target.branch.is_empty() && target.head.is_empty() {
-        return Err("Nothing was committed yet then: there is nothing to go back to".to_owned());
+        return Err(
+            "Nothing was committed yet then: pick a later entry, or use New branch there"
+                .to_owned(),
+        );
+    }
+    if let Some(name) = std::iter::once(&target.branch)
+        .chain(moved.iter().map(|(n, ..)| *n))
+        .find(|n| n.starts_with('-'))
+    {
+        return Err(format!(
+            "{name} reads like an option to git: rename it first"
+        ));
+    }
+    if !target.branch.is_empty()
+        && target.branch != now.branch
+        && elsewhere.contains(&target.branch)
+    {
+        return Err(format!(
+            "{} is checked out in another worktree: check it out elsewhere there first",
+            target.branch
+        ));
     }
     let current = now.branch.as_str();
     let mut steps = vec![expect_symref("HEAD", &full(current))];
@@ -175,34 +195,45 @@ pub(crate) fn restore_steps(
             None => strings(&["update-ref", "-m", "gitcraft: undo tree", "-d", &full, old]),
         }
     };
-    // The branch checked out now waits until HEAD has left it, or is reset in place.
-    let current_moves = moved.iter().find(|(n, ..)| n.as_str() == current);
-    for (name, old, new) in &moved {
-        if name.as_str() != current {
-            steps.push(update(name, *old, *new));
-        }
-    }
+    // HEAD goes first, while no branch has moved yet: a checkout refused (local changes in
+    // the way) then leaves everything as it was. A branch to check out that isn't there now is
+    // made first, at its commit then.
     let same_place = if target.branch.is_empty() {
         current.is_empty() && now.head == target.head
     } else {
         target.branch == current
     };
+    let target_moves = moved
+        .iter()
+        .find(|(n, ..)| !target.branch.is_empty() && **n == target.branch);
+    let mut made = false;
     if !same_place {
-        steps.push(if target.branch.is_empty() {
-            strings(&["checkout", "--detach", &target.head, "--"])
+        if target.branch.is_empty() {
+            steps.push(strings(&["checkout", "--detach", &target.head, "--"]));
         } else {
-            strings(&["checkout", &target.branch, "--"])
-        });
-        if let Some((name, old, new)) = current_moves {
+            if let Some((name, None, new)) = target_moves {
+                steps.push(update(name, None, *new));
+                made = true;
+            }
+            steps.push(strings(&["checkout", &target.branch, "--"]));
+        }
+    }
+    // Then every other branch, the one checked out before among them.
+    for (name, old, new) in &moved {
+        if target.branch.is_empty() || **name != target.branch {
             steps.push(update(name, *old, *new));
         }
-    } else if let Some((_, _, new)) = current_moves {
+    }
+    // Last, the branch checked out now moves in place, keeping uncommitted changes.
+    if let Some((_, Some(_), new)) = target_moves
+        && !made
+    {
         match new {
             Some(new) => steps.push(strings(&["reset", "--keep", new])),
             None => {
                 return Err(format!(
-                    "{current} didn't exist then, and it is checked out: check out another \
-                     branch first"
+                    "{} didn't exist then, and it is checked out: check out another branch first",
+                    target.branch
                 ));
             }
         }

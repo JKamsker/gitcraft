@@ -157,14 +157,14 @@ so your config, credentials and hooks apply as usual.
   to switch a repository to; _Use the profile's author_ takes the repository's own out again.
 - Undo / redo (Ctrl+Z / Ctrl+Y) of commits, amends, merges, rebases, pulls, resets,
   cherry-picks, reverts, checkouts, branch create / rename / delete, tags and stashes.
-- **Timeline and undo tree** (Ctrl+Shift+Z, or the clock in the toolbar): every operation of
-  gitcraft's, with the branches before and after it and the files it changed, kept across
-  restarts (open yesterday's rebase and get the old branch tip back as a branch, or put the
-  branch back). Branch moves made elsewhere (the terminal, another client, while gitcraft was
-  closed) show up too, named from the reflog. Undo three steps and do something new: the undone
-  steps stay as a branch of the tree, and _Go here_ jumps to any entry, uncommitted changes kept.
-  The commits it needs stay under `refs/gitcraft/undo/*`, so `git gc` doesn't prune them; the
-  oldest entries go past 300, or with _Forget…_.
+- **Timeline and undo tree** (Ctrl+Shift+Z, or the clock in the toolbar; redo is Ctrl+Y):
+  gitcraft's operations, with the branches before and after each and the files it changed,
+  kept across restarts (open yesterday's rebase and get the old branch tip back as a branch, or
+  put the branch back). Branch moves made elsewhere (the terminal, another client, while
+  gitcraft was closed) show up too, named from the reflog. Undo three steps and do something
+  new: the undone steps stay as a side path of the tree, and _Go here_ jumps to any entry,
+  changes in files kept. The commits it needs stay under `refs/gitcraft/undo/*`, so `git gc`
+  doesn't prune them. Entries past the newest 300 are dropped; _Forget…_ drops them sooner.
 
 **Diffs and conflicts** (centre)
 

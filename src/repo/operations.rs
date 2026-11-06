@@ -38,7 +38,7 @@ impl RepoTab {
         }
         self.busy_op = Some(label.to_owned());
         self.op_started = Some(Instant::now());
-        self.timeline_op_started(quiet);
+        self.timeline_op_started(quiet, refresh);
         self.note_checkout_move(&ops, ctx);
         if !quiet {
             self.status = None;

@@ -421,6 +421,74 @@ fn back_to_back_operations_are_both_kept() {
     assert!(named);
     assert_eq!(path.len(), 2);
     if let Some(status) = refused {
-        assert!(status.contains("try once more"), "{status}");
+        assert!(status.contains("waiting for the repository"), "{status}");
     }
+}
+
+/// A commit in another worktree of the repository is that worktree's: it is no entry here, and
+/// Ctrl+Z here still undoes this tab's own last operation.
+#[test]
+fn work_in_another_worktree_stays_off_this_timeline() {
+    let dir = repo("worktrees");
+    let ctx = egui::Context::default();
+    let mut tab = open(&dir, &ctx);
+    let made = commit(&mut tab, &ctx, "a.txt", "mine");
+    let wt = dir.with_file_name(format!(
+        "{}-wt",
+        dir.file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    ));
+    let _ = std::fs::remove_dir_all(&wt);
+    git_ok(
+        &dir,
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "-b",
+            "other",
+            &wt.to_string_lossy(),
+        ],
+    );
+    git_ok(&wt, &["commit", "-q", "--allow-empty", "-m", "theirs"]);
+    tab.reload(&ctx);
+    assert!(wait(&mut tab, &ctx, |t| settled(t) && t.worktrees.len() == 2));
+    let entries = tab.timeline.entries.len();
+    act(&mut tab, &ctx, Action::Undo);
+    let head = git::head(&dir);
+    let _ = git::run(
+        Some(&dir),
+        &["worktree", "remove", "--force", &wt.to_string_lossy()],
+    );
+    let _ = std::fs::remove_dir_all(&wt);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(entries, 1);
+    assert_ne!(head, made);
+}
+
+/// Staging right after a commit, before its read is in, doesn't leave undo waiting for good.
+#[test]
+fn staging_after_an_operation_does_not_hold_undo_back() {
+    use crate::repo::Refresh;
+    let dir = repo("stage-after");
+    let ctx = egui::Context::default();
+    let mut tab = open(&dir, &ctx);
+    let _ = std::fs::write(dir.join("a.txt"), "a");
+    tab.commit_summary = "first".to_owned();
+    tab.apply(Action::Commit, &ctx);
+    assert!(wait(&mut tab, &ctx, |t| t.busy_op.is_none()));
+    let _ = std::fs::write(dir.join("b.txt"), "b");
+    tab.apply(
+        Action::Ops {
+            label: "Stage".to_owned(),
+            ops: crate::repo::ops(&[&["add", "b.txt"]]),
+            refresh: Refresh::Status,
+        },
+        &ctx,
+    );
+    let settles = wait(&mut tab, &ctx, settled);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(settles, "{:?}", tab.timeline.awaiting);
+    assert_eq!(tab.timeline.entries.len(), 1);
 }
