@@ -190,11 +190,23 @@ fn a_branch_name_taken_here_still_pushes_to_the_forks_name() {
     let Ok(plan) = plan else { return };
     let (result, _) = run_steps(&w.me, &plan.steps, OpKind::plain(), None);
     commit(&w.me, "maintainer.txt");
-    let pushed = git::run(Some(&w.me), &["push", "-q"]);
+    // As the toolbar's Push does it for such a branch.
+    let push = plan::renamed_push(&w.setup(), "ann/fix").unwrap_or_default();
+    let args: Vec<&str> = push.iter().map(String::as_str).collect();
+    let pushed = git::run(Some(&w.me), &args);
     let on_fork = git::resolve(&w.fork, "refs/heads/fix").unwrap_or_default();
     let mine = git::head(&w.me);
+    // Another branch on the same fork still pushes with a plain `git push`: no remote-wide
+    // refspec was added.
+    let config = git::run_ok_codes(
+        Some(&w.me),
+        &["config", "--get-all", "remote.ann.push"],
+        &[0, 1],
+    );
     assert!(result.is_ok(), "{result:?}");
     assert_eq!(plan.local, "ann/fix");
+    assert_eq!(config.map(|c| c.trim().to_owned()), Ok(String::new()));
+    assert_eq!(plan::renamed_push(&w.setup(), "main"), None);
     assert!(pushed.is_ok(), "{pushed:?}");
     assert_eq!(on_fork, mine);
 }

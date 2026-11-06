@@ -16,6 +16,7 @@ use egui::Context;
 use super::state::PendingOp;
 use super::{Dialog, OpKind, Refresh, RepoTab, Undo, UndoEntry};
 use crate::forge::ForkInfo;
+use crate::git;
 
 pub(crate) use plan::Setup;
 pub(crate) use view::paint_badges;
@@ -36,6 +37,13 @@ pub(crate) struct Forks {
     reading_setup: bool,
     /// The rebase asked for in the dialog, or running: what a failed push leaves to undo.
     running: Option<(String, plan::Rebase)>,
+    /// A rebase that stopped on conflicts: once it is continued, its push is offered.
+    after_conflict: Option<plan::Rebase>,
+    /// The pull request whose runs "Approve and run" was chosen for once: chosen again, they
+    /// are approved.
+    approve_armed: Option<u64>,
+    /// Runs are being approved.
+    approving: bool,
 }
 
 /// What the views ask of the forks.
@@ -61,9 +69,19 @@ impl Forks {
         self.waiting.get(sha).map_or(&[], Vec::as_slice)
     }
 
+    /// How the branches and fork remotes are set up, as last read.
+    pub(crate) fn setup(&self) -> &Setup {
+        &self.setup
+    }
+
     /// The fork remotes nothing uses any more.
     pub(crate) fn unused(&self) -> Vec<String> {
         self.setup.unused_forks()
+    }
+
+    /// Why the forge couldn't say where the pull requests come from, if it couldn't.
+    pub(crate) fn error(&self) -> Option<&str> {
+        self.error.as_deref()
     }
 }
 
@@ -90,12 +108,16 @@ impl RepoTab {
                 },
             );
         }
-        let (Some(loaded), Some(hosting)) = (self.prs_loaded, self.hosting.clone()) else {
+        self.offer_push_after_conflict();
+        let Some(loaded) = self.prs_loaded else {
             return;
         };
         if self.forks.read_for == Some(loaded) || self.prs.is_empty() {
             return;
         }
+        let Some(hosting) = self.hosting.clone() else {
+            return;
+        };
         self.forks.read_for = Some(loaded);
         let repo = self.path.clone();
         self.then(
@@ -103,7 +125,13 @@ impl RepoTab {
             move || {
                 let provider = hosting.forge.provider();
                 let forks = provider.forks(&repo, &hosting);
-                let waiting = provider.waiting_runs(&repo, &hosting).unwrap_or_default();
+                // Runs wait for approval on pull requests from forks only.
+                let any_fork = forks.as_ref().is_ok_and(|l| l.iter().any(|i| i.cross));
+                let waiting = if any_fork {
+                    provider.waiting_runs(&repo, &hosting).unwrap_or_default()
+                } else {
+                    Vec::new()
+                };
                 (hosting, forks, waiting)
             },
             move |tab, (hosting, forks, waiting), _| {
@@ -116,7 +144,12 @@ impl RepoTab {
                         tab.forks.info = list.into_iter().map(|i| (i.number, i)).collect();
                         tab.forks.error = None;
                     }
-                    Err(e) => tab.forks.error = Some(e),
+                    // What was said before may be of pull requests since closed: nothing is
+                    // offered from it.
+                    Err(e) => {
+                        tab.forks.info.clear();
+                        tab.forks.error = Some(e);
+                    }
                 }
                 tab.forks.waiting.clear();
                 for (sha, run) in waiting {
@@ -134,29 +167,7 @@ impl RepoTab {
             ForkAct::Checkout(number) => self.checkout_fork(number, ctx),
             ForkAct::Rebase(number) => self.plan_fork_rebase(number, ctx),
             ForkAct::Approve(number) => self.approve_runs(number, ctx),
-            ForkAct::Tidy => {
-                let unused = self.forks.unused();
-                let (steps, undo) = plan::tidy(&self.remotes, &unused);
-                if steps.is_empty() {
-                    self.status = Some(("No fork remote is unused".to_owned(), false));
-                    return;
-                }
-                let names = unused.join(", ");
-                self.dialog = Some(
-                    Dialog::confirm(
-                        "Remove unused fork remotes",
-                        format!(
-                            "Removes the remotes added for forks that no branch pulls from or \
-                             pushes to any more: {names}, with their remote-tracking branches. \
-                             Ctrl+Z adds them back (fetch them again for their branches)."
-                        ),
-                        "Remove",
-                        steps.clone(),
-                        None,
-                    )
-                    .undo(Undo::Custom { undo, redo: steps }),
-                );
-            }
+            ForkAct::Tidy => self.plan_tidy(ctx),
         }
     }
 
@@ -230,7 +241,131 @@ impl RepoTab {
         );
     }
 
+    /// Reads again which fork remotes nothing uses (a branch made in a terminal since counts),
+    /// leaves out those whose branches hold commits no local branch has, and asks.
+    fn plan_tidy(&mut self, ctx: &Context) {
+        let repo = self.path.clone();
+        self.then(
+            ctx,
+            move || {
+                let setup = plan::read_setup(&repo)?;
+                let remotes = git::remotes(&repo)?;
+                let mut keep = Vec::new();
+                let mut unused = Vec::new();
+                for name in setup.unused_forks() {
+                    let only_there = git::run(
+                        Some(&repo),
+                        &[
+                            "rev-list",
+                            "--count",
+                            &format!("--remotes={name}/*"),
+                            "--not",
+                            "--branches",
+                        ],
+                    )
+                    .map(|n| n.trim() != "0")
+                    .unwrap_or(true);
+                    if only_there {
+                        keep.push(name);
+                    } else {
+                        unused.push(name);
+                    }
+                }
+                Ok::<_, String>((plan::tidy(&remotes, &unused), unused, keep))
+            },
+            |tab, found, _| {
+                let ((steps, undo), unused, keep) = match found {
+                    Ok(found) => found,
+                    Err(e) => {
+                        tab.status = Some((format!("Couldn't read the remotes: {e}"), true));
+                        return;
+                    }
+                };
+                let kept = if keep.is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        "\n\nKept: {}, whose branches have commits no branch here has.",
+                        keep.join(", ")
+                    )
+                };
+                if steps.is_empty() {
+                    tab.status = Some((format!("No fork remote can go{kept}"), false));
+                    return;
+                }
+                tab.dialog = Some(
+                    Dialog::confirm(
+                        "Remove unused fork remotes",
+                        format!(
+                            "Removes the remotes gitcraft added for forks that no branch pulls \
+                             from or pushes to any more: {}, with their remote-tracking \
+                             branches. Ctrl+Z adds them back (fetch them for their \
+                             branches).{kept}",
+                            unused.join(", ")
+                        ),
+                        "Remove",
+                        steps.clone(),
+                        None,
+                    )
+                    .undo(Undo::Custom { undo, redo: steps }),
+                );
+            },
+        );
+    }
+
+    /// Once a rebase that stopped on conflicts is continued, asks to push it to the fork; once
+    /// it is aborted, forgets it.
+    fn offer_push_after_conflict(&mut self) {
+        let Some(plan) = &self.forks.after_conflict else {
+            return;
+        };
+        if self.work.in_progress.is_some() || self.loading || self.dialog.is_some() {
+            return;
+        }
+        let plan = plan.clone();
+        self.forks.after_conflict = None;
+        let here = self.refs.current.as_deref() == Some(plan.local.as_str());
+        if !here || self.refs.head == plan.head {
+            return;
+        }
+        let label = format!("Push the rebased {} to {}", plan.local, plan.fork);
+        self.dialog = Some(
+            Dialog::confirm(
+                &label,
+                format!(
+                    "The rebase is done. Force-pushes {} to {}'s {} with a lease: refused if \
+                     they pushed there since it was fetched. Ctrl+Z puts their branch back as \
+                     it was (and yours with the next Ctrl+Z).",
+                    plan.local, plan.fork, plan.branch
+                ),
+                "Push",
+                plan.push_now(),
+                None,
+            )
+            .undo(Undo::Custom {
+                undo: plan.fork_undo_steps(),
+                redo: plan.push_now(),
+            }),
+        );
+    }
+
     fn approve_runs(&mut self, number: u64, ctx: &Context) {
+        if self.forks.approving {
+            return;
+        }
+        // Chosen once: say what it means. Chosen again: go ahead.
+        if self.forks.approve_armed != Some(number) {
+            self.forks.approve_armed = Some(number);
+            self.status = Some((
+                format!(
+                    "Approving runs the contributor's code on your CI: look through #{number}'s \
+                     changes first, then choose Approve and run again"
+                ),
+                false,
+            ));
+            return;
+        }
+        self.forks.approve_armed = None;
         let Some(info) = self.forks.of(number) else {
             return;
         };
@@ -242,6 +377,7 @@ impl RepoTab {
             return;
         }
         let repo = self.path.clone();
+        self.forks.approving = true;
         self.status = Some((format!("Approving #{number}'s workflow runs…"), false));
         self.then(
             ctx,
@@ -252,6 +388,7 @@ impl RepoTab {
                     .unwrap_or(Ok(()))
             },
             move |tab, result, ctx| {
+                tab.forks.approving = false;
                 tab.status = Some(match result {
                     Ok(()) => (format!("#{number}'s workflow runs are approved"), false),
                     Err(e) => (
@@ -279,15 +416,27 @@ impl RepoTab {
         };
         let Err(error) = result else { return };
         let auth = crate::git::is_auth_error(error);
+        let conflicts = error.contains("CONFLICT") || error.contains("could not apply");
         let repo = self.path.clone();
         let local = format!("refs/heads/{}", plan.local);
         self.then(
             ctx,
             move || crate::git::resolve(&repo, &local).unwrap_or_default(),
             move |tab, now, _| {
-                // Stopped before the rebase, or by its conflicts: nothing rewritten to undo.
-                let rebasing = tab.work.in_progress.is_some();
-                if now.is_empty() || now == plan.head || rebasing {
+                // Stopped by its conflicts: once they are resolved and the rebase continued,
+                // the push is offered.
+                if conflicts {
+                    tab.forks.after_conflict = Some(plan);
+                    tab.status = Some((
+                        "The rebase stopped on conflicts: resolve them and continue it, then \
+                         gitcraft offers to push it (or abort it)"
+                            .to_owned(),
+                        true,
+                    ));
+                    return;
+                }
+                // Stopped before the rebase: nothing rewritten to undo.
+                if now.is_empty() || now == plan.head {
                     return;
                 }
                 let (undo, redo) = plan.local_undo(&now);
@@ -309,11 +458,18 @@ impl RepoTab {
                     && let Some(op) = &mut tab.last_op
                     && op.label == asked
                 {
+                    // Undoable on the fork too once pushed; the rewrite here has its own entry.
                     *op = PendingOp {
                         label: format!("Push {} to {}", plan.local, plan.fork),
-                        ops: vec![plan.steps().pop().unwrap_or_default()],
+                        ops: plan.push_now(),
                         refresh: Refresh::All,
-                        kind: OpKind::plain(),
+                        kind: OpKind::Normal(
+                            Undo::Custom {
+                                undo: plan.fork_undo_steps(),
+                                redo: plan.push_now(),
+                            },
+                            String::new(),
+                        ),
                         quiet: false,
                     };
                 }
@@ -326,10 +482,10 @@ impl RepoTab {
 fn rebase_preview(info: &ForkInfo, plan: &plan::Rebase) -> String {
     format!(
         "Rebases {} ({}'s branch {} of #{}) onto {}, which has {} commit{} it hasn't, then \
-         force-pushes it to {}'s fork with a lease: refused if {} pushed there since it was \
-         fetched a moment ago.\n\nIf the rebase stops on conflicts, resolve them and continue it \
-         (or abort it); nothing is pushed then.\n\nCtrl+Z puts the branch as it was back, on the \
-         fork and here.",
+         force-pushes it to {} (their fork) with a lease: refused if {} pushed there since it \
+         was fetched a moment ago.\n\nIf the rebase stops on conflicts, resolve them and \
+         continue it: gitcraft then offers to push it. Abort it, and nothing is pushed.\n\n\
+         Ctrl+Z puts the branch back as it was, on the fork and here.",
         plan.local,
         info.owner,
         info.branch,
@@ -339,7 +495,7 @@ fn rebase_preview(info: &ForkInfo, plan: &plan::Rebase) -> String {
             .unwrap_or(&plan.onto),
         plan.behind,
         if plan.behind == 1 { "" } else { "s" },
-        info.owner,
+        plan.fork,
         info.owner,
     )
 }

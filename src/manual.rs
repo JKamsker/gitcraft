@@ -71,7 +71,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",
             "Right-click a pull request and choose Open in worktree to work on its branch in a worktree of its own, made for it when there is none.",
-            "Pull requests from forks show maintainers can edit, first-time contributor and workflows awaiting approval (Approve and run). Check out to push to its author adds their fork as a remote and checks the branch out so that Push goes back to it; Rebase onto main and push to them rebases it and force-pushes with a lease. Remove unused fork remotes (Ctrl+P) tidies up after.",
+            "Pull requests from forks show awaiting approval (Approve and run), can edit and first-time. Check out to push to its author adds their fork as a remote and checks the branch out so that Push goes back to it; Rebase onto main and push to them rebases it and force-pushes with a lease. Remove unused fork remotes (Ctrl+P) tidies up after.",
             "A terminal panel with tabs, in the repository's folder.",
         ],
     ),
