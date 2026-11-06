@@ -10,7 +10,7 @@ mod map;
 pub(super) mod moved;
 #[cfg(test)]
 mod moved_tests;
-mod moved_view;
+pub(super) mod moved_view;
 mod paint;
 mod parse;
 mod patch;

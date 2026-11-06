@@ -121,6 +121,8 @@ impl RepoTab {
             });
             if esc && self.diff.is_some() && self.line_comment_open() {
                 acts.push(Action::Pr(pr_review::PrAct::CloseLine));
+            } else if esc && self.diff.as_ref().is_some_and(|d| d.moved.is_some()) {
+                acts.push(Action::DiffMoved(None));
             } else if esc && self.diff.is_some() {
                 acts.push(Action::CloseDiff);
             } else if esc && self.rebase.is_some() {

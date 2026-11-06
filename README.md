@@ -173,8 +173,10 @@ so your config, credentials and hooks apply as usual.
   around its lines aside, so re-indenting doesn't hide it) shows in a muted colour of its own
   instead of red and green, with a bar beside both places. _Moved to line…_ / _Moved from
   line…_ on its first line opens a panel with the two places together: the lines kept, those
-  edited on the way (the changed part of each marked), and buttons to go to either place. Lines
-  can still be picked and staged as usual.
+  edited on the way (the changed part of each marked), and buttons to go to either place; the
+  button reads _…, edited_ when lines changed on the way. Esc or its × closes the panel.
+  Staging hunks and lines works as before (a click on the button opens the panel rather than
+  picking that line).
 - The _Diff_ / _File_ switch shows the whole file as it is after the change instead (before it,
   for a deleted file), coloured and with line numbers.
 - A Markdown file's diff has an eye button that renders it: the changes block by block (removed
