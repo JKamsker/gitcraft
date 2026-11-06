@@ -153,7 +153,12 @@ fn a_broken_repository_file_offers_nothing_but_says_why() {
     write_file(&dir, r#"{"commands": [{"name": "X"}]}"#);
     let ctx = egui::Context::default();
     let mut tab = open(&dir, &ctx);
-    let text = tab.custom.file.as_ref().map(|f| f.text.clone()).unwrap_or_default();
+    let text = tab
+        .custom
+        .file
+        .as_ref()
+        .map(|f| f.text.clone())
+        .unwrap_or_default();
     // Trusted as it is, it still offers nothing: it can't be read as commands.
     tab.apply(Action::Custom(CustomAct::Trust(text)), &ctx);
     let none = Placement::ALL
@@ -234,7 +239,11 @@ fn a_menus_scope_gets_the_rest_from_the_checked_out_branch() {
 }
 
 /// Runs `c` from its menu entry, about HEAD, and waits for its toast.
-fn run_to_toast(tab: &mut RepoTab, ctx: &egui::Context, c: CustomCommand) -> Option<(String, bool)> {
+fn run_to_toast(
+    tab: &mut RepoTab,
+    ctx: &egui::Context,
+    c: CustomCommand,
+) -> Option<(String, bool)> {
     tab.finished.clear();
     let scope = tab.default_scope();
     tab.apply(
@@ -258,7 +267,11 @@ fn a_toast_command_runs_in_the_background_and_shows_its_output() {
     let done = run_to_toast(
         &mut tab,
         &ctx,
-        command("Show", Placement::Palette, "echo \"$BRANCH $SHORT_SHA\"; git rev-parse \"$SHA\""),
+        command(
+            "Show",
+            Placement::Palette,
+            "echo \"$BRANCH $SHORT_SHA\"; git rev-parse \"$SHA\"",
+        ),
     );
     let failed = run_to_toast(
         &mut tab,
@@ -281,7 +294,11 @@ fn a_command_that_asks_first_opens_its_dialog_and_runs_with_the_answers() {
     let dir = repo("ask");
     let ctx = egui::Context::default();
     let mut tab = open(&dir, &ctx);
-    let mut c = command("Tag it", Placement::Commit, "git tag \"$TAG\" \"$SHA\" && echo \"$TAG\"");
+    let mut c = command(
+        "Tag it",
+        Placement::Commit,
+        "git tag \"$TAG\" \"$SHA\" && echo \"$TAG\"",
+    );
     c.prompts.push(Prompt {
         variable: "TAG".to_owned(),
         label: "Tag name".to_owned(),

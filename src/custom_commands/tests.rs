@@ -89,7 +89,11 @@ fn a_prompt_answer_is_one_word_too() -> Result<(), String> {
     let answers = vec![("MESSAGE".to_owned(), "x; touch PWNED $(id)".to_owned())];
     let vars = variables(&scope("abc", "main", ""), "/r", &answers);
     // Even unquoted, a value is only split, never run.
-    let ran = run(&dir, &vars, "printf '[%s]' \"$MESSAGE\"; printf '<%s>' $MESSAGE")?;
+    let ran = run(
+        &dir,
+        &vars,
+        "printf '[%s]' \"$MESSAGE\"; printf '<%s>' $MESSAGE",
+    )?;
     let pwned = dir.join("PWNED").exists();
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(
@@ -102,7 +106,11 @@ fn a_prompt_answer_is_one_word_too() -> Result<(), String> {
 
 #[test]
 fn the_commands_variables_are_set_from_the_scope() {
-    let vars = variables(&scope("0123456789abcdef", "feat/ü", "a b.txt"), "/home/me/r", &[]);
+    let vars = variables(
+        &scope("0123456789abcdef", "feat/ü", "a b.txt"),
+        "/home/me/r",
+        &[],
+    );
     let get = |n: &str| vars.iter().find(|(k, _)| k == n).map(|(_, v)| v.as_str());
     assert_eq!(get("SHA"), Some("0123456789abcdef"));
     assert_eq!(get("SHORT_SHA"), Some("01234567"));
@@ -131,7 +139,10 @@ fn a_command_runs_in_the_repository_and_sees_its_path() -> Result<(), String> {
     )?;
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(ran.code, 0, "{}", String::from_utf8_lossy(&ran.stderr));
-    assert_eq!(String::from_utf8_lossy(&ran.stdout), format!("{head}\nhere\n"));
+    assert_eq!(
+        String::from_utf8_lossy(&ran.stdout),
+        format!("{head}\nhere\n")
+    );
     Ok(())
 }
 
@@ -140,7 +151,11 @@ fn a_huge_value_and_a_huge_output_get_through() -> Result<(), String> {
     let dir = repo("huge");
     let big = "ü".repeat(50_000);
     let vars = variables(&scope("", "", &big), "/r", &[]);
-    let ran = run(&dir, &vars, "printf '%s' \"$FILE\"; i=0; while [ $i -lt 3000 ]; do echo line $i; i=$((i+1)); done")?;
+    let ran = run(
+        &dir,
+        &vars,
+        "printf '%s' \"$FILE\"; i=0; while [ $i -lt 3000 ]; do echo line $i; i=$((i+1)); done",
+    )?;
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(ran.code, 0);
     let out = String::from_utf8_lossy(&ran.stdout);
@@ -156,11 +171,18 @@ fn a_huge_value_and_a_huge_output_get_through() -> Result<(), String> {
 fn a_failing_command_says_so_with_its_error() -> Result<(), String> {
     let dir = repo("fails");
     let vars = variables(&Scope::default(), "/r", &[]);
-    let ran = run(&dir, &vars, "echo working; echo 'no such thing' >&2; exit 3")?;
+    let ran = run(
+        &dir,
+        &vars,
+        "echo working; echo 'no such thing' >&2; exit 3",
+    )?;
     let (text, failed) = toast_text("Deploy", ran.code, &ran.stdout, &ran.stderr);
     assert_eq!(ran.code, 3);
     assert!(failed);
-    assert_eq!(text, "Deploy failed (exit status 3)\nworking\nno such thing");
+    assert_eq!(
+        text,
+        "Deploy failed (exit status 3)\nworking\nno such thing"
+    );
     // A program that isn't there is a failure too, with the shell's message.
     let ran = run(&dir, &vars, "gitcraft-no-such-program-x")?;
     let (text, failed) = toast_text("Missing", ran.code, &ran.stdout, &ran.stderr);
@@ -189,11 +211,7 @@ fn an_exit_in_the_command_ends_only_the_command() -> Result<(), String> {
 
 /// Runs `script` the way the terminal does for a repository here, `input` on its input:
 /// (exit code, output).
-fn run_with_input(
-    dir: &Path,
-    script: &str,
-    input: &str,
-) -> Result<(Option<i32>, String), String> {
+fn run_with_input(dir: &Path, script: &str, input: &str) -> Result<(Option<i32>, String), String> {
     use std::io::Write;
     let (program, args) = git::shell_command_here(dir, script);
     let mut child = std::process::Command::new(program)
@@ -283,8 +301,23 @@ fn prompt_variables_must_be_plain_and_not_taken() {
         assert_eq!(variable_error(ok), None, "{ok}");
     }
     for bad in [
-        "", "message", "1X", "_X", "MY-VAR", "A B", "ÜBER", "SHA", "FILE", "REPO", "PATH", "IFS",
-        "HOME", "GIT_DIR", "LD_PRELOAD", "GITCRAFT_COMMAND", "LC_ALL",
+        "",
+        "message",
+        "1X",
+        "_X",
+        "MY-VAR",
+        "A B",
+        "ÜBER",
+        "SHA",
+        "FILE",
+        "REPO",
+        "PATH",
+        "IFS",
+        "HOME",
+        "GIT_DIR",
+        "LD_PRELOAD",
+        "GITCRAFT_COMMAND",
+        "LC_ALL",
     ] {
         assert!(variable_error(bad).is_some(), "{bad}");
     }
@@ -324,7 +357,10 @@ fn menus_offer_only_their_own_commands_that_can_run() {
             .map(|o| (o.command.name, o.source))
             .collect()
     };
-    assert_eq!(names(Placement::Commit), [("On commit".to_owned(), Source::Global)]);
+    assert_eq!(
+        names(Placement::Commit),
+        [("On commit".to_owned(), Source::Global)]
+    );
     assert_eq!(
         names(Placement::File),
         [
@@ -391,8 +427,14 @@ fn a_bad_repository_file_says_what_is_wrong() {
         ("", "can't be read"),
         ("[]", "can't be read"),
         (r#"{"commands": [], "extra": 1}"#, "unknown field"),
-        (r#"{"commands": [{"name": "X", "where": "nowhere", "command": "x"}]}"#, "unknown variant"),
-        (r#"{"commands": [{"name": "", "command": "x"}]}"#, "Command 1: It has no name"),
+        (
+            r#"{"commands": [{"name": "X", "where": "nowhere", "command": "x"}]}"#,
+            "unknown variant",
+        ),
+        (
+            r#"{"commands": [{"name": "", "command": "x"}]}"#,
+            "Command 1: It has no name",
+        ),
         (
             r#"{"commands": [{"name": "X", "command": "x", "prompts": [{"variable": "PATH"}]}]}"#,
             "“X”: $PATH is used by the shell",
@@ -402,7 +444,10 @@ fn a_bad_repository_file_says_what_is_wrong() {
         let e = parse_repo_file(text).err().unwrap_or_default();
         assert!(e.contains(said), "{text}: {e}");
     }
-    let huge = format!(r#"{{"commands": [], "x": "{}"}}"#, "a".repeat(REPO_FILE_MAX));
+    let huge = format!(
+        r#"{{"commands": [], "x": "{}"}}"#,
+        "a".repeat(REPO_FILE_MAX)
+    );
     assert!(parse_repo_file(&huge).is_err_and(|e| e.contains("larger than")));
     assert_eq!(parse_repo_file(r#"{"commands": []}"#), Ok(Vec::new()));
 }
@@ -431,9 +476,15 @@ fn a_toast_shows_the_end_of_the_output_without_colours() {
     let out = b"\x1b[32mgreen\x1b[0m done\nprogress 10%\rprogress 100%\r\n\n";
     assert_eq!(
         toast_text("Build", 0, out, b""),
-        ("Build finished\ngreen done\nprogress 100%".to_owned(), false)
+        (
+            "Build finished\ngreen done\nprogress 100%".to_owned(),
+            false
+        )
     );
-    assert_eq!(toast_text("Quiet", 0, b"", b"  \n"), ("Quiet finished".to_owned(), false));
+    assert_eq!(
+        toast_text("Quiet", 0, b"", b"  \n"),
+        ("Quiet finished".to_owned(), false)
+    );
     let long = "é".repeat(2000);
     let (text, _) = toast_text("Long", 0, long.as_bytes(), b"");
     assert!(text.chars().count() < 700);
@@ -464,8 +515,7 @@ fn commands_round_trip_through_the_settings() -> Result<(), String> {
         ..Default::default()
     };
     let text = serde_json::to_string(&settings).map_err(|e| e.to_string())?;
-    let back: crate::settings::Settings =
-        serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    let back: crate::settings::Settings = serde_json::from_str(&text).map_err(|e| e.to_string())?;
     assert_eq!(back.custom_commands, vec![c]);
     assert_eq!(back.trusted_command_files, settings.trusted_command_files);
     Ok(())

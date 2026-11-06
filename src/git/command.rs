@@ -160,7 +160,14 @@ fn goes_over_network(args: &[&str]) -> bool {
     matches!(
         after_options(args).first().copied(),
         Some(
-            "fetch" | "pull" | "push" | "clone" | "ls-remote" | "remote" | "submodule" | "lfs"
+            "fetch"
+                | "pull"
+                | "push"
+                | "clone"
+                | "ls-remote"
+                | "remote"
+                | "submodule"
+                | "lfs"
                 | SHELL_ALIAS
         )
     )

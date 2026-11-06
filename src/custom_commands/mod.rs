@@ -12,9 +12,10 @@ mod tests;
 use serde::{Deserialize, Serialize};
 
 pub use program::{Scope, captured_program, terminal_program, toast_text, variables};
+#[cfg(test)]
+use repo_file::parse_repo_file;
 pub use repo_file::{
-    FILE as REPO_FILE, MAX_BYTES as REPO_FILE_MAX, RepoFile, TrustedFile, is_trusted, parse_repo_file,
-    trust,
+    FILE as REPO_FILE, MAX_BYTES as REPO_FILE_MAX, RepoFile, TrustedFile, is_trusted, trust,
 };
 
 /// Where a command is offered.
@@ -140,8 +141,14 @@ impl Default for CustomCommand {
 pub const BUILT_IN: [(&str, &str); 6] = [
     ("SHA", "the commit's full hash"),
     ("SHORT_SHA", "its first 8 characters"),
-    ("BRANCH", "the branch (the checked-out one outside a branch's menu)"),
-    ("REMOTE", "the branch's remote (its upstream's, else origin)"),
+    (
+        "BRANCH",
+        "the branch (the checked-out one outside a branch's menu)",
+    ),
+    (
+        "REMOTE",
+        "the branch's remote (its upstream's, else origin)",
+    ),
     ("FILE", "the file, relative to the repository"),
     ("REPO", "the repository's folder, on its machine"),
 ];
@@ -149,8 +156,7 @@ pub const BUILT_IN: [(&str, &str); 6] = [
 /// Variables a prompt can't be given: those the shell, git or gitcraft rely on (`PATH`,
 /// `IFS`, `HOME`…), which an answer would change for the whole command.
 const RESERVED: [&str; 12] = [
-    "PATH", "HOME", "IFS", "SHELL", "ENV", "PWD", "OLDPWD", "USER", "LANG", "TERM", "CDPATH",
-    "PS4",
+    "PATH", "HOME", "IFS", "SHELL", "ENV", "PWD", "OLDPWD", "USER", "LANG", "TERM", "CDPATH", "PS4",
 ];
 
 /// Prefixes of the variables a prompt can't be given: git's, the loader's, ssh's, gitcraft's.
@@ -173,7 +179,9 @@ pub fn variable_error(name: &str) -> Option<String> {
         return Some(format!("${name} is already set by gitcraft"));
     }
     if RESERVED.contains(&name) || RESERVED_PREFIXES.iter().any(|p| name.starts_with(p)) {
-        return Some(format!("${name} is used by the shell or git; pick another name"));
+        return Some(format!(
+            "${name} is used by the shell or git; pick another name"
+        ));
     }
     None
 }

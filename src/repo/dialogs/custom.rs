@@ -78,7 +78,12 @@ fn ask(
         };
         ui.label(label);
         let mut take_focus = *focus && i == 0;
-        field(ui, answer, &format!("${}", prompt.variable), &mut take_focus);
+        field(
+            ui,
+            answer,
+            &format!("${}", prompt.variable),
+            &mut take_focus,
+        );
         if prompt.kind == PromptKind::Branch {
             branch_list(ui, i, answer, branches);
         }
@@ -136,7 +141,7 @@ fn branch_list(ui: &mut Ui, i: usize, answer: &mut String, branches: &[String]) 
 }
 
 /// A command line, as it will run, in a box.
-fn command_line(ui: &mut Ui, id: impl std::hash::Hash, text: &str) {
+fn command_line(ui: &mut Ui, id: impl std::hash::Hash + std::fmt::Debug, text: &str) {
     let t = Tokens::get(ui.ctx());
     egui::Frame::new()
         .fill(t.field)
@@ -190,9 +195,13 @@ fn review(ui: &mut Ui, file: &RepoFile) -> Outcome {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new(c.name.trim()).font(theme::semibold(13.0)));
                     ui.label(
-                        RichText::new(format!("{} · output: {}", c.placement.label(), c.output.label()))
-                            .color(t.text_faint)
-                            .small(),
+                        RichText::new(format!(
+                            "{} · output: {}",
+                            c.placement.label(),
+                            c.output.label()
+                        ))
+                        .color(t.text_faint)
+                        .small(),
                     );
                 });
                 command_line(ui, ("custom-review", i), &c.command);
