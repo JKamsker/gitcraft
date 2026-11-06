@@ -657,7 +657,103 @@ fn whole_life(family: &'static GiteaFamily) -> Result<(), String> {
         "anonymous comment: {refused:?}"
     );
 
+    pull_request_from_a_fork(&server, family, &dir, &hosting, &name)?;
+
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::remove_dir_all(&other);
+    Ok(())
+}
+
+/// The reviewer forks the repository and proposes a branch of the fork, letting maintainers
+/// edit it: the list says so, and the author checks it out as gitcraft does and pushes to it.
+fn pull_request_from_a_fork(
+    server: &Server,
+    family: &'static GiteaFamily,
+    dir: &Path,
+    hosting: &Hosting,
+    name: &str,
+) -> Result<(), String> {
+    eprintln!("{}: A pull request from a fork", family.name);
+    let fork_name = format!("{name}-fork");
+    server.reviewer().send(
+        "POST",
+        &format!("repos/{}/forks", hosting.path),
+        Some(&json!({ "name": fork_name })),
+    )?;
+    let fork_path = format!("reviewer/{fork_name}");
+    let as_reviewer =
+        server
+            .url
+            .replacen("://", &format!("://reviewer:{}@", server.reviewer_token), 1)
+            + &format!("/{fork_path}.git");
+    run(dir, &["checkout", "-q", "-b", "patch", "main"])?;
+    write(dir, "d.txt", "from the fork\n")?;
+    run(dir, &["add", "."])?;
+    run(dir, &["commit", "-q", "-m", "fix: from the fork"])?;
+    eventually("the fork to be made", || {
+        Ok(run(dir, &["push", "-q", &as_reviewer, "patch"])
+            .ok()
+            .map(|_| ()))
+    })?;
+    run(dir, &["checkout", "-q", "main"])?;
+    run(dir, &["branch", "-D", "patch"])?;
+    let opened = server.reviewer().send(
+        "POST",
+        &format!("repos/{}/pulls", hosting.path),
+        Some(&json!({ "head": "reviewer:patch", "base": "main", "title": "From a fork" })),
+    )?;
+    let number = opened
+        .get("number")
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(0);
+    server.reviewer().send(
+        "PATCH",
+        &format!("repos/{}/pulls/{number}", hosting.path),
+        Some(&json!({ "allow_maintainer_edit": true })),
+    )?;
+    let forks = family.forks(dir, hosting)?;
+    let info = forks
+        .iter()
+        .find(|f| f.number == number)
+        .ok_or("the fork's pull request isn't listed")?;
+    ensure!(
+        info.cross
+            && info.maintainers_can_edit
+            && info.owner == "reviewer"
+            && info.branch == "patch"
+            && info.base == "main"
+            && info.clone_https.ends_with(&format!("{fork_path}.git")),
+        "{info:?}"
+    );
+    ensure!(
+        forks.iter().any(|f| f.number != number && !f.cross),
+        "the repository's own branch reads as a fork: {forks:?}"
+    );
+    // Checked out as gitcraft does, then pushed to with the author's login.
+    let creds = git::Credentials {
+        username: "author".to_owned(),
+        password: server.author_token.clone(),
+    };
+    let setup = crate::repo::forks::plan::read_setup(dir)?;
+    let locals = vec!["main".to_owned(), "feat".to_owned(), "wip".to_owned()];
+    let plan =
+        crate::repo::forks::plan::checkout(info, &git::remotes(dir)?, &setup, &locals, "main")?;
+    for step in &plan.steps {
+        let args: Vec<&str> = step.iter().map(String::as_str).collect();
+        git::run_with(Some(dir), &args, Some(&creds))?;
+    }
+    write(dir, "d.txt", "fixed by the maintainer\n")?;
+    run(dir, &["commit", "-q", "-am", "fix: by the maintainer"])?;
+    git::run_with(Some(dir), &["push", "-q"], Some(&creds))?;
+    let mine = run(dir, &["rev-parse", "HEAD"])?.trim().to_owned();
+    let branch = server
+        .author()
+        .get(&format!("repos/{fork_path}/branches/patch"))?;
+    ensure!(
+        at(&branch, "/commit/id") == mine,
+        "the fork's branch is at {:?}, not {mine}",
+        at(&branch, "/commit/id")
+    );
+    run(dir, &["checkout", "-q", "main"])?;
     Ok(())
 }

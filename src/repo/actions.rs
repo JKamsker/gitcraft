@@ -188,6 +188,8 @@ pub(crate) enum Action {
     CloseCompare,
     /// Search commit messages, or what commits changed in files.
     SearchCode(bool),
+    /// Something done on a pull request from a fork.
+    Fork(super::forks::ForkAct),
 }
 
 /// Compares two branches, given to git by their full refs (a tag of the same name is not
@@ -368,6 +370,14 @@ impl RepoTab {
                 "Open in browser".into(),
                 "remote".into(),
                 Action::OpenUrl(url),
+            ));
+        }
+        let unused = self.forks.unused().len();
+        if unused > 0 {
+            items.push((
+                format!("Remove unused fork remotes ({unused})"),
+                "remote".into(),
+                Action::Fork(super::forks::ForkAct::Tidy),
             ));
         }
         if !self.submodules.is_empty() {

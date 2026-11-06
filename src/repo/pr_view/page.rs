@@ -77,6 +77,9 @@ impl RepoTab {
                             false,
                         );
                     });
+                    ui.horizontal_wrapped(|ui| {
+                        self.fork_items(ui, acts, details.number, idle, true);
+                    });
                 });
             ui.separator();
         }

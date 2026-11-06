@@ -137,6 +137,20 @@ so your config, credentials and hooks apply as usual.
   and above the changed files of an open pull request) opens the worktree its branch is checked
   out in, or makes one beside the repository first: on the local branch, on a new one tracking
   the remote branch, or fetched from the forge for a fork that isn't a remote here.
+- Pull requests from forks (GitHub, GitLab, Forgejo, Gitea): the list marks those whose author
+  lets maintainers push to their branch (_maintainers can edit_), first-time contributors
+  (GitHub, GitLab) and, on GitHub, commits whose workflow runs wait for a maintainer's approval,
+  with _Approve and run_ in the menu. _Check out to push to ann_ (in the menu, and on the pull
+  request's page) adds the fork as a remote named after its owner (or uses the remote that
+  already is it, reached like `origin`: SSH or HTTPS), fetches the branch, checks it out
+  tracking it and sets `branch.<name>.pushRemote`, so that Push sends your fixes back to the
+  contributor's branch; when the branch's name is taken here it is checked out as
+  `ann/branch` and still pushed to theirs. Ctrl+Z goes back, deleting the branch (only while it
+  has nothing new) and the remote it added. _Rebase onto main and push to ann_ fetches the base
+  and their branch, refuses if they pushed commits you haven't, rebases, then force-pushes to
+  their fork with a lease, after showing what it will do; Ctrl+Z puts the branch back on their
+  fork and here. _Remove unused fork remotes_ (palette) takes out the remotes added for forks
+  that no branch uses any more (Ctrl+Z adds them back).
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
 
 **Changes and commits** (right)
@@ -383,6 +397,8 @@ was made this way, on a demo repository.
 | `src/pull_request/mod.rs` | one pull request in full, whatever the forge: details, checks, comments, changes, safe markdown |
 | `src/pr_post/mod.rs` | what goes out: the `Target` trait each forge implements, and what they share (suggestions, merge rules) |
 | `src/pr_threads.rs` | review threads, the pending review and permissions                          |
+| `src/forge/forks.rs` | where each forge's pull requests come from (forks), what their authors allow, runs awaiting approval |
+| `src/repo/forks/` | pull requests from forks: badges, checking out to push to the contributor, rebase and push, tidying fork remotes |
 | `src/avatars.rs`         | avatars from GitHub, Forgejo / Gitea, GitLab or Gravatar, cached on disk           |
 | `src/update.rs`          | new-release check                                                                  |
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |

@@ -4,7 +4,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use super::{Hosting, NewPullRequest, Provider, PullRequest, cli};
+use super::{ForkInfo, Hosting, NewPullRequest, Provider, PullRequest, cli};
 use crate::avatars::Hint;
 
 pub(super) struct GitLab;
@@ -54,6 +54,28 @@ impl Provider for GitLab {
             args.push("--draft");
         }
         self.run(repo, &args).map(|out| out.trim().to_owned())
+    }
+
+    /// The open merge requests, and for those from a fork, the fork's clone URLs (one request
+    /// per fork project).
+    fn forks(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<ForkInfo>, String> {
+        let project = hosting.path.replace('/', "%2F");
+        let host = api_authority(hosting);
+        let api = |endpoint: &str| self.run(repo, &["api", "--hostname", &host, endpoint]);
+        let mut list = super::forks::parse_gitlab(&api(&format!(
+            "projects/{project}/merge_requests?state=opened&per_page=100"
+        ))?)?;
+        let mut asked: Vec<(u64, Result<String, String>)> = Vec::new();
+        for info in list.iter_mut().filter(|i| i.cross && i.project_id > 0) {
+            let id = info.project_id;
+            if !asked.iter().any(|(p, _)| *p == id) {
+                asked.push((id, api(&format!("projects/{id}"))));
+            }
+            if let Some((_, Ok(json))) = asked.iter().find(|(p, _)| *p == id) {
+                super::forks::fill_gitlab_project(info, json)?;
+            }
+        }
+        Ok(list)
     }
 
     /// The host's own avatar API, asked by email.
