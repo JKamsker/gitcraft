@@ -13,6 +13,39 @@ use crate::settings::Settings;
 /// would write over what the first saves.
 static MERGING: Mutex<Vec<(PathBuf, String)>> = Mutex::new(Vec::new());
 
+/// A file in [`MERGING`], taken out again when this is dropped (however the work holding it
+/// ends, a panic included).
+struct Merging((PathBuf, String));
+
+impl Merging {
+    /// Marks `path` of `repo` as open in a merge tool, unless it already is.
+    fn register(repo: &Path, path: &str) -> Option<Merging> {
+        let entry = (repo.to_path_buf(), path.to_owned());
+        let mut open = MERGING.lock().unwrap_or_else(|e| e.into_inner());
+        if open.contains(&entry) {
+            return None;
+        }
+        open.push(entry.clone());
+        Some(Merging(entry))
+    }
+}
+
+impl Drop for Merging {
+    fn drop(&mut self) {
+        let mut open = MERGING.lock().unwrap_or_else(|e| e.into_inner());
+        open.retain(|e| *e != self.0);
+    }
+}
+
+/// Whether a merge tool is open on `path` of `repo`: the conflict editor of the file waits.
+pub(crate) fn is_merging(repo: &Path, path: &str) -> bool {
+    MERGING
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+        .any(|(r, p)| r == repo && p == path)
+}
+
 /// What a file's menu offers for the diff `key` stands for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ToolItem {
@@ -61,7 +94,7 @@ fn diff_target(repo: &Path, key: &DiffKey) -> Result<DiffTarget, String> {
 /// Where the tool opens, for the message saying it is waited for: over SSH it runs there.
 fn where_it_runs(repo: &Path) -> String {
     match tool::place_of(repo) {
-        Place::Ssh(host) => format!(" on {host} (over SSH the tool runs on that machine)"),
+        Place::Ssh(host) => format!(". It runs on {host}, so it has to be installed there"),
         Place::Here | Place::Wsl => String::new(),
     }
 }
@@ -72,9 +105,15 @@ impl RepoTab {
         let choice = Settings::get(ctx).diff_tool;
         let label = choice.label(Kind::Diff);
         let file = key.path().to_owned();
+        // Only the working tree's side can be edited in the tool.
+        let refreshes = if matches!(key, DiffKey::Work(_)) {
+            ": the view refreshes when it closes"
+        } else {
+            ""
+        };
         self.status = Some((
             format!(
-                "Showing {file} in {label}{}: the view refreshes when it closes",
+                "Showing {file} in {label}{refreshes}{}",
                 where_it_runs(&self.path)
             ),
             false,
@@ -98,27 +137,16 @@ impl RepoTab {
     pub(super) fn resolve_in_merge_tool(&mut self, path: String, ctx: &egui::Context) {
         let choice = Settings::get(ctx).merge_tool;
         let label = choice.label(Kind::Merge);
-        let entry = (self.path.clone(), path.clone());
-        let taken = MERGING
-            .lock()
-            .map(|mut open| {
-                let taken = open.contains(&entry);
-                if !taken {
-                    open.push(entry.clone());
-                }
-                taken
-            })
-            .unwrap_or(false);
-        if taken {
+        let Some(open) = Merging::register(&self.path, &path) else {
             self.status = Some((
                 format!("{path} is already open in a merge tool: finish there first"),
                 true,
             ));
             return;
-        }
+        };
         self.status = Some((
             format!(
-                "Resolving {path} in {label}{}: save and close it to finish",
+                "Waiting for {label} on {path}: save and close it to finish{}",
                 where_it_runs(&self.path)
             ),
             false,
@@ -127,10 +155,8 @@ impl RepoTab {
         self.then(
             ctx,
             move || {
-                let result = tool::resolve_conflict(&repo, &choice, &entry.1);
-                if let Ok(mut open) = MERGING.lock() {
-                    open.retain(|e| *e != entry);
-                }
+                let result = tool::resolve_conflict(&repo, &choice, &open.0.1);
+                drop(open);
                 (result, label)
             },
             move |tab, (result, label): (Result<MergeOutcome, String>, String), ctx| {
@@ -288,11 +314,7 @@ mod tests {
         assert!(wait(&mut tab, &ctx, |t| !t.work.conflicted.is_empty()));
 
         tab.apply(Action::ResolveInMergeTool("f.txt".to_owned()), &ctx);
-        assert!(
-            status(&tab).starts_with("Resolving f.txt in "),
-            "{}",
-            status(&tab)
-        );
+        assert!(status(&tab).starts_with("Waiting for "), "{}", status(&tab));
         assert!(merging().contains(&(repo.0.clone(), "f.txt".to_owned())));
         // A second one on the same file while it is open is refused.
         tab.apply(Action::ResolveInMergeTool("f.txt".to_owned()), &ctx);
@@ -377,6 +399,25 @@ mod tests {
                 .is_some_and(|(s, error)| *error && s.contains("runs in a terminal"))
         });
         assert!(told, "{}", status(&tab));
+        Ok(())
+    }
+
+    /// A merge tool's file is let go however the work holding it ends, a panic included, and
+    /// the conflict editor of it waits meanwhile.
+    #[test]
+    fn a_merge_tool_file_is_let_go_even_if_the_work_panics() -> Result<(), String> {
+        use super::{Merging, is_merging};
+        let repo = PathBuf::from("/nowhere/panics");
+        let held = Merging::register(&repo, "f.txt").ok_or("not registered")?;
+        assert!(is_merging(&repo, "f.txt"));
+        assert!(!is_merging(&repo, "g.txt"));
+        assert!(Merging::register(&repo, "f.txt").is_none());
+        let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            let _held = held;
+            std::panic::resume_unwind(Box::new("boom"));
+        }));
+        assert!(panicked.is_err());
+        assert!(!is_merging(&repo, "f.txt"));
         Ok(())
     }
 

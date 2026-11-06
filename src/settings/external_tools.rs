@@ -48,11 +48,14 @@ fn tool_ui(ui: &mut Ui, choice: &mut ToolChoice, kind: Kind) {
         ui.add_space(4.0);
         match choice.preset {
             None => {
+                let falls_back = match kind {
+                    Kind::Diff => ", or else merge.tool",
+                    Kind::Merge => "",
+                };
                 layout::note(
                     ui,
                     format!(
-                        "git {} --tool=<{}> with your git config's tool",
-                        kind.command(),
+                        "The tool your git config names in {}{falls_back}",
                         kind.key()
                     ),
                 );
@@ -64,8 +67,10 @@ fn tool_ui(ui: &mut Ui, choice: &mut ToolChoice, kind: Kind) {
                         .desired_width(layout::fit(ui, FIELD_WIDTH)),
                 )
                 .on_hover_text(
-                    "The program to run, when it isn't found by itself (on the PATH, or in \
-                     Program Files on Windows). Empty: found by itself.",
+                    "The program of this machine to run, when it isn't found by itself (on the \
+                     PATH, or in Program Files on Windows and for WSL repositories, where it is \
+                     the Windows .exe). Over SSH it isn't used: the tool there is found by git of \
+                     that machine (its mergetool.<tool>.path).",
                 );
             }
         }

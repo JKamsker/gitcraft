@@ -1,7 +1,7 @@
 //! How each tool is started, and real `git difftool` / `git mergetool` runs on temporary
 //! repositories with stand-in tools (scripts) that succeed, fail or are closed without saving.
 
-use super::plan::{self, Place, tool_args, windows_program};
+use super::plan::{self, AS_FILE, Place, tool_args, windows_program};
 use super::preset::{Kind, Preset, Slot, ToolChoice, Word};
 use super::target::DiffTarget;
 
@@ -64,14 +64,18 @@ fn vs_code_is_started_with_its_wait_and_diff_or_merge_options() {
     assert_eq!(diff.name, "gitcraft-vscode");
     assert_eq!(
         settings(&diff),
-        [r#"difftool.gitcraft-vscode.cmd='code' '--wait' '--diff' "$LOCAL" "$REMOTE""#]
+        [format!(
+            r#"difftool.gitcraft-vscode.cmd={AS_FILE}; 'code' '--wait' '--diff' "$(gc_a "$LOCAL")" "$(gc_a "$REMOTE")""#
+        )]
     );
     let merge = plan::preset(Preset::VsCode, Kind::Merge, &Place::Here, None, None);
     assert_eq!(
         settings(&merge),
         [
-            r#"mergetool.gitcraft-vscode.cmd='code' '--wait' '--merge' "$REMOTE" "$LOCAL" "$BASE" "$MERGED""#,
-            "mergetool.gitcraft-vscode.trustExitCode=false",
+            format!(
+                r#"mergetool.gitcraft-vscode.cmd={AS_FILE}; 'code' '--wait' '--merge' "$(gc_a "$REMOTE")" "$(gc_a "$LOCAL")" "$(gc_a "$BASE")" "$(gc_a "$MERGED")""#
+            ),
+            "mergetool.gitcraft-vscode.trustExitCode=false".to_owned(),
         ]
     );
     // A program with a space and a quote in its path stays one word.
@@ -85,7 +89,7 @@ fn vs_code_is_started_with_its_wait_and_diff_or_merge_options() {
     assert!(
         odd.config[0]
             .1
-            .starts_with(r"'/opt/my code/it'\''s' '--wait'"),
+            .contains(r"; '/opt/my code/it'\''s' '--wait'"),
         "{:?}",
         odd.config
     );
@@ -142,7 +146,7 @@ fn in_wsl_every_preset_is_the_windows_program_given_windows_paths() {
             }
         }
     }
-    // A program typed as a path there is run as it is.
+    // A program typed as a path there (or a bare name) is run as it is, with the paths there.
     let p = plan::preset(
         Preset::Meld,
         Kind::Diff,
@@ -151,10 +155,20 @@ fn in_wsl_every_preset_is_the_windows_program_given_windows_paths() {
         None,
     );
     assert!(
-        p.config[0].1.contains("; '/usr/bin/meld' "),
+        p.config[0]
+            .1
+            .contains(r#"; '/usr/bin/meld' "$(gc_a "$LOCAL")""#),
         "{:?}",
         p.config
     );
+    assert!(!p.config[0].1.contains("wslpath"), "{:?}", p.config);
+    let code = plan::preset(Preset::VsCode, Kind::Diff, &Place::Wsl, None, None);
+    assert!(
+        code.config[0].1.contains("; 'code' '--wait'"),
+        "{:?}",
+        code.config
+    );
+    assert!(!code.config[0].1.contains("wslpath"), "{:?}", code.config);
     // An option glued to a file keeps them together.
     let bc = plan::preset(
         Preset::BeyondCompare,
@@ -289,17 +303,17 @@ fn a_windows_program_is_found_where_its_installer_puts_it() {
         _ => None,
     };
     let found = windows_program(Preset::BeyondCompare, env, |p| {
-        p == r"C:\Program Files (x86)\Beyond Compare 4\BCompare.exe"
+        p == r"C:\Program Files (x86)\Beyond Compare 4\BComp.exe"
     });
     assert_eq!(
         found.as_deref(),
-        Some(r"C:\Program Files (x86)\Beyond Compare 4\BCompare.exe")
+        Some(r"C:\Program Files (x86)\Beyond Compare 4\BComp.exe")
     );
     // The newest first.
     let found = windows_program(Preset::BeyondCompare, env, |p| p.contains("Beyond Compare"));
     assert_eq!(
         found.as_deref(),
-        Some(r"C:\Program Files\Beyond Compare 5\BCompare.exe")
+        Some(r"C:\Program Files\Beyond Compare 5\BComp.exe")
     );
     // An empty folder variable isn't the root of the drive.
     assert_eq!(
@@ -746,25 +760,125 @@ mod real {
 
     #[test]
     fn a_merge_tool_that_is_not_installed_is_an_error() -> Result<(), String> {
-        let repo = Repo::conflicted("merge-missing")?;
-        let choice = ToolChoice {
-            preset: Some(Preset::P4Merge),
-            program: repo
-                .path()
-                .join("missing p4merge")
-                .to_string_lossy()
-                .into_owned(),
-        };
-        let outcome = resolve_conflict(repo.path(), &choice, FILE);
-        // Either way it isn't resolved, and the user is told by which tool.
-        match outcome {
-            Ok(MergeOutcome::Unresolved(why)) => assert!(why.contains("P4Merge"), "{why}"),
-            Err(e) => assert!(e.contains("P4Merge"), "{e}"),
-            Ok(MergeOutcome::Resolved) => {
-                return Err("resolved by a tool that isn't there".to_owned());
-            }
+        // One of git's own tools, and gitcraft's VS Code command, whose program the shell
+        // doesn't find: an error saying what to do, not "closed without saving".
+        for (preset, name) in [(Preset::P4Merge, "P4Merge"), (Preset::VsCode, "VS Code")] {
+            let repo = Repo::conflicted(&format!("merge-missing-{}", preset.id()))?;
+            let choice = ToolChoice {
+                preset: Some(preset),
+                program: repo
+                    .path()
+                    .join("missing tool")
+                    .to_string_lossy()
+                    .into_owned(),
+            };
+            let outcome = resolve_conflict(repo.path(), &choice, FILE);
+            assert!(
+                outcome
+                    .as_ref()
+                    .is_err_and(|e| e.starts_with(&format!("{name} could not open"))
+                        && e.contains("Install it, or set where it is")),
+                "{outcome:?}"
+            );
+            assert!(repo.still_conflicted()?);
+            let unstaged = DiffTarget::Unstaged {
+                path: FILE.to_owned(),
+            };
+            repo.git(&["merge", "--abort"])?;
+            repo.write(FILE, "changed\n")?;
+            let diff = open_diff(repo.path(), &choice, &unstaged);
+            assert!(
+                diff.as_ref()
+                    .is_err_and(|e| e.contains("Install it, or set where it is")),
+                "{diff:?}"
+            );
         }
-        assert!(repo.still_conflicted()?);
+        Ok(())
+    }
+
+    /// `git mergetool` reads names as patterns: a file named `x*.txt` would merge `xa.txt`
+    /// too, which nobody asked for.
+    #[test]
+    fn a_file_named_like_a_pattern_is_not_handed_to_mergetool() -> Result<(), String> {
+        let repo = Repo::new("merge-glob")?;
+        for name in ["x*.txt", "xa.txt"] {
+            repo.commit(name, "base\n", "base")?;
+        }
+        repo.git(&["checkout", "-q", "-b", "theirs"])?;
+        for name in ["x*.txt", "xa.txt"] {
+            repo.commit(name, "theirs\n", "theirs")?;
+        }
+        repo.git(&["checkout", "-q", "main"])?;
+        for name in ["x*.txt", "xa.txt"] {
+            repo.commit(name, "ours\n", "ours")?;
+        }
+        assert!(run(Some(repo.path()), &["merge", "theirs"]).is_err());
+        repo.merge_tool("echo merged > \"$1\"", true)?;
+        let refused = resolve_conflict(repo.path(), &configured(), "x*.txt");
+        assert!(
+            refused.as_ref().is_err_and(|e| e.contains("pattern")),
+            "{refused:?}"
+        );
+        assert!(repo.read("xa.txt").contains("<<<<<<<"));
+        Ok(())
+    }
+
+    /// A file whose name starts with `-` reaches gitcraft's own command (VS Code) as a file.
+    #[test]
+    fn a_file_named_like_an_option_reaches_the_tool_as_a_file() -> Result<(), String> {
+        let repo = Repo::new("diff-dash")?;
+        repo.commit("-dash.txt", "one\n", "first")?;
+        repo.write("-dash.txt", "two\n")?;
+        let args = repo.path().with_extension("args");
+        let program = repo.tool(
+            "code",
+            &format!(
+                "for a; do printf '%s\\n' \"$a\"; done > '{}'",
+                args.display()
+            ),
+        )?;
+        let choice = ToolChoice {
+            preset: Some(Preset::VsCode),
+            program,
+        };
+        let unstaged = DiffTarget::Unstaged {
+            path: "-dash.txt".to_owned(),
+        };
+        assert_eq!(open_diff(repo.path(), &choice, &unstaged), Ok(()));
+        let got = std::fs::read_to_string(&args).map_err(|e| e.to_string())?;
+        let lines: Vec<&str> = got.lines().collect();
+        assert_eq!(lines.first(), Some(&"--wait"), "{got}");
+        assert!(lines.iter().skip(2).all(|l| !l.starts_with('-')), "{got}");
+        assert!(lines.contains(&"./-dash.txt"), "{got}");
+        Ok(())
+    }
+
+    /// Over SSH the tool is that machine's: a program typed for this one isn't used there.
+    #[test]
+    fn a_typed_program_is_not_used_over_ssh() -> Result<(), String> {
+        let repo = Repo::new("program-place")?;
+        let typed = r"C:\Tools\BComp.exe";
+        let ssh = Place::Ssh("build".to_owned());
+        let program_for = super::super::run::program_for;
+        assert_eq!(
+            program_for(repo.path(), Preset::BeyondCompare, typed, &ssh, Kind::Diff),
+            Ok(None)
+        );
+        assert_eq!(
+            program_for(
+                repo.path(),
+                Preset::BeyondCompare,
+                typed,
+                &Place::Here,
+                Kind::Diff
+            ),
+            Ok(Some(typed.to_owned()))
+        );
+        // VS Code in WSL is its own `code` there, not a Windows program to look for.
+        assert_eq!(
+            program_for(repo.path(), Preset::VsCode, "", &Place::Wsl, Kind::Merge),
+            Ok(None)
+        );
         Ok(())
     }
 
@@ -801,7 +915,7 @@ mod real {
             Preset::BeyondCompare,
             Kind::Merge,
             &Place::Wsl,
-            Some(r"C:\Tools\BCompare.exe"),
+            Some(r"C:\Tools\BComp.exe"),
             None,
         );
         let path = format!(

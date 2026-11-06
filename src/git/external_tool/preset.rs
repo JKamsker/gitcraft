@@ -192,20 +192,22 @@ impl Preset {
         matches!(self, Preset::KDiff3)
     }
 
-    /// Where its Windows installer puts it: (the folder variable, the path under it).
+    /// Where its Windows installer puts it: (the folder variable, the path under it). Beyond
+    /// Compare's `BComp.exe`, not `BCompare.exe`, which hands the files to a window already
+    /// open and returns at once (git would take the merge for unsaved).
     pub fn windows_places(self) -> &'static [(&'static str, &'static str)] {
         const PF: &str = "ProgramFiles";
         const PF86: &str = "ProgramFiles(x86)";
         const LOCAL: &str = "LOCALAPPDATA";
         match self {
             Preset::BeyondCompare => &[
-                (PF, r"Beyond Compare 5\BCompare.exe"),
-                (PF, r"Beyond Compare 4\BCompare.exe"),
-                (PF86, r"Beyond Compare 4\BCompare.exe"),
-                (PF, r"Beyond Compare 3\BCompare.exe"),
-                (PF86, r"Beyond Compare 3\BCompare.exe"),
-                (LOCAL, r"Programs\Beyond Compare 5\BCompare.exe"),
-                (LOCAL, r"Programs\Beyond Compare 4\BCompare.exe"),
+                (PF, r"Beyond Compare 5\BComp.exe"),
+                (PF, r"Beyond Compare 4\BComp.exe"),
+                (PF86, r"Beyond Compare 4\BComp.exe"),
+                (PF, r"Beyond Compare 3\BComp.exe"),
+                (PF86, r"Beyond Compare 3\BComp.exe"),
+                (LOCAL, r"Programs\Beyond Compare 5\BComp.exe"),
+                (LOCAL, r"Programs\Beyond Compare 4\BComp.exe"),
             ],
             Preset::Araxis => &[
                 (PF, r"Araxis\Araxis Merge\Compare.exe"),

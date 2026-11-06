@@ -12,8 +12,10 @@ use crate::theme::{self, Tokens};
 impl RepoTab {
     pub(in crate::repo) fn conflict_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
-        let idle = self.busy_op.is_none();
         let Some(ed) = &mut self.conflict else { return };
+        // A merge tool open on the file writes it when it saves: nothing is chosen here meanwhile.
+        let idle = self.busy_op.is_none()
+            && !crate::repo::external_tools::is_merging(&self.path, &ed.path);
         let (ours_name, theirs_name) = ed.side_names();
         let left = ed.unresolved();
         // While it is written (on another machine), what is saved is what is shown.
@@ -112,11 +114,11 @@ impl ConflictEditor {
             }
         }
         if ui
-            .add_enabled(idle, egui::Button::new("Merge tool"))
+            .add_enabled(idle, egui::Button::new("Resolve in merge tool"))
             .on_hover_text(
                 "Resolve this file in the merge tool of Settings → Git → External tools \
                  instead; it is marked resolved when the tool reports success. Choices made \
-                 here and not saved are left out.",
+                 here and not saved are discarded.",
             )
             .clicked()
         {

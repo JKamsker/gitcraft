@@ -103,7 +103,7 @@ fn plan_for(repo: &Path, choice: &ToolChoice, kind: Kind) -> Result<Plan, String
         return plan::configured(&configured_name(repo, kind), kind);
     };
     let place = place_of(repo);
-    let program = program_for(preset, &choice.program, &place)?;
+    let program = program_for(repo, preset, &choice.program, &place, kind)?;
     let trust = match kind {
         Kind::Merge => trust_setting(repo, preset),
         Kind::Diff => None,
@@ -148,11 +148,24 @@ fn trust_setting(repo: &Path, preset: Preset) -> Option<bool> {
     }
 }
 
-/// The program to start the preset with: the one set in Settings; else, where it has to be a
-/// program of this Windows machine (WSL) or git doesn't look in Program Files (Windows), where
-/// its installer put it; else the one git finds by itself.
-fn program_for(preset: Preset, typed: &str, place: &Place) -> Result<Option<String>, String> {
+/// The program to start the preset with, or `None` for the one git (or the PATH) finds:
+/// - over SSH, always that machine's own: a program typed in Settings is one of this machine;
+/// - the one typed in Settings;
+/// - in WSL, the Windows program where its installer put it (VS Code: its own `code`
+///   command there, which opens the files in VS Code's WSL window);
+/// - on Windows, where its installer put it, unless git's config sets `<command>.<tool>.path`
+///   (git doesn't look in Program Files for most tools by itself).
+pub(super) fn program_for(
+    repo: &Path,
+    preset: Preset,
+    typed: &str,
+    place: &Place,
+    kind: Kind,
+) -> Result<Option<String>, String> {
     let typed = typed.trim();
+    if matches!(place, Place::Ssh(_)) || preset == Preset::VsCode && typed.is_empty() {
+        return Ok(None);
+    }
     if !typed.is_empty() {
         return Ok(Some(typed.to_owned()));
     }
@@ -171,24 +184,54 @@ fn program_for(preset: Preset, typed: &str, place: &Place) -> Result<Option<Stri
                 preset.label()
             )
         }),
-        Place::Here if cfg!(windows) => Ok(installed()),
+        Place::Here if cfg!(windows) && !has_path_setting(repo, preset, kind) => Ok(installed()),
         _ => Ok(None),
     }
+}
+
+/// Whether git's config says where the preset's program is (`difftool.bc.path`…).
+fn has_path_setting(repo: &Path, preset: Preset, kind: Kind) -> bool {
+    let Some(name) = preset.git_name() else {
+        return false;
+    };
+    // `difftool` falls back to `mergetool.<tool>.path`, as git does.
+    let keys = match kind {
+        Kind::Diff => vec![
+            format!("difftool.{name}.path"),
+            format!("mergetool.{name}.path"),
+        ],
+        Kind::Merge => vec![format!("mergetool.{name}.path")],
+    };
+    keys.iter()
+        .any(|key| run(Some(repo), &["config", "--get", key]).is_ok_and(|v| !v.trim().is_empty()))
 }
 
 /// Checks that `path` is a conflict a merge tool can take: both sides changed its content.
 /// A file deleted on one side, a symbolic link or a submodule would have git ask a question
 /// on a terminal nobody sees.
 fn mergeable(repo: &Path, path: &str) -> Result<(), String> {
+    // `git mergetool` reads the names it is given as patterns (`x*.txt` would also merge
+    // `xa.txt`), whatever `--literal-pathspecs` says.
+    if path.contains(['*', '?', '[']) {
+        return Err(format!(
+            "{path} has *, ? or [ in its name, which git mergetool takes for a pattern of other \
+             files too: resolve it in the conflict editor or the terminal"
+        ));
+    }
     let stages = unmerged_stages(repo, path)?;
     if stages.is_empty() {
         return Err(format!("{path} has no conflict left to resolve"));
     }
     let side = |n: u8| stages.iter().find(|(_, stage)| *stage == n);
     let (Some(ours), Some(theirs)) = (side(2), side(3)) else {
+        let deleted = if side(2).is_none() && side(3).is_none() {
+            "on both sides"
+        } else {
+            "on one side"
+        };
         return Err(format!(
-            "{path} was deleted on one side: keep it or delete it with Use mine / Use theirs, \
-             or in the terminal, rather than in a merge tool"
+            "{path} was deleted {deleted}, so there are no two versions to merge: keep it \
+             with Mark resolved, or delete it with git rm in the terminal"
         ));
     };
     for (mode, _) in [ours, theirs] {
@@ -266,9 +309,18 @@ fn said(ran: &ToolRun, words: &str) -> bool {
     ran.stderr.contains(words) || ran.stdout.contains(words)
 }
 
-/// Whether git couldn't start the tool at all.
+/// Whether git couldn't start the tool at all: git's own words for one of its tools, or the
+/// shell's for a program of a `.cmd` (gitcraft's VS Code and WSL ones) that isn't there.
 fn not_available(ran: &ToolRun) -> bool {
-    said(ran, "is not available as") || said(ran, "Unknown merge tool")
+    [
+        "is not available as",
+        "Unknown merge tool",
+        ": not found",
+        "command not found",
+        "No such file or directory",
+    ]
+    .iter()
+    .any(|words| said(ran, words))
 }
 
 /// What git said about a tool that failed, in a line or two, with what to do about a tool
