@@ -11,7 +11,23 @@ impl RepoTab {
     pub(in crate::repo) fn diff_rich_kind(&self) -> Option<RichKind> {
         let kind = self.diff_rich.filter(|_| !self.diff_as_file)?;
         let view = self.diff.as_ref()?;
-        kind.accepts(view.key.path()).then_some(kind)
+        self.rich_kinds_of(view.key.path())
+            .contains(&kind)
+            .then_some(kind)
+    }
+
+    /// The rich views the file `path` has a button for: those its name offers, and one turned on
+    /// for it from another view.
+    pub(in crate::repo) fn rich_kinds_of(&self, path: &str) -> Vec<RichKind> {
+        let mut kinds = RichKind::of(path);
+        if self.diff_rich_for.as_deref() == Some(path)
+            && let Some(kind) = self.diff_rich.or(Some(RichKind::Api))
+            && kind.accepts(path)
+            && !kinds.contains(&kind)
+        {
+            kinds.push(kind);
+        }
+        kinds
     }
 
     /// Reads the open diff as the rich view that is on, in the background.
@@ -39,6 +55,12 @@ impl RepoTab {
     /// Shows diffs as `kind` (`None`: as their lines).
     pub(in crate::repo) fn show_diff_rich(&mut self, kind: Option<RichKind>, ctx: &egui::Context) {
         self.diff_rich = kind;
+        // On for a file whose name doesn't offer it: for that file.
+        if let (Some(k), Some(view)) = (kind, &self.diff)
+            && !RichKind::of(view.key.path()).contains(&k)
+        {
+            self.diff_rich_for = Some(view.key.path().to_owned());
+        }
         // One reading at a time: the Markdown rendered gives way.
         if kind.is_some() {
             self.diff_rendered = false;

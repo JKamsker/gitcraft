@@ -3,6 +3,8 @@
 //! that became required, request values narrowed, and responses that lost codes, fields or
 //! guarantees. Each change has its place in the file.
 
+use std::collections::{HashMap, HashSet};
+
 use super::Sides;
 use super::config::{self, same};
 use super::tree::{Field, Node};
@@ -10,9 +12,8 @@ use super::tree::{Field, Node};
 const METHODS: &[&str] = &[
     "get", "put", "post", "delete", "options", "head", "patch", "trace",
 ];
-/// How deep schemas are compared (and `$ref`s followed): far enough for real APIs, bounded
-/// for recursive ones.
-const MAX_SCHEMA_DEPTH: usize = 8;
+/// How deep schemas are compared: far enough for real APIs, bounded for odd ones.
+const MAX_SCHEMA_DEPTH: usize = 12;
 const MAX_REFS: usize = 32;
 
 /// How bad a change is for the API's clients.
@@ -42,7 +43,7 @@ pub struct ApiDiff {
     pub changes: Vec<ApiChange>,
 }
 
-/// A document and its root, to follow `$ref`s in.
+/// A document's root, to follow `$ref`s in.
 #[derive(Clone, Copy)]
 struct Doc<'a> {
     root: &'a Node,
@@ -62,6 +63,10 @@ fn text(node: &Node) -> Option<&str> {
     }
 }
 
+fn flag(node: &Node, key: &str) -> bool {
+    get(node, key).and_then(|f| text(&f.node)) == Some("true")
+}
+
 fn strings(node: Option<&Field>) -> Vec<String> {
     match node.map(|f| &f.node) {
         Some(Node::List(items)) => items
@@ -69,6 +74,7 @@ fn strings(node: Option<&Field>) -> Vec<String> {
             .filter_map(|i| text(&i.node))
             .map(str::to_owned)
             .collect(),
+        Some(Node::Scalar { text, .. }) => vec![text.clone()],
         _ => Vec::new(),
     }
 }
@@ -83,15 +89,17 @@ pub fn version_of(root: &Node) -> Option<String> {
     v("openapi", "OpenAPI").or_else(|| v("swagger", "Swagger"))
 }
 
+/// The `$ref` a node is, if it is one.
+fn ref_of(node: &Node) -> Option<&str> {
+    get(node, "$ref").and_then(|f| text(&f.node))
+}
+
 impl<'a> Doc<'a> {
-    /// `node` with its `$ref` followed (a local one, `#/…`), and the line it is at.
+    /// `node` with its `$ref`s followed (local ones, `#/…`), and the line it is at.
     fn resolve(self, node: &'a Node, line: u32) -> (&'a Node, u32) {
         let (mut node, mut line) = (node, line);
         for _ in 0..MAX_REFS {
-            let Some(target) = get(node, "$ref").and_then(|f| text(&f.node)) else {
-                break;
-            };
-            let Some(found) = self.pointer(target) else {
+            let Some(found) = ref_of(node).and_then(|r| self.pointer(r)) else {
                 break;
             };
             (node, line) = (&found.node, found.line);
@@ -121,12 +129,9 @@ pub fn diff(path: &str, sides: &Sides) -> Result<ApiDiff, String> {
     let version = side_version(&new).or_else(|| side_version(&old)).ok_or(
         "it isn't an OpenAPI or Swagger document (no `openapi` or `swagger` key at its top)",
     )?;
+    let empty = Node::Map(Vec::new());
     let mut out = Vec::new();
     match (&old, &new) {
-        (Some(old), Some(new)) => {
-            let (a, b) = (Doc { root: old }, Doc { root: new });
-            endpoints(a, b, &mut out);
-        }
         (Some(_), None) => out.push(change(
             Severity::Breaking,
             "",
@@ -134,7 +139,12 @@ pub fn diff(path: &str, sides: &Sides) -> Result<ApiDiff, String> {
             Some(1),
             None,
         )),
-        _ => {}
+        _ => {
+            // A new document: every endpoint is added.
+            let old = old.as_ref().unwrap_or(&empty);
+            let new = new.as_ref().unwrap_or(&empty);
+            endpoints(Doc { root: old }, Doc { root: new }, &mut out);
+        }
     }
     out.sort_by_key(|c| c.severity);
     Ok(ApiDiff {
@@ -159,20 +169,48 @@ fn change(
     }
 }
 
-/// Every operation of `doc`: (`GET /pets`, the path's field, the operation's field).
-fn operations<'a>(doc: Doc<'a>) -> Vec<(String, &'a Field, &'a Field)> {
-    let Some(paths) = get(doc.root, "paths") else {
-        return Vec::new();
-    };
-    let Node::Map(paths) = &paths.node else {
+/// An operation: its name (`GET /pets/{id}`), the path's field and the operation's.
+type Op<'a> = (String, &'a Field, &'a Field);
+
+/// Every operation of `doc`, by the shape of its path (`/pets/{}`): a path parameter renamed
+/// is the same endpoint.
+fn operations(doc: Doc<'_>) -> Vec<(String, Op<'_>)> {
+    let Some(Field {
+        node: Node::Map(paths),
+        ..
+    }) = get(doc.root, "paths")
+    else {
         return Vec::new();
     };
     let mut out = Vec::new();
     for p in paths {
+        let shape = shape(&p.key);
         for m in METHODS {
             if let Some(op) = get(&p.node, m) {
-                out.push((format!("{} {}", m.to_uppercase(), p.key), p, op));
+                let name = format!("{} {}", m.to_uppercase(), p.key);
+                out.push((format!("{m} {shape}"), (name, p, op)));
             }
+        }
+    }
+    out
+}
+
+/// A path with the names of its parameters left out.
+fn shape(path: &str) -> String {
+    let mut out = String::new();
+    let mut inside = false;
+    for c in path.chars() {
+        match c {
+            '{' => {
+                inside = true;
+                out.push('{');
+            }
+            '}' => {
+                inside = false;
+                out.push('}');
+            }
+            _ if inside => {}
+            _ => out.push(c),
         }
     }
     out
@@ -180,8 +218,10 @@ fn operations<'a>(doc: Doc<'a>) -> Vec<(String, &'a Field, &'a Field)> {
 
 fn endpoints(a: Doc, b: Doc, out: &mut Vec<ApiChange>) {
     let (old_ops, new_ops) = (operations(a), operations(b));
-    for (name, _, op) in &old_ops {
-        match new_ops.iter().find(|(n, ..)| n == name) {
+    let new_by: HashMap<&str, &Op> = new_ops.iter().map(|(k, op)| (k.as_str(), op)).collect();
+    let old_keys: HashSet<&str> = old_ops.iter().map(|(k, _)| k.as_str()).collect();
+    for (key, (name, path, op)) in &old_ops {
+        match new_by.get(key.as_str()) {
             None => out.push(change(
                 Severity::Breaking,
                 name,
@@ -189,16 +229,20 @@ fn endpoints(a: Doc, b: Doc, out: &mut Vec<ApiChange>) {
                 Some(op.line),
                 None,
             )),
-            Some((_, new_path, new_op)) => {
-                let old_path = old_ops.iter().find(|(n, ..)| n == name).map(|(_, p, _)| *p);
-                if let Some(old_path) = old_path {
-                    operation(name, (a, old_path, op), (b, new_path, new_op), out);
-                }
+            Some((new_name, new_path, new_op)) => {
+                let mut cx = Cx {
+                    a,
+                    b,
+                    name: new_name.clone(),
+                    out: &mut *out,
+                    visited: HashSet::new(),
+                };
+                cx.operation((path, op), (new_path, new_op));
             }
         }
     }
-    for (name, _, op) in &new_ops {
-        if !old_ops.iter().any(|(n, ..)| n == name) {
+    for (key, (name, _, op)) in &new_ops {
+        if !old_keys.contains(key.as_str()) {
             out.push(change(
                 Severity::Added,
                 name,
@@ -217,6 +261,18 @@ struct Param<'a> {
     required: bool,
     node: &'a Node,
     line: u32,
+}
+
+impl Param<'_> {
+    /// Whether it is the same parameter as `other`: a header's name in any case.
+    fn is(&self, other: &Param) -> bool {
+        self.place == other.place
+            && if self.place == "header" {
+                self.name.eq_ignore_ascii_case(&other.name)
+            } else {
+                self.name == other.name
+            }
+    }
 }
 
 /// The parameters of an operation and of its path, `$ref`s followed; the operation's win.
@@ -238,244 +294,440 @@ fn params<'a>(doc: Doc<'a>, path: &'a Field, op: &'a Field) -> Vec<Param<'a>> {
                     .unwrap_or_default()
                     .to_owned()
             };
-            let (name, place) = (field("name"), field("in"));
-            if out.iter().any(|p| p.name == name && p.place == place) {
-                continue;
-            }
-            let required = place == "path" || field("required") == "true";
-            out.push(Param {
-                name,
-                place,
-                required,
+            let p = Param {
+                name: field("name"),
+                place: field("in"),
+                required: field("in") == "path" || flag(node, "required"),
                 node,
                 line,
-            });
+            };
+            if !out.iter().any(|o| o.is(&p)) {
+                out.push(p);
+            }
         }
     }
     out
 }
 
-fn operation(
-    name: &str,
-    (a, old_path, old_op): (Doc, &Field, &Field),
-    (b, new_path, new_op): (Doc, &Field, &Field),
-    out: &mut Vec<ApiChange>,
-) {
-    let (old_params, new_params) = (params(a, old_path, old_op), params(b, new_path, new_op));
-    for p in &new_params {
-        // A body parameter (Swagger 2) is the request body, compared below.
-        if p.place == "body" {
-            continue;
+/// Which way a schema's values travel: what the client sends, or what it gets back.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+enum Dir {
+    Request,
+    Response,
+}
+
+/// Comparing one operation on both sides.
+struct Cx<'a, 'o> {
+    a: Doc<'a>,
+    b: Doc<'a>,
+    /// The endpoint, as it is named now.
+    name: String,
+    out: &'o mut Vec<ApiChange>,
+    /// The pairs of `$ref`s compared already for this operation (each compared once).
+    visited: HashSet<(String, String, Dir)>,
+}
+
+/// A schema being compared: where it is in the body or parameter (`a.b[].c`), what holds it
+/// (`Request body`, `Response 200`, `Query parameter limit`).
+#[derive(Clone)]
+struct At {
+    owner: String,
+    path: String,
+}
+
+impl At {
+    fn child(&self, key: &str) -> At {
+        At {
+            owner: self.owner.clone(),
+            path: if self.path.is_empty() {
+                key.to_owned()
+            } else {
+                format!("{}.{key}", self.path)
+            },
         }
-        match old_params
-            .iter()
-            .find(|o| o.name == p.name && o.place == p.place)
-        {
-            None if p.required => out.push(change(
-                Severity::Breaking,
-                name,
-                format!("New required {} parameter `{}`", p.place, p.name),
-                None,
-                Some(p.line),
-            )),
-            Some(o) if p.required && !o.required => out.push(change(
-                Severity::Breaking,
-                name,
-                format!("The {} parameter `{}` is now required", p.place, p.name),
-                Some(o.line),
-                Some(p.line),
-            )),
-            Some(o) => {
-                let what = format!("{} parameter `{}`", p.place, p.name);
-                let (os, ol) = schema_of(a, o.node, o.line);
-                let (ns, nl) = schema_of(b, p.node, p.line);
-                schema(
-                    &what,
-                    Dir::Request,
-                    (a, os, ol),
-                    (b, ns, nl),
-                    name,
-                    out,
-                    0,
-                    &mut Vec::new(),
+    }
+
+    /// `Request body field `a.b``, or the owner itself at its top.
+    fn name(&self) -> String {
+        if self.path.is_empty() {
+            self.owner.clone()
+        } else {
+            format!("{} field `{}`", self.owner, self.path)
+        }
+    }
+}
+
+impl<'a> Cx<'a, '_> {
+    fn breaking(&mut self, what: String, old: Option<u32>, new: Option<u32>) {
+        let c = change(Severity::Breaking, &self.name, what, old, new);
+        self.out.push(c);
+    }
+
+    fn operation(
+        &mut self,
+        (old_path, old_op): (&'a Field, &'a Field),
+        (new_path, new_op): (&'a Field, &'a Field),
+    ) {
+        let (a, b) = (self.a, self.b);
+        let (old_params, new_params) = (params(a, old_path, old_op), params(b, new_path, new_op));
+        for p in &new_params {
+            // A body parameter (Swagger 2) is the request body, compared below.
+            if p.place == "body" {
+                continue;
+            }
+            let label = format!("{} parameter `{}`", cap(&p.place), p.name);
+            match old_params.iter().find(|o| o.is(p)) {
+                None if p.required => self.breaking(
+                    format!("New required {} parameter `{}`", p.place, p.name),
+                    None,
+                    Some(p.line),
+                ),
+                Some(o) if p.required && !o.required => self.breaking(
+                    format!("{label} is now required"),
+                    Some(o.line),
+                    Some(p.line),
+                ),
+                Some(o) => {
+                    let old = schema_of(a, o.node, o.line);
+                    let new = schema_of(b, p.node, p.line);
+                    let at = At {
+                        owner: label,
+                        path: String::new(),
+                    };
+                    self.schema(&at, Dir::Request, old, new, 0);
+                }
+                None => {}
+            }
+        }
+        for o in &old_params {
+            if o.place != "body" && !new_params.iter().any(|p| p.is(o)) {
+                self.breaking(
+                    format!(
+                        "{} parameter `{}` was removed (clients sending it may be refused)",
+                        cap(&o.place),
+                        o.name
+                    ),
+                    Some(o.line),
+                    None,
                 );
             }
-            None => {}
         }
+        self.request_body((old_op, &old_params), (new_op, &new_params));
+        self.responses(old_op, new_op);
     }
-    for o in &old_params {
-        if o.place != "body"
-            && !new_params
-                .iter()
-                .any(|p| p.name == o.name && p.place == o.place)
-        {
-            out.push(change(
-                Severity::Breaking,
-                name,
-                format!(
-                    "The {} parameter `{}` was removed (clients sending it may be refused)",
-                    o.place, o.name
-                ),
-                Some(o.line),
+
+    fn request_body(
+        &mut self,
+        (old_op, old_params): (&'a Field, &[Param<'a>]),
+        (new_op, new_params): (&'a Field, &[Param<'a>]),
+    ) {
+        let (a, b) = (self.a, self.b);
+        let old = body(a, old_op, old_params);
+        let new = body(b, new_op, new_params);
+        match (&old, &new) {
+            (None, Some(n)) if n.required => self.breaking(
+                "A request body is now required".to_owned(),
                 None,
-            ));
+                Some(n.line),
+            ),
+            (Some(o), Some(n)) if n.required && !o.required => self.breaking(
+                "The request body is now required".to_owned(),
+                Some(o.line),
+                Some(n.line),
+            ),
+            _ => {}
+        }
+        let (Some(o), Some(n)) = (old, new) else {
+            return;
+        };
+        // A media type the client sent may no longer be accepted.
+        for m in &o.media {
+            if !n.media.is_empty() && !n.media.contains(m) {
+                self.breaking(
+                    format!("The request body no longer accepts `{m}`"),
+                    Some(o.line),
+                    Some(n.line),
+                );
+            }
+        }
+        if let (Some(os), Some(ns)) = (o.schema, n.schema) {
+            let at = At {
+                owner: "Request body".to_owned(),
+                path: String::new(),
+            };
+            self.schema(&at, Dir::Request, os, ns, 0);
         }
     }
-    request_body(
-        name,
-        (a, old_op, &old_params),
-        (b, new_op, &new_params),
-        out,
-    );
-    responses(name, (a, old_op), (b, new_op), out);
+
+    fn responses(&mut self, old_op: &'a Field, new_op: &'a Field) {
+        let (a, b) = (self.a, self.b);
+        let codes = |op: &'a Field| -> &'a [Field] {
+            match get(&op.node, "responses").map(|f| &f.node) {
+                Some(Node::Map(fields)) => fields,
+                _ => &[],
+            }
+        };
+        let (old, new) = (codes(old_op), codes(new_op));
+        for o in old {
+            let Some(n) = new.iter().find(|n| n.key == o.key) else {
+                // Only a success code taken away breaks what clients rely on.
+                if o.key.starts_with('2') || o.key == "default" {
+                    self.breaking(
+                        format!("Response `{}` was removed", o.key),
+                        Some(o.line),
+                        None,
+                    );
+                }
+                continue;
+            };
+            let (on, ol) = a.resolve(&o.node, o.line);
+            let (nn, nl) = b.resolve(&n.node, n.line);
+            if let (Some(os), Some(ns)) = (body_schema(a, on, ol).0, body_schema(b, nn, nl).0) {
+                let at = At {
+                    owner: format!("Response `{}`", o.key),
+                    path: String::new(),
+                };
+                self.schema(&at, Dir::Response, os, ns, 0);
+            }
+        }
+    }
+
+    /// Compares the schema at `at`, travelling `dir`; each `$ref` pair once per operation.
+    fn schema(
+        &mut self,
+        at: &At,
+        dir: Dir,
+        (old, ol): (&'a Node, u32),
+        (new, nl): (&'a Node, u32),
+        depth: usize,
+    ) {
+        if depth > MAX_SCHEMA_DEPTH {
+            return;
+        }
+        // Through `$ref`s: a pair of them compared already is not compared again (that
+        // makes schemas that refer to each other end, and reports each change once).
+        if let (Some(r), Some(s)) = (ref_of(old), ref_of(new))
+            && !self.visited.insert((r.to_owned(), s.to_owned(), dir))
+        {
+            return;
+        }
+        let (a, b) = (self.a, self.b);
+        let (old, ol) = a.resolve(old, ol);
+        let (new, nl) = b.resolve(new, nl);
+        if same(old, new) && !refers(old) {
+            return;
+        }
+        self.types(at, dir, (old, ol), (new, nl));
+        self.enums(at, dir, (old, ol), (new, nl));
+        // Fields beyond those listed: allowed unless `additionalProperties: false`.
+        let closed =
+            |n: &Node| get(n, "additionalProperties").and_then(|f| text(&f.node)) == Some("false");
+        if dir == Dir::Request && !closed(old) && closed(new) {
+            self.breaking(
+                format!("{} no longer accepts other fields", at.name()),
+                Some(ol),
+                Some(nl),
+            );
+        }
+        let (op, or) = properties(a, old);
+        let (np, nr) = properties(b, new);
+        for o in &op {
+            let child = at.child(&o.key);
+            let Some(n) = np.iter().find(|n| n.key == o.key) else {
+                // A field always returned that's gone; one that might not be there was
+                // never to be relied on.
+                if dir == Dir::Response && or.contains(&o.key) {
+                    self.breaking(format!("{} was removed", child.name()), Some(o.line), None);
+                }
+                continue;
+            };
+            // Clients don't send what is read-only.
+            let read_only = flag(b.resolve(&n.node, n.line).0, "readOnly");
+            if dir == Dir::Response && or.contains(&o.key) && !nr.contains(&o.key) {
+                self.breaking(
+                    format!("{} is no longer always returned", child.name()),
+                    Some(o.line),
+                    Some(n.line),
+                );
+            }
+            if dir == Dir::Request && !or.contains(&o.key) && nr.contains(&o.key) && !read_only {
+                self.breaking(
+                    format!("{} is now required", child.name()),
+                    Some(o.line),
+                    Some(n.line),
+                );
+            }
+            self.schema(&child, dir, (&o.node, o.line), (&n.node, n.line), depth + 1);
+        }
+        if dir == Dir::Request {
+            for n in np.iter().filter(|n| !op.iter().any(|o| o.key == n.key)) {
+                let read_only = flag(b.resolve(&n.node, n.line).0, "readOnly");
+                if nr.contains(&n.key) && !read_only {
+                    let path = at.child(&n.key).path;
+                    self.breaking(
+                        format!("{}: new required field `{path}`", at.owner),
+                        None,
+                        Some(n.line),
+                    );
+                }
+            }
+        }
+        if let (Some(oi), Some(ni)) = (get(old, "items"), get(new, "items")) {
+            let items = At {
+                owner: at.owner.clone(),
+                path: format!("{}[]", at.path),
+            };
+            self.schema(
+                &items,
+                dir,
+                (&oi.node, oi.line),
+                (&ni.node, ni.line),
+                depth + 1,
+            );
+        }
+    }
+
+    /// A type that no longer takes what it took (a request) or gives what clients expect (a
+    /// response). `integer` is a kind of `number`; a list of types is a choice of them.
+    fn types(&mut self, at: &At, dir: Dir, (old, ol): (&Node, u32), (new, nl): (&Node, u32)) {
+        let (Some(ot), Some(nt)) = (types_of(old), types_of(new)) else {
+            return;
+        };
+        let covers = |wide: &HashSet<String>, narrow: &HashSet<String>| {
+            narrow
+                .iter()
+                .all(|t| wide.contains(t) || (t == "integer" && wide.contains("number")))
+        };
+        let breaks = match dir {
+            Dir::Request => !covers(&nt, &ot),
+            Dir::Response => !covers(&ot, &nt),
+        };
+        if breaks {
+            let show = |s: &HashSet<String>| {
+                let mut v: Vec<&str> = s.iter().map(String::as_str).collect();
+                v.sort_unstable();
+                v.join(" | ")
+            };
+            self.breaking(
+                format!("{} changed type: {} → {}", at.name(), show(&ot), show(&nt)),
+                Some(ol),
+                Some(nl),
+            );
+        }
+    }
+
+    /// A request that may no longer send a value it could; a response that may now return one
+    /// clients don't know.
+    fn enums(&mut self, at: &At, dir: Dir, (old, ol): (&Node, u32), (new, nl): (&Node, u32)) {
+        let (oe, ne) = (strings(get(old, "enum")), strings(get(new, "enum")));
+        if oe.is_empty() && ne.is_empty() {
+            return;
+        }
+        let line = |n: &Node, l| get(n, "enum").map_or(l, |f| f.line);
+        let quote = |v: &[&String]| {
+            v.iter()
+                .map(|v| format!("`{v}`"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        match dir {
+            Dir::Request if oe.is_empty() => {
+                let only: Vec<&String> = ne.iter().collect();
+                self.breaking(
+                    format!("{} now accepts only {}", at.name(), quote(&only)),
+                    Some(ol),
+                    Some(line(new, nl)),
+                );
+            }
+            Dir::Request if !ne.is_empty() => {
+                let missing: Vec<&String> = oe.iter().filter(|v| !ne.contains(v)).collect();
+                if !missing.is_empty() {
+                    self.breaking(
+                        format!("{} no longer accepts {}", at.name(), quote(&missing)),
+                        Some(line(old, ol)),
+                        Some(line(new, nl)),
+                    );
+                }
+            }
+            Dir::Response if !oe.is_empty() => {
+                let extra: Vec<&String> = ne.iter().filter(|v| !oe.contains(v)).collect();
+                if !extra.is_empty() {
+                    self.breaking(
+                        format!("{} can now return {}", at.name(), quote(&extra)),
+                        Some(line(old, ol)),
+                        Some(line(new, nl)),
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 /// A parameter's schema: its `schema` (OpenAPI 3, Swagger body), or the parameter itself.
 fn schema_of<'a>(doc: Doc<'a>, param: &'a Node, line: u32) -> (&'a Node, u32) {
     match get(param, "schema") {
-        Some(f) => doc.resolve(&f.node, f.line),
-        None => (param, line),
+        Some(f) => (&f.node, f.line),
+        None => doc.resolve(param, line),
     }
+}
+
+/// A request body: whether it is required, its line, the media types it takes and its schema.
+struct Body<'a> {
+    required: bool,
+    line: u32,
+    media: Vec<String>,
+    schema: Option<(&'a Node, u32)>,
+}
+
+fn body<'a>(doc: Doc<'a>, op: &'a Field, params: &[Param<'a>]) -> Option<Body<'a>> {
+    if let Some(f) = get(&op.node, "requestBody") {
+        let (node, line) = doc.resolve(&f.node, f.line);
+        let (schema, media) = body_schema(doc, node, line);
+        return Some(Body {
+            required: flag(node, "required"),
+            line,
+            media,
+            schema,
+        });
+    }
+    let p = params.iter().find(|p| p.place == "body")?;
+    let (schema, media) = body_schema(doc, p.node, p.line);
+    Some(Body {
+        required: p.required,
+        line: p.line,
+        media,
+        schema,
+    })
 }
 
 /// The schema of a body (`content` → a media type → `schema`, JSON preferred), or of a
-/// Swagger 2 body parameter.
-fn body_schema<'a>(doc: Doc<'a>, body: &'a Node, line: u32) -> Option<(&'a Node, u32)> {
+/// Swagger 2 body parameter; and the media types it has.
+fn body_schema<'a>(
+    doc: Doc<'a>,
+    body: &'a Node,
+    line: u32,
+) -> (Option<(&'a Node, u32)>, Vec<String>) {
+    let _ = (doc, line);
     if let Some(f) = get(body, "schema") {
-        return Some(doc.resolve(&f.node, f.line));
+        return (Some((&f.node, f.line)), Vec::new());
     }
-    let Node::Map(media) = &get(body, "content")?.node else {
-        return None;
+    let Some(Field {
+        node: Node::Map(media),
+        ..
+    }) = get(body, "content")
+    else {
+        return (None, Vec::new());
     };
+    let names = media.iter().map(|m| m.key.clone()).collect();
     let pick = media
         .iter()
         .find(|m| m.key.contains("json"))
-        .or_else(|| media.first())?;
-    let f = get(&pick.node, "schema")?;
-    let _ = line;
-    Some(doc.resolve(&f.node, f.line))
-}
-
-/// The `$ref` a body's schema is, to compare a schema that refers back to itself once.
-fn body_ref(body: &Node) -> Vec<String> {
-    let schema = get(body, "schema").or_else(|| {
-        let Node::Map(media) = &get(body, "content")?.node else {
-            return None;
-        };
-        let pick = media
-            .iter()
-            .find(|m| m.key.contains("json"))
-            .or_else(|| media.first())?;
-        get(&pick.node, "schema")
-    });
-    schema
-        .and_then(|f| ref_of(&f.node))
-        .map(str::to_owned)
-        .into_iter()
-        .collect()
-}
-
-/// A request body: whether it is required, its line, and its schema with the schema's line.
-type Body = Option<(bool, u32, Option<(Node, u32)>)>;
-
-fn request_body(
-    name: &str,
-    (a, old_op, old_params): (Doc, &Field, &[Param]),
-    (b, new_op, new_params): (Doc, &Field, &[Param]),
-    out: &mut Vec<ApiChange>,
-) {
-    let body = |doc: Doc<'_>, op: &Field, params: &[Param]| -> Body {
-        if let Some(f) = get(&op.node, "requestBody") {
-            let (node, line) = doc.resolve(&f.node, f.line);
-            let required = get(node, "required").and_then(|r| text(&r.node)) == Some("true");
-            let schema = body_schema(doc, node, line).map(|(n, l)| (n.clone(), l));
-            return Some((required, line, schema));
-        }
-        let p = params.iter().find(|p| p.place == "body")?;
-        let schema = body_schema(doc, p.node, p.line).map(|(n, l)| (n.clone(), l));
-        Some((p.required, p.line, schema))
-    };
-    let (old, new) = (body(a, old_op, old_params), body(b, new_op, new_params));
-    match (&old, &new) {
-        (None, Some((true, line, _))) => out.push(change(
-            Severity::Breaking,
-            name,
-            "A request body is now required",
-            None,
-            Some(*line),
-        )),
-        (Some((false, ol, _)), Some((true, nl, _))) => out.push(change(
-            Severity::Breaking,
-            name,
-            "The request body is now required",
-            Some(*ol),
-            Some(*nl),
-        )),
-        _ => {}
-    }
-    if let (Some((_, _, Some((os, ol)))), Some((_, _, Some((ns, nl))))) = (old, new) {
-        schema(
-            "request body",
-            Dir::Request,
-            (a, &os, ol),
-            (b, &ns, nl),
-            name,
-            out,
-            0,
-            &mut Vec::new(),
-        );
-    }
-}
-
-fn responses(
-    name: &str,
-    (a, old_op): (Doc, &Field),
-    (b, new_op): (Doc, &Field),
-    out: &mut Vec<ApiChange>,
-) {
-    let codes = |op: &Field| match get(&op.node, "responses").map(|f| &f.node) {
-        Some(Node::Map(fields)) => fields.clone(),
-        _ => Vec::new(),
-    };
-    let (old, new) = (codes(old_op), codes(new_op));
-    for o in &old {
-        let Some(n) = new.iter().find(|n| n.key == o.key) else {
-            // Only a success code taken away breaks what clients rely on.
-            if o.key.starts_with('2') || o.key == "default" {
-                out.push(change(
-                    Severity::Breaking,
-                    name,
-                    format!("Response `{}` removed", o.key),
-                    Some(o.line),
-                    None,
-                ));
-            }
-            continue;
-        };
-        let (on, ol) = a.resolve(&o.node, o.line);
-        let (nn, nl) = b.resolve(&n.node, n.line);
-        if let (Some((os, osl)), Some((ns, nsl))) = (body_schema(a, on, ol), body_schema(b, nn, nl))
-        {
-            let what = format!("response `{}`", o.key);
-            schema(
-                &what,
-                Dir::Response,
-                (a, os, osl),
-                (b, ns, nsl),
-                name,
-                out,
-                0,
-                &mut body_ref(on),
-            );
-        }
-    }
-}
-
-/// Which way a schema's values travel: what the client sends, or what it gets back.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Dir {
-    Request,
-    Response,
+        .or_else(|| media.first());
+    let schema = pick
+        .and_then(|m| get(&m.node, "schema"))
+        .map(|f| (&f.node, f.line));
+    (schema, names)
 }
 
 /// A schema's properties (`allOf` parts merged) and its required ones.
@@ -494,175 +746,30 @@ fn properties<'a>(doc: Doc<'a>, node: &'a Node) -> (Vec<&'a Field>, Vec<String>)
         ..
     }) = get(node, "allOf")
     {
-        for part in parts {
+        for part in parts.iter().take(MAX_REFS) {
             let (part, _) = doc.resolve(&part.node, part.line);
-            let (p, r) = properties(doc, part);
-            props.extend(p);
-            required.extend(r);
+            if let Node::Map(_) = part
+                && get(part, "allOf").is_none()
+            {
+                let (p, r) = properties(doc, part);
+                props.extend(p);
+                required.extend(r);
+            }
         }
     }
     (props, required)
 }
 
-fn type_of(node: &Node) -> Option<String> {
-    let f = get(node, "type")?;
-    match &f.node {
-        Node::Scalar { text, .. } => Some(text.clone()),
-        Node::List(items) => Some(
-            items
-                .iter()
-                .filter_map(|i| text(&i.node))
-                .collect::<Vec<_>>()
-                .join(" | "),
-        ),
-        Node::Map(_) => None,
+/// The types a schema allows (`type`, or a list of them; `nullable: true` adds `null`).
+fn types_of(node: &Node) -> Option<HashSet<String>> {
+    let mut types: HashSet<String> = strings(get(node, "type")).into_iter().collect();
+    if types.is_empty() {
+        return None;
     }
-}
-
-/// Compares the schema `what` (a parameter, the request body, a response) travelling `dir`.
-#[allow(clippy::too_many_arguments)]
-fn schema(
-    what: &str,
-    dir: Dir,
-    (a, old, ol): (Doc, &Node, u32),
-    (b, new, nl): (Doc, &Node, u32),
-    name: &str,
-    out: &mut Vec<ApiChange>,
-    depth: usize,
-    seen: &mut Vec<String>,
-) {
-    // Two schemas that are the same text and follow no `$ref` are the same; a `$ref` can
-    // point at something else on each side.
-    if depth > MAX_SCHEMA_DEPTH || (same(old, new) && !refers(old)) {
-        return;
+    if flag(node, "nullable") {
+        types.insert("null".to_owned());
     }
-    let breaking = |out: &mut Vec<ApiChange>, text: String, o: Option<u32>, n: Option<u32>| {
-        out.push(change(Severity::Breaking, name, text, o, n));
-    };
-    if let (Some(ot), Some(nt)) = (type_of(old), type_of(new))
-        && ot != nt
-    {
-        breaking(
-            out,
-            format!("{} changed type: {ot} → {nt}", cap(what)),
-            Some(ol),
-            Some(nl),
-        );
-        return;
-    }
-    // Enums: a request may no longer send a value it could; a response may now return one
-    // clients don't know.
-    let (oe, ne) = (strings(get(old, "enum")), strings(get(new, "enum")));
-    if !oe.is_empty() || !ne.is_empty() {
-        let line = |n: &Node, l| get(n, "enum").map_or(l, |f| f.line);
-        let missing: Vec<&String> = oe.iter().filter(|v| !ne.contains(v)).collect();
-        let extra: Vec<&String> = ne.iter().filter(|v| !oe.contains(v)).collect();
-        if dir == Dir::Request && !ne.is_empty() && (!missing.is_empty() || oe.is_empty()) {
-            let values = if oe.is_empty() {
-                "an enum".to_owned()
-            } else {
-                list(&missing)
-            };
-            breaking(
-                out,
-                format!("{} no longer accepts {values}", cap(what)),
-                Some(line(old, ol)),
-                Some(line(new, nl)),
-            );
-        }
-        if dir == Dir::Response && !extra.is_empty() && !oe.is_empty() {
-            breaking(
-                out,
-                format!("{} can now return {}", cap(what), list(&extra)),
-                Some(line(old, ol)),
-                Some(line(new, nl)),
-            );
-        }
-    }
-    let (op, or) = properties(a, old);
-    let (np, nr) = properties(b, new);
-    for o in &op {
-        let n = np.iter().find(|n| n.key == o.key);
-        let field = format!("{what} field `{}`", o.key);
-        match n {
-            None if dir == Dir::Response => {
-                breaking(out, format!("{} removed", cap(&field)), Some(o.line), None)
-            }
-            None => {}
-            Some(n) => {
-                if dir == Dir::Response && or.contains(&o.key) && !nr.contains(&o.key) {
-                    breaking(
-                        out,
-                        format!("{} is no longer always returned", cap(&field)),
-                        Some(o.line),
-                        Some(n.line),
-                    );
-                }
-                if dir == Dir::Request && !or.contains(&o.key) && nr.contains(&o.key) {
-                    breaking(
-                        out,
-                        format!("{} is now required", cap(&field)),
-                        Some(o.line),
-                        Some(n.line),
-                    );
-                }
-                // A schema that refers back to one being compared (a tree of itself) was
-                // compared already.
-                if !recurs(&o.node, seen) {
-                    let (os, osl) = a.resolve(&o.node, o.line);
-                    let (ns, nsl) = b.resolve(&n.node, n.line);
-                    let depth_seen = seen.len();
-                    seen.extend(ref_of(&o.node).map(str::to_owned));
-                    let next = (a, os, osl);
-                    schema(&field, dir, next, (b, ns, nsl), name, out, depth + 1, seen);
-                    seen.truncate(depth_seen);
-                }
-            }
-        }
-    }
-    if dir == Dir::Request {
-        for n in np.iter().filter(|n| !op.iter().any(|o| o.key == n.key)) {
-            if nr.contains(&n.key) {
-                breaking(
-                    out,
-                    format!("New required {what} field `{}`", n.key),
-                    None,
-                    Some(n.line),
-                );
-            }
-        }
-    }
-    // Items of an array.
-    if let (Some(oi), Some(ni)) = (get(old, "items"), get(new, "items"))
-        && !recurs(&oi.node, seen)
-    {
-        let (os, osl) = a.resolve(&oi.node, oi.line);
-        let (ns, nsl) = b.resolve(&ni.node, ni.line);
-        let depth_seen = seen.len();
-        seen.extend(ref_of(&oi.node).map(str::to_owned));
-        let what = format!("{what} items");
-        schema(
-            &what,
-            dir,
-            (a, os, osl),
-            (b, ns, nsl),
-            name,
-            out,
-            depth + 1,
-            seen,
-        );
-        seen.truncate(depth_seen);
-    }
-}
-
-/// The `$ref` a schema is, if it is one.
-fn ref_of(node: &Node) -> Option<&str> {
-    get(node, "$ref").and_then(|f| text(&f.node))
-}
-
-/// Whether `node` is a `$ref` to a schema already being compared further up.
-fn recurs(node: &Node, seen: &[String]) -> bool {
-    ref_of(node).is_some_and(|r| seen.iter().any(|s| s == r))
+    Some(types)
 }
 
 /// Whether a schema follows a `$ref` anywhere in it.
@@ -679,12 +786,4 @@ fn cap(s: &str) -> String {
     c.next()
         .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
         .unwrap_or_default()
-}
-
-fn list(values: &[&String]) -> String {
-    values
-        .iter()
-        .map(|v| format!("`{v}`"))
-        .collect::<Vec<_>>()
-        .join(", ")
 }

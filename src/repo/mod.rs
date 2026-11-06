@@ -173,6 +173,9 @@ pub struct RepoTab {
     diff_rendered: bool,
     /// Diffs show as this rich view, for the files it reads.
     diff_rich: Option<diff::rich::RichKind>,
+    /// The file a rich view was turned on for that only its contents offer (an API document
+    /// not named like one): the view applies to it, and its button shows on it.
+    diff_rich_for: Option<String>,
     /// Whether the commit pane lists every file of the commit, and those read.
     all_files: detail::AllFiles,
     conflict: Option<conflict::ConflictEditor>,
@@ -324,6 +327,7 @@ impl RepoTab {
             diff_as_file: false,
             diff_rendered: false,
             diff_rich: None,
+            diff_rich_for: None,
             all_files: Default::default(),
             conflict: None,
             conflict_generation: 0,

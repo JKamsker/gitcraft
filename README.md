@@ -215,11 +215,15 @@ so your config, credentials and hooks apply as usual.
   - _API contract changes_ (the server, for an OpenAPI or Swagger file: offered on files named
     like one, and from the view by key of any JSON or YAML file that is one): what breaks the
     API's clients, each with its endpoint — endpoints removed, parameters that became required
-    or are new and required, a request body or request field now required, request values
-    narrowed (an enum value taken away), types changed, success responses removed, response
-    fields removed or no longer always returned, and responses that can now return an enum
-    value clients don't know — then the endpoints added. Local `$ref`s are followed (a schema
-    that refers to itself is compared once). A click opens the change's place in the file.
+    or are new and required, a request body or request field now required (read-only fields
+    aside), a request media type dropped, request values narrowed (an enum value taken away,
+    no more other fields), types that no longer take what they took (`integer` → `number` is
+    wider, not breaking), success responses removed, response fields that were always there
+    removed or no longer always returned, and responses that can now return an enum value
+    clients don't know — then the endpoints added. A path parameter renamed is the same
+    endpoint; header names are compared in any case. Local `$ref`s are followed, each pair
+    once per endpoint (schemas that refer to each other end). A click opens the change's
+    place in the file.
 - A Markdown file's diff has an eye button that renders it: the changes block by block (removed
   ones red, added ones green, the rest as they are) or, with _File_, the whole file. Images of
   the repository show as they are on each side of the change; any other image is a link, so a

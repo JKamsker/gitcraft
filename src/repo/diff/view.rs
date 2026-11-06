@@ -35,15 +35,10 @@ impl RepoTab {
         // A Markdown file can show rendered: `Some(whether it does)`.
         let markdown = rendered::is_markdown(&path).then_some(self.diff_rendered);
         // The rich views the file has, and the one shown (not with the file, nor rendered).
-        let mut rich_kinds = rich::RichKind::of(&path);
+        let rich_kinds = self.rich_kinds_of(&path);
         let rich_on = self
             .diff_rich_kind()
             .filter(|_| !as_file && markdown != Some(true));
-        // One turned on from another view (the API changes from the view by key) gets its
-        // button too, to turn it off.
-        if let Some(kind) = rich_on.filter(|k| !rich_kinds.contains(k)) {
-            rich_kinds.push(kind);
-        }
         let rich_ready =
             rich_on.is_some() && !matches!(&view.rich, Some((_, Ok(rich::Rich::Plain(_)))));
         let clear = self.diff_header(
