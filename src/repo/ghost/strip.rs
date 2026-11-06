@@ -79,11 +79,12 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
             ),
             None => "The merge stops".to_owned(),
         };
-        line(
-            ui,
-            t.danger,
-            &format!("{what}: conflicts in {}", listed(&c.files, |f| f.clone())),
-        );
+        let why = if c.files.is_empty() {
+            "the commit becomes empty".to_owned()
+        } else {
+            format!("conflicts in {}", listed(&c.files, |f| f.clone()))
+        };
+        line(ui, t.danger, &format!("{what}: {why}"));
     }
     let fetched = o.created.len() - o.copies;
     let mut made = Vec::new();

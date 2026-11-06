@@ -32,6 +32,25 @@ impl Badge {
         }
     }
 
+    /// The full names of the refs the pill stands for.
+    pub(super) fn full_refs(&self) -> Vec<String> {
+        match self.kind {
+            BadgeKind::Tag => vec![format!("refs/tags/{}", self.label)],
+            BadgeKind::DetachedHead => vec!["HEAD".to_owned()],
+            BadgeKind::Branch => {
+                let mut refs: Vec<String> = self
+                    .remotes
+                    .iter()
+                    .map(|r| format!("refs/remotes/{r}/{}", self.label))
+                    .collect();
+                if self.local {
+                    refs.insert(0, format!("refs/heads/{}", self.label));
+                }
+                refs
+            }
+        }
+    }
+
     pub(super) fn describe(&self) -> String {
         match self.kind {
             BadgeKind::Tag => format!("tag {}", self.label),

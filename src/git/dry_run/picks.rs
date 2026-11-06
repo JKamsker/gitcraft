@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use super::super::{END_OPTS, run, run_ok_codes};
+use super::super::{END_OPTS, NO_SIGNATURE, run, run_ok_codes};
 use super::{CANCELLED, Engine, GitVersion, commit_oid, is_oid, scratch, tree_of, with_write_opts};
 
 /// One commit replayed.
@@ -54,8 +54,10 @@ impl Replay {
 
 /// The commits `git rebase <upstream>` replays of `tip`, oldest first: those `upstream`
 /// hasn't, merges and commits whose change `upstream` has already (cherry-picked) left out.
+/// As git's sequencer does, an empty commit is kept even when `upstream` has one too (two
+/// empty commits have the same, empty, patch).
 pub fn rebase_picks(repo: &Path, upstream: &str, tip: &str) -> Result<Vec<String>, String> {
-    lines(run(
+    let marked = run(
         Some(repo),
         &[
             "rev-list",
@@ -63,11 +65,31 @@ pub fn rebase_picks(repo: &Path, upstream: &str, tip: &str) -> Result<Vec<String
             "--topo-order",
             "--no-merges",
             "--right-only",
-            "--cherry-pick",
+            "--cherry-mark",
             END_OPTS,
             &format!("{upstream}...{tip}"),
         ],
-    )?)
+    )?;
+    let mut picks = Vec::new();
+    for line in marked.lines() {
+        let line = line.trim();
+        if let Some(hash) = line.strip_prefix('+') {
+            picks.push(hash.to_owned());
+        } else if let Some(hash) = line.strip_prefix('=')
+            && started_empty(repo, hash)
+        {
+            picks.push(hash.to_owned());
+        }
+    }
+    Ok(picks)
+}
+
+/// Whether the commit `hash` changes nothing (its tree is its first parent's).
+fn started_empty(repo: &Path, hash: &str) -> bool {
+    match (tree_of(repo, hash), tree_of(repo, &format!("{hash}^"))) {
+        (Ok(own), Ok(parent)) => own == parent,
+        _ => false,
+    }
 }
 
 fn lines(out: String) -> Result<Vec<String>, String> {
@@ -176,9 +198,18 @@ fn with_git_replay(
     if plain != picks {
         return Err("the commits aren't a plain range".to_owned());
     }
+    // From git 2.53, replay moves the branch itself unless told only to print the updates
+    // (`--ref-action=print`, which an older git doesn't know; it ignores the config).
     let out = run_ok_codes(
         Some(repo),
-        &with_write_opts(&["replay", "--onto", onto, &range]),
+        &with_write_opts(&[
+            "-c",
+            "replay.refAction=print",
+            "replay",
+            "--onto",
+            onto,
+            &range,
+        ]),
         &[0, 1],
     )?;
     let Some(new_tip) = out.lines().find_map(|line| {
@@ -190,7 +221,14 @@ fn with_git_replay(
         return Ok(None);
     };
     let read = |revs: &[&str]| -> Result<Vec<Keyed>, String> {
-        let mut args = vec!["log", "--reverse", "--topo-order", KEY_FORMAT, END_OPTS];
+        let mut args = vec![
+            "log",
+            NO_SIGNATURE,
+            "--reverse",
+            "--topo-order",
+            KEY_FORMAT,
+            END_OPTS,
+        ];
         args.extend(revs);
         args.push("--");
         Ok(keyed(&run(Some(repo), &args)?))
@@ -241,6 +279,7 @@ fn trees_and_parents(
     for chunk in hashes.chunks(100) {
         let mut args = vec![
             "log",
+            NO_SIGNATURE,
             "--no-walk=unsorted",
             "--format=%H%x00%T%x00%P%x00",
             END_OPTS,

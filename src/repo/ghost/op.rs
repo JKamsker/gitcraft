@@ -53,6 +53,7 @@ pub(crate) struct Facts {
     pub(crate) refs: Refs,
     /// The remotes' names.
     pub(crate) remotes: Vec<String>,
+    /// Tracked files have uncommitted changes (untracked files stop no rebase).
     pub(crate) dirty: bool,
     pub(crate) credentials: Option<crate::git::Credentials>,
 }
@@ -63,6 +64,16 @@ pub(crate) struct Upstream<'a> {
     pub(crate) remote: &'a str,
     pub(crate) name: &'a str,
     pub(crate) tracking: &'a Branch,
+}
+
+/// Whether `work` has changes to tracked files, which a rebase refuses to start with.
+pub(crate) fn tracked_changes(work: &crate::git::WorkStatus) -> bool {
+    !work.staged.is_empty()
+        || !work.conflicted.is_empty()
+        || work
+            .unstaged
+            .iter()
+            .any(|f| f.area != crate::git::Area::Untracked)
 }
 
 impl Facts {

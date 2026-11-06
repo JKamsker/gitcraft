@@ -17,7 +17,7 @@ fn facts(repo: &TestRepo) -> Result<Facts, String> {
             .into_iter()
             .map(|r| r.name)
             .collect(),
-        dirty: !status.is_clean(),
+        dirty: super::op::tracked_changes(&status),
         credentials: None,
     })
 }
@@ -146,6 +146,12 @@ fn a_hard_reset_ghost_is_what_resetting_does() -> Result<(), String> {
     repo.git(&["reset", "-q", "--hard", &to])?;
     assert_eq!(files, changed.lines().collect::<Vec<_>>());
     assert_eq!(files, ["b", "c"]);
+    // As the reset changes them: both go.
+    assert!(
+        o.files.iter().flatten().all(|f| f.status == 'D'),
+        "{:?}",
+        o.files
+    );
     assert_eq!(lost(&o), really_lost(&repo, &old)?);
     assert_eq!(o.lost.len(), 2);
     assert_eq!(o.lost[0].author, "Ana");
@@ -439,5 +445,130 @@ fn a_hover_that_ends_early_stops_its_work() -> Result<(), String> {
     std::thread::sleep(std::time::Duration::from_millis(300));
     tab.poll(&ctx);
     assert!(tab.ghost.shown.is_none());
+    Ok(())
+}
+
+/// An untracked file stops no rebase, and the ghost run doesn't say it would.
+#[test]
+fn an_untracked_file_does_not_refuse_a_rebase() -> Result<(), String> {
+    let repo = diverged("ghost-untracked")?;
+    std::fs::write(repo.dir.join("notes.txt"), "mine\n").map_err(|e| e.to_string())?;
+    let o = ghost(
+        &repo,
+        &GhostOp::Rebase {
+            onto: "refs/heads/main".to_owned(),
+            label: "main".to_owned(),
+        },
+    )?;
+    assert_eq!(o.refused, None);
+    repo.git(&["rebase", "-q", "main"])?;
+    // A change to a tracked file does refuse.
+    std::fs::write(repo.dir.join("a"), "edited\n").map_err(|e| e.to_string())?;
+    let o = ghost(
+        &repo,
+        &GhostOp::Rebase {
+            onto: "refs/heads/main".to_owned(),
+            label: "main".to_owned(),
+        },
+    )?;
+    assert!(o.refused.is_some());
+    Ok(())
+}
+
+/// Dropping a commit that a later one undoes leaves that later one empty: the interactive
+/// rebase a quick edit runs stops there, and so does the ghost run.
+#[test]
+fn a_drop_that_empties_a_commit_stops_where_the_rebase_stops() -> Result<(), String> {
+    let repo = TestRepo::new("ghost-drop-empty")?;
+    repo.commit(&[("f", "1\n")], "base")?;
+    let c = repo.commit(&[("f", "2\n")], "f to 2")?;
+    let d = repo.commit(&[("f", "1\n")], "f back to 1")?;
+    repo.commit(&[("g", "g\n")], "adds g")?;
+    let o = ghost(&repo, &GhostOp::DropCommit { hash: c.clone() })?;
+    let stop = o.conflict.clone().ok_or("no stop")?;
+    let dropped = repo.git(&[
+        "-c",
+        "sequence.editor=sed -i -e 1s/^pick/drop/",
+        "rebase",
+        "-i",
+        &format!("{c}^"),
+    ]);
+    let stopped = repo.dir.join(".git/rebase-merge").exists();
+    let _ = repo.git(&["rebase", "--abort"]);
+    assert!(dropped.is_err() && stopped, "{dropped:?}");
+    assert_eq!((stop.step, stop.of), (1, 2));
+    assert_eq!(stop.commit.map(|c| c.hash), Some(d));
+    assert!(stop.files.is_empty() && o.moves.is_empty());
+    Ok(())
+}
+
+/// A commit of the branch that upstream has cherry-picked (and changed since) is left out by
+/// `git pull --rebase`, which compares with the new upstream: no conflict, the same tree.
+#[test]
+fn a_pull_rebase_leaves_out_what_upstream_picked() -> Result<(), String> {
+    let r = remote("ghost-pull-picked")?;
+    let mine = r.here.commit(&[("a", "2\n")], "mine")?;
+    r.here
+        .git(&["push", "-q", "origin", &format!("{mine}:refs/heads/picked")])?;
+    r.other.git(&["fetch", "-q", "origin"])?;
+    r.other.git(&["cherry-pick", "-x", &mine])?;
+    r.other.commit(&[("a", "3\n")], "theirs on top")?;
+    r.other.git(&["push", "-q", "origin", "main"])?;
+    r.here.commit(&[("c", "c\n")], "more of mine")?;
+    let o = ghost(&r.here, &GhostOp::Pull(PullMode::Rebase))?;
+    assert!(o.conflict.is_none(), "{:?}", o.conflict);
+    r.here.git(&["pull", "-q", "--rebase"])?;
+    assert_eq!(o.tree, Some(r.here.rev("HEAD^{tree}")?));
+    Ok(())
+}
+
+/// With `rebase.updateRefs`, a branch on one of the rebased commits moves to its copy, as
+/// git moves it; its old commit is then lost too.
+#[test]
+fn update_refs_moves_the_stacked_branch_along() -> Result<(), String> {
+    let repo = diverged("ghost-update-refs")?;
+    repo.git(&["config", "rebase.updateRefs", "true"])?;
+    repo.git(&["branch", "stack", "HEAD~1"])?;
+    let old = repo.rev("HEAD")?;
+    let o = ghost(
+        &repo,
+        &GhostOp::Rebase {
+            onto: "refs/heads/main".to_owned(),
+            label: "main".to_owned(),
+        },
+    )?;
+    let stack = moved_to(&o, "refs/heads/stack").ok_or("stack doesn't move")?;
+    repo.git(&["rebase", "-q", "main"])?;
+    assert_eq!(
+        repo.rev(&format!("{stack}^{{tree}}"))?,
+        repo.rev("stack^{tree}")?
+    );
+    assert_eq!(lost(&o), really_lost(&repo, &old)?);
+    Ok(())
+}
+
+/// `git branch -d` checks a branch with an upstream against the upstream, not HEAD: merged
+/// into the checked-out branch but not pushed, it refuses, and the ghost run says so.
+#[test]
+fn delete_says_unpushed_is_unmerged() -> Result<(), String> {
+    let r = remote("ghost-delete-upstream")?;
+    r.here.git(&["switch", "-q", "-c", "feat"])?;
+    r.here.git(&["push", "-q", "-u", "origin", "feat"])?;
+    r.here.commit(&[("f", "f\n")], "not pushed")?;
+    r.here.git(&["switch", "-q", "main"])?;
+    r.here.git(&["merge", "-q", "--ff-only", "feat"])?;
+    let o = ghost(
+        &r.here,
+        &GhostOp::DeleteBranch {
+            branch: "feat".to_owned(),
+            remote: false,
+        },
+    )?;
+    assert!(
+        o.notes.iter().any(|n| n.contains("isn't merged")),
+        "{:?}",
+        o.notes
+    );
+    assert!(r.here.git(&["branch", "-d", "feat"]).is_err());
     Ok(())
 }
