@@ -281,6 +281,9 @@ impl RepoTab {
         if self.amend {
             commit.push("--amend".to_owned());
         }
+        if self.signs_off() {
+            commit.push("--signoff".to_owned());
+        }
         commit.extend(["-m".to_owned(), summary.to_owned()]);
         let body = self.commit_body.trim();
         if !body.is_empty() {

@@ -81,6 +81,7 @@ impl RepoTab {
                         message_end = ui.cursor().top();
                         ui.add_space(12.0);
                         author_line(ui, detail);
+                        self.dco.commit_note(ui, detail);
                         ui.add_space(10.0);
                         meta_grid(ui, acts, detail, builds);
                     });

@@ -72,6 +72,13 @@ const FEATURES: &[(&str, &[&str])] = &[
             "A terminal panel with tabs, in the repository's folder.",
         ],
     ),
+    (
+        "Maintainers",
+        &[
+            "Sign off in the commit box adds Signed-off-by with your name and email (DCO). It turns on by itself when the repository has a DCO file or .github/dco.yml, or a pull request's DCO check fails; what you set it to is kept for the repository.",
+            "Where sign-offs are asked for, a commit without its author's Signed-off-by says so under its author, and a pull request's page lists them under Sign-off (DCO). With its branch checked out, Sign off my commits on this branch rewrites them (rebase --signoff) and force-pushes with a lease, after showing what it will do; Ctrl+Z puts the old commits back, here and on the remote.",
+        ],
+    ),
 ];
 
 /// Keyboard and mouse shortcuts: (keys, what they do). `Cmd` stands for Ctrl outside macOS.

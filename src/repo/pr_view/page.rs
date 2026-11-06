@@ -6,7 +6,7 @@ use crate::git;
 use crate::icons;
 use crate::pull_request::{self as pr, CheckState, PrDetails};
 use crate::repo::pr_review::{self, Place, PrDraft};
-use crate::repo::{Action, DiffKey, RepoTab, short, widgets};
+use crate::repo::{Action, DiffKey, RepoTab, dco, short, widgets};
 use crate::theme::{self, Tokens};
 
 use super::timeline::timeline;
@@ -36,6 +36,11 @@ impl RepoTab {
                 // Text wraps to this; only what can't (a table of images) scrolls sideways.
                 let width = (ui.available_width() - 2.0 * MARGIN_X).min(CONTENT_W);
                 let drafts = &mut self.pr_drafts;
+                let dco = Dco {
+                    state: &self.dco,
+                    current: self.refs.current.as_deref(),
+                    idle: self.busy_op.is_none(),
+                };
                 egui::ScrollArea::both()
                     .id_salt(("pr-view", view.number))
                     .auto_shrink(false)
@@ -45,7 +50,7 @@ impl RepoTab {
                             .show(ui, |ui| {
                                 ui.set_max_width(width);
                                 let draft = drafts.entry(view.number).or_default();
-                                page(ui, view, draft, width, acts);
+                                page(ui, view, draft, width, &dco, acts);
                             });
                     });
             }
@@ -163,7 +168,22 @@ fn page_header(ui: &mut Ui, view: &PrView, acts: &mut Vec<Action>) {
 }
 
 /// What the page shows of a pull request that was read, top to bottom.
-fn page(ui: &mut Ui, view: &mut PrView, draft: &mut PrDraft, width: f32, acts: &mut Vec<Action>) {
+/// The sign-off state the page shows, and what fixing it needs: the branch checked out here
+/// and whether the tab is free.
+struct Dco<'a> {
+    state: &'a dco::Dco,
+    current: Option<&'a str>,
+    idle: bool,
+}
+
+fn page(
+    ui: &mut Ui,
+    view: &mut PrView,
+    draft: &mut PrDraft,
+    width: f32,
+    dco: &Dco,
+    acts: &mut Vec<Action>,
+) {
     let t = Tokens::get(ui.ctx());
     let Some(Ok(details)) = &view.details else {
         return;
@@ -180,6 +200,10 @@ fn page(ui: &mut Ui, view: &mut PrView, draft: &mut PrDraft, width: f32, acts: &
     blocks(ui, &mut view.markdown, "body", &view.body, width);
     section(ui, "BUILD STATUS");
     checks(ui, details, acts);
+    if dco::pr_shows(dco.state, details) {
+        section(ui, "SIGN-OFF (DCO)");
+        dco::pr_section(ui, dco.state, details, dco.current, dco.idle, acts);
+    }
     if details.state == "OPEN" {
         section(ui, "MERGE");
         crate::repo::pr_merge::merge_box(ui, draft, details, acts);
@@ -209,7 +233,11 @@ fn page(ui: &mut Ui, view: &mut PrView, draft: &mut PrDraft, width: f32, acts: &
     section(ui, "ADD A COMMENT");
     pr_review::comment_box(ui, draft, acts);
     section(ui, &format!("COMMITS ({})", details.commits.len()));
-    commits(ui, details);
+    commits(
+        ui,
+        details,
+        dco.state.for_pr(details.number, &details.head_oid),
+    );
 }
 
 fn section(ui: &mut Ui, title: &str) {
@@ -412,10 +440,15 @@ fn checks(ui: &mut Ui, d: &PrDetails, acts: &mut Vec<Action>) {
     }
 }
 
-fn commits(ui: &mut Ui, d: &PrDetails) {
+/// The commits, those without their author's sign-off marked (`signoffs`: as read here).
+fn commits(ui: &mut Ui, d: &PrDetails, signoffs: Option<&dco::PrSignoffs>) {
     let t = Tokens::get(ui.ctx());
     for commit in &d.commits {
         ui.horizontal(|ui| {
+            if dco::unsigned(signoffs, &commit.oid) {
+                ui.label(RichText::new("no sign-off").color(t.warning).small())
+                    .on_hover_text("No Signed-off-by from its author: the DCO check refuses it");
+            }
             ui.label(
                 RichText::new(short(&commit.oid))
                     .font(theme::mono(11.0))
