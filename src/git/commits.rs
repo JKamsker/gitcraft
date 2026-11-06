@@ -45,8 +45,10 @@ pub fn log(
     };
     let fields: Vec<&str> = out.split('\0').collect();
     Ok(fields
-        .chunks_exact(LOG_FIELDS)
-        .filter_map(parse_record)
+        .as_chunks::<LOG_FIELDS>()
+        .0
+        .iter()
+        .filter_map(|record| parse_record(record))
         .collect())
 }
 
@@ -468,11 +470,10 @@ pub fn rebase_commits(repo: &Path, onto: &str) -> Result<Vec<RebaseCommit>, Stri
 fn parse_rebase_commits(out: &str) -> Vec<RebaseCommit> {
     let fields: Vec<&str> = out.split('\0').collect();
     fields
-        .chunks_exact(6)
-        .filter_map(|f| {
-            let [hash, parents, author, email, summary, message] = f else {
-                return None;
-            };
+        .as_chunks::<6>()
+        .0
+        .iter()
+        .filter_map(|[hash, parents, author, email, summary, message]| {
             let hash = hash.trim();
             if hash.is_empty() {
                 return None;
