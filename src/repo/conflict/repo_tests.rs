@@ -72,7 +72,7 @@ fn editor_with_bases(dir: &Path, path: &str) -> Result<ConflictEditor, String> {
 }
 
 fn base_of(ed: &ConflictEditor, k: usize) -> Option<String> {
-    match ed.original.of(&ed.segments, k) {
+    match ed.original.of(k) {
         Original::Text(base) => Some(base.to_owned()),
         _ => None,
     }
@@ -136,6 +136,21 @@ fn a_diff3_file_has_its_own_bases() -> Result<(), String> {
     Ok(())
 }
 
+/// After Mergiraf (or anything) leaves conflicts without bases in a file whose conflicts had
+/// their own, the index is asked: the card doesn't wait forever.
+#[test]
+fn bases_are_asked_for_when_they_go_missing() {
+    let (segments, _, _) = super::parse("<<<<<<< a\nx\n||||||| b\no\n=======\ny\n>>>>>>> c\n");
+    let mut state = super::original::State::new(&segments);
+    assert_eq!(state.index, IndexBases::NotNeeded);
+    state.asked = true;
+    let (now, _, _) = super::parse("<<<<<<< a\nx\n=======\ny\n>>>>>>> c\n");
+    state.reset(&now);
+    assert_eq!(state.index, IndexBases::Loading);
+    assert!(!state.asked);
+    assert_eq!(state.of(0), Original::Loading);
+}
+
 /// Both sides added the file: the card says there is no original.
 #[test]
 fn add_add_has_no_original() -> Result<(), String> {
@@ -147,7 +162,7 @@ fn add_add_has_no_original() -> Result<(), String> {
     git::run_ok_codes(Some(&dir), &["merge", "-q", "--no-edit", "other"], &[0, 1])?;
     let ed = editor_with_bases(&dir, "new file.txt")?;
     let _ = std::fs::remove_dir_all(&dir);
-    assert_eq!(ed.original.of(&ed.segments, 0), Original::Added);
+    assert_eq!(ed.original.of(0), Original::Added);
     Ok(())
 }
 
@@ -176,7 +191,7 @@ fn bases_follow_the_conflicts_left() -> Result<(), String> {
     let edited = rest.replace("TWO", "TWO edited");
     ed.take_solved(edited);
     assert!(matches!(
-        ed.original.of(&ed.segments, 0),
+        ed.original.of(0),
         Original::Unknown(why) if why.contains("edited")
     ));
     Ok(())
@@ -244,9 +259,19 @@ fn keep_both_writes_through_the_filters() -> Result<(), String> {
     let plan = keep_both::plan(&dir, "x.dat", Some(InProgress::Merge))?;
     keep_both::write(&dir, &plan)?;
     let ours = std::fs::read(dir.join(&plan.ours.target));
+    // An LFS pointer's size is that of the file it points to, read without downloading it.
+    std::fs::write(
+        dir.join("pointer"),
+        "version https://git-lfs.github.com/spec/v1\noid sha256:abc\nsize 123456\n",
+    )
+    .map_err(|e| e.to_string())?;
+    let oid = git::run(Some(&dir), &["hash-object", "-w", "pointer"])?;
+    let pointed = git::checked_out_size(&dir, oid.trim());
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(ours.map_err(|e| e.to_string())?, b"ours\r\n");
-    assert_eq!(plan.ours.size, 6);
+    // The preview's size is the stored one (no blob is read for it).
+    assert_eq!(plan.ours.size, 5);
+    assert_eq!(pointed, Ok(123_456));
     Ok(())
 }
 
@@ -431,6 +456,9 @@ fn through_the_tab() -> Result<(), String> {
         area: Area::Conflicted,
     };
     tab.open_diff(DiffKey::Work(file("t.txt")), &ctx);
+    // As the editor's view does on each frame: asked once.
+    tab.request_conflict_bases(&ctx);
+    tab.request_conflict_bases(&ctx);
     let based = poll_until(&mut tab, &ctx, |tab| {
         tab.conflict.as_ref().is_some_and(|ed| !ed.wants_bases())
     });
@@ -448,8 +476,23 @@ fn through_the_tab() -> Result<(), String> {
         std::fs::read(dir.join("pic.main.gif")),
         std::fs::read(dir.join("pic.feature.gif")),
     );
+    // The merge aborted while the window was open: Stage both stages and removes nothing.
+    let Some(KeepBoth::Written(plan)) = tab.keep_both.take() else {
+        return Err("not written".to_owned());
+    };
+    git::run(Some(&dir), &["merge", "--abort"])?;
+    tab.keep_both_stage(plan, &ctx);
+    let refused = poll_until(&mut tab, &ctx, |tab| {
+        tab.status
+            .as_ref()
+            .is_some_and(|(m, _)| m.contains("no longer in the conflict"))
+    });
+    let pic_kept = std::fs::read(dir.join("pic.gif"));
+    let staged = git::run(Some(&dir), &["diff", "--cached", "--name-only"])?;
     let _ = std::fs::remove_dir_all(&dir);
-    assert!(based && previewed && written);
+    assert!(based && previewed && written && refused);
+    assert_eq!(pic_kept.map_err(|e| e.to_string())?, b"GIF89a\x00ours");
+    assert_eq!(staged, "");
     assert_eq!(base.as_deref(), Some("keep\n"));
     assert_eq!(files.0.map_err(|e| e.to_string())?, b"GIF89a\x00ours");
     assert_eq!(files.1.map_err(|e| e.to_string())?, b"GIF89a\x00theirs");

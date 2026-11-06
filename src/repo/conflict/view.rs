@@ -12,6 +12,7 @@ use crate::theme::{self, Tokens};
 impl RepoTab {
     pub(in crate::repo) fn conflict_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
+        self.request_conflict_bases(ui.ctx());
         let idle = self.busy_op.is_none();
         let Some(ed) = &mut self.conflict else { return };
         let (ours_name, theirs_name) = ed.side_names();
@@ -222,7 +223,7 @@ impl ConflictEditor {
                                 ui,
                                 t,
                                 (k, self.original.is_open(k)),
-                                self.original.of(&self.segments, k),
+                                self.original.of(k),
                                 self.original.diffs(k),
                                 names,
                             ) {

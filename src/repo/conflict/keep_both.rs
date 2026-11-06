@@ -198,9 +198,8 @@ pub fn plan(repo: &Path, path: &str, state: Option<InProgress>) -> Result<Plan, 
                 },
                 oid: stage.oid.clone(),
                 executable: stage.mode == "100755",
-                size: git::checked_out_blob(repo, &stage.oid, path)
-                    .map_err(|e| format!("Could not read the version of {who}: {e}"))?
-                    .len() as u64,
+                size: git::checked_out_size(repo, &stage.oid)
+                    .map_err(|e| format!("Could not read the version of {who}: {e}"))?,
                 ignored: git::is_ignored(repo, &target)?,
                 target,
                 taken,
@@ -339,6 +338,23 @@ fn remove(file: &Path) -> Result<(), String> {
         Ok(())
     } else {
         Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
+    }
+}
+
+/// Whether `plan.path` is still in the conflict `plan` was made for, both sides as they were
+/// (blocking: in the background).
+pub fn still_in_conflict(repo: &Path, plan: &Plan) -> Result<(), String> {
+    let stages = git::conflict_stages(repo, &plan.path)?;
+    let same =
+        |stage: Option<&Stage>, version: &Version| stage.is_some_and(|s| s.oid == version.oid);
+    if same(stages.ours.as_ref(), &plan.ours) && same(stages.theirs.as_ref(), &plan.theirs) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{} is no longer in the conflict Keep both was opened for, so nothing was staged or \
+             removed. {} and {} are still there to check.",
+            plan.path, plan.ours.target, plan.theirs.target
+        ))
     }
 }
 

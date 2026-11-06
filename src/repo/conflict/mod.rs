@@ -369,7 +369,9 @@ impl ConflictEditor {
         self.original.index == original::IndexBases::Loading
     }
 
-    /// Asks the index of `repo` for the bases of the conflicts (blocking: in the background).
+    /// Asks the index of `repo` for the bases of the conflicts, here and now (as the
+    /// background job does).
+    #[cfg(test)]
     pub fn read_bases(&mut self, repo: &Path) {
         if self.wants_bases() {
             let bases = original::load(repo, &self.path);
