@@ -175,6 +175,13 @@ so your config, credentials and hooks apply as usual.
   ones red, added ones green, the rest as they are) or, with _File_, the whole file. Images of
   the repository show as they are on each side of the change; any other image is a link, so a
   file can't make gitcraft contact a server.
+- _weakens checks_: a file in the list of a commit, a comparison or the changes, and each hunk of
+  its diff, gets this badge when it removes assertions or tests, deletes a test file, adds
+  `#[ignore]` / `skip` / `xit` / `@Disabled` / `t.Skip()` (and the like) or an assertion that
+  can't fail (`assert True`), loosens a tolerance (`rtol=1e-6` → `1e-2`), rewrites a snapshot
+  wholesale, lets CI fail (`continue-on-error`, `allow_failure`, `|| true`), removes a CI job or
+  trigger, or adds `--no-verify`. It is read from the diff alone, the same way every time, and
+  its hover lists the lines that made it.
 - Code takes the colours of the theme VS Code (or Insiders, VSCodium) is using, read from its
   settings and extensions, when it is dark or light like gitcraft's; a setting turns it off.
 - Conflicts open in a three-pane editor: each conflict's two sides with _Ours_, _Theirs_ and

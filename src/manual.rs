@@ -66,6 +66,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Hover a branch and click its eye to hide it from the graph, or Solo it from its menu to see only the branches soloed; “Show all” at the top brings them all back.",
             "Conflicts open in a three-pane editor with Ours, Theirs and Both for each conflict.",
             "Right-click a file for its history, its blame or the whole file as it is at the commit.",
+            "A “weakens checks” badge on a file or a hunk: it removes assertions or tests, skips tests, adds an assertion that can't fail, loosens a tolerance, rewrites a snapshot wholesale, lets CI fail or removes a CI job, or adds --no-verify. Hover the badge for the lines that made it.",
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",
             "Right-click a pull request and choose Open in worktree to work on its branch in a worktree of its own, made for it when there is none.",

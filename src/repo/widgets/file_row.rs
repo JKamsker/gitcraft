@@ -7,17 +7,22 @@ use crate::icons;
 use crate::theme::{self, Tokens};
 
 /// What a file row shows on its right edge.
+#[derive(Clone, Copy)]
 pub enum RowExtra<'a> {
     /// `+added −removed` (`None` for binary files).
     Stats(Option<u32>, Option<u32>),
     /// Icon buttons shown while the row is hovered: `(icon, tooltip)`.
     Buttons(&'a [(&'a str, &'a str)]),
+    /// [`RowExtra::Stats`] or [`RowExtra::Buttons`] with a warning badge left of them.
+    Badged(&'a RowExtra<'a>, &'a str),
 }
 
 pub struct FileRowResponse {
     pub row: Response,
     /// Index of the clicked hover button.
     pub button: Option<usize>,
+    /// Where the badge of [`RowExtra::Badged`] is, for its own hover text.
+    pub badge: Option<Rect>,
 }
 
 /// One file: status letter, file name, its folder dimmed, and `extra` on the right.
@@ -64,15 +69,26 @@ pub fn file_row(
     // Right edge first, so the name is clipped before it.
     let mut right = rect.right() - 8.0;
     let mut button = None;
+    let mut badge = None;
+    let (extra, label) = match &extra {
+        RowExtra::Badged(inner, label) => (*inner, Some(*label)),
+        other => (other, None),
+    };
     match extra {
         RowExtra::Stats(added, removed) => {
-            right = stats(&painter, &t, right, y, added, removed);
+            right = stats(&painter, &t, right, y, *added, *removed);
         }
         RowExtra::Buttons(buttons) => {
             if hovered || selected {
                 (right, button) = hover_buttons(ui, &painter, &t, &row, right, buttons);
             }
         }
+        RowExtra::Badged(..) => {}
+    }
+    if let Some(label) = label {
+        let at = warning_badge(&painter, &t, right, y, label);
+        right = at.left() - 6.0;
+        badge = Some(at);
     }
 
     let (dir, name) = split_dir(path);
@@ -112,7 +128,18 @@ pub fn file_row(
         None if !dir.is_empty() => row.on_hover_text(path),
         None => row,
     };
-    FileRowResponse { row, button }
+    FileRowResponse { row, button, badge }
+}
+
+/// A small warning pill with `label`, right-aligned at `right`; returns where it is.
+fn warning_badge(painter: &Painter, t: &Tokens, right: f32, y: f32, label: &str) -> Rect {
+    let font = theme::medium(10.0);
+    let galley = painter.layout_no_wrap(label.to_owned(), font, t.warning);
+    let size = galley.size() + vec2(10.0, 3.0);
+    let rect = Rect::from_min_size(pos2(right - size.x, y - size.y / 2.0), size);
+    painter.rect_filled(rect, CornerRadius::same(4), t.warning.gamma_multiply(0.18));
+    painter.galley(rect.min + vec2(5.0, 1.5), galley, t.warning);
+    rect
 }
 
 /// `+added −removed` (or `bin`) right-aligned at `right`; returns where the name must end.

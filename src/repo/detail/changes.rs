@@ -200,6 +200,10 @@ impl RepoTab {
         let key = DiffKey::Work(f.clone());
         let selected = self.open_key() == Some(&key);
         let buttons = if self.busy_op.is_none() { buttons } else { &[] };
+        let scope = crate::weakened::Scope::Work(self.work_read);
+        let found = self.weakened.get(ui.ctx(), &self.path, scope);
+        let plain = RowExtra::Buttons(buttons);
+        let (extra, flags) = super::super::weakened_marks::extra(found.as_ref(), &f.path, &plain);
         let r = widgets::file_row(
             ui,
             f.code,
@@ -207,8 +211,9 @@ impl RepoTab {
             f.old_path.as_deref(),
             indent,
             selected,
-            RowExtra::Buttons(buttons),
+            extra,
         );
+        super::super::weakened_marks::hover(ui, &r, flags);
         if f.code != 'D' {
             widgets::file_menu(&r.row, &f.path, None, true, acts);
         }
