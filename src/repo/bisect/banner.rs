@@ -38,24 +38,6 @@ impl RepoTab {
                     });
                 });
             }
-        } else if let Some(e) = &self.bisect.error {
-            // Never read: what is wrong, and a way out.
-            ui.horizontal(|ui| {
-                let t = Tokens::get(ui.ctx());
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui
-                        .add_enabled(self.busy_op.is_none(), egui::Button::new("Stop bisect"))
-                        .on_hover_text("git bisect reset: ends the bisect gitcraft can't read")
-                        .on_disabled_hover_text(BUSY)
-                        .clicked()
-                    {
-                        acts.push(Action::Bisect(BisectAct::Reset));
-                    }
-                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                        ui.add(egui::Label::new(RichText::new(e).color(t.danger)).truncate());
-                    });
-                });
-            });
         }
         if let Some(run) = &self.bisect.run {
             run_log(ui, run, acts);
@@ -111,6 +93,12 @@ impl RepoTab {
             }
             (None, None, None) => {
                 waiting(ui, &t, bisect.word(Mark::Bad), "one with the change");
+            }
+            (None, None, Some(_)) if !bisect.marks.good.is_empty() => {
+                let text = "git finds nothing to test between the marks (a good commit after the \
+                            bad one?): mark others, or Stop.";
+                ui.add(egui::Label::new(RichText::new(text).color(t.warning)).truncate())
+                    .on_hover_text(text);
             }
             (None, None, Some(_)) => {
                 waiting(

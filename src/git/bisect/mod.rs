@@ -119,25 +119,31 @@ pub fn bisect_state(repo: &Path) -> Result<Option<Bisect>, String> {
         Err(e) if parse::not_bisecting(&e) => return Ok(None),
         Err(e) => return Err(format!("Couldn't read the bisect: {e}")),
     };
-    let files = Files::read(repo)?;
-    let terms = parse::terms(files.terms.as_deref());
-    let (marks, current) = std::thread::scope(|scope| {
-        let marks = scope.spawn(|| read_marks(repo, &terms));
+    // Side by side: for a repository elsewhere, each is a round trip or more.
+    let (files, refs, current) = std::thread::scope(|scope| {
+        let files = scope.spawn(|| Files::read(repo));
+        let refs = scope.spawn(|| bisect_refs(repo));
         let current = current_commit(repo);
-        let marks = marks
-            .join()
-            .map_err(|_| "could not read the bisect's marks".to_owned())?;
-        Ok::<_, String>((marks?, current?))
+        let join = |_| "could not read the bisect".to_owned();
+        Ok::<_, String>((
+            files.join().map_err(join)??,
+            refs.join().map_err(join)??,
+            current?,
+        ))
     })?;
+    let terms = parse::terms(files.terms.as_deref());
+    let marks = parse::marks(&refs, &terms);
     let outcome = parse::outcome(&log, &terms.bad);
     let progress = match (&outcome, &marks.bad) {
-        (None, Some(bad)) if !marks.good.is_empty() => {
-            let vars = range_vars(repo, bad, &marks.good, &files)?;
-            Some(Progress {
+        // Marks git took but can't bisect between (a good commit after the bad one) leave
+        // nothing to count: no progress, the rest of the state still shown.
+        (None, Some(bad)) if !marks.good.is_empty() => range_vars(repo, bad, &marks.good, &files)
+            .ok()
+            .filter(|vars| vars.candidates > 0)
+            .map(|vars| Progress {
                 left: vars.left,
                 steps: steps_left(vars.candidates),
-            })
-        }
+            }),
         _ => None,
     };
     Ok(Some(Bisect {
@@ -202,16 +208,16 @@ fn optional_file(repo: &Path, printed: &str) -> Result<Option<String>, String> {
     }
 }
 
-fn read_marks(repo: &Path, terms: &Terms) -> Result<Marks, String> {
-    let out = run(
+/// The bisect's refs, as `<hash> <name>` lines.
+fn bisect_refs(repo: &Path) -> Result<String, String> {
+    run(
         Some(repo),
         &[
             "for-each-ref",
             "--format=%(objectname) %(refname)",
             "refs/bisect/",
         ],
-    )?;
-    Ok(parse::marks(&out, terms))
+    )
 }
 
 /// The commit being tested.
@@ -314,9 +320,20 @@ pub fn bisect_mark(
     }
 }
 
-/// Ends the bisect and checks out again what was checked out when it began.
+/// Ends the bisect and checks out again what was checked out when it began. When that can't
+/// be checked out any more (the branch was deleted), it ends it where it is, and says so.
 pub fn bisect_reset(repo: &Path) -> Result<String, String> {
-    run(Some(repo), &["bisect", "reset"]).map(|out| out.trim().to_owned())
+    match run(Some(repo), &["bisect", "reset"]) {
+        Ok(out) => Ok(out.trim().to_owned()),
+        Err(e) if e.contains("could not check out original HEAD") => {
+            run(Some(repo), &["bisect", "reset", "HEAD"])?;
+            Err(format!(
+                "{} Ended the bisect where it was instead.",
+                e.lines().next().unwrap_or_default().trim()
+            ))
+        }
+        Err(e) => Err(e),
+    }
 }
 
 /// The arguments of `git bisect run` for a command typed as it would be in a shell (`cargo

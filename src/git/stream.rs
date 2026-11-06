@@ -5,9 +5,9 @@
 use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::sync::mpsc::{Sender, channel};
+use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, channel};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::command::{Extra, git_cmd, remote_request, with_profile};
 use crate::remote::{self, Host};
@@ -15,6 +15,15 @@ use crate::remote::{self, Host};
 /// What the script on another machine prints first: the process of the shell it runs in,
 /// which is stopped (with all it started) to stop the command.
 const PID_MARK: &str = "gitcraft-stream-pid";
+
+/// What it prints last, with the command's exit code.
+const END_MARK: &str = "gitcraft-stream-end";
+
+/// How often a command's end is looked for while it prints nothing.
+const POLL: Duration = Duration::from_millis(100);
+
+/// How long what a command printed last is waited for once it ended.
+const DRAIN: Duration = Duration::from_millis(300);
 
 /// How long a command asked to stop has before it is killed.
 const GRACE: Duration = Duration::from_secs(2);
@@ -83,9 +92,14 @@ impl Stopper {
     fn kill(&self, process: Process) {
         match process {
             Process::Here(pid) => kill_here(self.clone(), pid, true),
+            // That machine's processes first: with `ssh` gone, what the command started could
+            // lose its parent and be missed.
             Process::There { host, pid, local } => {
-                remote::stop(host, pid);
-                kill_here(self.clone(), local, false);
+                let stopper = self.clone();
+                std::thread::spawn(move || {
+                    let _ = remote::stop(host, pid).join();
+                    kill_here(stopper, local, false);
+                });
             }
         }
     }
@@ -95,42 +109,46 @@ impl Stopper {
     }
 }
 
-/// Ends the process `pid` of this machine (and its process group, `group`), in the background:
-/// asked politely first, then killed if it hasn't ended after [`GRACE`].
+/// Ends the process `pid` of this machine (and its process group, `group`): asked politely
+/// right away (so that it is asked even when the app is quitting), then killed in the
+/// background if it hasn't ended after [`GRACE`].
 fn kill_here(stopper: Stopper, pid: u32, group: bool) {
-    std::thread::spawn(move || {
-        #[cfg(unix)]
-        {
-            let target = if group {
-                format!("-{pid}")
-            } else {
-                pid.to_string()
-            };
-            let signal = |name: &str| {
-                let _ = Command::new("kill")
-                    .args([name, "--", &target])
-                    .stderr(Stdio::null())
-                    .status();
-            };
-            signal("-TERM");
+    #[cfg(unix)]
+    {
+        let target = if group {
+            format!("-{pid}")
+        } else {
+            pid.to_string()
+        };
+        let signal = move |name: &str| {
+            let _ = Command::new("kill")
+                .args([name, "--", &target])
+                .stderr(Stdio::null())
+                .status();
+        };
+        signal("-TERM");
+        std::thread::spawn(move || {
             std::thread::sleep(GRACE);
-            if !stopper.has_ended() {
+            // A group is killed whether git ended or not: what it ran may have outlived it,
+            // ignoring the polite ask.
+            if group || !stopper.has_ended() {
                 signal("-KILL");
             }
-        }
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-            let _ = (&stopper, group);
-            let _ = Command::new("taskkill")
-                .args(["/PID", &pid.to_string(), "/T", "/F"])
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .creation_flags(CREATE_NO_WINDOW)
-                .status();
-        }
-    });
+        });
+    }
+    // No polite way to ask there: the whole tree is ended at once.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let _ = (&stopper, group);
+        let _ = Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .creation_flags(CREATE_NO_WINDOW)
+            .status();
+    }
 }
 
 /// How a streamed command ended.
@@ -194,14 +212,43 @@ fn stream_here(
         child.stderr.take().map(|err| read_lines(err, tx.clone())),
     ];
     drop(tx);
-    rx.into_iter().for_each(line);
-    for reader in readers.into_iter().flatten() {
+    let mut line = line;
+    // Until git has ended: something it left running in the background (a server a test
+    // started) may hold its outputs open for good.
+    let status = loop {
+        match rx.recv_timeout(POLL) {
+            Ok(text) => line(text),
+            Err(RecvTimeoutError::Timeout) => {}
+            Err(RecvTimeoutError::Disconnected) => {
+                break child
+                    .wait()
+                    .map_err(|e| format!("could not run git: {e}"))?;
+            }
+        }
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|e| format!("could not run git: {e}"))?
+        {
+            break status;
+        }
+    };
+    // What it printed last, still on its way.
+    drain(&rx, &mut line);
+    for reader in readers.into_iter().flatten().filter(|r| r.is_finished()) {
         let _ = reader.join();
     }
-    let status = child
-        .wait()
-        .map_err(|e| format!("could not run git: {e}"))?;
     Ok(status.code())
+}
+
+/// Takes the lines still coming for a moment after the command ended.
+fn drain(rx: &Receiver<String>, line: &mut impl FnMut(String)) {
+    let until = Instant::now() + DRAIN;
+    while let Some(left) = until.checked_duration_since(Instant::now()) {
+        match rx.recv_timeout(left) {
+            Ok(text) => line(text),
+            Err(_) => return,
+        }
+    }
 }
 
 fn stream_there(
@@ -211,8 +258,7 @@ fn stream_there(
     mut line: impl FnMut(String),
 ) -> Result<Option<i32>, String> {
     let mut req = remote_request(target, &Extra::default(), args);
-    // `$$` in the subshell the request runs in is the shell's own: the one that runs it all.
-    req.script = format!("printf '%s %s\\n' {PID_MARK} \"$$\"\n{} 2>&1", req.script);
+    req.script = there_script(&req.script);
     let mut child = remote::spawn(&target.host, &req)?;
     let local = child.id();
     let (tx, rx) = channel();
@@ -222,22 +268,18 @@ fn stream_there(
         child.stderr.take().map(|err| read_lines(err, tx.clone())),
     ];
     drop(tx);
-    let mut started = false;
-    for text in rx {
-        if !started
-            && let Some(pid) = text
-                .strip_prefix(PID_MARK)
-                .and_then(|p| p.trim().parse().ok())
-        {
-            started = true;
-            stopper.started(Process::There {
-                host: target.host.clone(),
-                pid,
-                local,
-            });
-            continue;
-        }
-        line(text);
+    let said_end = read_there(&rx, &mut line, |pid| {
+        stopper.started(Process::There {
+            host: target.host.clone(),
+            pid,
+            local,
+        });
+    });
+    if let Some(code) = said_end {
+        // Ended there: the connection goes, whatever still holds it open.
+        let _ = child.kill();
+        let _ = child.wait();
+        return Ok(Some(code));
     }
     for reader in readers.into_iter().flatten() {
         let _ = reader.join();
@@ -246,6 +288,51 @@ fn stream_there(
         .wait()
         .map_err(|e| format!("could not reach {}: {e}", target.host.label()))?;
     Ok(status.code())
+}
+
+/// `script` (`exec git …`) as it runs on another machine: its shell's process said first (`$$`
+/// in the subshell a request runs in is the shell's own, the one that runs it all), both
+/// outputs as one, and its end said in a line of its own with the exit code, since something
+/// it left running in the background may hold the connection open for good.
+fn there_script(script: &str) -> String {
+    let command = script.strip_prefix("exec ").unwrap_or(script);
+    format!(
+        "printf '%s %s\\n' {PID_MARK} \"$$\"\n{command} 2>&1\nprintf '\\n%s %s\\n' {END_MARK} \"$?\""
+    )
+}
+
+/// Reads what [`there_script`] prints from `rx`, giving its process to `started` and the
+/// command's lines to `line`, up to its end: the exit code it says, `None` when the output
+/// ended first (the connection dropped).
+fn read_there(
+    rx: &Receiver<String>,
+    line: &mut impl FnMut(String),
+    mut started: impl FnMut(u32),
+) -> Option<i32> {
+    let mut known = false;
+    // An empty line is held back: the one before the end's is the script's own.
+    let mut blank = false;
+    for text in rx {
+        if let Some(code) = text.strip_prefix(END_MARK) {
+            return code.trim().parse().ok();
+        }
+        if !known
+            && let Some(pid) = text
+                .strip_prefix(PID_MARK)
+                .and_then(|p| p.trim().parse().ok())
+        {
+            known = true;
+            started(pid);
+            continue;
+        }
+        if std::mem::replace(&mut blank, text.is_empty()) {
+            line(String::new());
+        }
+        if !blank {
+            line(text);
+        }
+    }
+    None
 }
 
 /// Reads `from` line by line (as text, whatever its bytes) into `to`, on a thread of its own.
@@ -322,6 +409,54 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         assert!(ended?.stopped);
         assert!(lines.is_empty());
+        Ok(())
+    }
+
+    /// What runs on another machine says its process, its lines (blank ones too) and its end,
+    /// even when something it left in the background holds the output open. Run here by `sh`,
+    /// as it is there.
+    #[cfg(unix)]
+    #[test]
+    fn a_command_elsewhere_says_its_end_whatever_it_leaves_running() -> Result<(), String> {
+        let script = there_script("exec sh -c 'echo one; echo; echo two >&2; sleep 33 & exit 3'");
+        let mut child = Command::new("sh")
+            .args(["-c", &script])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let (tx, rx) = channel();
+        let _reader = child.stdout.take().map(|out| read_lines(out, tx));
+        let mut lines = Vec::new();
+        let mut pid = None;
+        let started = Instant::now();
+        let code = read_there(&rx, &mut |l| lines.push(l), |p| pid = Some(p));
+        let _ = child.wait();
+        assert!(started.elapsed() < Duration::from_secs(20));
+        assert_eq!(code, Some(3));
+        assert_eq!(pid, Some(child.id()));
+        assert_eq!(lines, ["one", "", "two"]);
+        Ok(())
+    }
+
+    /// A command that leaves something running with its outputs is over when git is.
+    #[cfg(unix)]
+    #[test]
+    fn a_command_is_over_when_git_is() -> Result<(), String> {
+        let dir = repo("background")?;
+        let started = Instant::now();
+        let mut lines = Vec::new();
+        let ended = stream(
+            &dir,
+            &["-c", "alias.bg=!sleep 34 & echo started", "bg"],
+            &Stopper::default(),
+            |l| lines.push(l),
+        );
+        let took = started.elapsed();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(ended?.code, Some(0));
+        assert_eq!(lines, ["started"]);
+        assert!(took < Duration::from_secs(20), "{took:?}");
         Ok(())
     }
 

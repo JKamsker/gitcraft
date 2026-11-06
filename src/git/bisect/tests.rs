@@ -439,3 +439,45 @@ fn a_start_is_refused_with_changes_or_an_operation_in_the_way() {
         Some("A merge is in progress: finish or abort it first.")
     );
 }
+
+/// The branch it began on deleted meanwhile: reset says so and still ends the bisect.
+#[test]
+fn reset_ends_the_bisect_even_when_its_branch_is_gone() -> Result<(), String> {
+    let (dir, hashes) = culprit_repo("reset-gone", 6, 3)?;
+    let result = (|| {
+        git::run(Some(&dir), &["checkout", "-q", "-b", "gone"])?;
+        bisect_start(&dir, "HEAD", Some(&hashes[0]))?;
+        git::run(Some(&dir), &["update-ref", "-d", "refs/heads/gone"])?;
+        let said = bisect_reset(&dir);
+        assert!(
+            said.as_ref().is_err_and(|e| e.contains("where it was")),
+            "{said:?}"
+        );
+        assert!(bisect_state(&dir)?.is_none());
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}
+
+/// A good commit marked after the bad one leaves git nothing to test: the state still reads,
+/// with no progress, so the marks show and it can be stopped.
+#[test]
+fn marks_git_can_t_bisect_between_still_read() -> Result<(), String> {
+    let (dir, hashes) = culprit_repo("contradiction", 10, 5)?;
+    let result = (|| {
+        bisect_start(&dir, &hashes[3], Some(&hashes[0]))?;
+        let bisect = state(&dir)?;
+        // git takes the mark, then says it can't go on.
+        assert!(bisect_mark(&dir, &bisect, Mark::Good, Some(&hashes[9])).is_err());
+        let bisect = state(&dir)?;
+        assert_eq!(bisect.mark_of(&hashes[9]), Some(Mark::Good));
+        assert_eq!(bisect.progress, None);
+        assert_eq!(bisect.outcome, None);
+        bisect_reset(&dir)?;
+        assert!(bisect_state(&dir)?.is_none());
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}

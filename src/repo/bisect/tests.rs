@@ -228,3 +228,26 @@ fn a_start_with_uncommitted_changes_is_refused_with_why() -> Result<(), String> 
     let _ = std::fs::remove_dir_all(&dir);
     result
 }
+
+/// A bisect that ended before the tab opened shows its end, but the selection stays where
+/// the tab puts it: only an end found while the tab watches selects the culprit.
+#[test]
+fn opening_on_a_finished_bisect_keeps_the_selection() -> Result<(), String> {
+    let (dir, hashes) = culprit_repo("finished", 8, 3)?;
+    let ctx = egui::Context::default();
+    let result = (|| {
+        for args in [
+            &["bisect", "start", &hashes[7], &hashes[0]][..],
+            &["bisect", "run", "sh", "-c", "! grep -q bug f"],
+        ] {
+            git::run(Some(&dir), args)?;
+        }
+        let tab = open(&dir, &ctx)?;
+        let outcome = tab.bisect.state().and_then(|b| b.outcome.clone());
+        assert_eq!(outcome, Some(Outcome::FirstBad(hashes[2].clone())));
+        assert_ne!(selected(&tab), Some(hashes[2].clone()));
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}
