@@ -210,7 +210,10 @@ impl RepoTab {
             RowExtra::Buttons(buttons),
         );
         if f.code != 'D' {
-            widgets::file_menu(&r.row, &f.path, None, true, acts);
+            let lfs = |ui: &mut Ui, acts: &mut Vec<Action>| {
+                self.storage_menu_items(ui, &f.path, None, acts);
+            };
+            widgets::file_menu_with(&r.row, &f.path, None, true, lfs, acts);
         }
         match r.button {
             Some(i) => RowClick::Button(i),

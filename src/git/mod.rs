@@ -6,6 +6,9 @@ mod commits;
 mod diff;
 mod files;
 mod lfs;
+#[cfg(test)]
+pub(crate) mod lfs_fixtures;
+mod lfs_storage;
 mod refs;
 mod status;
 mod submodule;
@@ -16,6 +19,7 @@ pub use self::commits::*;
 pub use self::diff::*;
 pub use self::files::*;
 pub use self::lfs::*;
+pub use self::lfs_storage::*;
 pub use self::refs::*;
 pub use self::status::*;
 pub use self::submodule::*;

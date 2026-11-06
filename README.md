@@ -166,6 +166,13 @@ so your config, credentials and hooks apply as usual.
 - A file kept in Git LFS shows as its LFS objects before and after, with their sizes, rather
   than the text of the pointer git stores. With git-lfs installed, the palette (Ctrl+P) of a
   repository that uses LFS has _LFS: Fetch_ and _LFS: Pull_.
+- LFS storage: _LFS: Storage…_ in the palette says how much disk the local LFS objects take,
+  lists the files of the checkout that are only their pointer (never downloaded) with
+  _Download_ for each or all, sets which folders LFS fetches (`lfs.fetchinclude` /
+  `lfs.fetchexclude`, for the repository only) and prunes old objects after showing what that
+  frees. In _View all files_ of the checked-out commit, a cloud marks the files that are only
+  pointers; a file's menu has _LFS: Download_, _LFS: Fetch only <folder>_ and, for a file not
+  in LFS, _Track \*.ext in LFS_ (which writes `.gitattributes`).
 - The arrows in a diff's header (F7 / Shift+F7, or Alt+↓ / Alt+↑) jump to the next and previous
   change. The strip beside the scrollbar marks where the changes are, removals red and additions
   green; click a mark to jump to its change, or anywhere else on the strip to scroll there.
