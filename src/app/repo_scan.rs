@@ -144,25 +144,27 @@ pub(super) fn scan(
             let Ok(entries) = std::fs::read_dir(&dir) else {
                 continue;
             };
-            for entry in entries.flatten() {
-                // Never more kept than will be looked in.
-                if seen + next.len() >= limits.max_dirs {
-                    found.stopped = Some(Stopped::Folders);
-                    break;
-                }
+            // In name order, whatever order the file system lists them in: which ones are kept
+            // when the limit cuts in is the same everywhere.
+            let mut children: Vec<_> = entries
+                .flatten()
                 // A link's own type: never followed.
-                if !entry.file_type().is_ok_and(|t| t.is_dir()) {
-                    continue;
-                }
-                let name = entry.file_name();
-                let name = name.to_string_lossy();
-                if name == ".git" {
-                    continue;
-                }
-                next.push((entry.path(), walked(&name)));
+                .filter(|entry| entry.file_type().is_ok_and(|t| t.is_dir()))
+                .filter(|entry| entry.file_name() != ".git")
+                .map(|entry| {
+                    let walk = walked(&entry.file_name().to_string_lossy());
+                    (entry.path(), walk)
+                })
+                .collect();
+            children.sort();
+            // Never more kept than will be looked in.
+            let room = limits.max_dirs.saturating_sub(seen + next.len());
+            if children.len() > room {
+                found.stopped = Some(Stopped::Folders);
+                children.truncate(room);
             }
+            next.extend(children);
         }
-        next.sort();
         level = next;
     }
     progress(Progress {
