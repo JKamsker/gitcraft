@@ -6,22 +6,30 @@ fn files_listed_as_json() -> Result<(), String> {
     let json = r#"{"files":[
         {"name":"sub dir/a b.bin","size":5000,"checkout":false,"downloaded":false},
         {"name":"ü.bin","size":7000,"checkout":true,"downloaded":true},
-        {"name":"old\\x.bin","size":1,"checkout":true}]}"#;
+        {"name":"fetched.bin","size":3,"checkout":false,"downloaded":true},
+        {"name":"old.bin","size":1,"checkout":true}]}"#;
     let files = parse_files_json(json)?;
-    let short: Vec<(&str, u64, bool)> = files
+    let short: Vec<(&str, u64, bool, bool)> = files
         .iter()
-        .map(|f| (f.path.as_str(), f.size, f.downloaded))
+        .map(|f| (f.path.as_str(), f.size, f.downloaded, f.checked_out))
         .collect();
     assert_eq!(
         short,
         [
-            ("sub dir/a b.bin", 5000, false),
-            ("ü.bin", 7000, true),
-            ("old/x.bin", 1, true)
+            ("sub dir/a b.bin", 5000, false, false),
+            ("ü.bin", 7000, true, true),
+            ("fetched.bin", 3, true, false),
+            ("old.bin", 1, true, true)
         ]
     );
+    // Fetched but not checked out: a pointer on disk, unless it was changed since.
+    assert!(files[0].only_pointer(false));
+    assert!(!files[1].only_pointer(false));
+    assert!(files[2].only_pointer(false));
+    assert!(!files[2].only_pointer(true));
     assert!(parse_files_json("")?.is_empty());
     assert!(parse_files_json("{}")?.is_empty());
+    assert!(parse_files_json(r#"{"files":null}"#)?.is_empty());
     assert!(parse_files_json("nope").is_err());
     Ok(())
 }
@@ -33,8 +41,8 @@ fn files_listed_as_text() {
     assert_eq!(files.len(), 2);
     assert_eq!(files[0].path, "sub dir/a b (1).bin");
     assert_eq!(files[0].size, 5120);
-    assert!(!files[0].downloaded);
-    assert_eq!((files[1].size, files[1].downloaded), (300, true));
+    assert!(files[0].only_pointer(false));
+    assert_eq!((files[1].size, files[1].only_pointer(false)), (300, false));
 }
 
 #[test]
@@ -58,15 +66,26 @@ fn the_media_dir_from_lfs_env() {
 #[test]
 fn prune_plans() {
     let out =
-        "prune: 3 local objects, 2 retained, done.\n\n * c844 (300 B), done.\n * ab12 (1.0 KB)\n";
+        "prune: 3 local objects, 2 retained, done.\nprune: 1 file would be pruned (300 B), done.\n";
     assert_eq!(
         parse_prune(out),
         Some(PrunePlan {
             local: 3,
             retained: 2,
-            objects: 2,
-            bytes: 300 + 1024
+            objects: 1,
+            bytes: 300
         })
+    );
+    let many =
+        "prune: 9 local objects, 3 retained, done.\nprune: 6 files would be pruned (41 B), done.\n";
+    assert_eq!(
+        parse_prune(many).map(|p| (p.objects, p.bytes)),
+        Some((6, 41))
+    );
+    // Without the second line, what isn't retained goes.
+    assert_eq!(
+        parse_prune("prune: 5 local objects, 2 retained, done.\n").map(|p| p.objects),
+        Some(3)
     );
     assert_eq!(
         parse_prune("prune: 0 local objects, 0 retained, done.\n"),
@@ -77,10 +96,17 @@ fn prune_plans() {
 
 #[test]
 fn folder_and_track_patterns() {
-    assert_eq!(folder_pattern("./art/chars/").as_deref(), Some("art/chars"));
-    assert_eq!(folder_pattern("art\\ü x").as_deref(), Some("art/ü x"));
-    assert_eq!(folder_pattern("/"), None);
-    assert_eq!(folder_pattern("a,b"), None);
+    assert_eq!(
+        folder_pattern("./art/chars/").as_deref(),
+        Some("/art/chars")
+    );
+    assert_eq!(folder_pattern("art\\ü x").as_deref(), Some("/art/ü x"));
+    assert_eq!(folder_pattern("x[1]").as_deref(), Some("/x\\[1\\]"));
+    assert_eq!(pattern_label("/x\\[1\\]"), "x[1]");
+    assert_eq!(pattern_label("legacy"), "legacy");
+    for bad in ["/", "", "a,b", " lead", "trail "] {
+        assert_eq!(folder_pattern(bad), None, "{bad:?}");
+    }
     assert_eq!(split_list(" a, b ,,c"), ["a", "b", "c"]);
     assert_eq!(track_pattern("art/hero.PSD").as_deref(), Some("*.PSD"));
     assert_eq!(track_pattern("Makefile").as_deref(), Some("Makefile"));
@@ -88,8 +114,12 @@ fn folder_and_track_patterns() {
         track_pattern("dir/my file").as_deref(),
         Some("dir/my[[:space:]]file")
     );
-    assert_eq!(track_pattern(".env").as_deref(), Some(".env"));
-    assert_eq!(track_pattern(""), None);
+    assert_eq!(track_pattern("x[1]").as_deref(), Some("x\\[1\\]"));
+    for none in ["", ".env", ".gitattributes", "dir/.lfsconfig"] {
+        assert_eq!(track_pattern(none), None, "{none:?}");
+    }
+    let attrs = "*.psd filter=lfs diff=lfs merge=lfs -text\n# *.x filter=lfs\n*.txt text\n";
+    assert_eq!(lfs_patterns_in(attrs), ["*.psd"]);
 }
 
 /// The checkout's LFS files and whether they were downloaded, the storage's size, a file
@@ -102,40 +132,49 @@ fn storage_through_git_lfs() -> Result<(), String> {
     let files = lfs_files(&clone)?;
     let listed: Vec<(&str, bool)> = files
         .iter()
-        .map(|f| (f.path.as_str(), f.downloaded))
+        .map(|f| (f.path.as_str(), f.only_pointer(false)))
         .collect();
-    assert_eq!(listed, [("art dir/a b.bin", false), ("ü.bin", false)]);
+    assert_eq!(listed, [("art dir/a b.bin", true), ("ü.bin", true)]);
     assert_eq!(lfs_usage(&clone)?.objects, 0);
 
     // One file downloaded on its own.
     git(
         &clone,
-        &["lfs", "pull", "--include", "ü.bin", "--exclude", ""],
+        &["lfs", "pull", "--include", "/ü.bin", "--exclude", ""],
     )?;
     let files = lfs_files(&clone)?;
-    assert!(files.iter().any(|f| f.path == "ü.bin" && f.downloaded));
     assert!(
         files
             .iter()
-            .any(|f| f.path == "art dir/a b.bin" && !f.downloaded)
+            .any(|f| f.path == "ü.bin" && !f.only_pointer(false))
+    );
+    assert!(
+        files
+            .iter()
+            .any(|f| f.path == "art dir/a b.bin" && f.only_pointer(false))
     );
     let usage = lfs_usage(&clone)?;
     assert_eq!((usage.objects, usage.bytes), (1, 700));
 
-    // Where to fetch from: set, read back, taken out.
-    set_fetch_filter(&clone, false, &["art dir".to_owned(), "levels".to_owned()])?;
-    set_fetch_filter(&clone, true, &["art dir/old".to_owned()])?;
-    assert_eq!(
-        fetch_filters(&clone),
-        (
-            vec!["art dir".to_owned(), "levels".to_owned()],
-            vec!["art dir/old".to_owned()]
-        )
-    );
+    // Where to fetch from: set, read back, taken out; .lfsconfig's shown apart.
+    set_fetch_filter(
+        &clone,
+        false,
+        &["/art dir".to_owned(), "/levels".to_owned()],
+    )?;
+    set_fetch_filter(&clone, true, &["/art dir/old".to_owned()])?;
+    std::fs::write(clone.join(".lfsconfig"), "[lfs]\n\tfetchinclude = shared\n")
+        .map_err(|e| e.to_string())?;
+    let filters = fetch_filters(&clone)?;
+    assert_eq!(filters.include, ["/art dir", "/levels"]);
+    assert_eq!(filters.exclude, ["/art dir/old"]);
+    assert_eq!(filters.shared_include, ["shared"]);
+    assert!(filters.shared_exclude.is_empty());
     assert!(set_fetch_filter(&clone, false, &["a,b".to_owned()]).is_err());
     set_fetch_filter(&clone, false, &[])?;
     set_fetch_filter(&clone, false, &[])?;
-    assert!(fetch_filters(&clone).0.is_empty());
+    assert!(fetch_filters(&clone)?.include.is_empty());
+    let _ = std::fs::remove_file(clone.join(".lfsconfig"));
 
     // The source repository has an old version of ü.bin, pushed: prune may let it go.
     let plan = lfs_prune_plan(&work)?;

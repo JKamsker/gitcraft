@@ -16,12 +16,33 @@ pub struct LfsFile {
     pub size: u64,
     /// Its object is in the local LFS storage.
     pub downloaded: bool,
+    /// The file on disk is its object, not the pointer (or it was changed: git-lfs can't say).
+    pub checked_out: bool,
+}
+
+impl LfsFile {
+    /// Only its pointer is on disk: the object was never downloaded, or it was (`git lfs
+    /// fetch`) but never checked out, unless the file has changes (`changed`), which also makes
+    /// git-lfs say "not checked out".
+    pub fn only_pointer(&self, changed: bool) -> bool {
+        !self.downloaded || (!self.checked_out && !changed)
+    }
+}
+
+/// `a\\b` as `a/b` where git-lfs may print Windows paths; elsewhere a backslash is part of a name.
+fn slashes(path: &str) -> String {
+    if cfg!(windows) {
+        path.replace('\\', "/")
+    } else {
+        path.to_owned()
+    }
 }
 
 #[derive(Deserialize)]
 struct RawFiles {
+    /// `null` when nothing is in LFS yet.
     #[serde(default)]
-    files: Vec<RawFile>,
+    files: Option<Vec<RawFile>>,
 }
 
 #[derive(Deserialize)]
@@ -56,12 +77,17 @@ pub(crate) fn parse_files_json(json: &str) -> Result<Vec<LfsFile>, String> {
         .map_err(|e| format!("git-lfs listed its files in a way gitcraft can't read: {e}"))?;
     Ok(raw
         .files
+        .unwrap_or_default()
         .into_iter()
-        .map(|f| LfsFile {
-            path: f.name.replace('\\', "/"),
-            size: f.size,
-            // Checked out implies downloaded; with neither said, it isn't known to be there.
-            downloaded: f.downloaded.or(f.checkout).unwrap_or(false),
+        .map(|f| {
+            let checked_out = f.checkout.unwrap_or(false);
+            LfsFile {
+                path: slashes(&f.name),
+                size: f.size,
+                // Checked out implies downloaded; with neither said, it isn't known to be there.
+                downloaded: f.downloaded.unwrap_or(checked_out),
+                checked_out,
+            }
         })
         .collect())
 }
@@ -77,10 +103,12 @@ pub(crate) fn parse_files_text(text: &str) -> Vec<LfsFile> {
                 Some((path, size)) => (path, size.strip_suffix(')').map(parse_human_size)),
                 None => (rest, None),
             };
+            // `-` can't tell "never downloaded" from "downloaded, not checked out".
             Some(LfsFile {
-                path: path.replace('\\', "/"),
+                path: slashes(path),
                 size: size.flatten().unwrap_or(0),
                 downloaded: mark == "*",
+                checked_out: mark == "*",
             })
         })
         .collect()
@@ -202,9 +230,9 @@ pub struct PrunePlan {
     pub bytes: u64,
 }
 
-/// What pruning would remove, asking nothing to be removed (`--dry-run --verbose`).
+/// What pruning would remove, asking nothing to be removed (`--dry-run`).
 pub fn lfs_prune_plan(repo: &Path) -> Result<PrunePlan, String> {
-    let out = run(Some(repo), &["lfs", "prune", "--dry-run", "--verbose"])?;
+    let out = run(Some(repo), &["lfs", "prune", "--dry-run"])?;
     parse_prune(&out).ok_or_else(|| {
         format!(
             "git lfs prune said something gitcraft can't read: {}",
@@ -213,44 +241,77 @@ pub fn lfs_prune_plan(repo: &Path) -> Result<PrunePlan, String> {
     })
 }
 
-/// `prune: 3 local objects, 2 retained, done.` and one ` * <oid> (<size>)` line per object to
-/// go.
+/// `prune: 3 local objects, 2 retained, done.`, then `prune: 1 file would be pruned (300 B),
+/// done.` when anything would go. (`--verbose` lists the objects only on a terminal.)
 pub(crate) fn parse_prune(out: &str) -> Option<PrunePlan> {
-    let summary = out.lines().find_map(|l| {
-        l.trim()
-            .strip_prefix("prune: ")
-            .filter(|s| s.contains("local object"))
-    })?;
     let mut plan = PrunePlan::default();
-    for part in summary.split(',') {
-        let part = part.trim();
-        let n = part.split_whitespace().next().and_then(|n| n.parse().ok());
-        if part.contains("local object") {
-            plan.local = n?;
-        } else if part.contains("retained") {
-            plan.retained = n.unwrap_or(0);
+    let mut summary = false;
+    for line in out.lines().filter_map(|l| l.trim().strip_prefix("prune: ")) {
+        if line.contains("local object") {
+            summary = true;
+            for part in line.split(',') {
+                let part = part.trim();
+                let n = part.split_whitespace().next().and_then(|n| n.parse().ok());
+                if part.contains("local object") {
+                    plan.local = n?;
+                } else if part.contains("retained") {
+                    plan.retained = n.unwrap_or(0);
+                }
+            }
+        } else if line.contains("would be pruned") {
+            plan.objects = line.split_whitespace().next()?.parse().ok()?;
+            plan.bytes = line
+                .split_once(" (")
+                .and_then(|(_, s)| s.split(')').next())
+                .and_then(parse_human_size)
+                .unwrap_or(0);
         }
     }
-    for line in out.lines().filter_map(|l| l.trim().strip_prefix("* ")) {
-        plan.objects += 1;
-        let size = line
-            .rsplit_once(" (")
-            .and_then(|(_, s)| s.split(')').next())
-            .and_then(parse_human_size);
-        plan.bytes += size.unwrap_or(0);
+    if summary && plan.objects == 0 {
+        plan.objects = plan.local.saturating_sub(plan.retained);
     }
-    Some(plan)
+    summary.then_some(plan)
 }
 
-/// The folders `git lfs fetch` / `pull` limit themselves to, or leave out, as set for the
-/// repository: (`lfs.fetchinclude`, `lfs.fetchexclude`).
-pub fn fetch_filters(repo: &Path) -> (Vec<String>, Vec<String>) {
-    let get = |key: &str| {
-        run(Some(repo), &["config", "--get", key])
-            .map(|v| split_list(&v))
-            .unwrap_or_default()
+/// The folders `git lfs fetch` / `pull` limit themselves to, or leave out.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct FetchFilters {
+    /// As this repository's own config sets them, which gitcraft edits.
+    pub include: Vec<String>,
+    pub exclude: Vec<String>,
+    /// As the repository's committed `.lfsconfig` sets them, which its own config overrides.
+    pub shared_include: Vec<String>,
+    pub shared_exclude: Vec<String>,
+}
+
+/// The fetch filters of the repository (`lfs.fetchinclude`, `lfs.fetchexclude`), its own and
+/// its `.lfsconfig`'s.
+pub fn fetch_filters(repo: &Path) -> Result<FetchFilters, String> {
+    let get = |file: Option<&str>, key: &str| -> Result<Vec<String>, String> {
+        let mut args = vec!["config"];
+        match file {
+            Some(f) => args.extend(["-f", f]),
+            None => args.push("--local"),
+        }
+        args.extend(["--get", key]);
+        // Exit 1: not set (or no such file).
+        super::run_ok_codes(Some(repo), &args, &[0, 1]).map(|v| split_list(&v))
     };
-    (get("lfs.fetchinclude"), get("lfs.fetchexclude"))
+    let lfsconfig = crate::remote::git_path(&crate::remote::join(repo, ".lfsconfig"));
+    let shared = crate::remote::is_file(&crate::remote::join(repo, ".lfsconfig"));
+    let shared_get = |key| {
+        if shared {
+            get(Some(&lfsconfig), key)
+        } else {
+            Ok(Vec::new())
+        }
+    };
+    Ok(FetchFilters {
+        include: get(None, "lfs.fetchinclude")?,
+        exclude: get(None, "lfs.fetchexclude")?,
+        shared_include: shared_get("lfs.fetchinclude")?,
+        shared_exclude: shared_get("lfs.fetchexclude")?,
+    })
 }
 
 /// `a,b, c` as its items.
@@ -263,12 +324,45 @@ pub(crate) fn split_list(value: &str) -> Vec<String> {
         .collect()
 }
 
-/// A folder of the repository as a fetch filter pattern: `art/chars` (no `./`, no trailing
-/// `/`, `/` between folders); `None` for the root or one with a `,` (which would split it).
+/// A folder of the repository as a fetch filter pattern, from the root: `/art/chars` (no
+/// `./`, no trailing `/`, glob characters escaped, so a nested `x/art/chars` isn't matched);
+/// `None` for the root, or with a `,` (which would split it) or spaces at its ends (which
+/// git-lfs trims).
 pub fn folder_pattern(folder: &str) -> Option<String> {
     let p = folder.replace('\\', "/");
-    let p = p.trim().trim_start_matches("./").trim_matches('/');
-    (!p.is_empty() && !p.contains(',')).then(|| p.to_owned())
+    let p = p.trim_start_matches("./").trim_matches('/');
+    if p.is_empty() || p.trim().is_empty() || p.contains(',') || p.trim() != p {
+        return None;
+    }
+    Some(format!("/{}", escape_glob(p)))
+}
+
+/// A path as a pattern matching it alone: `[ ] * ? \\` escaped.
+pub fn escape_glob(path: &str) -> String {
+    let mut out = String::with_capacity(path.len());
+    for c in path.chars() {
+        if matches!(c, '*' | '?' | '[' | ']' | '\\') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// A fetch filter pattern as people read it: `/art/x\\[1\\]` as `art/x[1]`.
+pub fn pattern_label(pattern: &str) -> String {
+    let p = pattern.strip_prefix('/').unwrap_or(pattern);
+    let mut out = String::new();
+    let mut escaped = false;
+    for c in p.chars() {
+        if c == '\\' && !escaped {
+            escaped = true;
+            continue;
+        }
+        escaped = false;
+        out.push(c);
+    }
+    out
 }
 
 /// Sets the repository's own `lfs.fetchinclude` / `lfs.fetchexclude` (`exclude`) to `list`,
@@ -297,18 +391,40 @@ pub fn set_fetch_filter(repo: &Path, exclude: bool, list: &[String]) -> Result<(
 }
 
 /// The pattern for files like `path` in `.gitattributes`: `*.psd` for its extension, or the
-/// file itself (with `[ ]` for spaces, which separate attributes) when it has none.
+/// file itself (glob characters escaped, `[[:space:]]` for spaces, which separate attributes)
+/// when it has none. None for dotfiles (`.gitattributes` itself in LFS would break LFS).
 pub fn track_pattern(path: &str) -> Option<String> {
     let name = path.rsplit('/').next().unwrap_or(path);
+    if name.is_empty() || name.starts_with('.') {
+        return None;
+    }
     match name.rsplit_once('.') {
         Some((stem, ext))
             if !stem.is_empty() && !ext.is_empty() && ext.chars().all(|c| c.is_alphanumeric()) =>
         {
             Some(format!("*.{ext}"))
         }
-        _ if name.is_empty() => None,
-        _ => Some(path.replace(' ', "[[:space:]]")),
+        _ => Some(escape_glob(path).replace(' ', "[[:space:]]")),
     }
+}
+
+/// The patterns the root `.gitattributes` sends through LFS (`filter=lfs`).
+pub fn lfs_patterns(repo: &Path) -> Vec<String> {
+    crate::remote::read_to_string(&crate::remote::join(repo, ".gitattributes"))
+        .map(|text| lfs_patterns_in(&text))
+        .unwrap_or_default()
+}
+
+pub(crate) fn lfs_patterns_in(text: &str) -> Vec<String> {
+    text.lines()
+        .map(str::trim)
+        .filter(|l| !l.starts_with('#'))
+        .filter_map(|l| {
+            let mut words = l.split_whitespace();
+            let pattern = words.next()?;
+            words.any(|a| a == "filter=lfs").then(|| pattern.to_owned())
+        })
+        .collect()
 }
 
 #[cfg(test)]
