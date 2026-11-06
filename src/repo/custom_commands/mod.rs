@@ -270,7 +270,11 @@ impl RepoTab {
             }
             CustomAct::Trust(text) => {
                 let mut settings = Settings::get(ctx);
-                cc::trust(&mut settings.trusted_command_files, &self.trust_key(), &text);
+                cc::trust(
+                    &mut settings.trusted_command_files,
+                    &self.trust_key(),
+                    &text,
+                );
                 settings.set(ctx);
             }
             CustomAct::FileRead(read) => self.custom_file_read(read, ctx),
@@ -350,7 +354,10 @@ fn read_here(path: &std::path::Path, max: u64) -> std::io::Result<Option<Vec<u8>
         return Err(Error::other("it isn't a file"));
     }
     if meta.len() > max {
-        return Err(Error::other(format!("it is larger than {} KiB", max / 1024)));
+        return Err(Error::other(format!(
+            "it is larger than {} KiB",
+            max / 1024
+        )));
     }
     std::fs::read(path).map(Some)
 }

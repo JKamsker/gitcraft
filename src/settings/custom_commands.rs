@@ -64,12 +64,10 @@ fn commands(card: &mut Card, list: &mut Vec<CustomCommand>) {
     let mut up = None;
     for (i, command) in list.iter_mut().enumerate() {
         let found_by = format!("{} {} command", command.name, command.command);
-        card.full(&found_by, |ui| {
-            match command_ui(ui, i, command) {
-                Edit::Remove => remove = Some(i),
-                Edit::Up => up = Some(i),
-                Edit::None => {}
-            }
+        card.full(&found_by, |ui| match command_ui(ui, i, command) {
+            Edit::Remove => remove = Some(i),
+            Edit::Up => up = Some(i),
+            Edit::None => {}
         });
     }
     if let Some(i) = remove {
