@@ -145,7 +145,10 @@ fn moving_to_working_changes_keeps_other_changes_to_the_file() {
     sh(&dir, "echo more >> 'f i.txt'");
     tab.run_split(&ctx);
     let status = finished(&mut tab, &ctx);
-    let text = std::fs::read_to_string(dir.join("f i.txt")).unwrap_or_default();
+    // Checked out with CRLF where git's config says so (Windows).
+    let text = std::fs::read_to_string(dir.join("f i.txt"))
+        .unwrap_or_default()
+        .replace("\r\n", "\n");
     let staged = git_out(&dir, &["diff", "--cached"]);
     let _ = std::fs::remove_dir_all(&dir);
     assert!(status.as_ref().is_some_and(|s| !s.1), "{status:?}");
