@@ -314,7 +314,13 @@ fn a_conflict_in_another_worktree_stops_there_resumes_and_aborts() -> Result<(),
             let Outcome::Stopped { worktree, .. } = outcome else {
                 return Err(format!("no stop: {outcome:?}"));
             };
-            assert_eq!(worktree.as_deref(), Some(wt.as_path()));
+            // The same folder, however git spells it (on Windows: `/` and the long names).
+            let same = |a: &std::path::Path| std::fs::canonicalize(a).ok();
+            let stopped_in = worktree.as_deref().and_then(same);
+            assert!(
+                stopped_in.is_some() && stopped_in == same(&wt),
+                "{worktree:?}"
+            );
             // Here nothing moved, nor is anything checked out differently.
             assert_eq!(
                 repo.git(&["symbolic-ref", "--short", "HEAD"])?.trim(),
