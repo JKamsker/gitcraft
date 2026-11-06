@@ -73,8 +73,11 @@ fn a_picture_changed_in_a_commit() -> Result<(), String> {
     };
     let data = load(&dir, &key, DiffOptions::default(), true)?;
     let cmp = data.compare.ok_or("not compared")?;
+    let ctx = egui::Context::default();
+    let history = history_of(&cmp, &ctx);
+    draw(&cmp, &ctx)?;
     // A thumbnail of the oldest, under its old name.
-    let oldest = cmp.history.last().ok_or("no history")?;
+    let oldest = history.last().ok_or("no history")?;
     let thumb = super::filmstrip::read(&cmp.repo, &oldest.hash, &oldest.path);
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(thumb.map(|t| t.size), Some([4, 4]));
@@ -83,14 +86,13 @@ fn a_picture_changed_in_a_commit() -> Result<(), String> {
         (dims(&cmp.old), dims(&cmp.new)),
         (Some((4, 4)), Some((4, 2)))
     );
-    let diff = cmp.diff.as_ref().ok_or("no difference")?;
+    let diff = difference_of(&cmp, &ctx).ok_or("no difference")?;
     // Every pixel: the top half changed its alpha, the bottom half is only in the old one.
     assert_eq!((diff.changed, diff.total), (16, 16));
-    let text = changes(&cmp);
+    let text = changes(&cmp, Some(&diff));
     assert!(text.starts_with("4 × 4 → 4 × 2 · "), "{text}");
     assert!(text.ends_with("100.0% of pixels changed"), "{text}");
-    let history: Vec<(&str, &str)> = cmp
-        .history
+    let history: Vec<(&str, &str)> = history
         .iter()
         .map(|v| (v.summary.as_str(), v.path.as_str()))
         .collect();
@@ -120,8 +122,10 @@ fn new_unchanged_and_broken_pictures() -> Result<(), String> {
     });
     let data = load(&dir, &key, DiffOptions::default(), true)?;
     let cmp = data.compare.ok_or("new picture not compared")?;
-    assert!(cmp.old.is_none() && cmp.diff.is_none());
-    assert_eq!(changes(&cmp).split(" · ").next(), Some("2 × 3"));
+    let ctx = egui::Context::default();
+    assert!(cmp.old.is_none() && difference_of(&cmp, &ctx).is_none());
+    assert_eq!(changes(&cmp, None).split(" · ").next(), Some("2 × 3"));
+    draw(&cmp, &ctx)?;
 
     commit(&dir, "same.png", &png(2, 2, [1, 2, 3, 255]), "one")?;
     // The same pixels written again (another file, as an editor might save it).
@@ -135,11 +139,12 @@ fn new_unchanged_and_broken_pictures() -> Result<(), String> {
     let cmp = load(&dir, &key, DiffOptions::default(), true)?
         .compare
         .ok_or("not compared")?;
-    assert!(changes(&cmp).contains("same dimensions"));
+    let diff = difference_of(&cmp, &ctx);
+    assert!(changes(&cmp, diff.as_deref()).contains("same dimensions"));
     assert!(
-        changes(&cmp).ends_with("no pixel changed"),
+        changes(&cmp, diff.as_deref()).ends_with("no pixel changed"),
         "{}",
-        changes(&cmp)
+        changes(&cmp, diff.as_deref())
     );
 
     let hash = commit(&dir, "broken.png", b"not a png at all", "broken")?;
@@ -152,4 +157,63 @@ fn new_unchanged_and_broken_pictures() -> Result<(), String> {
     assert!(data.compare.is_none());
     assert!(data.image.is_some());
     Ok(())
+}
+
+fn history_of(cmp: &super::Compare, ctx: &egui::Context) -> std::sync::Arc<Vec<super::Version>> {
+    for _ in 0..400 {
+        if let Some(h) = cmp.versions(ctx) {
+            return h;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    std::sync::Arc::new(Vec::new())
+}
+
+fn difference_of(
+    cmp: &super::Compare,
+    ctx: &egui::Context,
+) -> Option<std::sync::Arc<super::decode::Difference>> {
+    for _ in 0..400 {
+        if let Some(d) = cmp.difference(ctx) {
+            return Some(d);
+        }
+        if cmp.old.is_none() || cmp.new.is_none() {
+            return None;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    None
+}
+
+/// Draws the comparison in every mode in a headless frame, twice (textures made, then kept):
+/// nothing may panic or lock up.
+fn draw(cmp: &super::Compare, ctx: &egui::Context) -> Result<(), String> {
+    use super::view_state::{Mode, ViewState};
+    crate::theme::install_fonts(ctx);
+    let key = egui::Id::new(("image-compare", &cmp.repo, &cmp.path));
+    let mut acts = Vec::new();
+    for mode in Mode::ALL {
+        for _ in 0..2 {
+            ctx.data_mut(|d| {
+                d.insert_temp(
+                    key,
+                    ViewState {
+                        mode,
+                        zoom: Some(3.0),
+                        ..ViewState::default()
+                    },
+                )
+            });
+            let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
+                egui::CentralPanel::default()
+                    .show(ui, |ui| super::compare_view(ui, cmp, &mut acts));
+            });
+            out.textures_delta.clear();
+        }
+    }
+    if acts.is_empty() {
+        Ok(())
+    } else {
+        Err("drawing asked for something".to_owned())
+    }
 }
