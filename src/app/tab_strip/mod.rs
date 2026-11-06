@@ -13,7 +13,6 @@ use crate::icons;
 use crate::repo::worktree_tab::{self, Chip};
 use crate::tab_look::TabLook;
 use crate::theme::{self, ThemeKind, Tokens};
-use crate::update;
 
 const TAB_H: f32 = 40.0;
 /// Space between tabs.
@@ -230,7 +229,7 @@ impl App {
             .collect()
     }
 
-    /// Settings, command palette, theme menu and manual, the update pill first in the row.
+    /// Settings, command palette, theme menu and manual.
     fn bar_buttons(&mut self, ui: &mut Ui, t: &Tokens) {
         ui.add_space(4.0);
         ui.spacing_mut().item_spacing.x = 6.0;
@@ -258,54 +257,6 @@ impl App {
         if icons::bar_button(ui, "book-open", "Manual and keyboard shortcuts (F1)").clicked() {
             self.manual_open = true;
         }
-        // A newer release: first in the row, before the icons.
-        if let Some(release) = self.update.clone() {
-            ui.add_space(4.0);
-            self.update_pill(ui, t, &release);
-        }
-    }
-
-    /// "vX available", with a menu to open the release page or skip that version.
-    fn update_pill(&mut self, ui: &mut Ui, t: &Tokens, release: &update::Release) {
-        let pill = ui.add(
-            egui::Button::new(
-                RichText::new(format!("v{} available", release.version))
-                    .color(t.accent_text)
-                    .font(theme::medium(11.5)),
-            )
-            .fill(t.accent)
-            .corner_radius(10.0),
-        );
-        egui::Popup::menu(&pill)
-            .style(theme::menu_style)
-            .show(|ui| {
-                // Menus have no side margin (their buttons pad themselves); the
-                // text gets the buttons' own.
-                egui::Frame::new()
-                    .inner_margin(egui::Margin {
-                        left: 16,
-                        right: 16,
-                        top: 4,
-                        bottom: 8,
-                    })
-                    .show(ui, |ui| {
-                        ui.label(
-                            RichText::new(format!(
-                                "gitcraft {} is out (you have {}).",
-                                release.version,
-                                update::CURRENT
-                            ))
-                            .color(t.text_dim),
-                        );
-                    });
-                if ui.button("Open the release page").clicked() {
-                    let _ = open::that_detached(&release.url);
-                }
-                if ui.button("Skip this version").clicked() {
-                    self.skipped_version = release.version.clone();
-                    self.update = None;
-                }
-            });
     }
 
     fn apply_strip_actions(&mut self, actions: StripActions, ctx: &egui::Context) {

@@ -47,6 +47,10 @@ Source: "{#Root}\ATTRIBUTION.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Root}\LICENSE-MIT"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Root}\LICENSE-APACHE"; DestDir: "{app}"; Flags: ignoreversion
 
+[UninstallDelete]
+; The version an update replaced, if it couldn't be removed yet.
+Type: files; Name: "{app}\gitcraft.exe.old"
+
 [Icons]
 Name: "{autoprograms}\gitcraft"; Filename: "{app}\gitcraft.exe"
 Name: "{autodesktop}\gitcraft"; Filename: "{app}\gitcraft.exe"; Tasks: desktopicon

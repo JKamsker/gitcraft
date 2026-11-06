@@ -8,6 +8,7 @@ mod tab_strip;
 mod tabs;
 #[cfg(test)]
 mod tests;
+mod update_banner;
 mod worktrees;
 
 use std::collections::BTreeMap;
@@ -46,8 +47,6 @@ struct Saved {
     theme: ThemeKind,
     clone_parent: Option<PathBuf>,
     settings: Settings,
-    /// Unix time of the last update check.
-    update_checked: i64,
     /// A release the user chose to skip.
     skipped_version: String,
     /// Repository tabs given their own icon or colour.
@@ -84,9 +83,15 @@ pub struct App {
     /// The form of the running clone, back on screen if it needs credentials.
     cloning_form: Option<CloneForm>,
     /// A newer release than this build.
-    update: Option<update::Release>,
-    update_rx: Option<Receiver<Result<update::Release, String>>>,
-    update_checked: i64,
+    update: Option<update::Found>,
+    update_rx: Option<Receiver<Result<Option<update::Found>, String>>>,
+    /// The settings the last look for a newer release went by (whether to look, the channel,
+    /// whether to download): changing them looks again.
+    update_looked: Option<(bool, update::Channel, bool)>,
+    /// The update banner was put off until the next start.
+    update_later: bool,
+    /// Why the update didn't go in place.
+    update_error: Option<String>,
     skipped_version: String,
     tab_looks: BTreeMap<PathBuf, TabLook>,
     settings: Settings,
@@ -137,19 +142,13 @@ impl App {
             cloning_form: None,
             update: None,
             update_rx: None,
-            update_checked: saved.update_checked,
+            update_looked: None,
+            update_later: false,
+            update_error: None,
             skipped_version: saved.skipped_version,
             tab_looks: saved.tab_looks,
         };
-        if saved.settings.check_updates && git::now() - saved.update_checked > update::INTERVAL {
-            let (tx, rx) = channel();
-            let ctx2 = ctx.clone();
-            std::thread::spawn(move || {
-                let _ = tx.send(update::latest());
-                ctx2.request_repaint();
-            });
-            app.update_rx = Some(rx);
-        }
+        update::clean_up();
         let mut kept = Vec::new();
         if app.git_version.is_ok() {
             for path in saved.open {
@@ -226,19 +225,32 @@ impl App {
         theme::apply(ctx, kind);
     }
 
-    fn poll_update(&mut self) {
+    /// Looks for a newer release once on start, and again when the update settings change;
+    /// takes in what was found.
+    fn poll_update(&mut self, ctx: &egui::Context) {
+        let s = &self.settings;
+        let want = (s.check_updates, s.update_channel, s.download_updates);
+        if self.update_looked != Some(want) {
+            self.update_looked = Some(want);
+            self.update = None;
+            self.update_rx = None;
+            let (check, releases, download) = want;
+            if check {
+                let (tx, rx) = channel();
+                let ctx = ctx.clone();
+                let skipped = self.skipped_version.clone();
+                std::thread::spawn(move || {
+                    let _ = tx.send(update::look(releases, download, &skipped));
+                    ctx.request_repaint();
+                });
+                self.update_rx = Some(rx);
+            }
+        }
         let Some(rx) = &self.update_rx else { return };
         let Ok(result) = rx.try_recv() else { return };
         self.update_rx = None;
-        // A failed check (offline…) is tried again next start.
-        if let Ok(release) = result {
-            self.update_checked = git::now();
-            if update::newer(&release.version, update::CURRENT)
-                && release.version != self.skipped_version
-            {
-                self.update = Some(release);
-            }
-        }
+        // A failed look (offline…) is tried again next start.
+        self.update = result.ok().flatten();
     }
 
     /// Keyboard shortcuts, and the reload on coming back to the window. Returns whether the
@@ -349,7 +361,7 @@ impl eframe::App for App {
             return;
         }
         self.poll_clone(&ctx);
-        self.poll_update();
+        self.poll_update(&ctx);
         let focused = self.shortcuts(&ctx);
 
         // Background repos still need their results drained. Those restored on start are read
@@ -385,6 +397,7 @@ impl eframe::App for App {
                     }),
             )
             .show(ui, |ui| self.tab_strip(ui));
+        self.update_banner(ui);
         if let Some(path) = self.switch_to.take() {
             self.open_worktree(&path, &ctx);
         }
@@ -424,7 +437,6 @@ impl eframe::App for App {
             theme: self.theme,
             clone_parent: self.clone_parent.clone(),
             settings: self.settings.clone(),
-            update_checked: self.update_checked,
             skipped_version: self.skipped_version.clone(),
             tab_looks: self.tab_looks.clone(),
         };
@@ -461,6 +473,11 @@ pub fn warm_up() {
     std::thread::spawn(|| {
         let _ = crate::shell_path::path();
     });
+}
+
+/// Once the window closed: starts the version an update put in place, if it did.
+pub fn after_exit() {
+    update::relaunch();
 }
 
 /// The window and taskbar icon (the `.exe` gets the same picture from `build.rs`).

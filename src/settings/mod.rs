@@ -67,8 +67,12 @@ pub struct Settings {
     pub editor: String,
     /// Desktop notifications when a long operation ends while the window is in the background.
     pub notifications: bool,
-    /// Ask GitHub every 12 hours whether a newer release exists.
+    /// Ask GitHub on every start whether a newer release exists.
     pub check_updates: bool,
+    /// Which releases: the main ones, or also a build of every change to dev.
+    pub update_channel: crate::update::Channel,
+    /// Download a newer release in the background, ready to go in place with a restart.
+    pub download_updates: bool,
     /// Colour code in diffs and blame with VS Code's current theme, when it has one.
     pub vscode_colors: bool,
     /// Offer Mergiraf in the conflict editor, when it is installed.
@@ -109,6 +113,8 @@ impl Default for Settings {
             editor: "code".to_owned(),
             notifications: true,
             check_updates: true,
+            update_channel: Default::default(),
+            download_updates: true,
             vscode_colors: true,
             mergiraf: true,
             keep_submodules: false,
@@ -310,7 +316,26 @@ impl Settings {
                 ui.end_row();
             }
             ui.label("Updates");
-            ui.checkbox(&mut self.check_updates, "Check GitHub for a new version every 12 hours");
+            ui.checkbox(&mut self.check_updates, "Look for a new version on GitHub on every start");
+            ui.end_row();
+            ui.label("");
+            ui.add_enabled_ui(self.check_updates, |ui| {
+                ui.checkbox(
+                    &mut self.download_updates,
+                    "Download it in the background, ready to install with a restart",
+                );
+            });
+            ui.end_row();
+            ui.label("Update channel");
+            ui.add_enabled_ui(self.check_updates, |ui| {
+                egui::ComboBox::from_id_salt("settings-update-channel")
+                    .selected_text(self.update_channel.label())
+                    .show_ui(ui, |ui| {
+                        for channel in crate::update::Channel::ALL {
+                            ui.selectable_value(&mut self.update_channel, channel, channel.label());
+                        }
+                    });
+            });
             ui.end_row();
         });
 

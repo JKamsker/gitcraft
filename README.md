@@ -155,8 +155,11 @@ so your config, credentials and hooks apply as usual.
   `gpg.format`, `user.signingkey`, `gpg.program` (`gpg.ssh.program`, `gpg.x509.program`),
   `commit.gpgSign` and `tag.gpgSign`, shown as they are set and written back there; git does
   the signing as usual.
-- Checks GitHub every 12 hours for a newer release and shows a pill to download it (can be turned
-  off).
+- Looks on GitHub for a newer release on every start, of the main channel (releases) or the dev
+  channel (a prerelease of every change to `dev`). It downloads it in the background and parks it
+  on disk; "Update now" in the banner then swaps it in place of the running version and restarts.
+  A copy gitcraft can't replace (a .deb or .rpm, an all-users install) offers the release page
+  instead. Looking and downloading can each be turned off.
 - Toasts, and a desktop notification when a long operation ends while the window is in the
   background.
 - Themes: Dark, Medium Gray and Light, from PhotoCraft's Pro palettes.

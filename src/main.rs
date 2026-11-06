@@ -26,12 +26,14 @@ fn main() -> eframe::Result {
         })),
         ..Default::default()
     };
-    eframe::run_native(
+    let result = eframe::run_native(
         "gitcraft",
         options,
         Box::new(|cc| {
             let open_arg = std::env::args_os().nth(1).map(std::path::PathBuf::from);
             Ok(Box::new(app::App::new(cc, open_arg)))
         }),
-    )
+    );
+    app::after_exit();
+    result
 }
