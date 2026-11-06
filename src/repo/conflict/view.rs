@@ -20,6 +20,7 @@ impl RepoTab {
         let editable = !ed.saving;
 
         ed.header(ui, &t, idle && editable, left, acts);
+        ed.history_strip(ui, &t, (&ours_name, &theirs_name), acts);
         ed.result_panel(ui, &t, editable);
         ed.conflict_list(ui, &t, (&ours_name, &theirs_name), editable);
     }

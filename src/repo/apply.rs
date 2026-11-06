@@ -249,6 +249,7 @@ impl RepoTab {
             }
             Action::SolveWithMergiraf => self.solve_with_mergiraf(ctx),
             Action::SaveConflict => self.save_conflict(ctx),
+            Action::Archaeology(act) => self.archaeology_act(act, ctx),
         }
     }
 
