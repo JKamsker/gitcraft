@@ -45,8 +45,8 @@ pub(crate) enum Shape {
     Behind,
     /// Both have commits the other doesn't.
     Diverged,
-    /// Diverged, and the branch here once was where the remote is now: it was rewritten
-    /// (amended, rebased, reset) after that was pushed.
+    /// The branch here once was where the remote is now, and was rewritten (amended,
+    /// rebased) or moved back (undone, reset) since: everything the remote has was here.
     Rewritten,
 }
 
@@ -82,6 +82,9 @@ pub(crate) enum Checked {
     Gone {
         branch: String,
         target: Target,
+        /// A first push: pushing again publishes and tracks it (`-u`); otherwise the upstream
+        /// is left as it is.
+        publish: bool,
     },
 }
 
@@ -109,21 +112,25 @@ pub(super) fn check(
     };
     let local = git::resolve(path, &format!("refs/heads/{}", q.branch))?;
     let dst = format!("refs/heads/{}", target.branch);
-    // What the remote has right now: the lease expects exactly this, and it is what is counted.
-    let listed = git::run_with(
+    // Where the push goes (`pushurl`, `pushInsteadOf`), not where fetches come from: that
+    // repository is what the push was refused by.
+    let url = git::run(
         Some(path),
-        &["ls-remote", "--", &target.remote, &dst],
-        creds,
+        &["remote", "get-url", "--push", "--", &target.remote],
     )?;
+    let url = url.trim();
+    // What the remote has right now: the lease expects exactly this, and it is what is counted.
+    let listed = git::run_with(Some(path), &["ls-remote", "--", url, &dst], creds)?;
     let Some(remote) = remote_commit(&listed, &dst) else {
         return Ok(Checked::Gone {
             branch: q.branch.clone(),
             target,
+            publish: q.publish,
         });
     };
     git::run_with(
         Some(path),
-        &["fetch", "--quiet", "--no-tags", "--", &target.remote, &dst],
+        &["fetch", "--quiet", "--no-tags", "--", url, &dst],
         creds,
     )?;
     if git::resolve(path, &remote).is_err() {
@@ -133,7 +140,7 @@ pub(super) fn check(
         ));
     }
     let (ahead, behind) = apart(path, &local, &remote)?;
-    let rewritten = ahead > 0 && behind > 0 && was_here(path, &q.branch, &remote);
+    let rewritten = behind > 0 && was_here(path, &q.branch, &remote);
     let missing = if behind > 0 {
         remote_only(path, &local, &remote)?
     } else {
@@ -285,8 +292,8 @@ pub(super) fn any_in(a: &str, b: &str) -> bool {
 pub(super) fn shape(ahead: u32, behind: u32, rewritten: bool) -> Shape {
     match (ahead, behind) {
         (_, 0) => Shape::Clear,
-        (0, _) => Shape::Behind,
         _ if rewritten => Shape::Rewritten,
+        (0, _) => Shape::Behind,
         _ => Shape::Diverged,
     }
 }
@@ -327,8 +334,8 @@ mod tests {
         assert_eq!(shape(2, 0, false), Shape::Clear);
         assert_eq!(shape(0, 0, false), Shape::Clear);
         assert_eq!(shape(0, 3, false), Shape::Behind);
-        // Only behind can't have been rewritten into anything.
-        assert_eq!(shape(0, 3, true), Shape::Behind);
+        // Moved back (an undone commit): what the remote has was here.
+        assert_eq!(shape(0, 3, true), Shape::Rewritten);
         assert_eq!(shape(2, 3, false), Shape::Diverged);
         assert_eq!(shape(2, 3, true), Shape::Rewritten);
     }
