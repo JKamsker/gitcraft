@@ -184,6 +184,16 @@ so your config, credentials and hooks apply as usual.
   before you check the result. Settings → Git installs it in one click and can have git merge
   with it everywhere ([docs/mergiraf.md](docs/mergiraf.md)). gitcraft only runs the `mergiraf`
   program: it neither bundles nor links Mergiraf (GPL-3.0), so gitcraft's licence is unchanged.
+- Conflict warnings before you act: in the menus of branches, pills and commits, _Merge_,
+  _Rebase_ and _Cherry-pick_ say _conflicts in 3 files_, _applies cleanly_ or _may conflict_
+  before they are clicked. Hover one to see which files would conflict (for a rebase, at which
+  of its commits) and whether Mergiraf could likely solve each one. A badge beside the branch in
+  the toolbar says when merging its upstream (or the default branch, without one) would
+  conflict. It is worked out with `git merge-tree --write-tree` in the background, a rebase or
+  cherry-pick commit by commit, and never touches the working tree, the index or a ref, so it
+  works in WSL and over SSH too; results are kept by the commits involved. Merges need git
+  2.38, rebases and cherry-picks 2.40; with an older git the entries say so on hover instead.
+  Uncommitted changes are not part of the check.
 - A merge, rebase, cherry-pick, revert or patch stopped on conflicts shows a banner with
   _Abort_; the commit box finishes it (_Continue rebase_ during a rebase, _Continue patch_ while
   `git am` applies one).
@@ -372,6 +382,7 @@ was made this way, on a demo repository.
 | File                     | Job                                                                                |
 | ------------------------ | ---------------------------------------------------------------------------------- |
 | `src/git.rs`             | `git` CLI wrapper and output parsing (refs, log, status, stashes, remotes, search) |
+| `src/git/simulate` | a merge, rebase or cherry-pick worked out with `git merge-tree`, without doing it |
 | `src/graph.rs`           | lane layout for the commit graph                                                   |
 | `src/forge/mod.rs`       | the forges behind one `Provider` trait: which one hosts a remote, list, create, avatars, the page of one |
 | `src/forge/github/`      | GitHub through `gh`: list, `gh pr view`, GraphQL threads, comments, reviews, merges |
@@ -408,6 +419,7 @@ was made this way, on a demo repository.
 | `src/repo/highlight.rs`  | syntax colours (syntect)                                                           |
 | `src/vscode_theme.rs`    | VS Code's current colour theme as a syntect theme                                  |
 | `src/repo/conflict.rs`   | three-pane conflict editor                                                         |
+| `src/repo/conflict_check.rs` | conflict warnings in the menus and the toolbar, checked in the background and kept |
 | `src/mergiraf.rs` | Mergiraf, run as the user's own command when it is installed |
 | `src/repo/rebase.rs`     | interactive rebase editor and its todo list                                        |
 | `src/repo/file_view.rs`  | a file's history, blame and contents at a commit                                   |

@@ -6,6 +6,7 @@ use super::badge::{BadgeKind, badges};
 use super::compare_items;
 use crate::git;
 use crate::repo::actions::{BranchRef, interactive_rebase_action};
+use crate::repo::conflict_check::Op;
 use crate::repo::operations::{expect_ref_at, expect_symref};
 use crate::repo::{
     Action, Dialog, Refresh, RepoTab, Undo, WIP_HASH, fast_forward_action, merge_action, ops,
@@ -81,6 +82,8 @@ impl RepoTab {
         self.quick_edit_items(ui, &hash, idle, acts);
         ui.separator();
         let rewrite = Rewrite {
+            tab: self,
+            merge: commit.parents.len() > 1,
             hash: &hash,
             short: &short,
             summary: &summary,
@@ -156,20 +159,16 @@ impl RepoTab {
         {
             acts.push(fast_forward_action(git_ref, current));
         }
-        if ui
-            .add_enabled(
-                idle,
-                egui::Button::new(format!("Merge {branch} into {current}")),
-            )
+        let merge = format!("Merge {branch} into {current}");
+        if self
+            .conflict_button(ui, merge, idle, Op::Merge, hash)
             .clicked()
         {
             acts.push(merge_action(git_ref, current));
         }
-        if ui
-            .add_enabled(
-                idle,
-                egui::Button::new(format!("Rebase {current} onto {branch}")),
-            )
+        let rebase = format!("Rebase {current} onto {branch}");
+        if self
+            .conflict_button(ui, rebase, idle, Op::Rebase, hash)
             .clicked()
         {
             acts.push(rebase_action(git_ref, current));
@@ -288,6 +287,10 @@ impl RepoTab {
 
 /// The commit a menu rewrites the checked-out branch from.
 struct Rewrite<'a> {
+    /// The tab, which marks the cherry-pick with whether it would conflict.
+    tab: &'a RepoTab,
+    /// The commit is a merge (cherry-picking it needs a parent, and isn't checked).
+    merge: bool,
     hash: &'a str,
     short: &'a str,
     summary: &'a str,
@@ -319,13 +322,14 @@ fn rewrite_items(ui: &mut Ui, r: &Rewrite<'_>, idle: bool, is_head: bool, acts: 
             label: short.to_owned(),
         });
     }
-    if ui
-        .add_enabled(
-            idle && !is_head,
-            egui::Button::new("Cherry-pick onto current branch"),
-        )
-        .clicked()
-    {
+    let cherry_pick = "Cherry-pick onto current branch".to_owned();
+    let picked = if r.merge {
+        ui.add_enabled(idle && !is_head, egui::Button::new(cherry_pick))
+    } else {
+        r.tab
+            .conflict_button(ui, cherry_pick, idle && !is_head, Op::CherryPick, hash)
+    };
+    if picked.clicked() {
         acts.push(Action::UndoableOps {
             label: format!("Cherry-pick {short}"),
             ops: ops(&[&["cherry-pick", hash]]),
@@ -359,6 +363,7 @@ fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<Action>) {
         summary,
         target,
         head,
+        ..
     } = *r;
     for (mode, undo_mode, label, explain) in [
         ("--soft", "--soft", "Soft", "Keeps every change, staged."),

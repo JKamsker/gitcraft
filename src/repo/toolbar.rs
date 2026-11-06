@@ -31,6 +31,7 @@ impl RepoTab {
             }
             widgets::toolbar_separator(ui);
             self.head_label(ui, idle, acts);
+            self.target_conflict_badge(ui);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 self.op_status(ui);
             });

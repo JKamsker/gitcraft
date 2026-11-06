@@ -8,6 +8,7 @@ use crate::icons;
 use crate::repo::actions::BranchRef;
 use crate::repo::branch_tree::{self, LeafRow, TreeView};
 use crate::repo::branch_visibility::remote_ref;
+use crate::repo::conflict_check::Op;
 use crate::repo::graph_view;
 use crate::repo::pinned_sections::{Button, Header, Sections};
 use crate::repo::{
@@ -152,14 +153,16 @@ impl RepoTab {
             {
                 acts.push(fast_forward_action(BranchRef::remote(&b.name), current));
             }
-            if ui
-                .add_enabled(idle, egui::Button::new(format!("Merge into {current}")))
+            let merge = format!("Merge into {current}");
+            if self
+                .conflict_button(ui, merge, idle, Op::Merge, &b.target)
                 .clicked()
             {
                 acts.push(merge_action(BranchRef::remote(&b.name), current));
             }
-            if ui
-                .add_enabled(idle, egui::Button::new(format!("Rebase {current} onto it")))
+            let rebase = format!("Rebase {current} onto it");
+            if self
+                .conflict_button(ui, rebase, idle, Op::Rebase, &b.target)
                 .clicked()
             {
                 acts.push(rebase_action(BranchRef::remote(&b.name), current));
