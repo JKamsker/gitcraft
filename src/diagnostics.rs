@@ -1,8 +1,9 @@
 //! Help → Copy diagnostics: what a bug report needs to know about this install, as Markdown.
 //! gitcraft's version and channel, the system, the graphics adapter, the versions of git, `gh`,
 //! `glab` and `tea` and whether each is signed in, and the git settings of the doctor's
-//! allowlist with where they come from. Never a token, an account, a name or an email, and the
-//! home folder is written `~`.
+//! allowlist with the scope and file name they come from. Never a token, an account, a name
+//! or an email; a setting whose value is a path says only that it is set, and any folder of a
+//! user's (`/home/x`, `C:\Users\x`, `/mnt/c/Users/x`…) is written `~`.
 
 use std::path::{Path, PathBuf};
 
@@ -25,10 +26,14 @@ const PERSONAL: &[&str] = &["user.name", "user.email", "user.signingKey"];
 
 /// Collects the report. Runs git and the forges' tools: not on the window's thread.
 pub fn collect(facts: &Facts) -> String {
-    let tools: Vec<crate::forge::ToolReport> = ["gh", "glab", "tea"]
-        .into_iter()
-        .map(crate::forge::tool_report)
-        .collect();
+    // Each tool may take a few seconds (glab asks its server): side by side.
+    let tools: Vec<crate::forge::ToolReport> = std::thread::scope(|scope| {
+        let asked: Vec<_> = ["gh", "glab", "tea"]
+            .into_iter()
+            .map(|tool| scope.spawn(move || crate::forge::tool_report(tool)))
+            .collect();
+        asked.into_iter().filter_map(|t| t.join().ok()).collect()
+    });
     let git = crate::git::version().unwrap_or_else(|e| format!("not found ({e})"));
     let settings = facts.repo.as_deref().map(repo_settings);
     report(facts, &git, &tools, settings.as_ref(), &home())
@@ -58,22 +63,29 @@ pub fn report(
     );
     line("git", git);
     for t in tools {
+        // glab can only tell by asking its server: offline reads as a failed check.
+        let (yes, no) = if t.tool == "glab" {
+            ("auth status ok", "auth status failed")
+        } else {
+            ("signed in", "not signed in")
+        };
         let state = match (&t.version, t.signed_in) {
-            (None, _) => "not installed".to_owned(),
-            (Some(v), Some(true)) => format!("{v}, signed in"),
-            (Some(v), Some(false)) => format!("{v}, not signed in"),
+            (None, _) => "not found (or didn't answer)".to_owned(),
+            (Some(v), Some(true)) => format!("{v}, {yes}"),
+            (Some(v), Some(false)) => format!("{v}, {no}"),
             (Some(v), None) => format!("{v}, sign-in not known"),
         };
         line(t.tool, &state);
     }
     match settings {
         None => out.push_str("\nNo repository open: no git settings.\n"),
-        Some(Err(e)) => out.push_str(&format!("\nGit settings: could not be read ({e}).\n")),
+        // The error names paths and machines: left out.
+        Some(Err(_)) => out.push_str("\nGit settings: could not be read.\n"),
         Some(Ok(rows)) if rows.is_empty() => {
             out.push_str("\nGit settings: none of the reported ones is set.\n")
         }
         Some(Ok(rows)) => {
-            out.push_str("\nGit settings in effect (value · scope · file):\n\n```\n");
+            out.push_str("\nGit settings in effect (value · scope · file name):\n\n```\n");
             for row in rows {
                 out.push_str(row);
                 out.push('\n');
@@ -81,7 +93,7 @@ pub fn report(
             out.push_str("```\n");
         }
     }
-    redact_home(&out, home)
+    redact_users(&redact_home(&out, home))
 }
 
 /// The settings of the doctor's allowlist in effect in `repo`, but the personal ones: `key =
@@ -107,12 +119,22 @@ pub fn settings_rows(all: &[config::Origin]) -> Vec<String> {
         .filter(|s| !PERSONAL.iter().any(|p| p.eq_ignore_ascii_case(s.key)))
         .filter_map(|s| {
             let winner = config::values_of(all, s.key).into_iter().last()?;
+            let value = winner.shown_value();
+            // A path (an editor, a program, a folder) can name its user: only that it is set.
+            let value = if value.contains(['/', '\\']) {
+                "(a path)"
+            } else {
+                value
+            };
+            let file = winner
+                .file
+                .as_deref()
+                .map(|f| f.rsplit(['/', '\\']).next().unwrap_or(f))
+                .unwrap_or("-");
             Some(format!(
-                "{} = {} · {} · {}",
+                "{} = {value} · {} · {file}",
                 s.key,
-                winner.shown_value(),
                 winner.scope.label(),
-                winner.file.as_deref().unwrap_or("-")
             ))
         })
         .collect()
@@ -152,14 +174,70 @@ fn home() -> String {
         .unwrap_or_default()
 }
 
-/// `text` with the home folder (as written with `\` or `/`) replaced by `~`.
+/// `text` with the home folder (as written with `\` or `/`, in any case) replaced by `~`, where
+/// it is a whole path (followed by a separator, a space or the end).
 pub fn redact_home(text: &str, home: &str) -> String {
     let home = home.trim_end_matches(['/', '\\']);
     if home.len() < 2 {
         return text.to_owned();
     }
-    let forward = home.replace('\\', "/");
-    text.replace(home, "~").replace(&forward, "~")
+    let mut out = text.to_owned();
+    for form in [home.to_owned(), home.replace('\\', "/")] {
+        out = replace_whole(&out, &form, "~");
+    }
+    out
+}
+
+/// `text` with every `needle` (ASCII case ignored) that ends where a path component does
+/// replaced by `with`.
+fn replace_whole(text: &str, needle: &str, with: &str) -> String {
+    let lower = text.to_ascii_lowercase();
+    let wanted = needle.to_ascii_lowercase();
+    let mut out = String::with_capacity(text.len());
+    let mut at = 0;
+    while let Some(found) = lower[at..].find(&wanted) {
+        let start = at + found;
+        let end = start + wanted.len();
+        let whole = text[end..]
+            .chars()
+            .next()
+            .is_none_or(|c| matches!(c, '/' | '\\' | '`') || c.is_whitespace());
+        out.push_str(&text[at..start]);
+        out.push_str(if whole { with } else { &text[start..end] });
+        at = end;
+    }
+    out.push_str(&text[at..]);
+    out
+}
+
+/// `text` with the folder named after any user written `~`: what follows `/home/`, `/Users/`
+/// or `\Users\` (also `/mnt/c/Users/`, `/c/Users/`, `C:/Users/`), and `/root`, on whichever
+/// machine (WSL, SSH, Windows) the path is.
+pub fn redact_users(text: &str) -> String {
+    let lower = text.to_ascii_lowercase();
+    let mut out = String::with_capacity(text.len());
+    let mut at = 0;
+    while at < text.len() {
+        let next = ["/home/", "/users/", "\\users\\"]
+            .iter()
+            .filter_map(|m| lower[at..].find(m).map(|i| (at + i, m.len())))
+            .min();
+        let Some((start, len)) = next else {
+            break;
+        };
+        // Back to the start of the path: a drive (`C:`), `/mnt/c`, `/c`.
+        let path_start = text[at..start]
+            .rfind(|c: char| c.is_whitespace() || matches!(c, '`' | '"' | '\'' | '(' | '='))
+            .map_or(at, |i| at + i + 1);
+        let name_end = text[start + len..]
+            .find(|c: char| matches!(c, '/' | '\\' | '`') || c.is_whitespace())
+            .map_or(text.len(), |i| start + len + i);
+        out.push_str(&text[at..path_start]);
+        out.push('~');
+        at = name_end;
+    }
+    out.push_str(&text[at..]);
+    replace_whole(&out, "/root", "~")
 }
 
 #[cfg(test)]
@@ -179,10 +257,17 @@ mod tests {
              global\0file:/home/zoë/.gitconfig\0user.name\nZoë\0\
              global\0file:/home/zoë/.gitconfig\0pull.rebase\ntrue\0\
              local\0file:.git/config\0pull.rebase\nfalse\0\
-             local\0file:.git/config\0credential.helper\nstore\0",
+             local\0file:.git/config\0credential.helper\nstore\0\
+             global\0file:/home/zoë/.gitconfig\0core.editor\n/home/zoë/bin/ed\0",
         );
         let rows = settings_rows(&all);
-        assert_eq!(rows, ["pull.rebase = false · Repository · .git/config"]);
+        assert_eq!(
+            rows,
+            [
+                "pull.rebase = false · Repository · config",
+                "core.editor = (a path) · Global · .gitconfig"
+            ]
+        );
         let tools = [
             ToolReport {
                 tool: "gh",
@@ -191,12 +276,18 @@ mod tests {
             },
             ToolReport {
                 tool: "glab",
+                version: Some("glab 1.50".into()),
+                signed_in: Some(false),
+            },
+            ToolReport {
+                tool: "tea",
                 version: None,
                 signed_in: None,
             },
         ];
         let settings = Ok(vec![
-            "pull.rebase = true · Global · /home/zoë/.gitconfig".to_owned(),
+            "pull.rebase = true · Global · .gitconfig".to_owned(),
+            r"# a WSL path /mnt/c/Users/Ana/x and C:\Users\Ana\y".to_owned(),
         ]);
         let text = report(
             &facts,
@@ -208,21 +299,45 @@ mod tests {
         assert!(text.contains("dev channel"));
         assert!(text.contains("llvmpipe (Vulkan)"));
         assert!(text.contains("gh version 2.89.0, signed in"));
-        assert!(text.contains("**glab:** not installed"));
-        assert!(text.contains("pull.rebase = true · Global · ~/.gitconfig"));
-        assert!(!text.contains("zoë") && !text.contains("example.com"));
+        assert!(text.contains("glab 1.50, auth status failed"));
+        assert!(text.contains("**tea:** not found"));
+        assert!(text.contains("pull.rebase = true · Global · .gitconfig"));
+        assert!(text.contains(r"a WSL path ~/x and ~\y"), "{text}");
+        assert!(!text.contains("zoë") && !text.contains("example.com") && !text.contains("Ana"));
         let none = report(&facts, "git", &[], None, "");
         assert!(none.contains("No repository open"));
+        let failed = report(
+            &facts,
+            "git",
+            &[],
+            Some(&Err("ssh://bob@x/home/bob".into())),
+            "",
+        );
+        assert!(failed.contains("could not be read.") && !failed.contains("bob"));
     }
 
     #[test]
-    fn home_is_redacted_either_way() {
+    fn home_and_users_are_redacted() {
         assert_eq!(
-            redact_home(r"C:\Users\ana\x and C:/Users/ana/y", r"C:\Users\ana"),
+            redact_home(r"C:\Users\ana\x and c:/users/ana/y", r"C:\Users\ana"),
             "~\\x and ~/y"
         );
+        // Only a whole folder: /home/al isn't the start of /home/alice.
+        assert_eq!(
+            redact_home("/home/alice/x /rootless", "/home/al"),
+            "/home/alice/x /rootless"
+        );
+        assert_eq!(redact_home("/home/al/x", "/home/al"), "~/x");
         // Too short to be a home folder: nothing replaced.
         assert_eq!(redact_home("/a/b", "/"), "/a/b");
+        // Any user's folder, here or on another machine, in every form.
+        assert_eq!(
+            redact_users(
+                "/home/bob/.gitconfig /mnt/c/Users/Ana/gpg.exe /c/Users/ana C:/Users/x/y /root/z"
+            ),
+            "~/.gitconfig ~/gpg.exe ~ ~/y ~/z"
+        );
+        assert_eq!(redact_users("no paths /rootless"), "no paths /rootless");
         assert_eq!(
             pretty_name("NAME=x\nPRETTY_NAME=\"Ubuntu 24.04 LTS\"\n"),
             Some("Ubuntu 24.04 LTS".into())
@@ -244,7 +359,10 @@ mod tests {
         let text = collect(&facts);
         let _ = std::fs::remove_dir_all(&dir);
         assert!(text.contains("**git:** git version"), "{text}");
-        assert!(text.contains("pull.ff = only · Repository"), "{text}");
+        assert!(
+            text.contains("pull.ff = only · Repository · config"),
+            "{text}"
+        );
         assert!(text.contains("repository on this machine"));
         Ok(())
     }

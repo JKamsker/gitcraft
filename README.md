@@ -234,10 +234,12 @@ so your config, credentials and hooks apply as usual.
 - _Copy diagnostics_ (at the top of the manual, or _Help: Copy diagnostics_ in the palette):
   what a bug report needs, as Markdown on the clipboard. gitcraft's version and channel, the
   system, the graphics adapter and backend wgpu draws with, the versions of git, `gh`, `glab`
-  and `tea` and whether each is signed in (`auth status`'s exit code, `tea`'s logins counted;
-  never a token or an account), and the settings of the doctor's allowlist in effect in the
-  repository shown, with their scope and file. Never your name, email or signing key, and the
-  home folder is written `~`.
+  and `tea` and whether each has a login (`gh auth token`'s exit code, offline too; `glab auth
+  status`, which asks its server; `tea`'s logins counted; never a token or an account), and the
+  settings of the doctor's allowlist in effect in the repository shown, with their scope and
+  file name. Never your name, email or signing key; a setting whose value is a path only says it
+  is set, and any user's folder (`/home/x`, `C:\Users\x`, `/mnt/c/Users/x`) is written `~`.
+  The tools are asked side by side; check the text before posting it.
 - Avatars: on a GitHub repository, the authors' GitHub accounts (through `gh` when installed, else
   GitHub's API); on Forgejo and Gitea, the accounts the host ties the commits to; on GitLab, the
   host's avatar API; elsewhere Gravatar (a hash of the email).
