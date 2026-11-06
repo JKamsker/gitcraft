@@ -16,6 +16,8 @@ pub(crate) struct NewTask {
     /// The agent's command line, without the prompt.
     pub agent: String,
     pub prompt: String,
+    /// Install the hooks that save each turn as a checkpoint in the worktree.
+    pub hooks: bool,
 }
 
 pub(crate) struct StartForm {
@@ -29,6 +31,8 @@ pub(crate) struct StartForm {
     agent: usize,
     custom: String,
     give_prompt: bool,
+    /// Save each turn as a checkpoint (Claude Code and Codex).
+    hooks: bool,
     focus: bool,
     repo: std::path::PathBuf,
     /// The local branches, which the new one mustn't be.
@@ -57,6 +61,7 @@ impl StartForm {
             agent: 0,
             custom: String::new(),
             give_prompt: true,
+            hooks: true,
             focus: true,
             repo: tab.path.clone(),
             branches: tab.refs.local.iter().map(|b| b.name.clone()).collect(),
@@ -149,6 +154,7 @@ impl StartForm {
                     } else {
                         String::new()
                     },
+                    hooks: self.hooks && self.takes_hooks(),
                 })));
             }
             if ui
@@ -203,6 +209,13 @@ impl StartForm {
         None
     }
 
+    /// Whether the agent picked has hooks gitcraft installs: Claude Code and Codex.
+    fn takes_hooks(&self) -> bool {
+        KNOWN
+            .get(self.agent)
+            .is_some_and(|cli| matches!(cli.program, "claude" | "codex"))
+    }
+
     fn agent_choice(&mut self, ui: &mut Ui, t: &Tokens) {
         caption(ui, "Agent", t);
         let selected = KNOWN
@@ -246,6 +259,12 @@ impl StartForm {
                     .color(t.text_faint),
                 );
             }
+        }
+        if self.takes_hooks() {
+            ui.checkbox(&mut self.hooks, "Save each turn as a review step (installs its hooks in the worktree)")
+                .on_hover_text(
+                    "After each turn the agent's hook runs gitcraft checkpoint: Uncommitted changes then lists the turns, each to diff on its own",
+                );
         }
     }
 }
@@ -348,6 +367,7 @@ mod tests {
             agent: 0,
             custom: String::new(),
             give_prompt: true,
+            hooks: false,
             focus: false,
             repo: PathBuf::from(repo),
             branches: vec!["main".to_owned(), "agent/x".to_owned()],

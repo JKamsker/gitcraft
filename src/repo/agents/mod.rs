@@ -5,6 +5,7 @@
 mod panel;
 mod recipe_editor;
 mod start;
+mod turns;
 
 use std::path::PathBuf;
 
@@ -27,6 +28,11 @@ pub(crate) struct AgentsState {
     pub(super) dialog: Option<AgentDialog>,
     /// A worktree being made by the operation so labelled: what to run in it once it is there.
     made: Option<Made>,
+    /// The agent turns saved in this worktree (see [`crate::agent::checkpoint`]).
+    pub(super) turns: Vec<crate::agent::checkpoint::Turn>,
+    /// What the turns were read for: (history read, working tree read).
+    turns_for: Option<(u64, u64)>,
+    turns_reading: bool,
 }
 
 /// A worktree an operation is making.
@@ -35,6 +41,8 @@ struct Made {
     worktree: PathBuf,
     /// The agent to start there, and its task to list, for an agent task.
     agent: Option<(String, AgentTask)>,
+    /// Install the hooks that save each turn as a checkpoint there first.
+    hooks: bool,
 }
 
 pub(super) enum AgentDialog {
@@ -55,6 +63,10 @@ pub(crate) enum AgentAct {
     Restart(AgentTask),
     /// Takes the task off the list; its worktree stays.
     Forget(String),
+    /// Installs the hooks that save each agent turn, in the worktree this tab shows.
+    InstallHooks,
+    /// Deletes the saved turns of a session.
+    ForgetTurns(String),
 }
 
 impl RepoTab {
@@ -97,6 +109,8 @@ impl RepoTab {
                     self.open_request = Some(OpenRequest::Worktree(path));
                 }
             }
+            AgentAct::InstallHooks => self.install_hooks(ctx),
+            AgentAct::ForgetTurns(session) => self.forget_turns(session, ctx),
             AgentAct::Forget(path) => {
                 let repo = self.path.clone();
                 self.then(
@@ -112,6 +126,7 @@ impl RepoTab {
     /// read again when the worktrees changed.
     pub(super) fn agents_frame(&mut self, ctx: &egui::Context) {
         crate::agent::launch::warm_up();
+        self.reload_turns(ctx);
         if let Some(launch) = PendingLaunches::take(&self.path) {
             self.start_launch(launch, ctx);
         }
@@ -182,6 +197,7 @@ impl RepoTab {
             label: label.to_owned(),
             worktree: worktree_path(&self.path, folder),
             agent: None,
+            hooks: false,
         });
     }
 
@@ -198,9 +214,11 @@ impl RepoTab {
             matches!(&self.open_request, Some(OpenRequest::Worktree(p)) if *p == made.worktree);
         let repo = self.path.clone();
         let task = made.agent.as_ref().map(|(_, task)| task.clone());
+        let hooks_in = made.hooks.then(|| made.worktree.clone());
         self.then(
             ctx,
             move || {
+                let hooks = hooks_in.map(|wt| crate::agent::hooks::install(&wt));
                 let recipe = Recipe::load(&repo);
                 let listed = task.map(|mut task| {
                     // As git lists it, which the worktrees shown are compared with.
@@ -215,9 +233,15 @@ impl RepoTab {
                     }
                     tasks::add(&repo, task)
                 });
-                (recipe, listed)
+                (recipe, listed, hooks)
             },
-            move |tab, (recipe, listed), ctx| {
+            move |tab, (recipe, listed, hooks), ctx| {
+                if let Some(Err(e)) = hooks {
+                    tab.status = Some((
+                        format!("The agent checkpoint hooks weren't installed: {e}"),
+                        true,
+                    ));
+                }
                 let recipe = recipe.unwrap_or_else(|e| {
                     tab.status = Some((format!("The worktree setup recipe wasn't run: {e}"), true));
                     Recipe::default()
@@ -284,6 +308,7 @@ impl RepoTab {
             label: label.clone(),
             worktree: worktree.clone(),
             agent: Some((command, task)),
+            hooks: new.hooks,
         });
         self.open_when_done = Some((label.clone(), worktree));
         self.run_ops(&label, ops, Refresh::All, OpKind::plain(), ctx);

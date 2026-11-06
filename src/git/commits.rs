@@ -412,6 +412,8 @@ fn push_revisions<'a>(args: &mut Vec<&'a str>, from: Option<&'a [String]>) {
             "--exclude=refs/stash",
             "--exclude=refs/notes/*",
             "--exclude=refs/prefetch/*",
+            // Agent turns saved by `gitcraft checkpoint`: shown with the changes, not as history.
+            "--exclude=refs/gitcraft/*",
             "--all",
         ]),
     }

@@ -6,7 +6,11 @@
 //! WSL and SSH included: files through [`crate::remote`], git through [`crate::git`].
 
 pub(crate) mod bakeoff;
+pub(crate) mod checkpoint;
+#[cfg(test)]
+mod checkpoint_tests;
 mod files;
+pub(crate) mod hooks;
 pub(crate) mod launch;
 pub(crate) mod recipe;
 pub(crate) mod sh;

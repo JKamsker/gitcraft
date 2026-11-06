@@ -12,6 +12,10 @@ fn main() -> eframe::Result {
     if let Some(code) = app::askpass_helper() {
         std::process::exit(code);
     }
+    // Run by a coding agent's hook after each turn (see `agent::checkpoint`): no window.
+    if let Some(code) = app::checkpoint_cli() {
+        std::process::exit(code);
+    }
     app::warm_up();
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

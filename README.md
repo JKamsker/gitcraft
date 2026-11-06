@@ -211,6 +211,17 @@ so your config, credentials and hooks apply as usual.
   (`npm ci`). A step that fails says so; the setup command and the agent are then not run. It runs with `sh` on the repository's machine (Git's own `sh` on Windows),
   WSL and SSH included; the script it makes can be read in the editor, and tried on a worktree
   before saving. Kept in `.git/gitcraft/`, never committed.
+- Agent turns as review steps: _Agent checkpoints: install hooks in this worktree_ (palette),
+  or _Save each turn as a review step_ when starting a task, installs Claude Code's
+  `UserPromptSubmit` / `Stop` hooks (`.claude/settings.local.json`) and Codex's `notify`
+  (`.codex/config.toml`, read for trusted projects), both kept out of git through
+  `info/exclude`. After each turn they run `gitcraft checkpoint`, which saves the worktree as
+  it is (uncommitted and untracked files, its own index untouched) under
+  `refs/gitcraft/agent/<session>/<n>`, a turn that changed nothing skipped. _Uncommitted
+  changes_ then shows AGENT TURNS, each named by its prompt: click one to see what that turn
+  changed, right-click for everything since it. On a WSL or SSH machine, where gitcraft isn't,
+  the hooks run a `sh` script gitcraft writes into the repository's git folder. The turns are
+  not history: the graph leaves them out.
 - _Bake-off: compare attempts…_ (palette, or _Compare them_ under AGENTS): pick 2–4 worktrees or
   branches that tried the same task (the agent tasks come picked when there are 2–4 of them).
   A grid compares them with the commit they all start from (their merge base; one that started
@@ -392,6 +403,7 @@ was made this way, on a demo repository.
 | `src/remote/` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
 | `src/agent/` | coding agents: the worktree setup recipe, the agent tasks, the terminal script that runs them |
 | `src/repo/agents/` | the AGENTS section and the agent task and setup recipe dialogs |
+| `src/agent/checkpoint.rs` | agent turns: `gitcraft checkpoint`, the turns of a worktree; `hooks.rs` installs the agents' hooks, `checkpoint.sh` is the script for other machines |
 | `src/agent/bakeoff/` | bake-off: comparing attempts, new dependencies, hunks, assembling a branch, builds |
 | `src/repo/bakeoff/` | the bake-off page and its attempt picker |
 | `src/settings/`          | user settings, profiles, and the settings pages                                    |
