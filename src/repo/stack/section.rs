@@ -4,10 +4,11 @@
 
 use egui::{Align2, Rect, Response, Ui, pos2, vec2};
 
-use super::{StackAct, Tree, trees};
+use super::{StackAct, Tree, looped, trees};
 use crate::git::Branch;
 use crate::git::stack::Layer;
 use crate::icons;
+use crate::repo::actions::{BranchRef, compare_branches_action};
 use crate::repo::pinned_sections::{Header, Sections};
 use crate::repo::sidebar::ROW_H;
 use crate::repo::{Action, RepoTab, widgets};
@@ -23,10 +24,12 @@ impl RepoTab {
         ui: &mut Ui,
         acts: &mut Vec<Action>,
         idle: bool,
+        filter: &str,
         sections: &mut Sections,
     ) {
         let stacks = trees(&self.stacks.layers);
-        if stacks.is_empty() && self.stacks.error.is_none() {
+        let looped = looped(&self.stacks.layers);
+        if stacks.is_empty() && looped.is_empty() && self.stacks.error.is_none() {
             return;
         }
         let open = sections.add(
@@ -50,13 +53,44 @@ impl RepoTab {
                 ui.colored_label(t.danger, e);
             });
         }
+        // Filtered, a stack shows only its layers that match, under its title.
+        let shown = |l: &Layer| filter.is_empty() || l.branch.to_lowercase().contains(filter);
         for tree in &stacks {
+            if !tree.rows.iter().any(|(_, l)| shown(l)) {
+                continue;
+            }
             title_row(ui, tree);
-            for (depth, layer) in &tree.rows {
+            for (depth, layer) in tree.rows.iter().filter(|(_, l)| shown(l)) {
                 let r = self.layer_row(ui, layer, *depth);
                 self.layer_clicks(r, layer, idle, acts);
             }
         }
+        if !looped.is_empty() {
+            self.loop_row(ui, &looped, idle, acts);
+        }
+    }
+
+    /// Branches based on each other in a loop (the config edited by hand): named, with a way
+    /// out.
+    fn loop_row(&self, ui: &mut Ui, looped: &[String], idle: bool, acts: &mut Vec<Action>) {
+        let t = Tokens::get(ui.ctx());
+        ui.horizontal_wrapped(|ui| {
+            ui.add_space(22.0);
+            ui.label(
+                egui::RichText::new(format!("{} are based on each other.", looped.join(", ")))
+                    .color(t.warning),
+            );
+            if let Some(first) = looped.first()
+                && ui
+                    .add_enabled(
+                        idle,
+                        egui::Button::new(format!("Pick {first}'s parent…")).small(),
+                    )
+                    .clicked()
+            {
+                acts.push(Action::Stack(StackAct::OpenBasedOn(first.clone())));
+            }
+        });
     }
 
     /// A layer: its name, how many commits it adds, its pull request, and a warning when its
@@ -134,22 +168,27 @@ impl RepoTab {
         );
         if let Some(pr) = self.prs.iter().find(|p| p.branch == layer.branch) {
             let noun = self.forge().map_or("pull request", |f| f.noun());
-            tip.push_str(&format!("\n{noun} #{}: {}", pr.number, pr.title));
+            tip.push_str(&format!(
+                "\n{} #{}: {}",
+                capitalised(noun),
+                pr.number,
+                pr.title
+            ));
         }
         if layer.parent_missing {
             tip.push_str(&format!(
-                "\n{} is gone: pick the branch it is based on now",
+                "\n{} is gone: pick the branch it is based on now (This branch is based on…)",
                 layer.parent
             ));
         } else if layer.needs_restack() {
             tip.push_str(&format!(
-                "\n{} moved on ({} not in {}): needs restacking",
+                "\n{} moved on ({} not in {}): needs restacking onto it",
                 layer.parent,
                 commits(layer.behind),
                 layer.branch
             ));
         }
-        tip.push_str("\nDouble-click to check out");
+        tip.push_str("\nDouble-click to check out; right-click for the changes it adds");
         tip
     }
 
@@ -178,13 +217,28 @@ impl RepoTab {
         b: &Branch,
         idle: bool,
     ) {
-        let label = match self.stacks.recorded.get(&b.name) {
-            Some(r) => format!("Based on {}…", r.parent),
-            None => "This branch is based on…".to_owned(),
+        let recorded = self.stacks.recorded.get(&b.name);
+        // Its own changes: since it forked from its parent, as its pull request will show them.
+        if let Some(r) = recorded
+            && self.refs.local.iter().any(|l| l.name == r.parent)
+            && ui
+                .button(format!("Changes {} adds to {}", b.name, r.parent))
+                .on_hover_text("Its own commits in the stack: since it forked from its parent")
+                .clicked()
+        {
+            acts.push(compare_branches_action(
+                BranchRef::local(&r.parent),
+                BranchRef::local(&b.name),
+                true,
+            ));
+        }
+        let hover = match recorded {
+            Some(r) => format!("Now based on {}", r.parent),
+            None => "The branch it is a layer on in a stack".to_owned(),
         };
         if ui
-            .add_enabled(idle, egui::Button::new(label))
-            .on_hover_text("The branch it is a layer on in a stack")
+            .add_enabled(idle, egui::Button::new("This branch is based on…"))
+            .on_hover_text(hover)
             .clicked()
         {
             acts.push(Action::Stack(StackAct::OpenBasedOn(b.name.clone())));
@@ -206,12 +260,18 @@ fn title_row(ui: &mut Ui, tree: &Tree) {
     let painter = ui.painter_at(rect);
     let y = rect.center().y;
     let mut right = rect.right() - 8.0;
-    let stale = tree.stale();
-    if stale > 0 {
+    let (stale, gone) = tree.stale();
+    let note = match (stale, gone) {
+        (0, 0) => None,
+        (n, 0) => Some(format!("{n} to restack")),
+        (0, g) => Some(format!("{g} parent{} gone", if g == 1 { "" } else { "s" })),
+        (n, g) => Some(format!("{n} to restack · {g} gone")),
+    };
+    if let Some(note) = note {
         let r = painter.text(
             pos2(right, y),
             Align2::RIGHT_CENTER,
-            format!("{stale} to restack"),
+            note,
             theme::medium(10.5),
             t.warning,
         );
@@ -228,4 +288,13 @@ fn title_row(ui: &mut Ui, tree: &Tree) {
             t.text_dim,
         );
     resp.on_hover_text(title);
+}
+
+/// `noun` with a capital first letter: "Merge request".
+fn capitalised(noun: &str) -> String {
+    let mut chars = noun.chars();
+    chars
+        .next()
+        .map(|c| c.to_uppercase().chain(chars).collect())
+        .unwrap_or_default()
 }

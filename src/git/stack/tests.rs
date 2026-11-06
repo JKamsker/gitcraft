@@ -105,9 +105,10 @@ fn a_parent_on_the_branch_itself_or_above_it_is_a_loop() {
     assert!(would_loop(&recorded, "api", "ui"));
     assert!(!would_loop(&recorded, "ui", "schema"));
     assert!(!would_loop(&recorded, "schema", "main"));
-    // A loop already in the config ends.
+    // A loop already in the config ends, and is no loop for a branch outside it.
     recorded.extend(rec(&[("main", "ui")]));
-    assert!(would_loop(&recorded, "x", "main"));
+    assert!(!would_loop(&recorded, "x", "main"));
+    assert!(would_loop(&recorded, "api", "main"));
 }
 
 #[test]
@@ -225,5 +226,79 @@ fn the_fork_point_is_the_parents_commit_the_branch_is_on() -> Result<(), String>
         .err()
         .unwrap_or_default();
     assert!(err.contains("no commit in common"), "{err}");
+    Ok(())
+}
+
+#[test]
+fn a_branch_made_from_the_branch_is_never_its_suggested_parent() -> Result<(), String> {
+    // main ← A1 ← A2 (A) ← B1 (B, made from A); then A gets A3. Both moved on since they
+    // forked, and B is nearer A than main is: only B's reflog says it was made from A.
+    let repo = TestRepo::new("child not parent")?;
+    repo.branch("A", "main")?;
+    repo.commit("a1.txt", "1\n", "A1")?;
+    repo.commit("a2.txt", "2\n", "A2")?;
+    repo.branch("B", "A")?;
+    repo.commit("b1.txt", "1\n", "B1")?;
+    repo.checkout("A")?;
+    repo.commit("a3.txt", "3\n", "A3")?;
+    let none = BTreeMap::new();
+    assert_eq!(
+        suggest_parent(repo.path(), "A", &none)?.as_deref(),
+        Some("main")
+    );
+    assert_eq!(
+        suggest_parent(repo.path(), "B", &none)?.as_deref(),
+        Some("A")
+    );
+    Ok(())
+}
+
+#[test]
+fn a_loop_the_branch_is_not_part_of_is_no_loop_for_it() {
+    let recorded = rec(&[("x", "y"), ("y", "x")]);
+    assert!(!would_loop(&recorded, "a", "x"));
+    assert!(would_loop(&recorded, "x", "y"));
+}
+
+#[test]
+fn keys_set_more_than_once_by_hand_are_set_and_unset() -> Result<(), String> {
+    let repo = TestRepo::new("multi valued")?;
+    repo.stack(&["api"])?;
+    let key = config_key("api", PARENT_KEY);
+    repo.git(&["config", "--local", "--add", &key, "other"])?;
+    repo.steps(&set_parent_ops("api", "main", &repo.tip("main")?))?;
+    assert_eq!(
+        recorded(repo.path())?.get("api").map(|r| r.parent.as_str()),
+        Some("main")
+    );
+    repo.git(&["config", "--local", "--add", &key, "other"])?;
+    repo.steps(&unset_parent_ops("api"))?;
+    assert!(recorded(repo.path())?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn renaming_a_parent_takes_its_layers_along() -> Result<(), String> {
+    let repo = TestRepo::new("rename parent")?;
+    repo.stack(&["schema", "api", "ui"])?;
+    let kids = children(&recorded(repo.path())?, "schema");
+    assert_eq!(kids, ["api"]);
+    let rename = |from: &str, to: &str| -> Result<(), String> {
+        repo.git(&["branch", "-m", from, to])?;
+        repo.steps(&reparent_ops(&kids, to))
+    };
+    rename("schema", "db-schema")?;
+    let got = recorded(repo.path())?;
+    assert_eq!(got.get("api").map(|r| r.parent.as_str()), Some("db-schema"));
+    // The renamed branch keeps its own parent (git moves its config along).
+    assert_eq!(
+        got.get("db-schema").map(|r| r.parent.as_str()),
+        Some("main")
+    );
+    rename("db-schema", "schema")?;
+    assert_eq!(
+        recorded(repo.path())?.get("api").map(|r| r.parent.as_str()),
+        Some("schema")
+    );
     Ok(())
 }

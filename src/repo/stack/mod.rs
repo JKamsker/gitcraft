@@ -14,7 +14,7 @@ use crate::git::stack::{self, Layer, Recorded};
 
 use super::{RepoTab, Undo};
 pub(crate) use dialog::BasedOn;
-pub(crate) use model::{Tree, chain, trees};
+pub(crate) use model::{Tree, chain, looped, trees};
 
 /// What the views ask of stacks.
 pub(crate) enum StackAct {
@@ -53,6 +53,15 @@ impl Stacks {
     }
 }
 
+/// Why `branch` can't be based on `parent`: that would make a loop.
+fn loop_problem(branch: &str, parent: &str) -> String {
+    if branch == parent {
+        format!("{branch} can't be based on itself.")
+    } else {
+        format!("{parent} is based on {branch}: {branch} can't be based on it too.")
+    }
+}
+
 impl RepoTab {
     /// Reads the recorded parents and the state of each layer in the background.
     pub(super) fn read_stacks(&mut self, ctx: &egui::Context) {
@@ -82,7 +91,7 @@ impl RepoTab {
                         tab.stacks.layers = layers;
                         tab.stacks.error = None;
                     }
-                    Err(e) => tab.stacks.error = Some(format!("Reading the stacks failed: {e}")),
+                    Err(e) => tab.stacks.error = Some(format!("Couldn't read the stacks: {e}")),
                 }
             },
         );
@@ -100,13 +109,14 @@ impl RepoTab {
                 self.stacks.dialog = None;
                 self.set_parent(branch, parent, ctx);
             }
-            StackAct::RemoveParent(branch) => self.remove_parent(&branch, ctx),
+            StackAct::RemoveParent(branch) => self.remove_parent(branch, ctx),
             StackAct::CloseDialog => self.stacks.dialog = None,
         }
     }
 
-    /// Records `branch` as based on `parent`, at the commit it forks from it (found in the
-    /// background first). Undoable.
+    /// Records `branch` as based on `parent`, at the commit it forks from it. What is recorded
+    /// now (for the undo, and to refuse a loop) and the fork point are read in the background
+    /// first: the last read of the stacks may be older than an operation just run. Undoable.
     fn set_parent(&mut self, branch: String, parent: String, ctx: &egui::Context) {
         if let Some(problem) = self.parent_problem(&branch, &parent) {
             self.status = Some((problem, true));
@@ -116,19 +126,21 @@ impl RepoTab {
         let (b, p) = (branch.clone(), parent.clone());
         self.then(
             ctx,
-            move || stack::fork_point(&path, &b, &p),
-            move |tab, base, ctx| match base {
-                Ok(base) => {
-                    let before = tab.stacks.recorded.get(&branch).cloned();
+            move || {
+                let recorded = stack::recorded(&path)?;
+                if stack::would_loop(&recorded, &b, &p) {
+                    return Err(loop_problem(&b, &p));
+                }
+                let base = stack::fork_point(&path, &b, &p)?;
+                Ok((recorded.get(&b).cloned(), base))
+            },
+            move |tab, found, ctx| match found {
+                Ok((before, base)) => {
                     let steps = stack::set_parent_ops(&branch, &parent, &base);
-                    tab.run_undoable(
-                        &format!("Base {branch} on {parent}"),
-                        steps.clone(),
-                        super::Refresh::All,
-                        Undo::Custom {
-                            undo: stack::restore_ops(&branch, before.as_ref()),
-                            redo: steps,
-                        },
+                    tab.run_stack_op(
+                        format!("Base {branch} on {parent}"),
+                        steps,
+                        stack::restore_ops(&branch, before.as_ref()),
                         ctx,
                     );
                 }
@@ -137,7 +149,7 @@ impl RepoTab {
         );
     }
 
-    /// Why `branch` can't be based on `parent`, if it can't.
+    /// Why `branch` can't be based on `parent`, if it can't (as far as the last read knows).
     fn parent_problem(&self, branch: &str, parent: &str) -> Option<String> {
         if parent.is_empty() {
             return Some(format!("Pick the branch {branch} is based on."));
@@ -146,25 +158,49 @@ impl RepoTab {
             return Some(format!("{parent} is not a local branch."));
         }
         if stack::would_loop(&self.stacks.recorded, branch, parent) {
-            return Some(format!(
-                "{parent} is {branch} or based on it: {branch} can't be based on it too."
-            ));
+            return Some(loop_problem(branch, parent));
         }
         None
     }
 
-    /// Takes `branch` out of its stack. Undoable.
-    fn remove_parent(&mut self, branch: &str, ctx: &egui::Context) {
-        let before = self.stacks.recorded.get(branch).cloned();
-        let steps = stack::unset_parent_ops(branch);
+    /// Takes `branch` out of its stack, what it is recorded as based on read first (for the
+    /// undo). Undoable.
+    fn remove_parent(&mut self, branch: String, ctx: &egui::Context) {
+        let path = self.path.clone();
+        let b = branch.clone();
+        self.then(
+            ctx,
+            move || stack::recorded(&path).map(|r| r.get(&b).cloned()),
+            move |tab, found, ctx| match found {
+                Ok(before) => tab.run_stack_op(
+                    format!("Remove {branch} from its stack"),
+                    stack::unset_parent_ops(&branch),
+                    stack::restore_ops(&branch, before.as_ref()),
+                    ctx,
+                ),
+                Err(e) => tab.status = Some((format!("Couldn't read the stacks: {e}"), true)),
+            },
+        );
+    }
+
+    /// Runs `steps` as an undoable operation, once the background read before it is in;
+    /// says so rather than drop it when another operation started meanwhile.
+    fn run_stack_op(
+        &mut self,
+        label: String,
+        steps: Vec<Vec<String>>,
+        undo: Vec<Vec<String>>,
+        ctx: &egui::Context,
+    ) {
+        if let Some(busy) = &self.busy_op {
+            self.status = Some((format!("{label}: run it again once {busy} is done"), true));
+            return;
+        }
         self.run_undoable(
-            &format!("Remove {branch} from its stack"),
+            &label,
             steps.clone(),
             super::Refresh::All,
-            Undo::Custom {
-                undo: stack::restore_ops(branch, before.as_ref()),
-                redo: steps,
-            },
+            Undo::Custom { undo, redo: steps },
             ctx,
         );
     }
