@@ -72,10 +72,17 @@ fn operation(repo: &Path, state: Option<InProgress>) -> Result<Operation, String
             .map(|s| s.trim().to_owned())
             .map_err(|_| format!("{name} can't be read: is the operation still in progress?"))
     };
+    let shown = rev(head)?;
+    let base = match base {
+        Some(name) => Some(rev(name).map_err(|_| {
+            format!("{head} has no parent (a first commit): there is no history to look into")
+        })?),
+        None => None,
+    };
     Ok(Operation {
-        shown: rev(head)?,
+        shown,
         merged: merged.map(rev).transpose()?,
-        base: base.map(rev).transpose()?,
+        base,
     })
 }
 
@@ -108,30 +115,33 @@ fn parse_steps(out: &str) -> Vec<(char, Step)> {
         .collect()
 }
 
-/// The first-parent commits of `range` (`<`: the left side's, `>`: the right side's when
-/// `--left-right`) that touched `path`, newest first, leaving out those the other side has
-/// too (as a rebase has them replayed).
-fn log(repo: &Path, range: &str, path: &str) -> Result<Vec<(char, Step)>, String> {
-    let count = format!("--max-count={}", 2 * MAX_COMMITS + 2);
-    let out = git::run(
-        Some(repo),
-        &[
-            "--literal-pathspecs",
-            "log",
-            "--no-show-signature",
-            "--encoding=UTF-8",
-            "--format=%x1e%m%x1f%H%x1f%h%x1f%an%x1f%at%x1f%s",
-            "--first-parent",
-            "--left-right",
-            "--cherry-pick",
-            &count,
-            "--end-of-options",
-            range,
-            "--",
-            path,
-        ],
-    )?;
-    Ok(parse_steps(&out))
+/// The first-parent commits of one side of `range` (`side`: `--left-only` or
+/// `--right-only`) that touched `path`, newest first, at most [`MAX_COMMITS`] + 1 (to tell
+/// when some are left out). `drop_copies`: leave out those the other side has too, as a
+/// rebase, cherry-pick or revert has them replayed; a merge keeps them, as two branches that
+/// made the same change still each made it.
+fn log(
+    repo: &Path,
+    range: &str,
+    (side, drop_copies): (&str, bool),
+    path: &str,
+) -> Result<Vec<Step>, String> {
+    let count = format!("--max-count={}", MAX_COMMITS + 1);
+    let mut args = vec![
+        "--literal-pathspecs",
+        "log",
+        "--no-show-signature",
+        "--encoding=UTF-8",
+        "--format=%x1e %x1f%H%x1f%h%x1f%an%x1f%at%x1f%s",
+        "--first-parent",
+        side,
+    ];
+    if drop_copies {
+        args.push("--cherry-pick");
+    }
+    args.extend([count.as_str(), "--end-of-options", range, "--", path]);
+    let out = git::run(Some(repo), &args)?;
+    Ok(parse_steps(&out).into_iter().map(|(_, s)| s).collect())
 }
 
 /// `steps` (newest first) oldest first, at most [`MAX_COMMITS`] of them, and whether some were
@@ -147,16 +157,10 @@ fn oldest_first(mut steps: Vec<Step>) -> (Vec<Step>, bool) {
 pub fn timelines(repo: &Path, path: &str, state: Option<InProgress>) -> Result<Timelines, String> {
     let op = operation(repo, state)?;
     let Some(base) = op.base else {
-        let marked = log(repo, &format!("HEAD...{}", op.shown), path)?;
-        let side = |mark: char| -> Vec<Step> {
-            marked
-                .iter()
-                .filter(|(m, _)| *m == mark)
-                .map(|(_, s)| s.clone())
-                .collect()
-        };
-        let (ours, cut_ours) = oldest_first(side('<'));
-        let (theirs, cut_theirs) = oldest_first(side('>'));
+        // Each side read on its own, so that a long one leaves the other its share.
+        let range = format!("HEAD...{}", op.shown);
+        let (ours, cut_ours) = oldest_first(log(repo, &range, ("--left-only", false), path)?);
+        let (theirs, cut_theirs) = oldest_first(log(repo, &range, ("--right-only", false), path)?);
         return Ok(Timelines {
             ours,
             theirs,
@@ -166,12 +170,7 @@ pub fn timelines(repo: &Path, path: &str, state: Option<InProgress>) -> Result<T
         });
     };
     // Ours: what the checked-out side has that the base hasn't (its replayed copies left out).
-    let marked = log(repo, &format!("HEAD...{base}"), path)?;
-    let left = marked
-        .into_iter()
-        .filter(|(m, _)| *m == '<')
-        .map(|(_, s)| s)
-        .collect();
+    let left = log(repo, &format!("HEAD...{base}"), ("--left-only", true), path)?;
     let (ours, cut) = oldest_first(left);
     let theirs = one_commit(repo, &op.shown)?;
     Ok(Timelines {

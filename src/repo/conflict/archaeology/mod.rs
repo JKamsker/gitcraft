@@ -225,6 +225,10 @@ impl RepoTab {
                 let (Some(a), Some(b)) = (timelines.ours.get(i), timelines.theirs_merged(j)) else {
                     return;
                 };
+                // That pair already being tested: not a second merge of it.
+                if history.pair_test == Some(((i, j), Read::Reading)) {
+                    return;
+                }
                 let (a, b, base) = (a.hash.clone(), b.to_owned(), timelines.base.clone());
                 history.pair_test = Some(((i, j), Read::Reading));
                 let file = path.clone();
