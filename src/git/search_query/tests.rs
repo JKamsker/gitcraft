@@ -456,11 +456,8 @@ fn path_message_and_free_text_on_a_real_repository() -> Result<(), String> {
     );
     assert!(h.repo.search("path:missing.txt", false)?.is_empty());
     assert_eq!(h.repo.search("message:session", false)?, [h.login.as_str()]);
-    // Letter case is ignored for A to Z (git's -i); others are matched as typed.
-    assert_eq!(
-        h.repo.search("message:ÜNÏCÖDÉ", false)?,
-        Vec::<String>::new()
-    );
+    // Letter case is ignored for A to Z (git's -i). Whether git also folds other letters
+    // depends on its platform and locale, so that is not asserted.
     assert_eq!(h.repo.search("message:RéSuMé", false)?, [h.resume.as_str()]);
     // Several messages must all match.
     assert_eq!(
