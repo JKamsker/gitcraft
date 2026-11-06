@@ -26,6 +26,8 @@ fn main() {
     };
     let steps: Vec<String> = args.collect();
 
+    // What it types mustn't become the user's drafts, nor its exit look like a crash.
+    gitcraft::app::keep_no_drafts();
     let mut harness = Harness::builder()
         .with_size([1400.0, 860.0])
         // A frame's worth of time per step, so two clicks make a double-click.

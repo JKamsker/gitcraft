@@ -190,7 +190,6 @@ impl App {
             tab_looks: saved.tab_looks,
         };
         update::clean_up();
-        app.say_if_unclean();
         let mut kept = Vec::new();
         if app.git_version.is_ok() {
             for path in saved.open {
@@ -588,6 +587,8 @@ fn repo_root(path: &Path) -> Result<PathBuf, String> {
     let root = std::fs::canonicalize(&root).unwrap_or(root);
     Ok(strip_verbatim(root))
 }
+
+pub use draft_saving::keep_no_drafts;
 
 /// When this process was started by ssh as its askpass program: asks the running app ssh's
 /// question and returns the exit code to end with, before any window is made. `None` for an

@@ -17,6 +17,8 @@ use super::rebase::{Entry, RebaseEditor, Step};
 pub(crate) struct DraftShape {
     commit: bool,
     rebase: bool,
+    /// The boxes with text in them, over all pull requests: one sent while another still has
+    /// text counts too.
     pull_requests: usize,
 }
 
@@ -59,7 +61,7 @@ impl RepoTab {
         DraftShape {
             commit: !self.commit_summary.trim().is_empty() || !self.commit_body.trim().is_empty(),
             rebase: self.rebase.is_some(),
-            pull_requests: self.pr_drafts.values().filter(|d| d.has_text()).count(),
+            pull_requests: self.pr_drafts.values().map(boxes_with_text).sum(),
         }
     }
 
@@ -76,7 +78,10 @@ impl RepoTab {
             .pr_drafts
             .iter()
             .filter_map(|(number, draft)| {
-                let head = shown_head.filter(|_| shown == Some(*number));
+                // A line restored and not looked at since keeps the head it came with.
+                let head = shown_head
+                    .filter(|_| shown == Some(*number))
+                    .or(draft.line_head.as_deref());
                 pr_text(draft, head).map(|text| (*number, text))
             })
             .collect();
@@ -106,10 +111,11 @@ impl RepoTab {
 
     /// Puts `drafts` back into this view.
     pub(super) fn put_back(&mut self, drafts: RepoDrafts) {
+        // "Amend" isn't ticked again: the last commit may be another one by now (one made in
+        // a terminal), which a click would then rewrite.
         if !drafts.commit.is_empty() {
             self.commit_summary = drafts.commit.summary;
             self.commit_body = drafts.commit.body;
-            self.amend = drafts.commit.amend;
         }
         for (number, text) in drafts.pull_requests {
             let draft = self.pr_drafts.entry(number).or_default();
@@ -129,16 +135,40 @@ impl RepoTab {
                 draft.line_head = Some(line.head);
             }
         }
-        if let Some(rebase) = drafts.rebase {
-            self.rebase = Some(rebase_editor(rebase));
+        match drafts.rebase.map(rebase_editor) {
+            Some(Some(editor)) => {
+                self.rebase = Some(editor);
+                self.status = Some((
+                    "The interactive rebase you were setting up is back: start it, or cancel it"
+                        .to_owned(),
+                    false,
+                ));
+            }
+            Some(None) => {
+                self.status = Some((
+                    "The interactive rebase you were setting up was saved by another version of \
+                     gitcraft and couldn't be restored"
+                        .to_owned(),
+                    true,
+                ));
+            }
+            None => {}
         }
     }
+}
+
+/// How many of `draft`'s boxes have text in them.
+fn boxes_with_text(draft: &PrDraft) -> usize {
+    [&draft.comment, &draft.review, &draft.line_text]
+        .iter()
+        .filter(|text| !text.trim().is_empty())
+        .count()
 }
 
 /// What `draft` has typed, if anything. `head` is the pull request's latest commit when its
 /// page is open: a line picked is kept only with it (it is let go of when the page is left).
 fn pr_text(draft: &PrDraft, head: Option<&str>) -> Option<PrText> {
-    if !draft.has_text() {
+    if boxes_with_text(draft) == 0 {
         return None;
     }
     let line = draft
@@ -183,27 +213,30 @@ fn rebase_draft(editor: &RebaseEditor) -> RebaseDraft {
 }
 
 /// The editor `draft` was saved from. Its HEAD is the one the commits were read at, so
-/// starting it once the branch has moved is refused, as it was before.
-fn rebase_editor(draft: RebaseDraft) -> RebaseEditor {
+/// starting it once the branch has moved is refused, as it was before. `None` when a step is
+/// one this version doesn't know: guessing it would rebase other than what was set up.
+fn rebase_editor(draft: RebaseDraft) -> Option<RebaseEditor> {
     let mut editor = RebaseEditor::new(draft.onto, draft.onto_label, Vec::new());
     editor.head = draft.head;
     editor.entries = draft
         .entries
         .into_iter()
-        .map(|saved| Entry {
-            step: step_named(&saved.step),
-            message: saved.message,
-            commit: RebaseCommit {
-                hash: saved.hash,
-                author: saved.author,
-                email: saved.email,
-                summary: saved.summary,
-                message: saved.original,
-                merge: saved.merge,
-            },
+        .map(|saved| {
+            Some(Entry {
+                step: step_named(&saved.step)?,
+                message: saved.message,
+                commit: RebaseCommit {
+                    hash: saved.hash,
+                    author: saved.author,
+                    email: saved.email,
+                    summary: saved.summary,
+                    message: saved.original,
+                    merge: saved.merge,
+                },
+            })
         })
-        .collect();
-    editor
+        .collect::<Option<_>>()?;
+    Some(editor)
 }
 
 fn step_name(step: Step) -> &'static str {
@@ -216,13 +249,14 @@ fn step_name(step: Step) -> &'static str {
     }
 }
 
-/// The step saved as `name`; one this version doesn't know is kept as it is (picked).
-fn step_named(name: &str) -> Step {
-    match name {
+/// The step saved as `name`, if this version knows it.
+fn step_named(name: &str) -> Option<Step> {
+    Some(match name {
+        "pick" => Step::Pick,
         "reword" => Step::Reword,
         "squash" => Step::Squash,
         "fixup" => Step::Fixup,
         "drop" => Step::Drop,
-        _ => Step::Pick,
-    }
+        _ => return None,
+    })
 }

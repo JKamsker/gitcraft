@@ -271,6 +271,98 @@ fn a_line_comment_keeps_its_line_only_while_the_pull_request_has_not_moved() {
 }
 
 #[test]
+fn amend_is_not_ticked_again() {
+    // The last commit may be another one by the next start: a click would rewrite it.
+    let dir = repo("amend");
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    tab.commit_summary = "three".to_owned();
+    tab.amend = true;
+    save(&tab);
+    let again = RepoTab::new_deferred(dir.clone(), &ctx);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(again.commit_summary, "three");
+    assert!(!again.amend);
+}
+
+#[test]
+fn sending_one_box_while_another_has_text_is_saved_at_once() {
+    let dir = repo("pr-shape");
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    tab.pr_drafts.insert(
+        9,
+        PrDraft {
+            comment: "Sent soon".to_owned(),
+            review: "Still being written".to_owned(),
+            ..PrDraft::default()
+        },
+    );
+    let before = tab.draft_shapes();
+    tab.pr_posted(9, Posted::Comment, Ok(()), &ctx);
+    let after = tab.draft_shapes();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(after[0].1.lost_since(before[0].1));
+}
+
+#[test]
+fn a_restored_line_keeps_its_head_until_the_page_is_seen() {
+    let dir = repo("pr-line-kept");
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut drafts = RepoDrafts::default();
+    let text = crate::drafts::PrText {
+        line_text: "Here".to_owned(),
+        line: Some(crate::drafts::LineDraft {
+            path: "a.rs".to_owned(),
+            line: 3,
+            new_side: true,
+            head: "abc".to_owned(),
+        }),
+        ..Default::default()
+    };
+    drafts.pull_requests.insert(4, text.clone());
+    tab.put_back(drafts);
+    // Saved again before the page was opened: the line is still there.
+    let saved = tab.drafts();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(saved.pull_requests.get(&4), Some(&text));
+}
+
+#[test]
+fn a_rebase_step_this_version_does_not_know_is_not_guessed() {
+    let dir = repo("rebase-unknown");
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let step = crate::drafts::RebaseStep {
+        hash: "a".to_owned(),
+        author: String::new(),
+        email: String::new(),
+        summary: String::new(),
+        original: String::new(),
+        merge: false,
+        step: "edit".to_owned(),
+        message: String::new(),
+    };
+    tab.put_back(RepoDrafts {
+        rebase: Some(crate::drafts::RebaseDraft {
+            onto: "main".to_owned(),
+            onto_label: "main".to_owned(),
+            head: String::new(),
+            entries: vec![step],
+        }),
+        ..RepoDrafts::default()
+    });
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(tab.rebase.is_none());
+    assert!(
+        tab.status
+            .as_ref()
+            .is_some_and(|(s, error)| *error && s.contains("another version"))
+    );
+}
+
+#[test]
 fn two_repositories_keep_their_own_drafts() {
     let (a, b) = (repo("apart-a"), repo("apart-b"));
     let ctx = egui::Context::default();
@@ -278,7 +370,6 @@ fn two_repositories_keep_their_own_drafts() {
     let mut tab_b = RepoTab::new_deferred(b.clone(), &ctx);
     tab_a.commit_summary = "Only in a".to_owned();
     tab_b.commit_summary = "Only in b".to_owned();
-    tab_b.amend = true;
     save(&tab_a);
     save(&tab_b);
     let (again_a, again_b) = (
@@ -288,9 +379,7 @@ fn two_repositories_keep_their_own_drafts() {
     let _ = std::fs::remove_dir_all(&a);
     let _ = std::fs::remove_dir_all(&b);
     assert_eq!(again_a.commit_summary, "Only in a");
-    assert!(!again_a.amend);
     assert_eq!(again_b.commit_summary, "Only in b");
-    assert!(again_b.amend);
 }
 
 #[test]

@@ -1,6 +1,5 @@
 //! Tests of the drafts' files, their writer, the session marker and when saves happen.
 
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime};
 
@@ -178,9 +177,16 @@ fn a_damaged_or_foreign_file_is_not_taken_for_drafts() {
     assert!(std::fs::write(&file, b"{\"format\":1,\"repo\":").is_ok());
     let damaged = store::read(&file, repo);
     assert!(
-        damaged.as_ref().is_err_and(|e| e.contains("damaged")),
+        damaged
+            .as_ref()
+            .is_err_and(|e| e.contains("damaged") && e.contains("moved to")),
         "{damaged:?}"
     );
+    // Set aside, not lost: the next save can't replace it.
+    let mut aside = file.as_os_str().to_owned();
+    aside.push(".damaged");
+    assert!(PathBuf::from(aside).exists());
+    assert!(!file.exists());
 
     // Another repository's drafts in this file (the same hash) are not this one's.
     let (bytes, _) = limits::encode(Path::new("/other"), commit("Other")).unwrap_or_default();
@@ -217,11 +223,21 @@ fn a_file_too_large_is_not_read() {
 fn a_huge_message_is_kept_shortened_and_said_so_once() {
     let dir = folder("huge");
     let repo = Path::new("/r");
-    let mut warned = HashSet::new();
-    let huge = commit(&"ä".repeat(MAX_TEXT));
-    let first = write(&dir, repo, huge.clone(), &mut warned);
-    assert!(first.is_err_and(|e| e.contains("too long")));
-    assert!(write(&dir, repo, huge, &mut warned).is_ok());
+    let huge = commit(&"ä".repeat(MAX_TEXT + 10));
+    let writer = Writer::new(Some(dir.clone()));
+    writer.save(repo, huge.clone());
+    writer.flush(Duration::from_secs(10));
+    let said = writer.take_notice();
+    assert!(
+        said.as_ref()
+            .is_some_and(|n| !n.error && n.text.contains("too long")),
+        "{said:?}"
+    );
+    let mut longer = huge;
+    longer.commit.body.push('!');
+    writer.save(repo, longer);
+    writer.flush(Duration::from_secs(10));
+    assert_eq!(writer.take_notice(), None, "said once");
     let back = store::read(&store::file_of(&dir, repo), repo).unwrap_or_default();
     assert_eq!(back.commit.summary.len(), MAX_TEXT);
     assert!(back.commit.summary.chars().all(|c| c == 'ä'));
@@ -232,8 +248,7 @@ fn a_huge_message_is_kept_shortened_and_said_so_once() {
 fn nothing_left_to_keep_removes_the_file() {
     let dir = folder("emptied");
     let repo = Path::new("/r");
-    let mut warned = HashSet::new();
-    assert!(write(&dir, repo, commit("Soon committed"), &mut warned).is_ok());
+    assert_eq!(write(&dir, repo, commit("Soon committed")), Ok(false));
     let file = store::file_of(&dir, repo);
     assert!(file.exists());
     // Whitespace alone is nothing worth keeping.
@@ -246,10 +261,10 @@ fn nothing_left_to_keep_removes_the_file() {
         ..RepoDrafts::default()
     };
     assert!(blank.is_empty());
-    assert!(write(&dir, repo, RepoDrafts::default(), &mut warned).is_ok());
+    assert!(write(&dir, repo, RepoDrafts::default()).is_ok());
     assert!(!file.exists());
     // Removing what isn't there is no error.
-    assert!(write(&dir, repo, RepoDrafts::default(), &mut warned).is_ok());
+    assert!(write(&dir, repo, RepoDrafts::default()).is_ok());
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -262,7 +277,7 @@ fn the_writer_keeps_two_repositories_apart_and_on_disk() {
     writer.save(b, pull_request());
     writer.flush(Duration::from_secs(10));
     assert_eq!(writer.load(a), Ok(commit("In a")));
-    assert_eq!(writer.take_error(), None);
+    assert_eq!(writer.take_notice(), None);
 
     // A new run reads them from the files.
     let later = Writer::new(Some(dir.clone()));
@@ -298,13 +313,84 @@ fn a_writer_that_cannot_write_says_why() {
     let writer = Writer::new(Some(blocked));
     writer.save(Path::new("/my repo"), commit("Lost?"));
     writer.flush(Duration::from_secs(10));
-    let error = writer.take_error().unwrap_or_default();
+    let said = writer.take_notice();
     assert!(
-        error.starts_with("Couldn't save what you typed in my repo"),
-        "{error}"
+        said.as_ref().is_some_and(|n| n.error
+            && n.text
+                .starts_with("Couldn't save what you typed in my repo")),
+        "{said:?}"
     );
-    // Said once.
-    assert_eq!(writer.take_error(), None);
+    // Typing on, failing the same way: said once, not at every save.
+    writer.save(Path::new("/my repo"), commit("Lost? Still"));
+    writer.flush(Duration::from_secs(10));
+    assert_eq!(writer.take_notice(), None);
+    // The failed drafts are tried again when given again (at exit, say).
+    writer.save(Path::new("/my repo"), commit("Lost? Still"));
+    writer.flush(Duration::from_secs(10));
+    let file = store::file_of(&dir.join("drafts"), Path::new("/my repo"));
+    assert!(!file.exists());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_failed_write_is_tried_again_with_the_same_drafts() {
+    let dir = folder("retry");
+    let blocked = dir.join("drafts");
+    assert!(std::fs::write(&blocked, b"").is_ok());
+    let writer = Writer::new(Some(blocked.clone()));
+    let repo = Path::new("/r");
+    writer.save(repo, commit("Retry me"));
+    writer.flush(Duration::from_secs(10));
+    // The disk has room again.
+    assert!(std::fs::remove_file(&blocked).is_ok());
+    writer.save(repo, commit("Retry me"));
+    writer.flush(Duration::from_secs(10));
+    let file = store::file_of(&blocked, repo);
+    assert_eq!(store::read(&file, repo), Ok(commit("Retry me")));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_file_of_another_version_is_left_alone_while_nothing_is_typed() {
+    let dir = folder("other-version");
+    let repo = Path::new("/r");
+    let file = store::file_of(&dir, repo);
+    let (bytes, _) = limits::encode(repo, commit("From a newer gitcraft")).unwrap_or_default();
+    let later = String::from_utf8_lossy(&bytes).replace("\"format\":1", "\"format\":99");
+    assert!(std::fs::write(&file, &later).is_ok());
+    let writer = Writer::new(Some(dir.clone()));
+    // The tab starts empty and saves that: the file stays.
+    assert_eq!(writer.load(repo), Ok(RepoDrafts::default()));
+    writer.save(repo, RepoDrafts::default());
+    writer.flush(Duration::from_secs(10));
+    assert_eq!(std::fs::read_to_string(&file).ok(), Some(later));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_file_that_cannot_be_read_is_not_removed_by_the_empty_tab() {
+    let dir = folder("unreadable");
+    let repo = Path::new("/r");
+    let file = store::file_of(&dir, repo);
+    // A folder where the file should be: reading it fails, as a locked file would.
+    assert!(std::fs::create_dir_all(file.join("x")).is_ok());
+    let writer = Writer::new(Some(dir.clone()));
+    assert!(writer.load(repo).is_err());
+    writer.save(repo, RepoDrafts::default());
+    writer.flush(Duration::from_secs(10));
+    assert!(file.join("x").exists());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_marker_being_made_is_not_taken_for_a_crash() {
+    let dir = folder("starting");
+    // What another run left halfway through making its marker.
+    assert!(std::fs::write(dir.join("1-2.starting"), b"").is_ok());
+    let mut session = Session::start_in(&dir);
+    assert!(!session.unclean);
+    assert!(!dir.join("1-2.starting").exists());
+    session.end();
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -314,7 +400,7 @@ fn without_a_data_folder_nothing_is_kept_and_nothing_fails() {
     writer.save(Path::new("/r"), commit("Nowhere to go"));
     writer.flush(Duration::from_secs(1));
     assert_eq!(writer.load(Path::new("/r")), Ok(RepoDrafts::default()));
-    assert_eq!(writer.take_error(), None);
+    assert_eq!(writer.take_notice(), None);
 }
 
 #[test]
