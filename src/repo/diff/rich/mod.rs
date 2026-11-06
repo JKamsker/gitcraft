@@ -11,6 +11,10 @@ pub(super) mod config;
 #[cfg(test)]
 mod config_tests;
 mod config_view;
+pub(super) mod deps;
+#[cfg(test)]
+mod deps_tests;
+mod deps_view;
 mod json;
 pub(super) mod prose;
 pub(super) mod prose_view;
@@ -42,6 +46,8 @@ pub enum RichKind {
     Config,
     /// An OpenAPI or Swagger document's breaking changes.
     Api,
+    /// A lockfile's packages upgraded, added and removed.
+    Deps,
 }
 
 impl RichKind {
@@ -49,6 +55,9 @@ impl RichKind {
     pub fn of(path: &str) -> Vec<RichKind> {
         let ext = extension(path);
         let mut kinds = Vec::new();
+        if deps::lockfile(path).is_some() {
+            kinds.push(RichKind::Deps);
+        }
         if prose::EXTENSIONS.contains(&ext.as_str()) {
             kinds.push(RichKind::Prose);
         }
@@ -78,6 +87,7 @@ impl RichKind {
             RichKind::Prose => "book-open",
             RichKind::Config => "list",
             RichKind::Api => "server",
+            RichKind::Deps => "package",
         }
     }
 
@@ -91,6 +101,9 @@ impl RichKind {
             (RichKind::Config, false) => {
                 "Show the changes by key: the keys added, removed, changed and moved"
             }
+            (RichKind::Deps, false) => {
+                "Show the dependency changes: packages upgraded, added and removed"
+            }
             (RichKind::Api, false) => {
                 "Show the API contract changes: what breaks the API's clients, and what was added"
             }
@@ -103,6 +116,7 @@ impl RichKind {
             RichKind::Prose => "as prose",
             RichKind::Config => "by key",
             RichKind::Api => "as API contract changes",
+            RichKind::Deps => "as dependency changes",
         }
     }
 }
@@ -127,6 +141,7 @@ pub enum RichDiff {
     Prose(prose::ProseDiff),
     Config(config::ConfigDiff),
     Api(api::ApiDiff),
+    Deps(deps::DepsDiff),
 }
 
 /// What reading the diff for a rich view gave.
@@ -216,6 +231,10 @@ pub fn load(
             Ok(diff) => Rich::Ready(RichDiff::Config(diff)),
             Err(note) => Rich::Plain(note),
         },
+        RichKind::Deps => match deps::diff(key.path(), &sides) {
+            Ok(diff) => Rich::Ready(RichDiff::Deps(diff)),
+            Err(note) => Rich::Plain(note),
+        },
         RichKind::Api => match api::diff(key.path(), &sides) {
             Ok(diff) => Rich::Ready(RichDiff::Api(diff)),
             Err(note) => Rich::Plain(note),
@@ -239,6 +258,7 @@ pub fn show(ui: &mut Ui, diff: &RichDiff, state: &mut RichState, acts: &mut Vec<
         RichDiff::Prose(prose) => prose_view::show(ui, prose, state, acts),
         RichDiff::Config(config) => config_view::show(ui, config, acts),
         RichDiff::Api(api) => api_view::show(ui, api, acts),
+        RichDiff::Deps(deps) => deps_view::show(ui, deps, acts),
     }
 }
 
