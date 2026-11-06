@@ -141,7 +141,8 @@ pub struct LogStream {
 }
 
 struct RunningLog {
-    child: std::process::Child,
+    /// Taken when it is dropped (see `Drop`).
+    child: Option<std::process::Child>,
     out: std::io::BufReader<std::process::ChildStdout>,
     /// What git says on its error output, read as it comes (unread, a full pipe would stop
     /// git, and with it the output read here).
@@ -170,7 +171,11 @@ impl LogStream {
             })
         });
         Ok(Self {
-            git: Some(RunningLog { child, out, err }),
+            git: Some(RunningLog {
+                child: Some(child),
+                out,
+                err,
+            }),
         })
     }
 
@@ -208,6 +213,8 @@ impl RunningLog {
     fn check_exit(&mut self) -> Result<(), String> {
         let status = self
             .child
+            .as_mut()
+            .ok_or("could not run git")?
             .wait()
             .map_err(|e| format!("could not run git: {e}"))?;
         let err = self
@@ -232,8 +239,14 @@ impl Drop for RunningLog {
     fn drop(&mut self) {
         // Not needed any more (history reloaded, the tab closed): don't leave it waiting. Its
         // error output then ends, and with it the thread reading that.
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        // Ended in the background: dropped on the window's thread (a reload), it doesn't wait
+        // for a process to go, even a quick one.
+        if let Some(mut child) = self.child.take() {
+            let _ = child.kill();
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
+        }
     }
 }
 

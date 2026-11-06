@@ -13,6 +13,7 @@ mod fs;
 mod pool;
 mod session;
 mod shell;
+mod ui_guard;
 
 use std::path::{Path, PathBuf};
 
@@ -22,6 +23,7 @@ pub use fs::{
     try_is_dir, try_is_file, worktree_file, write,
 };
 pub use session::{Output, Request, exec, is_missing_folder, spawn};
+pub use ui_guard::{mark_ui_thread, refused_on_ui_thread};
 
 /// The machine a repository is on, when it isn't this one.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -150,6 +152,21 @@ pub fn parent_there(path: &str) -> &str {
     }
 }
 
+/// Opens `path` with this machine's program for it (the file manager for a folder). One in
+/// WSL from a thread of its own: Windows reaches it through WSL, which may first have to
+/// start. One over SSH can't be (see [`openable_here`]).
+pub fn open_here(path: PathBuf) -> Result<(), String> {
+    openable_here(&path)?;
+    if is_remote(&path) {
+        std::thread::spawn(move || {
+            let _ = open::that_detached(path);
+        });
+    } else {
+        let _ = open::that_detached(path);
+    }
+    Ok(())
+}
+
 /// The host as `ssh` is given it: `user@host:port` only reads as one in the URL form.
 pub fn ssh_destination(host: &str) -> String {
     if host.contains(':') {
@@ -176,7 +193,7 @@ pub fn terminal_command(t: &Target) -> (String, Vec<String>, String) {
         ),
         Host::Ssh(dest) => {
             let dest = ssh_destination(dest);
-            let remote = format!("cd -- {} && exec \"${{SHELL:-sh}}\" -l", sh_path(&t.path));
+            let remote = terminal_script(&t.path);
             (
                 "ssh".to_owned(),
                 vec!["-t".to_owned(), "--".to_owned(), dest, remote],
@@ -184,6 +201,23 @@ pub fn terminal_command(t: &Target) -> (String, Vec<String>, String) {
             )
         }
     }
+}
+
+/// What ssh is told to run for a terminal in `path`. ssh hands it to the user's login shell,
+/// which may be fish or csh, which read quotes and `$` their own way: so it is words that every
+/// shell reads alike — `exec sh -c '<script>' sh <path in base64>` — and `sh` does the rest
+/// (the folder, then the user's own shell as a login one). The script has no `'`, `\` or `!`
+/// (csh expands that even in quotes), the base64 nothing any shell treats specially.
+fn terminal_script(path: &str) -> String {
+    use base64::Engine;
+    const SCRIPT: &str = concat!(
+        "p=$(printf %s \"$1\" | base64 -d); ",
+        "case $p in \"~\"|\"~/\"*) p=\"$HOME${p#\"~\"}\";; esac; ",
+        "cd -- \"$p\" 2>/dev/null; ",
+        "exec \"${SHELL:-sh}\" -l",
+    );
+    let encoded = base64::engine::general_purpose::STANDARD.encode(path);
+    format!("exec sh -c '{SCRIPT}' sh {encoded}")
 }
 
 /// The path this app gives `path` (absolute there, or under `~`) on `host`.

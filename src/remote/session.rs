@@ -12,6 +12,7 @@
 use std::io::{Read, Write};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant};
 
 use super::pool::{Lane, pool};
 use super::shell::{Failure, Shell};
@@ -50,7 +51,32 @@ pub struct Request {
     /// It goes over the network and may take minutes (fetch, push…): run in shells of their
     /// own, so the quick reads aren't left waiting behind it.
     pub long: bool,
+    /// How long it may take before it is stopped; `None`: as long as its lane allows (see
+    /// [`Request::time_limit`]).
+    pub timeout: Option<std::time::Duration>,
 }
+
+impl Request {
+    /// What it runs, in short, for a message: its script's first line.
+    fn what(&self) -> String {
+        let first = self.script.lines().next().unwrap_or_default();
+        let first = first.strip_prefix("exec ").unwrap_or(first);
+        first.chars().take(80).collect()
+    }
+
+    /// How long it may run before it is stopped.
+    pub(super) fn time_limit(&self) -> Duration {
+        self.timeout
+            .unwrap_or(if self.long { LONG_FOR } else { QUICK_FOR })
+    }
+}
+
+/// How long a quick read may take at most (a huge repository's first `status` can take
+/// minutes; one that hangs is stopped after this).
+const QUICK_FOR: Duration = Duration::from_secs(300);
+
+/// How long a network operation may take at most.
+const LONG_FOR: Duration = Duration::from_secs(1800);
 
 /// Without the variables' values (a password) nor the input.
 impl std::fmt::Debug for Request {
@@ -63,6 +89,7 @@ impl std::fmt::Debug for Request {
             .field("unset", &self.unset)
             .field("stdin", &self.stdin.as_ref().map(Vec::len))
             .field("long", &self.long)
+            .field("timeout", &self.timeout)
             .finish()
     }
 }
@@ -77,6 +104,7 @@ pub struct Output {
 
 /// Runs `req` on `host`, in one of the shells kept open there.
 pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
+    super::ui_guard::off_ui_thread(&req.what())?;
     let lane = if req.long { Lane::Long } else { Lane::Quick };
     let pool = pool(host, lane);
     loop {
@@ -87,7 +115,8 @@ pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
         let Some(shell) = taken.shell() else {
             continue;
         };
-        match shell.run(&script, &nonce) {
+        let limit = req.time_limit();
+        match shell.run(&script, &nonce, Instant::now() + limit) {
             Ok(out) => {
                 taken.give_back();
                 return Ok(out);
@@ -95,14 +124,55 @@ pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
             // A shell left open went away meanwhile: the script never reached it, so another
             // shell can run it. (`taken`, dropped, closes it.)
             Err(Failure::NotSent(_)) if reused => {}
+            // Hung: its shell is closed (`taken`, dropped), and the command stopped there.
+            Err(Failure::TimedOut(pid)) => {
+                drop(taken);
+                if let Some(pid) = pid {
+                    stop(host.clone(), pid);
+                }
+                return Err(format!(
+                    "{} didn't finish within {} minutes on {} and was stopped",
+                    req.what(),
+                    limit.as_secs().div_ceil(60),
+                    host.label()
+                ));
+            }
             Err(failure) => return Err(failure.message()),
         }
     }
 }
 
+/// Stops the process `pid` on `host` (a command that hung) and what it started, in the
+/// background: politely, then for good.
+fn stop(host: Host, pid: u32) {
+    std::thread::spawn(move || {
+        let script = format!(
+            concat!(
+                "pkill -TERM -P {pid} 2>/dev/null; kill -TERM {pid} 2>/dev/null
+",
+                "sleep 2
+",
+                "pkill -KILL -P {pid} 2>/dev/null; kill -KILL {pid} 2>/dev/null
+",
+                "true",
+            ),
+            pid = pid
+        );
+        let _ = exec(
+            &host,
+            &Request {
+                script,
+                timeout: Some(Duration::from_secs(30)),
+                ..Request::default()
+            },
+        );
+    });
+}
+
 /// Starts `req` on `host` in a process of its own, whose output the caller reads as it comes
 /// (a long `git log`): from the command's first byte on, what a login printed skipped.
 pub fn spawn(host: &Host, req: &Request) -> Result<Child, String> {
+    super::ui_guard::off_ui_thread(&req.what())?;
     let mut cmd = shell_command(host);
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -293,9 +363,16 @@ pub(super) fn framed(req: &Request, nonce: &str) -> String {
         None => ("true".to_owned(), "/dev/null"),
     };
     s.push_str(&format!("if {decode}; then\n"));
-    s.push_str(&inline(req, &format!("<{input} >\"$T/out\" 2>\"$T/err\"")));
+    // In the background, its process said (`J <nonce> <pid>`), so that one that hangs can be
+    // stopped (see `exec`).
+    s.push_str(&inline(
+        req,
+        &format!("<{input} >\"$T/out\" 2>\"$T/err\" &"),
+    ));
+    s.push_str(&format!(
+        "\np=$!\nprintf 'J %s %s\\n' {nonce} \"$p\"\nwait \"$p\"; r=$?\n"
+    ));
     s.push_str(concat!(
-        "\nr=$?\n",
         "else r=125; echo 'gitcraft: could not pass the input on' >\"$T/err\"; fi\n",
         "if cat \"$T/out\" >\"$T/sent-out\" && cat \"$T/err\" >\"$T/sent-err\"; then :; else\n",
         "  r=125; : >\"$T/sent-out\"; echo 'gitcraft: no room for the output in '\"$T\" >\"$T/sent-err\"\n",
@@ -306,6 +383,15 @@ pub(super) fn framed(req: &Request, nonce: &str) -> String {
     ));
     s.push_str("cat \"$T/sent-out\" \"$T/sent-err\"\nrm -f \"$T/in\" \"$T/out\" \"$T/err\" \"$T/sent-out\" \"$T/sent-err\"\n}\n");
     s
+}
+
+/// `J <nonce> <pid>`: the process of the command of `nonce`.
+pub(super) fn parse_job(line: &str, nonce: &str) -> Option<u32> {
+    let mut words = line.split_whitespace();
+    if words.next()? != "J" || words.next()? != nonce {
+        return None;
+    }
+    words.next()?.parse().ok()
 }
 
 /// `R <nonce> <code> <stdout bytes> <stderr bytes>` (`wc -c` may pad the numbers with

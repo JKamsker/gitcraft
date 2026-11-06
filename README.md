@@ -22,20 +22,32 @@ so your config, credentials and hooks apply as usual.
 
 - Start page → _Remote_ (or the palette's _Open remote repository_): pick a WSL distribution
   or an SSH host (the hosts of `~/.ssh/config` are offered), and the repository's folder there
-  (`/home/me/repo` or `~/repo`). A `\wsl.localhost\…` folder chosen with _Open_ is a WSL
+  (`/home/me/repo` or `~/repo`). A `\\wsl.localhost\…` folder chosen with _Open_ is a WSL
   repository too, and `gitcraft ssh://host/path/to/repo` opens one from the command line.
+- The window never waits for that machine: everything asked of it is asked in the background,
+  and a slow or unreachable machine only shows as work still going on (anything asked of it
+  from the window's thread is refused rather than run, and a test drives the window against a
+  WSL repository to keep it so).
 - git, and every file read or written in the repository (diffs of the working tree, staging
   lines, the conflict editor, `.gitignore`, rebase todo lists), runs on that machine, with its
   own git, config, credentials and hooks. Nothing has to be installed there but git and a POSIX
   `sh`.
 - A few shells per machine are kept open (`ssh -T host sh`, `wsl.exe -d distro --exec sh`), so a
   command costs one round trip, not a new connection. SSH signs in with keys or an agent
-  (`BatchMode`): set up key login first; there is no password prompt.
-- Changes made there show up by themselves: the repository is looked at every few seconds.
-- The terminal opens a shell on that machine, in the repository. Pull requests and builds use
-  `gh` / `glab` of this machine, told which repository.
+  (`BatchMode`): set up key login first; there is no password prompt. A host seen for the first
+  time is trusted by connecting to it once with `ssh` in a terminal.
+- Network operations (fetch, pull, push, clone) run in shells of their own, so the reads never
+  wait behind them. A command that hangs is stopped there, with what it started, after 5
+  minutes (30 for network operations).
+- Changes made there show up by themselves: the repository is looked at every few seconds
+  (every 15 while the window isn't focused).
+- The terminal opens a shell on that machine, in the repository, whatever the login shell
+  (bash, zsh, fish, csh…). Pull requests and builds use `gh` / `glab` of this machine, told
+  which repository, and only for github.com, gitlab.com or a host they're signed in to.
 - Over SSH, programs of this machine can't open the files (reveal in the file manager, open in
-  editor, Mergiraf). In WSL they can, through `\wsl.localhost`.
+  editor, Mergiraf). In WSL they can, through `\\wsl.localhost`.
+- Settings that write this machine's global git config (commit signing, Mergiraf) don't apply
+  there: that machine's own git config does.
 
 **Graph**
 
@@ -230,7 +242,11 @@ The tests of `src/remote/live_tests.rs` run only when given a machine:
 ```sh
 GITCRAFT_TEST_SSH='build-host:~/repos/some-repo' cargo test live_tests -- --nocapture  # reads it
 GITCRAFT_TEST_WSL=Ubuntu cargo test live_tests -- --nocapture  # works in a scratch repo in /tmp
+GITCRAFT_TEST_WSL=Ubuntu cargo test never_holds_up_the_window  # drives the window against one
 ```
+
+`cargo run --example ui_shot` ends by saying how many commands for another machine were asked
+from the window's thread (each is a bug: refused, it would have frozen the window).
 
 ### Looking at the UI headlessly
 

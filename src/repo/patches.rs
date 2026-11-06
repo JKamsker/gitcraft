@@ -11,8 +11,9 @@ impl RepoTab {
     /// Asks where to save the patch of commit `hash`, then writes it there.
     pub(super) fn save_patch(&mut self, hash: String, summary: &str, ctx: &egui::Context) {
         let mut dialog = rfd::FileDialog::new().set_title("Save patch");
-        // Saved on this machine: next to the repository when it is here (or in WSL).
-        if crate::remote::openable_here(&self.path).is_ok() {
+        // Saved on this machine: next to the repository when it is here (a folder in WSL
+        // would make the dialog wait for WSL).
+        if !crate::remote::is_remote(&self.path) {
             dialog = dialog.set_directory(&self.path);
         }
         let Some(file) = dialog
@@ -42,7 +43,7 @@ impl RepoTab {
     /// Asks for a patch file and applies it, undoably.
     pub(super) fn apply_patch(&mut self, ctx: &egui::Context) {
         let mut dialog = rfd::FileDialog::new().set_title("Apply patch");
-        if crate::remote::openable_here(&self.path).is_ok() {
+        if !crate::remote::is_remote(&self.path) {
             dialog = dialog.set_directory(&self.path);
         }
         let Some(file) = dialog

@@ -104,6 +104,7 @@ fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Requ
         unset: GIT_ENV_REMOVED.iter().map(|n| (*n).to_owned()).collect(),
         stdin: None,
         long: goes_over_network(args),
+        timeout: None,
     }
 }
 

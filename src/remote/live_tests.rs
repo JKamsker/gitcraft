@@ -146,8 +146,36 @@ fn late_output_stays_out(host: &Host) -> Result<(), String> {
     Ok(())
 }
 
+/// A command that hangs is stopped at its deadline, there too, and the shells go on.
+fn hung_commands_are_stopped(host: &Host) -> Result<(), String> {
+    let marker = format!("{}.{}", std::process::id() % 1000 + 100, 25);
+    let hung = exec(
+        host,
+        &Request {
+            script: format!("exec sleep {marker}"),
+            timeout: Some(std::time::Duration::from_secs(2)),
+            ..Request::default()
+        },
+    );
+    let err = hung.err().unwrap_or_default();
+    assert!(err.contains("was stopped"), "{err}");
+    // Stopped in the background, within a few seconds.
+    std::thread::sleep(std::time::Duration::from_secs(4));
+    let left = exec(
+        host,
+        &Request {
+            script: format!("ps -eo args | grep -c '^sleep {marker}$' || true"),
+            ..Request::default()
+        },
+    )?;
+    assert_eq!(String::from_utf8_lossy(&left.stdout).trim(), "0");
+    Ok(())
+}
+
 fn work_in(repo: &PathBuf) -> Result<(), String> {
-    late_output_stays_out(&parse(repo).ok_or("not remote")?.host)?;
+    let host = parse(repo).ok_or("not remote")?.host;
+    late_output_stays_out(&host)?;
+    hung_commands_are_stopped(&host)?;
     let git = |args: &[&str]| git::run(Some(repo), args);
     git::init(repo)?;
     git(&["config", "user.name", "Live Test"])?;

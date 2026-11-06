@@ -190,7 +190,7 @@ fn worktree_menu_items(
         .add_enabled(openable, egui::Button::new(crate::repo::reveal_label()))
         .clicked()
     {
-        let _ = open::that_detached(&wt.path);
+        let _ = crate::remote::open_here(wt.path.clone());
     }
     if ui.button("Copy path").clicked() {
         ui.ctx().copy_text(path.clone());

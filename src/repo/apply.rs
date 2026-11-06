@@ -66,6 +66,7 @@ impl RepoTab {
             Action::CheckoutPull(name) => self.checkout_pull(&name, ctx),
             Action::CheckoutRemote(name) => self.checkout_remote(&name, ctx),
             Action::Dialog(dialog) => self.dialog = Some(dialog),
+            Action::DeleteTag { name, target } => self.delete_tag(name, target, ctx),
             Action::Commit => self.commit(ctx),
             Action::Fetch => {
                 self.last_fetch = Instant::now();
@@ -126,12 +127,8 @@ impl RepoTab {
                 }
             }
             Action::OpenPath(rel) => {
-                let path = self.path.join(rel);
-                match crate::remote::openable_here(&path) {
-                    Ok(()) => {
-                        let _ = open::that_detached(path);
-                    }
-                    Err(e) => self.status = Some((e, true)),
+                if let Err(e) = crate::remote::open_here(self.path.join(rel)) {
+                    self.status = Some((e, true));
                 }
             }
             Action::OpenInEditor(rel) => {

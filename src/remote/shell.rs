@@ -8,7 +8,7 @@ use std::sync::mpsc::{Receiver, RecvTimeoutError, channel};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use super::session::{Output, READY, nonce, parse_header, setup_script};
+use super::session::{Output, READY, nonce, parse_header, parse_job, setup_script};
 
 /// How long the connection may take to be made and signed in to.
 const CONNECT_FOR: Duration = Duration::from_secs(30);
@@ -27,12 +27,15 @@ pub(super) enum Failure {
     NotSent(String),
     /// After it was sent: whether it ran, and what it did, is unknown.
     Lost(String),
+    /// It didn't end by its deadline; its process there, when known, is to be stopped.
+    TimedOut(Option<u32>),
 }
 
 impl Failure {
     pub(super) fn message(self) -> String {
         match self {
             Failure::NotSent(m) | Failure::Lost(m) => m,
+            Failure::TimedOut(_) => "it took too long and was stopped".to_owned(),
         }
     }
 }
@@ -103,7 +106,7 @@ impl Shell {
                 Err(if said.is_empty() {
                     e
                 } else {
-                    format!("could not reach {label}: {said}")
+                    format!("could not reach {label}: {said}{}", connect_hint(&said))
                 })
             }
         }
@@ -161,7 +164,14 @@ impl Shell {
     }
 
     /// Runs `script` (see `session::framed`), the command of `nonce`.
-    pub(super) fn run(&mut self, script: &str, nonce: &str) -> Result<Output, Failure> {
+    /// Runs `script` (see `session::framed`), the command of `nonce`, which must be done by
+    /// `deadline`.
+    pub(super) fn run(
+        &mut self,
+        script: &str,
+        nonce: &str,
+        deadline: Instant,
+    ) -> Result<Output, Failure> {
         lock(&self.said).clear();
         self.stdin
             .write_all(script.as_bytes())
@@ -175,15 +185,34 @@ impl Shell {
             Ok(_) => return Err(lost(self, "it answered out of turn")),
             Err(_) => return Err(closed(self)),
         }
-        let header = match self.read_line(None) {
-            Ok(line) => parse_header(&String::from_utf8_lossy(&line), nonce),
-            Err(_) => return Err(closed(self)),
+        // `J <nonce> <pid>` (no process: the input couldn't be passed on, `R` comes next).
+        let mut line = match self.read_line(Some(deadline)) {
+            Ok(line) => line,
+            Err(ReadError::TimedOut) => return Err(Failure::TimedOut(None)),
+            Err(ReadError::Closed) => return Err(closed(self)),
         };
-        let Some((code, out_len, err_len)) = header else {
+        let pid = parse_job(&String::from_utf8_lossy(&line), nonce);
+        if pid.is_some() {
+            line = match self.read_line(Some(deadline)) {
+                Ok(line) => line,
+                Err(ReadError::TimedOut) => return Err(Failure::TimedOut(pid)),
+                Err(ReadError::Closed) => return Err(closed(self)),
+            };
+        }
+        let Some((code, out_len, err_len)) = parse_header(&String::from_utf8_lossy(&line), nonce)
+        else {
             return Err(lost(self, "it answered out of turn"));
         };
-        let stdout = self.read_exactly(out_len).map_err(|_| closed(self))?;
-        let stderr = self.read_exactly(err_len).map_err(|_| closed(self))?;
+        let timed_out_or_closed = |e: ReadError, s: &Self| match e {
+            ReadError::TimedOut => Failure::TimedOut(None),
+            ReadError::Closed => closed(s),
+        };
+        let stdout = self
+            .read_exactly(out_len, Some(deadline))
+            .map_err(|e| timed_out_or_closed(e, self))?;
+        let stderr = self
+            .read_exactly(err_len, Some(deadline))
+            .map_err(|e| timed_out_or_closed(e, self))?;
         self.used = Instant::now();
         Ok(Output {
             code,
@@ -223,9 +252,13 @@ impl Shell {
 
     /// The next `len` bytes, held only as they arrive: a header that says more than comes
     /// doesn't make the app set aside memory for it.
-    fn read_exactly(&mut self, len: usize) -> Result<Vec<u8>, ReadError> {
+    fn read_exactly(
+        &mut self,
+        len: usize,
+        deadline: Option<Instant>,
+    ) -> Result<Vec<u8>, ReadError> {
         while self.pending.len() < len {
-            self.more(None)?;
+            self.more(deadline)?;
         }
         let rest = self.pending.split_off(len);
         Ok(std::mem::replace(&mut self.pending, rest))
@@ -251,6 +284,19 @@ impl Drop for Shell {
         // Its shell ends (and clears its folder) as the connection goes.
         let _ = self.child.kill();
         let _ = self.child.wait();
+    }
+}
+
+/// What to do about what ssh said when it couldn't connect, for the two cases it can't solve
+/// itself here: a host it hasn't seen yet, and a sign-in that needs a password or passphrase
+/// (nobody can type one into a connection made in the background).
+fn connect_hint(said: &str) -> &'static str {
+    if said.contains("Host key verification failed") {
+        " - connect once with ssh in a terminal to trust its host key"
+    } else if said.contains("Permission denied") {
+        " - sign-in works with keys or an agent only (ssh-add, or a key without a passphrase)"
+    } else {
+        ""
     }
 }
 
@@ -322,7 +368,11 @@ mod tests {
     fn run_in(shell: &mut Shell, req: &Request) -> Result<Output, String> {
         let nonce = nonce();
         shell
-            .run(&framed(req, &nonce), &nonce)
+            .run(
+                &framed(req, &nonce),
+                &nonce,
+                Instant::now() + Duration::from_secs(30),
+            )
             .map_err(Failure::message)
     }
 

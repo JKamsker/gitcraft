@@ -112,6 +112,8 @@ pub struct App {
 impl App {
     /// `open_arg`: a repository passed on the command line, opened (or focused) on start.
     pub fn new(cc: &eframe::CreationContext<'_>, open_arg: Option<PathBuf>) -> Self {
+        // The window's thread: it never waits for another machine (see `remote::ui_guard`).
+        crate::remote::mark_ui_thread();
         let saved: Saved = cc
             .storage
             .and_then(|s| eframe::get_value(s, eframe::APP_KEY))
@@ -507,6 +509,12 @@ fn repo_root(path: &Path) -> Result<PathBuf, String> {
     }
     let root = std::fs::canonicalize(&root).unwrap_or(root);
     Ok(strip_verbatim(root))
+}
+
+/// How many commands for a repository on another machine were asked from the window's thread
+/// (and refused: it never waits for a network). For tests and `examples/ui_shot.rs`.
+pub fn refused_on_ui_thread() -> usize {
+    crate::remote::refused_on_ui_thread()
 }
 
 /// Work the first frame will need, started before the window is made so that it overlaps with

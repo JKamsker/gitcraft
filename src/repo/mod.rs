@@ -32,6 +32,8 @@ pub(crate) mod pull;
 mod quick_edit;
 mod rebase;
 mod rewrite;
+#[cfg(test)]
+mod samples;
 mod sidebar;
 mod state;
 mod terminals;

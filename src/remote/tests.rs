@@ -200,3 +200,22 @@ fn a_wsl_folder_picked_here_is_its_path_there() {
     );
     assert!(folder_for_git(&repo, r"\\wsl.localhost\Debian\home\me\x").is_err());
 }
+
+/// The terminal's command reads alike in sh, bash, fish and csh: nothing but the single-quoted
+/// script and words of letters, digits and `+/=`.
+#[test]
+fn the_terminal_command_is_for_any_login_shell() {
+    let s = terminal_script("/home/me/it's a \"repo\" $(x) !1");
+    let (head, rest) = s.split_once(" '").unwrap_or_default();
+    assert_eq!(head, "exec sh -c");
+    let (script, tail) = rest.split_once("' ").unwrap_or_default();
+    assert!(!script.contains(['\'', '\\', '!']), "{script}");
+    let words: Vec<&str> = tail.split(' ').collect();
+    assert_eq!(words.len(), 2, "{tail}");
+    assert_eq!(words[0], "sh");
+    assert!(
+        words[1]
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '/' | '='))
+    );
+}

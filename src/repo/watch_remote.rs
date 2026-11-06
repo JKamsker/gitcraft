@@ -48,6 +48,8 @@ pub(super) fn poll(repo: &Path, tx: &Sender<FsChange>, ctx: &egui::Context, aliv
             cwd: Some(target.path.clone()),
             script: script(&timed, &mark),
             env: vec![("GIT_OPTIONAL_LOCKS".to_owned(), "0".to_owned())],
+            // A look that hangs is given up (and stopped) before the next.
+            timeout: Some(Duration::from_secs(60)),
             ..remote::Request::default()
         };
         // Not reached this time (the network…): next time.

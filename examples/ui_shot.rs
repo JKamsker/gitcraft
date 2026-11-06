@@ -202,6 +202,11 @@ fn main() {
             other => eprintln!("unknown step {other}"),
         }
     }
+    // Commands for another machine asked from the window's thread (each would have frozen it).
+    println!(
+        "asked of another machine on the window's thread: {}",
+        gitcraft::app::refused_on_ui_thread()
+    );
 }
 
 /// Steps frames for `ms` of real time, so background git work can land.

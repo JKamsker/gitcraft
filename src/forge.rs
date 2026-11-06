@@ -95,7 +95,12 @@ pub(crate) fn tool_with_input(
                     cmd.env("GH_REPO", format!("{host}/{path}"));
                 }
                 Forge::GitLab => {
-                    cmd.env("GITLAB_HOST", &host).args(["--repo", &path]);
+                    cmd.env("GITLAB_HOST", &host);
+                    // `glab api` takes no `--repo` (it would fail on it): its calls name the
+                    // host and the project themselves.
+                    if gitlab_takes_repo(args) {
+                        cmd.args(["--repo", &path]);
+                    }
                 }
             }
         }
@@ -129,6 +134,11 @@ pub(crate) fn tool_with_input(
     } else {
         Err(failure(forge, &out))
     }
+}
+
+/// Whether `glab` with `args` takes `--repo`: every command but `api`.
+fn gitlab_takes_repo(args: &[&str]) -> bool {
+    args.first().is_some_and(|sub| *sub != "api")
 }
 
 /// The web host and `owner/repo` of the remote the forge is found from (see [`detect`]), for a
@@ -455,6 +465,19 @@ fn parse_github_avatars(json: &str) -> HashMap<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `glab api` would refuse `--repo`; the commands about a project take it.
+    #[test]
+    fn only_glab_commands_about_a_project_take_repo() {
+        assert!(!gitlab_takes_repo(&[
+            "api",
+            "--hostname",
+            "gitlab.com",
+            "projects/x"
+        ]));
+        assert!(gitlab_takes_repo(&["mr", "list", "-F", "json"]));
+        assert!(!gitlab_takes_repo(&[]));
+    }
 
     /// The user's environment can't colour the JSON read from the tools, nor point them at
     /// another repository or host.
