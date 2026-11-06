@@ -4,7 +4,7 @@
 use egui::{Key, Modifiers, Stroke, Ui};
 
 use super::suggest::{self, Listing};
-use crate::git::search_query::Operator;
+use crate::git::search_query::{DATE_FORMATS, Operator};
 use crate::icons;
 use crate::repo::{Action, RepoTab};
 use crate::theme::Tokens;
@@ -261,9 +261,8 @@ fn operators_help() -> String {
     for op in Operator::ALL {
         help.push_str(&format!("\n{}:  {}", op.name(), op.help()));
     }
-    help.push_str(
-        "\n\nQuote values with spaces: author:\"Jane Doe\". \
-         Dates: 2024-05-01, 2024-05, 2w, 3m, 1y, today.",
-    );
+    help.push_str(&format!(
+        "\n\nQuote values with spaces: author:\"Jane Doe\".\nDates: {DATE_FORMATS}."
+    ));
     help
 }
