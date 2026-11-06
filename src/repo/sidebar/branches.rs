@@ -7,6 +7,8 @@ use crate::ci::Status;
 use crate::git::Branch;
 use crate::icons;
 use crate::repo::actions::{BranchRef, compare_branches_action, interactive_rebase_action};
+use crate::repo::branch_health::Reason;
+use crate::repo::branch_order::BranchOrder;
 use crate::repo::branch_tree::{self, LeafRow, TreeView};
 use crate::repo::branch_visibility::local_ref;
 use crate::repo::graph_view;
@@ -53,6 +55,21 @@ impl RepoTab {
         if !open {
             return;
         }
+        let order = BranchOrder::load(ui.ctx(), self.repo_key());
+        let by_date = self
+            .branch_health
+            .health
+            .as_ref()
+            .map_or(&[][..], |h| h.by_date.as_slice());
+        let (pinned, local) = order.arrange(local, by_date);
+        let stale_days = Settings::get(ui.ctx()).stale_branch_days;
+        for b in pinned {
+            let row = LeafRow {
+                name: &b.name,
+                indent: 0.0,
+            };
+            self.local_branch_row(ui, acts, b, row, idle, stale_days, true);
+        }
         let tree = branch_tree::build(local.iter().map(|b| (b.name.as_str(), *b)));
         let view = TreeView::branches(
             egui::Id::new(("branch-folder", self.repo_key(), "local")),
@@ -65,10 +82,13 @@ impl RepoTab {
             &view,
             &|b: &&Branch| b.is_head,
             &|b: &&Branch| ("branch-row", local_ref(&b.name)),
-            &mut |ui, row, b: &&Branch| self.local_branch_row(ui, acts, b, row, idle),
+            &mut |ui, row, b: &&Branch| {
+                self.local_branch_row(ui, acts, b, row, idle, stale_days, false);
+            },
         );
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn local_branch_row(
         &self,
         ui: &mut Ui,
@@ -76,6 +96,8 @@ impl RepoTab {
         b: &Branch,
         row: LeafRow<'_>,
         idle: bool,
+        stale_days: u32,
+        pinned: bool,
     ) {
         let (ahead, behind) = b.ahead_behind();
         // Checked out in another worktree: git won't check it out here too.
@@ -87,8 +109,11 @@ impl RepoTab {
         let ci = self.ci_status(&b.target);
         let full = local_ref(&b.name);
         let shown = self.branch_shown(&full, b.is_head);
+        let reasons = self.branch_reasons(b, stale_days);
         let marks = Marks {
             gone: b.upstream_gone(),
+            badge: badge(&reasons),
+            pinned,
             in_worktree: elsewhere.is_some(),
             has_pr,
             ci: ci.map(|status| (b.target.as_str(), status)),
@@ -106,6 +131,9 @@ impl RepoTab {
         };
         if let Some(status) = ci {
             tip.push_str(&format!("\nCI: {}", ci_status::state_word(status.state)));
+        }
+        for reason in reasons.iter().filter(|r| **r != Reason::UpstreamGone) {
+            tip.push_str(&format!("\n{}", capitalise(&reason.describe())));
         }
         let r = match elsewhere {
             Some(wt) => r.on_hover_text(format!(
@@ -181,10 +209,29 @@ impl RepoTab {
         if ui.button("Copy name").clicked() {
             ui.ctx().copy_text(b.name.clone());
         }
+        self.pin_item(ui, &b.name);
         ui.separator();
         self.visibility_items(ui, acts, &local_ref(&b.name), b.is_head);
         ui.separator();
         self.delete_items(ui, acts, b, idle);
+    }
+
+    /// Pin to top, or Unpin: kept for this repository.
+    fn pin_item(&self, ui: &mut Ui, name: &str) {
+        let mut order = BranchOrder::load(ui.ctx(), self.repo_key());
+        let label = if order.is_pinned(name) {
+            "Unpin"
+        } else {
+            "Pin to top"
+        };
+        if ui
+            .button(label)
+            .on_hover_text("Pinned branches stay at the top of Local")
+            .clicked()
+        {
+            order.toggle_pin(name);
+            order.store(ui.ctx(), self.repo_key());
+        }
     }
 
     /// Check out `b`, here or in a new worktree; or open the worktree it is checked out in.
@@ -318,7 +365,7 @@ impl RepoTab {
 
     /// The branch pull requests go into by default: main, master or develop on the default
     /// remote, else main.
-    fn default_base(&self) -> String {
+    pub(in crate::repo) fn default_base(&self) -> String {
         let remote = self.default_remote().unwrap_or_else(|| "origin".to_owned());
         let names: Vec<&str> = self
             .remote_branches(&remote)
@@ -390,10 +437,39 @@ fn integrate_items(ui: &mut Ui, acts: &mut Vec<Action>, b: &Branch, current: &st
     graph_view::compare_items(ui, acts, BranchRef::local(&b.name), current);
 }
 
+/// The badge a branch's row shows for the first of `reasons` that has one: Merged, else Stale.
+fn badge(reasons: &[Reason]) -> Option<Badge> {
+    if reasons.iter().any(Reason::is_merged) {
+        Some(Badge::Merged)
+    } else if reasons.iter().any(|r| matches!(r, Reason::Stale(_))) {
+        Some(Badge::Stale)
+    } else {
+        None
+    }
+}
+
+/// `Merged into main` from `merged into main`.
+fn capitalise(text: &str) -> String {
+    let mut chars = text.chars();
+    chars.next().map_or_else(String::new, |first| {
+        first.to_uppercase().chain(chars).collect()
+    })
+}
+
+/// A word on a branch's row saying it could be cleaned up.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Badge {
+    Merged,
+    Stale,
+}
+
 /// What a branch's row shows besides its name and how far ahead and behind it is.
 struct Marks<'a> {
     /// Its upstream was deleted on the remote.
     gone: bool,
+    badge: Option<Badge>,
+    /// Kept at the top of Local: a pin instead of the branch icon.
+    pinned: bool,
     /// Checked out in another worktree.
     in_worktree: bool,
     has_pr: bool,
@@ -416,6 +492,8 @@ fn branch_row(
 ) -> (Response, Option<Action>) {
     let Marks {
         gone,
+        badge,
+        pinned,
         in_worktree,
         has_pr,
         ci,
@@ -437,6 +515,8 @@ fn branch_row(
         Rect::from_center_size(pos2(rect.left() + 34.0 + row.indent, y), vec2(16.0, 16.0));
     if is_head {
         icons::paint(ui, icon_rect, "check", 14.0, t.accent);
+    } else if pinned {
+        icons::paint(ui, icon_rect, "pin", 13.0, t.text_dim);
     } else {
         icons::paint(ui, icon_rect, "git-branch", 13.0, t.text_faint);
     }
@@ -460,6 +540,20 @@ fn branch_row(
             "gone",
             theme::medium(10.5),
             t.text_faint,
+        );
+        right = r.left() - 6.0;
+    }
+    if let Some(badge) = badge {
+        let (word, color) = match badge {
+            Badge::Merged => ("merged", t.success),
+            Badge::Stale => ("stale", t.warning),
+        };
+        let r = painter.text(
+            pos2(right, y),
+            Align2::RIGHT_CENTER,
+            word,
+            theme::medium(10.5),
+            color,
         );
         right = r.left() - 6.0;
     }
@@ -573,5 +667,55 @@ mod tests {
         assert!(opened, "the right-click opened no menu");
         assert!(followed, "the menu closed when its branch moved down a row");
         assert!(!egui::Popup::is_any_open(&ctx));
+    }
+
+    /// A pinned branch is the first row of Local, whatever its name: right-clicking that row
+    /// opens its menu.
+    #[test]
+    fn a_pinned_branch_is_the_first_row() {
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let mut tab = RepoTab::new_deferred("/nonexistent/branch-pin-test".into(), &ctx);
+        tab.refs.local = vec![
+            branch("alpha", 'a'),
+            branch("beta", 'b'),
+            branch("zeta", 'c'),
+        ];
+        let mut order = BranchOrder::default();
+        order.toggle_pin("zeta");
+        order.store(&ctx, tab.repo_key());
+        let screen = Rect::from_min_size(egui::Pos2::ZERO, vec2(320.0, 600.0));
+        let first = pos2(160.0, 26.0 + ROW_H * 0.5);
+        let mut zeta_menu = false;
+        let mut frame = |events: Vec<egui::Event>| {
+            let input = egui::RawInput {
+                screen_rect: Some(screen),
+                events,
+                ..Default::default()
+            };
+            ctx.run_ui(input, |ui| {
+                egui::CentralPanel::default()
+                    .frame(egui::Frame::NONE)
+                    .show(ui, |ui| {
+                        ui.spacing_mut().item_spacing.y = 0.0;
+                        let mut sections = Sections::new(egui::Id::new("branch-pin-test"), None);
+                        tab.local_section(ui, &mut Vec::new(), true, "", &mut sections);
+                        zeta_menu =
+                            widgets::keyed_row_menu_open(ui, ("branch-row", "refs/heads/zeta"));
+                    });
+            })
+            .drop_without_applying_deltas();
+        };
+        frame(vec![egui::Event::PointerMoved(first)]);
+        let click = |pressed| egui::Event::PointerButton {
+            pos: first,
+            button: egui::PointerButton::Secondary,
+            pressed,
+            modifiers: egui::Modifiers::NONE,
+        };
+        frame(vec![click(true), click(false)]);
+        frame(Vec::new());
+        frame(Vec::new());
+        assert!(zeta_menu, "the first row is not the pinned branch's");
     }
 }

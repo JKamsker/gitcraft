@@ -19,7 +19,7 @@ use crate::theme::{self, Tokens};
 impl RepoTab {
     /// The remote-tracking branches of `remote`. Told apart by name, not by the first part of
     /// it: a remote can have a slash in its name (`my/fork`).
-    pub(super) fn remote_branches<'a>(
+    pub(in crate::repo) fn remote_branches<'a>(
         &'a self,
         remote: &'a str,
     ) -> impl Iterator<Item = &'a Branch> + 'a {
