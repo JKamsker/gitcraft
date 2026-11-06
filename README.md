@@ -18,6 +18,11 @@ so your config, credentials and hooks apply as usual.
   its own open tabs, recent repositories, theme, git author and commit signing (Settings →
   Profile); the other settings pages are shared. Switching closes this profile's tabs and opens the
   other one's (refused while a tab has unfinished work).
+- One window: `gitcraft <folder>` or _Open in gitcraft_ while gitcraft is running opens that
+  folder in a tab of the running window (or switches to its tab) and brings it to the front; a
+  bare `gitcraft` just brings it to the front. Two windows never save their tabs over each
+  other's. The handoff goes over 127.0.0.1 with a random token kept in a file of the data
+  folder only you can read.
 - Changes made elsewhere (editor, terminal) show up by themselves: the folder is watched.
 - Repositories on another machine, in a WSL distribution or over SSH: the window stays here and
   git runs there (see below).
