@@ -15,8 +15,8 @@ so your config, credentials and hooks apply as usual.
 - Browser-like tabs, one per repository (Ctrl+T, Ctrl+W, middle-click; Ctrl+Shift+T reopens a
   closed one). Open tabs, recents, theme and settings are remembered.
 - Profiles, as in GitKraken: switch between them from the title bar (or the palette). Each has
-  its own open tabs, recent repositories, theme, git author and commit signing; the rest of the
-  settings are shared (Settings → General). Switching closes this profile's tabs and opens the
+  its own open tabs, recent repositories, theme, git author and commit signing (Settings →
+  Profile); the other settings pages are shared. Switching closes this profile's tabs and opens the
   other one's (refused while a tab has unfinished work).
 - Changes made elsewhere (editor, terminal) show up by themselves: the folder is watched.
 - Repositories on another machine, in a WSL distribution or over SSH: the window stays here and
@@ -205,14 +205,16 @@ so your config, credentials and hooks apply as usual.
   GitHub's API); on Forgejo and Gitea, the accounts the host ties the commits to; on GitLab, the
   host's avatar API; elsewhere Gravatar (a hash of the email).
   Cached on disk; can be turned off.
-- Settings: zoom, branch column width, graph columns, avatars, notifications, update check,
-  background fetch, keeping submodules up to date, editor command, default shell and terminal
-  font size, saved identities.
-- Commit signing in Settings: the format (OpenPGP, SSH or X.509), signing key and program, and
+- Settings (Ctrl+, or the gear in the title bar), in pages listed on the left: the profile in
+  use and what is its own, zoom, branch column width, graph columns, avatars, notifications,
+  update check, background fetch, keeping submodules up to date, editor command, default shell
+  and terminal font size, saved identities, and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it);
+  Alt+↑ / Alt+↓ go through the pages.
+- Commit signing in Settings → Commit signing: the format (OpenPGP, SSH or X.509), signing key and program, and
   whether commits and tags are signed by default. These are your global git config's
   `gpg.format`, `user.signingkey`, `gpg.program` (`gpg.ssh.program`, `gpg.x509.program`),
   `commit.gpgSign` and `tag.gpgSign`, shown as they are set and written back there; git does
-  the signing as usual. A profile can sign its own way instead.
+  the signing as usual. A profile can sign its own way instead (Settings → Profile).
 - How a profile's git author and signing reach git: gitcraft writes them to a config file of the
   profile's (in its data folder, `profiles/<id>.gitconfig`) that includes your own global config
   first and then sets the profile's values, and runs git with `GIT_CONFIG_GLOBAL` pointing at it

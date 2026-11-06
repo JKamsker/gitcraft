@@ -110,8 +110,6 @@ pub struct App {
     settings: Settings,
     /// The profiles not in use: their tabs, recent repositories and theme.
     profile_states: profiles::ProfileStates,
-    /// The settings page shows the profile's settings rather than the general ones.
-    settings_profile_page: bool,
     /// What the profile set for git when the repository tabs last read who commits are by.
     profile_git_seen: String,
     manual_open: bool,
@@ -156,7 +154,6 @@ impl App {
             clone_parent: saved.clone_parent,
             settings,
             profile_states: saved.profile_states,
-            settings_profile_page: false,
             profile_git_seen: String::new(),
             manual_open: false,
             palette: None,
@@ -320,18 +317,23 @@ impl App {
             || self.palette.is_some()
             || self.manual_open
             || ctx.egui_wants_keyboard_input();
-        let (new_tab, reopen, close, refresh, focused, palette, manual) = ctx.input(|i| {
-            let t = i.modifiers.command && i.key_pressed(Key::T);
-            (
-                t && !i.modifiers.shift,
-                t && i.modifiers.shift,
-                i.modifiers.command && i.key_pressed(Key::W),
-                i.key_pressed(Key::F5),
-                i.focused,
-                i.modifiers.command && i.key_pressed(Key::P),
-                i.key_pressed(Key::F1),
-            )
-        });
+        let (new_tab, reopen, close, refresh, focused, palette, manual, settings) =
+            ctx.input(|i| {
+                let t = i.modifiers.command && i.key_pressed(Key::T);
+                (
+                    t && !i.modifiers.shift,
+                    t && i.modifiers.shift,
+                    i.modifiers.command && i.key_pressed(Key::W),
+                    i.key_pressed(Key::F5),
+                    i.focused,
+                    i.modifiers.command && i.key_pressed(Key::P),
+                    i.key_pressed(Key::F1),
+                    i.modifiers.command && i.key_pressed(Key::Comma),
+                )
+            });
+        if settings && !modal_open {
+            self.open_settings();
+        }
         // Not over a dialog that asks something (the clone, the remote one, ssh's question).
         let asking = self.clone_form.is_some() || self.remote_form.is_some() || self.askpass_open();
         if manual && !asking && self.palette.is_none() {

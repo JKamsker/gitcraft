@@ -1,13 +1,14 @@
-//! The profile half of the settings page: which profile is in use, and what is its own (name,
-//! git author, commit signing, theme).
+//! The settings' Profile page: which profile is in use, and what is its own (name, git author,
+//! commit signing, theme).
 
 use std::time::Instant;
 
 use egui::{Align2, Color32, RichText, Ui, vec2};
 
+use super::layout::{self, Filter, section};
 use super::profiles::{self, UserProfile};
-use super::signing::{self, LABEL_W, RECHECK};
-use super::{Settings, section};
+use super::signing::{self, RECHECK};
+use super::{FIELD_WIDTH, Settings};
 use crate::theme::{self, ThemeKind, Tokens};
 
 /// What the profile page asks the app for: profiles switch with the tabs, which are the app's.
@@ -20,6 +21,16 @@ pub enum ProfileRequest {
     Duplicate,
     Delete(u64),
     Theme(ThemeKind),
+}
+
+/// What the Profile page needs of the app, and what it asks the app to do.
+pub struct ProfileView<'a> {
+    /// The app's theme, which is the profile's.
+    pub theme: ThemeKind,
+    /// What `git --version` said.
+    pub git_version: &'a str,
+    /// Set by the page: profiles switch with the tabs, which are the app's.
+    pub request: Option<ProfileRequest>,
 }
 
 /// The author the user's own global git config sets, read again now and then: it can change
@@ -79,89 +90,78 @@ pub fn badge(ui: &mut Ui, size: f32, profile: &UserProfile) {
 }
 
 impl Settings {
-    /// The profile in use and its own settings. `theme` is the app's (the profile's), and
-    /// `git_version` what `git --version` said. Returns whether a setting changed, and what the
-    /// app is asked to do.
-    pub fn profile_ui(
-        &mut self,
-        ui: &mut Ui,
-        theme: ThemeKind,
-        git_version: &str,
-    ) -> (bool, Option<ProfileRequest>) {
+    /// The profile in use and its own settings, or what a search matches of them.
+    pub(super) fn profile_ui(&mut self, ui: &mut Ui, f: &Filter, view: &mut ProfileView) {
         let t = Tokens::get(ui.ctx());
-        let before = self.clone();
-        let mut request = None;
         let current = self.profile();
+        let mut request = None;
 
-        section(ui, "PROFILE");
-        ui.label(
-            RichText::new(
-                "Each profile has its own tabs, recent repositories, theme, git author and commit \
-                 signing; everything under General is shared. Switching closes this profile's \
+        section(
+            ui,
+            f,
+            "Profile",
+            Some(
+                "Each profile has its own tabs, recent repositories, theme, git author and \
+                 commit signing; the other pages are shared. Switching closes this profile's \
                  tabs and opens the other one's.",
-            )
-            .color(t.text_dim)
-            .small(),
-        );
-        ui.add_space(4.0);
-        egui::Grid::new("settings-profile")
-            .num_columns(2)
-            .min_col_width(LABEL_W)
-            .spacing([16.0, 8.0])
-            .show(ui, |ui| {
-                ui.label("In use");
-                ui.horizontal(|ui| {
-                    badge(ui, 20.0, &current);
-                    egui::ComboBox::from_id_salt("settings-profile-pick")
-                        .selected_text(current.title())
-                        .width(180.0)
-                        .show_ui(ui, |ui| {
-                            for p in &self.user_profiles {
-                                if ui.selectable_label(p.id == current.id, p.title()).clicked()
-                                    && p.id != current.id
-                                {
-                                    request = Some(ProfileRequest::Switch(p.id));
+            ),
+            |card| {
+                card.row("In use", "switch profile new duplicate delete", |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        badge(ui, 20.0, &current);
+                        egui::ComboBox::from_id_salt("settings-profile-pick")
+                            .selected_text(current.title())
+                            .width(layout::fit(ui, 180.0))
+                            .show_ui(ui, |ui| {
+                                for p in &self.user_profiles {
+                                    if ui.selectable_label(p.id == current.id, p.title()).clicked()
+                                        && p.id != current.id
+                                    {
+                                        request = Some(ProfileRequest::Switch(p.id));
+                                    }
                                 }
-                            }
-                        });
-                    if ui
-                        .button("New")
-                        .on_hover_text("A new profile, with no tabs, switched to")
-                        .clicked()
-                    {
-                        request = Some(ProfileRequest::New);
-                    }
-                    if ui
-                        .button("Duplicate")
-                        .on_hover_text(
-                            "A copy of this profile's settings (not its tabs), switched to",
-                        )
-                        .clicked()
-                    {
-                        request = Some(ProfileRequest::Duplicate);
-                    }
-                    request = request.or(delete_button(ui, &current, self.user_profiles.len()));
-                });
-                ui.end_row();
-                ui.label("Name");
-                ui.add(
-                    egui::TextEdit::singleline(&mut self.profile_mut().name)
-                        .hint_text("Work")
-                        .desired_width(200.0),
-                );
-                ui.end_row();
-                ui.label("Theme");
-                ui.horizontal(|ui| {
-                    for kind in ThemeKind::ALL {
-                        if ui.radio(theme == kind, kind.label()).clicked() && theme != kind {
-                            request = Some(ProfileRequest::Theme(kind));
+                            });
+                        if ui
+                            .button("New")
+                            .on_hover_text("A new profile, with no tabs, switched to")
+                            .clicked()
+                        {
+                            request = Some(ProfileRequest::New);
                         }
-                    }
+                        if ui
+                            .button("Duplicate")
+                            .on_hover_text(
+                                "A copy of this profile's settings (not its tabs), switched to",
+                            )
+                            .clicked()
+                        {
+                            request = Some(ProfileRequest::Duplicate);
+                        }
+                        request = request.or(delete_button(ui, &current, self.user_profiles.len()));
+                    });
                 });
-                ui.end_row();
-            });
+                card.row("Name", "rename title", |ui| {
+                    ui.add(
+                        layout::field(&mut self.profile_mut().name)
+                            .hint_text("Work")
+                            .desired_width(layout::fit(ui, 200.0)),
+                    );
+                });
+                card.row("Theme", "dark light colours colors appearance", |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.spacing_mut().item_spacing.x = 18.0;
+                        for kind in ThemeKind::ALL {
+                            if ui.radio(view.theme == kind, kind.label()).clicked()
+                                && view.theme != kind
+                            {
+                                request = Some(ProfileRequest::Theme(kind));
+                            }
+                        }
+                    });
+                });
+            },
+        );
 
-        section(ui, "GIT AUTHOR");
         let own = own_author(ui.ctx());
         let hint = |value: &str, key: &str| {
             if value.is_empty() {
@@ -170,80 +170,83 @@ impl Settings {
                 value.to_owned()
             }
         };
-        egui::Grid::new("settings-profile-author")
-            .num_columns(2)
-            .min_col_width(LABEL_W)
-            .spacing([16.0, 8.0])
-            .show(ui, |ui| {
-                let profile = self.profile_mut();
-                ui.label("Name");
-                ui.add(
-                    egui::TextEdit::singleline(&mut profile.author_name)
-                        .hint_text(hint(&own.name, "user.name"))
-                        .desired_width(300.0),
-                );
-                ui.end_row();
-                ui.label("Email");
-                ui.add(
-                    egui::TextEdit::singleline(&mut profile.author_email)
-                        .hint_text(hint(&own.email, "user.email"))
-                        .desired_width(300.0),
-                );
-                ui.end_row();
-            });
-        ui.label(
-            RichText::new(
+        section(
+            ui,
+            f,
+            "Git author",
+            Some(
                 "Commits from gitcraft are by this author. Empty: as in your global git config \
-                 (shown greyed). A repository that sets its own user.name or user.email \
-                 (git config --local, or \"Commit as…\" in its commit box) keeps them: the \
+                 (shown greyed). A repository that sets its own user.name or user.email (git \
+                 config --local, or \"Commit as…\" in its commit box) keeps them: the \
                  repository's config wins over the profile. A repository in WSL or over SSH \
                  goes by that machine's git config instead.",
-            )
-            .color(t.text_faint)
-            .small(),
+            ),
+            |card| {
+                let profile = self.profile_mut();
+                card.row("Name", "user.name author committer", |ui| {
+                    ui.add(
+                        layout::field(&mut profile.author_name)
+                            .hint_text(hint(&own.name, "user.name"))
+                            .desired_width(layout::fit(ui, FIELD_WIDTH)),
+                    );
+                });
+                card.row("Email", "user.email author committer", |ui| {
+                    ui.add(
+                        layout::field(&mut profile.author_email)
+                            .hint_text(hint(&own.email, "user.email"))
+                            .desired_width(layout::fit(ui, FIELD_WIDTH)),
+                    );
+                });
+            },
         );
 
-        section(ui, "COMMIT SIGNING");
-        let profile = self.profile_mut();
-        ui.horizontal(|ui| {
-            ui.radio_value(
-                &mut profile.own_signing,
-                false,
-                "As in your global git config",
-            );
-            ui.radio_value(&mut profile.own_signing, true, "Just for this profile");
+        section(ui, f, "Profile's commit signing", None, |card| {
+            let profile = self.profile_mut();
+            card.row("Signing", "gpg sign key profile own global", |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing.x = 18.0;
+                    ui.radio_value(
+                        &mut profile.own_signing,
+                        false,
+                        "As in your global git config",
+                    )
+                    .on_hover_text("Set on the Commit signing page");
+                    ui.radio_value(&mut profile.own_signing, true, "Just for this profile");
+                });
+            });
+            if profile.own_signing {
+                signing::fields_rows(card, &mut profile.signing, "settings-profile-signing");
+                card.full("profile signing global override", |ui| {
+                    layout::note(
+                        ui,
+                        "Kept with the profile, over your global git config; empty fields \
+                             leave what it sets. A repository's own config can still override it.",
+                    );
+                });
+            }
         });
-        ui.add_space(4.0);
-        if profile.own_signing {
-            signing::fields_ui(ui, &mut profile.signing, "settings-profile-signing");
-            ui.label(
-                RichText::new(
-                    "Kept with the profile, over your global git config; empty fields leave \
-                     what it sets. A repository's own config can still override it.",
-                )
-                .color(t.text_faint)
-                .small(),
-            );
-        } else {
-            signing::signing_ui(ui);
-        }
 
-        if !profiles::git_reads_profiles(git_version) {
-            ui.add_space(6.0);
-            ui.label(
-                RichText::new(format!(
-                    "This git ({git_version}) is older than 2.32 and ignores what a profile sets \
-                     for git: the author and signing above are not used. Update git to use them."
-                ))
-                .color(t.warning)
-                .small(),
-            );
+        if !f.searching() {
+            if !profiles::git_reads_profiles(view.git_version) {
+                ui.add_space(10.0);
+                ui.label(
+                    RichText::new(format!(
+                        "This git ({}) is older than 2.32 and ignores what a profile sets for \
+                         git: the author and signing above are not used. Update git to use them.",
+                        view.git_version
+                    ))
+                    .color(t.warning)
+                    .small(),
+                );
+            }
+            if let Some(e) = profiles::error() {
+                ui.add_space(6.0);
+                ui.label(RichText::new(e).color(t.danger).small());
+            }
         }
-        if let Some(e) = profiles::error() {
-            ui.add_space(6.0);
-            ui.label(RichText::new(e).color(t.danger).small());
+        if request.is_some() {
+            view.request = request;
         }
-        (*self != before, request)
     }
 }
 

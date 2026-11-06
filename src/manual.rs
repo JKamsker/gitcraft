@@ -5,7 +5,7 @@ use egui::{RichText, Ui};
 use crate::theme::{self, Tokens};
 
 /// Ctrl, or Cmd on macOS, as the shortcuts are written.
-fn command() -> &'static str {
+pub(crate) fn command() -> &'static str {
     if cfg!(target_os = "macos") {
         "Cmd"
     } else {
@@ -53,7 +53,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "The arrows in a diff's header jump from change to change; the marks beside the scrollbar show where the changes are, and a click on one jumps there.",
             "Write the summary and description and commit; amend the last commit; pick the identity you commit as, or Use the profile's author to take a repository's own one out.",
             "Profiles (title bar, or Settings → Profile): each has its own tabs, recent repositories, theme, git author and commit signing. A repository's own git config (user.name, user.email, signing) still wins over the profile's.",
-            "Settings → Profile → Commit signing sets the format, key and program git signs with, and whether it signs commits and tags by default: in your global git config, or just for the profile.",
+            "Settings → Commit signing sets the format, key and program git signs with, and whether it signs commits and tags by default, in your global git config; Settings → Profile can sign just for the profile instead.",
             "Double-click a commit's message in the right pane to edit it (any commit of the checked-out branch with no merges after it).",
             "Undo and redo commits, merges, rebases, resets, checkouts, branches, tags and stashes.",
         ],
@@ -73,7 +73,7 @@ const FEATURES: &[(&str, &[&str])] = &[
 ];
 
 /// Keyboard and mouse shortcuts: (keys, what they do). `Cmd` stands for Ctrl outside macOS.
-const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
+pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
     (
         "Window",
         &[
@@ -81,6 +81,7 @@ const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("Cmd+W", "Close the tab (or middle-click it)"),
             ("Cmd+Shift+T", "Reopen the tab closed last"),
             ("Cmd+P", "Command palette: every action and branch"),
+            ("Cmd+,", "Settings"),
             ("F5", "Reload the repository"),
             ("F1", "This manual"),
         ],
@@ -118,6 +119,14 @@ const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
                 "Copy the selection (without one, it goes to the shell)",
             ),
             ("Cmd+Shift+C", "Copy the selection"),
+        ],
+    ),
+    (
+        "Settings",
+        &[
+            ("Cmd+F", "Search the settings"),
+            ("Esc", "Clear the search"),
+            ("Alt+↑ / Alt+↓", "Previous / next page"),
         ],
     ),
 ];
@@ -162,19 +171,23 @@ pub fn ui(ui: &mut Ui) {
             .min_col_width(170.0)
             .show(ui, |ui| {
                 for (combo, what) in *keys {
-                    ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing.x = 4.0;
-                        for (n, part) in combo.split(" / ").enumerate() {
-                            if n > 0 {
-                                ui.label(RichText::new("/").color(t.text_faint));
-                            }
-                            key_chip(ui, &part.replace("Cmd", command()));
-                        }
-                    });
+                    ui.horizontal(|ui| key_combo(ui, &combo.replace("Cmd", command())));
                     ui.label(RichText::new(*what).color(t.text_dim));
                     ui.end_row();
                 }
             });
+    }
+}
+
+/// Key combinations, `a / b`, each drawn like a keycap.
+pub(crate) fn key_combo(ui: &mut Ui, combo: &str) {
+    let t = Tokens::get(ui.ctx());
+    ui.spacing_mut().item_spacing.x = 4.0;
+    for (n, part) in combo.split(" / ").enumerate() {
+        if n > 0 {
+            ui.label(RichText::new("/").color(t.text_faint));
+        }
+        key_chip(ui, part);
     }
 }
 

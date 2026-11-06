@@ -284,7 +284,7 @@ impl App {
                     request = Some(ProfileRequest::New);
                 }
                 if ui.button("Manage profiles…").clicked() {
-                    self.settings_profile_page = true;
+                    settings::show_page(ui.ctx(), settings::Page::Profile);
                     self.open_settings();
                 }
             });
@@ -339,36 +339,5 @@ fn author_line(p: &settings::UserProfile) -> String {
         (false, true) => format!(" · {name}"),
         (true, false) => format!(" · <{email}>"),
         (false, false) => format!(" · {name} <{email}>"),
-    }
-}
-
-impl App {
-    /// The settings page's two halves, as tabs: the profile in use, and what all share.
-    pub(super) fn settings_halves(&mut self, ui: &mut Ui) {
-        let ctx = ui.ctx().clone();
-        let profile = self.settings.profile();
-        let labels = [
-            format!("Profile: {}", profile.title()),
-            "General".to_owned(),
-        ];
-        let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
-        let on = if self.settings_profile_page { 0 } else { 1 };
-        ui.horizontal(|ui| {
-            if let Some(picked) = crate::repo::widgets::switch(ui, &labels, on) {
-                self.settings_profile_page = picked == 0;
-            }
-        });
-        if self.settings_profile_page {
-            let version = self.git_version.clone().unwrap_or_default();
-            let (changed, request) = self.settings.profile_ui(ui, self.theme, &version);
-            if changed {
-                self.settings.set(&ctx);
-            }
-            if let Some(request) = request {
-                self.profile_request(request, &ctx);
-            }
-        } else if self.settings.ui(ui) {
-            self.settings.set(&ctx);
-        }
     }
 }
