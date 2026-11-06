@@ -8,6 +8,7 @@ use egui::{Key, RichText, Stroke, Ui, vec2};
 
 use super::panels::Toast;
 use super::{App, Tab, repo_root};
+use crate::folder_browser::{FolderBrowser, Outcome};
 use crate::git;
 use crate::remote::{self, Host};
 use crate::theme::{self, Tokens};
@@ -32,6 +33,8 @@ pub(super) struct RemoteForm {
     path: String,
     error: Option<String>,
     focus: bool,
+    /// The folders of the machine, browsed for the folder (in place of the form while open).
+    browser: Option<FolderBrowser>,
 }
 
 /// A repository on another machine being reached: where, and what came of it.
@@ -70,6 +73,7 @@ impl RemoteForm {
             path: String::new(),
             error: None,
             focus: true,
+            browser: None,
         }
     }
 
@@ -94,7 +98,12 @@ impl RemoteForm {
                 "The folder is a path on that machine: /home/me/repo or ~/repo.".to_owned(),
             );
         }
-        let host = match self.kind {
+        Ok((self.host()?, path.to_owned()))
+    }
+
+    /// The machine the form names, or why it names none.
+    fn host(&self) -> Result<Host, String> {
+        Ok(match self.kind {
             Kind::Wsl => {
                 let distro = self.distro.trim();
                 if !remote::valid_distro(distro) {
@@ -112,8 +121,36 @@ impl RemoteForm {
                 }
                 Host::Ssh(host.to_owned())
             }
+        })
+    }
+
+    /// Opens the folder browser on the machine named, at the folder typed (else its home).
+    fn browse(&mut self, ctx: &egui::Context) {
+        match self.host() {
+            Ok(host) => {
+                self.error = None;
+                self.browser = Some(FolderBrowser::new(host, &self.path, ctx));
+            }
+            Err(e) => self.error = Some(e),
+        }
+    }
+
+    /// Draws the folder browser; once a folder is picked (or the browser left), the form again.
+    /// Whether it is open.
+    fn browser_ui(&mut self, ui: &mut Ui) -> bool {
+        let Some(browser) = &mut self.browser else {
+            return false;
         };
-        Ok((host, path.to_owned()))
+        match browser.ui(ui) {
+            Some(Outcome::Picked(path)) => {
+                self.path = path;
+                self.error = None;
+                self.browser = None;
+            }
+            Some(Outcome::Cancelled) => self.browser = None,
+            None => {}
+        }
+        true
     }
 }
 
@@ -203,8 +240,13 @@ impl App {
             .frame(frame)
             .backdrop_color(egui::Color32::from_black_alpha(110))
             .show(ctx, |ui| {
-                ui.set_width(460.0);
+                ui.set_width(520.0);
                 ui.label(RichText::new("Open remote repository").font(theme::semibold(15.0)));
+                if form.browser.is_some() {
+                    ui.add_space(8.0);
+                    form.browser_ui(ui);
+                    return;
+                }
                 ui.add_space(4.0);
                 ui.label(
                     RichText::new("git runs on that machine; this window shows what it reports.")
@@ -212,7 +254,9 @@ impl App {
                         .small(),
                 );
                 ui.add_space(10.0);
-                form_fields(ui, form, &t);
+                if form_fields(ui, form, &t) {
+                    form.browse(ui.ctx());
+                }
                 if let Some(err) = &form.error {
                     ui.add_space(4.0);
                     ui.colored_label(t.danger, err);
@@ -239,7 +283,12 @@ impl App {
                 });
             });
         if resp.should_close() {
-            cancel = true;
+            // Esc in the browser goes back to the form.
+            if form.browser.is_some() {
+                form.browser = None;
+            } else {
+                cancel = true;
+            }
         }
         if submit {
             match form.target() {
@@ -282,8 +331,8 @@ fn resolve_home(host: &Host, path: &str) -> Result<String, String> {
     Ok(format!("{home}{rest}"))
 }
 
-/// The machine (WSL distribution or SSH host) and the folder there.
-fn form_fields(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) {
+/// The machine (WSL distribution or SSH host) and the folder there: whether Browse was clicked.
+fn form_fields(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) -> bool {
     ui.horizontal(|ui| {
         ui.selectable_value(&mut form.kind, Kind::Wsl, "WSL");
         ui.selectable_value(&mut form.kind, Kind::Ssh, "SSH");
@@ -295,18 +344,26 @@ fn form_fields(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) {
     }
     ui.add_space(8.0);
     ui.label(RichText::new("Folder there").color(t.text_dim).small());
-    let path = ui.add(
-        egui::TextEdit::singleline(&mut form.path)
-            .hint_text("/home/me/repo or ~/repo")
-            .desired_width(f32::INFINITY)
-            .margin(egui::Margin::symmetric(8, 6)),
-    );
-    if std::mem::take(&mut form.focus) {
-        path.request_focus();
-    }
-    if path.changed() {
-        form.error = None;
-    }
+    let mut browse = false;
+    ui.horizontal(|ui| {
+        let path = ui.add(
+            egui::TextEdit::singleline(&mut form.path)
+                .hint_text("/home/me/repo or ~/repo")
+                .desired_width(ui.available_width() - 90.0)
+                .margin(egui::Margin::symmetric(8, 6)),
+        );
+        if std::mem::take(&mut form.focus) {
+            path.request_focus();
+        }
+        if path.changed() {
+            form.error = None;
+        }
+        browse = ui
+            .add(egui::Button::new("Browse…").min_size(vec2(80.0, 28.0)))
+            .on_hover_text("Pick the folder among that machine's")
+            .clicked();
+    });
+    browse
 }
 
 fn distro_field(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) {
@@ -387,6 +444,7 @@ mod tests {
             path: path.to_owned(),
             error: None,
             focus: false,
+            browser: None,
         }
     }
 

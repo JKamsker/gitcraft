@@ -22,7 +22,8 @@ so your config, credentials and hooks apply as usual.
 
 - Start page → _Remote_ (or the palette's _Open remote repository_): pick a WSL distribution
   or an SSH host (the hosts of `~/.ssh/config` are offered), and the repository's folder there
-  (`/home/me/repo` or `~/repo`). A `\\wsl.localhost\…` folder chosen with _Open_ is a WSL
+  (`/home/me/repo` or `~/repo`), typed or found with _Browse…_, which lists that machine's
+  folders and marks its repositories. A `\\wsl.localhost\…` folder chosen with _Open_ is a WSL
   repository too, and `gitcraft ssh://host/path/to/repo` opens one from the command line.
 - The window never waits for that machine: everything asked of it is asked in the background,
   and a slow or unreachable machine only shows as work still going on (anything asked of it
