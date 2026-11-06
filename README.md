@@ -159,13 +159,16 @@ so your config, credentials and hooks apply as usual.
 - Hotfixes, the git-flow way: _Start hotfix from v2.3.1…_ in a version tag's menu offers a branch
   `hotfix/2.3.2` there (git-flow's prefix when it is set up), checked out. _Finish hotfix…_ (the
   branch's menu, or the palette while it is checked out) shows the tag it will make (`v2.3.2`,
-  with notes from its commits to edit) and what it will do, then, as one step: tags it (annotated
-  or signed), merges it into the main branch (`main`, `master` or git-flow's) and the development
-  one (`develop` or git-flow's, if there is one) with `--no-ff`, deletes it, and pushes those
-  branches (to their upstreams) and the tag at once (`--atomic`). A merge that would stop on
-  conflicts is said beforehand (git 2.38 or later) and refused. Ctrl+Z puts the hotfix branch
-  back (checked out), the branches where they were and takes the tag off here; what was pushed
-  stays.
+  with notes from its commits to edit) and what it will do, then, as one step: merges it into the
+  development branch (`develop` or git-flow's, if there is one) and the main one (`main`,
+  `master` or git-flow's) with `--no-ff`, tags main's merge (annotated, or signed when ticked;
+  git-flow's tag prefix when it is set up), deletes it here, and pushes those branches (to their
+  upstreams) and the tag at once (`--atomic`). A merge that would stop on conflicts is said
+  beforehand (git 2.38 or later) and refused, and so is a branch checked out in another
+  worktree. Ctrl+Z puts the hotfix branch back (checked out, with its upstream), the branches
+  where they were and takes the tag off here; what was pushed stays, and Ctrl+Y brings back the
+  same merges and tag. Should it stop part-way (a checkout or a merge refused), Ctrl+Z puts back
+  what it did.
 - Conflicted / unstaged / staged lists with stage, unstage, discard and mark-resolved buttons,
   _Stage all_ / _Unstage all_; right-click a file to open it, open it in your editor, show it in
   its folder, see its history or blame, or ignore it (the file, its extension or its folder go

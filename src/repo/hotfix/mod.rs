@@ -33,12 +33,20 @@ pub(crate) enum HotfixAct {
     Close,
 }
 
+struct Running {
+    label: String,
+    plan: plan::Finish,
+    choices: plan::Choices,
+    push: Option<Vec<String>>,
+}
+
 /// The hotfix's state in the tab.
 #[derive(Default)]
 pub(crate) struct Hotfix {
     pub(crate) finish: Option<FinishView>,
-    /// The push that follows the operation so labelled, once it has gone through.
-    push_after: Option<(String, Vec<String>)>,
+    /// The finish under way: its operation's label, what it was planned from and the push
+    /// that follows it once it has gone through.
+    running: Option<Running>,
     /// The branches' names, read with the repository.
     prefix: Option<String>,
 }
@@ -141,7 +149,12 @@ impl RepoTab {
         let label = format!("Finish hotfix {}", c.tag.trim());
         let steps = plan.steps(&c);
         let undo = plan.undo(&c);
-        self.hotfix.push_after = plan.push(&c).map(|p| (label.clone(), p));
+        self.hotfix.running = Some(Running {
+            label: label.clone(),
+            plan: plan.clone(),
+            choices: c.clone(),
+            push: plan.push(&c),
+        });
         self.hotfix.finish = None;
         self.run_undoable(
             &label,
@@ -152,27 +165,69 @@ impl RepoTab {
         );
     }
 
-    /// Takes in how an operation ended: once the hotfix is finished here, it is pushed (a push of
-    /// its own, so that a refused push leaves what was done here undoable, and signing in
-    /// pushes again).
+    /// Takes in how an operation ended. Once the hotfix is finished here, redo is made to put
+    /// back these very merges and tag, and it is pushed (a push of its own, so that a refused
+    /// push leaves what was done here undoable, and signing in pushes again). Stopped part-way,
+    /// what it did is made undoable.
     pub(super) fn hotfix_op_done(
         &mut self,
         label: &str,
         result: &Result<String, String>,
         ctx: &Context,
     ) {
-        let Some((_, push)) = self.hotfix.push_after.take_if(|(l, _)| l == label) else {
+        let Some(run) = self.hotfix.running.take_if(|r| r.label == label) else {
             return;
         };
+        let repo = self.path.clone();
         if result.is_ok() {
-            let tag = label.trim_start_matches("Finish hotfix ").to_owned();
-            self.run_ops(
-                &format!("Push hotfix {tag}"),
-                vec![push],
-                Refresh::All,
-                super::OpKind::plain(),
+            let (finish, choices) = (run.plan.clone(), run.choices.clone());
+            let label = run.label.clone();
+            let entry_label = label.clone();
+            self.then(
                 ctx,
+                move || plan::now(&repo, &finish, &choices),
+                move |tab, now, _| {
+                    let Some(tag) = now.tag else { return };
+                    let redo = run.plan.redo(&run.choices, &now.branches, &tag);
+                    if let Some(entry) =
+                        tab.undo_stack.last_mut().filter(|e| e.label == entry_label)
+                    {
+                        entry.redo = redo;
+                    }
+                },
             );
+            if let Some(push) = run.push {
+                let tag = label.trim_start_matches("Finish hotfix ").to_owned();
+                self.run_ops(
+                    &format!("Push hotfix {tag}"),
+                    vec![push],
+                    Refresh::All,
+                    super::OpKind::plain(),
+                    ctx,
+                );
+            }
+            return;
         }
+        let (finish, choices) = (run.plan.clone(), run.choices.clone());
+        self.then(
+            ctx,
+            move || plan::now(&repo, &finish, &choices),
+            move |tab, now, _| {
+                let Some(undo) = plan::recover(&run.plan, &run.choices, &now) else {
+                    return;
+                };
+                let redo = run.plan.steps(&run.choices);
+                tab.undo_stack.push(super::state::UndoEntry {
+                    label: format!("{} (stopped part-way)", run.label),
+                    undo,
+                    redo,
+                    heads: None,
+                });
+                tab.redo_stack.clear();
+                if let Some((text, true)) = &mut tab.status {
+                    text.push_str(" — Ctrl+Z puts back what it did");
+                }
+            },
+        );
     }
 }

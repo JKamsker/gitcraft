@@ -10,6 +10,7 @@ use crate::theme::{self, Tokens};
 impl RepoTab {
     /// The dialog, while a hotfix is being finished.
     pub(in crate::repo) fn hotfix_dialog(&mut self, ctx: &Context, acts: &mut Vec<Action>) {
+        let busy = self.busy_op.is_some();
         let Some(view) = &mut self.hotfix.finish else {
             return;
         };
@@ -26,7 +27,7 @@ impl RepoTab {
             .backdrop_color(egui::Color32::from_black_alpha(110))
             .show(ctx, |ui| {
                 ui.set_width(540.0);
-                contents(ui, view, room, acts);
+                contents(ui, view, room, busy, acts);
             });
         if response.should_close() {
             acts.push(Action::Hotfix(HotfixAct::Close));
@@ -34,7 +35,7 @@ impl RepoTab {
     }
 }
 
-fn contents(ui: &mut Ui, view: &mut FinishView, room: f32, acts: &mut Vec<Action>) {
+fn contents(ui: &mut Ui, view: &mut FinishView, room: f32, busy: bool, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
     ui.label(RichText::new("Finish hotfix").font(theme::semibold(15.0)));
     let plan = match &view.plan {
@@ -148,7 +149,14 @@ fn contents(ui: &mut Ui, view: &mut FinishView, room: f32, acts: &mut Vec<Action
     }
     ui.add_space(8.0);
     ui.horizontal(|ui| {
-        if widgets::primary_button(ui, "Finish hotfix", problem.is_none(), 120.0).clicked() {
+        let finish =
+            widgets::primary_button(ui, "Finish hotfix", problem.is_none() && !busy, 120.0);
+        if busy {
+            finish
+                .clone()
+                .on_disabled_hover_text("Another operation is running: wait for it");
+        }
+        if finish.clicked() {
             acts.push(Action::Hotfix(HotfixAct::Finish));
         }
         cancel(ui, acts);
