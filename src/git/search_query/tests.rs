@@ -495,7 +495,10 @@ fn contents_regex_and_merges_on_a_real_repository() -> Result<(), String> {
     );
     assert_eq!(h.repo.search("contents:naïve", false)?, [h.resume.as_str()]);
     // With a name or message to match, git ignores the case of A to Z in changes too.
-    assert_eq!(h.repo.search("contents:NAïVE author:zoë", false)?, [h.resume.as_str()]);
+    assert_eq!(
+        h.repo.search("contents:NAïVE author:zoë", false)?,
+        [h.resume.as_str()]
+    );
     assert_eq!(
         h.repo.search("regex:feature_[a-z]+", false)?,
         [h.feature.as_str()]
