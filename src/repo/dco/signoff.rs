@@ -1,9 +1,10 @@
 //! Developer Certificate of Origin sign-offs: whether a repository asks for them, which commits
-//! carry their author's, and the rewrite that adds them to the commits of a branch.
+//! carry one the DCO check takes, and the rewrite that adds them to the commits of a branch.
 
 use std::path::Path;
 
 use crate::git;
+use crate::repo::operations::{expect_ref, expect_ref_at, expect_symref};
 
 /// The files that say a repository asks for a DCO sign-off: the certificate itself, or the
 /// settings of the DCO app (probot/dco), whose check refuses commits without one.
@@ -18,7 +19,7 @@ pub(crate) const SIGN_OFF_KEY: &str = "gitcraft.signOff";
 pub(crate) struct Rules {
     /// The file that asks for a sign-off, if one does (as committed at HEAD).
     pub file: Option<String>,
-    /// What the commit box was last set to here (`gitcraft.signOff`).
+    /// What the commit box was set to here (`gitcraft.signOff`); unset: as the repository asks.
     pub choice: Option<bool>,
 }
 
@@ -33,10 +34,10 @@ pub(crate) fn read_rules(repo: &Path) -> Rules {
         .iter()
         .find(|name| listed.lines().any(|line| line == **name))
         .map(|name| (*name).to_owned());
-    // Exit 1: not set.
+    // Exit 1: not set. `--bool`, which gits older than 2.18 (`--type`) know too.
     let choice = git::run_ok_codes(
         Some(repo),
-        &["config", "--local", "--type=bool", "--get", SIGN_OFF_KEY],
+        &["config", "--local", "--bool", "--get", SIGN_OFF_KEY],
         &[0, 1],
     )
     .ok()
@@ -48,17 +49,19 @@ pub(crate) fn read_rules(repo: &Path) -> Rules {
     Rules { file, choice }
 }
 
-/// The git config command that keeps the commit box's choice for the repository.
-pub(crate) fn choice_command(on: bool) -> Vec<String> {
-    [
-        "config",
-        "--local",
-        SIGN_OFF_KEY,
-        if on { "true" } else { "false" },
-    ]
-    .iter()
-    .map(|s| (*s).to_owned())
-    .collect()
+/// The git config command that keeps the commit box's choice for the repository, or takes it
+/// out (`None`), so that the box follows what the repository asks again.
+pub(crate) fn choice_command(choice: Option<bool>) -> Vec<String> {
+    let args: &[&str] = match choice {
+        Some(on) => &[
+            "config",
+            "--local",
+            SIGN_OFF_KEY,
+            if on { "true" } else { "false" },
+        ],
+        None => &["config", "--local", "--unset-all", SIGN_OFF_KEY],
+    };
+    strings(args)
 }
 
 /// Whether a check of a pull request is the DCO check (the DCO app's is named `DCO`).
@@ -76,32 +79,43 @@ pub(crate) struct Signed {
     pub email: String,
     /// It has more than one parent.
     pub merge: bool,
-    /// Its message has a `Signed-off-by:` of its author (by email).
+    /// Its author is a bot (`dependabot[bot]`), which the DCO check leaves alone.
+    pub bot: bool,
+    /// Its message has a sign-off the DCO check takes: its author's or its committer's.
     pub signed: bool,
 }
 
-/// Whether `message` has a `Signed-off-by: Name <email>` line for `email`, as the DCO check
-/// reads it: anywhere in the message, the key in any case, the email compared without case.
-pub(crate) fn signed_off_by(message: &str, email: &str) -> bool {
-    let email = email.trim().to_lowercase();
-    message.lines().any(|line| {
-        let line = line.trim();
-        let Some((key, value)) = line.split_once(':') else {
-            return false;
-        };
-        if !key.trim().eq_ignore_ascii_case("signed-off-by") {
-            return false;
+impl Signed {
+    /// Whether the DCO check refuses it.
+    pub(crate) fn refused(&self) -> bool {
+        !self.merge && !self.bot && !self.signed
+    }
+}
+
+/// The `Name <email>` of each `Signed-off-by:` line of `message`, read as the DCO app reads
+/// them (`^Signed-off-by: (.*) <(.*)>\s*$`, any case of the key).
+fn sign_offs(message: &str) -> impl Iterator<Item = (&str, &str)> {
+    message.lines().filter_map(|line| {
+        let line = line.trim_end();
+        let key = line.get(..15)?;
+        if !key.eq_ignore_ascii_case("signed-off-by: ") {
+            return None;
         }
-        let value = value.trim();
-        let Some(open) = value.rfind('<') else {
-            return false;
-        };
-        let Some(close) = value[open..].find('>') else {
-            return false;
-        };
-        let name = value[..open].trim();
-        let addr = value[open + 1..open + close].trim().to_lowercase();
-        !name.is_empty() && !addr.is_empty() && addr == email
+        let rest = line[15..].strip_suffix('>')?;
+        let (name, email) = rest.rsplit_once(" <")?;
+        Some((name, email))
+    })
+}
+
+/// Whether `message` is signed off by one of `people` (`(name, email)`), as the DCO check reads
+/// it: the name and the email both, without case.
+pub(crate) fn signed_off_by(message: &str, people: &[(&str, &str)]) -> bool {
+    sign_offs(message).any(|(name, email)| {
+        people.iter().any(|(n, e)| {
+            !e.trim().is_empty()
+                && name.trim().eq_ignore_ascii_case(n.trim())
+                && email.trim().eq_ignore_ascii_case(e.trim())
+        })
     })
 }
 
@@ -111,7 +125,7 @@ const RECORD: char = '\u{1e}';
 
 /// The commits of `range` (`a..b`), newest first, with whether each is signed off.
 pub(crate) fn commits(repo: &Path, range: &str) -> Result<Vec<Signed>, String> {
-    let format = "--format=%H%x1f%P%x1f%an%x1f%ae%x1f%s%x1f%B%x1e";
+    let format = "--format=%H%x1f%P%x1f%an%x1f%ae%x1f%cn%x1f%ce%x1f%s%x1f%B%x1e";
     let out = git::run(Some(repo), &["log", format, range, "--"])?;
     Ok(parse_commits(&out))
 }
@@ -120,7 +134,7 @@ fn parse_commits(out: &str) -> Vec<Signed> {
     out.split(RECORD)
         .filter_map(|record| {
             let record = record.trim_start_matches('\n');
-            let mut fields = record.splitn(6, FIELD);
+            let mut fields = record.splitn(8, FIELD);
             let hash = fields.next()?.trim().to_owned();
             if hash.is_empty() {
                 return None;
@@ -128,11 +142,18 @@ fn parse_commits(out: &str) -> Vec<Signed> {
             let parents = fields.next()?;
             let author = fields.next()?.to_owned();
             let email = fields.next()?.to_owned();
+            let committer = fields.next()?;
+            let committer_email = fields.next()?;
             let summary = fields.next()?.to_owned();
             let message = fields.next().unwrap_or_default();
+            let people = [
+                (author.as_str(), email.as_str()),
+                (committer, committer_email),
+            ];
             Some(Signed {
-                signed: signed_off_by(message, &email),
+                signed: signed_off_by(message, &people),
                 merge: parents.split_whitespace().count() > 1,
+                bot: author.ends_with("[bot]"),
                 hash,
                 summary,
                 author,
@@ -142,10 +163,9 @@ fn parse_commits(out: &str) -> Vec<Signed> {
         .collect()
 }
 
-/// The commits of `list` the DCO check would refuse: those without their author's sign-off.
-/// Merges are left out, as the check leaves them out.
+/// The commits of `list` the DCO check would refuse.
 pub(crate) fn missing(list: &[Signed]) -> impl Iterator<Item = &Signed> {
-    list.iter().filter(|c| !c.merge && !c.signed)
+    list.iter().filter(|c| c.refused())
 }
 
 /// Where a branch is pushed: the remote, the branch there, and where that was last seen.
@@ -160,6 +180,17 @@ pub(crate) struct PushTarget {
     pub seen: Option<String>,
 }
 
+impl PushTarget {
+    /// `origin/x`, as people read it.
+    pub(crate) fn label(&self) -> String {
+        let there = self
+            .remote_ref
+            .strip_prefix("refs/heads/")
+            .unwrap_or(&self.remote_ref);
+        format!("{}/{there}", self.remote)
+    }
+}
+
 /// The plan of signing off the commits of the checked-out branch since `base`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Plan {
@@ -172,21 +203,35 @@ pub(crate) struct Plan {
     pub push: Option<PushTarget>,
 }
 
-/// Plans signing off every commit of the checked-out branch since it left `base` (a commit or
-/// ref: the pull request's base). Refused when there is nothing to do or the branch can't be
-/// rewritten that way, with why.
-pub(crate) fn plan(repo: &Path, base: &str) -> Result<Plan, String> {
-    let branch = git::run_ok_codes(
-        Some(repo),
-        &["symbolic-ref", "-q", "--short", "HEAD"],
-        &[0, 1],
-    )?
-    .trim()
-    .to_owned();
-    if branch.is_empty() {
+/// Plans signing off every commit of the checked-out branch since it left `base` (the pull
+/// request's base). `expected` is the pull request's latest commit: the branch must be at it,
+/// so that the commits rewritten are the pull request's. Refused, with why, when there is
+/// nothing to do or the branch can't be rewritten that way.
+pub(crate) fn plan(repo: &Path, base: &str, expected: Option<&str>) -> Result<Plan, String> {
+    let full = git::run_ok_codes(Some(repo), &["symbolic-ref", "-q", "HEAD"], &[0, 1])?
+        .trim()
+        .to_owned();
+    let Some(branch) = full.strip_prefix("refs/heads/").map(str::to_owned) else {
         return Err("Check out the pull request's branch first: HEAD is detached".to_owned());
-    }
+    };
     let head = git::head(repo);
+    if let Some(expected) = expected.filter(|e| *e != head) {
+        return Err(format!(
+            "{branch} is at {}, the pull request at {}: pull or push it first, so that the \
+             commits signed off are the pull request's",
+            crate::repo::short(&head),
+            crate::repo::short(expected)
+        ));
+    }
+    let dirty = git::run(
+        Some(repo),
+        &["status", "--porcelain", "--untracked-files=no"],
+    )?;
+    if !dirty.trim().is_empty() {
+        return Err(
+            "Commit or stash your changes first: signing off rebases the branch".to_owned(),
+        );
+    }
     let merge_base = git::merge_base(repo, &head, base)
         .map_err(|e| format!("The branch and its base have no commit in common: {e}"))?;
     let commits = commits(repo, &format!("{merge_base}..{head}"))?;
@@ -195,16 +240,24 @@ pub(crate) fn plan(repo: &Path, base: &str) -> Result<Plan, String> {
     }
     if commits.iter().any(|c| c.merge) {
         return Err(format!(
-            "{branch} has merge commits since its base, which a rebase would flatten: sign it \
-             off by hand"
+            "{branch} has merge commits since its base, which a rebase would flatten. Sign it \
+             off in a terminal (git rebase --signoff --rebase-merges {}), or ask its authors to",
+            crate::repo::short(&merge_base)
         ));
     }
     if missing(&commits).next().is_none() {
-        return Err(format!(
-            "Every commit of {branch} is already signed off by its author"
-        ));
+        return Err(format!("Every commit of {branch} is already signed off"));
     }
     let push = push_target(repo, &branch)?;
+    if let Some(seen) = push.as_ref().and_then(|p| p.seen.as_deref())
+        && !is_ancestor(repo, seen, &head)?
+    {
+        let label = push.as_ref().map(PushTarget::label).unwrap_or_default();
+        return Err(format!(
+            "{label} has commits {branch} hasn't: pull them first, or the push would throw them \
+             away"
+        ));
+    }
     Ok(Plan {
         branch,
         head,
@@ -214,11 +267,20 @@ pub(crate) fn plan(repo: &Path, base: &str) -> Result<Plan, String> {
     })
 }
 
+/// Whether `ancestor` is in the history of `of`: none of its commits are missing there.
+fn is_ancestor(repo: &Path, ancestor: &str, of: &str) -> Result<bool, String> {
+    let count = git::run(
+        Some(repo),
+        &["rev-list", "--count", &format!("{of}..{ancestor}"), "--"],
+    )?;
+    Ok(count.trim() == "0")
+}
+
 /// Where `branch` is pushed to (`branch.<name>.pushRemote` and its upstream decide), if
-/// anywhere.
+/// anywhere, and the remote-tracking ref of that branch.
 fn push_target(repo: &Path, branch: &str) -> Result<Option<PushTarget>, String> {
     let format = "--format=%(push:remotename)%00%(push:remoteref)%00%(push)%00\
-                  %(upstream:remotename)%00%(upstream:remoteref)";
+                  %(upstream:remotename)%00%(upstream:remoteref)%00%(upstream)";
     let out = git::run(
         Some(repo),
         &["for-each-ref", format, &format!("refs/heads/{branch}")],
@@ -230,16 +292,19 @@ fn push_target(repo: &Path, branch: &str) -> Result<Option<PushTarget>, String> 
     if remote.is_empty() {
         return Ok(None);
     }
+    let some = |s: &str| (!s.is_empty()).then(|| s.to_owned());
     // git leaves the branch pushed to unsaid for `push.default=simple`: the upstream's where
-    // that is on the same remote, else the branch of the same name.
-    let remote_ref = if !part(1).is_empty() {
-        part(1).to_owned()
+    // that is on the same remote (and its remote-tracking ref with it), else the branch of the
+    // same name.
+    let (remote_ref, tracking) = if !part(1).is_empty() {
+        (part(1).to_owned(), some(part(2)))
     } else if part(3) == remote && !part(4).is_empty() {
-        part(4).to_owned()
+        (part(4).to_owned(), some(part(5)))
     } else {
-        format!("refs/heads/{branch}")
+        let tracking = format!("refs/remotes/{remote}/{branch}");
+        let known = git::resolve(repo, &tracking).is_ok();
+        (format!("refs/heads/{branch}"), known.then_some(tracking))
     };
-    let tracking = Some(part(2)).filter(|t| !t.is_empty()).map(str::to_owned);
     let seen = tracking
         .as_deref()
         .and_then(|t| git::resolve(repo, t).ok())
@@ -252,38 +317,62 @@ fn push_target(repo: &Path, branch: &str) -> Result<Option<PushTarget>, String> 
     }))
 }
 
+/// The rebase that signs off the commits after `base`, on the branch checked out only (other
+/// branches `rebase.updateRefs` would move along aren't put back by undo).
+fn signoff_rebase(base: &str) -> Vec<String> {
+    strings(&[
+        "-c",
+        "rebase.updateRefs=false",
+        "rebase",
+        "--signoff",
+        "--force-rebase",
+        base,
+    ])
+}
+
 impl Plan {
+    fn local(&self) -> String {
+        format!("refs/heads/{}", self.branch)
+    }
+
     /// The steps that sign the commits off and push them (only while the branch and HEAD are
     /// where the plan saw them, and the remote's branch where it was last fetched).
     pub(crate) fn steps(&self) -> Vec<Vec<String>> {
-        use crate::repo::operations::{expect_ref_at, expect_symref};
-        let local = format!("refs/heads/{}", self.branch);
+        let local = self.local();
         let mut steps = vec![
             expect_symref("HEAD", &local),
             expect_ref_at(&local, &self.head),
-            strings(&["rebase", "--signoff", "--force-rebase", &self.base]),
+            signoff_rebase(&self.base),
         ];
-        if let Some(push) = &self.push {
-            let lease = match &push.seen {
-                Some(seen) => format!("--force-with-lease={}:{seen}", push.remote_ref),
-                None => format!("--force-with-lease={}:", push.remote_ref),
-            };
-            steps.push(strings(&[
-                "push",
-                &lease,
-                "--",
-                &push.remote,
-                &format!("{local}:{}", push.remote_ref),
-            ]));
-        }
+        steps.extend(self.push_steps());
         steps
     }
 
-    /// The steps that put the commits as they were back, here and on the remote: only while the
-    /// branch (and the remote's, as last seen) are still at the signed-off commits.
+    /// The push of the signed-off branch: replacing what the remote has only if it is still
+    /// what was last fetched of it.
+    pub(crate) fn push_steps(&self) -> Vec<Vec<String>> {
+        let Some(push) = &self.push else {
+            return Vec::new();
+        };
+        let lease = format!(
+            "--force-with-lease={}:{}",
+            push.remote_ref,
+            push.seen.as_deref().unwrap_or_default()
+        );
+        vec![strings(&[
+            "push",
+            &lease,
+            "--",
+            &push.remote,
+            &format!("{}:{}", self.local(), push.remote_ref),
+        ])]
+    }
+
+    /// The steps that put the commits as they were back, on the remote first and then here:
+    /// only while the branch (and the remote's, as last seen) are still at the signed-off
+    /// commits.
     pub(crate) fn undo_steps(&self) -> Vec<Vec<String>> {
-        use crate::repo::operations::{expect_ref, expect_symref};
-        let local = format!("refs/heads/{}", self.branch);
+        let local = self.local();
         let mut steps = vec![expect_symref("HEAD", &local), expect_ref(&local)];
         if let Some(PushTarget {
             tracking: Some(tracking),
@@ -292,21 +381,20 @@ impl Plan {
         {
             steps.push(expect_ref(tracking));
         }
-        steps.push(strings(&["reset", "--keep", &self.head]));
         if let Some(push) = &self.push {
-            steps.push(back_push(push, &local));
+            steps.push(back_push(push, &self.head));
         }
+        steps.push(strings(&["reset", "--keep", &self.head]));
         steps
     }
 
     /// The steps that sign them off again after an undo.
     pub(crate) fn redo_steps(&self) -> Vec<Vec<String>> {
-        use crate::repo::operations::{expect_ref, expect_symref};
-        let local = format!("refs/heads/{}", self.branch);
+        let local = self.local();
         let mut steps = vec![
             expect_symref("HEAD", &local),
             expect_ref(&local),
-            strings(&["rebase", "--signoff", "--force-rebase", &self.base]),
+            signoff_rebase(&self.base),
         ];
         if let Some(push) = &self.push {
             steps.push(back_push(push, &local));
@@ -314,24 +402,40 @@ impl Plan {
         steps
     }
 
-    /// The commits the plan signs off, which their authors haven't.
+    /// The undo of a rewrite whose push failed: the branch back where it was, here only.
+    pub(crate) fn local_undo(&self, now: &str) -> (Vec<Vec<String>>, Vec<Vec<String>>) {
+        let local = self.local();
+        let undo = vec![
+            expect_symref("HEAD", &local),
+            expect_ref_at(&local, now),
+            strings(&["reset", "--keep", &self.head]),
+        ];
+        let redo = vec![
+            expect_symref("HEAD", &local),
+            expect_ref_at(&local, &self.head),
+            strings(&["reset", "--keep", now]),
+        ];
+        (undo, redo)
+    }
+
+    /// The commits the plan signs off, which the DCO check refuses now.
     pub(crate) fn unsigned(&self) -> Vec<&Signed> {
         missing(&self.commits).collect()
     }
 
-    /// Those of them by someone else than `email`: the check wants their own sign-off.
+    /// Those of them by someone else than `email`.
     pub(crate) fn by_others(&self, email: &str) -> Vec<&Signed> {
-        let email = email.trim().to_lowercase();
         self.unsigned()
             .into_iter()
-            .filter(|c| c.email.trim().to_lowercase() != email)
+            .filter(|c| !c.email.trim().eq_ignore_ascii_case(email.trim()))
             .collect()
     }
 }
 
-/// A push of `local` to `push`'s branch that replaces what is there only if it is still what was
-/// last fetched of it (the remote-tracking branch, checked before by the undo).
-fn back_push(push: &PushTarget, local: &str) -> Vec<String> {
+/// A push of `what` (a commit or a ref) to `push`'s branch that replaces what is there only if
+/// it is still what was last fetched of it (the remote-tracking branch, which the undo checks
+/// first).
+fn back_push(push: &PushTarget, what: &str) -> Vec<String> {
     let lease = match &push.tracking {
         Some(_) => format!("--force-with-lease={}", push.remote_ref),
         None => format!("--force-with-lease={}:", push.remote_ref),
@@ -341,7 +445,7 @@ fn back_push(push: &PushTarget, local: &str) -> Vec<String> {
         &lease,
         "--",
         &push.remote,
-        &format!("{local}:{}", push.remote_ref),
+        &format!("{what}:{}", push.remote_ref),
     ])
 }
 
@@ -353,42 +457,80 @@ fn strings(args: &[&str]) -> Vec<String> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn a_sign_off_is_the_authors_by_email_in_any_case() {
-        let msg = "fix: x\n\nbody\n\nSigned-off-by: Ann Lee <Ann@Example.org>\n";
-        assert!(signed_off_by(msg, "ann@example.org"));
-        assert!(signed_off_by(msg, " ANN@example.org "));
-        assert!(!signed_off_by(msg, "bob@example.org"));
-        assert!(signed_off_by("x\n\nsigned-off-by: Ann <ann@e>", "ann@e"));
-        assert!(signed_off_by("x\n\nSigned-off-by:Ann <ann@e>", "ann@e"));
-    }
+    const ANN: (&str, &str) = ("Ann Lee", "Ann@Example.org");
 
     #[test]
-    fn a_sign_off_needs_a_name_and_an_email() {
-        assert!(!signed_off_by("x\n\nSigned-off-by: <ann@e>", "ann@e"));
-        assert!(!signed_off_by("x\n\nSigned-off-by: Ann", "ann@e"));
-        assert!(!signed_off_by("x\n\nSigned-off-by: Ann <>", ""));
-        assert!(!signed_off_by("x\n\nCo-authored-by: Ann <ann@e>", "ann@e"));
-        assert!(!signed_off_by("", "ann@e"));
+    fn a_sign_off_counts_with_the_name_and_email_in_any_case() {
+        let msg = "fix: x\n\nbody\n\nSigned-off-by: Ann Lee <ann@example.org>\n";
+        assert!(signed_off_by(msg, &[ANN]));
+        assert!(signed_off_by(msg, &[("ANN LEE", "ann@EXAMPLE.org")]));
+        assert!(!signed_off_by(msg, &[("Bob", "bob@example.org")]));
+        assert!(signed_off_by(
+            "x\n\nsigned-off-by: Ann Lee <ann@example.org>",
+            &[ANN]
+        ));
+    }
+
+    /// As the DCO app reads them: one space after the colon, the line ending with `>`, and the
+    /// name too.
+    #[test]
+    fn a_sign_off_is_read_as_the_dco_check_reads_it() {
+        assert!(!signed_off_by(
+            "x\n\nSigned-off-by:Ann Lee <ann@example.org>",
+            &[ANN]
+        ));
+        assert!(!signed_off_by(
+            "x\n\n  Signed-off-by: Ann Lee <ann@example.org>",
+            &[ANN]
+        ));
+        assert!(!signed_off_by(
+            "x\n\nSigned-off-by: Ann Lee <ann@example.org> ok",
+            &[ANN]
+        ));
+        assert!(!signed_off_by(
+            "x\n\nSigned-off-by: Ann <ann@example.org>",
+            &[ANN]
+        ));
+        assert!(signed_off_by(
+            "x\n\nSigned-off-by: Ann Lee <ann@example.org>   ",
+            &[ANN]
+        ));
+        assert!(!signed_off_by("x\n\nSigned-off-by: Ann Lee", &[ANN]));
+        assert!(!signed_off_by(
+            "x\n\nCo-authored-by: Ann Lee <ann@example.org>",
+            &[ANN]
+        ));
+        assert!(!signed_off_by("", &[ANN]));
+        assert!(!signed_off_by(
+            "x\n\nSigned-off-by: Ann Lee <>",
+            &[("Ann Lee", "")]
+        ));
     }
 
     #[test]
     fn unicode_names_and_emails_are_read() {
         let msg = "feat: ü\n\nSigned-off-by: Zoë Ångström <zoë@exämple.org>";
-        assert!(signed_off_by(msg, "ZOË@exämple.org"));
+        assert!(signed_off_by(msg, &[("Zoë Ångström", "zoë@exämple.org")]));
     }
 
     #[test]
     fn the_log_is_read_into_commits() {
         let out = "\
-aaa\u{1f}p1\u{1f}Ann\u{1f}ann@e\u{1f}one\u{1f}one\n\nSigned-off-by: Ann <ann@e>\n\u{1e}\n\
-bbb\u{1f}p1 p2\u{1f}Bob\u{1f}bob@e\u{1f}Merge\u{1f}Merge\n\u{1e}\n\
-ccc\u{1f}p1\u{1f}Bob\u{1f}bob@e\u{1f}two\u{1f}two\n\nSigned-off-by: Ann <ann@e>\n\u{1e}";
+aaa\u{1f}p1\u{1f}Ann\u{1f}ann@e\u{1f}Ann\u{1f}ann@e\u{1f}one\u{1f}one\n\nSigned-off-by: Ann <ann@e>\n\u{1e}\n\
+bbb\u{1f}p1 p2\u{1f}Bob\u{1f}bob@e\u{1f}Bob\u{1f}bob@e\u{1f}Merge\u{1f}Merge\n\u{1e}\n\
+ccc\u{1f}p1\u{1f}Bob\u{1f}bob@e\u{1f}Bob\u{1f}bob@e\u{1f}two\u{1f}two\n\nSigned-off-by: Ann <ann@e>\n\u{1e}\n\
+ddd\u{1f}p1\u{1f}Bob\u{1f}bob@e\u{1f}Ann\u{1f}ann@e\u{1f}three\u{1f}three\n\nSigned-off-by: Ann <ann@e>\n\u{1e}\n\
+eee\u{1f}p1\u{1f}dependabot[bot]\u{1f}b@e\u{1f}x\u{1f}x@e\u{1f}bump\u{1f}bump\n\u{1e}";
         let list = parse_commits(out);
-        assert_eq!(list.len(), 3);
+        assert_eq!(list.len(), 5);
         assert!(list[0].signed && !list[0].merge);
         assert!(list[1].merge);
-        assert!(!list[2].signed, "signed by someone else than the author");
+        assert!(
+            !list[2].signed,
+            "signed by someone else than its author and committer"
+        );
+        assert!(list[3].signed, "signed by its committer");
+        assert!(list[4].bot);
         let missing: Vec<&str> = missing(&list).map(|c| c.hash.as_str()).collect();
         assert_eq!(missing, ["ccc"]);
     }
@@ -402,5 +544,17 @@ ccc\u{1f}p1\u{1f}Bob\u{1f}bob@e\u{1f}two\u{1f}two\n\nSigned-off-by: Ann <ann@e>\
         assert!(is_dco_check("ci / DCO"));
         assert!(!is_dco_check("deco"));
         assert!(!is_dco_check("build"));
+    }
+
+    #[test]
+    fn the_choice_is_kept_or_taken_out() {
+        assert_eq!(
+            choice_command(Some(true)),
+            ["config", "--local", SIGN_OFF_KEY, "true"]
+        );
+        assert_eq!(
+            choice_command(None),
+            ["config", "--local", "--unset-all", SIGN_OFF_KEY]
+        );
     }
 }

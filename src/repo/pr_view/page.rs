@@ -233,11 +233,10 @@ fn page(
     section(ui, "ADD A COMMENT");
     pr_review::comment_box(ui, draft, acts);
     section(ui, &format!("COMMITS ({})", details.commits.len()));
-    commits(
-        ui,
-        details,
-        dco.state.for_pr(details.number, &details.head_oid),
-    );
+    let signoffs = dco::pr_shows(dco.state, details)
+        .then(|| dco.state.for_pr(details.number, &details.head_oid))
+        .flatten();
+    commits(ui, details, signoffs);
 }
 
 fn section(ui: &mut Ui, title: &str) {
@@ -447,7 +446,9 @@ fn commits(ui: &mut Ui, d: &PrDetails, signoffs: Option<&dco::PrSignoffs>) {
         ui.horizontal(|ui| {
             if dco::unsigned(signoffs, &commit.oid) {
                 ui.label(RichText::new("no sign-off").color(t.warning).small())
-                    .on_hover_text("No Signed-off-by from its author: the DCO check refuses it");
+                    .on_hover_text(
+                        "No sign-off of its author or committer: the DCO check refuses it",
+                    );
             }
             ui.label(
                 RichText::new(short(&commit.oid))

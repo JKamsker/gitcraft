@@ -155,15 +155,19 @@ so your config, credentials and hooks apply as usual.
   (warns when the commit is already pushed), the identity you commit as (and whether it is the
   repository's own, the profile's or the global one), and saved identities or profile authors
   to switch a repository to; _Use the profile's author_ takes the repository's own out again.
-- _Sign off_ in the commit box adds `Signed-off-by` (DCO). It turns on by itself in a
-  repository with a `DCO` file (`DCO.md`, `DCO.txt`…) or `.github/dco.yml` committed, or when a
-  pull request's DCO check fails; what you set it to is kept in the repository's git config
-  (`gitcraft.signOff`). There, a commit without its author's sign-off says so in the commit pane,
-  and a pull request's page lists those under _Sign-off (DCO)_ (and marks them among its commits).
-  With the pull request's branch checked out, _Sign off my commits on this branch_ shows what it
-  will do, then runs `rebase --signoff` on the branch's commits (refusing a branch with merges)
-  and force-pushes it with a lease, so that a push made by someone else since isn't overwritten.
-  Ctrl+Z puts the commits as they were back, here and on the remote (again with a lease).
+- _Sign off_ in the commit box adds `Signed-off-by` with your name and email (DCO). It is on
+  by itself in a repository with a `DCO` file (`DCO.md`, `DCO.txt`…) or `.github/dco.yml`
+  committed, and while a pull request whose DCO check fails is open. Turning it the other way is
+  kept for the repository (`gitcraft.signOff` in its git config); turning it back to what the
+  repository asks takes that out again. In a repository that asks for sign-offs, a commit
+  without its author's says so in the commit pane, and a pull request's page lists the commits
+  the DCO check refuses under _Sign-off (DCO)_ (and marks them among its commits); elsewhere
+  nothing is flagged. With the pull request's branch checked out at its latest commit, _Sign
+  off the branch's commits…_ shows what it will do, then adds your sign-off to every commit of
+  the branch (`rebase --signoff`; a branch with merges is refused) and force-pushes it with a
+  lease, so that a push made by someone else since isn't overwritten (one already fetched must
+  be pulled first). Ctrl+Z puts the commits as they were back, on the remote and here; if the
+  push fails, the rewrite stays undoable here.
 - Undo / redo (Ctrl+Z / Ctrl+Y) of commits, amends, merges, rebases, pulls, resets,
   cherry-picks, reverts, checkouts, branch create / rename / delete, tags and stashes.
 
