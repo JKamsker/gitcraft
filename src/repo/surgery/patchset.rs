@@ -73,6 +73,14 @@ fn why_whole(raw: &str, header: &str, lines: &[DiffLine]) -> Option<&'static str
     let has = |start: &str| preamble.iter().any(|l| l.starts_with(start));
     if has("GIT binary patch") || has("Binary files") {
         Some("a binary file")
+    } else if has("new file mode 120000")
+        || has("deleted file mode 120000")
+        || preamble
+            .iter()
+            .any(|l| l.starts_with("index ") && l.ends_with(" 120000"))
+    {
+        // A link's target is one line: half of it is no link at all.
+        Some("a symbolic link")
     } else if has("deleted file mode") {
         Some("deleted")
     } else if has("old mode") || has("new mode") {
@@ -96,17 +104,17 @@ fn why_whole(raw: &str, header: &str, lines: &[DiffLine]) -> Option<&'static str
 
 /// The files of `patch` (as [`crate::git::patch_between`] writes it), named by `paths` (in its
 /// order, from [`crate::git::paths_between`]).
-pub(crate) fn files_of(patch: &str, paths: Vec<String>) -> Result<Vec<FilePatch>, String> {
-    let mut sections: Vec<String> = Vec::new();
-    for line in patch.split_inclusive('\n') {
-        if line.starts_with("diff --git ") || sections.is_empty() {
-            sections.push(String::new());
+pub(crate) fn files_of(patch: &[u8], paths: Vec<String>) -> Result<Vec<FilePatch>, String> {
+    let mut sections: Vec<Vec<u8>> = Vec::new();
+    for line in patch.split_inclusive(|&b| b == b'\n') {
+        if line.starts_with(b"diff --git ") || sections.is_empty() {
+            sections.push(Vec::new());
         }
         if let Some(last) = sections.last_mut() {
-            last.push_str(line);
+            last.extend_from_slice(line);
         }
     }
-    sections.retain(|s| s.starts_with("diff --git "));
+    sections.retain(|s| s.starts_with(b"diff --git "));
     if sections.len() != paths.len() {
         return Err(format!(
             "git listed {} files but its patch has {}",
@@ -114,21 +122,17 @@ pub(crate) fn files_of(patch: &str, paths: Vec<String>) -> Result<Vec<FilePatch>
             sections.len()
         ));
     }
-    // Read with its odd bytes replaced: a patch of it would write the replacements.
-    if let Some((path, _)) = paths
-        .iter()
-        .zip(&sections)
-        .find(|(_, s)| s.contains(char::REPLACEMENT_CHARACTER))
-    {
-        return Err(format!(
-            "{path} isn't UTF-8 text (Latin-1…), which can't be split here: split it in the terminal"
-        ));
-    }
-    Ok(paths
+    paths
         .into_iter()
         .zip(sections)
-        .map(|(path, raw)| FilePatch::new(path, raw))
-        .collect())
+        .map(|(path, raw)| match String::from_utf8(raw) {
+            Ok(raw) => Ok(FilePatch::new(path, raw)),
+            // A patch of it read with its odd bytes replaced would write the replacements.
+            Err(_) => Err(format!(
+                "{path} isn't UTF-8 text (Latin-1…), which can't be split here: split it in the terminal"
+            )),
+        })
+        .collect()
 }
 
 /// The patch of what `picked(file, unit)` keeps of `files`: one file after the other, each
@@ -189,7 +193,7 @@ new mode 100755
         let paths = ["a.txt", "bin.png", "new file.txt", "gone.txt", "run.sh"]
             .map(str::to_owned)
             .to_vec();
-        files_of(PATCH, paths).unwrap_or_default()
+        files_of(PATCH.as_bytes(), paths).unwrap_or_default()
     }
 
     #[test]
@@ -229,8 +233,16 @@ new mode 100755
 
     #[test]
     fn a_patch_whose_listing_does_not_match_is_refused() {
-        assert!(files_of(PATCH, vec!["a.txt".to_owned()]).is_err());
-        assert!(files_of("diff --git a/x b/x\n+\u{FFFD}\n", vec!["x".to_owned()]).is_err());
-        assert!(files_of("", Vec::new()).is_ok_and(|f| f.is_empty()));
+        assert!(files_of(PATCH.as_bytes(), vec!["a.txt".to_owned()]).is_err());
+        assert!(files_of(b"diff --git a/x b/x\n+caf\xe9\n", vec!["x".to_owned()]).is_err());
+        // U+FFFD written as such is text like any other.
+        assert!(
+            files_of(
+                "diff --git a/x b/x\n+\u{FFFD}\n".as_bytes(),
+                vec!["x".to_owned()]
+            )
+            .is_ok()
+        );
+        assert!(files_of(b"", Vec::new()).is_ok_and(|f| f.is_empty()));
     }
 }
