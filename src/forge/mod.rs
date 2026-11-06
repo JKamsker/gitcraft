@@ -13,6 +13,9 @@ mod gitea;
 mod github;
 mod gitlab;
 mod http;
+pub mod stack;
+#[cfg(test)]
+mod stack_tests;
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -109,6 +112,8 @@ pub struct PullRequest {
     pub title: String,
     /// The branch it proposes (head / source branch).
     pub branch: String,
+    /// The branch it goes into (base / target branch).
+    pub base: String,
     /// Its latest commit.
     pub sha: String,
     pub author: String,
@@ -139,6 +144,16 @@ pub trait Provider: Sync {
         hosting: &Hosting,
         new: &NewPullRequest,
     ) -> Result<String, String>;
+
+    /// Changes the branch the pull request numbered `number` goes into: the next layer down of
+    /// a stack, or what that one went into once it merged.
+    fn retarget(
+        &self,
+        repo: &Path,
+        hosting: &Hosting,
+        number: u64,
+        base: &str,
+    ) -> Result<(), String>;
 
     /// Where the account pictures of the authors (by commit email) are.
     fn avatars(&self, repo: &Path, hosting: &Hosting, emails: &[String]) -> Vec<(String, Hint)>;

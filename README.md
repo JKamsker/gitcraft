@@ -137,6 +137,18 @@ so your config, credentials and hooks apply as usual.
   branch back, with its recorded base) works after a restart too. One Ctrl+Z puts every branch
   it moved back. The interactive rebase has _Update dependent branches_ (`--update-refs`, git
   2.38+) for rebasing a stack from its top in one go.
+- Stacked pull requests, on GitHub, GitLab, Forgejo and Gitea alike: right-click a stack's
+  title in STACKS (or _Publish its stack's pull requests…_ in a layer's menu). The preview shows
+  each layer's pull request with its base (the layer below; the bottom one goes into the branch
+  the stack is on), its commits and `--shortstat`, and whether it will be opened, retargeted or
+  just pushed. _Publish_ pushes each branch (`--force-with-lease`, so a restacked one goes over
+  its old commits but never over someone else's) and opens the missing ones bottom-up, each
+  description naming the one it depends on, optionally as drafts. Run it again later to update
+  them all: pushed again, and any whose base is wrong is pointed at the right one. When a lower
+  one is merged (or closed), it is left alone and the ones above go into what it went into, also
+  as recorded in git's config (restack them afterwards). Each one opened is recorded on its
+  branch (`branch.<name>.gitcraft-pr`) as soon as it is, so a publish that failed halfway is run
+  again without opening any twice.
 - Remotes: add, edit (name and URL), fetch one, remove; their branches below each.
 - Worktrees: a yellow dot in place of the folder icon marks the others with uncommitted changes,
   here and in the switcher. Add (existing or new branch), open in the same tab (the tab then shows the branch, a searchable switcher and a button to close the worktree, and what you left keeps running; can be turned off in Settings) or a new one, open a terminal there, lock, remove,
@@ -366,8 +378,9 @@ was made this way, on a demo repository.
 | `src/graph.rs`           | lane layout for the commit graph                                                   |
 | `src/forge/mod.rs`       | the forges behind one `Provider` trait: which one hosts a remote, list, create, avatars, the page of one |
 | `src/forge/github/`      | GitHub through `gh`: list, `gh pr view`, GraphQL threads, comments, reviews, merges |
-| `src/forge/gitlab.rs`    | GitLab through `glab`: list and create                                             |
+| `src/forge/gitlab.rs`    | GitLab through `glab`: list, create and retarget                                   |
 | `src/forge/gitea/`       | Forgejo and Gitea through their REST API: list, the page of one, comments, reviews, merges; finding the login |
+| `src/forge/stack.rs`     | a stack's pull requests: planned, published bottom-up, retargeted, recorded         |
 | `src/forge/http.rs`      | the REST client for forges without a command-line tool                             |
 | `src/forge/cli.rs`       | running `gh` / `glab`                                                              |
 | `ci/forge-server.sh`     | a throwaway Forgejo or Gitea for the live tests (`src/forge/gitea/live.rs`)        |

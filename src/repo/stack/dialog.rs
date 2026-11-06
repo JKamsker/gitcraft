@@ -71,6 +71,7 @@ impl RepoTab {
     /// Draws the dialog, when it is open.
     pub(in crate::repo) fn stack_dialogs(&self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         self.restack_dialog(ctx, acts);
+        self.publish_dialog(ctx, acts);
         let Some(dialog) = &self.stacks.dialog else {
             return;
         };

@@ -454,3 +454,21 @@ fn undo_refuses_rather_than_move_a_checked_out_branch_or_stop_halfway() -> Resul
     assert_eq!((repo.tip("b")?, repo.tip("c")?), (main, b));
     Ok(())
 }
+
+/// A repository on no forge gitcraft knows has nowhere to publish to: said, nothing opened.
+#[test]
+fn publishing_without_a_forge_says_so() -> Result<(), String> {
+    let repo = TestRepo::new("tab publish no forge")?;
+    repo.stack(&["api"])?;
+    let ctx = egui::Context::default();
+    let mut tab = open(&repo, &ctx)?;
+    settle(&mut tab, &ctx, |t| t.stacks.layer("api").is_some())?;
+    tab.apply(Action::Stack(StackAct::OpenPublish("api".into())), &ctx);
+    assert!(tab.stacks.publish.is_none());
+    let status = tab.status.clone().unwrap_or_default();
+    assert!(
+        status.1 && status.0.contains("nowhere to publish"),
+        "{status:?}"
+    );
+    Ok(())
+}

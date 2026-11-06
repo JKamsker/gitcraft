@@ -57,6 +57,19 @@ impl Provider for GitLab {
     }
 
     /// The host's own avatar API, asked by email.
+    fn retarget(&self, repo: &Path, _: &Hosting, number: u64, base: &str) -> Result<(), String> {
+        let number = number.to_string();
+        let args = [
+            "mr",
+            "update",
+            number.as_str(),
+            "--target-branch",
+            base,
+            "--yes",
+        ];
+        self.run(repo, &args).map(drop)
+    }
+
     fn avatars(&self, _: &Path, hosting: &Hosting, emails: &[String]) -> Vec<(String, Hint)> {
         let api = api_authority(hosting);
         emails
@@ -93,6 +106,7 @@ fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
             number: item.get("iid").and_then(Value::as_u64).unwrap_or(0),
             title: text(item, "/title"),
             branch: text(item, "/source_branch"),
+            base: text(item, "/target_branch"),
             sha: text(item, "/sha"),
             author: text(item, "/author/username"),
             url: text(item, "/web_url"),
@@ -107,13 +121,14 @@ mod tests {
 
     #[test]
     fn parses_merge_requests() {
-        let gl = r#"[{"iid":3,"title":"Add","source_branch":"feat","sha":"beef","author":{"username":"bo"},"web_url":"u","draft":false}]"#;
+        let gl = r#"[{"iid":3,"title":"Add","source_branch":"feat","target_branch":"main","sha":"beef","author":{"username":"bo"},"web_url":"u","draft":false}]"#;
         let mrs = parse_list(gl).unwrap_or_default();
         assert_eq!((mrs[0].number, mrs[0].author.as_str()), (3, "bo"));
         assert_eq!(
             (mrs[0].branch.as_str(), mrs[0].sha.as_str()),
             ("feat", "beef")
         );
+        assert_eq!(mrs[0].base, "main");
         assert!(parse_list("oops").is_err());
     }
 

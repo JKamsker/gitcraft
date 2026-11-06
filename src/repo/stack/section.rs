@@ -65,7 +65,20 @@ impl RepoTab {
             if !tree.rows.iter().any(|(_, l)| shown(l)) {
                 continue;
             }
-            title_row(ui, tree);
+            let r = title_row(ui, tree);
+            if let Some(forge) = self.forge() {
+                egui::Popup::context_menu(&r)
+                    .style(crate::theme::menu_style)
+                    .show(|ui| {
+                        if ui
+                            .add_enabled(idle, egui::Button::new(format!("Publish its {}s…", forge.noun())))
+                            .on_hover_text("Preview each one's base and patch, then open or update them bottom-up")
+                            .clicked()
+                        {
+                            acts.push(Action::Stack(StackAct::OpenPublish(tree.root.clone())));
+                        }
+                    });
+            }
             for (depth, layer) in tree.rows.iter().filter(|(_, l)| shown(l)) {
                 let r = self.layer_row(ui, layer, *depth);
                 self.layer_clicks(r, layer, idle, acts);
@@ -358,6 +371,20 @@ impl RepoTab {
         {
             acts.push(Action::Stack(StackAct::OpenRestack(Some(b.name.clone()))));
         }
+        if let Some(forge) = self.forge()
+            && self.stacks.layer(&b.name).is_some()
+            && ui
+                .add_enabled(
+                    idle,
+                    egui::Button::new(format!("Publish its stack's {}s…", forge.noun())),
+                )
+                .on_hover_text(
+                    "Preview each one's base and patch, then open or update them bottom-up",
+                )
+                .clicked()
+        {
+            acts.push(Action::Stack(StackAct::OpenPublish(b.name.clone())));
+        }
         if self.stacks.recorded.contains_key(&b.name)
             && ui
                 .add_enabled(idle, egui::Button::new("Remove from its stack"))
@@ -369,7 +396,7 @@ impl RepoTab {
 }
 
 /// A stack's title: `main → schema → api → ui`, and how many need restacking.
-fn title_row(ui: &mut Ui, tree: &Tree) {
+fn title_row(ui: &mut Ui, tree: &Tree) -> Response {
     let t = Tokens::get(ui.ctx());
     let (rect, resp) = widgets::keyed_row(ui, ROW_H, ("stack-title", &tree.root));
     let painter = ui.painter_at(rect);
@@ -402,7 +429,7 @@ fn title_row(ui: &mut Ui, tree: &Tree) {
             theme::medium(11.5),
             t.text_dim,
         );
-    resp.on_hover_text(title);
+    resp.on_hover_text(format!("{title}\nRight-click to publish them"))
 }
 
 /// `noun` with a capital first letter: "Merge request".
