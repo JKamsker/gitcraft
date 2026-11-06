@@ -55,7 +55,9 @@ impl RepoTab {
     /// The text field, with its suggestions below it while an operator is typed.
     fn search_field(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let id = ui.make_persistent_id("graph-search-field");
-        let listing_open = self.search.suggest.open && ui.memory(|m| m.has_focus(id));
+        // Not while the manual, a dialog or the palette is over the tab: its keys are its own.
+        let free = self.dialog.is_none() && !self.keys_blocked;
+        let listing_open = free && self.search.suggest.open && ui.memory(|m| m.has_focus(id));
         let keys = if listing_open {
             self.take_list_keys(ui)
         } else {

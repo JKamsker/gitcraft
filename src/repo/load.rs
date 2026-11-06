@@ -346,6 +346,9 @@ impl RepoTab {
         // A page asked for before this was read past the old history, which
         // this one replaces: it would leave a gap.
         self.history_gen += 1;
+        // Who wrote what and which files there are may have changed: read again when next
+        // suggested.
+        self.search.suggest.forget_sources();
         // The `git log` older pages came from read the history replaced: let it go (once a
         // page being read from it is in).
         self.log_stream = Default::default();
