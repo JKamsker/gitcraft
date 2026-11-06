@@ -6,6 +6,8 @@
 
 mod config_section;
 mod flags_section;
+mod health;
+mod health_section;
 mod hooks;
 mod hooks_section;
 mod ignore;
@@ -15,6 +17,7 @@ mod page;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
+use health::HealthState;
 pub(crate) use hooks::HooksAct;
 use hooks::HooksState;
 pub(crate) use ignore::IgnoreAct;
@@ -29,14 +32,16 @@ use crate::git::doctor::flags::{self, Flag, Flagged, Sparse};
 pub(crate) enum Section {
     Ignore,
     Hooks,
+    Health,
     Config,
     Flags,
 }
 
 impl Section {
-    pub(crate) const ALL: [Section; 4] = [
+    pub(crate) const ALL: [Section; 5] = [
         Section::Ignore,
         Section::Hooks,
+        Section::Health,
         Section::Config,
         Section::Flags,
     ];
@@ -45,6 +50,7 @@ impl Section {
         match self {
             Section::Ignore => "Ignore rules and attributes",
             Section::Hooks => "Hooks",
+            Section::Health => "Health and maintenance",
             Section::Config => "Which configuration wins",
             Section::Flags => "Hidden changes",
         }
@@ -54,6 +60,7 @@ impl Section {
         match self {
             Section::Ignore => "eye",
             Section::Hooks => "git-merge",
+            Section::Health => "rocket",
             Section::Config => "settings",
             Section::Flags => "eye-off",
         }
@@ -153,6 +160,7 @@ pub(crate) struct DoctorView {
     closing: bool,
     ignore: IgnoreState,
     hooks: HooksState,
+    health: HealthState,
     config: ConfigState,
     flags: FlagsState,
 }
@@ -188,6 +196,7 @@ impl RepoTab {
                 closing: false,
                 ignore: IgnoreState::default(),
                 hooks: HooksState::default(),
+                health: HealthState::default(),
                 config: ConfigState::default(),
                 flags: FlagsState::default(),
             })
@@ -276,6 +285,7 @@ impl RepoTab {
         match doctor.section {
             Section::Ignore => self.load_ignore(read, ctx),
             Section::Hooks => self.load_hooks(read, ctx),
+            Section::Health => self.load_health(read, ctx),
             Section::Config => {
                 doctor.config.origins = None;
                 doctor.config.worktrees = None;

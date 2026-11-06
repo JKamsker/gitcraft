@@ -354,3 +354,49 @@ fn a_hook_is_fixed_in_one_click_through_the_tab() -> Result<(), String> {
     let _ = std::fs::remove_dir_all(&dir);
     result
 }
+
+#[test]
+fn the_health_section_reads_and_turns_a_speed_up_on() -> Result<(), String> {
+    use crate::git::doctor::health::State;
+    let dir = git::doctor::tests::repo("tab-health", &[("a.txt", b"a\n")])?;
+    let ctx = egui::Context::default();
+    crate::theme::install_fonts(&ctx);
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let result = (|| {
+        tab.apply(Action::Reload, &ctx);
+        tab.apply(Action::OpenDoctor(Section::Health), &ctx);
+        let graph = |t: &RepoTab| {
+            t.doctor
+                .as_ref()
+                .and_then(|d| d.health.found.as_ref())
+                .and_then(|f| f.as_ref().ok())
+                .map(|h| h.commit_graph)
+        };
+        wait(&mut tab, &ctx, |t| graph(t).is_some() && !t.loading)?;
+        assert_eq!(graph(&tab), Some(false));
+        // The tab's own reload was timed.
+        assert!(!tab.loading_facts().times.is_empty());
+        let health = tab
+            .doctor
+            .as_ref()
+            .and_then(|d| d.health.found.clone())
+            .ok_or("not read")??;
+        let s = git::doctor::health::suggestions(&health)
+            .into_iter()
+            .find(|s| s.title == "Commit-graph" && s.state == State::Off)
+            .ok_or("no commit-graph suggestion")?;
+        tab.apply(
+            Action::Doctor(DoctorAct::Run {
+                label: "Turn on".into(),
+                ops: s.ops,
+            }),
+            &ctx,
+        );
+        wait(&mut tab, &ctx, |t| {
+            t.busy_op.is_none() && graph(t) == Some(true)
+        })?;
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}
