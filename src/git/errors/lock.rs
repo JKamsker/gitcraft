@@ -161,11 +161,12 @@ fn within_git_dir(repo: &Path, lock: &str) -> Result<String, String> {
         ],
     )?;
     let here = !remote::is_remote(repo);
-    let lock_key = comparable(lock, here);
+    let lock_key = comparable(&resolved(lock, here, true), here);
     let inside = dirs
         .lines()
-        .map(|dir| comparable(dir.trim_end_matches('\r'), here))
+        .map(|dir| dir.trim_end_matches('\r'))
         .filter(|dir| !dir.is_empty())
+        .map(|dir| comparable(&resolved(dir, here, false), here))
         .any(|dir| lock_key.starts_with(&format!("{}/", dir.trim_end_matches('/'))));
     if inside {
         Ok(lock.to_owned())
@@ -174,6 +175,33 @@ fn within_git_dir(repo: &Path, lock: &str) -> Result<String, String> {
             "{lock} is not in this repository's git folder: left alone"
         ))
     }
+}
+
+/// `path` of this machine (`here`) as the file system names it: a folder reached through a
+/// link, or written short (Windows' `RUNNER~1`), in its one long form. For a file
+/// (`file`), its folder is resolved and its name kept, as the lock itself may be gone. As it
+/// is when it can't be resolved, or is on another machine.
+fn resolved(path: &str, here: bool, file: bool) -> String {
+    if !here {
+        return path.to_owned();
+    }
+    let p = Path::new(path);
+    let full = if file {
+        match (p.parent(), p.file_name()) {
+            (Some(dir), Some(name)) => std::fs::canonicalize(dir).map(|d| d.join(name)),
+            _ => return path.to_owned(),
+        }
+    } else {
+        std::fs::canonicalize(p)
+    };
+    full.map_or_else(
+        |_| path.to_owned(),
+        |f| {
+            let s = f.to_string_lossy().into_owned();
+            // `\\?\C:\…`, as canonicalize gives it on Windows.
+            s.strip_prefix(r"\\?\").map_or(s.clone(), str::to_owned)
+        },
+    )
 }
 
 /// A path to compare with another of the same machine: `/` between names, and on Windows

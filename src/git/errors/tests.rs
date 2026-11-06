@@ -566,3 +566,23 @@ fn the_global_file_written_is_named() {
     assert_eq!(fix::origins(xdg_only), ["/h/.config/git/config"]);
     assert!(fix::origins("").is_empty());
 }
+
+/// A lock named through another spelling of the folder (a link to it here; on Windows the
+/// short `RUNNER~1` form of the temp folder): still the repository's, removed.
+#[cfg(unix)]
+#[test]
+fn a_lock_named_through_a_link_to_the_folder() -> Result<(), String> {
+    let dir = repo("lock-alias")?;
+    let alias = dir.with_extension("alias");
+    let _ = std::fs::remove_file(&alias);
+    std::os::unix::fs::symlink(&dir, &alias).map_err(|e| e.to_string())?;
+    let lock_file = dir.join(".git/index.lock");
+    std::fs::write(&lock_file, "").map_err(|e| e.to_string())?;
+    let printed = format!("{}/.git/index.lock", alias.display());
+    let seen = lock::inspect(&dir, &printed)?.ok_or("there")?;
+    lock::remove(&dir, &seen)?;
+    assert!(!lock_file.exists());
+    let _ = std::fs::remove_file(&alias);
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
