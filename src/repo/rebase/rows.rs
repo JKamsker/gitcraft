@@ -129,11 +129,11 @@ impl RebaseEditor {
         false
     }
 
-    /// Reads this frame's keys when nothing else has the keyboard (`free`); whether one of them
-    /// reworded the selected row.
-    pub(super) fn keys(&mut self, ui: &Ui, free: bool) -> bool {
+    /// Reads this frame's keys when nothing else has the keyboard (`free`): what they did for
+    /// the list to follow.
+    pub(super) fn keys(&mut self, ui: &Ui, free: bool) -> Keys {
         if !free || self.starting {
-            return false;
+            return Keys::default();
         }
         // In the order they came, each with whether Alt was held; with Ctrl, Cmd or Shift
         // they are someone else's shortcuts.
@@ -156,19 +156,22 @@ impl RebaseEditor {
             });
             pressed
         });
-        let mut reworded = false;
+        let mut keys = Keys {
+            reveal: !pressed.is_empty(),
+            ..Keys::default()
+        };
         for (key, alt) in pressed {
-            reworded |= self.press(key, alt);
+            keys.reworded |= self.press(key, alt);
         }
-        reworded
+        keys
     }
 
-    /// The rows, newest on top. `focus`: the selected row was just reworded, its message takes
-    /// the keyboard.
-    pub(super) fn list(&mut self, ui: &mut Ui, focus: bool) {
+    /// The rows, newest on top; those out of sight only take their place.
+    pub(super) fn list(&mut self, ui: &mut Ui, keys: Keys) {
         let n = self.entries.len();
         let mut swap: Option<(usize, usize)> = None;
         let mut rows: Vec<(usize, Rect)> = Vec::with_capacity(n);
+        let t = Tokens::get(ui.ctx());
         // What is being started is what is shown.
         let starting = self.starting;
         let editor = self.id;
@@ -183,21 +186,40 @@ impl RebaseEditor {
                     ui.disable();
                 }
                 ui.add_space(6.0);
+                let width = ui.available_width();
                 // Newest first, like the graph; `i` indexes git's oldest-first order.
                 for i in (0..n).rev() {
                     let top = ui.cursor().top();
-                    let picked = self.row(ui, i, focus, dragged == Some(i), &mut swap);
-                    if picked {
-                        self.selected = Some(i);
+                    let selected = self.selected == Some(i);
+                    let hash = self.entries[i].commit.hash.clone();
+                    let known = self.heights.get(&hash).copied();
+                    let reveal = keys.reveal && selected;
+                    let unseen = known.is_some_and(|h| {
+                        !ui.is_rect_visible(Rect::from_min_size(
+                            egui::pos2(ui.cursor().left(), top),
+                            egui::vec2(width, h),
+                        ))
+                    });
+                    if unseen && !reveal && dragged != Some(i) {
+                        ui.allocate_space(egui::vec2(width, known.unwrap_or(ROW_H)));
+                    } else {
+                        let lifted = dragged == Some(i);
+                        if self.row(ui, &t, i, keys.reworded, lifted, &mut swap) {
+                            self.selected = Some(i);
+                        }
+                        ui.add_space(2.0);
+                        ui.separator();
+                        self.heights.insert(hash, ui.cursor().top() - top);
                     }
-                    ui.add_space(2.0);
                     let rect =
                         Rect::from_x_y_ranges(ui.max_rect().x_range(), top..=ui.cursor().top());
-                    ui.separator();
+                    if reveal {
+                        ui.scroll_to_rect(rect, None);
+                    }
                     rows.push((i, rect));
                 }
                 if let Some(from) = dragged {
-                    self.drop_on(ui, from, &rows);
+                    self.drop_on(ui, &t, from, &rows);
                 }
             });
         if let Some((a, b)) = swap {
@@ -206,33 +228,41 @@ impl RebaseEditor {
     }
 
     /// While row `from` is dragged over `rows`: the line where it would go, the list scrolled
-    /// when the pointer nears its edge, and the row moved there when it is let go.
-    fn drop_on(&mut self, ui: &mut Ui, from: usize, rows: &[(usize, Rect)]) {
+    /// when the pointer nears its edge, and the row moved there when it is let go over the
+    /// list. Let go anywhere else, it stays where it was.
+    fn drop_on(&mut self, ui: &mut Ui, t: &Tokens, from: usize, rows: &[(usize, Rect)]) {
         let Some(pos) = ui.ctx().pointer_interact_pos() else {
             return;
         };
-        let t = Tokens::get(ui.ctx());
+        if let Some(e) = self.entries.get(from) {
+            ghost(ui, t, pos, &e.commit.hash, &e.commit.summary);
+        }
         let clip = ui.clip_rect();
+        let over =
+            clip.x_range().contains(pos.x) && clip.expand2(egui::vec2(0.0, 40.0)).contains(pos);
         const EDGE: f32 = 28.0;
-        if pos.y < clip.top() + EDGE {
+        if over && pos.y < clip.top() + EDGE {
             ui.scroll_with_delta(egui::vec2(0.0, 8.0));
             ui.ctx().request_repaint();
-        } else if pos.y > clip.bottom() - EDGE {
+        } else if over && pos.y > clip.bottom() - EDGE {
             ui.scroll_with_delta(egui::vec2(0.0, -8.0));
             ui.ctx().request_repaint();
         }
-        let Some((target, above)) = row_at(rows, pos.y) else {
-            return;
-        };
-        let to = drop_index(from, target, above);
-        if let (Some(_), Some((_, rect))) = (to, rows.iter().find(|(i, _)| *i == target)) {
-            let y = if above { rect.top() } else { rect.bottom() };
+        let to = over
+            .then(|| row_at(rows, pos.y))
+            .flatten()
+            .and_then(|(target, above)| {
+                let to = drop_index(from, target, above)?;
+                let rect = rows.iter().find(|(i, _)| *i == target)?.1;
+                Some((to, if above { rect.top() } else { rect.bottom() }, rect))
+            });
+        if let Some((_, y, rect)) = to {
             ui.painter()
                 .hline(rect.x_range(), y, Stroke::new(2.0, t.accent));
         }
         if ui.input(|i| i.pointer.any_released()) {
             egui::DragAndDrop::clear_payload(ui.ctx());
-            if let Some(to) = to {
+            if let Some((to, _, _)) = to {
                 self.move_entry(from, to);
                 self.selected = Some(to);
             }
@@ -244,12 +274,12 @@ impl RebaseEditor {
     fn row(
         &mut self,
         ui: &mut Ui,
+        t: &Tokens,
         i: usize,
         focus: bool,
         lifted: bool,
         swap: &mut Option<(usize, usize)>,
     ) -> bool {
-        let t = Tokens::get(ui.ctx());
         let n = self.entries.len();
         let selected = self.selected == Some(i);
         let editor = self.id;
@@ -264,6 +294,7 @@ impl RebaseEditor {
         };
         ui.push_id(&e.commit.hash, |ui| {
             egui::Frame::new().fill(fill).show(ui, |ui| {
+                ui.set_min_width(ui.available_width());
                 if lifted {
                     ui.set_opacity(0.4);
                 }
@@ -305,9 +336,11 @@ impl RebaseEditor {
                                 .font(theme::mono(11.5))
                                 .color(t.text_faint),
                         )
+                        .selectable(false)
                         .sense(Sense::click()),
                     );
-                    let (rect, _) = ui.allocate_exact_size(egui::vec2(20.0, 20.0), Sense::hover());
+                    let (rect, avatar) =
+                        ui.allocate_exact_size(egui::vec2(20.0, 20.0), Sense::click());
                     widgets::avatar(ui, rect.center(), 9.0, &e.commit.author, &e.commit.email);
                     let mut text = egui::RichText::new(&e.commit.summary).color(if dim {
                         t.text_faint
@@ -317,8 +350,12 @@ impl RebaseEditor {
                     if dim {
                         text = text.strikethrough();
                     }
-                    let summary = ui.add(egui::Label::new(text).sense(Sense::click()));
-                    picked |= hash.clicked() || summary.clicked();
+                    let summary = ui.add(
+                        egui::Label::new(text)
+                            .selectable(false)
+                            .sense(Sense::click()),
+                    );
+                    picked |= hash.clicked() || avatar.clicked() || summary.clicked();
                     if matches!(e.step, Step::Squash | Step::Fixup) {
                         ui.label(
                             egui::RichText::new("↓ into the commit below")
@@ -328,11 +365,17 @@ impl RebaseEditor {
                     }
                     if e.step == Step::Edit {
                         ui.label(
-                            egui::RichText::new("stops here to be changed")
+                            egui::RichText::new("stops here so you can change it")
                                 .color(t.accent)
                                 .small(),
                         );
                     }
+                    // The rest of the row selects it too.
+                    let rest = ui.allocate_exact_size(
+                        egui::vec2(ui.available_width(), 20.0),
+                        Sense::click(),
+                    );
+                    picked |= rest.1.clicked();
                 });
                 if e.step == Step::Reword {
                     ui.horizontal(|ui| {
@@ -351,6 +394,38 @@ impl RebaseEditor {
         });
         picked
     }
+}
+
+/// What the keys pressed this frame did.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) struct Keys {
+    /// The selected row was just reworded: its message takes the keyboard.
+    pub reworded: bool,
+    /// The selection moved (or its row did): the list scrolls to it.
+    pub reveal: bool,
+}
+
+/// The height a row is taken to have before it was first drawn.
+const ROW_H: f32 = 28.0;
+
+/// The commit being dragged, beside the pointer.
+fn ghost(ui: &Ui, t: &Tokens, pos: egui::Pos2, hash: &str, summary: &str) {
+    egui::Area::new(egui::Id::new("rebase_row_ghost"))
+        .order(egui::Order::Tooltip)
+        .fixed_pos(pos + egui::vec2(14.0, 6.0))
+        .interactable(false)
+        .show(ui.ctx(), |ui| {
+            egui::Frame::popup(ui.style()).show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(
+                        egui::RichText::new(short(hash))
+                            .font(theme::mono(11.5))
+                            .color(t.text_faint),
+                    );
+                    ui.label(egui::RichText::new(summary).color(t.text));
+                });
+            });
+        });
 }
 
 impl Step {
@@ -412,6 +487,9 @@ mod tests {
     #[test]
     fn letters_set_the_selected_rows_action() {
         let mut ed = editor(&["a", "b", "c"]);
+        // The newest row starts selected.
+        assert_eq!(ed.selected, Some(2));
+        ed.selected = None;
         // Nothing selected: letters do nothing.
         assert!(!ed.press(Key::D, false));
         assert_eq!(steps(&ed), [Step::Pick; 3]);
@@ -439,6 +517,7 @@ mod tests {
     #[test]
     fn arrows_select_and_alt_arrows_move() {
         let mut ed = editor(&["a", "b", "c"]);
+        ed.selected = None;
         // The newest (top) row first.
         ed.press(Key::ArrowDown, false);
         assert_eq!(ed.selected, Some(2));
@@ -553,6 +632,7 @@ mod tests {
     fn keys_pressed_over_the_list_act_on_it() {
         let ctx = egui::Context::default();
         let mut ed = editor(&["a", "b", "c"]);
+        ed.selected = None;
         frame(&ctx, &mut ed, vec![]);
         frame(
             &ctx,
@@ -617,6 +697,54 @@ mod tests {
             }],
         );
         assert_eq!(order(&ed), ["b", "c", "a"]);
+    }
+
+    #[test]
+    fn a_row_let_go_outside_the_list_stays_where_it_was() {
+        let ctx = egui::Context::default();
+        let mut ed = editor(&["a", "b", "c"]);
+        frame(&ctx, &mut ed, vec![]);
+        egui::DragAndDrop::set_payload(
+            &ctx,
+            DraggedRow {
+                editor: ed.id,
+                index: 0,
+            },
+        );
+        let at = egui::pos2(950.0, 1.0);
+        frame(
+            &ctx,
+            &mut ed,
+            vec![
+                egui::Event::PointerMoved(at),
+                egui::Event::PointerButton {
+                    pos: at,
+                    button: egui::PointerButton::Primary,
+                    pressed: false,
+                    modifiers: Modifiers::NONE,
+                },
+            ],
+        );
+        assert_eq!(order(&ed), ["a", "b", "c"]);
+        assert!(!egui::DragAndDrop::has_any_payload(&ctx));
+    }
+
+    #[test]
+    fn rows_out_of_sight_are_only_measured_once_and_the_selection_is_followed() {
+        let ctx = egui::Context::default();
+        let names: Vec<String> = (0..400).map(|i| format!("c{i}")).collect();
+        let mut ed = editor(&names.iter().map(String::as_str).collect::<Vec<_>>());
+        frame(&ctx, &mut ed, vec![]);
+        frame(&ctx, &mut ed, vec![]);
+        assert_eq!(ed.heights.len(), 400);
+        // Walking down past the window still moves the selected row, drawn where it is.
+        let downs = (0..350)
+            .map(|_| key(Key::ArrowDown, Modifiers::NONE))
+            .collect();
+        frame(&ctx, &mut ed, downs);
+        frame(&ctx, &mut ed, vec![key(Key::D, Modifiers::NONE)]);
+        assert_eq!(ed.selected, Some(49));
+        assert_eq!(ed.entries[49].step, Step::Drop);
     }
 
     #[test]

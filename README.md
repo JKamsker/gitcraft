@@ -102,7 +102,8 @@ so your config, credentials and hooks apply as usual.
   `git format-patch` into commits (`git am`) and puts any other diff on the working tree
   (`git apply`). Ctrl+Z undoes either.
 - Interactive rebase: the commits to rewrite, newest on top; pick, reword (edit the message in
-  place), edit (stop there to change the commit; _Commit_ amends it and goes on), squash, fix up
+  place), edit (stop there to change the commit; _Continue rebase_ amends it with what is staged
+  and goes on), squash, fix up
   or drop each one, then _Start rebase_. Drag a row by its handle to move it, or click a row and
   use the keys: P, R, E, S, F, D set its action, ↑ / ↓ select another, Alt+↑ / Alt+↓ move it.
   Ctrl+Z undoes it.
