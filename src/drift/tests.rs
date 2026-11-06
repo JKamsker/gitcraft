@@ -118,8 +118,16 @@ fn issue_numbers_from_branches_and_tasks() {
     assert_eq!(issue_number("feat/issues/31", ""), Some(31));
     assert_eq!(issue_number("42", ""), Some(42));
     assert_eq!(
-        issue_number("agent/login", "see #508 for details"),
+        issue_number("agent/login", "This fixes #508 for good"),
         Some(508)
+    );
+    // Dates, stamps, words that only contain a marker, colours.
+    assert_eq!(issue_number("agent/2024-11-06-cleanup", ""), None);
+    assert_eq!(issue_number("wt/20261106-1530", ""), None);
+    assert_eq!(issue_number("fix/high-5-dpi", ""), None);
+    assert_eq!(
+        issue_number("agent/button", "make the button #333 gray"),
+        None
     );
     assert_eq!(issue_number("agent/v2-login", ""), None);
     assert_eq!(issue_number("", ""), None);
@@ -266,7 +274,19 @@ fn a_real_worktree_measured_against_its_task() -> Result<(), String> {
             .lines()
             .all(|l| !l.contains("gitcraft-task"))
     );
-    assert!(measure(&wt, "", "x").is_err());
+    // No main commit known (a bare layout): compared with main.
+    assert_eq!(measure(&wt, "", "x")?.fork, base);
+    assert!(measure(&wt, "--x", "x").is_err());
+    // What only the worktree's own working tree shows.
+    assert_eq!(
+        report.uncommitted,
+        vec!["docs/guide ü.md", "notes.txt", "src/fmt.rs"]
+    );
+    assert_eq!(report.untracked, vec!["notes.txt"]);
+    // With prefixes configured away, signatures are still found.
+    git(&wt, &["config", "diff.mnemonicPrefix", "true"])?;
+    git(&wt, &["config", "diff.noprefix", "true"])?;
+    assert_eq!(measure(&wt, &base, "")?.signatures.len(), 1);
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::remove_dir_all(dir.with_extension("wt"));
     Ok(())
@@ -280,4 +300,53 @@ fn the_question_for_a_coding_agent_has_paths_not_contents() {
     };
     let q = super::llm::prompt("Fix login", &report);
     assert!(q.contains("Fix login") && q.contains("src/a.rs") && q.contains("NONE"));
+}
+
+#[test]
+fn review_cases_for_signatures() {
+    assert!(is_public("src/a.rs", "pub const MAX: u32 = 1;"));
+    assert!(is_public("src/a.rs", "pub const fn f() {}"));
+    assert!(is_public("src/a.rs", "pub const unsafe fn f() {}"));
+    assert!(!is_public("web/a.ts", "export const TIMEOUT = 5000;"));
+    assert!(is_public("web/a.ts", "export const go = (x: number) => x;"));
+    assert!(is_public("web/a.ts", "export interface User {"));
+    assert!(!is_public("A.java", "public static final int X = foo();"));
+    let quoted = "diff --git \"a/src/t\\tx.rs\" \"b/src/t\\tx.rs\"\n--- \"a/src/t\\tx.rs\"\n+++ \"b/src/t\\tx.rs\"\n@@ -1 +1 @@\n-pub fn f() {}\n+pub fn f(a: u8) {}\n";
+    assert_eq!(changed(quoted).len(), 1);
+}
+
+#[test]
+fn review_cases_for_folders() {
+    let auth = keywords("Fix authentication for the parser");
+    assert!(related("src/auth", &auth));
+    assert!(related("src/parse", &auth), "{auth:?}");
+    assert!(related("src/parsing", &auth), "{auth:?}");
+    let deps = keywords("Update the dependencies");
+    assert!(related("src/deps", &deps));
+    let speed = keywords("Speed up the parser");
+    assert!(speed.contains(&"speed".to_owned()), "{speed:?}");
+    // An issue's links and template words don't make every folder related.
+    let issue = keywords(
+        "Login fails\n\nSteps to reproduce: see https://github.com/x/y/issues/1\nExpected behavior: it works",
+    );
+    assert!(!related(".github/workflows", &issue), "{issue:?}");
+    assert!(related("src/login", &issue));
+}
+
+#[test]
+fn review_cases_for_dependencies() {
+    let before = "[dependencies]\nserde = \"1\"\n";
+    let workspace = "[dependencies] # ours\nserde.workspace = true\ntokio = { version = \"1\",\n  features = [\"full\"] }\n";
+    assert_eq!(added("Cargo.toml", before, workspace), vec!["tokio"]);
+    let extras = "[project]\nname = \"x\"\n\n[project.optional-dependencies]\ndev = [\"pytest>=7\", \"ruff\"]\nlint = [\n  \"mypy\", # don't use 'flake8'\n]\n\n[dependency-groups]\ntest = [\"coverage\"]\n";
+    assert_eq!(
+        added("pyproject.toml", "", extras),
+        vec!["coverage", "mypy", "pytest", "ruff"]
+    );
+    let reqs = "git+https://github.com/a/b.git#egg=bee\nhttps://example.com/x.whl\nflask # web\n";
+    assert_eq!(
+        added("requirements/dev.txt", "", reqs),
+        vec!["bee", "flask"]
+    );
+    assert!(is_manifest("requirements/dev.txt"));
 }

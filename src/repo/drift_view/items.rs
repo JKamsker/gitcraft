@@ -127,7 +127,12 @@ fn item(
     files: &[String],
     acts: &mut Vec<Action>,
 ) {
-    let tip = if files.len() > 1 {
+    let elsewhere = files
+        .first()
+        .is_some_and(|f| view.diff_key(report, f).is_none());
+    let tip = if elsewhere {
+        "Not committed in that worktree: opens it, where its changes are".to_owned()
+    } else if files.len() > 1 {
         let mut tip: Vec<&str> = files.iter().map(String::as_str).take(12).collect();
         if files.len() > 12 {
             tip.push("…");
@@ -153,6 +158,8 @@ fn item(
                 .unwrap_or_else(|| view.worktree.name()),
             since_fork: false,
         });
-        acts.push(Action::OpenDiff(view.diff_key(report, first)));
+        if let Some(key) = view.diff_key(report, first) {
+            acts.push(Action::OpenDiff(key));
+        }
     }
 }
