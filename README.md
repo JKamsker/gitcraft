@@ -215,9 +215,10 @@ so your config, credentials and hooks apply as usual.
   Cached on disk; can be turned off.
 - Settings (Ctrl+, or the gear in the title bar), in pages listed on the left: the profile in
   use and what is its own, zoom, branch column width, graph columns, avatars, notifications,
-  update check, background fetch, keeping submodules up to date, editor command, default shell
-  and terminal font size, saved identities, SSH sign-ins, and every keyboard shortcut. Ctrl+F
-  searches all pages at once (Esc clears it); Alt+↑ / Alt+↓ go through the pages.
+  update check (with a Check for updates button), background fetch, keeping submodules up to
+  date, editor command, default shell and terminal font size, saved identities, SSH sign-ins,
+  and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
+  Alt+↓ go through the pages.
 - Commit signing in Settings → Commit signing: the format (OpenPGP, SSH or X.509), signing key
   and program, and whether commits and tags are signed by default. These are your global git
   config's `gpg.format`, `user.signingkey`, `gpg.program` (`gpg.ssh.program`, `gpg.x509.program`),
