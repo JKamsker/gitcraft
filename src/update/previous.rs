@@ -18,9 +18,16 @@ pub struct Previous {
 }
 
 impl Previous {
+    /// Newer than this build: going to it is going forward to the version gone back from.
+    pub fn is_newer(&self) -> bool {
+        self.version
+            .as_deref()
+            .is_some_and(|v| super::newer(v, super::CURRENT))
+    }
+
     /// "0.3.3", or a plain name when its version wasn't written down.
     pub fn label(&self) -> &str {
-        self.version.as_deref().unwrap_or("the previous version")
+        self.version.as_deref().unwrap_or("the version kept")
     }
 }
 
@@ -106,7 +113,15 @@ pub(super) fn swap_back(target: &Path, current: &str) -> Result<Previous, String
     fs::rename(target, &old)
         .map_err(|e| format!("Could not move {} aside: {e}", target.display()))?;
     if let Err(e) = fs::rename(&previous.path, target) {
-        let _ = fs::rename(&old, target);
+        if fs::rename(&old, target).is_err() {
+            return Err(format!(
+                "Could not put gitcraft {} back in place ({e}), nor this version: it is at {}; \
+                 rename it back to {} by hand",
+                previous.label(),
+                old.display(),
+                target.display()
+            ));
+        }
         return Err(format!(
             "Could not put gitcraft {} back in place: {e}",
             previous.label()
@@ -120,11 +135,15 @@ pub(super) fn swap_back(target: &Path, current: &str) -> Result<Previous, String
 /// kept so far. If it can't be, it is left as `.old`, removed on the next start.
 fn keep(target: &Path, old: &Path, version: &str) {
     let kept = kept_path(target);
-    remove(&kept);
     let versions = version_file(target);
-    if fs::rename(old, &kept).is_ok() && plain_version(version) {
-        let _ = fs::write(&versions, version);
-    } else {
+    // Never a version file naming what was kept before.
+    let _ = fs::remove_file(&versions);
+    remove(&kept);
+    // Still there (locked, on Windows): nothing is kept rather than the wrong one.
+    if kept.exists() || fs::rename(old, &kept).is_err() {
+        return;
+    }
+    if plain_version(version) && fs::write(&versions, version).is_err() {
         let _ = fs::remove_file(&versions);
     }
 }

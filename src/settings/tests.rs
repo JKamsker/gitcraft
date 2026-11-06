@@ -179,6 +179,7 @@ fn found_with(query: &str, previous: Option<&str>, pinned: &str) -> Vec<(Page, u
                     update: UpdateCheck::NotYet,
                     check_updates_now: false,
                     previous: previous.map(str::to_owned),
+                    previous_is_newer: false,
                     pinned: pinned.to_owned(),
                     go_back: false,
                     unpin: false,

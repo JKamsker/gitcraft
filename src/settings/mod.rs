@@ -386,12 +386,21 @@ impl Settings {
                     card.row("Check now", "check for updates new version look", |ui| {
                         ui.horizontal_wrapped(|ui| {
                             let checking = view.update == UpdateCheck::Checking;
+                            let pinned = matches!(view.update, UpdateCheck::Pinned(_));
                             if ui
-                                .add_enabled(!checking, egui::Button::new("Check for updates"))
+                                .add_enabled(
+                                    !checking && !pinned,
+                                    egui::Button::new("Check for updates"),
+                                )
                                 .on_hover_text(format!(
                                     "Looks on GitHub for a newer version on the {} channel",
                                     self.update_channel.label()
                                 ))
+                                .on_disabled_hover_text(if pinned {
+                                    "Pinned to this version: unpin it to look for updates"
+                                } else {
+                                    "Looking…"
+                                })
                                 .clicked()
                             {
                                 view.check_updates_now = true;
@@ -417,12 +426,8 @@ impl Settings {
                                 UpdateCheck::Failed(e) => {
                                     ui.label(RichText::new(e).color(t.danger).small());
                                 }
-                                UpdateCheck::Pinned(version) => {
-                                    layout::note(
-                                        ui,
-                                        format!("Staying on {version}: unpin it to see updates"),
-                                    );
-                                }
+                                // Said in the Pinned row, with its Unpin button.
+                                UpdateCheck::Pinned(_) => {}
                             }
                         });
                     });
@@ -843,19 +848,29 @@ pub enum UpdateCheck {
 /// the pin that keeps it.
 fn rollback_rows(card: &mut Card, view: &mut SettingsView) {
     if let Some(version) = view.previous.clone() {
+        let (button, tip) = if view.previous_is_newer {
+            (
+                format!("Go forward to {version}"),
+                format!(
+                    "Restarts as gitcraft {version}, the newer version kept when you went back; \
+                     the open tabs stay, and updates are offered again."
+                ),
+            )
+        } else {
+            (
+                format!("Go back to {version}"),
+                format!(
+                    "Restarts as {version}, kept by the last update; the open tabs stay. No \
+                     update is offered until you unpin it."
+                ),
+            )
+        };
         card.row(
             "Previous version",
-            "go back rollback undo update downgrade",
+            "go back forward rollback undo update downgrade",
             |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    if ui
-                        .button(format!("Go back to {version}"))
-                        .on_hover_text(format!(
-                            "Restarts as gitcraft {version}, the version the last update replaced; \
-                         the open tabs stay. No update is offered until you unpin it."
-                        ))
-                        .clicked()
-                    {
+                    if ui.button(button).on_hover_text(tip).clicked() {
                         view.go_back = true;
                     }
                 });
@@ -869,7 +884,7 @@ fn rollback_rows(card: &mut Card, view: &mut SettingsView) {
                 ui.label(format!("Staying on gitcraft {pinned}"));
                 if ui
                     .button("Unpin")
-                    .on_hover_text("Look for new versions again, as the settings above say")
+                    .on_hover_text("Look for new versions again, as the update settings say")
                     .clicked()
                 {
                     view.unpin = true;

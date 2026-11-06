@@ -101,7 +101,7 @@ fn an_unwritten_or_odd_version_is_left_unnamed() -> Result<(), String> {
     fs::write(version_file(&target), "0.3.3-dev.12\n").map_err(|e| e.to_string())?;
     let dev = find(&target).and_then(|p| p.version);
     let _ = fs::remove_dir_all(&dir);
-    assert_eq!(unwritten.as_deref(), Some("the previous version"));
+    assert_eq!(unwritten.as_deref(), Some("the version kept"));
     assert_eq!(odd, None);
     assert_eq!(dev.as_deref(), Some("0.3.3-dev.12"));
     Ok(())
@@ -141,4 +141,29 @@ fn the_pin_holds_for_the_version_gone_back_to() {
     assert_eq!(settle_pin(PIN_THIS, "0.3.3"), "0.3.3");
     // Another version was installed by hand since: no longer pinned.
     assert_eq!(settle_pin("0.3.3", "0.3.5"), "");
+}
+
+#[test]
+fn a_newer_kept_version_is_going_forward() {
+    let kept = |v: Option<&str>| Previous {
+        version: v.map(str::to_owned),
+        path: PathBuf::new(),
+    };
+    assert!(kept(Some("999.0.0")).is_newer());
+    assert!(!kept(Some("0.0.1")).is_newer());
+    assert!(!kept(Some(crate::update::CURRENT)).is_newer());
+    assert!(!kept(None).is_newer());
+}
+
+/// When the running version can't be kept (its rename fails), the version file of the copy
+/// kept before is gone too: no copy is ever offered under another version's name.
+#[test]
+fn a_kept_copy_that_stays_put_is_never_mislabelled() -> Result<(), String> {
+    let (dir, target) = program("locked", "gitcraft", "v0.3.4")?;
+    fs::write(version_file(&target), "0.3.2").map_err(|e| e.to_string())?;
+    keep(&target, &dir.join("missing.old"), "0.3.3");
+    let after = (find(&target), version_file(&target).exists());
+    let _ = fs::remove_dir_all(&dir);
+    assert_eq!(after, (None, false));
+    Ok(())
 }
