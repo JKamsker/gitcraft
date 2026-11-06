@@ -64,6 +64,20 @@ impl RepoTab {
         if ui.button("Copy name").clicked() {
             ui.ctx().copy_text(tag.name.clone());
         }
+        if crate::release::version::Version::parse(&tag.name).is_some()
+            && ui
+                .add_enabled(
+                    idle,
+                    egui::Button::new(format!("Start hotfix from {}…", tag.name)),
+                )
+                .on_hover_text("A hotfix branch made here (the next patch version), checked out")
+                .clicked()
+        {
+            acts.push(Action::Hotfix(crate::repo::hotfix::HotfixAct::Start {
+                tag: tag.name.clone(),
+                target: tag.target.clone(),
+            }));
+        }
         if let Some(remote) = self.default_remote() {
             if ui
                 .add_enabled(idle, egui::Button::new(format!("Push to {remote}")))

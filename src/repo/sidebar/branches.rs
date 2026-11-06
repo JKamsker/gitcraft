@@ -138,6 +138,18 @@ impl RepoTab {
         idle: bool,
     ) {
         self.checkout_items(ui, acts, b, idle);
+        if b.is_head
+            && b.name.starts_with(&self.hotfix_prefix())
+            && ui
+                .add_enabled(idle, egui::Button::new("Finish hotfix…"))
+                .on_hover_text(
+                    "Tags it, merges it back into the main branch (and the development one), \
+                     deletes it and pushes it all, after showing what it will do",
+                )
+                .clicked()
+        {
+            acts.push(Action::Hotfix(crate::repo::hotfix::HotfixAct::OpenFinish));
+        }
         if let Some(current) = self.refs.current.as_deref()
             && !b.is_head
         {
