@@ -496,3 +496,30 @@ fn data_from(lines: Vec<DiffLine>) -> DiffData {
         lines,
     }
 }
+
+/// A moved block ending its hunk (no context after it) keeps its lines when lines are opened
+/// right after it.
+#[test]
+fn a_moved_block_does_not_grow_over_lines_opened_after_it() {
+    let lines = parse(
+        "@@ -11,3 +10,0 @@\n-let first_moved_line = compute_it();\n-let second_moved_line = again();\n-let third = more_letters_here();\n@@ -40,0 +38,3 @@\n+let first_moved_line = compute_it();\n+let second_moved_line = again();\n+let third = more_letters_here();\n",
+    );
+    let mut data = data_from(lines);
+    data.moves = crate::repo::diff::moved::detect(&data.lines);
+    assert_eq!(data.moves.blocks.len(), 1);
+    let before = data.moves.blocks[0].clone();
+    data.context = Some(Context {
+        gaps: gaps_of(&data.lines, 60).unwrap_or_default(),
+        raw: (1..=60).map(|n| format!("l{n}")).collect(),
+        path: "f.rs".to_owned(),
+        dark: true,
+        no_newline_at_end: false,
+    });
+    data.unfold(1, Unfold::Down(2));
+    let after = &data.moves.blocks[0];
+    assert_eq!(after.del, before.del);
+    assert_eq!(after.add.len(), before.add.len());
+    assert_eq!(data.lines[before.del.end].kind, Kind::Context);
+    // The header below the empty range numbers the lines opened from the line after it.
+    assert_eq!(data.lines[0].raw, "@@ -11,5 +11,2 @@");
+}
