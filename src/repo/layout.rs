@@ -106,7 +106,7 @@ impl RepoTab {
 
     /// Escape closes the innermost view; Ctrl+Z / Ctrl+Y undo and redo, Ctrl+F searches, F7 and
     /// Shift+F7 (or Alt+↓ / Alt+↑) go to the next and previous change of a diff.
-    fn shortcuts(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
+    pub(super) fn shortcuts(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         let free_keys =
             self.dialog.is_none() && !self.keys_blocked && !ctx.egui_wants_keyboard_input();
         if free_keys {
@@ -123,8 +123,10 @@ impl RepoTab {
                 acts.push(Action::Pr(pr_review::PrAct::CloseLine));
             } else if esc && self.diff.is_some() {
                 acts.push(Action::CloseDiff);
-            } else if esc && self.rebase.is_some() {
-                acts.push(Action::CloseRebase);
+            } else if esc && let Some(rebase) = &self.rebase {
+                if !rebase.typing {
+                    acts.push(Action::CloseRebase);
+                }
             } else if esc && self.file_view.is_some() {
                 acts.push(Action::CloseFileView);
             } else if esc && self.ci_view.is_some() {

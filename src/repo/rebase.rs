@@ -89,6 +89,9 @@ pub(crate) struct RebaseEditor {
     /// How tall each row (by commit) was when last drawn: rows out of sight only take their
     /// place.
     pub heights: std::collections::HashMap<String, f32>,
+    /// A text field had the keyboard at the end of the last frame: the Esc that takes it away
+    /// (egui does, before the frame) doesn't also close the editor.
+    pub typing: bool,
 }
 
 impl RebaseEditor {
@@ -115,6 +118,7 @@ impl RebaseEditor {
             starting: false,
             selected,
             heights: std::collections::HashMap::new(),
+            typing: false,
         }
     }
 
@@ -381,6 +385,7 @@ impl RepoTab {
         // The row keys act on this frame, unless something else has the keyboard.
         let keys = editor.keys(ui, keys_free);
         editor.list(ui, keys);
+        editor.typing = ui.ctx().memory(|m| m.focused().is_some());
     }
 }
 

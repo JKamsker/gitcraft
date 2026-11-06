@@ -386,9 +386,9 @@ mod tests {
         tab.run_rebase(&ctx);
         let stopped = op_result(&tab);
         let state = git::status(&dir).map(|w| w.in_progress);
+        // Not staged: Continue stages it, as a commit would.
         let file = dir.join("añadido café.txt");
         let wrote = std::fs::write(&file, "edited\n");
-        let staged = git::run(Some(&dir), &["add", "-A"]);
         tab.work = git::status(&dir).unwrap_or_default();
         tab.busy_op = None;
         tab.commit(&ctx);
@@ -409,7 +409,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         assert!(matches!(stopped, Some(Ok(_))), "{stopped:?}");
         assert_eq!(state, Ok(Some(git::InProgress::Rebase)));
-        assert!(wrote.is_ok() && staged.is_ok());
+        assert!(wrote.is_ok());
         assert!(matches!(continued, Some(Ok(_))), "{continued:?}");
         assert_eq!(after, Ok(None));
         // The change went into "base", and "read" is replayed after it.
@@ -418,6 +418,49 @@ mod tests {
             "the edited commit holds the staged file"
         );
         assert_eq!(top, "read");
+    }
+
+    /// Esc pressed in a reword message takes the keyboard out of it, and leaves the editor
+    /// open; pressed again, it closes the editor.
+    #[test]
+    fn esc_in_a_message_does_not_close_the_rebase_editor() {
+        let dir = repo("rebase-esc");
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+        let commits = git::rebase_commits(&dir, "HEAD~1").unwrap_or_default();
+        tab.rebase = Some(rebase::RebaseEditor::new(
+            "HEAD~1".to_owned(),
+            "HEAD~1".to_owned(),
+            commits,
+        ));
+        let esc = |tab: &mut RepoTab| {
+            let input = egui::RawInput {
+                events: vec![egui::Event::Key {
+                    key: egui::Key::Escape,
+                    physical_key: None,
+                    pressed: true,
+                    repeat: false,
+                    modifiers: egui::Modifiers::NONE,
+                }],
+                ..Default::default()
+            };
+            let mut acts = Vec::new();
+            let mut out = ctx.run_ui(input, |ui| tab.shortcuts(ui.ctx(), &mut acts));
+            out.textures_delta.clear();
+            acts.iter()
+                .any(|a| matches!(a, super::super::Action::CloseRebase))
+        };
+        if let Some(e) = tab.rebase.as_mut() {
+            e.typing = true;
+        }
+        let first = esc(&mut tab);
+        if let Some(e) = tab.rebase.as_mut() {
+            e.typing = false;
+        }
+        let second = esc(&mut tab);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(!first);
+        assert!(second);
     }
 
     /// Editing the message of what the tab thinks is the latest commit, after another was made
