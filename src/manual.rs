@@ -68,7 +68,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Right-click a file for its history, its blame or the whole file as it is at the commit.",
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",
-            "A notebook's diff is cell by cell, outputs (pictures too) before and after; JSON shows its lines. Strip outputs when committing sets a clean filter for the repository (nbstripout, else Python). Cells are never run.",
+            "A notebook's diff is cell by cell, outputs (pictures too) before and after; JSON shows its lines. Strip outputs when committing sets a clean filter in this clone only (nbstripout, else a Python 3 script): staged notebooks lose outputs and counts, the file on disk keeps them. Cells are never run.",
             "Right-click a pull request and choose Open in worktree to work on its branch in a worktree of its own, made for it when there is none.",
             "A terminal panel with tabs, in the repository's folder.",
         ],

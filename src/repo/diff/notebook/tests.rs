@@ -111,7 +111,8 @@ fn a_notebook_changed_in_a_commit() -> Result<(), String> {
     );
     assert_eq!(summary(&nb), "1 cell changed, 1 added, 1 removed");
     assert!(nb.diff.metadata.is_none());
-    assert!(!nb.strips);
+    assert_eq!(nb.strip, git::StripState::Off);
+    assert!(!nb.compared_stripped);
     draw(&nb)?;
     Ok(())
 }

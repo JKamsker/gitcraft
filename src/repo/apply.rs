@@ -407,17 +407,30 @@ impl RepoTab {
         let path = self.path.clone();
         self.then(
             ctx,
-            move || git::set_strip_outputs(&path, on),
-            move |tab, result, ctx| {
+            move || {
+                let done = git::set_strip_outputs(&path, on);
+                (done, git::strip_state(&path))
+            },
+            move |tab, (result, state), ctx| {
                 tab.status = Some(match result {
-                    Ok(()) if on => (
-                        "Notebooks are staged without their outputs from now on".to_owned(),
-                        false,
-                    ),
-                    Ok(()) => (
-                        "Notebooks are staged with their outputs again".to_owned(),
-                        false,
-                    ),
+                    Ok(Some(command)) => {
+                        let tool = if command == "nbstripout" { "nbstripout" } else { "Python" };
+                        (
+                            format!(
+                                "Notebooks are staged without their outputs from now on (by \
+                                 {tool}, in this clone): git status may show them changed until \
+                                 they are committed once so"
+                            ),
+                            false,
+                        )
+                    }
+                    Ok(_) => match state {
+                        git::StripState::Other(name) => (
+                            format!("gitcraft no longer strips outputs, but the repository's {name} filter still does"),
+                            false,
+                        ),
+                        _ => ("Notebooks are staged with their outputs again".to_owned(), false),
+                    },
                     Err(e) => (
                         format!("Could not change how notebooks are staged: {e}"),
                         true,

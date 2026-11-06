@@ -19,6 +19,10 @@ pub struct CellChange {
     pub old: Option<Cell>,
     pub new: Option<Cell>,
     pub status: Status,
+    /// Its number in the notebook (the new one, or the old one for a removed cell).
+    pub number: usize,
+    /// It moved among the other cells.
+    pub moved: bool,
     /// Its source, line by line.
     pub source: Vec<(Edit, String)>,
     pub outputs_changed: bool,
@@ -47,9 +51,23 @@ pub fn compare(old: Option<&Notebook>, new: Option<&Notebook>) -> NotebookDiff {
     let empty = Notebook::default();
     let (a, b) = (old.unwrap_or(&empty), new.unwrap_or(&empty));
     let pairs = match_cells(&a.cells, &b.cells);
+    let mut last_old = None;
     let cells = pairs
         .into_iter()
-        .map(|(o, n)| change(o.map(|i| &a.cells[i]), n.map(|i| &b.cells[i])))
+        .map(|(o, n)| {
+            // Matched by id, before a cell that came before it: moved.
+            let moved = o.is_some() && n.is_some() && last_old.zip(o).is_some_and(|(l, i)| i < l);
+            if o.is_some() && n.is_some() {
+                last_old = last_old.max(o);
+            }
+            let mut c = change(o.map(|i| &a.cells[i]), n.map(|i| &b.cells[i]));
+            c.number = n.or(o).map_or(0, |i| i + 1);
+            c.moved = moved;
+            if moved && c.status == Status::Unchanged {
+                c.status = Status::Modified;
+            }
+            c
+        })
         .collect();
     let metadata = (old.is_some() && new.is_some() && a.metadata != b.metadata)
         .then(|| owned(diff_lines(&lines(&a.metadata), &lines(&b.metadata))));
@@ -59,7 +77,13 @@ pub fn compare(old: Option<&Notebook>, new: Option<&Notebook>) -> NotebookDiff {
 /// The cells paired: by id when every cell of both sides has one, else by their sources in
 /// order (a removed and an added cell next to each other being the same one edited).
 pub(crate) fn match_cells(a: &[Cell], b: &[Cell]) -> Vec<(Option<usize>, Option<usize>)> {
-    let ids = |cells: &[Cell]| cells.iter().all(|c| c.id.is_some());
+    // Every cell with an id of its own, on both sides.
+    let ids = |cells: &[Cell]| {
+        let mut seen = std::collections::HashSet::new();
+        cells
+            .iter()
+            .all(|c| c.id.as_deref().is_some_and(|id| seen.insert(id)))
+    };
     if !a.is_empty() && !b.is_empty() && ids(a) && ids(b) {
         return match_by_id(a, b);
     }
@@ -166,7 +190,9 @@ fn change(old: Option<&Cell>, new: Option<&Cell>) -> CellChange {
     let status = match (old, new) {
         (None, _) => Status::Added,
         (_, None) => Status::Removed,
-        (Some(a), Some(b)) if a.source != b.source || a.kind != b.kind || outputs_changed => {
+        (Some(a), Some(b))
+            if a.source != b.source || a.kind != b.kind || outputs_changed || metadata_changed =>
+        {
             Status::Modified
         }
         _ => Status::Unchanged,
@@ -175,6 +201,8 @@ fn change(old: Option<&Cell>, new: Option<&Cell>) -> CellChange {
         old: old.cloned(),
         new: new.cloned(),
         status,
+        number: 0,
+        moved: false,
         source,
         outputs_changed,
         count_changed,
@@ -223,6 +251,59 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_ids_match_by_source() {
+        let a = [cell(Some("1"), "a"), cell(Some("1"), "b")];
+        let b = [
+            cell(Some("1"), "a"),
+            cell(Some("1"), "b"),
+            cell(Some("2"), "c"),
+        ];
+        assert_eq!(
+            match_cells(&a, &b),
+            [(Some(0), Some(0)), (Some(1), Some(1)), (None, Some(2))]
+        );
+    }
+
+    #[test]
+    fn moves_and_numbers() {
+        let nb = |cells: Vec<Cell>| crate::repo::diff::notebook::parse::Notebook {
+            cells,
+            metadata: "{}".into(),
+        };
+        let a = nb(vec![
+            cell(Some("1"), "a"),
+            cell(Some("2"), "b"),
+            cell(Some("3"), "c"),
+        ]);
+        let b = nb(vec![
+            cell(Some("2"), "b"),
+            cell(Some("1"), "a"),
+            cell(Some("3"), "c"),
+        ]);
+        let d = compare(Some(&a), Some(&b));
+        let shown: Vec<(usize, bool, Status)> = d
+            .cells
+            .iter()
+            .map(|c| (c.number, c.moved, c.status))
+            .collect();
+        assert_eq!(
+            shown,
+            [
+                (1, false, Status::Unchanged),
+                (2, true, Status::Modified),
+                (3, false, Status::Unchanged)
+            ]
+        );
+        // Removed: its old number.
+        let c = nb(vec![cell(Some("1"), "a"), cell(Some("3"), "c")]);
+        let d = compare(Some(&a), Some(&c));
+        assert_eq!(
+            d.cells.iter().map(|c| c.number).collect::<Vec<_>>(),
+            [1, 2, 2]
+        );
+    }
+
+    #[test]
     fn matched_by_source_without_ids() {
         let a = [
             cell(None, "import x"),
@@ -260,6 +341,9 @@ mod tests {
         // Run again only: unchanged, the count folded away.
         b.source = a.source.clone();
         assert_eq!(change(Some(&a), Some(&b)).status, Status::Unchanged);
+        // Its metadata (tags) changed only: changed.
+        b.metadata = "{\"tags\": [\"x\"]}".into();
+        assert_eq!(change(Some(&a), Some(&b)).status, Status::Modified);
         assert_eq!(change(None, Some(&b)).status, Status::Added);
         assert_eq!(change(Some(&a), None).status, Status::Removed);
     }

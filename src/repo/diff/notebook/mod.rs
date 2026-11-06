@@ -14,10 +14,12 @@ pub(super) use view::notebook_bar;
 use super::DiffKey;
 pub use compare::NotebookDiff;
 
-/// A notebook's diff, and whether the repository strips outputs when committing.
+/// A notebook's diff, how the repository strips outputs when committing, and whether the
+/// working-tree side was compared as it would be staged (outputs stripped).
 pub struct NotebookData {
     pub diff: NotebookDiff,
-    pub strips: bool,
+    pub strip: crate::git::StripState,
+    pub compared_stripped: bool,
 }
 
 pub(super) fn is_notebook(path: &str) -> bool {
@@ -42,9 +44,20 @@ pub(super) fn load(
     if old.is_none() && new.is_none() {
         return None;
     }
+    let strip = crate::git::strip_state(repo);
+    // The working tree against the index: its outputs won't be staged, so they aren't
+    // compared (git's own diff, through the filter, shows them out too).
+    let unstaged = matches!(key, DiffKey::Work(f) if f.area == crate::git::Area::Unstaged);
+    let compared_stripped = unstaged && strip != crate::git::StripState::Off;
+    let new = if compared_stripped {
+        new.map(parse::Notebook::stripped)
+    } else {
+        new
+    };
     Some(NotebookData {
         diff: compare::compare(old.as_ref(), new.as_ref()),
-        strips: crate::git::strips_outputs(repo),
+        strip,
+        compared_stripped,
     })
 }
 
