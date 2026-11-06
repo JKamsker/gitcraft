@@ -8,7 +8,9 @@ use std::time::Instant;
 
 use super::diff::literal_path;
 use super::messages::spawn_or;
-use super::operations::{expect_ref, is_expectation, run_steps_counted, stash_push_args};
+use super::operations::{
+    expect_ref, expect_tree, is_expectation, run_steps_counted, stash_push_args,
+};
 use super::{Msg, OpKind, Refresh, RepoTab, Undo, ops};
 use crate::git::{self, WorkStatus};
 
@@ -64,6 +66,9 @@ pub(crate) enum StagedSupport {
     Unknown,
     Checking,
     Known(Result<(), String>),
+    /// git couldn't be asked (the machine wasn't reached): asked again when the dialog opens
+    /// next.
+    Failed(String),
 }
 
 /// A tab's part in this: the files picked to stash (Ctrl+click in the changes), and whether
@@ -99,37 +104,85 @@ fn all_files(work: &WorkStatus) -> impl Iterator<Item = &git::StatusFile> {
         .chain(&work.unstaged)
 }
 
-/// Why git can't stash just `paths` as they are in `work`, if it can't: `git stash push --
+/// Why the file of the row `f` can't be stashed by its name, if it can't: `git stash push --
 /// <paths>` refuses a path only HEAD knows (a staged deletion, the old side of a staged rename),
 /// and with untracked files it does so after saving the stash, the changes left in place.
+/// Messages read after "<operation> failed: ", so they start in lower case.
+pub(crate) fn row_problem(f: &git::StatusFile) -> Option<String> {
+    let path = &f.path;
+    if f.area == git::Area::Conflicted {
+        return Some(format!("“{path}” has conflicts: resolve them first"));
+    }
+    if let Some(old) = &f.old_path {
+        return Some(format!(
+            "“{old}” → “{path}” is a staged rename, which git can't stash by file name: \
+             unstage it first, or stash only what is staged"
+        ));
+    }
+    if f.area == git::Area::Staged && f.code == 'D' {
+        return Some(format!(
+            "the deletion of “{path}” is staged, which git can't stash by file name: \
+             unstage it first, or stash only what is staged"
+        ));
+    }
+    None
+}
+
+/// How long the picked paths may be together: they go on one command line, which Windows
+/// keeps under 32 767 characters.
+const PATHS_BUDGET: usize = 24 * 1024;
+
+/// Why git can't stash just `paths` as they are in `work`, if it can't (see [`row_problem`]).
 pub(crate) fn files_problem(paths: &[String], work: &WorkStatus) -> Option<String> {
     if paths.is_empty() {
-        return Some("Pick the files to stash first (Ctrl+click them in the changes)".into());
+        return Some(format!(
+            "pick the files to stash first ({}+click them in the changes)",
+            crate::manual::command()
+        ));
+    }
+    let bytes: usize = paths.iter().map(|p| p.len() + 12).sum();
+    if bytes > PATHS_BUDGET {
+        return Some(format!(
+            "{} files are too many to stash by name in one go (git's command line would be too \
+             long): pick fewer, or stash everything",
+            paths.len()
+        ));
     }
     for path in paths {
         let mut entries = all_files(work).filter(|f| &f.path == path).peekable();
         if entries.peek().is_none() {
-            return Some(format!("“{path}” has no changes any more"));
+            return Some(format!(
+                "“{path}” has no changes any more: cancel and pick the files again"
+            ));
         }
-        for f in entries {
-            if f.area == git::Area::Conflicted {
-                return Some(format!("“{path}” has conflicts: resolve them first"));
-            }
-            if let Some(old) = &f.old_path {
-                return Some(format!(
-                    "“{old}” → “{path}” is a staged rename, which git can't stash by file \
-                     name: unstage it first, or stash only what is staged"
-                ));
-            }
-            if f.area == git::Area::Staged && f.code == 'D' {
-                return Some(format!(
-                    "The deletion of “{path}” is staged, which git can't stash by file name: \
-                     unstage it first, or stash only what is staged"
-                ));
-            }
+        if let Some(problem) = entries.find_map(row_problem) {
+            return Some(problem);
         }
     }
     None
+}
+
+/// Whether `work` has changes besides untracked files (what a stash without them can take).
+pub(crate) fn has_tracked_changes(work: &WorkStatus) -> bool {
+    !work.staged.is_empty()
+        || !work.conflicted.is_empty()
+        || work.unstaged.iter().any(|f| f.area != git::Area::Untracked)
+}
+
+/// Why stashing everything (or a snapshot) can't be done now, if it can't.
+pub(crate) fn everything_problem(work: &WorkStatus, untracked: bool) -> Option<String> {
+    if work.is_clean() {
+        Some("there are no changes to stash".into())
+    } else if !untracked && !has_tracked_changes(work) {
+        Some("only untracked files have changes: tick Include untracked files".into())
+    } else {
+        None
+    }
+}
+
+/// Keeps of `files` those that still have changes in `work`.
+pub(crate) fn keep_changed_files(files: &mut Vec<String>, work: &WorkStatus) {
+    files.retain(|p| all_files(work).any(|f| &f.path == p));
 }
 
 /// Whether any of `paths` is untracked (it then needs `--include-untracked`).
@@ -143,10 +196,10 @@ pub(crate) fn has_untracked(paths: &[String], work: &WorkStatus) -> bool {
 pub(crate) fn push_args(request: &StashRequest, work: &WorkStatus) -> Result<Vec<String>, String> {
     let mut args = vec!["stash".to_owned(), "push".to_owned()];
     let paths = match &request.mode {
-        StashMode::Snapshot => return Err("A snapshot isn't made with git stash push".into()),
+        StashMode::Snapshot => return Err("a snapshot isn't made with git stash push".into()),
         StashMode::Everything => {
-            if work.is_clean() {
-                return Err("There are no changes to stash".into());
+            if let Some(problem) = everything_problem(work, request.untracked) {
+                return Err(problem);
             }
             if request.untracked {
                 args = stash_push_args().map(str::to_owned).to_vec();
@@ -155,7 +208,7 @@ pub(crate) fn push_args(request: &StashRequest, work: &WorkStatus) -> Result<Vec
         }
         StashMode::Staged => {
             if work.staged.is_empty() {
-                return Err("Nothing is staged".into());
+                return Err("nothing is staged".into());
             }
             args.push("--staged".to_owned());
             None
@@ -214,12 +267,31 @@ fn reapply_staged_undo(path: &Path, undo: &mut Vec<Vec<String>>) {
     let Some(patch) = patch.ok().and_then(|p| String::from_utf8(p).ok()) else {
         return;
     };
+    let tree = |rev: &str| {
+        git::run(
+            Some(path),
+            &["rev-parse", "--verify", "-q", &format!("{rev}^{{tree}}")],
+        )
+        .map(|s| s.trim().to_owned())
+    };
+    let (Ok(base), Ok(staged)) = (tree("stash@{0}^1"), tree("stash@{0}^2")) else {
+        return;
+    };
     let Ok(file) = git::save_patch_for(path, &patch) else {
         return;
     };
-    // The check that the stash is still the newest stays first.
+    // The check that the stash is still the newest stays first. Then that it holds what the
+    // patch was made from: redone, it is made again from what is staged then, which may be
+    // more, and dropping it would lose that.
     undo.retain(|step| is_expectation(step));
+    undo.extend([
+        expect_tree("stash@{0}^1", &base),
+        expect_tree("stash@{0}^2", &staged),
+    ]);
+    // Both checked before either is applied, so that it isn't left half done.
     undo.extend(ops(&[
+        &["apply", "--check", "--whitespace=nowarn", &file],
+        &["apply", "--cached", "--check", "--whitespace=nowarn", &file],
         &["apply", "--whitespace=nowarn", &file],
         &["apply", "--cached", "--whitespace=nowarn", &file],
         &["stash", "drop", "-q"],
@@ -253,7 +325,7 @@ pub(crate) fn run_push(
     }
     let result = match result {
         Ok(out) if out.contains("No local changes to save") => {
-            Err("there are no local changes to stash".to_owned())
+            Err("there are no changes to stash".to_owned())
         }
         Err(e) if e.trim() == "No staged changes" => Err("nothing is staged".to_owned()),
         Err(e) => Err(after_failed_push(
@@ -292,14 +364,24 @@ fn after_failed_push(path: &Path, before: Option<&str>, e: &str, roll_back_stage
              unstaged changes touch the same lines. Pick the files and stash them, or stash \
              everything"
         };
-        return format!("nothing was stashed: {why} (git said: {})", e.trim());
+        return format!("nothing was stashed: {why} (git said: {})", one_line(e));
     }
     format!(
-        "git saved the stash ({}), then stopped: {}. The changes are in that stash and may \
-         still be in the working tree too: check them before you pop or drop it",
+        "git saved the stash ({}), then stopped. The changes are in that stash and may still \
+         be in the working tree too: check them before you pop or drop it (git said: {})",
         super::short(&now),
-        e.trim()
+        one_line(e)
     )
+}
+
+/// What git said, on one line: the status line shows the first line of an error, and the one
+/// starting with `error:` before any other, which would hide what is said before it.
+fn one_line(said: &str) -> String {
+    said.lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect::<Vec<_>>()
+        .join("; ")
 }
 
 /// Saves a snapshot in the background (see [`git::snapshot`]) and stores it as the newest stash.
@@ -313,17 +395,13 @@ fn run_snapshot(
         Ok(Some(s)) => s,
         Ok(None) if untracked => {
             return (
-                Err("there are no local changes to save".to_owned()),
+                Err("there are no changes to save".to_owned()),
                 OpKind::plain(),
             );
         }
         Ok(None) => {
             return (
-                Err(
-                    "no tracked file has changes (tick Include untracked files to save the \
-                     new ones)"
-                        .to_owned(),
-                ),
+                Err("only untracked files have changes: tick Include untracked files".to_owned()),
                 OpKind::plain(),
             );
         }
@@ -399,7 +477,12 @@ impl RepoTab {
         self.then(
             ctx,
             move || git::staged_stash_support(&path),
-            |tab, found, _| tab.stash_picks.staged = StagedSupport::Known(found),
+            |tab, found, _| {
+                tab.stash_picks.staged = match found {
+                    Ok(known) => StagedSupport::Known(known),
+                    Err(e) => StagedSupport::Failed(e),
+                }
+            },
         );
     }
 }

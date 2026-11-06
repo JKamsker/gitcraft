@@ -119,7 +119,8 @@ impl RepoTab {
         }
         if icons::tool_button(ui, "archive", "Stash", idle && !self.work.is_clean())
             .on_hover_text(
-                "Stash changes: everything, the files picked, only what is staged, or a snapshot",
+                "Stash changes: everything, only what is staged, a snapshot, or the files picked \
+                 (chosen when some are picked)",
             )
             .on_disabled_hover_text("No changes to stash")
             .clicked()
