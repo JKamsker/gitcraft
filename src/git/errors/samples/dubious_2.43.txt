@@ -1,0 +1,4 @@
+fatal: detected dubious ownership in repository at '/home/me/work/dub dir/ünï'
+To add an exception for this directory, call:
+
+	git config --global --add safe.directory '/home/me/work/dub dir/ünï'

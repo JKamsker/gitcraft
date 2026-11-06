@@ -1,0 +1,8 @@
+fatal: detected dubious ownership in repository at 'D:/Projects/My Repo'
+'D:/Projects/My Repo' is owned by:
+	BUILTIN/Administrators (S-1-5-32-544)
+but the current user is:
+	DESKTOP-1/me (S-1-5-21-1004336348-1177238915-682003330-1001)
+To add an exception for this directory, call:
+
+	git config --global --add safe.directory 'D:/Projects/My Repo'
