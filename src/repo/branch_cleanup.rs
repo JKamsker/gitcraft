@@ -22,12 +22,10 @@ pub(crate) struct Candidate {
 }
 
 impl Candidate {
-    /// Ticked when the dialog opens: its work is in the default branch, or its upstream is gone
-    /// along with being stale. Stale alone, or gone alone, may still hold work.
+    /// Ticked when the dialog opens: its work is in the default branch. A stale branch, or one
+    /// deleted on its remote, may still hold work that is nowhere else.
     pub fn preselected(&self) -> bool {
-        let gone = self.reasons.contains(&Reason::UpstreamGone);
-        let stale = self.reasons.iter().any(|r| matches!(r, Reason::Stale(_)));
-        self.reasons.iter().any(Reason::is_merged) || (gone && stale)
+        self.reasons.iter().any(Reason::is_merged)
     }
 }
 
@@ -58,11 +56,37 @@ impl RepoTab {
         }
         let inputs = Inputs::new(&self.refs.local, bases, &self.branch_health.merged_prs);
         let path = self.path.clone();
+        let mut cache = self.branch_health.cache.clone();
         self.then(
             ctx,
-            move || branch_health::read(&path, &inputs),
-            move |tab, result, _| tab.branch_health.arrived(key, result),
+            move || {
+                // A read that panics is answered all the same: the next one waits for it.
+                let read = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    branch_health::read(&path, &inputs, &mut cache)
+                }));
+                match read {
+                    Ok(result) => result.map(|health| (health, cache)),
+                    Err(_) => Err("the read stopped unexpectedly".to_owned()),
+                }
+            },
+            |tab, result, ctx| tab.health_arrived(result, ctx),
         );
+    }
+
+    /// Takes in a read; reads again if the branches changed meanwhile, and fills in the
+    /// cleanup dialog if it was opened while this was being read.
+    fn health_arrived(
+        &mut self,
+        result: Result<(branch_health::Health, branch_health::CherryCache), String>,
+        ctx: &egui::Context,
+    ) {
+        if self.branch_health.arrived(result) {
+            self.want_health(ctx);
+        }
+        let waiting = matches!(&self.dialog, Some(Dialog::Cleanup(d)) if d.is_checking());
+        if waiting && !self.branch_health.checking() {
+            self.dialog = Some(self.cleanup_dialog(ctx));
+        }
     }
 
     /// Lists the merged pull requests in the background, then reads the branches again with
@@ -93,8 +117,7 @@ impl RepoTab {
     /// The repository is another one on the forge now: its merged pull requests are not this
     /// one's.
     pub(super) fn forget_merged_prs(&mut self) {
-        self.branch_health.merged_prs.clear();
-        self.branch_health.invalidate();
+        self.branch_health.forget_prs();
     }
 
     /// Why `b` could go, as the badges and the cleanup show it.
@@ -107,7 +130,8 @@ impl RepoTab {
     }
 
     /// Whether `b` may be offered at all: never the checked-out branch, the default one, or
-    /// one checked out in a worktree.
+    /// one checked out in a worktree. (One being rebased or bisected in a worktree, which the
+    /// list shows detached, is caught when deleting: see `delete_many`.)
     fn offerable(&self, b: &Branch, default: &str) -> bool {
         !b.is_head
             && b.name != default
@@ -126,15 +150,19 @@ impl RepoTab {
             .filter(|b| self.offerable(b, &default))
             .filter_map(|b| {
                 let reasons = self.branch_reasons(b, stale_days);
-                (!reasons.is_empty()).then(|| self.candidate(b, reasons))
+                (!reasons.is_empty()).then(|| self.candidate(b, reasons, &default))
             })
             .collect()
     }
 
-    fn candidate(&self, b: &Branch, reasons: Vec<Reason>) -> Candidate {
+    /// `b` as offered. Its remote branch can go with it only when it has the same name: a
+    /// branch made from `origin/release` tracks that, which is not its own to delete. Never the
+    /// default branch on the remote.
+    fn candidate(&self, b: &Branch, reasons: Vec<Reason>, default: &str) -> Candidate {
         let tracked = (!b.upstream_gone())
             .then(|| self.split_upstream(&b.upstream))
             .flatten()
+            .filter(|(_, name)| *name == b.name && *name != default)
             .and_then(|(remote, name)| {
                 let at = self
                     .remote_branches(&remote)
@@ -155,10 +183,9 @@ impl RepoTab {
     /// _Select stale or merged branches…_ with what there is to offer now.
     pub(super) fn cleanup_dialog(&self, ctx: &egui::Context) -> Dialog {
         let days = Settings::get(ctx).stale_branch_days;
-        let checking = self.branch_health.health.is_none() && self.branch_health.error.is_none();
         Dialog::cleanup(
             self.cleanup_candidates(days),
-            checking,
+            self.branch_health.checking(),
             self.branch_health.error.clone(),
         )
     }

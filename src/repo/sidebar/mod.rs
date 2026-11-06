@@ -108,13 +108,19 @@ impl RepoTab {
         let clean = ui.add_enabled_ui(idle, |ui| {
             icons::small_button(ui, "brush", "Select stale or merged branches…")
         });
-        if clean.inner.clicked() {
+        let clean = clean.inner.on_disabled_hover_text(
+            "Select stale or merged branches… once the running operation is done",
+        );
+        if clean.clicked() {
             acts.push(Action::SelectStaleBranches);
         }
         let mut order = BranchOrder::load(ui.ctx(), self.repo_key());
         let on = usize::from(order.by_date);
-        let picked = widgets::switch(ui, &["Name", "Recent"], on);
-        if let Some(picked) = picked {
+        let sort = ui.scope(|ui| widgets::switch(ui, &["Name", "Recent"], on));
+        sort.response.on_hover_text(
+            "Sort the local branches by name, or by their last commit (newest first)",
+        );
+        if let Some(picked) = sort.inner {
             order.by_date = picked == 1;
             order.store(ui.ctx(), self.repo_key());
         }

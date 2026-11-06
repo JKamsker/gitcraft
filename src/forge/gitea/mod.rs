@@ -24,7 +24,7 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 
 use super::http::{Api, Login};
-use super::{Forge, Hosting, NewPullRequest, Pages, Provider, PullRequest};
+use super::{Forge, Hosting, MergedPullRequest, NewPullRequest, Pages, Provider, PullRequest};
 use crate::avatars::Hint;
 use crate::pr_post::Target;
 use crate::pull_request::{PrDetails, at};
@@ -77,7 +77,7 @@ impl Provider for GiteaFamily {
         list(&self.api(hosting), hosting)
     }
 
-    fn merged(&self, _: &Path, hosting: &Hosting) -> Result<Vec<PullRequest>, String> {
+    fn merged(&self, _: &Path, hosting: &Hosting) -> Result<Vec<MergedPullRequest>, String> {
         merged(&self.api(hosting), hosting)
     }
 
@@ -123,7 +123,7 @@ fn list(api: &Api, hosting: &Hosting) -> Result<Vec<PullRequest>, String> {
 }
 
 /// The latest closed pull requests that were merged; the API lists those closed unmerged too.
-fn merged(api: &Api, hosting: &Hosting) -> Result<Vec<PullRequest>, String> {
+fn merged(api: &Api, hosting: &Hosting) -> Result<Vec<MergedPullRequest>, String> {
     let endpoint = format!(
         "repos/{}/pulls?state=closed&sort=recentupdate",
         hosting.path
@@ -132,12 +132,13 @@ fn merged(api: &Api, hosting: &Hosting) -> Result<Vec<PullRequest>, String> {
     Ok(merged_only(&items))
 }
 
-fn merged_only(items: &[Value]) -> Vec<PullRequest> {
-    items
+fn merged_only(items: &[Value]) -> Vec<MergedPullRequest> {
+    let merged: Vec<Value> = items
         .iter()
         .filter(|item| item.get("merged").and_then(Value::as_bool) == Some(true))
-        .map(parse_pull_request)
-        .collect()
+        .cloned()
+        .collect();
+    super::merged_items(&merged, ["/number", "/head/ref", "/head/sha", "/base/ref"])
 }
 
 fn create(api: &Api, hosting: &Hosting, new: &NewPullRequest) -> Result<String, String> {
@@ -417,13 +418,20 @@ mod tests {
     #[test]
     fn only_merged_pull_requests_count_as_merged() {
         let items = [
-            json!({"number": 1, "head": {"ref": "a", "sha": "1"}, "merged": true}),
+            json!({"number": 1, "head": {"ref": "a", "sha": "1"}, "base": {"ref": "main"}, "merged": true}),
             json!({"number": 2, "head": {"ref": "b", "sha": "2"}, "merged": false}),
             json!({"number": 3, "head": {"ref": "c", "sha": "3"}}),
         ];
         let merged = merged_only(&items);
         assert_eq!(merged.len(), 1);
-        assert_eq!((merged[0].number, merged[0].branch.as_str()), (1, "a"));
+        assert_eq!(
+            (
+                merged[0].number,
+                merged[0].branch.as_str(),
+                merged[0].base.as_str()
+            ),
+            (1, "a", "main")
+        );
         assert!(merged_only(&[]).is_empty());
     }
 

@@ -4,7 +4,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use super::{Hosting, NewPullRequest, Provider, PullRequest, cli};
+use super::{Hosting, MergedPullRequest, NewPullRequest, Provider, PullRequest, cli};
 use crate::avatars::Hint;
 
 pub(super) struct GitLab;
@@ -36,7 +36,7 @@ impl Provider for GitLab {
         parse_list(&self.run(repo, &args)?)
     }
 
-    fn merged(&self, repo: &Path, _: &Hosting) -> Result<Vec<PullRequest>, String> {
+    fn merged(&self, repo: &Path, _: &Hosting) -> Result<Vec<MergedPullRequest>, String> {
         let args = [
             "mr",
             "list",
@@ -46,7 +46,8 @@ impl Provider for GitLab {
             "--per-page",
             "100",
         ];
-        parse_list(&self.run(repo, &args)?)
+        let pointers = ["/iid", "/source_branch", "/sha", "/target_branch"];
+        super::parse_merged(&self.run(repo, &args)?, pointers, TOOL)
     }
 
     fn create(&self, repo: &Path, _: &Hosting, new: &NewPullRequest) -> Result<String, String> {
