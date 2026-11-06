@@ -1634,12 +1634,14 @@ dependencies = [
  "portable-pty",
  "pulldown-cmark",
  "rfd",
+ "rustix 1.1.6",
  "serde",
  "serde_json",
  "syntect",
  "two-face",
  "ureq 2.12.1",
  "vt100",
+ "windows-sys 0.61.2",
  "winresource",
 ]
 

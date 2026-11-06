@@ -1,10 +1,10 @@
-//! The terminal's colours: the 16 ANSI ones per theme, the 256-colour cube and true colour.
+//! The terminal's colours: the 16 ANSI ones of the theme, the 256-colour cube and true colour.
 
 use egui::Color32;
 
 use crate::theme::Tokens;
 
-/// Terminal colours tuned to the app theme.
+/// Terminal colours: the theme's.
 pub(super) struct Palette {
     fg: Color32,
     ansi: [Color32; 16],
@@ -12,45 +12,7 @@ pub(super) struct Palette {
 
 impl Palette {
     pub(super) fn new(t: &Tokens) -> Self {
-        let ansi = if t.dark() {
-            [
-                Color32::from_rgb(40, 40, 40),
-                Color32::from_rgb(236, 91, 98),
-                Color32::from_rgb(92, 196, 122),
-                Color32::from_rgb(232, 176, 70),
-                Color32::from_rgb(64, 156, 255),
-                Color32::from_rgb(200, 110, 230),
-                Color32::from_rgb(60, 205, 210),
-                Color32::from_rgb(200, 200, 200),
-                Color32::from_rgb(110, 110, 110),
-                Color32::from_rgb(255, 120, 125),
-                Color32::from_rgb(130, 225, 150),
-                Color32::from_rgb(250, 205, 100),
-                Color32::from_rgb(110, 180, 255),
-                Color32::from_rgb(220, 150, 245),
-                Color32::from_rgb(110, 225, 230),
-                Color32::from_rgb(245, 245, 245),
-            ]
-        } else {
-            [
-                Color32::from_rgb(20, 20, 20),
-                Color32::from_rgb(200, 40, 50),
-                Color32::from_rgb(30, 140, 70),
-                Color32::from_rgb(170, 110, 0),
-                Color32::from_rgb(20, 100, 210),
-                Color32::from_rgb(150, 60, 190),
-                Color32::from_rgb(0, 140, 150),
-                Color32::from_rgb(110, 110, 110),
-                Color32::from_rgb(90, 90, 90),
-                Color32::from_rgb(230, 60, 70),
-                Color32::from_rgb(40, 170, 90),
-                Color32::from_rgb(200, 140, 0),
-                Color32::from_rgb(40, 120, 240),
-                Color32::from_rgb(180, 80, 220),
-                Color32::from_rgb(0, 170, 180),
-                Color32::from_rgb(40, 40, 40),
-            ]
-        };
+        let ansi = t.ansi;
         Self { fg: t.text, ansi }
     }
 

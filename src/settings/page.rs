@@ -4,6 +4,7 @@
 use egui::{Align2, Id, Key, Modifiers, RichText, Sense, Stroke, Ui, vec2};
 
 use super::layout::Filter;
+use super::preview;
 use super::{Page, Settings, SettingsView};
 use crate::theme::{self, Tokens};
 
@@ -57,6 +58,12 @@ impl Settings {
         let before = self.clone();
         let mut view: View = ui.data(|d| d.get_temp(view_id())).unwrap_or_default();
         keys(ui, &mut view, app.dialog_open);
+        // Another search finds other rows: the preview of one found before goes.
+        let searched = Id::new("settings-preview-query");
+        if ui.data(|d| d.get_temp::<String>(searched)).as_deref() != Some(view.query.as_str()) {
+            preview::forget(ui.ctx());
+            ui.data_mut(|d| d.insert_temp(searched, view.query.clone()));
+        }
         // How many settings the search finds on each page.
         let counts: Vec<usize> = if view.query.trim().is_empty() {
             Vec::new()
@@ -79,36 +86,96 @@ impl Settings {
                 nav(ui, &mut view, &counts);
             });
             ui.add_space(gap);
-            let salt = if counts.is_empty() {
-                Id::new(("settings-page", view.page as u8))
-            } else {
-                Id::new("settings-results")
-            };
-            egui::ScrollArea::vertical()
-                .id_salt(salt)
-                .auto_shrink([false, false])
-                .show(ui, |ui| {
-                    let width = CONTENT_WIDTH.min(ui.available_width() - 16.0);
+            // What the setting pointed at does, beside the page; above it in a narrow window.
+            let at = counts.is_empty().then_some(view.page);
+            // Nothing found, nothing to preview.
+            let found = counts.is_empty() || counts.iter().any(|&n| n > 0);
+            let shown = preview::shown(ui.ctx(), at).filter(|_| found);
+            let room = ui.available_width() - preview::SIDE_MARGIN;
+            let height = ui.available_height();
+            match (shown, shown.and_then(|_| preview::side_width(room))) {
+                (Some(shown), Some(side)) => {
+                    let page_w = room - side - preview::SIDE_GAP;
+                    ui.allocate_ui_with_layout(
+                        vec2(page_w, height),
+                        egui::Layout::top_down(egui::Align::Min),
+                        |ui| self.page_column(ui, &mut view, &counts, app),
+                    );
+                    ui.add_space(preview::SIDE_GAP - ui.spacing().item_spacing.x);
+                    ui.allocate_ui_with_layout(
+                        vec2(side, height),
+                        egui::Layout::top_down(egui::Align::Min),
+                        |ui| {
+                            egui::ScrollArea::vertical()
+                                .id_salt("settings-preview-side")
+                                .auto_shrink([false, true])
+                                .show(ui, |ui| {
+                                    ui.add_space(TOP + 38.0);
+                                    preview::panel(ui, shown, self, &app.theme);
+                                    ui.add_space(24.0);
+                                });
+                        },
+                    );
+                }
+                (Some(shown), None) => {
                     ui.vertical(|ui| {
-                        ui.set_width(width);
                         ui.add_space(TOP);
-                        if counts.is_empty() {
-                            title(ui, view.page.title());
-                            self.page_ui(
-                                ui,
-                                view.page,
-                                &Filter::new("", view.page.title(), false),
-                                app,
-                            );
-                        } else {
-                            self.results(ui, &mut view, &counts, app);
-                        }
-                        ui.add_space(40.0);
+                        let width = CONTENT_WIDTH.min(ui.available_width() - 16.0);
+                        ui.allocate_ui_with_layout(
+                            vec2(width, preview::ABOVE_MAX_H),
+                            egui::Layout::top_down(egui::Align::Min),
+                            |ui| {
+                                egui::ScrollArea::vertical()
+                                    .id_salt("settings-preview-above")
+                                    .max_height(preview::ABOVE_MAX_H)
+                                    .show(ui, |ui| preview::panel(ui, shown, self, &app.theme));
+                            },
+                        );
+                        self.page_column(ui, &mut view, &counts, app);
                     });
-                });
+                }
+                _ => self.page_column(ui, &mut view, &counts, app),
+            }
         });
         ui.data_mut(|d| d.insert_temp(view_id(), view));
         *self != before
+    }
+
+    /// The page, or what the search finds, scrolling.
+    fn page_column(
+        &mut self,
+        ui: &mut Ui,
+        view: &mut View,
+        counts: &[usize],
+        app: &mut SettingsView,
+    ) {
+        let salt = if counts.is_empty() {
+            Id::new(("settings-page", view.page as u8))
+        } else {
+            Id::new("settings-results")
+        };
+        egui::ScrollArea::vertical()
+            .id_salt(salt)
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                let width = CONTENT_WIDTH.min(ui.available_width() - 16.0);
+                ui.vertical(|ui| {
+                    ui.set_width(width);
+                    ui.add_space(TOP);
+                    if counts.is_empty() {
+                        title(ui, view.page.title());
+                        self.page_ui(
+                            ui,
+                            view.page,
+                            &Filter::new("", view.page.title(), false).on_page(view.page),
+                            app,
+                        );
+                    } else {
+                        self.results(ui, view, counts, app);
+                    }
+                    ui.add_space(40.0);
+                });
+            });
     }
 
     /// What the search finds, under the title of each page it is on.
