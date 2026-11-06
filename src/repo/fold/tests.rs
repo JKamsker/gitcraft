@@ -299,6 +299,9 @@ fn a_conflict_aborted_goes_back_to_before_the_fold() {
     );
     assert_eq!(tab.work.in_progress, Some(InProgress::Rebase));
     assert!(tab.fold.stopped.is_some());
+    let said = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    assert!(said.contains("stopped on a conflict"), "{said}");
+    assert!(tab.fold_stopped_here(InProgress::Rebase).is_some());
     let steps = match tab.abort_for(InProgress::Rebase) {
         Action::Dialog(Dialog::Confirm { ops, title, .. }) => Some((title, ops)),
         _ => None,
@@ -408,9 +411,9 @@ fn merges_after_the_commit_and_other_branches_are_refused() {
     git_ok(&dir, &["add", "f1.txt"]);
     let refused = |target: &str| plan(&dir, target).err().unwrap_or_default();
     assert!(refused("HEAD~2").contains("Merges came after"));
-    assert!(refused("HEAD").contains("Merge commits"));
+    assert!(refused("HEAD").contains("A merge commit"));
     git_ok(&dir, &["checkout", "-q", "-b", "other", "HEAD~2"]);
-    assert!(refused(&side).contains("not an ancestor"));
+    assert!(refused(&side).contains("not on the checked-out branch"));
     git_ok(&dir, &["checkout", "-q", "--detach"]);
     assert!(refused("HEAD~1").contains("detached"));
     let _ = std::fs::remove_dir_all(&dir);
@@ -545,7 +548,8 @@ fn a_refusing_pre_commit_hook_changes_nothing() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// The dialog, drawn: Enter folds as shown, and ticking _Keep as fixup!_ makes that what runs.
+/// The dialog, drawn: Enter folds as shown (unless that rewrites pushed commits), and ticking
+/// _Keep as fixup!_ makes that what runs.
 #[test]
 fn the_dialog_runs_the_fold_it_shows() {
     let dir = repo("dialog", 3);
@@ -588,8 +592,19 @@ fn the_dialog_runs_the_fold_it_shows() {
         })
     };
 
+    // Pushed commits: Enter doesn't rewrite them, a click has to.
+    assert!(found.rewrites_pushed());
     tab.dialog = Some(Dialog::Fold(Box::new(found.clone())));
     assert!(frame(&mut tab, Vec::new()).is_empty());
+    assert_eq!(ran(frame(&mut tab, enter())), None);
+    assert!(tab.dialog.is_some());
+
+    let unpushed = Plan {
+        pushed: Vec::new(),
+        ..found.clone()
+    };
+    tab.dialog = Some(Dialog::Fold(Box::new(unpushed)));
+    let _ = frame(&mut tab, Vec::new());
     assert_eq!(ran(frame(&mut tab, enter())), Some(false));
     assert!(tab.dialog.is_none());
 
@@ -600,4 +615,35 @@ fn the_dialog_runs_the_fold_it_shows() {
     tab.dialog = Some(Dialog::Fold(Box::new(kept)));
     let _ = frame(&mut tab, Vec::new());
     assert_eq!(ran(frame(&mut tab, enter())), Some(true));
+}
+
+/// The fixup commit went in but the rebase failed without starting: the commit gets an undo of
+/// its own, which stages the changes again, and redo commits them again.
+#[test]
+fn a_rebase_that_never_started_leaves_an_undoable_fixup_commit() {
+    let dir = repo("never-started", 3);
+    let ctx = egui::Context::default();
+    let mut tab = tab(&dir, &ctx);
+    let before = git::head(&dir);
+    write(&dir, "f2.txt", "2 fixed\n");
+    git_ok(&dir, &["add", "f2.txt"]);
+    let was_staged = staged(&dir);
+    let Ok(found) = plan(&dir, "HEAD~1") else {
+        return;
+    };
+    // A rebase git refuses outright, as one that can't begin would be.
+    let refused = vec!["rebase".to_owned(), "--no-such-option".to_owned()];
+    tab.fold_ready(&found, Ok((refused, String::new())), &ctx);
+    let result = finish(&mut tab, &ctx);
+    assert!(matches!(result, Some(Err(_))), "{result:?}");
+    assert_eq!(subjects(&dir)[0], "fixup! c2");
+    assert!(tab.fold.stopped.is_none());
+    let fixup = git::head(&dir);
+
+    done(undo(&mut tab, &ctx));
+    assert_eq!(git::head(&dir), before);
+    assert_eq!(staged(&dir), was_staged);
+    done(redo(&mut tab, &ctx));
+    assert_eq!(git::head(&dir), fixup);
+    let _ = std::fs::remove_dir_all(&dir);
 }

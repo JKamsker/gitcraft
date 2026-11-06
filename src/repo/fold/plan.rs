@@ -4,7 +4,7 @@
 use crate::git::{Commit, FoldRead, InProgress, RebaseCommit};
 use crate::repo::operations::{expect_ref, expect_ref_at, expect_symref};
 use crate::repo::rebase::{RebaseEditor, Step};
-use crate::repo::{OpKind, Undo, short};
+use crate::repo::{OpKind, Undo, UndoEntry, short};
 
 /// A fold as its dialog shows it, read just before.
 #[derive(Clone, Debug)]
@@ -48,7 +48,7 @@ pub(crate) fn blocked(
 /// its first parents.
 pub(crate) fn refusal(line: &[&Commit], hash: &str) -> Option<&'static str> {
     let Some(pos) = line.iter().position(|c| c.hash == hash) else {
-        return Some("Only commits of the checked-out branch can take the staged changes");
+        return Some(OFF_BRANCH);
     };
     if line[..pos].iter().any(|c| c.parents.len() > 1) {
         return Some(MERGES_AFTER);
@@ -57,7 +57,8 @@ pub(crate) fn refusal(line: &[&Commit], hash: &str) -> Option<&'static str> {
 }
 
 const MERGES_AFTER: &str = "Merges came after this commit: rewriting it would flatten them";
-const MERGE_TARGET: &str = "Merge commits can't take the staged changes";
+const MERGE_TARGET: &str = "A merge commit can't take the staged changes";
+const OFF_BRANCH: &str = "Only commits of the checked-out branch can take the staged changes";
 
 impl Plan {
     /// The fold `read` describes, unless something there stands in its way.
@@ -67,7 +68,7 @@ impl Plan {
         }
         if !read.ancestor {
             return Err(format!(
-                "{} is not on the checked-out branch (not an ancestor of HEAD)",
+                "{} is not on the checked-out branch",
                 short(&read.target)
             ));
         }
@@ -80,9 +81,7 @@ impl Plan {
             return Err(MERGES_AFTER.to_owned());
         }
         if commits.first().is_none_or(|c| c.hash != read.target) {
-            return Err(
-                "only commits of the checked-out branch can take the staged changes".to_owned(),
-            );
+            return Err(OFF_BRANCH.to_owned());
         }
         let after = commits.split_off(1);
         let Some(target) = commits.pop() else {
@@ -110,7 +109,7 @@ impl Plan {
         if self.keep_fixup {
             format!("Commit fixup! for {}", short(&self.target.hash))
         } else {
-            format!("Fold staged changes into {}", short(&self.target.hash))
+            format!("Fold into {}", short(&self.target.hash))
         }
     }
 
@@ -240,6 +239,20 @@ impl Stopped {
     }
 }
 
+impl Stopped {
+    /// The undo of the fixup commit `fixup` a fold left on top without melding it in: back to
+    /// before it, the changes staged; redo commits them again as it was.
+    pub(in crate::repo) fn leftover_undo(&self, fixup: &str) -> UndoEntry {
+        let on_branch = expect_symref("HEAD", &format!("refs/heads/{}", self.branch));
+        UndoEntry {
+            label: format!("{} (its fixup! commit)", self.label),
+            undo: vec![on_branch.clone(), soft_reset(&self.before)],
+            redo: vec![on_branch, soft_reset(fixup)],
+            heads: Some((self.before.clone(), fixup.to_owned())),
+        }
+    }
+}
+
 fn soft_reset(to: &str) -> Vec<String> {
     ["reset", "--soft", to].map(str::to_owned).to_vec()
 }
@@ -347,7 +360,7 @@ mod tests {
         let refused = |r: FoldRead| Plan::from_read(r).err().unwrap_or_default();
         let mut not_ancestor = read("x", &[]);
         not_ancestor.ancestor = false;
-        assert!(refused(not_ancestor).contains("not an ancestor of HEAD"));
+        assert!(refused(not_ancestor).contains("not on the checked-out branch"));
         let mut detached = read("b", &["b", "c"]);
         detached.branch = None;
         assert!(refused(detached).contains("detached"));

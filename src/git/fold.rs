@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use super::{InProgress, RebaseCommit, in_progress, not_an_option, run};
+use super::{InProgress, RebaseCommit, in_progress, not_an_option, run, run_ok_codes};
 
 /// The repository as a fold into `target` would find it.
 #[derive(Clone, Debug, Default)]
@@ -46,7 +46,9 @@ pub fn fold_read(repo: &Path, target: &str) -> Result<FoldRead, String> {
         .filter(|b| !b.is_empty());
     let parents = run(Some(repo), &["rev-list", "--parents", "-n", "1", &target])?;
     let root = parents.split_whitespace().count() == 1;
-    let base = run(Some(repo), &["merge-base", &target, &head]).unwrap_or_default();
+    // Exit 1 with nothing printed: no common ancestor. Anything else (a machine not reached)
+    // is an error, not an answer.
+    let base = run_ok_codes(Some(repo), &["merge-base", &target, &head], &[0, 1])?;
     let ancestor = base.trim() == target;
     // The commits a rebase from below the target replays: all of them for the root.
     let range = if root {

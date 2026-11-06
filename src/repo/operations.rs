@@ -178,7 +178,6 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         self.busy_op = None;
-        self.fold_op_done(&label, result.is_ok());
         let long = self
             .op_started
             .take()
@@ -241,6 +240,7 @@ impl RepoTab {
                 ),
             });
         }
+        self.fold_op_done(&label, &result);
         match refresh {
             Refresh::Status => self.reload_status(ctx),
             Refresh::All => self.reload(ctx),

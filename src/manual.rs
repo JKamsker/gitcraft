@@ -55,7 +55,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Profiles (title bar, or Settings → Profile): each has its own tabs, recent repositories, theme, git author and commit signing. A repository's own git config (user.name, user.email, signing) still wins over the profile's.",
             "Settings → Commit signing sets the format, key and program git signs with, and whether it signs commits and tags by default, in your global git config; Settings → Profile can sign just for the profile instead.",
             "Double-click a commit's message in the right pane to edit it (any commit of the checked-out branch with no merges after it).",
-            "Fold staged changes into an older commit: right-click it in the graph, or Fold into… beside Amend. First it shows the commit and the ones after it that get rewritten, and warns when they are already pushed. Keep as fixup! commit for later commits the changes as fixup! on top instead. A conflict is resolved as in any rebase, and aborting goes back to before the fold; Ctrl+Z undoes it, the changes staged again.",
+            "Fold staged changes into an older commit: right-click it in the graph and pick “Fold staged changes into this commit”, or use “Fold…” beside “Amend last commit”. First it shows the commit and the ones after it that get rewritten, and warns when they are already pushed. “Keep as fixup! commit for later” only commits them as “fixup! <summary>” on top. A conflict is resolved as in any rebase, and Abort goes back to before the fold; Ctrl+Z undoes it, the changes staged again.",
             "Undo and redo commits, merges, rebases, folds, resets, checkouts, branches, tags and stashes.",
         ],
     ),

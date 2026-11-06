@@ -37,7 +37,7 @@ impl RepoTab {
                 amend_started =
                     amend.changed() && amending && self.commit_summary.trim().is_empty();
                 if !rebasing {
-                    self.fold_picker(ui, acts);
+                    self.fold_picker(ui, amending, acts);
                 }
             });
         });
