@@ -77,11 +77,16 @@ pub fn read(dir: &Path) -> Option<Found> {
     (found.port != 0 && token_ok).then_some(found)
 }
 
+/// Removes the file, whoever's it is.
+pub fn remove(dir: &Path) {
+    let _ = std::fs::remove_file(path(dir));
+}
+
 /// Removes the file if it still names the instance with `token` (a newer one may have written
 /// its own since).
 pub fn remove_if_ours(dir: &Path, token: &str) {
     if read(dir).is_some_and(|f| f.token == token) {
-        let _ = std::fs::remove_file(path(dir));
+        remove(dir);
     }
 }
 

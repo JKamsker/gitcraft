@@ -1,23 +1,24 @@
 //! The running instance's side: a listener on 127.0.0.1 that takes the requests of later starts
 //! (see [`super::message`]) and keeps them for the window, which takes them each frame.
 
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::discovery::{self, Found};
 use super::lock::Held;
 use super::message::{self, Refusal, Reply, Request};
 
-/// How long a start has to send its request once connected.
+/// How long a start has to send its whole request once connected: one sending a byte now and
+/// then would otherwise hold its connection for as long as it likes.
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Connections served at once; more are closed unread. A start sends one request and is done:
 /// more than this at once is no gitcraft's.
-const MAX_CONNECTIONS: usize = 8;
+pub(super) const MAX_CONNECTIONS: usize = 8;
 
 #[derive(Default)]
 struct State {
@@ -58,6 +59,9 @@ impl Primary {
             state: Mutex::default(),
             serving: AtomicUsize::new(0),
         });
+        // Holding the lock, any file there is a crashed instance's: gone before anything else,
+        // so that no start trusts it (whoever has its port now) if this one can't write its own.
+        discovery::remove(dir);
         let port = match listen(Arc::clone(&shared)) {
             Ok(port) => Some(port),
             Err(e) => {
@@ -130,7 +134,15 @@ fn listen(shared: Arc<Shared>) -> std::io::Result<u16> {
     std::thread::Builder::new()
         .name("gitcraft-instance".to_owned())
         .spawn(move || {
-            for stream in listener.incoming().flatten() {
+            for stream in listener.incoming() {
+                let stream = match stream {
+                    Ok(stream) => stream,
+                    // Out of file handles, say: not tried again at once, over and over.
+                    Err(_) => {
+                        std::thread::sleep(Duration::from_millis(50));
+                        continue;
+                    }
+                };
                 if shared.serving.fetch_add(1, Ordering::AcqRel) >= MAX_CONNECTIONS {
                     shared.serving.fetch_sub(1, Ordering::AcqRel);
                     continue;
@@ -152,21 +164,46 @@ fn listen(shared: Arc<Shared>) -> std::io::Result<u16> {
     Ok(port)
 }
 
-/// One request line, its `\n` included; `None` for one longer than [`message::MAX_LINE`], cut
-/// short, or not text.
-pub(super) fn read_line(stream: &TcpStream) -> std::io::Result<Option<String>> {
+/// One line, its `\n` included, read within `within` all told; `None` for one longer than
+/// [`message::MAX_LINE`], cut short, too slow, or not text.
+pub(super) fn read_line(
+    mut stream: &TcpStream,
+    within: Duration,
+) -> std::io::Result<Option<String>> {
+    let deadline = Instant::now() + within;
+    let limit = usize::try_from(message::MAX_LINE).unwrap_or(usize::MAX);
     let mut line = Vec::new();
-    BufReader::new(stream.take(message::MAX_LINE)).read_until(b'\n', &mut line)?;
-    if line.last() != Some(&b'\n') {
-        return Ok(None);
+    let mut chunk = [0u8; 4096];
+    loop {
+        let left = deadline.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Ok(None);
+        }
+        stream.set_read_timeout(Some(left))?;
+        let read = match stream.read(&mut chunk) {
+            Ok(0) => return Ok(None),
+            Ok(read) => read,
+            Err(e) if e.kind() == ErrorKind::Interrupted => continue,
+            Err(e) if matches!(e.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut) => {
+                return Ok(None);
+            }
+            Err(e) => return Err(e),
+        };
+        let got = &chunk[..read];
+        let end = got.iter().position(|&b| b == b'\n');
+        line.extend_from_slice(&got[..end.map_or(read, |i| i + 1)]);
+        if line.len() > limit {
+            return Ok(None);
+        }
+        if end.is_some() {
+            return Ok(String::from_utf8(line).ok());
+        }
     }
-    Ok(String::from_utf8(line).ok())
 }
 
 fn serve(shared: &Shared, mut stream: TcpStream) -> std::io::Result<()> {
-    stream.set_read_timeout(Some(READ_TIMEOUT))?;
     stream.set_write_timeout(Some(READ_TIMEOUT))?;
-    let Some(line) = read_line(&stream)? else {
+    let Some(line) = read_line(&stream, READ_TIMEOUT)? else {
         return Ok(());
     };
     let reply = match message::decode_request(&line, &shared.token) {

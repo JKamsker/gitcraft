@@ -37,9 +37,8 @@ pub fn hand_over(found: &Found, request: &Request) -> Handoff {
 fn send(found: &Found, request: &Request) -> std::io::Result<Option<Reply>> {
     let address = SocketAddr::from((Ipv4Addr::LOCALHOST, found.port));
     let mut stream = TcpStream::connect_timeout(&address, CONNECT_TIMEOUT)?;
-    stream.set_read_timeout(Some(ANSWER_TIMEOUT))?;
     stream.set_write_timeout(Some(ANSWER_TIMEOUT))?;
     stream.write_all(message::encode_request(&found.token, request).as_bytes())?;
-    let line = super::server::read_line(&stream)?;
+    let line = super::server::read_line(&stream, ANSWER_TIMEOUT)?;
     Ok(line.as_deref().and_then(message::decode_reply))
 }
