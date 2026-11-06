@@ -34,7 +34,8 @@ impl RepoTab {
                         }
                         let stash = ui
                             .add_enabled(idle, egui::Button::new("Stash…"))
-                            .on_hover_text("Stash only the files picked");
+                            .on_hover_text("Stash only the files picked")
+                            .on_disabled_hover_text("Wait for the current operation to finish");
                         if stash.clicked() {
                             acts.push(Action::Dialog(Dialog::stash_files(
                                 picked.iter().cloned().collect(),
@@ -52,12 +53,29 @@ fn picked_label(n: usize) -> String {
 }
 
 /// The stash entries of the menu of the working-tree file `path`.
+/// The mark of a file picked to stash: a bar in the accent colour along its row's left edge,
+/// apart from the highlight of the file whose diff is open.
+pub(super) fn mark_picked(ui: &Ui, row: egui::Rect) {
+    let t = Tokens::get(ui.ctx());
+    let bar = egui::Rect::from_min_size(row.min, egui::vec2(3.0, row.height()));
+    ui.painter().rect_filled(bar, 0.0, t.accent);
+}
+
+/// `problem`: why git can't stash this file by its name, if it can't (its entries are then
+/// greyed out, saying why).
 pub(super) fn stash_menu_items(
     ui: &mut Ui,
     path: &str,
+    problem: Option<&str>,
     picked: &BTreeSet<String>,
     acts: &mut Vec<Action>,
 ) {
+    if let Some(why) = problem {
+        let why = crate::repo::dialogs::sentence(why);
+        ui.add_enabled(false, egui::Button::new("Stash this file…"))
+            .on_disabled_hover_text(why);
+        return;
+    }
     let is_picked = picked.contains(path);
     if is_picked && picked.len() > 1 {
         if ui
@@ -72,7 +90,7 @@ pub(super) fn stash_menu_items(
         acts.push(Action::Dialog(Dialog::stash_files(vec![path.to_owned()])));
     }
     let pick = if is_picked {
-        "Unpick".to_owned()
+        "Unpick (don't stash it)".to_owned()
     } else {
         format!("Pick to stash ({}+click)", crate::manual::command())
     };

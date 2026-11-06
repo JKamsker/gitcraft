@@ -5,7 +5,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use super::{LITERAL_PATHS, NO_SIGNATURE, UTF8, head, run, run_with_index};
+use super::{NO_SIGNATURE, UTF8, head, run, run_with_index};
 
 /// The first git with `git stash push --staged`.
 pub const STAGED_STASH_SINCE: (u32, u32) = (2, 35);
@@ -21,21 +21,22 @@ pub fn parse_version(line: &str) -> Option<(u32, u32)> {
 }
 
 /// Whether the git of the machine `repo` is on can stash only the staged changes; why not
-/// when it can't, as the dialog says it.
-pub fn staged_stash_support(repo: &Path) -> Result<(), String> {
+/// when it can't, as the dialog says it. The outer error: git couldn't be asked (the machine
+/// wasn't reached), which asking again later may get past.
+pub fn staged_stash_support(repo: &Path) -> Result<Result<(), String>, String> {
     let line = run(Some(repo), &["--version"])
-        .map_err(|e| format!("Couldn't ask git for its version: {e}"))?;
-    match parse_version(&line) {
+        .map_err(|e| format!("couldn't ask git for its version: {e}"))?;
+    Ok(match parse_version(&line) {
         Some(v) if v >= STAGED_STASH_SINCE => Ok(()),
         Some((major, minor)) => Err(format!(
-            "Needs git {}.{} or newer; this repository's git is {major}.{minor}",
+            "needs git {}.{} or newer; this repository's git is {major}.{minor}",
             STAGED_STASH_SINCE.0, STAGED_STASH_SINCE.1
         )),
         None => Err(format!(
-            "Couldn't tell which git this is (it says “{}”)",
+            "couldn't tell which git this is (it says “{}”)",
             line.trim()
         )),
-    }
+    })
 }
 
 /// A snapshot made and ready to be stored: `git stash store -m <message> <commit>`.
@@ -57,7 +58,7 @@ const ADD_CHUNK_BYTES: usize = 16 * 1024;
 pub fn snapshot(repo: &Path, message: &str, untracked: bool) -> Result<Option<Snapshot>, String> {
     let base = head(repo);
     if base.is_empty() {
-        return Err("There is no commit yet to save a snapshot on: make the first commit".into());
+        return Err("there is no commit yet to save a snapshot on; make the first commit".into());
     }
     let scratch = Scratch::new(repo)?;
     let on = describe_head(repo)?;
@@ -132,12 +133,19 @@ fn untracked_commit(repo: &Path, scratch: &Scratch, on: &str) -> Result<Option<S
         &scratch.copy,
         &["ls-files", "-z", "--others", "--exclude-standard"],
     )?;
-    let files: Vec<&str> = listed.split('\0').filter(|f| !f.is_empty()).collect();
+    // A repository inside this one is listed as its folder (`nested/`): `git stash
+    // --include-untracked` leaves it out, and so does this.
+    let files: Vec<&str> = listed
+        .split('\0')
+        .filter(|f| !f.is_empty() && !f.ends_with('/'))
+        .collect();
     if files.is_empty() {
         return Ok(None);
     }
+    // `update-index`, as `git stash` itself does it: paths as they are (no pathspec), and
+    // outside a sparse checkout's cone too, which `git add` refuses.
     for chunk in chunks(&files) {
-        let mut args = vec![LITERAL_PATHS, "add", "--"];
+        let mut args = vec!["update-index", "--add", "--"];
         args.extend(chunk);
         run_with_index(repo, &scratch.untracked, &args)
             .map_err(|e| format!("git couldn't save the untracked files: {e}"))?;
@@ -182,7 +190,7 @@ fn commit_tree(repo: &Path, tree: &str, parents: &[&str], message: &str) -> Resu
 fn rev(repo: &Path, rev: &str) -> Result<String, String> {
     run(Some(repo), &["rev-parse", "--verify", "-q", rev])
         .map(|s| s.trim().to_owned())
-        .map_err(|_| format!("{rev} is not a commit"))
+        .map_err(|_| format!("git couldn't read the stash it just made ({rev})"))
 }
 
 /// The index files a snapshot works on, in the repository's git folder (where a split index
@@ -216,7 +224,7 @@ impl Scratch {
             untracked,
         };
         crate::remote::copy_keeping_time(&here(&index), &scratch.files[0])
-            .map_err(|e| format!("Couldn't copy the index to work on: {e}"))?;
+            .map_err(|e| format!("couldn't copy the index to work on: {e}"))?;
         Ok(scratch)
     }
 }

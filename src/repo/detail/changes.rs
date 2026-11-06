@@ -3,10 +3,11 @@
 
 use egui::{Align2, RichText, Sense, Ui, pos2, vec2};
 
-use super::stash_picks::stash_menu_items;
+use super::stash_picks::{mark_picked, stash_menu_items};
 use crate::git::{Area, InProgress, StatusFile};
 use crate::icons;
 use crate::repo::diff::{literal_path, unstage_args};
+use crate::repo::partial_stash::row_problem;
 use crate::repo::widgets::{self, RowExtra};
 use crate::repo::{Action, Dialog, DiffKey, Refresh, RepoTab, abort_action, branch_tree, ops};
 use crate::theme::{self, Tokens};
@@ -201,7 +202,7 @@ impl RepoTab {
     ) -> RowClick {
         let key = DiffKey::Work(f.clone());
         let picked = &self.stash_picks.picked;
-        let selected = self.open_key() == Some(&key) || picked.contains(&f.path);
+        let selected = self.open_key() == Some(&key);
         let buttons = if self.busy_op.is_none() { buttons } else { &[] };
         let r = widgets::file_row(
             ui,
@@ -212,9 +213,15 @@ impl RepoTab {
             selected,
             RowExtra::Buttons(buttons),
         );
+        if picked.contains(&f.path) {
+            mark_picked(ui, r.row.rect);
+        }
+        // A file git can't stash by its name (conflicted, a staged rename or deletion) is
+        // neither picked nor offered for stashing, but says why.
+        let problem = row_problem(f);
         let stash = |ui: &mut Ui, acts: &mut Vec<Action>| {
             ui.separator();
-            stash_menu_items(ui, &f.path, picked, acts);
+            stash_menu_items(ui, &f.path, problem.as_deref(), picked, acts);
         };
         if f.code != 'D' {
             widgets::file_menu_with(&r.row, &f.path, None, true, acts, stash);
@@ -222,11 +229,17 @@ impl RepoTab {
             // A deleted file has nothing to open, but can be stashed.
             egui::Popup::context_menu(&r.row)
                 .style(theme::menu_style)
-                .show(|ui| stash_menu_items(ui, &f.path, picked, acts));
+                .show(|ui| stash_menu_items(ui, &f.path, problem.as_deref(), picked, acts));
         }
         match r.button {
             Some(i) => RowClick::Button(i),
-            None if r.row.clicked() && ui.input(|i| i.modifiers.command) => RowClick::Pick,
+            None if r.row.clicked() && ui.input(|i| i.modifiers.command) => {
+                if problem.is_some() {
+                    RowClick::None
+                } else {
+                    RowClick::Pick
+                }
+            }
             None if r.row.clicked() => RowClick::Open,
             None => RowClick::None,
         }

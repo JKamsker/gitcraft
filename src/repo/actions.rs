@@ -334,17 +334,17 @@ impl RepoTab {
             ("Undo".into(), "Ctrl+Z".into(), Action::Undo),
             ("Redo".into(), "Ctrl+Y".into(), Action::Redo),
             (
-                "Stash changes".into(),
+                "Stash changes…".into(),
                 "stash".into(),
                 Action::Dialog(Dialog::stash()),
             ),
             (
-                "Stash only staged changes".into(),
+                "Stash only what is staged…".into(),
                 "stash".into(),
                 Action::Dialog(Dialog::stash_as(StashChoice::Staged)),
             ),
             (
-                "Snapshot: stash and keep the changes".into(),
+                "Save snapshot (stash, keep the changes)…".into(),
                 "stash".into(),
                 Action::Dialog(Dialog::stash_as(StashChoice::Snapshot)),
             ),

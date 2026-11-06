@@ -12,6 +12,8 @@ use std::path::{Path, PathBuf};
 use egui::{Key, RichText};
 
 pub use self::stash::Choice as StashChoice;
+pub(crate) use self::stash::sentence;
+use super::partial_stash::StagedSupport;
 use super::widgets;
 use super::{Action, Refresh, RepoTab, Undo};
 use crate::theme::{self, Tokens};
@@ -265,6 +267,12 @@ impl RepoTab {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         if let Some(Dialog::Stash(d)) = &mut self.dialog {
             d.seed(self.stash_picks.picked.iter().cloned());
+            d.keep_changed(&self.work);
+            if !std::mem::replace(&mut d.opened, true)
+                && matches!(self.stash_picks.staged, StagedSupport::Failed(_))
+            {
+                self.stash_picks.staged = StagedSupport::Unknown;
+            }
             self.check_staged_stash(ctx);
         }
         let Some(dialog) = &mut self.dialog else {

@@ -6,7 +6,7 @@ use egui::{RichText, Ui};
 use crate::git::WorkStatus;
 use crate::repo::Action;
 use crate::repo::partial_stash::{
-    StagedSupport, StashMode, StashRequest, files_problem, has_untracked,
+    StagedSupport, StashMode, StashRequest, everything_problem, files_problem, has_untracked,
 };
 use crate::theme::Tokens;
 
@@ -30,6 +30,9 @@ pub struct StashDialog {
     pub(super) focus: bool,
     /// The files picked in the changes were taken in (on the first frame).
     pub(super) seeded: bool,
+    /// Opened: a git that couldn't be asked whether it stashes only what is staged is asked
+    /// again.
+    pub(super) opened: bool,
 }
 
 impl StashDialog {
@@ -41,6 +44,7 @@ impl StashDialog {
             message: String::new(),
             untracked: true,
             focus: true,
+            opened: false,
         }
     }
 
@@ -54,6 +58,18 @@ impl StashDialog {
         self.files = picked.into_iter().collect();
         if !self.files.is_empty() && self.choice == Choice::Everything {
             self.choice = Choice::Files;
+        }
+    }
+
+    /// Lets go of the files that have no changes any more (committed, discarded, stashed
+    /// elsewhere while it is open); with none left, it stashes everything instead.
+    pub(super) fn keep_changed(&mut self, work: &WorkStatus) {
+        if self.files.is_empty() {
+            return;
+        }
+        crate::repo::partial_stash::keep_changed_files(&mut self.files, work);
+        if self.files.is_empty() && self.choice == Choice::Files {
+            self.choice = Choice::Everything;
         }
     }
 
@@ -73,17 +89,28 @@ impl StashDialog {
     }
 }
 
+/// Said while the repository's git is asked whether it can stash only what is staged.
+const CHECKING: &str = "checking which git this repository has…";
+
+/// `text` as a sentence of its own: messages start in lower case, as they read after
+/// "<operation> failed: " in the status line.
+pub(crate) fn sentence(text: &str) -> String {
+    let mut chars = text.chars();
+    chars
+        .next()
+        .map(|c| c.to_uppercase().chain(chars).collect())
+        .unwrap_or_default()
+}
+
 /// Why stashing only what is staged can't be done now, if it can't.
 pub(super) fn staged_problem(work: &WorkStatus, support: &StagedSupport) -> Option<String> {
     if work.staged.is_empty() {
-        return Some("Nothing is staged".into());
+        return Some("nothing is staged".into());
     }
     match support {
         StagedSupport::Known(Ok(())) => None,
-        StagedSupport::Known(Err(e)) => Some(e.clone()),
-        StagedSupport::Unknown | StagedSupport::Checking => {
-            Some("Checking which git this repository has…".into())
-        }
+        StagedSupport::Known(Err(e)) | StagedSupport::Failed(e) => Some(e.clone()),
+        StagedSupport::Unknown | StagedSupport::Checking => Some(CHECKING.into()),
     }
 }
 
@@ -94,10 +121,7 @@ pub(super) fn problem(
     support: &StagedSupport,
 ) -> Option<String> {
     match d.choice {
-        Choice::Everything | Choice::Snapshot if work.is_clean() => {
-            Some("There are no changes to stash".into())
-        }
-        Choice::Everything | Choice::Snapshot => None,
+        Choice::Everything | Choice::Snapshot => everything_problem(work, d.untracked),
         Choice::Files => files_problem(&d.files, work),
         Choice::Staged => staged_problem(work, support),
     }
@@ -125,7 +149,7 @@ pub(super) fn stash(
     title(
         ui,
         "Stash changes",
-        "Puts changes aside in a stash; Undo brings them back.",
+        "Saves changes in a stash; Undo takes it back.",
         &t,
     );
     choice(
@@ -133,11 +157,25 @@ pub(super) fn stash(
         &mut d.choice,
         Choice::Everything,
         "Everything",
-        "Every change, leaving a clean working tree.",
+        "Every change; the files go back to how the last commit has them.",
         None,
         &t,
     );
-    if !d.files.is_empty() {
+    if d.files.is_empty() {
+        let how = format!(
+            "{}+click files in the changes to pick them",
+            crate::manual::command()
+        );
+        choice(
+            ui,
+            &mut d.choice,
+            Choice::Files,
+            "Picked files",
+            "",
+            Some(&how),
+            &t,
+        );
+    } else {
         let n = d.files.len();
         let label = format!("{n} picked file{}", if n == 1 { "" } else { "s" });
         let hint = files_summary(&d.files);
@@ -170,7 +208,7 @@ pub(super) fn stash(
     if let Some(p) = &problem
         && d.choice != Choice::Staged
     {
-        ui.label(RichText::new(p).color(t.danger).small());
+        ui.label(RichText::new(sentence(p)).color(t.danger).small());
     }
     ui.add_space(10.0);
     let button = if d.choice == Choice::Snapshot {
@@ -198,13 +236,15 @@ fn choice(
         ui.radio_value(current, value, label);
     });
     let (text, color) = match unavailable {
+        // Not a warning while it is only being found out.
+        Some(why) if why == CHECKING => (why, t.text_faint),
         Some(why) => (why, t.warning),
         None => (hint, t.text_faint),
     };
     ui.horizontal(|ui| {
         ui.add_space(24.0);
         ui.label(
-            RichText::new(text)
+            RichText::new(sentence(text))
                 .color(color)
                 .font(egui::FontId::proportional(11.5)),
         );
@@ -225,7 +265,7 @@ fn untracked_box(ui: &mut Ui, d: &mut StashDialog, work: &WorkStatus) {
                 false,
                 egui::Checkbox::new(&mut picked, "Include untracked files"),
             )
-            .on_disabled_hover_text("New files picked go with the others; those not picked stay");
+            .on_disabled_hover_text("Untracked files you picked are stashed; the others stay");
         }
         Choice::Staged => {
             let mut none = false;
@@ -233,7 +273,7 @@ fn untracked_box(ui: &mut Ui, d: &mut StashDialog, work: &WorkStatus) {
                 false,
                 egui::Checkbox::new(&mut none, "Include untracked files"),
             )
-            .on_disabled_hover_text("git stashes no untracked files with only what is staged");
+            .on_disabled_hover_text("Untracked files aren't staged, so they stay");
         }
     }
 }
@@ -310,7 +350,7 @@ mod tests {
         let mut d = StashDialog::new(Choice::Staged, Vec::new());
         assert_eq!(
             problem(&d, &work, &known).as_deref(),
-            Some("Nothing is staged")
+            Some("nothing is staged")
         );
         let staged = WorkStatus {
             staged: vec![file("a", 'M', Area::Staged)],
@@ -318,10 +358,10 @@ mod tests {
         };
         assert_eq!(problem(&d, &staged, &known), None);
         assert!(problem(&d, &staged, &StagedSupport::Checking).is_some());
-        let old = StagedSupport::Known(Err("Needs git 2.35 or newer".into()));
+        let old = StagedSupport::Known(Err("needs git 2.35 or newer".into()));
         assert_eq!(
             problem(&d, &staged, &old).as_deref(),
-            Some("Needs git 2.35 or newer")
+            Some("needs git 2.35 or newer")
         );
         d.choice = Choice::Files;
         d.files = vec!["gone".to_owned()];
