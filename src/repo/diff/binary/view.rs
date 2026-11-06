@@ -1,9 +1,9 @@
-//! How a binary file's diff looks: its kind and sizes before and after with what is known of
-//! each side, then its text, its archive's members or its bytes, as picked.
+//! How a binary file's diff looks: its kind and what changed in its size, a table of what is
+//! known of each side, then its text, its archive's members or its bytes, as picked.
 
 use egui::{RichText, Ui};
 
-use super::{BinaryPair, HEX_BYTES, MemberChange, Side};
+use super::{BinaryPair, HEX_BYTES, MAX_READ, MemberChange, Side};
 use crate::git::human_size;
 use crate::icons;
 use crate::repo::diff::line_diff::Edit;
@@ -11,9 +11,8 @@ use crate::repo::widgets;
 use crate::theme::{self, Tokens};
 
 /// What the lower part shows.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Show {
-    #[default]
     Text,
     Members,
     Hex,
@@ -22,7 +21,7 @@ enum Show {
 /// The diff of a binary file. `id`: the file shown, which the view picked is kept for.
 pub(in crate::repo::diff) fn binary_view(ui: &mut Ui, pair: &BinaryPair, id: &str) {
     let t = Tokens::get(ui.ctx());
-    ui.add_space(10.0);
+    ui.add_space(12.0);
     egui::Frame::new()
         .inner_margin(egui::Margin::symmetric(14, 0))
         .show(ui, |ui| {
@@ -31,32 +30,60 @@ pub(in crate::repo::diff) fn binary_view(ui: &mut Ui, pair: &BinaryPair, id: &st
                 ui.colored_label(t.danger, e);
             }
             ui.add_space(10.0);
-            let options: Vec<(Show, &str)> = [
-                (Show::Text, "Text", pair.text.is_some()),
-                (Show::Members, "Members", pair.members.is_some()),
-                (Show::Hex, "Bytes", has_bytes(pair)),
-            ]
-            .into_iter()
-            .filter(|(_, _, there)| *there)
-            .map(|(s, l, _)| (s, l))
-            .collect();
+            let mut options: Vec<(Show, &str, bool)> = Vec::new();
+            if let Some(text) = &pair.text {
+                options.push((
+                    Show::Text,
+                    "Text",
+                    !text.is_empty() && pair.text_changes > 0,
+                ));
+            }
+            if let Some(m) = &pair.members {
+                options.push((Show::Members, "Members", !m.is_empty()));
+            }
+            if has_bytes(pair) {
+                options.push((Show::Hex, "Bytes", true));
+            }
+            if let Some(note) = &pair.text_note {
+                ui.label(RichText::new(note).color(t.text_dim).small());
+            }
             if options.is_empty() {
+                if [&pair.old, &pair.new]
+                    .iter()
+                    .any(|s| s.as_ref().is_some_and(|s| s.kind.is_none()))
+                {
+                    let text = format!(
+                        "Too big to show: gitcraft reads files up to {}.",
+                        human_size(MAX_READ)
+                    );
+                    ui.label(RichText::new(text).color(t.text_dim));
+                }
                 return;
             }
             let key = egui::Id::new(("binary-view", id));
-            let mut show: Show = ui.data(|d| d.get_temp(key)).unwrap_or_default();
-            if !options.iter().any(|(s, _)| *s == show) {
-                show = options[0].0;
+            let picked: Option<Show> = ui.data(|d| d.get_temp(key));
+            // The pick if this file has it, else the first view with changes, else the first.
+            let show = picked
+                .filter(|p| options.iter().any(|(s, _, _)| s == p))
+                .or_else(|| {
+                    options
+                        .iter()
+                        .find(|(_, _, changed)| *changed)
+                        .map(|(s, _, _)| *s)
+                })
+                .unwrap_or(options[0].0);
+            let mut show = show;
+            if options.len() > 1 {
+                ui.horizontal(|ui| {
+                    let labels: Vec<&str> = options.iter().map(|(_, l, _)| *l).collect();
+                    let on = options.iter().position(|(s, _, _)| *s == show).unwrap_or(0);
+                    if let Some(i) = widgets::switch(ui, &labels, on) {
+                        show = options[i].0;
+                        ui.data_mut(|d| d.insert_temp(key, show));
+                    }
+                });
+                ui.add_space(6.0);
             }
-            ui.horizontal(|ui| {
-                let labels: Vec<&str> = options.iter().map(|(_, l)| *l).collect();
-                let on = options.iter().position(|(s, _)| *s == show).unwrap_or(0);
-                if let Some(i) = widgets::switch(ui, &labels, on) {
-                    show = options[i].0;
-                }
-            });
-            ui.data_mut(|d| d.insert_temp(key, show));
-            ui.add_space(6.0);
             match show {
                 Show::Text => text_diff(ui, &t, pair),
                 Show::Members => members(ui, &t, pair.members.as_deref().unwrap_or_default()),
@@ -80,27 +107,31 @@ pub(super) fn size_change(old: u64, new: u64) -> String {
     }
 }
 
-/// Kind, sizes and facts of both sides, facts that changed marked.
+/// A side's size as the table says it: "12.0 KB", "70.2 MB, not read (over 64 MB)".
+pub(super) fn size_text(s: &Side) -> String {
+    let limit = human_size(MAX_READ);
+    match (s.size, s.kind.is_some()) {
+        (Some(n), true) => human_size(n),
+        (Some(n), false) => format!("{}, not read (over {limit})", human_size(n)),
+        (None, _) => format!("over {limit}, not read"),
+    }
+}
+
+/// Kind and the size's change, then the facts of both sides, those that changed marked.
 fn summary(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
-    let kind = pair
-        .new
-        .as_ref()
-        .or(pair.old.as_ref())
-        .and_then(|s| s.kind.clone())
-        .unwrap_or_else(|| "Binary file".to_owned());
+    let kind = |s: &Option<Side>| s.as_ref().and_then(|s| s.kind.clone());
+    let kinds = match (kind(&pair.old), kind(&pair.new)) {
+        (Some(a), Some(b)) if a != b => format!("{a} → {b}"),
+        (a, b) => b.or(a).unwrap_or_else(|| "Binary file".to_owned()),
+    };
     ui.horizontal(|ui| {
         icons::inline(ui, "file-diff", 16.0, t.icon);
-        ui.label(RichText::new(kind).font(theme::semibold(14.0)));
-        if let (Some(a), Some(b)) = (&pair.old, &pair.new) {
-            let change = size_change(a.size, b.size);
-            ui.label(
-                RichText::new(format!(
-                    "{} → {} ({change})",
-                    human_size(a.size),
-                    human_size(b.size)
-                ))
-                .color(t.text_dim),
-            );
+        ui.label(RichText::new(kinds).font(theme::semibold(14.0)));
+        if let (Some(a), Some(b)) = (
+            pair.old.as_ref().and_then(|s| s.size),
+            pair.new.as_ref().and_then(|s| s.size),
+        ) {
+            ui.label(RichText::new(size_change(a, b)).color(t.text_dim));
         }
     });
     ui.add_space(6.0);
@@ -115,49 +146,41 @@ fn summary(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
     let value = |s: &Option<Side>, k: &str| -> Option<String> {
         let s = s.as_ref()?;
         if k == "Size" {
-            return Some(
-                human_size(s.size)
-                    + &if s.kind.is_none() {
-                        " (too big to read)".to_owned()
-                    } else {
-                        String::new()
-                    },
-            );
+            return Some(size_text(s));
         }
         s.facts.iter().find(|(f, _)| f == k).map(|(_, v)| v.clone())
     };
+    let both = pair.old.is_some() && pair.new.is_some();
     egui::Grid::new("binary-facts")
         .num_columns(3)
         .spacing([18.0, 4.0])
         .show(ui, |ui| {
             ui.label("");
-            ui.label(
-                RichText::new("Before")
-                    .font(theme::semibold(12.0))
-                    .color(t.text_dim),
-            );
-            ui.label(
-                RichText::new("After")
-                    .font(theme::semibold(12.0))
-                    .color(t.text_dim),
-            );
+            for title in ["Before", "After"] {
+                ui.label(
+                    RichText::new(title)
+                        .font(theme::semibold(12.0))
+                        .color(t.text_dim),
+                );
+            }
             ui.end_row();
             for k in &facts {
                 let (a, b) = (value(&pair.old, k), value(&pair.new, k));
-                let changed = a != b;
+                let changed = both && a != b;
                 ui.label(RichText::new(k).color(t.text_dim));
-                let missing = |side_there: bool| if side_there { "—" } else { "(no file)" };
-                let shown = |v: &Option<String>, there: bool, color| {
-                    RichText::new(v.clone().unwrap_or_else(|| missing(there).to_owned()))
-                        .color(color)
-                };
-                let (ca, cb) = if changed {
-                    (t.danger, t.success)
-                } else {
-                    (t.text, t.text)
-                };
-                ui.label(shown(&a, pair.old.is_some(), ca));
-                ui.label(shown(&b, pair.new.is_some(), cb));
+                for (v, side, missing, color) in [
+                    (&a, &pair.old, "(new file)", t.danger),
+                    (&b, &pair.new, "(deleted)", t.success),
+                ] {
+                    let shown = match (v, side) {
+                        (Some(v), _) => {
+                            RichText::new(v).color(if changed { color } else { t.text })
+                        }
+                        (None, Some(_)) => RichText::new("—").color(t.text_faint),
+                        (None, None) => RichText::new(missing).color(t.text_faint),
+                    };
+                    ui.label(shown);
+                }
                 ui.end_row();
             }
         });
@@ -165,39 +188,67 @@ fn summary(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
 
 fn text_diff(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
     let Some(lines) = &pair.text else { return };
-    let changes = lines.iter().filter(|(e, _)| *e != Edit::Same).count();
-    if changes == 0 {
+    if lines.is_empty() {
+        ui.label(RichText::new("No text.").color(t.text_dim));
+        return;
+    }
+    if pair.text_changes == 0 {
+        let more = if pair.members.is_some() {
+            "Members"
+        } else {
+            "Bytes"
+        };
         ui.label(
-            RichText::new("The text is the same: what changed is elsewhere in the file.")
-                .color(t.text_dim),
+            RichText::new(format!(
+                "The text is the same; see {more} for what changed."
+            ))
+            .color(t.text_dim),
         );
     }
-    let row_h = 18.0;
+    let font = theme::mono(12.5);
+    let row_h = ui.fonts_mut(|f| f.row_height(&font)) + 2.0;
     egui::ScrollArea::both()
         .id_salt("binary-text")
         .auto_shrink(false)
         .show_rows(ui, row_h, lines.len(), |ui, range| {
+            ui.spacing_mut().item_spacing.y = 2.0;
             for (edit, line) in &lines[range] {
                 let (mark, bg, color) = match edit {
-                    Edit::Same => (' ', egui::Color32::TRANSPARENT, t.text),
-                    Edit::Del => ('−', t.diff_del_bg, t.text),
-                    Edit::Add => ('+', t.diff_add_bg, t.text),
+                    Edit::Same => (" ", egui::Color32::TRANSPARENT, t.text_faint),
+                    Edit::Del => ("−", t.diff_del_bg, t.danger),
+                    Edit::Add => ("+", t.diff_add_bg, t.success),
                 };
-                egui::Frame::new().fill(bg).show(ui, |ui| {
-                    ui.set_min_width(ui.available_width());
-                    ui.label(
-                        RichText::new(format!("{mark} {line}"))
-                            .font(theme::mono(12.5))
-                            .color(color),
-                    );
-                });
+                let mut job = egui::text::LayoutJob::default();
+                job.append(
+                    mark,
+                    0.0,
+                    egui::TextFormat {
+                        font_id: font.clone(),
+                        color,
+                        ..Default::default()
+                    },
+                );
+                job.append(" ", 0.0, egui::TextFormat::default());
+                job.append(
+                    line,
+                    0.0,
+                    egui::TextFormat {
+                        font_id: font.clone(),
+                        color: t.text,
+                        background: bg,
+                        ..Default::default()
+                    },
+                );
+                // One row each: a row that wrapped would throw the scrolling off.
+                job.wrap.max_width = f32::INFINITY;
+                ui.add(egui::Label::new(job).extend());
             }
         });
 }
 
 fn members(ui: &mut Ui, t: &Tokens, changes: &[MemberChange]) {
     if changes.is_empty() {
-        ui.label(RichText::new("Every member is the same.").color(t.text_dim));
+        ui.label(RichText::new("No member changed.").color(t.text_dim));
         return;
     }
     egui::ScrollArea::vertical()
@@ -209,6 +260,11 @@ fn members(ui: &mut Ui, t: &Tokens, changes: &[MemberChange]) {
                     let (word, color, size) = match (c.old, c.new) {
                         (None, Some(n)) => ("added", t.success, human_size(n)),
                         (Some(o), None) => ("removed", t.danger, human_size(o)),
+                        (Some(o), Some(n)) if o == n => (
+                            "changed",
+                            t.warning,
+                            format!("{}, same size", human_size(n)),
+                        ),
                         (Some(o), Some(n)) => (
                             "changed",
                             t.warning,
@@ -229,44 +285,66 @@ fn members(ui: &mut Ui, t: &Tokens, changes: &[MemberChange]) {
         });
 }
 
-/// 16 bytes a row, both sides one under the other per row; bytes that differ marked.
+/// 16 bytes a row, the sides there one under the other per offset; bytes that differ at the
+/// same offset marked.
 fn hex(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
-    let empty = Vec::new();
-    let old = pair.old.as_ref().map_or(&empty, |s| &s.head);
-    let new = pair.new.as_ref().map_or(&empty, |s| &s.head);
-    let rows = old.len().max(new.len()).div_ceil(16);
+    let sides: Vec<(&str, &[u8], &[u8], egui::Color32)> = {
+        let old = pair.old.as_ref().map(|s| s.head.as_slice());
+        let new = pair.new.as_ref().map(|s| s.head.as_slice());
+        let mut v = Vec::new();
+        if let Some(o) = old {
+            v.push(("−", o, new.unwrap_or_default(), t.danger));
+        }
+        if let Some(n) = new {
+            v.push(("+", n, old.unwrap_or_default(), t.success));
+        }
+        v
+    };
+    let rows = sides
+        .iter()
+        .map(|(_, b, _, _)| b.len())
+        .max()
+        .unwrap_or(0)
+        .div_ceil(16);
     let cut = [pair.old.as_ref(), pair.new.as_ref()]
         .into_iter()
         .flatten()
-        .any(|s| s.size > HEX_BYTES as u64);
+        .any(|s| s.size.is_none_or(|n| n > HEX_BYTES as u64));
     if cut {
         ui.label(
-            RichText::new(format!(
-                "The first {} of each side.",
-                human_size(HEX_BYTES as u64)
-            ))
-            .color(t.text_faint)
-            .small(),
+            RichText::new("Showing the first 64 KB of each side.")
+                .color(t.text_faint)
+                .small(),
         );
     }
+    let font = theme::mono(12.0);
+    let line_h = ui.fonts_mut(|f| f.row_height(&font));
+    let row_h = line_h * sides.len() as f32 + 7.0;
     egui::ScrollArea::both()
         .id_salt("binary-hex")
         .auto_shrink(false)
-        .show_rows(ui, 34.0, rows, |ui, range| {
+        .show_rows(ui, row_h, rows, |ui, range| {
             for row in range {
                 let at = row * 16;
                 ui.vertical(|ui| {
-                    for (mark, bytes, other, color) in
-                        [('−', old, new, t.danger), ('+', new, old, t.success)]
-                    {
+                    ui.spacing_mut().item_spacing.y = 0.0;
+                    for (mark, bytes, other, color) in &sides {
                         let mut job = egui::text::LayoutJob::default();
-                        let font = theme::mono(12.0);
                         let plain = egui::TextFormat {
                             font_id: font.clone(),
                             color: t.text_dim,
                             ..Default::default()
                         };
-                        job.append(&format!("{mark} {at:08x}  "), 0.0, plain.clone());
+                        job.append(
+                            mark,
+                            0.0,
+                            egui::TextFormat {
+                                font_id: font.clone(),
+                                color: *color,
+                                ..Default::default()
+                            },
+                        );
+                        job.append(&format!(" {at:08x}  "), 0.0, plain.clone());
                         let mut ascii = String::new();
                         for i in at..at + 16 {
                             let (text, differs) = match bytes.get(i) {
@@ -280,44 +358,63 @@ fn hex(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
                                 }
                                 None => ("   ".to_owned(), false),
                             };
-                            let format = if differs {
+                            let c = if differs { *color } else { t.text };
+                            job.append(
+                                &text,
+                                0.0,
                                 egui::TextFormat {
                                     font_id: font.clone(),
-                                    color,
+                                    color: c,
                                     ..Default::default()
-                                }
-                            } else {
-                                egui::TextFormat {
-                                    font_id: font.clone(),
-                                    color: t.text,
-                                    ..Default::default()
-                                }
-                            };
-                            job.append(&text, 0.0, format);
+                                },
+                            );
                         }
                         job.append(&format!(" {ascii}"), 0.0, plain);
-                        ui.label(job);
+                        ui.add(egui::Label::new(job).extend());
                     }
+                    ui.add_space(3.0);
+                    let r = ui.available_rect_before_wrap();
+                    ui.painter()
+                        .hline(r.x_range(), r.top(), egui::Stroke::new(1.0, t.separator));
+                    ui.add_space(4.0);
                 });
             }
         });
 }
 
 /// A line above a diff git made through the file's `textconv` program: the text is that
-/// program's, and the patch can't be staged a line at a time.
-pub(in crate::repo::diff) fn textconv_note(ui: &mut Ui, program: &str) {
+/// program's; in the working tree (`work`) it is staged as a whole file.
+pub(in crate::repo::diff) fn textconv_note(ui: &mut Ui, program: &str, work: bool) {
     let t = Tokens::get(ui.ctx());
     egui::Frame::new()
         .fill(t.chrome)
         .inner_margin(egui::Margin::symmetric(10, 4))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
-            ui.label(
-                RichText::new(format!(
-                    "The text of this file as `{program}` (its textconv) gives it; it is staged as a whole."
-                ))
-                .color(t.text_dim)
-                .small(),
-            );
+            ui.horizontal(|ui| {
+                ui.label(
+                    RichText::new("Text made by its textconv,")
+                        .color(t.text_dim)
+                        .small(),
+                );
+                let shown: String = program.chars().take(60).collect();
+                let more = if program.chars().count() > 60 {
+                    "…"
+                } else {
+                    ""
+                };
+                ui.label(
+                    RichText::new(format!("{shown}{more}"))
+                        .font(theme::mono(11.5))
+                        .color(t.text_dim),
+                )
+                .on_hover_text(program);
+                let rest = if work {
+                    "not the file's own lines. Stage or discard it as a whole file."
+                } else {
+                    "not the file's own lines."
+                };
+                ui.label(RichText::new(rest).color(t.text_dim).small());
+            });
         });
 }

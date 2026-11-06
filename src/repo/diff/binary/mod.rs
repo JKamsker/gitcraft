@@ -17,13 +17,14 @@ use super::line_diff::{Edit, diff_lines};
 use crate::git::{self, Area};
 
 /// Past this size a side isn't read: only its size is told.
-const MAX_READ: u64 = 64 * 1024 * 1024;
+pub(super) const MAX_READ: u64 = 64 * 1024 * 1024;
 /// How many bytes of each side the hex view shows.
 pub(super) const HEX_BYTES: usize = 64 * 1024;
 
 /// One version of a binary file.
 pub struct Side {
-    pub size: u64,
+    /// Its size, when known (one too big to read elsewhere may not say).
+    pub size: Option<u64>,
     /// "PDF document", "ZIP archive"…; `None` when it was too big to read.
     pub kind: Option<String>,
     pub facts: Vec<sniff::Fact>,
@@ -46,8 +47,12 @@ pub struct MemberChange {
 pub struct BinaryPair {
     pub old: Option<Side>,
     pub new: Option<Side>,
-    /// The text of both sides diffed, when both (or the one there) have text.
+    /// The text of both sides diffed, when every side there has text (lines cut to a length
+    /// that shows), and how many lines changed.
     pub text: Option<Vec<(Edit, String)>>,
+    pub text_changes: usize,
+    /// Why the text isn't diffed although a side has some.
+    pub text_note: Option<String>,
     /// The members of both archives that differ.
     pub members: Option<Vec<MemberChange>>,
     /// Why a side couldn't be read.
@@ -68,11 +73,18 @@ fn read_side(repo: &Path, rev: Option<&str>, path: &str) -> Result<Option<Side>,
             Some(read) => {
                 return match read {
                     Ok(Some(bytes)) => Ok(Some(side(path, bytes.len() as u64, &bytes))),
-                    Ok(None) => Ok(Some(too_big(None))),
+                    // Refused: too big, or not a file there at all (deleted, a link).
+                    Ok(None) => {
+                        match crate::remote::try_is_file(&crate::remote::join(repo, path)) {
+                            Ok(true) => Ok(Some(too_big(None))),
+                            Ok(false) => Ok(None),
+                            Err(e) => Err(format!("{path}: {e}")),
+                        }
+                    }
                     Err(e) => Err(format!("{path}: {e}")),
                 };
             }
-            None => match std::fs::metadata(repo.join(path)) {
+            None => match std::fs::symlink_metadata(repo.join(path)) {
                 Ok(m) => m.len(),
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
                 Err(e) => return Err(format!("{path}: {e}")),
@@ -100,7 +112,7 @@ fn read_side(repo: &Path, rev: Option<&str>, path: &str) -> Result<Option<Side>,
 
 fn too_big(size: Option<u64>) -> Side {
     Side {
-        size: size.unwrap_or(MAX_READ + 1),
+        size,
         kind: None,
         facts: Vec::new(),
         head: Vec::new(),
@@ -112,7 +124,7 @@ fn too_big(size: Option<u64>) -> Side {
 fn side(path: &str, size: u64, bytes: &[u8]) -> Side {
     let (kind, facts) = sniff::describe(path, bytes);
     Side {
-        size,
+        size: Some(size),
         kind: Some(kind),
         facts,
         head: bytes[..bytes.len().min(HEX_BYTES)].to_vec(),
@@ -164,21 +176,33 @@ pub(super) fn pair(old: Option<Side>, new: Option<Side>, error: Option<String>) 
     fn members_of(s: &Option<Side>) -> Option<&Vec<zip::Member>> {
         s.as_ref().and_then(|s| s.members.as_ref())
     }
-    let text = match (text_of(&old), text_of(&new)) {
-        (None, None) => None,
-        (a, b) => {
-            let (a, b): (Vec<&str>, Vec<&str>) = (
-                a.map(|t| t.lines().collect()).unwrap_or_default(),
-                b.map(|t| t.lines().collect()).unwrap_or_default(),
-            );
-            Some(
-                diff_lines(&a, &b)
-                    .into_iter()
-                    .map(|(e, l)| (e, l.to_owned()))
-                    .collect(),
-            )
+    let unread = |s: &Option<Side>| s.is_some() && text_of(s).is_none();
+    let (mut text, mut text_changes, mut text_note) = (None, 0, None);
+    if text_of(&old).is_some() || text_of(&new).is_some() {
+        if unread(&old) || unread(&new) {
+            let which = if unread(&old) {
+                "the old version"
+            } else {
+                "the new version"
+            };
+            text_note = Some(format!(
+                "The text of {which} can't be read, so it isn't compared."
+            ));
+        } else {
+            let a: Vec<&str> = text_of(&old)
+                .map(|t| t.lines().collect())
+                .unwrap_or_default();
+            let b: Vec<&str> = text_of(&new)
+                .map(|t| t.lines().collect())
+                .unwrap_or_default();
+            let diffed: Vec<(Edit, String)> = diff_lines(&a, &b)
+                .into_iter()
+                .map(|(e, l)| (e, cut(l)))
+                .collect();
+            text_changes = diffed.iter().filter(|(e, _)| *e != Edit::Same).count();
+            text = Some(diffed);
         }
-    };
+    }
     let members = match (members_of(&old), members_of(&new)) {
         (None, None) => None,
         (a, b) => Some(member_changes(
@@ -190,8 +214,19 @@ pub(super) fn pair(old: Option<Side>, new: Option<Side>, error: Option<String>) 
         old,
         new,
         text,
+        text_changes,
+        text_note,
         members,
         error,
+    }
+}
+
+/// A line cut to what a row shows (the whole is in the document).
+fn cut(line: &str) -> String {
+    const MAX: usize = crate::repo::highlight::MAX_LINE_CHARS;
+    match line.char_indices().nth(MAX) {
+        Some((at, _)) => format!("{}…", &line[..at]),
+        None => line.to_owned(),
     }
 }
 
@@ -219,9 +254,44 @@ pub(super) fn member_changes(old: &[zip::Member], new: &[zip::Member]) -> Vec<Me
         .collect()
 }
 
+/// Whether the repository's config has any `diff.<driver>.textconv`, asked at most every
+/// half minute per repository: when it has none (most), no file's diff goes through one.
+fn has_textconv(repo: &Path) -> bool {
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+    use std::time::{Duration, Instant};
+    static ASKED: Mutex<Option<HashMap<std::path::PathBuf, (Instant, bool)>>> = Mutex::new(None);
+    let fresh = |at: &Instant| at.elapsed() < Duration::from_secs(30);
+    let known = ASKED
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .as_ref()
+        .and_then(|m| m.get(repo).copied())
+        .filter(|(at, _)| fresh(at));
+    if let Some((_, any)) = known {
+        return any;
+    }
+    // Exit 1: none set.
+    let any = git::run_ok_codes(
+        Some(repo),
+        &["config", "--get-regexp", r"^diff\..*\.textconv$"],
+        &[0, 1],
+    )
+    .is_ok_and(|out| !out.trim().is_empty());
+    ASKED
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .get_or_insert_with(HashMap::new)
+        .insert(repo.to_path_buf(), (Instant::now(), any));
+    any
+}
+
 /// The `textconv` program git turns `path` into text with for diffs, if its `diff` attribute
 /// names a driver that has one: the diff shown is then that text, not the file.
 pub fn textconv_for(repo: &Path, path: &str) -> Option<String> {
+    if !has_textconv(repo) {
+        return None;
+    }
     let out = git::run(Some(repo), &["check-attr", "-z", "diff", "--", path]).ok()?;
     let driver = out.split('\0').nth(2)?;
     if matches!(driver, "" | "set" | "unset" | "unspecified") {

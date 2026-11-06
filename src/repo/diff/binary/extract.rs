@@ -1,45 +1,103 @@
 //! The text of documents, taken out of them here: Word, Excel and PowerPoint files and their
 //! OpenDocument cousins (XML in a ZIP archive), and PDFs as far as their text is plainly in
 //! them. What it can't read it leaves alone: the diff then shows the rest (sizes, members, hex).
+//! Every read is bounded: what an archive or a PDF may inflate, and the text kept.
 
-use super::zip::{self, Member};
+use super::zip::{self, Member, Reader};
+
+/// The most text kept of a document; past it, a line says it was cut.
+pub const MAX_TEXT: usize = 4 * 1024 * 1024;
+/// The most bytes a PDF's streams may inflate to, all together.
+const PDF_BUDGET: usize = 48 * 1024 * 1024;
+
+/// `text` cut to [`MAX_TEXT`] (at a character), with a line saying so.
+fn capped(mut text: String) -> String {
+    if text.len() > MAX_TEXT {
+        let mut at = MAX_TEXT;
+        while !text.is_char_boundary(at) {
+            at -= 1;
+        }
+        text.truncate(at);
+        text.push_str("\n… (the rest of the text isn't shown)");
+    }
+    text
+}
 
 /// The text of a document, a paragraph a line, if gitcraft can read its kind.
 pub fn text_of(path: &str, bytes: &[u8]) -> Option<String> {
     if bytes.starts_with(b"%PDF-") {
-        return pdf_text(bytes);
+        return pdf_text(bytes).map(capped);
     }
     if !zip::is_zip(bytes) {
         return None;
     }
     let members = zip::members(bytes)?;
+    let mut reader = Reader::new(bytes);
     let ext = path
         .rsplit_once('.')
         .map(|(_, e)| e.to_ascii_lowercase())
         .unwrap_or_default();
-    let read = |name: &str| {
-        zip::read_named(bytes, &members, name).map(|b| String::from_utf8_lossy(&b).into_owned())
+    let mut read = |name: &str| {
+        reader
+            .read_named(&members, name)
+            .map(|b| String::from_utf8_lossy(&b).into_owned())
     };
-    match ext.as_str() {
-        "docx" | "docm" | "dotx" => {
-            read("word/document.xml").map(|x| xml_text(&x, &["w:p"], &["w:t"], &["w:tab", "w:br"]))
+    let text = match ext.as_str() {
+        "docx" | "docm" | "dotx" => read("word/document.xml").map(|x| xml_text(&x, &Rules::WORD)),
+        "xlsx" | "xlsm" => Some(workbook(&members, &mut reader)),
+        "pptx" | "ppsx" => Some(slides(&members, &mut reader)),
+        "odt" | "ods" | "odp" | "odg" | "ott" => {
+            read("content.xml").map(|x| xml_text(&x, &Rules::OPEN))
         }
-        "xlsx" | "xlsm" => read("xl/sharedStrings.xml").map(|x| xml_text(&x, &["si"], &["t"], &[])),
-        "pptx" | "ppsx" => Some(slides(bytes, &members)),
-        "odt" | "ods" | "odp" | "odg" | "ott" => read("content.xml").map(|x| {
-            xml_text(
-                &x,
-                &["text:p", "text:h"],
-                &[],
-                &["text:tab", "text:line-break"],
-            )
-        }),
         _ => None,
-    }
+    }?;
+    Some(capped(text))
+}
+
+/// How the text is taken out of an XML document: the elements whose characters are text
+/// (any characters when empty), those ending a line, those that are a tab or a line break, a
+/// run of spaces (`text:s`), and those whose insides are skipped (a text box's fallback copy).
+pub struct Rules {
+    pub runs: &'static [&'static str],
+    pub blocks: &'static [&'static str],
+    pub breaks: &'static [&'static str],
+    pub spaces: Option<&'static str>,
+    pub skip: &'static [&'static str],
+}
+
+impl Rules {
+    const WORD: Rules = Rules {
+        runs: &["w:t"],
+        blocks: &["w:p"],
+        breaks: &["w:tab", "w:br"],
+        spaces: None,
+        skip: &["mc:Fallback"],
+    };
+    const OPEN: Rules = Rules {
+        runs: &[],
+        blocks: &["text:p", "text:h"],
+        breaks: &["text:tab", "text:line-break"],
+        spaces: Some("text:s"),
+        skip: &[],
+    };
+    const SLIDE: Rules = Rules {
+        runs: &["a:t"],
+        blocks: &["a:p"],
+        breaks: &["a:br"],
+        spaces: None,
+        skip: &["mc:Fallback"],
+    };
+    const STRINGS: Rules = Rules {
+        runs: &["t"],
+        blocks: &["si"],
+        breaks: &[],
+        spaces: None,
+        skip: &["rPh"],
+    };
 }
 
 /// The text of each slide of a presentation, in order, under a line naming it.
-fn slides(bytes: &[u8], members: &[Member]) -> String {
+fn slides(members: &[Member], reader: &mut Reader<'_>) -> String {
     let mut slides: Vec<(u32, &Member)> = members
         .iter()
         .filter_map(|m| {
@@ -53,28 +111,117 @@ fn slides(bytes: &[u8], members: &[Member]) -> String {
     slides.sort_by_key(|(n, _)| *n);
     let mut out = String::new();
     for (n, m) in slides {
-        let Some(xml) = zip::read(bytes, m) else {
-            continue;
-        };
-        let text = xml_text(
-            &String::from_utf8_lossy(&xml),
-            &["a:p"],
-            &["a:t"],
-            &["a:br"],
-        );
+        let Some(xml) = reader.read(m) else { continue };
+        let text = xml_text(&String::from_utf8_lossy(&xml), &Rules::SLIDE);
         out.push_str(&format!("— Slide {n} —\n{text}\n"));
+        if out.len() > MAX_TEXT {
+            break;
+        }
     }
     out
 }
 
-/// The text of an XML document: the characters inside `runs` elements (any text when empty),
-/// a line break after each `blocks` element, a tab or a line for `breaks`. Entities decoded.
-pub fn xml_text(xml: &str, blocks: &[&str], runs: &[&str], breaks: &[&str]) -> String {
+/// The cells of a workbook, sheet by sheet: `A1: value` a line, shared strings looked up,
+/// inline strings and numbers as they are.
+fn workbook(members: &[Member], reader: &mut Reader<'_>) -> String {
+    let strings: Vec<String> = reader
+        .read_named(members, "xl/sharedStrings.xml")
+        .map(|x| shared_strings(&String::from_utf8_lossy(&x)))
+        .unwrap_or_default();
+    let mut sheets: Vec<(u32, &Member)> = members
+        .iter()
+        .filter_map(|m| {
+            let n = m
+                .name
+                .strip_prefix("xl/worksheets/sheet")?
+                .strip_suffix(".xml")?;
+            Some((n.parse().ok()?, m))
+        })
+        .collect();
+    sheets.sort_by_key(|(n, _)| *n);
     let mut out = String::new();
-    let mut in_run = runs.is_empty();
+    for (n, m) in sheets {
+        let Some(xml) = reader.read(m) else { continue };
+        out.push_str(&format!("— Sheet {n} —\n"));
+        for (cell, value) in cells(&String::from_utf8_lossy(&xml), &strings) {
+            out.push_str(&format!("{cell}: {value}\n"));
+            if out.len() > MAX_TEXT {
+                return out;
+            }
+        }
+    }
+    out
+}
+
+/// The shared strings of a workbook, in order (one may span lines).
+pub fn shared_strings(xml: &str) -> Vec<String> {
+    xml.split("<si")
+        .skip(1)
+        .map(|si| {
+            let si = si.split("</si>").next().unwrap_or(si);
+            xml_text(&format!("<si{si}</si>"), &Rules::STRINGS)
+        })
+        .collect()
+}
+
+/// The cells of a worksheet with a value: (reference, value).
+pub fn cells(xml: &str, strings: &[String]) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let mut rest = xml;
+    while let Some(at) = rest.find("<c ") {
+        rest = &rest[at..];
+        let head_end = rest.find('>').map_or(rest.len(), |e| e + 1);
+        let end = if rest[..head_end].ends_with("/>") {
+            head_end
+        } else {
+            rest.find("</c>").map_or(rest.len(), |e| e + 4)
+        };
+        let cell = &rest[..end];
+        rest = &rest[end..];
+        let head = cell.split('>').next().unwrap_or("");
+        let attr = |name: &str| {
+            let key = format!(" {name}=\"");
+            head.find(&key)
+                .and_then(|i| head[i + key.len()..].split('"').next())
+        };
+        let reference = attr("r").unwrap_or("?").to_owned();
+        let inner = |tag: &str| {
+            let open = format!("<{tag}>");
+            let i = cell.find(&open)? + open.len();
+            let j = cell[i..].find(&format!("</{tag}>"))?;
+            Some(decode_entities(&cell[i..i + j]))
+        };
+        let value = match attr("t") {
+            Some("s") => inner("v")
+                .and_then(|v| v.trim().parse::<usize>().ok())
+                .and_then(|i| strings.get(i).cloned()),
+            Some("inlineStr") => Some(xml_text(
+                cell,
+                &Rules {
+                    runs: &["t"],
+                    blocks: &[],
+                    breaks: &[],
+                    spaces: None,
+                    skip: &[],
+                },
+            )),
+            _ => inner("v").or_else(|| inner("f").map(|f| format!("={f}"))),
+        };
+        if let Some(v) = value.filter(|v| !v.is_empty()) {
+            out.push((reference, v));
+        }
+    }
+    out
+}
+
+/// The text of an XML document, as `rules` say. Entities decoded.
+pub fn xml_text(xml: &str, rules: &Rules) -> String {
+    let mut out = String::new();
+    let mut in_run = rules.runs.is_empty();
+    let mut skipping = 0usize;
     let mut rest = xml;
     while let Some(lt) = rest.find('<') {
-        if in_run {
+        if in_run && skipping == 0 {
             out.push_str(&decode_entities(&rest[..lt]));
         }
         let Some(gt) = rest[lt..].find('>') else {
@@ -83,19 +230,43 @@ pub fn xml_text(xml: &str, blocks: &[&str], runs: &[&str], breaks: &[&str]) -> S
         let tag = &rest[lt + 1..lt + gt];
         rest = &rest[lt + gt + 1..];
         let closing = tag.starts_with('/');
+        let empty = tag.ends_with('/');
         let name = tag
             .trim_start_matches('/')
-            .split([' ', '/', '\t', '\n'])
+            .split([' ', '/', '\t', '\n', '\r'])
             .next()
             .unwrap_or("");
-        if runs.contains(&name) {
-            in_run = !closing && !tag.ends_with('/');
+        if rules.skip.contains(&name) && !empty {
+            if closing {
+                skipping = skipping.saturating_sub(1);
+            } else {
+                skipping += 1;
+            }
+            continue;
         }
-        if closing && blocks.contains(&name) {
+        if skipping > 0 {
+            continue;
+        }
+        if rules.runs.contains(&name) {
+            in_run = !closing && !empty;
+        }
+        if closing && rules.blocks.contains(&name) {
             out.push('\n');
         }
-        if !closing && breaks.contains(&name) {
+        if !closing && rules.breaks.contains(&name) {
             out.push(if name.ends_with("tab") { '\t' } else { '\n' });
+        }
+        if !closing && rules.spaces == Some(name) {
+            let n = tag
+                .split("text:c=\"")
+                .nth(1)
+                .and_then(|v| v.split('"').next())
+                .and_then(|v| v.parse::<usize>().ok())
+                .unwrap_or(1);
+            out.push_str(&" ".repeat(n.min(1000)));
+        }
+        if out.len() > MAX_TEXT {
+            break;
         }
     }
     let lines: Vec<&str> = out.lines().map(str::trim_end).collect();
@@ -112,7 +283,8 @@ pub fn decode_entities(s: &str) -> String {
     while let Some(amp) = rest.find('&') {
         out.push_str(&rest[..amp]);
         let after = &rest[amp + 1..];
-        let Some(semi) = after.find(';').filter(|&i| i <= 10) else {
+        // An entity is short: its `;` is within a dozen bytes, or it is none.
+        let Some(semi) = after.bytes().take(12).position(|b| b == b';') else {
             out.push('&');
             rest = after;
             continue;
@@ -147,17 +319,20 @@ pub fn decode_entities(s: &str) -> String {
 }
 
 /// The text a PDF shows, as far as it is plainly in it: the strings of the text operators
-/// (`Tj`, `TJ`, `'`, `"`) of its content streams, inflated when compressed. Fonts with their
-/// own encodings (much of what is made today) come out as nothing, and then there is no text.
+/// (`Tj`, `TJ`, `'`, `"`) of its content streams, inflated when compressed, one stream at a
+/// time within [`PDF_BUDGET`]. Fonts with their own encodings (much of what is made today)
+/// come out as nothing, and then there is no text.
 pub fn pdf_text(bytes: &[u8]) -> Option<String> {
     let mut text = String::new();
-    for stream in pdf_streams(bytes) {
-        let ops = text_operators(&stream);
+    let mut budget = PDF_BUDGET;
+    each_content_stream(bytes, &mut budget, |stream| {
+        let ops = text_operators(stream);
         if !ops.trim().is_empty() {
             text.push_str(&ops);
             text.push('\n');
         }
-    }
+        text.len() < MAX_TEXT
+    });
     let text = text.trim().to_owned();
     // Mostly odd characters: an encoding of its own, not text.
     let readable = text
@@ -167,20 +342,22 @@ pub fn pdf_text(bytes: &[u8]) -> Option<String> {
     (!text.is_empty() && readable * 10 >= text.chars().count() * 7).then_some(text)
 }
 
-/// The content of each `stream … endstream` of a PDF, inflated when its dictionary says
-/// FlateDecode; others (images…) are left out.
-fn pdf_streams(bytes: &[u8]) -> Vec<Vec<u8>> {
-    const MAX: usize = 16 * 1024 * 1024;
-    let mut out = Vec::new();
+/// Calls `each` with every content stream of a PDF (`stream … endstream`, inflated when its
+/// dictionary says FlateDecode), until it says stop or `budget` (bytes inflated) runs out.
+/// Pictures, fonts, cross-reference and object streams are left out.
+fn each_content_stream(bytes: &[u8], budget: &mut usize, mut each: impl FnMut(&[u8]) -> bool) {
+    const SKIP: [&str; 7] = [
+        "/Image",
+        "/Length1",
+        "/FontFile",
+        "/XRef",
+        "/ObjStm",
+        "/Subtype",
+        "/Metadata",
+    ];
     let mut at = 0;
     while let Some(i) = find(&bytes[at..], b"stream") {
         let start_kw = at + i;
-        // Its own dictionary: from the last `obj` before it, within reach.
-        let window = &bytes[start_kw.saturating_sub(1024)..start_kw];
-        let dict = window
-            .windows(3)
-            .rposition(|w| w == b"obj")
-            .map_or(window, |i| &window[i..]);
         let mut start = start_kw + 6;
         if bytes.get(start) == Some(&b'\r') {
             start += 1;
@@ -197,23 +374,36 @@ fn pdf_streams(bytes: &[u8]) -> Vec<Vec<u8>> {
         if start_kw >= 3 && &bytes[start_kw - 3..start_kw] == b"end" {
             continue;
         }
-        let dict_text = String::from_utf8_lossy(dict);
-        if dict_text.contains("/Image") {
+        // Its own dictionary: from the last `obj` before it, within reach.
+        let window = &bytes[start_kw.saturating_sub(1024)..start_kw];
+        let dict = window
+            .windows(3)
+            .rposition(|w| w == b"obj")
+            .map_or(window, |i| &window[i..]);
+        let dict = String::from_utf8_lossy(dict);
+        if SKIP.iter().any(|k| dict.contains(k)) {
             continue;
         }
-        if dict_text.contains("FlateDecode") {
-            if let Ok(inflated) = miniz_oxide::inflate::decompress_to_vec_zlib_with_limit(data, MAX)
-            {
-                out.push(inflated);
+        let go_on = if dict.contains("FlateDecode") {
+            if *budget == 0 {
+                return;
             }
-        } else if !dict_text.contains("Decode") {
-            out.push(data.to_vec());
-        }
-        if out.len() > 10_000 {
-            break;
+            match miniz_oxide::inflate::decompress_to_vec_zlib_with_limit(data, *budget) {
+                Ok(inflated) => {
+                    *budget = budget.saturating_sub(inflated.len().max(1));
+                    each(&inflated)
+                }
+                Err(_) => true,
+            }
+        } else if !dict.contains("Decode") {
+            each(data)
+        } else {
+            true
+        };
+        if !go_on {
+            return;
         }
     }
-    out
 }
 
 fn find(hay: &[u8], needle: &[u8]) -> Option<usize> {
@@ -221,7 +411,7 @@ fn find(hay: &[u8], needle: &[u8]) -> Option<usize> {
 }
 
 /// The strings shown by a content stream's text operators, a line per `BT … ET` block or
-/// line move.
+/// line move; in a `TJ` array, a large gap between strings is a space.
 fn text_operators(stream: &[u8]) -> String {
     let mut out = String::new();
     let mut strings: Vec<String> = Vec::new();
@@ -246,6 +436,22 @@ fn text_operators(stream: &[u8]) -> String {
                     i += 1;
                 }
             }
+            b'-' if !strings.is_empty() => {
+                // A kerning number in a TJ array: past this much, a gap between words.
+                let start = i;
+                i += 1;
+                while i < stream.len() && (stream[i].is_ascii_digit() || stream[i] == b'.') {
+                    i += 1;
+                }
+                let n: f32 = std::str::from_utf8(&stream[start..i])
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0.0);
+                if n < -200.0 {
+                    strings.push(" ".to_owned());
+                }
+                continue;
+            }
             c if c.is_ascii_alphabetic() || c == b'\'' || c == b'"' => {
                 let start = i;
                 while i < stream.len()
@@ -265,6 +471,9 @@ fn text_operators(stream: &[u8]) -> String {
                         }
                     }
                     _ => strings.clear(),
+                }
+                if out.len() > MAX_TEXT {
+                    break;
                 }
                 continue;
             }
@@ -287,7 +496,7 @@ fn literal_string(b: &[u8], mut i: usize) -> (String, usize) {
                     Some(b'n') => out.push(b'\n'),
                     Some(b't') => out.push(b'\t'),
                     Some(b'r' | b'\n') => {}
-                    Some(d) if d.is_ascii_digit() => {
+                    Some(b'0'..=b'7') => {
                         let digits: Vec<u8> = b[i..]
                             .iter()
                             .take(3)
@@ -321,7 +530,7 @@ fn literal_string(b: &[u8], mut i: usize) -> (String, usize) {
 }
 
 /// PDF strings in the standard encodings read near enough as Latin-1; UTF-16 when marked.
-fn latin1(b: &[u8]) -> String {
+pub fn latin1(b: &[u8]) -> String {
     if b.starts_with(&[0xFE, 0xFF]) {
         let units: Vec<u16> = b[2..]
             .chunks_exact(2)
@@ -407,7 +616,7 @@ pub(crate) mod tests {
 
     #[test]
     fn opendocument_and_spreadsheets_and_slides() {
-        let content = "<office:text><text:h>Title</text:h><text:p>One<text:tab/>two</text:p><text:p>x &#233; &#xE9;</text:p></office:text>";
+        let content = "<office:text><text:h>Title</text:h><text:p>One<text:tab/>two<text:s text:c=\"2\"/>sp</text:p><text:p>x &#233; &#xE9;</text:p></office:text>";
         let odt = make_zip(&[
             (
                 "mimetype",
@@ -418,11 +627,21 @@ pub(crate) mod tests {
         ]);
         assert_eq!(
             text_of("a.odt", &odt).as_deref(),
-            Some("Title\nOne\ttwo\nx é é")
+            Some("Title\nOne\ttwo  sp\nx é é")
         );
-        let strings = "<sst><si><t>Name</t></si><si><r><t>Bo</t></r><r><t>b</t></r></si></sst>";
-        let xlsx = make_zip(&[("xl/sharedStrings.xml", strings.as_bytes(), true)]);
-        assert_eq!(text_of("b.xlsx", &xlsx).as_deref(), Some("Name\nBob"));
+        let strings = "<sst><si><t>Name</t></si><si><r><t>Bo</t></r><r><t>b</t></r></si><si><t>two\nlines</t></si></sst>";
+        let sheet = "<worksheet><sheetData><row r=\"1\"><c r=\"A1\" t=\"s\"><v>0</v></c><c r=\"B1\"/><c r=\"C1\" t=\"s\"><v>2</v></c></row>\
+            <row r=\"2\"><c r=\"A2\" t=\"s\"><v>1</v></c><c r=\"B2\"><v>42.5</v></c><c r=\"C2\" t=\"inlineStr\"><is><t>inline &amp; more</t></is></c><c r=\"D2\"><f>B2*2</f></c></row></sheetData></worksheet>";
+        let xlsx = make_zip(&[
+            ("xl/sharedStrings.xml", strings.as_bytes(), true),
+            ("xl/worksheets/sheet1.xml", sheet.as_bytes(), true),
+        ]);
+        assert_eq!(
+            text_of("b.xlsx", &xlsx).as_deref(),
+            Some(
+                "— Sheet 1 —\nA1: Name\nC1: two\nlines\nA2: Bob\nB2: 42.5\nC2: inline & more\nD2: =B2*2\n"
+            )
+        );
         let slide = |t: &str| format!("<p:sld><a:p><a:r><a:t>{t}</a:t></a:r></a:p></p:sld>");
         let (s1, s10, s2) = (slide("first"), slide("tenth"), slide("second"));
         let pptx = make_zip(&[
@@ -454,6 +673,40 @@ pub(crate) mod tests {
         // Hex strings, octal escapes and UTF-16.
         let stream = b"BT <48656c6c6f> Tj T* (caf\\351) Tj T* (\xfe\xff\x00h\x00i) Tj ET";
         assert_eq!(text_operators(stream), "Hello\ncafé\nhi\n");
+    }
+
+    #[test]
+    fn hostile_inputs_stay_bounded() {
+        // Entities without a `;`: linear, not quadratic.
+        let amps = "&".repeat(300_000);
+        let started = std::time::Instant::now();
+        assert_eq!(decode_entities(&amps).len(), 300_000);
+        assert!(started.elapsed().as_secs() < 2);
+        // `\8` isn't an octal escape.
+        assert_eq!(text_operators(b"BT (a\\8b) Tj ET"), "a8b\n");
+        // One deflated member listed many times is read once; the budget caps the rest.
+        let big = vec![b'A'; 2 * 1024 * 1024];
+        let slide = [
+            b"<p:sld><a:p><a:r><a:t>".as_slice(),
+            &big,
+            b"</a:t></a:r></a:p></p:sld>",
+        ]
+        .concat();
+        let names: Vec<String> = (1..=3)
+            .map(|i| format!("ppt/slides/slide{i}.xml"))
+            .collect();
+        let files: Vec<(&str, &[u8], bool)> = names
+            .iter()
+            .map(|n| (n.as_str(), slide.as_slice(), true))
+            .collect();
+        let pptx = make_zip(&files);
+        let text = text_of("bomb.pptx", &pptx).unwrap_or_default();
+        assert!(text.len() <= MAX_TEXT + 64, "{}", text.len());
+        // Kerning gaps are spaces.
+        assert_eq!(
+            text_operators(b"BT [(Hello) -250 (world) -10 (!)] TJ ET"),
+            "Hello world!\n"
+        );
     }
 
     #[test]

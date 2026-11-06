@@ -16,6 +16,8 @@ pub struct Member {
 
 /// The largest member inflated, so a hostile archive can't fill the memory.
 const MAX_INFLATED: usize = 16 * 1024 * 1024;
+/// The most bytes inflated from one archive, all members together.
+pub const ARCHIVE_BUDGET: usize = 48 * 1024 * 1024;
 /// The most members listed.
 const MAX_MEMBERS: usize = 100_000;
 
@@ -43,34 +45,86 @@ pub fn members(bytes: &[u8]) -> Option<Vec<Member>> {
     let count = usize::from(u16_at(bytes, eocd + 10)?);
     let mut at = u32_at(bytes, eocd + 16)? as usize;
     let mut out = Vec::new();
+    let mut offsets = std::collections::HashSet::new();
     for _ in 0..count.min(MAX_MEMBERS) {
-        if !bytes.get(at..)?.starts_with(b"PK\x01\x02") {
+        // What was read so far stays listed when the rest is broken.
+        let Some(member) = entry(bytes, at) else {
             break;
+        };
+        let (m, next) = member;
+        // Two entries for one member: a trick to inflate the same data again and again.
+        if offsets.insert(m.offset) {
+            out.push(m);
         }
-        let method = u16_at(bytes, at + 10)?;
-        let crc = u32_at(bytes, at + 16)?;
-        let compressed = u64::from(u32_at(bytes, at + 20)?);
-        let size = u64::from(u32_at(bytes, at + 24)?);
-        let name_len = usize::from(u16_at(bytes, at + 28)?);
-        let extra_len = usize::from(u16_at(bytes, at + 30)?);
-        let comment_len = usize::from(u16_at(bytes, at + 32)?);
-        let offset = u64::from(u32_at(bytes, at + 42)?);
-        let name = bytes.get(at + 46..at + 46 + name_len)?;
-        out.push(Member {
-            name: String::from_utf8_lossy(name).into_owned(),
-            size,
-            compressed,
-            crc,
-            method,
-            offset,
-        });
-        at += 46 + name_len + extra_len + comment_len;
+        at = next;
     }
-    Some(out)
+    (!out.is_empty() || count == 0).then_some(out)
+}
+
+/// The central directory entry at `at`, and where the next one starts.
+fn entry(bytes: &[u8], at: usize) -> Option<(Member, usize)> {
+    if !bytes.get(at..)?.starts_with(b"PK\x01\x02") {
+        return None;
+    }
+    let method = u16_at(bytes, at + 10)?;
+    let crc = u32_at(bytes, at + 16)?;
+    let compressed = u64::from(u32_at(bytes, at + 20)?);
+    let size = u64::from(u32_at(bytes, at + 24)?);
+    let name_len = usize::from(u16_at(bytes, at + 28)?);
+    let extra_len = usize::from(u16_at(bytes, at + 30)?);
+    let comment_len = usize::from(u16_at(bytes, at + 32)?);
+    let offset = u64::from(u32_at(bytes, at + 42)?);
+    let name = bytes.get(at + 46..at + 46 + name_len)?;
+    let member = Member {
+        name: String::from_utf8_lossy(name).into_owned(),
+        size,
+        compressed,
+        crc,
+        method,
+        offset,
+    };
+    Some((member, at + 46 + name_len + extra_len + comment_len))
+}
+
+/// Inflates members of one archive within [`ARCHIVE_BUDGET`] all together.
+pub struct Reader<'a> {
+    bytes: &'a [u8],
+    left: usize,
+}
+
+impl<'a> Reader<'a> {
+    pub fn new(bytes: &'a [u8]) -> Self {
+        Self {
+            bytes,
+            left: ARCHIVE_BUDGET,
+        }
+    }
+
+    /// The contents of `member`, while the budget lasts.
+    pub fn read(&mut self, member: &Member) -> Option<Vec<u8>> {
+        if self.left == 0 {
+            return None;
+        }
+        let data = read_limited(self.bytes, member, self.left.min(MAX_INFLATED))?;
+        self.left = self.left.saturating_sub(data.len().max(1));
+        Some(data)
+    }
+
+    /// The contents of the member named `name`, if the archive has it.
+    pub fn read_named(&mut self, members: &[Member], name: &str) -> Option<Vec<u8>> {
+        let m = members.iter().find(|m| m.name == name)?;
+        self.read(m)
+    }
 }
 
 /// The contents of `member` (stored or deflated), at most [`MAX_INFLATED`] bytes.
+#[cfg(test)]
 pub fn read(bytes: &[u8], member: &Member) -> Option<Vec<u8>> {
+    read_limited(bytes, member, MAX_INFLATED)
+}
+
+/// The contents of `member`, at most `limit` bytes.
+fn read_limited(bytes: &[u8], member: &Member, limit: usize) -> Option<Vec<u8>> {
     let at = usize::try_from(member.offset).ok()?;
     if !bytes.get(at..)?.starts_with(b"PK\x03\x04") {
         return None;
@@ -81,13 +135,14 @@ pub fn read(bytes: &[u8], member: &Member) -> Option<Vec<u8>> {
     let len = usize::try_from(member.compressed).ok()?;
     let data = bytes.get(start..start.checked_add(len)?)?;
     match member.method {
-        0 => Some(data.get(..data.len().min(MAX_INFLATED))?.to_vec()),
-        8 => miniz_oxide::inflate::decompress_to_vec_with_limit(data, MAX_INFLATED).ok(),
+        0 => Some(data.get(..data.len().min(limit))?.to_vec()),
+        8 => miniz_oxide::inflate::decompress_to_vec_with_limit(data, limit).ok(),
         _ => None,
     }
 }
 
 /// The contents of the member named `name`, if the archive has it.
+#[cfg(test)]
 pub fn read_named(bytes: &[u8], members: &[Member], name: &str) -> Option<Vec<u8>> {
     members
         .iter()
@@ -193,6 +248,30 @@ pub(crate) mod tests {
         assert!(!is_zip(b"%PDF-1.4"));
         assert_eq!(members(b""), None);
         assert_eq!(members(b"PK\x03\x04 truncated"), None);
+        // Many entries for one member are listed once.
+        let one = make_zip(&[("a", b"x", false)]);
+        let at = one.windows(4).position(|w| w == b"PK\x01\x02").unwrap_or(0);
+        let entry = one[at..one.len() - 22].to_vec();
+        let mut many = one[..at].to_vec();
+        for _ in 0..3 {
+            many.extend(&entry);
+        }
+        many.extend(b"PK\x05\x06");
+        many.extend([0u8; 4]);
+        many.extend(3u16.to_le_bytes());
+        many.extend(3u16.to_le_bytes());
+        many.extend(((entry.len() * 3) as u32).to_le_bytes());
+        many.extend((at as u32).to_le_bytes());
+        many.extend(0u16.to_le_bytes());
+        assert_eq!(members(&many).map(|m| m.len()), Some(1));
+        // The budget runs out across members.
+        let mut r = Reader {
+            bytes: &one,
+            left: 1,
+        };
+        let list = members(&one).unwrap_or_default();
+        assert!(r.read(&list[0]).is_some());
+        assert!(r.read(&list[0]).is_none());
         // A directory pointing past the end lists nothing rather than failing.
         let mut zip = make_zip(&[("a", b"x", false)]);
         let n = zip.len();
