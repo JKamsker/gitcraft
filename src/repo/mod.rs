@@ -212,6 +212,8 @@ pub struct RepoTab {
     counting_worktrees: bool,
     /// A read came in while they were counted: they are counted again after.
     recount_worktrees: bool,
+    /// When they were last counted (see `recount_siblings`).
+    counted_at: Instant,
     fs_rx: Option<Receiver<watch::FsChange>>,
     /// A change on disk not yet reloaded: (inside .git, when).
     fs_pending: Option<(watch::FsChange, Instant)>,
@@ -338,6 +340,7 @@ impl RepoTab {
             poller: None,
             counting_worktrees: false,
             recount_worktrees: false,
+            counted_at: Instant::now(),
             fs_rx: None,
             fs_pending: None,
             queued: Vec::new(),

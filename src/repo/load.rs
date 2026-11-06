@@ -12,6 +12,10 @@ use crate::git::{self, Commit, Identity, Refs, Remote, Stash, Submodule, WorkSta
 use crate::graph;
 use crate::settings::Settings;
 
+/// How often the other worktrees of a repository elsewhere are counted again, at most (see
+/// [`RepoTab::recount_siblings`]).
+const RECOUNT_EVERY: Duration = Duration::from_secs(30);
+
 pub(super) struct Loaded {
     pub(super) refs: Refs,
     pub(super) history: Vec<Arc<Commit>>,
@@ -160,8 +164,11 @@ impl RepoTab {
             return;
         }
         self.counting_worktrees = true;
+        self.counted_at = Instant::now();
         let path = self.path.clone();
-        spawn(&self.tx, ctx, move || {
+        // Answered with no counts should it fail, so that counting isn't held up for good.
+        let failed = |_| Msg::WorktreeCounts(Vec::new());
+        super::messages::spawn_or(&self.tx, ctx, failed, move || {
             git::count_changes(&path, &mut list);
             Msg::WorktreeCounts(
                 list.into_iter()
@@ -169,6 +176,30 @@ impl RepoTab {
                     .collect(),
             )
         });
+    }
+
+    /// Counts the other worktrees of a repository elsewhere again every so often while the
+    /// window has the focus: the poller looks only at this one, so a change made in another
+    /// (an editor there) would otherwise show only on the next reload.
+    pub(super) fn recount_siblings(&mut self, ctx: &egui::Context) {
+        let others = self
+            .worktrees
+            .iter()
+            .any(|w| !w.current && !w.bare && w.prunable.is_none());
+        if !crate::remote::is_remote(&self.path)
+            || !others
+            || self.loading
+            || self.counting_worktrees
+            || !ctx.input(|i| i.focused)
+        {
+            return;
+        }
+        let since = self.counted_at.elapsed();
+        if since < RECOUNT_EVERY {
+            ctx.request_repaint_after(RECOUNT_EVERY - since);
+            return;
+        }
+        self.count_worktrees(ctx);
     }
 
     /// Takes in the counts of [`Self::count_worktrees`].

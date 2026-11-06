@@ -252,6 +252,7 @@ impl RepoTab {
         }
 
         self.poll_ci(ctx);
+        self.recount_siblings(ctx);
         self.poll_ci_view(ctx);
 
         // Debounced search while typing.
