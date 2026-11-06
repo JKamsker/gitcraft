@@ -7,6 +7,7 @@ mod branch_tree;
 mod branch_visibility;
 mod ci_status;
 mod ci_view;
+mod collision_view;
 pub(crate) mod columns;
 mod commands;
 mod conflict;
@@ -137,6 +138,8 @@ pub struct RepoTab {
     prs_loaded: Option<Instant>,
     /// The build status of the commits that show one.
     ci: ci_status::CiStatuses,
+    /// The collision matrix window, while it is open.
+    collisions: Option<collision_view::CollisionView>,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -299,6 +302,7 @@ impl RepoTab {
             pr_error: None,
             prs_loaded: None,
             ci: ci_status::CiStatuses::default(),
+            collisions: None,
             selected: None,
             stash_view: None,
             scroll_to: None,
