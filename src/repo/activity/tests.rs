@@ -40,9 +40,12 @@ fn the_log_keeps_the_newest_operations() {
             (MAX_ENTRIES + 24) as u64
         ))
     );
-    log.reveal_last();
+    log.reveal((MAX_ENTRIES + 24) as u64);
     assert!(log.open);
     assert_eq!(log.reveal, Some((MAX_ENTRIES + 24) as u64));
+    // One dropped since is not revealed.
+    log.reveal(3);
+    assert_eq!(log.reveal, None);
     log.clear();
     assert_eq!(log.len(), 0);
 }
@@ -73,25 +76,15 @@ fn a_huge_output_keeps_its_start_and_end() {
 }
 
 #[test]
-fn commands_read_as_typed_in_a_shell_and_hide_passwords() {
+fn commands_read_as_typed_in_a_shell() {
     let args = |a: &[&str]| a.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
     assert_eq!(
         command_line(&args(&["commit", "-m", "it's a fix", "--", "a b.txt"])),
         r"git commit -m 'it'\''s a fix' -- 'a b.txt'"
     );
-    assert_eq!(
-        command_line(&args(&["clone", "https://ana:s3cret@host/r.git", "dépôt"])),
-        "git clone 'https://ana:***@host/r.git' dépôt"
-    );
-    assert_eq!(
-        command_line(&args(&[
-            "fetch",
-            "https://host/a@b",
-            "",
-            "ssh://git@host/r"
-        ])),
-        "git fetch https://host/a@b '' ssh://git@host/r"
-    );
+    let many: Vec<String> = (0..1000).map(|i| format!("f{i}")).collect();
+    let short = short_command_line(&[vec!["add".to_owned(), "--".to_owned()], many].concat());
+    assert!(short.ends_with("f21 … 978 more"), "{short}");
 }
 
 #[test]
@@ -206,4 +199,117 @@ fn a_background_fetch_is_kept_only_when_it_fails() {
     assert!(tab.activity.last().is_some_and(|e| e.background
         && matches!(e.outcome, Outcome::Failed(_))
         && e.steps[0].args == ["fetch", "no-such-remote"]));
+}
+
+/// What is recorded of a call has its secrets hidden: a token URL in its arguments and output,
+/// and the password typed into the tab.
+#[test]
+fn a_recorded_call_hides_its_secrets() {
+    let dir = repo("secrets");
+    let creds = git::Credentials {
+        username: "ana".to_owned(),
+        password: "s3cr3t-pass".to_owned(),
+    };
+    let url = "https://ghp_TOKEN123@example.invalid/o/r.git";
+    let (_, added) = git::run_recorded(
+        Some(&dir),
+        &["remote", "add", "o", url],
+        Some(&creds),
+        false,
+    );
+    let (_, listed) = git::run_recorded(Some(&dir), &["remote", "-v"], None, false);
+    let (_, echoed) = git::run_recorded(
+        Some(&dir),
+        &["config", "x.y", "s3cr3t-pass"],
+        Some(&creds),
+        false,
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+    for rec in [&added, &listed, &echoed] {
+        let text = format!("{:?} {}", rec.args, rec.output);
+        assert!(!text.contains("ghp_TOKEN123"), "{text}");
+        assert!(!text.contains("s3cr3t-pass"), "{text}");
+    }
+    assert!(
+        listed
+            .output
+            .contains("https://***@example.invalid/o/r.git"),
+        "{}",
+        listed.output
+    );
+}
+
+/// A background fetch failing the same way again and again is one entry, counted.
+#[test]
+fn the_same_background_failure_is_counted_not_repeated() {
+    let mut log = ActivityLog::default();
+    let failed = || Outcome::Failed("could not resolve host".to_owned());
+    for _ in 0..5 {
+        log.push(
+            "Background fetch",
+            Duration::ZERO,
+            Vec::new(),
+            failed(),
+            true,
+        );
+    }
+    log.push("Fetch", Duration::ZERO, Vec::new(), Outcome::Done, false);
+    log.push(
+        "Background fetch",
+        Duration::ZERO,
+        Vec::new(),
+        failed(),
+        true,
+    );
+    let counts: Vec<(String, u32)> = log
+        .entries()
+        .map(|e| (e.label.clone(), e.repeats))
+        .collect();
+    assert_eq!(
+        counts,
+        [
+            ("Background fetch".to_owned(), 5),
+            ("Fetch".to_owned(), 1),
+            ("Background fetch".to_owned(), 1)
+        ]
+    );
+}
+
+/// The toolbar's message opens the entry of the operation that left it, not the newest one.
+#[test]
+fn the_toolbar_message_opens_its_own_operation() {
+    let dir = repo("link");
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    tab.run_ops(
+        "Check out",
+        ops(&[&["checkout", "nowhere"]]),
+        Refresh::All,
+        OpKind::plain(),
+        &ctx,
+    );
+    finish(&mut tab, &ctx);
+    let failed = tab.status_entry();
+    // Another operation after it: its message (none, for staging) is never tied to the
+    // failed one's entry, nor the failed one's message to the newer entry.
+    let old_message = tab.status.clone();
+    tab.run_ops(
+        "Stage",
+        ops(&[&["status"]]),
+        Refresh::Status,
+        OpKind::plain(),
+        &ctx,
+    );
+    finish(&mut tab, &ctx);
+    let after = tab.status_entry();
+    tab.status = old_message;
+    let restored = tab.status_entry();
+    let newest = tab.activity.entries().last().map(|e| e.id);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(failed.is_some());
+    assert_ne!(after, newest);
+    assert_ne!(restored, newest);
+    // A message no operation left opens nothing.
+    tab.status = Some(("Something else".to_owned(), true));
+    assert_eq!(tab.status_entry(), None);
 }

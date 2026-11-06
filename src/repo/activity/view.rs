@@ -3,7 +3,7 @@
 
 use egui::{RichText, Ui};
 
-use super::{Entry, Outcome, command_line, exit_text, outcome_text, seconds};
+use super::{Entry, Outcome, exit_text, outcome_text, seconds, short_command_line};
 use crate::icons;
 use crate::repo::{Action, RepoTab};
 use crate::theme::{self, Tokens};
@@ -18,8 +18,16 @@ impl RepoTab {
         ui.horizontal(|ui| {
             ui.label(RichText::new("Activity").font(theme::semibold(12.5)));
             ui.label(
-                RichText::new(format!("{} operations, newest first", self.activity.len()))
-                    .color(t.text_dim),
+                RichText::new(format!(
+                    "{} operations{}, newest first",
+                    self.activity.len(),
+                    if self.busy_op.is_some() {
+                        " and the one running"
+                    } else {
+                        ""
+                    }
+                ))
+                .color(t.text_dim),
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if icons::small_button(ui, "x", "Close the Activity panel").clicked() {
@@ -67,12 +75,12 @@ impl RepoTab {
                 ui.label(RichText::new(p.label()).color(t.text_dim));
             }
         });
-        for step in running.control.steps() {
+        for (args, code) in running.control.step_summaries() {
             ui.label(
                 RichText::new(format!(
                     "$ {}  · {}",
-                    command_line(&step.args),
-                    exit_text(step.code)
+                    short_command_line(&args),
+                    exit_text(code)
                 ))
                 .font(theme::mono(11.5))
                 .color(t.text_dim),
@@ -108,6 +116,9 @@ fn entry_ui(ui: &mut Ui, entry: &Entry, reveal: bool, t: &Tokens) {
         if entry.background {
             when.push_str(" · in the background");
         }
+        if entry.repeats > 1 {
+            when.push_str(&format!(" · {} times in a row", entry.repeats));
+        }
         ui.label(RichText::new(when).color(t.text_dim));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if icons::small_button(ui, "copy", "Copy the commands and all they printed").clicked() {
@@ -122,11 +133,10 @@ fn entry_ui(ui: &mut Ui, entry: &Entry, reveal: bool, t: &Tokens) {
         if entry.steps.is_empty() {
             ui.label(RichText::new("No git command ran.").color(t.text_dim));
         }
-        for (i, step) in entry.steps.iter().enumerate() {
+        for (i, (step, line)) in entry.steps.iter().zip(&entry.lines).enumerate() {
             ui.label(
                 RichText::new(format!(
-                    "$ {}  · {} · {}",
-                    command_line(&step.args),
+                    "$ {line}  · {} · {}",
                     exit_text(step.code),
                     seconds(step.took)
                 ))
