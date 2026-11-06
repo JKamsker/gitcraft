@@ -38,7 +38,12 @@ impl RepoTab {
         };
         let (rect, mid, gx, cols) = (row.rect, row.mid(), row.gx, row.cols);
         let refs_clip = Rect::from_min_max(rect.min, pos2(gx - 4.0, rect.bottom()));
-        let rp = painter.with_clip_rect(refs_clip);
+        let mut rp = painter.with_clip_rect(refs_clip);
+        // In a ghost run: a pill where the operation would put it, or one it would delete.
+        let (moved, gone) = self.ghost.pill(&first.label);
+        if moved || gone {
+            rp.multiply_opacity(if gone { 0.5 } else { 0.8 });
+        }
         let more = badges.len() - 1;
         let more_w = if more > 0 { 28.0 } else { 0.0 };
         let max_w = cols.refs - 10.0 - 5.0 - more_w - 14.0;
@@ -51,6 +56,7 @@ impl RepoTab {
             max_w.max(40.0),
             self.marks(first, &row.commit.hash),
         );
+        ghost_pill_marks(&rp, &t, pill, moved, gone);
         self.pill_clicks(ui, &resp, pill, first, &row.commit.hash, acts);
         let mut end = pill.right();
         let mut more_rect = None;
@@ -288,6 +294,36 @@ struct Marks {
 }
 
 /// Paints a pill with white text and icons, at most `max_w` wide; returns its rect.
+/// A ghost run's marks on a pill: a dashed outline where it would go, a line through one it
+/// would delete.
+fn ghost_pill_marks(p: &Painter, t: &Tokens, pill: Rect, moved: bool, gone: bool) {
+    if moved {
+        let r = pill.expand(2.0);
+        let corners = [
+            r.left_top(),
+            r.right_top(),
+            r.right_bottom(),
+            r.left_bottom(),
+            r.left_top(),
+        ];
+        p.add(egui::Shape::dashed_line(
+            &corners,
+            Stroke::new(1.2, t.text),
+            3.0,
+            2.0,
+        ));
+    }
+    if gone {
+        p.line_segment(
+            [
+                pos2(pill.left() + 3.0, pill.center().y),
+                pos2(pill.right() - 3.0, pill.center().y),
+            ],
+            Stroke::new(1.5, t.danger),
+        );
+    }
+}
+
 fn ref_pill(
     ui: &Ui,
     painter: &Painter,

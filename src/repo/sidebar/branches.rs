@@ -9,6 +9,7 @@ use crate::icons;
 use crate::repo::actions::{BranchRef, compare_branches_action, interactive_rebase_action};
 use crate::repo::branch_tree::{self, LeafRow, TreeView};
 use crate::repo::branch_visibility::local_ref;
+use crate::repo::ghost::{GhostOp, offer};
 use crate::repo::graph_view;
 use crate::repo::pinned_sections::{Button, Header, Sections};
 use crate::repo::{
@@ -234,6 +235,7 @@ impl RepoTab {
         {
             acts.push(push);
         }
+        self.force_push_item(ui, acts, b, idle);
         if let Some(remote) = self.default_remote()
             && ui
                 .add_enabled(idle, egui::Button::new("Set upstream…"))
@@ -292,6 +294,59 @@ impl RepoTab {
                     )));
                 }
             }
+        }
+    }
+
+    /// Force push (with lease) of `b` to the branch it tracks, when that has commits `b`
+    /// hasn't (a plain push is refused). Hovering it shows what would leave the remote.
+    fn force_push_item(&self, ui: &mut Ui, acts: &mut Vec<Action>, b: &Branch, idle: bool) {
+        let (_, behind) = b.ahead_behind();
+        if behind == 0 || b.upstream_gone() {
+            return;
+        }
+        let Some((remote, name)) = self.split_upstream(&b.upstream) else {
+            return;
+        };
+        let Some(tracked) = self
+            .refs
+            .remotes
+            .iter()
+            .flat_map(|(_, list)| list)
+            .find(|r| r.name == b.upstream)
+        else {
+            return;
+        };
+        let button = ui
+            .add_enabled(
+                idle,
+                egui::Button::new(format!("Force push to {} (with lease)…", b.upstream)),
+            )
+            .on_hover_text(format!(
+                "Replace {} with {}, unless someone pushed to it since it was fetched",
+                b.upstream, b.name
+            ));
+        offer(&button, || GhostOp::ForcePush {
+            branch: b.name.clone(),
+        });
+        if button.clicked() {
+            acts.push(Action::Dialog(Dialog::confirm(
+                "Force push",
+                format!(
+                    "Replace “{name}” on {remote} with {}? The {behind} commit{} it has that {} \
+                     hasn't leave it, for everyone.",
+                    b.name,
+                    if behind == 1 { "" } else { "s" },
+                    b.name
+                ),
+                "Force push",
+                ops(&[&[
+                    "push",
+                    &format!("--force-with-lease=refs/heads/{name}:{}", tracked.target),
+                    &remote,
+                    &format!("refs/heads/{}:refs/heads/{name}", b.name),
+                ]]),
+                None,
+            )));
         }
     }
 
@@ -368,13 +423,15 @@ fn integrate_items(ui: &mut Ui, acts: &mut Vec<Action>, b: &Branch, current: &st
     {
         acts.push(merge_action(BranchRef::local(&b.name), current));
     }
-    if ui
-        .add_enabled(
-            idle,
-            egui::Button::new(format!("Rebase {current} onto {}", b.name)),
-        )
-        .clicked()
-    {
+    let rebase = ui.add_enabled(
+        idle,
+        egui::Button::new(format!("Rebase {current} onto {}", b.name)),
+    );
+    offer(&rebase, || GhostOp::Rebase {
+        onto: BranchRef::local(&b.name).full(),
+        label: b.name.clone(),
+    });
+    if rebase.clicked() {
         acts.push(rebase_action(BranchRef::local(&b.name), current));
     }
     if ui

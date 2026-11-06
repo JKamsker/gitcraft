@@ -87,6 +87,7 @@ impl RepoTab {
         let pull =
             icons::tool_button_count(ui, "arrow-down-to-line", "Pull", behind, idle && has_remote)
                 .on_hover_text(mode.tip());
+        crate::repo::ghost::offer(&pull, || crate::repo::ghost::GhostOp::Pull(mode));
         if pull.clicked() {
             acts.push(Action::Pull);
         }

@@ -6,6 +6,7 @@ use super::badge::{BadgeKind, badges};
 use super::compare_items;
 use crate::git;
 use crate::repo::actions::{BranchRef, interactive_rebase_action};
+use crate::repo::ghost::{GhostOp, offer};
 use crate::repo::operations::{expect_ref_at, expect_symref};
 use crate::repo::{
     Action, Dialog, Refresh, RepoTab, Undo, WIP_HASH, fast_forward_action, merge_action, ops,
@@ -165,13 +166,15 @@ impl RepoTab {
         {
             acts.push(merge_action(git_ref, current));
         }
-        if ui
-            .add_enabled(
-                idle,
-                egui::Button::new(format!("Rebase {current} onto {branch}")),
-            )
-            .clicked()
-        {
+        let rebase = ui.add_enabled(
+            idle,
+            egui::Button::new(format!("Rebase {current} onto {branch}")),
+        );
+        offer(&rebase, || GhostOp::Rebase {
+            onto: git_ref.full(),
+            label: branch.to_owned(),
+        });
+        if rebase.clicked() {
             acts.push(rebase_action(git_ref, current));
         }
         if ui
@@ -377,7 +380,13 @@ fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<Action>) {
         ),
     ] {
         let first = explain.split('.').next().unwrap_or(explain);
-        if ui.button(format!("{label} — {first}")).clicked() {
+        let button = ui.button(format!("{label} — {first}"));
+        if mode == "--hard" {
+            offer(&button, || GhostOp::ResetHard {
+                to: hash.to_owned(),
+            });
+        }
+        if button.clicked() {
             acts.push(Action::Dialog(
                 Dialog::confirm(
                     &format!("{label} reset"),
