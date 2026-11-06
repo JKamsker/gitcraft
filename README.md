@@ -120,6 +120,11 @@ so your config, credentials and hooks apply as usual.
   one for what the test printed. Results are kept by tree in git notes in git-test's format
   (`refs/notes/tests/default`, `test.default.command`), so `git test` and gitcraft share them
   and a rebase that keeps a commit's files keeps its result.
+- Rehearse: _Rehearse merge or rebase…_ on a branch plays a rebase onto it, or a merge of it,
+  through in a scratch worktree and reports where it stops (_stops at commit 3 of 5, 1
+  conflict_), which files conflict and whether the test command passes on the result. The
+  merge and the rebase can be rehearsed side by side; _Rebase now_ / _Merge now_ checks that
+  neither branch moved meanwhile, then does it as usual, undoable with Ctrl+Z.
 - Quick edits from a commit's menu, for commits of the checked-out branch: _Edit commit
   message_, _Drop commit_, _Move commit up_ / _down_, each a rebase without the editor and undone
   with Ctrl+Z. What can't be done (a merge, merges after the commit) is greyed out with why.

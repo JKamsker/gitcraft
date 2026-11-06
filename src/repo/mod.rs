@@ -32,6 +32,7 @@ mod pr_view;
 pub(crate) mod pull;
 mod quick_edit;
 mod rebase;
+mod rehearse;
 mod rewrite;
 #[cfg(test)]
 mod samples;
@@ -184,6 +185,8 @@ pub struct RepoTab {
     bisect: bisect::Bisecting,
     /// The test lane's results, and the run filling it.
     test_lane: test_lane::TestLane,
+    /// The rehearsal shown in its window.
+    rehearsing: rehearse::Rehearsing,
 
     commit_summary: String,
     commit_body: String,
@@ -333,6 +336,7 @@ impl RepoTab {
             conflict_generation: 0,
             bisect: Default::default(),
             test_lane: Default::default(),
+            rehearsing: Default::default(),
             commit_summary: String::new(),
             commit_body: String::new(),
             amend: false,

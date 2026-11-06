@@ -186,6 +186,7 @@ impl RepoTab {
         {
             acts.push(interactive_rebase_action(git_ref));
         }
+        crate::repo::rehearse::rehearse_item(ui, acts, git_ref);
         ui.separator();
         compare_items(ui, acts, git_ref, current);
     }

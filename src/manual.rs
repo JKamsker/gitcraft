@@ -63,6 +63,14 @@ const FEATURES: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "Rehearse",
+        &[
+            "Right-click a branch (its pill, or in the left pane) and choose Rehearse merge or rebase… (or use the palette for the base branch) to try a rebase of the checked-out branch onto it, or a merge of it, before doing it. It is played through in a scratch worktree on the repository's machine; your branches and files stay as they are.",
+            "The report says where it stops (for a rebase, at which commit, say commit 3 of 5) and which files conflict, or that it goes through; with a test command it also says whether the result passes (a result already stored for its files is taken instead of running it again).",
+            "Tick Rehearse the merge too (or the rebase) to see both side by side, with whether they give the same files. Rebase now or Merge now does the one you pick for real, after checking that neither branch moved since; it goes into the undo history (Ctrl+Z), and conflicts open in the conflict editor as usual.",
+        ],
+    ),
+    (
         "Changes and commits",
         &[
             "Stage, unstage or discard whole files from the right pane.",
