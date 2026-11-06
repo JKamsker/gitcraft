@@ -21,6 +21,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Open, create or clone a repository from the start page; recent ones are listed there.",
             "One tab per repository. Changes made elsewhere (editor, terminal) show up by themselves.",
             "Right-click a tab to give it its own icon and highlight colour.",
+            "Copy diagnostics (at the top of this manual, or Help: Copy diagnostics in the palette) puts what a bug report needs on the clipboard: gitcraft's version and channel, the system, the graphics adapter, git, gh, glab and tea (signed in or not, never a token) and the git settings in effect, without your name, email or home folder.",
             "Drag a tab along the strip to reorder the tabs.",
             "Remote on the start page opens a repository in WSL or over SSH: git runs there, this window shows it. Browse… lists that machine's folders, its repositories marked. The toolbar names the machine; the terminal opens a shell there. What ssh asks (a password, a passphrase, a new host key) is asked in this window; Remember connection keeps a password encrypted in the system's credential store, and Forget saved SSH sign-ins (Ctrl+P) removes them.",
         ],

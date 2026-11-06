@@ -4,6 +4,7 @@ pub mod app;
 mod avatars;
 mod ci;
 mod desktop_entry;
+mod diagnostics;
 mod folder_browser;
 mod forge;
 mod git;

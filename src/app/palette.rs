@@ -35,6 +35,7 @@ enum AppCommand {
     Clone,
     OpenRemote,
     ForgetSignIns,
+    CopyDiagnostics,
     Settings,
     Manual,
     Theme(ThemeKind),
@@ -97,6 +98,11 @@ impl App {
                 Entry::App(AppCommand::Settings),
             ),
             (
+                "Help: Copy diagnostics".to_owned(),
+                "app".to_owned(),
+                Entry::App(AppCommand::CopyDiagnostics),
+            ),
+            (
                 "Manual and keyboard shortcuts".to_owned(),
                 "F1".to_owned(),
                 Entry::App(AppCommand::Manual),
@@ -154,6 +160,7 @@ impl App {
                 std::thread::spawn(crate::remote::askpass::forget_saved);
             }
             Entry::App(AppCommand::Settings) => self.open_settings(),
+            Entry::App(AppCommand::CopyDiagnostics) => self.copy_diagnostics(ctx),
             Entry::App(AppCommand::Manual) => self.manual_open = true,
             Entry::App(AppCommand::Theme(kind)) => self.set_theme(ctx, kind),
             Entry::App(AppCommand::Profile(id)) => {
