@@ -31,6 +31,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Every branch with its pill on its latest commit: solid for the checked-out one, a laptop when it is local, a cloud when a remote has it.",
             "Double-click a pill to check that branch out (and pull it when its remote is ahead; on the checked-out branch's remote pill, just pull); hover +N to see every branch of the commit, and right-click any of them.",
             "Right-click a commit or a pill for branches, tags, merge, rebase, cherry-pick, revert, reset and more.",
+            "A robot on a commit's row: an agent wrote it (amber: with a person), as the commit records it (git-ai notes, Agent Trace, an agent's account or Co-authored-by trailer). Agent-written in the search bar steps through them; blame and diffs show a stripe per line; a branch's menu says how much agents wrote.",
             "Search messages, authors and hashes, or switch to Code to find the commits that added or removed some text.",
             "Drag the borders in the column header to resize; right-click it to pick the columns, make the graph column compact or reset the columns.",
             "Interactive rebase: reorder, reword, squash, fix up or drop commits, then start it.",

@@ -84,6 +84,8 @@ pub struct DiffData {
     pub(super) uncut: std::collections::HashMap<usize, String>,
     /// The runs of changed rows and the changes they make, unified and side by side: worked
     /// out the first time they are needed, not every frame.
+    /// Who wrote each added line, as its commit records (a commit's diff only).
+    pub(super) authors: Vec<Option<crate::authorship::Who>>,
     map: [std::sync::OnceLock<(map::ChangeRuns, Vec<std::ops::Range<usize>>)>; 2],
 }
 
@@ -181,6 +183,7 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         .map(|l| l.text.chars().count())
         .max()
         .unwrap_or(0);
+    let authors = line_authors(repo, key, &path, &lines);
     Ok(DiffData {
         lines,
         spans,
@@ -193,8 +196,32 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         new_file,
         longest,
         uncut,
+        authors,
         map: Default::default(),
     })
+}
+
+/// Who wrote each added line of a commit's diff, as the commit records it (git-ai notes, Agent
+/// Trace, its author or trailers); nothing for other diffs or a commit that records nothing.
+fn line_authors(
+    repo: &Path,
+    key: &DiffKey,
+    path: &str,
+    lines: &[DiffLine],
+) -> Vec<Option<crate::authorship::Who>> {
+    let DiffKey::Commit { hash, .. } = key else {
+        return Vec::new();
+    };
+    let Some(a) = crate::authorship::load::one(repo, hash).ok().flatten() else {
+        return Vec::new();
+    };
+    lines
+        .iter()
+        .map(|l| match (l.kind, l.new) {
+            (Kind::Add, Some(n)) => Some(a.line(path, n)),
+            _ => None,
+        })
+        .collect()
 }
 
 /// Whether hunks and lines of this diff can be picked on their own.

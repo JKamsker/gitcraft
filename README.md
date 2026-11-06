@@ -84,6 +84,14 @@ so your config, credentials and hooks apply as usual.
   the one you want.
 - Each commit's summary, followed by the rest of its message, faded and cut to fit.
 - An _Uncommitted changes_ row on top while the working tree is dirty.
+- AI authorship, as agents record it, never guessed from the code: git-ai's line attribution
+  (`refs/notes/ai`), Agent Trace records (`refs/notes/agent-trace`), an agent's account as the
+  author or an agent in a `Co-authored-by:` trailer. A robot marks agent-written commits on
+  their row (amber when co-written), with where that comes from on hover; _Agent-written_ in the
+  search bar steps through them. Blame and a commit's diff get a stripe per line: blue for an
+  agent, amber for both, green for a person, none where nothing is recorded. A branch's menu →
+  _How much agents wrote_ says e.g. _71% agent-written (412 of 580 lines added in 9 commits), 9%
+  of that since edited by a person_.
 - Search (Ctrl+F) through messages, authors and hashes of all history, or switch to _Code_ to
   find the commits that added or removed a piece of text in a file (`git log -S`); Enter /
   Shift+Enter jump between results, loading older history when needed.
