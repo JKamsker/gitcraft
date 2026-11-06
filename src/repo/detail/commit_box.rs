@@ -14,6 +14,8 @@ impl RepoTab {
         let continuing = self.work.in_progress.filter(|s| s.continues());
         let rebasing = continuing.is_some();
         let mut amend_started = false;
+        // Taken out while the row is drawn, which reads the whole tab too (the fold picker).
+        let mut amending = self.amend;
         ui.horizontal(|ui| {
             ui.label(
                 RichText::new(match continuing {
@@ -27,15 +29,19 @@ impl RepoTab {
                 let amend = ui
                     .add_enabled(
                         !rebasing && !self.refs.head.is_empty(),
-                        egui::Checkbox::new(&mut self.amend, "Amend last commit"),
+                        egui::Checkbox::new(&mut amending, "Amend last commit"),
                     )
                     .on_hover_text(
                         "Rewrite the last commit with the staged changes and this message",
                     );
                 amend_started =
-                    amend.changed() && self.amend && self.commit_summary.trim().is_empty();
+                    amend.changed() && amending && self.commit_summary.trim().is_empty();
+                if !rebasing {
+                    self.fold_picker(ui, acts);
+                }
             });
         });
+        self.amend = amending;
         if amend_started {
             // Start from the message being amended (read in the background for a repository
             // on another machine), unless one was typed meanwhile.

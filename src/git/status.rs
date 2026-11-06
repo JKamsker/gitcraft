@@ -106,7 +106,7 @@ pub fn status(repo: &Path) -> Result<WorkStatus, String> {
 /// The operation git left half done in `repo`, if any.
 /// Fails when that couldn't be asked (a repository on another machine not reached): no
 /// operation in progress would be an answer, and a wrong one.
-fn in_progress(repo: &Path) -> Result<Option<InProgress>, String> {
+pub fn in_progress(repo: &Path) -> Result<Option<InProgress>, String> {
     if let Some(target) = crate::remote::parse(repo) {
         return in_progress_there(&target);
     }

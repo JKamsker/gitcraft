@@ -54,7 +54,7 @@ impl Edit {
 
 /// The checked-out branch from HEAD down its first parents, newest first, as far as `commits`
 /// are loaded.
-fn first_parents<'a, C: std::borrow::Borrow<Commit>>(
+pub(super) fn first_parents<'a, C: std::borrow::Borrow<Commit>>(
     commits: &'a [C],
     index: &HashMap<String, usize>,
     head: &str,

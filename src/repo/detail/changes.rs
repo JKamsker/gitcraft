@@ -7,7 +7,7 @@ use crate::git::{Area, InProgress, StatusFile};
 use crate::icons;
 use crate::repo::diff::{literal_path, unstage_args};
 use crate::repo::widgets::{self, RowExtra};
-use crate::repo::{Action, Dialog, DiffKey, Refresh, RepoTab, abort_action, branch_tree, ops};
+use crate::repo::{Action, Dialog, DiffKey, Refresh, RepoTab, branch_tree, ops};
 use crate::theme::{self, Tokens};
 
 impl RepoTab {
@@ -59,7 +59,7 @@ impl RepoTab {
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui.add_enabled(idle, egui::Button::new("Abort")).clicked() {
-                            acts.push(abort_action(state));
+                            acts.push(self.abort_for(state));
                         }
                     });
                 });

@@ -2,6 +2,7 @@
 
 mod branch;
 mod confirm;
+mod fold;
 mod remote;
 mod upstream;
 mod worktree;
@@ -94,6 +95,8 @@ pub enum Dialog {
         password: String,
         focus: bool,
     },
+    /// Fold the staged changes into an older commit, as read just before.
+    Fold(Box<super::fold::Plan>),
     CreatePr {
         noun: String,
         branch: String,
@@ -372,6 +375,7 @@ impl RepoTab {
                     draft,
                     focus,
                 } => remote::create_pr(ui, noun, branch, base, title, body, draft, focus),
+                Dialog::Fold(plan) => fold::fold(ui, enter, plan),
                 Dialog::Confirm {
                     title,
                     body,

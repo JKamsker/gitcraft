@@ -129,7 +129,7 @@ impl RepoTab {
     /// A step refusing an operation unless the branch checked out is still the one this tab
     /// last read (or HEAD still detached): another branch at the same commit passes a check of
     /// HEAD's commit, and a rewrite would then rewrite that branch.
-    fn same_branch(&self) -> Vec<String> {
+    pub(super) fn same_branch(&self) -> Vec<String> {
         let branch = self
             .refs
             .current

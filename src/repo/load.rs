@@ -356,6 +356,7 @@ impl RepoTab {
         // A status read since this reload started is newer.
         if Self::newer(loaded.read, &mut self.work_read) {
             self.work = loaded.work;
+            self.fold_status_read(loaded.read);
         }
         // The last counts of worktrees this read left uncounted (on another machine) stay
         // until they are counted again.
