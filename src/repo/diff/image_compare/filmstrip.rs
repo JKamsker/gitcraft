@@ -68,7 +68,8 @@ fn work(shared: &Mutex<Shared>, ctx: &egui::Context, repo: &std::path::Path) {
             let mut s = shared
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            match s.queue.pop() {
+            // In the order asked for: the first ones on screen first.
+            match (!s.queue.is_empty()).then(|| s.queue.remove(0)) {
                 Some(next) => next,
                 None => {
                     s.running -= 1;

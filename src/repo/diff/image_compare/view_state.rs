@@ -34,7 +34,7 @@ impl Mode {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ViewState {
     pub mode: Mode,
-    /// Picture pixels per screen point; `None` fits the picture to its area.
+    /// Screen points per picture pixel; `None` fits the picture to its area.
     pub zoom: Option<f32>,
     /// The picture point at the centre of the area, as a share of its size (0.5, 0.5 the
     /// middle).
@@ -118,11 +118,12 @@ impl ViewState {
         self.center = self.center.clamp(vec2(-0.5, -0.5), vec2(1.5, 1.5));
     }
 
-    /// The zoom as people read it: "Fit", "100%", "250%".
-    pub fn zoom_label(&self) -> String {
+    /// The zoom as people read it, in screen pixels per picture pixel (`ppp`: pixels per
+    /// point): "Fit", "100%", "250%".
+    pub fn zoom_label(&self, ppp: f32) -> String {
         match self.zoom {
             None => "Fit".to_owned(),
-            Some(z) => format!("{:.0}%", z * 100.0),
+            Some(z) => format!("{:.0}%", z * ppp * 100.0),
         }
     }
 }
@@ -154,7 +155,7 @@ mod tests {
             v.placed(vec2(800.0, 300.0), AREA),
             Rect::from_min_size(pos2(0.0, 75.0), vec2(400.0, 150.0))
         );
-        assert_eq!(v.zoom_label(), "Fit");
+        assert_eq!(v.zoom_label(2.0), "Fit");
     }
 
     #[test]
@@ -168,7 +169,8 @@ mod tests {
         let after = v.placed(size, AREA);
         let under = after.min + share * after.size();
         assert!((under - pointer).length() < 0.01, "{under:?}");
-        assert_eq!(v.zoom_label(), "300%");
+        assert_eq!(v.zoom_label(1.0), "300%");
+        assert_eq!(v.zoom_label(2.0), "600%");
         v.zoom_at(1e9, pointer, size, AREA);
         assert_eq!(v.zoom, Some(MAX_ZOOM));
     }

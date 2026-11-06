@@ -4,10 +4,13 @@
 
 mod decode;
 mod filmstrip;
+mod lazy;
 mod view;
 mod view_state;
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 pub(super) use view::compare_view;
 
@@ -15,6 +18,7 @@ use super::DiffKey;
 use super::images::ImagePair;
 use crate::git;
 use decode::{Decoded, Difference};
+use lazy::Lazy;
 
 /// How many of the picture's commits the strip shows.
 const HISTORY: usize = 60;
@@ -33,7 +37,8 @@ pub struct Version {
 pub struct Compare {
     pub old: Option<Decoded>,
     pub new: Option<Decoded>,
-    pub diff: Option<Difference>,
+    /// Where they differ: worked out the first time it is shown.
+    pub diff: Lazy<Option<Arc<Difference>>>,
     /// The sizes of the files.
     pub old_bytes: Option<usize>,
     pub new_bytes: Option<usize>,
@@ -41,9 +46,40 @@ pub struct Compare {
     pub id: String,
     pub repo: PathBuf,
     pub path: String,
-    /// The commits that changed the picture, newest first, and the one this diff is of.
-    pub history: Vec<Version>,
+    /// The commits that changed the picture, newest first (read the first time the strip
+    /// shows, up to `from`), and the one this diff is of.
+    pub history: Lazy<Arc<Vec<Version>>>,
+    pub from: Option<String>,
     pub current: Option<String>,
+    /// The textures made for it, let go of with it.
+    pub textures: Mutex<HashMap<String, egui::TextureHandle>>,
+}
+
+impl Compare {
+    /// Where the two pictures differ, once worked out (`None` until then, or with one side).
+    pub fn difference(&self, ctx: &egui::Context) -> Option<Arc<Difference>> {
+        let (a, b) = (
+            self.old.as_ref()?.image.clone(),
+            self.new.as_ref()?.image.clone(),
+        );
+        self.diff
+            .get(
+                ctx,
+                move || Some(Arc::new(decode::difference(&a, &b))),
+                None,
+            )
+            .flatten()
+    }
+
+    /// The picture's history, once read.
+    pub fn versions(&self, ctx: &egui::Context) -> Option<Arc<Vec<Version>>> {
+        let (repo, from, path) = (self.repo.clone(), self.from.clone(), self.path.clone());
+        self.history.get(
+            ctx,
+            move || Arc::new(history(&repo, from.as_deref(), &path).unwrap_or_default()),
+            Arc::new(Vec::new()),
+        )
+    }
 }
 
 /// The comparison of `pair` (read for `key`), when both sides that are there decode; else
@@ -57,26 +93,25 @@ pub(super) fn compare(repo: &Path, key: &DiffKey, path: &str, pair: &ImagePair) 
     if old.is_none() && new.is_none() {
         return None;
     }
-    let diff = match (&old, &new) {
-        (Some(a), Some(b)) => Some(decode::difference(&a.image, &b.image)),
-        _ => None,
-    };
+    let (old, new) = decode::ready(old, new);
     let (from, current) = match key {
-        DiffKey::Commit { hash, .. } => (Some(hash.as_str()), Some(hash.clone())),
-        DiffKey::Range { to: Some(to), .. } => (Some(to.as_str()), None),
+        DiffKey::Commit { hash, .. } => (Some(hash.clone()), Some(hash.clone())),
+        DiffKey::Range { to: Some(to), .. } => (Some(to.clone()), None),
         _ => (None, None),
     };
     Some(Compare {
         old,
         new,
-        diff,
+        diff: Lazy::default(),
         old_bytes: pair.old.as_ref().map(|b| b.len()),
         new_bytes: pair.new.as_ref().map(|b| b.len()),
         id: pair.id.clone(),
         repo: repo.to_path_buf(),
         path: path.to_owned(),
-        history: history(repo, from, path).unwrap_or_default(),
+        history: Lazy::default(),
+        from,
         current,
+        textures: Mutex::default(),
     })
 }
 
