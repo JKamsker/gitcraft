@@ -82,6 +82,13 @@ pub fn features(repo: &Path) -> Result<Features, String> {
         .ok_or_else(|| format!("Unrecognised git version: {}", out.trim()))
 }
 
+/// Whether `repo` is a partial clone (`git clone --filter`): merging there downloads the
+/// files it lacks from the remote, which a check must not do behind the user's back.
+pub fn partial_clone(repo: &Path) -> bool {
+    run(Some(repo), &["config", "--get", "extensions.partialClone"])
+        .is_ok_and(|v| !v.trim().is_empty())
+}
+
 /// A file a merge would leave conflicted.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ConflictFile {

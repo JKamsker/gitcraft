@@ -189,10 +189,11 @@ so your config, credentials and hooks apply as usual.
   _applies cleanly_ or _may conflict_ before they are clicked. Hover one to see which files would conflict (for a rebase, at which
   of its commits) and whether Mergiraf could likely solve each one. A badge beside the branch in
   the toolbar says when merging its upstream (or the default branch, without one) would
-  conflict. It is worked out with `git merge-tree --write-tree` in the background, a rebase or
+  conflict, or rebasing onto its upstream when Pull is set to rebase. It is worked out with `git merge-tree --write-tree` in the background, a rebase or
   cherry-pick commit by commit, and never touches the working tree, the index or a ref, so it
   works in WSL and over SSH too; results are remembered until the commits change. Merges need git
   2.38, rebases and cherry-picks 2.40; with an older git the entries say so on hover instead.
+  A partial clone isn't checked (git would download the files it lacks); F5 checks again.
   Uncommitted changes aren't part of the check; git may refuse to start if they touch the same
   files.
 - A merge, rebase, cherry-pick, revert or patch stopped on conflicts shows a banner with
