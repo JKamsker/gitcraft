@@ -209,3 +209,23 @@ fn only_commits_on_nothing_else_are_left_behind() -> Result<(), String> {
     assert!(tagged.is_empty());
     Ok(())
 }
+
+/// Something started while the commits were being listed (a commit from the box): the answer
+/// may be out of date, so nothing is checked out and nothing asked; it says why.
+#[test]
+fn a_listing_that_answers_while_busy_does_nothing() {
+    let dir = detached_repo("busy");
+    git_ok(&dir, &["commit", "-q", "--allow-empty", "-m", "loose"]);
+    let ctx = egui::Context::default();
+    let mut tab = opened(&dir, &ctx);
+    tab.apply(Action::Checkout("main".to_owned()), &ctx);
+    tab.busy_op = Some("Commit".to_owned());
+    let answered = wait(&mut tab, &ctx, |t| !t.detached.checking);
+    let status = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    let head = symbolic_head(&dir);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(answered);
+    assert!(tab.dialog.is_none());
+    assert_eq!(head, "");
+    assert!(status.contains("Commit started meanwhile"), "{status}");
+}

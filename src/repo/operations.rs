@@ -36,8 +36,8 @@ impl RepoTab {
         if self.busy_op.is_some() {
             return;
         }
-        // A commit or push ticked to skip its hooks, this once.
-        let ops = self.skip_hooks.apply(ops);
+        // A push asked to skip its hooks, this once (set only while that push starts).
+        let ops = self.skip_hooks.push_steps(ops);
         self.busy_op = Some(label.to_owned());
         self.op_started = Some(Instant::now());
         self.note_checkout_move(&ops, ctx);

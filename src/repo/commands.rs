@@ -293,6 +293,8 @@ impl RepoTab {
             steps.push(vec!["add".to_owned(), "-A".to_owned()]);
         }
         steps.push(commit);
+        // Ticked to skip its hooks: this commit only.
+        let steps = self.skip_hooks.commit_steps(steps);
         let label = if self.amend { "Amend" } else { "Commit" };
         self.run_undoable(
             label,
