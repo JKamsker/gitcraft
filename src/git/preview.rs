@@ -11,25 +11,33 @@ use super::{END_OPTS, FS, NO_SIGNATURE, UTF8, run};
 /// How many commits, and files, a preview lists; the rest are only counted.
 pub const PREVIEW_SHOWN: usize = 25;
 
-/// The commits reachable from `tip` and not from `keep` (from `tip` alone when `keep` is `None`,
-/// as for a branch whose history shares nothing with HEAD's, or with HEAD unborn).
+/// The commits reachable from `tips` and not from `keep` (from `tips` alone when `keep` is
+/// `None`, as for a branch whose history shares nothing with HEAD's, or with HEAD unborn).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Range {
-    pub tip: String,
+    pub tips: Vec<String>,
     pub keep: Option<String>,
 }
 
 impl Range {
     pub fn new(tip: &str, keep: Option<&str>) -> Self {
         Range {
-            tip: tip.to_owned(),
+            tips: vec![tip.to_owned()],
             keep: keep.filter(|k| !k.is_empty()).map(str::to_owned),
         }
     }
 
-    /// `tip ^keep`, after [`END_OPTS`] (which must come before them).
+    /// The range with the commits of `tip` too (a remote branch deleted with the local one).
+    pub fn and_tip(mut self, tip: &str) -> Self {
+        if !self.tips.iter().any(|t| t == tip) {
+            self.tips.push(tip.to_owned());
+        }
+        self
+    }
+
+    /// `tip… ^keep`, after [`END_OPTS`] (which must come before them).
     fn revisions(&self) -> Vec<String> {
-        let mut revs = vec![self.tip.clone()];
+        let mut revs = self.tips.clone();
         revs.extend(self.keep.as_ref().map(|k| format!("^{k}")));
         revs
     }
@@ -39,9 +47,11 @@ impl Range {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LostFiles {
     None,
-    /// Every uncommitted change to a tracked file, staged or not (`reset --hard`); untracked
-    /// files stay.
-    Tracked,
+    /// What `reset --hard` to the commit given loses: every uncommitted change to a tracked
+    /// file, staged or not, and the untracked or ignored files the commit's tree has a file of
+    /// the same path for (written over). Other untracked files stay. `None`: tracked changes
+    /// only.
+    HardReset(Option<String>),
     /// These paths, as the operation names them (discarding one file).
     Listed(Vec<String>),
 }
@@ -83,18 +93,22 @@ impl PreviewAsk {
             rewritten: Some(range),
             upstream,
             files: if hard {
-                LostFiles::Tracked
+                LostFiles::HardReset(Some(to.to_owned()))
             } else {
                 LostFiles::None
             },
         }
     }
 
-    /// Deleting the refs `moving` (full names), at `tip`: the commits leaving are those HEAD
+    /// Deleting the refs `moving` (full names), at `tips`: the commits leaving are those HEAD
     /// (at `head`, empty when unborn) hasn't.
-    pub fn delete(tip: &str, head: &str, moving: Vec<String>) -> Self {
+    pub fn delete(tips: &[&str], head: &str, moving: Vec<String>) -> Self {
+        let range = (tips.iter().skip(1)).fold(
+            Range::new(tips.first().copied().unwrap_or("HEAD"), Some(head)),
+            |range, tip| range.and_tip(tip),
+        );
         PreviewAsk {
-            leaving: Some(Range::new(tip, Some(head))),
+            leaving: Some(range),
             moving,
             ..PreviewAsk::nothing()
         }
@@ -130,7 +144,7 @@ impl PreviewAsk {
     pub fn reads_git(&self) -> bool {
         self.leaving.is_some()
             || (self.rewritten.is_some() && self.upstream.is_some())
-            || self.files == LostFiles::Tracked
+            || matches!(self.files, LostFiles::HardReset(_))
     }
 }
 
@@ -266,6 +280,8 @@ fn other_refs(moving: &[String]) -> Vec<String> {
     args.extend(excluded("refs/heads/"));
     args.push("--branches".to_owned());
     args.extend(excluded("refs/remotes/"));
+    // `origin/HEAD` only points at another remote branch, and dangles once that is deleted.
+    args.push("--exclude=*/HEAD".to_owned());
     args.push("--remotes".to_owned());
     args.extend(excluded("refs/tags/"));
     args.push("--tags".to_owned());
@@ -330,13 +346,14 @@ fn ref_names(
     hashes: &[&str],
     moving: &[String],
 ) -> Result<Vec<(String, Option<String>)>, String> {
-    let excluded: Vec<String> = moving.iter().map(|r| format!("--exclude={r}")).collect();
+    let mut excluded: Vec<String> = moving.iter().map(|r| format!("--exclude={r}")).collect();
+    excluded.push("--exclude=refs/remotes/*/HEAD".to_owned());
     let mut names: Vec<(String, Option<String>)> =
         hashes.iter().map(|h| ((*h).to_owned(), None)).collect();
-    for refs in [
-        "--refs=refs/heads/*",
-        "--refs=refs/remotes/*",
-        "--refs=refs/tags/*",
+    for (refs, kind) in [
+        ("--refs=refs/heads/*", RefKind::Branch),
+        ("--refs=refs/remotes/*", RefKind::Remote),
+        ("--refs=refs/tags/*", RefKind::Tag),
     ] {
         let unnamed: Vec<&str> = (names.iter())
             .filter(|(_, name)| name.is_none())
@@ -348,7 +365,7 @@ fn ref_names(
         let mut args = vec!["name-rev", refs];
         args.extend(excluded.iter().map(String::as_str));
         args.extend(unnamed);
-        let found = parse_names(&run(Some(repo), &args)?);
+        let found = parse_names(&run(Some(repo), &args)?, kind);
         for (hash, name) in &mut names {
             if name.is_none() {
                 *name = found
@@ -361,30 +378,40 @@ fn ref_names(
     Ok(names)
 }
 
-/// `name-rev`'s `<hash> <name>~2` lines: the ref of each name, read for a person.
-fn parse_names(out: &str) -> Vec<(String, Option<String>)> {
+/// Which refs a `name-rev` pass named from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RefKind {
+    Branch,
+    Remote,
+    Tag,
+}
+
+/// `name-rev`'s `<hash> <name>~2` lines from a pass over `kind` refs: the ref of each name,
+/// read for a person.
+fn parse_names(out: &str, kind: RefKind) -> Vec<(String, Option<String>)> {
     out.lines()
         .filter_map(|line| {
             let (hash, name) = line.split_once(' ')?;
-            Some((hash.to_owned(), ref_label(name)))
+            Some((hash.to_owned(), ref_label(name, kind)))
         })
         .collect()
 }
 
 /// `remotes/origin/main~2^2` as `origin/main`, `tags/v1^0` as `tag v1`, `main` as itself;
-/// `undefined` (no ref has it) as `None`. A ref name has no `~` nor `^`.
-fn ref_label(name: &str) -> Option<String> {
+/// `undefined` (no ref has it) as `None`. A ref name has no `~` nor `^`. Which kind it is comes
+/// from the pass, not the name: a branch can be called `tags/x` or `origin/main`, and git
+/// prints it so, without `heads/`.
+fn ref_label(name: &str, kind: RefKind) -> Option<String> {
     let name = name.split(['~', '^']).next().unwrap_or(name).trim();
     if name.is_empty() || name == "undefined" {
         return None;
     }
-    if let Some(remote) = name.strip_prefix("remotes/") {
-        return Some(remote.to_owned());
-    }
-    if let Some(tag) = name.strip_prefix("tags/") {
-        return Some(format!("tag {tag}"));
-    }
-    Some(name.strip_prefix("heads/").unwrap_or(name).to_owned())
+    let under = |prefix: &str| name.strip_prefix(prefix).unwrap_or(name).to_owned();
+    Some(match kind {
+        RefKind::Branch => under("heads/"),
+        RefKind::Remote => under("remotes/"),
+        RefKind::Tag => format!("tag {}", under("tags/")),
+    })
 }
 
 /// How many commits of `range` `upstream` has, when any: `None` when it has none, or is gone.
@@ -410,22 +437,87 @@ fn lost_files(repo: &Path, files: &LostFiles) -> Result<Vec<String>, String> {
     let mut paths = match files {
         LostFiles::None => return Ok(Vec::new()),
         LostFiles::Listed(paths) => paths.clone(),
-        LostFiles::Tracked => {
+        LostFiles::HardReset(to) => {
+            // Not what is in submodules: a reset leaves their working trees as they are.
             let out = run(
                 Some(repo),
-                &["status", "--porcelain=v1", "-z", "--untracked-files=no"],
+                &[
+                    "status",
+                    "--porcelain=v1",
+                    "-z",
+                    "--untracked-files=no",
+                    "--ignore-submodules=all",
+                ],
             )?;
             let status = parse_status(&out);
-            (status.staged.into_iter())
+            let mut paths: Vec<String> = (status.staged.into_iter())
                 .chain(status.unstaged)
                 .chain(status.conflicted)
                 .map(|f| f.path)
-                .collect()
+                .collect();
+            if let Some(to) = to {
+                paths.extend(written_over(repo, to)?);
+            }
+            paths
         }
     };
     paths.sort_unstable();
     paths.dedup();
     Ok(paths)
+}
+
+/// The untracked or ignored files `reset --hard <to>` writes over: those at a path `to` has a
+/// file at and HEAD hasn't (one HEAD has is tracked, and counted as a change).
+fn written_over(repo: &Path, to: &str) -> Result<Vec<String>, String> {
+    let added = run(
+        Some(repo),
+        &[
+            "diff",
+            "--no-ext-diff",
+            "--no-renames",
+            "--name-only",
+            "-z",
+            "--diff-filter=A",
+            "HEAD",
+            END_OPTS,
+            to,
+            "--",
+        ],
+    );
+    // `--end-of-options` there is git 2.30+: older git reads `to` the same without it.
+    let added = match added {
+        Ok(out) => out,
+        Err(_) => run(
+            Some(repo),
+            &[
+                "diff",
+                "--no-ext-diff",
+                "--no-renames",
+                "--name-only",
+                "-z",
+                "--diff-filter=A",
+                "HEAD",
+                super::not_an_option(to)?,
+                "--",
+            ],
+        )?,
+    };
+    let added: Vec<&str> = added.split('\0').filter(|p| !p.is_empty()).collect();
+    if added.is_empty() {
+        return Ok(Vec::new());
+    }
+    // Every file not tracked, ignored ones too; a folder git tracks nothing in as one entry.
+    let untracked = run(Some(repo), &["ls-files", "-z", "-o", "--directory"])?;
+    let untracked: Vec<&str> = untracked.split('\0').filter(|p| !p.is_empty()).collect();
+    Ok(added
+        .into_iter()
+        .filter(|path| {
+            untracked
+                .iter()
+                .any(|u| u == path || (u.ends_with('/') && path.starts_with(u)))
+        })
+        .map(str::to_owned)
+        .collect())
 }
 
 #[cfg(test)]
@@ -434,15 +526,24 @@ mod tests {
 
     #[test]
     fn ref_labels_read_for_a_person() {
-        assert_eq!(ref_label("main~2"), Some("main".to_owned()));
         assert_eq!(
-            ref_label("remotes/origin/feat/x^2~1"),
+            ref_label("main~2", RefKind::Branch),
+            Some("main".to_owned())
+        );
+        assert_eq!(
+            ref_label("remotes/origin/feat/x^2~1", RefKind::Remote),
             Some("origin/feat/x".to_owned())
         );
-        assert_eq!(ref_label("tags/v1.0^0"), Some("tag v1.0".to_owned()));
-        assert_eq!(ref_label("heads/tags/x"), Some("tags/x".to_owned()));
-        assert_eq!(ref_label("undefined"), None);
-        assert_eq!(ref_label(""), None);
+        assert_eq!(
+            ref_label("tags/v1.0^0", RefKind::Tag),
+            Some("tag v1.0".to_owned())
+        );
+        assert_eq!(
+            ref_label("tags/x~1", RefKind::Branch),
+            Some("tags/x".to_owned())
+        );
+        assert_eq!(ref_label("undefined", RefKind::Tag), None);
+        assert_eq!(ref_label("", RefKind::Branch), None);
     }
 
     #[test]
@@ -459,6 +560,7 @@ mod tests {
                 "--exclude=feat/x",
                 "--branches",
                 "--exclude=origin/feat/x",
+                "--exclude=*/HEAD",
                 "--remotes",
                 "--tags",
                 "--not",
@@ -477,7 +579,7 @@ mod tests {
     fn name_rev_lines_parse() {
         let out = "aaa main~1\nbbb undefined\nccc remotes/origin/main\n";
         assert_eq!(
-            parse_names(out),
+            parse_names(out, RefKind::Remote),
             [
                 ("aaa".to_owned(), Some("main".to_owned())),
                 ("bbb".to_owned(), None),
@@ -499,10 +601,10 @@ mod tests {
             true,
         );
         assert_eq!(hard.moving, ["refs/heads/main"]);
-        assert_eq!(hard.files, LostFiles::Tracked);
+        assert_eq!(hard.files, LostFiles::HardReset(Some("t".to_owned())));
         assert_eq!(hard.rewritten, Some(Range::new("h", Some("t"))));
         // HEAD unborn: everything on the branch leaves.
-        let delete = PreviewAsk::delete("tip", "", vec!["refs/heads/x".into()]);
+        let delete = PreviewAsk::delete(&["tip"], "", vec!["refs/heads/x".into()]);
         assert_eq!(delete.leaving, Some(Range::new("tip", None)));
         let dropped = PreviewAsk::drop_commit("c", "p", "main", "h", None);
         assert_eq!(dropped.leaving, Some(Range::new("c", Some("p"))));
@@ -515,7 +617,7 @@ mod tests {
         assert!(!ask.reads_git());
         ask.files = LostFiles::Listed(vec!["a".to_owned()]);
         assert!(!ask.reads_git());
-        ask.files = LostFiles::Tracked;
+        ask.files = LostFiles::HardReset(None);
         assert!(ask.reads_git());
     }
 }
