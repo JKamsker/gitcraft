@@ -189,6 +189,12 @@ so your config, credentials and hooks apply as usual.
   when a conflict you resolved before comes back, git reuses your resolution and the editor
   says so, showing each conflict with the text reused for it. It stays unstaged until you save;
   _Forget this resolution_ runs `git rerere forget` and brings the conflict markers back.
+- _Note why…_ under a conflict keeps a reason ("keep the new validation, keep the old wire
+  format") and a test command with how it is resolved, in git
+  (`refs/gitcraft/conflict-decisions/*`, sent or fetched only from the palette). When the same
+  conflict comes back, it is resolved the same way with the reason shown, and how its test last
+  went; if the code around it changed since, it is only offered, marked stale. _Run the tests
+  after saving_ runs them in the repository's folder once the file is saved.
 - A merge, rebase, cherry-pick, revert or patch stopped on conflicts shows a banner with
   _Abort_; the commit box finishes it (_Continue rebase_ during a rebase, _Continue patch_ while
   `git am` applies one).

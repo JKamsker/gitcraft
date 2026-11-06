@@ -155,11 +155,27 @@ fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Requ
     }
 }
 
-/// Whether the git command `args` (its options first) talks to a remote and may take minutes.
+/// The git alias a command of the user's (a conflict decision's test) is run as, set with
+/// `-c alias.<it>=!<command>`: git runs it with `sh` in the repository's top folder, wherever
+/// the repository is.
+pub const USER_COMMAND_ALIAS: &str = "gitcraft-user-command";
+
+/// Whether the git command `args` (its options first) talks to a remote and may take minutes
+/// (or is a command of the user's, which may too).
 fn goes_over_network(args: &[&str]) -> bool {
     matches!(
         after_options(args).first().copied(),
-        Some("fetch" | "pull" | "push" | "clone" | "ls-remote" | "remote" | "submodule" | "lfs")
+        Some(
+            "fetch"
+                | "pull"
+                | "push"
+                | "clone"
+                | "ls-remote"
+                | "remote"
+                | "submodule"
+                | "lfs"
+                | USER_COMMAND_ALIAS
+        )
     )
 }
 
@@ -184,6 +200,80 @@ fn execute_there(target: &Target, extra: &Extra, args: &[&str]) -> Result<Ran, S
 /// Runs git in `dir` and returns stdout, or the error output.
 pub fn run(dir: Option<&Path>, args: &[&str]) -> Result<String, String> {
     run_ok_codes(dir, args, &[0])
+}
+
+/// How a git call ended, whatever its exit code.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Captured {
+    /// `None` when it was ended by a signal.
+    pub code: Option<i32>,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+/// Runs git in `dir` and returns how it ended, its exit code whatever it is, with `input` on
+/// its standard input when given (`hash-object --stdin`…). Blocking: from the background.
+pub fn run_captured(dir: &Path, args: &[&str], input: Option<&[u8]>) -> Result<Captured, String> {
+    let out = match (remote::parse(dir), input) {
+        (Some(target), _) => {
+            let mut request = remote_request(&target, &Extra::default(), args);
+            request.stdin = input.map(<[u8]>::to_vec);
+            let out = remote::exec(&target.host, &request)?;
+            if out.code == 1 && remote::is_missing_folder(&out.stderr) {
+                return Err(format!(
+                    "{} isn't a folder on {}",
+                    target.path,
+                    target.host.label()
+                ));
+            }
+            Ran {
+                code: Some(out.code),
+                status: format!("exit status: {}", out.code),
+                stdout: out.stdout,
+                stderr: out.stderr,
+            }
+        }
+        (None, None) => execute(Some(dir), &Extra::default(), args)?,
+        (None, Some(input)) => run_here_with_input(dir, args, input)?,
+    };
+    Ok(Captured {
+        code: out.code,
+        stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+    })
+}
+
+/// Runs git here in `dir` with `input` on its standard input.
+fn run_here_with_input(dir: &Path, args: &[&str], input: &[u8]) -> Result<Ran, String> {
+    use std::io::Write;
+    use std::process::Stdio;
+    let mut cmd = git_cmd();
+    with_profile(&mut cmd, args);
+    cmd.arg("-C").arg(dir).args(args);
+    cmd.stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = cmd.spawn().map_err(|e| format!("could not run git: {e}"))?;
+    // Written from a thread of its own: git may fill its output before it has read it all.
+    let writer = child.stdin.take().map(|mut stdin| {
+        let input = input.to_vec();
+        std::thread::spawn(move || stdin.write_all(&input))
+    });
+    let out = child
+        .wait_with_output()
+        .map_err(|e| format!("could not run git: {e}"))?;
+    // Git stopping before it read it all (a broken pipe) says what it has to say itself.
+    if let Some(Ok(Err(e))) = writer.map(std::thread::JoinHandle::join)
+        && e.kind() != std::io::ErrorKind::BrokenPipe
+    {
+        return Err(format!("could not pass git its input: {e}"));
+    }
+    Ok(Ran {
+        code: out.status.code(),
+        status: out.status.to_string(),
+        stdout: out.stdout,
+        stderr: out.stderr,
+    })
 }
 
 /// Runs git and returns stdout as raw bytes (file contents: images…).

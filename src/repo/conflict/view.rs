@@ -17,6 +17,9 @@ impl RepoTab {
         // The switch waits for what is being read or set, and for the operation running.
         let switchable = idle && !self.rerere.busy;
         let Some(ed) = &mut self.conflict else { return };
+        if ed.memo.offers.is_none() && !ed.memo.reading {
+            acts.push(Action::Decisions(super::decisions::Act::Load));
+        }
         let (ours_name, theirs_name) = ed.side_names();
         let left = ed.unresolved();
         // While it is written (on another machine), what is saved is what is shown.
@@ -171,6 +174,8 @@ impl ConflictEditor {
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         super::reused::rerere_switch(ui, rerere, acts);
+                        let has_tests = self.has_tests();
+                        super::decisions::view::run_tests_switch(ui, &mut self.memo, has_tests);
                     });
                 });
                 egui::ScrollArea::both()
@@ -204,6 +209,8 @@ impl ConflictEditor {
                 }
                 let mut k = 0;
                 let mut pick = None;
+                let mut use_offer = None;
+                let memo = &mut self.memo;
                 for seg in &self.segments {
                     let Segment::Conflict { ours, theirs, .. } = seg else {
                         continue;
@@ -218,7 +225,7 @@ impl ConflictEditor {
                                         .font(theme::semibold(12.0)),
                                 );
                                 ui.add_space(8.0);
-                                let recorded = self.recorded(k).is_some();
+                                let recorded = self.recorded.get(k).is_some_and(Option::is_some);
                                 if let Some(choice) = choice_buttons(ui, t, chosen, names, recorded)
                                 {
                                     pick = Some((k, choice));
@@ -241,10 +248,23 @@ impl ConflictEditor {
                                     side_box(col, t, (k, side), name, text, picked);
                                 }
                             });
-                            if let Some(text) = self.recorded(k) {
+                            let recorded = self.recorded.get(k).and_then(Option::as_deref);
+                            if let Some(text) = recorded {
                                 ui.add_space(4.0);
                                 let picked = chosen == Some(Choice::Recorded);
                                 super::reused::recorded_box(ui, t, k, text, picked);
+                            }
+                            let applied = chosen == Some(Choice::Recorded)
+                                && memo
+                                    .offers
+                                    .as_ref()
+                                    .and_then(|o| o.get(k))
+                                    .and_then(Option::as_ref)
+                                    .is_some_and(|o| {
+                                        Some(o.decision.resolution.as_str()) == recorded
+                                    });
+                            if super::decisions::view::card(ui, t, k, memo, applied) {
+                                use_offer = Some(k);
                             }
                         });
                     let (sep, _) =
@@ -254,6 +274,9 @@ impl ConflictEditor {
                 }
                 if let Some((k, choice)) = pick {
                     self.choose(k, choice);
+                }
+                if let Some(k) = use_offer {
+                    self.use_offer(k);
                 }
             });
     }

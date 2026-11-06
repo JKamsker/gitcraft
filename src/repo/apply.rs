@@ -250,6 +250,7 @@ impl RepoTab {
             Action::SolveWithMergiraf => self.solve_with_mergiraf(ctx),
             Action::SaveConflict => self.save_conflict(ctx),
             Action::Rerere(act) => self.rerere_act(act, ctx),
+            Action::Decisions(act) => self.decisions_act(act, ctx),
         }
     }
 
@@ -478,6 +479,9 @@ impl RepoTab {
         saved: Result<(), String>,
         ctx: &egui::Context,
     ) {
+        if saved.is_ok() {
+            self.record_decisions(&file, ctx);
+        }
         match saved {
             Ok(()) => self.run_prepared(
                 "Mark resolved",
