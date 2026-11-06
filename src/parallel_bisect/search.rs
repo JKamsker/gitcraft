@@ -154,8 +154,15 @@ impl Search {
         if untested == 0 {
             return 0;
         }
-        let parts = (k.max(1) + 1) as f64;
-        ((untested + 1) as f64).log(parts).ceil().max(1.0) as usize
+        // The least r with (k + 1)^r ≥ untested + 1, counted in integers (a float log is off
+        // at exact powers).
+        let parts = k.max(1) + 1;
+        let (mut reach, mut rounds) = (1usize, 0);
+        while reach < untested + 1 {
+            reach = reach.saturating_mul(parts);
+            rounds += 1;
+        }
+        rounds
     }
 
     /// The end, once no candidate is left untested.
@@ -366,6 +373,9 @@ mod tests {
         assert_eq!(s.rounds_left(1), 10);
         assert_eq!(s.rounds_left(3), 5);
         assert_eq!(s.rounds_left(1023), 1);
+        // 124 untested, k = 4: 5^3 = 125, three rounds (a float log says 3.0000000000000004).
+        let s = Search::new(line(125), "c124")?;
+        assert_eq!(s.rounds_left(4), 3);
         Ok(())
     }
 }

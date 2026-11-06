@@ -371,6 +371,29 @@ fn an_exit_code_of_128_or_more_stops_it() -> Result<(), String> {
     Ok(())
 }
 
+/// A crash (128 or more) on a commit between the ends counts as a skip, with a warning: a bisect
+/// one commit at a time might never have tested it. (Here c7, just before the first bad c8, is
+/// needed: the answer is a choice of the two.)
+#[test]
+fn a_crash_between_the_ends_is_a_skip() -> Result<(), String> {
+    let dir = scratch("crash-between")?;
+    let repo = Repo::with_culprit(&dir.join("repo"), 10, 8)?;
+    let command = "[ \"$(cat n.txt)\" = 7 ] && exit 139; test ! -e bug";
+    for k in [1, 10] {
+        let (outcome, events) = bisect(repo.setup(command, k));
+        let either = vec![repo.commits[8].clone(), repo.commits[7].clone()];
+        assert_eq!(outcome, Outcome::OneOf(either), "k {k}");
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, Event::Warning(w) if w.contains("139")))
+        );
+    }
+    repo.assert_clean()?;
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
 /// Cancelling stops every test running and removes the worktrees.
 #[test]
 fn cancelling_stops_the_tests_and_removes_the_worktrees() -> Result<(), String> {
@@ -437,6 +460,34 @@ fn a_crashed_bisect_is_cleared_up_by_the_next() -> Result<(), String> {
     let (outcome, _) = bisect(repo.setup(&command(&dir.join("t2")), 2));
     assert_eq!(outcome, Outcome::FirstBad(repo.commits[4].clone()));
     repo.assert_clean()?;
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+/// Clearing up never forgets the user's own worktrees, not even one whose folder is away (an
+/// unmounted drive): only the bisect's.
+#[test]
+fn clearing_up_keeps_the_user_s_worktrees() -> Result<(), String> {
+    let dir = scratch("own-worktrees")?;
+    let repo = Repo::with_culprit(&dir.join("repo"), 8, 4)?;
+    let away = dir.join("away");
+    git::run(
+        Some(&repo.dir),
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "--detach",
+            &sh_path(&away),
+            &repo.commits[1],
+        ],
+    )?;
+    std::fs::rename(&away, dir.join("moved")).map_err(|e| e.to_string())?;
+    let (outcome, _) = bisect(repo.setup("test ! -e bug", 3));
+    assert_eq!(outcome, Outcome::FirstBad(repo.commits[4].clone()));
+    let list = git::run(Some(&repo.dir), &["worktree", "list", "--porcelain"])?;
+    assert!(list.contains("away"), "{list}");
+    assert_eq!(list.matches("worktree ").count(), 2, "{list}");
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())
 }

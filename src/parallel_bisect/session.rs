@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, channel};
 use std::sync::{Arc, Mutex, PoisonError};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use super::cache::TreeCache;
 use super::dag::Dag;
@@ -19,9 +19,6 @@ use super::verdict::{Ended, Verdict, interpret};
 use super::workspace::Workspace;
 use super::{MAX_PARALLEL, short};
 use crate::git;
-
-/// How often the bisect says its folder is still in use (see `workspace`).
-pub const HEARTBEAT: Duration = Duration::from_secs(20);
 
 /// What to bisect, with what, and where.
 #[derive(Clone, Debug)]
@@ -255,7 +252,6 @@ fn run_in(
         search,
         slots: (1..=parallel).map(|n| Slot::new(ws, n)).collect(),
         machine: setup.machine.label(),
-        beat: Instant::now(),
     };
     run.send_remaining();
     run.rounds(ends)
@@ -411,8 +407,6 @@ struct Run<'a> {
     slots: Vec<Slot>,
     /// The machine, as the cache knows it.
     machine: String,
-    /// When the folder was last said to be in use.
-    beat: Instant,
 }
 
 impl Run<'_> {
@@ -516,7 +510,6 @@ impl Run<'_> {
             drop(tx);
             let mut running: HashSet<usize> = (0..jobs.len()).collect();
             while !running.is_empty() {
-                self.keep_alive();
                 let (j, result) = match rx.recv_timeout(Duration::from_millis(250)) {
                     Ok(got) => got,
                     Err(RecvTimeoutError::Timeout) => continue,
@@ -559,23 +552,29 @@ impl Run<'_> {
         ended.transpose()
     }
 
-    /// Says now and then that the folder is in use.
-    fn keep_alive(&mut self) {
-        if self.beat.elapsed() >= HEARTBEAT {
-            self.beat = Instant::now();
-            self.ws.heartbeat();
-        }
-    }
-
-    /// What a test that came back says: `Some` when it ends the bisect.
+    /// What a test that came back says: `Some` when it ends the bisect. An exit code of 128 or
+    /// more stops it on an end, as `git bisect run` would; on a commit in between, which a bisect
+    /// one commit at a time might never have tested, it counts as skipped (not kept for its
+    /// tree), with a warning.
     fn answer(&mut self, job: &Job, ran: Ran) -> Result<Option<Outcome>, String> {
         let verdict = match ran.ended {
-            Ended::Exited(code) => interpret(code).map_err(|e| {
-                let output = ran.output.trim();
-                format!("{} {e}\n{output}", short(&job.hash))
-                    .trim_end()
-                    .to_owned()
-            })?,
+            Ended::Exited(code) => match interpret(code) {
+                Ok(verdict) => verdict,
+                Err(e) if job.end.is_some() => {
+                    let output = ran.output.trim();
+                    return Err(format!("{} {e}\n{output}", short(&job.hash))
+                        .trim_end()
+                        .to_owned());
+                }
+                Err(_) => {
+                    self.out.send(Event::Warning(format!(
+                        "The test of {} ended with exit code {code} (a crash or a signal): it \
+                         counts as skipped.",
+                        short(&job.hash)
+                    )));
+                    return Ok(self.take(job, Verdict::Skip, ran.output, true));
+                }
+            },
             Ended::TimedOut => Verdict::TimedOut,
             Ended::Stopped => return Ok(None),
         };
