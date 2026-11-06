@@ -28,7 +28,7 @@ impl RepoTab {
             .stroke(Stroke::new(1.0, t.separator))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    icons::inline(ui, "search", 15.0, t.text_faint);
+                    search_icon(ui, &t);
                     self.search_field(ui, acts);
                     self.search_where(ui, acts);
                     ui.label(
@@ -49,23 +49,13 @@ impl RepoTab {
                         }
                     });
                 });
-                if let Some(problem) = &self.search.problem {
-                    ui.horizontal(|ui| {
-                        icons::inline(ui, "circle-alert", 13.0, t.warning);
-                        ui.add(
-                            egui::Label::new(egui::RichText::new(problem).color(t.warning).small())
-                                .truncate(),
-                        )
-                        .on_hover_text(problem);
-                    });
-                }
             });
     }
 
     /// The text field, with its suggestions below it while an operator is typed.
     fn search_field(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let id = ui.make_persistent_id("graph-search-field");
-        let listing_open = self.search.suggest.shown > 0 && ui.memory(|m| m.has_focus(id));
+        let listing_open = self.search.suggest.open && ui.memory(|m| m.has_focus(id));
         let keys = if listing_open {
             self.take_list_keys(ui)
         } else {
@@ -75,9 +65,9 @@ impl RepoTab {
         let out = egui::TextEdit::singleline(&mut self.search.query)
             .id(id)
             .hint_text(if code {
-                "Search code added or removed by a commit; or author:, path:, after:…"
+                "Search code changes, or author:, path:…"
             } else {
-                "Search messages, authors and hashes; or author:, path:, after:…"
+                "Search messages, authors, hashes, or author:, path:…"
             })
             .desired_width(ui.available_width() - 290.0)
             .margin(egui::Margin::symmetric(8, 4))
@@ -90,11 +80,7 @@ impl RepoTab {
                 vertical_arrows: true,
             })
             .show(ui);
-        let edit = out
-            .response
-            .response
-            .clone()
-            .on_hover_text(operators_help());
+        let edit = out.response.response.clone();
         if std::mem::take(&mut self.search.focus) {
             edit.request_focus();
         }
@@ -114,7 +100,8 @@ impl RepoTab {
             .map(|r| r.primary.index.0);
         let listing = match cursor {
             Some(c) if self.search.suggest.dismissed.as_ref() != Some(&self.search.query) => {
-                suggest::listing(&self.search.query, c, &self.search.suggest)
+                let query = self.search.query.clone();
+                self.search.suggest.listing_for(&query, c)
             }
             _ => Listing::default(),
         };
@@ -125,6 +112,9 @@ impl RepoTab {
         }
         let accepted = self.list_keys(&listing, &keys);
         let clicked = self.suggestions_popup(ui, edit.rect, &listing);
+        if self.search.suggest.popup.is_none() {
+            self.problem_hint(ui, edit.rect);
+        }
         if let Some(i) = accepted.or(clicked) {
             self.accept_suggestion(ui.ctx(), id, &listing, i);
             edit.request_focus();
@@ -171,6 +161,7 @@ impl RepoTab {
             s.listed_for.clone_from(&listing.key);
         }
         s.shown = n;
+        s.open = n > 0 || listing.status.is_some();
         if n == 0 {
             return None;
         }
@@ -214,6 +205,37 @@ impl RepoTab {
         }
     }
 
+    /// Why the query isn't searched, floating under the field (the graph doesn't move).
+    fn problem_hint(&self, ui: &Ui, field: egui::Rect) {
+        let Some(problem) = &self.search.problem else {
+            return;
+        };
+        let t = Tokens::get(ui.ctx());
+        egui::Area::new(ui.id().with("search-problem"))
+            .order(egui::Order::Foreground)
+            .fixed_pos(field.left_bottom() + egui::vec2(0.0, 4.0))
+            .interactable(false)
+            .show(ui.ctx(), |ui| {
+                egui::Frame::new()
+                    .fill(t.card)
+                    .stroke(Stroke::new(1.0, t.warning))
+                    .corner_radius(t.radius)
+                    .inner_margin(egui::Margin::symmetric(8, 4))
+                    .show(ui, |ui| {
+                        ui.set_max_width(field.width().max(320.0));
+                        ui.horizontal(|ui| {
+                            icons::inline(ui, "circle-alert", 13.0, t.warning);
+                            ui.add(
+                                egui::Label::new(
+                                    egui::RichText::new(problem).color(t.text).small(),
+                                )
+                                .wrap(),
+                            );
+                        });
+                    });
+            });
+    }
+
     /// Messages or Code: where free text is looked for.
     fn search_where(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let code = self.search.code;
@@ -255,7 +277,17 @@ impl RepoTab {
     }
 }
 
-/// The field's tooltip: every operator and what it finds.
+/// The magnifier, its tooltip every operator and what it finds.
+fn search_icon(ui: &mut Ui, t: &Tokens) {
+    let (rect, resp) = ui.allocate_exact_size(egui::Vec2::splat(15.0), egui::Sense::hover());
+    icons::paint(ui, rect, "search", 15.0, t.text_faint);
+    resp.on_hover_ui(|ui| {
+        ui.set_max_width(460.0);
+        ui.label(operators_help());
+    });
+}
+
+/// The field's help: every operator and what it finds.
 fn operators_help() -> String {
     let mut help = String::from("Operators, combined with each other and with text:\n");
     for op in Operator::ALL {
