@@ -244,7 +244,7 @@ impl RepoTab {
         if minutes > 0
             && !self.remotes.is_empty()
             && self.busy_op.is_none()
-            && crate::network::background_paused().is_none()
+            && super::offline::background_fetch_may_run(&self.path)
             && self.last_fetch.elapsed() > Duration::from_secs(u64::from(minutes) * 60)
         {
             self.last_fetch = Instant::now();
@@ -261,6 +261,7 @@ impl RepoTab {
             ctx.request_repaint_after(Duration::from_secs(30));
         }
 
+        self.follow_network(ctx);
         self.poll_ci(ctx);
         self.recount_siblings(ctx);
         self.poll_ci_view(ctx);
@@ -430,7 +431,9 @@ impl RepoTab {
                 Ok(prs) => {
                     self.prs = prs;
                     self.pr_error = None;
-                    self.refresh_ci(ctx);
+                    if crate::network::background_may_run() {
+                        self.refresh_ci(ctx);
+                    }
                 }
                 Err(e) => self.pr_error = Some(e),
             },

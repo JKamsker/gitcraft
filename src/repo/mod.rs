@@ -205,6 +205,12 @@ pub struct RepoTab {
     /// Jump to the changes row on the next rebuild (after an operation left conflicts).
     focus_wip: bool,
     last_fetch: Instant,
+    /// When the repository was last fetched, for the offline chip (see `offline`).
+    fetched_at: std::sync::Arc<std::sync::Mutex<Option<std::time::SystemTime>>>,
+    /// That was looked up once.
+    fetch_time_asked: bool,
+    /// Background network work was paused on the last frame (see `follow_network`).
+    network_paused: bool,
 
     terminals: Vec<Terminal>,
     active_terminal: usize,
@@ -343,6 +349,9 @@ impl RepoTab {
             focus_branch_filter: false,
             focus_wip: false,
             last_fetch: Instant::now(),
+            fetched_at: Default::default(),
+            fetch_time_asked: false,
+            network_paused: false,
             terminals: Vec::new(),
             active_terminal: 0,
             terminal_open: false,

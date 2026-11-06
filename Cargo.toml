@@ -41,6 +41,8 @@ rustix = { version = "1", features = ["fs"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
+# Whether the connection is metered (WinRT's NetworkInformation: safe calls, no unsafe code).
+windows = { version = "0.62", features = ["Networking_Connectivity"] }
 
 [lints.rust]
 # Denied everywhere; the one exception, asking Windows where an open file really is

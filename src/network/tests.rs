@@ -1,4 +1,4 @@
-use super::detect::{parse_linux, parse_windows};
+use super::detect::{from_windows, parse_linux};
 use super::*;
 
 const NOTHING: Detected = Detected::UNKNOWN;
@@ -30,20 +30,44 @@ fn the_switch_wins_then_no_connection_then_metered() {
 #[test]
 fn reads_what_windows_says() {
     let d = |connected, metered| Detected { connected, metered };
-    for (out, want) in [
-        ("3 1 False False False", d(Some(true), Some(false))),
-        ("3 2 False False False", d(Some(true), Some(true))),
-        ("3 3 False False False", d(Some(true), Some(true))),
-        ("3 1 True False False", d(Some(true), Some(true))),
-        ("3 1 False True False", d(Some(true), Some(true))),
-        ("3 0 False False True", d(Some(true), Some(true))),
-        ("1 1 False False False", d(Some(false), Some(false))),
-        ("none", d(Some(false), None)),
-        ("", NOTHING),
-        ("garbage", NOTHING),
-        ("3 x False False False", d(Some(true), None)),
+    for ((level, cost, roaming, over, near), want) in [
+        (
+            (Some(3), Some(1), false, false, false),
+            d(Some(true), Some(false)),
+        ),
+        (
+            (Some(3), Some(2), false, false, false),
+            d(Some(true), Some(true)),
+        ),
+        (
+            (Some(3), Some(3), false, false, false),
+            d(Some(true), Some(true)),
+        ),
+        (
+            (Some(3), Some(1), true, false, false),
+            d(Some(true), Some(true)),
+        ),
+        (
+            (Some(3), Some(1), false, true, false),
+            d(Some(true), Some(true)),
+        ),
+        (
+            (Some(3), Some(0), false, false, true),
+            d(Some(true), Some(true)),
+        ),
+        ((Some(0), None, false, false, false), d(Some(false), None)),
+        // Local or limited access: a blocked probe as often as no connection.
+        (
+            (Some(1), Some(1), false, false, false),
+            d(None, Some(false)),
+        ),
+        (
+            (Some(2), Some(1), false, false, false),
+            d(None, Some(false)),
+        ),
+        ((None, None, false, false, false), NOTHING),
     ] {
-        assert_eq!(parse_windows(out), want, "{out:?}");
+        assert_eq!(from_windows(level, cost, roaming, over, near), want);
     }
 }
 
