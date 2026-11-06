@@ -227,7 +227,10 @@ impl App {
         } = palette;
         let entries: &[Item] = entries.as_ref().map_or(&[], |(_, e)| e);
         let lowered = query.to_lowercase();
+        // A forge link pasted: the one entry is to open it.
+        let link = super::links::palette_link(query);
         let shown: Vec<usize> = (0..entries.len())
+            .filter(|_| link.is_none())
             .filter(|&i| fuzzy(&entries[i].1, &lowered))
             .take(60)
             .collect();
@@ -247,6 +250,7 @@ impl App {
             *chosen = chosen.saturating_sub(1);
         }
         let mut run = None;
+        let mut open_link = false;
         let mut close = esc;
         let frame = egui::Frame::new()
             .fill(t.card)
@@ -278,6 +282,19 @@ impl App {
                     .max_height(380.0)
                     .show(ui, |ui| {
                         ui.spacing_mut().item_spacing.y = 0.0;
+                        if let Some(link) = &link {
+                            let what = super::links::describe(link);
+                            if palette_row(
+                                ui,
+                                &t,
+                                "Open this link in its clone",
+                                &what,
+                                true,
+                                false,
+                            ) {
+                                open_link = true;
+                            }
+                        }
                         for (k, &i) in shown.iter().enumerate() {
                             let (label, _, hint, _) = &entries[i];
                             let selected = k == *chosen;
@@ -285,7 +302,7 @@ impl App {
                                 run = Some(i);
                             }
                         }
-                        if shown.is_empty() {
+                        if shown.is_empty() && link.is_none() {
                             ui.label(RichText::new("Nothing matches").color(t.text_faint));
                         }
                     });
@@ -294,11 +311,19 @@ impl App {
         if enter && let Some(&i) = shown.get(*chosen) {
             run = Some(i);
         }
+        if enter && link.is_some() {
+            open_link = true;
+        }
         if resp.response.clicked_elsewhere()
             && ctx.input(|i| i.pointer.any_pressed())
             && run.is_none()
         {
             close = true;
+        }
+        if open_link && let Some(link) = link {
+            self.palette = None;
+            self.open_link(link, ctx);
+            return;
         }
         if close || run.is_some() {
             let entries = self.palette.take().and_then(|p| p.entries);

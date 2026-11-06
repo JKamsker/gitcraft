@@ -89,6 +89,8 @@ impl App {
                         }
                     });
 
+                    self.home_link_field(ui, &t);
+
                     if let Some(err) = &self.error {
                         ui.add_space(12.0);
                         ui.colored_label(t.danger, err);

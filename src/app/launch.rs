@@ -30,10 +30,25 @@ impl App {
                 return;
             }
         }
+        // Where a link's clone may be: the open tabs (also elsewhere, already reached) and the
+        // recent repositories of this machine (one elsewhere would be reached just to look).
+        let mut clones: Vec<PathBuf> = self
+            .tabs
+            .iter()
+            .filter_map(|t| match t {
+                Tab::Repo(r) => Some(r.path.clone()),
+                _ => None,
+            })
+            .collect();
+        for path in &self.recent {
+            if !crate::remote::is_remote(path) && !clones.contains(path) {
+                clones.push(path.clone());
+            }
+        }
         let (tx, rx) = channel();
         let ctx = ctx.clone();
         std::thread::spawn(move || {
-            let _ = tx.send(crate::launch::resolve::resolve(&cmd, &cwd));
+            let _ = tx.send(crate::launch::resolve::resolve_among(&cmd, &cwd, &clones));
             ctx.request_repaint();
         });
         self.launching.resolving.push(rx);
@@ -52,6 +67,10 @@ impl App {
         });
         for result in done {
             match result {
+                Ok(Resolved {
+                    then: Then::Clone(url),
+                    ..
+                }) => self.offer_clone(url),
                 Ok(resolved) => {
                     if crate::remote::is_remote(&resolved.root) {
                         self.open_repo(&resolved.root, ctx);

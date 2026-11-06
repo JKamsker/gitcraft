@@ -406,3 +406,89 @@ fn command_lines_handed_over_together_are_all_carried_out() -> Result<(), String
     assert_eq!(tabs, roots);
     Ok(())
 }
+
+/// A `gitcraft://` link from the browser, handed over: the commit it points at is selected in
+/// the open clone of its repository (found by its remote, written another way); a link to a
+/// repository with no clone here opens the clone dialog with its URL.
+#[test]
+fn a_link_from_the_browser_opens_in_its_clone_or_offers_to_clone() -> Result<(), String> {
+    use crate::instance::Request;
+    use std::time::{Duration, Instant};
+
+    let root = std::env::temp_dir().join(format!(
+        "gitcraft-link-handoff ü {}-{}",
+        std::process::id(),
+        crate::remote::askpass::random_token()
+    ));
+    std::fs::create_dir_all(&root).map_err(|e| e.to_string())?;
+    for args in [
+        &["init", "-q"][..],
+        &["config", "user.name", "t"],
+        &["config", "user.email", "t@t"],
+        &["remote", "add", "origin", "git@github.com:Owner/Repo.git"],
+        &["commit", "-q", "--allow-empty", "-m", "one"],
+        &["commit", "-q", "--allow-empty", "-m", "two"],
+    ] {
+        crate::git::run(Some(&root), args)?;
+    }
+    let first = crate::git::run(Some(&root), &["rev-parse", "HEAD~1"])?
+        .trim()
+        .to_owned();
+    let expected = super::repo_root(&root)?;
+    let mut harness = egui_kittest::Harness::builder()
+        .with_size([1200.0, 800.0])
+        .build_eframe(|cc| super::App::new(cc, None));
+    harness.step();
+    let ctx = harness.ctx.clone();
+    harness
+        .state_mut()
+        .handle_handoff(Request::Open(root.clone()), &ctx);
+    let link = format!(
+        "gitcraft://open?url=https%3A%2F%2Fgithub.com%2Fowner%2Frepo%2Fcommit%2F{}",
+        first.get(..12).unwrap_or(&first)
+    );
+    harness.state_mut().handle_handoff(
+        Request::Launch {
+            cwd: std::env::temp_dir(),
+            args: vec![link],
+        },
+        &ctx,
+    );
+    let until = Instant::now() + Duration::from_secs(20);
+    let selected = loop {
+        harness.step();
+        let state = harness.state();
+        let selected = match state.tabs.get(state.active) {
+            Some(super::Tab::Repo(r)) if r.path == expected => r.selected_commit(),
+            _ => None,
+        };
+        if selected.as_deref() == Some(first.as_str()) || Instant::now() > until {
+            break selected;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    harness.state_mut().handle_handoff(
+        Request::Launch {
+            cwd: std::env::temp_dir(),
+            args: vec!["https://codeberg.org/someone/else/pulls/3".into()],
+        },
+        &ctx,
+    );
+    let until = Instant::now() + Duration::from_secs(20);
+    let offered = loop {
+        harness.step();
+        let url = harness.state().clone_url();
+        if url.is_some() || Instant::now() > until {
+            break url;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    drop(harness);
+    let _ = std::fs::remove_dir_all(&root);
+    assert_eq!(selected, Some(first));
+    assert_eq!(
+        offered.as_deref(),
+        Some("https://codeberg.org/someone/else.git")
+    );
+    Ok(())
+}

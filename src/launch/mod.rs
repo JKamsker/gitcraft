@@ -2,6 +2,8 @@
 //! it ([`args`]) and making sense of it on disk ([`resolve`]).
 
 pub mod args;
+pub mod link;
+mod open_link;
 pub mod resolve;
 
 pub use args::{Command, Parsed, parse};
@@ -32,6 +34,9 @@ pub(crate) fn actions(then: Then) -> Vec<Action> {
             line: line as usize,
         }],
         Then::Commit(hash) => vec![Action::SelectHash(hash)],
+        Then::PullRequest(number) => vec![Action::OpenPr(number)],
+        // Cloned first, by the window (see `app::launch`).
+        Then::Clone(_) => Vec::new(),
         Then::Compare {
             base,
             base_label,

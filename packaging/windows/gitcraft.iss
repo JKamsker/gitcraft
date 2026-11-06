@@ -39,6 +39,7 @@ ChangesAssociations=no
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 Name: "foldermenu"; Description: "Add ""Open in gitcraft"" to the right-click menu of folders"; GroupDescription: "Explorer:"
+Name: "links"; Description: "Open gitcraft:// links from the browser in gitcraft"; GroupDescription: "Links:"
 Name: "filemenu"; Description: "Add ""History in gitcraft"" and ""Blame in gitcraft"" to the right-click menu of files"; GroupDescription: "Explorer:"
 
 [Files]
@@ -71,6 +72,11 @@ Root: HKA; Subkey: "Software\Classes\*\shell\gitcraft.history\command"; ValueTyp
 Root: HKA; Subkey: "Software\Classes\*\shell\gitcraft.blame"; ValueType: string; ValueName: ""; ValueData: "Blame in gitcraft"; Tasks: filemenu; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\Classes\*\shell\gitcraft.blame"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\gitcraft.exe"""; Tasks: filemenu
 Root: HKA; Subkey: "Software\Classes\*\shell\gitcraft.blame\command"; ValueType: string; ValueName: ""; ValueData: """{app}\gitcraft.exe"" blame -- ""%1"""; Tasks: filemenu
+; gitcraft://open?url=… links (the program checks every link it is given).
+Root: HKA; Subkey: "Software\Classes\gitcraft"; ValueType: string; ValueName: ""; ValueData: "URL:gitcraft link"; Tasks: links; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\gitcraft"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Tasks: links
+Root: HKA; Subkey: "Software\Classes\gitcraft\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\gitcraft.exe"",0"; Tasks: links
+Root: HKA; Subkey: "Software\Classes\gitcraft\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\gitcraft.exe"" ""%1"""; Tasks: links
 
 [Run]
 Filename: "{app}\gitcraft.exe"; Description: "{cm:LaunchProgram,gitcraft}"; Flags: nowait postinstall skipifsilent

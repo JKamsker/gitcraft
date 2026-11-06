@@ -177,3 +177,24 @@ fn a_name_that_is_not_text_is_kept_as_it_is() {
         }))
     );
 }
+
+#[test]
+fn links_from_the_browser() {
+    let link = run(&["gitcraft://open?url=https%3A%2F%2Fgithub.com%2Fo%2Fr%2Fpull%2F5"]);
+    assert!(
+        matches!(&link, Some(Command::Link(l)) if l.repo == "o/r"),
+        "{link:?}"
+    );
+    assert!(matches!(
+        run(&["https://gitlab.com/g/r/-/merge_requests/2"]),
+        Some(Command::Link(_))
+    ));
+    // A broken link says why, rather than being taken for a folder.
+    assert!(fails(&["gitcraft://run?x=1"]).contains("only opens"));
+    assert!(fails(&["https://github.com/o"]).contains("not a link gitcraft can open"));
+    // A folder whose name merely starts so is still a folder.
+    assert_eq!(
+        run(&["gitcraft-src"]),
+        Some(Command::Open("gitcraft-src".into()))
+    );
+}

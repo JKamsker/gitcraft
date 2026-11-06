@@ -45,6 +45,17 @@ so your config, credentials and hooks apply as usual.
   the `.tar.gz`); Settings → General adds them to Files (GNOME) as scripts and to Finder as
   Quick Actions (they may show after logging in again). Each starts gitcraft, which hands the
   file to the window already open. No overlay icons.
+- Links from the browser: `gitcraft://open?url=<forge link>` opens that pull request, commit or
+  file (`#L40` scrolls the blame to the line) in your clone of the repository, found by its
+  remotes' URLs among the open tabs and the recent repositories; with none, the clone dialog
+  opens with the repository's URL. The link itself pasted into the palette (Ctrl+P) or the start
+  page's field, or given as `gitcraft <link>`, does the same. GitHub, GitLab (groups too),
+  Gitea / Forgejo (Codeberg) and Bitbucket links are read by their paths; every link is checked
+  (https or http only, a plain host name, no `..`, a revision that can't be an option) and
+  anything else is refused with why. The Windows installer registers the `gitcraft://` scheme
+  (an option), the .deb / .rpm install `gitcraft-link.desktop` (`x-scheme-handler/gitcraft`),
+  and the AppImage's menu entry adds one. macOS hands a link to an app as an Apple Event, which
+  the windowing library doesn't pass on, so there paste the link instead.
 - Without a terminal (a menu, a file manager, Windows), what the command line says (`--help`,
   a mistake) shows in a dialog.
 
