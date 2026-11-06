@@ -1,8 +1,10 @@
 // No console window behind the app on Windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
+use eframe::egui_wgpu::{WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew, wgpu};
 use gitcraft::app;
 
 fn main() -> eframe::Result {
@@ -24,6 +26,7 @@ fn main() -> eframe::Result {
                 builder
             }
         })),
+        wgpu_options: wgpu_options(),
         ..Default::default()
     };
     let result = eframe::run_native(
@@ -36,4 +39,37 @@ fn main() -> eframe::Result {
     );
     app::after_exit();
     result
+}
+
+/// egui-wgpu's defaults, made lighter on memory. The `WGPU_*` environment variables still win.
+fn wgpu_options() -> WgpuConfiguration {
+    let mut setup = WgpuSetupCreateNew::without_display_handle();
+
+    // wgpu's default `MemoryHints::Performance` reserves GPU memory in blocks of 128 MB and
+    // 64 MB. On integrated graphics those blocks are system RAM, about 190 MB of it, when the
+    // UI needs a few MB. `MemoryUsage` starts the blocks at 8 MB and 4 MB.
+    let default_descriptor = Arc::clone(&setup.device_descriptor);
+    setup.device_descriptor = Arc::new(move |adapter| wgpu::DeviceDescriptor {
+        memory_hints: wgpu::MemoryHints::MemoryUsage,
+        ..default_descriptor(adapter)
+    });
+
+    if cfg!(windows) {
+        let instance = &mut setup.instance_descriptor;
+        // Only DirectX 12, which every supported Windows has (with WARP as a software
+        // fallback). The default also loads each GPU's Vulkan and OpenGL drivers.
+        if wgpu::Backends::from_env().is_none() {
+            instance.backends = wgpu::Backends::DX12;
+        }
+        // FXC ships with Windows. The default looks for `dxcompiler.dll` along the DLL search
+        // path and takes whichever copy it finds there, such as another app's.
+        if wgpu::Dx12Compiler::from_env().is_none() {
+            instance.backend_options.dx12.shader_compiler = wgpu::Dx12Compiler::Fxc;
+        }
+    }
+
+    WgpuConfiguration {
+        wgpu_setup: WgpuSetup::CreateNew(setup),
+        ..Default::default()
+    }
 }
