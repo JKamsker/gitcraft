@@ -202,13 +202,13 @@ impl RepoTab {
             button.on_disabled_hover_text("There is no other branch to review it against");
             return;
         };
-        if button
-            .on_hover_text(format!(
-                "Have your AI tool (Settings → AI) review what {} adds to {base}",
-                b.name
-            ))
-            .clicked()
-        {
+        let tip = if Settings::get(ui.ctx()).ai.enabled() {
+            format!("Have your AI tool review what {} adds to {base}", b.name)
+        } else {
+            "Pick an AI tool first (Settings → AI, or the sparkles button of the commit box)"
+                .to_owned()
+        };
+        if button.on_hover_text(tip).clicked() {
             acts.push(Action::ReviewBranch {
                 branch: b.name.clone(),
                 base,

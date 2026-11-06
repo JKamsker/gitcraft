@@ -120,9 +120,22 @@ impl CommandLine {
     pub fn program(&self) -> String {
         match self {
             CommandLine::Words(words) => words.first().cloned().unwrap_or_default(),
-            CommandLine::Line(line) => line.split_whitespace().next().unwrap_or("").to_owned(),
+            CommandLine::Line(line) => first_word(line),
             CommandLine::Script { .. } => "sh".to_owned(),
         }
+    }
+}
+
+/// The first word of a command line, its quotes taken off: `'/my tools/ask' -x` → `/my tools/ask`.
+fn first_word(line: &str) -> String {
+    let line = line.trim_start();
+    match line.chars().next() {
+        Some(q @ ('\'' | '"')) => line[1..].split(q).next().unwrap_or_default().to_owned(),
+        _ => line
+            .split_whitespace()
+            .next()
+            .unwrap_or_default()
+            .to_owned(),
     }
 }
 
@@ -268,17 +281,43 @@ fn run_here(job: &Job<'_>) -> Result<Ran, RunError> {
         }
         std::thread::sleep(TICK);
     };
-    if let Some(writer) = writer {
-        let _ = writer.join();
+    // Something the tool left running may hold its output open: what came by then is the
+    // answer, and what is still running is stopped.
+    let mut out = [(stdout, None), (stderr, None)];
+    let until = Instant::now() + LINGER;
+    for (reader, got) in &mut out {
+        *got = collect(reader.as_ref(), until);
     }
-    let joined = |h: Option<std::thread::JoinHandle<Vec<u8>>>| {
-        h.and_then(|h| h.join().ok()).unwrap_or_default()
-    };
+    if out.iter().any(|(_, got)| got.is_none()) {
+        // Stopping it closes the pipes, and what was read comes.
+        stop_here(&mut child);
+        let until = Instant::now() + LINGER;
+        for (reader, got) in &mut out {
+            if got.is_none() {
+                *got = collect(reader.as_ref(), until);
+            }
+        }
+    }
+    drop(writer);
+    let [(_, stdout), (_, stderr)] = out;
     Ok(Ran {
         code,
-        stdout: joined(stdout),
-        stderr: joined(stderr),
+        stdout: stdout.unwrap_or_default(),
+        stderr: stderr.unwrap_or_default(),
     })
+}
+
+/// How long a pipe may stay open after the tool ended.
+const LINGER: Duration = Duration::from_secs(2);
+
+/// What a reader got, once its pipe closed before `until`; `None` if it didn't.
+fn collect(reader: Option<&Reader>, until: Instant) -> Option<Vec<u8>> {
+    let Some(reader) = reader else {
+        return Some(Vec::new());
+    };
+    reader
+        .recv_timeout(until.saturating_duration_since(Instant::now()))
+        .ok()
 }
 
 /// The shell that runs `command` here.
@@ -289,6 +328,9 @@ fn shell_here(command: &CommandLine) -> Command {
         let mut cmd = Command::new("cmd");
         // `/S`: the quotes around the line are taken off and the rest kept as it is.
         cmd.raw_arg(format!("/D /S /C \"{}\"", command.cmd()));
+        // cmd looks for a program in the folder it runs in before the PATH: a repository's
+        // own `claude.cmd` would run in place of the tool.
+        cmd.env("NoDefaultCurrentDirectoryInExePath", "1");
         cmd.creation_flags(0x0800_0000);
         cmd
     }
@@ -302,8 +344,13 @@ fn shell_here(command: &CommandLine) -> Command {
     }
 }
 
-/// Reads all of `pipe` in a thread of its own, keeping at most [`MAX_ANSWER`] bytes.
-fn read_capped(mut pipe: impl Read + Send + 'static) -> std::thread::JoinHandle<Vec<u8>> {
+/// What a pipe's reader sends once the pipe closes.
+type Reader = std::sync::mpsc::Receiver<Vec<u8>>;
+
+/// Reads all of `pipe` in a thread of its own, keeping at most [`MAX_ANSWER`] bytes, and sends
+/// it once the pipe closes.
+fn read_capped(mut pipe: impl Read + Send + 'static) -> Reader {
+    let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         let mut kept = Vec::new();
         let mut buf = [0u8; 8192];
@@ -316,8 +363,9 @@ fn read_capped(mut pipe: impl Read + Send + 'static) -> std::thread::JoinHandle<
                 }
             }
         }
-        kept
-    })
+        let _ = tx.send(kept);
+    });
+    rx
 }
 
 /// Stops a tool run here and everything it started: politely, then for good.
@@ -378,6 +426,8 @@ fn there_script(command: &CommandLine, id: &str) -> String {
     format!(
         concat!(
             "p={pid}\n",
+            "trap 'rm -f \"$p\"' EXIT\n",
+            "trap 'rm -f \"$p\"; exit 143' HUP INT TERM\n",
             "exec 3<&0\n",
             "sh -c {cmd} <&3 3<&- &\n",
             "c=$!\n",
@@ -399,8 +449,9 @@ fn run_there(target: &Target, job: &Job<'_>) -> Result<Ran, RunError> {
         script: there_script(job.command, &id),
         env: vec![("NO_COLOR".to_owned(), "1".to_owned())],
         stdin: Some(job.input.to_vec()),
-        // Minutes, maybe: in shells of their own, so git's quick reads don't wait behind it.
-        long: true,
+        // Minutes, maybe: in shells apart from git's, so neither its reads nor a fetch or push
+        // wait behind it.
+        apart: true,
         timeout: Some(job.timeout),
         ..remote::Request::default()
     };
@@ -410,7 +461,7 @@ fn run_there(target: &Target, job: &Job<'_>) -> Result<Ran, RunError> {
         std::thread::spawn(move || {
             while !done.load(Ordering::SeqCst) {
                 if cancel.is_cancelled() {
-                    stop_there(&host, &id);
+                    stop_there(&host, &id, &done);
                     return;
                 }
                 std::thread::sleep(TICK * 2);
@@ -435,15 +486,16 @@ fn run_there(target: &Target, job: &Job<'_>) -> Result<Ran, RunError> {
     }
 }
 
-/// Stops the run `id` on `host` and what it started, once it has said its process (it may be
-/// just starting).
-fn stop_there(host: &remote::Host, id: &str) {
+/// Stops the run `id` on `host` and what it started, once it has said its process: it may be
+/// waiting for a shell or its input may still be on the way, so this asks until it has, or
+/// until the run is `done`.
+fn stop_there(host: &remote::Host, id: &str, done: &AtomicBool) {
     let read = remote::Request {
         script: format!("cat {} 2>/dev/null", pid_file(id)),
         timeout: Some(Duration::from_secs(30)),
         ..remote::Request::default()
     };
-    for _ in 0..20 {
+    while !done.load(Ordering::SeqCst) {
         let pid = remote::exec(host, &read)
             .ok()
             .and_then(|out| String::from_utf8_lossy(&out.stdout).trim().parse().ok());
@@ -451,7 +503,7 @@ fn stop_there(host: &remote::Host, id: &str) {
             remote::stop_process(host, pid);
             return;
         }
-        std::thread::sleep(Duration::from_millis(100));
+        std::thread::sleep(Duration::from_millis(250));
     }
 }
 
@@ -485,6 +537,11 @@ mod tests {
             CommandLine::Line("ollama run llama3".to_owned())
         );
         assert!(line(AiTool::Custom, " ").is_err());
+        assert_eq!(
+            CommandLine::Line("'/my tools/ask' -x".to_owned()).program(),
+            "/my tools/ask"
+        );
+        assert_eq!(CommandLine::Line("llm -m x".to_owned()).program(), "llm");
         assert!(line(AiTool::Off, "x").is_err());
         Ok(())
     }
@@ -546,6 +603,33 @@ mod tests {
             timed_out("x", Duration::from_secs(90)).message(),
             "x didn't answer within 90 seconds and was stopped."
         );
+    }
+
+    /// Stopped on that machine (a timeout, a cancel), the script leaves no file behind.
+    #[cfg(unix)]
+    #[test]
+    fn the_script_for_another_machine_cleans_up_when_stopped() -> Result<(), String> {
+        let id = run_id();
+        let command = CommandLine::Line("sleep 30".to_owned());
+        let mut child = Command::new("sh")
+            .args(["-c", &there_script(&command, &id)])
+            .stdin(Stdio::null())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let tmp = std::env::var("TMPDIR").unwrap_or_else(|_| "/tmp".to_owned());
+        let file = Path::new(&tmp).join(format!("gitcraft-ai-{id}.pid"));
+        let until = Instant::now() + Duration::from_secs(5);
+        while !file.exists() && Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let written = file.exists();
+        let _ = Command::new("kill")
+            .args(["-TERM", &child.id().to_string()])
+            .status();
+        let _ = child.wait();
+        let left = file.exists();
+        assert!(written && !left);
+        Ok(())
     }
 
     /// The script for another machine, run here by `sh` the same way: the input reaches the

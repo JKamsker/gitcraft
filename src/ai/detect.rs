@@ -18,9 +18,10 @@ command -v gh >/dev/null 2>&1 && gh copilot --help >/dev/null 2>&1 </dev/null &&
 true";
 
 /// The same for `cmd` (Windows).
-const CMD: &str = "(where claude >nul 2>nul && echo claude) & \
-(where codex >nul 2>nul && echo codex) & \
-(where gh >nul 2>nul && gh copilot --help >nul 2>nul <nul && echo copilot) & ver >nul";
+/// `$PATH:`: only the PATH, never the folder it runs in.
+const CMD: &str = "(where $PATH:claude >nul 2>nul && echo claude) & \
+(where $PATH:codex >nul 2>nul && echo codex) & \
+(where $PATH:gh >nul 2>nul && gh copilot --help >nul 2>nul <nul && echo copilot) & ver >nul";
 
 /// Where looking for the tools of a machine stands.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -67,8 +68,15 @@ pub fn installed(repo: &Path) -> Result<Vec<AiTool>, String> {
         sh: SH.to_owned(),
         cmd: CMD.to_owned(),
     };
+    // Here, from a folder of no repository's: nothing of the repository's is taken for a tool.
+    let neutral = std::env::temp_dir();
+    let folder = if crate::remote::is_remote(repo) {
+        repo
+    } else {
+        neutral.as_path()
+    };
     let out = run::run(&Job {
-        repo,
+        repo: folder,
         command: &look,
         input: &[],
         timeout: LOOK_FOR,
@@ -131,13 +139,17 @@ mod tests {
     }
 
     #[test]
-    fn looking_in_a_folder_that_isnt_there_says_so() {
+    fn tools_here_are_looked_for_outside_the_repository() {
+        // Its folder isn't where the look runs: one that is gone doesn't matter.
         let found = installed(Path::new("/nonexistent/gitcraft-ai-detect"));
-        assert!(
-            found
-                .as_ref()
-                .is_err_and(|e| e.starts_with("Couldn't look for AI tools")),
-            "{found:?}"
-        );
+        assert!(found.is_ok(), "{found:?}");
+    }
+
+    /// On Windows, `where` with `$PATH:` and cmd's `NoDefaultCurrentDirectoryInExePath` keep
+    /// a repository's own `claude.cmd` from being found or run.
+    #[test]
+    fn the_windows_look_searches_only_the_path() {
+        assert_eq!(CMD.matches("where $PATH:").count(), 3);
+        assert!(!CMD.contains("where claude"));
     }
 }

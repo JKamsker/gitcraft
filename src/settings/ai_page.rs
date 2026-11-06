@@ -51,17 +51,25 @@ const PROMPT_ROWS: usize = 7;
 
 impl Settings {
     pub(super) fn ai_ui(&mut self, ui: &mut Ui, f: &Filter) {
-        let look = tools_here(ui.ctx());
+        // A search draws every page: only the page itself, shown, starts the look.
+        let look = if f.searching() {
+            HERE.lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone()
+        } else {
+            tools_here(ui.ctx())
+        };
         section(
             ui,
             f,
             "AI",
             Some(
-                "A button in the commit box asks an AI command-line tool you already have for a \
-                 message, and Review this branch in a branch's menu asks it for a review. It \
-                 runs on the repository's machine (here, in WSL or over SSH) with its own \
-                 sign-in: gitcraft keeps no API key. It is sent the staged changes (or what the \
-                 branch adds), your latest commit summaries and the prompt below.",
+                "The sparkles button in the commit box asks an AI command-line tool you already \
+                 have for a commit message, and Review this branch in a branch's menu asks it for \
+                 a review. It runs on the repository's machine (here, in WSL or over SSH) with \
+                 its own sign-in: gitcraft keeps no API key. A message is sent the staged changes \
+                 and your latest commit summaries; a review, the branch's commits and what it \
+                 changes; each with its prompt below.",
             ),
             |card| {
                 card.row("Tool", "ai claude codex copilot gh llm off", |ui| {
@@ -72,7 +80,9 @@ impl Settings {
                             ui.selectable_value(&mut self.ai.tool, AiTool::Off, "Off");
                             for tool in AiTool::CHOICES {
                                 let label = match look.has(tool) {
-                                    Some(false) => format!("{} — not found here", tool.label()),
+                                    Some(false) => {
+                                        format!("{} — not found on this machine", tool.label())
+                                    }
                                     _ => tool.label().to_owned(),
                                 };
                                 ui.selectable_value(&mut self.ai.tool, tool, label);
@@ -86,7 +96,16 @@ impl Settings {
                         Look::Found(found) => format!("On this machine: {}", names(found)),
                         Look::Failed(e) => e.clone(),
                     };
-                    layout::note(ui, note);
+                    ui.horizontal(|ui| {
+                        layout::note(ui, note);
+                        if matches!(look, Look::Found(_) | Look::Failed(_))
+                            && ui.small_button("Look again").clicked()
+                        {
+                            *HERE
+                                .lock()
+                                .unwrap_or_else(std::sync::PoisonError::into_inner) = Look::NotYet;
+                        }
+                    });
                 });
                 if self.ai.tool == AiTool::Custom {
                     card.row_hint(
@@ -111,7 +130,7 @@ impl Settings {
                     );
                 }
                 card.row_hint(
-                    "Most of a diff sent",
+                    "Largest diff sent",
                     "The rest is named, with its line counts",
                     "ai size limit kb truncate diff",
                     |ui| {
@@ -131,7 +150,8 @@ impl Settings {
                         layout::note(
                             ui,
                             "{conventions} says how the repository's latest summaries are \
-                             written (Conventional Commits when most of them are).",
+                             written (Conventional Commits when most of them are); {left_out} \
+                             lists the files whose diff didn't fit.",
                         );
                     },
                 );

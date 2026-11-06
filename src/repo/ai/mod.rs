@@ -77,7 +77,7 @@ fn coverage(files: usize, left_out: usize) -> Option<String> {
     (left_out > 0).then(|| {
         let whole = files.saturating_sub(left_out);
         format!(
-            "The tool saw {whole} of {files} file{} in full; the others by name and line counts \
+            "The tool saw {whole} of {files} file{} in full; the rest only in part or by name \
              (Settings → AI sets how much is sent).",
             if files == 1 { "" } else { "s" }
         )

@@ -26,9 +26,15 @@ impl RepoTab {
         let settings = Settings::get(ui.ctx()).ai;
         let busy = self.ai.writing.is_some();
         let tip = if !editable {
-            "The message can't be changed now".to_owned()
+            "Not while a rebase or patch continues: reword the commit once it is done".to_owned()
         } else if busy {
             "Writing the message…".to_owned()
+        } else if settings.enabled() && self.amend {
+            format!(
+                "Write the message with {} from the last commit and what is staged\nRight-click \
+                 for another tool",
+                settings.tool.short()
+            )
         } else if settings.enabled() {
             format!(
                 "Write the message with {} from the staged changes\nRight-click for another tool",
@@ -72,7 +78,7 @@ impl RepoTab {
         let place = crate::remote::parse(&self.path)
             .map_or_else(|| "this machine".to_owned(), |t| t.host.label());
         ui.label(
-            RichText::new(format!("Write commit messages with (on {place})"))
+            RichText::new(format!("AI tool, for messages and reviews (on {place})"))
                 .color(t.text_faint)
                 .small(),
         );
@@ -83,7 +89,8 @@ impl RepoTab {
             let text = match found {
                 Some(true) if no_command => format!("{} — set it in Settings → AI", tool.label()),
                 Some(true) => tool.label().to_owned(),
-                Some(false) => format!("{} — not installed", tool.label()),
+                Some(false) => format!("{} — not found", tool.label()),
+                None if matches!(self.ai.tools, Look::Failed(_)) => tool.label().to_owned(),
                 None => format!("{} — looking…", tool.label()),
             };
             let can = found != Some(false) && !no_command;
@@ -96,6 +103,14 @@ impl RepoTab {
         }
         if let Look::Failed(e) = &self.ai.tools {
             ui.label(RichText::new(e).color(t.danger).small());
+        }
+        if matches!(self.ai.tools, Look::Found(_) | Look::Failed(_))
+            && ui
+                .button("Look again")
+                .on_hover_text("Look for the tools again, after installing one")
+                .clicked()
+        {
+            self.ai.tools = Look::NotYet;
         }
         ui.separator();
         if current != AiTool::Off && ui.button("Turn off").clicked() {
@@ -138,19 +153,19 @@ impl RepoTab {
         self.ai.note = None;
         self.ai.suggestion = None;
         let repo = self.path.clone();
+        let question = Question::CommitMessage { amend: self.amend };
         self.then(
             ctx,
-            move || {
-                ai::ask(
-                    &repo,
-                    &settings,
-                    &Question::CommitMessage,
-                    ai::TIMEOUT,
-                    &cancel,
-                )
-            },
+            move || ai::ask(&repo, &settings, &question, ai::TIMEOUT, &cancel),
             move |tab, answer, _| tab.message_answered(id, answer),
         );
+    }
+
+    /// After a commit: what was written for it, or is being written, is done with.
+    pub(in crate::repo) fn ai_committed(&mut self) {
+        self.cancel_message();
+        self.ai.suggestion = None;
+        self.ai.note = None;
     }
 
     /// Stops the message being written, if one is.

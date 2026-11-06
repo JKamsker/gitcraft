@@ -11,8 +11,8 @@ use super::{AiSettings, gather};
 /// What is asked.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Question {
-    /// A message for the staged changes.
-    CommitMessage,
+    /// A message for the staged changes; when `amend`, for the last commit with them.
+    CommitMessage { amend: bool },
     /// A review of what `branch` adds to `base`.
     Review { branch: String, base: String },
 }
@@ -38,7 +38,7 @@ pub fn ask(
 ) -> Result<Answer, RunError> {
     let command = CommandLine::for_tool(settings).map_err(RunError::Failed)?;
     let prompt = match question {
-        Question::CommitMessage => gather::commit_prompt(repo, settings),
+        Question::CommitMessage { amend } => gather::commit_prompt(repo, settings, *amend),
         Question::Review { branch, base } => gather::review_prompt(repo, settings, branch, base),
     }
     .map_err(RunError::Failed)?;

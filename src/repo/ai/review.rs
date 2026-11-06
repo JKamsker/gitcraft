@@ -203,13 +203,14 @@ fn review_ui(ui: &mut Ui, review: &mut Review) -> Option<Asked> {
         }
         State::Failed(e) => {
             ui.add(egui::Label::new(RichText::new(e).color(t.danger)).wrap());
-            if ui.button("Try again").clicked() {
+            // With no tool picked, trying again is the same answer: the message says what to do.
+            if Settings::get(ui.ctx()).ai.enabled() && ui.button("Try again").clicked() {
                 asked = Some(Asked::Again);
             }
         }
         State::Stopped => {
             ui.label(RichText::new("Stopped.").color(t.text_dim));
-            if ui.button("Start again").clicked() {
+            if ui.button("Review again").clicked() {
                 asked = Some(Asked::Again);
             }
         }

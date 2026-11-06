@@ -14,6 +14,9 @@ use super::shell::{Shell, lock};
 pub(super) enum Lane {
     Quick,
     Long,
+    /// A program other than git that may take minutes (an AI tool): apart from both, so that
+    /// it never keeps a fetch or push waiting.
+    Apart,
 }
 
 impl Lane {
@@ -22,6 +25,7 @@ impl Lane {
         match self {
             Lane::Quick => 6,
             Lane::Long => 3,
+            Lane::Apart => 2,
         }
     }
 }
