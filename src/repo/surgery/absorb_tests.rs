@@ -262,3 +262,112 @@ fn pushed_commits_are_marked_and_nothing_staged_is_said() {
     assert!(nothing.is_some_and(|s| s.1 && s.0.contains("nothing is staged")));
     assert_eq!(targets, [("B".to_owned(), false), ("A".to_owned(), true)]);
 }
+
+/// Staged a fix, then kept editing the same line: the working tree stays exactly as it was
+/// (no conflict, no stash left), and what wasn't absorbed is still staged as it was.
+#[test]
+fn edits_made_after_staging_stay_as_they_are() {
+    let dir = repo("absorb-edited", HISTORY);
+    sh(
+        &dir,
+        "printf '1\\nzwei\\n3\\n4\\n5\\n6\\n7\\n8\\nNEUN\\n10\\n' > 'f é.txt' && echo n1 > n.txt \
+         && git add -A && printf '1\\nzwei\\n3\\n4\\n5\\n6\\n7\\n8\\nNEUN2\\n10\\n' > 'f é.txt' \
+         && echo n2 > n.txt && echo later > ita.txt && git add -N ita.txt",
+    );
+    let (mut tab, ctx) = opened(&dir);
+    let before_file = std::fs::read_to_string(dir.join("f é.txt")).unwrap_or_default();
+    open(&mut tab, &ctx);
+    check(&mut tab, &ctx);
+    tab.run_absorb(&ctx);
+    let status = finished(&mut tab, &ctx);
+    let after_file = std::fs::read_to_string(dir.join("f é.txt")).unwrap_or_default();
+    let in_b = show(&dir, "HEAD:f é.txt");
+    let staged_n = show(&dir, ":n.txt");
+    let worktree_n = std::fs::read_to_string(dir.join("n.txt")).unwrap_or_default();
+    let ita = git_out(&dir, &["ls-files", "--", "ita.txt"]);
+    let stash = git_out(&dir, &["stash", "list"]);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(status.as_ref().is_some_and(|s| !s.1), "{status:?}");
+    assert_eq!(after_file, before_file);
+    assert!(in_b.contains("NEUN") && !in_b.contains("NEUN2"));
+    assert_eq!(staged_n, "n1");
+    assert_eq!(worktree_n, "n2\n");
+    assert_eq!(ita, "ita.txt");
+    assert!(stash.is_empty());
+}
+
+/// A fix to A's line next to a line B changed would conflict when B is made again on it:
+/// Check says so, and nothing changes.
+#[test]
+fn a_fix_a_later_commit_conflicts_with_is_refused_at_check() {
+    let dir = repo(
+        "absorb-conflict",
+        "printf 'a\\nb\\nc\\n' > f && git add -A && git commit -q -m base && git checkout -q -b feat \
+         && printf 'a\\nB\\nc\\n' > f && git commit -q -am A && printf 'a\\nB\\nC\\n' > f \
+         && git commit -q -am B",
+    );
+    sh(&dir, "printf 'a\\nBB\\nC\\n' > f && git add -A");
+    let (mut tab, ctx) = opened(&dir);
+    let before = git_out(&dir, &["rev-parse", "HEAD"]);
+    open(&mut tab, &ctx);
+    let hunks = found(&tab);
+    tab.check_absorb(&ctx);
+    pump(&mut tab, &ctx, |t| {
+        t.absorb.as_ref().is_some_and(|a| !a.busy)
+    });
+    let error = tab.absorb.as_ref().and_then(|a| a.error.clone());
+    let head = git_out(&dir, &["rev-parse", "HEAD"]);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(hunks, ["clear A"]);
+    assert!(
+        error.is_some_and(|e| e.contains("later commit")),
+        "{:?}",
+        tab.absorb.as_ref().map(|a| &a.error)
+    );
+    assert_eq!(head, before);
+}
+
+/// A commit made after checking: absorbing refuses, and the branch keeps it.
+#[test]
+fn a_commit_made_after_checking_stops_it() {
+    let dir = repo("absorb-head-moved", HISTORY);
+    sh(
+        &dir,
+        "printf '1\\nZWEI\\n3\\n4\\n5\\n6\\n7\\n8\\nneun\\n10\\n' > 'f é.txt' && git add -A",
+    );
+    let (mut tab, ctx) = opened(&dir);
+    open(&mut tab, &ctx);
+    check(&mut tab, &ctx);
+    sh(&dir, "git commit -q --allow-empty -m newer");
+    let newer = git_out(&dir, &["rev-parse", "HEAD"]);
+    tab.run_absorb(&ctx);
+    let status = finished(&mut tab, &ctx);
+    let head = git_out(&dir, &["rev-parse", "HEAD"]);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(status.as_ref().is_some_and(|s| s.1), "{status:?}");
+    assert_eq!(head, newer);
+}
+
+/// With commit.gpgsign, the commits made again are signed (here by a stand-in for gpg).
+#[test]
+#[cfg(unix)]
+fn the_commits_made_again_are_signed_when_the_config_says_so() {
+    let dir = repo("absorb-signed", HISTORY);
+    sh(
+        &dir,
+        "printf '#!/bin/sh\\necho \"[GNUPG:] SIG_CREATED D 1 8 00 0 X\" >&2\\necho \"-----BEGIN PGP SIGNATURE-----\"\\necho fake\\necho \"-----END PGP SIGNATURE-----\"\\n' > fake-gpg \
+         && chmod +x fake-gpg && git config gpg.program \"$PWD/fake-gpg\" && git config commit.gpgsign true \
+         && echo fake-gpg > .git/info/exclude \
+         && printf '1\\nZWEI\\n3\\n4\\n5\\n6\\n7\\n8\\nneun\\n10\\n' > 'f é.txt' && git add 'f é.txt'",
+    );
+    let (mut tab, ctx) = opened(&dir);
+    open(&mut tab, &ctx);
+    check(&mut tab, &ctx);
+    tab.run_absorb(&ctx);
+    let status = finished(&mut tab, &ctx);
+    let raw = git_out(&dir, &["cat-file", "commit", "HEAD~1"]);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(status.as_ref().is_some_and(|s| !s.1), "{status:?}");
+    // Whatever the format the config picks (here a stand-in for gpg, or ssh set globally).
+    assert!(raw.contains("\ngpgsig "), "{raw}");
+}

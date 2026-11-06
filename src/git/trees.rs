@@ -210,15 +210,25 @@ pub fn commit_tree(
     message: &str,
     author: Option<&Author>,
 ) -> Result<String, String> {
+    commit_tree_signed(repo, tree, parent, message, author, false)
+}
+
+/// [`commit_tree`], signed (with the user's `user.signingKey` and `gpg.format`) when `sign`.
+pub fn commit_tree_signed(
+    repo: &Path,
+    tree: &str,
+    parent: &str,
+    message: &str,
+    author: Option<&Author>,
+    sign: bool,
+) -> Result<String, String> {
     let file = super::save_patch_for(repo, message)?;
     let env = author.map(Author::env).unwrap_or_default();
-    Ok(run_env(
-        repo,
-        &env,
-        &["commit-tree", tree, "-p", parent, "-F", &file],
-    )?
-    .trim()
-    .to_owned())
+    let mut args = vec!["commit-tree", tree, "-p", parent, "-F", &file];
+    if sign {
+        args.push("-S");
+    }
+    Ok(run_env(repo, &env, &args)?.trim().to_owned())
 }
 
 #[cfg(test)]
