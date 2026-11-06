@@ -157,6 +157,13 @@ so your config, credentials and hooks apply as usual.
   to switch a repository to; _Use the profile's author_ takes the repository's own out again.
 - Undo / redo (Ctrl+Z / Ctrl+Y) of commits, amends, merges, rebases, pulls, resets,
   cherry-picks, reverts, checkouts, branch create / rename / delete, tags and stashes.
+- _What a package will publish_ (Ctrl+P) lists the files `cargo package --list` or
+  `npm pack --dry-run --ignore-scripts` would ship for a crate or npm package of the repository
+  (each of a workspace's members), run where the repository is (here, in WSL or over SSH). It
+  flags what looks shipped by accident (`.env`, keys, logs, build output, editor folders), what
+  is left out that a package usually wants (the README and licence, a crate's `src/` files, the
+  files the manifest names: `readme`, `main`, `bin`…), and the files new or gone since the version on
+  crates.io or npm.
 
 **Diffs and conflicts** (centre)
 
@@ -358,6 +365,8 @@ was made this way, on a demo repository.
 | `src/update.rs`          | new-release check                                                                  |
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |
 | `src/shell_path.rs`      | on macOS, the login shell's PATH for the commands gitcraft starts                  |
+| `src/package/` | what a crate or npm package will publish: the tool's listing, what looks wrong, the registry's version |
+| `src/repo/package/` | the panel that shows it |
 | `src/remote/` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
 | `src/settings/`          | user settings, profiles, and the settings pages                                    |
 | `src/manual.rs`          | the manual (F1): features and keyboard shortcuts                                   |

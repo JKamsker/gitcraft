@@ -72,6 +72,12 @@ const FEATURES: &[(&str, &[&str])] = &[
             "A terminal panel with tabs, in the repository's folder.",
         ],
     ),
+    (
+        "Packages",
+        &[
+            "What a package will publish (Ctrl+P) lists the files cargo package --list or npm pack --dry-run would ship for each crate or npm package of the repository, what looks shipped by accident (.env, keys, logs, build output), what a package usually wants and leaves out (its README, LICENSE, main file), and the files new or gone since the version on crates.io or npm.",
+        ],
+    ),
 ];
 
 /// Keyboard and mouse shortcuts: (keys, what they do). `Cmd` stands for Ctrl outside macOS.
