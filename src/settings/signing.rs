@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use egui::{RichText, Ui};
 
-use super::layout::section;
+use super::layout::{Filter, section};
 use crate::theme::Tokens;
 
 /// How long values read from the config hold while nothing is being edited: it can change
@@ -168,7 +168,7 @@ struct Form {
 const GLOBAL: &[&str] = &["--global"];
 
 /// The commit signing form. Choices are written at once, text fields when they lose focus.
-pub(super) fn signing_ui(ui: &mut Ui) {
+pub(super) fn signing_ui(ui: &mut Ui, filter: &Filter) {
     let t = Tokens::get(ui.ctx());
     let id = egui::Id::new("settings-signing");
     let mut form = ui
@@ -186,10 +186,11 @@ pub(super) fn signing_ui(ui: &mut Ui) {
     let mut commit = false;
     section(
         ui,
+        filter,
         "Commit signing",
         Some("Your global git config; a repository's own config can override it."),
         |card| {
-            card.row("Format", |ui| {
+            card.row("Format", "gpg openpgp ssh x509 s/mime", |ui| {
                 let shown = FORMATS
                     .iter()
                     .find(|(value, _)| *value == form.edit.format())
@@ -219,32 +220,44 @@ pub(super) fn signing_ui(ui: &mut Ui) {
                 "x509" => ("Certificate ID", "gpgsm"),
                 _ => ("Key ID or fingerprint", "gpg"),
             };
-            card.row_hint("Signing key", "Empty: picked from your identity", |ui| {
-                let key = ui
-                    .add(
-                        super::layout::field(&mut form.edit.key)
-                            .hint_text(key_hint)
-                            .desired_width(super::FIELD_WIDTH),
-                    )
-                    .on_hover_text("user.signingkey; empty lets git pick one from your identity");
-                commit |= key.lost_focus();
-            });
+            card.row_hint(
+                "Signing key",
+                "Empty: picked from your identity",
+                "signingkey gpg ssh",
+                |ui| {
+                    let key = ui
+                        .add(
+                            super::layout::field(&mut form.edit.key)
+                                .hint_text(key_hint)
+                                .desired_width(super::FIELD_WIDTH),
+                        )
+                        .on_hover_text(
+                            "user.signingkey; empty lets git pick one from your identity",
+                        );
+                    commit |= key.lost_focus();
+                },
+            );
 
-            card.row_hint("Program", "Empty: the one on the PATH", |ui| {
-                let program = ui
-                    .add(
-                        super::layout::field(&mut form.edit.program)
-                            .hint_text(program_hint)
-                            .desired_width(super::FIELD_WIDTH),
-                    )
-                    .on_hover_text(format!(
-                        "{}; empty runs {program_hint} from the PATH",
-                        program_key(form.edit.format())
-                    ));
-                commit |= program.lost_focus();
-            });
+            card.row_hint(
+                "Program",
+                "Empty: the one on the PATH",
+                "gpg ssh-keygen gpgsm",
+                |ui| {
+                    let program = ui
+                        .add(
+                            super::layout::field(&mut form.edit.program)
+                                .hint_text(program_hint)
+                                .desired_width(super::FIELD_WIDTH),
+                        )
+                        .on_hover_text(format!(
+                            "{}; empty runs {program_hint} from the PATH",
+                            program_key(form.edit.format())
+                        ));
+                    commit |= program.lost_focus();
+                },
+            );
 
-            card.row("Sign by default", |ui| {
+            card.row("Sign by default", "commits tags gpgsign", |ui| {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 18.0;
                     commit |= ui
@@ -259,7 +272,7 @@ pub(super) fn signing_ui(ui: &mut Ui) {
             });
 
             if let Some(e) = &form.error {
-                card.full(|ui| ui.label(RichText::new(e).color(t.danger).small()));
+                card.full("", |ui| ui.label(RichText::new(e).color(t.danger).small()));
             }
         },
     );

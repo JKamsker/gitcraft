@@ -147,9 +147,11 @@ so your config, credentials and hooks apply as usual.
 - Avatars: on a GitHub repository, the authors' GitHub accounts (through `gh` when installed, else
   GitHub's API); on GitLab, the host's avatar API; elsewhere Gravatar (a hash of the email).
   Cached on disk; can be turned off.
-- Settings: zoom, branch column width, graph columns, avatars, notifications, update check,
-  background fetch, keeping submodules up to date, editor command, default shell and terminal
-  font size, saved identities.
+- Settings (Ctrl+, or the gear in the title bar), in pages listed on the left: zoom, branch
+  column width, graph columns, avatars, notifications, update check, background fetch, keeping
+  submodules up to date, editor command, default shell and terminal font size, saved
+  identities, and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it);
+  Alt+↑ / Alt+↓ go through the pages.
 - Commit signing in Settings: the format (OpenPGP, SSH or X.509), signing key and program, and
   whether commits and tags are signed by default. These are your global git config's
   `gpg.format`, `user.signingkey`, `gpg.program` (`gpg.ssh.program`, `gpg.x509.program`),

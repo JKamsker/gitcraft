@@ -1,13 +1,14 @@
 //! User settings: stored with the app state, readable from anywhere through the egui context.
 
 mod layout;
+mod page;
 mod signing;
 
 use egui::{RichText, Ui};
 use serde::{Deserialize, Serialize};
 
 use crate::theme::Tokens;
-use layout::{Card, section};
+use layout::{Card, Filter, section};
 
 /// A name and email to commit with, applied per repository.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -168,11 +169,12 @@ impl Settings {
     /// the conflict editor, and whether git merges with it.
     fn mergiraf_ui(&mut self, card: &mut Card) {
         use crate::mergiraf::{self, Job};
-        let t = Tokens::get(card.ctx());
-        let state = mergiraf::state(card.ctx());
+        let ctx = card.ctx();
+        let t = Tokens::get(&ctx);
+        let state = mergiraf::state(&ctx);
         let job = mergiraf::job();
         let busy = matches!(job, Job::Running(_));
-        card.row("Installed", |ui| {
+        card.row("Installed", "install version download codeberg", |ui| {
             ui.horizontal(|ui| {
                 match &state.found {
                     Some(found) => {
@@ -216,7 +218,7 @@ impl Settings {
                 }
             });
         });
-        card.row("Conflict editor", |ui| {
+        card.row("Conflict editor", "offer answer resolve", |ui| {
             ui.add_enabled(
                 state.found.is_some(),
                 egui::Checkbox::new(&mut self.mergiraf, "Offer Mergiraf's answer"),
@@ -226,276 +228,394 @@ impl Settings {
                  Its answer shows in the editor; nothing is saved before you check it.",
             );
         });
-        card.row("Git merges", |ui| {
-            let mut in_merges = state.in_merges;
-            let toggle = ui
-                .add_enabled(
-                    state.found.is_some() && !busy,
-                    egui::Checkbox::new(&mut in_merges, "Use it in every git merge"),
-                )
-                .on_hover_text(
-                    "Git merges, rebases and cherry-picks go through Mergiraf, in every \
+        card.row(
+            "Git merges",
+            "every merge rebase cherry-pick driver",
+            |ui| {
+                let mut in_merges = state.in_merges;
+                let toggle = ui
+                    .add_enabled(
+                        state.found.is_some() && !busy,
+                        egui::Checkbox::new(&mut in_merges, "Use it in every git merge"),
+                    )
+                    .on_hover_text(
+                        "Git merges, rebases and cherry-picks go through Mergiraf, in every \
                      repository and in the terminal too, so fewer conflicts are left at all. \
                      Sets merge.mergiraf in your global git config and adds a marked block to \
                      your global attributes file (also merge.conflictStyle = diff3, if you set \
                      none); unticking takes them out again.",
-                );
-            if toggle.changed() {
-                mergiraf::use_in_merges(ui.ctx(), in_merges);
-            }
-        });
-    }
-
-    /// The settings form. Returns true when something changed.
-    pub fn ui(&mut self, ui: &mut Ui) -> bool {
-        let t = Tokens::get(ui.ctx());
-        let before = self.clone();
-
-        section(ui, "Appearance", None, |card| {
-            card.row("Zoom", |ui| {
-                ui.spacing_mut().slider_width = 240.0;
-                ui.add(layout::slider(
-                    egui::Slider::new(&mut self.ui_scale, 0.7..=2.0)
-                        .step_by(0.05)
-                        .custom_formatter(|v, _| format!("{:.0} %", v * 100.0)),
-                ));
-            });
-            card.row("Code colours", |ui| {
-                ui.checkbox(&mut self.vscode_colors, "Use VS Code's colour theme")
-                    .on_hover_text("Colours code in diffs and blame like your editor does");
-                if self.vscode_colors {
-                    let note = match crate::vscode_theme::current() {
-                        Some(found) if found.dark == t.dark() => found.name.clone(),
-                        Some(found) => format!(
-                            "{} is {}: gitcraft's colours meanwhile",
-                            found.name,
-                            if found.dark { "dark" } else { "light" }
-                        ),
-                        None => "No VS Code theme found".to_owned(),
-                    };
-                    indented_note(ui, note);
-                }
-            });
-            card.row("Avatars", |ui| {
-                ui.checkbox(&mut self.avatars, "Load from GitHub, GitLab or Gravatar")
-                    .on_hover_text("On a GitHub repository, its commit list says which account each author is; on GitLab, the host is asked by email. Other authors: an MD5 hash of the email goes to gravatar.com. Cached on disk.");
-            });
-        });
-
-        section(ui, "Commit graph", None, |card| {
-            card.row("Branch column width", |ui| {
-                ui.spacing_mut().slider_width = 240.0;
-                ui.add(layout::slider(
-                    egui::Slider::new(&mut self.refs_width, 210.0..=2000.0)
-                        .step_by(10.0)
-                        .suffix(" px"),
-                ));
-            });
-            card.row_hint("Columns", "Or right-click the graph's header", |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.spacing_mut().item_spacing.x = 18.0;
-                    ui.checkbox(&mut self.show_author, "Author");
-                    ui.checkbox(&mut self.show_when, "When");
-                    ui.checkbox(&mut self.show_date, "Date");
-                    ui.checkbox(&mut self.show_hash, "Hash");
-                });
-            });
-            card.row("Lanes", |ui| {
-                let mut compact = self.compact_graph;
-                if ui.checkbox(&mut compact, "Compact graph").changed() {
-                    self.set_compact_graph(compact);
-                }
-                indented_note(ui, COMPACT_TIP);
-            });
-        });
-
-        section(ui, "Behaviour", None, |card| {
-            card.row("Worktrees", |ui| {
-                ui.checkbox(&mut self.worktrees_in_same_tab, "Open in the same tab")
-                    .on_hover_text("The tab moves to the worktree and shows its branch, which also opens a list to switch between them. What you leave behind keeps running: terminals, operations, a half-written commit message.");
-            });
-            card.row("Notifications", |ui| {
-                ui.checkbox(
-                    &mut self.notifications,
-                    "When a long operation ends in the background",
-                );
-            });
-            if let Some(appimage) = crate::desktop_entry::appimage() {
-                card.row("Applications menu", |ui| {
-                    if crate::desktop_entry::installed() {
-                        if ui.button("Remove gitcraft").clicked() {
-                            let _ = crate::desktop_entry::uninstall();
-                        }
-                    } else if ui.button("Add gitcraft").clicked() {
-                        let _ = crate::desktop_entry::install(&appimage);
-                    }
-                    layout::note(ui, "Starts this AppImage; follows it when you replace it");
-                });
-            }
-        });
-
-        section(ui, "Updates", None, |card| {
-            card.row("Version", |ui| {
-                ui.add_space(4.0);
-                ui.label(
-                    RichText::new(format!("gitcraft {}", crate::update::CURRENT)).color(t.text_dim),
-                );
-            });
-            card.row("New versions", |ui| {
-                ui.checkbox(
-                    &mut self.check_updates,
-                    "Look for a new version on GitHub on every start",
-                );
-                ui.add_enabled_ui(self.check_updates, |ui| {
-                    ui.checkbox(
-                        &mut self.download_updates,
-                        "Download it in the background, ready to install with a restart",
                     );
-                });
-            });
-            card.row("Channel", |ui| {
-                ui.add_enabled_ui(self.check_updates, |ui| {
-                    egui::ComboBox::from_id_salt("settings-update-channel")
-                        .width(COMBO_WIDTH)
-                        .selected_text(self.update_channel.label())
-                        .show_ui(ui, |ui| {
-                            for channel in crate::update::Channel::ALL {
-                                ui.selectable_value(
-                                    &mut self.update_channel,
-                                    channel,
-                                    channel.label(),
-                                );
-                            }
-                        });
-                });
-            });
-        });
-
-        section(ui, "Git", None, |card| {
-            card.row("Fetch in the background", |ui| {
-                ui.horizontal(|ui| {
-                    ui.add(
-                        egui::DragValue::new(&mut self.auto_fetch_minutes)
-                            .range(0..=240)
-                            .suffix(" min"),
-                    );
-                    layout::note(ui, "0 turns it off");
-                });
-            });
-            card.row("Pull", |ui| {
-                egui::ComboBox::from_id_salt("settings-pull")
-                    .width(COMBO_WIDTH)
-                    .selected_text(self.pull_mode.label())
-                    .show_ui(ui, |ui| {
-                        for mode in crate::repo::pull::PullMode::ALL {
-                            ui.selectable_value(&mut self.pull_mode, mode, mode.label());
-                        }
-                    });
-            });
-            card.row("Submodules", |ui| {
-                ui.checkbox(&mut self.keep_submodules, "Keep submodules up to date")
-                    .on_hover_text(
-                        "After a checkout, pull, merge or rebase in a repository with \
-                         submodules, run git submodule update --init --recursive, so each one \
-                         is at the commit the repository now records.",
-                    );
-            });
-            card.row_hint("Editor command", "Opens a folder or file", |ui| {
-                ui.add(
-                    layout::field(&mut self.editor)
-                        .hint_text("code")
-                        .desired_width(FIELD_WIDTH),
-                )
-                .on_hover_text("Run with a folder or file path, e.g. code, subl, idea");
-            });
-        });
-
-        section(
-            ui,
-            "Mergiraf",
-            Some("Solves merge conflicts from the syntax of the code."),
-            |card| self.mergiraf_ui(card),
-        );
-
-        signing::signing_ui(ui);
-
-        section(ui, "Terminal", None, |card| {
-            card.row("Default shell", |ui| {
-                let shells = crate::terminal::available_shells();
-                let current = shells
-                    .iter()
-                    .find(|s| s.program == self.shell)
-                    .map(|s| s.label.clone())
-                    .unwrap_or_else(|| "System default".to_owned());
-                egui::ComboBox::from_id_salt("settings-shell")
-                    .width(COMBO_WIDTH)
-                    .selected_text(current)
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut self.shell, String::new(), "System default");
-                        for s in &shells {
-                            ui.selectable_value(&mut self.shell, s.program.clone(), &s.label);
-                        }
-                    });
-            });
-            card.row("Font size", |ui| {
-                ui.spacing_mut().slider_width = 240.0;
-                ui.add(layout::slider(
-                    egui::Slider::new(&mut self.terminal_font, 9.0..=20.0)
-                        .step_by(0.5)
-                        .max_decimals(1)
-                        .suffix(" pt"),
-                ));
-            });
-        });
-
-        section(
-            ui,
-            "Identities",
-            Some("Name and email pairs you can apply to a repository from its commit box."),
-            |card| {
-                let mut remove = None;
-                for (i, p) in self.profiles.iter_mut().enumerate() {
-                    card.full(|ui| {
-                        ui.horizontal(|ui| {
-                            ui.add(
-                                layout::field(&mut p.label)
-                                    .hint_text("Work")
-                                    .desired_width(110.0),
-                            );
-                            ui.add(
-                                layout::field(&mut p.name)
-                                    .hint_text("Name")
-                                    .desired_width(170.0),
-                            );
-                            // The email takes what is left, the remove button at the end.
-                            let rest = (ui.available_width() - 32.0).max(120.0);
-                            ui.add(
-                                layout::field(&mut p.email)
-                                    .hint_text("email@example.com")
-                                    .desired_width(rest),
-                            );
-                            if crate::icons::small_button(ui, "x", "Remove").clicked() {
-                                remove = Some(i);
-                            }
-                        });
-                    });
+                if toggle.changed() {
+                    mergiraf::use_in_merges(ui.ctx(), in_merges);
                 }
-                if let Some(i) = remove {
-                    self.profiles.remove(i);
-                }
-                card.full(|ui| {
-                    ui.horizontal(|ui| {
-                        if ui.button("Add identity").clicked() {
-                            self.profiles.push(Profile::default());
-                        }
-                        if self.profiles.is_empty() {
-                            layout::note(ui, "None yet");
-                        }
-                    });
-                });
             },
         );
-        *self != before
+    }
+
+    /// One page of the settings, or what a search matches on it (see [`layout::Filter`]).
+    fn page_ui(&mut self, ui: &mut Ui, page: Page, f: &Filter) {
+        let t = Tokens::get(ui.ctx());
+        match page {
+            Page::General => {
+                section(ui, f, "Behaviour", None, |card| {
+                    card.row("Worktrees", "open same tab switch", |ui| {
+                        ui.checkbox(&mut self.worktrees_in_same_tab, "Open in the same tab")
+                            .on_hover_text("The tab moves to the worktree and shows its branch, which also opens a list to switch between them. What you leave behind keeps running: terminals, operations, a half-written commit message.");
+                    });
+                    card.row("Notifications", "desktop long operation background", |ui| {
+                        ui.checkbox(
+                            &mut self.notifications,
+                            "When a long operation ends in the background",
+                        );
+                    });
+                    if let Some(appimage) = crate::desktop_entry::appimage() {
+                        card.row(
+                            "Applications menu",
+                            "appimage desktop entry launcher",
+                            |ui| {
+                                if crate::desktop_entry::installed() {
+                                    if ui.button("Remove gitcraft").clicked() {
+                                        let _ = crate::desktop_entry::uninstall();
+                                    }
+                                } else if ui.button("Add gitcraft").clicked() {
+                                    let _ = crate::desktop_entry::install(&appimage);
+                                }
+                                layout::note(
+                                    ui,
+                                    "Starts this AppImage; follows it when you replace it",
+                                );
+                            },
+                        );
+                    }
+                });
+                section(ui, f, "Updates", None, |card| {
+                    card.row("Version", "about release", |ui| {
+                        ui.add_space(4.0);
+                        ui.label(
+                            RichText::new(format!("gitcraft {}", crate::update::CURRENT))
+                                .color(t.text_dim),
+                        );
+                    });
+                    card.row("New versions", "check download github restart", |ui| {
+                        ui.checkbox(
+                            &mut self.check_updates,
+                            "Look for a new version on GitHub on every start",
+                        );
+                        ui.add_enabled_ui(self.check_updates, |ui| {
+                            ui.checkbox(
+                                &mut self.download_updates,
+                                "Download it in the background, ready to install with a restart",
+                            );
+                        });
+                    });
+                    card.row("Channel", "main dev releases builds", |ui| {
+                        ui.add_enabled_ui(self.check_updates, |ui| {
+                            egui::ComboBox::from_id_salt("settings-update-channel")
+                                .width(COMBO_WIDTH)
+                                .selected_text(self.update_channel.label())
+                                .show_ui(ui, |ui| {
+                                    for channel in crate::update::Channel::ALL {
+                                        ui.selectable_value(
+                                            &mut self.update_channel,
+                                            channel,
+                                            channel.label(),
+                                        );
+                                    }
+                                });
+                        });
+                    });
+                });
+            }
+            Page::Appearance => {
+                section(ui, f, "Appearance", None, |card| {
+                    card.row("Zoom", "scale size interface ui", |ui| {
+                        ui.spacing_mut().slider_width = SLIDER_WIDTH;
+                        ui.add(layout::slider(
+                            egui::Slider::new(&mut self.ui_scale, 0.7..=2.0)
+                                .step_by(0.05)
+                                .custom_formatter(|v, _| format!("{:.0} %", v * 100.0)),
+                        ));
+                    });
+                    card.row(
+                        "Code colours",
+                        "vs code vscode theme syntax highlighting colors",
+                        |ui| {
+                            ui.checkbox(&mut self.vscode_colors, "Use VS Code's colour theme")
+                                .on_hover_text(
+                                    "Colours code in diffs and blame like your editor does",
+                                );
+                            if self.vscode_colors {
+                                let note = match crate::vscode_theme::current() {
+                                    Some(found) if found.dark == t.dark() => found.name.clone(),
+                                    Some(found) => format!(
+                                        "{} is {}: gitcraft's colours meanwhile",
+                                        found.name,
+                                        if found.dark { "dark" } else { "light" }
+                                    ),
+                                    None => "No VS Code theme found".to_owned(),
+                                };
+                                indented_note(ui, note);
+                            }
+                        },
+                    );
+                    card.row("Avatars", "github gitlab gravatar pictures authors", |ui| {
+                        ui.checkbox(&mut self.avatars, "Load from GitHub, GitLab or Gravatar")
+                            .on_hover_text("On a GitHub repository, its commit list says which account each author is; on GitLab, the host is asked by email. Other authors: an MD5 hash of the email goes to gravatar.com. Cached on disk.");
+                    });
+                });
+            }
+            Page::Graph => {
+                section(ui, f, "Commit graph", None, |card| {
+                    card.row("Branch column width", "refs tags pills", |ui| {
+                        ui.spacing_mut().slider_width = SLIDER_WIDTH;
+                        ui.add(layout::slider(
+                            egui::Slider::new(&mut self.refs_width, 210.0..=2000.0)
+                                .step_by(10.0)
+                                .suffix(" px"),
+                        ));
+                    });
+                    card.row_hint(
+                        "Columns",
+                        "Or right-click the graph's header",
+                        "author when date hash show",
+                        |ui| {
+                            ui.horizontal_wrapped(|ui| {
+                                ui.spacing_mut().item_spacing.x = 18.0;
+                                ui.checkbox(&mut self.show_author, "Author");
+                                ui.checkbox(&mut self.show_when, "When");
+                                ui.checkbox(&mut self.show_date, "Date");
+                                ui.checkbox(&mut self.show_hash, "Hash");
+                            });
+                        },
+                    );
+                    card.row("Lanes", "compact graph narrow", |ui| {
+                        let mut compact = self.compact_graph;
+                        if ui.checkbox(&mut compact, "Compact graph").changed() {
+                            self.set_compact_graph(compact);
+                        }
+                        indented_note(ui, COMPACT_TIP);
+                    });
+                });
+            }
+            Page::Git => {
+                section(ui, f, "Git", None, |card| {
+                    card.row(
+                        "Fetch in the background",
+                        "auto fetch interval minutes remote",
+                        |ui| {
+                            ui.horizontal(|ui| {
+                                ui.add(
+                                    egui::DragValue::new(&mut self.auto_fetch_minutes)
+                                        .range(0..=240)
+                                        .suffix(" min"),
+                                );
+                                layout::note(ui, "0 turns it off");
+                            });
+                        },
+                    );
+                    card.row("Pull", "fast-forward rebase merge", |ui| {
+                        egui::ComboBox::from_id_salt("settings-pull")
+                            .width(COMBO_WIDTH)
+                            .selected_text(self.pull_mode.label())
+                            .show_ui(ui, |ui| {
+                                for mode in crate::repo::pull::PullMode::ALL {
+                                    ui.selectable_value(&mut self.pull_mode, mode, mode.label());
+                                }
+                            });
+                    });
+                    card.row("Submodules", "update recursive", |ui| {
+                        ui.checkbox(&mut self.keep_submodules, "Keep submodules up to date")
+                            .on_hover_text(
+                                "After a checkout, pull, merge or rebase in a repository with \
+                                 submodules, run git submodule update --init --recursive, so \
+                                 each one is at the commit the repository now records.",
+                            );
+                    });
+                    card.row_hint(
+                        "Editor command",
+                        "Opens a folder or file",
+                        "code vs code subl idea open",
+                        |ui| {
+                            ui.add(
+                                layout::field(&mut self.editor)
+                                    .hint_text("code")
+                                    .desired_width(FIELD_WIDTH),
+                            )
+                            .on_hover_text("Run with a folder or file path, e.g. code, subl, idea");
+                        },
+                    );
+                });
+                section(
+                    ui,
+                    f,
+                    "Mergiraf",
+                    Some("Solves merge conflicts from the syntax of the code."),
+                    |card| self.mergiraf_ui(card),
+                );
+            }
+            Page::Signing => signing::signing_ui(ui, f),
+            Page::Terminal => {
+                section(ui, f, "Terminal", None, |card| {
+                    card.row("Default shell", "bash zsh powershell cmd fish", |ui| {
+                        let shells = crate::terminal::available_shells();
+                        let current = shells
+                            .iter()
+                            .find(|s| s.program == self.shell)
+                            .map(|s| s.label.clone())
+                            .unwrap_or_else(|| "System default".to_owned());
+                        egui::ComboBox::from_id_salt("settings-shell")
+                            .width(COMBO_WIDTH)
+                            .selected_text(current)
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut self.shell,
+                                    String::new(),
+                                    "System default",
+                                );
+                                for s in &shells {
+                                    ui.selectable_value(
+                                        &mut self.shell,
+                                        s.program.clone(),
+                                        &s.label,
+                                    );
+                                }
+                            });
+                    });
+                    card.row("Font size", "text", |ui| {
+                        ui.spacing_mut().slider_width = SLIDER_WIDTH;
+                        ui.add(layout::slider(
+                            egui::Slider::new(&mut self.terminal_font, 9.0..=20.0)
+                                .step_by(0.5)
+                                .max_decimals(1)
+                                .suffix(" pt"),
+                        ));
+                    });
+                });
+            }
+            Page::Identities => {
+                section(
+                    ui,
+                    f,
+                    "Identities",
+                    Some("Name and email pairs you can apply to a repository from its commit box."),
+                    |card| {
+                        let mut remove = None;
+                        for (i, p) in self.profiles.iter_mut().enumerate() {
+                            let found_by = format!("{} {} {}", p.label, p.name, p.email);
+                            card.full(&found_by, |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.add(
+                                        layout::field(&mut p.label)
+                                            .hint_text("Work")
+                                            .desired_width(110.0),
+                                    );
+                                    ui.add(
+                                        layout::field(&mut p.name)
+                                            .hint_text("Name")
+                                            .desired_width(170.0),
+                                    );
+                                    // The email takes what is left, the remove button at the end.
+                                    let rest = (ui.available_width() - 32.0).max(120.0);
+                                    ui.add(
+                                        layout::field(&mut p.email)
+                                            .hint_text("email@example.com")
+                                            .desired_width(rest),
+                                    );
+                                    if crate::icons::small_button(ui, "x", "Remove").clicked() {
+                                        remove = Some(i);
+                                    }
+                                });
+                            });
+                        }
+                        if let Some(i) = remove {
+                            self.profiles.remove(i);
+                        }
+                        card.full("add new name email user profile", |ui| {
+                            ui.horizontal(|ui| {
+                                if ui.button("Add identity").clicked() {
+                                    self.profiles.push(Profile::default());
+                                }
+                                if self.profiles.is_empty() {
+                                    layout::note(ui, "None yet");
+                                }
+                            });
+                        });
+                    },
+                );
+            }
+            Page::Shortcuts => {
+                for (group, keys) in crate::manual::SHORTCUTS {
+                    section(ui, f, group, None, |card| {
+                        card.compact();
+                        for (combo, what) in *keys {
+                            let combo = combo.replace("Cmd", crate::manual::command());
+                            card.full(&format!("{combo} {what} keys keyboard"), |ui| {
+                                ui.horizontal(|ui| {
+                                    let start = ui.cursor().left();
+                                    crate::manual::key_combo(ui, &combo);
+                                    let used = ui.cursor().left() - start;
+                                    ui.add_space((layout::LABEL_WIDTH + 8.0 - used).max(8.0));
+                                    ui.label(RichText::new(*what).color(t.text_dim));
+                                });
+                            });
+                        }
+                    });
+                }
+            }
+        }
+    }
+}
+
+/// The pages of the settings, in the order of their tabs.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum Page {
+    #[default]
+    General,
+    Appearance,
+    Graph,
+    Git,
+    Signing,
+    Terminal,
+    Identities,
+    Shortcuts,
+}
+
+impl Page {
+    pub const ALL: [Page; 8] = [
+        Page::General,
+        Page::Appearance,
+        Page::Graph,
+        Page::Git,
+        Page::Signing,
+        Page::Terminal,
+        Page::Identities,
+        Page::Shortcuts,
+    ];
+
+    pub fn title(self) -> &'static str {
+        match self {
+            Page::General => "General",
+            Page::Appearance => "Appearance",
+            Page::Graph => "Commit graph",
+            Page::Git => "Git",
+            Page::Signing => "Commit signing",
+            Page::Terminal => "Terminal",
+            Page::Identities => "Identities",
+            Page::Shortcuts => "Keyboard shortcuts",
+        }
+    }
+
+    fn icon(self) -> &'static str {
+        match self {
+            Page::General => "settings",
+            Page::Appearance => "palette",
+            Page::Graph => "git-branch",
+            Page::Git => "git-merge",
+            Page::Signing => "key-round",
+            Page::Terminal => "square-terminal",
+            Page::Identities => "user-round",
+            Page::Shortcuts => "keyboard",
+        }
     }
 }
 
@@ -503,6 +623,8 @@ impl Settings {
 const COMBO_WIDTH: f32 = 230.0;
 /// Width of the text fields.
 const FIELD_WIDTH: f32 = 300.0;
+/// Width of the sliders' track.
+const SLIDER_WIDTH: f32 = 240.0;
 
 /// A note under a checkbox, lined up with the checkbox's text.
 fn indented_note(ui: &mut Ui, text: impl Into<String>) {

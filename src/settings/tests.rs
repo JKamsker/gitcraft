@@ -98,3 +98,37 @@ fn settings_survive_a_restart() {
     let back: Option<Settings> = eframe::get_value(&storage, "s");
     assert_eq!(back, Some(settings));
 }
+
+/// How many rows a search finds on each page, with the page drawn nowhere.
+fn found(query: &str) -> Vec<(Page, usize)> {
+    let ctx = egui::Context::default();
+    let mut settings = Settings::default();
+    let mut counts = Vec::new();
+    let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+        counts = Page::ALL
+            .iter()
+            .map(|&page| {
+                let filter = Filter::new(query, page.title(), true);
+                settings.page_ui(ui, page, &filter);
+                (page, filter.found())
+            })
+            .filter(|(_, n)| *n > 0)
+            .collect();
+    });
+    // Nothing renders here: the font texture is left unapplied on purpose.
+    output.textures_delta.clear();
+    counts
+}
+
+#[test]
+fn a_search_finds_settings_by_name_keyword_section_or_page() {
+    // A keyword only, any case.
+    assert_eq!(found("GRAVATAR"), vec![(Page::Appearance, 1)]);
+    // Every word has to be there.
+    assert_eq!(found("fetch background"), vec![(Page::Git, 1)]);
+    // A section's name finds all its rows.
+    assert_eq!(found("mergiraf"), vec![(Page::Git, 3)]);
+    // Shortcuts by their keys or what they do.
+    assert_eq!(found("reopen"), vec![(Page::Shortcuts, 1)]);
+    assert!(found("nothing like this qqq").is_empty());
+}

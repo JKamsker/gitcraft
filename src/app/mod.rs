@@ -261,18 +261,23 @@ impl App {
             || self.palette.is_some()
             || self.manual_open
             || ctx.egui_wants_keyboard_input();
-        let (new_tab, reopen, close, refresh, focused, palette, manual) = ctx.input(|i| {
-            let t = i.modifiers.command && i.key_pressed(Key::T);
-            (
-                t && !i.modifiers.shift,
-                t && i.modifiers.shift,
-                i.modifiers.command && i.key_pressed(Key::W),
-                i.key_pressed(Key::F5),
-                i.focused,
-                i.modifiers.command && i.key_pressed(Key::P),
-                i.key_pressed(Key::F1),
-            )
-        });
+        let (new_tab, reopen, close, refresh, focused, palette, manual, settings) =
+            ctx.input(|i| {
+                let t = i.modifiers.command && i.key_pressed(Key::T);
+                (
+                    t && !i.modifiers.shift,
+                    t && i.modifiers.shift,
+                    i.modifiers.command && i.key_pressed(Key::W),
+                    i.key_pressed(Key::F5),
+                    i.focused,
+                    i.modifiers.command && i.key_pressed(Key::P),
+                    i.key_pressed(Key::F1),
+                    i.modifiers.command && i.key_pressed(Key::Comma),
+                )
+            });
+        if settings && !modal_open {
+            self.open_settings();
+        }
         if manual && self.clone_form.is_none() && self.palette.is_none() {
             self.manual_open = !self.manual_open;
         }
