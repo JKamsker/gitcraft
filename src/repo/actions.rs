@@ -17,8 +17,8 @@ pub(crate) enum Action {
     CancelOp,
     /// Open or close the Activity panel.
     ToggleActivity,
-    /// Open the Activity panel on the latest operation (an error clicked in the toolbar).
-    ShowLastActivity,
+    /// Open the Activity panel on an operation's entry (its message clicked in the toolbar).
+    ShowActivity(u64),
     Select(usize),
     SelectHash(String),
     SelectStash(usize),

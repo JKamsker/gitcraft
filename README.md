@@ -214,11 +214,13 @@ so your config, credentials and hooks apply as usual.
   for.
 - Activity (the list button in the toolbar, or _Activity_ in the palette): every operation of
   the tab, newest first, with how it ended and how long it took; unfold one for each git
-  command it ran (as you would type it, a password in a URL hidden), its exit code, its time and
+  command it ran (as you would type it; tokens in URLs, `Authorization` headers and a password
+  typed into the tab are hidden), its exit code, its time and
   all it printed, selectable, with a button that copies the lot. The operation running shows
   its commands so far. A message in the toolbar (an error, cut to its first line there) opens
   the operation's entry when clicked. The last 100 operations are kept, each command's output
-  up to 64 KiB (its start and its end); a background fetch only when it fails.
+  up to 64 KiB (its start and its end); a background fetch only when it fails, and the same
+  failure again and again as one entry, counted.
 - Background fetch every few minutes (Settings; 0 turns it off).
 - HTTPS sign-in: when a remote wants a username and password (or token) and no credential helper
   provides them, a dialog asks and the operation runs again. They stay in memory for the tab;

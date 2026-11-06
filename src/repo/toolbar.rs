@@ -291,14 +291,27 @@ impl RepoTab {
         {
             let color = if *is_err { t.danger } else { t.text_dim };
             let first_line = headline(msg);
-            let label = egui::Label::new(egui::RichText::new(first_line).color(color))
-                .truncate()
-                .sense(egui::Sense::click());
-            let shown = ui.add(label).on_hover_text(format!(
-                "{msg}\n\nClick for the commands and all they printed (Activity)"
-            ));
-            if shown.clicked() {
-                acts.push(Action::ShowLastActivity);
+            let entry = self.status_entry();
+            let mut label =
+                egui::Label::new(egui::RichText::new(first_line).color(color)).truncate();
+            if entry.is_some() {
+                label = label.sense(egui::Sense::click());
+            }
+            let shown = ui.add(label).on_hover_ui(|ui| {
+                ui.label(msg.as_str());
+                if entry.is_some() {
+                    ui.label(
+                        egui::RichText::new(
+                            "Click for its git commands and all they printed (Activity)",
+                        )
+                        .color(t.text_dim),
+                    );
+                }
+            });
+            if let Some(id) = entry
+                && shown.clicked()
+            {
+                acts.push(Action::ShowActivity(id));
             }
         }
         let Some(op) = &self.busy_op else {

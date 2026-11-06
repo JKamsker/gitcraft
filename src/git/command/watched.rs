@@ -67,9 +67,20 @@ impl OpControl {
         (self.notify)();
     }
 
-    /// What the operation's git calls did so far.
-    pub fn steps(&self) -> Vec<Recorded> {
-        self.steps.lock().map(|s| s.clone()).unwrap_or_default()
+    /// What the operation's git calls did, taken out (once it has ended).
+    pub fn take_steps(&self) -> Vec<Recorded> {
+        self.steps
+            .lock()
+            .map(|mut s| std::mem::take(&mut *s))
+            .unwrap_or_default()
+    }
+
+    /// The git calls made so far, without their output: their arguments and exit codes.
+    pub fn step_summaries(&self) -> Vec<(Vec<String>, Option<i32>)> {
+        self.steps
+            .lock()
+            .map(|s| s.iter().map(|r| (r.args.clone(), r.code)).collect())
+            .unwrap_or_default()
     }
 
     fn set_progress(&self, progress: Option<Progress>) {
@@ -155,7 +166,7 @@ pub fn run_watched_recorded(
 ) -> (Result<String, String>, Recorded) {
     let started = Instant::now();
     if control.is_cancelled() {
-        let not_run = Recorded::new(args, None, "Not run: cancelled".to_owned(), started);
+        let not_run = Recorded::new(args, None, "Not run: cancelled", creds, started);
         return (Err(CANCELLED.to_owned()), not_run);
     }
     let words = if quiet {
@@ -165,7 +176,7 @@ pub fn run_watched_recorded(
     };
     let words: Vec<&str> = words.iter().map(String::as_str).collect();
     let failed = |e: String| {
-        let rec = Recorded::new(&words, None, e.clone(), started);
+        let rec = Recorded::new(&words, None, &e, creds, started);
         (Err(e), rec)
     };
     let extra = extra_for(dir, creds, quiet);
@@ -184,7 +195,7 @@ pub fn run_watched_recorded(
         Err(e) if e == CANCELLED => {
             return (
                 Err(e),
-                Recorded::new(&words, None, "Stopped: cancelled".to_owned(), started),
+                Recorded::new(&words, None, "Stopped: cancelled", creds, started),
             );
         }
         Err(e) => return failed(e),
@@ -192,7 +203,8 @@ pub fn run_watched_recorded(
     let recorded = Recorded::new(
         &words,
         ended.code,
-        super::both(&ended.stdout, &ended.stderr),
+        &super::both(&ended.stdout, &ended.stderr),
+        creds,
         started,
     );
     if ended.code == Some(0) {

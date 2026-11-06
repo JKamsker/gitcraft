@@ -38,9 +38,13 @@ pub(super) struct Entry {
     pub(super) at: Instant,
     pub(super) took: Duration,
     pub(super) steps: Vec<Recorded>,
+    /// Each step's command line, as shown (a long list of paths shortened).
+    pub(super) lines: Vec<String>,
     pub(super) outcome: Outcome,
     /// Nobody asked for it (the background fetch).
     pub(super) background: bool,
+    /// How many times in a row it failed the same way (a background fetch while offline).
+    pub(super) repeats: u32,
 }
 
 impl Entry {
@@ -77,6 +81,10 @@ pub(super) struct ActivityLog {
     pub(super) open: bool,
     /// An entry to open and scroll to (an error clicked in the toolbar).
     pub(super) reveal: Option<u64>,
+    /// The toolbar message an operation left, and its entry: a click on that message opens it.
+    pub(super) status_link: Option<(String, u64)>,
+    /// The entry just added, until `op_done` has set its message.
+    pending_link: Option<u64>,
 }
 
 impl ActivityLog {
@@ -89,23 +97,43 @@ impl ActivityLog {
         outcome: Outcome,
         background: bool,
     ) -> u64 {
+        let outcome = match outcome {
+            Outcome::Failed(why) => Outcome::Failed(bounded(&why)),
+            other => other,
+        };
+        // The same background failure again (offline): counted, not added.
+        if background
+            && let Some(last) = self.entries.back_mut()
+            && last.background
+            && last.label == label
+            && last.outcome == outcome
+            && matches!(outcome, Outcome::Failed(_))
+        {
+            last.repeats += 1;
+            last.at = Instant::now();
+            last.took = took;
+            return last.id;
+        }
         let id = self.next_id;
         self.next_id += 1;
-        let steps = steps
+        let steps: Vec<Recorded> = steps
             .into_iter()
             .map(|mut s| {
                 s.output = bounded(&s.output);
                 s
             })
             .collect();
+        let lines = steps.iter().map(|s| short_command_line(&s.args)).collect();
         self.entries.push_back(Entry {
             id,
             label: label.to_owned(),
             at: Instant::now(),
             took,
             steps,
+            lines,
             outcome,
             background,
+            repeats: 1,
         });
         while self.entries.len() > MAX_ENTRIES {
             self.entries.pop_front();
@@ -131,10 +159,10 @@ impl ActivityLog {
         self.entries.clear();
     }
 
-    /// Opens the panel on the newest entry.
-    pub(super) fn reveal_last(&mut self) {
+    /// Opens the panel on the entry `id` (if it is still kept).
+    pub(super) fn reveal(&mut self, id: u64) {
         self.open = true;
-        self.reveal = self.entries.back().map(|e| e.id);
+        self.reveal = self.entries.iter().any(|e| e.id == id).then_some(id);
     }
 }
 
@@ -167,10 +195,26 @@ fn ceil_char(s: &str, mut i: usize) -> usize {
     i
 }
 
-/// `git` and `args` as they would be typed in a shell (a word with spaces or quotes quoted),
-/// with any password in a URL hidden.
+/// The most arguments a command line shows in the panel; the rest are counted.
+const SHOWN_ARGS: usize = 24;
+
+/// [`command_line`] with a long list of arguments (a `git add` of thousands of paths) cut,
+/// saying how many more there are.
+pub(super) fn short_command_line(args: &[String]) -> String {
+    if args.len() <= SHOWN_ARGS {
+        return command_line(args);
+    }
+    format!(
+        "{} … {} more",
+        command_line(&args[..SHOWN_ARGS]),
+        args.len() - SHOWN_ARGS
+    )
+}
+
+/// `git` and `args` as they would be typed in a shell (a word with spaces or quotes quoted).
+/// Secrets were hidden when the call was recorded (see [`crate::git::redact`]).
 pub(super) fn command_line(args: &[String]) -> String {
-    let words: Vec<String> = args.iter().map(|a| shell_word(&hide_password(a))).collect();
+    let words: Vec<String> = args.iter().map(|a| shell_word(a)).collect();
     format!("git {}", words.join(" "))
 }
 
@@ -183,27 +227,6 @@ fn shell_word(word: &str) -> String {
         word.to_owned()
     } else {
         format!("'{}'", word.replace('\'', r"'\''"))
-    }
-}
-
-/// `https://user:secret@host/x` → `https://user:***@host/x`.
-fn hide_password(word: &str) -> String {
-    let Some(scheme_end) = word.find("://") else {
-        return word.to_owned();
-    };
-    let rest = &word[scheme_end + 3..];
-    let authority_end = rest.find('/').unwrap_or(rest.len());
-    let Some(at) = rest[..authority_end].rfind('@') else {
-        return word.to_owned();
-    };
-    match rest[..at].find(':') {
-        Some(colon) => format!(
-            "{}{}:***{}",
-            &word[..scheme_end + 3],
-            &rest[..colon],
-            &rest[at..]
-        ),
-        None => word.to_owned(),
     }
 }
 
@@ -251,12 +274,28 @@ impl super::RepoTab {
         if background && result.is_ok() {
             return;
         }
+        let password = self.credentials.as_ref().map(|c| c.password.as_str());
         let outcome = match result {
             Ok(_) => Outcome::Done,
             Err(_) if cancelled => Outcome::Cancelled,
-            Err(e) => Outcome::Failed(e.clone()),
+            Err(e) => Outcome::Failed(crate::git::redact(e, password)),
         };
         let took = self.op_started.map(|t| t.elapsed()).unwrap_or_default();
-        self.activity.push(label, took, steps, outcome, background);
+        let id = self.activity.push(label, took, steps, outcome, background);
+        self.activity.pending_link = Some(id);
+    }
+
+    /// Ties the toolbar message the operation just left (by `op_done`) to its entry.
+    pub(super) fn link_status(&mut self) {
+        if let Some(id) = self.activity.pending_link.take() {
+            self.activity.status_link = self.status.as_ref().map(|(msg, _)| (msg.clone(), id));
+        }
+    }
+
+    /// The entry of the message the toolbar shows, when an operation left it.
+    pub(super) fn status_entry(&self) -> Option<u64> {
+        let (msg, _) = self.status.as_ref()?;
+        let (linked, id) = self.activity.status_link.as_ref()?;
+        (linked == msg).then_some(*id)
     }
 }

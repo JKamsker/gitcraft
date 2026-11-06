@@ -348,7 +348,18 @@ fn run_inner(
     creds: Option<&Credentials>,
     quiet: bool,
 ) -> Result<String, String> {
-    run_inner_recorded(dir, args, ok, creds, quiet).0
+    let extra = extra_for(dir, creds, quiet);
+    let out = execute(dir, &extra, args)?;
+    if out.code.is_some_and(|c| ok.contains(&c)) {
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    } else {
+        Err(failure_message(
+            args,
+            &out.status,
+            &String::from_utf8_lossy(&out.stdout),
+            &String::from_utf8_lossy(&out.stderr),
+        ))
+    }
 }
 
 /// [`run_inner`], and what the call did, for the activity log.
@@ -363,13 +374,18 @@ fn run_inner_recorded(
     let extra = extra_for(dir, creds, quiet);
     let out = match execute(dir, &extra, args) {
         Ok(out) => out,
-        Err(e) => return (Err(e.clone()), Recorded::new(args, None, e, started)),
+        Err(e) => {
+            return (
+                Err(e.clone()),
+                Recorded::new(args, None, &e, creds, started),
+            );
+        }
     };
     let (stdout, stderr) = (
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr),
     );
-    let recorded = Recorded::new(args, out.code, both(&stdout, &stderr), started);
+    let recorded = Recorded::new(args, out.code, &both(&stdout, &stderr), creds, started);
     let result = if out.code.is_some_and(|c| ok.contains(&c)) {
         Ok(stdout.into_owned())
     } else {
@@ -402,16 +418,20 @@ pub struct Recorded {
 }
 
 impl Recorded {
+    /// What a call did, its secrets hidden (see [`super::redact`]): the password typed into
+    /// the tab (`creds`) among them.
     pub(crate) fn new(
         args: &[&str],
         code: Option<i32>,
-        output: String,
+        output: &str,
+        creds: Option<&Credentials>,
         started: std::time::Instant,
     ) -> Self {
+        let password = creds.map(|c| c.password.as_str());
         Self {
-            args: args.iter().map(|a| (*a).to_owned()).collect(),
+            args: args.iter().map(|a| super::redact(a, password)).collect(),
             code,
-            output,
+            output: super::redact(output, password),
             took: started.elapsed(),
         }
     }

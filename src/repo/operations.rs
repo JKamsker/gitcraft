@@ -205,7 +205,7 @@ impl RepoTab {
         let running = self.running.take();
         let cancelled =
             result.is_err() && running.as_ref().is_some_and(|r| r.control.is_cancelled());
-        let steps = running.map(|r| r.control.steps()).unwrap_or_default();
+        let steps = running.map(|r| r.control.take_steps()).unwrap_or_default();
         self.log_activity(&label, &result, cancelled, quiet, steps);
         let long = self
             .op_started
@@ -287,6 +287,7 @@ impl RepoTab {
         }
         self.follow_checkout_move(result.is_ok(), ctx);
         self.after_op(result.is_ok(), quiet, ctx);
+        self.link_status();
     }
 
     fn record_undo(&mut self, label: &str, kind: OpKind) {
@@ -358,6 +359,8 @@ fn run_step(
     } else {
         git::run_recorded(Some(path), args, creds, quiet)
     };
+    let mut recorded = recorded;
+    recorded.output = super::activity::bounded(&recorded.output);
     control.record(recorded);
     result
 }
