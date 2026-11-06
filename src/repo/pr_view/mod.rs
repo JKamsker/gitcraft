@@ -76,6 +76,7 @@ impl RepoTab {
         self.diff = None;
         self.file_view = None;
         self.compare = None;
+        self.versions.view = None;
         self.pr_view = Some(PrView {
             number,
             request: 0,
@@ -173,7 +174,18 @@ impl RepoTab {
             draft.posting = false;
         }
         let before = view.files.take().and_then(Result::ok);
+        // Its commits are here now: whether it changed since it was last looked at.
+        let details = match (&result, &view.details) {
+            (Ok(_), Some(Ok(details))) => Some(details.clone()),
+            _ => None,
+        };
         view.files = Some(result);
+        if let Some(details) = details {
+            self.check_pr_since(&details, ctx);
+        }
+        let Some(view) = self.pr_view.as_mut() else {
+            return;
+        };
         let (Some(before), Some(Ok(now))) = (before, view.files.as_ref()) else {
             return;
         };

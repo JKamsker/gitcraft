@@ -162,6 +162,7 @@ impl RepoTab {
                 ));
             }
         }
+        self.versions_items(ui, acts, b);
         ui.separator();
         self.publish_items(ui, acts, b, idle);
         ui.separator();

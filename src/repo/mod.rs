@@ -40,6 +40,7 @@ mod terminals;
 #[cfg(test)]
 mod tests;
 mod toolbar;
+mod versions;
 mod watch;
 mod watch_remote;
 pub(crate) mod widgets;
@@ -152,6 +153,9 @@ pub struct RepoTab {
     pr_view: Option<pr_view::PrView>,
     /// The builds of a commit the big area shows.
     ci_view: Option<ci_view::CiView>,
+    /// Two versions of a series of commits compared, the rewrites kept and the pull requests'
+    /// versions seen.
+    versions: versions::Versions,
     pr_requests: u64,
     /// What was written on each pull request and not sent, by its number.
     pr_drafts: HashMap<u64, pr_review::PrDraft>,
@@ -309,6 +313,7 @@ impl RepoTab {
             compare: None,
             pr_view: None,
             ci_view: None,
+            versions: Default::default(),
             pr_requests: 0,
             pr_drafts: HashMap::new(),
             compare_requests: 0,
