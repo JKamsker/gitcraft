@@ -11,9 +11,7 @@ impl RepoTab {
     pub(in crate::repo) fn diff_rich_kind(&self) -> Option<RichKind> {
         let kind = self.diff_rich.filter(|_| !self.diff_as_file)?;
         let view = self.diff.as_ref()?;
-        RichKind::of(view.key.path())
-            .contains(&kind)
-            .then_some(kind)
+        kind.accepts(view.key.path()).then_some(kind)
     }
 
     /// Reads the open diff as the rich view that is on, in the background.

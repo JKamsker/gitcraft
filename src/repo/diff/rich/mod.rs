@@ -3,6 +3,10 @@
 //! both sides of the file on a background thread; a file they can't read (malformed, too big)
 //! falls back to the plain diff with a note saying why. Staging stays in the plain diff.
 
+pub(super) mod api;
+#[cfg(test)]
+mod api_tests;
+mod api_view;
 pub(super) mod config;
 #[cfg(test)]
 mod config_tests;
@@ -36,6 +40,8 @@ pub enum RichKind {
     Prose,
     /// JSON, YAML and TOML compared key by key.
     Config,
+    /// An OpenAPI or Swagger document's breaking changes.
+    Api,
 }
 
 impl RichKind {
@@ -49,7 +55,21 @@ impl RichKind {
         if config::EXTENSIONS.contains(&ext.as_str()) {
             kinds.push(RichKind::Config);
         }
+        // Named like an API document: its button shows; any other JSON or YAML file that is
+        // one offers it from the view by key.
+        let name = path.rsplit('/').next().unwrap_or(path).to_lowercase();
+        if RichKind::Api.accepts(path) && (name.contains("openapi") || name.contains("swagger")) {
+            kinds.push(RichKind::Api);
+        }
         kinds
+    }
+
+    /// Whether `path` can be read this way.
+    pub fn accepts(self, path: &str) -> bool {
+        match self {
+            RichKind::Api => matches!(extension(path).as_str(), "json" | "yaml" | "yml"),
+            kind => RichKind::of(path).contains(&kind),
+        }
     }
 
     /// The icon of its button in the diff's header.
@@ -57,6 +77,7 @@ impl RichKind {
         match self {
             RichKind::Prose => "book-open",
             RichKind::Config => "list",
+            RichKind::Api => "server",
         }
     }
 
@@ -70,6 +91,9 @@ impl RichKind {
             (RichKind::Config, false) => {
                 "Show the changes by key: the keys added, removed, changed and moved"
             }
+            (RichKind::Api, false) => {
+                "Show the API contract changes: what breaks the API's clients, and what was added"
+            }
         }
     }
 
@@ -78,6 +102,7 @@ impl RichKind {
         match self {
             RichKind::Prose => "as prose",
             RichKind::Config => "by key",
+            RichKind::Api => "as API contract changes",
         }
     }
 }
@@ -101,6 +126,7 @@ pub struct Sides {
 pub enum RichDiff {
     Prose(prose::ProseDiff),
     Config(config::ConfigDiff),
+    Api(api::ApiDiff),
 }
 
 /// What reading the diff for a rich view gave.
@@ -190,6 +216,10 @@ pub fn load(
             Ok(diff) => Rich::Ready(RichDiff::Config(diff)),
             Err(note) => Rich::Plain(note),
         },
+        RichKind::Api => match api::diff(key.path(), &sides) {
+            Ok(diff) => Rich::Ready(RichDiff::Api(diff)),
+            Err(note) => Rich::Plain(note),
+        },
     })
 }
 
@@ -208,6 +238,7 @@ pub fn show(ui: &mut Ui, diff: &RichDiff, state: &mut RichState, acts: &mut Vec<
     match diff {
         RichDiff::Prose(prose) => prose_view::show(ui, prose, state, acts),
         RichDiff::Config(config) => config_view::show(ui, config, acts),
+        RichDiff::Api(api) => api_view::show(ui, api, acts),
     }
 }
 
