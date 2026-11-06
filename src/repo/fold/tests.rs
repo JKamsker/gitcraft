@@ -313,7 +313,7 @@ fn a_conflict_aborted_goes_back_to_before_the_fold() {
         _ => None,
     };
     assert!(
-        steps.as_ref().is_some_and(|(_, ops)| ops.len() == 3),
+        steps.as_ref().is_some_and(|(_, ops)| ops.len() == 2),
         "the fold's abort"
     );
     let Some((label, ops)) = steps else { return };
@@ -766,10 +766,99 @@ fn a_merge_started_since_the_dialog_stops_the_fold() {
     git_ok(&dir, &["merge", "-q", "--no-ff", "--no-commit", "side"]);
     git_ok(&dir, &["add", "f1.txt"]);
     let before = git::head(&dir);
-    tab.apply(Action::RunFold(Box::new(found)), &ctx);
+    tab.apply(Action::RunFold(Box::new(found.clone())), &ctx);
+    settle(&mut tab, &ctx);
+    let said = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    assert!(said.contains("merge is in progress"), "{said}");
+    assert_eq!(git::head(&dir), before);
+    // And should it start between that check and the commit, the steps' own checks refuse.
+    let Ok(steps) = found.editor().and_then(|e| e.command(&dir)) else {
+        return;
+    };
+    tab.fold_ready(&found, Ok((steps, String::new())), &ctx);
     let result = finish(&mut tab, &ctx);
     assert!(matches!(result, Some(Err(_))), "{result:?}");
     assert_eq!(git::head(&dir), before);
     assert_eq!(git::in_progress(&dir), Ok(Some(InProgress::Merge)));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A `git am` stopped after the dialog read the branch (no ref says so, only its folder): the
+/// fold sees it right before it runs, and commits nothing.
+#[test]
+fn a_patch_stopped_since_the_dialog_stops_the_fold() {
+    let dir = repo("am-since", 2);
+    git_ok(&dir, &["checkout", "-q", "-b", "side", "HEAD~1"]);
+    write(&dir, "f2.txt", "side\n");
+    git_ok(&dir, &["add", "-A"]);
+    git_ok(&dir, &["commit", "-q", "-m", "side"]);
+    let patch = git_ok(&dir, &["format-patch", "-1", "--stdout"]);
+    write(&dir, ".git/side.patch", &patch);
+    git_ok(&dir, &["checkout", "-q", "main"]);
+    let ctx = egui::Context::default();
+    let mut tab = tab(&dir, &ctx);
+    write(&dir, "f1.txt", "1 fixed\n");
+    git_ok(&dir, &["add", "f1.txt"]);
+    let found = plan(&dir, "HEAD~1");
+    assert!(found.is_ok(), "{found:?}");
+    let Ok(found) = found else { return };
+    // f2.txt differs on main: the patch stops. Staged meanwhile, the fix stays staged.
+    git_ok(&dir, &["reset", "-q", "f1.txt"]);
+    let stopped = git::run(Some(&dir), &["am", "-q", ".git/side.patch"]);
+    git_ok(&dir, &["add", "f1.txt"]);
+    assert!(stopped.is_err());
+    assert_eq!(git::in_progress(&dir), Ok(Some(InProgress::Am)));
+    let before = git::head(&dir);
+    tab.apply(Action::RunFold(Box::new(found)), &ctx);
+    settle(&mut tab, &ctx);
+    let said = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    assert!(said.contains("patch is in progress"), "{said}");
+    assert_eq!(git::head(&dir), before);
+    let _ = git::run(Some(&dir), &["am", "--abort"]);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The fold's abort asked for, then (while its dialog was open) the rebase replaced in the
+/// terminal by one of another branch: confirming aborts that one, and the step that stages
+/// the changes again refuses rather than reset the other branch.
+#[test]
+fn an_abort_confirmed_after_the_rebase_was_replaced_resets_no_other_branch() {
+    let (dir, before, _) = conflicting("abort-replaced");
+    let ctx = egui::Context::default();
+    let mut tab = tab(&dir, &ctx);
+    let result = fold(&mut tab, &ctx, "HEAD~3", false);
+    assert!(matches!(result, Some(Err(_))), "{result:?}");
+    tab.apply(Action::AbortFold, &ctx);
+    settle(&mut tab, &ctx);
+    let asked = match tab.dialog.take() {
+        Some(Dialog::Confirm { ops, title, .. }) => Some((title, ops)),
+        _ => None,
+    };
+    assert!(asked.is_some());
+    let Some((label, ops)) = asked else { return };
+    // Meanwhile, in the terminal: the fold's rebase aborted, another branch's started.
+    git_ok(&dir, &["rebase", "--abort"]);
+    git_ok(&dir, &["checkout", "-q", "-b", "other", &before]);
+    write(&dir, "f1.txt", "other\n");
+    git_ok(&dir, &["commit", "-q", "-am", "other"]);
+    let other = git::head(&dir);
+    git_ok(&dir, &["checkout", "-q", "-b", "third", "HEAD~1"]);
+    write(&dir, "f1.txt", "third\n");
+    git_ok(&dir, &["commit", "-q", "-am", "third"]);
+    let _ = git::run(Some(&dir), &["rebase", "other"]);
+    assert_eq!(git::in_progress(&dir), Ok(Some(InProgress::Rebase)));
+    let third = git::resolve(&dir, "refs/heads/third");
+
+    tab.apply(
+        Action::Ops {
+            label,
+            ops,
+            refresh: crate::repo::Refresh::All,
+        },
+        &ctx,
+    );
+    let _ = finish(&mut tab, &ctx);
+    assert_eq!(git::resolve(&dir, "refs/heads/third"), third);
+    assert_eq!(git::resolve(&dir, "refs/heads/other"), Ok(other));
     let _ = std::fs::remove_dir_all(&dir);
 }
