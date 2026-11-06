@@ -39,7 +39,8 @@ pub fn variables(scope: &Scope, repo: &str, answers: &[(String, String)]) -> Vec
 /// command line in a subshell (an `exit` in it ends only the command). It exits as the command
 /// does.
 pub fn captured_program(vars: &[(String, String)], command: &str) -> String {
-    let mut script = String::new();
+    // No arguments: what the command reads as `$1`, `$@` is nothing, wherever it runs.
+    let mut script = String::from("set --\n");
     for (name, value) in vars {
         // Names were checked (see `variable_error`); values can be anything.
         script.push_str(&format!("{name}={}\nexport {name}\n", sh_quote(value)));

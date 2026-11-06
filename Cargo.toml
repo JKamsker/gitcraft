@@ -33,6 +33,8 @@ two-face = { version = "0.5.2", default-features = false, features = ["syntect-d
 # is picked in src/forge/http.rs: ureq's own reading of the environment ignores NO_PROXY.)
 ureq = { version = "2", features = ["native-certs"] }
 base64 = "0.22"
+# What a repository's trusted command file read as (Settings → Custom commands).
+sha2 = "0.11"
 vt100 = "0.18"
 
 # Reading a repository's file without following a link swapped in on the way (safe_read.rs).

@@ -90,6 +90,38 @@ fn palette_labels(tab: &RepoTab) -> Vec<String> {
         .collect()
 }
 
+/// What the review dialog's "Trust and use" gives for the file the tab shows.
+fn trust_act(tab: &RepoTab) -> CustomAct {
+    CustomAct::Trust {
+        digest: tab
+            .custom
+            .file
+            .as_ref()
+            .map(|f| f.digest.clone())
+            .unwrap_or_default(),
+        commands: 2,
+    }
+}
+
+/// An answer older than one already taken doesn't replace it.
+#[test]
+fn an_older_read_of_the_file_does_not_replace_a_newer_one() {
+    let dir = repo("reads");
+    let ctx = egui::Context::default();
+    let mut tab = open(&dir, &ctx);
+    let taken = tab.custom.read;
+    tab.apply(
+        Action::Custom(CustomAct::FileRead(taken + 2, Ok(Some(FILE.to_owned())))),
+        &ctx,
+    );
+    tab.apply(
+        Action::Custom(CustomAct::FileRead(taken + 1, Ok(None))),
+        &ctx,
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(tab.custom.file.as_ref().is_some_and(|f| f.text == FILE));
+}
+
 const FILE: &str = r#"{"commands": [
   {"name": "Repo hello", "where": "branch", "command": "echo hello", "confirm": false},
   {"name": "Repo palette", "where": "palette", "command": "echo p", "confirm": false}
@@ -117,7 +149,7 @@ fn a_repositorys_commands_wait_for_trust_and_are_asked_again_once_changed() {
     tab.apply(Action::Custom(CustomAct::Review), &ctx);
     assert!(matches!(tab.dialog, Some(Dialog::Custom(_))));
     tab.dialog = None;
-    tab.apply(Action::Custom(CustomAct::Trust(FILE.to_owned())), &ctx);
+    tab.apply(Action::Custom(trust_act(&tab)), &ctx);
     assert_eq!(offered(&mut tab, &ctx, Placement::Branch), ["Repo hello"]);
     assert!(offered(&mut tab, &ctx, Placement::Commit).is_empty());
     assert!(!tab.custom.published.review);
@@ -153,14 +185,8 @@ fn a_broken_repository_file_offers_nothing_but_says_why() {
     write_file(&dir, r#"{"commands": [{"name": "X"}]}"#);
     let ctx = egui::Context::default();
     let mut tab = open(&dir, &ctx);
-    let text = tab
-        .custom
-        .file
-        .as_ref()
-        .map(|f| f.text.clone())
-        .unwrap_or_default();
     // Trusted as it is, it still offers nothing: it can't be read as commands.
-    tab.apply(Action::Custom(CustomAct::Trust(text)), &ctx);
+    tab.apply(Action::Custom(trust_act(&tab)), &ctx);
     let none = Placement::ALL
         .iter()
         .all(|&p| offered(&mut tab, &ctx, p).is_empty());
@@ -208,6 +234,40 @@ fn global_commands_go_to_the_menu_they_name() {
     assert!(!palette.contains(&"On commit".to_owned()));
     // No file: nothing to review.
     assert!(!palette.iter().any(|l| l.starts_with("Review")));
+}
+
+/// A commit's pill gives its branch's own remote, not the checked-out branch's.
+#[test]
+fn a_commits_pill_gives_its_own_branch_and_remote() {
+    let dir = repo("pill");
+    for args in [
+        &["remote", "add", "origin", "https://example.invalid/o.git"][..],
+        &["remote", "add", "fork", "https://example.invalid/f.git"],
+        &["update-ref", "refs/remotes/origin/main", "HEAD"],
+        &["update-ref", "refs/remotes/fork/feature", "HEAD"],
+        &["branch", "feature"],
+        &["config", "branch.main.remote", "origin"],
+        &["config", "branch.main.merge", "refs/heads/main"],
+        &["config", "branch.feature.remote", "fork"],
+        &["config", "branch.feature.merge", "refs/heads/feature"],
+    ] {
+        assert!(git::run(Some(&dir), args).is_ok(), "{args:?}");
+    }
+    let ctx = egui::Context::default();
+    let tab = open(&dir, &ctx);
+    let head = tab.refs.head.clone();
+    let of = |branch: Option<&str>| {
+        let s = tab.commit_scope(&head, branch);
+        (s.branch, s.remote)
+    };
+    let local = of(Some("feature"));
+    let remote = of(Some("fork/feature"));
+    let none = of(None);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(local, ("feature".to_owned(), "fork".to_owned()));
+    assert_eq!(remote, ("fork/feature".to_owned(), "fork".to_owned()));
+    // No pill: filled from the checked-out branch when the menu is drawn.
+    assert_eq!(none, (String::new(), String::new()));
 }
 
 #[test]

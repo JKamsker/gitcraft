@@ -17,7 +17,9 @@ pub(super) fn page(settings: &mut Settings, ui: &mut Ui, f: &Filter) {
         Some(
             "Commands of your own in a commit's, a branch's or a file's menu, or in the palette. \
              They run with sh on the repository's machine (here, in WSL or over SSH), in its \
-             folder.",
+             folder. With the output in a toast a command runs unattended: nothing can answer \
+             it (no editor, no password prompt), so pick Terminal for one that asks something \
+             or runs for long.",
         ),
         |card| commands(card, &mut settings.custom_commands),
     );
@@ -26,7 +28,7 @@ pub(super) fn page(settings: &mut Settings, ui: &mut Ui, f: &Filter) {
         f,
         "Variables",
         Some(
-            "Set for every command, and empty where they don't apply. Write them as shell \
+            "Set for every command. Write them as shell \
              variables, in double quotes: \"$FILE\". Their values are never pasted into the \
              command line, so a name with spaces, quotes or $(…) stays one word.",
         ),
@@ -148,9 +150,10 @@ fn command_ui(ui: &mut Ui, i: usize, c: &mut CustomCommand) -> Edit {
         }
     });
     prompts_ui(ui, i, &mut c.prompts);
-    if let Some(problem) = c.problem() {
+    let fresh = c.name.trim().is_empty() && c.command.trim().is_empty();
+    if let Some(problem) = c.problem().filter(|_| !fresh) {
         ui.label(
-            RichText::new(format!("{problem}: it isn't offered until fixed"))
+            RichText::new(format!("Not offered until fixed: {problem}"))
                 .color(t.danger)
                 .small(),
         );

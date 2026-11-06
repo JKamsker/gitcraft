@@ -111,11 +111,7 @@ impl RepoTab {
         }
         ui.separator();
         copy_items(ui, &hash, &summary, branch_name.as_deref());
-        let scope = crate::custom_commands::Scope {
-            sha: hash.clone(),
-            branch: branch_name.clone().unwrap_or_default(),
-            ..Default::default()
-        };
+        let scope = self.commit_scope(&hash, branch_name.as_deref());
         crate::repo::custom_commands::menu_items(
             ui,
             crate::custom_commands::Placement::Commit,

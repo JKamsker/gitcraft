@@ -13,12 +13,22 @@ pub const FILE: &str = ".gitcraft/commands.json";
 pub const MAX_BYTES: usize = 256 * 1024;
 
 /// A repository's file as trusted: which repository (its path as gitcraft opens it) and the
-/// file's text when the user trusted it.
+/// [`digest`] of the file's text when the user trusted it.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct TrustedFile {
     pub repo: String,
-    pub text: String,
+    pub digest: String,
+}
+
+/// The SHA-256 of `text`, in hex: what a trust is kept as (the settings are read many times a
+/// frame, so not the file itself), and no other text can be made to read the same.
+pub fn digest(text: &str) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(text.as_bytes())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 /// What the file says: `{ "commands": [ … ] }`.
@@ -28,17 +38,33 @@ struct Contents {
     commands: Vec<CustomCommand>,
 }
 
-/// The repository's file as read: its text, and the commands in it or why there are none.
+/// The repository's file as read: its text and its [`digest`], and the commands in it or why
+/// there are none.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RepoFile {
     pub text: String,
+    pub digest: String,
     pub commands: Result<Vec<CustomCommand>, String>,
 }
 
 impl RepoFile {
     pub fn new(text: String) -> Self {
         let commands = parse_repo_file(&text);
-        Self { text, commands }
+        let digest = digest(&text);
+        Self {
+            text,
+            digest,
+            commands,
+        }
+    }
+
+    /// A file that couldn't be read, saying why.
+    pub fn unreadable(error: String) -> Self {
+        Self {
+            text: String::new(),
+            digest: digest(""),
+            commands: Err(error),
+        }
     }
 }
 
@@ -66,16 +92,17 @@ pub fn parse_repo_file(text: &str) -> Result<Vec<CustomCommand>, String> {
     Ok(contents.commands)
 }
 
-/// Whether the file of `repo` reading `text` is the one the user trusted there.
-pub fn is_trusted(trusted: &[TrustedFile], repo: &str, text: &str) -> bool {
-    trusted.iter().any(|t| t.repo == repo && t.text == text)
+/// Whether the file of `repo` whose text has `digest` is the one the user trusted there.
+pub fn is_trusted(trusted: &[TrustedFile], repo: &str, digest: &str) -> bool {
+    trusted.iter().any(|t| t.repo == repo && t.digest == digest)
 }
 
-/// `trusted` with `repo`'s file trusted as `text`, in place of what was trusted there before.
-pub fn trust(trusted: &mut Vec<TrustedFile>, repo: &str, text: &str) {
+/// `trusted` with `repo`'s file trusted as the text of `digest`, in place of what was trusted
+/// there before.
+pub fn trust(trusted: &mut Vec<TrustedFile>, repo: &str, digest: &str) {
     trusted.retain(|t| t.repo != repo);
     trusted.push(TrustedFile {
         repo: repo.to_owned(),
-        text: text.to_owned(),
+        digest: digest.to_owned(),
     });
 }

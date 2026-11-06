@@ -217,7 +217,9 @@ so your config, credentials and hooks apply as usual.
   (`{"commands": [{"name": …, "where": "commit" | "branch" | "file" | "palette", "command": …,
   "prompts": [{"variable": "NAME", "label": …, "kind": "text" | "branch", "default": …}],
   "confirm": true, "output": "toast" | "terminal"}]}`); they are offered only once you have read
-  the file and trusted it, and asked about again whenever it changes.
+  the file and trusted it, and asked about again whenever it changes. `confirm` is `true` and
+  `output` `"toast"` when left out; a field the format doesn't know makes the file unusable (the
+  review says why). A toast shows only the last 8 lines of what a command printed.
 - Manual (F1, or the book in the title bar): what each part does and every keyboard shortcut.
 - Avatars: on a GitHub repository, the authors' GitHub accounts (through `gh` when installed, else
   GitHub's API); on Forgejo and Gitea, the accounts the host ties the commits to; on GitLab, the

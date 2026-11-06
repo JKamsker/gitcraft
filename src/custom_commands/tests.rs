@@ -104,6 +104,38 @@ fn a_prompt_answer_is_one_word_too() -> Result<(), String> {
     Ok(())
 }
 
+/// The command gets no arguments: gitcraft's script (with every value in it) isn't its `$1`.
+#[test]
+fn the_command_has_no_arguments_wherever_it_runs() -> Result<(), String> {
+    let dir = repo("args");
+    let vars = variables(&scope("abc", "main", ""), "/r", &[]);
+    let ran = run(&dir, &vars, "printf '%s|%s' \"$#\" \"$1\"")?;
+    let script = terminal_program(&vars, "printf '%s|%s' \"$#\" \"$1\"", "N");
+    let (_, terminal) = run_with_input(&dir, &script, "\n")?;
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(String::from_utf8_lossy(&ran.stdout), "0|");
+    assert!(terminal.starts_with("0|\n"), "{terminal:?}");
+    Ok(())
+}
+
+/// A toast command's script goes in git's environment, not on a command line `ps` shows.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_toast_scripts_values_stay_off_the_command_line() -> Result<(), String> {
+    let dir = repo("argv");
+    let answers = vec![("TOKEN".to_owned(), "s3cret-token".to_owned())];
+    let vars = variables(&Scope::default(), "/r", &answers);
+    // Every command line of the processes above the command: git and its shell.
+    let line = "p=$$; while [ \"$p\" -gt 1 ]; do tr '\\0' ' ' < /proc/$p/cmdline; echo; \
+                p=$(awk '{print $4}' /proc/$p/stat); done";
+    let ran = run(&dir, &vars, line)?;
+    let _ = std::fs::remove_dir_all(&dir);
+    let seen = String::from_utf8_lossy(&ran.stdout).into_owned();
+    assert!(seen.contains("gitcraft-run"), "{seen}");
+    assert!(!seen.contains("s3cret-token"), "{seen}");
+    Ok(())
+}
+
 #[test]
 fn the_commands_variables_are_set_from_the_scope() {
     let vars = variables(
@@ -455,20 +487,38 @@ fn a_bad_repository_file_says_what_is_wrong() {
 #[test]
 fn trust_is_for_one_repository_and_its_exact_file() {
     let mut trusted = Vec::new();
-    assert!(!is_trusted(&trusted, "/r", REPO_JSON));
-    trust(&mut trusted, "/r", REPO_JSON);
-    assert!(is_trusted(&trusted, "/r", REPO_JSON));
+    let file = digest(REPO_JSON);
+    assert!(!is_trusted(&trusted, "/r", &file));
+    trust(&mut trusted, "/r", &file);
+    assert!(is_trusted(&trusted, "/r", &file));
     // Another repository with the same file isn't trusted.
-    assert!(!is_trusted(&trusted, "/other", REPO_JSON));
+    assert!(!is_trusted(&trusted, "/other", &file));
     // The file changed: asked again, even for a space.
-    let changed = REPO_JSON.replace("ci.example", "evil.example");
+    let changed = digest(&REPO_JSON.replace("ci.example", "evil.example"));
     assert!(!is_trusted(&trusted, "/r", &changed));
-    assert!(!is_trusted(&trusted, "/r", &format!("{REPO_JSON} ")));
+    assert!(!is_trusted(
+        &trusted,
+        "/r",
+        &digest(&format!("{REPO_JSON} "))
+    ));
     // Trusting the new one replaces the old one.
     trust(&mut trusted, "/r", &changed);
     assert_eq!(trusted.len(), 1);
     assert!(is_trusted(&trusted, "/r", &changed));
-    assert!(!is_trusted(&trusted, "/r", REPO_JSON));
+    assert!(!is_trusted(&trusted, "/r", &file));
+}
+
+#[test]
+fn a_digest_is_sha256_of_the_text() {
+    assert_eq!(
+        digest(""),
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    );
+    assert_eq!(
+        digest("abc"),
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    );
+    assert_ne!(digest("ü"), digest("u"));
 }
 
 #[test]
@@ -510,7 +560,7 @@ fn commands_round_trip_through_the_settings() -> Result<(), String> {
         custom_commands: vec![c.clone()],
         trusted_command_files: vec![TrustedFile {
             repo: "/r".to_owned(),
-            text: REPO_JSON.to_owned(),
+            digest: digest(REPO_JSON),
         }],
         ..Default::default()
     };
