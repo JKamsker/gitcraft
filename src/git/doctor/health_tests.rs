@@ -43,3 +43,50 @@ fn health_is_read_and_speed_ups_turned_on() -> Result<(), String> {
     let _ = std::fs::remove_dir_all(&dir);
     result
 }
+
+#[test]
+fn shallow_clones_empty_chains_and_the_monitor_set_on_linux() -> Result<(), String> {
+    let dir = repo("health-shallow", &[("a.txt", b"a\n")])?;
+    let clone = std::path::PathBuf::from(format!("{} clone", dir.display()));
+    let _ = std::fs::remove_dir_all(&clone);
+    let result = (|| {
+        git(&dir, &["commit", "-q", "--allow-empty", "-m", "two"])?;
+        let url = format!("file://{}", dir.display().to_string().replace('\\', "/"));
+        git(
+            &dir,
+            &[
+                "clone",
+                "-q",
+                "--depth",
+                "1",
+                &url,
+                &clone.to_string_lossy(),
+            ],
+        )?;
+        let shallow = health::health(&clone, true)?;
+        assert!(shallow.shallow);
+        assert_eq!(health::suggestions(&shallow)[0].state, State::Unsupported);
+
+        // A split chain written back into one file leaves its folder behind, empty.
+        git(&dir, &["commit-graph", "write", "--reachable", "--split"])?;
+        assert!(health::health(&dir, true)?.commit_graph);
+        let info = dir.join(".git/objects/info");
+        let _ = std::fs::remove_file(info.join("commit-graphs/commit-graph-chain"));
+        for entry in std::fs::read_dir(info.join("commit-graphs")).map_err(|e| e.to_string())? {
+            let _ = std::fs::remove_file(entry.map_err(|e| e.to_string())?.path());
+        }
+        let _ = std::fs::remove_file(info.join("commit-graph"));
+        assert!(!health::health(&dir, true)?.commit_graph);
+
+        // core.fsmonitor=true does nothing where git has no monitor of its own.
+        git(&dir, &["config", "core.fsmonitor", "true"])?;
+        assert_eq!(
+            health::health(&dir, true)?.fsmonitor,
+            Some(State::Unsupported)
+        );
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&clone);
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}

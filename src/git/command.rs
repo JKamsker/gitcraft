@@ -32,7 +32,8 @@ fn user_global_config(args: &[&str]) -> bool {
     let rest = after_options(args);
     (rest.first() == Some(&"config") && rest.contains(&"--global"))
         // `maintenance start` / `register` write `maintenance.repo` to the global config.
-        || rest.first() == Some(&"maintenance")
+        || (rest.first() == Some(&"maintenance")
+            && matches!(rest.get(1), Some(&("start" | "register" | "unregister" | "stop"))))
 }
 
 /// `args` from the subcommand on: past the options before it (`-c x=y`, `-C dir`,
@@ -430,6 +431,8 @@ mod tests {
         ]));
         assert!(user_global_config(&["-ck=v", "config", "--global", "x"]));
         assert!(user_global_config(&["maintenance", "start"]));
+        // Running it reads the configuration as every command does.
+        assert!(!user_global_config(&["maintenance", "run"]));
         assert!(!user_global_config(&[]));
     }
 

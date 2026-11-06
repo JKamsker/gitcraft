@@ -20,7 +20,8 @@ pub(super) fn ui(
     faint(
         ui,
         "How big the repository is, how long reading it takes, and what would make git faster \
-         here. Every speed-up is git's own and works for git everywhere, not only in gitcraft.",
+         here. Every speed-up is git's own, set for this repository: it helps git everywhere, \
+         not only in gitcraft.",
     );
     let Some(h) = reading(ui, &state.found) else {
         return;
@@ -141,6 +142,10 @@ fn suggestion(ui: &mut Ui, s: &Suggestion, locked: bool, acts: &mut Vec<Action>)
         );
         match s.state {
             State::On => widgets::chip(ui, "on", t.success),
+            // A one-off action rather than something left on.
+            State::Off if s.title == "Pack the objects" => {
+                widgets::chip(ui, "suggested", t.warning)
+            }
             State::Off => widgets::chip(ui, "off", t.text_faint),
             State::Unsupported => widgets::chip(ui, "not available here", t.text_faint),
         };
@@ -153,11 +158,13 @@ fn suggestion(ui: &mut Ui, s: &Suggestion, locked: bool, acts: &mut Vec<Action>)
         .collect();
     match s.state {
         State::On => {}
-        State::Unsupported => faint(
+        State::Unsupported if s.title == "File system monitor" => faint(
             ui,
-            "git's own monitor exists on Windows and macOS only; on Linux a Watchman hook can \
-             stand in (core.fsmonitor naming it).",
+            "git's own monitor exists on Windows and macOS only (and not on network drives \
+             unless fsmonitor.allowRemote is set); on Linux a Watchman hook can stand in \
+             (core.fsmonitor naming it).",
         ),
+        State::Unsupported => {}
         State::Off => {
             ui.horizontal_wrapped(|ui| {
                 let turn_on = ui
@@ -181,9 +188,13 @@ fn turn_on_action(s: &Suggestion, commands: &[String]) -> Action {
         return Action::Doctor(DoctorAct::Confirm(Confirm {
             title: "Schedule maintenance?".to_owned(),
             body: format!(
-                "{} adds this repository to maintenance.repo in your global git config and \
-                 schedules git to run in the background every hour (git maintenance stop \
-                 undoes it).",
+                "{} adds this repository to maintenance.repo in your own global git config, sets \
+                 maintenance.auto=false and maintenance.strategy=incremental in its config, and \
+                 schedules git to run in the background: every hour it fetches from the \
+                 remotes into refs/prefetch. The scheduled runs read your own global config, \
+                 not a gitcraft profile's. git maintenance unregister undoes it for this \
+                 repository (and git config --unset maintenance.auto brings automatic gc \
+                 back); git maintenance stop removes the schedule for every repository.",
                 commands.join(", ")
             ),
             button: "Schedule".to_owned(),
