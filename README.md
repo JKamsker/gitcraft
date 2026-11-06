@@ -117,6 +117,13 @@ so your config, credentials and hooks apply as usual.
   menu to see only those; the graph then has just the commits of the branches it shows and the
   checked-out one. _Viewing 12 of 55_ at the top says how many it shows, with _Show all_. Kept
   per repository.
+- Stacked branches: _This branch is based on…_ in a branch's menu records the branch it is a
+  layer on (`branch.<name>.gitcraft-parent` in the repository's git config, with the parent's
+  commit it was based on as `gitcraft-parent-base`), the one history suggests picked first: the
+  local branch it forks from last. _STACKS_ then shows each stack as `main → schema → api → ui`,
+  every layer with the commits it adds, its pull request and a warning when its parent moved on
+  (amended, rebased, new commits) and it needs restacking; a branch pill's tooltip in the graph
+  names its stack. Undoable, and _Remove from its stack_ takes a branch out.
 - Remotes: add, edit (name and URL), fetch one, remove; their branches below each.
 - Worktrees: a yellow dot in place of the folder icon marks the others with uncommitted changes,
   here and in the switcher. Add (existing or new branch), open in the same tab (the tab then shows the branch, a searchable switcher and a button to close the worktree, and what you left keeps running; can be turned off in Settings) or a new one, open a terminal there, lock, remove,
@@ -381,6 +388,8 @@ was made this way, on a demo repository.
 | `src/repo/conflict.rs`   | three-pane conflict editor                                                         |
 | `src/mergiraf.rs` | Mergiraf, run as the user's own command when it is installed |
 | `src/repo/rebase.rs`     | interactive rebase editor and its todo list                                        |
+| `src/git/stack/`         | stacked branches: the parents recorded in git's config, each layer's state, the parent suggested from history |
+| `src/repo/stack/`        | stacks in the tab: the sidebar's STACKS, _This branch is based on…_, the graph's tooltips |
 | `src/repo/file_view.rs`  | a file's history, blame and contents at a commit                                   |
 | `src/repo/file_text.rs`  | a whole file at a commit, coloured, for the file view and diffs                    |
 | `src/repo/dialogs.rs`    | branch, tag, stash, remote, worktree, pull request and confirm dialogs             |

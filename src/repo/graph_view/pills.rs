@@ -71,7 +71,13 @@ impl RepoTab {
         });
         let refs_cell = Rect::from_min_max(rect.min, pos2(gx, rect.bottom()));
         if !stack_open && ui.rect_contains_pointer(refs_cell) {
-            let lines: Vec<String> = badges.iter().map(Badge::describe).collect();
+            let mut lines: Vec<String> = badges.iter().map(Badge::describe).collect();
+            lines.extend(
+                badges
+                    .iter()
+                    .filter(|b| b.kind == BadgeKind::Branch && b.local)
+                    .filter_map(|b| self.stack_line(&b.label)),
+            );
             return resp.on_hover_text(format!(
                 "{}\nTip commit by {} · {}\nDouble-click a pill to check it out",
                 lines.join("\n"),

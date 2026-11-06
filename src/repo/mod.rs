@@ -35,6 +35,7 @@ mod rewrite;
 #[cfg(test)]
 mod samples;
 mod sidebar;
+mod stack;
 mod state;
 mod terminals;
 #[cfg(test)]
@@ -158,6 +159,8 @@ pub struct RepoTab {
     compare_requests: u64,
     file_view: Option<file_view::FileView>,
     rebase: Option<rebase::RebaseEditor>,
+    /// Stacked branches: the recorded parents and the layers they make.
+    stacks: stack::Stacks,
     /// The selected commit's message, being edited in the right pane.
     reword: Option<Reword>,
     /// HTTPS credentials typed in this session, used for every later git command of the tab.
@@ -314,6 +317,7 @@ impl RepoTab {
             compare_requests: 0,
             file_view: None,
             rebase: None,
+            stacks: Default::default(),
             reword: None,
             credentials: None,
             last_op: None,

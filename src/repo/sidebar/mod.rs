@@ -74,6 +74,7 @@ impl RepoTab {
         let output = scroll.show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = 0.0;
             self.local_section(ui, acts, idle, &filter, &mut sections);
+            self.stack_section(ui, acts, idle, &mut sections);
             self.remotes_section(ui, acts, idle, &filter, &mut sections);
             ui.add_space(gap);
             self.worktree_section(ui, acts, idle, &mut sections);

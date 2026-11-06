@@ -208,6 +208,7 @@ impl RepoTab {
             Action::QuickEdit { edit, hash } => self.quick_edit(edit, hash, ctx),
             Action::RunRebase => self.run_rebase(ctx),
             Action::CloseRebase => self.rebase = None,
+            Action::Stack(act) => self.stack_act(act, ctx),
             Action::SignIn(creds) => self.sign_in(creds, ctx),
             Action::Ignore { pattern, path } => self.ignore(&pattern, &path, ctx),
             Action::PickLines { pick, lines } => self.pick_lines(pick, &lines, ctx),
