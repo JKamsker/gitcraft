@@ -13,6 +13,7 @@ mod conflict;
 mod detail;
 mod dialogs;
 mod diff;
+pub(crate) mod fence_view;
 mod file_text;
 mod file_view;
 mod graph_view;
@@ -137,6 +138,8 @@ pub struct RepoTab {
     prs_loaded: Option<Instant>,
     /// The build status of the commits that show one.
     ci: ci_status::CiStatuses,
+    /// The agent fence: its list, the worktrees checked against it, its editor.
+    fence: fence_view::FenceState,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -299,6 +302,7 @@ impl RepoTab {
             pr_error: None,
             prs_loaded: None,
             ci: ci_status::CiStatuses::default(),
+            fence: Default::default(),
             selected: None,
             stash_view: None,
             scroll_to: None,
