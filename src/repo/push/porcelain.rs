@@ -86,21 +86,27 @@ impl RefLine {
 }
 
 /// The refused line of a push of `branch` (`refs/heads/main`) or of the commit `commit`, with
-/// why: that line, else the only refused one. `None` when nothing was refused (the push failed
-/// before it reached the remote: no network, a sign-in…).
+/// why. `None` when that push went through (another branch pushed along with it may have been
+/// refused: not this one's business), or when nothing was refused (the push failed before it
+/// reached the remote: no network, a sign-in…). Only a line that names no branch (`HEAD`, a
+/// commit) is taken for it when none names it; never another branch's.
 pub(super) fn refused(out: &str, branch: &str, commit: Option<&str>) -> Option<(RefLine, Refusal)> {
-    let refused: Vec<(RefLine, Refusal)> = parse(out)
-        .into_iter()
-        .filter_map(|line| line.refusal().map(|why| (line, why)))
-        .collect();
-    let ours = refused
-        .iter()
-        .position(|(line, _)| line.from == branch || Some(line.from.as_str()) == commit);
-    match ours {
-        Some(i) => refused.into_iter().nth(i),
-        None if refused.len() == 1 => refused.into_iter().next(),
-        None => None,
+    let lines = parse(out);
+    let ours = |line: &RefLine| line.from == branch || Some(line.from.as_str()) == commit;
+    if let Some(line) = lines.iter().find(|l| ours(l)) {
+        let why = line.refusal()?;
+        return Some((line.clone(), why));
     }
+    let mut unnamed = lines
+        .into_iter()
+        .filter(|l| !l.from.starts_with("refs/"))
+        .filter_map(|line| line.refusal().map(|why| (line, why)));
+    let first = unnamed.next();
+    // Two of them: which one was this push can't be told.
+    if unnamed.next().is_some() {
+        return None;
+    }
+    first
 }
 
 #[cfg(test)]
@@ -197,6 +203,9 @@ mod tests {
         assert!(matches!(found, Some((_, Refusal::Remote(_)))));
         // Two others refused and neither is it: nothing to say about this branch.
         assert_eq!(refused(out, "refs/heads/third", None), None);
+        // HEAD pushed: the one line that names no branch.
+        let head = "!\tHEAD:refs/heads/main\t[rejected] (fetch first)";
+        assert!(refused(head, "refs/heads/main", None).is_some());
         // A commit pushed (a force push pushes the commit it was shown).
         let sha = "!\t1234abcd:refs/heads/main\t[rejected] (stale info)\n\
             !\trefs/heads/x:refs/heads/x\t[rejected] (stale info)";
@@ -205,6 +214,18 @@ mod tests {
             found.map(|(line, why)| (line.from, why)),
             Some(("1234abcd".to_owned(), Refusal::Moved))
         );
+    }
+
+    /// `push.default=matching`: this branch went through, another one was refused. That is
+    /// no refusal of this push, and the other branch's line must not stand in for it.
+    #[test]
+    fn another_branch_refused_beside_this_one_is_not_taken() {
+        let out = " \trefs/heads/main:refs/heads/main\t5da346c..dfe72be\n\
+            !\trefs/heads/other:refs/heads/other\t[rejected] (non-fast-forward)";
+        assert_eq!(refused(out, "refs/heads/main", None), None);
+        // Nor when this branch isn't in the output at all.
+        let only_other = "!\trefs/heads/other:refs/heads/other\t[rejected] (non-fast-forward)";
+        assert_eq!(refused(only_other, "refs/heads/main", None), None);
     }
 
     #[test]

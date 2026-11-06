@@ -32,6 +32,11 @@ pub(super) fn headline(r: &Rejection) -> String {
     }
 }
 
+/// `one` for a single commit, `many` for several.
+fn pick<'a>(n: u32, one: &'a str, many: &'a str) -> &'a str {
+    if n == 1 { one } else { many }
+}
+
 /// How the branch stands, after the headline.
 pub(super) fn explanation(r: &Rejection) -> String {
     let (remote, branch) = (r.target.label(), &r.branch);
@@ -40,29 +45,33 @@ pub(super) fn explanation(r: &Rejection) -> String {
     } else {
         String::new()
     };
+    let n = r.behind;
     let rest = match r.shape {
         Shape::Clear => "It may have been pushed from elsewhere meanwhile.".to_owned(),
-        Shape::Behind => {
-            format!("Your {branch} is just behind, with nothing new to push: pull to catch up.")
-        }
+        Shape::Behind => format!(
+            "Your {branch} is only behind it, with nothing of its own to push: pull to catch up."
+        ),
         Shape::Diverged => format!(
-            "Your {branch} has {} it doesn't: both moved on. Pull to join them, or force push \
-             to replace what is on {remote}.",
+            "Your {branch} has {} that {remote} doesn't have: both moved on. Pull, then push \
+             joins them; a force push replaces what is on {remote}.",
             commits(r.ahead)
         ),
+        Shape::Rewritten if r.ahead == 0 => format!(
+            "Your {branch} was moved back here (a commit undone, a reset) after {} pushed. \
+             Pulling would bring {} back; a force push removes {} from {remote}.",
+            pick(n, "it was", "they were"),
+            pick(n, "it", "them"),
+            pick(n, "it", "them"),
+        ),
         Shape::Rewritten => format!(
-            "Your {branch} was rewritten here (amended, rebased or undone) after {} pushed, \
-             and has {} in {} place. Pulling would bring the old {} back beside the new; force \
-             pushing replaces {}.",
-            if r.behind == 1 {
-                "that was"
-            } else {
-                "those were"
-            },
+            "Your {branch} was rewritten here (amended or rebased) after {} pushed, and has {} \
+             in {} place. Pulling would bring the old {} back beside the new; a force push \
+             replaces {}.",
+            pick(n, "that commit was", "those commits were"),
             commits(r.ahead),
-            if r.behind == 1 { "its" } else { "their" },
-            if r.behind == 1 { "commit" } else { "commits" },
-            if r.behind == 1 { "it" } else { "them" },
+            pick(n, "its", "their"),
+            pick(n, "one", "ones"),
+            pick(n, "it", "them"),
         ),
     };
     format!("{moved}{rest}")
@@ -76,24 +85,26 @@ fn commit_line(c: &RemoteCommit) -> String {
 /// The confirmation's words: what the force push removes from the remote, and what guards it.
 pub(super) fn force_body(r: &Rejection) -> String {
     let (remote, branch) = (r.target.label(), &r.branch);
+    let n = r.behind;
     let mut body = format!(
-        "{remote} is replaced with your {branch} ({}). {} on {remote} {} not on your {branch}, \
-         and the push removes {} from {remote}:\n",
+        "Force pushing will replace {remote} with your {branch} ({}). {} on {remote} but not \
+         on your {branch}; {} removed from {remote} (clones that already have {} keep {}):\n",
         short(&r.local),
-        if r.behind == 1 {
-            "This commit".to_owned()
+        if n == 1 {
+            "This commit is".to_owned()
         } else {
-            format!("These {} commits", r.behind)
+            format!("These {n} commits are")
         },
-        if r.behind == 1 { "is" } else { "are" },
-        if r.behind == 1 { "it" } else { "them" },
+        pick(n, "it will be", "they will be"),
+        pick(n, "it", "them"),
+        pick(n, "it", "them"),
     );
     for c in &r.missing {
         body.push_str(&format!("\n    {}", commit_line(c)));
     }
     let listed = r.missing.len() as u32;
-    if r.behind > listed {
-        body.push_str(&format!("\n    and {} more", commits(r.behind - listed)));
+    if n > listed {
+        body.push_str(&format!("\n    and {} more", n - listed));
     }
     debug_assert!(r.missing.len() <= LISTED);
     body.push_str(&format!(
@@ -140,21 +151,22 @@ impl RepoTab {
                         Banner::NoUpstream { branch, remotes } => {
                             no_upstream(ui, branch, remotes, idle, acts)
                         }
-                        Banner::Gone { branch, target } => {
+                        Banner::Gone { branch, target, .. } => {
                             text(ui, &format!("{} is gone", target.label()), true);
                             text(
                                 ui,
                                 &format!(
-                                    "The branch your {branch} went to was deleted there. Push \
-                                     again to publish {branch} on it anew."
+                                    "The branch {branch} pushes to was deleted on {}. Push \
+                                     again to create it there.",
+                                    target.remote
                                 ),
                                 false,
                             );
                             buttons(ui, |ui| {
-                                primary(ui, "Push again", idle, || {
+                                primary(ui, "Push again", "", idle, || {
                                     acts.push(Action::PushFlow(PushAct::PushAgain))
                                 });
-                                cancel(ui, acts);
+                                dismiss(ui, acts);
                             });
                         }
                         Banner::Detached => {
@@ -165,10 +177,11 @@ impl RepoTab {
                                 false,
                             );
                             buttons(ui, |ui| {
-                                primary(ui, "Create branch…", idle && !head.is_empty(), || {
+                                let can = idle && !head.is_empty();
+                                primary(ui, "Create branch…", "", can, || {
                                     acts.push(Action::Dialog(Dialog::create_branch(&head, "HEAD")))
                                 });
-                                cancel(ui, acts);
+                                dismiss(ui, acts);
                             });
                         }
                     });
@@ -191,7 +204,7 @@ fn rejected(ui: &mut Ui, r: &Rejection, idle: bool, acts: &mut Vec<Action>) {
     let named = r.missing.len().min(IN_BANNER) as u32;
     if r.behind > named && named > 0 {
         ui.label(
-            RichText::new(format!("and {} more", commits(r.behind - named)))
+            RichText::new(format!("and {} more", r.behind - named))
                 .size(11.5)
                 .color(t.text_faint),
         );
@@ -200,21 +213,24 @@ fn rejected(ui: &mut Ui, r: &Rejection, idle: bool, acts: &mut Vec<Action>) {
     buttons(ui, |ui| {
         match r.shape {
             Shape::Clear => {
-                primary(ui, "Push again", idle, || {
+                primary(ui, "Push again", "", idle, || {
                     acts.push(Action::PushFlow(PushAct::PushAgain))
                 });
             }
             Shape::Behind => {
-                primary(ui, &format!("Pull {}", r.target.label()), idle, || {
-                    acts.push(Action::PushFlow(PushAct::PullThenPush(None)))
+                let label = format!("Pull {}", r.target.label());
+                let tip = format!("{}; nothing is pushed", mode.label());
+                primary(ui, &label, &tip, idle, || {
+                    acts.push(Action::PushFlow(PushAct::Pull))
                 });
             }
             Shape::Diverged | Shape::Rewritten => {
                 // After a rewrite, replacing is what is most likely meant; else joining.
                 let rewritten = r.shape == Shape::Rewritten;
                 let force = "Force push (with lease)…";
+                let force_tip = "Asks first, naming the commits it removes";
                 if rewritten {
-                    primary(ui, force, idle, || {
+                    primary(ui, force, force_tip, idle, || {
                         acts.push(Action::PushFlow(PushAct::ConfirmForce))
                     });
                 }
@@ -222,7 +238,7 @@ fn rejected(ui: &mut Ui, r: &Rejection, idle: bool, acts: &mut Vec<Action>) {
                 if !rewritten
                     && ui
                         .add_enabled(idle, egui::Button::new(force))
-                        .on_hover_text("Asks first, naming the commits it removes")
+                        .on_hover_text(force_tip)
                         .clicked()
                 {
                     acts.push(Action::PushFlow(PushAct::ConfirmForce));
@@ -236,7 +252,7 @@ fn rejected(ui: &mut Ui, r: &Rejection, idle: bool, acts: &mut Vec<Action>) {
         {
             acts.push(Action::PushFlow(PushAct::CheckAgain));
         }
-        cancel(ui, acts);
+        dismiss(ui, acts);
     });
 }
 
@@ -268,7 +284,7 @@ fn pull_buttons(ui: &mut Ui, mode: PullMode, first: bool, idle: bool, acts: &mut
     for (i, (label, way, tip)) in ways.into_iter().enumerate() {
         let act = Action::PushFlow(PushAct::PullThenPush(way));
         if first && i == 0 {
-            if primary(ui, &label, idle, || {}) {
+            if primary(ui, &label, &tip, idle, || {}) {
                 acts.push(act);
             }
         } else if ui
@@ -290,8 +306,8 @@ fn refused(ui: &mut Ui, branch: &str, message: &str, acts: &mut Vec<Action>) {
     );
     text(
         ui,
-        "A hook or a branch protection there said no; force pushing would not get past it. \
-         What git said:",
+        "The remote said no itself (a hook or a branch protection, for example); force pushing \
+         won't get past that. What git said:",
         false,
     );
     egui::ScrollArea::vertical()
@@ -311,7 +327,7 @@ fn refused(ui: &mut Ui, branch: &str, message: &str, acts: &mut Vec<Action>) {
     let mut copy = false;
     buttons(ui, |ui| {
         copy = ui.button("Copy message").clicked();
-        cancel(ui, acts);
+        dismiss(ui, acts);
     });
     if copy {
         ui.ctx().copy_text(message.to_owned());
@@ -322,7 +338,7 @@ fn no_upstream(ui: &mut Ui, branch: &str, remotes: &[String], idle: bool, acts: 
     text(ui, &format!("{branch} isn't on any remote yet"), true);
     text(
         ui,
-        &format!("Publish it on one, which {branch} then tracks:"),
+        &format!("Choose a remote to publish it on; {branch} will track it there."),
         false,
     );
     buttons(ui, |ui| {
@@ -333,12 +349,12 @@ fn no_upstream(ui: &mut Ui, branch: &str, remotes: &[String], idle: bool, acts: 
             let label = format!("Publish to {remote}");
             let mut act = || acts.push(Action::PushFlow(PushAct::Publish(remote.clone())));
             if i == 0 {
-                primary(ui, &label, idle, act);
+                primary(ui, &label, "", idle, act);
             } else if ui.add_enabled(idle, egui::Button::new(label)).clicked() {
                 act();
             }
         }
-        cancel(ui, acts);
+        dismiss(ui, acts);
     });
 }
 
@@ -358,9 +374,9 @@ fn buttons(ui: &mut Ui, add: impl FnOnce(&mut Ui)) {
     ui.horizontal_wrapped(add);
 }
 
-/// The button of what is most likely meant; `clicked` runs when it is clicked, and the
-/// return says whether it was.
-fn primary(ui: &mut Ui, label: &str, enabled: bool, clicked: impl FnOnce()) -> bool {
+/// The button of what is most likely meant, with `tip` (if any) on hover; `clicked` runs when
+/// it is clicked, and the return says whether it was.
+fn primary(ui: &mut Ui, label: &str, tip: &str, enabled: bool, clicked: impl FnOnce()) -> bool {
     let t = Tokens::get(ui.ctx());
     let button = egui::Button::new(
         RichText::new(label)
@@ -368,15 +384,19 @@ fn primary(ui: &mut Ui, label: &str, enabled: bool, clicked: impl FnOnce()) -> b
             .font(theme::medium(12.0)),
     )
     .fill(t.accent);
-    let hit = ui.add_enabled(enabled, button).clicked();
+    let mut response = ui.add_enabled(enabled, button);
+    if !tip.is_empty() {
+        response = response.on_hover_text(tip);
+    }
+    let hit = response.clicked();
     if hit {
         clicked();
     }
     hit
 }
 
-fn cancel(ui: &mut Ui, acts: &mut Vec<Action>) {
-    if ui.button("Cancel").clicked() {
+fn dismiss(ui: &mut Ui, acts: &mut Vec<Action>) {
+    if ui.button("Dismiss").clicked() {
         acts.push(Action::PushFlow(PushAct::Dismiss));
     }
 }

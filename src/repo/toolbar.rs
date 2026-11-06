@@ -106,8 +106,9 @@ impl RepoTab {
             acts.push(Action::Push);
         }
         let sync_tip = format!(
-            "Sync: {}, then push the current branch\nStops at the pull on conflicts, nothing pushed",
-            mode.label()
+            "Pull, then push the current branch (git {}, then git push)\nIf the pull fails \
+             (conflicts, or it can't fast-forward), nothing is pushed",
+            mode.args().join(" ")
         );
         if icons::tool_button(ui, "arrow-down-up", "Sync", idle && has_remote)
             .on_hover_text(sync_tip)

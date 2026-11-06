@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use super::check::{self, Checked, Question, Rejection, Shape, Target};
 use super::porcelain::{self, RefLine, Refusal};
-use super::{force_push_ops, publish_args, pull_from};
+use super::{Attempt, Chain, force_push_ops, publish_args, pull_from, refused_target};
 use crate::git;
 use crate::repo::operations::run_steps;
 use crate::repo::pull::PullMode;
@@ -374,6 +374,7 @@ fn a_remote_branch_deleted_is_gone() -> Result<(), String> {
     let gone = Checked::Gone {
         branch: "main".to_owned(),
         target: origin("elsewhere"),
+        publish: false,
     };
     assert_eq!(checked, gone);
     Ok(())
@@ -399,4 +400,126 @@ fn the_push_remote_is_the_one_checked() -> Result<(), String> {
     assert_eq!(r.target.remote, "fork");
     assert_eq!(r.missing[0].subject, "on the fork");
     Ok(())
+}
+
+/// A commit pushed, then undone here: the branch is only behind, but what the remote has was
+/// here, so it is told as a rewrite (with the force push), not "pull to catch up".
+#[test]
+fn an_undone_commit_after_pushing_is_a_rewrite() -> Result<(), String> {
+    let w = world("undone")?;
+    commit(&w.mine, "to undo")?;
+    run(&w.mine, &["push", "-q"])?;
+    run(&w.mine, &["reset", "-q", "--keep", "HEAD~1"])?;
+    let r = push_and_check(&w)?;
+    assert_eq!((r.ahead, r.behind), (0, 1));
+    assert_eq!(r.shape, Shape::Rewritten);
+    let (forced, _) = run_steps(&w.mine, &force_push_ops(&r), OpKind::plain(), None);
+    assert!(forced.is_ok(), "{forced:?}");
+    assert_eq!(remote_main(&w), git::head(&w.mine));
+    Ok(())
+}
+
+/// Fetched from one repository, pushed to another (`pushurl`): what is checked is the
+/// repository the push was refused by.
+#[test]
+fn the_push_url_is_the_one_checked() -> Result<(), String> {
+    let w = world("push-url")?;
+    let fork = path(&w.root.join("fork.git"));
+    run(&w.root, &["clone", "-q", "--bare", &path(&w.bare), &fork])?;
+    run(&w.mine, &["config", "remote.origin.pushurl", &fork])?;
+    run(&w.theirs, &["remote", "add", "fork", &fork])?;
+    commit(&w.theirs, "only on the push url")?;
+    run(&w.theirs, &["push", "-q", "fork", "main"])?;
+    commit(&w.mine, "mine")?;
+    let r = push_and_check(&w)?;
+    assert_eq!(r.target, origin("main"));
+    assert_eq!(r.missing[0].subject, "only on the push url");
+    assert_eq!(
+        git::resolve(Path::new(&fork), "refs/heads/main"),
+        Ok(r.remote.clone())
+    );
+    Ok(())
+}
+
+#[test]
+fn a_refused_push_is_looked_at_where_the_line_says() {
+    // A publish sent to `me/main` by the remote's push refspec: that is what is checked.
+    assert_eq!(
+        refused_target(Some(origin("main")), "refs/heads/me/main"),
+        Some(Some(origin("me/main")))
+    );
+    // A plain push: the remote is left to git's config.
+    assert_eq!(refused_target(None, "refs/heads/main"), Some(None));
+    // Gerrit's review refs are no branch to look at or replace.
+    assert_eq!(refused_target(Some(origin("main")), "refs/for/main"), None);
+}
+
+/// Sync's push waits for what started after its pull (updating the submodules), then runs.
+#[test]
+fn syncs_push_waits_for_the_submodule_update_after_the_pull() {
+    let ctx = egui::Context::default();
+    let mut tab = crate::repo::RepoTab::new_deferred("/nonexistent/sync-chain".into(), &ctx);
+    let push = Attempt {
+        label: "Sync: push".to_owned(),
+        branch: "main".to_owned(),
+        target: None,
+        commit: None,
+        publish: false,
+        done: None,
+    };
+    tab.push_flow.then_push = Some(Chain {
+        after: "Sync: pull".to_owned(),
+        push,
+        pulled: false,
+    });
+    // The pull ended, and the submodule update started right after it.
+    tab.busy_op = Some("Update submodules".to_owned());
+    tab.push_op_ended("Sync: pull", &Ok(String::new()), &ctx);
+    let waiting = tab
+        .push_flow
+        .then_push
+        .as_ref()
+        .map(|c| (c.after.clone(), c.pulled));
+    assert_eq!(waiting, Some(("Update submodules".to_owned(), true)));
+    // It ended (even failing): the push is started. With no branch read, it says HEAD is
+    // detached, which shows it ran.
+    tab.busy_op = None;
+    tab.push_op_ended("Update submodules", &Err("failed".to_owned()), &ctx);
+    assert!(tab.push_flow.then_push.is_none());
+    assert!(matches!(
+        tab.push_flow.banner,
+        Some(super::Banner::Detached)
+    ));
+}
+
+/// A failed pull stops Sync: nothing is pushed, and the status says so.
+#[test]
+fn a_failed_sync_pull_pushes_nothing() {
+    let ctx = egui::Context::default();
+    let mut tab = crate::repo::RepoTab::new_deferred("/nonexistent/sync-stop".into(), &ctx);
+    let push = Attempt {
+        label: "Sync: push".to_owned(),
+        branch: "main".to_owned(),
+        target: None,
+        commit: None,
+        publish: false,
+        done: None,
+    };
+    tab.push_flow.then_push = Some(Chain {
+        after: "Sync: pull".to_owned(),
+        push,
+        pulled: false,
+    });
+    tab.push_op_ended(
+        "Sync: pull",
+        &Err("CONFLICT (content): f.txt".to_owned()),
+        &ctx,
+    );
+    assert!(tab.push_flow.then_push.is_none());
+    assert!(tab.push_flow.banner.is_none());
+    let status = tab
+        .status
+        .clone()
+        .map(|(s, err)| (s.contains("nothing was pushed"), err));
+    assert_eq!(status, Some((true, true)));
 }

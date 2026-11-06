@@ -200,7 +200,8 @@ so your config, credentials and hooks apply as usual.
   search, open the folder (Explorer / Finder, your editor), refresh (F5).
 - Pull's arrow (or a right-click on it) sets what it does: fast-forward, merging when the branch
   has diverged; fast-forward only; or rebase. Also in Settings, and the menu has _Fetch all_.
-- _Sync_ pulls (the way Pull is set to), then pushes; it stops at the pull on conflicts.
+- _Sync_ pulls (the way Pull is set to), then pushes; if the pull fails (conflicts, or it can't
+  fast-forward), nothing is pushed.
 - A refused push gets a banner instead of "failed to push some refs": _origin/dev has 3 commits
   you don't have_, saying whether the branch was rewritten here or both moved on, with _Pull,
   then push_ and _Force push (with lease)…_. The force push names the commits it removes from the

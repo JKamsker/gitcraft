@@ -19,13 +19,17 @@ use crate::settings::Settings;
 use check::{Checked, Rejection, Target};
 use porcelain::Refusal;
 
-/// The labels of Sync's two steps (the pull's is also its undo's).
+/// The labels of Sync's steps (the pull's is also its undo's).
 const SYNC_PULL: &str = "Sync: pull";
 const SYNC_PUSH: &str = "Sync: push";
+const SYNC_PUBLISH: &str = "Sync: publish";
 
 /// What the banner's buttons ask for.
 #[derive(Clone, Debug)]
 pub(crate) enum PushAct {
+    /// Pull from the remote branch the push was refused by, the way the settings say: the
+    /// branch is only behind, there is nothing to push.
+    Pull,
     /// Pull from the remote branch the push was refused by (the way `mode` says, else the
     /// settings'), then push again.
     PullThenPush(Option<PullMode>),
@@ -33,7 +37,8 @@ pub(crate) enum PushAct {
     ConfirmForce,
     /// Publish the branch on this remote, and track it.
     Publish(String),
-    /// Push again to the same place (the remote has nothing the branch doesn't any more).
+    /// Push again to the same place (the remote has nothing the branch doesn't any more, or
+    /// its branch is gone).
     PushAgain,
     /// Look at the remote again.
     CheckAgain,
@@ -53,7 +58,11 @@ pub(crate) enum Banner {
         remotes: Vec<String>,
     },
     /// The remote branch the push went to is gone.
-    Gone { branch: String, target: Target },
+    Gone {
+        branch: String,
+        target: Target,
+        publish: bool,
+    },
     /// HEAD is on no branch.
     Detached,
 }
@@ -82,6 +91,21 @@ struct Attempt {
     /// The commit pushed, for a push of one (a force push).
     commit: Option<String>,
     publish: bool,
+    /// What the status line says once it went through, if more than "done".
+    done: Option<String>,
+}
+
+/// A push waiting for an operation to end: Sync's push, after its pull.
+#[derive(Clone, Debug)]
+struct Chain {
+    /// The label of the operation it waits for.
+    after: String,
+    /// What is pushed then: to the place the banner's pull came from, or (`target: None`)
+    /// where git's config says.
+    push: Attempt,
+    /// The pull is done, and what is waited for now is what ran after it (updating the
+    /// submodules): the push follows whatever came of that.
+    pulled: bool,
 }
 
 /// The tab's push state.
@@ -89,18 +113,17 @@ struct Attempt {
 pub(crate) struct PushFlow {
     attempt: Option<Attempt>,
     pub(crate) banner: Option<Banner>,
-    /// Sync's push waits for the pull so labelled; to where the banner's pull came from, if
-    /// it came from there.
-    then_push: Option<(String, Option<Attempt>)>,
+    then_push: Option<Chain>,
 }
 
 impl RepoTab {
     /// The toolbar's Push: the checked-out branch, to where it goes.
     pub(super) fn push(&mut self, ctx: &egui::Context) {
-        self.push_labelled("Push", ctx);
+        self.push_labelled("Push", None, ctx);
     }
 
-    fn push_labelled(&mut self, label: &str, ctx: &egui::Context) {
+    /// The checked-out branch, as `label`; `done`: the status line once it went through.
+    fn push_labelled(&mut self, label: &str, done: Option<String>, ctx: &egui::Context) {
         if self.busy_op.is_some() {
             return;
         }
@@ -108,31 +131,24 @@ impl RepoTab {
             self.push_flow.banner = Some(Banner::Detached);
             return;
         };
-        let tracked = self
-            .refs
-            .local
-            .iter()
-            .any(|b| b.name == current && !b.upstream.is_empty() && !b.upstream_gone());
-        if tracked {
-            self.start_push(
-                Attempt {
-                    label: label.to_owned(),
-                    branch: current,
-                    target: None,
-                    commit: None,
-                    publish: false,
-                },
-                super::ops(&[&["push", "--porcelain"]]),
-                ctx,
-            );
+        if self.tracks(&current) {
+            let attempt = Attempt {
+                label: label.to_owned(),
+                branch: current,
+                target: None,
+                commit: None,
+                publish: false,
+                done,
+            };
+            self.start_push(attempt, super::ops(&[&["push", "--porcelain"]]), ctx);
             return;
         }
         // A first push: publish it and track the remote one, on the one remote there is, or the
         // one picked.
-        let remotes: Vec<String> = self.remotes.iter().map(|r| r.name.clone()).collect();
+        let remotes = self.remote_names();
         match remotes.len() {
             0 => self.status = Some(("This repository has no remote to push to".to_owned(), true)),
-            1 => self.publish(&current, &remotes[0], label, ctx),
+            1 => self.publish(&current, &remotes[0], label, done, ctx),
             _ => {
                 self.push_flow.banner = Some(Banner::NoUpstream {
                     branch: current,
@@ -142,8 +158,24 @@ impl RepoTab {
         }
     }
 
-    /// Publishes `branch` on `remote` under its own name, and tracks it.
-    fn publish(&mut self, branch: &str, remote: &str, label: &str, ctx: &egui::Context) {
+    /// Whether `branch` tracks a remote branch that is still there.
+    fn tracks(&self, branch: &str) -> bool {
+        self.refs
+            .local
+            .iter()
+            .any(|b| b.name == branch && !b.upstream.is_empty() && !b.upstream_gone())
+    }
+
+    /// Publishes `branch` on `remote` and tracks it (under its own name, unless the remote's
+    /// push refspecs say otherwise).
+    fn publish(
+        &mut self,
+        branch: &str,
+        remote: &str,
+        label: &str,
+        done: Option<String>,
+        ctx: &egui::Context,
+    ) {
         let target = Target {
             remote: remote.to_owned(),
             branch: branch.to_owned(),
@@ -154,6 +186,7 @@ impl RepoTab {
             target: Some(target),
             commit: None,
             publish: true,
+            done,
         };
         let steps = vec![publish_args(branch, remote)];
         self.start_push(attempt, steps, ctx);
@@ -179,25 +212,44 @@ impl RepoTab {
             self.push_flow.banner = Some(Banner::Detached);
             return;
         };
-        let tracked = self
-            .refs
-            .local
-            .iter()
-            .any(|b| b.name == current && !b.upstream.is_empty() && !b.upstream_gone());
-        if !tracked {
+        if !self.tracks(&current) {
             // Nothing to pull from: publishing is all there is to do.
-            self.push_labelled(SYNC_PUSH, ctx);
+            let done = format!("Sync: {current} published (it had nothing to pull)");
+            self.push_labelled(SYNC_PUBLISH, Some(done), ctx);
             return;
         }
         let mode = Settings::get(ctx).pull_mode;
-        self.sync_pull(super::ops(&[mode.args()]), None, ctx);
+        let push = Attempt {
+            label: SYNC_PUSH.to_owned(),
+            branch: current.clone(),
+            target: None,
+            commit: None,
+            publish: false,
+            done: Some(format!("Sync: {current} pulled and pushed")),
+        };
+        self.pull_then(SYNC_PULL, super::ops(&[mode.args()]), push, ctx);
     }
 
-    fn sync_pull(&mut self, steps: Vec<Vec<String>>, push: Option<Attempt>, ctx: &egui::Context) {
+    /// Pulls (undoably) as `label`, then runs `push`.
+    fn pull_then(
+        &mut self,
+        label: &str,
+        steps: Vec<Vec<String>>,
+        push: Attempt,
+        ctx: &egui::Context,
+    ) {
         self.push_flow.banner = None;
-        self.push_flow.then_push = Some((SYNC_PULL.to_owned(), push));
+        self.push_flow.then_push = Some(Chain {
+            after: label.to_owned(),
+            push,
+            pulled: false,
+        });
+        self.pull_steps(label, steps, ctx);
+    }
+
+    fn pull_steps(&mut self, label: &str, steps: Vec<Vec<String>>, ctx: &egui::Context) {
         self.run_undoable(
-            SYNC_PULL,
+            label,
             steps,
             Refresh::All,
             Undo::HeadMove { mode: "--keep" },
@@ -214,23 +266,37 @@ impl RepoTab {
             PushAct::Dismiss => self.push_flow.banner = None,
             PushAct::Publish(remote) => {
                 if let Some(Banner::NoUpstream { branch, .. }) = self.push_flow.banner.take() {
-                    self.publish(&branch, &remote, &format!("Push {branch} to {remote}"), ctx);
+                    let label = format!("Push {branch} to {remote}");
+                    self.publish(&branch, &remote, &label, None, ctx);
                 }
             }
             PushAct::PushAgain => match self.push_flow.banner.take() {
-                Some(Banner::Gone { branch, target }) => {
-                    self.push_to(&branch, &target, true, "Push", ctx)
-                }
-                Some(Banner::Rejected(r)) => {
-                    self.push_to(&r.branch, &r.target, r.publish, "Push", ctx)
-                }
+                Some(Banner::Gone {
+                    branch,
+                    target,
+                    publish,
+                }) => self.push_to(&branch, &target, publish, ctx),
+                Some(Banner::Rejected(r)) => self.push_to(&r.branch, &r.target, r.publish, ctx),
                 other => self.push_flow.banner = other,
             },
+            PushAct::Pull => {
+                if let Some(Banner::Rejected(r)) = self.push_flow.banner.take() {
+                    let mode = Settings::get(ctx).pull_mode;
+                    let label = format!("Pull {}", r.target.label());
+                    self.pull_steps(&label, vec![pull_from(mode, &r.target)], ctx);
+                }
+            }
             PushAct::PullThenPush(mode) => {
                 if let Some(Banner::Rejected(r)) = self.push_flow.banner.clone() {
                     let mode = mode.unwrap_or(Settings::get(ctx).pull_mode);
-                    let push = explicit_push(&r.branch, &r.target, r.publish, SYNC_PUSH);
-                    self.sync_pull(vec![pull_from(mode, &r.target)], Some(push.0), ctx);
+                    let (mut push, _) = explicit_push(&r.branch, &r.target, r.publish, "Push");
+                    push.done = Some(format!(
+                        "{} pulled from {} and pushed",
+                        r.branch,
+                        r.target.label()
+                    ));
+                    let label = format!("Pull {}", r.target.label());
+                    self.pull_then(&label, vec![pull_from(mode, &r.target)], push, ctx);
                 }
             }
             PushAct::ConfirmForce => {
@@ -257,16 +323,22 @@ impl RepoTab {
     }
 
     /// Pushes `branch` to `target` explicitly.
-    fn push_to(
-        &mut self,
-        branch: &str,
-        target: &Target,
-        publish: bool,
-        label: &str,
-        ctx: &egui::Context,
-    ) {
-        let (attempt, steps) = explicit_push(branch, target, publish, label);
+    fn push_to(&mut self, branch: &str, target: &Target, publish: bool, ctx: &egui::Context) {
+        let (attempt, steps) = explicit_push(branch, target, publish, "Push");
         self.start_push(attempt, steps, ctx);
+    }
+
+    /// Runs the push a chain waited for.
+    fn chained_push(&mut self, attempt: Attempt, ctx: &egui::Context) {
+        match attempt.target.clone() {
+            Some(t) => {
+                let (mut explicit, steps) =
+                    explicit_push(&attempt.branch, &t, attempt.publish, &attempt.label);
+                explicit.done = attempt.done;
+                self.start_push(explicit, steps, ctx);
+            }
+            None => self.push_labelled(&attempt.label, attempt.done, ctx),
+        }
     }
 
     fn remote_names(&self) -> Vec<String> {
@@ -281,59 +353,68 @@ impl RepoTab {
         result: &Result<String, String>,
         ctx: &egui::Context,
     ) {
-        if let Some((pull, push)) = self.push_flow.then_push.take() {
-            if pull == label {
-                self.sync_pulled(push, result, ctx);
+        if let Some(chain) = self.push_flow.then_push.take() {
+            if chain.after == label {
+                self.chain_step_ended(chain, result, ctx);
                 return;
             }
-            self.push_flow.then_push = Some((pull, push));
+            self.push_flow.then_push = Some(chain);
         }
         let Some(attempt) = self.push_flow.attempt.take_if(|a| a.label == label) else {
             return;
         };
+        let branch_ref = format!("refs/heads/{}", attempt.branch);
+        let refused = |out: &str| porcelain::refused(out, &branch_ref, attempt.commit.as_deref());
         match result {
+            // Older git ends a push some of whose refs were refused with success all the same.
+            Ok(out) if refused(out).is_some() => {
+                let out = out.clone();
+                self.status = Some((format!("{label} refused: {}", out.trim()), true));
+                self.push_failed(attempt, &out, ctx);
+            }
             Ok(_) => {
                 self.push_flow.banner = None;
-                if label == SYNC_PUSH {
-                    self.status =
-                        Some((format!("Sync: {} pulled and pushed", attempt.branch), false));
+                if let Some(done) = attempt.done {
+                    self.status = Some((done, false));
                 }
             }
-            // Run again once signed in, and then taken in here again.
-            Err(e) if git::is_auth_error(e) => self.push_flow.attempt = Some(attempt),
+            // Run again once signed in, and then taken in here again. Not a refusal whose
+            // message (a hook's words) happens to say "403".
+            Err(e) if refused(e).is_none() && git::is_auth_error(e) => {
+                self.push_flow.attempt = Some(attempt)
+            }
             Err(e) => self.push_failed(attempt, e, ctx),
         }
     }
 
-    fn sync_pulled(
+    /// The operation a chain waited for ended.
+    fn chain_step_ended(
         &mut self,
-        push: Option<Attempt>,
+        mut chain: Chain,
         result: &Result<String, String>,
         ctx: &egui::Context,
     ) {
+        // After the pull, or after what ran after it (whatever came of that).
+        if chain.pulled || result.is_ok() {
+            // Something else started meanwhile (updating the submodules after the pull): the
+            // push waits for it.
+            if let Some(busy) = self.busy_op.clone() {
+                chain.after = busy;
+                chain.pulled = true;
+                self.push_flow.then_push = Some(chain);
+            } else {
+                self.chained_push(chain.push, ctx);
+            }
+            return;
+        }
         match result {
-            Ok(_) => match push {
-                Some(attempt) => {
-                    let target = attempt.target.clone();
-                    match target {
-                        Some(t) => {
-                            self.push_to(&attempt.branch, &t, attempt.publish, SYNC_PUSH, ctx)
-                        }
-                        None => self.push_labelled(SYNC_PUSH, ctx),
-                    }
-                }
-                None => self.push_labelled(SYNC_PUSH, ctx),
-            },
             // Pulled again once signed in.
-            Err(e) if git::is_auth_error(e) => {
-                self.push_flow.then_push = Some((SYNC_PULL.to_owned(), push))
-            }
+            Err(e) if git::is_auth_error(e) => self.push_flow.then_push = Some(chain),
             Err(e) => {
-                self.status = Some((
-                    format!("Sync stopped at the pull, nothing was pushed: {e}"),
-                    true,
-                ));
+                let what = chain.after;
+                self.status = Some((format!("{what} failed, so nothing was pushed: {e}"), true));
             }
+            Ok(_) => {}
         }
     }
 
@@ -353,9 +434,12 @@ impl RepoTab {
                 });
             }
             Refusal::Behind | Refusal::Moved => {
+                let Some(target) = refused_target(attempt.target, &line.to) else {
+                    return;
+                };
                 let q = check::Question {
                     branch: attempt.branch,
-                    target: attempt.target,
+                    target,
                     to: line.to,
                     remotes: self.remote_names(),
                     publish: attempt.publish,
@@ -398,12 +482,20 @@ impl RepoTab {
         self.busy_op = None;
         match checked {
             Ok(Checked::Rejected(r)) => {
-                self.status = Some((banner::headline(&r), true));
+                self.status = Some((format!("Push refused: {}", banner::headline(&r)), true));
                 self.push_flow.banner = Some(Banner::Rejected(r));
             }
-            Ok(Checked::Gone { branch, target }) => {
-                self.status = Some((format!("{} is gone", target.label()), true));
-                self.push_flow.banner = Some(Banner::Gone { branch, target });
+            Ok(Checked::Gone {
+                branch,
+                target,
+                publish,
+            }) => {
+                self.status = Some((format!("Push refused: {} is gone", target.label()), true));
+                self.push_flow.banner = Some(Banner::Gone {
+                    branch,
+                    target,
+                    publish,
+                });
             }
             Err(e) => {
                 self.status = Some((
@@ -417,6 +509,18 @@ impl RepoTab {
     }
 }
 
+/// Where a refused push to `to` (the ref the refused line names) went: only a branch can be
+/// looked at and replaced (not Gerrit's `refs/for/main`: `None`). The remote is the one the push
+/// named, if it did (`Some(None)` leaves it to git's config); the branch is the one the line
+/// names, as a remote's push refspecs may have sent it under another name than the one asked.
+pub(super) fn refused_target(asked: Option<Target>, to: &str) -> Option<Option<Target>> {
+    let name = to.strip_prefix("refs/heads/")?;
+    Some(asked.map(|t| Target {
+        remote: t.remote,
+        branch: name.to_owned(),
+    }))
+}
+
 /// A first push of `branch` to `remote`, tracking it: the full ref (a tag of the same name must
 /// not be what is pushed), no `:dst` (which would bypass `remote.<name>.push`, Gerrit's
 /// refs/for/*), and `simple` (with push.default=upstream, a source alone goes to the branch it
@@ -428,6 +532,7 @@ pub(super) fn publish_args(branch: &str, remote: &str) -> Vec<String> {
         "push",
         "--porcelain",
         "-u",
+        "--",
         remote,
         &format!("refs/heads/{branch}"),
     ]
@@ -446,6 +551,7 @@ fn explicit_push(
     if publish {
         args.push("-u".to_owned());
     }
+    args.push("--".to_owned());
     args.push(target.remote.clone());
     args.push(format!("refs/heads/{branch}:refs/heads/{}", target.branch));
     let attempt = Attempt {
@@ -454,6 +560,7 @@ fn explicit_push(
         target: Some(target.clone()),
         commit: None,
         publish,
+        done: None,
     };
     (attempt, vec![args])
 }
@@ -484,6 +591,7 @@ pub(super) fn force_push_ops(r: &Rejection) -> Vec<Vec<String>> {
     if r.if_includes {
         push.push("--force-if-includes".to_owned());
     }
+    push.push("--".to_owned());
     push.push(r.target.remote.clone());
     push.push(format!("{}:{dst}", r.local));
     let mut steps = vec![
@@ -515,6 +623,7 @@ fn force_dialog(r: &Rejection) -> (Attempt, Dialog) {
         target: Some(r.target.clone()),
         commit: Some(r.local.clone()),
         publish: r.publish,
+        done: None,
     };
     let dialog = Dialog::confirm(
         &title,
