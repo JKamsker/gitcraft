@@ -1,5 +1,6 @@
 //! User settings: stored with the app state, readable from anywhere through the egui context.
 
+mod file_menus;
 mod layout;
 mod page;
 mod preview;
@@ -12,6 +13,7 @@ use egui::{RichText, Ui};
 use serde::{Deserialize, Serialize};
 
 use crate::theme::Tokens;
+use file_menus::file_menu_rows;
 use layout::{Card, Filter, section};
 pub(crate) use page::show as show_page;
 use preview::Preview;
@@ -355,21 +357,7 @@ impl Settings {
                             "When a long operation ends in the background",
                         );
                     });
-                    if let Some(bundle) = crate::finder_actions::bundle() {
-                        card.row("Finder", "finder quick action services history blame menu", |ui| {
-                            if crate::finder_actions::installed() {
-                                if ui.button("Remove History and Blame").clicked() {
-                                    let _ = crate::finder_actions::uninstall();
-                                }
-                            } else if ui.button("Add History and Blame").clicked() {
-                                let _ = crate::finder_actions::install(&bundle);
-                            }
-                            layout::note(
-                                ui,
-                                "History in gitcraft and Blame in gitcraft in Finder's menu of files (Quick Actions)",
-                            );
-                        });
-                    }
+                    file_menu_rows(card);
                     if let Some(appimage) = crate::desktop_entry::appimage() {
                         card.row(
                             "Applications menu",

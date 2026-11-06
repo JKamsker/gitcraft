@@ -91,11 +91,8 @@ fn a_deleted_file_still_has_a_history_but_a_folder_is_not_a_file() -> Result<(),
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(gone?.then, Then::History("sub dir/ünï file.txt".into()));
     assert!(folder.err().is_some_and(|e| e.contains("is a folder")));
-    assert!(
-        nowhere
-            .err()
-            .is_some_and(|e| e.starts_with("No such folder"))
-    );
+    // Its folder gone too: named from the nearest folder there is.
+    assert_eq!(nowhere?.then, Then::History("no such/x.txt".into()));
     Ok(())
 }
 
@@ -186,71 +183,54 @@ fn outside_any_repository() -> Result<(), String> {
     Ok(())
 }
 
+/// A file named in another case than on disk (Windows and macOS find it all the same), a
+/// folder reached through a link, and a file whose folder was deleted with it.
 #[test]
-fn paths_inside_the_repository() {
-    let root = Path::new("/r/my repo");
-    assert_eq!(
-        relative(root, Path::new("/r/my repo/a/b c.rs")).as_deref(),
-        Some("a/b c.rs")
-    );
-    assert_eq!(relative(root, Path::new("/r/my repo")), None);
-    assert_eq!(relative(root, Path::new("/r/other/a.rs")), None);
-    assert_eq!(relative(root, Path::new("/r/my repo/../x")), None);
+fn names_as_git_has_them() -> Result<(), String> {
+    let dir = repo("names")?;
+    git::run(Some(&dir), &["mv", "sub dir", "moved"])?;
+    git::run(Some(&dir), &["commit", "-q", "-m", "moved"])?;
+    // The old folder is gone, and with it the old file.
+    let gone = resolve(&Command::Log("sub dir/ünï file.txt".into()), &dir);
+    #[cfg(unix)]
+    let linked = {
+        let link = dir.with_file_name(format!(
+            "{}-link",
+            dir.file_name().unwrap_or_default().to_string_lossy()
+        ));
+        let _ = std::fs::remove_file(&link);
+        std::os::unix::fs::symlink(dir.join("moved"), &link).map_err(|e| e.to_string())?;
+        let r = resolve(&Command::Log(link.join("ünï file.txt")), Path::new("/"));
+        let _ = std::fs::remove_file(&link);
+        Some(r)
+    };
+    #[cfg(not(unix))]
+    let linked: Option<Result<Resolved, String>> = None;
+    let case_insensitive = dir.join("MOVED").is_dir();
+    let other_case = resolve(&Command::Log("MOVED/ÜNÏ FILE.TXT".into()), &dir);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(gone?.then, Then::History("sub dir/ünï file.txt".into()));
+    if let Some(linked) = linked {
+        let linked = linked?;
+        assert_eq!(linked.root, dir);
+        assert_eq!(linked.then, Then::History("moved/ünï file.txt".into()));
+    }
+    if case_insensitive {
+        assert_eq!(other_case?.then, Then::History("moved/ünï file.txt".into()));
+    }
+    Ok(())
 }
 
 #[test]
-fn paths_on_other_machines() {
+fn a_relative_path_typed_elsewhere_stays_there() {
     let ssh_root = Path::new("ssh://build/home/me/app");
-    assert_eq!(
-        remote_relative(ssh_root, Path::new("ssh://build/home/me/app/src/main.rs")).as_deref(),
-        Some("src/main.rs")
-    );
-    assert_eq!(
-        remote_relative(ssh_root, Path::new("ssh://other/home/me/app/src/main.rs")),
-        None
-    );
-    assert_eq!(
-        remote_relative(ssh_root, Path::new("ssh://build/home/me/app2/x.rs")),
-        None
-    );
-    // WSL folders are paths of Windows only.
-    if !cfg!(windows) {
-        return;
-    }
-    let wsl_root = Path::new(r"\\wsl.localhost\Ubuntu\home\me\repo");
-    assert_eq!(
-        remote_relative(
-            wsl_root,
-            Path::new(r"\\wsl.localhost\Ubuntu\home\me\repo\src\a b.rs")
-        )
-        .as_deref(),
-        Some("src/a b.rs")
-    );
-    // `\\wsl$\…` names the same machine.
-    assert_eq!(
-        remote_relative(wsl_root, Path::new(r"\\wsl$\Ubuntu\home\me\repo\x.rs")).as_deref(),
-        Some("x.rs")
-    );
-    // Another distribution, or a folder beside the repository that starts the same.
-    assert_eq!(
-        remote_relative(
-            wsl_root,
-            Path::new(r"\\wsl.localhost\Debian\home\me\repo\x.rs")
-        ),
-        None
-    );
-    assert_eq!(
-        remote_relative(
-            wsl_root,
-            Path::new(r"\\wsl.localhost\Ubuntu\home\me\repo2\x.rs")
-        ),
-        None
-    );
-    // A relative path typed in a WSL folder is joined to it, and stays on that machine.
-    let joined = absolute(wsl_root, Path::new("src/a.rs"));
+    let joined = absolute(ssh_root, Path::new("src/a.rs"));
     assert!(crate::remote::is_remote(&joined));
     assert_eq!(
-        remote_relative(wsl_root, &joined).as_deref(),
-        Some("src/a.rs")
+        crate::remote::parse(&joined).map(|t| t.path).as_deref(),
+        Some("/home/me/app/src/a.rs")
     );
+    // Typed whole, it is taken as it is.
+    let typed = Path::new("ssh://build/~/repo/a.rs");
+    assert_eq!(absolute(Path::new("/x"), typed), typed);
 }

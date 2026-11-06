@@ -56,6 +56,14 @@ Usage:
   gitcraft -- <folder>            a folder named like a command
   gitcraft --help | --version";
 
+/// The arguments as the system gave them, without what macOS adds on its own (`-psn_…`, the
+/// process serial number of an older Finder launch).
+pub fn from_system(args: impl IntoIterator<Item = OsString>) -> Vec<OsString> {
+    args.into_iter()
+        .filter(|a| !a.to_str().is_some_and(|a| a.starts_with("-psn_")))
+        .collect()
+}
+
 /// Reads the arguments after the program's name.
 pub fn parse(args: impl IntoIterator<Item = OsString>) -> Parsed {
     let args: Vec<OsString> = args.into_iter().collect();
@@ -84,10 +92,10 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Parsed {
                 Parsed::Fail(format!("{}\n\n{USAGE}", wrong_count(cmd)))
             }
             (Some(flag), _) if flag.starts_with('-') && flag != "-" => {
-                Parsed::Fail(format!("Unknown option {flag}\n\n{USAGE}"))
+                Parsed::Fail(format!("unknown option {flag}\n\n{USAGE}"))
             }
             (_, []) => Parsed::Run(Some(Command::Open(cmd.into()))),
-            _ => Parsed::Fail(format!("Too many arguments\n\n{USAGE}")),
+            _ => Parsed::Fail(format!("too many arguments\n\n{USAGE}")),
         },
     }
 }
@@ -99,7 +107,7 @@ fn wrong_count(cmd: &OsString) -> String {
         Some("show") => "a commit",
         _ => "two commits, as a..b",
     };
-    format!("gitcraft {} takes {what}", cmd.to_string_lossy())
+    format!("{} takes {what}", cmd.to_string_lossy())
 }
 
 /// `file`, or `file:42`. Only a number after the last `:` is a line: `C:\x` and `a:b.txt` stay

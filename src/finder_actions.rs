@@ -50,10 +50,10 @@ pub fn installed() -> bool {
     services_dir().is_some_and(|s| ACTIONS.iter().all(|(n, _)| workflow(&s, n).is_dir()))
 }
 
-/// Adds (or rewrites) the actions, starting the app at `bundle`.
-pub fn install(bundle: &Path) -> Result<(), String> {
+/// Adds (or rewrites) the actions.
+pub fn install() -> Result<(), String> {
     let services = services_dir().ok_or("No home folder")?;
-    write_all(&services, bundle)
+    write_all(&services)
 }
 
 /// Removes the actions.
@@ -70,13 +70,13 @@ pub fn uninstall() -> Result<(), String> {
     Ok(())
 }
 
-fn write_all(services: &Path, bundle: &Path) -> Result<(), String> {
+fn write_all(services: &Path) -> Result<(), String> {
     for (name, command) in ACTIONS {
         let contents = workflow(services, name).join("Contents");
         std::fs::create_dir_all(&contents).map_err(|e| format!("{}: {e}", contents.display()))?;
         let files = [
             ("Info.plist", info_plist(name)),
-            ("document.wflow", document(&script(bundle, command))),
+            ("document.wflow", document(&script(command))),
         ];
         for (file, text) in files {
             let path = contents.join(file);
@@ -86,11 +86,14 @@ fn write_all(services: &Path, bundle: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// The app, as the workflows find it wherever it was moved to: its bundle identifier.
+const BUNDLE_ID: &str = "io.github.vancete.gitcraft";
+
 /// The shell script the action runs, the files chosen given as its arguments: a new instance
-/// of the app for each (`open -n`), with the command line asked for.
-fn script(bundle: &Path, command: &str) -> String {
-    let app = crate::remote::sh_quote(&bundle.to_string_lossy());
-    format!("for f in \"$@\"; do\n\topen -n -a {app} --args {command} \"$f\"\ndone\n")
+/// of the app for each (`open -n`; the one running takes them, see `crate::instance`), with
+/// the command line asked for.
+fn script(command: &str) -> String {
+    format!("for f in \"$@\"; do\n\topen -n -b {BUNDLE_ID} --args {command} \"$f\"\ndone\n")
 }
 
 /// `text` inside an XML element.
@@ -105,7 +108,7 @@ const PLIST_HEAD: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \
 \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n";
 
-/// The workflow's menu entry: shown for files and folders, in Finder.
+/// The workflow's menu entry: shown for files (not folders), in Finder.
 fn info_plist(name: &str) -> String {
     format!(
         "{PLIST_HEAD}<dict>\n\
@@ -117,7 +120,7 @@ fn info_plist(name: &str) -> String {
          \t\t\t\t<key>NSApplicationIdentifier</key>\n\
          \t\t\t\t<string>com.apple.finder</string>\n\t\t\t</dict>\n\
          \t\t\t<key>NSSendFileTypes</key>\n\t\t\t<array>\n\
-         \t\t\t\t<string>public.item</string>\n\t\t\t</array>\n\
+         \t\t\t\t<string>public.data</string>\n\t\t\t</array>\n\
          \t\t</dict>\n\t</array>\n</dict>\n</plist>\n",
         xml(name)
     )
@@ -200,15 +203,11 @@ mod tests {
 
     #[test]
     fn the_script_starts_the_app_for_each_file() {
-        let s = script(Path::new("/Applications/My Tools/gitcraft.app"), "blame --");
         assert_eq!(
-            s,
-            "for f in \"$@\"; do\n\topen -n -a '/Applications/My Tools/gitcraft.app' --args \
-             blame -- \"$f\"\ndone\n"
+            script("blame --"),
+            "for f in \"$@\"; do\n\topen -n -b io.github.vancete.gitcraft --args blame -- \
+             \"$f\"\ndone\n"
         );
-        // A quote in the folder's name stays inside the quoting.
-        let odd = script(Path::new("/Users/me/it's/gitcraft.app"), "log");
-        assert!(odd.contains("'/Users/me/it'\\''s/gitcraft.app'"), "{odd}");
     }
 
     #[test]
@@ -216,7 +215,7 @@ mod tests {
         let services =
             std::env::temp_dir().join(format!("gitcraft-services <&> {}", std::process::id()));
         let _ = std::fs::remove_dir_all(&services);
-        let written = write_all(&services, Path::new("/Applications/a&b.app"));
+        let written = write_all(&services);
         let read = |name: &str, file: &str| {
             std::fs::read_to_string(workflow(&services, name).join("Contents").join(file))
                 .unwrap_or_default()
@@ -227,13 +226,11 @@ mod tests {
         written?;
         assert!(info.contains("<string>History in gitcraft</string>"));
         assert!(info.contains("<string>runWorkflowAsService</string>"));
+        assert!(info.contains("<string>public.data</string>"));
         // The script, escaped for XML.
-        assert!(
-            doc.contains("open -n -a '/Applications/a&amp;b.app' --args blame -- "),
-            "{doc}"
-        );
+        assert!(doc.contains("--args blame -- &quot;$f&quot;"), "{doc}");
         assert!(doc.contains("&quot;$@&quot;"), "{doc}");
-        assert!(!doc.contains("a&b"));
+        assert_eq!(xml("a&b<\"c\">"), "a&amp;b&lt;&quot;c&quot;&gt;");
         Ok(())
     }
 }

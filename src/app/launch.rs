@@ -1,19 +1,22 @@
 //! Carrying out what gitcraft was started for (`gitcraft log <file>`…, see `crate::launch`):
 //! resolved off the window's thread, then the repository opened and the view asked for shown.
+//! Several can be on their way at once: choosing History in gitcraft on five files starts
+//! gitcraft five times, each handing its own over.
 
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{Receiver, channel};
+use std::sync::mpsc::{Receiver, TryRecvError, channel};
 
+use super::panels::Toast;
 use super::{App, Tab};
 use crate::launch::{Command, Resolved, Then};
 
-/// A request being made sense of, and one waiting for its repository's tab.
+/// Requests being made sense of, and those waiting for their repository's tab.
 #[derive(Default)]
 pub(super) struct Launching {
-    rx: Option<Receiver<Result<Resolved, String>>>,
-    /// What to show once the tab of this folder is there (one elsewhere opens in the
+    resolving: Vec<Receiver<Result<Resolved, String>>>,
+    /// What to show once the tab of each folder is there (one elsewhere opens in the
     /// background).
-    then: Option<(PathBuf, Then)>,
+    waiting: Vec<(PathBuf, Then)>,
 }
 
 impl App {
@@ -33,15 +36,21 @@ impl App {
             let _ = tx.send(crate::launch::resolve::resolve(&cmd, &cwd));
             ctx.request_repaint();
         });
-        self.launching.rx = Some(rx);
+        self.launching.resolving.push(rx);
     }
 
-    /// Takes in a resolved request, and shows what it asked for once its tab is open.
+    /// Takes in resolved requests, and shows what each asked for once its tab is open.
     pub(super) fn poll_launch(&mut self, ctx: &egui::Context) {
-        if let Some(rx) = &self.launching.rx
-            && let Ok(result) = rx.try_recv()
-        {
-            self.launching.rx = None;
+        let mut done = Vec::new();
+        self.launching.resolving.retain(|rx| match rx.try_recv() {
+            Ok(result) => {
+                done.push(result);
+                false
+            }
+            Err(TryRecvError::Empty) => true,
+            Err(TryRecvError::Disconnected) => false,
+        });
+        for result in done {
             match result {
                 Ok(resolved) => {
                     if crate::remote::is_remote(&resolved.root) {
@@ -50,30 +59,42 @@ impl App {
                         // Already the top folder, as tabs name it.
                         self.open_root(resolved.root.clone(), ctx);
                     }
-                    self.launching.then = Some((resolved.root, resolved.then));
+                    self.launching.waiting.push((resolved.root, resolved.then));
                 }
                 Err(e) => self.report(e),
             }
         }
-        let Some((root, _)) = &self.launching.then else {
-            return;
-        };
-        let Some(i) = self.tab_of(root) else {
-            // Elsewhere: still being reached (or that failed, and said so).
-            if !self.connecting.is_empty() {
-                return;
+        let waiting = std::mem::take(&mut self.launching.waiting);
+        for (root, then) in waiting {
+            match self.tab_of(&root) {
+                Some(i) => self.show_in(i, then),
+                // Elsewhere: still being reached (or that failed, and said so).
+                None if !self.connecting.is_empty() => self.launching.waiting.push((root, then)),
+                None => {}
             }
-            self.launching.then = None;
-            return;
-        };
-        let Some((_, then)) = self.launching.then.take() else {
-            return;
-        };
+        }
+    }
+
+    /// Shows `then` in the repository tab `i`, unless an editor there holds unsaved work (a
+    /// conflict being solved, an interactive rebase being set up) that it would close.
+    fn show_in(&mut self, i: usize, then: Then) {
         self.active = i;
-        if let Some(Tab::Repo(repo)) = self.tabs.get_mut(i) {
-            for action in crate::launch::actions(then) {
-                repo.queue(action);
-            }
+        let Some(Tab::Repo(repo)) = self.tabs.get_mut(i) else {
+            return;
+        };
+        if then != Then::Nothing && repo.editor_open() {
+            let name = repo.name.clone();
+            self.toasts.push(Toast::new(
+                format!(
+                    "{name}: finish or close the conflict or rebase editor first, then run the \
+                     command again"
+                ),
+                true,
+            ));
+            return;
+        }
+        for action in crate::launch::actions(then) {
+            repo.queue(action);
         }
     }
 

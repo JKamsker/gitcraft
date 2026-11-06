@@ -106,63 +106,65 @@ pub(crate) fn repo_root(path: &Path) -> Result<PathBuf, String> {
     Ok(crate::app::strip_verbatim(root))
 }
 
-/// The repository `file` is in, and its path there. A file that is gone (deleted, renamed) can
-/// still have a history: only its folder has to be there.
+/// The repository `file` is in, and its path there as git names it: git says where the
+/// file's folder is in the repository (`rev-parse --show-prefix`, which follows links, `~` and
+/// the case the folder really has), the same here and on another machine. A file that is gone
+/// (deleted, renamed) can still have a history, also when its folder is gone too.
 fn file_in_repo(file: &Path) -> Result<(PathBuf, String), String> {
-    let name = file
-        .file_name()
-        .ok_or_else(|| format!("{} is not a file", file.display()))?;
+    let not_a_file = || format!("{} is not a file", file.display());
+    let name = match file.components().next_back() {
+        Some(Component::Normal(name)) => name.to_string_lossy().into_owned(),
+        _ => return Err(not_a_file()),
+    };
     let folder = file
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
-        .ok_or_else(|| format!("{} is not a file", file.display()))?;
-    if crate::remote::is_remote(file) {
-        let root = repo_root(folder)?;
-        let path = remote_relative(&root, file)
-            .ok_or_else(|| format!("{} is not inside {}", file.display(), root.display()))?;
-        return Ok((root, path));
-    }
-    if file.is_dir() {
+        .ok_or_else(not_a_file)?;
+    let remote = crate::remote::is_remote(file);
+    if !remote && file.is_dir() {
         return Err(format!(
             "{} is a folder: give a file (or open the folder with gitcraft {0})",
             file.display()
         ));
     }
-    if !folder.is_dir() {
-        return Err(format!("No such folder: {}", folder.display()));
+    let (existing, missing) = if remote {
+        (folder.to_owned(), Vec::new())
+    } else {
+        nearest_folder(folder)?
+    };
+    let root = repo_root(&existing)?;
+    let prefix = git::run(Some(&existing), &["rev-parse", "--show-prefix"])?;
+    let prefix = prefix.trim_end_matches(['\n', '\r']);
+    // The name as it is on disk (the one typed may differ in case on Windows and macOS).
+    let name = (!remote)
+        .then(|| std::fs::canonicalize(file).ok())
+        .flatten()
+        .and_then(|real| real.file_name().map(|n| n.to_string_lossy().into_owned()))
+        .unwrap_or(name);
+    let mut path = prefix.to_owned();
+    for part in missing.iter().rev() {
+        path.push_str(part);
+        path.push('/');
     }
-    let root = repo_root(folder)?;
-    let folder = crate::app::strip_verbatim(
-        std::fs::canonicalize(folder).map_err(|e| format!("{}: {e}", folder.display()))?,
-    );
-    let path = relative(&root, &folder.join(name))
-        .ok_or_else(|| format!("{} is not inside {}", file.display(), root.display()))?;
+    path.push_str(&name);
     Ok((root, path))
 }
 
-/// `file`'s path inside `root`, `/` between names; `None` when it isn't inside.
-pub(crate) fn relative(root: &Path, file: &Path) -> Option<String> {
-    let rest = file.strip_prefix(root).ok()?;
-    let mut names = Vec::new();
-    for part in rest.components() {
-        match part {
-            Component::Normal(name) => names.push(name.to_string_lossy().into_owned()),
-            Component::CurDir => {}
-            _ => return None,
+/// The nearest folder of `folder` (itself, or one it is in) that is there, and the names of
+/// those under it that aren't, innermost first.
+fn nearest_folder(folder: &Path) -> Result<(PathBuf, Vec<String>), String> {
+    let mut dir = folder;
+    let mut missing = Vec::new();
+    while !dir.is_dir() {
+        match (dir.file_name(), dir.parent()) {
+            (Some(name), Some(parent)) if !parent.as_os_str().is_empty() => {
+                missing.push(name.to_string_lossy().into_owned());
+                dir = parent;
+            }
+            _ => return Err(format!("No such folder: {}", folder.display())),
         }
     }
-    (!names.is_empty()).then(|| names.join("/"))
-}
-
-/// The same for a file of another machine, by its path there.
-fn remote_relative(root: &Path, file: &Path) -> Option<String> {
-    let (root, file) = (crate::remote::parse(root)?, crate::remote::parse(file)?);
-    if root.host != file.host {
-        return None;
-    }
-    let rest = file.path.strip_prefix(&root.path)?.strip_prefix('/')?;
-    let fine = !rest.is_empty() && rest.split('/').all(|n| !n.is_empty() && n != "..");
-    fine.then(|| rest.replace("/./", "/"))
+    Ok((dir.to_owned(), missing))
 }
 
 #[cfg(test)]

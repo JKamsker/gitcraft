@@ -40,9 +40,13 @@ so your config, credentials and hooks apply as usual.
   `b` changed since they diverged). `gitcraft --help` lists them; a revision that starts with `-`
   is refused.
 - _History in gitcraft_ and _Blame in gitcraft_ on files: the Windows installer adds them to
-  Explorer's right-click menu (an option, like _Open in gitcraft_ on folders); the Linux
-  `.desktop` entry (and the AppImage's menu entry) has them as actions; on macOS, Settings →
-  General → Finder adds them as Quick Actions. No overlay icons.
+  Explorer's right-click menu (an option, like _Open in gitcraft_ on folders); the .deb and .rpm
+  packages add a Dolphin service menu (`packaging/linux/gitcraft-servicemenu.desktop`, also in
+  the `.tar.gz`); Settings → General adds them to Files (GNOME) as scripts and to Finder as
+  Quick Actions (they may show after logging in again). Each starts gitcraft, which hands the
+  file to the window already open. No overlay icons.
+- Without a terminal (a menu, a file manager, Windows), what the command line says (`--help`,
+  a mistake) shows in a dialog.
 
 **Remote repositories (WSL, SSH)**
 

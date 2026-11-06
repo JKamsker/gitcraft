@@ -341,3 +341,68 @@ fn a_command_line_handed_over_opens_the_file_s_history() -> Result<(), String> {
     assert_eq!(tabs, 1);
     Ok(())
 }
+
+/// Several command lines handed over in the same moment (History in gitcraft on files of two
+/// repositories) are all carried out: each repository gets its tab.
+#[test]
+fn command_lines_handed_over_together_are_all_carried_out() -> Result<(), String> {
+    use crate::instance::Request;
+    use std::time::{Duration, Instant};
+
+    let base = std::env::temp_dir().join(format!(
+        "gitcraft-handoff-many-{}-{}",
+        std::process::id(),
+        crate::remote::askpass::random_token()
+    ));
+    let mut roots = Vec::new();
+    for name in ["one", "two"] {
+        let dir = base.join(name);
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        std::fs::write(dir.join("f.txt"), "x\n").map_err(|e| e.to_string())?;
+        for args in [
+            &["init", "-q"][..],
+            &["config", "user.name", "t"],
+            &["config", "user.email", "t@t"],
+            &["add", "-A"],
+            &["commit", "-q", "-m", "one"],
+        ] {
+            crate::git::run(Some(&dir), args)?;
+        }
+        roots.push(super::repo_root(&dir)?);
+    }
+    let mut harness = egui_kittest::Harness::builder()
+        .with_size([1200.0, 800.0])
+        .build_eframe(|cc| super::App::new(cc, None));
+    harness.step();
+    let ctx = harness.ctx.clone();
+    for root in &roots {
+        harness.state_mut().handle_handoff(
+            Request::Launch {
+                cwd: root.clone(),
+                args: vec!["log".into(), "f.txt".into()],
+            },
+            &ctx,
+        );
+    }
+    let open = |app: &super::App| -> Vec<std::path::PathBuf> {
+        app.tabs
+            .iter()
+            .filter_map(|t| match t {
+                super::Tab::Repo(r) => Some(r.path.clone()),
+                _ => None,
+            })
+            .collect()
+    };
+    let until = Instant::now() + Duration::from_secs(20);
+    while open(harness.state()).len() < 2 && Instant::now() < until {
+        harness.step();
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let mut tabs = open(harness.state());
+    drop(harness);
+    let _ = std::fs::remove_dir_all(&base);
+    tabs.sort();
+    roots.sort();
+    assert_eq!(tabs, roots);
+    Ok(())
+}

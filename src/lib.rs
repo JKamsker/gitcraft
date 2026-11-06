@@ -15,6 +15,7 @@ mod instance;
 pub mod launch;
 mod manual;
 mod mergiraf;
+mod nautilus_scripts;
 mod pr_post;
 mod pr_threads;
 mod pull_request;

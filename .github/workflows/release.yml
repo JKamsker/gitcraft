@@ -158,7 +158,7 @@ jobs:
           dir="$PKG"
           mkdir "$dir"
           cp target/release/gitcraft README.md ATTRIBUTION.md LICENSE-MIT LICENSE-APACHE \
-            packaging/gitcraft.desktop "$dir/"
+            packaging/gitcraft.desktop packaging/linux/gitcraft-servicemenu.desktop "$dir/"
           cp assets/app-icon/gitcraft-256.png "$dir/gitcraft.png"
           strip "$dir/gitcraft"
           tar czf "$dir.tar.gz" "$dir"
