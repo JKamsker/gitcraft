@@ -163,6 +163,14 @@ impl RepoTab {
         if terminal.clicked() {
             acts.push(Action::ToggleTerminal);
         }
+        let activity = icons::tool_button(ui, "list", "", true)
+            .on_hover_text("Activity: each operation's git commands and all they printed");
+        if self.activity.open {
+            widgets::active_underline(ui, activity.rect, t.accent);
+        }
+        if activity.clicked() {
+            acts.push(Action::ToggleActivity);
+        }
         let search =
             icons::tool_button(ui, "search", "", true).on_hover_text("Search commits (Ctrl+F)");
         if self.search.open {
@@ -283,8 +291,15 @@ impl RepoTab {
         {
             let color = if *is_err { t.danger } else { t.text_dim };
             let first_line = headline(msg);
-            ui.add(egui::Label::new(egui::RichText::new(first_line).color(color)).truncate())
-                .on_hover_text(msg.as_str());
+            let label = egui::Label::new(egui::RichText::new(first_line).color(color))
+                .truncate()
+                .sense(egui::Sense::click());
+            let shown = ui.add(label).on_hover_text(format!(
+                "{msg}\n\nClick for the commands and all they printed (Activity)"
+            ));
+            if shown.clicked() {
+                acts.push(Action::ShowLastActivity);
+            }
         }
         let Some(op) = &self.busy_op else {
             if self.loading {

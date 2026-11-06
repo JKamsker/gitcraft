@@ -95,6 +95,8 @@ impl RepoTab {
             Action::Push => self.push(ctx),
             Action::Reload => self.reload(ctx),
             Action::CancelOp => self.cancel_op(),
+            Action::ToggleActivity => self.activity.open = !self.activity.open,
+            Action::ShowLastActivity => self.activity.reveal_last(),
             Action::LoadMore => self.load_more(ctx),
             Action::Undo => self.undo(ctx),
             Action::Redo => self.redo(ctx),

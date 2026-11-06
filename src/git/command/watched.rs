@@ -14,7 +14,9 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
-use super::{Credentials, Extra, after_options, extra_for, failure_message, local_command};
+use super::{
+    Credentials, Extra, Recorded, after_options, extra_for, failure_message, local_command,
+};
 use crate::git::progress::{Progress, ProgressReader, without_progress};
 use crate::remote::{self, Host, Target};
 
@@ -25,6 +27,8 @@ pub const CANCELLED: &str = "cancelled";
 pub struct OpControl {
     cancel: AtomicBool,
     progress: Mutex<Option<Progress>>,
+    /// What each git call of the operation did so far, for the activity log.
+    steps: Mutex<Vec<Recorded>>,
     /// Called whenever there is news (a repaint of the window).
     notify: Box<dyn Fn() + Send + Sync>,
 }
@@ -35,6 +39,7 @@ impl OpControl {
         Arc::new(Self {
             cancel: AtomicBool::new(false),
             progress: Mutex::new(None),
+            steps: Mutex::new(Vec::new()),
             notify: Box::new(notify),
         })
     }
@@ -52,6 +57,19 @@ impl OpControl {
     /// The latest progress the running command reported.
     pub fn progress(&self) -> Option<Progress> {
         self.progress.lock().ok().and_then(|p| p.clone())
+    }
+
+    /// Keeps what a git call of the operation did.
+    pub fn record(&self, step: Recorded) {
+        if let Ok(mut steps) = self.steps.lock() {
+            steps.push(step);
+        }
+        (self.notify)();
+    }
+
+    /// What the operation's git calls did so far.
+    pub fn steps(&self) -> Vec<Recorded> {
+        self.steps.lock().map(|s| s.clone()).unwrap_or_default()
     }
 
     fn set_progress(&self, progress: Option<Progress>) {
@@ -123,8 +141,22 @@ pub fn run_watched(
     quiet: bool,
     control: &Arc<OpControl>,
 ) -> Result<String, String> {
+    run_watched_recorded(dir, args, creds, quiet, control).0
+}
+
+/// [`run_watched`], and what the call did, for the activity log (with `--progress` in its
+/// command line when it was added).
+pub fn run_watched_recorded(
+    dir: Option<&Path>,
+    args: &[&str],
+    creds: Option<&Credentials>,
+    quiet: bool,
+    control: &Arc<OpControl>,
+) -> (Result<String, String>, Recorded) {
+    let started = Instant::now();
     if control.is_cancelled() {
-        return Err(CANCELLED.to_owned());
+        let not_run = Recorded::new(args, None, "Not run: cancelled".to_owned(), started);
+        return (Err(CANCELLED.to_owned()), not_run);
     }
     let words = if quiet {
         args.iter().map(|a| (*a).to_owned()).collect()
@@ -132,18 +164,39 @@ pub fn run_watched(
         with_progress(args)
     };
     let words: Vec<&str> = words.iter().map(String::as_str).collect();
+    let failed = |e: String| {
+        let rec = Recorded::new(&words, None, e.clone(), started);
+        (Err(e), rec)
+    };
     let extra = extra_for(dir, creds, quiet);
     let target = dir.and_then(remote::parse);
-    let (child, host) = match &target {
-        Some(t) => (
-            remote::spawn(&t.host, &watched_request(t, &extra, &words))?,
-            Some(t.host.clone()),
-        ),
-        None => (spawn_here(dir, &extra, &words)?, None),
+    let spawned = match &target {
+        Some(t) => remote::spawn(&t.host, &watched_request(t, &extra, &words))
+            .map(|c| (c, Some(t.host.clone()))),
+        None => spawn_here(dir, &extra, &words).map(|c| (c, None)),
     };
-    let ended = follow(child, host.as_ref(), control)?;
+    let (child, host) = match spawned {
+        Ok(spawned) => spawned,
+        Err(e) => return failed(e),
+    };
+    let ended = match follow(child, host.as_ref(), control) {
+        Ok(ended) => ended,
+        Err(e) if e == CANCELLED => {
+            return (
+                Err(e),
+                Recorded::new(&words, None, "Stopped: cancelled".to_owned(), started),
+            );
+        }
+        Err(e) => return failed(e),
+    };
+    let recorded = Recorded::new(
+        &words,
+        ended.code,
+        super::both(&ended.stdout, &ended.stderr),
+        started,
+    );
     if ended.code == Some(0) {
-        return Ok(ended.stdout);
+        return (Ok(ended.stdout), recorded);
     }
     if let Some(t) = &target
         && ended.code == Some(1)
@@ -153,14 +206,16 @@ pub fn run_watched(
             .lines()
             .any(|l| remote::is_missing_folder(l.as_bytes()))
     {
-        return Err(format!("{} isn't a folder on {}", t.path, t.host.label()));
+        let e = format!("{} isn't a folder on {}", t.path, t.host.label());
+        return (Err(e), recorded);
     }
-    Err(failure_message(
+    let e = failure_message(
         args,
         &ended.status,
         &ended.stdout,
         &without_progress(&ended.stderr),
-    ))
+    );
+    (Err(e), recorded)
 }
 
 fn spawn_here(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Child, String> {

@@ -54,7 +54,7 @@ fn with_profile(cmd: &mut Command, args: &[&str]) {
 use crate::remote::{self, Target};
 
 mod watched;
-pub use watched::{CANCELLED, OpControl, run_watched};
+pub use watched::{CANCELLED, OpControl, run_watched, run_watched_recorded};
 
 /// What every git call is run with.
 /// - `GIT_TERMINAL_PROMPT`: never block on an interactive prompt (credential helpers with a
@@ -348,18 +348,83 @@ fn run_inner(
     creds: Option<&Credentials>,
     quiet: bool,
 ) -> Result<String, String> {
+    run_inner_recorded(dir, args, ok, creds, quiet).0
+}
+
+/// [`run_inner`], and what the call did, for the activity log.
+fn run_inner_recorded(
+    dir: Option<&Path>,
+    args: &[&str],
+    ok: &[i32],
+    creds: Option<&Credentials>,
+    quiet: bool,
+) -> (Result<String, String>, Recorded) {
+    let started = std::time::Instant::now();
     let extra = extra_for(dir, creds, quiet);
-    let out = execute(dir, &extra, args)?;
-    if out.code.is_some_and(|c| ok.contains(&c)) {
-        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    let out = match execute(dir, &extra, args) {
+        Ok(out) => out,
+        Err(e) => return (Err(e.clone()), Recorded::new(args, None, e, started)),
+    };
+    let (stdout, stderr) = (
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr),
+    );
+    let recorded = Recorded::new(args, out.code, both(&stdout, &stderr), started);
+    let result = if out.code.is_some_and(|c| ok.contains(&c)) {
+        Ok(stdout.into_owned())
     } else {
-        Err(failure_message(
-            args,
-            &out.status,
-            &String::from_utf8_lossy(&out.stdout),
-            &String::from_utf8_lossy(&out.stderr),
-        ))
+        Err(failure_message(args, &out.status, &stdout, &stderr))
+    };
+    (result, recorded)
+}
+
+/// What a command printed, its output then its error output.
+fn both(stdout: &str, stderr: &str) -> String {
+    match (stdout.trim_end(), stderr.trim_end()) {
+        ("", err) => err.to_owned(),
+        (out, "") => out.to_owned(),
+        (out, err) => format!("{out}\n{err}"),
     }
+}
+
+/// What one git call did, for the activity log: its command line, how it ended, what it
+/// printed and how long it took.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Recorded {
+    /// The arguments after `git`, as the caller gave them (credentials never are: they go to
+    /// git through the environment).
+    pub args: Vec<String>,
+    /// Its exit code; `None` when it couldn't run, or was stopped.
+    pub code: Option<i32>,
+    /// What it printed (output, then error output; progress lines as last drawn).
+    pub output: String,
+    pub took: std::time::Duration,
+}
+
+impl Recorded {
+    pub(crate) fn new(
+        args: &[&str],
+        code: Option<i32>,
+        output: String,
+        started: std::time::Instant,
+    ) -> Self {
+        Self {
+            args: args.iter().map(|a| (*a).to_owned()).collect(),
+            code,
+            output,
+            took: started.elapsed(),
+        }
+    }
+}
+
+/// [`run_with`] (or [`run_unattended`] when `quiet`), and what the call did.
+pub fn run_recorded(
+    dir: Option<&Path>,
+    args: &[&str],
+    creds: Option<&Credentials>,
+    quiet: bool,
+) -> (Result<String, String>, Recorded) {
+    run_inner_recorded(dir, args, &[0], creds, quiet)
 }
 
 /// What git's credential helpers keep for `url` (`https://host`), asking nobody: no terminal

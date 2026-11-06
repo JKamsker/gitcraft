@@ -41,6 +41,18 @@ impl RepoTab {
                 .show(ui, |ui| self.progress_bar(ui));
         }
         self.side_panels(ui, &mut acts);
+        if self.activity.open {
+            egui::Panel::bottom("repo_activity")
+                .resizable(true)
+                .default_size(240.0)
+                .size_range(90.0..=900.0)
+                .frame(
+                    egui::Frame::new()
+                        .fill(t.card)
+                        .inner_margin(egui::Margin::symmetric(8, 6)),
+                )
+                .show(ui, |ui| self.activity_panel(ui, &mut acts));
+        }
         if self.terminal_open {
             egui::Panel::bottom("repo_terminal")
                 .resizable(true)
