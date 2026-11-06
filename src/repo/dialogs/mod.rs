@@ -2,6 +2,7 @@
 
 mod branch;
 mod confirm;
+mod keep_detached;
 mod remote;
 mod upstream;
 mod worktree;
@@ -103,6 +104,8 @@ pub enum Dialog {
         draft: bool,
         focus: bool,
     },
+    /// A checkout would leave the commits of a detached HEAD on no branch.
+    KeepDetached(Box<super::detached::KeepDialog>),
 }
 
 impl Dialog {
@@ -372,6 +375,7 @@ impl RepoTab {
                     draft,
                     focus,
                 } => remote::create_pr(ui, noun, branch, base, title, body, draft, focus),
+                Dialog::KeepDetached(keep) => keep_detached::keep_detached(ui, enter, keep),
                 Dialog::Confirm {
                     title,
                     body,

@@ -27,7 +27,17 @@ pub struct Graph {
     pub width: usize,
 }
 
+/// [`layout_with`] of a history read with every parent.
+#[cfg(test)]
 pub fn layout<C: Borrow<Commit>>(commits: &[C]) -> Graph {
+    layout_with(commits, false)
+}
+
+/// The lanes of `commits`, newest first; read with `--first-parent` when `first_parent`: a merge's other
+/// parents aren't listed, so they get no lane (one would run to the bottom of the graph,
+/// waiting for a commit that never comes).
+pub fn layout_with<C: Borrow<Commit>>(commits: &[C], first_parent: bool) -> Graph {
+    let followed = if first_parent { 1 } else { usize::MAX };
     let mut lanes: Vec<Option<&str>> = Vec::new();
     let mut rows = Vec::with_capacity(commits.len());
     let mut width = 0;
@@ -50,7 +60,7 @@ pub fn layout<C: Borrow<Commit>>(commits: &[C]) -> Graph {
         }
 
         let mut outgoing = Vec::new();
-        for (n, parent) in commit.parents.iter().enumerate() {
+        for (n, parent) in commit.parents.iter().enumerate().take(followed) {
             let parent = parent.as_str();
             if n == 0 {
                 // The first parent continues this lane. If another lane already waits for the
@@ -132,5 +142,19 @@ mod tests {
         // Both lanes wait for `a` and meet at its dot, in the leftmost lane.
         assert_eq!(g.rows[3].incoming, vec![0, 1]);
         assert_eq!(g.rows[3].col, 0);
+    }
+
+    /// Read with `--first-parent`, a merge's second parent is never listed: no lane waits for
+    /// it, so the graph stays one lane wide and nothing runs past the last commit.
+    #[test]
+    fn first_parent_history_opens_no_lane_for_merged_parents() {
+        let commits = [c("m2", &["m1", "f2"]), c("m1", &["a", "f1"]), c("a", &[])];
+        let g = layout_with(&commits, true);
+        assert_eq!(g.width, 1);
+        assert!(g.rows.iter().all(|r| r.col == 0 && r.through.is_empty()));
+        assert_eq!(g.rows[0].outgoing, vec![0]);
+        assert!(g.rows[2].outgoing.is_empty());
+        // Laid out with every parent, the same rows would leave lanes waiting for good.
+        assert!(layout(&commits).width > 1);
     }
 }

@@ -10,13 +10,16 @@ mod ci_view;
 pub(crate) mod columns;
 mod commands;
 mod conflict;
+mod detached;
 mod detail;
 mod dialogs;
 mod diff;
 mod file_text;
 mod file_view;
+mod graph_order;
 pub(crate) mod graph_view;
 pub(crate) mod highlight;
+mod hooks;
 mod keep_submodules;
 mod layout;
 mod load;
@@ -114,6 +117,8 @@ pub struct RepoTab {
     visibility: branch_visibility::Visibility,
     /// What `history` was logged from: `None` for every branch.
     log_from: Option<Vec<String>>,
+    /// The order `history` was read in, and whether it follows first parents only.
+    log_order: git::LogOrder,
     /// Counts the reloads of `history`, so that a page asked for before one is dropped.
     history_gen: u64,
     /// The `git log` older pages are read from, and the `history_gen` it reads for.
@@ -181,6 +186,10 @@ pub struct RepoTab {
     commit_summary: String,
     commit_body: String,
     amend: bool,
+    /// The next commit, or push, runs without its hooks (`--no-verify`).
+    skip_hooks: hooks::SkipHooks,
+    /// HEAD on no branch: its banner, and checkouts that would leave commits behind.
+    detached: detached::Detached,
     dialog: Option<Dialog>,
     search: Search,
     /// A commit to select once enough history is loaded (search results, links).
@@ -279,6 +288,7 @@ impl RepoTab {
             loading_more: false,
             visibility: Default::default(),
             log_from: None,
+            log_order: Default::default(),
             history_gen: 0,
             log_stream: Default::default(),
             work: WorkStatus::default(),
@@ -327,6 +337,8 @@ impl RepoTab {
             commit_summary: String::new(),
             commit_body: String::new(),
             amend: false,
+            skip_hooks: Default::default(),
+            detached: Default::default(),
             dialog: None,
             search: Search::default(),
             pending_goto: None,

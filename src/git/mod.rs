@@ -3,9 +3,12 @@
 
 mod command;
 mod commits;
+mod detached;
 mod diff;
 mod files;
+mod hooks;
 mod lfs;
+mod log_order;
 mod refs;
 mod status;
 mod submodule;
@@ -13,9 +16,12 @@ mod worktree;
 
 pub use self::command::*;
 pub use self::commits::*;
+pub use self::detached::*;
 pub use self::diff::*;
 pub use self::files::*;
+pub use self::hooks::subcommand;
 pub use self::lfs::*;
+pub use self::log_order::*;
 pub use self::refs::*;
 pub use self::status::*;
 pub use self::submodule::*;
@@ -167,5 +173,7 @@ pub fn now() -> i64 {
         .unwrap_or(0)
 }
 
+#[cfg(test)]
+mod order_tests;
 #[cfg(test)]
 mod tests;

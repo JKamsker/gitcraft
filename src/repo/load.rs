@@ -33,6 +33,8 @@ pub(super) struct Loaded {
     pub(super) requested: usize,
     /// What `history` was logged from.
     pub(super) log_from: Option<Vec<String>>,
+    /// The order `history` was read in.
+    pub(super) order: git::LogOrder,
     /// Which read this is (see `RepoTab::reads`).
     pub(super) read: u64,
 }
@@ -68,6 +70,7 @@ impl RepoTab {
         // Keep the pages already loaded.
         let count = self.history.len().clamp(git::LOG_PAGE, MAX_HISTORY);
         let mut visibility = Visibility::load(ctx, self.repo_key());
+        let order = super::graph_order::load(ctx, self.repo_key());
         // Answered all the same if it panics: the tab reloads only once it is.
         let failed = |e| Msg::Loaded(Err(e));
         super::messages::spawn_or(&self.tx, ctx, failed, move || {
@@ -80,7 +83,8 @@ impl RepoTab {
                 let path = path.as_path();
                 let (history, work, worktrees, stashes, remotes, submodules, lfs, identity) =
                     std::thread::scope(|scope| {
-                        let history = scope.spawn(|| git::log(path, log_from.as_deref(), 0, count));
+                        let history =
+                            scope.spawn(|| git::log(path, log_from.as_deref(), order, 0, count));
                         let work_trees = scope.spawn(|| {
                             let work = git::status(path)?;
                             let changes = Some(work.changed_files());
@@ -133,6 +137,7 @@ impl RepoTab {
                     identity,
                     requested: count,
                     log_from,
+                    order,
                     read,
                 }))
             })())
@@ -281,6 +286,7 @@ impl RepoTab {
         let skip = self.history.len();
         let generation = self.history_gen;
         let from = self.log_from.clone();
+        let order = self.log_order;
         let stream = Arc::clone(&self.log_stream);
         // Answered all the same if it panics: no more is read until it is.
         let failed = move |e| Msg::More(generation, Err(e));
@@ -298,7 +304,7 @@ impl RepoTab {
                     *slot = None;
                     *slot = Some((
                         generation,
-                        git::LogStream::start(&path, from.as_deref(), skip)?,
+                        git::LogStream::start(&path, from.as_deref(), order, skip)?,
                     ));
                 }
                 let page = match slot.as_mut() {
@@ -351,6 +357,7 @@ impl RepoTab {
         self.log_stream = Default::default();
         self.loading_more = false;
         self.refs = loaded.refs;
+        self.refresh_detached(ctx);
         self.has_more = loaded.history.len() >= loaded.requested;
         self.history = loaded.history;
         // A status read since this reload started is newer.
@@ -382,6 +389,7 @@ impl RepoTab {
         }
         self.count_worktrees(ctx);
         self.take_visibility(loaded.log_from, ctx);
+        self.take_order(loaded.order, ctx);
         // Stash numbers shift when one is pushed or dropped; follow the commit.
         let viewed = self
             .stash_view
@@ -511,7 +519,7 @@ impl RepoTab {
             // Shared with `history`, not copied: tens of thousands of commits may be loaded.
             self.commits.push(Arc::clone(commit));
         }
-        let graph = graph::layout(&self.commits);
+        let graph = graph::layout_with(&self.commits, self.log_order.first_parent);
         let index = self
             .commits
             .iter()

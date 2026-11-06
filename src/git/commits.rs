@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use super::ChangedFile;
+use super::LogOrder;
 use super::diff::commit_files;
 use super::{END_OPTS, NO_SIGNATURE, UTF8, not_an_option, run};
 
@@ -25,10 +26,12 @@ pub struct Commit {
 }
 
 /// The commits of every branch (stashes aside), or of the revisions `from` when given, newest
-/// first, in an order fit for drawing the graph: `limit` of them after the first `skip`.
+/// first, in an order fit for drawing the graph (`order`): `limit` of them after the first
+/// `skip`.
 pub fn log(
     repo: &Path,
     from: Option<&[String]>,
+    order: LogOrder,
     skip: usize,
     limit: usize,
 ) -> Result<Vec<Commit>, String> {
@@ -37,7 +40,10 @@ pub fn log(
         return Ok(Vec::new());
     }
     let limit = format!("--max-count={limit}");
-    let out = match run(Some(repo), &log_args(from, skip, Some(&limit)).as_args()) {
+    let out = match run(
+        Some(repo),
+        &log_args(from, order, skip, Some(&limit)).as_args(),
+    ) {
         Ok(out) => out,
         // A freshly initialised repository has no commits yet.
         Err(e) if e.contains("does not have any commits") => String::new(),
@@ -57,10 +63,16 @@ pub fn log(
 /// someone pasted, and would cut the commit in two or leave it out of the graph.
 const LOG_FIELDS: usize = 9;
 
-/// The arguments of `log` / [`LogStream`]: the revisions `from` (else every branch), after the
-/// first `skip`, at most `limit` (`--max-count=n`) when given.
-fn log_args<'a>(from: Option<&'a [String]>, skip: usize, limit: Option<&'a str>) -> LogArgs<'a> {
+/// The arguments of `log` / [`LogStream`]: the revisions `from` (else every branch) in `order`,
+/// after the first `skip`, at most `limit` (`--max-count=n`) when given.
+fn log_args<'a>(
+    from: Option<&'a [String]>,
+    order: LogOrder,
+    skip: usize,
+    limit: Option<&'a str>,
+) -> LogArgs<'a> {
     LogArgs {
+        order,
         format: "--format=%H%x00%P%x00%an%x00%ae%x00%at%x00%ad%x00%s%x00%D%x00%b%x00".to_owned(),
         skip: format!("--skip={skip}"),
         limit,
@@ -69,6 +81,7 @@ fn log_args<'a>(from: Option<&'a [String]>, skip: usize, limit: Option<&'a str>)
 }
 
 struct LogArgs<'a> {
+    order: LogOrder,
     format: String,
     skip: String,
     limit: Option<&'a str>,
@@ -77,14 +90,9 @@ struct LogArgs<'a> {
 
 impl LogArgs<'_> {
     fn as_args(&self) -> Vec<&str> {
-        let mut args = vec![
-            "log",
-            NO_SIGNATURE,
-            UTF8,
-            "--date-order",
-            "--date=format-local:%Y-%m-%d %H:%M",
-            &self.skip,
-        ];
+        let mut args = vec!["log", NO_SIGNATURE, UTF8];
+        args.extend(self.order.args());
+        args.extend(["--date=format-local:%Y-%m-%d %H:%M", &self.skip]);
         args.extend(self.limit);
         args.push(&self.format);
         push_revisions(&mut args, self.from);
@@ -151,6 +159,7 @@ pub struct LogStream {
 struct Paged {
     repo: std::path::PathBuf,
     from: Option<Vec<String>>,
+    order: LogOrder,
     skip: usize,
 }
 
@@ -164,8 +173,13 @@ struct RunningLog {
 }
 
 impl LogStream {
-    /// The commits of `from` (else every branch) after the first `skip`.
-    pub fn start(repo: &Path, from: Option<&[String]>, skip: usize) -> Result<Self, String> {
+    /// The commits of `from` (else every branch) in `order`, after the first `skip`.
+    pub fn start(
+        repo: &Path,
+        from: Option<&[String]>,
+        order: LogOrder,
+        skip: usize,
+    ) -> Result<Self, String> {
         // No revisions would make git log HEAD.
         if from.is_some_and(|revs| revs.is_empty()) {
             return Ok(Self {
@@ -179,11 +193,13 @@ impl LogStream {
                 paged: Some(Paged {
                     repo: repo.to_owned(),
                     from: from.map(<[String]>::to_vec),
+                    order,
                     skip,
                 }),
             });
         }
-        let mut child = super::command::spawn_piped(repo, &log_args(from, skip, None).as_args())?;
+        let mut child =
+            super::command::spawn_piped(repo, &log_args(from, order, skip, None).as_args())?;
         let out = child
             .stdout
             .take()
@@ -211,7 +227,13 @@ impl LogStream {
     pub fn next_page(&mut self, n: usize) -> Result<Vec<Commit>, String> {
         use std::io::BufRead;
         if let Some(paged) = &mut self.paged {
-            let page = log(&paged.repo, paged.from.as_deref(), paged.skip, n)?;
+            let page = log(
+                &paged.repo,
+                paged.from.as_deref(),
+                paged.order,
+                paged.skip,
+                n,
+            )?;
             paged.skip += page.len();
             return Ok(page);
         }
@@ -418,24 +440,25 @@ fn push_revisions<'a>(args: &mut Vec<&'a str>, from: Option<&'a [String]>) {
 }
 
 /// Commits whose message or author matches `query` (case-insensitive), or whose hash starts
-/// with it, newest first; among those of the revisions `from` when given, as `log`.
-pub fn search(repo: &Path, from: Option<&[String]>, query: &str) -> Result<Vec<String>, String> {
+/// with it, newest first; among those of the revisions `from` when given, read in `order`, as
+/// `log`.
+pub fn search(
+    repo: &Path,
+    from: Option<&[String]>,
+    order: LogOrder,
+    query: &str,
+) -> Result<Vec<String>, String> {
     if from.is_some_and(|revs| revs.is_empty()) {
         return Ok(Vec::new());
     }
     let mut hashes: Vec<String> = Vec::new();
     // A short query matches most of history: a linear check per hash would be quadratic.
     let mut seen: HashSet<String> = HashSet::new();
-    let base = [
-        "log",
-        NO_SIGNATURE,
-        UTF8,
-        "--date-order",
-        "-i",
-        "--format=%H",
-    ];
+    let mut base = vec!["log", NO_SIGNATURE, UTF8];
+    base.extend(order.args());
+    base.extend(["-i", "--format=%H"]);
     for filter in [format!("--grep={query}"), format!("--author={query}")] {
-        let mut args = base.to_vec();
+        let mut args = base.clone();
         args.push("--fixed-strings");
         args.push(&filter);
         push_revisions(&mut args, from);
@@ -464,17 +487,20 @@ pub fn search(repo: &Path, from: Option<&[String]>, query: &str) -> Result<Vec<S
 }
 
 /// Commits that added or removed `query` in a file's contents (`git log -S`), newest first;
-/// among those of the revisions `from` when given, as `log`.
+/// among those of the revisions `from` when given, read in `order`, as `log`.
 pub fn search_code(
     repo: &Path,
     from: Option<&[String]>,
+    order: LogOrder,
     query: &str,
 ) -> Result<Vec<String>, String> {
     if from.is_some_and(|revs| revs.is_empty()) {
         return Ok(Vec::new());
     }
     let pickaxe = format!("-S{query}");
-    let mut args = vec!["log", NO_SIGNATURE, "--date-order", "--format=%H", &pickaxe];
+    let mut args = vec!["log", NO_SIGNATURE];
+    args.extend(order.args());
+    args.extend(["--format=%H", pickaxe.as_str()]);
     push_revisions(&mut args, from);
     let out = run(Some(repo), &args)?;
     Ok(out.lines().map(str::to_owned).collect())
@@ -572,8 +598,8 @@ mod tests {
             "refs/prefetch/remotes/origin/main",
             ahead.trim(),
         ])?;
-        let whole = log(&dir, None, 0, 10);
-        let found = search(&dir, None, "a");
+        let whole = log(&dir, None, Default::default(), 0, 10);
+        let found = search(&dir, None, Default::default(), "a");
         let _ = std::fs::remove_dir_all(&dir);
         let summaries: Vec<String> = whole?.into_iter().map(|c| c.summary).collect();
         assert_eq!(summaries, ["one"]);
@@ -608,8 +634,9 @@ mod tests {
         }
         let odd = git(&["rev-parse", "HEAD~1"])?;
         let odd = odd.trim();
-        let whole = log(&dir, None, 0, 10);
-        let paged = LogStream::start(&dir, None, 0).and_then(|mut s| s.next_page(10));
+        let whole = log(&dir, None, Default::default(), 0, 10);
+        let paged =
+            LogStream::start(&dir, None, Default::default(), 0).and_then(|mut s| s.next_page(10));
         let detail = commit_detail(&dir, odd);
         let rebase = rebase_commits(&dir, "HEAD~2");
         let _ = std::fs::remove_dir_all(&dir);

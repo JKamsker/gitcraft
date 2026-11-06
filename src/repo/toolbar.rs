@@ -99,12 +99,16 @@ impl RepoTab {
         egui::Popup::menu(&more.inner)
             .style(crate::theme::menu_style)
             .show(|ui| pull_menu(ui, acts));
-        if icons::tool_button_count(ui, "arrow-up-from-line", "Push", ahead, idle && has_remote)
-            .on_hover_text("Push the current branch (publishes it if it has no upstream yet)")
-            .clicked()
-        {
+        let push =
+            icons::tool_button_count(ui, "arrow-up-from-line", "Push", ahead, idle && has_remote)
+                .on_hover_text(
+                    "Push the current branch (publishes it if it has no upstream yet)\n\
+                     Right-click to push skipping hooks",
+                );
+        if push.clicked() {
             acts.push(Action::Push);
         }
+        super::hooks::push_menu(&push, acts);
     }
 
     /// Branch, stash, terminal, search and the folder menu.

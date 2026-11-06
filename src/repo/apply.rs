@@ -3,6 +3,7 @@
 use std::path::Path;
 use std::time::Instant;
 
+use super::detached::Leave;
 use super::{
     Action, Compare, DiffKey, DiffView, Msg, OpKind, OpenRequest, Refresh, RepoTab, Undo, diff,
     ops, spawn,
@@ -67,9 +68,11 @@ impl RepoTab {
                 refresh,
                 undo,
             } => self.run_undoable(&label, ops, refresh, undo, ctx),
-            Action::Checkout(name) => self.checkout(&name, ctx),
-            Action::CheckoutPull(name) => self.checkout_pull(&name, ctx),
-            Action::CheckoutRemote(name) => self.checkout_remote(&name, ctx),
+            // From a detached HEAD, only once what that would leave behind is known.
+            Action::Checkout(name) => self.leave_to(Leave::Checkout(name), ctx),
+            Action::CheckoutPull(name) => self.leave_to(Leave::CheckoutPull(name), ctx),
+            Action::CheckoutRemote(name) => self.leave_to(Leave::CheckoutRemote(name), ctx),
+            Action::Detached(act) => self.detached_act(act, ctx),
             Action::Dialog(dialog) => self.dialog = Some(dialog),
             Action::DeleteTag { name, target } => self.delete_tag(name, target, ctx),
             Action::Commit => self.commit(ctx),
@@ -86,6 +89,7 @@ impl RepoTab {
             Action::Pull => self.pull(Settings::get(ctx).pull_mode, ctx),
             Action::PullWith(mode) => self.pull(mode, ctx),
             Action::Push => self.push(ctx),
+            Action::PushSkippingHooks => self.push_skipping_hooks(ctx),
             Action::Reload => self.reload(ctx),
             Action::LoadMore => self.load_more(ctx),
             Action::Undo => self.undo(ctx),
@@ -99,6 +103,7 @@ impl RepoTab {
                 settings.set(ctx);
             }
             Action::BranchVisibility(change) => self.change_visibility(change, ctx),
+            Action::GraphOrder(order) => self.set_log_order(order, ctx),
             Action::OpenBranches(section) => {
                 let mut settings = Settings::get(ctx);
                 settings.show_branches = true;
