@@ -74,32 +74,36 @@ pub(super) fn match_bases(segments: &[Segment], found: &[Segment]) -> Vec<Option
 }
 
 /// Whether the conflicts of `found` from `start` on, and the text between them, add up to
-/// `ours` and `theirs`: where that run ends, and its base.
+/// `ours` and `theirs`: where that run ends, and its base. Compared in place, so a run that
+/// isn't it stops at its first difference.
 fn span(found: &[Segment], start: usize, ours: &str, theirs: &str) -> Option<(usize, String)> {
-    let (mut o, mut t, mut b) = (String::new(), String::new(), String::new());
+    let (mut o, mut t) = (0, 0);
+    // `piece` is next in `whole` at `at`: moves `at` past it.
+    let next = |whole: &str, at: &mut usize, piece: &str| {
+        let fits = whole[*at..].starts_with(piece);
+        *at += piece.len();
+        fits
+    };
     for (i, seg) in found.iter().enumerate().skip(start) {
-        match seg {
-            Segment::Common(text) => {
-                let text = plain(text);
-                o.push_str(&text);
-                t.push_str(&text);
-                b.push_str(&text);
-            }
-            Segment::Conflict {
-                ours: so,
-                base,
-                theirs: st,
-            } => {
-                o.push_str(&plain(so));
-                t.push_str(&plain(st));
-                b.push_str(&plain(base.as_deref().unwrap_or_default()));
-                if o == ours && t == theirs {
-                    return Some((i + 1, b));
-                }
-            }
-        }
-        if !ours.starts_with(&o) || !theirs.starts_with(&t) {
+        let (so, st) = match seg {
+            Segment::Common(text) => (text, text),
+            Segment::Conflict { ours, theirs, .. } => (ours, theirs),
+        };
+        let (so, st) = (plain(so), plain(st));
+        if !next(ours, &mut o, &so) || !next(theirs, &mut t, &st) {
             return None;
+        }
+        if matches!(seg, Segment::Conflict { .. }) && o == ours.len() && t == theirs.len() {
+            let base = found[start..=i]
+                .iter()
+                .map(|seg| match seg {
+                    Segment::Common(text) => plain(text).into_owned(),
+                    Segment::Conflict { base, .. } => {
+                        plain(base.as_deref().unwrap_or_default()).into_owned()
+                    }
+                })
+                .collect();
+            return Some((i + 1, base));
         }
     }
     None
@@ -212,7 +216,9 @@ fn conflicts(segments: &[Segment]) -> impl Iterator<Item = (&str, Option<&str>, 
 #[derive(Debug)]
 pub(super) struct State {
     pub index: IndexBases,
-    /// For each conflict, its base in [`IndexBases::Found`], when found there.
+    /// The index was asked for [`IndexBases`] (once per [`IndexBases::Loading`]).
+    pub asked: bool,
+    /// Each conflict's base: the file's own, or the one found in [`IndexBases::Found`].
     bases: Vec<Option<String>>,
     /// Which conflicts' Original sections are open.
     open: Vec<bool>,
@@ -224,6 +230,7 @@ impl Default for State {
     fn default() -> Self {
         Self {
             index: IndexBases::NotNeeded,
+            asked: false,
             bases: Vec::new(),
             open: Vec::new(),
             diffs: Vec::new(),
@@ -232,30 +239,33 @@ impl Default for State {
 }
 
 impl State {
-    /// For the conflicts of `segments`, just read: the index is asked for the bases the file
-    /// doesn't have.
+    /// For the conflicts of `segments`, just read: the index is to be asked for the bases the
+    /// file doesn't have.
     pub fn new(segments: &[Segment]) -> Self {
-        let mut state = Self {
-            index: if conflicts(segments).all(|(_, base, _)| base.is_some()) {
-                IndexBases::NotNeeded
-            } else {
-                IndexBases::Loading
-            },
-            ..Self::default()
-        };
+        let mut state = Self::default();
         state.reset(segments);
         state
     }
 
-    /// The conflicts are now `segments` (some solved elsewhere): every section closed.
+    /// The conflicts are now `segments` (some solved elsewhere): every section closed. When
+    /// some have no base of their own and the index wasn't asked, it is to be.
     pub fn reset(&mut self, segments: &[Segment]) {
         let n = conflicts(segments).count();
+        let all_own = conflicts(segments).all(|(_, base, _)| base.is_some());
+        if !all_own && self.index == IndexBases::NotNeeded {
+            self.index = IndexBases::Loading;
+            self.asked = false;
+        }
         self.open = vec![false; n];
         self.diffs = vec![None; n];
-        self.bases = match &self.index {
-            IndexBases::Found(found) => match_bases(segments, found),
+        let found = match &self.index {
+            IndexBases::Found(found) if !all_own => match_bases(segments, found),
             _ => vec![None; n],
         };
+        self.bases = conflicts(segments)
+            .zip(found)
+            .map(|((_, own, _), found)| own.map(str::to_owned).or(found))
+            .collect();
     }
 
     /// What the index gave for the bases.
@@ -268,22 +278,19 @@ impl State {
     }
 
     /// The original of conflict `k`.
-    pub fn of<'a>(&'a self, segments: &'a [Segment], k: usize) -> Original<'a> {
-        if let Some((_, Some(base), _)) = conflicts(segments).nth(k) {
+    pub fn of(&self, k: usize) -> Original<'_> {
+        if let Some(base) = self.bases.get(k).and_then(Option::as_deref) {
             return Original::Text(base);
         }
         match &self.index {
             IndexBases::NotNeeded | IndexBases::Loading => Original::Loading,
             IndexBases::Added => Original::Added,
             IndexBases::Failed(why) => Original::Unknown(why),
-            IndexBases::Found(_) => match self.bases.get(k).and_then(Option::as_deref) {
-                Some(base) => Original::Text(base),
-                None => Original::Unknown(
-                    "this conflict doesn't match the one rebuilt from the index (the file may \
-                     have been edited since, or merged with options or a merge driver that \
-                     can't be repeated here)",
-                ),
-            },
+            IndexBases::Found(_) => Original::Unknown(
+                "this conflict doesn't match the one rebuilt from the index (the file may have \
+                 been edited since, or merged with options or a merge driver that can't be \
+                 repeated here)",
+            ),
         }
     }
 
@@ -303,7 +310,7 @@ impl State {
             if !self.is_open(k) || self.diffs.get(k).is_none_or(Option::is_some) {
                 continue;
             }
-            if let Original::Text(base) = self.of(segments, k) {
+            if let Some(base) = self.bases.get(k).and_then(Option::as_deref) {
                 let worked = Box::new((changes(base, ours), changes(base, theirs)));
                 self.diffs[k] = Some(worked);
             }

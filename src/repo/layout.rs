@@ -62,7 +62,7 @@ impl RepoTab {
             });
 
         self.dialogs(&ctx, &mut acts);
-        self.keep_both_dialog(&ctx, &mut acts);
+        self.keep_both_dialog(&ctx);
         for action in acts {
             self.apply(action, &ctx);
         }

@@ -86,12 +86,31 @@ impl RepoTab {
         );
     }
 
+    /// Stages both files of `plan` and takes its file out, once it is checked (in the
+    /// background) that the file is still in the conflict the plan was made for: aborted or
+    /// moved on since, its `rm` would delete a file that is no longer in conflict.
+    pub(super) fn keep_both_stage(&mut self, plan: Plan, ctx: &egui::Context) {
+        let repo = self.path.clone();
+        let check = plan.clone();
+        self.then(
+            ctx,
+            move || keep_both::still_in_conflict(&repo, &check),
+            move |tab, same, ctx| match same {
+                Ok(()) => tab.apply(
+                    Action::Ops {
+                        label: format!("Keep both versions of {}", plan.path),
+                        ops: keep_both::stage_steps(&plan),
+                        refresh: Refresh::Status,
+                    },
+                    ctx,
+                ),
+                Err(e) => tab.status = Some((e, true)),
+            },
+        );
+    }
+
     /// The Keep both dialog, when open.
-    pub(in crate::repo) fn keep_both_dialog(
-        &mut self,
-        ctx: &egui::Context,
-        acts: &mut Vec<Action>,
-    ) {
+    pub(in crate::repo) fn keep_both_dialog(&mut self, ctx: &egui::Context) {
         let Some(state) = &self.keep_both else {
             return;
         };
@@ -139,11 +158,7 @@ impl RepoTab {
             }
             Some(Step::Stage) => {
                 if let Some(KeepBoth::Written(plan)) = self.keep_both.take() {
-                    acts.push(Action::Ops {
-                        label: format!("Keep both versions of {}", plan.path),
-                        ops: keep_both::stage_steps(&plan),
-                        refresh: Refresh::Status,
-                    });
+                    self.keep_both_stage(plan, ctx);
                 }
             }
             Some(Step::Close) => self.keep_both = None,

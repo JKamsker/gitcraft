@@ -69,6 +69,29 @@ pub fn checked_out_blob(repo: &Path, oid: &str, path: &str) -> Result<Vec<u8>, S
     )
 }
 
+/// The size of the blob `oid` as it is checked out: an LFS pointer's is the file it points
+/// to, read from the pointer (nothing is downloaded); any other blob's is its own.
+pub fn checked_out_size(repo: &Path, oid: &str) -> Result<u64, String> {
+    let out = run(Some(repo), &["cat-file", "-s", oid])?;
+    let size: u64 = out
+        .trim()
+        .parse()
+        .map_err(|_| format!("could not read the size of object {oid}"))?;
+    // Pointers are small: only those are read.
+    if size <= 1024 {
+        let text = String::from_utf8(blob(repo, oid)?).unwrap_or_default();
+        if let Some(pointer) = super::parse_lfs_pointer(&text) {
+            return Ok(pointer.size);
+        }
+    }
+    Ok(size)
+}
+
+/// The blob `oid` as git stores it.
+fn blob(repo: &Path, oid: &str) -> Result<Vec<u8>, String> {
+    run_bytes(Some(repo), &["cat-file", "blob", oid])
+}
+
 /// Whether `path` would be ignored if it were a new file (a `.gitignore` names it).
 pub fn is_ignored(repo: &Path, path: &str) -> Result<bool, String> {
     // Exit 0: ignored (and printed); 1: not.
@@ -84,30 +107,27 @@ pub fn is_ignored(repo: &Path, path: &str) -> Result<bool, String> {
 /// conflict with the base between `|||||||` and `=======`, as wide as git's own markers make
 /// it. Needs git 2.43 (`merge-file --object-id`).
 pub fn conflict_with_base(repo: &Path, path: &str) -> Result<String, String> {
+    // As `git merge` diffs (histogram), so the conflicts split the same way, where merge-file
+    // can be told (git 2.44+); with myers otherwise.
+    match merge_stages(repo, path, Some("--diff-algorithm=histogram")) {
+        Err(e) if e.contains("diff-algorithm") => merge_stages(repo, path, None),
+        done => done,
+    }
+}
+
+/// `merge-file` of `path`'s three stages, with `extra` among its options.
+fn merge_stages(repo: &Path, path: &str, extra: Option<&str>) -> Result<String, String> {
     let stage = |n: u8| format!(":{n}:{path}");
+    let (ours, base, theirs) = (stage(2), stage(1), stage(3));
+    let mut args = vec!["merge-file", "-p", "--zdiff3", "--object-id"];
+    args.extend(extra);
+    args.extend([
+        "-L", "ours", "-L", "base", "-L", "theirs", &ours, &base, &theirs,
+    ]);
     // The exit code is how many conflicts there are (up to 127); errors are negative (255).
     let ok: Vec<i32> = (0..=127).collect();
-    run_ok_codes(
-        Some(repo),
-        &[
-            "merge-file",
-            "-p",
-            "--zdiff3",
-            "--object-id",
-            "-L",
-            "ours",
-            "-L",
-            "base",
-            "-L",
-            "theirs",
-            &stage(2),
-            &stage(1),
-            &stage(3),
-        ],
-        &ok,
-    )
-    .map_err(|e| {
-        if e.contains("object-id") || e.contains("usage:") {
+    run_ok_codes(Some(repo), &args, &ok).map_err(|e| {
+        if e.contains("unknown option `object-id'") {
             "showing the original needs git 2.43 or newer (or merge.conflictStyle set to diff3)"
                 .to_owned()
         } else {

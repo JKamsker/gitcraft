@@ -136,11 +136,7 @@ impl RepoTab {
                 let (repo, path, state) =
                     (self.path.clone(), file.path.clone(), self.work.in_progress);
                 spawn(&self.tx, ctx, move || {
-                    let editor =
-                        conflict::ConflictEditor::open(&repo, &path, state).map(|mut ed| {
-                            ed.read_bases(&repo);
-                            ed
-                        });
+                    let editor = conflict::ConflictEditor::open(&repo, &path, state);
                     Msg::ConflictOpened(generation, path, editor.map(Box::new))
                 });
                 None
@@ -155,7 +151,6 @@ impl RepoTab {
             }
             _ => None,
         };
-        self.request_conflict_bases(ctx);
         self.diff = Some(DiffView::new(key));
         self.refresh_diff(ctx);
     }

@@ -13,14 +13,17 @@ const MAX_SHOWN: usize = 400;
 
 impl RepoTab {
     /// Asks the index for the bases of the open conflict editor's conflicts, in the background,
-    /// when it is in this machine's file system (elsewhere they are read as it opens).
+    /// once each time they are wanted (as it opens, or after Mergiraf left conflicts without
+    /// one): cheap to call every frame.
     pub(in crate::repo) fn request_conflict_bases(&mut self, ctx: &egui::Context) {
-        let Some(ed) = self.conflict.as_ref().filter(|ed| ed.wants_bases()) else {
+        let Some(ed) = self
+            .conflict
+            .as_mut()
+            .filter(|ed| ed.wants_bases() && !ed.original.asked)
+        else {
             return;
         };
-        if crate::remote::is_remote(&self.path) {
-            return;
-        }
+        ed.original.asked = true;
         let (repo, path, generation) = (self.path.clone(), ed.path.clone(), ed.generation);
         let read = path.clone();
         self.then(
