@@ -16,6 +16,8 @@ use super::actions::{BranchRef, compare_branches_action};
 use super::columns::{Cols, MIN_COL_W, MIN_GRAPH_W, MIN_REFS_W};
 use super::{Action, Dialog, Refresh, RepoTab, WIP_HASH, ops};
 use crate::git;
+use crate::keymap::Command;
+use crate::menu_item::MenuItem;
 use crate::settings::Settings;
 use crate::theme::Tokens;
 use badge::{BadgeKind, badges};
@@ -249,8 +251,10 @@ fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
     egui::Popup::context_menu(resp)
         .style(crate::theme::menu_style)
         .show(|ui| {
-            if ui
-                .add_enabled(idle, egui::Button::new("Stage all changes"))
+            if MenuItem::new("Stage all changes")
+                .enabled(idle)
+                .keys(Command::StageAll)
+                .show(ui)
                 .clicked()
             {
                 acts.push(Action::Ops {
@@ -259,8 +263,10 @@ fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
                     refresh: Refresh::Status,
                 });
             }
-            if ui
-                .add_enabled(idle, egui::Button::new("Stash changes…"))
+            if MenuItem::new("Stash changes…")
+                .enabled(idle)
+                .keys(Command::Stash)
+                .show(ui)
                 .clicked()
             {
                 acts.push(Action::Dialog(Dialog::stash()));

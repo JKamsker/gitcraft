@@ -4,6 +4,7 @@
 use egui::{Rect, Response, RichText, Sense, Ui, pos2, vec2};
 
 use crate::icons;
+use crate::menu_item::MenuItem;
 use crate::repo::branch_visibility::Change;
 use crate::repo::{Action, RepoTab};
 use crate::theme::Tokens;
@@ -28,9 +29,9 @@ impl RepoTab {
         } else {
             "Show in the graph"
         };
-        if ui
-            .add_enabled(!is_head, egui::Button::new(hide))
-            .on_disabled_hover_text("The checked-out branch is always shown")
+        if MenuItem::new(hide)
+            .refused(is_head.then_some("The checked-out branch is always shown"))
+            .show(ui)
             .clicked()
         {
             acts.push(Action::BranchVisibility(Change::Toggle(full.to_owned())));

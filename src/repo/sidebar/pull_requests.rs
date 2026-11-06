@@ -8,6 +8,7 @@ use super::remote_short;
 use crate::forge::{Forge, PullRequest};
 use crate::git::Branch;
 use crate::icons;
+use crate::menu_item::MenuItem;
 use crate::repo::pinned_sections::{Header, Sections};
 use crate::repo::{Action, RepoTab, ci_status, widgets};
 use crate::theme::Tokens;
@@ -224,20 +225,25 @@ impl RepoTab {
                 ),
             ),
         };
-        let button = if in_menu {
-            egui::Button::new("Open in worktree")
+        let r = if in_menu {
+            // Why it can't open, under it; what it would do, on hover.
+            let here = matches!(plan, PrWorktree::Here);
+            MenuItem::new("Open in worktree")
+                .enabled(enabled || here)
+                .refused(here.then_some(tip.as_str()))
+                .show(ui)
+                .on_hover_text(&tip)
         } else {
             let t = Tokens::get(ui.ctx());
-            egui::Button::image_and_text(
+            let button = egui::Button::image_and_text(
                 icons::image("folder-git-2", 14.0, t.icon),
                 "Open in worktree",
             )
-            .min_size(vec2(0.0, 26.0))
+            .min_size(vec2(0.0, 26.0));
+            ui.add_enabled(enabled, button)
+                .on_hover_text(&tip)
+                .on_disabled_hover_text(tip)
         };
-        let r = ui
-            .add_enabled(enabled, button)
-            .on_hover_text(&tip)
-            .on_disabled_hover_text(tip);
         if r.clicked() {
             acts.push(Action::OpenPrWorktree {
                 number,

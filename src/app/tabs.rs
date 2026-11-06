@@ -70,10 +70,40 @@ impl App {
         };
     }
 
+    /// Goes `step` tabs to the right (left when negative), round from the last to the first.
+    pub(super) fn step_tab(&mut self, step: isize) {
+        self.active = stepped(self.active, self.tabs.len(), step);
+    }
+
+    /// Goes to the tab at `place` (1 for the first), when there is one.
+    pub(super) fn go_to_tab(&mut self, place: usize) {
+        if let Some(i) = at_place(place, self.tabs.len()) {
+            self.active = i;
+        }
+    }
+
+    pub(super) fn go_to_last_tab(&mut self) {
+        self.active = self.tabs.len().saturating_sub(1);
+    }
+
     pub(super) fn new_tab(&mut self) {
         self.tabs.push(Tab::Home);
         self.active = self.tabs.len() - 1;
     }
+}
+
+/// The tab `step` places from `active` among `count`, round from one end to the other.
+pub(super) fn stepped(active: usize, count: usize, step: isize) -> usize {
+    if count == 0 {
+        return 0;
+    }
+    let count = count as isize;
+    (active as isize + step).rem_euclid(count) as usize
+}
+
+/// The index of the tab at `place` (1 for the first) among `count`, if there is one.
+pub(super) fn at_place(place: usize, count: usize) -> Option<usize> {
+    place.checked_sub(1).filter(|&i| i < count)
 }
 
 /// Puts `path` on top of the closed tabs, once, dropping the oldest past `MAX_CLOSED`.
@@ -103,6 +133,29 @@ mod tests {
         assert!(reopenable(Path::new("ssh://build/home/me/app")));
         assert!(reopenable(&std::env::temp_dir()));
         assert!(!reopenable(Path::new("/nonexistent/gitcraft/repo")));
+    }
+
+    /// Ctrl+Tab goes round: past the last tab to the first, before the first to the last.
+    #[test]
+    fn stepping_through_the_tabs_wraps() {
+        assert_eq!(stepped(0, 3, 1), 1);
+        assert_eq!(stepped(2, 3, 1), 0);
+        assert_eq!(stepped(0, 3, -1), 2);
+        assert_eq!(stepped(1, 3, -1), 0);
+        assert_eq!(stepped(0, 1, 1), 0);
+        assert_eq!(stepped(0, 1, -1), 0);
+        assert_eq!(stepped(0, 0, 1), 0);
+        assert_eq!(stepped(4, 5, 7), 1);
+    }
+
+    /// Ctrl+1 … Ctrl+8 go to that tab when there is one, and do nothing past the last.
+    #[test]
+    fn a_tab_is_picked_by_its_place() {
+        assert_eq!(at_place(1, 3), Some(0));
+        assert_eq!(at_place(3, 3), Some(2));
+        assert_eq!(at_place(4, 3), None);
+        assert_eq!(at_place(0, 3), None);
+        assert_eq!(at_place(1, 0), None);
     }
 
     #[test]
