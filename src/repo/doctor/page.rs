@@ -21,6 +21,20 @@ impl RepoTab {
         self.doctor_poll(&ctx);
         self.hooks_poll();
         let busy = self.busy_op.is_some();
+        // Those whose config can be read: not bare, not gone.
+        let worktrees = self
+            .worktrees
+            .iter()
+            .filter(|w| !w.bare && w.prunable.is_none())
+            .count();
+        let loading = self.loading_facts();
+        let env = TabEnv {
+            loading,
+            worktrees,
+            remote: crate::remote::is_remote(&self.path),
+            top: crate::remote::git_path(&self.path),
+            busy,
+        };
         let Some(doctor) = self.doctor.as_deref_mut() else {
             return;
         };
@@ -34,18 +48,6 @@ impl RepoTab {
                 acts.push(Action::Doctor(DoctorAct::Reload));
             }
         });
-        // Those whose config can be read: not bare, not gone.
-        let worktrees = self
-            .worktrees
-            .iter()
-            .filter(|w| !w.bare && w.prunable.is_none())
-            .count();
-        let env = TabEnv {
-            worktrees,
-            remote: crate::remote::is_remote(&self.path),
-            top: crate::remote::git_path(&self.path),
-            busy,
-        };
         confirm_modal(ui, doctor, acts);
         ui.horizontal_top(|ui| {
             ui.add_space(20.0);
@@ -73,6 +75,8 @@ impl RepoTab {
 
 /// What the sections need to know about the tab.
 struct TabEnv {
+    /// How its reads went.
+    loading: super::health::Loading,
     /// Worktrees whose config can be read.
     worktrees: usize,
     /// The repository is in WSL or over SSH.
@@ -88,6 +92,9 @@ fn section_ui(ui: &mut Ui, doctor: &mut DoctorView, env: &TabEnv, acts: &mut Vec
     let (worktrees, remote, top) = (env.worktrees, env.remote, env.top.as_str());
     match doctor.section {
         Section::Ignore => super::ignore_section::ui(ui, &mut doctor.ignore, top, locked, acts),
+        Section::Health => {
+            super::health_section::ui(ui, &doctor.health, &env.loading, locked, acts)
+        }
         Section::Hooks => super::hooks_section::ui(ui, &doctor.hooks, locked, acts),
         Section::Config => {
             let env = super::config_section::Env::new(worktrees, remote, locked);

@@ -228,6 +228,16 @@ so your config, credentials and hooks apply as usual.
   the last dozen operations gitcraft ran in the repository (commit, merge, push, checkout,
   rebase…, also when they succeeded) is kept in memory, colours taken out and passwords in URLs
   hidden. On WSL and SSH the folder is read in a few round trips there.
+- _Health and maintenance_: commits (`git rev-list --count --all`), packed and loose objects and
+  their size (`git count-objects -v`, with leftover garbage pointed out), how long `git status`
+  takes and how long the tab's last reloads took; then what would make git faster here, each
+  with the commands it runs and _Turn on_: the commit-graph (`git commit-graph write
+  --reachable --changed-paths`, and `fetch.writeCommitGraph` to keep it up to date), scheduled
+  maintenance (`git maintenance start`, asked first: it registers the repository in your own
+  global config, never a profile's, and schedules git with the system), git's file system
+  monitor (`core.fsmonitor`; Windows and macOS only, said so elsewhere), the untracked cache,
+  and packing loose objects (`git gc`) when there are many. It also says what the graph's
+  100 000-commit limit means for this repository.
 - _Which configuration wins_: the settings that explain why git behaves differently here (pull
   strategy, push, signing, line endings, file handling, performance…), each with the value in
   effect and its scope and file (`git config --list --show-origin --show-scope --includes`).
@@ -432,7 +442,7 @@ was made this way, on a demo repository.
 | `src/vscode_theme.rs`    | VS Code's current colour theme as a syntect theme                                  |
 | `src/repo/conflict.rs`   | three-pane conflict editor                                                         |
 | `src/repo/doctor/`       | the repository doctor: its page, sections and what they ask the tab to do          |
-| `src/git/doctor/`        | what the doctor reads and changes: config origins, hidden flags, ignore rules and attributes, hooks and what they printed |
+| `src/git/doctor/`        | what the doctor reads and changes: config origins, hidden flags, ignore rules and attributes, hooks and what they printed, health |
 | `src/mergiraf.rs` | Mergiraf, run as the user's own command when it is installed |
 | `src/repo/rebase.rs`     | interactive rebase editor and its todo list                                        |
 | `src/repo/file_view.rs`  | a file's history, blame and contents at a commit                                   |

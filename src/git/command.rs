@@ -26,11 +26,13 @@ pub fn profile_config() -> Option<PathBuf> {
 }
 
 /// Whether `args` reads or writes the user's own global config: `git config --global …`
-/// (signing settings, Mergiraf's set-up), which must never land in the profile's file, which is
-/// written over.
+/// (signing settings, Mergiraf's set-up) or `git maintenance` (its list of repositories), which
+/// must never land in the profile's file, which is written over.
 fn user_global_config(args: &[&str]) -> bool {
     let rest = after_options(args);
-    rest.first() == Some(&"config") && rest.contains(&"--global")
+    (rest.first() == Some(&"config") && rest.contains(&"--global"))
+        // `maintenance start` / `register` write `maintenance.repo` to the global config.
+        || rest.first() == Some(&"maintenance")
 }
 
 /// `args` from the subcommand on: past the options before it (`-c x=y`, `-C dir`,
@@ -427,6 +429,7 @@ mod tests {
             "x"
         ]));
         assert!(user_global_config(&["-ck=v", "config", "--global", "x"]));
+        assert!(user_global_config(&["maintenance", "start"]));
         assert!(!user_global_config(&[]));
     }
 
