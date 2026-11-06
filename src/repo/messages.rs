@@ -53,7 +53,8 @@ pub(super) enum Msg {
     /// The whole file of the diff, read along with the diff request numbered so.
     DiffFile(u64, Result<FileText, String>),
     /// The Markdown file of the diff rendered, read along with the diff request numbered so.
-    DiffRendered(u64, Box<Result<diff::rendered::RenderedMd, String>>),
+    /// The diff's request, and which reading of it.
+    DiffRendered((u64, u64), Box<Result<diff::rendered::RenderedMd, String>>),
     FileHistory(String, Option<String>, Result<Vec<git::FileCommit>, String>),
     Blame(String, Option<String>, Result<file_view::BlameData, String>),
     /// A file as it is at a revision, for the file view.

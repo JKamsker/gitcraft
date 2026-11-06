@@ -1,6 +1,7 @@
 # Builds gitcraft for Windows, Linux and macOS and publishes a GitHub release when a `v*` tag is pushed.
-# Every push to `dev` publishes a prerelease of the next patch version, `vX.Y.Z-dev.N` (N is
-# the run number).
+# Every push to `dev` (each merge) publishes a prerelease of the next patch version,
+# `vX.Y.Z-dev.N` (N is the run number), and creates its tag on that commit: no tag is needed
+# beforehand.
 # Run it by hand (Actions › Release › Run workflow) to only build and download the artifacts.
 name: Release
 
@@ -15,10 +16,12 @@ on:
 permissions:
   contents: read
 
-# A newer push to dev replaces a dev build still running; tag builds always finish.
+# Every push to dev (every merge) gets a release of its own: a run is never cancelled by a newer
+# one, and each dev run has a group of its own (its commit), so none waits for or replaces
+# another. Tag builds of the same tag still run one at a time.
 concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/dev' }}
+  group: release-${{ github.ref }}${{ github.ref == 'refs/heads/dev' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: false
 
 jobs:
   # The version this run builds and the name its files carry. A tag or a run by hand builds

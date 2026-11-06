@@ -215,9 +215,10 @@ so your config, credentials and hooks apply as usual.
   Cached on disk; can be turned off.
 - Settings (Ctrl+, or the gear in the title bar), in pages listed on the left: the profile in
   use and what is its own, zoom, branch column width, graph columns, avatars, notifications,
-  update check, background fetch, keeping submodules up to date, editor command, default shell
-  and terminal font size, saved identities, SSH sign-ins, and every keyboard shortcut. Ctrl+F
-  searches all pages at once (Esc clears it); Alt+↑ / Alt+↓ go through the pages.
+  update check (with a Check for updates button), background fetch, keeping submodules up to
+  date, editor command, default shell and terminal font size, saved identities, SSH sign-ins,
+  and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
+  Alt+↓ go through the pages.
 - Previews beside the settings: point at a setting and a panel on the right (above the page in
   a narrow window) draws what it does with the values set now, as the app draws it. The branch
   column measured on a small graph with long branch names cut to fit, the columns at their
@@ -386,10 +387,10 @@ was made this way, on a demo repository.
 | `src/update.rs`          | new-release check                                                                  |
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |
 | `src/shell_path.rs`      | on macOS, the login shell's PATH for the commands gitcraft starts                  |
-| `src/remote.rs` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
-| `src/settings.rs`        | user settings and their form; the theme gallery; the previews beside them          |
+| `src/remote/` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
+| `src/settings/`          | user settings, profiles, the settings pages, the theme gallery and the previews    |
 | `src/manual.rs`          | the manual (F1): features and keyboard shortcuts                                   |
-| `src/theme.rs`           | colour tokens, fonts, egui style; themes: catalogue, palettes, theme files         |
+| `src/theme/`             | colour tokens, fonts, egui style; themes: catalogue, palettes, theme files         |
 | `src/icons.rs`           | embedded Lucide SVG icons, tinted                                                  |
 | `src/terminal.rs`        | integrated terminal: pty, VT parsing (`vt100`), painting, keys, selection          |
 | `src/repo/mod.rs`        | one repository tab: state, background git work, undo / redo, toolbar               |

@@ -140,6 +140,52 @@ pub fn try_is_link(path: &Path) -> io::Result<bool> {
     test(path, "-L")
 }
 
+/// The file `rel` (a path in the repository at `repo`, `/` between names) as it is on that
+/// machine, when it is a plain file of the repository there: not a link, not reached through a
+/// folder that is a link, and at most `max` bytes; `Ok(None)` when it isn't. Checked and read
+/// in one script, and never more than `max + 1` bytes read: a file that grew is refused, not
+/// sent. `None` for a repository here. One round trip, so not on the window's thread.
+pub fn read_within(repo: &Path, rel: &str, max: u64) -> Option<io::Result<Option<Vec<u8>>>> {
+    let t = parse(repo)?;
+    let Some(script) = read_within_script(&t.path, rel, max) else {
+        return Some(Ok(None));
+    };
+    Some(
+        run(&t, script, None)
+            .map(|out| (out.code == 0 && out.stdout.len() as u64 <= max).then_some(out.stdout)),
+    )
+}
+
+/// The script [`read_within`] runs in `repo` (a path there): the file on its output, exit code
+/// 0, when `rel` is such a file. `None` for an empty path.
+fn read_within_script(repo: &str, rel: &str, max: u64) -> Option<String> {
+    let names: Vec<&str> = rel.split('/').filter(|n| !n.is_empty()).collect();
+    if names.is_empty() {
+        return None;
+    }
+    let mut script = format!("cd -- {} || exit 1\n", sh_path(repo));
+    for i in 1..names.len() {
+        script.push_str(&format!(
+            "[ -L {} ] && exit 1\n",
+            sh_quote(&names[..i].join("/"))
+        ));
+    }
+    let file = sh_quote(&names.join("/"));
+    script.push_str(&format!(
+        concat!(
+            "[ -L {f} ] && exit 1\n",
+            "[ -f {f} ] || exit 1\n",
+            "size=$(wc -c < {f}) || exit 1\n",
+            "[ \"$size\" -le {max} ] || exit 1\n",
+            "exec head -c {more} -- {f}\n"
+        ),
+        f = file,
+        max = max,
+        more = max + 1,
+    ));
+    Some(script)
+}
+
 /// A file of a working tree as git sees it: a symbolic link is the path it holds, not what it
 /// points to; anything else but a file is refused (see `git::worktree_file`).
 pub fn worktree_file(file: &Path) -> Option<io::Result<Vec<u8>>> {
@@ -245,5 +291,44 @@ pub fn host_temp_file(t: &Target, suffix: &str, bytes: &[u8]) -> Result<String, 
             t.host.label(),
             failed(&out)
         ))
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    /// The script run on another machine, run here by `sh` the same way: a linked folder, a
+    /// missing file, a file too large and a link are refused; a plain file is read.
+    #[test]
+    fn a_file_there_is_read_only_when_plain_inside_and_small() -> Result<(), String> {
+        let dir = std::env::temp_dir().join(format!("gitcraft-within-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("docs")).map_err(|e| e.to_string())?;
+        std::fs::write(dir.join("docs/s.png"), "picture").map_err(|e| e.to_string())?;
+        std::os::unix::fs::symlink("/", dir.join("docs/l")).map_err(|e| e.to_string())?;
+        let repo = dir.display().to_string();
+        std::os::unix::fs::symlink("s.png", dir.join("docs/link.png"))
+            .map_err(|e| e.to_string())?;
+        let read = |rel: &str, max: u64| {
+            let script = read_within_script(&repo, rel, max).unwrap_or_default();
+            std::process::Command::new("sh")
+                .args(["-c", &script])
+                .output()
+                .ok()
+                .filter(|out| out.status.success())
+                .map(|out| out.stdout)
+        };
+        let found = (
+            read("docs/s.png", 100),
+            read("docs/l/etc/hostname", 1 << 20),
+            read("docs/none.png", 100),
+            read("docs/s.png", 3),
+            read("docs/link.png", 100),
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(found, (Some(b"picture".to_vec()), None, None, None, None));
+        assert!(read_within_script(&repo, "", 1).is_none());
+        Ok(())
     }
 }

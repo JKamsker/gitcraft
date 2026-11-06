@@ -32,6 +32,10 @@ pub struct SettingsView<'a> {
     /// A dialog is over the page (the manual, the palette, the clone or remote dialog): the
     /// keys are the dialog's.
     pub dialog_open: bool,
+    /// Where the look for a newer version stands.
+    pub update: super::UpdateCheck,
+    /// Set by the page: look for a newer version now.
+    pub check_updates_now: bool,
     /// Set by the page: profiles switch with the tabs, which are the app's.
     pub request: Option<ProfileRequest>,
 }

@@ -104,6 +104,9 @@ pub(crate) struct DiffView {
     pub(super) file: Option<Result<FileText, String>>,
     /// A Markdown file rendered, read when the diff is switched to that.
     pub(super) rendered: Option<Result<diff::rendered::RenderedMd, String>>,
+    /// Which reading of the rendered Markdown is the latest: an older one arriving last is
+    /// dropped.
+    pub(super) rendered_load: u64,
     /// What the rendered Markdown keeps between frames.
     pub(super) markdown: egui_commonmark::CommonMarkCache,
     /// How far the lines were scrolled down last frame.
@@ -130,6 +133,7 @@ impl DiffView {
             text_sel: None,
             file: None,
             rendered: None,
+            rendered_load: 0,
             markdown: Default::default(),
             scroll: 0.0,
             jump: None,
@@ -169,11 +173,11 @@ impl DiffView {
     /// read was made since.
     pub(super) fn rendered_arrived(
         &mut self,
-        request: u64,
+        (request, load): (u64, u64),
         result: Result<diff::rendered::RenderedMd, String>,
         ctx: &egui::Context,
     ) {
-        if request == self.request {
+        if request == self.request && load == self.rendered_load {
             if let Ok(md) = &result {
                 diff::rendered::include_images(ctx, md);
             }

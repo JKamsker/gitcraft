@@ -101,6 +101,10 @@ pub struct App {
     /// The settings the last look for a newer release went by (whether to look, the channel,
     /// whether to download): changing them looks again.
     update_looked: Option<(bool, update::Channel, bool)>,
+    /// Why the last look for a newer version failed.
+    update_look_error: Option<String>,
+    /// A look for a newer version came back, found or not.
+    update_checked: bool,
     /// The update banner was put off until the next start.
     update_later: bool,
     /// Why the update didn't go in place.
@@ -170,6 +174,8 @@ impl App {
             askpass: Default::default(),
             update: None,
             update_rx: None,
+            update_look_error: None,
+            update_checked: false,
             update_looked: None,
             update_later: false,
             update_error: None,
@@ -306,8 +312,51 @@ impl App {
         let Some(rx) = &self.update_rx else { return };
         let Ok(result) = rx.try_recv() else { return };
         self.update_rx = None;
-        // A failed look (offline…) is tried again next start.
-        self.update = result.ok().flatten();
+        // A failed look (offline…) is tried again next start, or with "Check for updates".
+        match result {
+            Ok(found) => {
+                self.update = found;
+                self.update_checked = true;
+                self.update_look_error = None;
+            }
+            Err(e) => self.update_look_error = Some(e),
+        }
+    }
+
+    /// Looks for a newer version now ("Check for updates" in the settings), whether or not
+    /// looking on start is on, and also for a version the user chose to skip.
+    pub(super) fn check_update_now(&mut self, ctx: &egui::Context) {
+        if self.update_rx.is_some() {
+            return;
+        }
+        let s = &self.settings;
+        let (releases, download) = (s.update_channel, s.download_updates);
+        let (tx, rx) = channel();
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            let _ = tx.send(update::look(releases, download, ""));
+            ctx.request_repaint();
+        });
+        self.update_rx = Some(rx);
+        self.update_look_error = None;
+        // Asked for: the bar shows what is found, even after "Not now".
+        self.update_later = false;
+    }
+
+    /// Where the look for a newer version stands, for the settings page.
+    pub(super) fn update_check(&self) -> crate::settings::UpdateCheck {
+        use crate::settings::UpdateCheck;
+        if self.update_rx.is_some() {
+            UpdateCheck::Checking
+        } else if let Some(found) = &self.update {
+            UpdateCheck::Found(found.release.version.clone())
+        } else if let Some(e) = &self.update_look_error {
+            UpdateCheck::Failed(format!("Couldn't look: {e}"))
+        } else if self.update_checked {
+            UpdateCheck::UpToDate
+        } else {
+            UpdateCheck::NotYet
+        }
     }
 
     /// Keyboard shortcuts, and the reload on coming back to the window. Returns whether the
