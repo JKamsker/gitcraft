@@ -9,6 +9,7 @@ use egui::{Event, Key};
 use super::Palette;
 use crate::app::{App, Saved, Tab};
 use crate::git;
+use crate::remote::askpass::asking;
 use crate::repo::{Action, DiffKey};
 
 type H<'a> = egui_kittest::Harness<'a, App>;
@@ -49,7 +50,8 @@ fn git_ok(dir: &Path, args: &[&str]) -> String {
     out.unwrap_or_default().trim().to_owned()
 }
 
-/// The window with `dir` open, once it is read.
+/// The window with `dir` open, once it is read. The caller holds [`asking`] while it runs:
+/// no other test's ssh question comes to it.
 fn window(dir: &Path) -> H<'static> {
     let path = dir.to_path_buf();
     let mut harness = egui_kittest::Harness::builder()
@@ -142,6 +144,7 @@ fn enter(harness: &mut H<'_>) {
 #[test]
 fn typing_reb_ranks_rebase_first_and_its_branch_is_picked_next() {
     let dir = repo("rebase");
+    let _asking = asking();
     let mut harness = window(&dir);
     open_and_type(&mut harness, "reb");
     let got = listed(&harness);
@@ -174,6 +177,7 @@ fn typing_reb_ranks_rebase_first_and_its_branch_is_picked_next() {
 #[test]
 fn enter_with_the_last_letter_in_the_same_frame_runs_the_new_best_match() {
     let dir = repo("same-frame");
+    let _asking = asking();
     let mut harness = window(&dir);
     open_and_type(&mut harness, "pu");
     harness.event(Event::Text("ll (r".to_owned()));
@@ -191,6 +195,7 @@ fn enter_with_the_last_letter_in_the_same_frame_runs_the_new_best_match() {
 fn the_selected_commit_is_cherry_picked_from_the_palette() {
     let dir = repo("cherry");
     let side = git_ok(&dir, &["rev-parse", "side"]);
+    let _asking = asking();
     let mut harness = window(&dir);
     queue(&mut harness, Action::SelectHash(side.clone()));
     open_and_type(&mut harness, "");
@@ -214,6 +219,7 @@ fn the_selected_commit_is_cherry_picked_from_the_palette() {
 #[test]
 fn going_back_from_the_second_step_restores_what_was_typed() {
     let dir = repo("back");
+    let _asking = asking();
     let mut harness = window(&dir);
     open_and_type(&mut harness, "merge");
     enter(&mut harness);
@@ -267,6 +273,7 @@ fn the_open_file_with_spaces_and_unicode_is_staged_from_the_palette() {
     let dir = repo("stage");
     let name = "notes ü 文件.txt";
     write(&dir, name, "new\n");
+    let _asking = asking();
     let mut harness = window(&dir);
     // The window saw the new file: open its diff, as clicking it does.
     queue(&mut harness, Action::Reload);
@@ -311,6 +318,7 @@ fn thousands_of_branches_open_and_filter_quickly() {
         "packed-refs",
         &format!("# pack-refs with: peeled fully-peeled sorted\n{packed}"),
     );
+    let _asking = asking();
     let mut harness = window(&dir);
     let started = Instant::now();
     open_and_type(&mut harness, "");
@@ -324,6 +332,11 @@ fn thousands_of_branches_open_and_filter_quickly() {
     assert!(listed(&harness).len() <= 10);
     harness.key_press(Key::Escape);
     harness.step();
+    harness.step();
+    assert!(
+        harness.state().palette.is_none(),
+        "Esc left the palette open"
+    );
     open_and_type(&mut harness, "merge into");
     enter(&mut harness);
     assert_eq!(listed(&harness).len(), 3001);
