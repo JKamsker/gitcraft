@@ -404,6 +404,10 @@ impl RepoTab {
         ui.add_space(10.0);
         self.jump_controls(ui, Some(entry.id), idle, confirm, acts);
         ui.add_space(14.0);
+        if let Some(receipt) = &entry.receipt {
+            super::receipt_view::receipt_section(ui, receipt);
+            ui.add_space(14.0);
+        }
         self.changed_refs(ui, entry, idle, acts);
         ui.add_space(14.0);
         changed_files(ui, entry);

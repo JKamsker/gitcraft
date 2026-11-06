@@ -583,6 +583,7 @@ fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
         files_total: 0,
         undo: Some(entry),
         redo_child: None,
+        receipt: None,
     });
     tab.undo(&ctx);
     let running = tab.busy_op.is_some();

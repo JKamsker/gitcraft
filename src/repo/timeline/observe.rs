@@ -17,6 +17,8 @@ pub(crate) struct Found {
     pub(crate) files_total: usize,
     /// A better name for a change made elsewhere, when the reflog says what it was.
     pub(crate) label: Option<String>,
+    /// What it did to a branch it rewrote.
+    pub(crate) receipt: Option<Result<super::receipt::Receipt, String>>,
 }
 
 /// The two commits whose difference is what `entry` did to the files: HEAD's when it moved,
@@ -69,6 +71,9 @@ pub(crate) fn find(repo: &Path, entry: &Entry) -> Found {
     {
         found.files = files;
         found.files_total = total;
+    }
+    if let Some((branch, old, new)) = super::receipt::rewritten(repo, entry) {
+        found.receipt = Some(super::receipt::receipt(repo, &branch, &old, &new));
     }
     if entry.origin == super::Origin::Outside {
         found.label = Some(outside_label(repo, entry));

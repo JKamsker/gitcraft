@@ -165,6 +165,11 @@ so your config, credentials and hooks apply as usual.
   new: the undone steps stay as a side path of the tree, and _Go here_ jumps to any entry,
   changes in files kept. The commits it needs stay under `refs/gitcraft/undo/*`, so `git gc`
   doesn't prune them. Entries past the newest 300 are dropped; _Forget…_ drops them sooner.
+- **Rewrite receipt**: after a rebase, squash, reorder or amend (in gitcraft or elsewhere), the
+  status line and the timeline entry say _final files identical, authors kept, 2 messages
+  changed, signatures replaced_. _Follow each commit_ pairs each old commit with its
+  replacement, as `git range-diff` does, with whether its files, message, author and signature
+  changed. The receipt is kept with the entry.
 
 **Diffs and conflicts** (centre)
 

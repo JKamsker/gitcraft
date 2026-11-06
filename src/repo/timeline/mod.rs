@@ -8,6 +8,10 @@
 //! the view is [`view`].
 
 pub(super) mod observe;
+pub(super) mod receipt;
+#[cfg(test)]
+mod receipt_tests;
+mod receipt_view;
 pub(super) mod snapshot;
 pub(super) mod store;
 mod tab;
@@ -182,6 +186,9 @@ pub(crate) struct Entry {
     /// The child redo goes to: the one last undone from (or made).
     #[serde(default)]
     pub(crate) redo_child: Option<u64>,
+    /// What it did to a branch it rewrote (a rebase, a squash, a reorder, an amend).
+    #[serde(default)]
+    pub(crate) receipt: Option<receipt::Receipt>,
 }
 
 impl Entry {
