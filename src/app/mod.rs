@@ -83,6 +83,9 @@ pub struct App {
     theme: ThemeId,
     clone_parent: Option<PathBuf>,
     error: Option<String>,
+    /// What the start page's error is, when it is a git failure gitcraft can explain (see
+    /// [`crate::error_card`]).
+    error_card: Option<crate::error_card::ErrorCard>,
     was_focused: bool,
     clone_form: Option<CloneForm>,
     /// A clone running in the background: (destination, result).
@@ -165,6 +168,7 @@ impl App {
             closed: Vec::new(),
             tab_drag: None,
             error: None,
+            error_card: None,
             was_focused: true,
             clone_form: None,
             cloning: None,
@@ -230,7 +234,10 @@ impl App {
         }
         match repo_root(path) {
             Ok(root) => self.open_root(root, ctx),
-            Err(e) => self.report(e),
+            Err(e) => {
+                self.error_card = crate::error_card::ErrorCard::for_error(&e, path, "Open", ctx);
+                self.report(e);
+            }
         }
     }
 
@@ -247,6 +254,7 @@ impl App {
     fn open_root(&mut self, root: PathBuf, ctx: &egui::Context) {
         self.remember(&root);
         self.error = None;
+        self.error_card.take_if(|card| !card.fixed());
 
         if let Some(i) = self
             .tabs

@@ -332,7 +332,10 @@ impl RepoTab {
         self.loading = false;
         match result {
             Ok(loaded) => self.take_loaded(*loaded, ctx),
-            Err(e) => self.load_error = Some(e),
+            Err(e) => {
+                self.explain_failure(&e, super::error_help::RELOAD, ctx);
+                self.load_error = Some(e);
+            }
         }
         if std::mem::take(&mut self.reload_again) {
             self.reload(ctx);

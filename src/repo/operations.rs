@@ -41,6 +41,8 @@ impl RepoTab {
         self.note_checkout_move(&ops, ctx);
         if !quiet {
             self.status = None;
+            // A fix made stays, for its undo, while what it fixed runs again.
+            self.error_card.take_if(|card| !card.fixed());
         }
         // A quiet one (the background fetch) never asks to sign in, and must not take the place
         // of the operation that did while its sign-in dialog is open.
@@ -124,7 +126,14 @@ impl RepoTab {
                 format!("{}: run it again once {busy} is done", op.label),
                 true,
             ));
-        } else if let Some(op) = self.last_op.take() {
+        } else {
+            self.run_last_op_again(ctx);
+        }
+    }
+
+    /// Runs the last operation started again (what of it didn't run, after a failure).
+    pub(super) fn run_last_op_again(&mut self, ctx: &egui::Context) {
+        if let Some(op) = self.last_op.take() {
             self.take_back(&op.kind);
             self.run_ops_ex(&op.label, op.ops, op.refresh, op.kind, op.quiet, ctx);
         }
@@ -223,6 +232,9 @@ impl RepoTab {
                 self.open_when_done.take_if(|(l, _)| *l == label);
                 self.focus_wip = e.contains("CONFLICT") || e.contains("could not apply");
                 self.status = Some((format!("{label} failed: {e}"), true));
+                if !quiet {
+                    self.explain_failure(e, &label, ctx);
+                }
                 // A failed undo stays undoable.
                 match kind {
                     OpKind::Undo(entry) => self.undo_stack.push(entry),
