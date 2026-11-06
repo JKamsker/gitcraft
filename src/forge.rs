@@ -153,8 +153,46 @@ fn remote_location(repo: &Path, forge: Forge) -> Result<(String, String), String
         .or_else(|| remotes.first())
         .and_then(|r| location(&r.url))
         .ok_or_else(|| format!("{} needs a remote with an owner/repo URL", forge.tool()))?;
+    // Named to the tool, a host is used whether or not the user signed in to it (in a folder,
+    // the tool skips remotes on hosts it doesn't know): only the forge's own or one signed in
+    // to, so a repository can't send the tool, and a token, to a host of its choosing.
+    if !trusted_host(forge, &found.0) {
+        return Err(format!(
+            "{} isn't signed in to {}: `{} auth login --hostname {}` to use it",
+            forge.tool(),
+            found.0,
+            forge.tool(),
+            found.0
+        ));
+    }
     lock().insert(repo.to_owned(), found.clone());
     Ok(found)
+}
+
+/// Whether `forge`'s tool may be pointed at `host`: the forge's own host, or one the tool is
+/// signed in to. A host that isn't a plain name (`a.b:8443` at most) never is.
+fn trusted_host(forge: Forge, host: &str) -> bool {
+    let plain = !host.is_empty()
+        && host
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':'))
+        && !host.starts_with(['-', '.']);
+    if !plain {
+        return false;
+    }
+    let own = match forge {
+        Forge::GitHub => "github.com",
+        Forge::GitLab => "gitlab.com",
+    };
+    if host.eq_ignore_ascii_case(own) {
+        return true;
+    }
+    let mut cmd = tool_command(forge);
+    cmd.args(["auth", "status", "--hostname", host])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    cmd.status().is_ok_and(|s| s.success())
 }
 
 /// The forge's tool, set to answer this repository in plain JSON.

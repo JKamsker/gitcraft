@@ -34,7 +34,10 @@ fn joined_ssh_paths_keep_their_host() {
         parse(&repo.join("src").join("a.rs")),
         ssh("build", "/home/me/repo/src/a.rs")
     );
-    assert_eq!(parse(Path::new(r"ssh:\build\x")), ssh("build", "/x"));
+    assert_eq!(parse(Path::new(r"ssh:\\build\x")), ssh("build", "/x"));
+    // A folder here named so is not a host.
+    assert_eq!(parse(Path::new("ssh:myrepo")), None);
+    assert_eq!(parse(Path::new("ssh:/x")), None);
 }
 
 #[test]

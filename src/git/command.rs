@@ -103,13 +103,33 @@ fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Requ
             .collect(),
         unset: GIT_ENV_REMOVED.iter().map(|n| (*n).to_owned()).collect(),
         stdin: None,
+        long: goes_over_network(args),
     }
+}
+
+/// Whether the git command `args` (its options first) talks to a remote and may take minutes.
+fn goes_over_network(args: &[&str]) -> bool {
+    let mut words = args.iter().copied();
+    // Past the options before the subcommand (`-c x=y`, `--literal-pathspecs`…).
+    let subcommand = loop {
+        match words.next() {
+            Some("-c" | "-C") => {
+                words.next();
+            }
+            Some(word) if word.starts_with('-') => {}
+            other => break other,
+        }
+    };
+    matches!(
+        subcommand,
+        Some("fetch" | "pull" | "push" | "clone" | "ls-remote" | "remote" | "submodule" | "lfs")
+    )
 }
 
 fn execute_there(target: &Target, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
     let out = remote::exec(&target.host, &remote_request(target, extra, args))?;
-    // `cd` failing: the folder is gone (or never was) on that machine.
-    if out.code == 1 && out.stdout.is_empty() && is_cd_error(&out.stderr) {
+    // The folder is gone (or never was) on that machine.
+    if out.code == 1 && remote::is_missing_folder(&out.stderr) {
         return Err(format!(
             "{} isn't a folder on {}",
             target.path,
@@ -122,12 +142,6 @@ fn execute_there(target: &Target, extra: &Extra, args: &[&str]) -> Result<Ran, S
         stdout: out.stdout,
         stderr: out.stderr,
     })
-}
-
-fn is_cd_error(stderr: &[u8]) -> bool {
-    let text = String::from_utf8_lossy(stderr);
-    let first = text.lines().next().unwrap_or_default();
-    first.contains(": cd: ")
 }
 
 /// Runs git in `dir` and returns stdout, or the error output.
@@ -294,6 +308,23 @@ mod tests {
     use std::process::Stdio;
 
     use super::*;
+
+    /// Network operations go to shells of their own on another machine; reads don't.
+    #[test]
+    fn network_operations_are_told_apart() {
+        for (args, long) in [
+            (&["fetch", "--prune"][..], true),
+            (&["-c", "credential.helper=x", "push", "origin"][..], true),
+            (&["--literal-pathspecs", "pull"][..], true),
+            (&["submodule", "update"][..], true),
+            (&["status", "--porcelain"][..], false),
+            (&["-c", "fetch.x=1", "log"][..], false),
+            (&["--no-optional-locks", "status"][..], false),
+            (&[][..], false),
+        ] {
+            assert_eq!(goes_over_network(args), long, "{args:?}");
+        }
+    }
 
     /// What git gets from the helper is what was typed, backslashes (`DOMAIN\user`) included.
     #[test]

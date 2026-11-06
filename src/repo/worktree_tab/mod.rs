@@ -204,12 +204,13 @@ impl RepoTab {
     /// Takes over from `from`, the same repository's view this one follows, so that the name and
     /// the sidebar are right from the first frame and a sign-in isn't asked for again.
     pub(crate) fn continue_from(&mut self, from: &RepoTab) {
+        let is_here = crate::remote::is_same_dir_as(&self.path);
         self.worktrees = from
             .worktrees
             .iter()
             .cloned()
             .map(|mut w| {
-                w.current = crate::remote::same_dir(&self.path, &w.path);
+                w.current = is_here(&w.path);
                 w
             })
             .collect();

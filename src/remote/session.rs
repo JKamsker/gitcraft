@@ -1,36 +1,37 @@
-//! Shells kept open on a repository's machine (`ssh host sh`, `wsl.exe -d distro --exec sh`),
-//! so a command there costs one round trip and not a new connection (well over a second for
-//! SSH, which can't share one connection between processes on Windows).
+//! Running commands on a repository's machine, through shells kept open there (`ssh host sh`,
+//! `wsl.exe -d distro --exec sh`; see [`super::pool`] and [`super::shell`]), so a command costs
+//! one round trip and not a new connection (well over a second for SSH, which can't share one
+//! connection between processes on Windows).
 //!
-//! Each command goes to a shell as a short script that runs it with its output into files of
-//! the shell's own temporary folder, then prints a header line (`R <nonce> <exit code> <stdout
+//! Each command goes to a shell as a script in braces (which `sh` runs only once it has all of
+//! it, so a script cut short runs nothing) that runs it with its output into files of the
+//! shell's own temporary folder, then prints a header line (`R <nonce> <exit code> <stdout
 //! bytes> <stderr bytes>`) and both outputs as they are: any bytes, any size, no escaping. The
-//! nonce, new for every command, makes sure what is read answers that command and no other. A
-//! few shells per machine run side by side; one that breaks, or answers anything unexpected,
-//! is dropped and replaced.
+//! nonce, new for every command, makes sure what is read answers that command and no other.
 
-use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Read, Write};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::io::{Read, Write};
+use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
-use std::time::{Duration, Instant};
 
+use super::pool::{Lane, pool};
+use super::shell::{Failure, Shell};
 use super::{Host, sh_path, sh_quote};
 
-/// How many shells per machine at most: the app reads a repository with several commands at
-/// once (status, refs, log, stashes…), more than that wait.
-const MAX_SESSIONS: usize = 6;
-
-/// After a shell couldn't be started, commands fail at once with its error for this long
-/// rather than each trying (and waiting for) a connection of its own.
-const FAILED_FOR: Duration = Duration::from_secs(5);
-
 /// What a shell prints once it is ready, after whatever the login printed.
-const READY: &str = "__GITCRAFT_READY__";
+pub(super) const READY: &str = "__GITCRAFT_READY__";
 
 /// Makes the shell's temporary folder (again, if something cleared it since).
 const MAKE_TEMP: &str = "T=$(mktemp -d \"${TMPDIR:-/tmp}/gitcraft-sh.XXXXXX\")";
+
+/// Where else git may be: a shell that isn't a login one has a short PATH.
+const MORE_PATH: &str =
+    "PATH=\"$PATH:$HOME/.local/bin:$HOME/bin:/usr/local/bin:/opt/homebrew/bin\"; export PATH";
+
+/// What a command's error output starts with when its folder isn't there.
+const NO_FOLDER: &str = "gitcraft: no such folder: ";
+
+/// The largest output a header is believed for (a server that says more is broken).
+const MAX_OUTPUT: usize = 1 << 31;
 
 /// A command to run on another machine.
 #[derive(Clone, Default)]
@@ -46,6 +47,9 @@ pub struct Request {
     pub unset: Vec<String>,
     /// What it reads on its input; nothing (`/dev/null`) when `None`.
     pub stdin: Option<Vec<u8>>,
+    /// It goes over the network and may take minutes (fetch, push…): run in shells of their
+    /// own, so the quick reads aren't left waiting behind it.
+    pub long: bool,
 }
 
 /// Without the variables' values (a password) nor the input.
@@ -58,6 +62,7 @@ impl std::fmt::Debug for Request {
             .field("env", &names)
             .field("unset", &self.unset)
             .field("stdin", &self.stdin.as_ref().map(Vec::len))
+            .field("long", &self.long)
             .finish()
     }
 }
@@ -72,44 +77,101 @@ pub struct Output {
 
 /// Runs `req` on `host`, in one of the shells kept open there.
 pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
-    let pool = pool(host);
+    let lane = if req.long { Lane::Long } else { Lane::Quick };
+    let pool = pool(host, lane);
     loop {
-        let (mut session, reused) = pool.take(host)?;
+        let mut taken = pool.take(host, lane)?;
+        let reused = taken.reused;
         let nonce = nonce();
-        match session.run(&framed(req, &nonce), &nonce) {
+        let script = framed(req, &nonce);
+        let Some(shell) = taken.shell() else {
+            continue;
+        };
+        match shell.run(&script, &nonce) {
             Ok(out) => {
-                pool.give_back(session);
+                taken.give_back();
                 return Ok(out);
             }
             // A shell left open went away meanwhile: the script never reached it, so another
-            // shell can run it.
-            Err(Failure::NotSent(_)) if reused => pool.forget(session),
-            Err(failure) => {
-                pool.forget(session);
-                return Err(failure.message());
-            }
+            // shell can run it. (`taken`, dropped, closes it.)
+            Err(Failure::NotSent(_)) if reused => {}
+            Err(failure) => return Err(failure.message()),
         }
     }
 }
 
 /// Starts `req` on `host` in a process of its own, whose output the caller reads as it comes
-/// (a long `git log`). Its input is taken: the script went there.
+/// (a long `git log`): from the command's first byte on, what a login printed skipped.
 pub fn spawn(host: &Host, req: &Request) -> Result<Child, String> {
     let mut cmd = shell_command(host);
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     let mut child = cmd.spawn().map_err(|e| start_error(host, &e))?;
-    let script = format!("{}\n", inline(req, "</dev/null"));
+    let script = format!(
+        "{MORE_PATH}\nprintf '\\n%s\\n' {READY}\n{}\n",
+        inline(req, "</dev/null")
+    );
     let written = child
         .stdin
         .take()
         .map(|mut stdin| stdin.write_all(script.as_bytes()));
-    if let Some(Err(e)) = written {
+    let ready = match (written, child.stdout.as_mut()) {
+        (Some(Ok(())), Some(stdout)) => skip_to_ready(stdout),
+        _ => false,
+    };
+    if !ready {
         let _ = child.kill();
-        return Err(format!("could not reach {}: {e}", host.label()));
+        let _ = child.wait();
+        let mut said = String::new();
+        if let Some(mut stderr) = child.stderr.take() {
+            let _ = stderr.read_to_string(&mut said);
+        }
+        let said = said.replace('\0', "");
+        return Err(format!("could not reach {}: {}", host.label(), said.trim()));
     }
     Ok(child)
+}
+
+/// Reads `stdout` up to and with the line [`READY`], a byte at a time (so nothing after it is
+/// taken from the caller); `false` when it ended first.
+fn skip_to_ready(stdout: &mut std::process::ChildStdout) -> bool {
+    let mut line = Vec::new();
+    let mut byte = [0u8; 1];
+    loop {
+        match stdout.read(&mut byte) {
+            Ok(1) if byte[0] == b'\n' => {
+                if line == READY.as_bytes() {
+                    return true;
+                }
+                line.clear();
+            }
+            Ok(1) => line.push(byte[0]),
+            _ => return false,
+        }
+    }
+}
+
+/// A new shell kept open on `host`.
+pub(super) fn start_shell(host: &Host) -> Result<Shell, String> {
+    Shell::start(shell_command(host), &host.label())
+}
+
+/// What a new shell is sent first: its temporary folder (removed when the shell ends, also on
+/// a hang-up or a signal), its PATH, then [`READY`].
+pub(super) fn setup_script() -> String {
+    format!(
+        concat!(
+            "{make} || exit 1\n",
+            "{path}\n",
+            "trap 'rm -rf \"$T\"' EXIT\n",
+            "trap 'rm -rf \"$T\"; exit 1' HUP INT TERM PIPE\n",
+            "printf '\\n{ready}\\n'\n",
+        ),
+        make = MAKE_TEMP,
+        path = MORE_PATH,
+        ready = READY
+    )
 }
 
 /// The process that runs `sh` on `host`, reading its script from its input.
@@ -170,12 +232,20 @@ fn is_variable_name(name: &str) -> bool {
         && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
+/// Whether a command's error output says its folder isn't there.
+pub fn is_missing_folder(stderr: &[u8]) -> bool {
+    stderr.starts_with(NO_FOLDER.as_bytes())
+}
+
 /// `req` as one `sh` command: in a subshell, so its folder and variables stay its own, with
 /// `redirects` applied to it.
 fn inline(req: &Request, redirects: &str) -> String {
     let mut s = String::from("(");
     if let Some(cwd) = &req.cwd {
-        s.push_str(&format!("cd -- {} || exit 1\n", sh_path(cwd)));
+        let path = sh_path(cwd);
+        s.push_str(&format!(
+            "cd -- {path} 2>/dev/null || {{ printf '{NO_FOLDER}%s\\n' {path} >&2; exit 1; }}\n"
+        ));
     }
     for name in req.unset.iter().filter(|n| is_variable_name(n)) {
         s.push_str(&format!("unset {name}\n"));
@@ -189,7 +259,7 @@ fn inline(req: &Request, redirects: &str) -> String {
 }
 
 /// A word no command's output will hold by chance: new for every command.
-fn nonce() -> String {
+pub(super) fn nonce() -> String {
     static SEQ: AtomicU64 = AtomicU64::new(0);
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -203,340 +273,52 @@ fn nonce() -> String {
     )
 }
 
-/// `req` as the script a kept-open shell is sent: `S <nonce>` once it starts, then the header
-/// and both outputs (see the module's doc). The outputs are copied before they are measured:
-/// something the command left running (a hook's background job) may still be writing to them,
-/// and the bytes sent must be the bytes the header counts.
-fn framed(req: &Request, nonce: &str) -> String {
-    let mut s = format!("printf 'S %s\\n' {nonce}\n[ -d \"$T\" ] || {MAKE_TEMP} || exit 1\n");
-    let input = match &req.stdin {
+/// `req` as the script a kept-open shell is sent (see the module's doc). The outputs are
+/// copied before they are measured: something the command left running (a hook's background
+/// job) may still be writing to them, and the bytes sent must be the bytes the header counts.
+/// What can't be passed on or kept (a full disk) fails the command (125) and says why.
+pub(super) fn framed(req: &Request, nonce: &str) -> String {
+    let mut s = format!(
+        "{{\nprintf 'S %s\\n' {nonce}\n[ -d \"$T\" ] || {MAKE_TEMP} || exit 1\n: >\"$T/out\"; : >\"$T/err\"\n"
+    );
+    let (decode, input) = match &req.stdin {
         Some(bytes) => {
             use base64::Engine;
             let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
-            s.push_str(&format!("printf '%s' '{b64}' | base64 -d >\"$T/i\"\n"));
-            "\"$T/i\""
+            (
+                format!("printf '%s' '{b64}' | base64 -d >\"$T/in\""),
+                "\"$T/in\"",
+            )
         }
-        None => "/dev/null",
+        None => ("true".to_owned(), "/dev/null"),
     };
-    s.push_str(&inline(req, &format!("<{input} >\"$T/o\" 2>\"$T/e\"")));
-    s.push_str(&format!(
-        concat!(
-            "\nr=$?\n",
-            "cat \"$T/o\" >\"$T/O\"; cat \"$T/e\" >\"$T/E\"\n",
-            "printf 'R %s %s %s %s\\n' {nonce} \"$r\" \"$(wc -c <\"$T/O\")\" \"$(wc -c <\"$T/E\")\"\n",
-            "cat \"$T/O\" \"$T/E\"\n",
-            "rm -f \"$T/i\" \"$T/o\" \"$T/e\" \"$T/O\" \"$T/E\"\n",
-        ),
-        nonce = nonce
+    s.push_str(&format!("if {decode}; then\n"));
+    s.push_str(&inline(req, &format!("<{input} >\"$T/out\" 2>\"$T/err\"")));
+    s.push_str(concat!(
+        "\nr=$?\n",
+        "else r=125; echo 'gitcraft: could not pass the input on' >\"$T/err\"; fi\n",
+        "if cat \"$T/out\" >\"$T/sent-out\" && cat \"$T/err\" >\"$T/sent-err\"; then :; else\n",
+        "  r=125; : >\"$T/sent-out\"; echo 'gitcraft: no room for the output in '\"$T\" >\"$T/sent-err\"\n",
+        "fi\n",
     ));
+    s.push_str(&format!(
+        "printf 'R %s %s %s %s\\n' {nonce} \"$r\" \"$(wc -c <\"$T/sent-out\")\" \"$(wc -c <\"$T/sent-err\")\"\n"
+    ));
+    s.push_str("cat \"$T/sent-out\" \"$T/sent-err\"\nrm -f \"$T/in\" \"$T/out\" \"$T/err\" \"$T/sent-out\" \"$T/sent-err\"\n}\n");
     s
-}
-
-/// What went wrong running a command in a shell.
-enum Failure {
-    /// The script never got to the shell: it can be run in another one.
-    NotSent(String),
-    /// After it was sent: whether it ran, and what it did, is unknown.
-    Lost(String),
-}
-
-impl Failure {
-    fn message(self) -> String {
-        match self {
-            Failure::NotSent(m) | Failure::Lost(m) => m,
-        }
-    }
-}
-
-/// A shell kept open on another machine.
-struct Session {
-    child: Child,
-    stdin: ChildStdin,
-    out: BufReader<ChildStdout>,
-    /// The end of what the process said on its error output (ssh's own errors).
-    said: Arc<Mutex<String>>,
-    label: String,
-}
-
-impl Session {
-    fn start(host: &Host) -> Result<Self, String> {
-        let mut cmd = shell_command(host);
-        cmd.stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        let mut child = cmd.spawn().map_err(|e| start_error(host, &e))?;
-        let (Some(stdin), Some(stdout), Some(stderr)) =
-            (child.stdin.take(), child.stdout.take(), child.stderr.take())
-        else {
-            let _ = child.kill();
-            return Err(format!("could not reach {}", host.label()));
-        };
-        let said = Arc::new(Mutex::new(String::new()));
-        let drain = drain_errors(stderr, Arc::clone(&said));
-        let mut session = Self {
-            child,
-            stdin,
-            out: BufReader::new(stdout),
-            said,
-            label: host.label(),
-        };
-        match session.handshake() {
-            Ok(()) => Ok(session),
-            Err(e) => {
-                // Its error output, read to the end once the process is gone, says why.
-                let _ = session.child.kill();
-                let _ = session.child.wait();
-                let _ = drain.join();
-                let said = session.said_text();
-                Err(match said.is_empty() {
-                    true => e,
-                    false => format!("could not reach {}: {said}", session.label),
-                })
-            }
-        }
-    }
-
-    /// Sets up the shell's temporary folder (removed when the shell ends, also on a hang-up
-    /// or a signal) and waits for it to say it's ready.
-    fn handshake(&mut self) -> Result<(), String> {
-        let setup = format!(
-            concat!(
-                "{make} || exit 1\n",
-                // Where else git may be: a shell that isn't a login one has a short PATH.
-                "PATH=\"$PATH:$HOME/.local/bin:$HOME/bin:/usr/local/bin:/opt/homebrew/bin\"\n",
-                "export PATH\n",
-                "trap 'rm -rf \"$T\"' EXIT\n",
-                "trap 'rm -rf \"$T\"; exit 1' HUP INT TERM PIPE\n",
-                "printf '\\n{ready}\\n'\n",
-            ),
-            make = MAKE_TEMP,
-            ready = READY
-        );
-        let lost = |e: std::io::Error| format!("could not reach {}: {e}", self.label);
-        self.stdin.write_all(setup.as_bytes()).map_err(lost)?;
-        self.stdin.flush().map_err(lost)?;
-        // What a login script printed comes first, in whatever encoding.
-        let mut line = Vec::new();
-        loop {
-            line.clear();
-            let n = self.out.read_until(b'\n', &mut line).map_err(lost)?;
-            if n == 0 {
-                return Err(format!(
-                    "could not reach {}: the connection closed",
-                    self.label
-                ));
-            }
-            if line.trim_ascii_end() == READY.as_bytes() {
-                return Ok(());
-            }
-        }
-    }
-
-    /// Whether its process has ended (the connection dropped while it waited).
-    fn ended(&mut self) -> bool {
-        self.child
-            .try_wait()
-            .map_or(true, |status| status.is_some())
-    }
-
-    fn run(&mut self, script: &str, nonce: &str) -> Result<Output, Failure> {
-        self.stdin
-            .write_all(script.as_bytes())
-            .and_then(|()| self.stdin.write_all(b"\n"))
-            .and_then(|()| self.stdin.flush())
-            .map_err(|e| Failure::NotSent(self.lost(&e.to_string())))?;
-        // From here on, the command may have run: nothing is run again.
-        let lost = |s: &Self, why: &str| Failure::Lost(s.lost(why));
-        let mut line = String::new();
-        match self.out.read_line(&mut line) {
-            Ok(_) if line.trim_end() == format!("S {nonce}") => {}
-            Ok(0) => return Err(lost(self, "the connection closed")),
-            Ok(_) => return Err(lost(self, "it answered out of turn")),
-            Err(e) => return Err(lost(self, &e.to_string())),
-        }
-        line.clear();
-        let header = match self.out.read_line(&mut line) {
-            Ok(n) if n > 0 => parse_header(&line, nonce),
-            Ok(_) => None,
-            Err(e) => return Err(lost(self, &e.to_string())),
-        };
-        let Some((code, out_len, err_len)) = header else {
-            return Err(lost(self, "the connection closed while a command ran"));
-        };
-        let stdout = self.read_exactly(out_len).map_err(|e| lost(self, &e))?;
-        let stderr = self.read_exactly(err_len).map_err(|e| lost(self, &e))?;
-        Ok(Output {
-            code,
-            stdout,
-            stderr,
-        })
-    }
-
-    /// The next `len` bytes, held only as they arrive: a header that says more than comes
-    /// doesn't make the app set aside memory for it.
-    fn read_exactly(&mut self, len: usize) -> Result<Vec<u8>, String> {
-        let mut bytes = Vec::new();
-        (&mut self.out)
-            .take(len as u64)
-            .read_to_end(&mut bytes)
-            .map_err(|e| e.to_string())?;
-        if bytes.len() == len {
-            Ok(bytes)
-        } else {
-            Err("the connection closed while a command's output came".to_owned())
-        }
-    }
-
-    /// The error for a shell that stopped answering, with what ssh said if anything.
-    fn lost(&self, why: &str) -> String {
-        let said = self.said_text();
-        if said.is_empty() {
-            format!("lost the connection to {}: {why}", self.label)
-        } else {
-            format!("lost the connection to {}: {said}", self.label)
-        }
-    }
-
-    fn said_text(&self) -> String {
-        lock(&self.said).trim().to_owned()
-    }
-}
-
-impl Drop for Session {
-    fn drop(&mut self) {
-        // Its shell ends (and clears its folder) as the connection goes.
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-    }
 }
 
 /// `R <nonce> <code> <stdout bytes> <stderr bytes>` (`wc -c` may pad the numbers with
 /// spaces), for the command of `nonce` only.
-fn parse_header(line: &str, nonce: &str) -> Option<(i32, usize, usize)> {
+pub(super) fn parse_header(line: &str, nonce: &str) -> Option<(i32, usize, usize)> {
     let mut words = line.split_whitespace();
     if words.next()? != "R" || words.next()? != nonce {
         return None;
     }
     let code = words.next()?.parse().ok()?;
-    let out = words.next()?.parse().ok()?;
-    let err = words.next()?.parse().ok()?;
-    Some((code, out, err))
-}
-
-/// Keeps reading the process's error output (unread, a full pipe would stop it), keeping the
-/// last few lines.
-fn drain_errors(
-    mut stderr: std::process::ChildStderr,
-    said: Arc<Mutex<String>>,
-) -> std::thread::JoinHandle<()> {
-    const KEEP: usize = 2048;
-    std::thread::spawn(move || {
-        let mut buf = [0u8; 1024];
-        while let Ok(n) = stderr.read(&mut buf) {
-            if n == 0 {
-                break;
-            }
-            let mut text = lock(&said);
-            // `wsl.exe` says its own errors in UTF-16: read as text, every other byte is a NUL.
-            text.extend(
-                String::from_utf8_lossy(&buf[..n])
-                    .chars()
-                    .filter(|&c| c != '\0'),
-            );
-            if text.len() > KEEP {
-                let cut = text.len() - KEEP;
-                let cut = (cut..text.len())
-                    .find(|&i| text.is_char_boundary(i))
-                    .unwrap_or(0);
-                text.drain(..cut);
-            }
-        }
-    })
-}
-
-/// The shells of one machine.
-#[derive(Default)]
-struct Pool {
-    state: Mutex<PoolState>,
-    freed: Condvar,
-}
-
-#[derive(Default)]
-struct PoolState {
-    idle: Vec<Session>,
-    /// Shells open or being opened, idle or not.
-    open: usize,
-    /// The last time one couldn't be opened, and why.
-    failed: Option<(Instant, String)>,
-}
-
-impl Pool {
-    /// A shell to run a command in, and whether it ran others before: an idle one still
-    /// connected, else a new one when there are fewer than [`MAX_SESSIONS`], else the next one
-    /// freed.
-    fn take(&self, host: &Host) -> Result<(Session, bool), String> {
-        let mut state = lock(&self.state);
-        loop {
-            while let Some(mut session) = state.idle.pop() {
-                if !session.ended() {
-                    return Ok((session, true));
-                }
-                state.open = state.open.saturating_sub(1);
-            }
-            // Fast only with none open: with some, the next one freed will do.
-            if let Some((at, why)) = &state.failed
-                && at.elapsed() < FAILED_FOR
-                && state.open == 0
-            {
-                return Err(why.clone());
-            }
-            if state.open < MAX_SESSIONS {
-                state.open += 1;
-                drop(state);
-                let started = Session::start(host);
-                let mut state = lock(&self.state);
-                return match started {
-                    Ok(session) => {
-                        state.failed = None;
-                        Ok((session, false))
-                    }
-                    Err(why) => {
-                        state.open -= 1;
-                        state.failed = Some((Instant::now(), why.clone()));
-                        self.freed.notify_all();
-                        Err(why)
-                    }
-                };
-            }
-            state = self
-                .freed
-                .wait(state)
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-        }
-    }
-
-    fn give_back(&self, session: Session) {
-        lock(&self.state).idle.push(session);
-        self.freed.notify_one();
-    }
-
-    fn forget(&self, session: Session) {
-        drop(session);
-        let mut state = lock(&self.state);
-        state.open = state.open.saturating_sub(1);
-        self.freed.notify_one();
-    }
-}
-
-fn pool(host: &Host) -> Arc<Pool> {
-    static POOLS: OnceLock<Mutex<HashMap<Host, Arc<Pool>>>> = OnceLock::new();
-    let pools = POOLS.get_or_init(Mutex::default);
-    Arc::clone(lock(pools).entry(host.clone()).or_default())
-}
-
-/// A lock, also when a thread panicked holding it: what it guards stays usable.
-fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+    let out: usize = words.next()?.parse().ok()?;
+    let err: usize = words.next()?.parse().ok()?;
+    (out <= MAX_OUTPUT && err <= MAX_OUTPUT).then_some((code, out, err))
 }
 
 #[cfg(test)]
@@ -553,6 +335,8 @@ mod tests {
         assert_eq!(parse_header("R ab2 0 1 2\n", "ab1"), None);
         assert_eq!(parse_header("X ab1 0 1 2\n", "ab1"), None);
         assert_eq!(parse_header("R ab1 0 1\n", "ab1"), None);
+        // A size no output has.
+        assert_eq!(parse_header("R ab1 0 99999999999 0\n", "ab1"), None);
     }
 
     #[test]
@@ -565,13 +349,49 @@ mod tests {
                 ("X;rm -rf ~".to_owned(), "1".to_owned()),
             ],
             unset: vec!["B".to_owned(), "$(x)".to_owned()],
-            stdin: None,
+            ..Request::default()
         };
         let s = inline(&req, "</dev/null");
         assert_eq!(
             s,
-            "(cd -- \"$HOME\"'/my repo' || exit 1\nunset B\nA='it'\\''s'; export A\nexec git status\n) </dev/null"
+            "(cd -- \"$HOME\"'/my repo' 2>/dev/null || { printf 'gitcraft: no such folder: %s\\n' \"$HOME\"'/my repo' >&2; exit 1; }\nunset B\nA='it'\\''s'; export A\nexec git status\n) </dev/null"
         );
+    }
+
+    /// Nothing runs before the shell has the whole script: it is one group in braces.
+    #[test]
+    fn a_framed_script_is_one_group() {
+        let s = framed(&Request::default(), "n1");
+        assert!(s.starts_with("{\n") && s.ends_with("\n}\n"), "{s}");
+    }
+
+    /// No two files of the framing differ only in case: on macOS (and Windows) they would be
+    /// one file, and copying one onto the other would empty it.
+    #[test]
+    fn framing_files_differ_beyond_case() {
+        let s = framed(
+            &Request {
+                stdin: Some(b"x".to_vec()),
+                ..Request::default()
+            },
+            "n1",
+        );
+        let mut names: Vec<String> = s
+            .split("$T/")
+            .skip(1)
+            .map(|rest| {
+                rest.chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '-')
+                    .collect::<String>()
+            })
+            .collect();
+        names.sort();
+        names.dedup();
+        let mut folded: Vec<String> = names.iter().map(|n| n.to_lowercase()).collect();
+        folded.sort();
+        folded.dedup();
+        assert_eq!(names.len(), folded.len(), "{names:?}");
+        assert!(names.len() >= 5, "{names:?}");
     }
 
     #[test]
@@ -585,86 +405,5 @@ mod tests {
             shown.contains("PASSWORD") && !shown.contains("hunter2"),
             "{shown}"
         );
-    }
-
-    /// A session in a real `sh`, as a kept-open shell runs.
-    #[cfg(unix)]
-    fn local_session() -> Result<Session, String> {
-        let mut child = Command::new("sh")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        let (Some(stdin), Some(stdout)) = (child.stdin.take(), child.stdout.take()) else {
-            return Err("no pipes".to_owned());
-        };
-        let mut session = Session {
-            child,
-            stdin,
-            out: BufReader::new(stdout),
-            said: Arc::new(Mutex::new(String::new())),
-            label: "test".to_owned(),
-        };
-        session.handshake()?;
-        Ok(session)
-    }
-
-    #[cfg(unix)]
-    fn run_in(session: &mut Session, req: &Request) -> Result<Output, String> {
-        let nonce = nonce();
-        session
-            .run(&framed(req, &nonce), &nonce)
-            .map_err(Failure::message)
-    }
-
-    /// The framing runs as it is in a real `sh`, binary output and input included.
-    #[cfg(unix)]
-    #[test]
-    fn a_framed_request_runs_in_sh() -> Result<(), String> {
-        let mut session = local_session()?;
-        let req = Request {
-            script: "cat; printf 'err' >&2; exit 3".to_owned(),
-            stdin: Some(vec![0, 1, 2, b'\n', 255]),
-            ..Request::default()
-        };
-        let out = run_in(&mut session, &req)?;
-        assert_eq!(out.code, 3);
-        assert_eq!(out.stdout, vec![0, 1, 2, b'\n', 255]);
-        assert_eq!(out.stderr, b"err");
-        // And again, on the same shell.
-        let out = run_in(
-            &mut session,
-            &Request {
-                script: "printf hi".to_owned(),
-                ..Request::default()
-            },
-        )?;
-        assert_eq!((out.code, out.stdout), (0, b"hi".to_vec()));
-        Ok(())
-    }
-
-    /// Something a command leaves writing to its output after it ends doesn't spill into the
-    /// next command's answer.
-    #[cfg(unix)]
-    #[test]
-    fn output_written_late_stays_out_of_the_next_answer() -> Result<(), String> {
-        let mut session = local_session()?;
-        let late = Request {
-            script: "printf a; (sleep 0.2; printf bbbbbbbb) &".to_owned(),
-            ..Request::default()
-        };
-        let out = run_in(&mut session, &late)?;
-        assert!(out.stdout.starts_with(b"a"));
-        std::thread::sleep(Duration::from_millis(400));
-        let next = run_in(
-            &mut session,
-            &Request {
-                script: "printf next".to_owned(),
-                ..Request::default()
-            },
-        )?;
-        assert_eq!(next.stdout, b"next");
-        Ok(())
     }
 }

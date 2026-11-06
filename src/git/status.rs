@@ -96,7 +96,7 @@ pub fn status(repo: &Path) -> Result<WorkStatus, String> {
         &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
     )?;
     let mut status = parse_status(&out);
-    status.in_progress = in_progress(repo);
+    status.in_progress = in_progress(repo)?;
     if status.in_progress.is_some() {
         status.prepared_message = prepared_message(repo);
     }
@@ -104,29 +104,33 @@ pub fn status(repo: &Path) -> Result<WorkStatus, String> {
 }
 
 /// The operation git left half done in `repo`, if any.
-fn in_progress(repo: &Path) -> Option<InProgress> {
+/// Fails when that couldn't be asked (a repository on another machine not reached): no
+/// operation in progress would be an answer, and a wrong one.
+fn in_progress(repo: &Path) -> Result<Option<InProgress>, String> {
+    let asked = |e: std::io::Error| format!("could not read the repository's state: {e}");
     for dir in ["rebase-merge", "rebase-apply"] {
-        if let Ok(path) = run(Some(repo), &["rev-parse", "--git-path", dir])
-            && crate::remote::is_dir(&crate::remote::resolve(repo, path.trim()))
-        {
+        let Ok(path) = run(Some(repo), &["rev-parse", "--git-path", dir]) else {
+            continue;
+        };
+        let state = crate::remote::resolve(repo, path.trim());
+        if crate::remote::try_is_dir(&state).map_err(asked)? {
             // `git am` keeps its state there too, marked by this file.
-            let state = crate::remote::resolve(repo, path.trim());
-            let am = crate::remote::is_file(&state.join("applying"));
-            return Some(if am {
+            let am = crate::remote::try_is_file(&state.join("applying")).map_err(asked)?;
+            return Ok(Some(if am {
                 InProgress::Am
             } else {
                 InProgress::Rebase
-            });
+            }));
         }
     }
-    [
+    Ok([
         (InProgress::Merge, "MERGE_HEAD"),
         (InProgress::CherryPick, "CHERRY_PICK_HEAD"),
         (InProgress::Revert, "REVERT_HEAD"),
     ]
     .into_iter()
     .find(|(_, head)| run(Some(repo), &["rev-parse", "-q", "--verify", head]).is_ok())
-    .map(|(state, _)| state)
+    .map(|(state, _)| state))
 }
 
 /// The message git prepared for the commit that ends the operation in progress.

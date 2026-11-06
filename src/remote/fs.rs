@@ -65,9 +65,12 @@ pub fn write(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let Some(t) = parse(path) else {
         return std::fs::write(path, bytes);
     };
+    // Never through a symbolic link, which a repository can point anywhere (`~/.bashrc`):
+    // checked and written in one go, there.
+    let f = sh_path(&t.path);
     let out = run(
         &t,
-        format!("exec cat > {}", sh_path(&t.path)),
+        format!("if [ -L {f} ]; then echo 'it is a symbolic link' >&2; exit 1; fi\nexec cat > {f}"),
         Some(bytes.to_vec()),
     )?;
     match out.code {
@@ -87,32 +90,48 @@ pub fn create_dir_all(path: &Path) -> io::Result<()> {
     }
 }
 
-fn test(path: &Path, flag: &str) -> bool {
+/// `test <flag> path`: whether it holds, or why it couldn't be asked (the machine wasn't
+/// reached), which a plain `false` would pass off as an answer.
+fn test(path: &Path, flag: &str) -> io::Result<bool> {
     match parse(path) {
         Some(t) => {
-            run(&t, format!("[ {flag} {} ]", sh_path(&t.path)), None).is_ok_and(|out| out.code == 0)
+            // 0: it holds; 1: it doesn't; anything else (or no answer): not known.
+            let out = run(&t, format!("[ {flag} {} ]", sh_path(&t.path)), None)?;
+            match out.code {
+                0 => Ok(true),
+                1 => Ok(false),
+                _ => Err(failed(&out)),
+            }
         }
-        None => match flag {
+        None => Ok(match flag {
             "-d" => path.is_dir(),
             "-L" => std::fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()),
             _ => path.is_file(),
-        },
+        }),
     }
 }
 
-/// Whether `path` is a file (or a link to one). Over SSH, a round trip: not for every frame.
+/// Whether `path` is a file (or a link to one); `false` also when that couldn't be asked.
+/// Over SSH, a round trip: not for every frame.
 pub fn is_file(path: &Path) -> bool {
+    test(path, "-f").unwrap_or(false)
+}
+
+/// [`is_file`], or why it couldn't be asked.
+pub fn try_is_file(path: &Path) -> io::Result<bool> {
     test(path, "-f")
 }
 
-/// Whether `path` is a folder (or a link to one). Over SSH, a round trip: not for every frame.
-pub fn is_dir(path: &Path) -> bool {
+/// Whether `path` is a folder (or a link to one), or why that couldn't be asked. Over SSH, a
+/// round trip: not for every frame.
+pub fn try_is_dir(path: &Path) -> io::Result<bool> {
     test(path, "-d")
 }
 
-/// Whether `path` is a symbolic link itself (not what it points to).
+/// Whether `path` is a symbolic link itself (not what it points to). When that can't be
+/// asked, it counts as one: callers refuse to write through a link.
 pub fn is_link(path: &Path) -> bool {
-    test(path, "-L")
+    test(path, "-L").unwrap_or(true)
 }
 
 /// A file of a working tree as git sees it: a symbolic link is the path it holds, not what it
@@ -154,6 +173,22 @@ pub fn same_dir(a: &Path, b: &Path) -> bool {
             _ => a == b,
         },
         (a, b) => a == b,
+    }
+}
+
+/// Tells which of many folders is `here`, resolving `here` once: a folder here that can't be
+/// resolved (it's gone) is none of them.
+pub fn is_same_dir_as(here: &Path) -> impl Fn(&Path) -> bool + use<> {
+    let remote = parse(here);
+    let resolved = remote
+        .is_none()
+        .then(|| std::fs::canonicalize(here).ok())
+        .flatten();
+    move |other: &Path| match (&remote, parse(other)) {
+        (None, None) => resolved
+            .as_ref()
+            .is_some_and(|r| std::fs::canonicalize(other).ok().as_ref() == Some(r)),
+        (remote, other) => remote.as_ref() == other.as_ref(),
     }
 }
 

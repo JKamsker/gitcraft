@@ -310,7 +310,12 @@ impl RepoTab {
             .map(|w| (w.path.clone(), w.changes))
             .collect();
         self.worktrees = loaded.worktrees;
-        for wt in self.worktrees.iter_mut().filter(|w| w.needs_count()) {
+        let remote = crate::remote::is_remote(&self.path);
+        for wt in self
+            .worktrees
+            .iter_mut()
+            .filter(|w| remote && w.needs_count())
+        {
             if let Some((_, changes)) = counted.iter().find(|(p, _)| *p == wt.path) {
                 wt.changes = *changes;
             }

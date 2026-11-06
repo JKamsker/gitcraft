@@ -10,16 +10,18 @@
 
 mod discover;
 mod fs;
+mod pool;
 mod session;
+mod shell;
 
 use std::path::{Path, PathBuf};
 
 pub use discover::{ssh_config_hosts, wsl_distros};
 pub use fs::{
-    create_dir_all, host_temp_file, is_dir, is_file, is_link, read_to_string, same_dir,
-    worktree_file, write,
+    create_dir_all, host_temp_file, is_file, is_link, is_same_dir_as, read_to_string, same_dir,
+    try_is_dir, try_is_file, worktree_file, write,
 };
-pub use session::{Output, Request, exec, spawn};
+pub use session::{Output, Request, exec, is_missing_folder, spawn};
 
 /// The machine a repository is on, when it isn't this one.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -52,12 +54,8 @@ pub struct Target {
 /// `None`: a path of this machine.
 pub fn parse(path: &Path) -> Option<Target> {
     let s = path.to_string_lossy().replace('\\', "/");
-    if let Some(rest) = strip_prefix_ignore_case(&s, "ssh:") {
-        // `ssh://host/x`, or `ssh:/host/x` when something folded the double slash.
-        let rest = rest
-            .strip_prefix("//")
-            .or_else(|| rest.strip_prefix('/'))
-            .unwrap_or(rest);
+    // Only `ssh://`: a folder here can be called `ssh:x` (Linux, macOS).
+    if let Some(rest) = strip_prefix_ignore_case(&s, "ssh://") {
         let (host, path) = rest.split_once('/').unwrap_or((rest, ""));
         if !valid_ssh_host(host) {
             return None;

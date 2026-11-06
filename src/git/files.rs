@@ -68,6 +68,11 @@ pub fn tree_files(repo: &Path, rev: &str) -> Result<Vec<String>, String> {
 /// when it was already there.
 pub fn add_to_gitignore(repo: &Path, pattern: &str) -> Result<bool, String> {
     let file = repo.join(".gitignore");
+    // A `.gitignore` a repository made a link (to `~/.bashrc`…) is not written through: the
+    // line added comes from a file name the repository chose too.
+    if crate::remote::is_link(&file) {
+        return Err(".gitignore is a symbolic link: not changed".to_owned());
+    }
     let existing = match crate::remote::read_to_string(&file) {
         Ok(s) => s,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
