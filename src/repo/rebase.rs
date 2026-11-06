@@ -75,6 +75,9 @@ pub(crate) struct RebaseEditor {
     /// Its rebase is being prepared (on another machine, in the background): it can't be
     /// started again, nor changed, meanwhile.
     pub starting: bool,
+    /// Move the branches on the commits rewritten along with them (`--update-refs`): the lower
+    /// layers of a stack rebased from its top.
+    pub update_refs: bool,
 }
 
 impl RebaseEditor {
@@ -97,6 +100,7 @@ impl RebaseEditor {
             head,
             id: IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             starting: false,
+            update_refs: false,
         }
     }
 
@@ -149,7 +153,7 @@ impl RebaseEditor {
     /// that machine, where git reads them.
     pub fn command(&self, repo: &Path) -> Result<Vec<String>, String> {
         if let Some(target) = crate::remote::parse(repo) {
-            return self.command_there(&target);
+            return self.command_there(repo, &target);
         }
         let dir = private_dir(&std::env::temp_dir())
             .map_err(|e| format!("could not prepare the rebase: {e}"))?;
@@ -167,16 +171,23 @@ impl RebaseEditor {
                 None
             });
         }
-        let todo = todo(&self.entries, |i| {
-            files.get(i).cloned().flatten().map(|p| sh_path(&p))
-        });
+        let refs = self.moved_refs(repo)?;
+        let todo = todo(
+            &self.entries,
+            |i| files.get(i).cloned().flatten().map(|p| sh_path(&p)),
+            &refs,
+        );
         let todo_file = write("todo.txt", &todo)?;
         Ok(self.rebase_args(&sh_path(&todo_file)))
     }
 
     /// [`Self::command`] for a repository on another machine: the files in a private folder
     /// there.
-    fn command_there(&self, target: &crate::remote::Target) -> Result<Vec<String>, String> {
+    fn command_there(
+        &self,
+        repo: &Path,
+        target: &crate::remote::Target,
+    ) -> Result<Vec<String>, String> {
         let write = |name: &str, text: &str| {
             crate::remote::host_temp_file(target, name, text.as_bytes())
                 .map_err(|e| format!("could not prepare the rebase: {e}"))
@@ -189,28 +200,49 @@ impl RebaseEditor {
                 None
             });
         }
-        let todo = todo(&self.entries, |i| {
-            files
-                .get(i)
-                .cloned()
-                .flatten()
-                .map(|p| crate::remote::sh_quote(&p))
-        });
+        let refs = self.moved_refs(repo)?;
+        let todo = todo(
+            &self.entries,
+            |i| {
+                files
+                    .get(i)
+                    .cloned()
+                    .flatten()
+                    .map(|p| crate::remote::sh_quote(&p))
+            },
+            &refs,
+        );
         let todo_file = write("rebase-todo.txt", &todo)?;
         Ok(self.rebase_args(&crate::remote::sh_quote(&todo_file)))
     }
 
+    /// The branches moved along with the commits, when Update dependent branches is ticked.
+    fn moved_refs(&self, repo: &Path) -> Result<Vec<(String, String)>, String> {
+        if !self.update_refs {
+            return Ok(Vec::new());
+        }
+        let commits: Vec<&str> = self
+            .entries
+            .iter()
+            .map(|e| e.commit.hash.as_str())
+            .collect();
+        dependent_refs(repo, &commits)
+    }
+
     /// The rebase, its todo list copied from `todo_file` (quoted for `sh`).
     fn rebase_args(&self, todo_file: &str) -> Vec<String> {
-        vec![
+        let mut args = vec![
             "-c".to_owned(),
             format!("sequence.editor=cp {todo_file}"),
             "rebase".to_owned(),
             "-i".to_owned(),
             "--autostash".to_owned(),
-            "--end-of-options".to_owned(),
-            self.onto.clone(),
-        ]
+        ];
+        if self.update_refs {
+            args.push("--update-refs".to_owned());
+        }
+        args.extend(["--end-of-options".to_owned(), self.onto.clone()]);
+        args
     }
 }
 
@@ -244,7 +276,13 @@ fn private_dir(parent: &Path) -> std::io::Result<PathBuf> {
 
 /// git's todo list for `entries` (oldest first). `message_file(i)` is the quoted path of entry
 /// `i`'s new message when it was reworded.
-fn todo(entries: &[Entry], message_file: impl Fn(usize) -> Option<String>) -> String {
+/// `refs`: (commit, `refs/heads/<branch>`) for the branches moved along (`--update-refs`), each
+/// placed after its commit, as git places them.
+fn todo(
+    entries: &[Entry],
+    message_file: impl Fn(usize) -> Option<String>,
+    refs: &[(String, String)],
+) -> String {
     let mut out = String::new();
     for (i, e) in entries.iter().enumerate() {
         let verb = match e.step {
@@ -259,8 +297,37 @@ fn todo(entries: &[Entry], message_file: impl Fn(usize) -> Option<String>) -> St
                 "exec git commit --amend --allow-empty --cleanup=whitespace -F {file}\n"
             ));
         }
+        for (_, name) in refs.iter().filter(|(at, _)| *at == e.commit.hash) {
+            out.push_str(&format!("update-ref {name}\n"));
+        }
     }
     out
+}
+
+/// The branches on `commits` that Update dependent branches moves along: (commit,
+/// `refs/heads/<branch>`). Not those checked out in a worktree (this one's included), which
+/// git refuses to move under them.
+fn dependent_refs(repo: &Path, commits: &[&str]) -> Result<Vec<(String, String)>, String> {
+    let out = crate::git::run(
+        Some(repo),
+        &[
+            "for-each-ref",
+            "--format=%(objectname) %(refname)",
+            "refs/heads",
+        ],
+    )?;
+    let checked_out: Vec<String> = crate::git::worktree_list(repo, None)
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|w| w.branch)
+        .map(|b| format!("refs/heads/{b}"))
+        .collect();
+    Ok(out
+        .lines()
+        .filter_map(|line| line.split_once(' '))
+        .filter(|(at, name)| commits.contains(at) && !checked_out.iter().any(|c| c == name))
+        .map(|(at, name)| (at.to_owned(), name.to_owned()))
+        .collect())
 }
 
 /// `path` for git's shell (`sh`, also on Windows): forward slashes, single-quoted.
@@ -351,6 +418,19 @@ impl RepoTab {
                         if ui.button("Cancel").clicked() {
                             acts.push(Action::CloseRebase);
                         }
+                        ui.add_enabled(
+                            !editor.starting,
+                            egui::Checkbox::new(
+                                &mut editor.update_refs,
+                                "Update dependent branches",
+                            ),
+                        )
+                        .on_hover_text(
+                            "Move the branches on these commits along with them (git rebase \
+                             --update-refs, git 2.38+): the lower layers of a stack rebased from \
+                             its top. Branches checked out in other worktrees are left where they \
+                             are; Restack in STACKS handles those.",
+                        );
                     });
                 });
             });
@@ -468,6 +548,44 @@ mod tests {
         }
     }
 
+    /// Rebasing the top of a stack with Update dependent branches moves the layers below
+    /// along; one checked out in another worktree stays (git's `--update-refs` skips it).
+    #[test]
+    fn update_dependent_branches_moves_the_lower_layers() -> Result<(), String> {
+        let repo = crate::git::stack::test_repo::TestRepo::new("rebase update refs")?;
+        repo.stack(&["schema", "api", "ui"])?;
+        repo.commit("m2.txt", "2\n", "main moves on")?;
+        let wt = repo.dir.with_file_name(format!(
+            "{} schema wt",
+            repo.dir
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default()
+        ));
+        let _ = std::fs::remove_dir_all(&wt);
+        let schema = repo.tip("schema")?;
+        repo.checkout("ui")?;
+        let result = (|| -> Result<(), String> {
+            let commits = crate::git::rebase_commits(repo.path(), "main")?;
+            let mut editor = RebaseEditor::new("main".into(), "main".into(), commits);
+            editor.update_refs = true;
+            // schema checked out in a worktree of its own: it stays.
+            repo.git(&["worktree", "add", "-q", &wt.to_string_lossy(), "schema"])?;
+            let command = editor.command(repo.path())?;
+            let args: Vec<&str> = command.iter().map(String::as_str).collect();
+            assert!(args.contains(&"--update-refs"));
+            repo.git(&args)?;
+            let is_ancestor =
+                |a: &str, b: &str| repo.git(&["merge-base", "--is-ancestor", a, b]).is_ok();
+            assert!(is_ancestor("main", "ui") && is_ancestor("main", "api"));
+            assert_eq!(repo.tip("schema")?, schema);
+            Ok(())
+        })();
+        let _ = repo.git(&["worktree", "remove", "--force", &wt.to_string_lossy()]);
+        let _ = std::fs::remove_dir_all(&wt);
+        result
+    }
+
     #[test]
     fn todo_lines() {
         let entries = vec![
@@ -476,10 +594,15 @@ mod tests {
             entry("c3", Step::Squash),
             entry("d4", Step::Drop),
         ];
-        let todo = todo(&entries, |i| (i == 1).then(|| "'/tmp/m 1.txt'".to_owned()));
+        let refs = [("c3".to_owned(), "refs/heads/api".to_owned())];
+        let todo = todo(
+            &entries,
+            |i| (i == 1).then(|| "'/tmp/m 1.txt'".to_owned()),
+            &refs,
+        );
         assert_eq!(
             todo,
-            "pick a1 summary a1\npick b2 summary b2\nexec git commit --amend --allow-empty --cleanup=whitespace -F '/tmp/m 1.txt'\nsquash c3 summary c3\ndrop d4 summary d4\n"
+            "pick a1 summary a1\npick b2 summary b2\nexec git commit --amend --allow-empty --cleanup=whitespace -F '/tmp/m 1.txt'\nsquash c3 summary c3\nupdate-ref refs/heads/api\ndrop d4 summary d4\n"
         );
     }
 

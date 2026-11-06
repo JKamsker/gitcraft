@@ -4,6 +4,7 @@
 
 mod dialog;
 mod model;
+mod restack;
 mod section;
 #[cfg(test)]
 pub(crate) mod tests;
@@ -14,7 +15,7 @@ use crate::git::stack::{self, Layer, Recorded};
 
 use super::{RepoTab, Undo};
 pub(crate) use dialog::BasedOn;
-pub(crate) use model::{Tree, chain, looped, trees};
+pub(crate) use model::{Tree, chain, dependents, looped, to_restack, trees};
 
 /// What the views ask of stacks.
 pub(crate) enum StackAct {
@@ -30,6 +31,15 @@ pub(crate) enum StackAct {
     /// Take the branch out of its stack.
     RemoveParent(String),
     CloseDialog,
+    /// Preview restacking the layers on the branch, or (`None`) every layer that needs it.
+    OpenRestack(Option<String>),
+    /// Restack as previewed.
+    StartRestack,
+    CloseRestack,
+    /// Go on with the restack that stopped.
+    ResumeRestack,
+    /// Give up the restack that stopped: every branch back where it was.
+    AbortRestack,
 }
 
 /// The tab's stacks.
@@ -44,9 +54,18 @@ pub(crate) struct Stacks {
     /// Numbers the reads: only the latest one's answer is taken.
     read: u64,
     pub dialog: Option<BasedOn>,
+    /// The restack that stopped (on conflicts), as kept in the config.
+    pub pending: Option<stack::restack::Pending>,
+    /// The restack being previewed.
+    pub preview: Option<restack::RestackPreview>,
 }
 
 impl Stacks {
+    /// Whether one of its dialogs is open (the keys are left to it).
+    pub fn modal_open(&self) -> bool {
+        self.dialog.is_some() || self.preview.is_some()
+    }
+
     /// The layer `branch` is, if it is one.
     pub fn layer(&self, branch: &str) -> Option<&Layer> {
         self.layers.iter().find(|l| l.branch == branch)
@@ -72,23 +91,24 @@ impl RepoTab {
         self.then(
             ctx,
             move || {
-                let recorded = stack::recorded(&path)?;
+                let (recorded, pending) = stack::read_all(&path)?;
                 // Most repositories have none: no more git to run then.
                 let layers = if recorded.is_empty() {
                     Vec::new()
                 } else {
                     stack::layers(&path, &recorded, &local)?
                 };
-                Ok::<_, String>((recorded, layers))
+                Ok::<_, String>((recorded, layers, pending))
             },
             move |tab, found, _| {
                 if tab.stacks.read != read {
                     return;
                 }
                 match found {
-                    Ok((recorded, layers)) => {
+                    Ok((recorded, layers, pending)) => {
                         tab.stacks.recorded = recorded;
                         tab.stacks.layers = layers;
+                        tab.stacks.pending = pending;
                         tab.stacks.error = None;
                     }
                     Err(e) => tab.stacks.error = Some(format!("Couldn't read the stacks: {e}")),
@@ -111,6 +131,11 @@ impl RepoTab {
             }
             StackAct::RemoveParent(branch) => self.remove_parent(branch, ctx),
             StackAct::CloseDialog => self.stacks.dialog = None,
+            StackAct::OpenRestack(from) => self.open_restack(from.as_deref(), ctx),
+            StackAct::StartRestack => self.start_restack(ctx),
+            StackAct::CloseRestack => self.stacks.preview = None,
+            StackAct::ResumeRestack => self.resume_restack(ctx),
+            StackAct::AbortRestack => self.abort_restack(ctx),
         }
     }
 

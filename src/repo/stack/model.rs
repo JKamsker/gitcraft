@@ -105,6 +105,33 @@ pub(crate) fn chain(layers: &[Layer], branch: &str) -> Vec<String> {
     out
 }
 
+/// Every layer based on `branch`, directly or through others, parents before the branches on
+/// them: the order they are restacked in after `branch` changed.
+pub(crate) fn dependents(layers: &[Layer], branch: &str) -> Vec<Layer> {
+    let mut rows = Vec::new();
+    push_children(layers, branch, 1, &mut rows);
+    // Nor the branch itself, through a loop.
+    rows.into_iter()
+        .map(|(_, l)| l)
+        .filter(|l| l.branch != branch)
+        .collect()
+}
+
+/// The layers to restack so that every stack is on its parents' tips again: each that needs
+/// it and every layer above one of those, parents first.
+pub(crate) fn to_restack(layers: &[Layer]) -> Vec<Layer> {
+    let mut out: Vec<Layer> = Vec::new();
+    for tree in trees(layers) {
+        for (_, layer) in tree.rows {
+            let parent_moves = out.iter().any(|l| l.branch == layer.parent);
+            if layer.needs_restack() || parent_moves {
+                out.push(layer);
+            }
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -139,6 +166,22 @@ mod tests {
         assert_eq!(got[0].stale(), (1, 0));
         assert_eq!(chain(&layers, "api"), ["main", "schema", "api"]);
         assert_eq!(chain(&layers, "main"), ["main"]);
+        let up: Vec<String> = dependents(&layers, "schema")
+            .into_iter()
+            .map(|l| l.branch)
+            .collect();
+        assert_eq!(up, ["api", "ui"]);
+        assert!(dependents(&layers, "ui").is_empty());
+        let all: Vec<String> = to_restack(&layers).into_iter().map(|l| l.branch).collect();
+        assert_eq!(all, ["ui"]);
+        // The bottom moved on: everything above it goes too, in order.
+        let layers = [
+            layer("ui", "api", 0),
+            layer("schema", "main", 2),
+            layer("api", "schema", 0),
+        ];
+        let all: Vec<String> = to_restack(&layers).into_iter().map(|l| l.branch).collect();
+        assert_eq!(all, ["schema", "api", "ui"]);
     }
 
     #[test]
@@ -171,6 +214,11 @@ mod tests {
         assert_eq!(got.len(), 1);
         assert_eq!(names(&got[0].rows), [(1, "c")]);
         assert_eq!(looped(&layers), ["a", "b"]);
+        let up: Vec<String> = dependents(&layers, "a")
+            .into_iter()
+            .map(|l| l.branch)
+            .collect();
+        assert_eq!(up, ["b"]);
         assert!(looped(&layers[2..]).is_empty());
         assert_eq!(chain(&layers, "a"), ["b", "a"]);
     }

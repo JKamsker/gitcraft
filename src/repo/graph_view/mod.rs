@@ -74,7 +74,7 @@ impl RepoTab {
         // is over the tab: the manual, the palette, the clone form).
         if !ui.ctx().egui_wants_keyboard_input()
             && self.dialog.is_none()
-            && self.stacks.dialog.is_none()
+            && !self.stacks.modal_open()
             && !self.keys_blocked
         {
             self.arrow_keys(ui, acts);

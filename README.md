@@ -126,6 +126,17 @@ so your config, credentials and hooks apply as usual.
   names its stack. _Changes api adds to schema_ in a layer's menu shows only its own changes.
   Undoable; _Remove from its stack_ takes a branch out, and renaming a branch takes the layers on
   it along.
+- Restacking: after a lower branch changes (amended, rebased, new commits), STACKS says _3
+  dependent branches need updating_; _Restack…_ (or _Restack the branches on it…_ in a branch's
+  menu) previews each one's new base and how many commits move, then replays them in order with
+  `git rebase --onto <parent's tip> <its old base>`, the old base being the parent's commit it was
+  recorded on. A branch checked out in another worktree is rebased in that worktree (which git's
+  `--update-refs` would skip); the others here, which needs this worktree clean, and what was
+  checked out comes back at the end. A conflict stops it, kept in the repository's config
+  (`gitcraft-restack.*`), so _Continue restack_ (after resolving) or _Abort restack_ (every
+  branch back, with its recorded base) works after a restart too. One Ctrl+Z puts every branch
+  it moved back. The interactive rebase has _Update dependent branches_ (`--update-refs`, git
+  2.38+) for rebasing a stack from its top in one go.
 - Remotes: add, edit (name and URL), fetch one, remove; their branches below each.
 - Worktrees: a yellow dot in place of the folder icon marks the others with uncommitted changes,
   here and in the switcher. Add (existing or new branch), open in the same tab (the tab then shows the branch, a searchable switcher and a button to close the worktree, and what you left keeps running; can be turned off in Settings) or a new one, open a terminal there, lock, remove,
