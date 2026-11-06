@@ -40,55 +40,126 @@ pub struct Violation {
 }
 
 /// The fenced paths the worktree at `worktree` touched since its branch left `base` (the
-/// main worktree's commit).
-pub fn check(worktree: &Path, base: &str, patterns: &[Pattern]) -> Result<Vec<Violation>, String> {
+/// main worktree's commit; with none, as in a bare repository, the remote's default branch or
+/// `main` / `master`). `own`: files gitcraft writes there itself, left out.
+pub fn check(
+    worktree: &Path,
+    base: &str,
+    patterns: &[Pattern],
+    own: &[&str],
+) -> Result<Vec<Violation>, String> {
     if patterns.is_empty() {
         return Ok(Vec::new());
     }
     let failed = |e: String| {
         format!(
-            "Could not check {} against the fence: {e}",
+            "Could not check {} against the agent fence: {e}",
             crate::remote::display(worktree)
         )
     };
-    let mut found: Vec<Violation> = Vec::new();
-    let mut add = |path: &str, how: How| {
-        if let Some(p) = fenced(patterns, path.trim_end_matches('/'))
-            && !found.iter().any(|v| v.path == path && v.how == how)
+    let base = if base.is_empty() {
+        fallback_base(worktree)
+            .ok_or_else(|| failed("there is no main branch to compare with".to_owned()))?
+    } else {
+        base.to_owned()
+    };
+    let mut found = Found::new(patterns, own);
+    for path in committed(worktree, &base, "HEAD").map_err(failed)? {
+        found.add(&path, How::Committed);
+    }
+    for (path, how) in working(worktree).map_err(failed)? {
+        found.add(&path, how);
+    }
+    for path in ignored(worktree, patterns).map_err(failed)? {
+        found.add(&path, How::Ignored);
+    }
+    Ok(found.done())
+}
+
+/// The fenced paths the commits of `tip` bring into `into` (what merging or rebasing onto
+/// it would): those changed since the two diverged.
+pub fn check_ref(
+    repo: &Path,
+    tip: &str,
+    into: &str,
+    patterns: &[Pattern],
+) -> Result<Vec<Violation>, String> {
+    let mut found = Found::new(patterns, &[]);
+    for path in committed(repo, into, tip)
+        .map_err(|e| format!("Could not check {tip} against the agent fence: {e}"))?
+    {
+        found.add(&path, How::Committed);
+    }
+    Ok(found.done())
+}
+
+/// What a check found so far.
+struct Found<'a> {
+    patterns: &'a [Pattern],
+    own: &'a [&'a str],
+    list: Vec<Violation>,
+}
+
+impl<'a> Found<'a> {
+    fn new(patterns: &'a [Pattern], own: &'a [&'a str]) -> Self {
+        Self {
+            patterns,
+            own,
+            list: Vec::new(),
+        }
+    }
+
+    fn add(&mut self, path: &str, how: How) {
+        let bare = path.trim_end_matches('/');
+        if self.own.contains(&bare) {
+            return;
+        }
+        if let Some(p) = fenced(self.patterns, bare)
+            && !self.list.iter().any(|v| v.path == path && v.how == how)
         {
-            found.push(Violation {
+            self.list.push(Violation {
                 path: path.to_owned(),
                 how,
                 pattern: p.text.clone(),
             });
         }
-    };
-    for path in committed(worktree, base).map_err(failed)? {
-        add(&path, How::Committed);
     }
-    for (path, how) in working(worktree).map_err(failed)? {
-        add(&path, how);
+
+    fn done(mut self) -> Vec<Violation> {
+        self.list
+            .sort_by(|a, b| (a.how, &a.path).cmp(&(b.how, &b.path)));
+        self.list
     }
-    found.sort_by(|a, b| (a.how, &a.path).cmp(&(b.how, &b.path)));
-    Ok(found)
 }
 
-/// The paths the commits of the worktree's HEAD changed since it left `base` (both names of
-/// a rename).
-fn committed(worktree: &Path, base: &str) -> Result<Vec<String>, String> {
-    if base.is_empty() || base.starts_with('-') {
-        return Ok(Vec::new());
+/// The branch a worktree is compared with when the main worktree has no commit (bare).
+fn fallback_base(worktree: &Path) -> Option<String> {
+    [
+        "refs/remotes/origin/HEAD",
+        "refs/heads/main",
+        "refs/heads/master",
+    ]
+    .iter()
+    .find_map(|r| {
+        crate::git::run(Some(worktree), &["rev-parse", "--verify", "--quiet", r])
+            .ok()
+            .map(|h| h.trim().to_owned())
+            .filter(|h| !h.is_empty())
+    })
+}
+
+/// The paths the commits of `tip` changed since it left `base` (both names of a rename).
+fn committed(dir: &Path, base: &str, tip: &str) -> Result<Vec<String>, String> {
+    if base.starts_with('-') || tip.starts_with('-') {
+        return Err(format!("{base} or {tip} is not a revision"));
     }
-    let fork = crate::git::run(
-        Some(worktree),
-        &["merge-base", "--end-of-options", base, "HEAD"],
-    )?;
+    let fork = crate::git::run(Some(dir), &["merge-base", "--end-of-options", base, tip])?;
     let fork = fork.trim();
     if fork.is_empty() {
-        return Ok(Vec::new());
+        return Err("it shares no history with the main branch".to_owned());
     }
     let out = crate::git::run(
-        Some(worktree),
+        Some(dir),
         &[
             "-c",
             "core.quotePath=false",
@@ -99,7 +170,7 @@ fn committed(worktree: &Path, base: &str) -> Result<Vec<String>, String> {
             "--no-ext-diff",
             "--end-of-options",
             fork,
-            "HEAD",
+            tip,
             "--",
         ],
     )?;
@@ -110,7 +181,7 @@ fn committed(worktree: &Path, base: &str) -> Result<Vec<String>, String> {
         .collect())
 }
 
-/// What `git status` shows in the worktree: changes, untracked and ignored files.
+/// What `git status` shows in the worktree: changes and untracked files.
 fn working(worktree: &Path) -> Result<Vec<(String, How)>, String> {
     let out = crate::git::run(
         Some(worktree),
@@ -121,11 +192,34 @@ fn working(worktree: &Path) -> Result<Vec<(String, How)>, String> {
             "--porcelain=v1",
             "-z",
             "--untracked-files=all",
-            "--ignored=matching",
             "--no-renames",
         ],
     )?;
     Ok(parse_status(&out))
+}
+
+/// The ignored files the fence covers, each of them, also inside ignored folders (which
+/// `git status` shows as one entry): listed by the fence's own pathspecs, so that git looks
+/// only for those.
+fn ignored(worktree: &Path, patterns: &[Pattern]) -> Result<Vec<String>, String> {
+    let specs: Vec<String> = patterns.iter().flat_map(Pattern::pathspecs).collect();
+    let mut args = vec![
+        "-c",
+        "core.quotePath=false",
+        "ls-files",
+        "--others",
+        "--ignored",
+        "--exclude-standard",
+        "-z",
+        "--",
+    ];
+    args.extend(specs.iter().map(String::as_str));
+    let out = crate::git::run(Some(worktree), &args)?;
+    Ok(out
+        .split('\0')
+        .filter(|p| !p.is_empty())
+        .map(str::to_owned)
+        .collect())
 }
 
 /// `git status --porcelain=v1 -z --no-renames`: `XY path`, each ended by a NUL.

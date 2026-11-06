@@ -122,15 +122,20 @@ so your config, credentials and hooks apply as usual.
   here and in the switcher. Add (existing or new branch), open in the same tab (the tab then shows the branch, a searchable switcher and a button to close the worktree, and what you left keeps running; can be turned off in Settings) or a new one, open a terminal there, lock, remove,
   prune.
 - Agent fence (a worktree's menu → _Agent fence…_): one list per repository of the paths agents
-  must stay out of (secrets, `.env`, CI workflows, migrations, lockfiles…), as in `.gitignore`,
-  kept in the repository's git config (`gitcraft.fence`, shared by its worktrees). Saving writes
-  it into every worktree's agent configs: Claude Code's deny rules in
-  `.claude/settings.local.json`, a block of `.cursorignore`, and a section of `AGENTS.md` for
-  Codex; only gitcraft's own entries are replaced. Rules can leak (a script the agent runs reads
-  the file anyway), so gitcraft checks the result: a linked worktree whose commits since it
-  left the main branch, uncommitted changes, untracked files or ignored files (which
-  `git worktree add` never makes) touch the fence turns red, its hover lists them, and merging
-  or fast-forwarding its branch asks for a confirmation first.
+  must stay out of (secrets, `.env`, CI workflows, migrations, lockfiles…), in `.gitignore`'s
+  syntax without `!` exceptions, any case, kept in the repository's git config
+  (`gitcraft.fence`, shared by its worktrees). It is written into every worktree's Claude Code
+  deny rules (`.claude/settings.local.json`, kept out of git through `info/exclude`), also into
+  worktrees added later, and, when ticked, into a block of `.cursorignore` and a section of
+  `AGENTS.md` for Codex (files a repository usually tracks, so they show as changed); only
+  gitcraft's own entries are replaced. Rules can leak (a script the agent runs reads the file
+  anyway), so gitcraft checks the result: a linked worktree whose commits (since its merge-base
+  with the main worktree's commit, or the default branch in a bare layout), uncommitted
+  changes, untracked files or ignored files touch the fence turns red, as does one that can't
+  be checked; its hover lists the paths. A merge, fast-forward or rebase onto any branch is
+  first checked in the background (what its commits bring in, and its worktree if it has one)
+  and asks for a confirmation when they touched the fence. Cherry-picks and merges on the forge
+  aren't checked. A copied `.env` in a worktree counts too: the fence says where agents work.
 - Submodules (shown when the repository has any): each with its commit and whether it is
   modified, not initialised or out of date. Update one or all (`git submodule update --init
   --recursive`), open one in a new tab (or double-click it), show it in its folder. _Keep

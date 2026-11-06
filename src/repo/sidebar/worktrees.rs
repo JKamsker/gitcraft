@@ -48,9 +48,11 @@ impl RepoTab {
                     crate::repo::fence_view::list_violations(fenced)
                 ));
             } else if let Some(e) = self.fence.error(&wt.path) {
-                tip.push_str(&format!("\n{e}"));
+                tip.push_str(&format!(
+                    "\n{e}\nUntil it can be, merging its branch asks first."
+                ));
             }
-            let r = worktree_row(ui, wt, !fenced.is_empty()).on_hover_text(tip);
+            let r = worktree_row(ui, wt, self.fence.red(&wt.path)).on_hover_text(tip);
             let can_open = !wt.current && wt.prunable.is_none();
             if r.double_clicked() && can_open {
                 acts.push(Action::OpenWorktree(wt.path.clone()));

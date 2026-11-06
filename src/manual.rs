@@ -68,7 +68,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Right-click a file for its history, its blame or the whole file as it is at the commit.",
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",
-            "Right-click a worktree and choose Agent fence… to list the paths agents must stay out of; saving writes them into each worktree's Claude Code, Cursor and Codex configs. A linked worktree that touched one anyway (committed, changed, untracked or ignored files) turns red, and merging its branch asks first.",
+            "Right-click a worktree and choose Agent fence… to list the paths agents must stay out of; they are written into each worktree's Claude Code deny rules (and, if ticked, .cursorignore and AGENTS.md). A linked worktree that touched one anyway (committed, changed, untracked or ignored files), or can't be checked, turns red; merging or rebasing onto a branch that touched one asks first.",
             "Right-click a pull request and choose Open in worktree to work on its branch in a worktree of its own, made for it when there is none.",
             "A terminal panel with tabs, in the repository's folder.",
         ],

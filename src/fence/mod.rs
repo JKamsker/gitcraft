@@ -13,7 +13,9 @@ mod tests;
 
 #[cfg(test)]
 pub use check::How;
-pub use check::{Violation, check};
-pub use configs::{AGENTS, CLAUDE, CURSOR, write_all};
-pub use pattern::{Pattern, parse_list};
-pub use store::{SUGGESTED, read, write};
+pub use check::{Violation, check, check_ref};
+pub use configs::{AGENTS, CLAUDE, CURSOR, Targets, write_all};
+#[cfg(test)]
+pub use pattern::Pattern;
+pub use pattern::parse_list;
+pub use store::{SUGGESTED, read, read_targets, write, write_targets};
