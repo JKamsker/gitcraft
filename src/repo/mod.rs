@@ -18,6 +18,7 @@ mod file_text;
 mod file_view;
 mod graph_view;
 mod highlight;
+mod interaction;
 mod keep_submodules;
 mod layout;
 mod load;
@@ -184,6 +185,8 @@ pub struct RepoTab {
     bisect: bisect::Bisecting,
     /// The test lane's results, and the run filling it.
     test_lane: test_lane::TestLane,
+    /// The search for the commits of two branches that fail together.
+    interactions: interaction::Interactions,
 
     commit_summary: String,
     commit_body: String,
@@ -333,6 +336,7 @@ impl RepoTab {
             conflict_generation: 0,
             bisect: Default::default(),
             test_lane: Default::default(),
+            interactions: Default::default(),
             commit_summary: String::new(),
             commit_body: String::new(),
             amend: false,

@@ -391,6 +391,7 @@ fn integrate_items(ui: &mut Ui, acts: &mut Vec<Action>, b: &Branch, current: &st
     {
         acts.push(interactive_rebase_action(BranchRef::local(&b.name)));
     }
+    crate::repo::interaction::interaction_item(ui, acts, &b.name);
     ui.separator();
     graph_view::compare_items(ui, acts, BranchRef::local(&b.name), current);
 }

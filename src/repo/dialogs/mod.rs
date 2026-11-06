@@ -3,6 +3,7 @@
 mod bisect;
 mod branch;
 mod confirm;
+mod interaction;
 mod remote;
 mod test_commits;
 mod upstream;
@@ -115,6 +116,11 @@ pub enum Dialog {
     /// `git bisect run` with the command typed.
     BisectRun {
         command: String,
+        focus: bool,
+    },
+    /// Look for the commits of two branches that fail together.
+    FindInteraction {
+        spec: crate::git::InteractionSpec,
         focus: bool,
     },
     /// Test a range of commits; `stored` is the repository's test command.
@@ -434,6 +440,9 @@ impl RepoTab {
                 ),
                 Dialog::BisectRun { command, focus } => {
                     bisect::bisect_run(ui, enter, &machine, command, focus)
+                }
+                Dialog::FindInteraction { spec, focus } => {
+                    interaction::find_interaction(ui, enter, &machine, spec, focus)
                 }
                 Dialog::TestCommits {
                     start,

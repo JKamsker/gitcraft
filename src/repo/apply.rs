@@ -250,6 +250,7 @@ impl RepoTab {
             Action::SolveWithMergiraf => self.solve_with_mergiraf(ctx),
             Action::Bisect(act) => self.bisect_act(act, ctx),
             Action::TestLane(act) => self.test_lane_act(act, ctx),
+            Action::Interaction(act) => self.interaction_act(act, ctx),
             Action::SaveConflict => self.save_conflict(ctx),
         }
     }

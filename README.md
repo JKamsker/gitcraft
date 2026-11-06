@@ -120,6 +120,11 @@ so your config, credentials and hooks apply as usual.
   one for what the test printed. Results are kept by tree in git notes in git-test's format
   (`refs/notes/tests/default`, `test.default.command`), so `git test` and gitcraft share them
   and a rebase that keeps a commit's files keeps its result.
+- Find the interaction: two branches pass alone but fail together. _Find the interaction…_ on a
+  branch tests subsets of its commits and the checked-out branch's, applied where the two
+  diverged, in a scratch worktree (delta debugging, `ddmin`), until it can say _these two
+  commits fail together; either alone passes_. It has a test budget, and re-runs a failure
+  before believing it, setting flaky results aside.
 - Quick edits from a commit's menu, for commits of the checked-out branch: _Edit commit
   message_, _Drop commit_, _Move commit up_ / _down_, each a rebase without the editor and undone
   with Ctrl+Z. What can't be done (a merge, merges after the commit) is greyed out with why.
