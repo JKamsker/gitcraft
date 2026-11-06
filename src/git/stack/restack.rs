@@ -54,6 +54,9 @@ pub struct Pending {
     /// What was checked out here: `refs/heads/<branch>`, or a commit.
     pub head: String,
     pub before: Vec<Before>,
+    /// Where each layer done was left: (branch, tip). Aborting puts back only a branch still
+    /// there, never one with commits made on it since.
+    pub after: Vec<(String, String)>,
     /// The other worktree the current step's rebase runs in (`None`: this one). Mid-rebase,
     /// that worktree's branch reads as detached, so it can't be found by its branch then.
     pub at: Option<PathBuf>,
@@ -94,6 +97,9 @@ pub struct Moved {
 pub enum Outcome {
     /// Every layer is on its parent's tip; these moved.
     Done(Vec<Moved>),
+    /// The restack was given up: every branch put back, but these, which had commits made on
+    /// them after they were restacked (left as they are).
+    Aborted(Vec<String>),
     /// A layer's rebase stopped on conflicts, in this worktree or the one named.
     Stopped {
         branch: String,
@@ -198,6 +204,9 @@ pub(crate) fn parse_pending(out: &str) -> Option<Pending> {
         match (name, fields.as_slice()) {
             ("head", [head]) => pending.head = (*head).to_owned(),
             ("at", _) if !value.is_empty() => pending.at = Some(PathBuf::from(value)),
+            ("after", [branch, tip]) => pending
+                .after
+                .push(((*branch).to_owned(), (*tip).to_owned())),
             ("done", [n]) => pending.done = n.parse().unwrap_or(0),
             ("step", [branch, parent, old_base]) => pending.steps.push(Step {
                 branch: (*branch).to_owned(),
@@ -256,6 +265,7 @@ pub fn start(repo: &Path, steps: Vec<Step>) -> Result<Outcome, String> {
         done: 0,
         head,
         before,
+        after: Vec::new(),
         at: None,
     };
     save(repo, &pending)?;
@@ -341,11 +351,26 @@ fn run_from(repo: &Path, mut pending: Pending) -> Result<Outcome, String> {
             )
         })?;
         let tip = local_ref(&step.branch);
-        if !is_ancestor(repo, &new_base, &tip) {
+        // On its parent's tip already, from the base it was on (a parent rewound to an older
+        // commit is not: the commits it lost are dropped from the layer too).
+        let done =
+            is_ancestor(repo, &new_base, &tip) && is_ancestor(repo, &step.old_base, &new_base);
+        if !done {
             let at = match place(&worktrees, &step.branch) {
                 Place::Worktree(path) => Some(path),
                 _ => None,
             };
+            // A merge or the like left half done there isn't this restack's to continue or
+            // abort.
+            if let Some(dir) = &at
+                && let Some(state) = git::status(dir)?.in_progress
+            {
+                return Err(format!(
+                    "The worktree at {} has a {} in progress: finish or abort it first",
+                    dir.display(),
+                    state.label().to_lowercase()
+                ));
+            }
             keep_at(repo, at.as_deref())?;
             if let Err(e) = rebase(repo, at.as_deref(), &step, &new_base) {
                 let stopped = rebase_stopped(repo, at.as_deref())?;
@@ -411,6 +436,10 @@ fn finish_step(repo: &Path, pending: &mut Pending, new_base: &str) -> Result<(),
         return Ok(());
     };
     run_op(repo, &set_op(&config_key(&step.branch, BASE_KEY), new_base))?;
+    let tip = resolve(repo, &local_ref(&step.branch))?;
+    let after = format!("{}\t{tip}", step.branch);
+    run_op(repo, &add_op(&format!("{SECTION}.after"), &after))?;
+    pending.after.push((step.branch.clone(), tip));
     pending.done += 1;
     let done = pending.done.to_string();
     run(
@@ -488,13 +517,22 @@ pub fn resume(repo: &Path) -> Result<Outcome, String> {
             message: e,
         });
     }
-    // Finished (here or in the terminal), or aborted: then it runs again.
+    // Finished (by the rebase continued here, or elsewhere): done. Aborted: it runs again.
+    let mut pending = pending;
+    if !rebase_stopped(repo, at.as_deref())?
+        && let Ok(new_base) = resolve(repo, &local_ref(&step.parent))
+        && is_ancestor(repo, &new_base, &local_ref(&step.branch))
+    {
+        finish_step(repo, &mut pending, &new_base)?;
+    }
     run_from(repo, pending)
 }
 
 /// Gives up the restack under way: aborts the rebase it stopped in, puts every branch back
 /// where it was, with its recorded base, and checks out again what was checked out here.
-pub fn abort(repo: &Path) -> Result<(), String> {
+/// A branch with commits made on it after it was restacked is left as it is: its name comes
+/// back, and its recorded base stays.
+pub fn abort(repo: &Path) -> Result<Vec<String>, String> {
     let pending = pending(repo)?.ok_or("No restack is under way.")?;
     if pending.current().is_some() {
         let at = pending.at.as_deref();
@@ -503,8 +541,17 @@ pub fn abort(repo: &Path) -> Result<(), String> {
         }
     }
     let worktrees = git::worktree_list(repo, None)?;
+    let mut kept = Vec::new();
     for b in &pending.before {
         let now = resolve(repo, &local_ref(&b.branch)).unwrap_or_default();
+        let restacked = pending
+            .after
+            .iter()
+            .any(|(br, tip)| *br == b.branch && *tip == now);
+        if now != b.tip && !restacked {
+            kept.push(b.branch.clone());
+            continue;
+        }
         if now != b.tip {
             match place(&worktrees, &b.branch) {
                 Place::Here => run(Some(repo), &["reset", "-q", "--keep", &b.tip])?,
@@ -527,5 +574,6 @@ pub fn abort(repo: &Path) -> Result<(), String> {
         };
     }
     checkout_back(repo, &pending.head)?;
-    clear(repo)
+    clear(repo)?;
+    Ok(kept)
 }
