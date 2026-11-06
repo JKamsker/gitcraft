@@ -132,7 +132,17 @@ impl RepoTab {
             } else if esc && self.ci_view.is_some() {
                 acts.push(Action::CloseCi);
             } else if esc && self.versions.view.is_some() {
-                acts.push(Action::Versions(super::versions::VersionsAct::Close));
+                // The patch of a pair first, then the comparison.
+                let open_pair = self
+                    .versions
+                    .view
+                    .as_ref()
+                    .is_some_and(|v| v.selected.is_some());
+                acts.push(Action::Versions(if open_pair {
+                    super::versions::VersionsAct::Deselect
+                } else {
+                    super::versions::VersionsAct::Close
+                }));
             } else if esc && self.pr_view.is_some() {
                 acts.push(Action::ClosePr);
             } else if esc && self.compare.is_some() {

@@ -100,16 +100,17 @@ impl RepoTab {
             t.text,
         );
         let moved = self.pr_moved_since_seen(pr);
+        // First, where a long branch name can't cut it off.
         let sub = format!(
-            "{} · {}{}{}",
-            pr.branch,
-            pr.author,
-            if pr.draft { " · draft" } else { "" },
+            "{}{} · {}{}",
             if moved {
-                " · changed since you looked"
+                "changed since you last looked · "
             } else {
                 ""
-            }
+            },
+            pr.branch,
+            pr.author,
+            if pr.draft { " · draft" } else { "" }
         );
         p.text(
             pos2(rect.left() + 48.0, y + 8.0),
@@ -124,7 +125,8 @@ impl RepoTab {
         }
         let has_view = forge.has_pages();
         // Without a page here, opening it in the browser is looking at it.
-        let seen_on_open = (!has_view).then_some(Action::Versions(
+        // Not when it changed since: that would take away what changed before it is compared.
+        let seen_on_open = (!has_view && !moved).then_some(Action::Versions(
             crate::repo::versions::VersionsAct::PrSeen(pr.number),
         ));
         let r = r.on_hover_text(if has_view {
@@ -153,7 +155,7 @@ impl RepoTab {
                 }
                 if ui.button("Open in the browser").clicked() {
                     acts.push(Action::OpenUrl(pr.url.clone()));
-                    if !has_view {
+                    if !has_view && !moved {
                         acts.push(Action::Versions(
                             crate::repo::versions::VersionsAct::PrSeen(pr.number),
                         ));

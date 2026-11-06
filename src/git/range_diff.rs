@@ -72,7 +72,8 @@ pub struct RangeDiff {
     pub pairs: Vec<Pair>,
 }
 
-/// How many pairs are of each kind, and how many of those in both series moved.
+/// How many pairs are of each kind; an unchanged pair that moved counts as moved, not the
+/// same, so that the counts add up to the pairs.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Counts {
     pub same: usize,
@@ -94,12 +95,12 @@ impl RangeDiff {
         let mut counts = Counts::default();
         for pair in &self.pairs {
             match pair.kind {
+                PairKind::Same if pair.moved => counts.moved += 1,
                 PairKind::Same => counts.same += 1,
                 PairKind::Changed => counts.changed += 1,
                 PairKind::Added => counts.added += 1,
                 PairKind::Dropped => counts.dropped += 1,
             }
-            counts.moved += usize::from(pair.moved);
         }
         counts
     }
@@ -107,16 +108,17 @@ impl RangeDiff {
 
 /// Compares the series `old` with `new` (`git range-diff old new`).
 pub fn range_diff(repo: &Path, old: &Series, new: &Series) -> Result<RangeDiff, String> {
-    let old_commits = series_commits(repo, old)?;
-    let new_commits = series_commits(repo, new)?;
-    for (side, commits) in [("old", &old_commits), ("new", &new_commits)] {
-        if commits.len() > MAX_SERIES {
+    // Counted first: listing a huge series diffs every commit of it.
+    for (side, series) in [("old", old), ("new", new)] {
+        let n = series_len(repo, series)?;
+        if n > MAX_SERIES {
             return Err(format!(
-                "The {side} version has {} commits, more than the {MAX_SERIES} gitcraft compares",
-                commits.len()
+                "the {side} version has {n} commits, more than the {MAX_SERIES} gitcraft compares"
             ));
         }
     }
+    let old_commits = series_commits(repo, old)?;
+    let new_commits = series_commits(repo, new)?;
     // range-diff refuses a range without commits: everything on the other side is then added
     // or dropped, nothing to pair.
     if old_commits.is_empty() || new_commits.is_empty() {
@@ -136,6 +138,20 @@ pub fn range_diff(repo: &Path, old: &Series, new: &Series) -> Result<RangeDiff, 
     Ok(resolve(raw, &old_commits, &new_commits))
 }
 
+/// How many commits `series` has, merges left out.
+fn series_len(repo: &Path, series: &Series) -> Result<usize, String> {
+    for rev in [&series.base, &series.tip] {
+        super::not_an_option(rev)?;
+    }
+    let out = run(
+        Some(repo),
+        &["rev-list", "--count", "--no-merges", &series.range(), "--"],
+    )?;
+    out.trim()
+        .parse()
+        .map_err(|_| format!("git counted {:?} commits", out.trim()))
+}
+
 /// The commits of `series`, oldest first, as range-diff takes them (merges left out).
 fn series_commits(repo: &Path, series: &Series) -> Result<Vec<SeriesCommit>, String> {
     // Ranges built from hashes the callers resolved: nothing here reads as an option.
@@ -151,6 +167,8 @@ fn series_commits(repo: &Path, series: &Series) -> Result<Vec<SeriesCommit>, Str
             UTF8,
             "--no-merges",
             "--reverse",
+            // As range-diff orders (and numbers) a series.
+            "--date-order",
             "--shortstat",
             &format,
             &series.range(),
@@ -215,8 +233,8 @@ pub(crate) struct RawPair {
 pub(crate) fn parse(out: &str) -> Vec<RawPair> {
     let mut pairs: Vec<RawPair> = Vec::new();
     for line in out.split_terminator('\n') {
-        let line = line.strip_suffix('\r').unwrap_or(line);
-        if let Some(pair) = header(line) {
+        // A carriage return ends a pair's line only; in a patch it is part of the file's line.
+        if let Some(pair) = header(line.strip_suffix('\r').unwrap_or(line)) {
             pairs.push(pair);
         } else if let Some(last) = pairs.last_mut() {
             // Only what follows a pair belongs to it; a blank line keeps its place.
@@ -292,7 +310,9 @@ fn resolve(raw: Vec<RawPair>, old: &[SeriesCommit], new: &[SeriesCommit]) -> Ran
             .iter()
             .find(|c| c.hash.starts_with(hash.as_str()))
             .or_else(|| list.get(n.checked_sub(1)?))
-            .cloned();
+            .cloned()
+            // Numbered as range-diff numbers it, which what moved is worked out from.
+            .map(|c| SeriesCommit { index: *n, ..c });
         Some(found.unwrap_or_else(|| SeriesCommit {
             hash: hash.clone(),
             summary: summary.to_owned(),
