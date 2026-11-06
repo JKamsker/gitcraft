@@ -32,7 +32,10 @@ so your config, credentials and hooks apply as usual.
 - git, and every file read or written in the repository (diffs of the working tree, staging
   lines, the conflict editor, `.gitignore`, rebase todo lists), runs on that machine, with its
   own git, config, credentials and hooks. Nothing has to be installed there but git and a POSIX
-  `sh`.
+  `sh` with the tools any Linux, BSD or macOS has: `mktemp -d` (each shell's temporary
+  folder), `base64 -d` (what a command reads, a patch or a file's new contents), `cat` and
+  `wc` (passing output back), `stat` (GNU or BSD: noticing changes), and `ps` with `awk`
+  (stopping a command that hung, and all it started).
 - A few shells per machine are kept open (`ssh -T host sh`, `wsl.exe -d distro --exec sh`), so a
   command costs one round trip, not a new connection; history is read page by page in them
   too. SSH signs in as it does in a terminal (keys, an agent, `~/.ssh/config`;

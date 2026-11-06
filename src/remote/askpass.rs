@@ -13,7 +13,7 @@
 //! or forgotten.
 
 use std::collections::{HashMap, HashSet};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{Sender, channel};
@@ -299,14 +299,31 @@ fn tell(server: &Server, notice: String) {
 
 /// One question from a helper: `<token> <session> <kind> <prompt in base64>`, answered
 /// `OK <answer in base64>` or `NO`.
+/// The longest request a helper sends: ssh's prompt (a few lines at most) in base64, and the
+/// words before it. Anything can connect to the port: what is longer is no helper's, and is
+/// refused before it is held, let alone its token checked.
+const MAX_REQUEST: u64 = 64 * 1024;
+
+/// One request line, its `\n` included; `None` for one longer than [`MAX_REQUEST`], cut
+/// short, or not text.
+fn read_request(stream: &TcpStream) -> std::io::Result<Option<String>> {
+    let mut line = Vec::new();
+    BufReader::new(stream.take(MAX_REQUEST)).read_until(b'\n', &mut line)?;
+    if line.last() != Some(&b'\n') {
+        return Ok(None);
+    }
+    Ok(String::from_utf8(line).ok())
+}
+
 fn serve(stream: TcpStream) -> std::io::Result<()> {
     static IDS: AtomicU64 = AtomicU64::new(1);
     let Some(server) = server() else {
         return Ok(());
     };
     stream.set_read_timeout(Some(Duration::from_secs(10)))?;
-    let mut line = String::new();
-    BufReader::new(&stream).read_line(&mut line)?;
+    let Some(line) = read_request(&stream)? else {
+        return Ok(());
+    };
     stream.set_read_timeout(None)?;
     let mut words = line.split_whitespace();
     let (Some(token), Some(session), Some(kind), prompt) =
@@ -699,6 +716,30 @@ mod tests {
             std::thread::sleep(Duration::from_millis(10));
         }
         None
+    }
+
+    /// A request longer than any helper's is dropped once that much is read: never held whole,
+    /// never answered, nothing asked.
+    #[test]
+    fn an_endless_request_is_cut_off() -> Result<(), String> {
+        let found = session_for("SSH · seven");
+        let port: u16 = found
+            .split_whitespace()
+            .next()
+            .and_then(|p| p.parse().ok())
+            .ok_or("no port")?;
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).map_err(|e| e.to_string())?;
+        stream
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .map_err(|e| e.to_string())?;
+        // No newline, ever: more than the limit, then the end of what it sends.
+        let endless = vec![b'a'; usize::try_from(MAX_REQUEST).unwrap_or(0) + 4096];
+        let _ = stream.write_all(&endless);
+        let _ = stream.shutdown(std::net::Shutdown::Write);
+        let mut reply = Vec::new();
+        let _ = stream.read_to_end(&mut reply);
+        assert!(reply.is_empty(), "{:?}", String::from_utf8_lossy(&reply));
+        Ok(())
     }
 
     /// Without the token, nothing is asked and nothing answered.

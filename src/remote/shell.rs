@@ -8,7 +8,7 @@ use std::sync::mpsc::{Receiver, RecvTimeoutError, channel};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use super::session::{Output, READY, nonce, parse_header, parse_job, setup_script};
+use super::session::{Output, nonce, parse_header, parse_job, parse_ready, setup_script};
 
 /// How long the connection may take to be made and signed in to.
 const CONNECT_FOR: Duration = Duration::from_secs(30);
@@ -20,6 +20,9 @@ const CHECK_AFTER: Duration = Duration::from_secs(20);
 
 /// How long that check may take.
 const CHECK_FOR: Duration = Duration::from_secs(5);
+
+/// How long the error output of a process that failed to connect is read for, at most.
+pub(super) const SAID_WITHIN: Duration = Duration::from_secs(2);
 
 /// What went wrong running a command in a shell.
 pub(super) enum Failure {
@@ -57,6 +60,9 @@ pub(super) struct Shell {
     label: String,
     /// When it last answered.
     pub(super) used: Instant,
+    /// Its process there, as it said when ready: stopped, with what runs in it, when a command
+    /// hangs before saying its own (closing the connection doesn't stop what runs there).
+    remote_pid: Option<u32>,
 }
 
 impl Shell {
@@ -85,6 +91,7 @@ impl Shell {
             said,
             label: label.to_owned(),
             used: Instant::now(),
+            remote_pid: None,
         };
         match shell.handshake() {
             Ok(()) => {
@@ -98,10 +105,7 @@ impl Shell {
                 let _ = shell.child.wait();
                 // Its error output says why, once read to the end: not waited for long, as a
                 // proxy it started can keep it open.
-                let until = Instant::now() + Duration::from_secs(2);
-                while !drain.is_finished() && Instant::now() < until {
-                    std::thread::sleep(Duration::from_millis(20));
-                }
+                wait_for(&drain, SAID_WITHIN);
                 let said = shell.said_text();
                 Err(if said.is_empty() {
                     e
@@ -123,8 +127,12 @@ impl Shell {
         let mut deadline = Instant::now() + CONNECT_FOR;
         loop {
             match self.read_line(Some(deadline)) {
-                Ok(line) if line.trim_ascii_end() == READY.as_bytes() => return Ok(()),
-                Ok(_) => {}
+                Ok(line) => {
+                    if let Some(pid) = parse_ready(&line) {
+                        self.remote_pid = pid;
+                        return Ok(());
+                    }
+                }
                 Err(ReadError::Closed) => return Err(lost(&"the connection closed")),
                 // The user is being asked something (a password): their time, not the network's.
                 Err(ReadError::TimedOut) if super::askpass::asked_lately(CONNECT_FOR) => {
@@ -167,9 +175,9 @@ impl Shell {
         answered
     }
 
-    /// Runs `script` (see `session::framed`), the command of `nonce`.
     /// Runs `script` (see `session::framed`), the command of `nonce`, which must be done by
-    /// `deadline`.
+    /// `deadline`. Every read has that deadline: one past it stops what runs there, the
+    /// command's own process when it said it, else the shell's (with all it started).
     pub(super) fn run(
         &mut self,
         script: &str,
@@ -184,15 +192,17 @@ impl Shell {
         // From here on, the command may have run: nothing is run again.
         let lost = |s: &Self, why: &str| Failure::Lost(s.lost(why));
         let closed = |s: &Self| lost(s, "the connection closed while a command ran");
-        match self.read_line(None) {
+        let shell_pid = self.remote_pid;
+        match self.read_line(Some(deadline)) {
             Ok(line) if line.trim_ascii_end() == format!("S {nonce}").as_bytes() => {}
             Ok(_) => return Err(lost(self, "it answered out of turn")),
-            Err(_) => return Err(closed(self)),
+            Err(ReadError::TimedOut) => return Err(Failure::TimedOut(shell_pid)),
+            Err(ReadError::Closed) => return Err(closed(self)),
         }
         // `J <nonce> <pid>` (no process: the input couldn't be passed on, `R` comes next).
         let mut line = match self.read_line(Some(deadline)) {
             Ok(line) => line,
-            Err(ReadError::TimedOut) => return Err(Failure::TimedOut(None)),
+            Err(ReadError::TimedOut) => return Err(Failure::TimedOut(shell_pid)),
             Err(ReadError::Closed) => return Err(closed(self)),
         };
         let pid = parse_job(&String::from_utf8_lossy(&line), nonce);
@@ -207,8 +217,10 @@ impl Shell {
         else {
             return Err(lost(self, "it answered out of turn"));
         };
+        // The command ended; what it left running (and the shell) is stopped if its output
+        // doesn't come in time.
         let timed_out_or_closed = |e: ReadError, s: &Self| match e {
-            ReadError::TimedOut => Failure::TimedOut(None),
+            ReadError::TimedOut => Failure::TimedOut(shell_pid),
             ReadError::Closed => closed(s),
         };
         let stdout = self
@@ -353,6 +365,23 @@ fn drain_errors(
     })
 }
 
+/// What a process that has ended said on `stderr`: read to its end, but waited for `within` at
+/// most, as a proxy it started can keep the pipe open after it.
+pub(super) fn said_on_ending(stderr: std::process::ChildStderr, within: Duration) -> String {
+    let said = Arc::new(Mutex::new(String::new()));
+    let drain = drain_errors(stderr, Arc::clone(&said));
+    wait_for(&drain, within);
+    lock(&said).trim().to_owned()
+}
+
+/// Waits for `drain` to end, `within` at most.
+fn wait_for(drain: &std::thread::JoinHandle<()>, within: Duration) {
+    let until = Instant::now() + within;
+    while !drain.is_finished() && Instant::now() < until {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
 /// A lock, also when a thread panicked holding it: what it guards stays usable.
 pub(super) fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -433,6 +462,25 @@ mod tests {
         let out = run_in(&mut shell, &req)?;
         assert_eq!(out.code, 1);
         assert!(crate::remote::session::is_missing_folder(&out.stderr));
+        Ok(())
+    }
+
+    /// A shell that never says the command started is given up on by the deadline, and its own
+    /// process (as it said when ready) is the one to stop.
+    #[test]
+    fn a_command_that_never_starts_times_out() -> Result<(), String> {
+        let mut shell = local_shell()?;
+        let pid = shell.remote_pid.ok_or("the shell didn't say its process")?;
+        let nonce = nonce();
+        let started = Instant::now();
+        // Not framed: it never says `S`.
+        let ran = shell.run(
+            "sleep 5\n",
+            &nonce,
+            Instant::now() + Duration::from_millis(300),
+        );
+        assert!(matches!(ran, Err(Failure::TimedOut(Some(p))) if p == pid));
+        assert!(started.elapsed() < Duration::from_secs(3));
         Ok(())
     }
 

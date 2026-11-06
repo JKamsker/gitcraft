@@ -177,6 +177,26 @@ fn hung_commands_are_stopped(host: &Host) -> Result<(), String> {
         },
     )?;
     assert_eq!(String::from_utf8_lossy(&left.stdout).trim(), "0");
+    // What it started started something in turn (a hook running a program): stopped as well.
+    let deep = format!("{}.{}", std::process::id() % 1000 + 100, 75);
+    let hung = exec(
+        host,
+        &Request {
+            script: format!("sh -c 'sleep {deep}; true'; true"),
+            timeout: Some(std::time::Duration::from_secs(2)),
+            ..Request::default()
+        },
+    );
+    assert!(hung.is_err());
+    std::thread::sleep(std::time::Duration::from_secs(4));
+    let left = exec(
+        host,
+        &Request {
+            script: format!("ps -eo args | grep -c '^sleep {deep}$' || true"),
+            ..Request::default()
+        },
+    )?;
+    assert_eq!(String::from_utf8_lossy(&left.stdout).trim(), "0");
     Ok(())
 }
 
@@ -219,5 +239,8 @@ fn work_in(repo: &PathBuf) -> Result<(), String> {
     assert!(git::add_to_gitignore(repo, "build/")?);
     let ignore = read_to_string(&repo.join(".gitignore")).map_err(|e| e.to_string())?;
     assert_eq!(ignore, "build/\n");
-    read_like_a_tab(repo)
+    read_like_a_tab(repo)?;
+    // The working tree's file, read as the tab reads it, is what was written there.
+    assert_eq!(git::file_at(repo, None, "a.txt")?, b"1\nX\n3\n");
+    Ok(())
 }

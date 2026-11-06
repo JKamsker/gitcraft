@@ -142,31 +142,39 @@ pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
     }
 }
 
-/// Stops the process `pid` on `host` (a command that hung) and what it started, in the
-/// background: politely, then for good.
+/// Stops the process `pid` on `host` (a command that hung, or the shell it hung in) and
+/// everything it started, however deep, in the background: politely, then for good. The
+/// processes are listed first, as one stopped leaves what it started to another parent.
 fn stop(host: Host, pid: u32) {
     std::thread::spawn(move || {
-        let script = format!(
-            concat!(
-                "pkill -TERM -P {pid} 2>/dev/null; kill -TERM {pid} 2>/dev/null
-",
-                "sleep 2
-",
-                "pkill -KILL -P {pid} 2>/dev/null; kill -KILL {pid} 2>/dev/null
-",
-                "true",
-            ),
-            pid = pid
-        );
         let _ = exec(
             &host,
             &Request {
-                script,
+                script: stop_script(pid),
                 timeout: Some(Duration::from_secs(30)),
                 ..Request::default()
             },
         );
     });
+}
+
+/// The script [`stop`] runs: `pid` and its descendants (from `ps`, which every system has with
+/// these options), else `pid` alone.
+fn stop_script(pid: u32) -> String {
+    format!(
+        concat!(
+            "all=$(ps -A -o pid= -o ppid= 2>/dev/null | awk -v root={pid} '",
+            "{{ up[$1] = $2 }} END {{ print root; seen[root] = 1; more = 1; ",
+            "while (more) {{ more = 0; for (p in up) if (!(p in seen) && (up[p] in seen)) ",
+            "{{ seen[p] = 1; print p; more = 1 }} }} }}')\n",
+            "[ -n \"$all\" ] || all={pid}\n",
+            "kill -TERM $all 2>/dev/null\n",
+            "sleep 2\n",
+            "kill -KILL $all 2>/dev/null\n",
+            "true\n",
+        ),
+        pid = pid
+    )
 }
 
 /// Starts `req` on `host` in a process of its own, whose output the caller reads as it comes
@@ -193,12 +201,13 @@ pub fn spawn(host: &Host, req: &Request) -> Result<Child, String> {
     if !ready {
         let _ = child.kill();
         let _ = child.wait();
-        let mut said = String::new();
-        if let Some(mut stderr) = child.stderr.take() {
-            let _ = stderr.read_to_string(&mut said);
-        }
-        let said = said.replace('\0', "");
-        return Err(format!("could not reach {}: {}", host.label(), said.trim()));
+        // What ssh said, as far as it comes in a moment (a proxy can hold the pipe open).
+        let said = child
+            .stderr
+            .take()
+            .map(|stderr| super::shell::said_on_ending(stderr, super::shell::SAID_WITHIN))
+            .unwrap_or_default();
+        return Err(format!("could not reach {}: {said}", host.label()));
     }
     if let Some(attempt) = attempt {
         attempt.connected();
@@ -237,7 +246,7 @@ pub(super) fn start_shell(host: &Host) -> Result<Shell, String> {
 }
 
 /// What a new shell is sent first: its temporary folder (removed when the shell ends, also on
-/// a hang-up or a signal), its PATH, then [`READY`].
+/// a hang-up or a signal), its PATH, then [`READY`] and its process (see [`parse_ready`]).
 pub(super) fn setup_script() -> String {
     format!(
         concat!(
@@ -245,7 +254,7 @@ pub(super) fn setup_script() -> String {
             "{path}\n",
             "trap 'rm -rf \"$T\"' EXIT\n",
             "trap 'rm -rf \"$T\"; exit 1' HUP INT TERM PIPE\n",
-            "printf '\\n{ready}\\n'\n",
+            "printf '\\n{ready} %s\\n' \"$$\"\n",
         ),
         make = MAKE_TEMP,
         path = MORE_PATH,
@@ -407,6 +416,18 @@ pub(super) fn framed(req: &Request, nonce: &str) -> String {
     s
 }
 
+/// `<READY> <pid>`, as a new shell says it's ready: `Some` with its process, which is stopped
+/// with what it runs if a command in it hangs before its own process is known.
+pub(super) fn parse_ready(line: &[u8]) -> Option<Option<u32>> {
+    let line = String::from_utf8_lossy(line);
+    let mut words = line.split_whitespace();
+    if words.next()? != READY {
+        return None;
+    }
+    let pid = words.next().and_then(|p| p.parse().ok());
+    (words.next().is_none()).then_some(pid)
+}
+
 /// `J <nonce> <pid>`: the process of the command of `nonce`.
 pub(super) fn parse_job(line: &str, nonce: &str) -> Option<u32> {
     let mut words = line.split_whitespace();
@@ -500,6 +521,41 @@ mod tests {
         folded.dedup();
         assert_eq!(names.len(), folded.len(), "{names:?}");
         assert!(names.len() >= 5, "{names:?}");
+    }
+
+    #[test]
+    fn a_ready_shell_says_its_process() {
+        assert_eq!(parse_ready(b"__GITCRAFT_READY__ 4242\n"), Some(Some(4242)));
+        assert_eq!(parse_ready(b"__GITCRAFT_READY__\n"), Some(None));
+        assert_eq!(parse_ready(b"login banner\n"), None);
+        assert_eq!(parse_ready(b"__GITCRAFT_READY__ 1 2\n"), None);
+    }
+
+    /// The stop script ends a process and what it started, however deep.
+    #[cfg(unix)]
+    #[test]
+    fn stopping_ends_a_whole_tree() -> Result<(), String> {
+        let marker = format!("{}.5", std::process::id() % 1000 + 200);
+        let mut tree = Command::new("sh")
+            .args(["-c", &format!("sh -c 'sleep {marker}; true'; true")])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        std::thread::sleep(Duration::from_millis(300));
+        let stopped = Command::new("sh")
+            .args(["-c", &stop_script(tree.id())])
+            .status()
+            .map_err(|e| e.to_string())?;
+        assert!(stopped.success());
+        let _ = tree.wait();
+        let left = Command::new("sh")
+            .args([
+                "-c",
+                &format!("ps -A -o args | grep -c '^sleep {marker}$' || true"),
+            ])
+            .output()
+            .map_err(|e| e.to_string())?;
+        assert_eq!(String::from_utf8_lossy(&left.stdout).trim(), "0");
+        Ok(())
     }
 
     #[test]
