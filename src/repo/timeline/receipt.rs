@@ -12,6 +12,9 @@ use crate::git;
 
 /// More commits than this on either side are not paired (range-diff is quadratic in them).
 const MAX_SERIES: usize = 300;
+/// Upstream refs looked at at most, the newest: each is an argument (a command line has a
+/// limit).
+const MAX_REFS: usize = 300;
 
 /// One commit of either version, as the receipt needs it.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -21,7 +24,8 @@ pub(crate) struct Commit {
     /// `Name <email>`.
     pub(crate) author: String,
     pub(crate) summary: String,
-    /// The whole message.
+    /// The whole message: only while the receipt is made (see [`Pair::message_changed`]).
+    #[serde(skip)]
     pub(crate) message: String,
     /// It carries a signature (GPG, SSH or X.509), whether or not it would verify.
     pub(crate) signed: bool,
@@ -46,11 +50,20 @@ pub(crate) struct Pair {
     pub(crate) kind: PairKind,
     pub(crate) old: Option<Commit>,
     pub(crate) new: Option<Commit>,
+    /// Both sides are there and their messages differ (worked out when made: the messages
+    /// themselves aren't kept).
+    #[serde(default)]
+    pub(crate) message_changed: bool,
 }
 
 impl Pair {
     pub(crate) fn message_changed(&self) -> bool {
-        matches!((&self.old, &self.new), (Some(o), Some(n)) if o.message.trim() != n.message.trim())
+        self.message_changed
+    }
+
+    /// Both sides are there.
+    pub(crate) fn paired(&self) -> bool {
+        self.old.is_some() && self.new.is_some()
     }
 
     pub(crate) fn author_changed(&self) -> bool {
@@ -124,10 +137,12 @@ impl Receipt {
             return capitalised(&parts.join(", "));
         }
         let c = self.counts();
-        parts.push(match c.authors_changed {
-            0 => "authors kept".to_owned(),
-            n => format!("{} changed", plural(n, "author", "authors")),
-        });
+        let paired = c.same + c.changed > 0;
+        match c.authors_changed {
+            0 if paired => parts.push("authors kept".to_owned()),
+            0 => {}
+            n => parts.push(format!("{} changed", plural(n, "author", "authors"))),
+        }
         match c.messages_changed {
             0 if c.same + c.changed > 0 => parts.push("messages kept".to_owned()),
             0 => {}
@@ -147,13 +162,13 @@ impl Receipt {
 
 /// What became of the signatures, when any commit had or has one.
 fn signatures(c: &Counts) -> Option<String> {
-    match (c.signed_before, c.signed_after) {
+    let (before, after) = (c.signed_before, c.signed_after);
+    match (before, after) {
         (0, 0) => None,
-        (0, _) => Some("now signed".to_owned()),
-        (_, 0) => Some(format!(
-            "{} dropped",
-            plural(c.signed_before, "signature", "signatures")
-        )),
+        (0, n) => Some(format!("{} now signed", plural(n, "commit", "commits"))),
+        (n, 0) => Some(format!("{} dropped", plural(n, "signature", "signatures"))),
+        (b, a) if a < b => Some(format!("signatures replaced, {} dropped", b - a)),
+        (b, a) if a > b => Some(format!("signatures replaced, {} more signed", a - b)),
         _ => Some("signatures replaced".to_owned()),
     }
 }
@@ -184,17 +199,7 @@ pub(crate) fn rewritten(repo: &Path, entry: &Entry) -> Option<(String, String, S
         .filter(|c| c.name != "HEAD" && !c.old.is_empty() && !c.new.is_empty())
         .map(|c| (c.name, c.old, c.new))
         .collect();
-    if entry.after.branch.is_empty()
-        && !entry.before.head.is_empty()
-        && !entry.after.head.is_empty()
-        && entry.before.head != entry.after.head
-    {
-        candidates.push((
-            "HEAD".to_owned(),
-            entry.before.head.clone(),
-            entry.after.head.clone(),
-        ));
-    }
+    // A detached HEAD moving (bisect, checking out commits) rewrites nothing: only branches.
     candidates.sort_by_key(|(name, ..)| *name != entry.after.branch);
     candidates
         .into_iter()
@@ -217,8 +222,9 @@ pub(crate) fn receipt(repo: &Path, branch: &str, old: &str, new: &str) -> Result
     )?;
     let trees: Vec<&str> = trees.lines().collect();
     let same_files = matches!(trees.as_slice(), [a, b] if a == b);
-    let old_series = series(repo, old, new, branch)?;
-    let new_series = series(repo, new, old, branch)?;
+    let upstream = upstream_refs(repo, old, new, branch)?;
+    let old_series = series(repo, old, new, &upstream)?;
+    let new_series = series(repo, new, old, &upstream)?;
     let mut receipt = Receipt {
         branch: branch.to_owned(),
         old_tip: old.to_owned(),
@@ -231,42 +237,77 @@ pub(crate) fn receipt(repo: &Path, branch: &str, old: &str, new: &str) -> Result
         receipt.unpaired = true;
         return Ok(receipt);
     }
-    let headers = range_diff(repo, &old_series, old, &new_series, new)?;
-    let commits = describe(repo, old_series.iter().chain(&new_series))?;
+    let Some(headers) = range_diff(repo, &old_series, old, &new_series, new)? else {
+        receipt.unpaired = true;
+        return Ok(receipt);
+    };
+    let mut commits = Vec::new();
+    // In parts: a command line has a limit (Windows: 32k characters).
+    let all: Vec<&String> = old_series.iter().chain(&new_series).collect();
+    for part in all.chunks(100) {
+        commits.extend(describe(repo, part.iter().copied())?);
+    }
     let find = |hash: &str| commits.iter().find(|c| c.hash == hash).cloned();
     receipt.pairs = headers
         .into_iter()
-        .map(|h| Pair {
-            kind: h.kind,
-            old: h.old.as_deref().and_then(find),
-            new: h.new.as_deref().and_then(find),
+        .map(|h| {
+            let (mut old, mut new) = (
+                h.old.as_deref().and_then(find),
+                h.new.as_deref().and_then(find),
+            );
+            let message_changed =
+                matches!((&old, &new), (Some(o), Some(n)) if o.message.trim() != n.message.trim());
+            // As kept: without the messages.
+            for c in [&mut old, &mut new].into_iter().flatten() {
+                c.message.clear();
+            }
+            Pair {
+                kind: h.kind,
+                old,
+                new,
+                message_changed,
+            }
         })
         .collect();
     Ok(receipt)
 }
 
-/// The commits of `tip` that `other` hasn't, and no branch but `branch` (or a copy of either
-/// version) has either: those the rewrite took or made, not those it found upstream. Oldest
-/// first, merges left out (as range-diff takes them).
-fn series(repo: &Path, tip: &str, other: &str, branch: &str) -> Result<Vec<String>, String> {
-    // Refs that have neither version: where commits picked up from upstream come from. A
-    // copy of the old or new version (its upstream before a force push, a backup branch) is
-    // not one.
-    let elsewhere = git::run(
+/// Refs a rewrite of `branch` from `old` to `new` may have taken commits from (a rebase's
+/// upstream): those that have neither version and aren't part of the old one either. A copy of
+/// either version (the upstream before a force push, a backup branch) or a ref on one of the
+/// old commits (pushed earlier, a tag, a stacked branch) is not one. The newest [`MAX_REFS`].
+fn upstream_refs(repo: &Path, old: &str, new: &str, branch: &str) -> Result<Vec<String>, String> {
+    let count = format!("--count={MAX_REFS}");
+    let listed = git::run(
         Some(repo),
         &[
             "for-each-ref",
             "--format=%(objectname) %(refname)",
+            "--sort=-committerdate",
+            &count,
             "--no-contains",
-            tip,
+            old,
             "--no-contains",
-            other,
+            new,
+            "--no-merged",
+            old,
             "refs/heads",
             "refs/remotes",
             "refs/tags",
         ],
     )?;
     let own = format!("refs/heads/{branch}");
+    Ok(listed
+        .lines()
+        .filter_map(|l| l.split_once(' '))
+        .filter(|(_, name)| *name != own)
+        .map(|(oid, _)| format!("^{oid}"))
+        .collect())
+}
+
+/// The commits of `tip` that `other` hasn't, nor any of `upstream` (`^oid`s): those the
+/// rewrite took or made. Oldest first, merges left out (as range-diff takes them).
+fn series(repo: &Path, tip: &str, other: &str, upstream: &[String]) -> Result<Vec<String>, String> {
     let mut args: Vec<String> = vec![
         "rev-list".to_owned(),
         "--reverse".to_owned(),
@@ -277,13 +318,7 @@ fn series(repo: &Path, tip: &str, other: &str, branch: &str) -> Result<Vec<Strin
         tip.to_owned(),
         format!("^{other}"),
     ];
-    args.extend(
-        elsewhere
-            .lines()
-            .filter_map(|l| l.split_once(' '))
-            .filter(|(_, name)| *name != own)
-            .map(|(oid, _)| format!("^{oid}")),
-    );
+    args.extend(upstream.iter().cloned());
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
     Ok(git::run(Some(repo), &args)?
         .lines()
@@ -299,14 +334,15 @@ pub(crate) struct Header {
     pub(crate) new: Option<String>,
 }
 
-/// Pairs the two series with `git range-diff`.
+/// Pairs the two series with `git range-diff`; `None` when the ranges it would take hold too
+/// many commits (a merge brought in a lot, or the series starts at the root).
 fn range_diff(
     repo: &Path,
     old: &[String],
     old_tip: &str,
     new: &[String],
     new_tip: &str,
-) -> Result<Vec<Header>, String> {
+) -> Result<Option<Vec<Header>>, String> {
     // A range from the parent of the oldest of the series to its tip; an empty one where the
     // version has none of its own.
     let range = |series: &[String], tip: &str| match series.first() {
@@ -327,39 +363,57 @@ fn range_diff(
             range(series, tip)
         }
     };
+    let (old_range, new_range) = (range_of(old, old_tip), range_of(new, new_tip));
+    for range in [&old_range, &new_range] {
+        let count = git::run(
+            Some(repo),
+            &["rev-list", "--count", "--no-merges", range, "--"],
+        )?;
+        if count.trim().parse::<usize>().unwrap_or(usize::MAX) > MAX_SERIES {
+            return Ok(None);
+        }
+    }
     let out = git::run(
         Some(repo),
         &[
             "range-diff",
             "--no-color",
+            "--no-notes",
             "--no-patch",
             "--abbrev=40",
             // Pairs a squash with what it was squashed from more often than the default 60.
             "--creation-factor=90",
-            &range_of(old, old_tip),
-            &range_of(new, new_tip),
+            &old_range,
+            &new_range,
         ],
     )?;
     let headers = parse_range_diff(&out);
     // What range-diff saw beyond the series (a merge's other side) is not this rewrite's.
-    Ok(headers
-        .into_iter()
-        .filter(|h| {
-            h.old.as_ref().is_none_or(|o| old.contains(o))
-                && h.new.as_ref().is_none_or(|n| new.contains(n))
-        })
-        .filter(|h| h.old.is_some() || h.new.is_some())
-        .collect())
+    Ok(Some(
+        headers
+            .into_iter()
+            .filter(|h| {
+                h.old.as_ref().is_none_or(|o| old.contains(o))
+                    && h.new.as_ref().is_none_or(|n| new.contains(n))
+            })
+            .filter(|h| h.old.is_some() || h.new.is_some())
+            .collect(),
+    ))
 }
 
 /// Reads `git range-diff --no-patch --abbrev=40`: `1:  <hash> = 1:  <hash> Summary`, with `!`
 /// for a changed pair, `<` for a dropped commit (`-:  ----` on the right), `>` for an added one.
+/// Positions are padded to the width of the largest (` 9:` beside `10:`); what follows a pair
+/// is indented by four spaces.
 pub(crate) fn parse_range_diff(out: &str) -> Vec<Header> {
     out.lines()
-        .filter(|l| !l.starts_with(' '))
+        .filter(|l| !l.starts_with("    "))
         .filter_map(|line| {
             let mut words = line.split_whitespace();
-            let _old_pos = words.next()?;
+            let old_pos = words.next()?;
+            if !old_pos.ends_with(':') {
+                return None;
+            }
             let old = words.next()?;
             let mark = words.next()?;
             let _new_pos = words.next()?;

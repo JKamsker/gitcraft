@@ -43,22 +43,31 @@ pub(super) fn receipt_section(ui: &mut Ui, receipt: &Receipt) {
 /// One old commit and its replacement, with what differs between them.
 fn pair_row(ui: &mut Ui, pair: &Pair) {
     let t = Tokens::get(ui.ctx());
-    let (mark, color) = match pair.kind {
-        PairKind::Same => ("=", t.success),
-        PairKind::Changed => ("≠", t.warning),
-        PairKind::Added => ("+", t.accent),
-        PairKind::Dropped => ("−", t.danger),
+    let (mark, color, meaning) = match pair.kind {
+        PairKind::Same => ("=", t.success, "The same change"),
+        PairKind::Changed => (
+            "≠",
+            t.warning,
+            "Paired, but the change or the message differs",
+        ),
+        PairKind::Added => ("+", t.accent, "Only in the new version"),
+        PairKind::Dropped => ("−", t.danger, "Dropped, or squashed into another"),
     };
-    let side = |c: &Option<Commit>| match c {
+    let side = |c: &Option<Commit>, missing: &str| match c {
         Some(c) => format!("{} {}", short(&c.hash), c.summary),
-        None => "none".to_owned(),
+        None => missing.to_owned(),
     };
     ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new(mark).font(theme::semibold(13.0)).color(color));
+        ui.label(RichText::new(mark).font(theme::semibold(13.0)).color(color))
+            .on_hover_text(meaning);
         ui.label(
-            RichText::new(format!("{}  →  {}", side(&pair.old), side(&pair.new)))
-                .font(theme::mono(12.0))
-                .color(t.text_dim),
+            RichText::new(format!(
+                "{}  →  {}",
+                side(&pair.old, "(new)"),
+                side(&pair.new, "(dropped)")
+            ))
+            .font(theme::mono(12.0))
+            .color(t.text_dim),
         );
     });
     let notes = notes(pair);
@@ -83,11 +92,12 @@ pub(super) fn notes(pair: &Pair) -> Vec<&'static str> {
         PairKind::Same => notes.push("same change"),
         PairKind::Changed => notes.push("the change differs"),
     }
-    if pair.old.is_some() && pair.new.is_some() {
+    // A same change on a moved base has other files: only worth saying for a changed one.
+    if pair.paired() && pair.kind == PairKind::Changed {
         notes.push(if pair.same_tree() {
             "same files"
         } else {
-            "files differ (the base moved, or the change did)"
+            "files differ"
         });
     }
     if pair.message_changed() {
