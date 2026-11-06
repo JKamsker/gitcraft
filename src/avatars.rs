@@ -58,7 +58,7 @@ pub fn hint(email: &str, hint: Hint) {
 }
 
 fn cache_dir() -> Option<PathBuf> {
-    eframe::storage_dir("gitcraft").map(|d| d.join("avatars"))
+    crate::portable::data_dir().map(|d| d.join("avatars"))
 }
 
 fn avatars(ctx: &egui::Context) -> &'static Avatars {

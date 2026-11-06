@@ -183,6 +183,9 @@ impl App {
             tab_looks: saved.tab_looks,
         };
         update::clean_up();
+        if let crate::portable::Mode::Unusable(why) = crate::portable::mode() {
+            app.toasts.push(Toast::new(why.clone(), true));
+        }
         let mut kept = Vec::new();
         if app.git_version.is_ok() {
             for path in saved.open {
@@ -464,6 +467,7 @@ impl eframe::App for App {
         self.settings = Settings::get(&ctx);
         // A theme file being edited, VS Code's theme switched: shown as they change.
         theme::poll(&ctx);
+        crate::portable::set_credential_store(self.settings.portable_credential_store);
 
         // eframe shows the window after the first frame; maximize it on the next one.
         if MAXIMIZE_WHEN_SHOWN.load(Ordering::Relaxed) {
@@ -602,6 +606,12 @@ pub fn warm_up() {
     std::thread::spawn(|| {
         let _ = crate::shell_path::path();
     });
+}
+
+/// The file the window's state is saved in, when it isn't eframe's own default place: in the
+/// portable folder when gitcraft runs portable.
+pub fn persistence_path() -> Option<PathBuf> {
+    crate::portable::persistence_path()
 }
 
 /// Once the window closed: starts the version an update put in place, if it did.

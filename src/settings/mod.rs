@@ -3,6 +3,7 @@
 mod layout;
 mod page;
 mod preview;
+mod portable_page;
 mod profile_page;
 pub mod profiles;
 mod signing;
@@ -94,6 +95,8 @@ pub struct Settings {
     pub mergiraf: bool,
     /// After a checkout, pull, merge or rebase, update the submodules to the commits it records.
     pub keep_submodules: bool,
+    /// Running portable: keep sign-ins in this computer's credential store all the same.
+    pub portable_credential_store: bool,
     /// Saved as `profiles` by the versions before profiles were what they are now.
     #[serde(rename = "profiles")]
     pub identities: Vec<SavedIdentity>,
@@ -140,6 +143,7 @@ impl Default for Settings {
             theme_tweaks: Default::default(),
             mergiraf: true,
             keep_submodules: false,
+            portable_credential_store: false,
             identities: Vec::new(),
             user_profiles: vec![UserProfile::default()],
             active_profile: UserProfile::default().id,
@@ -375,6 +379,7 @@ impl Settings {
                         );
                     }
                 });
+                self.portable_ui(ui, f);
                 section(ui, f, "Updates", None, |card| {
                     card.row("Version", "about release", |ui| {
                         ui.add_space(4.0);

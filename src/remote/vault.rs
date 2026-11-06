@@ -33,13 +33,23 @@ fn account(host: &str, prompt: &str) -> String {
 /// Changes to the list of names, one at a time.
 static NAMES: Mutex<()> = Mutex::new(());
 
-/// The secret kept for `prompt` of `host`, if one is.
+/// Why nothing is kept: a portable copy of gitcraft set to leave the credential store alone.
+const STORE_OFF: &str = "this portable copy of gitcraft doesn't use the system's credential \
+                         store (Settings → General → Portable mode)";
+
+/// The secret kept for `prompt` of `host`, if one is (and the credential store is used).
 pub(super) fn recall(host: &str, prompt: &str) -> Option<String> {
+    if !crate::portable::credential_store() {
+        return None;
+    }
     store().get(&account(host, prompt))
 }
 
 /// Keeps `secret` for `prompt` of `host`; why it couldn't be.
 pub(super) fn keep(host: &str, prompt: &str, secret: &str) -> Result<(), String> {
+    if !crate::portable::credential_store() {
+        return Err(STORE_OFF.to_owned());
+    }
     let account = account(host, prompt);
     let store = store();
     store.set(&account, secret)?;
@@ -108,7 +118,7 @@ impl System {
 
     /// The file listing the names kept.
     fn names_file() -> Option<PathBuf> {
-        eframe::storage_dir("gitcraft").map(|d| d.join("saved-sign-ins.json"))
+        crate::portable::data_dir().map(|d| d.join("saved-sign-ins.json"))
     }
 }
 
