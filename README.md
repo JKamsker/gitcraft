@@ -110,11 +110,12 @@ so your config, credentials and hooks apply as usual.
 - Drag and drop: drag a branch's pill (or its row in the left pane) onto another pill, a commit
   or a branch in the left pane, and a small menu offers what makes sense there: _Merge x into
   main_, _Rebase main onto x_, _Interactive rebase main onto x…_, or _Fast-forward_ when one
-  is only behind the other (also a branch that isn't checked out). Drag a commit onto the
-  checked-out branch to cherry-pick it, and a commit of the checked-out branch onto another of
-  it to move it right above or below that one, or squash or fix it up into it. The targets
-  that take what is dragged light up, the graph scrolls near its edges, Esc cancels, and each
-  entry is the menu's own operation, undone with Ctrl+Z.
+  branch is only behind the other, which also works for a branch that isn't checked out. Drag a
+  commit onto the checked-out branch to cherry-pick it, and a commit of the checked-out branch
+  onto another commit of that branch to move it right above or below that one, or squash or fix
+  it up into it. The targets that take what is dragged light up, the graph scrolls near its
+  edges, Esc cancels, and each entry runs the same operation as the right-click menu, undone
+  with Ctrl+Z.
 
 **Branches, remotes, worktrees, stashes, tags** (left)
 

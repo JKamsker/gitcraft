@@ -100,7 +100,7 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("Double-click a pill", "Check out that branch or tag"),
             (
                 "Drag a pill or a commit",
-                "Merge, rebase, cherry-pick, move or squash",
+                "Merge, rebase, fast-forward, cherry-pick, move or squash",
             ),
             ("Esc", "Close the diff, comparison or search"),
         ],

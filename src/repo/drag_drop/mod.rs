@@ -45,6 +45,8 @@ pub(crate) struct Hover {
     pub(crate) first: Option<String>,
     /// How many more it offers.
     pub(crate) more: usize,
+    /// Why it offers nothing, when so.
+    pub(crate) why: Option<String>,
 }
 
 /// Where the hover of this frame is kept for the drag ghost.
@@ -107,10 +109,30 @@ impl RepoTab {
         line
     }
 
+    /// Why a target takes nothing of `item`, said in the ghost over it.
+    fn nothing_here(&self, item: &DragItem) -> String {
+        match item {
+            _ if self.refs.current.is_none() => {
+                "HEAD is detached: check out a branch first".to_owned()
+            }
+            DragItem::Commit(c) if c.merge => {
+                "Merge commits can't be cherry-picked here".to_owned()
+            }
+            DragItem::Commit(_) => {
+                "Drop it on the checked-out branch to cherry-pick it, or on a commit of that \
+                 branch to move it"
+                    .to_owned()
+            }
+            DragItem::Branch(_) => {
+                "Only the checked-out branch is merged into or rebased here".to_owned()
+            }
+        }
+    }
+
     /// Why nothing can be dropped now, if so.
     pub(in crate::repo) fn drop_blocked(&self) -> Option<String> {
         if let Some(op) = &self.busy_op {
-            return Some(format!("Wait for {op} to finish"));
+            return Some(format!("{op} is still running, drop when it's done"));
         }
         self.work
             .in_progress
@@ -208,6 +230,7 @@ impl RepoTab {
                 Hover {
                     first: offers.first().map(Offer::label),
                     more: offers.len().saturating_sub(1),
+                    why: offers.is_empty().then(|| self.nothing_here(&payload.item)),
                 },
             );
         });
