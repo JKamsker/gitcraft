@@ -187,14 +187,7 @@ fn ready(ui: &mut Ui, preview: &WhatItDoes, found: &Preview, t: &Tokens) {
         }
         let more = found.leaving_total.saturating_sub(found.leaving.len());
         if more > 0 {
-            let shown_only_here = (found.leaving.iter())
-                .filter(|c| c.kept == Kept::OnlyHere)
-                .count();
-            more_row(
-                ui,
-                &more_commits(more, found.only_here_total - shown_only_here),
-                t,
-            );
+            more_row(ui, &more_commits(more, more_only_here(found)), t);
         }
     }
     if let Some(pushed) = &found.pushed {
@@ -252,6 +245,15 @@ fn commit_row(ui: &mut Ui, c: &git::LeavingCommit, t: &Tokens) {
 
 fn more_row(ui: &mut Ui, text: &str, t: &Tokens) {
     ui.label(RichText::new(text).color(t.text_dim));
+}
+
+/// How many of the commits not listed no other ref has. Counted and listed by two runs of git,
+/// between which a fetch can move refs: never below none.
+fn more_only_here(found: &Preview) -> usize {
+    let shown = (found.leaving.iter())
+        .filter(|c| c.kept == Kept::OnlyHere)
+        .count();
+    found.only_here_total.saturating_sub(shown)
 }
 
 /// `and 340 more`, with how many of those no other ref has.
@@ -435,6 +437,23 @@ mod tests {
             String::new(),
         );
         assert!(!may_lose_files(&soft));
+    }
+
+    /// Refs moved between counting and listing: more listed only here than counted.
+    #[test]
+    fn a_count_behind_the_list_does_not_underflow() {
+        let only_here = git::LeavingCommit {
+            hash: "a".to_owned(),
+            summary: String::new(),
+            kept: Kept::OnlyHere,
+        };
+        let found = Preview {
+            leaving: vec![only_here.clone(), only_here],
+            leaving_total: 30,
+            only_here_total: 1,
+            ..Preview::default()
+        };
+        assert_eq!(more_only_here(&found), 0);
     }
 
     #[test]
