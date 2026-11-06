@@ -70,6 +70,7 @@ fn run_until(harness: &mut H<'_>, ms: u64, done: &dyn Fn(&App) -> bool) -> bool 
 
 #[test]
 fn a_teleport_from_the_dialog_opens_its_worktree() -> Result<(), String> {
+    let _one = crate::teleport::test_serial();
     let root = std::env::temp_dir().join(format!("gitcraft-tp-window-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(&root).map_err(|e| e.to_string())?;

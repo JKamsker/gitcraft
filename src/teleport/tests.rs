@@ -4,16 +4,12 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
 use super::*;
 use crate::git;
 
-/// One at a time: they look for leftovers in folders all of them use.
-static SERIAL: Mutex<()> = Mutex::new(());
-
 fn serial() -> std::sync::MutexGuard<'static, ()> {
-    SERIAL.lock().unwrap_or_else(PoisonError::into_inner)
+    super::test_serial()
 }
 
 fn scratch(name: &str) -> Result<PathBuf, String> {

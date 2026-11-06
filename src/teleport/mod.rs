@@ -22,6 +22,14 @@ mod urls;
 #[cfg(test)]
 mod tests;
 
+/// For the tests that teleport (here and the window's): one at a time, as they look for
+/// leftovers in temporary folders all of them use.
+#[cfg(test)]
+pub(crate) fn test_serial() -> std::sync::MutexGuard<'static, ()> {
+    static SERIAL: Mutex<()> = Mutex::new(());
+    SERIAL.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Condvar, Mutex, PoisonError};
