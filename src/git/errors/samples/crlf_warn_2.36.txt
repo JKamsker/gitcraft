@@ -1,0 +1,4 @@
+warning: LF will be replaced by CRLF in src/main.rs.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in README.md.
+The file will have its original line endings in your working directory

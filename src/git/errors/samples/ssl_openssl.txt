@@ -1,0 +1,1 @@
+fatal: unable to access 'https://git.example.com/team/repo.git/': SSL certificate problem: unable to get local issuer certificate
