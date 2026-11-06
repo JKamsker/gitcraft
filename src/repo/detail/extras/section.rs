@@ -26,7 +26,11 @@ pub(super) fn section(
 ) {
     let t = Tokens::get(ui.ctx());
     let id = egui::Id::new(("commit-extras-open", title));
-    let mut open = ui.data_mut(|d| *d.get_persisted_mut_or(id, open_at_first));
+    // Kept only once folded or unfolded by hand: until then, `open_at_first` decides (which
+    // may change as what the section shows is read).
+    let mut open = ui
+        .data_mut(|d| d.get_persisted::<bool>(id))
+        .unwrap_or(open_at_first);
     ui.add_space(4.0);
     let header = ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 6.0;
@@ -119,4 +123,32 @@ pub(super) fn output_box(ui: &mut Ui, title: &str, text: &str) {
                 .selectable(true),
             );
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Until folded or unfolded by hand, a section follows what it is told at first (Notes
+    /// opens once a note turns out to be there); then it keeps what was chosen.
+    #[test]
+    fn a_section_opens_as_told_until_chosen_by_hand() {
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let mut drawn_open = |open_at_first: bool| {
+            let mut open = false;
+            ctx.run_ui(egui::RawInput::default(), |ui| {
+                section(ui, "Test", Summary::Loading, open_at_first, None, |_| {
+                    open = true;
+                });
+            })
+            .drop_without_applying_deltas();
+            open
+        };
+        assert!(!drawn_open(false));
+        assert!(drawn_open(true));
+        let id = egui::Id::new(("commit-extras-open", "Test"));
+        ctx.data_mut(|d| d.insert_persisted(id, false));
+        assert!(!drawn_open(true));
+    }
 }

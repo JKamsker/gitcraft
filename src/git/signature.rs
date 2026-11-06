@@ -81,7 +81,7 @@ impl Verdict {
         match self {
             Self::Valid { trusted: true } => "The signature is good and its key is trusted.",
             Self::Valid { trusted: false } => {
-                "The signature is good, but the key isn't marked as trusted in your keyring."
+                "The signature is good, but its key isn't marked as trusted in your GPG keyring."
             }
             Self::Expired { key: false } => "The signature is good, but it has expired.",
             Self::Expired { key: true } => {
@@ -93,11 +93,15 @@ impl Verdict {
                  signature is not genuine."
             }
             Self::UnknownKey => {
-                "The key this commit was signed with isn't known here: import it, or add it to \
-                 your allowed signers file (gpg.ssh.allowedSignersFile) for SSH."
+                "This commit was signed with a key you don't have. For GPG, import the key \
+                 (gpg --recv-keys <key>); for SSH, add it to your allowed signers file \
+                 (gpg.ssh.allowedSignersFile). Then check again."
             }
             Self::Unsigned => "This commit has no signature.",
-            Self::NotChecked => "The signature could not be checked; git's output says why.",
+            Self::NotChecked => {
+                "The signature could not be checked: git's output says why. Fix that, then \
+                 check again."
+            }
         }
     }
 }

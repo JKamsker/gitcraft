@@ -36,6 +36,7 @@ fn commit(dir: &Path, message: &str) -> String {
 fn wait(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&Extras) -> bool) {
     for _ in 0..400 {
         tab.poll(ctx);
+        tab.extras_tick(ctx);
         if done(&tab.extras) {
             return;
         }
@@ -229,5 +230,71 @@ fn the_sections_draw_in_every_state() {
     tab.extras.notes.draft = Some("a draft\nwith lines".repeat(500));
     assert!(draw(&mut tab.extras, true).is_empty());
     assert!(tab.extras.notes.draft.is_some());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Going through commits quickly reads nothing for those passed on the way, and at most one
+/// read of each kind runs at a time; the answers are those of the commit the selection rests
+/// on.
+#[test]
+fn passing_through_commits_starts_one_read_of_each_kind() {
+    let dir = repo("debounce");
+    let hashes: Vec<String> = (0..20).map(|n| commit(&dir, &format!("c{n}"))).collect();
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    for hash in &hashes {
+        tab.load_extras(hash, &ctx);
+        tab.extras_tick(&ctx);
+    }
+    assert_eq!(tab.extras.jobs.running, [false; 4], "read before resting");
+    let last = hashes.last().cloned().unwrap_or_default();
+    // Rests long enough: one of each starts.
+    std::thread::sleep(super::SETTLE);
+    tab.extras_tick(&ctx);
+    assert_eq!(tab.extras.jobs.running, [true; 4]);
+    // Another commit meanwhile: queued behind, the older answers dropped.
+    tab.load_extras(&hashes[0], &ctx);
+    std::thread::sleep(super::SETTLE);
+    wait(&mut tab, &ctx, |e| {
+        all_read(e) && e.jobs.running == [false; 4]
+    });
+    assert_eq!(tab.extras.hash.as_deref(), Some(hashes[0].as_str()));
+    assert!(matches!(&tab.extras.backlinks, Some(Ok((l, _))) if l.is_empty()));
+    assert!(matches!(&tab.extras.contained, Some(Ok(c)) if c.local.names == ["main"]));
+    assert_ne!(last, hashes[0]);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The changes row forgets the commit (nothing is read again for it on reloads), and a note
+/// being written comes back with its commit, counted as unfinished work meanwhile.
+#[test]
+fn a_note_being_written_survives_selecting_elsewhere() {
+    let dir = repo("draft");
+    let first = commit(&dir, "first");
+    let second = commit(&dir, "second");
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    tab.load_extras(&first, &ctx);
+    std::thread::sleep(super::SETTLE);
+    wait(&mut tab, &ctx, all_read);
+    tab.extras.notes.draft = Some("half written".to_owned());
+    // Switching namespaces is refused while writing.
+    let mut acts = Vec::new();
+    tab.extras_cmd(
+        ExtrasCmd::PickNamespace("other".to_owned()),
+        &mut acts,
+        &ctx,
+    );
+    assert_eq!(tab.extras.notes.namespace.as_deref(), Some("commits"));
+
+    tab.load_extras(&second, &ctx);
+    assert_eq!(tab.extras.notes.draft, None);
+    assert!(tab.note_being_written());
+    tab.drop_extras();
+    assert_eq!(tab.extras.hash, None);
+    tab.extras_after_reload(true, &ctx);
+    assert_eq!(tab.extras.jobs.running, [false; 4]);
+    tab.load_extras(&first, &ctx);
+    assert_eq!(tab.extras.notes.draft.as_deref(), Some("half written"));
     let _ = std::fs::remove_dir_all(&dir);
 }

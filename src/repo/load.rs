@@ -352,7 +352,6 @@ impl RepoTab {
         self.loading_more = false;
         let refs_moved = loaded.refs != self.refs;
         self.refs = loaded.refs;
-        self.extras_after_reload(refs_moved, ctx);
         self.has_more = loaded.history.len() >= loaded.requested;
         self.history = loaded.history;
         // A status read since this reload started is newer.
@@ -423,6 +422,8 @@ impl RepoTab {
         }
         self.refresh_ci(ctx);
         self.rebuild(ctx);
+        // After the selection is settled: not for a commit that went (amended, rebased).
+        self.extras_after_reload(refs_moved, ctx);
         self.hint_avatars(ctx);
         self.reload_compare(ctx);
     }
@@ -555,6 +556,7 @@ impl RepoTab {
             None => {
                 self.selected = None;
                 self.detail = None;
+                self.drop_extras();
             }
         }
     }

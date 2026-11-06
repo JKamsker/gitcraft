@@ -170,7 +170,8 @@ impl RepoTab {
             terminal: self.terminals.iter_mut().any(|t| !t.has_exited()),
             commit_message: !self.commit_summary.trim().is_empty()
                 || !self.commit_body.trim().is_empty()
-                || self.reword.is_some(),
+                || self.reword.is_some()
+                || self.note_being_written(),
             editor: self.rebase.is_some() || self.conflict.is_some(),
             review: self.has_pr_draft(),
         }
