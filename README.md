@@ -163,6 +163,13 @@ so your config, credentials and hooks apply as usual.
 - Unified or side by side (a new file takes the whole width, with no empty old side), syntax
   colours, the changed part of each line marked, whitespace changes optional, images shown
   before / after. Esc closes.
+- Jupyter notebooks (`.ipynb`) diff cell by cell: each changed cell's source line by line, its
+  outputs (text, errors, pictures) before and after, execution counts and metadata noted and
+  folded away, unchanged cells folded into a line; cells matched by their ids, or by their
+  sources in order. Nothing in a notebook is run. _JSON_ switches back to the file's own lines
+  (to stage a part of them). _Strip outputs when committing_ sets a clean filter for the
+  repository only (nbstripout when it is installed, else a few lines of Python), so what is
+  staged has no outputs or execution counts while the file on disk keeps them.
 - A file kept in Git LFS shows as its LFS objects before and after, with their sizes, rather
   than the text of the pointer git stores. With git-lfs installed, the palette (Ctrl+P) of a
   repository that uses LFS has _LFS: Fetch_ and _LFS: Pull_.

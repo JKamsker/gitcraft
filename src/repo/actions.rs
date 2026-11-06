@@ -120,6 +120,8 @@ pub(crate) enum Action {
     /// The commit pane lists every file of the commit, or only those it changed.
     ViewAllFiles(bool),
     SaveConflict,
+    /// Strip notebooks' outputs when committing in this repository, or stop.
+    StripNotebookOutputs(bool),
     /// Let Mergiraf solve what it can of the open conflict.
     SolveWithMergiraf,
     /// A file's history, blame or contents in the central pane (`rev`: the commit they are at).

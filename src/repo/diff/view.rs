@@ -5,6 +5,7 @@ use egui::{Sense, Stroke, Ui};
 
 use super::images::image_view;
 use super::lfs::lfs_view;
+use super::notebook::notebook_bar;
 use super::rendered;
 use super::rows::Rows;
 use super::{DiffData, Kind, Pick, unstage_args};
@@ -65,7 +66,7 @@ impl RepoTab {
             file_text::show(ui, ("diff_file", &path), view.file.as_ref());
             return;
         }
-        let Some(data) = ready_data(ui, view, ignore_ws, &t) else {
+        let Some(data) = ready_data(ui, view, ignore_ws, &t, acts) else {
             return;
         };
 
@@ -382,6 +383,7 @@ fn ready_data<'a>(
     view: &'a DiffView,
     ignore_ws: bool,
     t: &Tokens,
+    acts: &mut Vec<Action>,
 ) -> Option<&'a DiffData> {
     let data = match &view.data {
         None => {
@@ -404,6 +406,12 @@ fn ready_data<'a>(
     }
     if let Some(images) = &data.image {
         image_view(ui, images);
+        return None;
+    }
+    // A notebook shows its cells, unless its JSON is picked.
+    if let Some(nb) = &data.notebook
+        && !notebook_bar(ui, nb, view.key.path(), acts)
+    {
         return None;
     }
     if data.lines.is_empty() {

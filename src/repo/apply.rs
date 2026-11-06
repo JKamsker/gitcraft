@@ -248,6 +248,7 @@ impl RepoTab {
                 self.search.focus = true;
             }
             Action::SolveWithMergiraf => self.solve_with_mergiraf(ctx),
+            Action::StripNotebookOutputs(on) => self.strip_notebook_outputs(on, ctx),
             Action::SaveConflict => self.save_conflict(ctx),
         }
     }
@@ -398,6 +399,33 @@ impl RepoTab {
             Refresh::Status,
             kind,
             ctx,
+        );
+    }
+
+    /// Turns stripping notebooks' outputs when committing on or off, then shows the diff again.
+    fn strip_notebook_outputs(&mut self, on: bool, ctx: &egui::Context) {
+        let path = self.path.clone();
+        self.then(
+            ctx,
+            move || git::set_strip_outputs(&path, on),
+            move |tab, result, ctx| {
+                tab.status = Some(match result {
+                    Ok(()) if on => (
+                        "Notebooks are staged without their outputs from now on".to_owned(),
+                        false,
+                    ),
+                    Ok(()) => (
+                        "Notebooks are staged with their outputs again".to_owned(),
+                        false,
+                    ),
+                    Err(e) => (
+                        format!("Could not change how notebooks are staged: {e}"),
+                        true,
+                    ),
+                });
+                tab.reload_status(ctx);
+                tab.refresh_diff(ctx);
+            },
         );
     }
 
