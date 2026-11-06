@@ -359,7 +359,9 @@ impl Settings {
                             "When a long operation ends in the background",
                         );
                     });
-                    if let Some(appimage) = crate::desktop_entry::appimage() {
+                    if let Some(appimage) =
+                        crate::desktop_entry::appimage().filter(|_| !crate::portable::asked())
+                    {
                         card.row(
                             "Applications menu",
                             "appimage desktop entry launcher",

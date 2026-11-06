@@ -12,8 +12,14 @@ use std::sync::Mutex;
 
 use super::shell::lock;
 
-/// What the system's store files them under.
-const SERVICE: &str = "gitcraft";
+/// What the system's store files them under: a portable copy's apart from an installed one's.
+fn service() -> &'static str {
+    if crate::portable::asked() {
+        "gitcraft-portable"
+    } else {
+        "gitcraft"
+    }
+}
 
 /// Where the secrets are kept, and the names of those kept.
 trait Store: Send + Sync {
@@ -62,8 +68,12 @@ pub(super) fn keep(host: &str, prompt: &str, secret: &str) -> Result<(), String>
     Ok(())
 }
 
-/// Forgets what is kept for `prompt` of `host`: whether something was.
+/// Forgets what is kept for `prompt` of `host`: whether something was. Nothing is asked of a
+/// credential store that isn't used (it could ask to be unlocked on someone else's computer).
 pub(super) fn forget(host: &str, prompt: &str) -> bool {
+    if !crate::portable::credential_store() {
+        return false;
+    }
     let account = account(host, prompt);
     let store = store();
     let was = store.get(&account).is_some();
@@ -113,12 +123,18 @@ struct System;
 #[cfg_attr(test, allow(dead_code))]
 impl System {
     fn entry(account: &str) -> Result<keyring::Entry, String> {
-        keyring::Entry::new(SERVICE, account).map_err(|e| e.to_string())
+        keyring::Entry::new(service(), account).map_err(|e| e.to_string())
     }
 
-    /// The file listing the names kept.
+    /// The file listing the names kept: on this computer, with the secrets it names (a
+    /// portable copy's in the computer's app data, not on the stick that goes elsewhere).
     fn names_file() -> Option<PathBuf> {
-        crate::portable::data_dir().map(|d| d.join("saved-sign-ins.json"))
+        let name = if crate::portable::asked() {
+            "saved-sign-ins-portable.json"
+        } else {
+            "saved-sign-ins.json"
+        };
+        eframe::storage_dir("gitcraft").map(|d| d.join(name))
     }
 }
 
