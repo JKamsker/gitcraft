@@ -77,7 +77,10 @@ so your config, credentials and hooks apply as usual.
 - Stashes: stash (with a message, untracked files included), see what a stash holds, apply, pop,
   drop.
 - Pull / merge requests of GitHub (through `gh`) or GitLab (through `glab`): list, open in the
-  browser, check out, create from a branch.
+  browser, check out, create from a branch. _Open in worktree_ (in a request's menu, and above
+  the changed files of an open pull request) opens the worktree its branch is checked out in, or
+  makes one beside the repository first: on the local branch, on a new one tracking the remote
+  branch, or fetched from the forge for a fork that isn't a remote here.
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
 
 **Changes and commits** (right)
@@ -110,6 +113,10 @@ so your config, credentials and hooks apply as usual.
   green; click a mark to jump to its change, or anywhere else on the strip to scroll there.
 - The _Diff_ / _File_ switch shows the whole file as it is after the change instead (before it,
   for a deleted file), coloured and with line numbers.
+- A Markdown file's diff has an eye button that renders it: the changes block by block (removed
+  ones red, added ones green, the rest as they are) or, with _File_, the whole file. Images of
+  the repository show as they are on each side of the change; any other image is a link, so a
+  file can't make gitcraft contact a server.
 - Code takes the colours of the theme VS Code (or Insiders, VSCodium) is using, read from its
   settings and extensions, when it is dark or light like gitcraft's; a setting turns it off.
 - Conflicts open in a three-pane editor: each conflict's two sides with _Ours_, _Theirs_ and

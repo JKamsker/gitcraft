@@ -38,6 +38,11 @@ impl RepoTab {
                     self.ci_view = None;
                 }
             }
+            Action::OpenPrWorktree {
+                number,
+                branch,
+                sha,
+            } => self.open_pr_worktree(number, &branch, &sha, ctx),
             Action::ClosePr => {
                 self.close_pr();
                 self.diff = None;
@@ -150,8 +155,18 @@ impl RepoTab {
                 whole_file,
             } => self.set_diff_options(split, ignore_ws, whole_file, ctx),
             Action::DiffAsFile(on) => self.show_diff_as_file(on, ctx),
+            Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
             Action::DiffStep(delta) => {
-                if let Some(view) = self.diff.as_mut().filter(|_| !self.diff_as_file) {
+                let rendered = self.diff_rendered
+                    && self
+                        .diff
+                        .as_ref()
+                        .is_some_and(|v| diff::rendered::is_markdown(v.key.path()));
+                if let Some(view) = self
+                    .diff
+                    .as_mut()
+                    .filter(|_| !self.diff_as_file && !rendered)
+                {
                     view.step_change(Settings::get(ctx).diff_split, delta);
                 }
             }

@@ -12,7 +12,8 @@ use crate::forge::{self, Forge};
 use crate::git::{self, ChangedFile, Credentials, Remote};
 use crate::pr_threads::{self, PrExtras};
 
-pub use markdown::{safe_blocks, safe_markdown};
+pub(crate) use markdown::markdown_options;
+pub use markdown::{images_to_links_except, safe_blocks, safe_local_markdown, safe_markdown};
 pub(crate) use parse::{at, check, items, login, parse_details, parse_time};
 pub use tables::Block;
 

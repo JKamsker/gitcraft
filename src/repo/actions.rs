@@ -19,6 +19,13 @@ pub(crate) enum Action {
     OpenDiff(DiffKey),
     /// Show a pull request in the big area.
     OpenPr(u64),
+    /// Open the worktree of a pull request (proposing `branch`, at `sha`), making it first
+    /// when there is none.
+    OpenPrWorktree {
+        number: u64,
+        branch: String,
+        sha: String,
+    },
     ClosePr,
     ReloadPr,
     /// Something done on the pull request shown.
@@ -100,6 +107,8 @@ pub(crate) enum Action {
     },
     /// Diffs show the whole file as it is after the change, or the changes.
     DiffAsFile(bool),
+    /// Markdown files show rendered in diffs, or as text.
+    DiffRendered(bool),
     /// Scroll the diff to the next change (`1`) or the previous one (`-1`).
     DiffStep(i32),
     /// The commit pane lists every file of the commit, or only those it changed.

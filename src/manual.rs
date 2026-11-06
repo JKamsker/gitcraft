@@ -65,6 +65,8 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Conflicts open in a three-pane editor with Ours, Theirs and Both for each conflict.",
             "Right-click a file for its history, its blame or the whole file as it is at the commit.",
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
+            "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",
+            "Right-click a pull request and choose Open in worktree to work on its branch in a worktree of its own, made for it when there is none.",
             "A terminal panel with tabs, in the repository's folder.",
         ],
     ),

@@ -5,6 +5,7 @@ use egui::{Sense, Stroke, Ui};
 
 use super::images::image_view;
 use super::lfs::lfs_view;
+use super::rendered;
 use super::rows::Rows;
 use super::{DiffData, Kind, Pick, unstage_args};
 use crate::git::{Area, StatusFile};
@@ -31,15 +32,35 @@ impl RepoTab {
             settings.diff_whole_file,
         );
         let as_file = self.diff_as_file;
+        // A Markdown file can show rendered: `Some(whether it does)`.
+        let markdown = rendered::is_markdown(&path).then_some(self.diff_rendered);
         let clear = self.diff_header(
             ui,
             view,
             (&path, &origin),
             partial,
             (split, ignore_ws, whole_file, as_file),
+            markdown,
             acts,
         );
 
+        if markdown == Some(true) {
+            let Some(view) = &mut self.diff else { return };
+            match &view.rendered {
+                None => {
+                    ui.centered_and_justified(|ui| ui.add(crate::spinner::Spinner::new()));
+                }
+                Some(Err(e)) => {
+                    ui.add_space(12.0);
+                    ui.horizontal(|ui| {
+                        ui.add_space(12.0);
+                        ui.colored_label(t.danger, e);
+                    });
+                }
+                Some(Ok(md)) => rendered::show(ui, &path, md, &mut view.markdown, !as_file),
+            }
+            return;
+        }
         if as_file {
             file_text::show(ui, ("diff_file", &path), view.file.as_ref());
             return;
@@ -100,8 +121,9 @@ impl RepoTab {
     }
 
     /// Header: file, where it comes from, options, actions, close. `opts`: (side by side,
-    /// ignore whitespace, whole file, the file instead of the diff). True when the picked lines
-    /// are to be cleared.
+    /// ignore whitespace, whole file, the file instead of the diff); `markdown`: for a Markdown
+    /// file, whether it shows rendered. True when the picked lines are to be cleared.
+    #[allow(clippy::too_many_arguments)]
     fn diff_header(
         &self,
         ui: &mut Ui,
@@ -109,8 +131,10 @@ impl RepoTab {
         (path, origin): (&str, &str),
         partial: bool,
         (split, ignore_ws, whole_file, as_file): (bool, bool, bool, bool),
+        markdown: Option<bool>,
         acts: &mut Vec<Action>,
     ) -> bool {
+        let rendered = markdown == Some(true);
         let t = Tokens::get(ui.ctx());
         let mut clear = false;
         egui::Frame::new()
@@ -132,7 +156,12 @@ impl RepoTab {
                     };
                     widgets::file_menu(&title, path, rev, ignorable, acts);
                     widgets::chip(ui, origin, t.text_dim);
-                    if as_file && matches!(&view.file, Some(Ok(f)) if f.before) {
+                    let before = if rendered {
+                        matches!(&view.rendered, Some(Ok(md)) if md.before)
+                    } else {
+                        matches!(&view.file, Some(Ok(f)) if f.before)
+                    };
+                    if as_file && before {
                         widgets::chip(ui, "before the change", t.warning);
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -140,14 +169,30 @@ impl RepoTab {
                             acts.push(Action::CloseDiff);
                         }
                         if let DiffKey::Work(file) = &view.key {
-                            clear = self.file_actions(ui, view, file, partial && !as_file, acts);
+                            let partial = partial && !as_file && !rendered;
+                            clear = self.file_actions(ui, view, file, partial, acts);
                         }
                         ui.add_space(8.0);
-                        if !as_file {
+                        if !as_file && !rendered {
                             view_options(ui, &t, (split, ignore_ws, whole_file), acts);
                             ui.add_space(8.0);
                             change_steps(ui, acts);
                             ui.add_space(8.0);
+                        }
+                        if markdown.is_some() {
+                            let tip = match (rendered, as_file) {
+                                (true, _) => "Show the Markdown as text",
+                                (false, false) => "Show the changes rendered",
+                                (false, true) => "Show the file rendered",
+                            };
+                            let r = icons::small_button(ui, "eye", tip);
+                            if rendered {
+                                widgets::active_underline(ui, r.rect, t.accent);
+                            }
+                            if r.clicked() {
+                                acts.push(Action::DiffRendered(!rendered));
+                            }
+                            ui.add_space(4.0);
                         }
                         let on = usize::from(as_file);
                         if let Some(i) = widgets::switch(ui, &["Diff", "File"], on) {
