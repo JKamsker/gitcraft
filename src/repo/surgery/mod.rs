@@ -4,6 +4,9 @@
 //! them in place of the old one and replays the commits after it, so a conflict goes to the
 //! usual conflict flow and Ctrl+Z puts the branch back as one step.
 
+#[cfg(test)]
+mod move_tests;
+mod moving;
 mod patchset;
 mod split;
 #[cfg(test)]
@@ -94,6 +97,21 @@ impl RepoTab {
         };
         if button.clicked() {
             acts.push(Action::OpenSplit(hash.to_owned()));
+        }
+        let button = ui
+            .add_enabled(
+                idle && refused.is_none(),
+                egui::Button::new("Move changes to another commit…"),
+            )
+            .on_hover_text(
+                "Take some of its files, hunks or lines out, into another commit of the branch or the working changes",
+            );
+        let button = match &refused {
+            Some(why) => button.on_disabled_hover_text(why),
+            None => button,
+        };
+        if button.clicked() {
+            acts.push(Action::OpenMove(hash.to_owned()));
         }
     }
 

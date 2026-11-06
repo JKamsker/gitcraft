@@ -67,7 +67,7 @@ pub(super) fn git_out(dir: &Path, args: &[&str]) -> String {
         .to_owned()
 }
 
-fn subjects(dir: &Path) -> Vec<String> {
+pub(super) fn subjects(dir: &Path) -> Vec<String> {
     git_out(dir, &["log", "--format=%s", "HEAD"])
         .lines()
         .map(str::to_owned)
@@ -81,7 +81,7 @@ fn open(tab: &mut RepoTab, ctx: &egui::Context, rev: &str) {
     pump(tab, ctx, |t| t.split.is_some());
 }
 
-fn check(tab: &mut RepoTab, ctx: &egui::Context) {
+pub(super) fn check(tab: &mut RepoTab, ctx: &egui::Context) {
     tab.check_split(ctx);
     pump(tab, ctx, |t| t.split.as_ref().is_some_and(|s| !s.busy));
     let error = tab.split.as_ref().and_then(|s| s.error.clone());
@@ -90,7 +90,7 @@ fn check(tab: &mut RepoTab, ctx: &egui::Context) {
 }
 
 /// Draws the split editor one frame, as the window does, and what it asked for.
-fn draw(tab: &mut RepoTab, ctx: &egui::Context) -> usize {
+pub(super) fn draw(tab: &mut RepoTab, ctx: &egui::Context) -> usize {
     crate::theme::install_fonts(ctx);
     let mut acts = Vec::new();
     let input = egui::RawInput {
@@ -106,7 +106,7 @@ fn draw(tab: &mut RepoTab, ctx: &egui::Context) -> usize {
 }
 
 /// The index of the line of file `f` in the editor whose text is `text`.
-fn line(tab: &RepoTab, f: usize, text: &str) -> usize {
+pub(super) fn line(tab: &RepoTab, f: usize, text: &str) -> usize {
     tab.split
         .as_ref()
         .and_then(|s| s.files.get(f))

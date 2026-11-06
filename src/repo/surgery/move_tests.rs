@@ -1,0 +1,184 @@
+//! Moving changes between commits on real temporary repositories, through the tab.
+
+use super::moving::Dest;
+use super::tests::{check, draw, finished, git_out, line, opened, pump, repo, sh, subjects};
+use crate::repo::RepoTab;
+
+/// Ten lines, then `A` changes the 2nd and the 9th ("zwei", "neun") on top of `B`, which adds
+/// a file; `later` comes after.
+const HISTORY: &str = "printf '1\\n2\\n3\\n4\\n5\\n6\\n7\\n8\\n9\\n10\\n' > 'f i.txt' && git add -A \
+     && git commit -q -m base && echo b > b.txt && git add -A && git commit -q -m B \
+     && printf '1\\nzwei\\n3\\n4\\n5\\n6\\n7\\n8\\nneun\\n10\\n' > 'f i.txt' \
+     && git commit -q -am A -m 'A body' && echo later > later.txt && git add -A \
+     && git commit -q -m later";
+
+fn open_move(tab: &mut RepoTab, ctx: &egui::Context, rev: &str) {
+    let hash = git_out(&tab.path, &["rev-parse", rev]);
+    tab.open_move(hash, ctx);
+    pump(tab, ctx, |t| t.split.is_some());
+}
+
+/// Moves the "neun" hunk (its two lines) of the open editor to `dest`.
+fn move_neun(tab: &mut RepoTab, dest: Dest) {
+    let (nine, neun) = (line(tab, 0, "9"), line(tab, 0, "neun"));
+    if let Some(s) = tab.split.as_mut() {
+        s.assign_line(0, nine, 1);
+        s.assign_line(0, neun, 1);
+        s.set_dest(dest);
+    }
+}
+
+/// The target `summary` is in the list of the open editor.
+fn target(tab: &RepoTab, summary: &str) -> Dest {
+    let Some(super::split::Mode::Move(m)) = tab.split.as_ref().map(|s| s.mode.clone()) else {
+        return Dest::Work;
+    };
+    Dest::Commit(
+        m.targets
+            .iter()
+            .position(|t| t.summary == summary)
+            .unwrap_or(usize::MAX),
+    )
+}
+
+fn file_at(dir: &std::path::Path, rev: &str) -> String {
+    git_out(dir, &["show", &format!("{rev}:f i.txt")])
+}
+
+#[test]
+fn a_hunk_moves_into_an_older_commit_and_undo_brings_it_back() {
+    let dir = repo("move-older", HISTORY);
+    let (mut tab, ctx) = opened(&dir);
+    let (before, tree) = (
+        git_out(&dir, &["rev-parse", "HEAD"]),
+        git_out(&dir, &["rev-parse", "HEAD^{tree}"]),
+    );
+    open_move(&mut tab, &ctx, "HEAD~1");
+    let dest = target(&tab, "B");
+    move_neun(&mut tab, dest);
+    assert_eq!(draw(&mut tab, &ctx), 0);
+    check(&mut tab, &ctx);
+    assert_eq!(draw(&mut tab, &ctx), 0);
+    tab.run_split(&ctx);
+    let status = finished(&mut tab, &ctx);
+    assert!(status.as_ref().is_some_and(|s| !s.1), "{status:?}");
+    assert_eq!(subjects(&dir), ["later", "A", "B", "base", "root"]);
+    // B has the 9th line now, A only the 2nd; together as before.
+    assert_eq!(file_at(&dir, "HEAD~2"), "1\n2\n3\n4\n5\n6\n7\n8\nneun\n10");
+    assert_eq!(
+        file_at(&dir, "HEAD~1"),
+        "1\nzwei\n3\n4\n5\n6\n7\n8\nneun\n10"
+    );
+    assert_eq!(git_out(&dir, &["rev-parse", "HEAD^{tree}"]), tree);
+    assert_eq!(
+        git_out(&dir, &["log", "-1", "--format=%B", "HEAD~1"]),
+        "A\n\nA body"
+    );
+    assert_eq!(git_out(&dir, &["log", "-1", "--format=%B", "HEAD~2"]), "B");
+    tab.undo(&ctx);
+    let undone = finished(&mut tab, &ctx);
+    let head = git_out(&dir, &["rev-parse", "HEAD"]);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(undone.as_ref().is_some_and(|s| !s.1), "{undone:?}");
+    assert_eq!(head, before);
+}
+
+#[test]
+fn everything_of_a_commit_moved_into_a_newer_one_drops_it() {
+    let dir = repo("move-newer", HISTORY);
+    let (mut tab, ctx) = opened(&dir);
+    let tree = git_out(&dir, &["rev-parse", "HEAD^{tree}"]);
+    open_move(&mut tab, &ctx, "HEAD~1");
+    let dest = target(&tab, "later");
+    if let Some(s) = tab.split.as_mut() {
+        s.assign_file(0, 1);
+        s.set_dest(dest);
+    }
+    check(&mut tab, &ctx);
+    tab.run_split(&ctx);
+    let status = finished(&mut tab, &ctx);
+    let subjects = subjects(&dir);
+    let top = git_out(&dir, &["rev-parse", "HEAD^{tree}"]);
+    let under = file_at(&dir, "HEAD~1");
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(status.as_ref().is_some_and(|s| !s.1), "{status:?}");
+    assert_eq!(subjects, ["later", "B", "base", "root"]);
+    assert_eq!(top, tree);
+    assert_eq!(under, "1\n2\n3\n4\n5\n6\n7\n8\n9\n10");
+}
+
+#[test]
+fn a_hunk_moved_back_to_the_working_changes_is_staged_and_undo_takes_it_back() {
+    let dir = repo("move-work", HISTORY);
+    let (mut tab, ctx) = opened(&dir);
+    let before = git_out(&dir, &["rev-parse", "HEAD"]);
+    open_move(&mut tab, &ctx, "HEAD~1");
+    move_neun(&mut tab, Dest::Work);
+    check(&mut tab, &ctx);
+    tab.run_split(&ctx);
+    let status = finished(&mut tab, &ctx);
+    assert!(status.as_ref().is_some_and(|s| !s.1), "{status:?}");
+    assert_eq!(file_at(&dir, "HEAD"), "1\nzwei\n3\n4\n5\n6\n7\n8\n9\n10");
+    assert_eq!(
+        git_out(&dir, &["diff", "--cached", "--name-only"]),
+        "f i.txt"
+    );
+    assert_eq!(git_out(&dir, &["diff", "--name-only"]), "");
+    assert!(std::fs::read_to_string(dir.join("f i.txt")).is_ok_and(|t| t.contains("neun")));
+    tab.undo(&ctx);
+    let undone = finished(&mut tab, &ctx);
+    let head = git_out(&dir, &["rev-parse", "HEAD"]);
+    let clean = git_out(&dir, &["status", "--porcelain"]);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(undone.as_ref().is_some_and(|s| !s.1), "{undone:?}");
+    assert_eq!(head, before);
+    assert_eq!(clean, "");
+}
+
+#[test]
+fn moving_to_working_changes_that_touch_the_file_is_refused_and_changes_nothing() {
+    let dir = repo("move-work-dirty", HISTORY);
+    let (mut tab, ctx) = opened(&dir);
+    let before = git_out(&dir, &["rev-parse", "HEAD"]);
+    open_move(&mut tab, &ctx, "HEAD~1");
+    move_neun(&mut tab, Dest::Work);
+    check(&mut tab, &ctx);
+    sh(&dir, "echo more >> 'f i.txt'");
+    tab.run_split(&ctx);
+    pump(&mut tab, &ctx, |t| {
+        t.split.as_ref().is_some_and(|s| !s.busy)
+    });
+    let error = tab.split.as_ref().and_then(|s| s.error.clone());
+    let head = git_out(&dir, &["rev-parse", "HEAD"]);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(error.is_some_and(|e| e.contains("f i.txt has uncommitted changes")));
+    assert_eq!(head, before);
+}
+
+#[test]
+fn a_move_that_conflicts_stops_in_the_rebase_and_abort_goes_back() {
+    // "later" changes the 9th line again: moving A's "neun" under it into B conflicts with
+    // nothing, but moving it to the top after "later" changed it does.
+    let dir = repo(
+        "move-conflict",
+        &format!(
+            "{HISTORY} && printf '1\\nzwei\\n3\\n4\\n5\\n6\\n7\\n8\\nnine!\\n10\\n' > 'f i.txt' \
+             && git commit -q -am retouch"
+        ),
+    );
+    let (mut tab, ctx) = opened(&dir);
+    let before = git_out(&dir, &["rev-parse", "HEAD"]);
+    open_move(&mut tab, &ctx, "HEAD~2");
+    let dest = target(&tab, "retouch");
+    move_neun(&mut tab, dest);
+    check(&mut tab, &ctx);
+    tab.run_split(&ctx);
+    let status = finished(&mut tab, &ctx);
+    let state = crate::git::status(&dir).map(|w| w.in_progress);
+    sh(&dir, "git rebase --abort");
+    let head = git_out(&dir, &["rev-parse", "HEAD"]);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(status.as_ref().is_some_and(|s| s.1), "{status:?}");
+    assert_eq!(state, Ok(Some(crate::git::InProgress::Rebase)));
+    assert_eq!(head, before);
+}

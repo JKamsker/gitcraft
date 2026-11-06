@@ -18,6 +18,8 @@ use crate::repo::{RepoTab, Undo, short};
 
 pub(crate) use preview::Preview;
 
+use super::moving::Move;
+
 /// Most commits a commit is split into.
 pub(crate) const MAX_GROUPS: usize = 9;
 
@@ -45,6 +47,8 @@ pub(crate) struct Checked {
     /// The parent's tree, then each new commit's.
     pub trees: Vec<String>,
     pub preview: Preview,
+    /// For a move: the patch of what moves, saved where git runs.
+    pub moved: Option<String>,
 }
 
 /// The commit being split, read in the background.
@@ -124,6 +128,18 @@ pub(crate) struct SplitEditor {
     pub busy: bool,
     /// What went wrong checking or starting it.
     pub error: Option<String>,
+    /// The old commit's whole message.
+    pub message: String,
+    /// Splitting the commit, or moving some of its changes elsewhere.
+    pub mode: Mode,
+}
+
+/// What the editor does with the commit.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum Mode {
+    Split,
+    /// Commit `0` is what stays, commit `1` what moves.
+    Move(Move),
 }
 
 impl SplitEditor {
@@ -165,6 +181,8 @@ impl SplitEditor {
             checked: None,
             busy: false,
             error: None,
+            message: read.message,
+            mode: Mode::Split,
         };
         editor.recount();
         editor.relist();
@@ -180,7 +198,7 @@ impl SplitEditor {
             .unwrap_or(0)
     }
 
-    fn recount(&mut self) {
+    pub(crate) fn recount(&mut self) {
         let mut counts = vec![0; self.groups.len()];
         for (f, units) in self.units.iter().enumerate() {
             for &unit in units {
@@ -294,6 +312,9 @@ impl SplitEditor {
     /// Why it can't be split as set up, if it can't, and whether that is just how it starts
     /// (said as a hint, not an error).
     pub fn problem(&self) -> Option<(String, bool)> {
+        if let Mode::Move(m) = &self.mode {
+            return m.problem(&self.counts);
+        }
         let units: usize = self.units.iter().map(Vec::len).sum();
         if units < 2 {
             return Some((
@@ -364,6 +385,7 @@ pub(crate) fn prepare(
     Ok(Checked {
         trees,
         preview: Preview::new(&patches_out),
+        moved: None,
     })
 }
 
@@ -417,6 +439,10 @@ impl RepoTab {
         let Some(editor) = self.split.as_mut().filter(|e| !e.busy) else {
             return;
         };
+        if matches!(editor.mode, Mode::Move(_)) {
+            self.check_move(ctx);
+            return;
+        }
         if editor.problem().is_some() {
             return;
         }
@@ -454,6 +480,10 @@ impl RepoTab {
             return;
         };
         if editor.problem().is_some() {
+            return;
+        }
+        if matches!(editor.mode, Mode::Move(_)) {
+            self.run_move(ctx);
             return;
         }
         editor.busy = true;
@@ -622,6 +652,7 @@ Binary files a/b.bin and b/b.bin differ
         ed.checked = Some(Checked {
             trees: vec![],
             preview: Preview::new(&[]),
+            moved: None,
         });
         ed.assign_line(0, 1, 0);
         assert!(ed.checked.is_none());

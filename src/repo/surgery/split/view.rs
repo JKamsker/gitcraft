@@ -6,9 +6,10 @@
 use egui::{Color32, Key, RichText, Sense, Stroke, Ui};
 
 use super::preview::Look;
-use super::{MAX_GROUPS, Row, SplitEditor};
+use super::{MAX_GROUPS, Mode, Row, SplitEditor};
 use crate::icons;
 use crate::repo::diff::Kind;
+use crate::repo::surgery::moving::Dest;
 use crate::repo::{Action, RepoTab, short, widgets};
 use crate::theme::{self, Tokens};
 
@@ -76,7 +77,13 @@ impl RepoTab {
                     .inner_margin(egui::Margin::same(10))
                     .stroke(Stroke::new(1.0, t.separator)),
             )
-            .show(ui, |ui| groups(ui, &t, editor));
+            .show(ui, |ui| {
+                if matches!(editor.mode, Mode::Move(_)) {
+                    destinations(ui, &t, editor);
+                } else {
+                    groups(ui, &t, editor);
+                }
+            });
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(t.dock))
             .show(ui, |ui| {
@@ -117,9 +124,13 @@ fn header(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, acts: &mut Vec<Action>)
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 icons::inline(ui, "rows-2", 16.0, t.icon);
+                let verb = match editor.mode {
+                    Mode::Split => "Split",
+                    Mode::Move(_) => "Move changes out of",
+                };
                 ui.label(
                     RichText::new(format!(
-                        "Split {} · {}",
+                        "{verb} {} · {}",
                         short(&editor.hash),
                         editor.summary
                     ))
@@ -146,11 +157,15 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor, idle: bool, acts: &
         .show(ui, |ui| {
             // The buttons first, from the right: the note takes what is left, cut short, all
             // of it in its tooltip.
+            let moving = matches!(editor.mode, Mode::Move(_));
+            let (check, run) = if moving {
+                ("Check move", "Move changes")
+            } else {
+                ("Check split", "Split commit")
+            };
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if editor.checked.is_some() {
-                    if widgets::primary_button(ui, "Split commit", idle && !editor.busy, 120.0)
-                        .clicked()
-                    {
+                    if widgets::primary_button(ui, run, idle && !editor.busy, 120.0).clicked() {
                         acts.push(Action::RunSplit);
                     }
                     if ui
@@ -161,7 +176,7 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor, idle: bool, acts: &
                     }
                 } else if widgets::primary_button(
                     ui,
-                    "Check split",
+                    check,
                     problem.is_none() && !editor.busy,
                     120.0,
                 )
@@ -189,11 +204,19 @@ fn note(t: &Tokens, editor: &SplitEditor, problem: Option<(String, bool)>) -> (S
     match (&editor.error, problem, &editor.checked) {
         (Some(e), _, _) => (format!("Can't split it this way: {e}"), t.danger),
         (None, Some((p, hint)), _) => (p, if hint { t.text_dim } else { t.danger }),
+        (None, None, Some(_)) if matches!(editor.mode, Mode::Move(_)) => (
+            "Checked: what stays and what moves. Moving rewrites the branch from the older commit · Ctrl+Z undoes it".to_owned(),
+            t.text_dim,
+        ),
         (None, None, Some(c)) => (
             format!(
                 "Checked: {} commits, together exactly the old one. Splitting replays the commits after it · Ctrl+Z undoes it",
                 c.trees.len().saturating_sub(1)
             ),
+            t.text_dim,
+        ),
+        (None, None, None) if matches!(editor.mode, Mode::Move(_)) => (
+            "Check the move to see what leaves the commit and what arrives".to_owned(),
             t.text_dim,
         ),
         (None, None, None) => (
@@ -318,13 +341,83 @@ fn group_card(
     shown.inner || shown.response.interact(Sense::click()).clicked()
 }
 
+/// Where moved changes can go: the other commits of the branch, newest first, or the working
+/// changes.
+fn destinations(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
+    let Mode::Move(m) = &editor.mode else {
+        return;
+    };
+    let (targets, dest) = (m.targets.clone(), m.dest.clone());
+    let mut picked = None;
+    ui.label(
+        RichText::new(
+            "Click the files, hunks or lines to move on the right (chip 2; click again to keep them), then pick where they go.",
+        )
+        .color(t.text_dim)
+        .small(),
+    );
+    ui.add_space(6.0);
+    ui.horizontal(|ui| {
+        chip(ui, t, 0);
+        ui.label(RichText::new(&editor.groups[0].subject).color(t.text_dim));
+    });
+    ui.horizontal(|ui| {
+        chip(ui, t, 1);
+        ui.add(egui::Label::new(RichText::new(&editor.groups[1].subject)).truncate());
+    });
+    ui.add_space(8.0);
+    egui::ScrollArea::vertical()
+        .id_salt(("move_targets", editor.id))
+        .auto_shrink(false)
+        .show(ui, |ui| {
+            if editor.busy {
+                ui.disable();
+            }
+            if ui
+                .selectable_label(dest == Some(Dest::Work), "Working changes (staged)")
+                .on_hover_text("Out of the commit, staged; their files must have no other changes")
+                .clicked()
+            {
+                picked = Some(Dest::Work);
+            }
+            ui.separator();
+            if targets.is_empty() {
+                ui.label(
+                    RichText::new("No other commit of the branch can take them (a merge or the first commit is next).")
+                        .color(t.text_faint)
+                        .small(),
+                );
+            }
+            for (i, target) in targets.iter().enumerate() {
+                let text = format!("{}  {}", short(&target.hash), target.summary);
+                if ui
+                    .add(
+                        egui::Button::selectable(dest == Some(Dest::Commit(i)), text)
+                            .truncate(),
+                    )
+                    .clicked()
+                {
+                    picked = Some(Dest::Commit(i));
+                }
+            }
+        });
+    if let Some(dest) = picked {
+        editor.set_dest(dest);
+    }
+}
+
 /// The old commit's files and lines, each change with the chip of the commit it goes to.
 fn changes(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
     let mut click = None;
     let active = editor.active;
     ui.horizontal(|ui| {
         ui.add_space(8.0);
-        ui.label(RichText::new("Clicks go to").color(t.text_dim));
+        let lead = if matches!(editor.mode, Mode::Move(_)) {
+            "Clicks move to"
+        } else {
+            "Clicks go to"
+        };
+        ui.label(RichText::new(lead).color(t.text_dim));
         chip(ui, t, active);
         let subject = editor
             .groups
@@ -349,11 +442,39 @@ fn changes(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
             }
         });
     editor.rows = rows;
+    // Moving, a click on what already moves puts it back.
+    let to = |editor: &SplitEditor, units: &[usize], f: usize| {
+        let moving = matches!(editor.mode, Mode::Move(_));
+        if moving && units.iter().all(|&u| editor.group_of(f, u) == 1) {
+            0
+        } else {
+            active
+        }
+    };
     match click {
         Some(Click::Fold(f)) => editor.toggle_fold(f),
-        Some(Click::File(f)) => editor.assign_file(f, active),
-        Some(Click::Hunk(f, h)) => editor.assign_hunk(f, h, active),
-        Some(Click::Line(f, i)) => editor.assign_line(f, i, active),
+        Some(Click::File(f)) => {
+            let units = editor.units.get(f).cloned().unwrap_or_default();
+            let g = to(editor, &units, f);
+            editor.assign_file(f, g);
+        }
+        Some(Click::Hunk(f, h)) => {
+            let range = editor.hunk_range(f, h);
+            let units: Vec<usize> = editor
+                .units
+                .get(f)
+                .into_iter()
+                .flatten()
+                .copied()
+                .filter(|u| range.contains(u))
+                .collect();
+            let g = to(editor, &units, f);
+            editor.assign_hunk(f, h, g);
+        }
+        Some(Click::Line(f, i)) => {
+            let g = to(editor, &[i], f);
+            editor.assign_line(f, i, g);
+        }
         None => {}
     }
 }

@@ -209,6 +209,7 @@ impl RepoTab {
             Action::RunRebase => self.run_rebase(ctx),
             Action::CloseRebase => self.rebase = None,
             Action::OpenSplit(hash) => self.open_split(hash, ctx),
+            Action::OpenMove(hash) => self.open_move(hash, ctx),
             Action::CheckSplit => self.check_split(ctx),
             Action::RunSplit => self.run_split(ctx),
             Action::CloseSplit => self.split = None,
