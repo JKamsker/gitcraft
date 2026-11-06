@@ -51,9 +51,7 @@ impl App {
                         ui.add_space(32.0);
                         ui.label(RichText::new("Settings").font(theme::semibold(22.0)));
                         ui.add_space(4.0);
-                        if self.settings.ui(ui) {
-                            self.settings.set(ui.ctx());
-                        }
+                        self.settings_halves(ui);
                         ui.add_space(32.0);
                     });
                 });

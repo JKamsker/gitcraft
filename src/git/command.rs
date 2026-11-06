@@ -2,8 +2,46 @@
 //! repository in WSL or over SSH runs git there (see [`crate::remote`]), with the same
 //! environment.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::RwLock;
+
+/// The config file the active gitcraft profile has git read as its global config (see
+/// `settings::profiles`), if it sets anything.
+static PROFILE_CONFIG: RwLock<Option<PathBuf>> = RwLock::new(None);
+
+/// Has every git command from now on read `path` as its global config, or the user's own again
+/// with `None`. It is still the global scope, so what a repository sets itself (`--local`,
+/// `--worktree`) wins over it.
+pub fn set_profile_config(path: Option<PathBuf>) {
+    if let Ok(mut current) = PROFILE_CONFIG.write() {
+        *current = path;
+    }
+}
+
+/// Whether `args` reads or writes the user's own global config: `git config --global …`
+/// (signing settings, Mergiraf's set-up), which must never land in the profile's file, which is
+/// written over.
+fn user_global_config(args: &[&str]) -> bool {
+    let mut rest = args;
+    while let [flag, _, tail @ ..] = rest
+        && *flag == "-c"
+    {
+        rest = tail;
+    }
+    rest.first() == Some(&"config") && rest.contains(&"--global")
+}
+
+/// Points `cmd` at the active profile's config, unless `args` is about the user's own.
+fn with_profile(cmd: &mut Command, args: &[&str]) {
+    if user_global_config(args) {
+        return;
+    }
+    let path = PROFILE_CONFIG.read().ok().and_then(|p| p.clone());
+    if let Some(path) = path {
+        cmd.env("GIT_CONFIG_GLOBAL", path);
+    }
+}
 
 use crate::remote::{self, Target};
 
@@ -65,6 +103,7 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
         return execute_there(&target, extra, args);
     }
     let mut cmd = git_cmd();
+    with_profile(&mut cmd, args);
     if let Some(dir) = dir {
         cmd.arg("-C").arg(dir);
     }
@@ -169,6 +208,7 @@ pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Chi
         );
     }
     let mut cmd = git_cmd();
+    with_profile(&mut cmd, args);
     cmd.arg("-C").arg(dir).args(args);
     cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
@@ -308,6 +348,7 @@ pub fn stored_credentials(url: &str) -> Option<Credentials> {
     use std::io::Write;
     use std::process::Stdio;
     let mut cmd = git_cmd();
+    with_profile(&mut cmd, &["credential", "fill"]);
     unattended(&mut cmd);
     cmd.args(["credential", "fill"])
         .env("GCM_INTERACTIVE", "never")
@@ -358,6 +399,20 @@ mod tests {
         ] {
             assert_eq!(goes_over_network(args), long, "{args:?}");
         }
+    }
+
+    /// `git config --global` reaches the user's own file, whatever comes before it; every
+    /// other command (and a repository's own `config`) goes by the profile.
+    #[test]
+    fn only_global_config_commands_skip_the_profile() {
+        assert!(user_global_config(&["config", "--global", "user.name"]));
+        assert!(user_global_config(&[
+            "-c", "core.x=y", "config", "--global", "--list"
+        ]));
+        assert!(!user_global_config(&["config", "user.name"]));
+        assert!(!user_global_config(&["commit", "-m", "--global"]));
+        assert!(!user_global_config(&["-c", "config"]));
+        assert!(!user_global_config(&[]));
     }
 
     /// What git gets from the helper is what was typed, backslashes (`DOMAIN\user`) included.

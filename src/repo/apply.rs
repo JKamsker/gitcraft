@@ -153,6 +153,24 @@ impl RepoTab {
                 plain,
                 ctx,
             ),
+            Action::ClearIdentity { name, email } => {
+                let mut list: Vec<&[&str]> = Vec::new();
+                if name {
+                    list.push(&["config", "--local", "--unset-all", "user.name"]);
+                }
+                if email {
+                    list.push(&["config", "--local", "--unset-all", "user.email"]);
+                }
+                if !list.is_empty() {
+                    self.run_ops(
+                        "Use the profile's author",
+                        ops(&list),
+                        Refresh::All,
+                        plain,
+                        ctx,
+                    );
+                }
+            }
             Action::SetDiffOptions {
                 split,
                 ignore_ws,

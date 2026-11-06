@@ -180,6 +180,13 @@ impl RepoTab {
         self.work().label()
     }
 
+    /// What is unfinished in this view or one of its parked worktrees, if anything: what closing
+    /// the whole tab would lose.
+    pub(crate) fn unfinished_anywhere(&mut self) -> Option<&'static str> {
+        self.unfinished()
+            .or_else(|| self.parked.iter_mut().find_map(|p| p.unfinished()))
+    }
+
     /// What the tab strip shows for this tab.
     pub(crate) fn label(&self, worktrees_in_same_tab: bool) -> TabLabel {
         if worktrees_in_same_tab {

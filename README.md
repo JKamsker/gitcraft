@@ -14,6 +14,10 @@ so your config, credentials and hooks apply as usual.
   recent repositories.
 - Browser-like tabs, one per repository (Ctrl+T, Ctrl+W, middle-click; Ctrl+Shift+T reopens a
   closed one). Open tabs, recents, theme and settings are remembered.
+- Profiles, as in GitKraken: switch between them from the title bar (or the palette). Each has
+  its own open tabs, recent repositories, theme, git author and commit signing; the rest of the
+  settings are shared (Settings → General). Switching closes this profile's tabs and opens the
+  other one's (refused while a tab has unfinished work).
 - Changes made elsewhere (editor, terminal) show up by themselves: the folder is watched.
 - Repositories on another machine, in a WSL distribution or over SSH: the window stays here and
   git runs there (see below).
@@ -61,7 +65,8 @@ so your config, credentials and hooks apply as usual.
 - Over SSH, programs of this machine can't open the files (reveal in the file manager, open in
   editor, Mergiraf). In WSL they can, through `\\wsl.localhost`.
 - Settings that write this machine's global git config (commit signing, Mergiraf) don't apply
-  there: that machine's own git config does.
+  there, nor do a profile's author and signing: that machine's own git config does (the commit
+  box says `· global (SSH · host)`).
 
 **Graph**
 
@@ -144,8 +149,9 @@ so your config, credentials and hooks apply as usual.
   click the changed lines you want (Shift+click for a range) and stage, unstage or discard only
   those. Discarding can be undone with Ctrl+Z.
 - Commit box (Ctrl+Enter; with nothing staged it stages everything), _Amend last commit_
-  (warns when the commit is already pushed), the identity you commit as, and saved identities to
-  switch a repository to.
+  (warns when the commit is already pushed), the identity you commit as (and whether it is the
+  repository's own, the profile's or the global one), and saved identities or profile authors
+  to switch a repository to; _Use the profile's author_ takes the repository's own out again.
 - Undo / redo (Ctrl+Z / Ctrl+Y) of commits, amends, merges, rebases, pulls, resets,
   cherry-picks, reverts, checkouts, branch create / rename / delete, tags and stashes.
 
@@ -206,7 +212,14 @@ so your config, credentials and hooks apply as usual.
   whether commits and tags are signed by default. These are your global git config's
   `gpg.format`, `user.signingkey`, `gpg.program` (`gpg.ssh.program`, `gpg.x509.program`),
   `commit.gpgSign` and `tag.gpgSign`, shown as they are set and written back there; git does
-  the signing as usual.
+  the signing as usual. A profile can sign its own way instead.
+- How a profile's git author and signing reach git: gitcraft writes them to a config file of the
+  profile's (in its data folder, `profiles/<id>.gitconfig`) that includes your own global config
+  first and then sets the profile's values, and runs git with `GIT_CONFIG_GLOBAL` pointing at it
+  (git 2.32 or later). So the profile wins over `~/.gitconfig`, and a repository's own config
+  (`git config --local`, `--worktree`) wins over the profile, as it does over `~/.gitconfig`.
+  `git config --global` from gitcraft still reads and writes your own file. The built-in
+  terminal keeps your own config.
 - Looks on GitHub for a newer release on every start, of the main channel (releases) or the dev
   channel (a prerelease of every change to `dev`). It downloads it in the background and parks it
   on disk; "Update now" in the banner then swaps it in place of the running version and restarts.

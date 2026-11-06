@@ -258,6 +258,12 @@ impl RepoTab {
 
     /// Re-reads the submodules: the commits they should be at are in the index, which can
     /// change without any ref moving (`git add` of a submodule, `git submodule add`).
+    /// Reads again who commits are made as: the profile's author changed.
+    pub fn reload_identity(&mut self, ctx: &egui::Context) {
+        let path = self.path.clone();
+        spawn(&self.tx, ctx, move || Msg::Identity(git::identity(&path)));
+    }
+
     pub(super) fn reload_submodules(&mut self, ctx: &egui::Context) {
         let read = self.next_read();
         let path = self.path.clone();

@@ -80,7 +80,9 @@ fn forge_of(tool: &str) -> Result<Forge, String> {
     match tool {
         "gh" => Ok(Forge::GitHub),
         "glab" => Ok(Forge::GitLab),
-        _ => Err(format!("{tool} can't be run for a repository on another machine")),
+        _ => Err(format!(
+            "{tool} can't be run for a repository on another machine"
+        )),
     }
 }
 

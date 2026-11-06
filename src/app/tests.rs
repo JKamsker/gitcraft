@@ -1,5 +1,7 @@
 //! Saved state, the active tab on start, the window icon and palette matching.
 
+use eframe::Storage as _;
+
 use super::palette::fuzzy;
 use super::{Saved, active_among_kept, window_icon};
 use crate::tab_look::{TabColor, TabLook};
@@ -153,4 +155,33 @@ fn a_remote_repository_never_holds_up_the_window() -> Result<(), String> {
     let _ = std::thread::spawn(move || remote::exec(&host, &cleanup)).join();
     assert_eq!(refused, 0, "commands asked of WSL from the window's thread");
     Ok(())
+}
+
+/// The tabs of the profiles not in use survive a restart, and saves from before profiles load.
+#[test]
+fn profile_tabs_survive_a_restart() {
+    let mut saved = Saved::default();
+    saved.profile_states.insert(
+        2,
+        super::profiles::ProfileState {
+            open: vec!["C:/code/work".into()],
+            active: 0,
+            recent: vec!["C:/code/work".into()],
+            theme: crate::theme::ThemeKind::Light,
+        },
+    );
+    let mut storage = Memory::default();
+    eframe::set_value(&mut storage, eframe::APP_KEY, &saved);
+    let back: Option<Saved> = eframe::get_value(&storage, eframe::APP_KEY);
+    assert_eq!(
+        back.map(|b| b.profile_states),
+        Some(saved.profile_states.clone())
+    );
+
+    let mut old = Memory::default();
+    old.set_string(eframe::APP_KEY, "(open: [\"C:/a\"], active: 0)".to_owned());
+    let back: Option<Saved> = eframe::get_value(&old, eframe::APP_KEY);
+    let back = back.unwrap_or_default();
+    assert_eq!(back.open, [std::path::PathBuf::from("C:/a")]);
+    assert!(back.profile_states.is_empty());
 }

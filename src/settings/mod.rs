@@ -1,16 +1,20 @@
 //! User settings: stored with the app state, readable from anywhere through the egui context.
 
+mod profile_page;
+pub mod profiles;
 mod signing;
 
 use egui::{RichText, Ui};
 use serde::{Deserialize, Serialize};
 
 use crate::theme::{self, Tokens};
+pub use profile_page::{ProfileRequest, paint_badge};
+pub use profiles::UserProfile;
 
-/// A name and email to commit with, applied per repository.
+/// A name and email to commit with, applied per repository from its commit box.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
-pub struct Profile {
+pub struct SavedIdentity {
     pub label: String,
     pub name: String,
     pub email: String,
@@ -80,7 +84,13 @@ pub struct Settings {
     pub mergiraf: bool,
     /// After a checkout, pull, merge or rebase, update the submodules to the commits it records.
     pub keep_submodules: bool,
-    pub profiles: Vec<Profile>,
+    /// Saved as `profiles` by the versions before profiles were what they are now.
+    #[serde(rename = "profiles")]
+    pub identities: Vec<SavedIdentity>,
+    /// The profiles to switch between; there is always at least one.
+    pub user_profiles: Vec<UserProfile>,
+    /// The id of the profile in use.
+    pub active_profile: u64,
 }
 
 impl Default for Settings {
@@ -119,13 +129,27 @@ impl Default for Settings {
             vscode_colors: true,
             mergiraf: true,
             keep_submodules: false,
-            profiles: Vec::new(),
+            identities: Vec::new(),
+            user_profiles: vec![UserProfile::default()],
+            active_profile: UserProfile::default().id,
         }
     }
 }
 
 fn id() -> egui::Id {
     egui::Id::new("gitcraft-settings")
+}
+
+/// A section's heading on the settings page.
+fn section(ui: &mut Ui, title: &str) {
+    let t = Tokens::get(ui.ctx());
+    ui.add_space(10.0);
+    ui.label(
+        RichText::new(title)
+            .font(theme::semibold(10.5))
+            .color(t.text_faint),
+    );
+    ui.add_space(2.0);
 }
 
 /// What "Compact graph" does.
@@ -161,6 +185,70 @@ impl Settings {
         ctx.data_mut(|d| d.insert_temp(id(), self.clone()));
         ctx.set_zoom_factor(self.ui_scale.clamp(0.7, 2.0));
         crate::vscode_theme::set_enabled(self.vscode_colors);
+        profiles::apply(&self.profile());
+    }
+
+    /// There is a profile, and the active one is among them.
+    pub fn ensure_profile(&mut self) {
+        if self.user_profiles.is_empty() {
+            self.user_profiles.push(UserProfile::default());
+        }
+        if !self
+            .user_profiles
+            .iter()
+            .any(|p| p.id == self.active_profile)
+        {
+            self.active_profile = self.user_profiles.first().map_or(1, |p| p.id);
+        }
+    }
+
+    /// The profile in use.
+    pub fn profile(&self) -> UserProfile {
+        self.user_profiles
+            .iter()
+            .find(|p| p.id == self.active_profile)
+            .or(self.user_profiles.first())
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// The profile in use, to change.
+    pub fn profile_mut(&mut self) -> &mut UserProfile {
+        self.ensure_profile();
+        let active = self.active_profile;
+        let i = self
+            .user_profiles
+            .iter()
+            .position(|p| p.id == active)
+            .unwrap_or(0);
+        &mut self.user_profiles[i]
+    }
+
+    /// Adds a profile called `name`, a copy of the one in use when `copy`, and returns its id.
+    /// It is not switched to: that is the app's, which swaps the tabs.
+    pub fn add_profile(&mut self, name: &str, copy: bool) -> u64 {
+        let id = self.user_profiles.iter().map(|p| p.id).max().unwrap_or(0) + 1;
+        let mut profile = if copy {
+            self.profile()
+        } else {
+            UserProfile::default()
+        };
+        profile.id = id;
+        profile.name = name.to_owned();
+        self.user_profiles.push(profile);
+        id
+    }
+
+    /// `base`, or `base 2`, `base 3`… whichever no profile is called yet.
+    pub fn new_profile_name(&self, base: &str) -> String {
+        let taken = |name: &str| self.user_profiles.iter().any(|p| p.name == name);
+        if !taken(base) {
+            return base.to_owned();
+        }
+        (2..)
+            .map(|n| format!("{base} {n}"))
+            .find(|name| !taken(name))
+            .unwrap_or_else(|| base.to_owned())
     }
 
     /// Mergiraf: whether it is installed (and a button to install it), whether to offer it in
@@ -237,19 +325,10 @@ impl Settings {
         });
     }
 
-    /// The settings form. Returns true when something changed.
+    /// The settings every profile shares. Returns true when something changed.
     pub fn ui(&mut self, ui: &mut Ui) -> bool {
         let t = Tokens::get(ui.ctx());
         let before = self.clone();
-        let section = |ui: &mut Ui, title: &str| {
-            ui.add_space(10.0);
-            ui.label(
-                RichText::new(title)
-                    .font(theme::semibold(10.5))
-                    .color(t.text_faint),
-            );
-            ui.add_space(2.0);
-        };
 
         section(ui, "INTERFACE");
         egui::Grid::new("settings-ui").num_columns(2).spacing([16.0, 8.0]).show(ui, |ui| {
@@ -389,9 +468,6 @@ impl Settings {
                 ui.end_row();
             });
 
-        section(ui, "COMMIT SIGNING");
-        signing::signing_ui(ui);
-
         section(ui, "TERMINAL");
         egui::Grid::new("settings-term")
             .num_columns(2)
@@ -421,13 +497,15 @@ impl Settings {
         section(ui, "IDENTITIES");
         ui.label(
             RichText::new(
-                "Name and email pairs you can apply to a repository from its commit box.",
+                "Name and email pairs you can apply to a repository from its commit box. That \
+                 sets them in the repository's own config, where they win over the profile's \
+                 author.",
             )
             .color(t.text_dim)
             .small(),
         );
         let mut remove = None;
-        for (i, p) in self.profiles.iter_mut().enumerate() {
+        for (i, p) in self.identities.iter_mut().enumerate() {
             ui.horizontal(|ui| {
                 ui.add(
                     egui::TextEdit::singleline(&mut p.label)
@@ -450,10 +528,10 @@ impl Settings {
             });
         }
         if let Some(i) = remove {
-            self.profiles.remove(i);
+            self.identities.remove(i);
         }
         if ui.button("Add identity").clicked() {
-            self.profiles.push(Profile::default());
+            self.identities.push(SavedIdentity::default());
         }
         *self != before
     }

@@ -5,6 +5,7 @@ mod clone;
 mod home;
 mod palette;
 mod panels;
+mod profiles;
 mod remote_open;
 mod tab_strip;
 mod tabs;
@@ -54,6 +55,9 @@ struct Saved {
     skipped_version: String,
     /// Repository tabs given their own icon or colour.
     tab_looks: BTreeMap<PathBuf, TabLook>,
+    /// What the profiles not in use had open; `open`, `active`, `recent` and `theme` are the
+    /// profile's in use.
+    profile_states: profiles::ProfileStates,
 }
 
 enum Tab {
@@ -104,6 +108,12 @@ pub struct App {
     skipped_version: String,
     tab_looks: BTreeMap<PathBuf, TabLook>,
     settings: Settings,
+    /// The profiles not in use: their tabs, recent repositories and theme.
+    profile_states: profiles::ProfileStates,
+    /// The settings page shows the profile's settings rather than the general ones.
+    settings_profile_page: bool,
+    /// What the profile set for git when the repository tabs last read who commits are by.
+    profile_git_seen: String,
     manual_open: bool,
     palette: Option<Palette>,
     toasts: Vec<Toast>,
@@ -128,7 +138,9 @@ impl App {
         crate::image_fit::install(ctx);
         theme::install_fonts(ctx);
         theme::apply(ctx, saved.theme);
-        saved.settings.set(ctx);
+        let mut settings = saved.settings;
+        settings.ensure_profile();
+        settings.set(ctx);
         crate::desktop_entry::refresh();
 
         let mut app = Self {
@@ -142,7 +154,10 @@ impl App {
             recent: saved.recent,
             theme: saved.theme,
             clone_parent: saved.clone_parent,
-            settings: saved.settings.clone(),
+            settings,
+            profile_states: saved.profile_states,
+            settings_profile_page: false,
+            profile_git_seen: String::new(),
             manual_open: false,
             palette: None,
             toasts: Vec::new(),
@@ -413,6 +428,7 @@ impl eframe::App for App {
         self.poll_clone(&ctx);
         self.poll_connecting(&ctx);
         self.poll_update(&ctx);
+        self.notice_profile_git(&ctx);
         let focused = self.shortcuts(&ctx);
 
         // Background repos still need their results drained. Those restored on start are read
@@ -467,22 +483,8 @@ impl eframe::App for App {
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        let open: Vec<PathBuf> = self
-            .tabs
-            .iter()
-            .filter_map(|t| match t {
-                Tab::Repo(r) => Some(r.path.clone()),
-                Tab::Home | Tab::Settings => None,
-            })
-            .collect();
         // Index of the active tab among the saved (repo) tabs.
-        let active = self
-            .tabs
-            .iter()
-            .take(self.active + 1)
-            .filter(|t| matches!(t, Tab::Repo(_)))
-            .count()
-            .saturating_sub(1);
+        let (open, active) = self.open_repos();
         let saved = Saved {
             open,
             active,
@@ -492,6 +494,7 @@ impl eframe::App for App {
             settings: self.settings.clone(),
             skipped_version: self.skipped_version.clone(),
             tab_looks: self.tab_looks.clone(),
+            profile_states: self.profile_states.clone(),
         };
         eframe::set_value(storage, eframe::APP_KEY, &saved);
     }
