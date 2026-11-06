@@ -1,8 +1,9 @@
 //! The commit box under the working-tree changes: message, amend, identity.
 
-use egui::{Key, RichText, Ui};
+use egui::{RichText, Ui};
 
 use crate::icons;
+use crate::keymap::{self, Command, Scope};
 use crate::repo::{Action, RepoTab, widgets};
 use crate::theme::{self, Tokens};
 
@@ -79,6 +80,9 @@ impl RepoTab {
                 .desired_width(f32::INFINITY)
                 .margin(egui::Margin::symmetric(8, 6)),
         );
+        if std::mem::take(&mut self.focus_commit_summary) && !rebasing {
+            summary.request_focus();
+        }
         let body = ui.add_enabled(
             !rebasing,
             egui::TextEdit::multiline(&mut self.commit_body)
@@ -118,12 +122,12 @@ impl RepoTab {
             && self.work.conflicted.is_empty();
         // Only from the message fields, so Ctrl+Enter in the terminal stays the shell's.
         let shortcut = (summary.has_focus() || body.has_focus())
-            && ui.input(|i| i.modifiers.command && i.key_pressed(Key::Enter));
+            && ui.input(|i| keymap::pressed(i, Scope::Repository).contains(&Command::Commit));
         let resp = widgets::primary_button(ui, &label, can, ui.available_width());
         if (resp.clicked() || (shortcut && can)) && can {
             acts.push(Action::Commit);
         }
-        resp.on_hover_text("Ctrl+Enter");
+        resp.on_hover_text(keymap::label(Command::Commit));
 
         ui.add_space(4.0);
         self.identity_row(ui, acts);

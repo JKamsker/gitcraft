@@ -4,6 +4,7 @@ use egui::{Align2, Rect, Response, Ui, pos2, vec2};
 
 use crate::git::Worktree;
 use crate::icons;
+use crate::menu_item::MenuItem;
 use crate::repo::pinned_sections::{Button, Header, Sections};
 use crate::repo::{Action, Dialog, Refresh, RepoTab, ops, widgets, worktree_tab};
 use crate::settings::Settings;
@@ -209,9 +210,13 @@ fn worktree_menu_items(
                 refresh: Refresh::All,
             });
         }
-        if ui
-            .add_enabled(idle && !wt.current, egui::Button::new("Remove…"))
-            .on_disabled_hover_text("Open another worktree to remove this one")
+        if MenuItem::new("Remove…")
+            .enabled(idle)
+            .refused(
+                wt.current
+                    .then_some("Open another worktree to remove this one"),
+            )
+            .show(ui)
             .clicked()
         {
             acts.push(Action::Dialog(Dialog::confirm(

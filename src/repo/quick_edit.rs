@@ -10,6 +10,7 @@ use super::operations::expect_ref_at;
 use super::rebase::{RebaseEditor, Step};
 use super::{Action, Msg, Refresh, RepoTab, Undo, short, spawn};
 use crate::git::{self, Commit, RebaseCommit};
+use crate::menu_item::{MenuItem, same_reason_below};
 
 /// A change to one commit made from its menu.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -147,17 +148,19 @@ impl RepoTab {
                 .in_progress
                 .map(|s| format!("A {} is in progress", s.label().to_lowercase()))
         };
-        for edit in Edit::ALL {
-            let refused = blocked
+        let refusals = Edit::ALL.map(|edit| {
+            blocked
                 .clone()
-                .or_else(|| refusal(edit, &line, hash).map(str::to_owned));
-            let button = ui
-                .add_enabled(idle && refused.is_none(), egui::Button::new(edit.label()))
+                .or_else(|| refusal(edit, &line, hash).map(str::to_owned))
+        });
+        let below = same_reason_below(&refusals);
+        for ((edit, refused), below) in Edit::ALL.into_iter().zip(&refusals).zip(below) {
+            let button = MenuItem::new(edit.label())
+                .enabled(idle)
+                .refused(refused.as_deref())
+                .explained_below(below)
+                .show(ui)
                 .on_hover_text(edit.explain());
-            let button = match &refused {
-                Some(why) => button.on_disabled_hover_text(why),
-                None => button,
-            };
             if button.clicked() {
                 acts.push(match edit {
                     Edit::Message => Action::EditMessage(hash.to_owned()),
