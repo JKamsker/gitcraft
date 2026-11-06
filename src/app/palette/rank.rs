@@ -160,6 +160,21 @@ mod tests {
     }
 
     #[test]
+    fn cp_finds_cherry_pick_before_create_patch() {
+        let mut items: Vec<Item> = ["Create patch from a301da9c…", "Cherry-pick a301da9c"]
+            .into_iter()
+            .map(item)
+            .collect();
+        for i in &mut items {
+            i.selection = true;
+        }
+        assert_eq!(
+            labels(&items, "cp", &Recent::default())[0],
+            "Cherry-pick a301da9c"
+        );
+    }
+
+    #[test]
     fn a_recent_entry_wins_over_an_equal_match() {
         let items: Vec<Item> = ["Push", "Pull"].into_iter().map(item).collect();
         assert_eq!(labels(&items, "pu", &Recent::default())[0], "Push");

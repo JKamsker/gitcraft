@@ -29,10 +29,9 @@ const FEATURES: &[(&str, &[&str])] = &[
         "Command palette",
         &[
             "Ctrl+P lists every action; type a few letters of one. The best matches come first: letters at the start of words or in a row, like reb for Rebase or cp for Cherry-pick. The letters typed are highlighted.",
-            "What you ran lately is listed first, and kept across restarts.",
-            "With a commit selected, its actions come first: Cherry-pick, Revert, Reset to here, Interactive rebase onto it, a branch, tag or patch from it. With a file's diff open: stage, unstage or discard it, view it, its history or blame.",
-            "Merge, rebase, check out, compare or push pick the branch in a second step, with its own search. Esc, or Backspace in its empty field, goes back.",
-            "Typing a branch's name offers to check it out.",
+            "With nothing typed, what can be done with the selection comes first, then what you ran lately (kept across restarts). With a commit selected: Cherry-pick, Revert, Reset main to here…, Interactive rebase onto it, a branch, tag or patch from it. With a file's diff open: stage, unstage or discard it, view it, its history or blame.",
+            "Check out a branch…, Merge into…, Rebase … onto…, Compare … with… and Push another branch… pick the branch in a second step, with its own search. Esc goes back to the first step, and so does Backspace in its empty field.",
+            "Typing a branch's name offers to check out the few branches that match best; Check out a branch… lists them all.",
         ],
     ),
     (
