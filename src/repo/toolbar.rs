@@ -105,6 +105,16 @@ impl RepoTab {
         {
             acts.push(Action::Push);
         }
+        let sync_tip = format!(
+            "Sync: {}, then push the current branch\nStops at the pull on conflicts, nothing pushed",
+            mode.label()
+        );
+        if icons::tool_button(ui, "arrow-down-up", "Sync", idle && has_remote)
+            .on_hover_text(sync_tip)
+            .clicked()
+        {
+            acts.push(Action::Sync);
+        }
     }
 
     /// Branch, stash, terminal, search and the folder menu.
