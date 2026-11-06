@@ -200,17 +200,21 @@ so your config, credentials and hooks apply as usual.
   Everything is read in the background, and changes run as the tab's operations.
 - _Which configuration wins_: the settings that explain why git behaves differently here (pull
   strategy, push, signing, line endings, file handling, performance…), each with the value in
-  effect and its scope and file (`git config --show-origin --show-scope --includes`). Opened,
-  every value git read, the one in effect on top and those it overrides below. _Remove_ takes
-  a value out of its file so the others apply again; _Set it for_ writes a value for this
-  repository, this worktree, all your repositories (`~/.gitconfig`) or everyone on the
-  machine; _Compare with the other worktrees_ shows what it is in each. A value from a
-  gitcraft profile's file is marked as such and changed in Settings → Profile. Only an
-  allowlist of settings is read: nothing credential-related is ever shown.
+  effect and its scope and file (`git config --list --show-origin --show-scope --includes`).
+  Opened, every value git read, the one in effect on top and those it overrides below.
+  _Remove_ takes every value of the setting out of that file (asked first) so the others apply
+  again; _Set it for_ writes a value for this repository, this worktree (when
+  `extensions.worktreeConfig` is on), your global git config (usually `~/.gitconfig`) or
+  git's system file (those two asked first); _Compare with the other worktrees_ shows what it
+  is in each. A value from a gitcraft profile's file is marked as such and changed in
+  Settings → Profile. Only an allowlist of settings is read: nothing credential-related is
+  ever shown.
 - _Hidden changes_: tracked files marked `assume-unchanged` or `skip-worktree`
-  (`git ls-files -v`), whose changes never show under Changes, what each flag is for, and
-  clearing them (all, or those ticked). Files sparse-checkout leaves out carry the same mark
-  but are listed apart, with how sparse-checkout is set up, and are never cleared.
+  (`git ls-files -v`), whose changes never show under Changes, what each flag does (and that
+  git supports neither as a way to ignore changes to tracked files), and clearing them (all,
+  or those ticked; asked first). Files sparse-checkout leaves out carry the same mark but are
+  listed apart, with how sparse-checkout is set up, and are never cleared; with pattern-mode
+  sparse-checkout every skip-worktree file counts as its own.
 
 **Toolbar, terminal, app**
 

@@ -68,9 +68,9 @@ fn draw(tab: &mut RepoTab, ctx: &egui::Context) {
 fn flagged(tab: &RepoTab) -> Vec<Flagged> {
     tab.doctor
         .as_ref()
-        .and_then(|d| d.flags.list.clone())
-        .and_then(Result::ok)
-        .map(|(list, _)| list)
+        .and_then(|d| d.flags.list.as_ref())
+        .and_then(|r| r.as_ref().ok())
+        .map(|data| data.manual.clone())
         .unwrap_or_default()
 }
 
@@ -91,7 +91,8 @@ fn the_doctor_reads_settings_and_clears_flags_through_the_tab() -> Result<(), St
             .doctor
             .as_ref()
             .and_then(|d| d.config.origins.clone())
-            .ok_or("not read")??;
+            .ok_or("not read")??
+            .origins;
         let rebase = git::doctor::config::values_of(&origins, "pull.rebase");
         assert_eq!(rebase.last().map(|o| o.shown_value()), Some("merges"));
         // The setting opened draws its details.
@@ -108,13 +109,24 @@ fn the_doctor_reads_settings_and_clears_flags_through_the_tab() -> Result<(), St
         assert_eq!(list.len(), 2, "{list:?}");
         // The change shows under Changes only once the flag is cleared.
         write(&dir.join("a.txt"), b"changed\n")?;
-        tab.apply(
-            Action::Doctor(DoctorAct::Run {
+        // Asked first: nothing runs until the answer, and a no runs nothing.
+        let ask = || {
+            Action::Doctor(DoctorAct::Confirm(super::Confirm {
+                title: "Clear?".into(),
+                body: String::new(),
+                button: "Clear".into(),
                 label: "Clear".into(),
                 ops: git::doctor::flags::clear_ops(&list),
-            }),
-            &ctx,
-        );
+            }))
+        };
+        tab.apply(ask(), &ctx);
+        draw(&mut tab, &ctx);
+        assert!(tab.busy_op.is_none());
+        tab.apply(Action::Doctor(DoctorAct::Answer(false)), &ctx);
+        assert!(tab.busy_op.is_none());
+        assert!(tab.doctor.as_ref().is_some_and(|d| d.confirm.is_none()));
+        tab.apply(ask(), &ctx);
+        tab.apply(Action::Doctor(DoctorAct::Answer(true)), &ctx);
         assert!(tab.doctor.as_ref().is_some_and(|d| d.waiting));
         // Read again once the operation is done.
         wait(&mut tab, &ctx, |t| {

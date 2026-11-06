@@ -15,6 +15,9 @@ pub enum Flag {
     SkipWorktree,
     /// Both of them.
     Both,
+    /// assume-unchanged on a file sparse-checkout leaves out: only the assume-unchanged half
+    /// is anyone's to clear.
+    AssumeOnSparse,
     /// Left out by sparse-checkout, which marks it skip-worktree: not a manual flag.
     Sparse,
 }
@@ -25,6 +28,7 @@ impl Flag {
             Flag::AssumeUnchanged => "assume-unchanged",
             Flag::SkipWorktree => "skip-worktree",
             Flag::Both => "assume-unchanged, skip-worktree",
+            Flag::AssumeOnSparse => "assume-unchanged (sparse-checkout)",
             Flag::Sparse => "sparse-checkout",
         }
     }
@@ -33,7 +37,7 @@ impl Flag {
     /// `update-index` takes one of the two per run, so a file with both needs two.
     fn cleared_by(self, option: &str) -> bool {
         match self {
-            Flag::AssumeUnchanged => option == ASSUME,
+            Flag::AssumeUnchanged | Flag::AssumeOnSparse => option == ASSUME,
             Flag::SkipWorktree => option == SKIP,
             Flag::Both => true,
             Flag::Sparse => false,
@@ -58,8 +62,8 @@ pub enum Sparse {
     Off,
     /// Cone mode: the folders checked out.
     Cone(Vec<String>),
-    /// Patterns: which paths they leave out isn't worked out here; a path missing from the
-    /// working tree is taken as left out by them.
+    /// Patterns: which paths they leave out isn't worked out here; every skip-worktree path
+    /// is taken as theirs.
     Patterns,
 }
 
@@ -72,10 +76,10 @@ pub fn flagged(repo: &Path) -> Result<(Vec<Flagged>, Sparse), String> {
     let list = marked
         .into_iter()
         .map(|(path, flag)| {
-            let flag = if flag == Flag::SkipWorktree && sparse_managed(&path, &sparse, repo) {
-                Flag::Sparse
-            } else {
-                flag
+            let flag = match flag {
+                Flag::SkipWorktree if sparse_managed(&path, &sparse) => Flag::Sparse,
+                Flag::Both if sparse_managed(&path, &sparse) => Flag::AssumeOnSparse,
+                other => other,
             };
             Flagged { path, flag }
         })
@@ -115,7 +119,7 @@ fn sparse(repo: &Path) -> Sparse {
     match run(Some(repo), &["sparse-checkout", "list"]) {
         Ok(out) => Sparse::Cone(
             out.lines()
-                .map(|l| l.trim_end_matches('/').to_owned())
+                .map(|l| unquote(l).trim_end_matches('/').to_owned())
                 .filter(|l| !l.is_empty())
                 .collect(),
         ),
@@ -124,14 +128,14 @@ fn sparse(repo: &Path) -> Sparse {
 }
 
 /// Whether sparse-checkout is what leaves `path` out.
-fn sparse_managed(path: &str, sparse: &Sparse, repo: &Path) -> bool {
+fn sparse_managed(path: &str, sparse: &Sparse) -> bool {
     match sparse {
         Sparse::Off => false,
         Sparse::Cone(dirs) => !in_cone(path, dirs),
-        Sparse::Patterns => {
-            let file = crate::remote::join(repo, path);
-            !crate::remote::try_is_file(&file).unwrap_or(true)
-        }
+        // Patterns can't be told apart from manual flags without matching every path against
+        // them: every skip-worktree path counts as sparse-checkout's, so none is cleared by
+        // mistake (which would show the files it left out as deleted).
+        Sparse::Patterns => true,
     }
 }
 
@@ -149,6 +153,56 @@ pub fn in_cone(path: &str, dirs: &[String]) -> bool {
     })
 }
 
+/// A path as git prints it in a list: as it is, or C-quoted (`"a b/\303\251"`) when it holds
+/// spaces, quotes or letters outside ASCII.
+pub fn unquote(printed: &str) -> String {
+    let Some(inner) = printed
+        .strip_prefix('"')
+        .and_then(|rest| rest.strip_suffix('"'))
+    else {
+        return printed.to_owned();
+    };
+    let mut bytes = Vec::with_capacity(inner.len());
+    let mut chars = inner.bytes().peekable();
+    while let Some(b) = chars.next() {
+        if b != b'\\' {
+            bytes.push(b);
+            continue;
+        }
+        match chars.next() {
+            Some(b'n') => bytes.push(b'\n'),
+            Some(b't') => bytes.push(b'\t'),
+            Some(b'r') => bytes.push(b'\r'),
+            Some(b'a') => bytes.push(0x07),
+            Some(b'b') => bytes.push(0x08),
+            Some(b'f') => bytes.push(0x0c),
+            Some(b'v') => bytes.push(0x0b),
+            Some(d @ b'0'..=b'7') => {
+                let mut value = u32::from(d - b'0');
+                for _ in 0..2 {
+                    match chars.peek() {
+                        Some(&o @ b'0'..=b'7') => {
+                            value = value * 8 + u32::from(o - b'0');
+                            chars.next();
+                        }
+                        _ => break,
+                    }
+                }
+                bytes.push((value & 0xff) as u8);
+            }
+            Some(other) => bytes.push(other),
+            None => bytes.push(b'\\'),
+        }
+    }
+    String::from_utf8_lossy(&bytes).into_owned()
+}
+
+/// Whether `path` can be named to git as read: a name that isn't UTF-8 was read with
+/// replacement characters, and naming it so would fail the whole batch.
+pub fn clearable(path: &str) -> bool {
+    !path.contains('\u{FFFD}')
+}
+
 /// Longest command line the paths of one `update-index` go into, well under Windows' limit.
 const MAX_ARGS_LEN: usize = 8000;
 
@@ -162,7 +216,10 @@ pub fn clear_ops(files: &[Flagged]) -> Vec<Vec<String>> {
         let start = |op: &mut Vec<String>| {
             op.extend([LITERAL_PATHS, "update-index", option, "--"].map(str::to_owned));
         };
-        for file in files.iter().filter(|f| f.flag.cleared_by(option)) {
+        for file in files
+            .iter()
+            .filter(|f| f.flag.cleared_by(option) && clearable(&f.path))
+        {
             if op.is_empty() {
                 start(&mut op);
             } else if len + file.path.len() > MAX_ARGS_LEN {
@@ -199,6 +256,14 @@ mod tests {
     }
 
     #[test]
+    fn quoted_folder_names_are_read() {
+        assert_eq!(unquote("plain"), "plain");
+        assert_eq!(unquote("\"sub dir/\\303\\251\""), "sub dir/é");
+        assert_eq!(unquote("\"a\\\"b\\\\c\\td\""), "a\"b\\c\td");
+        assert_eq!(unquote("\""), "\"");
+    }
+
+    #[test]
     fn cone_mode_keeps_the_top_and_the_folders_above() {
         let dirs = ["src/app".to_owned()];
         assert!(in_cone("README.md", &dirs));
@@ -223,6 +288,14 @@ mod tests {
                     flag: Flag::Sparse,
                 },
                 Flagged {
+                    path: "bad \u{FFFD}.txt".into(),
+                    flag: Flag::AssumeUnchanged,
+                },
+                Flagged {
+                    path: "on-sparse.txt".into(),
+                    flag: Flag::AssumeOnSparse,
+                },
+                Flagged {
                     path: "b.txt".into(),
                     flag: Flag::Both,
                 },
@@ -234,8 +307,16 @@ mod tests {
             .iter()
             .map(|op| op.iter().skip_while(|a| *a != "--").count() - 1)
             .sum();
-        // The file with both flags is cleared twice, once for each.
-        assert_eq!(paths, 2002);
+        // The file with both flags is cleared twice, once for each; the one sparse-checkout
+        // leaves out only of assume-unchanged; the unreadable name not at all.
+        assert_eq!(paths, 2003);
+        assert!(!ops.iter().flatten().any(|a| a.contains('\u{FFFD}')));
+        let on_sparse: Vec<_> = ops
+            .iter()
+            .filter(|op| op.iter().any(|a| a == "on-sparse.txt"))
+            .collect();
+        assert_eq!(on_sparse.len(), 1);
+        assert!(on_sparse[0].iter().any(|a| a == "--no-assume-unchanged"));
         assert!(ops.iter().all(|op| op.join(" ").len() < MAX_ARGS_LEN + 200));
         assert!(!ops.iter().flatten().any(|a| a == "s.txt"));
         let last = ops.last().map(|op| op.join(" ")).unwrap_or_default();

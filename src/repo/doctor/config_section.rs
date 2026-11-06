@@ -5,29 +5,49 @@
 use egui::{RichText, Ui};
 
 use super::page::{card, code, dim, faint, reading};
-use super::{ConfigState, DoctorAct};
+use super::{ConfigState, Confirm, DoctorAct};
 use crate::git::doctor::config::{self, Origin, SETTINGS, Scope, Setting};
 use crate::repo::{Action, widgets};
 use crate::theme::Tokens;
 
-pub(super) fn ui(
-    ui: &mut Ui,
-    state: &mut ConfigState,
-    worktrees: usize,
-    locked: bool,
-    acts: &mut Vec<Action>,
-) {
+/// What the rows need to know about the tab.
+pub(super) struct Env {
+    /// Worktrees the setting can be compared across.
+    pub worktrees: usize,
+    /// The repository is in WSL or over SSH, where no gitcraft profile applies.
+    pub remote: bool,
+    /// An operation is running.
+    pub locked: bool,
+    /// `extensions.worktreeConfig` is on.
+    worktree_config: bool,
+}
+
+impl Env {
+    pub fn new(worktrees: usize, remote: bool, locked: bool) -> Self {
+        Self {
+            worktrees,
+            remote,
+            locked,
+            worktree_config: false,
+        }
+    }
+}
+
+pub(super) fn ui(ui: &mut Ui, state: &mut ConfigState, mut env: Env, acts: &mut Vec<Action>) {
     faint(
         ui,
-        "Git reads the system file, then your global one, then the repository's own and the \
-         worktree's; for a setting with one value, the last value read wins. Files pulled in \
-         with include or includeIf show under their own name. Only these settings are shown: \
-         nothing credential-related is.",
+        "Git reads the system file, then your global one, then this repository's and this \
+         worktree's, then values given on the command line; for a setting with one value, the \
+         last value read wins. With a gitcraft profile, the global file is the profile's: it \
+         reads ~/.gitconfig first, then its own values on top (git run outside gitcraft \
+         doesn't see it). Values from include or includeIf files show under their own file. \
+         Only these settings are shown: nothing credential-related.",
     );
-    let Some(all) = reading(ui, &state.origins) else {
+    let Some(data) = reading(ui, &state.origins).cloned() else {
         return;
     };
-    let all = all.clone();
+    env.worktree_config = data.worktree_config;
+    let all = data.origins;
     ui.add_space(10.0);
     ui.horizontal(|ui| {
         ui.add(
@@ -52,7 +72,7 @@ pub(super) fn ui(
             group = setting.group;
             group_heading(ui, group);
         }
-        setting_row(ui, state, setting, &values, worktrees, locked, acts);
+        setting_row(ui, state, setting, &values, &env, acts);
     }
     if group.is_empty() {
         ui.add_space(12.0);
@@ -78,8 +98,7 @@ fn setting_row(
     state: &mut ConfigState,
     setting: &'static Setting,
     values: &[&Origin],
-    worktrees: usize,
-    locked: bool,
+    env: &Env,
     acts: &mut Vec<Action>,
 ) {
     let t = Tokens::get(ui.ctx());
@@ -134,7 +153,7 @@ fn setting_row(
             .unwrap_or_default();
     }
     if open {
-        details(ui, state, setting, values, worktrees, locked, acts);
+        details(ui, state, setting, values, env, acts);
     }
 }
 
@@ -178,8 +197,7 @@ fn details(
     state: &mut ConfigState,
     setting: &'static Setting,
     values: &[&Origin],
-    worktrees: usize,
-    locked: bool,
+    env: &Env,
     acts: &mut Vec<Action>,
 ) {
     card(ui, setting.key, Some(setting.about), |ui| {
@@ -188,12 +206,12 @@ fn details(
         }
         // The one in effect first, then those it overrides.
         for (n, origin) in values.iter().rev().enumerate() {
-            value_row(ui, origin, n == 0, locked, acts);
+            value_row(ui, origin, n == 0, env.locked, acts);
         }
         ui.add_space(10.0);
         ui.separator();
-        set_row(ui, state, setting, locked, acts);
-        if worktrees > 1 {
+        set_row(ui, state, setting, env, acts);
+        if env.worktrees > 1 {
             ui.add_space(8.0);
             other_worktrees(ui, state, setting.key, acts);
         }
@@ -229,20 +247,48 @@ fn value_row(ui: &mut Ui, origin: &Origin, wins: bool, locked: bool, acts: &mut 
             }
             _ => None,
         };
+        let args = config::unset_args(origin);
+        let why = why.or(args.as_ref().err().map(String::as_str));
         let remove = ui
             .add_enabled(why.is_none() && !locked, egui::Button::new("Remove"))
-            .on_hover_text("Remove it from this file, so the others apply")
+            .on_hover_text(format!(
+                "Remove every {} from this file; the next value down (or git's default) then \
+                 applies",
+                origin.key
+            ))
             .on_disabled_hover_text(why.unwrap_or("Wait for the running operation"));
-        if remove.clicked() {
-            match config::unset_args(origin) {
-                Ok(op) => acts.push(Action::Doctor(DoctorAct::Run {
-                    label: format!("Remove {} from {}", origin.key, origin_label(origin)),
-                    ops: vec![op],
-                })),
-                Err(e) => faint(ui, e),
-            }
+        if remove.clicked()
+            && let Ok(op) = &args
+        {
+            acts.push(remove_confirm(origin, op.clone()));
         }
     });
+}
+
+/// The question asked before removing `origin` from its file.
+fn remove_confirm(origin: &Origin, op: Vec<String>) -> Action {
+    let file = origin.file.clone().unwrap_or_default();
+    let reach = match origin.scope {
+        Scope::Global => " This applies to all your repositories.",
+        Scope::System => " This applies to every user of this machine.",
+        _ => "",
+    };
+    Action::Doctor(DoctorAct::Confirm(Confirm {
+        title: format!("Remove {}?", origin.key),
+        body: format!(
+            "Remove {} = {} from {file}?{reach} The value isn't kept: to get it back, set it \
+             again.",
+            origin.key,
+            origin.shown_value()
+        ),
+        button: "Remove".to_owned(),
+        label: format!(
+            "Remove {} ({}) from {file}",
+            origin.key,
+            shortened(origin.shown_value())
+        ),
+        ops: vec![op],
+    }))
 }
 
 /// Setting a new value at a chosen scope.
@@ -250,9 +296,10 @@ fn set_row(
     ui: &mut Ui,
     state: &mut ConfigState,
     setting: &'static Setting,
-    locked: bool,
+    env: &Env,
     acts: &mut Vec<Action>,
 ) {
+    let locked = env.locked;
     let scope = *state.scope.get_or_insert(Scope::Local);
     ui.horizontal_wrapped(|ui| {
         ui.label("Set it for");
@@ -260,7 +307,15 @@ fn set_row(
             .selected_text(scope_choice(scope))
             .show_ui(ui, |ui| {
                 for s in Scope::WRITABLE {
-                    ui.selectable_value(&mut state.scope, Some(s), scope_choice(s));
+                    let off = s == Scope::Worktree && !env.worktree_config;
+                    ui.add_enabled_ui(!off, |ui| {
+                        ui.selectable_value(&mut state.scope, Some(s), scope_choice(s))
+                            .on_disabled_hover_text(
+                                "Needs extensions.worktreeConfig = true in this repository: \
+                                 without it git refuses when there are other worktrees, and \
+                                 with only one writes .git/config",
+                            );
+                    });
                 }
             });
         ui.label("to");
@@ -287,31 +342,64 @@ fn set_row(
             .on_disabled_hover_text(match &args {
                 Err(e) => e.as_str(),
                 Ok(_) if locked => "Wait for the running operation",
-                Ok(_) => "Type a value first",
+                Ok(_) if setting.choices.is_empty() => "Type a value first",
+                Ok(_) => "Choose a value first",
             });
         if set.clicked()
             && let Ok(op) = args
         {
-            acts.push(Action::Doctor(DoctorAct::Run {
-                label: format!(
-                    "Set {} for {}",
-                    setting.key,
-                    scope_choice(scope).to_lowercase()
-                ),
-                ops: vec![op],
+            let label = format!(
+                "Set {} to {} for {}",
+                setting.key,
+                shortened(&value),
+                scope_choice(scope).to_lowercase()
+            );
+            acts.push(Action::Doctor(match scope {
+                // Beyond this repository: asked first.
+                Scope::Global | Scope::System => DoctorAct::Confirm(Confirm {
+                    title: format!(
+                        "Set {} for {}?",
+                        setting.key,
+                        scope_choice(scope).to_lowercase()
+                    ),
+                    body: format!(
+                        "{} = {value} goes into {}. The value it replaces there isn't kept.",
+                        setting.key,
+                        if scope == Scope::Global {
+                            "your global git config, for all your repositories"
+                        } else {
+                            "git's system file, for every user of this machine"
+                        }
+                    ),
+                    button: "Set".to_owned(),
+                    label,
+                    ops: vec![op],
+                }),
+                _ => DoctorAct::Run {
+                    label,
+                    ops: vec![op],
+                },
             }));
         }
     });
     let note = match scope {
+        Scope::Global if env.remote => {
+            "Your global git config on that machine (usually ~/.gitconfig), for all your \
+             repositories there."
+        }
         Scope::Global => {
-            "Your own global file (~/.gitconfig), every repository of yours. A gitcraft \
-             profile that sets the same thing still wins over it."
+            "Your global git config (usually ~/.gitconfig), for all your repositories. A \
+             gitcraft profile that sets the same thing still wins over it."
         }
-        Scope::System => "Every user of this machine; usually needs administrator rights.",
-        Scope::Worktree => {
-            "Only this worktree; needs extensions.worktreeConfig, else git writes the repository's file."
+        Scope::System => {
+            "Git's system file, for every user of this machine; usually needs administrator \
+             rights."
         }
-        _ => "Only this repository (.git/config).",
+        Scope::Worktree => "Only this worktree (its config.worktree file).",
+        _ => {
+            "Only this repository (.git/config). An include later in that file that sets it \
+             still wins."
+        }
     };
     faint(ui, note);
 }
