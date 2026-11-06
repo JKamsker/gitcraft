@@ -93,6 +93,7 @@ impl App {
                         ui.add_space(12.0);
                         ui.colored_label(t.danger, err);
                     }
+                    self.error_card_ui(ui);
                     if let Some((dest, _)) = &self.cloning {
                         ui.add_space(12.0);
                         ui.horizontal(|ui| {
@@ -297,4 +298,25 @@ fn recent_row(ui: &mut Ui, path: &Path) -> Option<RecentClick> {
 
 fn same_path(a: &Path, b: &Path) -> bool {
     crate::remote::same_dir(a, b)
+}
+
+impl App {
+    /// The card explaining why a repository couldn't be opened, when gitcraft knows why; its
+    /// Try again opens the folder again.
+    fn error_card_ui(&mut self, ui: &mut Ui) {
+        let Some(card) = &mut self.error_card else {
+            return;
+        };
+        ui.add_space(10.0);
+        let event = card.ui(ui, true);
+        let dir = card.dir().to_owned();
+        match event {
+            Some(crate::error_card::CardEvent::Close) => self.error_card = None,
+            Some(crate::error_card::CardEvent::Retry) => {
+                let ctx = ui.ctx().clone();
+                self.open_repo(&dir, &ctx);
+            }
+            None => {}
+        }
+    }
 }
