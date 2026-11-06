@@ -122,6 +122,8 @@ pub(crate) struct DiffView {
     /// Unchanged lines opened from their folds (by their number on the new side), opened again
     /// when the diff is read again.
     pub(super) revealed: std::collections::BTreeSet<u32>,
+    /// Lines commented on (old side or not, number) whose fold was opened for them already.
+    pub(super) auto_opened: std::collections::BTreeSet<(bool, u32)>,
     /// The latest read of this diff: only its answer is shown, so a slower answer to an older
     /// read (before the whitespace or whole-file setting changed…) can't replace it.
     pub(super) request: u64,
@@ -148,6 +150,7 @@ impl DiffView {
             jump_line: None,
             moved: None,
             revealed: Default::default(),
+            auto_opened: Default::default(),
             request: 0,
         }
     }

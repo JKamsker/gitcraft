@@ -77,15 +77,21 @@ impl RepoTab {
             let draft = self.pr_drafts.entry(pr.number).or_default();
             line_comment_panel(ui, &t, pr, draft, data, acts);
         }
-        // Lines commented on in the pull request stay in view, their fold opened.
+        // Lines commented on in the pull request stay in view, their fold opened (once each,
+        // so a fold that can't open isn't asked again every frame).
+        let mut auto_opened = None;
         if let (Some(review), Some(ctx)) = (&review, &data.context) {
             let folded = review.marks.keys().find_map(|&(side, line)| {
                 let line = u32::try_from(line).ok()?;
                 let old = side == crate::pull_request::DiffSide::Left;
-                super::context::unfold_to(ctx, line, old, 3)
+                if view.auto_opened.contains(&(old, line)) {
+                    return None;
+                }
+                super::context::unfold_to(ctx, line, old, 3).map(|f| (f, (old, line)))
             });
-            if let Some((gap, how)) = folded {
+            if let Some(((gap, how), mark)) = folded {
                 acts.push(Action::DiffUnfold { gap, how });
+                auto_opened = Some(mark);
             }
         }
         if let Some(open) = &view.moved {
@@ -99,6 +105,7 @@ impl RepoTab {
         let (clicked, offset, jumped) = (rows.clicked, rows.offset, rows.jumped);
 
         if let Some(view) = &mut self.diff {
+            view.auto_opened.extend(auto_opened);
             view.text_sel = sel;
             view.scroll = offset;
             view.jump = None;

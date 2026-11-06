@@ -9,12 +9,17 @@ use super::{DiffData, Kind};
 use crate::repo::Action;
 use crate::theme::{self, Tokens};
 
-/// The fold on row `i`, if it hides lines, laid out right to left from `right`, centred on `y`.
+/// Room between the controls and the header's text, and between two controls.
+const GAP: f32 = 4.0;
+
+/// The fold on row `i`, if it hides lines, laid out right to left from `right` (centred on
+/// `y`) and never left of `left`, where the header's own text ends: what doesn't fit is left
+/// out, the least needed first.
 pub(super) fn controls(
     ui: &mut Ui,
     data: &DiffData,
     i: usize,
-    (right, y): (f32, f32),
+    (left, right, y): (f32, f32, f32),
     acts: &mut Vec<Action>,
 ) {
     let Some(ctx) = &data.context else { return };
@@ -22,65 +27,86 @@ pub(super) fn controls(
     let gap = &ctx.gaps[g];
     let hidden = gap.hidden();
     let t = Tokens::get(ui.ctx());
-    let mut right = right;
-    let mut button = |ui: &mut Ui, label: &str, tip: &str, how: Unfold| {
-        let id = ui.id().with(("fold", i, label));
-        let (resp, left) = text_button(ui, right, y, label, t.accent, id);
-        if resp.on_hover_text(tip).clicked() {
-            acts.push(Action::DiffUnfold { gap: g, how });
-        }
-        right = left - 4.0;
-    };
-    let is_hunk = data.lines.get(i).is_some_and(|l| l.kind == Kind::Hunk);
-    if is_hunk && has_function(data, i) {
-        button(
-            ui,
-            "Show the enclosing function",
-            "Show the unchanged lines of the function this hunk is in, above and below it",
-            Unfold::Function,
-        );
-    }
-    if hidden > STEP {
-        button(
-            ui,
-            &format!("Show all {hidden}"),
-            "Show every unchanged line folded here",
-            Unfold::All,
-        );
-    }
     let step = hidden.min(STEP);
-    if gap.opens_down(g) {
-        button(
-            ui,
-            &format!("↓ {step}"),
-            "Show the unchanged lines right below the hunk above",
-            Unfold::Down(step),
-        );
-    }
+    let is_hunk = data.lines.get(i).is_some_and(|l| l.kind == Kind::Hunk);
+    // Left to right, each with how much it is needed (higher stays longer).
+    let mut items: Vec<(String, &str, Unfold, u8)> = Vec::new();
     if !gap.trailing {
-        button(
-            ui,
-            &format!("↑ {step}"),
+        items.push((
+            format!("↑ {step}"),
             "Show the unchanged lines right above this hunk",
             Unfold::Up(step),
-        );
+            4,
+        ));
+    }
+    if gap.opens_down(g) {
+        items.push((
+            format!("↓ {step}"),
+            "Show the unchanged lines right below the hunk above",
+            Unfold::Down(step),
+            4,
+        ));
+    }
+    if hidden > STEP {
+        items.push((
+            format!("Show all {hidden}"),
+            "Show every unchanged line folded here",
+            Unfold::All,
+            2,
+        ));
+    }
+    if is_hunk && ctx.function_opens(g) {
+        items.push((
+            "Function".to_owned(),
+            "Show the enclosing function: its unchanged lines above and below this hunk",
+            Unfold::Function,
+            1,
+        ));
     }
     let what = if hidden == 1 {
         "1 unchanged line".to_owned()
     } else {
         format!("{hidden} unchanged lines")
     };
-    let galley = ui
+    let count = ui
         .painter()
         .layout_no_wrap(what, theme::medium(11.0), t.text_dim);
-    let at = egui::pos2(right - galley.size().x - 4.0, y - galley.size().y / 2.0);
-    ui.painter().galley(at, galley, t.text_dim);
-}
-
-/// Whether git named a function for the hunk whose header is row `i`.
-fn has_function(data: &DiffData, i: usize) -> bool {
-    data.lines
-        .get(i)
-        .and_then(|l| super::context::header_numbers(&l.raw))
-        .is_some_and(|(.., tail)| !tail.trim().is_empty())
+    let width = |label: &str| {
+        ui.painter()
+            .layout_no_wrap(label.to_owned(), theme::medium(11.0), t.accent)
+            .size()
+            .x
+            + 14.0
+            + GAP
+    };
+    let room = right - left;
+    let mut show_count = true;
+    let needed = |items: &[(String, &str, Unfold, u8)], count_too: bool| {
+        items.iter().map(|it| width(&it.0)).sum::<f32>()
+            + if count_too { count.size().x + GAP } else { 0.0 }
+    };
+    // Drop the least needed until the rest fit; the count goes before the arrows.
+    while needed(&items, show_count) > room {
+        let least = items.iter().enumerate().min_by_key(|(_, it)| it.3);
+        match least {
+            Some((k, it)) if it.3 < 3 || !show_count => {
+                items.remove(k);
+            }
+            _ if show_count => show_count = false,
+            _ => break,
+        }
+    }
+    let mut right = right;
+    for (label, tip, how, _) in items.iter().rev() {
+        let id = ui.id().with(("fold", i, label.as_str()));
+        let (resp, at) = text_button(ui, right, y, label, t.accent, id);
+        if resp.on_hover_text(*tip).clicked() {
+            acts.push(Action::DiffUnfold { gap: g, how: *how });
+        }
+        right = at - GAP;
+    }
+    if show_count {
+        let at = egui::pos2(right - count.size().x, y - count.size().y / 2.0);
+        ui.painter().galley(at, count, t.text_dim);
+    }
 }

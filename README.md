@@ -172,11 +172,14 @@ so your config, credentials and hooks apply as usual.
 - Context that opens where you need it: each hunk's header says how many unchanged lines are
   folded above it (_42 unchanged lines_), and a row after the last hunk those below it. _↑ 20_
   shows the lines right above the hunk, _↓ 20_ those right below the hunk before, _Show all_
-  every one, and _Show the enclosing function_ the lines of the function git names for the
-  hunk, up to its first line and down to its end. The lines opened join their hunk as context,
-  so staging, unstaging and discarding hunks or picked lines work as before; they stay open
-  when the diff is read again (after staging, or a change on disk), and a line a pull request's
-  review commented on opens by itself.
+  every one, and _Function_ the lines of the function git names for the hunk (when it encloses
+  the hunk), up to its first line and down to its end. In a narrow pane the least needed
+  buttons give way first. The lines opened join their hunk as context, so staging, unstaging
+  and discarding hunks or picked lines work as before; those next to a hunk stay open when the
+  diff is read again (after staging, or a change on disk), and a line a pull request's review
+  commented on opens by itself. Folds are only offered when the file read matches what git
+  diffed: not after a clean filter (`core.autocrlf`, Git LFS) or textconv, nor for files that
+  aren't UTF-8. Close and reopen the diff to fold everything again.
 - Moved code: a block removed in one place of the file and added in another (the whitespace
   around its lines aside, so re-indenting doesn't hide it) shows in a muted colour of its own
   instead of red and green, with a bar beside both places. _Moved to line…_ / _Moved from

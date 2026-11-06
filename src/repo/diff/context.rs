@@ -14,6 +14,9 @@ use crate::repo::DiffKey;
 pub const STEP: u32 = 20;
 /// A file bigger than this isn't read for its unchanged lines.
 const MAX_FILE_BYTES: usize = 16 * 1024 * 1024;
+/// More lines than this opened at once are shown without syntax colours: colouring them would
+/// hold up the window.
+const MAX_COLOURED: usize = 2_000;
 /// How far up from a hunk its function is looked for.
 const MAX_FUNCTION_LINES: u32 = 5_000;
 
@@ -30,6 +33,9 @@ pub struct Gap {
     pub old_offset: i64,
     /// After the last hunk: it opens downwards only, on a row of its own.
     pub trailing: bool,
+    /// The first and last line of the function the hunk below is in, when git named one and it
+    /// encloses the hunk.
+    pub function: Option<(u32, u32)>,
 }
 
 impl Gap {
@@ -54,7 +60,9 @@ impl Gap {
 pub struct Context {
     /// The lines as git has them (a `\r` before the newline kept), without the newline.
     raw: Vec<String>,
-    spans: Option<Vec<Spans>>,
+    /// The file, for the syntax colours of the lines opened, and whether the theme is dark.
+    path: String,
+    dark: bool,
     /// The file's last line has no newline: git notes that after it.
     no_newline_at_end: bool,
     pub gaps: Vec<Gap>,
@@ -113,6 +121,10 @@ fn before(start: u32, count: u32) -> u32 {
 
 /// Reads the new side of the file of `lines` (one file's diff) and finds the gaps.
 pub fn read(repo: &Path, key: &DiffKey, lines: &[DiffLine], dark: bool) -> Option<Context> {
+    // Nothing to fold without hunks (a binary file, a mode change).
+    if !lines.iter().any(|l| l.kind == Kind::Hunk) {
+        return None;
+    }
     let rev = new_side(key)?;
     let path = key.path();
     let bytes = git::file_at(repo, rev.as_deref(), path).ok()?;
@@ -122,15 +134,30 @@ pub fn read(repo: &Path, key: &DiffKey, lines: &[DiffLine], dark: bool) -> Optio
     // Not UTF-8: lines read with their odd bytes replaced would be wrong context to stage with.
     let text = String::from_utf8(bytes).ok()?;
     let raw: Vec<String> = text.split_terminator('\n').map(str::to_owned).collect();
-    let shown: Vec<String> = raw.iter().map(|l| display(l)).collect();
-    let gaps = gaps_of(lines, raw.len() as u32)?;
-    let spans = highlight::highlight(path, shown.iter().map(String::as_str), dark);
-    Some(Context {
+    // What git diffed must be this file as read: not so after a clean filter or textconv
+    // (`core.autocrlf`, Git LFS), or when the file changed since. Context lines that don't
+    // match would make wrong patches.
+    let matches = lines.iter().all(|l| {
+        l.kind != Kind::Context
+            || l.new.is_some_and(|n| {
+                n >= 1 && raw.get(n as usize - 1).map(String::as_str) == l.raw.get(1..)
+            })
+    });
+    if !matches {
+        return None;
+    }
+    let len = raw.len() as u32;
+    let mut ctx = Context {
         raw,
-        spans,
+        path: path.to_owned(),
+        dark,
         no_newline_at_end: !text.is_empty() && !text.ends_with('\n'),
-        gaps,
-    })
+        gaps: gaps_of(lines, len)?,
+    };
+    for g in 0..ctx.gaps.len() {
+        ctx.gaps[g].function = ctx.function_for(lines, g);
+    }
+    Some(ctx)
 }
 
 /// A line as the diff shows it: no `\r`, tabs four spaces wide.
@@ -155,6 +182,7 @@ pub(super) fn gaps_of(lines: &[DiffLine], len: u32) -> Option<Vec<Gap>> {
             last: nb,
             old_offset: i64::from(ob) - i64::from(nb),
             trailing: false,
+            function: None,
         });
         (old_end, new_end) = (ob + on, nb + nn);
     }
@@ -167,6 +195,7 @@ pub(super) fn gaps_of(lines: &[DiffLine], len: u32) -> Option<Vec<Gap>> {
         last: len,
         old_offset: i64::from(old_end) - i64::from(new_end),
         trailing: true,
+        function: None,
     });
     Some(gaps)
 }
@@ -193,24 +222,63 @@ impl Context {
             .position(|g| g.row == row && g.hidden() > 0)
     }
 
-    /// The new side's line `n` (from 1) as a line of context at old line `old`, with its
-    /// colours.
-    fn line(&self, n: u32, old: u32) -> Option<(DiffLine, Option<Spans>)> {
-        let raw = self.raw.get(n as usize - 1)?;
-        let spans = self
-            .spans
-            .as_ref()
-            .and_then(|s| s.get(n as usize - 1).cloned());
-        Some((
-            DiffLine {
+    /// The new side's lines `from..=to` as lines of context, numbered on the old side through
+    /// `offset`, coloured as a run of their own; `None` past the file's end.
+    fn lines(&self, from: u32, to: u32, offset: i64) -> Option<Vec<(DiffLine, Option<Spans>)>> {
+        if from == 0 || to < from {
+            return None;
+        }
+        let raw = self.raw.get(from as usize - 1..to as usize)?;
+        let lines: Vec<DiffLine> = raw
+            .iter()
+            .zip(from..)
+            .map(|(raw, n)| DiffLine {
                 kind: Kind::Context,
-                old: Some(old),
+                old: Some(old_of(n, offset)),
                 new: Some(n),
                 text: display(raw),
                 raw: format!(" {raw}"),
-            },
-            spans,
-        ))
+            })
+            .collect();
+        let spans = (lines.len() <= MAX_COLOURED)
+            .then(|| {
+                highlight::highlight(&self.path, lines.iter().map(|l| l.text.as_str()), self.dark)
+            })
+            .flatten();
+        let mut spans = spans.map(Vec::into_iter);
+        Some(
+            lines
+                .into_iter()
+                .map(|l| (l, spans.as_mut().and_then(Iterator::next)))
+                .collect(),
+        )
+    }
+
+    /// The function the hunk below gap `g` (its header at the gap's row of `lines`) is in, when
+    /// it encloses the hunk.
+    fn function_for(&self, lines: &[DiffLine], g: usize) -> Option<(u32, u32)> {
+        let gap = self.gaps.get(g).filter(|g| !g.trailing)?;
+        let header = lines.get(gap.row)?;
+        let (_, _, ns, nn, _) = header_numbers(&header.raw)?;
+        let span = self.function_span(&header.raw, gap.last + 1)?;
+        // A line named that the hunk is past the end of (git names the last such line above).
+        (span.1 > before(ns, nn)).then_some(span)
+    }
+
+    /// Whether _Show the enclosing function_ on gap `g` would open anything.
+    pub fn function_opens(&self, g: usize) -> bool {
+        let Some(gap) = self.gaps.get(g) else {
+            return false;
+        };
+        let Some((start, end)) = gap.function else {
+            return false;
+        };
+        let up = gap.hidden() > 0 && start <= gap.last;
+        let down = self
+            .gaps
+            .get(g + 1)
+            .is_some_and(|next| next.hidden() > 0 && end >= next.first);
+        up || down
     }
 
     /// The first and last line of the function hunk `header` is in, as the new side numbers
@@ -287,12 +355,7 @@ impl DiffData {
         let header = self.lines.get(gap.row)?;
         let (os, on, ns, nn, tail) = header_numbers(&header.raw)?;
         let from = gap.last + 1 - n;
-        let new: Vec<_> = (from..=gap.last)
-            .filter_map(|k| ctx.line(k, old_of(k, gap.old_offset)))
-            .collect();
-        if new.len() != n as usize {
-            return None;
-        }
+        let new = ctx.lines(from, gap.last, gap.old_offset)?;
         let first_old = old_of(from, gap.old_offset);
         let raw = format!("@@ -{first_old},{} +{from},{} @@{tail}", on + n, nn + n);
         // An empty range starts at the line before it; one with lines at its first line.
@@ -315,12 +378,9 @@ impl DiffData {
             return Vec::new();
         }
         let to = gap.first + n - 1;
-        let mut new: Vec<_> = (gap.first..=to)
-            .filter_map(|k| ctx.line(k, old_of(k, gap.old_offset)))
-            .collect();
-        if new.len() != n as usize {
+        let Some(mut new) = ctx.lines(gap.first, to, gap.old_offset) else {
             return Vec::new();
-        }
+        };
         if gap.trailing && to as usize == ctx.raw.len() && ctx.no_newline_at_end {
             new.push((super::parse::meta("\\ No newline at end of file"), None));
         }
@@ -332,7 +392,15 @@ impl DiffData {
             .rposition(|l| l.kind == Kind::Hunk)
             && let Some((os, on, ns, nn, tail)) = header_numbers(&self.lines[h].raw)
         {
-            let raw = format!("@@ -{os},{} +{ns},{} @@{tail}", on + n, nn + n);
+            // An empty range is numbered by the line before it; one with lines by its first.
+            let start = |s: u32, count: u32| if count == 0 { s + 1 } else { s };
+            let raw = format!(
+                "@@ -{},{} +{},{} @@{tail}",
+                start(os, on),
+                on + n,
+                start(ns, nn),
+                nn + n
+            );
             self.set_header(h, raw);
         }
         let mut shifts = vec![self.insert(gap.row, new)];
@@ -357,7 +425,7 @@ impl DiffData {
         let Some((_, _, ns, nn, _)) = header_numbers(&header.raw) else {
             return Vec::new();
         };
-        let Some((start, end)) = ctx.function_span(&header.raw, gap.last + 1) else {
+        let Some((start, end)) = gap.function else {
             return Vec::new();
         };
         let up = if start < gap.first {
@@ -410,9 +478,12 @@ impl DiffData {
         self.spans.splice(at..at, spans);
         self.changed
             .splice(at..at, std::iter::repeat_n(None, count));
-        self.moves
-            .of_line
-            .splice(at..at, std::iter::repeat_n(None, count));
+        // Without moves (a combined diff) there is no table of them per line.
+        if at <= self.moves.of_line.len() {
+            self.moves
+                .of_line
+                .splice(at..at, std::iter::repeat_n(None, count));
+        }
         shift
     }
 
@@ -455,9 +526,12 @@ impl DiffData {
                 }
             })
             .collect();
+        // A block's end is past its last line: it moves with that line, never over rows put
+        // in right after it.
+        let range = |r: &std::ops::Range<usize>| row(r.start)..row(r.end - 1) + 1;
         for block in &mut self.moves.blocks {
-            block.del = row(block.del.start)..row(block.del.end);
-            block.add = row(block.add.start)..row(block.add.end);
+            block.del = range(&block.del);
+            block.add = range(&block.add);
         }
         if let Some(ctx) = &mut self.context {
             for gap in &mut ctx.gaps {
