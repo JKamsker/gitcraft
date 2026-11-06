@@ -124,10 +124,13 @@ so your config, credentials and hooks apply as usual.
 - Scope drift (a linked worktree's menu → _Scope drift…_): what the worktree changed since it
   left the main branch (committed, uncommitted and new files), set against its task: the text
   written in the window (kept in the worktree's own git folder, never committed) or, without
-  one, the issue its branch names (`fix/123-login`, `issue-77`; read through `gh` / `glab`). Exact
+  one, the issue its branch names (`fix/123-login`, `issue-77`, not dates) or the task does
+  (`fixes #12`), read through `gh` / `glab`. Exact
   figures first: _14 files changed, 9 files in 5 folders the task doesn't mention, added 2
   dependencies (Cargo, npm, Python, Go, Ruby, Composer), changed 3 public signatures, 40%
-  formatting only_. Each item opens the worktree's changes and the item's first file. _Ask a
+  formatting only_ (a signature is its declaration's first line; the line figures are of tracked
+  files). Each item opens the worktree's changes and the item's first file (a change only that
+  worktree's working tree has opens the worktree itself). _Ask a
   coding agent_ optionally runs `claude -p` (or `codex exec`) here with the task and the paths,
   no file contents, for a second opinion.
 - Submodules (shown when the repository has any): each with its commit and whether it is

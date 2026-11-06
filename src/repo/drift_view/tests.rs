@@ -41,8 +41,11 @@ fn opened_from_the_worktree_it_reads_the_task_and_measures() -> Result<(), Strin
     let key = view.diff_key(report, "src/auth/login.rs");
     assert!(matches!(
         key,
-        crate::repo::DiffKey::Range { to: Some(_), .. }
+        Some(crate::repo::DiffKey::Range { to: Some(_), .. })
     ));
+    // A change only that worktree's working tree has opens the worktree instead.
+    assert!(view.diff_key(report, "notes.txt").is_none());
+    assert!(view.diff_key(report, "docs/guide ü.md").is_none());
     // Put away and brought back as it was.
     if let Some(v) = &mut tab.drift {
         v.hidden = true;

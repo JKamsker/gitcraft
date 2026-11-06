@@ -6,7 +6,22 @@ pub fn is_manifest(path: &str) -> bool {
     matches!(
         name,
         "Cargo.toml" | "package.json" | "pyproject.toml" | "go.mod" | "Gemfile" | "composer.json"
-    ) || (name.starts_with("requirements") && name.ends_with(".txt"))
+    ) || (name.ends_with(".txt")
+        && (name.starts_with("requirements") || path.contains("requirements/")))
+}
+
+/// `line` without its `#` comment (one outside quotes).
+fn uncommented(line: &str) -> &str {
+    let mut quote: Option<char> = None;
+    for (i, c) in line.char_indices() {
+        match (quote, c) {
+            (None, '"' | '\'') => quote = Some(c),
+            (Some(q), c) if c == q => quote = None,
+            (None, '#') => return &line[..i],
+            _ => {}
+        }
+    }
+    line
 }
 
 /// The dependencies the manifest `path` with `text` names.
@@ -26,11 +41,18 @@ pub fn names(path: &str, text: &str) -> Vec<String> {
 }
 
 /// The keys of the TOML tables `wanted` holds for (`[dependencies]`,
-/// `[target.'cfg(x)'.dev-dependencies]`, `[dependencies.serde]`…).
+/// `[target.'cfg(x)'.dev-dependencies]`, `[dependencies.serde]`…): `serde = "1"`,
+/// `serde.workspace = true`, `serde = { version = "1",` spread over lines.
 fn toml_tables(text: &str, wanted: impl Fn(&str) -> bool) -> Vec<String> {
     let mut out = Vec::new();
     let mut inside = false;
-    for line in text.lines().map(str::trim) {
+    // How deep inside a value spread over lines (`{ …` / `[ …` not closed yet).
+    let mut depth: i32 = 0;
+    for line in text.lines().map(|l| uncommented(l).trim()) {
+        if depth > 0 {
+            depth += balance(line);
+            continue;
+        }
         if let Some(table) = line.strip_prefix('[').and_then(|l| l.strip_suffix(']')) {
             let table = table.trim_matches(['[', ']']).trim();
             // `[dependencies.serde]`: the table is one dependency.
@@ -44,30 +66,64 @@ fn toml_tables(text: &str, wanted: impl Fn(&str) -> bool) -> Vec<String> {
             inside = wanted(table);
             continue;
         }
-        if inside
-            && !line.starts_with('#')
-            && let Some((key, _)) = line.split_once('=')
-        {
-            out.push(key.trim().trim_matches(['"', '\'']).to_owned());
+        if let Some((key, value)) = line.split_once('=') {
+            depth = balance(value).max(0);
+            if inside {
+                let key = key.trim();
+                let name = key
+                    .strip_prefix('"')
+                    .and_then(|k| k.split_once('"'))
+                    .map(|(n, _)| n)
+                    .unwrap_or_else(|| key.split('.').next().unwrap_or(key));
+                out.push(name.trim_matches(['"', '\'']).to_owned());
+            }
         }
     }
     out.retain(|k| !k.is_empty());
     out
 }
 
-/// `[project] dependencies = [...]` (PEP 621) and Poetry's tables.
+/// How many more `{` / `[` than `}` / `]` a line opens (outside quotes).
+fn balance(line: &str) -> i32 {
+    let mut quote: Option<char> = None;
+    let mut n = 0;
+    for c in line.chars() {
+        match (quote, c) {
+            (None, '"' | '\'') => quote = Some(c),
+            (Some(q), c) if c == q => quote = None,
+            (None, '{' | '[') => n += 1,
+            (None, '}' | ']') => n -= 1,
+            _ => {}
+        }
+    }
+    n
+}
+
+/// `[project] dependencies = [...]` (PEP 621), its extras (`[project.optional-dependencies]`),
+/// dependency groups (PEP 735) and Poetry's tables.
 fn pyproject(text: &str) -> Vec<String> {
     let mut out = toml_tables(text, |t| {
         t.starts_with("tool.poetry") && t.ends_with("dependencies")
     });
     out.retain(|n| n != "python");
+    let mut table = String::new();
     let mut in_list = false;
-    for line in text.lines().map(str::trim) {
-        if line.starts_with("dependencies") && line.contains('[') {
+    for line in text.lines().map(|l| uncommented(l).trim()) {
+        if let Some(t) = line.strip_prefix('[').and_then(|l| l.strip_suffix(']')) {
+            table = t.trim().to_owned();
+            in_list = false;
+            continue;
+        }
+        let lists = table == "project.optional-dependencies" || table == "dependency-groups";
+        let starts = (table == "project" && line.starts_with("dependencies") && line.contains('['))
+            || (lists && line.contains('=') && line.contains('['));
+        if starts {
             in_list = true;
         }
         if in_list {
-            for quoted in line.split(['"', '\'']).skip(1).step_by(2) {
+            let values = line.split_once('[').map_or(line, |(_, v)| v);
+            let values = if starts { values } else { line };
+            for quoted in values.split(['"', '\'']).skip(1).step_by(2) {
                 out.push(requirement_name(quoted));
             }
             if line.contains(']') {
@@ -92,7 +148,13 @@ fn requirements(text: &str) -> Vec<String> {
     text.lines()
         .map(str::trim)
         .filter(|l| !l.is_empty() && !l.starts_with('#') && !l.starts_with('-'))
-        .map(requirement_name)
+        .filter_map(|l| {
+            // `git+https://…#egg=name`: its name is the egg's; another URL names none.
+            if let Some((_, egg)) = l.split_once("#egg=") {
+                return Some(requirement_name(egg));
+            }
+            (!l.contains("://")).then(|| requirement_name(uncommented(l)))
+        })
         .filter(|n| !n.is_empty())
         .collect()
 }

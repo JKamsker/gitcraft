@@ -41,6 +41,13 @@ pub struct Report {
     pub head: String,
     /// Every file changed: committed, uncommitted or new.
     pub files: Vec<String>,
+    /// Those of them with changes not committed (or not tracked at all), which only the
+    /// worktree's own working tree shows.
+    pub uncommitted: Vec<String>,
+    /// Those of them git doesn't track.
+    pub untracked: Vec<String>,
+    /// Those of them its commits changed.
+    pub committed: Vec<String>,
     pub folders: Vec<Folder>,
     pub dependencies: Vec<Dependency>,
     pub signatures: Vec<Signature>,
@@ -109,22 +116,32 @@ pub fn measure(worktree: &Path, base: &str, task: &str) -> Result<Report, String
         crate::git::run(Some(worktree), args)
             .map_err(|e| format!("Could not measure the worktree's changes: {e}"))
     };
-    if base.is_empty() || base.starts_with('-') {
-        return Err("There is no main branch commit to compare the worktree with".to_owned());
+    // A bare layout's main entry has no commit: the default branch instead.
+    let base = if base.is_empty() {
+        default_branch(worktree)
+            .ok_or("There is no main branch commit to compare the worktree with")?
+    } else {
+        base.to_owned()
+    };
+    if base.starts_with('-') {
+        return Err(format!("{base} is not a revision"));
     }
-    let fork = git(&["merge-base", "--end-of-options", base, "HEAD"])?
+    let fork = git(&["merge-base", "--end-of-options", &base, "HEAD"])?
         .trim()
         .to_owned();
     let head = git(&["rev-parse", "HEAD"])?.trim().to_owned();
     let q = ["-c", "core.quotePath=false"];
     let diff = |extra: &[&str]| -> Result<String, String> {
         let mut args: Vec<&str> = q.to_vec();
+        // `a/` and `b/` whatever `diff.noprefix` / `diff.mnemonicPrefix` say.
         args.extend([
             "diff",
             "--no-color",
             "--no-ext-diff",
             "--no-textconv",
             "--no-renames",
+            "--src-prefix=a/",
+            "--dst-prefix=b/",
         ]);
         args.extend(extra);
         args.extend(["--end-of-options", fork.as_str(), "--"]);
@@ -147,6 +164,30 @@ pub fn measure(worktree: &Path, base: &str, task: &str) -> Result<Report, String
     files.extend(untracked.iter().cloned());
     files.sort();
     files.dedup();
+    let mut uncommitted = split_nul(&git(&[
+        "-c",
+        "core.quotePath=false",
+        "diff",
+        "--name-only",
+        "-z",
+        "--no-renames",
+        "HEAD",
+        "--",
+    ])?);
+    uncommitted.extend(untracked.iter().cloned());
+    uncommitted.sort();
+    let committed = split_nul(&git(&[
+        "-c",
+        "core.quotePath=false",
+        "diff",
+        "--name-only",
+        "-z",
+        "--no-renames",
+        "--end-of-options",
+        &fork,
+        "HEAD",
+        "--",
+    ])?);
 
     let all = numstat(&diff(&["--numstat", "-z"])?);
     let content = numstat(&diff(&["--numstat", "-z", "-w", "--ignore-blank-lines"])?);
@@ -167,6 +208,9 @@ pub fn measure(worktree: &Path, base: &str, task: &str) -> Result<Report, String
         fork,
         head,
         files,
+        uncommitted,
+        untracked,
+        committed,
         folders,
         dependencies,
         signatures,
@@ -174,6 +218,22 @@ pub fn measure(worktree: &Path, base: &str, task: &str) -> Result<Report, String
         formatting_lines: changed_lines.saturating_sub(content_lines),
         formatting_files,
         judged,
+    })
+}
+
+/// The remote's default branch, or `main` / `master`.
+fn default_branch(worktree: &Path) -> Option<String> {
+    [
+        "refs/remotes/origin/HEAD",
+        "refs/heads/main",
+        "refs/heads/master",
+    ]
+    .iter()
+    .find_map(|r| {
+        crate::git::run(Some(worktree), &["rev-parse", "--verify", "--quiet", r])
+            .ok()
+            .map(|h| h.trim().to_owned())
+            .filter(|h| !h.is_empty())
     })
 }
 

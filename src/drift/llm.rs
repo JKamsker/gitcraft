@@ -16,7 +16,12 @@ const MAX_FILES: usize = 300;
 
 /// The tools tried, in order: the program, and the arguments that make it answer one prompt
 /// read from its input and quit.
-const TOOLS: [(&str, &[&str]); 2] = [("claude", &["-p"]), ("codex", &["exec", "-"])];
+/// Codex runs in a folder that isn't a repository (it is given no files), which it refuses
+/// unless told.
+const TOOLS: [(&str, &[&str]); 2] = [
+    ("claude", &["-p"]),
+    ("codex", &["exec", "--skip-git-repo-check", "-"]),
+];
 
 /// The question asked.
 pub fn prompt(task: &str, report: &Report) -> String {
@@ -63,22 +68,39 @@ pub fn prompt(task: &str, report: &Report) -> String {
 /// Asks the first installed tool; its answer, or why there is none.
 pub fn ask(question: &str) -> Result<String, String> {
     let mut missing = Vec::new();
+    let mut failed = Vec::new();
     for (tool, args) in TOOLS {
         match run(tool, args, question) {
             Err(Missing) => missing.push(tool),
-            Ok(answer) => return answer.map(|a| format!("{tool}: {}", a.trim())),
+            Ok(Ok(answer)) => return Ok(format!("{tool}: {}", answer.trim())),
+            // Installed but not answering (not signed in…): the next one is tried.
+            Ok(Err(e)) => failed.push(e),
         }
     }
-    Err(format!(
-        "No coding agent's command line is installed ({}): the figures above are the exact part",
-        missing.join(", ")
-    ))
+    if failed.is_empty() {
+        Err(format!(
+            "No coding agent's command line is installed ({}): the figures above are the exact part",
+            missing.join(", ")
+        ))
+    } else {
+        Err(failed.join("\n"))
+    }
 }
 
 /// The tool isn't installed.
 struct Missing;
 
 fn run(tool: &str, args: &[&str], question: &str) -> Result<Result<String, String>, Missing> {
+    match start(tool, args) {
+        Err(Missing) if cfg!(windows) => {
+            // Installed with npm, it is a `.cmd`, which only a shell finds by its bare name.
+            finish(tool, start(&format!("{tool}.cmd"), args)?, question)
+        }
+        started => finish(tool, started?, question),
+    }
+}
+
+fn start(tool: &str, args: &[&str]) -> Result<std::io::Result<std::process::Child>, Missing> {
     let mut cmd = Command::new(tool);
     cmd.args(args)
         .stdin(Stdio::piped())
@@ -91,13 +113,28 @@ fn run(tool: &str, args: &[&str], question: &str) -> Result<Result<String, Strin
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x0800_0000);
     }
-    let mut child = match cmd.spawn() {
+    match cmd.spawn() {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(Missing),
+        other => Ok(other),
+    }
+}
+
+fn finish(
+    tool: &str,
+    child: std::io::Result<std::process::Child>,
+    question: &str,
+) -> Result<Result<String, String>, Missing> {
+    let mut child = match child {
         Ok(c) => c,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Err(Missing),
         Err(e) => return Ok(Err(format!("Could not run {tool}: {e}"))),
     };
+    // Written on a thread of its own: a tool that doesn't read it (or reads it slowly) can't
+    // hold the timeout off.
     if let Some(mut stdin) = child.stdin.take() {
-        let _ = stdin.write_all(question.as_bytes());
+        let question = question.to_owned();
+        std::thread::spawn(move || {
+            let _ = stdin.write_all(question.as_bytes());
+        });
     }
     let read = |pipe: Option<Box<dyn Read + Send>>| {
         std::thread::spawn(move || {

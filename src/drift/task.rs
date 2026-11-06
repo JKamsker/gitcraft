@@ -7,34 +7,99 @@ use std::path::{Path, PathBuf};
 /// The file the task is kept in, in the worktree's own git folder.
 const FILE: &str = "gitcraft-task.md";
 
-/// Words too common to tell anything about a folder.
-const COMMON: [&str; 40] = [
-    "the", "and", "for", "with", "that", "this", "from", "into", "when", "then", "than", "also",
-    "should", "would", "could", "make", "made", "add", "fix", "fixes", "use", "uses", "using",
-    "not", "but", "all", "any", "are", "was", "has", "have", "its", "our", "you", "your", "please",
-    "issue", "bug", "feat", "src",
+/// Words too common to tell anything about a folder, and those of an issue's template.
+const COMMON: &[&str] = &[
+    "the",
+    "and",
+    "for",
+    "with",
+    "that",
+    "this",
+    "from",
+    "into",
+    "when",
+    "then",
+    "than",
+    "also",
+    "should",
+    "would",
+    "could",
+    "make",
+    "made",
+    "add",
+    "fix",
+    "fixe",
+    "use",
+    "using",
+    "not",
+    "but",
+    "all",
+    "any",
+    "are",
+    "was",
+    "has",
+    "have",
+    "its",
+    "our",
+    "you",
+    "your",
+    "please",
+    "issue",
+    "issu",
+    "bug",
+    "feat",
+    "src",
+    "see",
+    "step",
+    "reproduce",
+    "reproduc",
+    "expect",
+    "expected",
+    "actual",
+    "behavior",
+    "behaviour",
+    "describe",
+    "description",
+    "version",
+    "screenshot",
+    "context",
+    "additional",
+    "github",
+    "com",
+    "http",
+    "https",
+    "www",
+    "todo",
 ];
 
-/// The task's words that say what it is about: lower case, three letters or more, the common
-/// ones left out, a plural's or a tense's ending cut (`logins` → `login`).
+/// The task's words that say what it is about: lower case, three letters or more, links and
+/// the common words left out, a plural's or a tense's ending cut (`logins` → `login`).
 pub fn keywords(task: &str) -> Vec<String> {
-    let mut out: Vec<String> = task
-        .to_lowercase()
-        .split(|c: char| !c.is_alphanumeric())
+    let lower = task.to_lowercase();
+    let text: Vec<&str> = lower
+        .split_whitespace()
+        .filter(|w| !w.contains("://") && !w.starts_with("www."))
+        .collect();
+    let mut out: Vec<String> = text
+        .iter()
+        .flat_map(|w| w.split(|c: char| !c.is_alphanumeric()))
         .filter(|w| w.chars().count() >= 3 && !w.chars().all(|c| c.is_ascii_digit()))
-        .filter(|w| !COMMON.contains(w))
         .map(stem)
+        .filter(|w| !COMMON.contains(&w.as_str()))
         .collect();
     out.sort();
     out.dedup();
     out
 }
 
-/// `w` without a plural's or tense's ending.
+/// `w` without a plural's or tense's ending: `logins` → `login`, `parsing` → `pars`, `deps` →
+/// `dep`, `libraries` → `library`; never shorter than three letters (four for a tense).
 pub fn stem(w: &str) -> String {
-    for end in ["ing", "ies", "ed", "es", "s"] {
+    for (end, keep) in [("ing", 4), ("ies", 3), ("ed", 4), ("es", 4), ("s", 3)] {
         if let Some(rest) = w.strip_suffix(end)
-            && rest.chars().count() >= 3
+            && rest.chars().count() >= keep
+            // `class`, `access`: no plural.
+            && !(end == "s" && rest.ends_with('s'))
         {
             return if end == "ies" {
                 format!("{rest}y")
@@ -46,44 +111,75 @@ pub fn stem(w: &str) -> String {
     w.to_owned()
 }
 
-/// Whether the folder `dir` (`/` between names) is one the task talks about: one of its names,
-/// or a part of one (`user-login` → `user`, `login`), is a keyword, or a keyword starts it.
+/// Whether the folder `dir` (`/` between names) is one the task talks about: a part of one of
+/// its names (`user-login` → `user`, `login`) and a keyword start the same way, one of them
+/// (three letters or more) the start of the other (`auth` / `authentication`, `parse` /
+/// `parser`, `deps` / `dependencies`).
 pub fn related(dir: &str, keywords: &[String]) -> bool {
     dir.to_lowercase()
         .split(|c: char| !c.is_alphanumeric())
         .filter(|p| p.chars().count() >= 3)
         .map(stem)
         .any(|part| {
-            keywords
-                .iter()
-                .any(|k| *k == part || (k.len() >= 4 && part.starts_with(k.as_str())))
+            keywords.iter().any(|k| {
+                // `auth` for `authentication`; `parser` for `pars(ing)`, two letters more
+                // at most (`workflows` is no `work`).
+                k.starts_with(part.as_str())
+                    || (k.len() >= 4 && part.starts_with(k.as_str()) && part.len() <= k.len() + 2)
+            })
         })
 }
 
 /// The number of the issue a branch (or the task) names: `fix/123-login`, `issue-123`,
-/// `gh-123`, `issues/123`, `#123`.
+/// `gh-123`, `issues/123`, or `fixes #123` in the task. A date or a stamp (`2024-11-06-x`,
+/// `20261106-1530`) is no issue, nor a colour (`#333`) in the task's text.
 pub fn issue_number(branch: &str, task: &str) -> Option<u64> {
     let last = branch.rsplit('/').next().unwrap_or(branch).to_lowercase();
     let leading: String = last.chars().take_while(char::is_ascii_digit).collect();
-    let named =
-        !leading.is_empty() && (leading == last || last[leading.len()..].starts_with(['-', '_']));
+    let after = &last[leading.len()..];
+    // `123-login`: a word after it; `123` alone.
+    let named = !leading.is_empty()
+        && leading.len() <= 6
+        && (after.is_empty()
+            || (after.starts_with(['-', '_'])
+                && after[1..].chars().next().is_some_and(char::is_alphabetic)));
     if named && let Ok(n) = leading.parse() {
         return Some(n);
     }
     let lower = branch.to_lowercase();
     for mark in ["issue-", "issues/", "issue/", "gh-", "#"] {
-        if let Some(at) = lower.find(mark) {
+        for (at, _) in lower.match_indices(mark) {
+            let free = lower[..at]
+                .chars()
+                .next_back()
+                .is_none_or(|c| !c.is_alphanumeric());
             let digits: String = lower[at + mark.len()..]
                 .chars()
                 .take_while(char::is_ascii_digit)
                 .collect();
-            if let Ok(n) = digits.parse() {
+            if free && let Ok(n) = digits.parse() {
                 return Some(n);
             }
         }
     }
-    task.split('#').skip(1).find_map(|rest| {
-        let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+    let words = task.to_lowercase();
+    [
+        "fixes #",
+        "fix #",
+        "closes #",
+        "close #",
+        "resolves #",
+        "resolve #",
+        "issue #",
+        "issues #",
+    ]
+    .iter()
+    .find_map(|mark| {
+        let at = words.find(mark)?;
+        let digits: String = words[at + mark.len()..]
+            .chars()
+            .take_while(char::is_ascii_digit)
+            .collect();
         digits.parse().ok()
     })
 }

@@ -53,13 +53,27 @@ impl DriftView {
     }
 
     /// Where a file of this worktree's changes is read from: its working tree when it is the
-    /// tab's own, else its HEAD (what is committed).
-    fn diff_key(&self, report: &Report, path: &str) -> DiffKey {
-        DiffKey::Range {
+    /// tab's own (an untracked file as one), else its HEAD (what is committed); `None` for a
+    /// change only another worktree's working tree has, which opens that worktree instead.
+    fn diff_key(&self, report: &Report, path: &str) -> Option<DiffKey> {
+        if self.worktree.current && report.untracked.iter().any(|u| u == path) {
+            return Some(DiffKey::Work(crate::git::StatusFile {
+                path: path.to_owned(),
+                old_path: None,
+                code: '?',
+                area: crate::git::Area::Untracked,
+            }));
+        }
+        let only_here = report.uncommitted.iter().any(|u| u == path)
+            && !report.committed.iter().any(|c| c == path);
+        if !self.worktree.current && only_here {
+            return None;
+        }
+        Some(DiffKey::Range {
             from: report.fork.clone(),
             to: (!self.worktree.current).then(|| report.head.clone()),
             path: path.to_owned(),
-        }
+        })
     }
 }
 
@@ -106,6 +120,7 @@ impl RepoTab {
         };
         view.busy = true;
         let path = view.worktree.path.clone();
+        let asked = path.clone();
         let branch = view.worktree.branch.clone().unwrap_or_default();
         let base = view.base.clone();
         let edited = view.task_text();
@@ -139,9 +154,16 @@ impl RepoTab {
                 let Some(view) = &mut tab.drift else {
                     return;
                 };
-                if first {
+                // Another worktree's window opened since: not this one's answer.
+                if view.worktree.path != asked {
+                    return;
+                }
+                // What was typed meanwhile stays.
+                if first && view.task == view.saved {
                     view.saved = task.clone();
                     view.task = task;
+                } else if first {
+                    view.saved = task;
                 }
                 if issue.is_some() {
                     view.issue = issue;
@@ -157,12 +179,15 @@ impl RepoTab {
             return;
         };
         let path = view.worktree.path.clone();
+        let asked = path.clone();
         let task = view.task.clone();
         self.then(
             ctx,
             move || drift::task::write(&path, &task).map(|()| task),
-            |tab, saved, ctx| {
-                if let Some(view) = &mut tab.drift {
+            move |tab, saved, ctx| {
+                if let Some(view) = &mut tab.drift
+                    && view.worktree.path == asked
+                {
                     match saved {
                         Ok(task) => {
                             view.saved = task;
@@ -184,13 +209,16 @@ impl RepoTab {
             return;
         };
         let question = drift::llm::prompt(&view.task_text(), report);
+        let asked = view.worktree.path.clone();
         view.asking = true;
         view.second_opinion = None;
         self.then(
             ctx,
             move || drift::llm::ask(&question),
-            |tab, answer, _| {
-                if let Some(view) = &mut tab.drift {
+            move |tab, answer, _| {
+                if let Some(view) = &mut tab.drift
+                    && view.worktree.path == asked
+                {
                     view.asking = false;
                     view.second_opinion = Some(answer);
                 }
