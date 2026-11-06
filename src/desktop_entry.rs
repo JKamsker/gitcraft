@@ -7,14 +7,26 @@ use std::path::{Path, PathBuf};
 const ENTRY: &str = "gitcraft-appimage.desktop";
 const ICON: &[u8] = include_bytes!("../assets/app-icon/gitcraft-256.png");
 
-/// The AppImage file gitcraft runs from (its runtime sets `APPIMAGE`), on Linux.
+/// The AppImage file gitcraft runs from (its runtime sets `APPIMAGE`), on Linux. Only when
+/// gitcraft runs from inside its mount (`APPDIR`): one started from a terminal of another
+/// AppImage inherits that one's variables.
 pub fn appimage() -> Option<PathBuf> {
     if !cfg!(target_os = "linux") {
+        return None;
+    }
+    let appdir = std::env::var_os("APPDIR").map(PathBuf::from)?;
+    let exe = std::env::current_exe().ok()?;
+    if !runs_from(&exe, &appdir) {
         return None;
     }
     std::env::var_os("APPIMAGE")
         .map(PathBuf::from)
         .filter(|p| p.is_file())
+}
+
+/// Whether `exe` is inside the AppImage mount `appdir`.
+fn runs_from(exe: &Path, appdir: &Path) -> bool {
+    !appdir.as_os_str().is_empty() && exe.starts_with(appdir)
 }
 
 fn data_home() -> Option<PathBuf> {
@@ -65,6 +77,10 @@ pub fn uninstall() -> Result<(), String> {
 /// At startup: an AppImage that was moved or replaced by a newer file keeps its menu entry
 /// pointing at the file running now.
 pub fn refresh() {
+    // A portable copy writes nothing outside its folder.
+    if crate::portable::asked() {
+        return;
+    }
     let (Some(appimage), Some(data)) = (appimage(), data_home()) else {
         return;
     };
@@ -132,6 +148,21 @@ fn escape_value(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_a_program_inside_the_mount_is_the_appimage() {
+        let mount = Path::new("/tmp/.mount_gitcraXYZ");
+        assert!(runs_from(
+            Path::new("/tmp/.mount_gitcraXYZ/usr/bin/gitcraft"),
+            mount
+        ));
+        // Started from a terminal of another AppImage, which set the variables.
+        assert!(!runs_from(Path::new("/home/me/bin/gitcraft"), mount));
+        assert!(!runs_from(
+            Path::new("/home/me/bin/gitcraft"),
+            Path::new("")
+        ));
+    }
 
     #[test]
     fn quotes_the_appimage_path() {

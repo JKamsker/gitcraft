@@ -143,6 +143,8 @@ impl App {
         theme::apply(ctx, &saved.theme, &settings.theme_tweaks);
         settings.ensure_profile();
         settings.set(ctx);
+        // Before anything could reach the credential store.
+        crate::portable::set_credential_store(settings.portable_credential_store);
         crate::desktop_entry::refresh();
 
         let mut app = Self {

@@ -55,19 +55,25 @@ pub fn persistence_path() -> Option<PathBuf> {
     portable_dir().map(|dir| dir.join("app.ron"))
 }
 
-/// Whether the system's credential store (Credential Manager, Keychain, Secret Service) may
-/// keep sign-ins. Always, unless gitcraft runs portable and the settings leave it out.
-static CREDENTIAL_STORE: AtomicBool = AtomicBool::new(true);
+/// Whether a portable copy may keep sign-ins in the system's credential store (Credential
+/// Manager, Keychain, Secret Service), as the settings say: off until they are applied.
+static STORE_WANTED: AtomicBool = AtomicBool::new(false);
 
-/// See [`CREDENTIAL_STORE`]; read from any thread.
+/// Whether the credential store is used: always when installed, as the settings say when
+/// portable. Read from any thread.
 pub fn credential_store() -> bool {
-    CREDENTIAL_STORE.load(Ordering::Relaxed)
+    credential_store_allowed(asked(), STORE_WANTED.load(Ordering::Relaxed))
 }
 
-/// Applies the setting: `wanted` counts only when gitcraft runs portable.
+/// Applies the setting, which counts only when portable mode was asked for (also when its
+/// folder couldn't be used: the user still asked for nothing to be kept on this computer).
 pub fn set_credential_store(wanted: bool) {
-    let on = credential_store_allowed(portable_dir().is_some(), wanted);
-    CREDENTIAL_STORE.store(on, Ordering::Relaxed);
+    STORE_WANTED.store(wanted, Ordering::Relaxed);
+}
+
+/// Whether portable mode was asked for, whether or not its folder could be used.
+pub fn asked() -> bool {
+    !matches!(mode(), Mode::Installed)
 }
 
 /// Whether the credential store is used: always when installed, as asked when portable.
@@ -81,31 +87,64 @@ fn program_dir() -> Option<PathBuf> {
     program_dir_of(&exe, crate::desktop_entry::appimage().as_deref())
 }
 
-/// The folder holding `exe`, or the AppImage it runs from, or the macOS app bundle it is in
-/// (`gitcraft.app/Contents/MacOS/gitcraft`): where the marker and the `data` folder go.
+/// The folder holding `exe`, or the AppImage it runs from, or (on macOS) the app bundle it is
+/// in (`gitcraft.app/Contents/MacOS/gitcraft`): where the marker and the `data` folder go.
 pub(crate) fn program_dir_of(exe: &Path, appimage: Option<&Path>) -> Option<PathBuf> {
     let program = appimage.unwrap_or(exe);
-    let program = program
-        .ancestors()
-        .find(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("app")))
-        .unwrap_or(program);
+    let program = if cfg!(target_os = "macos") {
+        bundle_of(program).unwrap_or(program)
+    } else {
+        program
+    };
     program
         .parent()
         .filter(|dir| !dir.as_os_str().is_empty())
         .map(Path::to_owned)
 }
 
+/// The app bundle `exe` is the program of: `X.app/Contents/MacOS/<exe>`.
+pub(crate) fn bundle_of(exe: &Path) -> Option<&Path> {
+    let macos = exe.parent()?;
+    let contents = macos.parent()?;
+    let bundle = contents.parent()?;
+    let is_bundle = macos.file_name()? == "MacOS"
+        && contents.file_name()? == "Contents"
+        && bundle
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("app"));
+    is_bundle.then_some(bundle)
+}
+
 /// The mode for a gitcraft in `dir`. The `data` folder is made when only the marker is there.
+/// A `data` folder alone counts only when it is empty or already holds gitcraft's state: an
+/// unrelated `data` folder of the user's (in `~/Downloads`, say) doesn't turn it on.
 pub(crate) fn detect(dir: &Path) -> Mode {
     let data = dir.join(DATA);
-    let asked = data.is_dir() || dir.join(MARKER).is_file();
+    let asked = dir.join(MARKER).is_file() || is_portable_data(&data);
     if !asked {
         return Mode::Installed;
+    }
+    // macOS runs a quarantined app from a random read-only copy, away from the marker.
+    if dir.to_string_lossy().contains("/AppTranslocation/") {
+        return Mode::Unusable(TRANSLOCATED.to_owned());
     }
     match usable(&data) {
         Ok(()) => Mode::Portable(data),
         Err(e) => Mode::Unusable(e),
     }
+}
+
+/// Said when macOS runs the app from its quarantine copy (see [`detect`]).
+const TRANSLOCATED: &str = "Portable mode is off: macOS runs this downloaded copy from a \
+    temporary folder. Run xattr -dr com.apple.quarantine on gitcraft.app, then start it again.";
+
+/// A `data` folder that is gitcraft's: empty, or holding the window's saved state.
+fn is_portable_data(data: &Path) -> bool {
+    if !data.is_dir() {
+        return false;
+    }
+    data.join("app.ron").is_file()
+        || std::fs::read_dir(data).is_ok_and(|mut entries| entries.next().is_none())
 }
 
 /// Whether gitcraft can keep its files in `data`: the folder is made if need be, and a file is

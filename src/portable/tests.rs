@@ -95,13 +95,20 @@ fn the_folder_gitcraft_runs_from() {
         program_dir_of(Path::new("/stick/gitcraft/gitcraft"), None),
         Some(PathBuf::from("/stick/gitcraft"))
     );
-    // Beside the app bundle, not inside it.
+    // On macOS beside the app bundle, not inside it; elsewhere `.app` means nothing.
+    let in_bundle = Path::new("/Volumes/Stick/gitcraft.app/Contents/MacOS/gitcraft");
+    let expected = if cfg!(target_os = "macos") {
+        "/Volumes/Stick"
+    } else {
+        "/Volumes/Stick/gitcraft.app/Contents/MacOS"
+    };
     assert_eq!(
-        program_dir_of(
-            Path::new("/Volumes/Stick/gitcraft.app/Contents/MacOS/gitcraft"),
-            None
-        ),
-        Some(PathBuf::from("/Volumes/Stick"))
+        program_dir_of(in_bundle, None),
+        Some(PathBuf::from(expected))
+    );
+    assert_eq!(
+        program_dir_of(Path::new("/home/me/tools.app/gitcraft/gitcraft"), None),
+        Some(PathBuf::from("/home/me/tools.app/gitcraft"))
     );
     // Beside the AppImage, not in its mount.
     assert_eq!(
@@ -121,4 +128,53 @@ fn the_credential_store_is_optional_only_when_portable() {
     assert!(credential_store_allowed(false, true));
     assert!(!credential_store_allowed(true, false));
     assert!(credential_store_allowed(true, true));
+}
+
+#[test]
+fn the_bundle_a_program_is_in() {
+    assert_eq!(
+        bundle_of(Path::new("/A/gitcraft.app/Contents/MacOS/gitcraft")),
+        Some(Path::new("/A/gitcraft.app"))
+    );
+    assert_eq!(bundle_of(Path::new("/A/x.app/gitcraft")), None);
+    assert_eq!(
+        bundle_of(Path::new("/A/x.app/Contents/Resources/gitcraft")),
+        None
+    );
+    assert_eq!(bundle_of(Path::new("gitcraft")), None);
+}
+
+/// A `data` folder of the user's own, next to gitcraft in `~/Downloads`, say, isn't asked for
+/// portable mode; one gitcraft already keeps its state in is.
+#[test]
+fn only_an_empty_data_folder_or_gitcraft_s_own_turns_it_on() -> Result<(), String> {
+    let dir = scratch("unrelated")?;
+    let data = dir.join(DATA);
+    std::fs::create_dir_all(&data).map_err(|e| e.to_string())?;
+    std::fs::write(data.join("photos.zip"), "x").map_err(|e| e.to_string())?;
+    let unrelated = detect(&dir);
+    std::fs::write(data.join("app.ron"), "()").map_err(|e| e.to_string())?;
+    let own = detect(&dir);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(unrelated, Mode::Installed);
+    assert_eq!(own, Mode::Portable(data));
+    Ok(())
+}
+
+/// macOS runs a quarantined download from a random read-only copy: said, with what to do.
+#[test]
+fn a_translocated_copy_says_what_to_do() -> Result<(), String> {
+    let base = scratch("translocated")?;
+    let dir = base.join("AppTranslocation").join("1234").join("d");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join(MARKER), "").map_err(|e| e.to_string())?;
+    let mode = detect(&dir);
+    let made = dir.join(DATA).exists();
+    let _ = std::fs::remove_dir_all(&base);
+    match mode {
+        Mode::Unusable(why) => assert!(why.contains("xattr -dr com.apple.quarantine"), "{why}"),
+        other => return Err(format!("{other:?}")),
+    }
+    assert!(!made);
+    Ok(())
 }
