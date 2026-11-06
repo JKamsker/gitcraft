@@ -165,6 +165,8 @@ pub struct RepoTab {
     diff_ignore_ws: bool,
     /// Diffs show the whole file instead of the changes.
     diff_as_file: bool,
+    /// Markdown files show rendered in diffs (their changes, or the file).
+    diff_rendered: bool,
     /// Whether the commit pane lists every file of the commit, and those read.
     all_files: detail::AllFiles,
     conflict: Option<conflict::ConflictEditor>,
@@ -210,6 +212,8 @@ pub struct RepoTab {
     queued: Vec<Action>,
     /// A folder the app should open (taken by `App`).
     pub open_request: Option<OpenRequest>,
+    /// A worktree to open once the operation so labelled (which makes it) is done.
+    open_when_done: Option<(String, PathBuf)>,
     /// The other worktrees this tab was on, oldest first, for coming back to. Boxed as in
     /// `Tab::Repo`, which they move in and out of.
     #[allow(clippy::vec_box)]
@@ -300,6 +304,7 @@ impl RepoTab {
             avatars_hinted: false,
             diff_ignore_ws: false,
             diff_as_file: false,
+            diff_rendered: false,
             all_files: Default::default(),
             conflict: None,
             commit_summary: String::new(),
@@ -329,6 +334,7 @@ impl RepoTab {
             fs_pending: None,
             queued: Vec::new(),
             open_request: None,
+            open_when_done: None,
             parked: Vec::new(),
             parked_status: Vec::new(),
             keys_blocked: false,
