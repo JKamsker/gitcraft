@@ -1,6 +1,7 @@
-//! The shells kept open per machine, in two lanes: quick reads (status, log, diffs…) and long
+//! The shells kept open per machine, in three lanes: quick reads (status, log, diffs…), long
 //! network operations (fetch, push…), which would otherwise take every shell of a machine for
-//! as long as they last and leave the tab waiting for its reads.
+//! as long as they last and leave the tab waiting for its reads, and the test runs of a parallel
+//! bisect, one shell per commit tested at once.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
@@ -14,6 +15,7 @@ use super::shell::{Shell, lock};
 pub(super) enum Lane {
     Quick,
     Long,
+    Test,
 }
 
 impl Lane {
@@ -22,9 +24,13 @@ impl Lane {
         match self {
             Lane::Quick => 6,
             Lane::Long => 3,
+            Lane::Test => TEST_SHELLS,
         }
     }
 }
+
+/// How many tests a parallel bisect runs at once on one machine, at most.
+pub const TEST_SHELLS: usize = 64;
 
 /// After a connection couldn't be made, commands fail at once with its error for this long
 /// (while none is open) rather than each trying, and waiting for, one of their own.
