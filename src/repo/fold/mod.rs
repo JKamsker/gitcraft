@@ -154,6 +154,38 @@ impl RepoTab {
             ));
             return;
         }
+        // What is going on now, not when the dialog read it: a `git am` stopped since (which
+        // no guard step can see) would take the fixup commit as its own.
+        let path = self.path.clone();
+        self.then(
+            ctx,
+            move || git::in_progress(&path),
+            move |tab, state, ctx| match state {
+                Ok(None) => tab.run_fold_now(plan, ctx),
+                Ok(Some(state)) => {
+                    tab.status = Some((
+                        format!(
+                            "{}: a {} is in progress now: finish or abort it first",
+                            plan.label(),
+                            state.label().to_lowercase()
+                        ),
+                        true,
+                    ));
+                }
+                Err(e) => tab.status = Some((format!("{}: {e}", plan.label()), true)),
+            },
+        );
+    }
+
+    /// Runs the fold, nothing being in progress.
+    fn run_fold_now(&mut self, plan: Plan, ctx: &egui::Context) {
+        if self.busy_op.is_some() {
+            self.status = Some((
+                format!("{}: something else started, try again", plan.label()),
+                true,
+            ));
+            return;
+        }
         let label = plan.label();
         if plan.keep_fixup {
             let (steps, undo) = plan.keep_steps();
@@ -262,7 +294,19 @@ impl RepoTab {
             }
             return;
         }
-        let over = |s: &Stopped| label == s.label || label == abort_label(s);
+        if ok && let Some(stopped) = self.fold.stopped.take_if(|s| label == abort_label(s)) {
+            // Aborted: the changes staged again, checked again now that the abort is done.
+            let steps = stopped.unfixup_steps();
+            self.run_ops(
+                &unfixup_label(&stopped),
+                steps,
+                Refresh::All,
+                OpKind::plain(),
+                ctx,
+            );
+            return;
+        }
+        let over = |s: &Stopped| label == s.label;
         if ok && self.fold.stopped.as_ref().is_some_and(over) {
             self.fold.stopped = None;
             // As after any rebase continued: what the box held was the rebase's.
@@ -388,6 +432,13 @@ impl RepoTab {
         self.fold_stopped_here(state)
             .map(|s| (s.label.clone(), s.continue_kind()))
     }
+}
+
+fn unfixup_label(stopped: &Stopped) -> String {
+    format!(
+        "Stage the changes of {} again",
+        stopped.label.replacen("Fold", "fold", 1)
+    )
 }
 
 fn put_back_label(stopped: &Stopped) -> String {
