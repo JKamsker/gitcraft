@@ -47,9 +47,14 @@ impl RepoTab {
                         );
                     } else {
                         ui.add(crate::spinner::Spinner::new());
-                        ui.label(RichText::new("Rehearsing…").color(t.text_dim));
-                        if ui.button("Stop").clicked() {
-                            acts.push(Action::Rehearse(RehearseAct::Stop));
+                        if run.stop.stopped() {
+                            // A rebase or merge under way finishes its step first.
+                            ui.label(RichText::new("Stopping…").color(t.text_dim));
+                        } else {
+                            ui.label(RichText::new("Rehearsing…").color(t.text_dim));
+                            if ui.button("Stop").clicked() {
+                                acts.push(Action::Rehearse(RehearseAct::Stop));
+                            }
                         }
                     }
                 });
@@ -112,7 +117,7 @@ fn outcome(
         Played::Failed(_) => t.danger,
         _ => t.success,
     };
-    ui.label(RichText::new(played_line(&r.played)).color(tone));
+    ui.label(RichText::new(played_line(kind, &r.played)).color(tone));
     if let Played::Stopped { conflicts, .. } = &r.played {
         for file in conflicts.iter().take(MAX_FILES) {
             ui.label(RichText::new(format!("  {file}")).font(theme::mono(11.5)));

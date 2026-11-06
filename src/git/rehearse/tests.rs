@@ -209,15 +209,19 @@ fn moved_refs_are_caught() -> Result<(), String> {
         &RunStop::default(),
     )?;
     unmoved(repo.path(), &r)?;
-    repo.git(&["checkout", "-q", "main"])?;
-    repo.commit("main again", &[("other", Some("x"))])?;
+    // main moves on without being checked out (a fetch, another worktree…).
+    let tree = repo.tree("main")?;
+    let moved = repo.git(&["commit-tree", &tree, "-p", "main", "-m", "again"])?;
+    repo.git(&["update-ref", "refs/heads/main", moved.trim()])?;
     let err = unmoved(repo.path(), &r).err().unwrap_or_default();
     assert!(err.starts_with("main moved since the rehearsal"), "{err}");
     assert!(err.ends_with("rehearse again"), "{err}");
-    repo.git(&["branch", "-D", "feature"])?;
+    // feature itself moved (reset in a terminal, say).
+    repo.git(&["update-ref", "refs/heads/main", &r.other_tip])?;
+    repo.git(&["reset", "-q", "--hard", "feature~1"])?;
     let err = unmoved(repo.path(), &r).err().unwrap_or_default();
     assert!(
-        err.contains("feature moved") && err.contains("gone"),
+        err.starts_with("feature moved since the rehearsal"),
         "{err}"
     );
     Ok(())
@@ -270,4 +274,62 @@ fn refs_read_as_people_name_them() {
     assert_eq!(short_ref("refs/heads/feat/ü x"), "feat/ü x");
     assert_eq!(short_ref("refs/remotes/origin/main"), "origin/main");
     assert_eq!(short_ref("abc123"), "abc123");
+}
+
+/// With `rebase.updateRefs`, a real rebase moves the branches stacked on the one rebased; a
+/// rehearsal never does, and counts only the commits.
+#[test]
+fn a_rehearsal_moves_no_stacked_branch() -> Result<(), String> {
+    let repo = Repo::new("rehearse-stacked")?;
+    repo.commit("base", &[("a", Some("1"))])?;
+    repo.git(&["checkout", "-q", "-b", "feature"])?;
+    let first = repo.commit("f1", &[("f", Some("1"))])?;
+    repo.git(&["branch", "stack1"])?;
+    repo.commit("f2", &[("g", Some("1"))])?;
+    repo.git(&["checkout", "-q", "main"])?;
+    repo.commit("m", &[("m", Some("1"))])?;
+    repo.git(&["checkout", "-q", "feature"])?;
+    repo.git(&["config", "rebase.updateRefs", "true"])?;
+    let tip = repo.rev("feature")?;
+    let r = rehearse(
+        repo.path(),
+        &spec(RehearseKind::Rebase, "refs/heads/main", None),
+        &RunStop::default(),
+    )?;
+    assert!(
+        matches!(r.played, Played::Clean { commits: 2, .. }),
+        "{:?}",
+        r.played
+    );
+    assert_eq!(repo.rev("stack1")?, first);
+    untouched(&repo, &tip)
+}
+
+/// A merge counts the commits it brings in, not the merge commit.
+#[test]
+fn a_merge_counts_what_it_brings_in() -> Result<(), String> {
+    let repo = Repo::new("rehearse-count")?;
+    repo.commit("base", &[("a", Some("1"))])?;
+    repo.git(&["checkout", "-q", "-b", "feature"])?;
+    repo.commit("f", &[("f", Some("1"))])?;
+    repo.git(&["checkout", "-q", "main"])?;
+    for i in 0..4 {
+        repo.commit(&format!("m{i}"), &[(&format!("m{i}"), Some("1"))])?;
+    }
+    repo.git(&["checkout", "-q", "feature"])?;
+    let r = rehearse(
+        repo.path(),
+        &spec(RehearseKind::Merge, "refs/heads/main", None),
+        &RunStop::default(),
+    )?;
+    assert!(
+        matches!(r.played, Played::Clean { commits: 4, .. }),
+        "{:?}",
+        r.played
+    );
+    // Checked out elsewhere since: applying refuses.
+    repo.git(&["checkout", "-q", "main"])?;
+    let err = unmoved(repo.path(), &r).err().unwrap_or_default();
+    assert_eq!(err, "feature is no longer checked out: rehearse again");
+    Ok(())
 }

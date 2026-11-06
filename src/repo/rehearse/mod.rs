@@ -141,7 +141,9 @@ impl RepoTab {
                 }
             }
             RehearseAct::Close => {
-                if !self.rehearsing.going() {
+                // Not while an apply is being checked: its answer belongs to this window.
+                let applying = self.rehearsing.run.as_ref().is_some_and(|r| r.applying);
+                if !self.rehearsing.going() && !applying {
                     self.rehearsing.run = None;
                 }
             }
@@ -261,6 +263,19 @@ impl RepoTab {
             self.status = Some(("Wait for the operation going on to finish".to_owned(), true));
             return;
         }
+        let work = &self.work;
+        let changed = !work.staged.is_empty()
+            || !work.conflicted.is_empty()
+            || work.in_progress.is_some()
+            || work.unstaged.iter().any(|f| f.area != git::Area::Untracked);
+        if changed {
+            self.status = Some((
+                "Commit or stash your changes first: the rehearsal was of the commits alone"
+                    .to_owned(),
+                true,
+            ));
+            return;
+        }
         if self.refs.current.as_deref() != Some(run.branch.as_str()) {
             self.status = Some((
                 format!("{} is no longer checked out: rehearse again", run.branch),
@@ -269,15 +284,17 @@ impl RepoTab {
             return;
         }
         run.applying = true;
+        let id = run.id;
         let (branch, other, remote) = (run.branch.clone(), run.other.clone(), run.remote);
         let path = self.path.clone();
         self.then(
             ctx,
             move || git::unmoved(&path, &rehearsal),
             move |tab, checked, ctx| {
-                if let Some(run) = tab.rehearsing.run.as_mut() {
-                    run.applying = false;
-                }
+                let Some(run) = tab.rehearsing.run.as_mut().filter(|r| r.id == id) else {
+                    return;
+                };
+                run.applying = false;
                 if let Err(e) = checked {
                     tab.status = Some((e, true));
                     return;
