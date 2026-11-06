@@ -151,7 +151,11 @@ fn the_window_shows_what_merges_resolved() {
         .with_size([1400.0, 860.0])
         .build_ui_state(|ui, tab: &mut RepoTab| tab.ui(ui), tab);
     crate::theme::install_fonts(&harness.ctx);
-    crate::theme::apply(&harness.ctx, crate::theme::ThemeKind::Dark);
+    crate::theme::apply(
+        &harness.ctx,
+        &crate::theme::ThemeId::default(),
+        &crate::theme::Tweaks::default(),
+    );
     assert!(run_until(&mut harness, |t| !t.opening()
         && t.settled()
         && !t.commits.is_empty()));
@@ -397,7 +401,11 @@ fn unticking_the_box_closes_a_diff_of_what_the_merge_resolved() {
         .with_size([1400.0, 860.0])
         .build_ui_state(|ui, tab: &mut RepoTab| tab.ui(ui), tab);
     crate::theme::install_fonts(&harness.ctx);
-    crate::theme::apply(&harness.ctx, crate::theme::ThemeKind::Dark);
+    crate::theme::apply(
+        &harness.ctx,
+        &crate::theme::ThemeId::default(),
+        &crate::theme::Tweaks::default(),
+    );
     let opened = run_until(&mut harness, |t| !t.opening() && t.settled());
     let key = DiffKey::Remerge {
         hash: m.resolved.clone(),
