@@ -507,3 +507,36 @@ fn an_old_git_says_why() -> Result<(), String> {
     );
     Ok(())
 }
+
+/// A branch that changes a line and then changes it back merges cleanly with an upstream that
+/// changed that line too, yet rebasing it stops at its first commit: why the toolbar checks a
+/// rebase when Pull rebases.
+#[test]
+fn a_clean_merge_can_still_be_a_conflicting_rebase() -> Result<(), String> {
+    let repo = forked("merge-vs-rebase")?;
+    let Some(features) = features_here(&repo)? else {
+        return Ok(());
+    };
+    repo.write("f.txt", b"a\nupstream\nc\n")?;
+    let upstream = repo.commit("upstream")?;
+    repo.git(&["checkout", "-q", "side"])?;
+    repo.write("f.txt", b"a\nmine\nc\n")?;
+    repo.commit("change it")?;
+    repo.write("f.txt", b"a\nb\nc\n")?;
+    let head = repo.commit("change it back")?;
+    let merged = merge(repo.path(), &head, &upstream)?;
+    assert_eq!(merged.outcome, Outcome::Clean { changes: true });
+    let rebased = rebase(repo.path(), features, &head, &upstream)?;
+    assert_eq!(conflicts(&rebased), (vec!["f.txt"], Some(1)));
+    Ok(())
+}
+
+/// A partial clone is told apart: merging there would download what it lacks.
+#[test]
+fn a_partial_clone_is_recognised() -> Result<(), String> {
+    let repo = forked("partial")?;
+    assert!(!partial_clone(repo.path()));
+    repo.git(&["config", "extensions.partialClone", "origin"])?;
+    assert!(partial_clone(repo.path()));
+    Ok(())
+}

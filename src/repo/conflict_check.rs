@@ -82,10 +82,11 @@ const WORKERS: usize = 2;
 
 #[derive(Default)]
 struct Inner {
-    /// What the git of the repository's machine can do, once asked.
-    features: Option<Result<Features, String>>,
-    /// Each check, with when it was last asked for.
-    entries: HashMap<Key, (u64, Check)>,
+    /// What the git of the repository's machine can do, and whether the repository is a
+    /// partial clone, once found out (a failure to find out is asked again next time).
+    repo_info: Option<RepoInfo>,
+    /// Each check, with when it was last asked for, and when it failed if it did.
+    entries: HashMap<Key, Entry>,
     /// Checks waiting for a worker; the latest asked for is taken first.
     queue: Vec<Key>,
     workers: usize,
@@ -93,7 +94,42 @@ struct Inner {
     asked: u64,
 }
 
+/// A check, as [`Inner::entries`] keeps it.
+#[derive(Clone, Debug)]
+struct Entry {
+    asked: u64,
+    check: Check,
+    /// When it failed: a failure (a machine out of reach) is tried again after [`RETRY`].
+    failed: Option<Instant>,
+}
+
+/// What a check needs to know about the repository's git.
+#[derive(Clone, Copy, Debug)]
+struct RepoInfo {
+    features: Features,
+    /// A partial clone, whose missing files git would download to merge.
+    partial: bool,
+}
+
+/// How long a failed check stands before it is tried again.
+const RETRY: Duration = Duration::from_secs(30);
+
 impl Inner {
+    /// Forgets the checks waiting for a worker that are about another HEAD than `head`: the
+    /// branch moved on, and menus only ask about the current one.
+    fn drop_stale(&mut self, head: &str) {
+        let stale: Vec<Key> = self
+            .queue
+            .iter()
+            .filter(|k| k.head != head)
+            .cloned()
+            .collect();
+        self.queue.retain(|k| k.head == head);
+        for key in stale {
+            self.entries.remove(&key);
+        }
+    }
+
     /// Drops the checks asked for longest ago, beyond [`CAPACITY`], but none still running.
     fn evict(&mut self) {
         let over = self.entries.len().saturating_sub(CAPACITY);
@@ -103,8 +139,8 @@ impl Inner {
         let mut done: Vec<(u64, Key)> = self
             .entries
             .iter()
-            .filter(|(_, (_, check))| !matches!(check, Check::Checking))
-            .map(|(key, (asked, _))| (*asked, key.clone()))
+            .filter(|(_, e)| !matches!(e.check, Check::Checking))
+            .map(|(key, e)| (e.asked, key.clone()))
             .collect();
         done.sort_unstable_by_key(|(asked, _)| *asked);
         for (_, key) in done.into_iter().take(over) {
@@ -114,9 +150,31 @@ impl Inner {
 }
 
 /// The checks of one repository, shared with the threads working them out.
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub(super) struct ConflictChecks {
     inner: Arc<Mutex<Inner>>,
+}
+
+impl ConflictChecks {
+    /// Forgets every finished check (F5): what merges cleanly also depends on
+    /// `.gitattributes` and git's config, which the commits don't capture.
+    pub fn forget_finished(&self) {
+        if let Ok(mut inner) = self.inner.lock() {
+            inner
+                .entries
+                .retain(|_, e| matches!(e.check, Check::Checking));
+            inner.repo_info = None;
+        }
+    }
+}
+
+impl Drop for ConflictChecks {
+    /// The tab is closed: what is still waiting is not worked out.
+    fn drop(&mut self) {
+        if let Ok(mut inner) = self.inner.lock() {
+            inner.queue.clear();
+        }
+    }
 }
 
 impl ConflictChecks {
@@ -128,11 +186,20 @@ impl ConflictChecks {
         };
         inner.asked += 1;
         let asked = inner.asked;
-        if let Some((when, check)) = inner.entries.get_mut(&key) {
-            *when = asked;
-            return check.clone();
+        let retry = |e: &Entry| e.failed.is_some_and(|at| at.elapsed() >= RETRY);
+        if let Some(entry) = inner.entries.get_mut(&key)
+            && !retry(entry)
+        {
+            entry.asked = asked;
+            return entry.check.clone();
         }
-        inner.entries.insert(key.clone(), (asked, Check::Checking));
+        inner.drop_stale(&key.head);
+        let entry = Entry {
+            asked,
+            check: Check::Checking,
+            failed: None,
+        };
+        inner.entries.insert(key.clone(), entry);
         inner.queue.push(key);
         inner.evict();
         if inner.workers < WORKERS {
@@ -147,48 +214,55 @@ impl ConflictChecks {
 /// A worker: takes checks from the queue until it is empty.
 fn work(shared: &Mutex<Inner>, ctx: &egui::Context, repo: &Path) {
     loop {
-        let (key, features) = {
+        let (key, info) = {
             let Ok(mut inner) = shared.lock() else { return };
             let Some(key) = inner.queue.pop() else {
                 inner.workers -= 1;
                 return;
             };
-            (key, inner.features.clone())
+            (key, inner.repo_info)
         };
-        let features = match features {
-            Some(features) => features,
-            None => {
-                let found = simulate::features(repo);
+        let info = match info {
+            Some(info) => Ok(info),
+            None => repo_info(repo).inspect(|found| {
                 if let Ok(mut inner) = shared.lock() {
-                    inner.features = Some(found.clone());
+                    inner.repo_info = Some(*found);
                 }
-                found
-            }
+            }),
         };
         let check = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            run_check(ctx, repo, features, &key)
+            run_check(ctx, repo, info, &key)
         }))
         .unwrap_or_else(|_| Check::Failed("internal error".to_owned()));
         if let Ok(mut inner) = shared.lock()
-            && let Some((_, entry)) = inner.entries.get_mut(&key)
+            && let Some(entry) = inner.entries.get_mut(&key)
         {
-            *entry = check;
+            entry.failed = matches!(check, Check::Failed(_)).then(Instant::now);
+            entry.check = check;
         }
         ctx.request_repaint();
     }
 }
 
+/// What the git of `repo`'s machine can do, and whether `repo` is a partial clone.
+fn repo_info(repo: &Path) -> Result<RepoInfo, String> {
+    Ok(RepoInfo {
+        features: simulate::features(repo)?,
+        partial: simulate::partial_clone(repo),
+    })
+}
+
 /// Works out the check `key`.
-fn run_check(
-    ctx: &egui::Context,
-    repo: &Path,
-    features: Result<Features, String>,
-    key: &Key,
-) -> Check {
-    let features = match features {
-        Ok(features) => features,
+fn run_check(ctx: &egui::Context, repo: &Path, info: Result<RepoInfo, String>, key: &Key) -> Check {
+    let RepoInfo { features, partial } = match info {
+        Ok(info) => info,
         Err(e) => return Check::Failed(e),
     };
+    if partial {
+        return Check::Unavailable(
+            "Not checked in a partial clone: git would download the files it lacks".to_owned(),
+        );
+    }
     let unavailable = match key.op {
         Op::Merge => features.merge_unavailable(),
         Op::Rebase | Op::CherryPick => features.replay_unavailable(),
@@ -477,10 +551,21 @@ impl RepoTab {
     /// conflict. Checked once the refs have settled, and not while an operation runs.
     pub(super) fn target_conflict_badge(&mut self, ui: &mut Ui) {
         let target = self.conflict_target();
+        // With Pull set to rebase, the upstream is rebased onto, not merged: a branch can
+        // merge cleanly and still stop at one of its commits.
+        let rebase =
+            crate::settings::Settings::get(ui.ctx()).pull_mode == super::pull::PullMode::Rebase;
         let key = target
             .as_ref()
             .filter(|(_, commit, _)| !self.refs.head.is_empty() && *commit != self.refs.head)
-            .map(|(_, commit, _)| Key::new(Op::Merge, &self.refs.head, commit));
+            .map(|(_, commit, upstream)| {
+                let op = if rebase && *upstream {
+                    Op::Rebase
+                } else {
+                    Op::Merge
+                };
+                Key::new(op, &self.refs.head, commit)
+            });
         let watch = &mut self.target_watch;
         if watch.key != key {
             watch.key = key;
@@ -499,12 +584,15 @@ impl RepoTab {
         if self.busy_op.is_some() || self.work.in_progress.is_some() {
             return;
         }
+        let op = key.op;
         let check = self.conflict_checks.get(ui.ctx(), &self.path, key);
         let Check::Done(verdict) = &check else {
             return;
         };
-        let Outcome::Conflicts { .. } = &verdict.prediction.outcome else {
-            return;
+        let what = match &verdict.prediction.outcome {
+            Outcome::Conflicts { .. } => "Conflicts with",
+            Outcome::Unsure(_) => "May conflict with",
+            Outcome::Clean { .. } => return,
         };
         let t = Tokens::get(ui.ctx());
         let target = self.target_watch.target.clone();
@@ -515,12 +603,14 @@ impl RepoTab {
         } else {
             "the default branch; it has no upstream"
         };
-        super::widgets::chip(ui, &format!("Conflicts with {target}"), t.warning).on_hover_text(
-            format!(
-                "Merging {target} ({why}) into {current} would conflict.\n{}",
-                tooltip(Op::Merge, &check, !self.work.is_clean())
-            ),
-        );
+        let doing = match op {
+            Op::Rebase => format!("Rebasing {current} onto {target} ({why}), as Pull does"),
+            _ => format!("Merging {target} ({why}) into {current}"),
+        };
+        super::widgets::chip(ui, &format!("{what} {target}"), t.warning).on_hover_text(format!(
+            "{doing}:\n{}",
+            tooltip(op, &check, !self.work.is_clean())
+        ));
     }
 }
 
@@ -670,13 +760,18 @@ mod tests {
         let mut inner = Inner::default();
         let key = |n: usize| Key::new(Op::Merge, "head", &format!("c{n}"));
         let clean = done(Outcome::Clean { changes: true }, 0, Vec::new());
-        inner.entries.insert(key(0), (0, Check::Checking));
+        let entry = |asked: u64, check: Check| Entry {
+            asked,
+            check,
+            failed: None,
+        };
+        inner.entries.insert(key(0), entry(0, Check::Checking));
         for n in 1..=CAPACITY + 10 {
-            inner.entries.insert(key(n), (n as u64, clean.clone()));
+            inner.entries.insert(key(n), entry(n as u64, clean.clone()));
         }
         // The first finished one was asked for again, late.
         if let Some(entry) = inner.entries.get_mut(&key(1)) {
-            entry.0 = 10_000;
+            entry.asked = 10_000;
         }
         inner.evict();
         assert_eq!(inner.entries.len(), CAPACITY);
@@ -686,6 +781,62 @@ mod tests {
             assert!(!inner.entries.contains_key(&key(n)), "{n}");
         }
         assert!(inner.entries.contains_key(&key(13)));
+    }
+
+    /// A failed check (a machine out of reach) is asked again once [`RETRY`] has passed, and
+    /// a check about a HEAD the branch has moved on from is dropped from the queue.
+    #[test]
+    fn failures_are_retried_and_stale_questions_dropped() {
+        let checks = ConflictChecks::default();
+        let ctx = egui::Context::default();
+        let failed = Key::new(Op::Merge, "head", "x");
+        let stale = Key::new(Op::Merge, "old-head", "y");
+        let Some(long_ago) = Instant::now().checked_sub(RETRY * 2) else {
+            return;
+        };
+        if let Ok(mut inner) = checks.inner.lock() {
+            // No worker starts: the test looks at the queue.
+            inner.workers = WORKERS;
+            let entry = |check: Check, failed: Option<Instant>| Entry {
+                asked: 0,
+                check,
+                failed,
+            };
+            let gone = Check::Failed("unreachable".into());
+            inner
+                .entries
+                .insert(failed.clone(), entry(gone.clone(), Some(Instant::now())));
+            inner
+                .entries
+                .insert(stale.clone(), entry(Check::Checking, None));
+            inner.queue.push(stale.clone());
+            // Just failed: the failure stands.
+            drop(inner);
+            assert!(matches!(
+                checks.get(&ctx, Path::new("."), failed.clone()),
+                Check::Failed(_)
+            ));
+            if let Ok(mut inner) = checks.inner.lock()
+                && let Some(e) = inner.entries.get_mut(&failed)
+            {
+                e.failed = Some(long_ago);
+            }
+        }
+        // Long enough ago: asked again; and the old HEAD's question is gone.
+        assert!(matches!(
+            checks.get(&ctx, Path::new("."), failed.clone()),
+            Check::Checking
+        ));
+        let state = checks
+            .inner
+            .lock()
+            .map(|inner| (inner.queue.clone(), inner.entries.contains_key(&stale)))
+            .ok();
+        assert_eq!(state, Some((vec![failed], false)));
+        // A closed tab leaves its workers nothing to do.
+        let inner = checks.inner.clone();
+        drop(checks);
+        assert_eq!(inner.lock().map(|i| i.queue.len()).ok(), Some(0));
     }
 
     /// Through the real thing: a check starts, finishes in the background, and is answered
@@ -709,8 +860,35 @@ mod tests {
         let base = git(&["rev-parse", "HEAD~1"])?;
         let ctx = egui::Context::default();
         let checks = ConflictChecks::default();
+        // Asked about before a commit moved HEAD on, and never taken by a worker.
+        let stale = Key::new(Op::Merge, "an-older-head", &base);
+        if let Ok(mut inner) = checks.inner.lock() {
+            inner.workers = WORKERS;
+            inner.queue.push(stale.clone());
+            let entry = Entry {
+                asked: 0,
+                check: Check::Checking,
+                failed: None,
+            };
+            inner.entries.insert(stale.clone(), entry);
+        }
         let key = Key::new(Op::Merge, &head, &base);
         let first = checks.get(&ctx, &dir, key.clone());
+        let dropped = checks
+            .inner
+            .lock()
+            .map(|mut inner| {
+                inner.workers = 0;
+                (inner.queue.clone(), inner.entries.contains_key(&stale))
+            })
+            .map_err(|e| e.to_string())?;
+        assert_eq!(dropped, (vec![key.clone()], false));
+        // The worker this test held back.
+        if let Ok(mut inner) = checks.inner.lock() {
+            inner.queue.clear();
+            inner.entries.clear();
+        }
+        let first_again = checks.get(&ctx, &dir, key.clone());
         let started = Instant::now();
         let answer = loop {
             match checks.get(&ctx, &dir, key.clone()) {
@@ -722,6 +900,7 @@ mod tests {
         };
         let _ = std::fs::remove_dir_all(&dir);
         assert!(matches!(first, Check::Checking));
+        assert!(matches!(first_again, Check::Checking));
         match answer {
             Check::Done(verdict) => {
                 assert_eq!(
