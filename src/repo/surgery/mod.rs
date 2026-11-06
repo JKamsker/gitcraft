@@ -8,6 +8,7 @@
 mod move_tests;
 mod moving;
 mod patchset;
+mod replay;
 mod split;
 #[cfg(test)]
 mod tests;

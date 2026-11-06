@@ -47,8 +47,6 @@ pub(crate) struct Checked {
     /// The parent's tree, then each new commit's.
     pub trees: Vec<String>,
     pub preview: Preview,
-    /// For a move: the patch of what moves, saved where git runs.
-    pub moved: Option<String>,
 }
 
 /// The commit being split, read in the background.
@@ -385,7 +383,6 @@ pub(crate) fn prepare(
     Ok(Checked {
         trees,
         preview: Preview::new(&patches_out),
-        moved: None,
     })
 }
 
@@ -652,7 +649,6 @@ Binary files a/b.bin and b/b.bin differ
         ed.checked = Some(Checked {
             trees: vec![],
             preview: Preview::new(&[]),
-            moved: None,
         });
         ed.assign_line(0, 1, 0);
         assert!(ed.checked.is_none());
