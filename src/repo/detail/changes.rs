@@ -137,6 +137,8 @@ impl RepoTab {
         ) {
             acts.push(stage_action("Unstage all", vec![unstage_all_args(head)]));
         }
+        let paths: Vec<&str> = staged.iter().map(|f| f.path.as_str()).collect();
+        self.owners_summary(ui, &paths);
         let buttons = [("minus", "Unstage")];
         self.work_list(
             ui,
@@ -156,8 +158,6 @@ impl RepoTab {
         );
         if staged.is_empty() {
             empty_hint(ui, "Stage files to choose what goes in the commit");
-        } else {
-            self.owners_summary(ui, staged.iter().map(|f| f.path.as_str()));
         }
     }
 

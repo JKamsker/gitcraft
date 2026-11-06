@@ -140,17 +140,22 @@ so your config, credentials and hooks apply as usual.
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
 - CODEOWNERS: the file at HEAD, found where the forge of `origin` looks for it (GitHub:
   `.github/`, the root, `docs/`; GitLab: the root, `docs/`, `.gitlab/`; Gitea: the root, `docs/`,
-  `.gitea/`, and `.forgejo/` first on Forgejo) and read its way: gitignore-like patterns where the
-  last match wins on GitHub; the same in GitLab's sections (`[Docs]`, `^[Optional][2] @owner`,
-  `!exclusions`), whose owners add up; regular expressions on the whole path on Gitea and
-  Forgejo, where every match adds its owners and `!regex` stands for the other files. Each file
-  row (changes, a commit, a comparison, a pull request) shows its owners; a line above the files
-  of a commit, comparison or pull request, and above the staged files, says who they need
-  ("Needs payments and infra · 2 files without an owner"). _Create pull request_ suggests the
-  owners of what the branch changes since its base as reviewers (ticked; GitHub takes accounts and
-  teams, GitLab accounts, Forgejo and Gitea both). _Check CODEOWNERS_ in the palette lists the
-  lines the forge would skip or read otherwise, the patterns that match no file and the files
-  without an owner.
+  `.gitea/`, and on Forgejo `.forgejo/` after those) and read its way: on GitHub,
+  gitignore-like patterns where the last match wins; on GitLab, patterns anchored only by a
+  leading `/` and matching files only (a trailing `/` for a folder's contents), in sections
+  (`[Docs]`, `^[Optional]`, `[Approvals][2] @owner`, those of one name merged) whose owners add
+  up, where an exclusion (`!pattern`) that matches drops the section; on Gitea and Forgejo,
+  regular expressions on the whole path (`^pattern$`), where every match adds its owners and
+  `!regex` stands for the other files. Each file row (changes, a commit, a comparison, a pull
+  request) shows its owners; a line above the files of a commit, comparison or pull request,
+  and above the staged files, says who they need ("Needs payments and infra · 2 files without
+  an owner"), worked out in the background. _Create pull request_ suggests, ticked, the owners
+  of what the branch changes since its base, read from the base's CODEOWNERS as the forge reads
+  it (none for a draft). Once it is open they are asked one at a time (GitHub: accounts and
+  teams; GitLab: accounts; Forgejo and Gitea: both), so one the forge refuses — the author, an
+  account that is gone — is said and doesn't keep the others from being asked. _Check
+  CODEOWNERS_ in the palette lists the lines the forge would skip or read differently, the
+  patterns that match no file and the files without an owner.
 
 **Changes and commits** (right)
 

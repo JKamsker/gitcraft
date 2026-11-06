@@ -7,10 +7,13 @@
 //!   sections (`[Docs]`, `^[Optional]`, `[Approvals][2] @default-owner`): in each, the last
 //!   line that matches counts, and the owners of every section add up. `!pattern` takes files
 //!   out of a section.
-//! - Gitea / Forgejo: `CODEOWNERS`, `docs/CODEOWNERS`, `.gitea/CODEOWNERS` (and
+//! - Gitea / Forgejo: `CODEOWNERS`, `docs/CODEOWNERS`, `.gitea/CODEOWNERS` (and then
 //!   `.forgejo/CODEOWNERS` on Forgejo). Each pattern is a regular expression matching the whole
-//!   path; every line that matches adds its owners, and `!regex` stands for the files it
-//!   doesn't match.
+//!   path (`^pattern$`, as their released versions compile it); every line that matches adds its
+//!   owners, and `!regex` stands for the files it doesn't match.
+//!
+//! GitHub, GitLab and Gitea read the file of the pull request's base branch: the reviewers
+//! suggested for one are read from there too.
 
 mod glob;
 mod parse;
@@ -56,10 +59,10 @@ pub(crate) fn locations(forge: Option<Forge>) -> Vec<(&'static str, Flavor)> {
             (".gitlab/CODEOWNERS", Flavor::GitLab),
         ],
         Some(Forge::Forgejo) => vec![
-            (".forgejo/CODEOWNERS", Flavor::Gitea),
             ("CODEOWNERS", Flavor::Gitea),
             ("docs/CODEOWNERS", Flavor::Gitea),
             (".gitea/CODEOWNERS", Flavor::Gitea),
+            (".forgejo/CODEOWNERS", Flavor::Gitea),
         ],
         Some(Forge::Gitea) => vec![
             ("CODEOWNERS", Flavor::Gitea),
@@ -87,6 +90,8 @@ pub(crate) struct CodeOwners {
     pub flavor: Flavor,
     /// The blob it was read from: the same blob needs no reading again.
     pub blob: String,
+    /// The forge it was read for: another one reads it otherwise.
+    pub forge: Option<Forge>,
     rules: Vec<parse::Rule>,
     sections: Vec<parse::Section>,
     /// Lines the forge would skip or misread, and why.
@@ -137,22 +142,24 @@ pub(crate) fn read(
     let Some((path, flavor, blob)) = find(repo, rev, forge)? else {
         return Ok(None);
     };
-    if let Some(known) = known.filter(|k| k.blob == blob && k.path == path) {
+    if let Some(known) = known.filter(|k| k.blob == blob && k.path == path && k.forge == forge) {
         return Ok(Some(known.clone()));
     }
     let bytes = git::run_bytes(Some(repo), &["cat-file", "blob", &blob])?;
     let text = String::from_utf8_lossy(&bytes);
-    let mut owners = CodeOwners::parse(&path, flavor, &text);
+    let mut owners = CodeOwners::parse(&path, flavor, &text, forge.is_none());
     owners.blob = blob;
+    owners.forge = forge;
     Ok(Some(owners))
 }
 
 impl CodeOwners {
-    /// Reads `text`, the file at `path`, the `flavor`'s way. GitHub's file with sections
-    /// (`[Name]`) is read as GitLab's.
-    pub(crate) fn parse(path: &str, flavor: Flavor, text: &str) -> Self {
+    /// Reads `text`, the file at `path`, the `flavor`'s way. When the forge isn't known
+    /// (`guessed`), a file found where GitHub looks that has sections (`[Name]`) is read as
+    /// GitLab's.
+    pub(crate) fn parse(path: &str, flavor: Flavor, text: &str, guessed: bool) -> Self {
         let flavor = match flavor {
-            Flavor::GitHub if parse::has_sections(text) => Flavor::GitLab,
+            Flavor::GitHub if guessed && parse::has_sections(text) => Flavor::GitLab,
             other => other,
         };
         let parsed = parse::parse(flavor, text);
@@ -160,6 +167,7 @@ impl CodeOwners {
             path: path.to_owned(),
             flavor,
             blob: String::new(),
+            forge: None,
             rules: parsed.rules,
             sections: parsed.sections,
             problems: parsed.problems,
@@ -183,18 +191,15 @@ impl CodeOwners {
                 }
             }
             Flavor::GitLab => {
-                for (i, section) in self.sections.iter().enumerate() {
-                    let last = self
-                        .rules
-                        .iter()
-                        .rev()
-                        .filter(|r| r.section == i)
-                        .find(|r| r.matches(path));
-                    match last {
-                        Some(rule) if rule.negated => {}
-                        Some(rule) if rule.owners.is_empty() => add(&section.defaults),
-                        Some(rule) => add(&rule.owners),
-                        None => {}
+                // In each section the last line that matches counts, unless an exclusion
+                // anywhere in it matches: then the section has nothing to say of the file.
+                for i in 0..self.sections.len() {
+                    let in_section = || self.rules.iter().filter(move |r| r.section == i);
+                    if in_section().any(|r| r.negated && r.matches(path)) {
+                        continue;
+                    }
+                    if let Some(rule) = in_section().filter(|r| !r.negated).last_match(path) {
+                        add(&rule.owners);
                     }
                 }
             }
@@ -210,10 +215,14 @@ impl CodeOwners {
     /// The rules of the file that match none of `files` (the repository's), and the files
     /// that no rule gives an owner.
     pub(crate) fn lint(&self, files: &[String]) -> Lint {
+        // A Gitea `!regex` applies to the files it doesn't match: to none when it matches all.
+        let applies = |rule: &parse::Rule, f: &str| {
+            rule.matches(f) != (rule.negated && self.flavor == Flavor::Gitea)
+        };
         let unmatched = self
             .rules
             .iter()
-            .filter(|rule| !files.iter().any(|f| rule.matches(f)))
+            .filter(|rule| !files.iter().any(|f| applies(rule, f)))
             .map(|rule| (rule.line, rule.pattern.clone()))
             .collect();
         let unowned = files
@@ -344,4 +353,15 @@ pub(crate) fn reviewers_for<'a>(
         .iter()
         .filter_map(|o| Reviewer::of(o))
         .collect()
+}
+
+/// The last of some rules that matches a path.
+trait LastMatch<'a> {
+    fn last_match(self, path: &str) -> Option<&'a parse::Rule>;
+}
+
+impl<'a, I: Iterator<Item = &'a parse::Rule>> LastMatch<'a> for I {
+    fn last_match(self, path: &str) -> Option<&'a parse::Rule> {
+        self.filter(|r| r.matches(path)).last()
+    }
 }

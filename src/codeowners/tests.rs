@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use super::*;
 
 fn owners(flavor: Flavor, text: &str, path: &str) -> Vec<String> {
-    CodeOwners::parse("CODEOWNERS", flavor, text).owners(path)
+    CodeOwners::parse("CODEOWNERS", flavor, text, false).owners(path)
 }
 
 const GITHUB: &str = "\
@@ -49,7 +49,7 @@ fn github_the_last_matching_line_wins() {
 
 #[test]
 fn github_skips_negations_and_says_so() {
-    let file = CodeOwners::parse("CODEOWNERS", Flavor::GitHub, "* @a\n!*.md @b\n");
+    let file = CodeOwners::parse("CODEOWNERS", Flavor::GitHub, "* @a\n!*.md @b\n", false);
     assert_eq!(file.owners("x.md"), ["@a"]);
     assert_eq!(file.problems.len(), 1);
     assert_eq!(file.problems[0].line, 2);
@@ -61,7 +61,7 @@ const GITLAB: &str = "\
 *.md
 /docs/internal/ @ann
 !/docs/internal/public.md
-^[Database][2] @dba
+^[Database] @dba
 db/
 [Backend]
 *.rb @bob @ann
@@ -90,17 +90,39 @@ fn gitlab_sections_add_up_and_use_their_default_owners() {
 
 #[test]
 fn a_file_with_sections_found_where_github_looks_is_read_as_gitlabs() {
-    let file = CodeOwners::parse("CODEOWNERS", Flavor::GitHub, GITLAB);
+    let file = CodeOwners::parse("CODEOWNERS", Flavor::GitHub, GITLAB, true);
     assert_eq!(file.flavor, Flavor::GitLab);
     assert_eq!(
         file.section_labels(),
-        ["Docs", "Database (optional, 2 approvals)", "Backend"]
+        ["Docs", "Database (optional)", "Backend"]
     );
+    // Known to be GitHub's: GitHub has no sections.
+    let github = CodeOwners::parse("CODEOWNERS", Flavor::GitHub, GITLAB, false);
+    assert_eq!(github.flavor, Flavor::GitHub);
+}
+
+/// As GitLab's `PatternIndex` and section parser do.
+#[test]
+fn gitlab_exclusions_win_wherever_they_are_and_sections_of_a_name_are_one() {
+    let text =
+        "[S]\n!/config/prod.yml\n/config/ @a\n[Docs]\n*.md @a\n[Other]\nx @b\n[docs]\n*.md @c\n";
+    assert!(owners(Flavor::GitLab, text, "config/prod.yml").is_empty());
+    assert_eq!(owners(Flavor::GitLab, text, "config/dev.yml"), ["@a"]);
+    assert_eq!(owners(Flavor::GitLab, text, "a.md"), ["@c"]);
+    let file = CodeOwners::parse("CODEOWNERS", Flavor::GitLab, text, false);
+    assert_eq!(file.section_labels(), ["S", "Docs", "Other"]);
+}
+
+#[test]
+fn gitlab_reads_owners_after_a_hash_and_says_so() {
+    let file = CodeOwners::parse("CODEOWNERS", Flavor::GitLab, "*.rb @a # ask @b\n", false);
+    assert_eq!(file.owners("x.rb"), ["@a", "@b"]);
+    assert_eq!(file.problems.len(), 1);
 }
 
 #[test]
 fn gitlab_lines_without_owners_in_a_section_without_defaults_are_noted() {
-    let file = CodeOwners::parse("CODEOWNERS", Flavor::GitLab, "[Ops]\n/ops/\n");
+    let file = CodeOwners::parse("CODEOWNERS", Flavor::GitLab, "[Ops]\n/ops/\n", false);
     assert!(file.owners("ops/a").is_empty());
     assert_eq!(file.problems.len(), 1);
 }
@@ -123,7 +145,7 @@ fn gitea_every_matching_line_adds_its_owners_and_negations_stand_for_the_rest() 
     );
     // The whole path, not a part of it.
     assert_eq!(owners(Flavor::Gitea, GITEA, "main.gox"), ["@acme/not-go"]);
-    let file = CodeOwners::parse("CODEOWNERS", Flavor::Gitea, GITEA);
+    let file = CodeOwners::parse("CODEOWNERS", Flavor::Gitea, GITEA, false);
     assert_eq!(file.problems.len(), 1, "{:?}", file.problems);
     assert_eq!(file.problems[0].line, 4);
 }
@@ -134,6 +156,7 @@ fn lint_finds_patterns_matching_nothing_and_files_without_owners() {
         "CODEOWNERS",
         Flavor::GitHub,
         "/src/ @dev\n/gone/ @old\n*.rs @rust\n",
+        false,
     );
     let files: Vec<String> = ["src/main.rs", "README.md", "build.rs"]
         .map(String::from)
@@ -153,6 +176,7 @@ fn owners_of_many_files_and_reviewers_to_ask() {
         "CODEOWNERS",
         Flavor::GitHub,
         "/pay/ @acme/payments\n/infra/ @acme/infra me@example.org\n/x/ @@maintainer\n",
+        false,
     );
     let (all, unowned) = owners_of(&file, ["pay/a", "infra/b", "pay/c", "other"]);
     assert_eq!(all, ["@acme/payments", "@acme/infra", "me@example.org"]);
@@ -184,7 +208,7 @@ fn a_huge_file_list_is_read_in_reasonable_time() {
     for i in 0..300 {
         text.push_str(&format!("/area{i}/**/*.rs @team{i}\n"));
     }
-    let file = CodeOwners::parse("CODEOWNERS", Flavor::GitHub, &text);
+    let file = CodeOwners::parse("CODEOWNERS", Flavor::GitHub, &text, false);
     let files: Vec<String> = (0..3000)
         .map(|i| format!("area{}/deep/er/file{i}.rs", i % 400))
         .collect();
@@ -261,7 +285,7 @@ fn each_forge_finds_the_file_in_its_own_places_in_a_real_repository() {
     );
     assert_eq!(
         found(&forgejo),
-        Some((".forgejo/CODEOWNERS".into(), vec!["@forgejo-owner".into()]))
+        Some(("docs/CODEOWNERS".into(), vec!["@docs-owner".into()]))
     );
     assert_eq!(found(&gitea).map(|f| f.0), Some("docs/CODEOWNERS".into()));
     assert_eq!(

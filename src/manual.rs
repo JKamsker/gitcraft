@@ -47,8 +47,8 @@ const FEATURES: &[(&str, &[&str])] = &[
         "Code owners",
         &[
             "With a CODEOWNERS file (GitHub's, GitLab's with its sections, or Gitea's and Forgejo's regular expressions, each read where and how that forge reads it), each file row shows its owners, and a line above a commit's, a comparison's, a pull request's or the staged files says who they need: “Needs payments and infra”.",
-            "Create pull request suggests the owners of what the branch changes as reviewers; untick those you don't want asked.",
-            "Check CODEOWNERS (Ctrl+P) lists the lines the forge reads otherwise than they look, the patterns that match no file and the files without an owner.",
+            "Create pull request suggests the owners of what the branch changes as reviewers (from the base's CODEOWNERS; none for a draft); untick those you don't want asked.",
+            "Check CODEOWNERS (Ctrl+P) lists the lines the forge reads differently than they look, the patterns that match no file and the files without an owner.",
         ],
     ),
     (

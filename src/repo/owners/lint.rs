@@ -15,6 +15,10 @@ const LISTED: usize = 300;
 /// The check's window.
 pub(crate) struct LintView {
     file: Arc<CodeOwners>,
+    /// Which check this is (see `Owners::lint_requests`).
+    request: u64,
+    /// Why the file couldn't be read again lately (the check is of the one read before).
+    stale: Option<String>,
     /// `None` while the repository's files are read and matched.
     pub(super) result: Option<Result<Lint, String>>,
 }
@@ -34,8 +38,12 @@ impl RepoTab {
                     self.status = Some(("This repository has no CODEOWNERS file".to_owned(), true));
                     return;
                 };
+                self.owners.lint_requests += 1;
+                let request = self.owners.lint_requests;
                 self.owners.lint = Some(LintView {
                     file: file.clone(),
+                    request,
+                    stale: self.owners.error.clone(),
                     result: None,
                 });
                 let repo = self.path.clone();
@@ -51,10 +59,13 @@ impl RepoTab {
                             .filter(|p| !p.is_empty())
                             .map(str::to_owned)
                             .collect();
-                        Ok(file.lint(&files))
+                        std::panic::catch_unwind(|| file.lint(&files))
+                            .map_err(|_| "checking it failed".to_owned())
                     },
-                    |tab, result, _| {
-                        if let Some(view) = &mut tab.owners.lint {
+                    move |tab, result, _| {
+                        if let Some(view) = &mut tab.owners.lint
+                            && view.request == request
+                        {
                             view.result = Some(result);
                         }
                     },
@@ -89,15 +100,24 @@ fn contents(ui: &mut Ui, view: &LintView, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
     let file = &view.file;
     ui.label(RichText::new("Check CODEOWNERS").font(theme::semibold(15.0)));
+    let rules = match file.rule_count() {
+        1 => "1 rule".to_owned(),
+        n => format!("{n} rules"),
+    };
     ui.label(
         RichText::new(format!(
-            "{} at HEAD, read as {} reads it · {} rules",
+            "{} at HEAD, read as {} reads it · {rules}",
             file.path,
             file.flavor.name(),
-            file.rule_count()
         ))
         .color(t.text_dim),
     );
+    if let Some(e) = &view.stale {
+        ui.colored_label(
+            t.warning,
+            format!("Couldn't read it again lately ({e}): this is the one read before."),
+        );
+    }
     let sections = file.section_labels();
     if !sections.is_empty() {
         ui.label(
@@ -113,7 +133,10 @@ fn contents(ui: &mut Ui, view: &LintView, acts: &mut Vec<Action>) {
         .show(ui, |ui| {
             heading(
                 ui,
-                &format!("LINES READ OTHERWISE ({})", file.problems.len()),
+                &format!(
+                    "LINES THE FORGE READS DIFFERENTLY ({})",
+                    file.problems.len()
+                ),
             );
             if file.problems.is_empty() {
                 faint(ui, "None: the forge reads every line as written.");

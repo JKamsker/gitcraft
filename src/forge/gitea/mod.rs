@@ -154,17 +154,25 @@ fn create(api: &Api, hosting: &Hosting, new: &NewPullRequest) -> Result<String, 
         url => url.to_owned(),
     };
     let number = answer.get("number").and_then(Value::as_u64).unwrap_or(0);
-    if !new.reviewers.is_empty() && number > 0 {
-        let endpoint = format!("repos/{}/pulls/{number}/requested_reviewers", hosting.path);
-        api.send("POST", &endpoint, Some(&reviewers_payload(new.reviewers)))
-            .map_err(|e| {
-                format!(
-                    "Opened {url}, but couldn't ask for the reviews: {}",
-                    e.message
-                )
-            })?;
+    if new.reviewers.is_empty() {
+        return Ok(url);
     }
-    Ok(url)
+    if number == 0 {
+        return Err(format!(
+            "Opened {url}, but {} didn't say its number: ask for the reviews on its page",
+            api.name()
+        ));
+    }
+    let endpoint = format!("repos/{}/pulls/{number}/requested_reviewers", hosting.path);
+    super::ask_reviewers(url, new.reviewers, |who| {
+        api.send(
+            "POST",
+            &endpoint,
+            Some(&reviewers_payload(&[who.to_owned()])),
+        )
+        .map(|_| ())
+        .map_err(|e| e.message)
+    })
 }
 
 /// Who to ask, as the API takes them: accounts, and teams by their name (the organisation is

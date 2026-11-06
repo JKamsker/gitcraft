@@ -53,12 +53,25 @@ impl Provider for GitLab {
         if new.draft {
             args.push("--draft");
         }
-        // glab asks accounts only: a group (`acme/payments`) would fail the whole request.
-        let reviewers = gitlab_reviewers(new.reviewers);
-        if !reviewers.is_empty() {
-            args.extend(["--reviewer", &reviewers]);
-        }
-        self.run(repo, &args).map(|out| out.trim().to_owned())
+        let out = self.run(repo, &args)?;
+        let url = out
+            .split_whitespace()
+            .find(|w| w.starts_with("http"))
+            .unwrap_or(out.trim())
+            .to_owned();
+        let Some(iid) = url.rsplit('/').next().filter(|n| n.parse::<u64>().is_ok()) else {
+            return Ok(url);
+        };
+        let iid = iid.to_owned();
+        // Asked after opening it, one at a time (accounts only: glab asks no group).
+        let accounts = gitlab_reviewers(new.reviewers);
+        super::ask_reviewers(url, &accounts, |who| {
+            self.run(
+                repo,
+                &["mr", "update", &iid, "--reviewer", &format!("+{who}")],
+            )
+            .map(|_| ())
+        })
     }
 
     /// The host's own avatar API, asked by email.
@@ -71,14 +84,13 @@ impl Provider for GitLab {
     }
 }
 
-/// The reviewers `glab` can ask, as it takes them: accounts, comma-separated.
-fn gitlab_reviewers(reviewers: &[String]) -> String {
+/// The reviewers `glab` can ask: accounts, not groups (`acme/payments`).
+fn gitlab_reviewers(reviewers: &[String]) -> Vec<String> {
     reviewers
         .iter()
         .filter(|r| !r.contains('/'))
-        .map(String::as_str)
-        .collect::<Vec<_>>()
-        .join(",")
+        .cloned()
+        .collect()
 }
 
 /// Where a self-hosted GitLab's API is: its host, with the port of an `https://host:8443/…`

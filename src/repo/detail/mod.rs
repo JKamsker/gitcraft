@@ -48,9 +48,10 @@ impl RepoTab {
     ) {
         let id = egui::Id::new(("file-folder", self.repo_key(), tree));
         let selected = |f: &&ChangedFile| self.open_key() == Some(&key(&f.path));
+        let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
+        self.owners_summary(ui, &paths);
         // Rows are known by their path within the list of this commit (or range): a menu left
         // open while another one is shown is not that one's file of the same path.
-        self.owners_summary(ui, files.iter().map(|f| f.path.as_str()));
         ui.push_id(("file-list", tree, rev), |ui| {
             branch_tree::files(
                 ui,

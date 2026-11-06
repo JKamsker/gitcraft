@@ -72,11 +72,11 @@ impl Provider for GitHub {
         if new.draft {
             args.push("--draft");
         }
-        let reviewers = new.reviewers.join(",");
-        if !reviewers.is_empty() {
-            args.extend(["--reviewer", &reviewers]);
-        }
-        gh(repo, &args).map(|out| out.trim().to_owned())
+        let url = gh(repo, &args)?.trim().to_owned();
+        // Asked after opening it: gh refuses the whole of `--reviewer` for one name it can't ask.
+        super::ask_reviewers(url.clone(), new.reviewers, |who| {
+            gh(repo, &["pr", "edit", &url, "--add-reviewer", who]).map(|_| ())
+        })
     }
 
     /// The authors' GitHub accounts, from the repository's latest commits (the API ties each
