@@ -39,9 +39,11 @@ pub struct FoldRead {
 /// one of the `touched` paths would be written over, if any.
 fn in_the_way(ignored: &str, touched: &str) -> Option<String> {
     let ignored: Vec<&str> = ignored.split('\0').filter(|p| !p.is_empty()).collect();
+    // Names as they are, spaces included; only the line break some versions put between
+    // commits goes.
     touched
         .split('\0')
-        .map(str::trim)
+        .map(|p| p.trim_start_matches('\n'))
         .filter(|p| !p.is_empty())
         .find_map(|path| {
             ignored
@@ -126,9 +128,18 @@ pub fn fold_read(repo: &Path, target: &str) -> Result<FoldRead, String> {
         if ignored.is_empty() {
             None
         } else {
+            // Without renames: a renamed file's old name is written too (checking out the
+            // commit before the rename).
             let touched = run(
                 Some(repo),
-                &["log", "--format=", "--name-only", "-z", &range],
+                &[
+                    "log",
+                    "--format=",
+                    "--name-only",
+                    "--no-renames",
+                    "-z",
+                    &range,
+                ],
             )?;
             in_the_way(&ignored, &touched)
         }
@@ -170,6 +181,9 @@ mod tests {
             Some("notes.txt".into())
         );
         assert_eq!(in_the_way(ignored, "notes.txt.bak\0buildx/y\0"), None);
+        // Spaces are part of a name.
+        assert_eq!(in_the_way(" x \0", "x\0 x \0"), Some(" x ".into()));
+        assert_eq!(in_the_way("x\0", " x \0"), None);
         assert_eq!(in_the_way("", "a\0"), None);
     }
 }

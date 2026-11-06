@@ -862,3 +862,41 @@ fn an_abort_confirmed_after_the_rebase_was_replaced_resets_no_other_branch() {
     assert_eq!(git::resolve(&dir, "refs/heads/other"), Ok(other));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// The same for an ignored file whose name has spaces around it, and one where a commit to
+/// replay renamed a file away from (its old name is written when the commit before is).
+#[test]
+fn ignored_files_named_with_spaces_or_renamed_away_are_refused() {
+    for (name, rename) in [(" collision ", false), ("old-name", true)] {
+        let dir = repo(
+            if rename {
+                "ignored-renamed"
+            } else {
+                "ignored-spaces"
+            },
+            1,
+        );
+        write(&dir, name, "tracked once\n");
+        git_ok(&dir, &["add", "-A"]);
+        git_ok(&dir, &["commit", "-q", "-m", "add it"]);
+        if rename {
+            git_ok(&dir, &["mv", name, "new-name"]);
+            git_ok(&dir, &["commit", "-q", "-m", "rename it"]);
+            git_ok(&dir, &["rm", "-q", "new-name"]);
+        } else {
+            git_ok(&dir, &["rm", "-q", name]);
+        }
+        git_ok(&dir, &["commit", "-q", "-m", "remove it"]);
+        let exclude = dir.join(".git").join("info").join("exclude");
+        // Spaces escaped: a pattern's trailing ones would be dropped.
+        let pattern = name.replace(' ', "\\ ");
+        assert!(std::fs::write(&exclude, format!("{pattern}\n")).is_ok());
+        write(&dir, name, "mine, not to lose\n");
+        write(&dir, "f1.txt", "1 fixed\n");
+        git_ok(&dir, &["add", "f1.txt"]);
+        let target = if rename { "HEAD~1" } else { "HEAD~2" };
+        let refused = plan(&dir, target).err().unwrap_or_default();
+        assert!(refused.contains(name), "{name:?}: {refused}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
