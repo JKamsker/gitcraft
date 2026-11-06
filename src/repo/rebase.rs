@@ -51,6 +51,7 @@ impl Step {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct Entry {
     pub commit: RebaseCommit,
     pub step: Step,
@@ -58,6 +59,7 @@ pub(crate) struct Entry {
     pub message: String,
 }
 
+#[derive(Clone)]
 pub(crate) struct RebaseEditor {
     /// What the commits are replayed onto (a commit or a branch).
     pub onto: String,

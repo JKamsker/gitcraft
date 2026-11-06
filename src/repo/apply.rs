@@ -237,10 +237,34 @@ impl RepoTab {
 
     /// Adds `pattern` to `.gitignore`, and stops tracking `path` if git tracks it.
     fn ignore(&mut self, pattern: &str, path: &str, ctx: &egui::Context) {
-        match git::add_to_gitignore(&self.path, pattern) {
+        // On another machine, the file is read and written there, in the background.
+        let (repo, pattern, path) = (self.path.clone(), pattern.to_owned(), path.to_owned());
+        self.here_or_later(
+            ctx,
+            move || {
+                let added = git::add_to_gitignore(&repo, &pattern);
+                let tracked = added.is_ok() && git::is_tracked(&repo, &path);
+                (pattern, path, added, tracked)
+            },
+            |tab, (pattern, path, added, tracked), ctx| {
+                tab.ignored(&pattern, &path, added, tracked, ctx);
+            },
+        );
+    }
+
+    /// Stops tracking `path` once `pattern` is in `.gitignore`, if it was tracked.
+    fn ignored(
+        &mut self,
+        pattern: &str,
+        path: &str,
+        added: Result<bool, String>,
+        tracked: bool,
+        ctx: &egui::Context,
+    ) {
+        match added {
             Err(e) => self.status = Some((e, true)),
             Ok(added) => {
-                if git::is_tracked(&self.path, path) {
+                if tracked {
                     self.run_ops(
                         &format!("Ignore {pattern}"),
                         ops(&[&[
@@ -287,13 +311,6 @@ impl RepoTab {
         let Some(patch) = diff::partial_patch(&data.header, &data.lines, lines, pick) else {
             return;
         };
-        let patch = match git::save_patch_for(&self.path, &patch) {
-            Ok(p) => p,
-            Err(e) => {
-                self.status = Some((e, true));
-                return;
-            }
-        };
         let n = lines.len();
         let label = format!(
             "{} {n} line{} of {}",
@@ -301,6 +318,30 @@ impl RepoTab {
             if n == 1 { "" } else { "s" },
             file.path
         );
+        // Written where git runs: on another machine, in the background.
+        let repo = self.path.clone();
+        self.here_or_later(
+            ctx,
+            move || git::save_patch_for(&repo, &patch),
+            move |tab, saved, ctx| tab.apply_picked(pick, &label, saved, ctx),
+        );
+    }
+
+    /// Applies the patch of lines picked, saved at `saved` (see [`Self::pick_lines`]).
+    fn apply_picked(
+        &mut self,
+        pick: diff::Pick,
+        label: &str,
+        saved: Result<String, String>,
+        ctx: &egui::Context,
+    ) {
+        let patch = match saved {
+            Ok(p) => p,
+            Err(e) => {
+                self.status = Some((e, true));
+                return;
+            }
+        };
         let mut args = pick.args().to_vec();
         args.push(&patch);
         if pick == diff::Pick::Discard {
@@ -309,9 +350,9 @@ impl RepoTab {
                 undo: ops(&[&["apply", &patch]]),
                 redo: ops(&[&args]),
             };
-            self.run_undoable(&label, ops(&[&args]), Refresh::Status, undo, ctx);
+            self.run_undoable(label, ops(&[&args]), Refresh::Status, undo, ctx);
         } else {
-            self.run_ops(&label, ops(&[&args]), Refresh::Status, OpKind::plain(), ctx);
+            self.run_ops(label, ops(&[&args]), Refresh::Status, OpKind::plain(), ctx);
         }
     }
 

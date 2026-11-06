@@ -107,6 +107,9 @@ pub fn status(repo: &Path) -> Result<WorkStatus, String> {
 /// Fails when that couldn't be asked (a repository on another machine not reached): no
 /// operation in progress would be an answer, and a wrong one.
 fn in_progress(repo: &Path) -> Result<Option<InProgress>, String> {
+    if let Some(target) = crate::remote::parse(repo) {
+        return in_progress_there(&target);
+    }
     let asked = |e: std::io::Error| format!("could not read the repository's state: {e}");
     for dir in ["rebase-merge", "rebase-apply"] {
         let Ok(path) = run(Some(repo), &["rev-parse", "--git-path", dir]) else {
@@ -131,6 +134,54 @@ fn in_progress(repo: &Path) -> Result<Option<InProgress>, String> {
     .into_iter()
     .find(|(_, head)| run(Some(repo), &["rev-parse", "-q", "--verify", head]).is_ok())
     .map(|(state, _)| state))
+}
+
+/// [`in_progress`] for a repository on another machine: asked there in one go, not in six
+/// round trips on every read of the status.
+fn in_progress_there(target: &crate::remote::Target) -> Result<Option<InProgress>, String> {
+    const SCRIPT: &str = concat!(
+        "g=$(git rev-parse --absolute-git-dir) || exit 1
+",
+        "for d in rebase-merge rebase-apply; do
+",
+        "  if [ -d \"$g/$d\" ]; then
+",
+        "    if [ -f \"$g/$d/applying\" ]; then echo am; else echo rebase; fi; exit 0
+",
+        "  fi
+",
+        "done
+",
+        "for h in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD; do
+",
+        "  git rev-parse -q --verify \"$h\" >/dev/null && { echo \"$h\"; exit 0; }
+",
+        "done
+",
+        "echo none
+",
+    );
+    let out = crate::remote::exec(
+        &target.host,
+        &crate::remote::Request {
+            cwd: Some(target.path.clone()),
+            script: SCRIPT.to_owned(),
+            ..crate::remote::Request::default()
+        },
+    )?;
+    let said = String::from_utf8_lossy(&out.stdout);
+    match (out.code, said.trim()) {
+        (0, "am") => Ok(Some(InProgress::Am)),
+        (0, "rebase") => Ok(Some(InProgress::Rebase)),
+        (0, "MERGE_HEAD") => Ok(Some(InProgress::Merge)),
+        (0, "CHERRY_PICK_HEAD") => Ok(Some(InProgress::CherryPick)),
+        (0, "REVERT_HEAD") => Ok(Some(InProgress::Revert)),
+        (0, "none") => Ok(None),
+        _ => Err(format!(
+            "could not read the repository's state: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        )),
+    }
 }
 
 /// The message git prepared for the commit that ends the operation in progress.

@@ -46,14 +46,26 @@ pub fn lfs_installed(repo: &Path) -> bool {
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .get(&target.host)
         .copied();
-    known.unwrap_or_else(|| {
-        let found = run(Some(repo), &["lfs", "version"]).is_ok();
+    if let Some(known) = known {
+        return known;
+    }
+    // Kept only when it's an answer: a machine not reached this time is asked again.
+    let answer = match run(Some(repo), &["lfs", "version"]) {
+        Ok(_) => Some(true),
+        Err(e)
+            if e.contains("is not a git command") || e.contains("appears to be a git command") =>
+        {
+            Some(false)
+        }
+        Err(_) => None,
+    };
+    if let Some(found) = answer {
         there
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .insert(target.host, found);
-        found
-    })
+    }
+    answer.unwrap_or(false)
 }
 
 /// The LFS pointer in a file's text, if the text is one: `version https://git-lfs…`, then

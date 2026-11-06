@@ -31,6 +31,17 @@ impl App {
         else {
             return;
         };
+        // In WSL: all of it there, in the background (WSL may first have to start).
+        if crate::remote::is_remote(&dir) {
+            let label = crate::remote::display(&dir);
+            self.connect_with(label, None, ctx, move || {
+                if !git::toplevel(&dir).is_ok_and(|root| same_path(&root, &dir)) {
+                    git::init(&dir).map_err(|e| format!("git init failed: {e}"))?;
+                }
+                super::repo_root(&dir)
+            });
+            return;
+        }
         // Already the root of a repository: just open it rather than re-initialising.
         if let Ok(root) = git::toplevel(&dir)
             && same_path(&root, &dir)
@@ -89,7 +100,7 @@ impl App {
                             ui.label(format!("Cloning into {}…", dest.display()));
                         });
                     }
-                    if let Some(connecting) = &self.connecting {
+                    for connecting in &self.connecting {
                         ui.add_space(12.0);
                         ui.horizontal(|ui| {
                             ui.add(crate::spinner::Spinner::new());

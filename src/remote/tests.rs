@@ -156,3 +156,47 @@ fn quoting_keeps_one_word_and_the_home() {
     assert_eq!(sh_path("/x/~y"), "'/x/~y'");
     assert_eq!(sh_path("~other/x"), "'~other/x'");
 }
+
+/// A worktree folder for a repository elsewhere is a path there, or a WSL path of the same
+/// distribution; never one of this machine or of another.
+#[test]
+fn folders_for_git_are_paths_on_the_repository_machine() {
+    let ssh_repo = PathBuf::from("ssh://build/home/me/app");
+    assert_eq!(
+        folder_for_git(&ssh_repo, " /home/me/app-x "),
+        Ok("/home/me/app-x".to_owned())
+    );
+    assert_eq!(
+        folder_for_git(&ssh_repo, "ssh://build/srv/x"),
+        Ok("/srv/x".to_owned())
+    );
+    assert!(folder_for_git(&ssh_repo, "ssh://other/srv/x").is_err());
+    assert!(folder_for_git(&ssh_repo, r"C:\work\x").is_err());
+    assert!(folder_for_git(&ssh_repo, r"..\x").is_err());
+    // A repository here takes any folder here, none elsewhere.
+    let here = PathBuf::from("/home/me/app");
+    assert_eq!(folder_for_git(&here, "../x"), Ok("../x".to_owned()));
+    assert!(folder_for_git(&here, "ssh://build/x").is_err());
+}
+
+#[test]
+fn git_paths_and_parents_are_those_of_the_machine() {
+    assert_eq!(
+        git_path(Path::new("ssh://build/home/me/app")),
+        "/home/me/app"
+    );
+    assert_eq!(parent_there("/home/me/app"), "/home/me");
+    assert_eq!(parent_there("/app"), "/");
+    assert_eq!(parent_there("~/app"), "~");
+}
+
+#[cfg(windows)]
+#[test]
+fn a_wsl_folder_picked_here_is_its_path_there() {
+    let repo = PathBuf::from(r"\\wsl.localhost\Ubuntu\home\me\app");
+    assert_eq!(
+        folder_for_git(&repo, r"\\wsl.localhost\Ubuntu\home\me\app-x"),
+        Ok("/home/me/app-x".to_owned())
+    );
+    assert!(folder_for_git(&repo, r"\\wsl.localhost\Debian\home\me\x").is_err());
+}

@@ -60,23 +60,32 @@ impl RepoTab {
             }
         };
         let label = format!("Apply {}", file_name(&file));
-        // For a repository on another machine, git there reads a copy put there.
-        let file = match crate::remote::parse(&self.path) {
-            Some(target) => {
-                match crate::remote::host_temp_file(&target, "apply.patch", text.as_bytes()) {
-                    Ok(there) => there,
-                    Err(e) => {
-                        self.status = Some((format!("Apply patch: {e}"), true));
-                        return;
-                    }
+        let mail = is_mail(&text);
+        // For a repository on another machine, git there reads a copy put there (in the
+        // background).
+        let repo = self.path.clone();
+        self.here_or_later(
+            ctx,
+            move || match crate::remote::parse(&repo) {
+                Some(target) => {
+                    crate::remote::host_temp_file(&target, "apply.patch", text.as_bytes())
                 }
-            }
-            None => file.to_string_lossy().into_owned(),
-        };
-        if is_mail(&text) {
+                None => Ok(file.to_string_lossy().into_owned()),
+            },
+            move |tab, file, ctx| match file {
+                Ok(file) => tab.apply_patch_file(&label, &file, mail, ctx),
+                Err(e) => tab.status = Some((format!("Apply patch: {e}"), true)),
+            },
+        );
+    }
+
+    /// Applies the patch at `file` (as git reads it), as commits when it is a `mail`.
+    fn apply_patch_file(&mut self, label: &str, file: &str, mail: bool, ctx: &egui::Context) {
+        let label = label.to_owned();
+        if mail {
             self.run_undoable(
                 &label,
-                ops(&[&["am", "--3way", &file]]),
+                ops(&[&["am", "--3way", file]]),
                 Refresh::All,
                 Undo::HeadMove { mode: "--keep" },
                 ctx,
@@ -84,11 +93,11 @@ impl RepoTab {
         } else {
             self.run_undoable(
                 &label,
-                ops(&[&["apply", &file]]),
+                ops(&[&["apply", file]]),
                 Refresh::All,
                 Undo::Custom {
-                    undo: ops(&[&["apply", "-R", &file]]),
-                    redo: ops(&[&["apply", &file]]),
+                    undo: ops(&[&["apply", "-R", file]]),
+                    redo: ops(&[&["apply", file]]),
                 },
                 ctx,
             );

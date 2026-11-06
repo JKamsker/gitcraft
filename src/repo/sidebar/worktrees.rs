@@ -159,7 +159,8 @@ fn worktree_menu_items(
     can_open: bool,
     any_prunable: bool,
 ) {
-    let path = wt.path.display().to_string();
+    // As git (and a shell) on the worktree's machine names it.
+    let path = crate::remote::git_path(&wt.path);
     if same_tab
         && ui
             .add_enabled(can_open, egui::Button::new("Open"))

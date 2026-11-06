@@ -257,7 +257,9 @@ pub(super) fn signing_ui(ui: &mut Ui) {
     match &form.error {
         Some(e) => ui.label(RichText::new(e).color(t.danger).small()),
         None => ui.label(
-            RichText::new("Your global git config; a repository's own config can override it.")
+            RichText::new(
+                "Your global git config on this machine; a repository's own config can override it. Repositories in WSL or over SSH use that machine's own.",
+            )
                 .color(t.text_faint)
                 .small(),
         ),

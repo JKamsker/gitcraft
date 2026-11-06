@@ -228,9 +228,21 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         let label = format!("{} {}", edit.label(), short(&hash));
-        let command = result
-            .and_then(|commits| plan(edit, &hash, commits))
-            .and_then(|editor| Ok((editor.command(&self.path)?, editor.head)));
+        match result.and_then(|commits| plan(edit, &hash, commits)) {
+            Ok(editor) => self.with_rebase_command(editor, ctx, move |tab, command, ctx| {
+                tab.quick_edit_ready(&label, command, ctx);
+            }),
+            Err(e) => self.status = Some((format!("{label}: {e}"), true)),
+        }
+    }
+
+    /// Runs the quick edit `label` names once its rebase command is ready.
+    fn quick_edit_ready(
+        &mut self,
+        label: &str,
+        command: Result<(Vec<String>, String), String>,
+        ctx: &egui::Context,
+    ) {
         match command {
             // Started while something else ran: say so rather than drop it.
             Ok(_) if self.busy_op.is_some() => {
@@ -244,7 +256,7 @@ impl RepoTab {
             }
             // The todo list replaces the commits read: not one made since (in the terminal).
             Ok((command, head)) => self.run_undoable(
-                &label,
+                label,
                 vec![expect_ref_at("HEAD", &head), command],
                 Refresh::All,
                 Undo::HeadMove { mode: "--keep" },

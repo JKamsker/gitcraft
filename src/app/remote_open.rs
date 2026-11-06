@@ -6,6 +6,7 @@ use std::sync::mpsc::{Receiver, channel};
 
 use egui::{Key, RichText, Stroke, Ui, vec2};
 
+use super::panels::Toast;
 use super::{App, Tab, repo_root};
 use crate::git;
 use crate::remote::{self, Host};
@@ -135,7 +136,7 @@ impl App {
 
     /// Opens, once `find` (run in the background) gives its top folder, a repository on
     /// another machine; `label` says where meanwhile.
-    fn connect_with(
+    pub(super) fn connect_with(
         &mut self,
         label: String,
         creds: Option<git::Credentials>,
@@ -149,30 +150,38 @@ impl App {
             ctx2.request_repaint();
         });
         self.error = None;
-        self.connecting = Some(Connecting { label, rx, creds });
+        // The start page says so; any other tab, a toast.
+        if !matches!(self.tabs.get(self.active), Some(Tab::Home)) {
+            self.toasts
+                .push(Toast::new(format!("Connecting to {label}…"), false));
+        }
+        self.connecting.push(Connecting { label, rx, creds });
     }
 
+    /// Opens the repositories reached since, each in its tab; says why one couldn't be.
     pub(super) fn poll_connecting(&mut self, ctx: &egui::Context) {
-        let Some(connecting) = &self.connecting else {
-            return;
-        };
-        let Ok(result) = connecting.rx.try_recv() else {
-            return;
-        };
-        let Some(Connecting { creds, .. }) = self.connecting.take() else {
-            return;
-        };
-        match result {
-            Ok(root) => {
-                self.open_root(root.clone(), ctx);
-                if let Some(creds) = creds
-                    && let Some(Tab::Repo(repo)) = self.tabs.get_mut(self.active)
-                    && repo.path == root
-                {
-                    repo.set_credentials(creds);
-                }
+        let mut done = Vec::new();
+        self.connecting.retain(|c| match c.rx.try_recv() {
+            Ok(result) => {
+                done.push((result, c.creds.clone()));
+                false
             }
-            Err(e) => self.error = Some(e),
+            Err(std::sync::mpsc::TryRecvError::Empty) => true,
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => false,
+        });
+        for (result, creds) in done {
+            match result {
+                Ok(root) => {
+                    self.open_root(root.clone(), ctx);
+                    if let Some(creds) = creds
+                        && let Some(Tab::Repo(repo)) = self.tabs.get_mut(self.active)
+                        && repo.path == root
+                    {
+                        repo.set_credentials(creds);
+                    }
+                }
+                Err(e) => self.report(e),
+            }
         }
     }
 

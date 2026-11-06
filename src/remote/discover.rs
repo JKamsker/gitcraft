@@ -33,6 +33,8 @@ fn parse_distros(bytes: &[u8]) -> Vec<String> {
         .lines()
         .map(|l| l.trim_matches(|c: char| c.is_whitespace() || c == '\u{feff}' || c == '\0'))
         .filter(|l| super::valid_distro(l))
+        // Docker Desktop's own, which has no git and no repositories.
+        .filter(|l| !l.starts_with("docker-desktop"))
         .map(str::to_owned)
         .collect()
 }
@@ -119,7 +121,7 @@ mod tests {
     fn distros_come_from_utf16() {
         let text = "Ubuntu\r\ndocker-desktop\r\n\r\n";
         let bytes: Vec<u8> = text.encode_utf16().flat_map(u16::to_le_bytes).collect();
-        assert_eq!(parse_distros(&bytes), ["Ubuntu", "docker-desktop"]);
+        assert_eq!(parse_distros(&bytes), ["Ubuntu"]);
     }
 
     #[test]

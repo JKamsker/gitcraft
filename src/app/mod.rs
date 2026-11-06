@@ -86,8 +86,8 @@ pub struct App {
     cloning_form: Option<CloneForm>,
     /// The dialog that opens a repository in WSL or over SSH.
     remote_form: Option<RemoteForm>,
-    /// A repository on another machine being reached, its tab to open once it answers.
-    connecting: Option<Connecting>,
+    /// Repositories on other machines being reached, each tab to open once it answers.
+    connecting: Vec<Connecting>,
     /// A newer release than this build.
     update: Option<update::Found>,
     update_rx: Option<Receiver<Result<Option<update::Found>, String>>>,
@@ -147,7 +147,7 @@ impl App {
             cloning: None,
             cloning_form: None,
             remote_form: None,
-            connecting: None,
+            connecting: Vec::new(),
             update: None,
             update_rx: None,
             update_looked: None,
@@ -206,8 +206,17 @@ impl App {
         }
         match repo_root(path) {
             Ok(root) => self.open_root(root, ctx),
-            Err(e) => self.error = Some(e),
+            Err(e) => self.report(e),
         }
+    }
+
+    /// Says why a repository couldn't be opened: on the start page, and in a toast when
+    /// another tab is shown (where the start page's message would go unseen).
+    fn report(&mut self, e: String) {
+        if !matches!(self.tabs.get(self.active), Some(Tab::Home)) {
+            self.toasts.push(Toast::new(e.clone(), true));
+        }
+        self.error = Some(e);
     }
 
     /// Opens the repository whose top folder is `root` (see [`Self::open_repo`]).

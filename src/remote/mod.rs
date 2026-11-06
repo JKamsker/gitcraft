@@ -103,6 +103,53 @@ pub fn openable_here(path: &Path) -> Result<(), String> {
     ))
 }
 
+/// `path` as git on its machine names it: as it is here; its path there for one elsewhere.
+pub fn git_path(path: &Path) -> String {
+    parse(path).map_or_else(|| path.display().to_string(), |t| t.path)
+}
+
+/// A folder for the repository at `repo` (a new worktree…), as typed or picked, as git of the
+/// repository's machine takes it; or why it can't be one. For a repository elsewhere: a path
+/// there (`/home/me/x`, `~/x`, relative to the repository), or a `\\wsl.localhost` path of the
+/// same distribution; never a folder of this machine or of another one.
+pub fn folder_for_git(repo: &Path, typed: &str) -> Result<String, String> {
+    let typed = typed.trim();
+    let here = parse(repo);
+    match (&here, parse(Path::new(typed))) {
+        (None, None) => Ok(typed.to_owned()),
+        (None, Some(t)) => Err(format!(
+            "That folder is on {}, the repository here",
+            t.host.label()
+        )),
+        (Some(r), Some(t)) if t.host == r.host => Ok(t.path),
+        (Some(r), Some(t)) => Err(format!(
+            "That folder is on {}, the repository on {}",
+            t.host.label(),
+            r.host.label()
+        )),
+        (Some(r), None) => {
+            // A path of that machine: no drive, no `\`.
+            if typed.contains('\\') || typed.get(1..2) == Some(":") {
+                Err(format!(
+                    "A folder on {}: /home/me/folder or ~/folder",
+                    r.host.label()
+                ))
+            } else {
+                Ok(typed.to_owned())
+            }
+        }
+    }
+}
+
+/// The folder a path of a machine is in (`/a/b` → `/a`, `~/x` → `~`).
+pub fn parent_there(path: &str) -> &str {
+    match path.rfind('/') {
+        Some(0) => "/",
+        Some(i) => &path[..i],
+        None => path,
+    }
+}
+
 /// The host as `ssh` is given it: `user@host:port` only reads as one in the URL form.
 pub fn ssh_destination(host: &str) -> String {
     if host.contains(':') {

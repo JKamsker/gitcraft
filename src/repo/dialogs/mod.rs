@@ -294,6 +294,7 @@ impl RepoTab {
                     branch::create_branch(ui, enter, &previous, at, at_label, name, checkout, focus)
                 }
                 Dialog::AddWorktree {
+                    repo,
                     path,
                     path_edited,
                     new_branch,
@@ -307,6 +308,7 @@ impl RepoTab {
                     let free = worktree::free_branches(local, worktrees);
                     worktree::add_worktree(
                         ui,
+                        repo,
                         enter,
                         &free,
                         path,

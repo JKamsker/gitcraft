@@ -72,8 +72,37 @@ impl RepoTab {
             if let Some(problem) = editor.problem() {
                 return Err(problem);
             }
-            Ok((editor.command(&self.path)?, editor.head))
+            Ok(editor)
         });
+        match result {
+            Ok(editor) => self.with_rebase_command(editor, ctx, move |tab, command, ctx| {
+                tab.reword_ready(&hash, command, ctx);
+            }),
+            Err(e) => self.status = Some((format!("Edit message: {e}"), true)),
+        }
+    }
+
+    /// Writes `editor`'s todo list and messages where git runs (on another machine, in the
+    /// background), then `then` with the rebase command and the head it starts from.
+    pub(super) fn with_rebase_command(
+        &mut self,
+        editor: rebase::RebaseEditor,
+        ctx: &egui::Context,
+        then: impl FnOnce(&mut RepoTab, Result<(Vec<String>, String), String>, &egui::Context)
+        + Send
+        + 'static,
+    ) {
+        let repo = self.path.clone();
+        self.here_or_later(ctx, move || Ok((editor.command(&repo)?, editor.head)), then);
+    }
+
+    /// Runs the reword of `hash` once its rebase command is ready.
+    fn reword_ready(
+        &mut self,
+        hash: &str,
+        result: Result<(Vec<String>, String), String>,
+        ctx: &egui::Context,
+    ) {
         match result {
             // Started while something else ran: say so rather than drop it.
             Ok(_) if self.busy_op.is_some() => {
@@ -87,7 +116,7 @@ impl RepoTab {
             }
             // The todo list replaces the commits read: not one made since.
             Ok((command, head)) => self.run_undoable(
-                &format!("Edit the message of {}", short(&hash)),
+                &format!("Edit the message of {}", short(hash)),
                 vec![self.same_branch(), expect_ref_at("HEAD", &head), command],
                 Refresh::All,
                 Undo::HeadMove { mode: "--keep" },
@@ -175,21 +204,30 @@ impl RepoTab {
             self.status = Some((why, true));
             return;
         }
-        match editor.command(&self.path) {
-            Ok(command) => {
-                let label = format!("Interactive rebase onto {}", editor.onto_label);
-                let guards = [self.same_branch(), expect_ref_at("HEAD", &editor.head)];
-                self.rebase = None;
-                self.run_undoable(
-                    &label,
-                    [guards.to_vec(), vec![command]].concat(),
-                    Refresh::All,
-                    Undo::HeadMove { mode: "--keep" },
-                    ctx,
-                );
+        let label = format!("Interactive rebase onto {}", editor.onto_label);
+        self.with_rebase_command(editor.clone(), ctx, move |tab, command, ctx| {
+            match command {
+                // Something else started while the files were written.
+                Ok(_) if tab.busy_op.is_some() => {
+                    tab.status = Some((
+                        format!("{label}: something else is running, try again when it's done"),
+                        true,
+                    ));
+                }
+                Ok((command, head)) => {
+                    let guards = [tab.same_branch(), expect_ref_at("HEAD", &head)];
+                    tab.rebase = None;
+                    tab.run_undoable(
+                        &label,
+                        [guards.to_vec(), vec![command]].concat(),
+                        Refresh::All,
+                        Undo::HeadMove { mode: "--keep" },
+                        ctx,
+                    );
+                }
+                Err(e) => tab.status = Some((e, true)),
             }
-            Err(e) => self.status = Some((e, true)),
-        }
+        });
     }
 }
 

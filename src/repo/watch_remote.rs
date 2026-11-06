@@ -13,6 +13,10 @@ use crate::remote::{self, sh_quote};
 /// How often the repository is asked.
 const EVERY: Duration = Duration::from_secs(3);
 
+/// How often while the window isn't focused: a change shows anyway on coming back (that
+/// reloads), and the machine isn't kept busy for nobody.
+const EVERY_UNFOCUSED: Duration = Duration::from_secs(15);
+
 /// The changed files whose times are asked, at most: an edit to a file already changed
 /// changes its status in nothing else.
 const TIMED_AT_MOST: usize = 200;
@@ -62,7 +66,8 @@ pub(super) fn poll(repo: &Path, tx: &Sender<FsChange>, ctx: &egui::Context, aliv
                 ctx.request_repaint_after(Duration::from_millis(500));
             }
         }
-        std::thread::sleep(EVERY);
+        let focused = ctx.input(|i| i.focused);
+        std::thread::sleep(if focused { EVERY } else { EVERY_UNFOCUSED });
     }
 }
 

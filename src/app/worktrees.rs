@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use super::panels::Toast;
 use super::{App, Tab, repo_root};
 use crate::repo::RepoTab;
 
@@ -13,10 +14,10 @@ impl App {
             self.open_repo(path, ctx);
             return;
         }
-        let root = match repo_root(path) {
+        let root = match worktree_root(path) {
             Ok(root) => root,
             Err(e) => {
-                self.error = Some(e);
+                self.toasts.push(Toast::new(e, true));
                 return;
             }
         };
@@ -51,13 +52,21 @@ impl App {
     /// was going on in it ends, as when closing a tab; the worktree itself stays on disk.
     pub(super) fn close_current_worktree(&mut self, ctx: &egui::Context) {
         let main = match self.tabs.get(self.active) {
-            Some(Tab::Repo(r)) => r.main_worktree().and_then(|main| repo_root(main).ok()),
+            Some(Tab::Repo(r)) => r.main_worktree().map(worktree_root),
             _ => return,
         };
-        // No main worktree to show (a bare repository): this is the end of the tab.
-        let Some(root) = main else {
-            self.close_tab(self.active, ctx);
-            return;
+        let root = match main {
+            Some(Ok(root)) => root,
+            // Not found (the machine it's on not reached…): the tab stays as it is.
+            Some(Err(e)) => {
+                self.toasts.push(Toast::new(e, true));
+                return;
+            }
+            // No main worktree to show (a bare repository): this is the end of the tab.
+            None => {
+                self.close_tab(self.active, ctx);
+                return;
+            }
         };
         let shows_main = |t: &Tab| matches!(t, Tab::Repo(r) if r.path == root);
         if self.tabs.iter().any(shows_main) {
@@ -87,5 +96,16 @@ impl App {
             Tab::Repo(r) => r.take_parked(path),
             Tab::Home | Tab::Settings => None,
         })
+    }
+}
+
+/// The top folder of the worktree at `path`, in the form tabs are told apart by. One on
+/// another machine is one git listed, already its top folder: not asked again (a round trip on
+/// the UI thread).
+fn worktree_root(path: &Path) -> Result<std::path::PathBuf, String> {
+    if crate::remote::is_remote(path) {
+        Ok(path.to_owned())
+    } else {
+        repo_root(path)
     }
 }
