@@ -140,6 +140,18 @@ impl RepoTab {
         if search.clicked() {
             acts.push(Action::ToggleSearch);
         }
+        let doctor = icons::tool_button(ui, "wrench", "", true)
+            .on_hover_text("Repository doctor: settings, hidden changes and more");
+        if self.doctor.is_some() {
+            widgets::active_underline(ui, doctor.rect, t.accent);
+        }
+        if doctor.clicked() {
+            acts.push(if self.doctor.is_some() {
+                Action::CloseDoctor
+            } else {
+                Action::OpenDoctor(super::doctor::Section::ALL[0])
+            });
+        }
         let open = icons::tool_button(ui, "external-link", "", true)
             .on_hover_text("Open the folder or the repository's page…");
         let page = self.web_page();

@@ -56,6 +56,8 @@ impl RepoTab {
                     self.ci_view_ui(ui, &mut acts);
                 } else if self.pr_view.is_some() {
                     self.pr_view_ui(ui, &mut acts);
+                } else if self.doctor.is_some() {
+                    self.doctor_ui(ui, &mut acts);
                 } else {
                     self.graph_view(ui, &mut acts);
                 }
@@ -131,6 +133,8 @@ impl RepoTab {
                 acts.push(Action::CloseCi);
             } else if esc && self.pr_view.is_some() {
                 acts.push(Action::ClosePr);
+            } else if esc && self.doctor.is_some() {
+                acts.push(Action::CloseDoctor);
             } else if esc && self.compare.is_some() {
                 acts.push(Action::CloseCompare);
             } else if esc && self.search.open {

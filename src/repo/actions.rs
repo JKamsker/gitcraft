@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use super::pull::PullMode;
 use super::toolbar::reveal_label;
 use super::{
-    Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view, ops,
-    pr_review, quick_edit,
+    Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, doctor, file_view,
+    ops, pr_review, quick_edit,
 };
 use crate::git::{self, InProgress};
 use crate::terminal::ShellSpec;
@@ -38,6 +38,11 @@ pub(crate) enum Action {
     CloseCi,
     /// Something done in the pipeline view.
     Ci(ci_view::CiAct),
+    /// Show the repository doctor in the big area, at a section.
+    OpenDoctor(doctor::Section),
+    CloseDoctor,
+    /// Something done in the repository doctor.
+    Doctor(doctor::DoctorAct),
     CloseDiff,
     Ops {
         label: String,
@@ -353,6 +358,11 @@ impl RepoTab {
             ),
             ("Reload".into(), "F5".into(), Action::Reload),
             (
+                "Repository doctor".into(),
+                "doctor".into(),
+                Action::OpenDoctor(doctor::Section::ALL[0]),
+            ),
+            (
                 reveal_label().into(),
                 "folder".into(),
                 Action::OpenPath(PathBuf::new()),
@@ -363,6 +373,13 @@ impl RepoTab {
                 Action::OpenInEditor(PathBuf::new()),
             ),
         ]);
+        for section in doctor::Section::ALL {
+            items.push((
+                format!("Doctor: {}", section.title()),
+                "doctor".into(),
+                Action::OpenDoctor(section),
+            ));
+        }
         if let Some(url) = self.web_page() {
             items.push((
                 "Open in browser".into(),

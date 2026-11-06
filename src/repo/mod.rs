@@ -13,6 +13,7 @@ mod conflict;
 mod detail;
 mod dialogs;
 mod diff;
+pub(crate) mod doctor;
 mod file_text;
 mod file_view;
 mod graph_view;
@@ -152,6 +153,8 @@ pub struct RepoTab {
     pr_view: Option<pr_view::PrView>,
     /// The builds of a commit the big area shows.
     ci_view: Option<ci_view::CiView>,
+    /// The repository doctor, when the big area shows it.
+    doctor: Option<Box<doctor::DoctorView>>,
     pr_requests: u64,
     /// What was written on each pull request and not sent, by its number.
     pr_drafts: HashMap<u64, pr_review::PrDraft>,
@@ -309,6 +312,7 @@ impl RepoTab {
             compare: None,
             pr_view: None,
             ci_view: None,
+            doctor: None,
             pr_requests: 0,
             pr_drafts: HashMap::new(),
             compare_requests: 0,

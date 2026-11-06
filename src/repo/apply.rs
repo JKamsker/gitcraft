@@ -17,16 +17,19 @@ impl RepoTab {
             Action::Select(row) => {
                 self.close_pr();
                 self.ci_view = None;
+                self.doctor = None;
                 self.select(row, ctx);
             }
             Action::SelectHash(hash) => {
                 self.close_pr();
                 self.ci_view = None;
+                self.doctor = None;
                 self.goto(&hash, ctx);
             }
             Action::SelectStash(i) => {
                 self.close_pr();
                 self.ci_view = None;
+                self.doctor = None;
                 self.select_stash(i, ctx);
             }
             Action::OpenDiff(key) => self.open_diff(key, ctx),
@@ -52,6 +55,9 @@ impl RepoTab {
             Action::OpenCi { sha, run } => self.open_ci(sha, run, ctx),
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),
+            Action::OpenDoctor(section) => self.open_doctor(section, ctx),
+            Action::CloseDoctor => self.doctor = None,
+            Action::Doctor(act) => self.doctor_act(act, ctx),
             Action::CloseDiff => {
                 self.diff = None;
                 self.conflict = None;

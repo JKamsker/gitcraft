@@ -19,6 +19,12 @@ pub fn set_profile_config(path: Option<PathBuf>) {
     }
 }
 
+/// The active profile's config file, when git reads it as the global config (see
+/// [`set_profile_config`]).
+pub fn profile_config() -> Option<PathBuf> {
+    PROFILE_CONFIG.read().ok().and_then(|p| p.clone())
+}
+
 /// Whether `args` reads or writes the user's own global config: `git config --global …`
 /// (signing settings, Mergiraf's set-up), which must never land in the profile's file, which is
 /// written over.
