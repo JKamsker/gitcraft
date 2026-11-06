@@ -76,8 +76,13 @@ impl RepoTab {
         let longest = data.longest as f32;
         let width = (GUTTER_W + NUM_W + 16.0 + longest * char_w + 24.0).max(ui.available_width());
         ui.spacing_mut().item_spacing.y = 0.0;
-        egui::ScrollArea::both()
-            .id_salt(("file_blame", &view.path, &view.rev))
+        let mut area = egui::ScrollArea::both();
+        // Asked for from the command line or a link: that line, a few lines below the top.
+        if let Some(line) = view.goto_line.take() {
+            let row = line.clamp(1, data.lines.len().max(1)) - 1;
+            area = area.vertical_scroll_offset(row.saturating_sub(5) as f32 * LINE_H);
+        }
+        area.id_salt(("file_blame", &view.path, &view.rev))
             .auto_shrink(false)
             .show_rows(ui, LINE_H, data.lines.len(), |ui, range| {
                 for i in range {
@@ -92,6 +97,9 @@ impl RepoTab {
                     // Each change starts with a thin rule, so blocks read as one.
                     if first && i > 0 {
                         p.hline(rect.x_range(), rect.top(), Stroke::new(1.0, t.separator));
+                    }
+                    if view.marked_line == Some(i + 1) {
+                        p.rect_filled(rect, 0.0, t.row_selected);
                     }
                     let gutter = Rect::from_min_size(rect.min, vec2(GUTTER_W, LINE_H));
                     p.rect_filled(gutter, 0.0, t.card);

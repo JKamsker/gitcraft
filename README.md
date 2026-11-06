@@ -29,6 +29,21 @@ so your config, credentials and hooks apply as usual.
 - Repositories on another machine, in a WSL distribution or over SSH: the window stays here and
   git runs there (see below).
 
+**From the terminal and the file manager**
+
+- `gitcraft .` (or `gitcraft <folder>`) opens the repository that folder is in, from any
+  subfolder or linked worktree, also a `\\wsl.localhost\…` folder.
+- `gitcraft log <file>` opens a file's history (also of a file deleted since), `gitcraft blame
+  <file>:<line>` its blame scrolled to and marking that line (`gitcraft blame -- <file>` takes a
+  name ending in `:12` as it is), `gitcraft show <rev>` selects a commit of the current folder's
+  repository, and `gitcraft compare a..b` lists what differs between two commits (`a...b`: what
+  `b` changed since they diverged). `gitcraft --help` lists them; a revision that starts with `-`
+  is refused.
+- _History in gitcraft_ and _Blame in gitcraft_ on files: the Windows installer adds them to
+  Explorer's right-click menu (an option, like _Open in gitcraft_ on folders); the Linux
+  `.desktop` entry (and the AppImage's menu entry) has them as actions; on macOS, Settings →
+  General → Finder adds them as Quick Actions. No overlay icons.
+
 **Remote repositories (WSL, SSH)**
 
 - Start page → _Remote_ (or the palette's _Open remote repository_): pick a WSL distribution

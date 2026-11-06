@@ -26,6 +26,16 @@ impl App {
                     self.open_repo(&path, ctx);
                 }
             }
+            Request::Launch { cwd, args } => {
+                let parsed = crate::launch::parse(args.iter().map(std::ffi::OsString::from));
+                if let crate::launch::Parsed::Run(Some(cmd)) = parsed
+                    && self.git_version.is_ok()
+                {
+                    self.manual_open = false;
+                    self.palette = None;
+                    self.launch(cmd, cwd, ctx);
+                }
+            }
         }
         come_to_front(ctx);
     }

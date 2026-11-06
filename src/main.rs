@@ -12,9 +12,20 @@ fn main() -> eframe::Result {
     if let Some(code) = app::askpass_helper() {
         std::process::exit(code);
     }
+    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    let launch = match gitcraft::launch::parse(args.clone()) {
+        gitcraft::launch::Parsed::Run(cmd) => cmd,
+        gitcraft::launch::Parsed::Print(text) => {
+            println!("{text}");
+            return Ok(());
+        }
+        gitcraft::launch::Parsed::Fail(why) => {
+            eprintln!("gitcraft: {why}");
+            std::process::exit(2);
+        }
+    };
     // gitcraft is running already: what this start was given goes to its window.
-    let open_arg = std::env::args_os().nth(1).map(std::path::PathBuf::from);
-    match app::single_instance(open_arg.as_deref()) {
+    match app::single_instance(launch.as_ref(), &args) {
         app::Start::Window => {}
         app::Start::HandedOver => return Ok(()),
         app::Start::Failed(message) => {
@@ -46,7 +57,7 @@ fn main() -> eframe::Result {
     let result = eframe::run_native(
         "gitcraft",
         options,
-        Box::new(|cc| Ok(Box::new(app::App::new(cc, open_arg)))),
+        Box::new(|cc| Ok(Box::new(app::App::launched(cc, launch)))),
     );
     app::after_exit();
     result

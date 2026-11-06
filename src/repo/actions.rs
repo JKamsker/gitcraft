@@ -129,6 +129,11 @@ pub(crate) enum Action {
         tab: file_view::FileTab,
     },
     CloseFileView,
+    /// A file's blame, scrolled to `line` (1 is the first) and marking it.
+    BlameAt {
+        path: String,
+        line: usize,
+    },
     /// Open the interactive rebase editor for the commits after `onto`.
     /// Gives a commit of the checked-out branch a new message: amending the latest, rebasing
     /// for an older one.

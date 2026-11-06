@@ -270,3 +270,74 @@ fn a_folder_handed_over_opens_its_repositorys_tab_once() -> Result<(), String> {
     let _ = std::fs::remove_dir_all(&root);
     Ok(())
 }
+
+/// `gitcraft log <file>` handed over by a later start, from a subfolder: the window opens the
+/// file's repository and shows that file's history; a refused command line (a revision that
+/// looks like an option) opens nothing.
+#[test]
+fn a_command_line_handed_over_opens_the_file_s_history() -> Result<(), String> {
+    use crate::instance::Request;
+    use std::time::{Duration, Instant};
+
+    let root = std::env::temp_dir().join(format!(
+        "gitcraft-handoff-log ü {}-{}",
+        std::process::id(),
+        crate::remote::askpass::random_token()
+    ));
+    let sub = root.join("src dir");
+    std::fs::create_dir_all(&sub).map_err(|e| e.to_string())?;
+    std::fs::write(sub.join("a b.txt"), "x\n").map_err(|e| e.to_string())?;
+    for args in [
+        &["init", "-q"][..],
+        &["config", "user.name", "t"],
+        &["config", "user.email", "t@t"],
+        &["add", "-A"],
+        &["commit", "-q", "-m", "one"],
+    ] {
+        crate::git::run(Some(&root), args)?;
+    }
+    let expected = super::repo_root(&root)?;
+    let mut harness = egui_kittest::Harness::builder()
+        .with_size([1200.0, 800.0])
+        .build_eframe(|cc| super::App::new(cc, None));
+    harness.step();
+    let ctx = harness.ctx.clone();
+    harness.state_mut().handle_handoff(
+        Request::Launch {
+            cwd: sub.clone(),
+            args: vec!["show".into(), "--output=/tmp/x".into()],
+        },
+        &ctx,
+    );
+    harness.state_mut().handle_handoff(
+        Request::Launch {
+            cwd: sub.clone(),
+            args: vec!["log".into(), "a b.txt".into()],
+        },
+        &ctx,
+    );
+    let until = Instant::now() + Duration::from_secs(20);
+    let shown = loop {
+        harness.step();
+        let state = harness.state();
+        let history = match state.tabs.get(state.active) {
+            Some(super::Tab::Repo(r)) if r.path == expected => r.file_view_path(),
+            _ => None,
+        };
+        if history.is_some() || Instant::now() > until {
+            break history;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    let tabs = harness
+        .state()
+        .tabs
+        .iter()
+        .filter(|t| matches!(t, super::Tab::Repo(_)))
+        .count();
+    drop(harness);
+    let _ = std::fs::remove_dir_all(&root);
+    assert_eq!(shown.as_deref(), Some("src dir/a b.txt"));
+    assert_eq!(tabs, 1);
+    Ok(())
+}

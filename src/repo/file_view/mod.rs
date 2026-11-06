@@ -32,6 +32,9 @@ pub(crate) struct FileView {
     pub history: Option<Result<Vec<FileCommit>, String>>,
     pub blame: Option<Result<BlameData, String>>,
     pub text: Option<Result<FileText, String>>,
+    /// A line to scroll to once the blame is read, and to mark (1 is the first).
+    pub goto_line: std::cell::Cell<Option<usize>>,
+    pub marked_line: Option<usize>,
 }
 
 impl FileView {
@@ -43,6 +46,8 @@ impl FileView {
             history: None,
             blame: None,
             text: None,
+            goto_line: Default::default(),
+            marked_line: None,
         }
     }
 
