@@ -34,7 +34,7 @@ pub const FETCH_FOR: Duration = Duration::from_secs(600);
 
 /// What a job may wait on top of its own time: a shell of a busy machine (`remote::pool`
 /// waits two minutes at most), or connecting to it.
-const SLACK: Duration = Duration::from_secs(150);
+pub const SLACK: Duration = Duration::from_secs(150);
 
 /// How long the window waits for a look before saying it got no answer.
 pub const LOOK_WAIT: Duration = LOOK_FOR.saturating_add(SLACK);

@@ -4,7 +4,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use super::inbox::{self, InboxPr};
+use super::inbox;
 use super::{Hosting, NewPullRequest, Provider, PullRequest, cli};
 use crate::avatars::Hint;
 
@@ -57,18 +57,51 @@ impl Provider for GitLab {
         self.run(repo, &args).map(|out| out.trim().to_owned())
     }
 
-    /// Two lists: those whose review is asked of you, and yours.
-    fn inbox(&self, repo: &Path, _: &Hosting) -> Result<Vec<InboxPr>, String> {
+    /// Two lists: those whose review is asked of you, and yours. The list has neither
+    /// pipelines nor who wrote the notes, so each of yours (the first few) is read once more,
+    /// with its notes.
+    fn inbox(&self, repo: &Path, hosting: &Hosting) -> Result<inbox::Answer, String> {
+        const MAX: usize = 50;
+        let run = |args: &[&str]| cli::run_within(TOOL, self.noun(), repo, args, inbox::TOOL_FOR);
         let list = |who: &str| {
-            let args = ["mr", "list", who, "--output", "json", "--per-page", "50"];
-            self.run(repo, &args)
+            let max = MAX.to_string();
+            run(&["mr", "list", who, "--output", "json", "--per-page", &max])
         };
-        let asked = list("--reviewer=@me")?;
-        let mine = list("--author=@me")?;
-        Ok(inbox::merged(vec![
-            inbox::parse_gitlab(&asked, true)?,
-            inbox::parse_gitlab(&mine, false)?,
-        ]))
+        let asked = inbox::parse_gitlab(&list("--reviewer=@me")?, true)?;
+        let mut mine = inbox::parse_gitlab(&list("--author=@me")?, false)?;
+        let mut cut: Vec<String> = [
+            inbox::cut_note(asked.len(), MAX, "asking your review"),
+            inbox::cut_note(mine.len(), MAX, "of yours"),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        // Named by its path, as `glab api` takes it wherever it runs: `:id` is the project of
+        // the folder glab runs in, which for a repository on another machine is none.
+        let project = project_id(&hosting.path)
+            .ok_or_else(|| format!("{TOOL} needs a plain group/project path"))?;
+        let host = api_authority(hosting);
+        let api = |rest: String| run(&["api", "--hostname", &host, &rest]);
+        if mine.len() > inbox::MAX_MINE {
+            cut.push(format!(
+                "the pipelines and notes of only {} of your {} merge requests were read",
+                inbox::MAX_MINE,
+                mine.len()
+            ));
+        }
+        for mr in mine.iter_mut().take(inbox::MAX_MINE) {
+            let at = format!("projects/{project}/merge_requests/{}", mr.number);
+            if let Ok(json) = api(at.clone()) {
+                mr.checks = inbox::gitlab_pipeline(&json);
+            }
+            if let Ok(json) = api(format!("{at}/notes?sort=desc&per_page=100")) {
+                mr.said = inbox::gitlab_notes(&json, &mr.author);
+            }
+        }
+        Ok(inbox::Answer {
+            prs: inbox::merged(vec![asked, mine]),
+            cut,
+        })
     }
 
     /// The host's own avatar API, asked by email.
@@ -89,6 +122,19 @@ fn api_authority(hosting: &Hosting) -> String {
         .split_once("://")
         .map_or(hosting.host.as_str(), |(_, authority)| authority)
         .to_owned()
+}
+
+/// `group%2Fsub%2Fproject`, how the API names a project by its path; none for a path that
+/// isn't plain (it goes into the API's path as it is).
+fn project_id(path: &str) -> Option<String> {
+    let plain = path.split('/').all(|part| {
+        !part.is_empty()
+            && !part.starts_with(['-', '.'])
+            && part
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+    });
+    (plain && path.contains('/')).then(|| path.replace('/', "%2F"))
 }
 
 fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
@@ -130,6 +176,14 @@ mod tests {
             ("feat", "beef")
         );
         assert!(parse_list("oops").is_err());
+    }
+
+    #[test]
+    fn a_project_is_named_by_its_encoded_path() {
+        assert_eq!(project_id("g/sub/p.x").as_deref(), Some("g%2Fsub%2Fp.x"));
+        for bad in ["p", "g//p", "g/../p", "g/p?x=1", "-g/p"] {
+            assert_eq!(project_id(bad), None, "{bad}");
+        }
     }
 
     #[test]

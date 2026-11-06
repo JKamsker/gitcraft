@@ -145,14 +145,21 @@ pub trait Provider: Sync {
     fn avatars(&self, repo: &Path, hosting: &Hosting, emails: &[String]) -> Vec<(String, Hint)>;
 
     /// The open pull requests that wait for the person logged in: those whose review is asked
-    /// of them, and theirs (see [`inbox::needs_you`] for which of them need them now).
-    fn inbox(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<inbox::InboxPr>, String> {
+    /// of them, and theirs (see [`inbox::needs_you`] for which of them need them now). It runs
+    /// unasked, so it never asks for a password or a keyring: only logins already at hand.
+    fn inbox(&self, repo: &Path, hosting: &Hosting) -> Result<inbox::Answer, String> {
         let _ = (repo, hosting);
         Err(format!(
             "gitcraft can't list the {}s waiting for you on {}",
             self.noun(),
             self.name()
         ))
+    }
+
+    /// Whether [`Provider::inbox`] answers for the whole host (every repository there), so
+    /// that it is asked once per host rather than once per repository.
+    fn inbox_per_host(&self) -> bool {
+        false
     }
 
     /// The page of one pull request, if gitcraft has one for this forge.

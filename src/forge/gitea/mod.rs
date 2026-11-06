@@ -9,7 +9,8 @@
 //!    too;
 //! 3. what git's credential helper keeps for `https://host` (a password or an access token).
 //!
-//! Without one, public repositories can still be read.
+//! Without one, public repositories can still be read. The start page's inbox, which asks
+//! unasked, takes only the first two or a login found before (see [`known_login`]).
 
 mod details;
 mod inbox;
@@ -27,7 +28,7 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 
 use super::http::{Api, Login};
-use super::inbox::InboxPr;
+use super::inbox::Answer;
 use super::{Forge, Hosting, NewPullRequest, Pages, Provider, PullRequest};
 use crate::avatars::Hint;
 use crate::pr_post::Target;
@@ -100,8 +101,17 @@ impl Provider for GiteaFamily {
             .collect()
     }
 
-    fn inbox(&self, _: &Path, hosting: &Hosting) -> Result<Vec<InboxPr>, String> {
-        inbox::inbox(&self.api(hosting), hosting)
+    /// With a login already at hand only: a credential helper may ask for a keyring to be
+    /// unlocked, which the inbox, asking unasked, mustn't bring up.
+    fn inbox(&self, _: &Path, hosting: &Hosting) -> Result<Answer, String> {
+        let login = known_login(&hosting.web);
+        let api = Api::new(self.name, &hosting.web, &hosting.host, login).on_refused(forget_login);
+        inbox::inbox(&api, hosting)
+    }
+
+    /// The host's search finds them in every repository there, forks' upstreams too.
+    fn inbox_per_host(&self) -> bool {
+        true
     }
 
     fn pages(&self) -> Option<&dyn Pages> {
@@ -251,6 +261,21 @@ fn find_login(web: &str) -> Option<Login> {
         entry.at = Some(Instant::now());
     }
     entry.login.clone()
+}
+
+/// The login for `web` that needs no asking: one found before (a tab's, from git's credential
+/// helper too), else the environment's or `tea`'s. Git's credential helper isn't run, so no
+/// keyring asks to be unlocked; nothing is kept, so a tab still looks for itself.
+fn known_login(web: &str) -> Option<Login> {
+    let found = found_logins().lock().ok()?;
+    let entry = found.get(web);
+    if let Some(login) = entry.and_then(|e| e.login.clone()) {
+        return Some(login);
+    }
+    let usable = |login: &Login| entry.is_none_or(|e| !e.refused.contains(login));
+    env_login(web)
+        .filter(usable)
+        .or_else(|| tea_login(web).filter(usable))
 }
 
 /// `tea`'s variables, for the server they name only.

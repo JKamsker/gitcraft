@@ -21,6 +21,108 @@ pub(super) fn run_with_input(
     args: &[&str],
     input: Option<&str>,
 ) -> Result<String, String> {
+    let (mut cmd, not_installed) = prepared(tool, noun, repo, args)?;
+    let out = match input {
+        None => cmd.output().map_err(not_installed)?,
+        Some(input) => {
+            let mut child = cmd
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .map_err(not_installed)?;
+            if let Some(mut stdin) = child.stdin.take() {
+                // A tool that stops reading has stopped for a reason, which its exit code and
+                // error output below tell better than the broken pipe would.
+                let _ = stdin.write_all(input.as_bytes());
+            }
+            child.wait_with_output().map_err(|e| e.to_string())?
+        }
+    };
+    answer(tool, &out)
+}
+
+/// [`run`], stopped when it hasn't finished `within` that long: for what nobody waits on (the
+/// inbox), where a tool that hangs would otherwise stay until the app ends.
+pub(super) fn run_within(
+    tool: &str,
+    noun: &str,
+    repo: &Path,
+    args: &[&str],
+    within: Duration,
+) -> Result<String, String> {
+    use std::io::Read;
+    let (mut cmd, not_installed) = prepared(tool, noun, repo, args)?;
+    let mut child = cmd
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(not_installed)?;
+    // Read as it comes, or a long answer would fill the pipe and the tool wait on it forever.
+    let drain = |pipe: Option<Box<dyn Read + Send>>| {
+        std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            if let Some(mut pipe) = pipe {
+                let _ = pipe.read_to_end(&mut bytes);
+            }
+            bytes
+        })
+    };
+    let stdout = drain(
+        child
+            .stdout
+            .take()
+            .map(|p| Box::new(p) as Box<dyn Read + Send>),
+    );
+    let stderr = drain(
+        child
+            .stderr
+            .take()
+            .map(|p| Box::new(p) as Box<dyn Read + Send>),
+    );
+    let until = Instant::now() + within;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if Instant::now() < until => std::thread::sleep(Duration::from_millis(50)),
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                // The readers are left: what the tool started may hold its pipes a while yet.
+                return Err(format!(
+                    "{tool} didn't finish within {} seconds",
+                    within.as_secs()
+                ));
+            }
+            Err(e) => return Err(format!("couldn't wait for {tool}: {e}")),
+        }
+    };
+    let out = std::process::Output {
+        status,
+        stdout: stdout.join().unwrap_or_default(),
+        stderr: stderr.join().unwrap_or_default(),
+    };
+    answer(tool, &out)
+}
+
+/// What the tool printed, or why it failed.
+fn answer(tool: &str, out: &std::process::Output) -> Result<String, String> {
+    if out.status.success() {
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    } else {
+        Err(failure(tool, out))
+    }
+}
+
+/// The command that runs `tool` with `args` about `repo` (here, or named for one on another
+/// machine), and what to say when it can't be started.
+fn prepared(
+    tool: &str,
+    noun: &str,
+    repo: &Path,
+    args: &[&str],
+) -> Result<(Command, impl Fn(std::io::Error) -> String), String> {
     let mut cmd = tool_command(tool);
     let remote = crate::remote::parse(repo).is_some();
     if remote {
@@ -57,34 +159,15 @@ pub(super) fn run_with_input(
     } else {
         cmd.current_dir(repo).args(args);
     }
-    let not_installed = |e: std::io::Error| match e.kind() {
-        std::io::ErrorKind::NotFound if remote || repo.is_dir() => {
+    let here = remote || repo.is_dir();
+    let (tool, noun, shown) = (tool.to_owned(), noun.to_owned(), repo.display().to_string());
+    let not_installed = move |e: std::io::Error| match e.kind() {
+        std::io::ErrorKind::NotFound if here => {
             format!("{tool} isn't installed: gitcraft uses it for {noun}s")
         }
-        _ => format!("couldn't run {tool} in {}: {e}", repo.display()),
+        _ => format!("couldn't run {tool} in {shown}: {e}"),
     };
-    let out = match input {
-        None => cmd.output().map_err(not_installed)?,
-        Some(input) => {
-            let mut child = cmd
-                .stdin(Stdio::piped())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn()
-                .map_err(not_installed)?;
-            if let Some(mut stdin) = child.stdin.take() {
-                // A tool that stops reading has stopped for a reason, which its exit code and
-                // error output below tell better than the broken pipe would.
-                let _ = stdin.write_all(input.as_bytes());
-            }
-            child.wait_with_output().map_err(|e| e.to_string())?
-        }
-    };
-    if out.status.success() {
-        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
-    } else {
-        Err(failure(tool, &out))
-    }
+    Ok((cmd, not_installed))
 }
 
 /// The forge whose tool `tool` is.
@@ -374,6 +457,28 @@ mod tests {
         assert!(named_hosts(&["run", "list", "-R", "o/r"]).is_empty());
         assert!(same_host("git.example.org:8443", "git.example.org"));
         assert!(!same_host("github.evil.example", "github.com"));
+    }
+
+    /// A tool that hangs is stopped at its time; a long answer still comes whole.
+    #[cfg(unix)]
+    #[test]
+    fn a_tool_given_a_time_is_stopped_at_it() {
+        let here = std::env::temp_dir();
+        let started = Instant::now();
+        let hung = run_within("sleep", "x", &here, &["20"], Duration::from_millis(300));
+        assert!(hung.is_err_and(|e| e.contains("didn't finish within")));
+        assert!(started.elapsed() < Duration::from_secs(10));
+        let script = "head -c 300000 /dev/zero | tr '\\0' x";
+        let long = run_within("sh", "x", &here, &["-c", script], Duration::from_secs(20));
+        assert_eq!(long.map(|out| out.len()), Ok(300_000));
+        let failed = run_within(
+            "sh",
+            "x",
+            &here,
+            &["-c", "echo no >&2; exit 3"],
+            Duration::from_secs(20),
+        );
+        assert_eq!(failed, Err("no".to_owned()));
     }
 
     /// `glab api` would refuse `--repo`; the commands about a project take it.

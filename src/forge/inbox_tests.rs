@@ -34,36 +34,60 @@ fn yours_only_when_checks_fail_or_others_said_something_new() {
     mine.checks = Checks::Failing;
     assert_eq!(needs_you(&mine, None), vec![Reason::ChecksFailing]);
     mine.checks = Checks::Passing;
-    mine.activity = Activity::At(vec![T0, T0 + 100]);
+    mine.said = vec![T0, T0 + 100];
     assert_eq!(needs_you(&mine, None), vec![Reason::NewComments(2)]);
-    let seen = Seen {
-        at: T0 + 50,
-        count: 0,
-    };
+    let seen = Seen { at: T0 + 50 };
     assert_eq!(needs_you(&mine, Some(seen)), vec![Reason::NewComments(1)]);
-    let later = Seen {
-        at: T0 + 100,
-        count: 0,
-    };
+    let later = Seen { at: T0 + 100 };
     assert!(
         needs_you(&mine, Some(later)).is_empty(),
         "a comment at that very second was seen"
     );
 }
 
+/// Seen goes by the forge's clock (the newest thing said), never back.
 #[test]
-fn a_forge_that_only_counts_comments_compares_counts() {
+fn what_is_seen_is_up_to_the_newest_comment() {
     let mut mine = pr(true, false);
-    mine.activity = Activity::Count(5);
-    assert_eq!(needs_you(&mine, None), vec![Reason::NewComments(5)]);
-    let seen = seen_now(&mine, T0);
-    assert_eq!(seen, Seen { at: T0, count: 5 });
-    assert!(needs_you(&mine, Some(seen)).is_empty());
-    // A comment deleted since: never fewer than none.
-    mine.activity = Activity::Count(3);
-    assert!(needs_you(&mine, Some(seen)).is_empty());
-    mine.activity = Activity::Count(7);
-    assert_eq!(needs_you(&mine, Some(seen)), vec![Reason::NewComments(2)]);
+    mine.said = vec![T0 + 100, T0];
+    assert_eq!(seen_now(&mine, None), Seen { at: T0 + 100 });
+    assert!(needs_you(&mine, Some(seen_now(&mine, None))).is_empty());
+    // A comment deleted since doesn't make what was seen earlier.
+    mine.said = vec![T0];
+    assert_eq!(seen_now(&mine, Some(Seen { at: T0 + 100 })).at, T0 + 100);
+    // Nothing said yet: whatever comes is new.
+    mine.said.clear();
+    let first = seen_now(&mine, None);
+    mine.said = vec![T0];
+    assert_eq!(needs_you(&mine, Some(first)), vec![Reason::NewComments(1)]);
+    // A list that didn't read what was said (one of many of yours) still says when it last
+    // changed: what came before is in that.
+    let unread = InboxPr {
+        updated: T0 + 300,
+        ..pr(true, false)
+    };
+    mine.said = vec![T0 + 200, T0 + 400];
+    assert_eq!(
+        needs_you(&mine, Some(seen_now(&unread, None))),
+        vec![Reason::NewComments(1)]
+    );
+}
+
+#[test]
+fn some_errors_arent_worth_asking_again_soon() {
+    assert!(gives_up(
+        "gh isn't installed: gitcraft uses it for pull requests"
+    ));
+    assert!(gives_up(
+        "glab isn't signed in to git.example.org: `glab auth login --hostname git.example.org`"
+    ));
+    assert!(gives_up(
+        "To get started with GitHub CLI, please run:  gh auth login"
+    ));
+    let no_login = "no Forgejo login known for https://codeberg.org: add one with `tea login add`";
+    assert!(gives_up(no_login) && is_no_login(no_login));
+    assert!(!gives_up("HTTP 502: Bad Gateway"));
+    assert!(!is_no_login("gh isn't installed"));
 }
 
 #[test]
@@ -90,11 +114,11 @@ fn reads_github_lists() -> Result<(), String> {
     assert!(list[0].mine && list[0].draft);
     assert_eq!(list[0].checks, Checks::Failing);
     assert_eq!(
-        list[0].activity,
-        Activity::At(vec![
+        list[0].said,
+        vec![
             parse_time("2026-11-02T20:20:00Z").unwrap_or(0),
             parse_time("2026-11-02T20:30:00Z").unwrap_or(0),
-        ])
+        ]
     );
     assert!(parse_github("not json", false).is_err());
     assert_eq!(parse_github("[]", false), Ok(Vec::new()));
@@ -125,20 +149,44 @@ fn githubs_checks_together() {
     );
 }
 
+/// `glab mr list` says nothing of pipelines (only one merge request read alone does), nor
+/// whose its notes are.
 #[test]
-fn reads_gitlab_lists() -> Result<(), String> {
+fn reads_gitlab_lists_and_each_of_yours() -> Result<(), String> {
     let json = r#"[{"iid": 4, "title": "MR", "web_url": "https://gitlab.com/g/p/-/merge_requests/4",
         "author": {"username": "me"}, "draft": false, "updated_at": "2026-11-02T20:00:00.000Z",
-        "user_notes_count": 3, "head_pipeline": {"status": "failed"}}]"#;
+        "user_notes_count": 3}]"#;
     let list = parse_gitlab(json, false)?;
     assert_eq!(list[0].number, 4);
-    assert_eq!(list[0].activity, Activity::Count(3));
-    assert_eq!(list[0].checks, Checks::Failing);
+    assert!(list[0].mine && list[0].said.is_empty());
+    assert_eq!(list[0].checks, Checks::Unknown);
     let quiet = r#"[{"iid": 5, "title": "x", "web_url": "u", "author": {"username": "a"}}]"#;
     let list = parse_gitlab(quiet, true)?;
-    assert_eq!(list[0].checks, Checks::Unknown);
-    assert_eq!(list[0].activity, Activity::Count(0));
+    assert!(list[0].review_requested);
     assert!(parse_gitlab("{", true).is_err());
+
+    let one = r#"{"iid": 4, "head_pipeline": {"id": 7, "status": "failed"}}"#;
+    assert_eq!(gitlab_pipeline(one), Checks::Failing);
+    assert_eq!(
+        gitlab_pipeline(r#"{"head_pipeline": {"status": "running"}}"#),
+        Checks::Pending
+    );
+    assert_eq!(
+        gitlab_pipeline(r#"{"head_pipeline": null}"#),
+        Checks::Unknown
+    );
+    assert_eq!(gitlab_pipeline("oops"), Checks::Unknown);
+
+    let notes = r#"[
+        {"body": "Why?", "author": {"username": "bo"}, "system": false, "created_at": "2026-11-02T20:30:00.000Z"},
+        {"body": "Because.", "author": {"username": "me"}, "system": false, "created_at": "2026-11-02T20:20:00.000Z"},
+        {"body": "added 1 commit", "author": {"username": "bo"}, "system": true, "created_at": "2026-11-02T20:10:00.000Z"}
+    ]"#;
+    assert_eq!(
+        gitlab_notes(notes, "me"),
+        vec![parse_time("2026-11-02T20:30:00.000Z").unwrap_or(0)]
+    );
+    assert!(gitlab_notes("{", "me").is_empty());
     Ok(())
 }
 
@@ -172,4 +220,13 @@ fn a_pull_request_in_both_lists_is_yours_once() {
     assert_eq!(Reason::NewComments(4).label(), "4 new comments");
     assert_eq!(status_checks("error"), Checks::Failing);
     assert_eq!(status_checks(""), Checks::Unknown);
+}
+
+#[test]
+fn a_full_list_says_it_was_cut() {
+    assert_eq!(cut_note(49, 50, "of yours"), None);
+    assert_eq!(
+        cut_note(50, 50, "of yours").as_deref(),
+        Some("only the 50 latest of yours were read")
+    );
 }

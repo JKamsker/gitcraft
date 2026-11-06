@@ -1,7 +1,7 @@
 //! The inbox against real servers (see `live.rs` and `ci/forge-server.sh`): a pull request by
 //! the author asks the reviewer's review, its head fails a check and the reviewer comments on it.
 //! The author's inbox has it as theirs with failing checks and one new comment; the reviewer's
-//! has it as asking their review.
+//! has it as asking their review. Both are the host's search, asked through another repository.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -9,7 +9,7 @@ use serde_json::json;
 
 use super::live::{Server, run, scratch, write};
 use super::{FORGEJO, GITEA, GiteaFamily, create, inbox};
-use crate::forge::inbox::{Checks, Reason, needs_you, seen_now};
+use crate::forge::inbox::{Checks, InboxPr, Reason, needs_you, seen_now};
 use crate::forge::{Hosting, NewPullRequest};
 
 #[test]
@@ -105,36 +105,50 @@ fn inbox_life(family: &'static GiteaFamily) -> Result<(), String> {
         Some(&json!({ "body": "Because." })),
     )?;
 
-    let theirs = inbox::inbox(&server.author(), &hosting)?;
+    // The host is asked as a whole: a clone of another repository there (a fork, whose pull
+    // requests are upstream's) finds it all the same.
+    let elsewhere = Hosting {
+        path: "author/some-fork".to_owned(),
+        ..hosting
+    };
+    let ours = |p: &&InboxPr| p.project == path && p.number == 1;
+    let theirs = inbox::inbox(&server.author(), &elsewhere)?.prs;
     let pr = theirs
         .iter()
-        .find(|p| p.number == 1)
+        .find(ours)
         .ok_or_else(|| format!("the author's inbox lacks it: {theirs:?}"))?;
     if !(pr.mine && !pr.review_requested && pr.checks == Checks::Failing) {
+        return Err(format!("the author's inbox read {pr:?}"));
+    }
+    if !pr.url.ends_with(&format!("/{path}/pulls/1")) || pr.title != "Change ünïcode" {
         return Err(format!("the author's inbox read {pr:?}"));
     }
     let reasons = needs_you(pr, None);
     if reasons != [Reason::ChecksFailing, Reason::NewComments(1)] {
         return Err(format!("the author's reasons: {reasons:?}"));
     }
-    // Opened from the inbox: the comment is seen; the failing checks still need them.
-    let seen = seen_now(pr, crate::git::now() + 1);
+    // Opened from the inbox (or first met): the comment is seen, by the forge's clock; the
+    // failing checks still need them.
+    let seen = seen_now(pr, None);
     if needs_you(pr, Some(seen)) != [Reason::ChecksFailing] {
-        return Err("a comment seen stays new".to_owned());
+        return Err(format!("a comment seen stays new: {seen:?} of {pr:?}"));
     }
 
-    let asked = inbox::inbox(&server.reviewer(), &hosting)?;
+    let asked = inbox::inbox(&server.reviewer(), &elsewhere)?.prs;
     let pr = asked
         .iter()
-        .find(|p| p.number == 1)
+        .find(ours)
         .ok_or_else(|| format!("the reviewer's inbox lacks it: {asked:?}"))?;
     if needs_you(pr, None) != [Reason::ReviewRequested] {
         return Err(format!("the reviewer's inbox read {pr:?}"));
     }
-    // Without a login, it says how to get one rather than listing nothing.
+    // Without a login, it says how to get one rather than listing nothing, and says it so
+    // that it isn't asked again and again.
     let anonymous = super::Api::new(family.name, &server.url, "127.0.0.1", None);
-    let err = inbox::inbox(&anonymous, &hosting).err().unwrap_or_default();
-    if !err.contains("login") {
+    let err = inbox::inbox(&anonymous, &elsewhere)
+        .err()
+        .unwrap_or_default();
+    if !(crate::forge::inbox::is_no_login(&err) && crate::forge::inbox::gives_up(&err)) {
         return Err(format!("without a login: {err}"));
     }
     Ok(())
