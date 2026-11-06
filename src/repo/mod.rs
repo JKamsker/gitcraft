@@ -31,6 +31,7 @@ mod pr_view;
 pub(crate) mod pull;
 mod quick_edit;
 mod rebase;
+mod release;
 mod rewrite;
 #[cfg(test)]
 mod samples;
@@ -158,6 +159,8 @@ pub struct RepoTab {
     compare_requests: u64,
     file_view: Option<file_view::FileView>,
     rebase: Option<rebase::RebaseEditor>,
+    /// The release being prepared or cut (its dialog).
+    release: Option<release::ReleaseView>,
     /// The selected commit's message, being edited in the right pane.
     reword: Option<Reword>,
     /// HTTPS credentials typed in this session, used for every later git command of the tab.
@@ -314,6 +317,7 @@ impl RepoTab {
             compare_requests: 0,
             file_view: None,
             rebase: None,
+            release: None,
             reword: None,
             credentials: None,
             last_op: None,

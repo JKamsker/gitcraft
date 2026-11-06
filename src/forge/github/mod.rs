@@ -75,6 +75,42 @@ impl Provider for GitHub {
         gh(repo, &args).map(|out| out.trim().to_owned())
     }
 
+    /// `gh release create`, the notes on its stdin; `--verify-tag`: the tag must be pushed.
+    fn create_release(
+        &self,
+        repo: &Path,
+        _: &Hosting,
+        new: &super::NewRelease,
+    ) -> Result<String, String> {
+        let mut args = vec![
+            "release",
+            "create",
+            new.tag,
+            "--verify-tag",
+            "--title",
+            new.title,
+            "--notes-file",
+            "-",
+        ];
+        if new.prerelease {
+            args.push("--prerelease");
+        }
+        gh_with_input(repo, &args, Some(new.notes)).map(|out| out.trim().to_owned())
+    }
+
+    fn upload_assets(
+        &self,
+        repo: &Path,
+        _: &Hosting,
+        tag: &str,
+        files: &[std::path::PathBuf],
+    ) -> Result<(), String> {
+        let paths = super::path_args(files);
+        let mut args = vec!["release", "upload", tag, "--clobber", "--"];
+        args.extend(paths.iter().map(String::as_str));
+        gh(repo, &args).map(|_| ())
+    }
+
     /// The authors' GitHub accounts, from the repository's latest commits (the API ties each
     /// commit to the account its email belongs to). Through `gh` when it's installed (private
     /// repositories, higher limits), else GitHub's public API.

@@ -188,6 +188,8 @@ pub(crate) enum Action {
     CloseCompare,
     /// Search commit messages, or what commits changed in files.
     SearchCode(bool),
+    /// Preparing or cutting a release.
+    Release(super::release::ReleaseAct),
 }
 
 /// Compares two branches, given to git by their full refs (a tag of the same name is not
@@ -404,6 +406,11 @@ impl RepoTab {
             ));
         }
         if !self.refs.head.is_empty() {
+            items.push((
+                "Cut release…".into(),
+                "release".into(),
+                Action::Release(super::release::ReleaseAct::Open(self.refs.head.clone())),
+            ));
             items.push((
                 "Create branch".into(),
                 "branch".into(),

@@ -16,7 +16,7 @@ use serde_json::json;
 
 use super::details::{self, thread_id};
 use super::post::GiteaTarget;
-use super::{Api, FORGEJO, GITEA, GiteaFamily, Login, create, list};
+use super::{Api, FORGEJO, GITEA, GiteaFamily, Login, create, create_release, list, upload_assets};
 use crate::forge::{self, Forge, Hosting, NewPullRequest, Provider};
 use crate::git;
 use crate::pr_post::{self, LineComment, MergeMethod, Suggestion, Target, Verdict};
@@ -657,7 +657,53 @@ fn whole_life(family: &'static GiteaFamily) -> Result<(), String> {
         "anonymous comment: {refused:?}"
     );
 
+    release_with_a_file(&server, family, &dir, &hosting)?;
+
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::remove_dir_all(&other);
+    Ok(())
+}
+
+/// A tag pushed, its release made with notes, and a file attached to it.
+fn release_with_a_file(
+    server: &Server,
+    family: &'static GiteaFamily,
+    dir: &Path,
+    hosting: &Hosting,
+) -> Result<(), String> {
+    eprintln!("{}: A release with a file", family.name);
+    run(dir, &["tag", "-a", "v1.0.0", "-m", "v1.0.0", "main"])?;
+    run(dir, &["push", "-q", "origin", "v1.0.0"])?;
+    let url = create_release(
+        &server.author(),
+        hosting,
+        &forge::NewRelease {
+            tag: "v1.0.0",
+            title: "v1.0.0",
+            notes: "### Features\n\n- ü things",
+            prerelease: true,
+        },
+    )?;
+    ensure!(url.contains("/releases/tag/v1.0.0"), "release at {url}");
+    let file = dir.join("dist ü.txt");
+    std::fs::write(&file, "attached\n").map_err(|e| e.to_string())?;
+    upload_assets(
+        &server.author(),
+        hosting,
+        "v1.0.0",
+        std::slice::from_ref(&file),
+    )?;
+    let release = server
+        .author()
+        .get(&format!("repos/{}/releases/tags/v1.0.0", hosting.path))?;
+    ensure!(
+        at(&release, "/body").contains("ü things")
+            && release
+                .get("prerelease")
+                .and_then(serde_json::Value::as_bool)
+                == Some(true)
+            && at(&release, "/assets/0/name") == "dist ü.txt",
+        "{release}"
+    );
     Ok(())
 }

@@ -34,6 +34,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Search messages, authors and hashes, or switch to Code to find the commits that added or removed some text.",
             "Drag the borders in the column header to resize; right-click it to pick the columns, make the graph column compact or reset the columns.",
             "Interactive rebase: reorder, reword, squash, fix up or drop commits, then start it.",
+            "Cut release… in a commit's menu (or the palette) suggests the next version from the Conventional Commits since the last tag and drafts the notes; it can move the version in Cargo.toml / package.json and CHANGELOG.md, tag (annotated or signed), push and make the release on the forge with files, showing each step first. A step that fails can be resumed; Ctrl+Z undoes what was done here.",
         ],
     ),
     (

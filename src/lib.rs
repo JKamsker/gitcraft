@@ -15,6 +15,7 @@ mod mergiraf;
 mod pr_post;
 mod pr_threads;
 mod pull_request;
+mod release;
 mod remote;
 mod repo;
 mod settings;

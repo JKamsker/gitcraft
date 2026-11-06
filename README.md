@@ -138,6 +138,21 @@ so your config, credentials and hooks apply as usual.
   out in, or makes one beside the repository first: on the local branch, on a new one tracking
   the remote branch, or fetched from the forge for a fork that isn't a remote here.
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
+- _Cut release…_ (a commit's menu, or the palette for HEAD) suggests the next version from the
+  Conventional Commits since the last tag (`feat` a minor version, `!` or `BREAKING CHANGE` a
+  major one — a minor one before 1.0 —, anything else a patch; a release candidate becomes its
+  release; the tag's `v` or no `v` is kept) and drafts the notes, grouped by type (breaking
+  changes, features, bug fixes, performance, documentation, other) with links to the pull
+  requests they name, to edit. It can move the version in `Cargo.toml` (and `Cargo.lock`) and
+  `package.json` (and `package-lock.json`), changing nothing else in them, and add the notes on
+  top of `CHANGELOG.md`, in one commit, `chore(release): v1.3.0` (from the tip of the branch
+  checked out, with those files unchanged); make an annotated or signed tag whose message is the
+  notes (headings kept); push the commit and the tag at once (`--atomic`); and make the release
+  on the forge (`gh release create`, `glab release create`, Forgejo's and Gitea's API) with files
+  attached. The dialog says what each step will do before anything runs, then how each went;
+  a step that failed (a push refused, the forge unreachable) can be resumed from there, the
+  steps before it kept. Ctrl+Z takes the version commit and the tag back off here; what was
+  pushed and published stays.
 
 **Changes and commits** (right)
 
@@ -354,6 +369,8 @@ was made this way, on a demo repository.
 | `src/pull_request/mod.rs` | one pull request in full, whatever the forge: details, checks, comments, changes, safe markdown |
 | `src/pr_post/mod.rs` | what goes out: the `Target` trait each forge implements, and what they share (suggestions, merge rules) |
 | `src/pr_threads.rs` | review threads, the pending review and permissions                          |
+| `src/release/` | cutting a release: versions, Conventional Commits, notes, manifests, each step |
+| `src/repo/release/` | the release dialog: choices, what it will do, the steps as they run, resume and undo |
 | `src/avatars.rs`         | avatars from GitHub, Forgejo / Gitea, GitLab or Gravatar, cached on disk           |
 | `src/update.rs`          | new-release check                                                                  |
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |
