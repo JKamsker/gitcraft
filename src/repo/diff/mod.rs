@@ -3,6 +3,7 @@
 //! their objects. Uncommitted changes can be staged, unstaged or discarded a hunk or a few
 //! lines at a time.
 
+mod image_compare;
 mod images;
 mod jump;
 mod lfs;
@@ -70,6 +71,9 @@ pub struct DiffData {
     /// Side-by-side rows: (left line, right line).
     pub split: Vec<(Option<usize>, Option<usize>)>,
     pub image: Option<ImagePair>,
+    /// The two versions of the picture decoded, to compare in every mode; `None` when they
+    /// don't decode (they show as `image` then).
+    pub compare: Option<image_compare::Compare>,
     /// The file is kept in Git LFS: the objects before and after, shown instead of the lines.
     pub lfs: Option<LfsPair>,
     /// The patch's file header (`diff --git`, `index`, `---`, `+++`), for partial patches.
@@ -164,6 +168,9 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
     } else {
         None
     };
+    let compare = image
+        .as_ref()
+        .and_then(|pair| image_compare::compare(repo, key, &path, pair));
     let mut spans = highlight_sides(&path, &lines, dark);
     let (mut changed, split) = pair_lines(&lines);
     let mut lines = lines;
@@ -187,6 +194,7 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         changed,
         split,
         image,
+        compare,
         lfs,
         header,
         partial,
