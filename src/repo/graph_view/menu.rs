@@ -81,6 +81,7 @@ impl RepoTab {
         self.quick_edit_items(ui, &hash, idle, acts);
         ui.separator();
         self.bisect_menu_items(ui, &hash, idle, acts);
+        self.parallel_menu_items(ui, &hash, acts);
         ui.separator();
         let rewrite = Rewrite {
             hash: &hash,

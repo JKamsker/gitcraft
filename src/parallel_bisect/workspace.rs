@@ -1,9 +1,11 @@
 //! Where a parallel bisect works on the machine its tests run on: a repository there (the
-//! tab's own when it is on that machine, else a copy the commits are sent to), and in its git
-//! folder `gitcraft-bisect/`, which holds the worktrees, the test logs and what says who is
-//! using it. Everything the bisect makes is in there (and under `refs/gitcraft-bisect/`), so
-//! taking it away is all the cleaning up there is: when the bisect ends however it ends, and
-//! when the next one starts after a crash.
+//! tab's own when it is on that machine, else a copy the commits are sent to), and a folder of
+//! its own for that repository, `~/.cache/gitcraft/bisect/run-<hash of its git folder>`, which
+//! holds the worktrees, the test logs and what says who is using it. Outside the repository, so
+//! that what the tests build there isn't seen by the tab's watcher. Everything the bisect makes
+//! is in there (and under `refs/gitcraft-bisect/`), so taking it away is all the cleaning up
+//! there is: when the bisect ends however it ends, and when the next one starts after a crash
+//! (or the tab opens).
 
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
@@ -13,8 +15,11 @@ use super::runner;
 use crate::git;
 use crate::remote;
 
-/// The folder's name, in the repository's git folder.
+/// The refs the bisect makes, under `refs/`.
 const FOLDER: &str = "gitcraft-bisect";
+
+/// Where the folders are, under the home folder; each is `run-<hash>`.
+const RUNS: &str = ".cache/gitcraft/bisect";
 
 /// What says the folder is in use: `gitcraft <process> <unix seconds>`, rewritten every
 /// [`super::session::HEARTBEAT`] while the bisect runs.
@@ -53,9 +58,7 @@ impl Workspace {
         repo_there: Option<&str>,
     ) -> Result<Self, String> {
         let repo = repository_for(source, machine, repo_there)?;
-        let common = git_common_dir(&repo)?;
-        let base_there = format!("{}/{FOLDER}", common.trim_end_matches('/'));
-        let base = remote::resolve(&repo, &base_there);
+        let (base, base_there) = base_for(&repo, machine)?;
         claim(&base)?;
         if let Err(e) = refuse_if_in_use(&base, machine) {
             release(&base);
@@ -84,7 +87,7 @@ impl Workspace {
 
     /// Worktree `n`'s folder: as the app names it, and as a path there.
     pub fn slot(&self, n: usize) -> (PathBuf, String) {
-        let name = n.to_string();
+        let name = format!("bisect-{n}");
         (
             remote::join(&self.base, &name),
             format!("{}/{name}", self.base_there),
@@ -214,12 +217,10 @@ fn refuse_if_in_use(base: &Path, machine: &Machine) -> Result<(), String> {
 /// Clears what a crashed bisect left in `repo`'s git folder, if anything; one running (here
 /// or in another window) is left alone.
 pub fn clear_leftovers(repo: &Path) {
-    let Ok(common) = git_common_dir(repo) else {
+    let machine = Machine::of(repo);
+    let Ok((base, base_there)) = base_for(repo, &machine) else {
         return;
     };
-    let base_there = format!("{}/{FOLDER}", common.trim_end_matches('/'));
-    let base = remote::resolve(repo, &base_there);
-    let machine = Machine::of(repo);
     if !remote::try_is_dir(&base).unwrap_or(false) || claim(&base).is_err() {
         return;
     }
@@ -238,10 +239,23 @@ pub fn clear_leftovers(repo: &Path) {
     let _ = ws.close();
 }
 
+/// The folder for bisecting in `repo` (on `machine`): as the app names it, and as a path there.
+pub fn base_for(repo: &Path, machine: &Machine) -> Result<(PathBuf, String), String> {
+    let common = git_common_dir(repo)?;
+    let home = machine.home()?.replace('\\', "/");
+    let digest = format!("{:x}", md5::compute(common.as_bytes()));
+    let there = format!(
+        "{}/{RUNS}/run-{}",
+        home.trim_end_matches('/'),
+        &digest[..12]
+    );
+    Ok((machine.path(&there), there))
+}
+
 /// What [`Workspace::clear`] runs in the repository there, `$1` the folder, `$2` the script
 /// that stops a test by its process file. Only a folder named so is ever removed.
 const CLEAR: &str = r#"b=$1
-case $b in */gitcraft-bisect) ;; *) echo "gitcraft: $b is no bisect folder" >&2; exit 1;; esac
+case $b in */.cache/gitcraft/bisect/run-*) ;; *) echo "gitcraft: $b is no bisect folder" >&2; exit 1;; esac
 if [ -d "$b" ]; then
   for f in "$b"/*.pid; do
     [ -f "$f" ] && sh -c "$2" gitcraft-bisect-stop "$f"

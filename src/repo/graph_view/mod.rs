@@ -21,9 +21,9 @@ use crate::theme::Tokens;
 use badge::{BadgeKind, badges};
 use row::Lanes;
 
-const ROW_H: f32 = 28.0;
+pub(super) const ROW_H: f32 = 28.0;
 /// Space between rows, which the graph's lines cross.
-const ROW_GAP: f32 = 2.0;
+pub(super) const ROW_GAP: f32 = 2.0;
 /// From one row to the next.
 const ROW_PITCH: f32 = ROW_H + ROW_GAP;
 /// From one lane to the next.

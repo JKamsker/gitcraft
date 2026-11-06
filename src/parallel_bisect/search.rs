@@ -52,6 +52,7 @@ impl Search {
         &self.dag
     }
 
+    #[cfg(test)]
     pub fn verdict(&self, i: usize) -> Option<Verdict> {
         self.verdicts.get(i).copied().flatten()
     }

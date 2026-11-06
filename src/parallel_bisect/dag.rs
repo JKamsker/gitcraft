@@ -66,10 +66,6 @@ impl Dag {
         self.hashes.len()
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.hashes.is_empty()
-    }
-
     pub fn index_of(&self, hash: &str) -> Option<usize> {
         self.index.get(hash).copied()
     }

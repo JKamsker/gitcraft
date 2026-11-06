@@ -3,6 +3,7 @@
 mod bisect;
 mod branch;
 mod confirm;
+mod parallel_bisect;
 mod remote;
 mod upstream;
 mod worktree;
@@ -10,6 +11,8 @@ mod worktree;
 use std::path::{Path, PathBuf};
 
 use egui::{Key, RichText};
+
+pub use parallel_bisect::ParallelForm;
 
 use super::widgets;
 use super::{Action, Refresh, RepoTab, Undo};
@@ -116,6 +119,8 @@ pub enum Dialog {
         command: String,
         focus: bool,
     },
+    /// A parallel bisect: its ends, command, machine and limits.
+    ParallelBisect(Box<ParallelForm>),
 }
 
 impl Dialog {
@@ -427,6 +432,7 @@ impl RepoTab {
                 Dialog::BisectRun { command, focus } => {
                     bisect::bisect_run(ui, enter, &machine, command, focus)
                 }
+                Dialog::ParallelBisect(form) => parallel_bisect::parallel_bisect(ui, enter, form),
                 Dialog::Confirm {
                     title,
                     body,

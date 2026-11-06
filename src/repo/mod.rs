@@ -24,6 +24,7 @@ mod load;
 mod messages;
 mod navigate;
 mod operations;
+mod parallel_bisect;
 mod patches;
 mod pinned_sections;
 mod pr_merge;
@@ -180,6 +181,8 @@ pub struct RepoTab {
     conflict_generation: u64,
     /// The bisect going on, and the output of `git bisect run`.
     bisect: bisect::Bisecting,
+    /// The parallel bisect running, or the last one, and the answers by tree.
+    parallel: parallel_bisect::Parallel,
 
     commit_summary: String,
     commit_body: String,
@@ -328,6 +331,7 @@ impl RepoTab {
             conflict: None,
             conflict_generation: 0,
             bisect: Default::default(),
+            parallel: Default::default(),
             commit_summary: String::new(),
             commit_body: String::new(),
             amend: false,

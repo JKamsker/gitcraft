@@ -89,6 +89,10 @@ impl RepoTab {
             Some(said) => resp.on_hover_text(said),
             None => resp,
         };
+        let resp = match self.parallel_mark(&painter, &t, rect, &commit.hash) {
+            Some(said) => resp.on_hover_text(said),
+            None => resp,
+        };
 
         let gx = rect.left() + cols.refs;
         let graph_row = self.graph.rows.get(i);
