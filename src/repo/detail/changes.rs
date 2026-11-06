@@ -36,6 +36,7 @@ impl RepoTab {
                 if !self.work.conflicted.is_empty() {
                     self.conflicted_list(ui, acts);
                 }
+                self.agent_turns(ui, acts);
                 self.unstaged_list(ui, acts);
                 self.staged_list(ui, acts);
             });

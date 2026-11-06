@@ -81,6 +81,7 @@ fn starting_a_task_makes_its_worktree_lists_it_and_hands_its_tab_the_agent() {
             base: "main".to_owned(),
             agent: "claude".to_owned(),
             prompt: "fix the 'login' bug".to_owned(),
+            hooks: true,
         }))),
         &ctx,
     );
@@ -93,6 +94,10 @@ fn starting_a_task_makes_its_worktree_lists_it_and_hands_its_tab_the_agent() {
     let on_disk = tasks::load(&dir).unwrap_or_default();
     let branch = git::run(Some(&folder), &["branch", "--show-current"]).unwrap_or_default();
     let base = git::head(&dir);
+    let claude =
+        std::fs::read_to_string(folder.join(".claude/settings.local.json")).unwrap_or_default();
+    let exclude = std::fs::read_to_string(dir.join(".git/info/exclude")).unwrap_or_default();
+    let clean = git::run(Some(&folder), &["status", "--porcelain"]).unwrap_or_default();
     let _ = std::fs::remove_dir_all(dir.parent().unwrap_or(&dir));
     assert!(listed, "{:?} {:?}", tab.status, tab.agents.error);
     assert!(opens);
@@ -114,6 +119,16 @@ fn starting_a_task_makes_its_worktree_lists_it_and_hands_its_tab_the_agent() {
         Some(r"claude 'fix the '\''login'\'' bug'")
     );
     assert_eq!(launch.label, "Claude Code");
+    // The hooks that save each turn, kept out of git.
+    assert!(
+        claude.contains("UserPromptSubmit") && claude.contains("checkpoint"),
+        "{claude}"
+    );
+    assert!(
+        exclude.contains("/.claude/settings.local.json"),
+        "{exclude}"
+    );
+    assert_eq!(clean, "", "the hooks' files show as no change");
 }
 
 /// Any worktree made from the tab gets the recipe, run in a real terminal of the tab when the

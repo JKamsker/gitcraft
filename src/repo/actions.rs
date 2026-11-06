@@ -367,6 +367,11 @@ impl RepoTab {
                 Action::Bake(super::bakeoff::BakeAct::OpenPicker),
             ),
             (
+                "Agent checkpoints: install hooks in this worktree".into(),
+                "agent".into(),
+                Action::Agent(super::agents::AgentAct::InstallHooks),
+            ),
+            (
                 "Worktree setup…".into(),
                 "agent".into(),
                 Action::Agent(super::agents::AgentAct::OpenRecipe),
