@@ -150,12 +150,15 @@ fn pdf_facts(b: &[u8]) -> Vec<Fact> {
     if let Some(pages) = page_count(b) {
         facts.push(("Pages".to_owned(), pages.to_string()));
     }
+    // The Info dictionary the last trailer names (an incremental update appends a new one),
+    // when it is plainly in the file; else the first strings found.
+    let info = info_object(b).unwrap_or(b);
     for (key, label) in [
         ("/Title", "Title"),
         ("/Author", "Author"),
         ("/Producer", "Made with"),
     ] {
-        if let Some(value) = info_string(b, key.as_bytes()) {
+        if let Some(value) = info_string(info, key.as_bytes()) {
             facts.push((label.to_owned(), value));
         }
     }
@@ -169,16 +172,42 @@ fn find_from(hay: &[u8], from: usize, needle: &[u8]) -> Option<usize> {
         .map(|i| i + from)
 }
 
-/// The pages: the largest `/Count` of a `/Type /Pages` dictionary (the root's), which
-/// incremental updates and object streams don't fool as counting `/Page`s would.
+/// The last `needle` in `hay[from..before]`.
+fn rfind_in(hay: &[u8], from: usize, before: usize, needle: &[u8]) -> Option<usize> {
+    hay.get(from..before)?
+        .windows(needle.len())
+        .rposition(|w| w == needle)
+        .map(|i| i + from)
+}
+
+/// The object around offset `i`: from its `N G obj` to its `endobj`, when they are within
+/// reach; else a few hundred bytes either side.
+fn object_around(b: &[u8], i: usize) -> &[u8] {
+    const REACH: usize = 4096;
+    let from = i.saturating_sub(REACH);
+    // The last `obj` before it, unless that is the `endobj` of the object before.
+    let start = rfind_in(b, from, i, b"obj").filter(|&o| o < 3 || &b[o - 3..o] != b"end");
+    let end = b[i..(i + REACH).min(b.len())]
+        .windows(6)
+        .position(|w| w == b"endobj")
+        .map(|e| i + e);
+    match (start, end) {
+        (Some(s), Some(e)) => &b[s..e],
+        _ => &b[i.saturating_sub(300)..(i + 300).min(b.len())],
+    }
+}
+
+/// The pages: the `/Count` of the root of the page tree (a `/Type /Pages` dictionary without
+/// a `/Parent`), the last one in the file: an incremental update appends the new root after the
+/// old. Counting `/Page`s would be fooled by those updates and by object streams.
 fn page_count(b: &[u8]) -> Option<u64> {
-    let mut best = None;
+    let mut last = None;
     let mut at = 0;
     while let Some(i) = find_from(b, at, b"/Count") {
         at = i + 6;
-        let window = &b[i.saturating_sub(300)..(i + 300).min(b.len())];
-        let pages = window.windows(6).any(|w| w == b"/Pages");
-        if !pages {
+        let object = object_around(b, i);
+        let has = |key: &[u8]| object.windows(key.len()).any(|w| w == key);
+        if !has(b"/Pages") || has(b"/Parent") {
             continue;
         }
         let digits: String = b[at..]
@@ -188,10 +217,39 @@ fn page_count(b: &[u8]) -> Option<u64> {
             .map(|&c| char::from(c))
             .collect();
         if let Ok(n) = digits.parse::<u64>() {
-            best = Some(best.map_or(n, |m: u64| m.max(n)));
+            last = Some(n);
         }
     }
-    best
+    last
+}
+
+/// The Info dictionary the last `/Info N G R` names, from its object's last `N G obj` to its
+/// `endobj`; `None` when it isn't plainly in the file (in an object stream…).
+fn info_object(b: &[u8]) -> Option<&[u8]> {
+    let i = rfind_in(b, 0, b.len(), b"/Info")?;
+    let words: Vec<&[u8]> = b[i + 5..]
+        .split(|c| c.is_ascii_whitespace())
+        .filter(|w| !w.is_empty())
+        .take(3)
+        .collect();
+    let [n, g, r] = words.as_slice() else {
+        return None;
+    };
+    if !r.starts_with(b"R") || !n.iter().chain(*g).all(u8::is_ascii_digit) {
+        return None;
+    }
+    let head = [*n, b" ", *g, b" obj"].concat();
+    let mut before = b.len();
+    let start = loop {
+        let o = rfind_in(b, 0, before, &head)?;
+        // `15 0 obj` isn't `5 0 obj`.
+        if o == 0 || !b[o - 1].is_ascii_digit() {
+            break o;
+        }
+        before = o;
+    };
+    let end = find_from(b, start, b"endobj").unwrap_or(b.len());
+    Some(&b[start..end])
 }
 
 /// `/Title (Report)` or `/Title(Report)`: the plain string after `key`, as Latin-1 or, when
@@ -288,5 +346,28 @@ mod tests {
             facts.contains(&("Pages".to_owned(), "12".to_owned())),
             "{facts:?}"
         );
+    }
+
+    /// After an incremental update, the pages and title are the update's: the last root of
+    /// the page tree (not a branch of it), the Info the last trailer names (not a bookmark's
+    /// title, not an object whose number ends the same).
+    #[test]
+    fn pdf_facts_of_the_last_update() -> Result<(), String> {
+        let pdf = b"%PDF-1.4\n\
+            1 0 obj << /Type /Outlines /Title (Bookmark) >> endobj\n\
+            2 0 obj << /Type /Pages /Kids [6 0 R] /Count 10 >> endobj\n\
+            5 0 obj << /Title (Draft) >> endobj\n\
+            trailer << /Root 3 0 R /Info 5 0 R >>\n%%EOF\n\
+            2 0 obj << /Type /Pages /Kids [6 0 R 7 0 R] /Count 9 >> endobj\n\
+            6 0 obj << /Type /Pages /Parent 2 0 R /Kids [] /Count 4 >> endobj\n\
+            5 0 obj << /Title (Final) /Author (Zo) >> endobj\n\
+            15 0 obj << /Title (Other) >> endobj\n\
+            trailer << /Root 3 0 R /Info 5 0 R /Prev 9 >>\n%%EOF\n";
+        let facts = describe("u.pdf", pdf).1;
+        let get = |k: &str| facts.iter().find(|(f, _)| f == k).map(|(_, v)| v.clone());
+        if get("Pages").as_deref() != Some("9") || get("Title").as_deref() != Some("Final") {
+            return Err(format!("{facts:?}"));
+        }
+        Ok(())
     }
 }

@@ -173,8 +173,9 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
     };
     let binary = (image.is_none() && lfs.is_none() && binary::is_binary_patch(&text))
         .then(|| binary::load_pair(repo, key, &path, renamed_from(&text)));
-    // A diff of what the file's textconv made of it: its lines aren't the file's.
-    let textconv = (binary.is_none() && !lines.is_empty())
+    // A diff of what the file's textconv made of it: its lines aren't the file's. Not for a
+    // symbolic link: git diffs those with its default driver, whatever the attribute says.
+    let textconv = (binary.is_none() && !lines.is_empty() && !is_symlink_patch(&text))
         .then(|| binary::textconv_for(repo, &path))
         .flatten();
     let partial = partial && textconv.is_none();
@@ -214,6 +215,18 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
 }
 
 /// Whether hunks and lines of this diff can be picked on their own.
+/// Whether the patch is of a symbolic link (mode 120000 before its first hunk, no file mode).
+pub(super) fn is_symlink_patch(text: &str) -> bool {
+    let modes: Vec<&str> = text
+        .split_terminator('\n')
+        .take_while(|l| !l.starts_with("@@"))
+        .filter(|l| l.starts_with("index ") || l.contains(" mode "))
+        .filter_map(|l| l.rsplit(' ').next())
+        .filter(|m| m.len() == 6 && m.bytes().all(|c| c.is_ascii_digit()))
+        .collect();
+    modes.contains(&"120000") && modes.iter().all(|m| *m == "120000")
+}
+
 fn can_pick(key: &DiffKey, opts: DiffOptions, header: &str, lines: &[DiffLine]) -> bool {
     // A patch made from a `-w` diff wouldn't apply; new, deleted, renamed and binary files,
     // truncated diffs and text that isn't UTF-8 only go whole.

@@ -170,11 +170,15 @@ so your config, credentials and hooks apply as usual.
   change of kind), what changed in size, and a before / after table of what can be told about
   them (a PDF's version, pages, title and author; an archive's members and unpacked size;
   the dimensions of a picture the image view doesn't take). Then _Text_, _Members_ or _Bytes_:
-  the text of Word, PowerPoint and OpenDocument files, the cells of Excel sheets, and the text
-  of PDFs where it is plainly in them, diffed line by line; the members of a ZIP-based file
-  added, removed and changed; and the first 64 KB of both sides in hex, bytes that differ at
-  the same offset marked. Files over 64 MB aren't read. A file with a `textconv` driver shows
-  git's text of it, said so above the diff, and is staged as a whole.
+  the text of Word and OpenDocument files, the slides of PowerPoint files in the order they
+  are shown, the cells of Excel sheets (a formula next to its value), and the text of PDFs
+  where it is plainly in them, diffed line by line; the members of a ZIP-based file added,
+  removed and changed; and the first 64 KB of both sides in hex, bytes that differ at the same
+  offset marked. Files over 64 MB aren't read. A note says when a side's text is incomplete (a
+  slide or sheet too big to read), when the texts are too unlike to match line by line, and
+  when a side couldn't be read or its member list is damaged (its members then aren't
+  compared). A file with a `textconv` driver shows git's text of it, said so above the diff,
+  and is staged or unstaged as a whole.
 - The arrows in a diff's header (F7 / Shift+F7, or Alt+↓ / Alt+↑) jump to the next and previous
   change. The strip beside the scrollbar marks where the changes are, removals red and additions
   green; click a mark to jump to its change, or anywhere else on the strip to scroll there.
