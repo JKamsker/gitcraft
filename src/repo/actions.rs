@@ -122,6 +122,8 @@ pub(crate) enum Action {
     SaveConflict,
     /// Let Mergiraf solve what it can of the open conflict.
     SolveWithMergiraf,
+    /// Preview keeping both versions of a conflicted file that can't be merged.
+    KeepBoth(String),
     /// A file's history, blame or contents in the central pane (`rev`: the commit they are at).
     FileView {
         path: String,

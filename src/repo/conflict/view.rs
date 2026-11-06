@@ -179,8 +179,9 @@ impl ConflictEditor {
                 if !editable {
                     ui.disable();
                 }
+                self.original.prepare(&self.segments);
                 let mut k = 0;
-                let mut pick = None;
+                let (mut pick, mut toggle) = (None, None);
                 for seg in &self.segments {
                     let Segment::Conflict { ours, theirs, .. } = seg else {
                         continue;
@@ -216,6 +217,17 @@ impl ConflictEditor {
                                     side_box(col, t, (k, side), name, text, picked);
                                 }
                             });
+                            ui.add_space(6.0);
+                            if super::original_view::section(
+                                ui,
+                                t,
+                                (k, self.original.is_open(k)),
+                                self.original.of(&self.segments, k),
+                                self.original.diffs(k),
+                                names,
+                            ) {
+                                toggle = Some(k);
+                            }
                         });
                     let (sep, _) =
                         ui.allocate_exact_size(vec2(ui.available_width(), 1.0), Sense::hover());
@@ -224,6 +236,9 @@ impl ConflictEditor {
                 }
                 if let Some((k, choice)) = pick {
                     self.choose(k, choice);
+                }
+                if let Some(k) = toggle {
+                    self.original.toggle(k);
                 }
             });
     }

@@ -3,6 +3,7 @@
 
 mod command;
 mod commits;
+mod conflict;
 mod diff;
 mod files;
 mod lfs;
@@ -13,6 +14,7 @@ mod worktree;
 
 pub use self::command::*;
 pub use self::commits::*;
+pub use self::conflict::*;
 pub use self::diff::*;
 pub use self::files::*;
 pub use self::lfs::*;

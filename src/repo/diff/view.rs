@@ -232,6 +232,17 @@ impl RepoTab {
                 refresh: Refresh::Status,
             });
         }
+        if file.area == Area::Conflicted
+            && ui
+                .add_enabled(idle, egui::Button::new("Keep both…"))
+                .on_hover_text(
+                    "Write each side's version as a file of its own, named after its branch, \
+                     for a file that can't be merged (an image, an archive…)",
+                )
+                .clicked()
+        {
+            acts.push(Action::KeepBoth(file.path.clone()));
+        }
         // The lines clicked in the diff.
         let chosen = view.chosen.len();
         if !partial || chosen == 0 {
