@@ -196,6 +196,9 @@ impl RepoTab {
                 if label.contains("etch") {
                     self.load_prs(ctx);
                 }
+                if label.starts_with("Push") {
+                    self.locks_after_push(ctx);
+                }
                 if let Some((_, path)) = self.open_when_done.take_if(|(l, _)| *l == label) {
                     self.open_request = Some(super::OpenRequest::Worktree(path));
                 }

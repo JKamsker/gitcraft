@@ -33,6 +33,7 @@ impl RepoTab {
                 if let Some(state) = self.work.in_progress {
                     self.in_progress_banner(ui, acts, state);
                 }
+                self.lock_banners(ui, acts);
                 if !self.work.conflicted.is_empty() {
                     self.conflicted_list(ui, acts);
                 }
@@ -209,8 +210,11 @@ impl RepoTab {
             selected,
             RowExtra::Buttons(buttons),
         );
+        self.lock_badge(ui, &r.row, &f.path, !buttons.is_empty());
         if f.code != 'D' {
-            widgets::file_menu(&r.row, &f.path, None, true, acts);
+            let locks =
+                |ui: &mut Ui, acts: &mut Vec<Action>| self.lock_menu_items(ui, &f.path, acts);
+            widgets::file_menu_with(&r.row, &f.path, None, true, locks, acts);
         }
         match r.button {
             Some(i) => RowClick::Button(i),

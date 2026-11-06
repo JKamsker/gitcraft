@@ -56,6 +56,7 @@ const SOURCES: &[(&str, &str)] = icons![
     "keyboard",
     "laptop",
     "list",
+    "lock",
     "log-in",
     "minus",
     "package",

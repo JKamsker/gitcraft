@@ -155,7 +155,10 @@ impl RepoTab {
                         DiffKey::Range { to: None, .. } => (None, false),
                         DiffKey::Work(_) => (None, true),
                     };
-                    widgets::file_menu(&title, path, rev, ignorable, acts);
+                    let locks = |ui: &mut Ui, acts: &mut Vec<Action>| {
+                        self.lock_menu_items(ui, path, acts);
+                    };
+                    widgets::file_menu_with(&title, path, rev, ignorable, locks, acts);
                     widgets::chip(ui, origin, t.text_dim);
                     let before = if rendered {
                         matches!(&view.rendered, Some(Ok(md)) if md.before)
