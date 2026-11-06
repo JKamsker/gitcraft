@@ -9,6 +9,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
+use super::inbox::{self, InboxPr};
 use super::{Hosting, NewPullRequest, Pages, Provider, PullRequest, cli};
 use crate::avatars::Hint;
 use crate::pr_post::Target;
@@ -104,6 +105,25 @@ impl Provider for GitHub {
             .into_iter()
             .map(|(email, url)| (email, Hint::Url(url)))
             .collect()
+    }
+
+    /// Two lists: those whose review is asked of you (or a team of yours), and yours with
+    /// their checks, comments and reviews.
+    fn inbox(&self, repo: &Path, _: &Hosting) -> Result<Vec<InboxPr>, String> {
+        const FIELDS: &str = "number,title,url,author,isDraft,updatedAt";
+        let list = |filter: &[&str], fields: &str| {
+            let mut args = vec!["pr", "list", "--state", "open", "--limit", "50"];
+            args.extend(filter);
+            args.extend(["--json", fields]);
+            gh(repo, &args)
+        };
+        let asked = list(&["--search", "review-requested:@me"], FIELDS)?;
+        let mine_fields = format!("{FIELDS},statusCheckRollup,comments,reviews");
+        let mine = list(&["--author", "@me"], &mine_fields)?;
+        Ok(inbox::merged(vec![
+            inbox::parse_github(&asked, true)?,
+            inbox::parse_github(&mine, false)?,
+        ]))
     }
 
     fn pages(&self) -> Option<&dyn Pages> {

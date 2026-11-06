@@ -3,6 +3,7 @@
 mod askpass_dialog;
 mod clone;
 mod home;
+mod inbox;
 mod palette;
 mod panels;
 mod profiles;
@@ -61,6 +62,8 @@ struct Saved {
     profile_states: profiles::ProfileStates,
     /// Named groups of repositories, on the start page.
     workspaces: crate::across::workspaces::Workspaces,
+    /// What was seen of each pull request (by URL) when it was opened from the inbox.
+    inbox_seen: BTreeMap<String, crate::forge::inbox::Seen>,
 }
 
 enum Tab {
@@ -128,6 +131,8 @@ pub struct App {
     workspaces: crate::across::workspaces::Workspaces,
     /// How the workspaces' repositories stand, as last looked at.
     workspaces_view: workspaces::WorkspacesView,
+    inbox: inbox::Inbox,
+    inbox_seen: BTreeMap<String, crate::forge::inbox::Seen>,
 }
 
 impl App {
@@ -189,6 +194,8 @@ impl App {
             tab_looks: saved.tab_looks,
             workspaces: saved.workspaces,
             workspaces_view: Default::default(),
+            inbox: Default::default(),
+            inbox_seen: saved.inbox_seen,
         };
         update::clean_up();
         let mut kept = Vec::new();
@@ -485,6 +492,7 @@ impl eframe::App for App {
         self.poll_clone(&ctx);
         self.poll_connecting(&ctx);
         self.poll_update(&ctx);
+        self.poll_inbox_opening(&ctx);
         self.notice_profile_git(&ctx);
         let focused = self.shortcuts(&ctx);
 
@@ -553,6 +561,7 @@ impl eframe::App for App {
             tab_looks: self.tab_looks.clone(),
             profile_states: self.profile_states.clone(),
             workspaces: self.workspaces.clone(),
+            inbox_seen: self.inbox_seen.clone(),
         };
         eframe::set_value(storage, eframe::APP_KEY, &saved);
     }

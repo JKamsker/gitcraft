@@ -110,6 +110,8 @@ impl App {
 
                     ui.add_space(30.0);
                     self.workspaces_section(ui);
+                    ui.add_space(24.0);
+                    self.inbox_section(ui);
 
                     if !self.recent.is_empty() {
                         ui.add_space(24.0);

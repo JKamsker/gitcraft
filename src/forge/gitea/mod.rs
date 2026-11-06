@@ -12,8 +12,11 @@
 //! Without one, public repositories can still be read.
 
 mod details;
+mod inbox;
 #[cfg(test)]
 mod live;
+#[cfg(test)]
+mod live_inbox;
 mod post;
 
 use std::collections::HashMap;
@@ -24,6 +27,7 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 
 use super::http::{Api, Login};
+use super::inbox::InboxPr;
 use super::{Forge, Hosting, NewPullRequest, Pages, Provider, PullRequest};
 use crate::avatars::Hint;
 use crate::pr_post::Target;
@@ -94,6 +98,10 @@ impl Provider for GiteaFamily {
             .into_iter()
             .map(|(email, url)| (email, Hint::Url(url)))
             .collect()
+    }
+
+    fn inbox(&self, _: &Path, hosting: &Hosting) -> Result<Vec<InboxPr>, String> {
+        inbox::inbox(&self.api(hosting), hosting)
     }
 
     fn pages(&self) -> Option<&dyn Pages> {

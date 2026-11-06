@@ -107,8 +107,9 @@ jobs:
       - name: Test against them
         run: |
           cargo test --locked --lib forge::gitea::live -- --ignored --nocapture 2>&1 | tee live.log
-          # Green has to mean both ran: a renamed module would match nothing and pass.
-          grep -q "test result: ok. 2 passed" live.log
+          # Green has to mean all ran (a pull request's life and the inbox, on each server): a
+          # renamed module would match nothing and pass.
+          grep -q "test result: ok. 4 passed" live.log
       - name: Server logs
         if: failure()
         env:

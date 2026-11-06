@@ -4,6 +4,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
+use super::inbox::{self, InboxPr};
 use super::{Hosting, NewPullRequest, Provider, PullRequest, cli};
 use crate::avatars::Hint;
 
@@ -54,6 +55,20 @@ impl Provider for GitLab {
             args.push("--draft");
         }
         self.run(repo, &args).map(|out| out.trim().to_owned())
+    }
+
+    /// Two lists: those whose review is asked of you, and yours.
+    fn inbox(&self, repo: &Path, _: &Hosting) -> Result<Vec<InboxPr>, String> {
+        let list = |who: &str| {
+            let args = ["mr", "list", who, "--output", "json", "--per-page", "50"];
+            self.run(repo, &args)
+        };
+        let asked = list("--reviewer=@me")?;
+        let mine = list("--author=@me")?;
+        Ok(inbox::merged(vec![
+            inbox::parse_gitlab(&asked, true)?,
+            inbox::parse_gitlab(&mine, false)?,
+        ]))
     }
 
     /// The host's own avatar API, asked by email.
