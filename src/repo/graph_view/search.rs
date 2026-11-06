@@ -81,8 +81,14 @@ impl RepoTab {
             })
             .desired_width(ui.available_width() - 290.0)
             .margin(egui::Margin::symmetric(8, 4))
-            // Tab picks a suggestion instead of leaving the field.
-            .lock_focus(listing_open)
+            // While the list is open, Tab picks a suggestion and Esc closes the list, instead
+            // of egui taking the focus off the field for them.
+            .event_filter(egui::EventFilter {
+                tab: listing_open,
+                escape: listing_open,
+                horizontal_arrows: true,
+                vertical_arrows: true,
+            })
             .show(ui);
         let edit = out
             .response
@@ -142,8 +148,9 @@ impl RepoTab {
         }
     }
 
-    /// Takes the keys the open list uses away from the field: the arrows and Tab always,
-    /// Enter and Esc only once a suggestion is highlighted (else they search and close).
+    /// Takes the keys the open list uses away from the field: the arrows, Tab and Esc (which
+    /// closes the list, not the search), and Enter once a suggestion is highlighted (else it
+    /// goes to the next result).
     fn take_list_keys(&self, ui: &mut Ui) -> ListKeys {
         let chosen = self.search.suggest.chosen.is_some();
         ui.input_mut(|i| ListKeys {
@@ -151,7 +158,7 @@ impl RepoTab {
             up: i.consume_key(Modifiers::NONE, Key::ArrowUp),
             tab: i.consume_key(Modifiers::NONE, Key::Tab),
             enter: chosen && i.consume_key(Modifiers::NONE, Key::Enter),
-            esc: chosen && i.consume_key(Modifiers::NONE, Key::Escape),
+            esc: i.consume_key(Modifiers::NONE, Key::Escape),
         })
     }
 
