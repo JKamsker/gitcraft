@@ -14,6 +14,8 @@ pub struct StackCommit {
     pub summary: String,
     /// How far down the branch: 0 for HEAD.
     pub depth: usize,
+    /// Its upstream has it: rewriting it needs a force push.
+    pub pushed: bool,
 }
 
 /// Most commits looked at.
@@ -51,6 +53,8 @@ pub fn absorb_stack(repo: &Path, branch: &str) -> Result<Vec<StackCommit>, Strin
         glob(upstream.strip_prefix("refs/remotes/").unwrap_or(&upstream))
     );
     let max = format!("--max-count={STACK_MAX}");
+    // `origin/HEAD` is the remote's default branch under another name.
+    let heads = "--exclude=*/HEAD";
     let mut args = vec![
         "log",
         NO_SIGNATURE,
@@ -64,10 +68,30 @@ pub fn absorb_stack(repo: &Path, branch: &str) -> Result<Vec<StackCommit>, Strin
         "--branches",
     ];
     if upstream.starts_with("refs/remotes/") {
-        args.push(&theirs);
+        args.extend([theirs.as_str(), heads]);
     }
     args.extend(["--remotes", "--"]);
     let out = run(Some(repo), &args)?;
+    // Those the upstream doesn't have yet.
+    let unpushed: std::collections::HashSet<String> = if upstream.is_empty() {
+        Default::default()
+    } else {
+        run(
+            Some(repo),
+            &[
+                "rev-list",
+                "--first-parent",
+                &max,
+                "HEAD",
+                "--not",
+                "@{upstream}",
+                "--",
+            ],
+        )?
+        .lines()
+        .map(str::to_owned)
+        .collect()
+    };
     let mut stack = Vec::new();
     for (depth, record) in out.lines().enumerate() {
         let mut fields = record.split('\0');
@@ -82,6 +106,7 @@ pub fn absorb_stack(repo: &Path, branch: &str) -> Result<Vec<StackCommit>, Strin
             hash: hash.to_owned(),
             summary: summary.unwrap_or_default().to_owned(),
             depth,
+            pushed: !upstream.is_empty() && !unpushed.contains(hash),
         });
     }
     Ok(stack)

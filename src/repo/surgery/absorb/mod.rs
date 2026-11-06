@@ -177,6 +177,12 @@ pub(crate) struct AbsorbEditor {
     pub checked: Option<Checked>,
     pub busy: bool,
     pub error: Option<String>,
+    /// The files that stay staged whole (no runs of lines of HEAD to follow).
+    pub whole: Vec<String>,
+    /// What each hunk's match says, worked out once.
+    pub verdicts: Vec<(String, egui::Color32)>,
+    /// How tall each hunk's card was last drawn: those out of sight only take their place.
+    pub heights: Vec<Option<f32>>,
 }
 
 impl AbsorbEditor {
@@ -191,7 +197,17 @@ impl AbsorbEditor {
                 _ => None,
             })
             .collect();
+        let whole = read
+            .files
+            .iter()
+            .enumerate()
+            .filter(|(f, _)| !read.hunks.iter().any(|h| h.file == *f))
+            .map(|(_, file)| file.path.clone())
+            .collect();
         Self {
+            whole,
+            verdicts: Vec::new(),
+            heights: Vec::new(),
             id: IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             head: read.head,
             targets: read.targets,
@@ -216,11 +232,25 @@ impl AbsorbEditor {
         }
     }
 
-    /// Whether line `i` of file `f` goes into commit `t` (or anywhere, `None`).
-    fn goes(&self, f: usize, i: usize, t: Option<usize>) -> bool {
-        self.hunks.iter().zip(&self.choice).any(|(h, c)| {
-            h.file == f && c.is_some() && (t.is_none() || *c == t) && h.lines.contains(&i)
-        })
+    /// For each file, the commit each of its lines goes into, if any: worked out once, for
+    /// the patches to be made in the background.
+    pub fn table(&self) -> Vec<Vec<Option<usize>>> {
+        let mut table: Vec<Vec<Option<usize>>> = self
+            .files
+            .iter()
+            .map(|f| vec![None; f.lines.len()])
+            .collect();
+        for (h, c) in self.hunks.iter().zip(&self.choice) {
+            let Some(c) = c else { continue };
+            if let Some(row) = table.get_mut(h.file) {
+                for &i in &h.lines {
+                    if let Some(slot) = row.get_mut(i) {
+                        *slot = Some(*c);
+                    }
+                }
+            }
+        }
+        table
     }
 
     /// The commits getting fixes, oldest first.
@@ -249,24 +279,23 @@ impl AbsorbEditor {
         }
         None
     }
+}
 
-    /// For each commit getting fixes, the patch of them; then of every fix, and of everything
-    /// staged.
-    pub fn patches(&self) -> (Vec<(usize, String)>, String, String) {
-        let each = self
-            .chosen_targets()
-            .into_iter()
-            .map(|t| {
-                (
-                    t,
-                    patchset::patch_of(&self.files, |f, u| self.goes(f, u, Some(t))),
-                )
-            })
-            .collect();
-        let all = patchset::patch_of(&self.files, |f, u| self.goes(f, u, None));
-        let staged = patchset::patch_of(&self.files, |_, _| true);
-        (each, all, staged)
-    }
+/// For each commit getting fixes (`targets`), the patch of them; then of every fix, and of
+/// everything staged. `table`: see [`AbsorbEditor::table`].
+pub(crate) fn patches(
+    files: &[FilePatch],
+    table: &[Vec<Option<usize>>],
+    targets: &[usize],
+) -> (Vec<(usize, String)>, String, String) {
+    let at = |f: usize, u: usize| table.get(f).and_then(|r| r.get(u)).copied().flatten();
+    let each = targets
+        .iter()
+        .map(|&t| (t, patchset::patch_of(files, |f, u| at(f, u) == Some(t))))
+        .collect();
+    let all = patchset::patch_of(files, |f, u| at(f, u).is_some());
+    let staged = patchset::patch_of(files, |_, _| true);
+    (each, all, staged)
 }
 
 /// Makes the trees of the fixups on `head`, of what is staged, and the patch of what stays.
@@ -300,6 +329,16 @@ pub(crate) fn prepare(
     }
     let absorbed = tree(all)?;
     let staged_tree = tree(staged)?;
+    if git::run(
+        Some(repo),
+        &["diff", "--cached", "--quiet", &staged_tree, "--"],
+    )
+    .is_err()
+    {
+        return Err(
+            "what is staged changed since this was opened: close it and open it again".to_owned(),
+        );
+    }
     let rest_patch = git::patch_between(repo, &absorbed, &staged_tree)?;
     let rest = if rest_patch.is_empty() {
         None
@@ -336,6 +375,20 @@ impl RepoTab {
             ));
             return;
         }
+        if self.work.staged.is_empty() {
+            self.status = Some((
+                "Distribute staged fixes: nothing is staged, stage the fixes first".to_owned(),
+                true,
+            ));
+            return;
+        }
+        if self.split.is_some() || self.rebase.is_some() {
+            self.status = Some((
+                "Distribute staged fixes: close the editor that is open first".to_owned(),
+                true,
+            ));
+            return;
+        }
         self.status = Some(("Distribute staged fixes: reading…".to_owned(), false));
         let path = self.path.clone();
         self.then(
@@ -343,7 +396,10 @@ impl RepoTab {
             move || read(&path, &branch),
             |tab, result, _| match result {
                 Ok(_) if tab.rebase.is_some() || tab.conflict.is_some() || tab.split.is_some() => {
-                    tab.status = None;
+                    tab.status = Some((
+                        "Distribute staged fixes: another editor opened meanwhile".to_owned(),
+                        true,
+                    ));
                 }
                 Ok(read) => {
                     tab.status = None;
@@ -363,7 +419,11 @@ impl RepoTab {
         if editor.problem().is_some() {
             return;
         }
-        let (each, all, staged) = editor.patches();
+        let (files, table, targets) = (
+            editor.files.clone(),
+            editor.table(),
+            editor.chosen_targets(),
+        );
         let names: Vec<String> = editor
             .targets
             .iter()
@@ -375,7 +435,10 @@ impl RepoTab {
         let path = self.path.clone();
         self.then(
             ctx,
-            move || prepare(&path, &head, &each, &all, &staged, &names),
+            move || {
+                let (each, all, staged) = patches(&files, &table, &targets);
+                prepare(&path, &head, &each, &all, &staged, &names)
+            },
             move |tab, result, _| {
                 let Some(editor) = tab.absorb.as_mut().filter(|e| e.id == id) else {
                     return;
@@ -471,14 +534,19 @@ impl RepoTab {
             (before, after),
             Undo::HeadMove { mode: "--soft" },
             move |tab, started| {
+                // Cancelled meanwhile: nothing runs.
                 let Some(editor) = tab.absorb.as_mut().filter(|e| e.id == id) else {
-                    return;
+                    return false;
                 };
                 match started {
-                    Ok(()) => tab.absorb = None,
+                    Ok(()) => {
+                        tab.absorb = None;
+                        true
+                    }
                     Err(e) => {
                         editor.busy = false;
                         editor.error = Some(e);
+                        false
                     }
                 }
             },

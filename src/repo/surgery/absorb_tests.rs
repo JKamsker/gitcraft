@@ -223,3 +223,42 @@ fn an_installed_git_absorb_is_offered_and_undone_as_one_step() {
     assert_eq!(head, before);
     assert_eq!(staged, "a");
 }
+
+/// Commits the upstream has are offered, marked pushed; nothing staged is said before reading.
+#[test]
+fn pushed_commits_are_marked_and_nothing_staged_is_said() {
+    let dir = repo("absorb-pushed", HISTORY);
+    let remote = dir.with_extension("remote");
+    let _ = std::fs::remove_dir_all(&remote);
+    sh(
+        &dir,
+        &format!(
+            "git init -q --bare '{r}' && git remote add origin '{r}' \
+             && git push -q -u origin HEAD~1:refs/heads/feat && git branch -q -u origin/feat",
+            r = remote.display()
+        ),
+    );
+    let (mut tab, ctx) = opened(&dir);
+    tab.open_absorb(&ctx);
+    let nothing = tab.status.clone();
+    sh(
+        &dir,
+        "printf '1\\nZWEI\\n3\\n4\\n5\\n6\\n7\\n8\\nneun\\n10\\n' > 'f é.txt' && git add -A",
+    );
+    tab.work = crate::git::status(&dir).unwrap_or_default();
+    open(&mut tab, &ctx);
+    let targets: Vec<(String, bool)> = tab
+        .absorb
+        .as_ref()
+        .map(|a| {
+            a.targets
+                .iter()
+                .map(|t| (t.summary.clone(), t.pushed))
+                .collect()
+        })
+        .unwrap_or_default();
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(&remote);
+    assert!(nothing.is_some_and(|s| s.1 && s.0.contains("nothing is staged")));
+    assert_eq!(targets, [("B".to_owned(), false), ("A".to_owned(), true)]);
+}
