@@ -194,6 +194,24 @@ so your config, credentials and hooks apply as usual.
 - _View all files_ under a commit's files lists every file of the commit, not only those it
   changed; click one to read it as it was in that commit.
 
+**Repository doctor** (the wrench in the toolbar, or _Doctor: …_ in the palette)
+
+- A page in the big area, its sections listed on the left as in Settings; Esc closes it.
+  Everything is read in the background, and changes run as the tab's operations.
+- _Which configuration wins_: the settings that explain why git behaves differently here (pull
+  strategy, push, signing, line endings, file handling, performance…), each with the value in
+  effect and its scope and file (`git config --show-origin --show-scope --includes`). Opened,
+  every value git read, the one in effect on top and those it overrides below. _Remove_ takes
+  a value out of its file so the others apply again; _Set it for_ writes a value for this
+  repository, this worktree, all your repositories (`~/.gitconfig`) or everyone on the
+  machine; _Compare with the other worktrees_ shows what it is in each. A value from a
+  gitcraft profile's file is marked as such and changed in Settings → Profile. Only an
+  allowlist of settings is read: nothing credential-related is ever shown.
+- _Hidden changes_: tracked files marked `assume-unchanged` or `skip-worktree`
+  (`git ls-files -v`), whose changes never show under Changes, what each flag is for, and
+  clearing them (all, or those ticked). Files sparse-checkout leaves out carry the same mark
+  but are listed apart, with how sparse-checkout is set up, and are never cleared.
+
 **Toolbar, terminal, app**
 
 - Undo, redo, Fetch, Pull and Push (with incoming / outgoing counts), new branch, stash, terminal,
@@ -379,6 +397,8 @@ was made this way, on a demo repository.
 | `src/repo/highlight.rs`  | syntax colours (syntect)                                                           |
 | `src/vscode_theme.rs`    | VS Code's current colour theme as a syntect theme                                  |
 | `src/repo/conflict.rs`   | three-pane conflict editor                                                         |
+| `src/repo/doctor/`       | the repository doctor: its page, sections and what they ask the tab to do          |
+| `src/git/doctor/`        | what the doctor reads and changes: config origins, hidden flags                    |
 | `src/mergiraf.rs` | Mergiraf, run as the user's own command when it is installed |
 | `src/repo/rebase.rs`     | interactive rebase editor and its todo list                                        |
 | `src/repo/file_view.rs`  | a file's history, blame and contents at a commit                                   |

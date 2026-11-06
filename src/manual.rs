@@ -59,6 +59,14 @@ const FEATURES: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "Repository doctor",
+        &[
+            "The wrench in the toolbar (or Doctor: … in the palette) opens the repository doctor in the big area, its sections on the left; Esc closes it.",
+            "Which configuration wins: each setting (pull, signing, line endings, …) with the value in effect and its scope and file; open one for every value git read, the one that wins on top. Remove a value from its file so the others apply again, set it for this repository, this worktree, all your repositories or everyone on the machine, and compare it across worktrees. Nothing credential-related is shown.",
+            "Hidden changes: tracked files marked assume-unchanged or skip-worktree, which never show under Changes, what each flag means, and clearing those set by mistake, all or the ticked ones. Files sparse-checkout leaves out are listed apart: they are not flags anyone set.",
+        ],
+    ),
+    (
         "Branches, remotes and more",
         &[
             "Left pane: local branches with ahead / behind counts, remotes, worktrees, submodules, stashes, pull requests and tags.",
