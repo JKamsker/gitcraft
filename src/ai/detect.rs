@@ -22,6 +22,27 @@ const CMD: &str = "(where claude >nul 2>nul && echo claude) & \
 (where codex >nul 2>nul && echo codex) & \
 (where gh >nul 2>nul && gh copilot --help >nul 2>nul <nul && echo copilot) & ver >nul";
 
+/// Where looking for the tools of a machine stands.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum Look {
+    #[default]
+    NotYet,
+    Looking,
+    Found(Vec<AiTool>),
+    Failed(String),
+}
+
+impl Look {
+    /// Whether `tool` was found; `None` while that isn't known. A custom command always is.
+    pub fn has(&self, tool: AiTool) -> Option<bool> {
+        match self {
+            _ if tool == AiTool::Custom => Some(true),
+            Look::Found(found) => Some(found.contains(&tool)),
+            _ => None,
+        }
+    }
+}
+
 /// The tools named in what the look printed, in the order they are offered.
 pub fn parse(out: &str) -> Vec<AiTool> {
     let words: Vec<&str> = out.split_whitespace().collect();

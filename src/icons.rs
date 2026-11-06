@@ -72,6 +72,7 @@ const SOURCES: &[(&str, &str)] = icons![
     "server",
     "settings",
     "smartphone",
+    "sparkles",
     "square-terminal",
     "star",
     "tag",

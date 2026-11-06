@@ -62,6 +62,7 @@ impl RepoTab {
             });
 
         self.dialogs(&ctx, &mut acts);
+        self.ai_review_window(&ctx);
         for action in acts {
             self.apply(action, &ctx);
         }

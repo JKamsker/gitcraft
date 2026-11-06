@@ -162,6 +162,7 @@ impl RepoTab {
                 ));
             }
         }
+        self.review_item(ui, acts, b);
         ui.separator();
         self.publish_items(ui, acts, b, idle);
         ui.separator();
@@ -185,6 +186,34 @@ impl RepoTab {
         self.visibility_items(ui, acts, &local_ref(&b.name), b.is_head);
         ui.separator();
         self.delete_items(ui, acts, b, idle);
+    }
+
+    /// _Review this branch_: the AI tool reviews what `b` adds to the branch pull requests
+    /// usually go to (to the checked-out one, for that branch itself).
+    fn review_item(&self, ui: &mut Ui, acts: &mut Vec<Action>, b: &Branch) {
+        let base = self
+            .base_ref()
+            .map(|base| base.name)
+            .filter(|base| *base != b.name)
+            .or_else(|| self.refs.current.clone().filter(|c| *c != b.name));
+        ui.separator();
+        let button = ui.add_enabled(base.is_some(), egui::Button::new("Review this branch"));
+        let Some(base) = base else {
+            button.on_disabled_hover_text("There is no other branch to review it against");
+            return;
+        };
+        if button
+            .on_hover_text(format!(
+                "Have your AI tool (Settings → AI) review what {} adds to {base}",
+                b.name
+            ))
+            .clicked()
+        {
+            acts.push(Action::ReviewBranch {
+                branch: b.name.clone(),
+                base,
+            });
+        }
     }
 
     /// Check out `b`, here or in a new worktree; or open the worktree it is checked out in.

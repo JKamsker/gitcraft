@@ -2,6 +2,7 @@
 //! (branches on the left, commit graph or diff in the middle, commit detail / changes on the right).
 
 mod actions;
+mod ai;
 mod apply;
 mod branch_tree;
 mod branch_visibility;
@@ -181,6 +182,8 @@ pub struct RepoTab {
     commit_summary: String,
     commit_body: String,
     amend: bool,
+    /// The AI tool's commit message and branch review (see `ai`).
+    ai: ai::AiState,
     dialog: Option<Dialog>,
     search: Search,
     /// A commit to select once enough history is loaded (search results, links).
@@ -327,6 +330,7 @@ impl RepoTab {
             commit_summary: String::new(),
             commit_body: String::new(),
             amend: false,
+            ai: Default::default(),
             dialog: None,
             search: Search::default(),
             pending_goto: None,
