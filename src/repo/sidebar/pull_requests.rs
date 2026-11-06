@@ -574,7 +574,8 @@ mod tests {
             worktree("/nonexistent/r/app", "main", true),
             worktree("/nonexistent/r/app-mine", "mine", false),
         ];
-        let folder = |name: &str| PathBuf::from(format!("/nonexistent/r/app-{name}"));
+        // Joined as the code joins it (with `\\` on Windows).
+        let folder = |name: &str| Path::new("/nonexistent/r").join(format!("app-{name}"));
         let prune = strings(&["worktree", "prune"]);
         // As this system joins paths (with `\\` on Windows).
         let arg = |name: &str| folder(name).display().to_string();
