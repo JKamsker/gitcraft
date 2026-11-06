@@ -69,6 +69,11 @@ pub(super) struct View {
     outcome: Option<Outcome>,
     warning: Option<String>,
     started: Instant,
+    /// Cancel was asked for.
+    cancelling: bool,
+    /// Its ends as given: whether what it found answers the bisect going on.
+    bad: String,
+    good: Vec<String>,
 }
 
 /// What the test said of a commit.
@@ -96,12 +101,17 @@ impl View {
             outcome: None,
             warning: None,
             started: Instant::now(),
+            cancelling: false,
+            bad: setup.bad.clone(),
+            good: setup.good.clone(),
         }
     }
 
     /// Takes in what the bisect said.
     fn take(&mut self, event: Event) {
         match event {
+            // Once cancelled, it says it is stopping until it has.
+            Event::Step(_) if self.cancelling => {}
             Event::Step(step) => self.step = Some(step),
             Event::Remaining(left) => {
                 if self.total == 0 {
@@ -160,6 +170,16 @@ impl View {
         self.outcome.is_none()
     }
 
+    /// Whether it bisected between the marks of `bisect` (its first bad commit then answers
+    /// that bisect too).
+    pub(super) fn same_ends(&self, bisect: &crate::git::Bisect) -> bool {
+        let mut good = self.good.clone();
+        let mut marked = bisect.marks.good.clone();
+        good.sort();
+        marked.sort();
+        bisect.marks.bad.as_deref() == Some(self.bad.as_str()) && good == marked
+    }
+
     /// The first bad commit, or those it may be, once found.
     pub(super) fn culprits(&self) -> &[String] {
         match &self.outcome {
@@ -185,6 +205,15 @@ impl RepoTab {
     pub(super) fn parallel_act(&mut self, act: ParallelAct, ctx: &egui::Context) {
         match act {
             ParallelAct::Open { bad, good, skip } => {
+                // After one that failed (a commit mistyped…), what was typed is offered again.
+                let failed = self
+                    .parallel
+                    .view()
+                    .is_some_and(|v| matches!(v.outcome, Some(Outcome::Failed(_))));
+                let (bad, good) = match (&self.parallel.last, failed) {
+                    (Some(last), true) => (last.bad.clone(), last.good.clone()),
+                    _ => (bad, good),
+                };
                 let form =
                     ParallelForm::new(&self.path, bad, good, skip, self.parallel.last.as_ref());
                 self.dialog = Some(Dialog::ParallelBisect(Box::new(form)));
@@ -197,6 +226,7 @@ impl RepoTab {
                 if let Some(view) = &mut self.parallel.view
                     && view.running()
                 {
+                    view.cancelling = true;
                     view.step = Some("Stopping the tests…".to_owned());
                 }
             }
@@ -368,7 +398,14 @@ fn outcome_message(outcome: &Outcome, machine: &str) -> (String, bool) {
             true,
         ),
         Outcome::Cancelled => ("Parallel bisect cancelled".to_owned(), false),
-        Outcome::Failed(e) => (format!("Parallel bisect failed: {e}"), true),
+        // Its first line: what follows (a test's output) shows on the banner's hover.
+        Outcome::Failed(e) => (
+            format!(
+                "Parallel bisect failed: {}",
+                e.lines().next().unwrap_or_default()
+            ),
+            true,
+        ),
     }
 }
 

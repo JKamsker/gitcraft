@@ -130,6 +130,22 @@ impl ParallelForm {
         None
     }
 
+    /// What is still missing before it can start, said as what to do.
+    fn missing(&self) -> &'static str {
+        let good: Vec<&str> = self.good.split_whitespace().collect();
+        if !usable(&self.bad) {
+            "Type the bad commit, which has the problem"
+        } else if good.is_empty() {
+            "Type a good commit, one from before the problem"
+        } else if !good.iter().all(|g| usable(g)) {
+            "A good commit can't start with -"
+        } else if self.command.trim().is_empty() {
+            "Type the command that tests a commit"
+        } else {
+            "Choose how many commits to test at once"
+        }
+    }
+
     /// The setup it gives, when it is complete.
     fn setup(&self) -> Option<pb::Setup> {
         let good: Vec<String> = self.good.split_whitespace().map(str::to_owned).collect();
@@ -160,8 +176,8 @@ pub(super) fn parallel_bisect(ui: &mut Ui, enter: bool, form: &mut ParallelForm)
         ui,
         "Bisect in parallel",
         "Tests several commits at once, each in a worktree of its own on the machine chosen, \
-         until the first bad commit is found: about log base k + 1 of n rounds instead of log \
-         base 2. Your checkout isn't touched.",
+         until the first bad commit is found: about log base (k + 1) of n rounds instead of \
+         log base 2 of n. Your checkout isn't touched.",
         &t,
     );
     ends(ui, form, &t);
@@ -188,12 +204,11 @@ pub(super) fn parallel_bisect(ui: &mut Ui, enter: bool, form: &mut ParallelForm)
     limits(ui, form, &t);
     ui.add_space(12.0);
     let setup = form.setup();
+    let missing = form.missing();
     let mut outcome = Outcome::Open;
     ui.horizontal(|ui| {
         let start = widgets::primary_button(ui, "Start", setup.is_some(), 90.0)
-            .on_disabled_hover_text(
-                "Fill in a bad and a good commit, a command and how many at once",
-            );
+            .on_disabled_hover_text(missing);
         if let Some(setup) = setup
             && (start.clicked() || enter)
         {
@@ -228,10 +243,10 @@ fn ends(ui: &mut Ui, form: &mut ParallelForm, t: &Tokens) {
     );
     if !form.skip.is_empty() {
         ui.label(
-            RichText::new(format!(
-                "The {} commits the bisect skipped aren't tested.",
-                form.skip.len()
-            ))
+            RichText::new(match form.skip.len() {
+                1 => "The commit the bisect skipped isn't tested.".to_owned(),
+                n => format!("The {n} commits the bisect skipped aren't tested."),
+            })
             .small()
             .color(t.text_faint),
         );
@@ -302,12 +317,15 @@ fn limits(ui: &mut Ui, form: &mut ParallelForm, t: &Tokens) {
         {
             form.parallel_set = true;
         }
-        let said = match &cores {
-            Some(Ok(n)) => format!("{n} cores there"),
-            Some(Err(e)) if !e.is_empty() => "cores unknown".to_owned(),
-            _ => "counting cores…".to_owned(),
+        let (said, why) = match &cores {
+            Some(Ok(n)) => (format!("{n} cores on {}", form.chosen().label()), None),
+            Some(Err(e)) if !e.is_empty() => ("cores unknown".to_owned(), Some(e.clone())),
+            _ => ("counting cores…".to_owned(), None),
         };
-        ui.label(RichText::new(said).small().color(t.text_faint));
+        let label = ui.label(RichText::new(said).small().color(t.text_faint));
+        if let Some(why) = why {
+            label.on_hover_text(why);
+        }
         ui.add_space(12.0);
         ui.label(RichText::new("Time limit:").color(t.text_dim));
         ui.add(

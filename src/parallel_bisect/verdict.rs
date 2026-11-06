@@ -48,7 +48,7 @@ pub fn interpret(code: i32) -> Result<Verdict, String> {
         125 => Ok(Verdict::Skip),
         1..=127 => Ok(Verdict::Bad),
         _ => Err(format!(
-            "the test ended with exit code {code}; 128 and more (a crash or a signal) stops a \
+            "ended its test with exit code {code}; 128 and more (a crash or a signal) stops a \
              bisect, as with git bisect run"
         )),
     }

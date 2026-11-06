@@ -572,7 +572,7 @@ impl Run<'_> {
         let verdict = match ran.ended {
             Ended::Exited(code) => interpret(code).map_err(|e| {
                 let output = ran.output.trim();
-                format!("Testing {}: {e}\n{output}", short(&job.hash))
+                format!("{} {e}\n{output}", short(&job.hash))
                     .trim_end()
                     .to_owned()
             })?,
