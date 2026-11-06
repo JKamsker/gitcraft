@@ -16,6 +16,7 @@ mod diff;
 mod file_text;
 mod file_view;
 mod graph_view;
+mod guide;
 mod highlight;
 mod keep_submodules;
 mod layout;
@@ -182,6 +183,8 @@ pub struct RepoTab {
     commit_body: String,
     amend: bool,
     dialog: Option<Dialog>,
+    /// The first steps, tips and first-time hints.
+    guide: guide::Guide,
     search: Search,
     /// A commit to select once enough history is loaded (search results, links).
     pending_goto: Option<String>,
@@ -328,6 +331,7 @@ impl RepoTab {
             commit_body: String::new(),
             amend: false,
             dialog: None,
+            guide: Default::default(),
             search: Search::default(),
             pending_goto: None,
             undo_stack: Vec::new(),

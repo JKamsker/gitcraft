@@ -22,6 +22,9 @@ const FEATURES: &[(&str, &[&str])] = &[
             "One tab per repository. Changes made elsewhere (editor, terminal) show up by themselves.",
             "Right-click a tab to give it its own icon and highlight colour.",
             "Drag a tab along the strip to reorder the tabs.",
+            "A repository with no commits shows its first steps in the graph: make the first commit, add a remote, publish.",
+            "Tips like this one show under the graph, a different one each day. A hint also shows once, the first time you do something that has a shortcut nearby.",
+            "The ✕ of the tips turns them off; Settings → General → Tips brings them back, and the hints already seen too.",
             "Remote on the start page opens a repository in WSL or over SSH: git runs there, this window shows it. Browse… lists that machine's folders, its repositories marked. The toolbar names the machine; the terminal opens a shell there. What ssh asks (a password, a passphrase, a new host key) is asked in this window; Remember connection keeps a password encrypted in the system's credential store, and Forget saved SSH sign-ins (Ctrl+P) removes them.",
         ],
     ),
@@ -73,6 +76,14 @@ const FEATURES: &[(&str, &[&str])] = &[
         ],
     ),
 ];
+
+/// Every point of [`FEATURES`], in order, as written (with `Ctrl`): what the "Did you know"
+/// tips are drawn from.
+pub(crate) fn feature_points() -> impl Iterator<Item = &'static str> {
+    FEATURES
+        .iter()
+        .flat_map(|(_, points)| points.iter().copied())
+}
 
 /// Keyboard and mouse shortcuts: (keys, what they do). `Cmd` stands for Ctrl outside macOS.
 pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[

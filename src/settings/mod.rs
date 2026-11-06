@@ -5,6 +5,7 @@ mod page;
 mod profile_page;
 pub mod profiles;
 mod signing;
+mod tips_row;
 
 use egui::{RichText, Ui};
 use serde::{Deserialize, Serialize};
@@ -95,6 +96,10 @@ pub struct Settings {
     pub user_profiles: Vec<UserProfile>,
     /// The id of the profile in use.
     pub active_profile: u64,
+    /// The "Did you know" line and the first-time hints of a repository tab.
+    pub tips: bool,
+    /// The first-time hints shown already (by their ids), each shown only once.
+    pub seen_hints: std::collections::BTreeSet<String>,
 }
 
 impl Default for Settings {
@@ -136,6 +141,8 @@ impl Default for Settings {
             identities: Vec::new(),
             user_profiles: vec![UserProfile::default()],
             active_profile: UserProfile::default().id,
+            tips: true,
+            seen_hints: Default::default(),
         }
     }
 }
@@ -347,6 +354,9 @@ impl Settings {
                             &mut self.notifications,
                             "When a long operation ends in the background",
                         );
+                    });
+                    card.row("Tips", "did you know hints help first time", |ui| {
+                        self.tips_ui(ui);
                     });
                     if let Some(appimage) = crate::desktop_entry::appimage() {
                         card.row(

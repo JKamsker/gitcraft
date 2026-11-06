@@ -5,7 +5,7 @@ use std::time::Instant;
 
 use super::{
     Action, Compare, DiffKey, DiffView, Msg, OpKind, OpenRequest, Refresh, RepoTab, Undo, diff,
-    ops, spawn,
+    guide, ops, spawn,
 };
 use crate::git;
 use crate::settings::Settings;
@@ -18,6 +18,9 @@ impl RepoTab {
                 self.close_pr();
                 self.ci_view = None;
                 self.select(row, ctx);
+                if !self.is_wip(row) && self.stash_at(row).is_none() {
+                    self.offer_hint(guide::Hint::CompareCommits, ctx);
+                }
             }
             Action::SelectHash(hash) => {
                 self.close_pr();
@@ -29,7 +32,12 @@ impl RepoTab {
                 self.ci_view = None;
                 self.select_stash(i, ctx);
             }
-            Action::OpenDiff(key) => self.open_diff(key, ctx),
+            Action::OpenDiff(key) => {
+                self.open_diff(key, ctx);
+                if self.diff.is_some() {
+                    self.offer_hint(guide::Hint::ChangeNavigation, ctx);
+                }
+            }
             Action::OpenPr(number) => {
                 // It refuses while an editor takes the big area: the builds shown stay then.
                 let requests = self.pr_requests;
@@ -98,7 +106,13 @@ impl RepoTab {
                 settings.show_branches = !settings.show_branches;
                 settings.set(ctx);
             }
-            Action::BranchVisibility(change) => self.change_visibility(change, ctx),
+            Action::BranchVisibility(change) => {
+                let hint = guide::visibility_hint(&change, &self.visibility);
+                self.change_visibility(change, ctx);
+                if let Some(hint) = hint {
+                    self.offer_hint(hint, ctx);
+                }
+            }
             Action::OpenBranches(section) => {
                 let mut settings = Settings::get(ctx);
                 settings.show_branches = true;
@@ -248,6 +262,7 @@ impl RepoTab {
                 self.search.focus = true;
             }
             Action::SolveWithMergiraf => self.solve_with_mergiraf(ctx),
+            Action::Guide(act) => self.guide_act(act, ctx),
             Action::SaveConflict => self.save_conflict(ctx),
         }
     }
