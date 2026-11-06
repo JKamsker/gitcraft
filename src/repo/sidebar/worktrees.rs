@@ -40,7 +40,17 @@ impl RepoTab {
         let same_tab = Settings::get(ui.ctx()).worktrees_in_same_tab;
         let any_prunable = self.worktrees.iter().any(|w| w.prunable.is_some());
         for wt in &self.worktrees {
-            let r = worktree_row(ui, wt).on_hover_text(worktree_tip(wt, same_tab));
+            let fenced = self.fence.violations(&wt.path);
+            let mut tip = worktree_tip(wt, same_tab);
+            if !fenced.is_empty() {
+                tip.push_str(&format!(
+                    "\nTouched the agent fence; merging its branch asks first:\n{}",
+                    crate::repo::fence_view::list_violations(fenced)
+                ));
+            } else if let Some(e) = self.fence.error(&wt.path) {
+                tip.push_str(&format!("\n{e}"));
+            }
+            let r = worktree_row(ui, wt, !fenced.is_empty()).on_hover_text(tip);
             let can_open = !wt.current && wt.prunable.is_none();
             if r.double_clicked() && can_open {
                 acts.push(Action::OpenWorktree(wt.path.clone()));
@@ -56,8 +66,9 @@ impl RepoTab {
     }
 }
 
-/// A worktree: its icon (a dot for uncommitted changes), name, branch and what is wrong with it.
-fn worktree_row(ui: &mut Ui, wt: &Worktree) -> Response {
+/// A worktree: its icon (a dot for uncommitted changes), name, branch and what is wrong with it;
+/// red when it touched the agent fence (`fenced`).
+fn worktree_row(ui: &mut Ui, wt: &Worktree, fenced: bool) -> Response {
     let t = Tokens::get(ui.ctx());
     // Known by its folder, not its place: one added or removed in the terminal shifts the rows,
     // and a menu left open (Lock, Prune…) must stay this worktree's.
@@ -65,6 +76,14 @@ fn worktree_row(ui: &mut Ui, wt: &Worktree) -> Response {
     let painter = ui.painter_at(rect);
     if wt.current {
         painter.rect_filled(rect, 0.0, t.accent.gamma_multiply(0.14));
+    }
+    if fenced {
+        painter.rect_filled(rect, 0.0, t.danger.gamma_multiply(0.16));
+        painter.rect_filled(
+            Rect::from_min_size(rect.min, vec2(3.0, rect.height())),
+            0.0,
+            t.danger,
+        );
     }
     if r.hovered() {
         painter.rect_filled(rect, 0.0, t.hover);
@@ -90,6 +109,7 @@ fn worktree_row(ui: &mut Ui, wt: &Worktree) -> Response {
     };
     let mut right = rect.right() - 8.0;
     for (on, label, color) in [
+        (fenced, "fence", t.danger),
         (wt.prunable.is_some(), "missing", t.danger),
         (wt.locked.is_some(), "locked", t.warning),
         (wt.main, "main", t.text_faint),
@@ -194,6 +214,13 @@ fn worktree_menu_items(
     }
     if ui.button("Copy path").clicked() {
         ui.ctx().copy_text(path.clone());
+    }
+    if ui
+        .button("Agent fence…")
+        .on_hover_text("Paths agents must stay out of, written into their configs and checked")
+        .clicked()
+    {
+        acts.push(Action::OpenFence);
     }
     if !wt.main {
         ui.separator();

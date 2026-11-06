@@ -121,6 +121,16 @@ so your config, credentials and hooks apply as usual.
 - Worktrees: a yellow dot in place of the folder icon marks the others with uncommitted changes,
   here and in the switcher. Add (existing or new branch), open in the same tab (the tab then shows the branch, a searchable switcher and a button to close the worktree, and what you left keeps running; can be turned off in Settings) or a new one, open a terminal there, lock, remove,
   prune.
+- Agent fence (a worktree's menu → _Agent fence…_): one list per repository of the paths agents
+  must stay out of (secrets, `.env`, CI workflows, migrations, lockfiles…), as in `.gitignore`,
+  kept in the repository's git config (`gitcraft.fence`, shared by its worktrees). Saving writes
+  it into every worktree's agent configs: Claude Code's deny rules in
+  `.claude/settings.local.json`, a block of `.cursorignore`, and a section of `AGENTS.md` for
+  Codex; only gitcraft's own entries are replaced. Rules can leak (a script the agent runs reads
+  the file anyway), so gitcraft checks the result: a linked worktree whose commits since it
+  left the main branch, uncommitted changes, untracked files or ignored files (which
+  `git worktree add` never makes) touch the fence turns red, its hover lists them, and merging
+  or fast-forwarding its branch asks for a confirmation first.
 - Submodules (shown when the repository has any): each with its commit and whether it is
   modified, not initialised or out of date. Update one or all (`git submodule update --init
   --recursive`), open one in a new tab (or double-click it), show it in its folder. _Keep

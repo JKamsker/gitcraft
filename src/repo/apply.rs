@@ -13,6 +13,7 @@ use crate::settings::Settings;
 impl RepoTab {
     pub(crate) fn apply(&mut self, action: Action, ctx: &egui::Context) {
         let plain = OpKind::plain();
+        let action = self.fence_gate(action);
         match action {
             Action::Select(row) => {
                 self.close_pr();
@@ -71,6 +72,7 @@ impl RepoTab {
             Action::CheckoutPull(name) => self.checkout_pull(&name, ctx),
             Action::CheckoutRemote(name) => self.checkout_remote(&name, ctx),
             Action::Dialog(dialog) => self.dialog = Some(dialog),
+            Action::OpenFence => self.open_fence(),
             Action::DeleteTag { name, target } => self.delete_tag(name, target, ctx),
             Action::Commit => self.commit(ctx),
             Action::Fetch => {
