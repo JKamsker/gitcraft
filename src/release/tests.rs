@@ -290,3 +290,24 @@ fn a_tag_that_isnt_a_version_isnt_taken_for_the_last_release() {
         |d| d.last_tag.as_deref() == Some("v1.2.3") && d.suggested.to_string() == "v1.3.0"
     ));
 }
+
+#[test]
+fn an_unticked_signature_is_not_made_where_tags_are_signed_by_default() {
+    let (dir, bare) = project("unsigned");
+    // Signing would fail here: the tag is made only if it isn't tried.
+    run(&dir, &["config", "tag.gpgSign", "true"]);
+    run(&dir, &["config", "gpg.program", "false"]);
+    let draft = draft(&dir, "HEAD", None);
+    assert!(draft.is_ok());
+    let Ok(draft) = draft else { return };
+    let mut plan = plan_of(&draft, "notes");
+    plan.bump = None;
+    plan.push = None;
+    let mut done = Done::default();
+    let made = run_step(&dir, &plan, Step::Tag, &mut done, None, None);
+    let tagged = git::resolve(&dir, "refs/tags/v1.3.0").is_ok();
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(&bare);
+    assert!(made.is_ok(), "{made:?}");
+    assert!(tagged);
+}

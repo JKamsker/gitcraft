@@ -415,9 +415,17 @@ pub(crate) fn run_step(
                 .unwrap_or_else(|| plan.commit.clone());
             let kind = if plan.sign { "-s" } else { "-a" };
             let message = plan.tag_message();
+            // Unticked, not signed even where tag.gpgSign asks for every tag to be.
+            let sign = if plan.sign {
+                "tag.gpgSign=true"
+            } else {
+                "tag.gpgSign=false"
+            };
             git::run(
                 Some(repo),
                 &[
+                    "-c",
+                    sign,
                     "tag",
                     kind,
                     "--cleanup=whitespace",
