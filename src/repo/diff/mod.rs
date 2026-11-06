@@ -94,6 +94,8 @@ pub struct DiffData {
     pub new_file: bool,
     /// Characters in the longest line, for the width to scroll (counted once, not every frame).
     longest: usize,
+    /// A hash of the diff text git gave: two reads with the same one show the same change.
+    pub(super) source: u64,
     /// The lines cut to be shown, as they were: what copying them copies.
     pub(super) uncut: std::collections::HashMap<usize, String>,
     /// The runs of changed rows and the changes they make, unified and side by side: worked
@@ -220,6 +222,12 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         context,
         new_file,
         longest,
+        source: {
+            use std::hash::{Hash, Hasher};
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            text.hash(&mut h);
+            h.finish()
+        },
         uncut,
         map: Default::default(),
     })

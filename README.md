@@ -193,14 +193,15 @@ so your config, credentials and hooks apply as usual.
 - Readings that understand the file: some files get a button in the diff's header that shows
   their change in a way of their own instead of as lines (click it again for the lines, where
   staging stays). They read both sides of the file in the background (on the repository's
-  machine, for WSL and SSH); a click on a part goes back to its line in the plain diff, and a
-  file they can't read (not UTF-8, over 8 MB, malformed) shows the plain diff with a note
+  machine, for WSL and SSH, under its old name before a rename); a click on a part goes back
+  to the lines, at its line or the nearest one the diff shows, and a file they can't read (not UTF-8, over 8 MB, malformed) shows the plain diff with a note
   saying why.
   - _Prose_ (the book, for `.md`, `.adoc`, `.rst` and `.txt`): paragraphs wrapped to the
     pane. In an edited paragraph the removed words are struck through on red and the added
-    ones on green, compared word by word (as `git diff --word-diff` does), so a paragraph
-    only re-wrapped says _re-wrapped_ and marks nothing. Removed and added paragraphs show
-    whole; long runs of unchanged ones fold (click to open).
+    ones on green, compared word by word (a punctuation mark counts as a word of its own;
+    the text keeps its own spacing), so a paragraph only re-wrapped says _re-wrapped_ and
+    marks nothing. Removed and added paragraphs show whole; long runs of unchanged ones fold
+    (click to open).
 - A Markdown file's diff has an eye button that renders it: the changes block by block (removed
   ones red, added ones green, the rest as they are) or, with _File_, the whole file. Images of
   the repository show as they are on each side of the change; any other image is a link, so a

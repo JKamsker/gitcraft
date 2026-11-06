@@ -46,10 +46,13 @@ impl RichKind {
         }
     }
 
-    /// What its button does.
-    pub fn tip(self) -> &'static str {
-        match self {
-            RichKind::Prose => "Prose: wrapped paragraphs, the words that changed marked",
+    /// What its button does, while it is off (`on`: while it shows).
+    pub fn tip(self, on: bool) -> &'static str {
+        match (self, on) {
+            (_, true) => "Show the changes as lines",
+            (RichKind::Prose, false) => {
+                "Show the changes as prose: wrapped paragraphs, the words that changed marked"
+            }
         }
     }
 
@@ -90,25 +93,34 @@ pub enum Rich {
 
 /// Reads both sides of `key`'s file. A side that isn't there (a new or deleted file) is
 /// `None`; one too big or not text makes the rich view fall back (`Err` holds the note).
-pub(super) fn read_sides(repo: &Path, key: &DiffKey) -> Result<Sides, Result<String, String>> {
-    let (old, new) = sides(key);
+pub(super) fn read_sides(
+    repo: &Path,
+    key: &DiffKey,
+    old_path: Option<&str>,
+) -> Result<Sides, Result<String, String>> {
+    let (mut old, new) = sides(key);
+    if let (Some(renamed), Some((_, path))) = (old_path, old.as_mut()) {
+        *path = renamed.to_owned();
+    }
     let read = |side: &Option<(Option<String>, String)>| -> Result<Option<String>, Result<String, String>> {
         let Some((rev, path)) = side else {
             return Ok(None);
         };
-        // Not there on that side (added, deleted): only the other one shows.
-        let Ok(bytes) = git::file_at(repo, rev.as_deref(), path) else {
-            return Ok(None);
+        let bytes = match git::file_at(repo, rev.as_deref(), path) {
+            Ok(bytes) => bytes,
+            // Not there on that side (added, deleted): only the other one shows.
+            Err(e) if missing(&e) => return Ok(None),
+            Err(e) => return Err(Err(e)),
         };
         if bytes.len() > MAX_SIDE_BYTES {
             return Err(Ok(format!(
-                "The file is over {} MB",
+                "the file is over {} MB",
                 MAX_SIDE_BYTES / 1024 / 1024
             )));
         }
         String::from_utf8(bytes)
             .map(Some)
-            .map_err(|_| Ok("The file isn't UTF-8 text".to_owned()))
+            .map_err(|_| Ok("the file isn't UTF-8 text".to_owned()))
     };
     let sides = Sides {
         old: read(&old)?,
@@ -122,9 +134,33 @@ pub(super) fn read_sides(repo: &Path, key: &DiffKey) -> Result<Sides, Result<Str
     Ok(sides)
 }
 
+/// Whether reading a side failed because the file isn't on it (git's words, or the system's
+/// for a file of the working tree), rather than for a reason to report.
+fn missing(error: &str) -> bool {
+    let e = error.to_lowercase();
+    [
+        "does not exist",
+        "exists on disk, but not in",
+        "invalid object name",
+        "unknown revision",
+        "bad revision",
+        "not a valid object name",
+        "no such file",
+        "cannot find",
+        "not found",
+    ]
+    .iter()
+    .any(|m| e.contains(m))
+}
+
 /// Reads `key`'s diff as `kind`, on a background thread.
-pub fn load(repo: &Path, key: &DiffKey, kind: RichKind) -> Result<Rich, String> {
-    let sides = match read_sides(repo, key) {
+pub fn load(
+    repo: &Path,
+    key: &DiffKey,
+    kind: RichKind,
+    old_path: Option<&str>,
+) -> Result<Rich, String> {
+    let sides = match read_sides(repo, key, old_path) {
         Ok(sides) => sides,
         Err(Ok(note)) => return Ok(Rich::Plain(note)),
         Err(Err(e)) => return Err(e),
@@ -139,6 +175,9 @@ pub fn load(repo: &Path, key: &DiffKey, kind: RichKind) -> Result<Rich, String> 
 pub struct RichState {
     /// Runs of unchanged parts opened (by their place in the view).
     pub opened: std::collections::HashSet<usize>,
+    /// The height of each thing shown, measured at `width`.
+    pub heights: Vec<f32>,
+    pub width: f32,
 }
 
 /// Shows `diff`; a click on a part asks for its line in the plain diff.

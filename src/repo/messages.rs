@@ -393,8 +393,20 @@ impl RepoTab {
             }
             Msg::TreeFiles(hash, result) => self.all_files.arrived(&hash, result),
             Msg::Diff(request, result) => {
+                let mut reread = false;
                 if let Some(view) = &mut self.diff {
+                    // The rich view is read again only when the change itself changed.
+                    let source = |d: &Option<Result<diff::DiffData, String>>| match d {
+                        Some(Ok(d)) => Some(d.source),
+                        _ => None,
+                    };
+                    let before = source(&view.data);
+                    let fresh = request == view.request;
                     view.arrived(request, result.map(|data| *data));
+                    reread = fresh && (before != source(&view.data) || view.rich.is_none());
+                }
+                if reread {
+                    self.load_diff_rich(ctx);
                 }
             }
             Msg::DiffFile(request, result) => {

@@ -240,7 +240,7 @@ impl RepoTab {
                         }
                         for &kind in rich_kinds.iter().rev() {
                             let on = rich_on == Some(kind);
-                            let r = icons::small_button(ui, kind.icon(), kind.tip());
+                            let r = icons::small_button(ui, kind.icon(), kind.tip(on));
                             if on {
                                 widgets::active_underline(ui, r.rect, t.accent);
                             }

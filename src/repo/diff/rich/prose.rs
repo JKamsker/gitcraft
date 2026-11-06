@@ -14,6 +14,9 @@ pub const EXTENSIONS: &[&str] = &[
 const SAME_PARAGRAPH: f32 = 0.5;
 /// How far ahead among the added paragraphs the edited version of a removed one is looked for.
 const LOOK_AHEAD: usize = 6;
+/// How many pairs of words may be compared in all to pair edited paragraphs; past it, the rest
+/// show removed and added (a huge rewrite would otherwise take seconds).
+const PAIRING_BUDGET: usize = 20_000_000;
 /// Past this many pairs of paragraphs to compare, the middle that differs is removed then added.
 const MAX_CELLS: usize = 4_000_000;
 
@@ -101,12 +104,13 @@ pub fn diff(sides: &Sides) -> ProseDiff {
     let old_keys: Vec<String> = old.iter().map(Para::key).collect();
     let new_keys: Vec<String> = new.iter().map(Para::key).collect();
     let mut parts = Vec::new();
+    let mut budget = PAIRING_BUDGET;
     let mut removed: Vec<&Para> = Vec::new();
     let mut added: Vec<&Para> = Vec::new();
     for step in align(&old_keys, &new_keys) {
         match step {
             (Some(i), Some(j)) => {
-                pair_up(&mut parts, &mut removed, &mut added);
+                pair_up(&mut parts, &mut removed, &mut added, &mut budget);
                 parts.push(Part::Kept {
                     old: old[i].line,
                     new: new[j].line,
@@ -119,18 +123,30 @@ pub fn diff(sides: &Sides) -> ProseDiff {
             (None, None) => {}
         }
     }
-    pair_up(&mut parts, &mut removed, &mut added);
+    pair_up(&mut parts, &mut removed, &mut added, &mut budget);
     ProseDiff { parts }
 }
 
 /// The paragraphs removed and added between two kept ones: each removed one paired with the
 /// added one it became, when there is one alike enough, in the order of the text after.
-fn pair_up<'a>(parts: &mut Vec<Part>, removed: &mut Vec<&'a Para>, added: &mut Vec<&'a Para>) {
+fn pair_up<'a>(
+    parts: &mut Vec<Part>,
+    removed: &mut Vec<&'a Para>,
+    added: &mut Vec<&'a Para>,
+    budget: &mut usize,
+) {
     let mut next_added = 0;
     for r in removed.drain(..) {
         let rw = r.words();
-        let found = (next_added..added.len().min(next_added + LOOK_AHEAD))
-            .find(|&k| words::similarity(&rw, &added[k].words()) >= SAME_PARAGRAPH);
+        let found = (next_added..added.len().min(next_added + LOOK_AHEAD)).find(|&k| {
+            let aw = added[k].words();
+            let cost = rw.len().saturating_mul(aw.len());
+            if cost > *budget {
+                return false;
+            }
+            *budget -= cost;
+            words::similarity(&rw, &aw) >= SAME_PARAGRAPH
+        });
         match found {
             Some(k) => {
                 for a in &added[next_added..k] {
@@ -139,14 +155,10 @@ fn pair_up<'a>(parts: &mut Vec<Part>, removed: &mut Vec<&'a Para>, added: &mut V
                         text: a.text.clone(),
                     });
                 }
-                let aw = added[k].words();
                 parts.push(Part::Changed {
                     old: r.line,
                     new: added[k].line,
-                    words: words::diff(&rw, &aw)
-                        .into_iter()
-                        .map(|(c, w)| (c, w.to_owned()))
-                        .collect(),
+                    words: words::diff_text(&r.text, &added[k].text),
                 });
                 next_added = k + 1;
             }
