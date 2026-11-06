@@ -152,7 +152,10 @@ impl Terminal {
                             lock(&parser).process(bytes);
                             // A busy program (a build, a log) prints all the time: the whole
                             // app redraws for it only while the terminal is in sight.
-                            if ctx.cumulative_pass_nr() <= drawn.load(Ordering::Relaxed) + 2 {
+                            // The main window's passes: a terminal popped out into a window
+                            // of its own is drawn in them too.
+                            let pass = ctx.cumulative_pass_nr_for(egui::ViewportId::ROOT);
+                            if pass <= drawn.load(Ordering::Relaxed) + 2 {
                                 ctx.request_repaint();
                             } else {
                                 ctx.request_repaint_after(HIDDEN_REPAINT);

@@ -149,7 +149,8 @@ fn page_header(ui: &mut Ui, view: &PrView, popped: bool, acts: &mut Vec<Action>)
     let title = format!("Pull request #{}", view.number);
     let loading = view.loading;
     widgets::panel_header(ui, &title, |ui| {
-        if icons::small_button(ui, "x", "Back to the graph (Esc)").clicked() {
+        let tip = popout::close_tip(popped, "Back to the graph (Esc)");
+        if icons::small_button(ui, "x", tip).clicked() {
             acts.push(Action::ClosePr);
         }
         popout::button(ui, Panel::Pr, popped, acts);

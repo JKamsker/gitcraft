@@ -47,7 +47,12 @@ pub fn terminal_tabs(
         .show(|ui| shell_items(ui, acts));
     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         ui.add_space(4.0);
-        if icons::small_button(ui, "x", "Hide the panel (shells keep running)").clicked() {
+        use crate::repo::popout::{Panel, Request};
+        if popped {
+            if icons::small_button(ui, "x", "Close the window (shells keep running)").clicked() {
+                acts.push(Action::Popout(Request::Close(Panel::Terminal)));
+            }
+        } else if icons::small_button(ui, "x", "Hide the panel (shells keep running)").clicked() {
             acts.push(Action::ToggleTerminal);
         }
         crate::repo::popout::button(ui, crate::repo::popout::Panel::Terminal, popped, acts);

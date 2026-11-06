@@ -123,25 +123,27 @@ impl RepoTab {
                     i.modifiers.command && i.key_pressed(Key::F),
                 )
             });
-            if esc && self.diff.is_some() && self.line_comment_open() {
+            // A view in a window of its own takes its keys there (the conflict editor's are here).
+            let diff_keys = self.diff.is_some()
+                && (self.main_keys(ctx, Panel::Diff) || self.conflict.is_some());
+            if esc && diff_keys && self.line_comment_open() {
                 acts.push(Action::Pr(pr_review::PrAct::CloseLine));
-            } else if esc && self.diff.is_some() {
+            } else if esc && diff_keys {
                 acts.push(Action::CloseDiff);
             } else if esc && self.rebase.is_some() {
                 acts.push(Action::CloseRebase);
             } else if esc && self.file_view.is_some() {
                 acts.push(Action::CloseFileView);
-            } else if esc && self.ci_view.is_some() {
+            } else if esc && self.ci_view.is_some() && self.main_keys(ctx, Panel::Ci) {
                 acts.push(Action::CloseCi);
-            } else if esc && self.pr_view.is_some() {
+            } else if esc && self.pr_view.is_some() && self.main_keys(ctx, Panel::Pr) {
                 acts.push(Action::ClosePr);
             } else if esc && self.compare.is_some() {
                 acts.push(Action::CloseCompare);
             } else if esc && self.search.open {
                 acts.push(Action::ToggleSearch);
             }
-            let diff_shown =
-                self.diff.is_some() && self.conflict.is_none() && self.rebase.is_none();
+            let diff_shown = diff_keys && self.conflict.is_none() && self.rebase.is_none();
             if let Some(delta) = ctx.input(change_step).filter(|_| diff_shown) {
                 acts.push(Action::DiffStep(delta));
             }

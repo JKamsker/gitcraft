@@ -72,7 +72,7 @@ impl RepoTab {
 fn page_header(ui: &mut Ui, view: &CiView, title: &str, popped: bool, acts: &mut Vec<Action>) {
     let url = view.shown_run().map(|run| run.url.clone());
     widgets::panel_header(ui, title, |ui| {
-        if icons::small_button(ui, "x", "Back (Esc)").clicked() {
+        if icons::small_button(ui, "x", popout::close_tip(popped, "Back (Esc)")).clicked() {
             acts.push(Action::CloseCi);
         }
         popout::button(ui, Panel::Ci, popped, acts);
