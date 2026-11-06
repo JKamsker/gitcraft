@@ -351,6 +351,8 @@ fn a_check_for_an_editor_closed_since_does_not_land_in_a_new_one() {
 /// A link's new target goes whole (half of it would be no link), `diff.context=0` changes
 /// nothing, and a file that becomes a link is read as its removal and the link's addition.
 #[test]
+// Windows' git checks links out as files by default (`core.symlinks`).
+#[cfg(unix)]
 fn links_type_changes_and_a_config_without_context_split_cleanly() {
     let dir = repo(
         "split-links",
