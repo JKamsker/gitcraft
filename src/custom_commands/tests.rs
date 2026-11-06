@@ -125,9 +125,14 @@ fn a_toast_scripts_values_stay_off_the_command_line() -> Result<(), String> {
     let dir = repo("argv");
     let answers = vec![("TOKEN".to_owned(), "s3cret-token".to_owned())];
     let vars = variables(&Scope::default(), "/r", &answers);
-    // Every command line of the processes above the command: git and its shell.
-    let line = "p=$$; while [ \"$p\" -gt 1 ]; do tr '\\0' ' ' < /proc/$p/cmdline; echo; \
-                p=$(awk '{print $4}' /proc/$p/stat); done";
+    // The command lines of the processes above the command, up to git (beyond it is the test
+    // runner's, which holds this test's own text).
+    let line = concat!(
+        "p=$PPID; while [ \"$p\" -gt 1 ]; do ",
+        "c=$(tr '\\0' ' ' < /proc/$p/cmdline); echo \"$c\"; ",
+        "case $c in *gitcraft-run*) break;; esac; ",
+        "p=$(awk '{print $4}' /proc/$p/stat); done"
+    );
     let ran = run(&dir, &vars, line)?;
     let _ = std::fs::remove_dir_all(&dir);
     let seen = String::from_utf8_lossy(&ran.stdout).into_owned();
