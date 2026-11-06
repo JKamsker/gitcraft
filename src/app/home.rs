@@ -283,7 +283,7 @@ fn recent_row(ui: &mut Ui, path: &Path) -> Option<RecentClick> {
     let mut forget = false;
     // Shown to the keyboard too, while the row or the button has it.
     let forget_id = resp.id.with("forget");
-    let keyboard = resp.has_focus() || ui.memory(|m| m.has_focus(forget_id));
+    let keyboard = crate::a11y::keyboard_on(&resp) || ui.memory(|m| m.has_focus(forget_id));
     if hovered || keyboard || ui.rect_contains_pointer(rect) {
         let x_rect = Rect::from_center_size(pos2(rect.right() - 18.0, y), vec2(20.0, 20.0));
         let x = ui

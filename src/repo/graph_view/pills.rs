@@ -246,9 +246,7 @@ impl RepoTab {
             _ => "double-click to check out",
         };
         let resp = resp.on_hover_text(format!("{} ({hint})", b.describe()));
-        widgets::a11y(&resp, egui::WidgetType::Button, || {
-            crate::a11y::labels::join([b.spoken().as_str(), hint])
-        });
+        widgets::a11y(&resp, egui::WidgetType::Button, || b.spoken());
         if resp.double_clicked() {
             if let Some(act) = self.pill_checkout(b) {
                 acts.push(act);

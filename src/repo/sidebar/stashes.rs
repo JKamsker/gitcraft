@@ -48,7 +48,7 @@ impl RepoTab {
             );
             crate::repo::widgets::a11y_selected(
                 &r,
-                || crate::a11y::labels::join([stash.name.as_str(), stash.message.as_str()]),
+                || crate::a11y::labels::stash(&stash.name, &stash.message),
                 self.stash_view == Some(i),
             );
             if self.stash_view == Some(i) {

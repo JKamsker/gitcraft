@@ -29,6 +29,11 @@ pub fn clean(text: &str) -> String {
     out
 }
 
+/// The name a widget is given: one line, without a tooltip's shortcut.
+pub fn name(text: &str) -> String {
+    clean(without_keys(text))
+}
+
 /// The parts that say something, cleaned and joined with commas.
 pub fn join<S: AsRef<str>>(parts: impl IntoIterator<Item = S>) -> String {
     parts
@@ -159,4 +164,39 @@ pub fn pull_request(number: u64, title: &str, author: &str, branch: &str, draft:
 pub fn submodule(path: &str, commit: &str, modified: bool) -> String {
     let base = join([format!("submodule {path}").as_str(), commit]);
     with_notes(&base, &[(modified, "modified")])
+}
+
+/// A stash: `stash@{2}` is said "stash 2", then its message.
+pub fn stash(name: &str, message: &str) -> String {
+    let number = name
+        .strip_prefix("stash@{")
+        .and_then(|rest| rest.strip_suffix('}'))
+        .map(|n| format!("stash {n}"));
+    join([number.as_deref().unwrap_or(name), message])
+}
+
+/// A name without the shortcut a tooltip ends with: "Reload (F5)" is "Reload". The keys are in
+/// the manual, and a name says what a widget is, not how a mouse user reaches it.
+pub fn without_keys(text: &str) -> &str {
+    let trimmed = text.trim_end();
+    let Some(open) = trimmed.rfind(" (") else {
+        return text;
+    };
+    let Some(inside) = trimmed[open + 2..].strip_suffix(')') else {
+        return text;
+    };
+    let is_key = |part: &str| {
+        let part = part.trim();
+        ["Ctrl", "Cmd", "Alt", "Shift", "Esc", "Enter"]
+            .iter()
+            .any(|k| part.starts_with(k))
+            || (part.len() >= 2
+                && part.starts_with('F')
+                && part[1..].chars().all(|c| c.is_ascii_digit()))
+    };
+    if !inside.is_empty() && inside.split(" / ").all(is_key) {
+        &trimmed[..open]
+    } else {
+        text
+    }
 }

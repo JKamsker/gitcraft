@@ -1,7 +1,9 @@
 //! The system's reduced-motion setting, for gitcraft's own animations and egui's.
 //!
 //! Asked once, in the background, on the first frame: GNOME's `enable-animations` and KDE's
-//! animation speed on Linux and the BSDs, Reduce motion on macOS, Windows' "Animation effects".
+//! animation speed on Linux and the BSDs, Reduce motion on macOS, Windows' "Animate windows
+//! when minimizing and maximizing" (`MinAnimate`, which "Adjust for best performance" turns off
+//! too). A change takes effect at the next start.
 //! `GITCRAFT_REDUCE_MOTION=1` (or `0`) decides instead, for a desktop that isn't asked.
 
 use std::process::Command;
@@ -81,7 +83,7 @@ pub(crate) fn from_env(value: Option<&str>) -> Option<bool> {
 
 #[cfg(target_os = "windows")]
 fn ask_system() -> bool {
-    // "Animation effects" off sets this to 0 along with the rest.
+    // "Animate windows when minimizing and maximizing", the window animations' own setting.
     output(
         "reg",
         &[

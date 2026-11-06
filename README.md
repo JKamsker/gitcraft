@@ -239,13 +239,17 @@ so your config, credentials and hooks apply as usual.
 - Toasts, and a desktop notification when a long operation ends while the window is in the
   background.
 - Themes: Dark, Medium Gray and Light, from PhotoCraft's Pro palettes.
-- Keyboard and screen readers: Tab / Shift+Tab reach every button, row, pill and card, the one
-  with the keyboard ringed in the accent colour, and Enter or Space clicks it. The graph is one
-  Tab stop on the selected commit, ↑ / ↓ moving the keyboard along. Each painted widget has a
-  name for screen readers (AccessKit): a graph row reads "commit a301da9, Merge…, Jonas, 26
-  minutes ago, branch dev". The system's reduced-motion setting (Animation effects on Windows,
-  Reduce motion on macOS, GNOME's or KDE's animations) stops the tabs and panels sliding;
-  `GITCRAFT_REDUCE_MOTION=1` (or `0`) decides instead.
+- Keyboard and screen readers: Tab / Shift+Tab move through the toolbar, the sidebar's rows, the
+  file lists, the graph, the tabs and the start page's cards; a painted button or row with the
+  keyboard is ringed in the accent colour (egui's own buttons and fields show their pressed
+  look), and Enter or Space clicks it. The graph is one Tab stop on the selected commit, ↑ / ↓
+  moving the keyboard along. Each painted widget has a name for screen readers (AccessKit): a
+  graph row reads "commit a301da9, Merge…, Jonas, 26 minutes ago, branch dev". Right-click
+  menus and double-clicks (checking out a pill) still need the mouse.
+- Reduced motion: when gitcraft starts it asks the system whether to animate (GNOME's
+  `enable-animations`, KDE's animation speed, macOS' Reduce motion, Windows' "Animate windows
+  when minimizing and maximizing"); with animations off, tabs and panels move into place without
+  sliding. `GITCRAFT_REDUCE_MOTION=1` (or `0`) decides instead.
 
 ## Download
 

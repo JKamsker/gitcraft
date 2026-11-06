@@ -73,7 +73,8 @@ impl RepoTab {
                 .interact(
                     grab,
                     ui.id().with(("col-handle", bar)),
-                    Sense::click_and_drag(),
+                    // Not a Tab stop: the keyboard can't drag it.
+                    Sense::CLICK | Sense::DRAG,
                 )
                 .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
             crate::repo::widgets::a11y(&resp, egui::WidgetType::ResizeHandle, || {

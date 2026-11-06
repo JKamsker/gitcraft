@@ -75,10 +75,11 @@ const FEATURES: &[(&str, &[&str])] = &[
     (
         "Keyboard and screen readers",
         &[
-            "Tab and Shift+Tab move through the buttons, rows and fields; the one that has the keyboard is ringed in the accent colour, and Enter or Space clicks it.",
+            "Tab and Shift+Tab move through the buttons, rows and fields; a painted button or row that has the keyboard is ringed in the accent colour, and Enter or Space clicks it.",
             "The graph is a single Tab stop, on the selected commit: ↑ and ↓ move the selection and the keyboard with it, and the next Tab leaves the graph.",
             "Screen readers hear each row by name, a commit as “commit a301da9, its summary, its author, how long ago, its branches and tags”, and files, branches, tabs and buttons likewise.",
-            "With the system's reduced-motion setting on (Animation effects off on Windows, Reduce motion on macOS, animations off in GNOME or KDE), tabs and panels move into place without sliding. GITCRAFT_REDUCE_MOTION=1 (or 0) decides instead.",
+            "Right-click menus and double-clicks (checking out a pill) still need the mouse.",
+            "With animations turned off in the system when gitcraft starts (GNOME or KDE, Reduce motion on macOS, Animate windows when minimizing and maximizing on Windows), tabs and panels move into place without sliding. GITCRAFT_REDUCE_MOTION=1 (or 0) decides instead.",
         ],
     ),
 ];
@@ -96,7 +97,10 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("F5", "Reload the repository"),
             ("F1", "This manual"),
             ("Tab / Shift+Tab", "Next / previous button, row or field"),
-            ("Enter / Space", "Click the ringed button or row"),
+            (
+                "Enter / Space",
+                "Click the button or row that has the keyboard",
+            ),
         ],
     ),
     (

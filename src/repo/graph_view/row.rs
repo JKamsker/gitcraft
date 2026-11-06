@@ -117,7 +117,14 @@ impl RepoTab {
             if let Some(status) = ci {
                 let center = pos2(rect.right() - cols.trailing() - 9.0, row.mid());
                 let id = ui.id().with(("ci-dot", &commit.hash));
-                acts.extend(ci_status::dot(ui, id, center, &commit.hash, status));
+                acts.extend(ci_status::dot_in(
+                    ui,
+                    id,
+                    center,
+                    &commit.hash,
+                    status,
+                    tab_stop,
+                ));
             }
         }
         resp
@@ -131,8 +138,8 @@ impl RepoTab {
             return labels::changes(w.conflicted.len(), w.staged.len(), w.unstaged.len());
         }
         let when = git::relative_time(commit.time, now);
-        if self.stashes.iter().any(|s| s.hash == commit.hash) {
-            return labels::join(["stash", commit.summary.as_str(), when.as_str()]);
+        if let Some(stash) = self.stashes.iter().find(|s| s.hash == commit.hash) {
+            return labels::join([labels::stash(&stash.name, &stash.message), when]);
         }
         let refs: Vec<String> = badges(&commit.refs, &self.refs)
             .iter()

@@ -72,7 +72,7 @@ pub fn file_row(
         }
         RowExtra::Buttons(buttons) => {
             // Also while the keyboard is on the row or one of them, so Tab reaches them.
-            let keyboard = row.has_focus()
+            let keyboard = crate::a11y::keyboard_on(&row)
                 || (0..buttons.len()).any(|i| ui.memory(|m| m.has_focus(button_id(&row, i))));
             if hovered || selected || keyboard {
                 (right, button) = hover_buttons(ui, &painter, &t, &row, right, buttons);

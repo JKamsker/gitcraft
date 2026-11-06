@@ -263,7 +263,7 @@ impl App {
         let width = (name.size().x + 34.0).min(180.0);
         let (rect, resp) = ui.allocate_exact_size(vec2(width, 28.0), Sense::click());
         crate::repo::widgets::a11y(&resp, egui::WidgetType::ComboBox, || {
-            format!("Profile: {}", profile.title())
+            format!("profile {}", profile.title())
         });
         if resp.hovered() {
             ui.painter().rect_filled(rect, t.radius, t.pressed);
@@ -326,7 +326,7 @@ impl App {
 fn profile_row(ui: &mut Ui, p: &settings::UserProfile, active: bool, t: &Tokens) -> egui::Response {
     let width = ui.available_width().clamp(180.0, 260.0);
     let (rect, resp) = ui.allocate_exact_size(vec2(width, 26.0), Sense::click());
-    crate::repo::widgets::a11y_selected(&resp, || format!("Profile {}", p.title()), active);
+    crate::repo::widgets::a11y_selected(&resp, || format!("profile {}", p.title()), active);
     if resp.hovered() {
         ui.painter().rect_filled(rect, t.radius_sm, t.pressed);
     }

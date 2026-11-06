@@ -24,6 +24,29 @@ fn painted_key() -> Id {
     Id::new("a11y-painted-focus")
 }
 
+fn before_key() -> Id {
+    Id::new("a11y-focus-before")
+}
+
+/// Whether `resp` had the keyboard as this pass began, or has it now. A widget that gives the
+/// keyboard away to the next one with Tab has already let go when it is drawn, but what shows
+/// only while it has the keyboard (a row's hover buttons) must still be drawn this pass, or
+/// Tab skips over it.
+pub fn keyboard_on(resp: &Response) -> bool {
+    resp.has_focus()
+        || resp
+            .ctx
+            .data(|d| d.get_temp::<Option<Id>>(before_key()))
+            .flatten()
+            == Some(resp.id)
+}
+
+/// Remembers which widget has the keyboard as the pass ends, for [`keyboard_on`].
+pub(super) fn remember(ctx: &Context) {
+    let focused = ctx.memory(|m| m.focused());
+    ctx.data_mut(|d| d.insert_temp(before_key(), focused));
+}
+
 /// Notes `resp` for the ring when it has the keyboard.
 pub(super) fn note(resp: &Response) {
     if !resp.has_focus() {
@@ -90,10 +113,11 @@ pub fn list_row_sense(stop: bool) -> Sense {
     if stop { Sense::click() } else { Sense::CLICK }
 }
 
-/// For the stop row of `list`, after its interaction. While it has the keyboard, ↑ / ↓ are the
-/// list's own (they move its selection, not egui's focus); when the selection, and so the
-/// stop, moves to another row, the keyboard follows it there.
-pub fn list_stop(resp: &Response, list: Id) {
+/// For the stop row of `list`, after its interaction. While it has the keyboard, the arrows are
+/// the list's own (↑ / ↓ move its selection, not egui's focus); when the selection moves to
+/// another row, the keyboard follows it there. `selected`: the stop is the selected row, not
+/// the first in view standing in for one scrolled away (scrolling doesn't move the keyboard).
+pub fn list_stop(resp: &Response, list: Id, selected: bool) {
     let ctx = &resp.ctx;
     let key = list_key(list);
     let pass = ctx.cumulative_pass_nr();
@@ -104,11 +128,12 @@ pub fn list_stop(resp: &Response, list: Id) {
     }
     // The stop moved this pass, with the keyboard on the old one in the pass before (it lets
     // go as it stops being focusable, or does a moment later in this pass).
-    let followed = last.is_some_and(|l| {
-        l.pass + 1 == pass
-            && l.row != resp.id
-            && ctx.memory(|m| m.focused().is_none_or(|f| f == l.row))
-    });
+    let followed = selected
+        && last.is_some_and(|l| {
+            l.pass + 1 == pass
+                && l.row != resp.id
+                && ctx.memory(|m| m.focused().is_none_or(|f| f == l.row))
+        });
     if followed {
         resp.request_focus();
         hold(resp, key, pass);
@@ -118,8 +143,10 @@ pub fn list_stop(resp: &Response, list: Id) {
 /// Keeps ↑ / ↓ for the list while `resp`, its stop, has the keyboard (set again every pass, as
 /// a new focus starts without it), and remembers where the keyboard is.
 fn hold(resp: &Response, key: Id, pass: u64) {
+    // ← / → too: egui would otherwise move the keyboard to whatever lies beside the row.
     let arrows = EventFilter {
         vertical_arrows: true,
+        horizontal_arrows: true,
         ..EventFilter::default()
     };
     resp.ctx
