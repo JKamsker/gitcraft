@@ -112,12 +112,13 @@ fn parse_record(record: &str, target: &str) -> Option<Backlink> {
 /// How `message` refers to `target`, and the line that does: the most explicit way it does,
 /// when it refers to it more than once.
 pub(super) fn find_link(message: &str, target: &str) -> Option<(LinkKind, String)> {
+    let trailers = trailer_lines(message);
     let mut best: Option<(LinkKind, String)> = None;
-    for line in message.lines() {
+    for (n, line) in message.lines().enumerate() {
         if !mentions(line, target) {
             continue;
         }
-        let kind = line_kind(line.trim());
+        let kind = line_kind(line.trim(), trailers.contains(&n));
         let better = match &best {
             None => true,
             Some((have, _)) => rank(&kind) > rank(have),
@@ -139,17 +140,53 @@ fn rank(kind: &LinkKind) -> u8 {
     }
 }
 
-/// What kind of link `line` (one that mentions the hash) is.
-fn line_kind(line: &str) -> LinkKind {
+/// What kind of link `line` (one that mentions the hash) is; `in_trailers`: it is in the
+/// message's trailer block.
+fn line_kind(line: &str, in_trailers: bool) -> LinkKind {
     let lower = line.to_lowercase();
     if lower.starts_with("this reverts commit ") {
         LinkKind::Revert
-    } else if lower.starts_with("(cherry picked from commit ") {
+    } else if is_cherry_pick_line(&lower) {
         LinkKind::CherryPick
-    } else if let Some(key) = trailer_key(line) {
+    } else if let Some(key) = trailer_key(line).filter(|_| in_trailers) {
         LinkKind::Trailer(key.to_owned())
     } else {
         LinkKind::Mention
+    }
+}
+
+fn is_cherry_pick_line(lower: &str) -> bool {
+    lower.starts_with("(cherry picked from commit ")
+}
+
+/// The numbers of the lines of `message` in its trailer block: its last paragraph, not the
+/// subject, when every line of it is a trailer (`Key: value`), the continuation of one, or
+/// the line `cherry-pick -x` adds. A `fix: …` subject or a `Note: …` line in the body is
+/// none.
+fn trailer_lines(message: &str) -> Vec<usize> {
+    let lines: Vec<&str> = message.lines().collect();
+    let Some(last) = lines.iter().rposition(|l| !l.trim().is_empty()) else {
+        return Vec::new();
+    };
+    let start = lines[..last]
+        .iter()
+        .rposition(|l| l.trim().is_empty())
+        .map_or(0, |blank| blank + 1);
+    // The subject's paragraph is never the trailers.
+    if start == 0 {
+        return Vec::new();
+    }
+    let block = start..=last;
+    let all_trailers = lines[block.clone()].iter().enumerate().all(|(i, line)| {
+        let continuation = i > 0 && line.starts_with([' ', '\t']);
+        continuation
+            || trailer_key(line.trim()).is_some()
+            || is_cherry_pick_line(&line.trim().to_lowercase())
+    });
+    if all_trailers {
+        block.collect()
+    } else {
+        Vec::new()
     }
 }
 
@@ -173,7 +210,7 @@ pub(super) fn mentions(text: &str, target: &str) -> bool {
     let bytes = text.as_bytes();
     let mut i = 0;
     while i < bytes.len() {
-        if !bytes[i].is_ascii_hexdigit() || (i > 0 && is_word_byte(bytes[i - 1])) {
+        if !bytes[i].is_ascii_hexdigit() || !word_starts(&text[..i]) {
             i += 1;
             continue;
         }
@@ -181,7 +218,7 @@ pub(super) fn mentions(text: &str, target: &str) -> bool {
         while i < bytes.len() && bytes[i].is_ascii_hexdigit() {
             i += 1;
         }
-        let word_ends = i == bytes.len() || !is_word_byte(bytes[i]);
+        let word_ends = text[i..].chars().next().is_none_or(|c| !is_word_char(c));
         let word = &text[start..i];
         if word_ends
             && word.len() >= MIN_MENTION
@@ -194,9 +231,29 @@ pub(super) fn mentions(text: &str, target: &str) -> bool {
     false
 }
 
-/// Letters, digits and `_`: what a hash would run into, were it part of a longer word.
-fn is_word_byte(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || b == b'_' || b >= 0x80
+/// Whether a word can start after `before`: at the start, after a character that isn't part
+/// of a word, or after the `-g` of a `git describe` name (`v1.0-3-g0123456`).
+fn word_starts(before: &str) -> bool {
+    let mut back = before.chars().rev();
+    match back.next() {
+        None => true,
+        Some('g') => back.next() == Some('-'),
+        Some(c) => !is_word_char(c),
+    }
+}
+
+/// Letters, digits and `_`: what a hash would run into, were it part of a longer word. Not
+/// the ideographs and kana of Chinese and Japanese, written without spaces between words.
+fn is_word_char(c: char) -> bool {
+    c == '_' || (c.is_alphanumeric() && !is_cjk(c))
+}
+
+fn is_cjk(c: char) -> bool {
+    matches!(
+        c as u32,
+        0x2E80..=0x2FFF | 0x3000..=0x30FF | 0x3400..=0x4DBF | 0x4E00..=0x9FFF | 0xAC00..=0xD7AF
+            | 0xF900..=0xFAFF | 0xFF00..=0xFFEF | 0x20000..=0x3FFFF
+    )
 }
 
 /// `line` cut to a length that fits a row, on a character boundary.
@@ -232,6 +289,39 @@ mod tests {
         assert!(!mentions("é0123456", H));
         assert!(!mentions(&format!("{H}0"), H));
         assert!(!mentions("", H));
+        // Beside non-ASCII punctuation, spaces and ideographs, or after describe's `-g`.
+        assert!(mentions("Reverts “0123456”", H));
+        assert!(mentions("修复0123456引入的问题", H));
+        assert!(mentions("see\u{a0}0123456", H));
+        assert!(mentions("since v1.0-3-g0123456", H));
+        assert!(!mentions("big0123456", H));
+        assert!(!mentions("ü0123456", H));
+    }
+
+    #[test]
+    fn only_the_last_paragraph_of_trailers_holds_trailers() {
+        let kind = |m: &str| find_link(m, H).map(|(k, _)| k);
+        // A conventional-commit subject and a `Note:` line in the body are mentions.
+        assert_eq!(
+            kind("fix: regression from 0123456"),
+            Some(LinkKind::Mention)
+        );
+        assert_eq!(
+            kind("x\n\nNote: 0123456 broke this.\n\nSigned-off-by: a <a@a>"),
+            Some(LinkKind::Mention)
+        );
+        // A trailer block with a continuation and cherry-pick's line.
+        assert_eq!(
+            kind(
+                "x\n\nbody\n\nFixes: 0123456 (\"the\n  subject\")\n(cherry picked from commit fedcba9)\nSigned-off-by: a <a@a>"
+            ),
+            Some(LinkKind::Trailer("Fixes".to_owned()))
+        );
+        // A last paragraph that isn't all trailers.
+        assert_eq!(
+            kind("x\n\nFixes: 0123456\nand some prose"),
+            Some(LinkKind::Mention)
+        );
     }
 
     #[test]

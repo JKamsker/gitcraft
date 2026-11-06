@@ -178,18 +178,35 @@ fn answers_for_another_commit_are_dropped() {
     let first = commit(&dir, "first");
     let second = commit(&dir, &format!("mentions {}", &first[..7]));
     let ctx = egui::Context::default();
+    assert!(git::run(Some(&dir), &["tag", "v2"]).is_ok());
+    assert!(git::write_note(&dir, "commits", &first, "on the first").is_ok());
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    // The first's reads start; the second is selected while they run.
     tab.load_extras(&first, &ctx);
+    std::thread::sleep(super::SETTLE);
+    tab.extras_tick(&ctx);
+    assert_eq!(tab.extras.jobs.running, [true; 4]);
     tab.load_extras(&second, &ctx);
-    wait(&mut tab, &ctx, all_read);
-    // Let any answer for the first come in too.
-    for _ in 0..10 {
+    // Every answer for the first comes in, before the second's reads start: none is shown.
+    for _ in 0..400 {
         tab.poll(&ctx);
-        std::thread::sleep(std::time::Duration::from_millis(20));
+        if tab.extras.jobs.running == [false; 4] {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
     }
+    assert_eq!(tab.extras.jobs.running, [false; 4]);
+    let e = &tab.extras;
+    assert!(e.signature.is_none() && e.contained.is_none() && e.backlinks.is_none());
+    assert!(e.notes.note.is_none());
+    // Then the second's own.
+    std::thread::sleep(super::SETTLE);
+    wait(&mut tab, &ctx, all_read);
     assert_eq!(tab.extras.hash.as_deref(), Some(second.as_str()));
-    // The first has a backlink (the second); the second has none.
+    // The first has a backlink (the second), a note, and v2~1; the second none, none, v2.
     assert!(matches!(&tab.extras.backlinks, Some(Ok((links, _))) if links.is_empty()));
+    assert_eq!(note_text(&tab.extras), Some(None));
+    assert!(matches!(&tab.extras.contained, Some(Ok(c)) if c.describe.as_deref() == Some("v2")));
 
     tab.stash_view = Some(0);
     tab.load_extras(&first, &ctx);
@@ -240,6 +257,8 @@ fn the_sections_draw_in_every_state() {
 fn passing_through_commits_starts_one_read_of_each_kind() {
     let dir = repo("debounce");
     let hashes: Vec<String> = (0..20).map(|n| commit(&dir, &format!("c{n}"))).collect();
+    // Something only the first has, to tell its answers from the last one's.
+    assert!(git::write_note(&dir, "commits", &hashes[0], "only on the first").is_ok());
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
     for hash in &hashes {
@@ -260,7 +279,7 @@ fn passing_through_commits_starts_one_read_of_each_kind() {
     });
     assert_eq!(tab.extras.hash.as_deref(), Some(hashes[0].as_str()));
     assert!(matches!(&tab.extras.backlinks, Some(Ok((l, _))) if l.is_empty()));
-    assert!(matches!(&tab.extras.contained, Some(Ok(c)) if c.local.names == ["main"]));
+    assert_eq!(note_text(&tab.extras), Some(Some("only on the first\n")));
     assert_ne!(last, hashes[0]);
     let _ = std::fs::remove_dir_all(&dir);
 }
