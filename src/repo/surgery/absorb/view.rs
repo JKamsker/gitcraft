@@ -126,7 +126,7 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut AbsorbEditor, idle: bool, acts: 
                             let text = format!(
                                 "Checked. Absorbing rewrites the branch from {}{}{}; Ctrl+Z undoes it",
                                 oldest.map(|t| short(&t.hash)).unwrap_or_default(),
-                                if c.rest.is_some() { ", the rest staged again" } else { "" },
+                                if c.rest { ", the rest staying staged" } else { "" },
                                 if pushed > 0 {
                                     " · pushed commits change: push with force (with lease) after"
                                 } else {

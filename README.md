@@ -114,8 +114,10 @@ so your config, credentials and hooks apply as usual.
   into the earlier commit of the branch that last changed those lines, as git-absorb does. A
   change whose lines one commit last changed is matched; one several commits changed is only
   suggested (the newest); one no commit of the branch changed (a new file, an older line) stays
-  staged. Change any of them, _Check_ the fixups and what stays staged, then absorb: fixup
-  commits are rebased into their commits and the rest is staged again. Ctrl+Z undoes it. With
+  staged. Change any of them, _Check_ the fixups and what stays staged (a fix a later commit
+  would conflict with is refused there), then absorb: the commits are made again with their
+  fixes (signed when your config signs), and the index and working tree stay exactly as they
+  are. Ctrl+Z undoes it. With
   `git-absorb` installed (on the repository's machine for WSL / SSH), _Run git-absorb instead_
   hands it over.
 - Quick edits from a commit's menu, for commits of the checked-out branch: _Edit commit

@@ -2,20 +2,21 @@
 //! commit of the branch that last touched those lines, as `git-absorb` does. A run whose lines
 //! were all last touched by one commit of the branch is a clear match; one touched by several
 //! is only suggested (the newest of them); one no commit of the branch touched (a new file, an
-//! older line) stays staged. Checking makes the fixups' trees and shows them; absorbing makes
-//! a fixup commit for each commit and rebases them into it, what wasn't absorbed staged again.
+//! older line) stays staged. Checking makes the new commits with the fixes in them (see
+//! [`history`]) and shows the fixes and what stays staged; absorbing moves the branch there,
+//! leaving the index and the working tree exactly as they are.
 
+mod history;
 mod view;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::path::Path;
 
 use super::patchset::{self, FilePatch};
-use super::prepared;
 use super::split::Preview;
 use crate::git::{self, StackCommit};
 use crate::repo::diff::Kind;
-use crate::repo::rebase::Step;
+use crate::repo::operations::expect_ref_at;
 use crate::repo::{RepoTab, Undo, short};
 
 /// How a run of staged changes matches the branch's commits.
@@ -160,8 +161,10 @@ pub(crate) struct Checked {
     pub fixups: Vec<(usize, String)>,
     /// What is staged now, as a tree: absorbing refuses once that changed.
     pub staged: String,
-    /// The patch of what stays staged, where git runs, if anything does.
-    pub rest: Option<String>,
+    /// Something stays staged.
+    pub rest: bool,
+    /// The branch with the fixes absorbed, made already: absorbing moves the branch there.
+    pub new_head: String,
     pub preview: Preview,
 }
 
@@ -305,7 +308,7 @@ pub(crate) fn prepare(
     each: &[(usize, String)],
     all: &str,
     staged: &str,
-    names: &[String],
+    targets: &[String],
 ) -> Result<Checked, String> {
     let base = git::tree_of(repo, head)?;
     let tree = |patch: &str| -> Result<String, String> {
@@ -319,7 +322,10 @@ pub(crate) fn prepare(
     let mut sections = Vec::new();
     for (t, patch) in each {
         let fixed = tree(patch)?;
-        let name = names.get(*t).cloned().unwrap_or_default();
+        let name = targets
+            .get(*t)
+            .map(|h| short(h).to_owned())
+            .unwrap_or_default();
         let files = git::paths_between(repo, &base, &fixed)?;
         sections.push((
             git::patch_between(repo, &base, &fixed)?,
@@ -340,17 +346,29 @@ pub(crate) fn prepare(
         );
     }
     let rest_patch = git::patch_between(repo, &absorbed, &staged_tree)?;
-    let rest = if rest_patch.is_empty() {
-        None
-    } else {
-        let files = git::paths_between(repo, &absorbed, &staged_tree)?;
-        sections.push((rest_patch.clone(), files));
-        Some(git::save_patch_for(repo, &rest_patch)?)
-    };
+    let rest = !rest_patch.is_empty();
+    if rest {
+        sections.push((
+            rest_patch,
+            git::paths_between(repo, &absorbed, &staged_tree)?,
+        ));
+    }
+    let fixes: HashMap<String, String> = fixups
+        .iter()
+        .filter_map(|(t, tree)| Some((targets.get(*t)?.clone(), tree.clone())))
+        .collect();
+    let oldest = fixups
+        .iter()
+        .map(|(t, _)| *t)
+        .max()
+        .and_then(|t| targets.get(t))
+        .ok_or("no commit gets fixes")?;
+    let new_head = history::absorbed(repo, head, oldest, &fixes, &absorbed)?;
     Ok(Checked {
         fixups,
         staged: staged_tree,
         rest,
+        new_head,
         preview: Preview::new(&sections),
     })
 }
@@ -424,11 +442,7 @@ impl RepoTab {
             editor.table(),
             editor.chosen_targets(),
         );
-        let names: Vec<String> = editor
-            .targets
-            .iter()
-            .map(|t| short(&t.hash).to_owned())
-            .collect();
+        let names: Vec<String> = editor.targets.iter().map(|t| t.hash.clone()).collect();
         let (id, head) = (editor.id, editor.head.clone());
         editor.busy = true;
         editor.error = None;
@@ -452,104 +466,47 @@ impl RepoTab {
         );
     }
 
-    /// Makes a fixup commit for each commit getting fixes and rebases each into its commit;
-    /// what wasn't absorbed is staged again after.
+    /// Moves the branch to the commits checking made, the fixes in them. What is staged and
+    /// the working tree are left as they are: what was absorbed is in HEAD now, so only what
+    /// wasn't shows staged. It refuses once HEAD, the branch or what is staged changed since.
     pub(in crate::repo) fn run_absorb(&mut self, ctx: &egui::Context) {
         if self.busy_op.is_some() {
             return;
         }
-        let Some(editor) = self.absorb.as_mut().filter(|e| !e.busy) else {
+        let Some(editor) = self.absorb.as_ref().filter(|e| !e.busy) else {
             return;
         };
         let Some(checked) = editor.checked.clone() else {
             return;
         };
-        let oldest = checked
-            .fixups
-            .iter()
-            .map(|(t, _)| *t)
-            .max()
-            .and_then(|t| editor.targets.get(t));
-        let Some(oldest) = oldest else {
-            return;
-        };
-        let onto = format!("{}^", oldest.hash);
-        let targets: Vec<StackCommit> = editor.targets.clone();
-        let (id, head) = (editor.id, editor.head.clone());
         let label = format!(
             "Distribute staged fixes into {} commit{}",
             checked.fixups.len(),
             if checked.fixups.len() == 1 { "" } else { "s" }
         );
-        // What is staged must still be what was checked; then it is unstaged (it all is in the
-        // working tree, which the rebase stashes and puts back), and what stays is staged again.
-        let before = vec![
+        let steps = vec![
+            self.same_branch(),
+            expect_ref_at("HEAD", &editor.head),
             ["diff", "--cached", "--quiet", &checked.staged, "--"]
                 .map(str::to_owned)
                 .to_vec(),
-            vec!["reset".to_owned(), "-q".to_owned()],
+            [
+                "update-ref",
+                "-m",
+                "gitcraft: distribute staged fixes",
+                "HEAD",
+                &checked.new_head,
+                &editor.head,
+            ]
+            .map(str::to_owned)
+            .to_vec(),
         ];
-        let after = checked
-            .rest
-            .iter()
-            .map(|rest| {
-                ["apply", "--cached", "--whitespace=nowarn", rest]
-                    .map(str::to_owned)
-                    .to_vec()
-            })
-            .collect();
-        editor.busy = true;
-        editor.error = None;
-        let path = self.path.clone();
-        let fixups = checked.fixups.clone();
-        self.rewrite_with(
-            label,
-            onto,
-            move |entries| {
-                let mut made: BTreeMap<String, crate::repo::rebase::Entry> = BTreeMap::new();
-                for (t, tree) in &fixups {
-                    let Some(target) = targets.get(*t) else {
-                        continue;
-                    };
-                    let Some(of) = entries.iter().find(|e| e.commit.hash == target.hash) else {
-                        return Err(format!(
-                            "{} is no longer on the checked-out branch",
-                            short(&target.hash)
-                        ));
-                    };
-                    let note = format!("fixup! {}", target.summary);
-                    let commit = git::commit_tree(&path, tree, &head, &note, None)?;
-                    let mut entry = prepared(commit, &note, &of.commit);
-                    entry.step = Step::Fixup;
-                    made.insert(target.hash.clone(), entry);
-                }
-                let mut todo = Vec::new();
-                for e in entries {
-                    let fix = made.remove(&e.commit.hash);
-                    todo.push(e);
-                    todo.extend(fix);
-                }
-                Ok(todo)
-            },
-            (before, after),
+        self.absorb = None;
+        self.run_undoable(
+            &label,
+            steps,
+            crate::repo::Refresh::All,
             Undo::HeadMove { mode: "--soft" },
-            move |tab, started| {
-                // Cancelled meanwhile: nothing runs.
-                let Some(editor) = tab.absorb.as_mut().filter(|e| e.id == id) else {
-                    return false;
-                };
-                match started {
-                    Ok(()) => {
-                        tab.absorb = None;
-                        true
-                    }
-                    Err(e) => {
-                        editor.busy = false;
-                        editor.error = Some(e);
-                        false
-                    }
-                }
-            },
             ctx,
         );
     }
@@ -561,7 +518,7 @@ impl RepoTab {
         };
         let steps = [
             self.same_branch(),
-            super::super::operations::expect_ref_at("HEAD", &editor.head),
+            expect_ref_at("HEAD", &editor.head),
             // Its rebase takes the todo list as it is, whatever editor the user's config sets.
             ["-c", "sequence.editor=true", "absorb", "--and-rebase"]
                 .map(str::to_owned)
