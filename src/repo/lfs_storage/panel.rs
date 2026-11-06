@@ -4,7 +4,7 @@
 use egui::{RichText, Ui};
 
 use super::{Panel, StorageAct, StorageState, download_action, prune_action};
-use crate::git::{folder_pattern, human_size};
+use crate::git::{FetchFilters, folder_pattern, human_size, pattern_label};
 use crate::icons;
 use crate::repo::{Action, RepoTab};
 use crate::theme::{self, Tokens};
@@ -44,7 +44,7 @@ impl RepoTab {
                     section(ui, "What LFS fetches");
                     filters(ui, &t, &mut panel, acts);
                     section(ui, "Old objects");
-                    prune(ui, &t, &panel, idle, acts);
+                    prune(ui, &t, &mut panel, idle, acts);
                 });
             });
         if close || resp.should_close() {
@@ -63,7 +63,7 @@ fn header(ui: &mut Ui, t: &Tokens, acts: &mut Vec<Action>) -> bool {
             if icons::small_button(ui, "x", "Close (Esc)").clicked() {
                 close = true;
             }
-            if icons::small_button(ui, "refresh-cw", "Measure again").clicked() {
+            if icons::small_button(ui, "refresh-cw", "Read again").clicked() {
                 acts.push(Action::LfsStorage(StorageAct::Refresh));
             }
         });
@@ -77,34 +77,30 @@ fn section(ui: &mut Ui, title: &str) {
     ui.add_space(2.0);
 }
 
+fn spinner_line(ui: &mut Ui, t: &Tokens, text: &str) {
+    ui.horizontal(|ui| {
+        ui.add(crate::spinner::Spinner::new());
+        ui.label(RichText::new(text).color(t.text_dim));
+    });
+}
+
+fn error(ui: &mut Ui, t: &Tokens, text: &str) {
+    ui.add(egui::Label::new(RichText::new(text).color(t.danger)).wrap());
+}
+
 fn usage(ui: &mut Ui, t: &Tokens, panel: &Panel) {
     ui.add_space(8.0);
     match &panel.usage {
-        None => {
-            ui.horizontal(|ui| {
-                ui.add(crate::spinner::Spinner::new());
-                ui.label(RichText::new("Measuring the LFS objects…").color(t.text_dim));
-            });
-        }
-        Some(Err(e)) => {
-            ui.add(
-                egui::Label::new(
-                    RichText::new(format!("Could not measure the LFS objects: {e}"))
-                        .color(t.danger),
-                )
-                .wrap(),
-            );
-        }
+        None => spinner_line(ui, t, "Measuring the LFS objects…"),
+        Some(Err(e)) if e.is_empty() => spinner_line(ui, t, "Measuring the LFS objects…"),
+        Some(Err(e)) => error(ui, t, &format!("Could not measure the LFS objects: {e}")),
         Some(Ok(u)) => {
-            let objects = if u.objects == 1 { "object" } else { "objects" };
-            ui.label(
-                RichText::new(format!(
-                    "{} in {} LFS {objects} on disk",
-                    human_size(u.bytes),
-                    u.objects
-                ))
-                .font(theme::semibold(15.0)),
-            );
+            let text = match u.objects {
+                0 => "No LFS objects on disk yet".to_owned(),
+                1 => format!("{} in 1 LFS object on disk", human_size(u.bytes)),
+                n => format!("{} in {n} LFS objects on disk", human_size(u.bytes)),
+            };
+            ui.label(RichText::new(text).font(theme::semibold(15.0)));
             ui.add(egui::Label::new(RichText::new(&u.dir).color(t.text_faint).small()).truncate())
                 .on_hover_text(&u.dir);
         }
@@ -114,46 +110,69 @@ fn usage(ui: &mut Ui, t: &Tokens, panel: &Panel) {
 /// The files of the checkout in LFS, those that are only pointers, and Download.
 fn checkout(ui: &mut Ui, t: &Tokens, state: &StorageState, idle: bool, acts: &mut Vec<Action>) {
     if let Some(e) = &state.files_error {
-        ui.add(egui::Label::new(RichText::new(e).color(t.danger)).wrap());
+        error(ui, t, e);
+        return;
+    }
+    if !state.files_read {
+        spinner_line(ui, t, "Listing the LFS files…");
         return;
     }
     let missing: Vec<_> = state.missing().collect();
-    let total: u64 = missing.iter().map(|f| f.size).sum();
     let files = state.files.len();
     let summary = match (files, missing.len()) {
         (0, _) => "No file of the checkout is kept in LFS.".to_owned(),
-        (n, 0) => format!("{n} {} in LFS, all downloaded.", plural(n, "file", "files")),
+        (1, 0) => "1 file in LFS, downloaded.".to_owned(),
+        (n, 0) => format!("{n} files in LFS, all downloaded."),
         (n, m) => format!(
-            "{n} {} in LFS; {m} only {} ({} never downloaded).",
-            plural(n, "file", "files"),
-            plural(m, "a pointer", "pointers"),
-            human_size(total)
+            "{n} {} in LFS; {} only {} here ({} not downloaded).",
+            if n == 1 { "file" } else { "files" },
+            if m == 1 {
+                "1 is".to_owned()
+            } else {
+                format!("{m} are")
+            },
+            if m == 1 { "a pointer" } else { "pointers" },
+            human_size(state.missing_bytes)
         ),
     };
     ui.label(RichText::new(summary).color(t.text_dim));
     if missing.is_empty() {
         return;
     }
-    ui.horizontal(|ui| {
-        if let Ok(all) = download_action(&[]) {
+    let paths: Vec<String> = missing.iter().map(|f| f.path.clone()).collect();
+    match download_action(&paths) {
+        Ok(all) => {
             let r = ui
-                .add_enabled(idle, egui::Button::new("Download"))
-                .on_hover_text("git lfs pull: every file, as far as the folders below allow");
+                .add_enabled(
+                    idle,
+                    egui::Button::new(format!("Download all ({})", paths.len())),
+                )
+                .on_hover_text("git lfs pull of each of them, whatever the folders below say");
             if r.clicked() {
                 acts.push(all);
             }
         }
-    });
+        Err(e) => {
+            let r = ui
+                .add_enabled(idle, egui::Button::new("Download"))
+                .on_hover_text(format!(
+                    "git lfs pull, as far as the folders below allow ({e})"
+                ));
+            if r.clicked()
+                && let Ok(pull) = download_action(&[])
+            {
+                acts.push(pull);
+            }
+        }
+    }
     egui::CollapsingHeader::new(format!("Only pointers ({})", missing.len()))
         .id_salt("lfs-missing")
         .show(ui, |ui| {
             for f in missing.iter().take(LISTED) {
                 ui.horizontal(|ui| {
                     icons::inline(ui, "cloud-download", 12.0, t.text_dim);
-                    ui.add(
-                        egui::Label::new(RichText::new(&f.path).font(theme::medium(12.0)))
-                            .truncate(),
-                    );
+                    let name = RichText::new(&f.path).font(theme::medium(12.0));
+                    ui.add(egui::Label::new(name).truncate());
                     ui.label(
                         RichText::new(human_size(f.size))
                             .color(t.text_faint)
@@ -178,56 +197,85 @@ fn checkout(ui: &mut Ui, t: &Tokens, state: &StorageState, idle: bool, acts: &mu
                 });
             }
             if missing.len() > LISTED {
-                ui.label(
-                    RichText::new(format!("and {} more", missing.len() - LISTED))
-                        .color(t.text_faint)
-                        .small(),
-                );
+                let more = format!("and {} more", missing.len() - LISTED);
+                ui.label(RichText::new(more).color(t.text_faint).small());
             }
         });
 }
 
-fn plural<'a>(n: usize, one: &'a str, many: &'a str) -> &'a str {
-    if n == 1 { one } else { many }
-}
-
-/// `lfs.fetchinclude` and `lfs.fetchexclude` as lists of folders, each taken out with its ×,
-/// added to with a field.
+/// This repository's `lfs.fetchinclude` and `lfs.fetchexclude` as lists of folders, each taken
+/// out with its ×, added to with a field; what its `.lfsconfig` sets, shown.
 fn filters(ui: &mut Ui, t: &Tokens, panel: &mut Panel, acts: &mut Vec<Action>) {
     ui.label(
         RichText::new(
-            "LFS: Fetch and Pull download only the folders included (every one when none is), \
-             leaving out those excluded. Set for this repository only.",
+            "git-lfs downloads only the folders included (every one when none is), leaving out \
+             those excluded, on fetch, pull and checkout. Set for this repository only.",
         )
         .color(t.text_dim)
         .small(),
     );
-    let Some((include, exclude)) = panel.filters.clone() else {
-        ui.add(crate::spinner::Spinner::new());
-        return;
+    let filters: FetchFilters = match &panel.filters {
+        None => {
+            ui.add(crate::spinner::Spinner::new());
+            return;
+        }
+        Some(Err(e)) => {
+            error(ui, t, &format!("Could not read what LFS fetches: {e}"));
+            return;
+        }
+        Some(Ok(f)) => f.clone(),
     };
-    for (exclude_list, title, list, typed) in [
-        (false, "Only these folders", include, &mut panel.new_include),
-        (true, "Never these folders", exclude, &mut panel.new_exclude),
-    ] {
+    let lists = [
+        (
+            false,
+            "Only these folders",
+            filters.include,
+            filters.shared_include,
+        ),
+        (
+            true,
+            "Never these folders",
+            filters.exclude,
+            filters.shared_exclude,
+        ),
+    ];
+    for (exclude, title, list, shared) in lists {
         ui.add_space(4.0);
         ui.label(RichText::new(title).font(theme::medium(12.5)));
         ui.horizontal_wrapped(|ui| {
             if list.is_empty() {
                 ui.label(RichText::new("none").color(t.text_faint));
             }
-            for (i, folder) in list.iter().enumerate() {
-                crate::repo::widgets::chip(ui, folder, t.text_dim);
-                if icons::small_button(ui, "x", &format!("Take {folder} out")).clicked() {
+            for (i, pattern) in list.iter().enumerate() {
+                let name = pattern_label(pattern);
+                crate::repo::widgets::chip(ui, &name, t.text_dim);
+                if icons::small_button(ui, "x", &format!("Take {name} out")).clicked() {
                     let mut rest = list.clone();
                     rest.remove(i);
                     acts.push(Action::LfsStorage(StorageAct::SetFilter {
-                        exclude: exclude_list,
+                        exclude,
                         list: rest,
                     }));
                 }
             }
         });
+        if !shared.is_empty() {
+            let names: Vec<String> = shared.iter().map(|p| pattern_label(p)).collect();
+            let note = if list.is_empty() {
+                format!("The repository's .lfsconfig sets: {}", names.join(", "))
+            } else {
+                format!(
+                    "Instead of what the repository's .lfsconfig sets: {}",
+                    names.join(", ")
+                )
+            };
+            ui.label(RichText::new(note).color(t.text_faint).small());
+        }
+        let typed = if exclude {
+            &mut panel.new_exclude
+        } else {
+            &mut panel.new_include
+        };
         ui.horizontal(|ui| {
             let field = ui.add(
                 egui::TextEdit::singleline(typed)
@@ -235,44 +283,39 @@ fn filters(ui: &mut Ui, t: &Tokens, panel: &mut Panel, acts: &mut Vec<Action>) {
                     .desired_width(240.0),
             );
             let enter = field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-            let folder = folder_pattern(typed);
-            let add = ui.add_enabled(folder.is_some(), egui::Button::new("Add"));
-            if let Some(folder) = folder
+            let pattern = folder_pattern(typed);
+            let add = ui.add_enabled(pattern.is_some(), egui::Button::new("Add"));
+            if let Some(pattern) = pattern
                 && (add.clicked() || enter)
             {
                 let mut list = list.clone();
-                if !list.contains(&folder) {
-                    list.push(folder);
+                if !list.contains(&pattern) {
+                    list.push(pattern);
                 }
-                typed.clear();
-                acts.push(Action::LfsStorage(StorageAct::SetFilter {
-                    exclude: exclude_list,
-                    list,
-                }));
+                acts.push(Action::LfsStorage(StorageAct::SetFilter { exclude, list }));
             }
         });
     }
     if let Some(e) = &panel.filter_error {
-        ui.colored_label(t.danger, e);
+        error(ui, t, e);
     }
 }
 
-/// What pruning would free, then Prune.
-fn prune(ui: &mut Ui, t: &Tokens, panel: &Panel, idle: bool, acts: &mut Vec<Action>) {
+/// What pruning would free, then Prune, asked twice.
+fn prune(ui: &mut Ui, t: &Tokens, panel: &mut Panel, idle: bool, acts: &mut Vec<Action>) {
     ui.label(
         RichText::new(
             "Pruning deletes local LFS objects that no recent commit, the checkout or unpushed \
-             work needs; they can be downloaded again.",
+             work needs; they can be downloaded again as long as the remote still has them.",
         )
         .color(t.text_dim)
         .small(),
     );
+    if panel.checking_plan {
+        spinner_line(ui, t, "Working out what pruning frees…");
+        return;
+    }
     ui.horizontal(|ui| {
-        if panel.checking_plan {
-            ui.add(crate::spinner::Spinner::new());
-            ui.label(RichText::new("Working out what pruning frees…").color(t.text_dim));
-            return;
-        }
         if ui.button("Check what pruning frees").clicked() {
             acts.push(Action::LfsStorage(StorageAct::CheckPrune));
         }
@@ -281,24 +324,30 @@ fn prune(ui: &mut Ui, t: &Tokens, panel: &Panel, idle: bool, acts: &mut Vec<Acti
                 ui.label(RichText::new("Nothing to prune.").color(t.text_dim));
             }
             Some(Ok(plan)) => {
-                let text = format!(
-                    "Frees {} in {} {}.",
-                    human_size(plan.bytes),
-                    plan.objects,
-                    if plan.objects == 1 {
-                        "object"
+                let objects = if plan.objects == 1 {
+                    "1 object".to_owned()
+                } else {
+                    format!("{} objects", plan.objects)
+                };
+                let label = if panel.confirm_prune {
+                    format!("Click again to delete {objects}")
+                } else {
+                    format!("Delete {objects} ({})", human_size(plan.bytes))
+                };
+                let button = egui::Button::new(RichText::new(label).color(t.danger));
+                if ui.add_enabled(idle, button).clicked() {
+                    if panel.confirm_prune {
+                        panel.confirm_prune = false;
+                        acts.push(prune_action());
                     } else {
-                        "objects"
+                        panel.confirm_prune = true;
                     }
-                );
-                ui.label(RichText::new(text).color(t.text));
-                if ui.add_enabled(idle, egui::Button::new("Prune")).clicked() {
-                    acts.push(prune_action());
+                }
+                if panel.confirm_prune && ui.small_button("Cancel").clicked() {
+                    panel.confirm_prune = false;
                 }
             }
-            Some(Err(e)) => {
-                ui.add(egui::Label::new(RichText::new(e).color(t.danger)).wrap());
-            }
+            Some(Err(e)) => error(ui, t, e),
             None => {}
         }
     });
