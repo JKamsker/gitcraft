@@ -19,22 +19,24 @@ use crate::git;
 use crate::settings::Settings;
 use crate::theme::Tokens;
 use badge::{BadgeKind, badges};
+/// For the settings' previews, which draw a graph of their own like this one.
+pub(crate) use lanes::edge;
 use row::Lanes;
 
-const ROW_H: f32 = 28.0;
+pub(crate) const ROW_H: f32 = 28.0;
 /// Space between rows, which the graph's lines cross.
-const ROW_GAP: f32 = 2.0;
+pub(crate) const ROW_GAP: f32 = 2.0;
 /// From one row to the next.
-const ROW_PITCH: f32 = ROW_H + ROW_GAP;
+pub(crate) const ROW_PITCH: f32 = ROW_H + ROW_GAP;
 /// From one lane to the next.
-const LANE_W: f32 = 16.0;
+pub(crate) const LANE_W: f32 = 16.0;
 /// From one lane to the next in a compact graph column.
-const COMPACT_LANE_W: f32 = 10.0;
+pub(crate) const COMPACT_LANE_W: f32 = 10.0;
 /// Radius of the corner where a line from a dot turns into another lane.
 const CORNER_R: f32 = 7.0;
 const MAX_LANES_SHOWN: usize = 24;
 /// How much darker the pills that are not checked out are (0 = same colour, 1 = black).
-const DIMMED: f32 = 0.4;
+pub(crate) const DIMMED: f32 = 0.4;
 /// A translucent black, so the column handles read as dark on every theme's header.
 const HANDLE_COLOR: egui::Color32 = egui::Color32::from_black_alpha(130);
 const HANDLE_WIDTH: f32 = 2.0;

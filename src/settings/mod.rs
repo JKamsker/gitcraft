@@ -2,9 +2,11 @@
 
 mod layout;
 mod page;
+mod preview;
 mod profile_page;
 pub mod profiles;
 mod signing;
+mod themes;
 
 use egui::{RichText, Ui};
 use serde::{Deserialize, Serialize};
@@ -12,8 +14,10 @@ use serde::{Deserialize, Serialize};
 use crate::theme::Tokens;
 use layout::{Card, Filter, section};
 pub(crate) use page::show as show_page;
+use preview::Preview;
 pub use profile_page::{ProfileRequest, SettingsView, paint_badge};
 pub use profiles::UserProfile;
+pub use themes::{ThemePick, theme_menu};
 
 /// A name and email to commit with, applied per repository from its commit box.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -84,6 +88,8 @@ pub struct Settings {
     pub download_updates: bool,
     /// Colour code in diffs and blame with VS Code's current theme, when it has one.
     pub vscode_colors: bool,
+    /// What is changed about whichever theme is in use: accent, corners, lane colours.
+    pub theme_tweaks: crate::theme::Tweaks,
     /// Offer Mergiraf in the conflict editor, when it is installed.
     pub mergiraf: bool,
     /// After a checkout, pull, merge or rebase, update the submodules to the commits it records.
@@ -131,6 +137,7 @@ impl Default for Settings {
             update_channel: Default::default(),
             download_updates: true,
             vscode_colors: true,
+            theme_tweaks: Default::default(),
             mergiraf: true,
             keep_submodules: false,
             identities: Vec::new(),
@@ -444,6 +451,13 @@ impl Settings {
                 });
             }
             Page::Appearance => {
+                section(
+                    ui,
+                    f,
+                    "Theme",
+                    Some("Each profile has its own theme; the accent and corners are for all."),
+                    |card| self.themes_ui(card, f, view),
+                );
                 section(ui, f, "Appearance", None, |card| {
                     card.row("Zoom", "scale size interface ui", |ui| {
                         ui.spacing_mut().slider_width = layout::fit(ui, SLIDER_WIDTH + 70.0) - 70.0;
@@ -468,6 +482,7 @@ impl Settings {
                             }
                         }
                     });
+                    card.preview(Preview::CodeColors);
                     card.row(
                         "Code colours",
                         "vs code vscode theme syntax highlighting colors",
@@ -490,14 +505,50 @@ impl Settings {
                             }
                         },
                     );
+                    card.preview(Preview::Avatars);
                     card.row("Avatars", "github gitlab forgejo gitea forge gravatar pictures authors", |ui| {
                         ui.checkbox(&mut self.avatars, "Load from the forge or Gravatar")
                             .on_hover_text("On a GitHub, Forgejo or Gitea repository, its commit list says which account each author is; on GitLab, the host is asked by email. Other authors: an MD5 hash of the email goes to gravatar.com. Cached on disk.");
                     });
                 });
+                section(ui, f, "Diffs and files", None, |card| {
+                    card.preview(Preview::DiffLayout);
+                    card.row("Diff layout", "unified split side by side columns", |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.spacing_mut().item_spacing.x = 18.0;
+                            ui.radio_value(&mut self.diff_split, false, "Unified");
+                            ui.radio_value(&mut self.diff_split, true, "Side by side");
+                        });
+                    });
+                    card.preview(Preview::DiffContext);
+                    card.row(
+                        "Diff context",
+                        "whole file lines around changes hunks fold",
+                        |ui| {
+                            ui.horizontal_wrapped(|ui| {
+                                ui.spacing_mut().item_spacing.x = 18.0;
+                                ui.radio_value(
+                                    &mut self.diff_whole_file,
+                                    false,
+                                    "Around the changes",
+                                );
+                                ui.radio_value(&mut self.diff_whole_file, true, "The whole file");
+                            });
+                        },
+                    );
+                    card.preview(Preview::FileList);
+                    card.row("Changed files", "tree folders list flat", |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.spacing_mut().item_spacing.x = 18.0;
+                            ui.radio_value(&mut self.files_as_tree, true, "In folders");
+                            ui.radio_value(&mut self.files_as_tree, false, "One list");
+                        });
+                    });
+                });
             }
             Page::Graph => {
                 section(ui, f, "Commit graph", None, |card| {
+                    card.preview(Preview::GraphRefs);
                     card.row("Branch column width", "refs tags pills", |ui| {
                         ui.spacing_mut().slider_width = layout::fit(ui, SLIDER_WIDTH + 70.0) - 70.0;
                         ui.add(layout::slider(
@@ -506,6 +557,7 @@ impl Settings {
                                 .suffix(" px"),
                         ));
                     });
+                    card.preview(Preview::GraphColumns);
                     card.row_hint(
                         "Columns",
                         "Or right-click the graph's header",
@@ -520,6 +572,7 @@ impl Settings {
                             });
                         },
                     );
+                    card.preview(Preview::GraphLanes);
                     card.row("Lanes", "compact graph narrow", |ui| {
                         let mut compact = self.compact_graph;
                         if ui.checkbox(&mut compact, "Compact graph").changed() {
@@ -527,6 +580,25 @@ impl Settings {
                         }
                         indented_note(ui, COMPACT_TIP);
                     });
+                    card.preview(Preview::LaneColors);
+                    card.row(
+                        "Lane colours",
+                        "colors colour blind palette okabe ito classic theme",
+                        |ui| {
+                            egui::ComboBox::from_id_salt("settings-lane-colors")
+                                .width(layout::fit(ui, COMBO_WIDTH))
+                                .selected_text(self.theme_tweaks.lanes.label())
+                                .show_ui(ui, |ui| {
+                                    for option in crate::theme::LaneColors::ALL {
+                                        ui.selectable_value(
+                                            &mut self.theme_tweaks.lanes,
+                                            option,
+                                            option.label(),
+                                        );
+                                    }
+                                });
+                        },
+                    );
                 });
             }
             Page::Git => {
@@ -545,6 +617,7 @@ impl Settings {
                             });
                         },
                     );
+                    card.preview(Preview::Pull);
                     card.row("Pull", "fast-forward rebase merge", |ui| {
                         egui::ComboBox::from_id_salt("settings-pull")
                             .width(layout::fit(ui, COMBO_WIDTH))
@@ -625,6 +698,7 @@ impl Settings {
             }
             Page::Terminal => {
                 section(ui, f, "Terminal", None, |card| {
+                    card.preview(Preview::Terminal);
                     card.row("Default shell", "bash zsh powershell cmd fish", |ui| {
                         let shells = crate::terminal::available_shells();
                         let current = shells
@@ -650,6 +724,7 @@ impl Settings {
                                 }
                             });
                     });
+                    card.preview(Preview::Terminal);
                     card.row("Font size", "text", |ui| {
                         ui.spacing_mut().slider_width = layout::fit(ui, SLIDER_WIDTH + 70.0) - 70.0;
                         ui.add(layout::slider(

@@ -167,7 +167,7 @@ fn profile_tabs_survive_a_restart() {
             open: vec!["C:/code/work".into()],
             active: 0,
             recent: vec!["C:/code/work".into()],
-            theme: crate::theme::ThemeKind::Light,
+            theme: crate::theme::ThemeId::new("Light"),
         },
     );
     let mut storage = Memory::default();
@@ -184,6 +184,32 @@ fn profile_tabs_survive_a_restart() {
     let back = back.unwrap_or_default();
     assert_eq!(back.open, [std::path::PathBuf::from("C:/a")]);
     assert!(back.profile_states.is_empty());
+}
+
+/// The theme was an enum before there were more themes, saved bare (`theme: Light`): such a
+/// save still loads, and a theme of the new kind saves and loads back.
+#[test]
+fn themes_saved_before_and_now_load() {
+    let mut old = Memory::default();
+    old.set_string(
+        eframe::APP_KEY,
+        "(open: [], theme: MediumGray, profile_states: { 2: (theme: Light) })".to_owned(),
+    );
+    let back: Option<Saved> = eframe::get_value(&old, eframe::APP_KEY);
+    let back = back.unwrap_or_default();
+    assert_eq!(back.theme, crate::theme::ThemeId::new("MediumGray"));
+    assert_eq!(
+        back.profile_states.get(&2).map(|s| s.theme.clone()),
+        Some(crate::theme::ThemeId::new("Light"))
+    );
+    let saved = Saved {
+        theme: crate::theme::ThemeId::file("my theme.json"),
+        ..Saved::default()
+    };
+    let mut storage = Memory::default();
+    eframe::set_value(&mut storage, eframe::APP_KEY, &saved);
+    let back: Option<Saved> = eframe::get_value(&storage, eframe::APP_KEY);
+    assert_eq!(back.map(|b| b.theme), Some(saved.theme));
 }
 
 /// When each recent repository was last opened survives a restart; a save from before it

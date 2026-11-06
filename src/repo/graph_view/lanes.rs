@@ -104,7 +104,7 @@ fn circle_points(center: Pos2, radius: f32, n: usize) -> Vec<Pos2> {
 
 /// Joins a commit's dot to another lane at `end` (the row's top or bottom): straight across
 /// the row from the dot, a small rounded corner, then straight along the lane.
-fn edge(p: &Painter, node: Pos2, end: Pos2, color: Color32, width: f32) {
+pub(crate) fn edge(p: &Painter, node: Pos2, end: Pos2, color: Color32, width: f32) {
     let stroke = Stroke::new(width, color);
     let dx = end.x - node.x;
     if dx.abs() < 0.5 {

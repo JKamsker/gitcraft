@@ -35,8 +35,17 @@ ureq = { version = "2", features = ["native-certs"] }
 base64 = "0.22"
 vt100 = "0.18"
 
+# Reading a repository's file without following a link swapped in on the way (safe_read.rs).
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1", features = ["fs"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
+
 [lints.rust]
-unsafe_code = "forbid"
+# Denied everywhere; the one exception, asking Windows where an open file really is
+# (safe_read.rs), allows it on that function alone.
+unsafe_code = "deny"
 
 [lints.clippy]
 unwrap_used = "deny"
