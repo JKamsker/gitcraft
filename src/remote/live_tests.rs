@@ -27,14 +27,14 @@ fn read_like_a_tab(repo: &Path) -> Result<(), String> {
     let worktrees = git::worktrees(repo, None)?;
     timed("worktrees", at);
     let at = Instant::now();
-    let mut log = git::LogStream::start(repo, None, 0)?;
+    let mut log = git::LogStream::start(repo, None, Default::default(), 0)?;
     let page = log.next_page(git::LOG_PAGE)?;
     timed("log page", at);
     // The next page follows on from it, as one log of both would have them.
     let at = Instant::now();
     let more = log.next_page(10)?;
     timed("next log page", at);
-    let whole = git::log(repo, None, 0, page.len() + more.len())?;
+    let whole = git::log(repo, None, Default::default(), 0, page.len() + more.len())?;
     let paged: Vec<&str> = page.iter().chain(&more).map(|c| c.hash.as_str()).collect();
     let at_once: Vec<&str> = whole.iter().map(|c| c.hash.as_str()).collect();
     assert_eq!(paged, at_once);

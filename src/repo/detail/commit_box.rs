@@ -34,6 +34,14 @@ impl RepoTab {
                     );
                 amend_started =
                     amend.changed() && self.amend && self.commit_summary.trim().is_empty();
+                ui.add_enabled(
+                    !rebasing,
+                    egui::Checkbox::new(&mut self.skip_hooks.commit, "Skip hooks"),
+                )
+                .on_hover_text(
+                    "Commit once without the pre-commit and commit-msg hooks (git commit \
+                     --no-verify); the commit after runs them again",
+                );
             });
         });
         if amend_started {

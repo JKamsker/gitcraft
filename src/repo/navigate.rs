@@ -423,6 +423,7 @@ impl RepoTab {
         let code = self.search.code;
         // In the branches the graph shows.
         let from = self.log_from.clone();
+        let order = self.log_order;
         // Answered all the same if it panics: the search runs until it is.
         let failed = {
             let query = query.clone();
@@ -430,9 +431,9 @@ impl RepoTab {
         };
         super::messages::spawn_or(&self.tx, ctx, failed, move || {
             let result = if code {
-                git::search_code(&path, from.as_deref(), &query)
+                git::search_code(&path, from.as_deref(), order, &query)
             } else {
-                git::search(&path, from.as_deref(), &query)
+                git::search(&path, from.as_deref(), order, &query)
             };
             Msg::Search(query, code, result)
         });

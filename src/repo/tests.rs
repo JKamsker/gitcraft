@@ -348,6 +348,7 @@ fn an_older_read_of_the_working_tree_does_not_replace_a_newer_one() {
         identity: Default::default(),
         requested: git::LOG_PAGE,
         log_from: None,
+        order: Default::default(),
         read: 1,
     }))));
     tab.poll(&ctx);
