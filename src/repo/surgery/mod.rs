@@ -100,7 +100,9 @@ impl RepoTab {
     /// Reads the commits after `onto` in the background, has `plan` make the todo list of
     /// them (it may make commits too: it runs there), and runs the rebase between the steps
     /// `around` it (those that prepare and finish the rewrite). It refuses once the branch checked out is another or HEAD moved
-    /// since that read; undone as one step. `started` hears whether it started, or why not.
+    /// since that read; undone as one step. `started` hears whether it can start, or why not,
+    /// and says whether it still should: the editor that asked for it closed meanwhile, it
+    /// doesn't.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn rewrite_with(
         &mut self,
@@ -109,7 +111,7 @@ impl RepoTab {
         plan: impl FnOnce(Vec<Entry>) -> Result<Vec<Entry>, String> + Send + 'static,
         around: (Vec<Vec<String>>, Vec<Vec<String>>),
         undo: Undo,
-        started: impl FnOnce(&mut RepoTab, Result<(), String>) + Send + 'static,
+        started: impl FnOnce(&mut RepoTab, Result<(), String>) -> bool + Send + 'static,
         ctx: &egui::Context,
     ) {
         let path = self.path.clone();
@@ -126,7 +128,7 @@ impl RepoTab {
                         "{} is still running, try again when it's done",
                         tab.busy_op.as_deref().unwrap_or_default()
                     );
-                    started(tab, Err(why));
+                    let _ = started(tab, Err(why));
                 }
                 Ok((command, head)) => {
                     let (before, after) = around;
@@ -137,10 +139,13 @@ impl RepoTab {
                         after,
                     ]
                     .concat();
-                    started(tab, Ok(()));
-                    tab.run_undoable(&label, steps, Refresh::All, undo, ctx);
+                    if started(tab, Ok(())) {
+                        tab.run_undoable(&label, steps, Refresh::All, undo, ctx);
+                    }
                 }
-                Err(e) => started(tab, Err(e)),
+                Err(e) => {
+                    let _ = started(tab, Err(e));
+                }
             },
         );
     }
