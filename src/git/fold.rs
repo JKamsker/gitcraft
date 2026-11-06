@@ -53,7 +53,7 @@ fn in_the_way(ignored: &str, touched: &str) -> Option<String> {
     touched
         .split('\0')
         .filter(|p| !p.is_empty())
-        .find_map(|path| hit(path).or_else(|| hit(path.trim_start_matches('\n'))))
+        .find_map(|path| hit(path).or_else(|| path.strip_prefix('\n').and_then(hit)))
 }
 
 /// The branch the rebase going on was started on (`refs/heads/main`), if one is going on.
@@ -187,6 +187,7 @@ mod tests {
         // A line break at the start: a name's own, or one between commits.
         assert_eq!(in_the_way("\nx\0", "a\0\nx\0"), Some("\nx".into()));
         assert_eq!(in_the_way("x\0", "a\0\nx\0"), Some("x".into()));
+        assert_eq!(in_the_way("\nx\0", "a\0\n\nx\0"), Some("\nx".into()));
         assert_eq!(in_the_way("", "a\0"), None);
     }
 }
