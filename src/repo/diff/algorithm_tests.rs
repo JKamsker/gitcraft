@@ -18,8 +18,8 @@ return fib(n-1) + fib(n-2);\n    }\n    return 1;\n}\n\n// Frobs foo heartily\ni
 foo)\n{\n    int i;\n    for(i = 0; i < 10; i++)\n    {\n        printf(\"%d\\n\", foo);\n    }\n}\
 \n\nint main(int argc, char **argv)\n{\n    frobnitz(fib(10));\n}\n";
 
-/// A repository where `name` went from [`BEFORE`] (committed twice: `from`, `to`) to
-/// [`AFTER`], and is [`AFTER`] edited once more in the working tree.
+/// A repository where `name` went from [`BEFORE`] (commit `from`) to [`AFTER`] (commit
+/// `to`), and `w-name`, committed as [`BEFORE`], is [`AFTER`] in the working tree.
 struct Repo {
     dir: std::path::PathBuf,
     from: String,
@@ -41,16 +41,19 @@ impl Repo {
         ] {
             git(args)?;
         }
-        let write = |body: &str| std::fs::write(dir.join(name), body).map_err(|e| e.to_string());
-        write(BEFORE)?;
+        let work = format!("w-{name}");
+        let write = |file: &str, body: &str| {
+            std::fs::write(dir.join(file), body).map_err(|e| e.to_string())
+        };
+        write(name, BEFORE)?;
+        write(&work, BEFORE)?;
         git(&["add", "-A"])?;
         git(&["commit", "-qm", "before"])?;
         let from = git(&["rev-parse", "HEAD"])?.trim().to_owned();
-        write(AFTER)?;
+        write(name, AFTER)?;
         git(&["commit", "-qam", "after"])?;
         let to = git(&["rev-parse", "HEAD"])?.trim().to_owned();
-        // The working tree against HEAD: the same change again, the other way round.
-        write(BEFORE)?;
+        write(&work, AFTER)?;
         Ok(Repo { dir, from, to })
     }
 
@@ -66,7 +69,7 @@ impl Repo {
                 path: name.to_owned(),
             },
             DiffKey::Work(StatusFile {
-                path: name.to_owned(),
+                path: format!("w-{name}"),
                 old_path: None,
                 code: 'M',
                 area: Area::Unstaged,
@@ -107,11 +110,15 @@ fn patience_and_myers_pair_lines_differently_in_every_kind_of_diff() -> Result<(
         let patience = repo.load(&key, Some(DiffAlgorithm::Patience))?;
         let histogram = repo.load(&key, Some(DiffAlgorithm::Histogram))?;
         let default = repo.load(&key, None)?;
+        assert_eq!(default.lines, myers.lines, "{key:?}");
+        assert_ne!(myers.lines, patience.lines, "{key:?}");
+        assert_eq!(patience.lines, histogram.lines, "{key:?}");
+        assert!(!minimal.lines.is_empty(), "{key:?}");
+        // From BEFORE to AFTER, Myers pairs the braces and patience the comment.
         assert!(!comment_kept(&myers), "{key:?}");
         assert!(!comment_kept(&minimal), "{key:?}");
         assert!(comment_kept(&patience), "{key:?}");
         assert!(comment_kept(&histogram), "{key:?}");
-        assert_eq!(default.lines, myers.lines, "{key:?}");
     }
     Ok(())
 }

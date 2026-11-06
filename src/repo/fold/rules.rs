@@ -96,6 +96,10 @@ impl Rules {
             Some(FoldAttr::NoDiff) => return Some(FoldReason::NoDiff),
             Some(FoldAttr::Unspecified) | None => {}
         }
+        // A path ending in `/` is a folder (a repository nested in the working tree).
+        if path.ends_with('/') {
+            return None;
+        }
         let name = path
             .trim_end_matches('/')
             .rsplit('/')
@@ -127,26 +131,45 @@ fn pattern_matches(pattern: &str, path: &str, name: &str) -> bool {
 }
 
 /// `*`, `**` and `?` against `text`, byte by byte (a `?` matches one byte of a character
-/// written in several).
+/// written in several). Each (pattern, text) position is tried once, so many stars over a
+/// long name stay quick.
 fn glob(pattern: &[u8], text: &[u8]) -> bool {
-    match pattern {
-        [] => text.is_empty(),
-        [b'*', b'*', rest @ ..] => {
-            match rest.strip_prefix(b"/") {
-                // `**/`: no folder, or any number of whole ones.
-                Some(rest) => (0..=text.len())
-                    .filter(|&i| i == 0 || text[i - 1] == b'/')
-                    .any(|i| glob(rest, &text[i..])),
-                None => (0..=text.len()).any(|i| glob(rest, &text[i..])),
-            }
-        }
-        [b'*', rest @ ..] => {
-            let within = text.iter().position(|&b| b == b'/').unwrap_or(text.len());
-            (0..=within).any(|i| glob(rest, &text[i..]))
-        }
-        [b'?', rest @ ..] => matches!(text, [c, tail @ ..] if *c != b'/' && glob(rest, tail)),
-        [c, rest @ ..] => matches!(text, [t, tail @ ..] if t == c && glob(rest, tail)),
+    let mut failed = std::collections::HashSet::new();
+    glob_at(pattern, text, 0, 0, &mut failed)
+}
+
+fn glob_at(
+    pattern: &[u8],
+    text: &[u8],
+    p: usize,
+    t: usize,
+    failed: &mut std::collections::HashSet<(usize, usize)>,
+) -> bool {
+    if failed.contains(&(p, t)) {
+        return false;
     }
+    let rest = &text[t..];
+    let matched = match &pattern[p..] {
+        [] => rest.is_empty(),
+        [b'*', b'*', b'/', ..] => (t..=text.len())
+            // `**/`: no folder, or any number of whole ones.
+            .filter(|&i| i == 0 || text[i - 1] == b'/')
+            .any(|i| glob_at(pattern, text, p + 3, i, failed)),
+        [b'*', b'*', ..] => (t..=text.len()).any(|i| glob_at(pattern, text, p + 2, i, failed)),
+        [b'*', ..] => {
+            let within = rest.iter().position(|&b| b == b'/').unwrap_or(rest.len());
+            (t..=t + within).any(|i| glob_at(pattern, text, p + 1, i, failed))
+        }
+        [b'?', ..] => {
+            matches!(rest.first(), Some(&c) if c != b'/')
+                && glob_at(pattern, text, p + 1, t + 1, failed)
+        }
+        [c, ..] => rest.first() == Some(c) && glob_at(pattern, text, p + 1, t + 1, failed),
+    };
+    if !matched {
+        failed.insert((p, t));
+    }
+    matched
 }
 
 /// _+1,204 −880, lockfile_: the lines a folded file adds and removes, and why it's folded.
@@ -167,7 +190,7 @@ pub(in crate::repo) fn thousands(n: u32) -> String {
     let digits = n.to_string();
     let mut out = String::with_capacity(digits.len() + digits.len() / 3);
     for (i, c) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i) % 3 == 0 {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
             out.push(',');
         }
         out.push(c);
