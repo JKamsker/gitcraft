@@ -32,6 +32,10 @@ impl App {
     /// moment); they go to the clipboard once collected.
     pub(super) fn copy_diagnostics(&mut self, ctx: &egui::Context) {
         if self.diagnostics.is_some() {
+            self.toasts.push(Toast::new(
+                "Diagnostics are still being collected".to_owned(),
+                false,
+            ));
             return;
         }
         let repo = match self.tabs.get(self.active) {
@@ -51,7 +55,7 @@ impl App {
         });
         self.diagnostics = Some(rx);
         self.toasts.push(Toast::new(
-            "Collecting diagnostics: git, gh, glab and tea are asked…".to_owned(),
+            "Collecting diagnostics (asking git, gh, glab, tea)…".to_owned(),
             false,
         ));
     }
@@ -66,7 +70,8 @@ impl App {
                 ctx.copy_text(text);
                 self.diagnostics = None;
                 self.toasts.push(Toast::new(
-                    "Diagnostics copied: paste them into the issue you report.".to_owned(),
+                    "Diagnostics copied: check them, then paste them into the issue you report."
+                        .to_owned(),
                     false,
                 ));
             }
