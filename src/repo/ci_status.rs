@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
-use egui::{Color32, Id, Painter, Pos2, Rect, Response, Sense, Stroke, Ui, vec2};
+use egui::{Color32, Id, Painter, Pos2, Rect, Response, Stroke, Ui, vec2};
 
 use super::{Action, Msg, RepoTab, WIP_HASH};
 use crate::ci::{self, CheckState, Project, Status};
@@ -194,6 +194,17 @@ pub(super) fn paint_dot(
     }
 }
 
+/// What a screen reader says of a dot: the tally, then what clicking does.
+fn spoken(status: &Status) -> String {
+    let tally = ci::tally_label(&status.checks);
+    let tally = if tally.is_empty() {
+        state_word(status.state).to_owned()
+    } else {
+        tally
+    };
+    crate::a11y::labels::join([format!("builds: {tally}").as_str(), "opens the builds"])
+}
+
 /// What a dot's tooltip says: the tally, then the checks that need attention.
 pub(super) fn tooltip(status: &Status) -> String {
     let mut text = match ci::tally_label(&status.checks) {
@@ -228,10 +239,23 @@ pub(crate) fn state_word(state: CheckState) -> &'static str {
 /// A clickable dot for `status` of commit `sha` around `center`; clicked, it asks for the
 /// commit's builds in the big area.
 pub(super) fn dot(ui: &Ui, id: Id, center: Pos2, sha: &str, status: &Status) -> Option<Action> {
+    dot_in(ui, id, center, sha, status, true)
+}
+
+/// [`dot`] on a row of a list that is one Tab stop (the graph): only the stop row's dot is
+/// `focusable`, so Tab doesn't stop on every row's dot.
+pub(super) fn dot_in(
+    ui: &Ui,
+    id: Id,
+    center: Pos2,
+    sha: &str,
+    status: &Status,
+    focusable: bool,
+) -> Option<Action> {
     let t = Tokens::get(ui.ctx());
     let rect = Rect::from_center_size(center, vec2(DOT_R * 2.0 + 6.0, DOT_R * 2.0 + 6.0));
-    let resp: Response = ui.interact(rect, id, Sense::click());
-    super::widgets::a11y(&resp, egui::WidgetType::Button, || tooltip(status));
+    let resp: Response = ui.interact(rect, id, crate::a11y::list_row_sense(focusable));
+    super::widgets::a11y(&resp, egui::WidgetType::Button, || spoken(status));
     let radius = if resp.hovered() { DOT_R + 1.0 } else { DOT_R };
     paint_dot(ui.painter(), &t, center, radius, status.state);
     let clicked = resp.on_hover_text(tooltip(status)).clicked();

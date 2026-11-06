@@ -117,7 +117,8 @@ fn header_row(
     let header = &placed.header;
     let resp = ui.interact(rect, placed.id, Sense::click());
     crate::repo::widgets::a11y(&resp, egui::WidgetType::CollapsingHeader, || {
-        crate::a11y::labels::section(header.title, &header.count.to_string(), placed.open)
+        let count = crate::a11y::labels::count(header.count, "item", "items");
+        crate::a11y::labels::section(header.title, &count, placed.open)
     });
     let painter = ui.painter();
     painter.rect_filled(rect, 0.0, t.card);

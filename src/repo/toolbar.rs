@@ -90,6 +90,7 @@ impl RepoTab {
         let mode = Settings::get(ui.ctx()).pull_mode;
         let pull =
             icons::tool_button_count(ui, "arrow-down-to-line", "Pull", behind, idle && has_remote)
+                .named(|| behind_ahead("Pull", behind, "behind"))
                 .on_hover_text(mode.tip());
         if pull.clicked() {
             acts.push(Action::Pull);
@@ -104,6 +105,7 @@ impl RepoTab {
             .style(crate::theme::menu_style)
             .show(|ui| pull_menu(ui, acts));
         if icons::tool_button_count(ui, "arrow-up-from-line", "Push", ahead, idle && has_remote)
+            .named(|| behind_ahead("Push", ahead, "ahead"))
             .on_hover_text("Push the current branch (publishes it if it has no upstream yet)")
             .clicked()
         {
@@ -274,6 +276,12 @@ pub(crate) fn reveal_label() -> &'static str {
     } else {
         "Open folder"
     }
+}
+
+/// Pull or Push as a screen reader says it: "Pull, 2 behind".
+fn behind_ahead(name: &str, n: u32, how: &str) -> String {
+    let count = (n > 0).then(|| format!("{n} {how}"));
+    crate::a11y::labels::join([name, count.as_deref().unwrap_or("")])
 }
 
 fn short_duration(d: Duration) -> String {

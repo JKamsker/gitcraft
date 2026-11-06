@@ -11,7 +11,7 @@ pub mod motion;
 
 use egui::{Response, WidgetInfo, WidgetType};
 
-pub use focus::{keyboard_taken, list_has_focus, list_row_sense, list_stop};
+pub use focus::{keyboard_on, keyboard_taken, list_has_focus, list_row_sense, list_stop};
 
 /// What a widget is called, built only when a screen reader or an event asks: a graph row's
 /// name joins several fields, and rows are drawn every frame.
@@ -47,7 +47,7 @@ impl<F: Fn() -> String> Label for F {
 /// focus ring while it has the keyboard. Call once per frame, after the widget's interaction.
 pub fn a11y(resp: &Response, typ: WidgetType, label: impl Label) {
     let enabled = resp.enabled();
-    resp.widget_info(|| WidgetInfo::labeled(typ, enabled, labels::clean(&label.text())));
+    resp.widget_info(|| WidgetInfo::labeled(typ, enabled, labels::name(&label.text())));
     focus::note(resp);
 }
 
@@ -60,7 +60,7 @@ pub fn a11y_selected(resp: &Response, label: impl Label, selected: bool) {
         ..WidgetInfo::labeled(
             WidgetType::SelectableLabel,
             enabled,
-            labels::clean(&label.text()),
+            labels::name(&label.text()),
         )
     });
     focus::note(resp);
@@ -83,6 +83,7 @@ impl Named for Response {
 /// stopped when the system asks for less motion.
 pub fn end_frame(ctx: &egui::Context) {
     focus::paint_ring(ctx);
+    focus::remember(ctx);
     motion::apply(ctx);
 }
 

@@ -157,10 +157,11 @@ fn switcher_row(ui: &mut Ui, wt: &Worktree, work: Option<&str>) -> Response {
     crate::repo::widgets::a11y_selected(
         &resp,
         || {
-            let branch = wt.branch.as_deref().unwrap_or("detached HEAD");
             let changes = changes_line(wt).unwrap_or_default();
             let path = crate::remote::display(&wt.path);
-            crate::a11y::labels::join([path.as_str(), branch, work.unwrap_or(""), changes.as_str()])
+            let notes = [(wt.current, "open here")];
+            let base = crate::a11y::labels::worktree(&path, wt.branch.as_deref(), None, &notes);
+            crate::a11y::labels::join([base.as_str(), work.unwrap_or(""), changes.as_str()])
         },
         wt.current,
     );

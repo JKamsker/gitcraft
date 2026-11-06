@@ -77,7 +77,8 @@ impl RepoTab {
         let keys_free =
             !ui.ctx().egui_wants_keyboard_input() || crate::a11y::list_has_focus(ui.ctx(), rows_id);
         if keys_free && self.dialog.is_none() && !self.keys_blocked {
-            self.arrow_keys(ui, acts);
+            let ringed = ui.data(|d| d.get_temp::<usize>(rows_id));
+            self.arrow_keys(ui, ringed, acts);
         }
 
         let settings = Settings::get(ui.ctx());
@@ -87,8 +88,7 @@ impl RepoTab {
 
         // Column headers.
         let (header, header_resp) =
-            ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::click());
-        super::widgets::a11y(&header_resp, egui::WidgetType::Button, "Graph columns");
+            ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::CLICK);
         header::column_headers(ui, &t, header, &cols);
         self.column_handles(ui, header, &prefs, &cols, &settings);
         header::header_menu(&header_resp, &settings);
@@ -122,6 +122,8 @@ impl RepoTab {
                 .selected
                 .filter(|s| range.contains(s))
                 .unwrap_or(range.start);
+            // Where ↑ / ↓ start from while nothing is selected: the row Tab rings.
+            ui.data_mut(|d| d.insert_temp(rows_id, stop));
             for i in range {
                 if i >= self.commits.len() {
                     loading_row(ui, &t);
@@ -129,7 +131,7 @@ impl RepoTab {
                 }
                 let resp = self.commit_row(ui, i, cols, lanes, now, i == stop, acts);
                 if i == stop {
-                    crate::a11y::list_stop(&resp, rows_id);
+                    crate::a11y::list_stop(&resp, rows_id, self.selected == Some(i));
                 }
                 if resp.clicked() {
                     // Ctrl+click: compare the selected commit with this one.
@@ -146,9 +148,10 @@ impl RepoTab {
     }
 
     /// Up and down select the row above or below the selected one.
-    fn arrow_keys(&mut self, ui: &Ui, acts: &mut Vec<Action>) {
+    /// `ringed`: the row Tab reaches, where they start while nothing is selected.
+    fn arrow_keys(&mut self, ui: &Ui, ringed: Option<usize>, acts: &mut Vec<Action>) {
         let (up, down) = ui.input(|i| (i.key_pressed(Key::ArrowUp), i.key_pressed(Key::ArrowDown)));
-        let current = self.selected.unwrap_or(0);
+        let current = self.selected.or(ringed).unwrap_or(0);
         let next = if up {
             Some(current.saturating_sub(1))
         } else if down {

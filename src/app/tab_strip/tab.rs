@@ -31,9 +31,13 @@ pub(super) fn tab_ui(ui: &mut Ui, placed: Placed<'_>, env: &mut TabEnv<'_>) {
     };
     let resp = ui.interact(rect, id, Sense::click_and_drag());
     let name = title.galley.text();
-    let label = || match tooltip.as_str() {
-        same if same == name => name.to_owned(),
-        more => labels::join([name, more]),
+    let label = || {
+        let more = if tooltip == name {
+            ""
+        } else {
+            tooltip.as_str()
+        };
+        labels::with_notes(&labels::join([name, more]), &[(busy, "busy")])
     };
     widgets::a11y_selected(&resp, label, active);
     let hovered = resp.hovered() && env.dragging.is_none();
@@ -121,7 +125,7 @@ pub(super) fn tab_ui(ui: &mut Ui, placed: Placed<'_>, env: &mut TabEnv<'_>) {
         crate::spinner::Spinner::new()
             .size(11.0)
             .paint_at(ui, close_rect);
-    } else if (active || hovered) && close_button(ui, close_rect, resp.id, t, env.dragging) {
+    } else if (active || hovered) && close_button(ui, close_rect, resp.id, name, t, env.dragging) {
         env.actions.close = Some(i);
     }
     if resp.drag_started_by(egui::PointerButton::Primary)
@@ -246,11 +250,12 @@ fn close_button(
     ui: &mut Ui,
     rect: Rect,
     tab_id: egui::Id,
+    name: &str,
     t: &Tokens,
     dragging: Option<usize>,
 ) -> bool {
     let c = ui.interact(rect, tab_id.with("close"), Sense::click());
-    widgets::a11y(&c, WidgetType::Button, "Close tab");
+    widgets::a11y(&c, WidgetType::Button, || format!("Close the tab {name}"));
     if c.hovered() {
         ui.painter().rect_filled(rect, t.radius_sm, t.pressed);
     }

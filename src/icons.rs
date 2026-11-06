@@ -159,15 +159,13 @@ pub fn tool_button_count(
     };
     ui.add_enabled(enabled, |ui: &mut Ui| {
         let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, 28.0), Sense::click());
-        crate::a11y::a11y(&resp, egui::WidgetType::Button, || {
-            let name = if label.is_empty() {
-                spoken(icon)
-            } else {
-                label.to_owned()
-            };
-            let count = (count > 0).then(|| count.to_string());
-            crate::a11y::labels::join([name, count.unwrap_or_default()])
-        });
+        // An icon-only button is named where it is used (`a11y::Named`), after what it does.
+        if !label.is_empty() {
+            crate::a11y::a11y(&resp, egui::WidgetType::Button, || {
+                let count = (count > 0).then(|| count.to_string());
+                crate::a11y::labels::join([label, &count.unwrap_or_default()])
+            });
+        }
         let r = egui::CornerRadius::same(t.radius_sm as u8);
         if resp.is_pointer_button_down_on() {
             ui.painter().rect_filled(rect, r, t.pressed);
@@ -239,11 +237,6 @@ pub fn bar_button(ui: &mut Ui, icon: &str, tooltip: &str) -> Response {
     let tint = if resp.hovered() { t.text } else { t.icon };
     paint(ui, rect, icon, 17.0, tint);
     resp.on_hover_text(tooltip)
-}
-
-/// An icon's name said as words, for a button without a label: `git-branch` is "git branch".
-fn spoken(icon: &str) -> String {
-    icon.replace(['-', '_'], " ")
 }
 
 /// An icon laid out inline, like a label.

@@ -137,7 +137,7 @@ pub(super) fn copy_selection(
     // Put together only when asked for: a selection can span thousands of lines.
     let selected_text = || sel.map(|s| s.text(lines, uncut)).filter(|s| !s.is_empty());
     let copy = sel.is_some()
-        && !ui.ctx().egui_wants_keyboard_input()
+        && !crate::a11y::keyboard_taken(ui.ctx())
         && ui.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Copy)));
     if copy && let Some(text) = selected_text() {
         ui.ctx().copy_text(text);
