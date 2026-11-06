@@ -66,6 +66,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Hover a branch and click its eye to hide it from the graph, or Solo it from its menu to see only the branches soloed; “Show all” at the top brings them all back.",
             "Conflicts open in a three-pane editor with Ours, Theirs and Both for each conflict.",
             "Tick Remember resolutions (above the conflict editor's result, or in the palette) and a conflict you resolved before is resolved the same way when it comes back (git rerere). The editor says so and shows the reused text under each conflict; nothing is staged until you save. Forget this resolution brings the conflict back.",
+            "Note why… under a conflict keeps a reason and a test command with how it is resolved, in git. When the same conflict comes back, it is resolved the same way with the reason shown and how its test last went; if the code around it changed since, it is only offered, as stale. Run the tests after saving runs them once the file is saved; the palette sends the decisions to the remote, or fetches its own.",
             "Right-click a file for its history, its blame or the whole file as it is at the commit.",
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",

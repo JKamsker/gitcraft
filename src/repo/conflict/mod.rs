@@ -2,6 +2,7 @@
 //! pick a side (or both), and the resulting file below, editable by hand.
 
 mod align;
+pub mod decisions;
 pub mod rerere;
 mod reused;
 mod view;
@@ -68,6 +69,8 @@ pub struct ConflictEditor {
     pub saving: bool,
     /// Opened from a file whose markers are gone: what stands in their place is shown.
     pub reused: Option<Reused>,
+    /// The decisions made before for its conflicts, and the notes written for them.
+    pub memo: decisions::Memo,
 }
 
 /// Whether `line` (without its line ending) is git's `kind` conflict marker: exactly seven
@@ -351,6 +354,7 @@ impl ConflictEditor {
             generation: 0,
             saving: false,
             reused: None,
+            memo: Default::default(),
         })
     }
 
@@ -380,6 +384,8 @@ impl ConflictEditor {
         self.choices = vec![None; left];
         self.recorded = vec![None; left];
         self.reused = None;
+        // Other conflicts: the decisions are read again for them.
+        self.memo = Default::default();
         self.segments = segments;
         self.result = text;
         self.manual = false;
@@ -411,6 +417,7 @@ impl ConflictEditor {
     }
 
     /// The text recorded for conflict `k`, if any.
+    #[cfg(test)]
     fn recorded(&self, k: usize) -> Option<&str> {
         self.recorded.get(k).and_then(Option::as_deref)
     }
@@ -535,6 +542,7 @@ mod tests {
             generation: 0,
             saving: false,
             reused: None,
+            memo: Default::default(),
         };
         assert_eq!(ed.unresolved(), 1);
         ed.choose(0, Choice::Ours);
@@ -563,6 +571,7 @@ mod tests {
             generation: 0,
             saving: false,
             reused: None,
+            memo: Default::default(),
         }
     }
 

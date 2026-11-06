@@ -94,6 +94,7 @@ impl ConflictEditor {
             } else {
                 Reused::NoMarkers
             }),
+            memo: Default::default(),
         };
         // What can't be told apart conflict by conflict stays as it is, edited by hand.
         let labels = (ed.ours_label.as_str(), ed.theirs_label.as_str());

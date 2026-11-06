@@ -122,6 +122,8 @@ pub(crate) enum Action {
     SaveConflict,
     /// Remembered conflict resolutions (git rerere): the switch, forgetting one.
     Rerere(super::conflict::rerere::RerereAct),
+    /// Conflict decisions: reading them for the open editor, sending or fetching them.
+    Decisions(super::conflict::decisions::Act),
     /// Let Mergiraf solve what it can of the open conflict.
     SolveWithMergiraf,
     /// A file's history, blame or contents in the central pane (`rev`: the commit they are at).
@@ -384,6 +386,7 @@ impl RepoTab {
                 Action::Rerere(super::conflict::rerere::RerereAct::SetEnabled(!on)),
             ));
         }
+        items.extend(self.decision_palette_items());
         if !self.submodules.is_empty() {
             items.push((
                 "Update submodules".into(),
