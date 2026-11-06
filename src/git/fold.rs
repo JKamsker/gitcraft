@@ -39,21 +39,21 @@ pub struct FoldRead {
 /// one of the `touched` paths would be written over, if any.
 fn in_the_way(ignored: &str, touched: &str) -> Option<String> {
     let ignored: Vec<&str> = ignored.split('\0').filter(|p| !p.is_empty()).collect();
-    // Names as they are, spaces included; only the line break some versions put between
-    // commits goes.
+    let hit = |path: &str| {
+        ignored
+            .iter()
+            .find(|i| match i.strip_suffix('/') {
+                Some(dir) => path == dir || path.starts_with(**i),
+                None => path == **i,
+            })
+            .map(|i| (*i).to_owned())
+    };
+    // Names as they are, spaces and all. Should a git version put a line break between
+    // commits, the name without it is tried too: a name can start with one as well.
     touched
         .split('\0')
-        .map(|p| p.trim_start_matches('\n'))
         .filter(|p| !p.is_empty())
-        .find_map(|path| {
-            ignored
-                .iter()
-                .find(|i| match i.strip_suffix('/') {
-                    Some(dir) => path == dir || path.starts_with(*i),
-                    None => path == **i,
-                })
-                .map(|i| (*i).to_owned())
-        })
+        .find_map(|path| hit(path).or_else(|| hit(path.trim_start_matches('\n'))))
 }
 
 /// The branch the rebase going on was started on (`refs/heads/main`), if one is going on.
@@ -184,6 +184,9 @@ mod tests {
         // Spaces are part of a name.
         assert_eq!(in_the_way(" x \0", "x\0 x \0"), Some(" x ".into()));
         assert_eq!(in_the_way("x\0", " x \0"), None);
+        // A line break at the start: a name's own, or one between commits.
+        assert_eq!(in_the_way("\nx\0", "a\0\nx\0"), Some("\nx".into()));
+        assert_eq!(in_the_way("x\0", "a\0\nx\0"), Some("x".into()));
         assert_eq!(in_the_way("", "a\0"), None);
     }
 }
