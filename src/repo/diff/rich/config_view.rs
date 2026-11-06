@@ -43,6 +43,14 @@ pub(super) fn show(ui: &mut Ui, diff: &ConfigDiff, acts: &mut Vec<Action>) {
                     .join(" · ")
                 };
                 ui.label(egui::RichText::new(summary).color(t.text_dim));
+                if diff.api
+                    && ui
+                        .link("Show the API contract changes")
+                        .on_hover_text("What breaks this API's clients, and what was added")
+                        .clicked()
+                {
+                    acts.push(Action::DiffRich(Some(super::RichKind::Api)));
+                }
             });
         });
     // Changes first, then the keys that only moved (sorted so when read).

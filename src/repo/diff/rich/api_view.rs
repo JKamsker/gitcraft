@@ -77,11 +77,13 @@ fn row(ui: &mut Ui, t: &Tokens, c: &ApiChange, acts: &mut Vec<Action>) {
     );
     let label = format!("{} {}", c.endpoint, c.what);
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &label));
-    let tip = match (c.old_line, c.new_line) {
-        (_, Some(n)) => format!("Go to line {n} of the document"),
-        (Some(o), None) => format!("Go to line {o} of the document before the change"),
+    let place = match (c.old_line, c.new_line) {
+        (_, Some(n)) => format!("Go to line {n}"),
+        (Some(o), None) => format!("Go to line {o} of the file before the change"),
         _ => String::new(),
     };
+    // The whole text, which a narrow pane cuts.
+    let tip = format!("{label}\n{place}");
     let resp = resp
         .on_hover_cursor(egui::CursorIcon::PointingHand)
         .on_hover_text(tip);

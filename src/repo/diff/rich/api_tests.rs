@@ -99,12 +99,11 @@ fn breaking_changes_are_found_with_their_endpoint_and_lines() {
     got.sort();
     let mut want = vec![
         "DELETE /pets/{id} Endpoint removed",
-        "GET /pets The query parameter `limit` is now required",
+        "GET /pets Query parameter `limit` is now required",
         "GET /pets New required header parameter `owner`",
         "GET /pets Query parameter `sort` no longer accepts `desc`",
-        "GET /pets Response `200` items field `tag` removed",
-        "GET /pets Response `200` items field `name` is no longer always returned",
-        "GET /pets Response `200` items field `kind` can now return `bird`",
+        "GET /pets Response `200` field `[].name` is no longer always returned",
+        "GET /pets Response `200` field `[].kind` can now return `bird`",
         "POST /pets The request body is now required",
         "POST /pets Request body field `age` is now required",
         "GET /pets/{id} Endpoint added",
@@ -112,7 +111,7 @@ fn breaking_changes_are_found_with_their_endpoint_and_lines() {
     want.sort();
     assert_eq!(got, want);
     // Breaking ones first.
-    assert!(c.iter().take(9).all(|c| c.severity == Severity::Breaking));
+    assert!(c.iter().take(8).all(|c| c.severity == Severity::Breaking));
     // Each opens its place: a removal where it was, the rest where they are now.
     let removed = c.iter().find(|c| c.what == "Endpoint removed");
     assert_eq!(
@@ -174,7 +173,7 @@ fn swagger_2_bodies_and_types() {
     let gone = before.replace("\"200\"", "\"404\"");
     assert_eq!(
         said(&changes("swagger.json", before, &gone)),
-        ["POST /users Response `200` removed"]
+        ["POST /users Response `200` was removed"]
     );
 }
 
@@ -303,4 +302,170 @@ fn api_changes_are_read_from_a_repository() -> Result<(), String> {
         ]
     );
     Ok(())
+}
+
+fn api(paths: &str, schemas: &str) -> String {
+    format!("openapi: 3.1.0\npaths:\n{paths}components:\n  schemas:\n{schemas}")
+}
+
+/// What reviewers of the first version found reported wrongly.
+#[test]
+fn what_is_not_breaking_is_not_reported() {
+    // A path parameter renamed is the same endpoint.
+    let old = "openapi: 3.0.0\npaths:\n  /pets/{id}:\n    get:\n      responses: {\"200\": {description: ok}}\n";
+    assert!(changes("openapi.yaml", old, &old.replace("{id}", "{petId}")).is_empty());
+    // A request type that only got wider; a type list reordered.
+    let param = |t: &str| {
+        format!(
+            "openapi: 3.1.0\npaths:\n  /a:\n    get:\n      parameters:\n        - {{name: q, in: query, schema: {{type: {t}}}}}\n      responses: {{\"200\": {{description: ok}}}}\n"
+        )
+    };
+    assert!(changes("openapi.yaml", &param("integer"), &param("number")).is_empty());
+    assert!(
+        changes(
+            "openapi.yaml",
+            &param("string"),
+            &param("[string, \"null\"]")
+        )
+        .is_empty()
+    );
+    assert!(
+        changes(
+            "openapi.yaml",
+            &param("[string, \"null\"]"),
+            &param("[\"null\", string]")
+        )
+        .is_empty()
+    );
+    assert_eq!(
+        said(&changes(
+            "openapi.yaml",
+            &param("number"),
+            &param("integer")
+        )),
+        ["GET /a Query parameter `q` changed type: number → integer"]
+    );
+    // Header names in any case.
+    let header = |n: &str| {
+        format!(
+            "openapi: 3.0.0\npaths:\n  /a:\n    get:\n      parameters:\n        - {{name: {n}, in: header, required: true, schema: {{type: string}}}}\n      responses: {{\"200\": {{description: ok}}}}\n"
+        )
+    };
+    assert!(
+        changes(
+            "openapi.yaml",
+            &header("X-Request-Id"),
+            &header("x-request-id")
+        )
+        .is_empty()
+    );
+    // A read-only field required: clients don't send it. An optional response field gone.
+    let body = |req: &str, props: &str| {
+        api(
+            "  /a:\n    post:\n      requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/T'}}}}\n      responses: {\"200\": {content: {application/json: {schema: {$ref: '#/components/schemas/T'}}}}}\n",
+            &format!(
+                "    T:\n      type: object\n      required: [{req}]\n      properties: {{{props}}}\n"
+            ),
+        )
+    };
+    let before = body(
+        "name",
+        "id: {type: integer, readOnly: true}, name: {type: string}, nick: {type: string}",
+    );
+    let after = body(
+        "name, id",
+        "id: {type: integer, readOnly: true}, name: {type: string}",
+    );
+    assert!(
+        changes("openapi.yaml", &before, &after).is_empty(),
+        "{:?}",
+        said(&changes("openapi.yaml", &before, &after))
+    );
+}
+
+#[test]
+fn what_breaks_is_reported_once() {
+    // A recursive request body: one report, not one per level.
+    let tree = |req: &str| {
+        api(
+            "  /t:\n    post:\n      requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Node'}}}}\n      responses: {\"200\": {description: ok}}\n",
+            &format!(
+                "    Node:\n      type: object\n      required: [{req}]\n      properties:\n        name: {{type: string}}\n        kids: {{type: array, items: {{$ref: '#/components/schemas/Node'}}}}\n"
+            ),
+        )
+    };
+    assert_eq!(
+        said(&changes("openapi.yaml", &tree(""), &tree("name"))),
+        ["POST /t Request body field `name` is now required"]
+    );
+    // A media type dropped, other fields refused, an enum where there was none.
+    let media = |types: &str, extra: &str, e: &str| {
+        format!("openapi: 3.0.0\npaths:\n  /m:\n    post:\n      requestBody:\n        content:\n{types}      responses: {{\"200\": {{description: ok}}}}\n").replace("SCHEMA", &format!("{{type: object, {extra}properties: {{k: {{type: string{e}}}}}}}"))
+    };
+    let both = "          application/json: {schema: SCHEMA}\n          application/xml: {schema: SCHEMA}\n";
+    let xml = "          application/xml: {schema: SCHEMA}\n";
+    let got = said(&changes(
+        "openapi.yaml",
+        &media(both, "", ""),
+        &media(xml, "additionalProperties: false, ", ", enum: [a]"),
+    ));
+    assert_eq!(
+        got,
+        [
+            "POST /m The request body no longer accepts `application/json`",
+            "POST /m Request body no longer accepts other fields",
+            "POST /m Request body field `k` now accepts only `a`",
+        ]
+    );
+}
+
+/// A new API document lists its endpoints as added.
+#[test]
+fn a_new_document_lists_its_endpoints() {
+    let d = api::diff(
+        "openapi.yaml",
+        &Sides {
+            old: None,
+            new: Some(BEFORE.to_owned()),
+        },
+    );
+    assert!(d.is_ok_and(
+        |d| d.changes.len() == 3 && d.changes.iter().all(|c| c.severity == Severity::Added)
+    ));
+}
+
+/// Schemas that all refer to each other end quickly.
+#[test]
+fn mutually_recursive_schemas_end_quickly() {
+    let names: Vec<String> = (0..12).map(|n| format!("S{n}")).collect();
+    let props: String = names
+        .iter()
+        .map(|n| {
+            format!(
+                "{}: {{$ref: '#/components/schemas/{n}'}}, ",
+                n.to_lowercase()
+            )
+        })
+        .collect();
+    let schemas: String = names
+        .iter()
+        .map(|n| {
+            format!(
+                "    {n}:\n      type: object\n      properties: {{{props}v: {{type: string}}}}\n"
+            )
+        })
+        .collect();
+    let doc = api(
+        "  /r:\n    get:\n      responses: {\"200\": {content: {application/json: {schema: {$ref: '#/components/schemas/S0'}}}}}\n",
+        &schemas,
+    );
+    let after = doc.replacen("v: {type: string}", "v: {type: integer}", 1);
+    let started = std::time::Instant::now();
+    let c = changes("openapi.yaml", &doc, &after);
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(5),
+        "{:?}",
+        started.elapsed()
+    );
+    assert_eq!(c.len(), 1, "{:?}", said(&c));
 }

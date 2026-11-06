@@ -39,6 +39,8 @@ pub struct Entry {
 pub struct ConfigDiff {
     /// `JSON`, `YAML` or `TOML`.
     pub format: &'static str,
+    /// The file is an OpenAPI or Swagger document, whose contract changes can be shown.
+    pub api: bool,
     pub entries: Vec<Entry>,
 }
 
@@ -87,7 +89,16 @@ pub fn diff(path: &str, sides: &Sides) -> Result<ConfigDiff, String> {
     );
     // Changes in the file's order, then the keys that only moved.
     entries.sort_by_key(|e| e.change == Change::Reordered);
-    Ok(ConfigDiff { format, entries })
+    let api = format != "TOML"
+        && [&old, &new].iter().any(|n| {
+            n.as_ref()
+                .is_some_and(|n| super::api::version_of(n).is_some())
+        });
+    Ok(ConfigDiff {
+        format,
+        api,
+        entries,
+    })
 }
 
 /// Whether two values are the same, wherever they are.
