@@ -25,7 +25,7 @@ impl RepoTab {
         };
         widgets::panel_header(ui, "Repository doctor", |ui| {
             if icons::small_button(ui, "x", "Back (Esc)").clicked() {
-                acts.push(Action::CloseDoctor);
+                acts.push(Action::Doctor(DoctorAct::Close));
             }
             if doctor.waiting || busy {
                 ui.add(crate::spinner::Spinner::new());
@@ -39,7 +39,12 @@ impl RepoTab {
             .iter()
             .filter(|w| !w.bare && w.prunable.is_none())
             .count();
-        let remote = crate::remote::is_remote(&self.path);
+        let env = TabEnv {
+            worktrees,
+            remote: crate::remote::is_remote(&self.path),
+            top: crate::remote::git_path(&self.path),
+            busy,
+        };
         confirm_modal(ui, doctor, acts);
         ui.horizontal_top(|ui| {
             ui.add_space(20.0);
@@ -57,7 +62,7 @@ impl RepoTab {
                         ui.set_width(width);
                         ui.add_space(22.0);
                         title(ui, doctor.section.title());
-                        section_ui(ui, doctor, worktrees, remote, busy, acts);
+                        section_ui(ui, doctor, &env, acts);
                         ui.add_space(40.0);
                     });
                 });
@@ -65,17 +70,23 @@ impl RepoTab {
     }
 }
 
-fn section_ui(
-    ui: &mut Ui,
-    doctor: &mut DoctorView,
+/// What the sections need to know about the tab.
+struct TabEnv {
+    /// Worktrees whose config can be read.
     worktrees: usize,
+    /// The repository is in WSL or over SSH.
     remote: bool,
+    /// The repository's top folder, as git names it.
+    top: String,
+    /// An operation of the tab is running.
     busy: bool,
-    acts: &mut Vec<Action>,
-) {
-    let locked = busy || doctor.waiting;
+}
+
+fn section_ui(ui: &mut Ui, doctor: &mut DoctorView, env: &TabEnv, acts: &mut Vec<Action>) {
+    let locked = env.busy || doctor.waiting;
+    let (worktrees, remote, top) = (env.worktrees, env.remote, env.top.as_str());
     match doctor.section {
-        Section::Ignore => super::ignore_section::ui(ui, &mut doctor.ignore, acts),
+        Section::Ignore => super::ignore_section::ui(ui, &mut doctor.ignore, top, locked, acts),
         Section::Config => {
             let env = super::config_section::Env::new(worktrees, remote, locked);
             super::config_section::ui(ui, &mut doctor.config, env, acts)
@@ -86,9 +97,49 @@ fn section_ui(
 
 /// The question asked before a change that can't be undone here.
 fn confirm_modal(ui: &mut Ui, doctor: &DoctorView, acts: &mut Vec<Action>) {
+    if doctor.closing {
+        let file = doctor
+            .ignore
+            .editing
+            .as_ref()
+            .map(|e| e.file.label.clone())
+            .unwrap_or_default();
+        ask(
+            ui,
+            "Discard your changes?",
+            &format!("Your changes to {file} aren't saved: closing the doctor drops them."),
+            "Discard",
+            "Keep editing",
+            |yes| Action::Doctor(DoctorAct::AnswerClose(yes)),
+            acts,
+        );
+        return;
+    }
     let Some(confirm) = &doctor.confirm else {
         return;
     };
+    ask(
+        ui,
+        &confirm.title,
+        &confirm.body,
+        &confirm.button,
+        "Cancel",
+        |yes| Action::Doctor(DoctorAct::Answer(yes)),
+        acts,
+    );
+}
+
+/// A question in a modal: `answer(true)` for its button, `answer(false)` for the other one or
+/// Esc.
+fn ask(
+    ui: &mut Ui,
+    title: &str,
+    body: &str,
+    button: &str,
+    cancel: &str,
+    answer: impl Fn(bool) -> Action,
+    acts: &mut Vec<Action>,
+) {
     let t = Tokens::get(ui.ctx());
     let frame = egui::Frame::new()
         .fill(t.card)
@@ -99,21 +150,21 @@ fn confirm_modal(ui: &mut Ui, doctor: &DoctorView, acts: &mut Vec<Action>) {
         .frame(frame)
         .show(ui.ctx(), |ui| {
             ui.set_width(420.0);
-            ui.label(RichText::new(&confirm.title).font(theme::semibold(15.0)));
+            ui.label(RichText::new(title).font(theme::semibold(15.0)));
             ui.add_space(8.0);
-            ui.add(egui::Label::new(RichText::new(&confirm.body).color(t.text_dim)).wrap());
+            ui.add(egui::Label::new(RichText::new(body).color(t.text_dim)).wrap());
             ui.add_space(14.0);
             ui.horizontal(|ui| {
-                if widgets::primary_button(ui, &confirm.button, true, 90.0).clicked() {
-                    acts.push(Action::Doctor(DoctorAct::Answer(true)));
+                if widgets::primary_button(ui, button, true, 90.0).clicked() {
+                    acts.push(answer(true));
                 }
-                if ui.button("Cancel").clicked() {
-                    acts.push(Action::Doctor(DoctorAct::Answer(false)));
+                if ui.button(cancel).clicked() {
+                    acts.push(answer(false));
                 }
             });
         });
     if resp.should_close() {
-        acts.push(Action::Doctor(DoctorAct::Answer(false)));
+        acts.push(answer(false));
     }
 }
 

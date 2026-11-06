@@ -198,17 +198,23 @@ so your config, credentials and hooks apply as usual.
 
 - A page in the big area, its sections listed on the left as in Settings; Esc closes it.
   Everything is read in the background, and changes run as the tab's operations.
-- _Ignore rules and attributes_ (also _Ignore rules and attributes_ in a file's menu): for a
-  path, the rule responsible (`git check-ignore -v`), shown as ignoring it, taking it back
-  with `!`, or not applying because the file is tracked; its line endings in the repository
-  and the working tree (`git ls-files --eol`), with a note when they differ and no attribute
-  pins them (where CRLF churn comes from); its attributes (`git check-attr -a`) in words (text
-  or binary, LFS, merge and diff drivers), and a warning for a merge, diff or filter driver an
-  attribute names but the configuration doesn't define (git quietly does without it). The
-  ignored files are listed; each `.gitignore`, `.git/info/exclude` and `core.excludesFile` can
+- _Ignore rules and attributes_ (also in the menu of a working-tree file): for a path, typed
+  from the repository's top or absolute inside it, the rule responsible (`git check-ignore -v`),
+  shown as ignoring it, the last `!` rule that matches it, or not applying because the file is
+  tracked (with what `git rm --cached` would change); a folder, and a path with no file, are
+  said to be so. Its line endings in the repository and the working tree (`git ls-files
+  --eol`), with a warning when CRLF is stored in the repository and a note when no attribute
+  pins them (where line-ending churn comes from); its attributes (`git check-attr -a`) in words
+  (text or binary, LFS, merge and diff drivers, git's own diff patterns), and a warning for a
+  merge, diff or filter driver an attribute names that isn't set up here (git falls back to its
+  own, or refuses the file for a required filter; LFS not installed is named as such). The
+  ignored files are listed (a folder ignored whole once). Each `.gitignore`, `.git/info/exclude`
+  and your own excludes file (`core.excludesFile`, or git's default `~/.config/git/ignore`) can
   be edited, with a preview of the files the change would start or stop ignoring (by that
-  file's rules alone, and tracked files it matches, which stay tracked); saving refuses a file
-  changed meanwhile or one that is a symbolic link.
+  file's rules alone, and the tracked files it matches, which stay tracked). Saving keeps the
+  file's line endings, refuses a file changed meanwhile (_Read it again_ keeps your text) or a
+  symbolic link, and asks once more for a file outside the repository; closing the doctor
+  with unsaved edits asks first.
 - _Which configuration wins_: the settings that explain why git behaves differently here (pull
   strategy, push, signing, line endings, file handling, performance…), each with the value in
   effect and its scope and file (`git config --list --show-origin --show-scope --includes`).
