@@ -2,6 +2,7 @@
 //! older history loaded as you scroll.
 
 mod badge;
+mod drag;
 mod handles;
 mod header;
 mod lanes;
@@ -112,6 +113,7 @@ impl RepoTab {
             if range.end + 40 >= self.commits.len() && self.has_more && !self.loading_more {
                 acts.push(Action::LoadMore);
             }
+            self.drag_auto_scroll(ui);
             for i in range {
                 if i >= self.commits.len() {
                     loading_row(ui, &t);

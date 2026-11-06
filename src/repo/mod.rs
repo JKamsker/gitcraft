@@ -13,6 +13,7 @@ mod conflict;
 mod detail;
 mod dialogs;
 mod diff;
+mod drag_drop;
 mod file_text;
 mod file_view;
 mod graph_view;
@@ -158,6 +159,8 @@ pub struct RepoTab {
     compare_requests: u64,
     file_view: Option<file_view::FileView>,
     rebase: Option<rebase::RebaseEditor>,
+    /// What a drop offers, while its menu is open.
+    drop_menu: Option<drag_drop::DropMenu>,
     /// The selected commit's message, being edited in the right pane.
     reword: Option<Reword>,
     /// HTTPS credentials typed in this session, used for every later git command of the tab.
@@ -314,6 +317,7 @@ impl RepoTab {
             compare_requests: 0,
             file_view: None,
             rebase: None,
+            drop_menu: None,
             reword: None,
             credentials: None,
             last_op: None,
