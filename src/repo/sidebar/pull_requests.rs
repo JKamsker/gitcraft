@@ -415,12 +415,10 @@ impl RepoTab {
         if !taken(path) {
             return path.to_path_buf();
         }
-        let name = path
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
+        // Appended to the path as written: a path of another machine keeps its `/` on Windows.
+        let base = path.to_string_lossy();
         (2..1000)
-            .map(|i| path.with_file_name(format!("{name}-{i}")))
+            .map(|i| PathBuf::from(format!("{base}-{i}")))
             .find(|p| !taken(p))
             .unwrap_or_else(|| path.to_path_buf())
     }
@@ -578,15 +576,9 @@ mod tests {
         ];
         let folder = |name: &str| PathBuf::from(format!("/nonexistent/r/app-{name}"));
         let prune = strings(&["worktree", "prune"]);
-        let add = |name: &str| {
-            strings(&[
-                "worktree",
-                "add",
-                "--",
-                &format!("/nonexistent/r/app-{name}"),
-                name,
-            ])
-        };
+        // As this system joins paths (with `\\` on Windows).
+        let arg = |name: &str| folder(name).display().to_string();
+        let add = |name: &str| strings(&["worktree", "add", "--", &arg(name), name]);
         // Checked out here, or in another worktree.
         assert_eq!(tab.pr_worktree_plan(1, "main", "m"), PrWorktree::Here);
         assert_eq!(
@@ -614,7 +606,7 @@ mod tests {
                         "-b",
                         "pr-3",
                         "--",
-                        "/nonexistent/r/app-pr-3",
+                        &arg("pr-3"),
                         "origin/feat",
                     ]),
                 ],
@@ -635,7 +627,7 @@ mod tests {
                         "-b",
                         "fix/x",
                         "--",
-                        "/nonexistent/r/app-fix-x",
+                        &arg("fix-x"),
                         "origin/fix/x",
                     ]),
                 ],
