@@ -155,6 +155,17 @@ so your config, credentials and hooks apply as usual.
   (warns when the commit is already pushed), the identity you commit as (and whether it is the
   repository's own, the profile's or the global one), and saved identities or profile authors
   to switch a repository to; _Use the profile's author_ takes the repository's own out again.
+- The commit box starts from the repository's `commit.template` (`~` and relative paths as git
+  reads them, comment lines left out, since a message given to git is kept as it is) and then
+  runs its `prepare-commit-msg` hook with the arguments git passes, as git's own editor would
+  (stopped after 10 seconds; an error shows under the message and never stops a commit). Above
+  the message: saved templates (for this repository or all), a type / scope picker
+  (Conventional Commits or Gitmoji), _Add co-author_ (the repository's authors as `.mailmap`
+  names them, written as a `Co-authored-by:` trailer by `git interpret-trailers`) and the
+  options. Typing completes the names of changed files and the types and scopes used before
+  (Tab).
+- Issue references in a commit's message link to their page: `#12` to the forge's issue, and
+  patterns of your own (`JIRA-\d+` → `https://jira.example.com/browse/$0`).
 - Undo / redo (Ctrl+Z / Ctrl+Y) of commits, amends, merges, rebases, pulls, resets,
   cherry-picks, reverts, checkouts, branch create / rename / delete, tags and stashes.
 
