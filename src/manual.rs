@@ -50,6 +50,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Path / Tree at the top of the right pane lists the files flat or in their folders; click a folder to fold it.",
             "In a file's diff, stage, unstage or discard one hunk, or click the lines you want and act on only those.",
             "A file kept in Git LFS shows as its LFS objects and their sizes; the palette has LFS: Fetch and LFS: Pull when git-lfs is installed.",
+            "Other binary files show their kind, sizes and details before and after, and Text (Word, Excel, PowerPoint, OpenDocument, PDF), Members (ZIP-based files) or Bytes (hex) of both sides. A file diffed through its textconv says so and is staged whole.",
             "The arrows in a diff's header jump from change to change; the marks beside the scrollbar show where the changes are, and a click on one jumps there.",
             "Write the summary and description and commit; amend the last commit; pick the identity you commit as, or Use the profile's author to take a repository's own one out.",
             "Profiles (title bar, or Settings → Profile): each has its own tabs, recent repositories, theme, git author and commit signing. A repository's own git config (user.name, user.email, signing) still wins over the profile's.",
