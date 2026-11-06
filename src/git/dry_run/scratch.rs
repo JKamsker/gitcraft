@@ -232,7 +232,7 @@ pub(super) fn merge(repo: &Path, ours: &str, theirs: &str) -> Result<Merge, Stri
 #[cfg(test)]
 mod tests {
     use super::Scratch;
-    use crate::git::simulate::tests::TestRepo;
+    use crate::git::dry_run::tests::TestRepo;
 
     /// The clone is in the temporary folder, has the repository's commits, and is gone once
     /// dropped.

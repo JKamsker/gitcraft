@@ -3,7 +3,7 @@
 //! and pills over the real ones, with a strip listing the commits it would leave on no ref, the
 //! files of the working tree that would change and where it would stop on a conflict. Nothing
 //! is done: the result is worked out in the background (see [`plan`] and
-//! [`crate::git::simulate`]), after a short delay so a pointer passing by starts nothing,
+//! [`crate::git::dry_run`]), after a short delay so a pointer passing by starts nothing,
 //! cached by the commits involved, and dropped (its work stopped) when the hover ends.
 
 pub(crate) mod op;
@@ -22,7 +22,7 @@ use egui::Response;
 
 use super::RepoTab;
 use crate::git::Commit;
-use crate::git::simulate::{CANCELLED, GitVersion};
+use crate::git::dry_run::{CANCELLED, GitVersion};
 use crate::graph::Graph;
 use op::Facts;
 pub(crate) use op::GhostOp;

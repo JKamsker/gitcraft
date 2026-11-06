@@ -86,6 +86,9 @@ pub fn replay(
     cancel: &dyn Fn() -> bool,
 ) -> Result<Replay, String> {
     let onto = commit_oid(repo, onto)?;
+    if !picks.is_empty() {
+        super::not_partial(repo)?;
+    }
     if picks.is_empty() {
         return Ok(Replay {
             onto,
