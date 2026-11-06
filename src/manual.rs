@@ -33,7 +33,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Right-click a commit or a pill for branches, tags, merge, rebase, cherry-pick, revert, reset and more.",
             "Search messages, authors and hashes, or switch to Code to find the commits that added or removed some text.",
             "Drag the borders in the column header to resize; right-click it to pick the columns, make the graph column compact or reset the columns.",
-            "Interactive rebase: reorder, reword, edit, squash, fix up or drop commits, then start it. Drag a row by its handle to move it; Edit stops the rebase after that commit, and Commit amends it and goes on.",
+            "Interactive rebase: reorder, reword, edit, squash, fix up or drop commits, then start it. Drag a row by its handle to move it; Edit stops the rebase after that commit: stage what should change, and Continue rebase amends it and goes on.",
         ],
     ),
     (
@@ -108,7 +108,7 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ),
             ("↑ / ↓", "Select the row above / below"),
             ("Alt+↑ / Alt+↓", "Move the selected commit up / down"),
-            ("Esc", "Cancel"),
+            ("Esc", "Close the editor without rebasing"),
         ],
     ),
     (

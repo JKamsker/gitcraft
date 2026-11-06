@@ -54,7 +54,7 @@ impl Step {
             Step::Squash => "Meld into the commit below, keeping both messages",
             Step::Fixup => "Meld into the commit below, dropping this message",
             Step::Drop => "Remove the commit and its changes",
-            Step::Edit => "Stop after this commit to change it, then Continue",
+            Step::Edit => "Stop after this commit to change it, then Continue rebase",
         }
     }
 }
@@ -83,8 +83,12 @@ pub(crate) struct RebaseEditor {
     /// Its rebase is being prepared (on another machine, in the background): it can't be
     /// started again, nor changed, meanwhile.
     pub starting: bool,
-    /// The row the keys act on (an index into `entries`), once one was clicked.
+    /// The row the keys act on (an index into `entries`): the newest, until another is
+    /// clicked.
     pub selected: Option<usize>,
+    /// How tall each row (by commit) was when last drawn: rows out of sight only take their
+    /// place.
+    pub heights: std::collections::HashMap<String, f32>,
 }
 
 impl RebaseEditor {
@@ -92,6 +96,8 @@ impl RebaseEditor {
         static IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         // `git log --reverse onto..HEAD`: HEAD comes last.
         let head = commits.last().map(|c| c.hash.clone()).unwrap_or_default();
+        // The newest row, at the top, takes the keys until another is clicked.
+        let selected = commits.len().checked_sub(1);
         let entries = commits
             .into_iter()
             .map(|c| Entry {
@@ -107,7 +113,8 @@ impl RebaseEditor {
             head,
             id: IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             starting: false,
-            selected: None,
+            selected,
+            heights: std::collections::HashMap::new(),
         }
     }
 
@@ -281,6 +288,9 @@ fn sh_path(path: &Path) -> String {
     format!("'{}'", p.replace('\'', r"'\''"))
 }
 
+/// How the rows are moved and their actions set, for the footer's tooltip.
+const KEYS_HINT: &str = "Drag a row by its handle, or Alt+↑ / Alt+↓, to move it. Click a row, then P / R / E / S / F / D set its action and ↑ / ↓ select another.";
+
 fn short(hash: &str) -> &str {
     hash.get(..7).unwrap_or(hash)
 }
@@ -332,46 +342,45 @@ impl RepoTab {
                     .stroke(Stroke::new(1.0, t.separator)),
             )
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    match &problem {
-                        Some(p) => {
-                            ui.colored_label(t.danger, p);
-                        }
-                        None => {
-                            let n = editor.entries.len();
-                            ui.label(
+                // The buttons first, from the right: the text takes what is left, cut short.
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if widgets::primary_button(
+                        ui,
+                        "Start rebase",
+                        idle && problem.is_none() && !editor.starting,
+                        120.0,
+                    )
+                    .clicked()
+                    {
+                        acts.push(Action::RunRebase);
+                    }
+                    if ui.button("Cancel").clicked() {
+                        acts.push(Action::CloseRebase);
+                    }
+                    if editor.starting {
+                        ui.add(crate::spinner::Spinner::new());
+                    }
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        let note = match &problem {
+                            Some(p) => egui::RichText::new(p).color(t.danger),
+                            None => {
+                                let n = editor.entries.len();
                                 egui::RichText::new(format!(
-                                    "{n} commit{}, newest on top · drag a row by its handle or Alt+↑/↓ to reorder · P R E S F D set the selected row's action · Ctrl+Z undoes the rebase",
+                                    "{n} commit{}, newest on top · Ctrl+Z undoes the rebase",
                                     if n == 1 { "" } else { "s" }
                                 ))
-                                .color(t.text_dim),
-                            );
-                        }
-                    }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if editor.starting {
-                            ui.add(crate::spinner::Spinner::new());
-                        }
-                        if widgets::primary_button(
-                            ui,
-                            "Start rebase",
-                            idle && problem.is_none() && !editor.starting,
-                            120.0,
-                        )
-                        .clicked()
-                        {
-                            acts.push(Action::RunRebase);
-                        }
-                        if ui.button("Cancel").clicked() {
-                            acts.push(Action::CloseRebase);
-                        }
+                                .color(t.text_dim)
+                            }
+                        };
+                        ui.add(egui::Label::new(note).truncate())
+                            .on_hover_text(KEYS_HINT);
                     });
                 });
             });
 
         // The row keys act on this frame, unless something else has the keyboard.
-        let focus = editor.keys(ui, keys_free);
-        editor.list(ui, focus);
+        let keys = editor.keys(ui, keys_free);
+        editor.list(ui, keys);
     }
 }
 
