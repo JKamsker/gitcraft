@@ -13,12 +13,14 @@ mod worktrees;
 
 use egui::{Sense, Ui, vec2};
 
+use super::branch_order::BranchOrder;
 use super::pinned_sections::{Sections, bottom_gap};
 use super::{Action, RepoTab, widgets};
 use crate::git::Branch;
 use crate::icons;
 use crate::theme::Tokens;
 
+pub(super) use branch_delete::delete_many;
 pub(super) use remotes::{remote_of, remote_short};
 // For the stash menu of the graph and the detail pane, and the banner's Pop and Apply: by the
 // stash itself, not its number, which moves.
@@ -32,7 +34,7 @@ const REMOTE_INDENT: f32 = 18.0;
 impl RepoTab {
     pub(super) fn sidebar(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
-        widgets::panel_header(ui, "Branches", |_| {});
+        widgets::panel_header(ui, "Branches", |ui| self.branch_header_buttons(ui, acts));
         // Sized like the commit search bar (Ctrl+F).
         ui.add_space(8.0);
         ui.horizontal(|ui| {
@@ -98,6 +100,24 @@ impl RepoTab {
             }
         }
         self.sidebar_jump = jump;
+    }
+
+    /// _Select stale or merged branches…_, and how the local branches are sorted.
+    fn branch_header_buttons(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        let idle = self.busy_op.is_none();
+        let clean = ui.add_enabled_ui(idle, |ui| {
+            icons::small_button(ui, "brush", "Select stale or merged branches…")
+        });
+        if clean.inner.clicked() {
+            acts.push(Action::SelectStaleBranches);
+        }
+        let mut order = BranchOrder::load(ui.ctx(), self.repo_key());
+        let on = usize::from(order.by_date);
+        let picked = widgets::switch(ui, &["Name", "Recent"], on);
+        if let Some(picked) = picked {
+            order.by_date = picked == 1;
+            order.store(ui.ctx(), self.repo_key());
+        }
     }
 
     /// The folded sidebar: a button for the filter and one for each section, about where they

@@ -3,6 +3,7 @@
 use egui::Ui;
 
 use crate::git::Branch;
+use crate::repo::branch_cleanup::Candidate;
 use crate::repo::operations::{expect_ref, expect_ref_at};
 use crate::repo::{Action, Dialog, RepoTab, Undo, ops};
 
@@ -153,6 +154,108 @@ fn delete_both(
     } else {
         [there, here].concat()
     }
+}
+
+/// How many branches one git command deletes or pushes back at most: a command line has a
+/// length limit (32 767 characters on Windows).
+const BATCH: usize = 150;
+
+/// Deleting the branches `chosen` here, and with `on_remote` the branches they track there too,
+/// as one undoable operation: `(steps, undo)`.
+///
+/// Nothing runs unless every branch is still where it was offered. The remote branches go
+/// first, one atomic push per remote, each only while it is where it was last fetched: a
+/// refused push leaves everything as it was. Then the branches here, with `-D`: the chosen ones
+/// may be squash-merged or stale, which `-d` refuses. Undo pushes the remote ones back, makes
+/// the branches again and has them track what they tracked.
+pub(in crate::repo) fn delete_many(
+    chosen: &[&Candidate],
+    on_remote: bool,
+) -> (Vec<Vec<String>>, Undo) {
+    let guards: Vec<Vec<String>> = chosen
+        .iter()
+        .map(|c| expect_ref_at(&format!("refs/heads/{}", c.name), &c.target))
+        .collect();
+    let remotes = if on_remote {
+        by_remote(chosen)
+    } else {
+        Vec::new()
+    };
+    let mut there = Vec::new();
+    let mut back = Vec::new();
+    for (remote, list) in &remotes {
+        for part in list.chunks(BATCH) {
+            there.push(push_delete(remote, part));
+            back.push(push_back(remote, part));
+        }
+    }
+    let names: Vec<&str> = chosen.iter().map(|c| c.name.as_str()).collect();
+    let here: Vec<Vec<String>> = names
+        .chunks(BATCH)
+        .map(|part| {
+            ["branch", "-D", "--"]
+                .into_iter()
+                .chain(part.iter().copied())
+                .map(str::to_owned)
+                .collect()
+        })
+        .collect();
+    let steps = [guards, there, here].concat();
+    let restore = chosen
+        .iter()
+        .flat_map(|c| ops(&[&["branch", "--", &c.name, &c.target]]));
+    let track = chosen.iter().flat_map(|c| c.track.iter().cloned());
+    let undo: Vec<Vec<String>> = back.into_iter().chain(restore).chain(track).collect();
+    // Redone only while every branch is where undoing put it back (see `redo_delete`).
+    let redo = chosen
+        .iter()
+        .map(|c| expect_ref(&format!("refs/heads/{}", c.name)))
+        .chain(steps.iter().cloned())
+        .collect();
+    (steps, Undo::Custom { undo, redo })
+}
+
+/// A branch on a remote to delete: its name there and its last fetched commit.
+type RemoteBranch<'a> = (&'a str, &'a str);
+
+/// The remote branches of `chosen`, by remote, in the order first met.
+fn by_remote<'a>(chosen: &[&'a Candidate]) -> Vec<(&'a str, Vec<RemoteBranch<'a>>)> {
+    let mut remotes: Vec<(&str, Vec<RemoteBranch>)> = Vec::new();
+    for (remote, name, at) in chosen.iter().filter_map(|c| c.remote.as_ref()) {
+        let item = (name.as_str(), at.as_str());
+        match remotes.iter_mut().find(|(r, _)| r == remote) {
+            Some((_, list)) => list.push(item),
+            None => remotes.push((remote.as_str(), vec![item])),
+        }
+    }
+    remotes
+}
+
+/// One atomic push deleting `list` on `remote`, each only where it was last fetched.
+fn push_delete(remote: &str, list: &[RemoteBranch]) -> Vec<String> {
+    let leases = list
+        .iter()
+        .map(|(name, at)| format!("--force-with-lease=refs/heads/{name}:{at}"));
+    let refs = list.iter().map(|(name, _)| format!("refs/heads/{name}"));
+    ["push", "--atomic"]
+        .into_iter()
+        .map(str::to_owned)
+        .chain(leases)
+        .chain([remote.to_owned(), "--delete".to_owned()])
+        .chain(refs)
+        .collect()
+}
+
+/// One atomic push putting `list` back on `remote` where they were.
+fn push_back(remote: &str, list: &[RemoteBranch]) -> Vec<String> {
+    let specs = list
+        .iter()
+        .map(|(name, at)| format!("{at}:refs/heads/{name}"));
+    ["push", "--atomic", remote]
+        .into_iter()
+        .map(str::to_owned)
+        .chain(specs)
+        .collect()
 }
 
 #[cfg(test)]

@@ -1,6 +1,7 @@
 //! Modal dialogs: create a branch, confirm a destructive operation.
 
 mod branch;
+mod cleanup;
 mod confirm;
 mod remote;
 mod upstream;
@@ -103,6 +104,8 @@ pub enum Dialog {
         draft: bool,
         focus: bool,
     },
+    /// Select stale or merged branches…
+    Cleanup(Box<cleanup::CleanupDialog>),
 }
 
 impl Dialog {
@@ -141,6 +144,18 @@ impl Dialog {
             *undo = how;
         }
         self
+    }
+
+    /// The checklist of `candidates` to delete; `checking` while which are merged is still being
+    /// read, `error` when reading it failed.
+    pub fn cleanup(
+        candidates: Vec<crate::repo::branch_cleanup::Candidate>,
+        checking: bool,
+        error: Option<String>,
+    ) -> Self {
+        Dialog::Cleanup(Box::new(cleanup::CleanupDialog::new(
+            candidates, checking, error,
+        )))
     }
 
     pub fn credentials(url: &str, refused: bool) -> Self {
@@ -372,6 +387,7 @@ impl RepoTab {
                     draft,
                     focus,
                 } => remote::create_pr(ui, noun, branch, base, title, body, draft, focus),
+                Dialog::Cleanup(dialog) => cleanup::cleanup(ui, dialog),
                 Dialog::Confirm {
                     title,
                     body,

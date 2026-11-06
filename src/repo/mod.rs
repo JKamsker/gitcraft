@@ -3,6 +3,9 @@
 
 mod actions;
 mod apply;
+mod branch_cleanup;
+mod branch_health;
+mod branch_order;
 mod branch_tree;
 mod branch_visibility;
 mod ci_status;
@@ -112,6 +115,8 @@ pub struct RepoTab {
     loading_more: bool,
     /// The branches hidden from the graph or soloed in it.
     visibility: branch_visibility::Visibility,
+    /// Which local branches are merged or stale, and the merged pull requests that tell.
+    branch_health: branch_health::HealthState,
     /// What `history` was logged from: `None` for every branch.
     log_from: Option<Vec<String>>,
     /// Counts the reloads of `history`, so that a page asked for before one is dropped.
@@ -278,6 +283,7 @@ impl RepoTab {
             has_more: false,
             loading_more: false,
             visibility: Default::default(),
+            branch_health: Default::default(),
             log_from: None,
             history_gen: 0,
             log_stream: Default::default(),

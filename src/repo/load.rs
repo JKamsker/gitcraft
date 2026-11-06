@@ -325,6 +325,7 @@ impl RepoTab {
         spawn(&self.tx, ctx, move || {
             Msg::Prs(asked, hosting.forge.provider().list(&path, &hosting))
         });
+        self.load_merged_prs(ctx);
     }
 
     /// Takes in what `reload` read, then reads again if a reload was asked for meanwhile.
@@ -404,6 +405,7 @@ impl RepoTab {
             self.prs.clear();
             self.pr_error = None;
             self.prs_loaded = None;
+            self.forget_merged_prs();
             if moved {
                 // The page and what was written for it are another repository's now: sent, they
                 // would go to this one, under that number.
@@ -420,6 +422,7 @@ impl RepoTab {
             self.load_prs(ctx);
         }
         self.refresh_ci(ctx);
+        self.want_health(ctx);
         self.rebuild(ctx);
         self.hint_avatars(ctx);
         self.reload_compare(ctx);
