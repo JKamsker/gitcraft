@@ -162,6 +162,8 @@ pub struct RepoTab {
     file_view: Option<file_view::FileView>,
     /// The recent views, for back and forward.
     nav: nav_history::NavHistory<navigation::View>,
+    /// The frame followed a link to a commit: a step of its own in `nav`.
+    nav_jump: bool,
     rebase: Option<rebase::RebaseEditor>,
     /// The selected commit's message, being edited in the right pane.
     reword: Option<Reword>,
@@ -319,6 +321,7 @@ impl RepoTab {
             compare_requests: 0,
             file_view: None,
             nav: Default::default(),
+            nav_jump: false,
             rebase: None,
             reword: None,
             credentials: None,

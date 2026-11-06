@@ -183,6 +183,13 @@ impl Settings {
         self.graph_width = 0.0;
     }
 
+    /// Puts these settings in place for a test, without what `set` does around them (the
+    /// zoom, the profile's git config, which are the whole process's).
+    #[cfg(test)]
+    pub(crate) fn put_for_test(&self, ctx: &egui::Context) {
+        ctx.data_mut(|d| d.insert_temp(id(), self.clone()));
+    }
+
     pub fn set(&self, ctx: &egui::Context) {
         ctx.data_mut(|d| d.insert_temp(id(), self.clone()));
         ctx.set_zoom_factor(self.ui_scale.clamp(0.7, 2.0));
@@ -575,6 +582,10 @@ impl Settings {
                             });
                         },
                     );
+                    card.row("Diffs", "diff split below beside graph", |ui| {
+                        ui.checkbox(&mut self.diff_beside_graph, "Show diffs below the graph")
+                            .on_hover_text("A diff of a commit or of the working tree opens below the graph instead of in its place; the button in a diff's header switches it too.");
+                    });
                     card.preview(Preview::GraphLanes);
                     card.row("Lanes", "compact graph narrow", |ui| {
                         let mut compact = self.compact_graph;

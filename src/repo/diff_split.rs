@@ -36,11 +36,23 @@ impl RepoTab {
     }
 
     /// The graph on top, the diff below, the border between them dragged to resize (egui keeps
-    /// the height for the session).
+    /// the height for the session). Without room for both, the diff in the graph's place.
     pub(super) fn split_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         let height = ui.available_height();
-        let most = (height - MIN_HEIGHT).max(MIN_HEIGHT);
+        if height < 2.0 * MIN_HEIGHT {
+            self.diff_view(ui, acts);
+            return;
+        }
+        // Just opened below the graph: the selected row may be under the diff now.
+        let frame = ui.ctx().cumulative_frame_nr();
+        let seen = egui::Id::new(("diff_below_graph_frame", &self.path));
+        let prev = ui.data(|d| d.get_temp::<u64>(seen));
+        ui.data_mut(|d| d.insert_temp(seen, frame));
+        if prev.is_none_or(|p| frame > p + 1) {
+            self.scroll_to = self.scroll_to.or(self.selected);
+        }
+        let most = height - MIN_HEIGHT;
         egui::Panel::bottom("repo_diff_below_graph")
             .resizable(true)
             .default_size(height * 0.55)
@@ -55,10 +67,10 @@ impl RepoTab {
     }
 
     /// The header's button putting the diff below the graph, or back in its place. Only for
-    /// the diffs that can show there.
-    pub(super) fn split_toggle(&self, ui: &mut Ui) {
+    /// the diffs that can show there (whether it showed).
+    pub(super) fn split_toggle(&self, ui: &mut Ui) -> bool {
         if !self.diff_can_split() {
-            return;
+            return false;
         }
         let t = Tokens::get(ui.ctx());
         let mut settings = Settings::get(ui.ctx());
@@ -66,7 +78,7 @@ impl RepoTab {
         let tip = if on {
             "Show the diff in place of the graph"
         } else {
-            "Show the diff below the graph (the graph stays usable; drag the border to resize)"
+            "Show the diff below the graph"
         };
         let button = icons::small_button(ui, "panel-bottom", tip);
         if on {
@@ -76,5 +88,16 @@ impl RepoTab {
             settings.diff_beside_graph = !on;
             settings.set(ui.ctx());
         }
+        true
+    }
+
+    /// Leaves a pull request's or a commit's builds page for the graph: a diff shown over it
+    /// was one of its files, and goes with it rather than staying below the graph.
+    pub(super) fn leave_pages(&mut self) {
+        if (self.pr_view.is_some() || self.ci_view.is_some()) && self.conflict.is_none() {
+            self.diff = None;
+        }
+        self.close_pr();
+        self.ci_view = None;
     }
 }

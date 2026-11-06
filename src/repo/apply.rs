@@ -15,18 +15,17 @@ impl RepoTab {
         let plain = OpKind::plain();
         match action {
             Action::Select(row) => {
-                self.close_pr();
-                self.ci_view = None;
+                self.leave_pages();
                 self.select(row, ctx);
             }
             Action::SelectHash(hash) => {
-                self.close_pr();
-                self.ci_view = None;
+                self.leave_pages();
+                // Following a link is a step of its own, back and forward.
+                self.nav_jump = true;
                 self.goto(&hash, ctx);
             }
             Action::SelectStash(i) => {
-                self.close_pr();
-                self.ci_view = None;
+                self.leave_pages();
                 self.select_stash(i, ctx);
             }
             Action::OpenDiff(key) => self.open_diff(key, ctx),

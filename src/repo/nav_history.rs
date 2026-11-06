@@ -59,10 +59,54 @@ impl<T: Clone + PartialEq> NavHistory<T> {
 
     /// The place shown became `entry` without going anywhere (another commit selected in the
     /// same graph, or what a step back could really show): the places back and forward stay.
+    /// Should it become the same as the place before or after it, the two are one: a step back
+    /// or forward always goes somewhere else.
     pub(super) fn replace_current(&mut self, entry: T) {
         match self.entries.get_mut(self.at) {
             Some(current) => *current = entry,
-            None => self.visit(entry),
+            None => return self.visit(entry),
+        }
+        self.merge_around(self.at);
+    }
+
+    /// Drops the place shown, which turned out to be gone, while stepping `step` (`-1` back,
+    /// `1` forward) through it: the place the step started from is the one shown again, so
+    /// stepping on the same way goes past it. Places it left side by side and equal are one.
+    pub(super) fn drop_current(&mut self, step: i32) {
+        if self.entries.is_empty() {
+            return;
+        }
+        let gone = self.at;
+        self.entries.remove(gone);
+        if self.entries.is_empty() {
+            self.at = 0;
+            return;
+        }
+        // Back: the start was after it, and moved down into its index; forward: before it.
+        self.at = if step < 0 {
+            gone.min(self.entries.len() - 1)
+        } else {
+            gone.saturating_sub(1)
+        };
+        // The two places either side of the gap.
+        if gone > 0 && gone < self.entries.len() && self.entries[gone - 1] == self.entries[gone] {
+            self.entries.remove(gone);
+            if self.at >= gone {
+                self.at -= 1;
+            }
+        }
+    }
+
+    /// Makes the place at `i` one with an equal neighbour, keeping it shown if it was.
+    fn merge_around(&mut self, i: usize) {
+        if i + 1 < self.entries.len() && self.entries[i + 1] == self.entries[i] {
+            self.entries.remove(i + 1);
+        }
+        if i > 0 && self.entries[i - 1] == self.entries[i] {
+            self.entries.remove(i);
+            if self.at >= i {
+                self.at -= 1;
+            }
         }
     }
 
@@ -227,5 +271,67 @@ mod tests {
         assert_eq!(h.go(-2), Some(&2));
         assert_eq!(h.go(5), None);
         assert_eq!(h.current(), Some(&2));
+    }
+
+    #[test]
+    fn a_gone_place_is_dropped_on_the_way_back() {
+        let mut h = history(&[1, 2, 3, 4]);
+        assert_eq!(h.go(-1), Some(&3));
+        h.drop_current(-1);
+        // Back where the step started, the next step back goes past it.
+        assert_eq!(h.current(), Some(&4));
+        assert_eq!(h.entries(), &[1, 2, 4]);
+        assert_eq!(h.go(-1), Some(&2));
+    }
+
+    #[test]
+    fn a_gone_place_is_dropped_on_the_way_forward() {
+        let mut h = history(&[1, 2, 3, 4]);
+        h.go(-3);
+        assert_eq!(h.go(1), Some(&2));
+        h.drop_current(1);
+        assert_eq!(h.current(), Some(&1));
+        assert_eq!(h.go(1), Some(&3));
+    }
+
+    #[test]
+    fn dropping_merges_the_places_it_leaves_side_by_side() {
+        // Back from the last 1 through a gone 2: the two 1s are one, nothing further back.
+        let mut h = history(&[1, 2, 1]);
+        h.go(-1);
+        h.drop_current(-1);
+        assert_eq!(h.entries(), &[1]);
+        assert_eq!(h.current(), Some(&1));
+        assert_eq!(h.go(-1), None);
+        // Forward from the first 1.
+        let mut h = history(&[1, 2, 1, 3]);
+        h.go(-3);
+        h.go(1);
+        h.drop_current(1);
+        assert_eq!(h.entries(), &[1, 3]);
+        assert_eq!(h.current(), Some(&1));
+        assert_eq!(h.go(1), Some(&3));
+        // The only place gone: nothing left.
+        let mut h = history(&[5]);
+        h.drop_current(-1);
+        assert_eq!(h.current(), None);
+        h.drop_current(1);
+        assert_eq!(h.current(), None);
+    }
+
+    #[test]
+    fn replacing_with_a_neighbour_makes_them_one() {
+        let mut h = history(&[1, 2, 3]);
+        h.go(-1);
+        h.replace_current(1);
+        assert_eq!(h.entries(), &[1, 3]);
+        assert_eq!(h.current(), Some(&1));
+        assert_eq!(h.peek(1), Some(&3));
+        let mut h = history(&[1, 2, 3]);
+        h.go(-1);
+        h.replace_current(3);
+        assert_eq!(h.entries(), &[1, 3]);
+        assert_eq!(h.current(), Some(&3));
+        assert_eq!(h.peek(-1), Some(&1));
     }
 }

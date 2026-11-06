@@ -137,8 +137,9 @@ impl RepoTab {
     /// Up and down select the row above or below the selected one.
     fn arrow_keys(&mut self, ui: &Ui, acts: &mut Vec<Action>) {
         // Alt+↑ / Alt+↓ go from change to change of the diff shown below the graph.
+        let below = self.diff_beside_graph(ui.ctx());
         let (up, down) = ui.input(|i| {
-            let plain = !i.modifiers.alt;
+            let plain = !(below && i.modifiers.alt);
             (
                 plain && i.key_pressed(Key::ArrowUp),
                 plain && i.key_pressed(Key::ArrowDown),

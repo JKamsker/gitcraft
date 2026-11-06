@@ -18,7 +18,7 @@ impl RepoTab {
             ui.spacing_mut().item_spacing.x = 2.0;
             let idle = self.busy_op.is_none();
             self.nav_buttons(ui, acts);
-            widgets::toolbar_separator(ui);
+            ui.add_space(4.0);
             self.history_buttons(ui, idle, acts);
             widgets::toolbar_separator(ui);
             self.remote_buttons(ui, idle, acts);
