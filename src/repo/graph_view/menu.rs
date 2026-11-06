@@ -6,10 +6,11 @@ use super::badge::{BadgeKind, badges};
 use super::compare_items;
 use crate::git;
 use crate::repo::actions::{BranchRef, interactive_rebase_action};
-use crate::repo::operations::{expect_ref_at, expect_symref};
+use crate::repo::commit_actions::{
+    RESET_MODES, Rewrite, cherry_pick_action, reset_action, revert_action,
+};
 use crate::repo::{
-    Action, Dialog, Refresh, RepoTab, Undo, WIP_HASH, fast_forward_action, merge_action, ops,
-    rebase_action,
+    Action, Dialog, RepoTab, WIP_HASH, fast_forward_action, merge_action, rebase_action,
 };
 
 /// Where a row remembers which branch pill was right-clicked, for its menu.
@@ -286,17 +287,6 @@ impl RepoTab {
     }
 }
 
-/// The commit a menu rewrites the checked-out branch from.
-struct Rewrite<'a> {
-    hash: &'a str,
-    short: &'a str,
-    summary: &'a str,
-    /// The checked-out branch, or `HEAD` when detached.
-    target: &'a str,
-    /// HEAD's commit, as the menu saw it.
-    head: &'a str,
-}
-
 /// Entries that rewrite `target` (the checked-out branch) from the commit: interactive rebase,
 /// cherry-pick, revert and reset.
 fn rewrite_items(ui: &mut Ui, r: &Rewrite<'_>, idle: bool, is_head: bool, acts: &mut Vec<Action>) {
@@ -326,90 +316,26 @@ fn rewrite_items(ui: &mut Ui, r: &Rewrite<'_>, idle: bool, is_head: bool, acts: 
         )
         .clicked()
     {
-        acts.push(Action::UndoableOps {
-            label: format!("Cherry-pick {short}"),
-            ops: ops(&[&["cherry-pick", hash]]),
-            refresh: Refresh::All,
-            undo: Undo::HeadMove { mode: "--keep" },
-        });
+        acts.push(cherry_pick_action(hash, short));
     }
     if ui
         .add_enabled(idle, egui::Button::new("Revert commit"))
         .clicked()
     {
-        acts.push(Action::UndoableOps {
-            label: format!("Revert {short}"),
-            ops: ops(&[&["revert", "--no-edit", hash]]),
-            refresh: Refresh::All,
-            undo: Undo::HeadMove { mode: "--keep" },
-        });
+        acts.push(revert_action(hash, short));
     }
     ui.add_enabled_ui(idle && !is_head, |ui| {
         ui.menu_button(format!("Reset {target} to here"), |ui| {
-            reset_items(ui, r, acts);
+            for mode in &RESET_MODES {
+                if ui
+                    .button(format!("{} — {}", mode.label, mode.short))
+                    .clicked()
+                {
+                    acts.push(reset_action(r, mode));
+                }
+            }
         });
     });
-}
-
-/// The reset modes, each asking before it moves `target` to the commit.
-fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<Action>) {
-    let Rewrite {
-        hash,
-        short,
-        summary,
-        target,
-        head,
-    } = *r;
-    for (mode, undo_mode, label, explain) in [
-        ("--soft", "--soft", "Soft", "Keeps every change, staged."),
-        (
-            "--mixed",
-            "--mixed",
-            "Mixed",
-            "Keeps every change, unstaged.",
-        ),
-        (
-            "--hard",
-            "--keep",
-            "Hard",
-            "Throws away uncommitted changes and the commits after this one. Uncommitted \
-             work can't be recovered.",
-        ),
-    ] {
-        let first = explain.split('.').next().unwrap_or(explain);
-        if ui.button(format!("{label} — {first}")).clicked() {
-            acts.push(Action::Dialog(
-                Dialog::confirm(
-                    &format!("{label} reset"),
-                    format!("Move {target} to {short} ({summary})? {explain}"),
-                    &format!("Reset {}", label.to_lowercase()),
-                    reset_steps(mode, hash, target, head),
-                    None,
-                )
-                .undo(Undo::HeadMove { mode: undo_mode }),
-            ));
-        }
-    }
-}
-
-/// `git reset <mode> <hash>` of the branch `target` (or of a detached `HEAD`), which the dialog
-/// asking first named, at `head`: it resets whatever is checked out when it runs, so it refuses
-/// once that has moved (another branch checked out, a commit made, in the terminal, while the
-/// dialog was open). A hard reset would throw away that branch's uncommitted work. That it is
-/// still `target` that is checked out is checked by name: another branch at the same commit
-/// resolves the same.
-fn reset_steps(mode: &str, hash: &str, target: &str, head: &str) -> Vec<Vec<String>> {
-    let checked_out = if target == "HEAD" {
-        String::new()
-    } else {
-        format!("refs/heads/{target}")
-    };
-    let mut steps = vec![
-        expect_symref("HEAD", &checked_out),
-        expect_ref_at("HEAD", head),
-    ];
-    steps.extend(ops(&[&["reset", mode, hash]]));
-    steps
 }
 
 /// Copying the commit's hash, message, and `branch` when there is one.
@@ -429,9 +355,9 @@ fn copy_items(ui: &mut Ui, hash: &str, summary: &str, branch: Option<&str>) {
 
 #[cfg(test)]
 mod tests {
-    use super::reset_steps;
     use crate::git;
     use crate::repo::OpKind;
+    use crate::repo::commit_actions::reset_steps;
     use crate::repo::operations::run_steps;
 
     /// A hard reset asked for on `main` does nothing once another branch is checked out (in the
