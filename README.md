@@ -13,12 +13,12 @@ so your config, credentials and hooks apply as usual.
 - Start page: checks that `git` is installed; open, create (`git init`) or clone a repository;
   recent repositories.
 - Browser-like tabs, one per repository (Ctrl+T, Ctrl+W, middle-click; Ctrl+Shift+T reopens a
-  closed one; Ctrl+Tab / Ctrl+Shift+Tab go round them, Ctrl+1 … 8 and Ctrl+9 for the last pick
-  one). Open tabs, recents, theme and settings are remembered.
+  closed one; Ctrl+Tab / Ctrl+Shift+Tab go round them, also on macOS; Ctrl+1 … 8 and Ctrl+9 for
+  the last pick one, Cmd on macOS). Open tabs, recents, theme and settings are remembered.
 - Keys for the main actions of a repository tab: Fetch (Ctrl+Shift+F), Pull (Ctrl+Shift+L), Push
   (Ctrl+Shift+K), Stash (Ctrl+Shift+S), New branch (Ctrl+B), Terminal (Ctrl+J), Stage all
   (Ctrl+Shift+A) and Commit (Ctrl+Enter). Cmd on macOS. None of them fires while a text field or
-  the terminal has the keyboard. The toolbar's tooltips, the palette and the context menus show
+  the terminal has the keyboard (Ctrl+Enter in the commit message still commits). The toolbar's tooltips, the palette and the context menus show
   each key, and a greyed-out menu entry says why under it.
 - Profiles, as in GitKraken: switch between them from the title bar (or the palette). Each has
   its own open tabs, recent repositories, theme, git author and commit signing (Settings →

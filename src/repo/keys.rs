@@ -12,7 +12,7 @@ impl RepoTab {
         if let Some(op) = &self.busy_op
             && command != Command::Terminal
         {
-            return Err(format!("Wait for {op} to finish"));
+            return Err(format!("{op} is still running"));
         }
         let no_remote = || "This repository has no remote".to_owned();
         let action = match command {
@@ -31,6 +31,10 @@ impl RepoTab {
             Command::Terminal => Action::ToggleTerminal,
             Command::StageAll if self.work.unstaged.is_empty() => {
                 return Err("Nothing to stage".into());
+            }
+            // `add -A` would mark them resolved, conflict markers and all.
+            Command::StageAll if !self.work.conflicted.is_empty() => {
+                return Err("Resolve the conflicted files first".into());
             }
             Command::StageAll => Action::Ops {
                 label: "Stage all".into(),
@@ -63,11 +67,19 @@ impl RepoTab {
         if self.work.in_progress.is_some_and(|s| s.continues()) {
             return Ok(Action::Commit);
         }
-        if self.work.is_clean() && !self.amend {
+        // A merge or cherry-pick whose conflicts were resolved back to HEAD's content leaves no
+        // changes, and committing still concludes it.
+        let concluding = self.work.in_progress.is_some();
+        if self.work.is_clean() && !self.amend && !concluding {
             return Err("Nothing to commit".into());
         }
         if self.commit_summary.trim().is_empty() {
-            return Ok(Action::FocusCommit);
+            // The summary is in the changes' commit box: without the changes row, nowhere.
+            return if self.index.contains_key(WIP_HASH) {
+                Ok(Action::FocusCommit)
+            } else {
+                Err("Write a commit summary first".into())
+            };
         }
         Ok(Action::Commit)
     }
@@ -83,9 +95,11 @@ impl RepoTab {
 
     /// Shows the changes and puts the cursor in the commit summary.
     pub(super) fn focus_commit(&mut self, ctx: &egui::Context) {
-        if let Some(&row) = self.index.get(WIP_HASH)
-            && self.selected != Some(row)
-        {
+        // No changes row (read again since the key): no commit box to put the cursor in.
+        let Some(&row) = self.index.get(WIP_HASH) else {
+            return;
+        };
+        if self.selected != Some(row) {
             self.select(row, ctx);
         }
         let mut settings = Settings::get(ctx);
@@ -211,10 +225,10 @@ mod tests {
         tab.run_key(Command::StageAll, &ctx);
         let shown = tab.status.clone();
         let _ = std::fs::remove_dir_all(&dir);
-        assert_eq!(fetch.as_deref(), Some("Wait for Push to finish"));
-        assert_eq!(commit.as_deref(), Some("Wait for Push to finish"));
+        assert_eq!(fetch.as_deref(), Some("Push is still running"));
+        assert_eq!(commit.as_deref(), Some("Push is still running"));
         assert!(matches!(terminal, Ok(Some(Action::ToggleTerminal))));
-        assert_eq!(shown, Some(("Wait for Push to finish".to_owned(), true)));
+        assert_eq!(shown, Some(("Push is still running".to_owned(), true)));
     }
 
     /// Stage all, then commit: with no summary the key goes to the message; with one it
@@ -249,32 +263,97 @@ mod tests {
         assert!(after.is_empty(), "{after}");
     }
 
-    /// Fetch, pull and push from the keys, against a remote in a folder with spaces.
+    /// Fetch, pull and push from the keys, against a remote in a folder with spaces: each
+    /// shows on the remote or in the repository, not just in a status line.
     #[test]
     fn fetch_pull_and_push_from_the_keys() {
         let dir = repo("remote");
-        let bare = dir.with_file_name(format!(
-            "{} remote.git",
-            dir.file_name().unwrap_or_default().to_string_lossy()
-        ));
-        let _ = std::fs::remove_dir_all(&bare);
-        let bare_s = bare.to_string_lossy().into_owned();
-        assert!(git::run(None, &["init", "-q", "--bare", &bare_s]).is_ok());
-        assert!(git::run(Some(&dir), &["remote", "add", "origin", &bare_s]).is_ok());
+        let name = dir.file_name().unwrap_or_default().to_string_lossy();
+        let bare = dir.with_file_name(format!("{name} remote.git"));
+        let other = dir.with_file_name(format!("{name} other clone"));
+        for d in [&bare, &other] {
+            let _ = std::fs::remove_dir_all(d);
+        }
+        let s = |p: &Path| p.to_string_lossy().into_owned();
+        let run = |dir: Option<&Path>, args: &[&str]| git::run(dir, args).unwrap_or_default();
+        assert!(git::run(None, &["init", "-q", "--bare", &s(&bare)]).is_ok());
+        run(Some(&dir), &["remote", "add", "origin", &s(&bare)]);
+        let branch = run(Some(&dir), &["branch", "--show-current"])
+            .trim()
+            .to_owned();
+        let tracking = format!("refs/remotes/origin/{branch}");
         let ctx = egui::Context::default();
         let mut tab = loaded(&dir, &ctx);
 
         press(&mut tab, &ctx, Command::Push);
-        let pushed = git::run(Some(&bare), &["log", "-1", "--format=%s"]).unwrap_or_default();
+        let pushed = run(Some(&bare), &["log", "-1", "--format=%s", &branch]);
+
+        // A commit made on the remote from elsewhere: fetch sees it, pull brings it in.
+        run(None, &["clone", "-q", &s(&bare), &s(&other)]);
+        for args in [
+            &["config", "user.name", "o"][..],
+            &["config", "user.email", "o@o"],
+            &["commit", "-q", "--allow-empty", "-m", "from élsewhere ✓"],
+            &["push", "-q", "origin", "HEAD"],
+        ] {
+            run(Some(&other), args);
+        }
         press(&mut tab, &ctx, Command::Fetch);
-        let fetch_status = tab.status.clone();
+        let fetched = run(Some(&dir), &["log", "-1", "--format=%s", &tracking]);
         press(&mut tab, &ctx, Command::Pull);
-        let pull_status = tab.status.clone();
-        let _ = std::fs::remove_dir_all(&dir);
-        let _ = std::fs::remove_dir_all(&bare);
+        let pulled = run(Some(&dir), &["log", "-1", "--format=%s"]);
+        let failed = tab.status.clone().filter(|(_, err)| *err);
+        for d in [&dir, &bare, &other] {
+            let _ = std::fs::remove_dir_all(d);
+        }
         assert_eq!(pushed.trim(), "base");
-        assert!(!fetch_status.is_some_and(|(_, err)| err));
-        assert!(!pull_status.is_some_and(|(_, err)| err));
+        assert_eq!(fetched.trim(), "from élsewhere ✓");
+        assert_eq!(pulled.trim(), "from élsewhere ✓");
+        assert_eq!(failed, None);
+    }
+
+    /// A merge whose conflicts were resolved back to HEAD's content has no changes, and the
+    /// key still concludes it; with no summary and no changes row, it says what is missing.
+    #[test]
+    fn the_commit_key_concludes_a_merge_and_never_points_at_a_missing_box() {
+        let dir = repo("merge");
+        let ctx = egui::Context::default();
+        let mut tab = loaded(&dir, &ctx);
+        tab.work.in_progress = Some(git::InProgress::Merge);
+        tab.commit_summary = "Merge branch 'x'".to_owned();
+        let concludes = matches!(tab.key_action(Command::Commit), Ok(Some(Action::Commit)));
+        tab.work.in_progress = None;
+        tab.amend = true;
+        tab.commit_summary.clear();
+        let nowhere = tab.key_action(Command::Commit).err();
+        tab.focus_commit(&ctx);
+        let stale = tab.focus_commit_summary;
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(concludes);
+        assert_eq!(nowhere.as_deref(), Some("Write a commit summary first"));
+        assert!(!stale);
+    }
+
+    /// Stage all would mark conflicted files resolved, markers and all.
+    #[test]
+    fn stage_all_waits_for_the_conflicts() {
+        let dir = repo("conflicted");
+        let ctx = egui::Context::default();
+        let mut tab = loaded(&dir, &ctx);
+        let file = |path: &str, area| git::StatusFile {
+            path: path.to_owned(),
+            old_path: None,
+            code: 'U',
+            area,
+        };
+        tab.work.conflicted = vec![file("a.txt", git::Area::Conflicted)];
+        tab.work.unstaged = vec![file("b.txt", git::Area::Untracked)];
+        let refused = tab.key_action(Command::StageAll).err();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(
+            refused.as_deref(),
+            Some("Resolve the conflicted files first")
+        );
     }
 
     /// One frame of `tab`'s keys with `events`, with a text field focused or not.
@@ -313,10 +392,10 @@ mod tests {
                 ..Default::default()
             };
             let mut acts = Vec::new();
+            // As in the tab's layout: its keys first, then the views and their fields.
             ctx.run_ui(input, |ui| {
-                let r = ui.text_edit_singleline(&mut text);
-                r.request_focus();
                 tab.shortcuts(ctx, &mut acts);
+                ui.text_edit_singleline(&mut text).request_focus();
             })
             .textures_delta
             .clear();
@@ -332,5 +411,33 @@ mod tests {
         assert!(matches!(free.as_slice(), [Action::Key(Command::Terminal)]));
         assert!(typing.iter().all(|a| !matches!(a, Action::Key(_))));
         assert!(blocked.is_empty());
+    }
+
+    /// While a commit's message is edited, Ctrl+Enter saves it: it doesn't commit the changes
+    /// too, even when nothing has the focus. The other keys still work.
+    #[test]
+    fn saving_a_reworded_message_does_not_also_commit() {
+        let dir = repo("reword");
+        let ctx = egui::Context::default();
+        let _ = std::fs::write(dir.join("dirty.txt"), "x\n");
+        let mut tab = loaded(&dir, &ctx);
+        tab.commit_summary = "not this".to_owned();
+        tab.reword = Some(super::super::state::Reword {
+            hash: tab.refs.head.clone(),
+            subject: "new message".to_owned(),
+            body: String::new(),
+            focus: false,
+            fill: false,
+        });
+        let press = |key| Event::Key {
+            key,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::COMMAND,
+        };
+        let acts = keys_in_frame(&mut tab, &ctx, vec![press(Key::Enter), press(Key::J)]);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(matches!(acts.as_slice(), [Action::Key(Command::Terminal)]));
     }
 }

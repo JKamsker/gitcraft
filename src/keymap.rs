@@ -130,6 +130,17 @@ pub(crate) fn find(key: Key, modifiers: Modifiers) -> Option<Command> {
         .map(|b| b.command)
 }
 
+/// The command of a key press: by the character the key types, else, for the tab keys, by
+/// where the digit is on the keyboard (on AZERTY the digits are typed with Shift, and the key
+/// under 4 reads as `'` without it).
+fn find_pressed(key: Key, physical: Option<Key>, modifiers: Modifiers) -> Option<Command> {
+    find(key, modifiers).or_else(|| {
+        physical
+            .and_then(|p| find(p, modifiers))
+            .filter(|c| matches!(c, Command::GoToTab(_) | Command::LastTab))
+    })
+}
+
 /// The commands of `scope` whose key was pressed this frame, in the order pressed.
 pub(crate) fn pressed(input: &InputState, scope: Scope) -> Vec<Command> {
     input
@@ -138,11 +149,11 @@ pub(crate) fn pressed(input: &InputState, scope: Scope) -> Vec<Command> {
         .filter_map(|e| match e {
             egui::Event::Key {
                 key,
+                physical_key,
                 pressed: true,
                 repeat,
                 modifiers,
-                ..
-            } => find(*key, *modifiers).filter(|c| !*repeat || c.repeats()),
+            } => find_pressed(*key, *physical_key, *modifiers).filter(|c| !*repeat || c.repeats()),
             _ => None,
         })
         .filter(|c| c.scope() == scope)
@@ -222,7 +233,7 @@ pub(crate) const WINDOW_ROWS: &[Row] = &[
     row(&[Command::ReopenTab], "Reopen the tab closed last"),
     row(
         &[Command::NextTab, Command::PreviousTab],
-        "Next / previous tab, round from the last to the first",
+        "Next / previous tab, wrapping around (Ctrl on macOS too)",
     ),
     Row {
         commands: &[
@@ -236,7 +247,7 @@ pub(crate) const WINDOW_ROWS: &[Row] = &[
             Command::GoToTab(8),
         ],
         range: true,
-        what: "Go to the first to the eighth tab",
+        what: "Go to tab 1 to 8",
     },
     row(&[Command::LastTab], "Go to the last tab"),
     row(
@@ -254,13 +265,16 @@ pub(crate) const REPOSITORY_ROWS: &[Row] = &[
     row(&[Command::Fetch], "Fetch all remotes"),
     row(&[Command::Pull], "Pull the current branch"),
     row(&[Command::Push], "Push the current branch"),
-    row(&[Command::Stash], "Stash all changes"),
+    row(&[Command::Stash], "Stash all changes…"),
     row(&[Command::NewBranch], "Create a branch at HEAD"),
-    row(&[Command::Terminal], "Show or hide the terminal"),
+    row(
+        &[Command::Terminal],
+        "Show or hide the terminal (to hide it from inside, click outside it first)",
+    ),
     row(&[Command::StageAll], "Stage all changes"),
     row(
         &[Command::Commit],
-        "Commit (with no summary yet, go to the message)",
+        "Commit; with nothing staged, everything; with no summary yet, go to the message",
     ),
 ];
 

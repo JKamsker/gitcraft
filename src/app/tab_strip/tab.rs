@@ -5,7 +5,7 @@ use egui::{Pos2, Rect, Sense, Stroke, Ui, pos2, vec2};
 use super::{BADGE_W, Placed, TabDrag, TabEnv};
 use crate::app::Tab;
 use crate::icons;
-use crate::keymap::Command;
+use crate::keymap::{self, Command};
 use crate::menu_item::MenuItem;
 use crate::repo::RepoTab;
 use crate::repo::worktree_tab::{self, Chip};
@@ -254,7 +254,7 @@ fn close_button(
     );
     let clicked = c.clicked();
     if dragging.is_none() {
-        c.on_hover_text("Close tab (Ctrl+W)");
+        c.on_hover_text(keymap::tip("Close tab", Command::CloseTab));
     }
     clicked
 }
