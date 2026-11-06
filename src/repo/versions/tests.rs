@@ -282,3 +282,54 @@ fn a_summary_counts_what_there_is() {
     assert_eq!(super::summary(&one), "1 commit added, 2 dropped, 1 moved");
     assert_eq!(super::summary(&git::Counts::default()), "no commits");
 }
+
+/// A pull request compared is taken as seen once its comparison is shown, the very version
+/// compared; one whose comparison fails stays as it was.
+#[test]
+fn a_pull_request_is_seen_only_once_its_comparison_shows() -> Result<(), String> {
+    use super::Since;
+    let scratch = repo("seen")?;
+    let dir = scratch.0.as_path();
+    let ctx = egui::Context::default();
+    let mut tab = tab(dir, &ctx);
+    tab.hosting = Some(crate::forge::Hosting {
+        forge: crate::forge::Forge::GitHub,
+        host: "github.com".to_owned(),
+        path: "acme/app".to_owned(),
+        web: "https://github.com".to_owned(),
+    });
+    let key = "github.com/acme/app";
+    let main = git(dir, &["rev-parse", "main"])?;
+    let topic = git(dir, &["rev-parse", "topic"])?;
+    let base = git(dir, &["merge-base", "main", "topic"])?;
+    let since = |tip: &str| Since {
+        number: 4,
+        old: git::Series::new(&base, &main),
+        new: git::Series::new(&base, tip),
+        counts: git::Counts::default(),
+        rewritten: true,
+    };
+
+    // A version that can't be read: the comparison fails, nothing is taken as seen.
+    tab.show_pr_since(since(&"f".repeat(40)), &ctx);
+    assert!(wait(&mut tab, &ctx, |t| t
+        .versions
+        .view
+        .as_ref()
+        .is_some_and(|v| v.data.is_some())));
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    tab.poll(&ctx);
+    assert_eq!(git::reviewed(dir, key, 4)?, None);
+
+    tab.show_pr_since(since(&topic), &ctx);
+    assert!(wait(&mut tab, &ctx, |_| git::reviewed(dir, key, 4)
+        .ok()
+        .flatten()
+        .is_some()));
+    assert_eq!(
+        git::reviewed(dir, key, 4)?,
+        Some(git::Series::new(&base, &topic))
+    );
+    assert_eq!(tab.versions.seen_heads.get(&4), Some(&topic));
+    Ok(())
+}

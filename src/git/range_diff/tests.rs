@@ -386,7 +386,7 @@ fn reordered_dropped_and_now_empty_commits() -> Result<(), String> {
     let counts = diff.counts();
     assert_eq!(
         (counts.same, counts.dropped, counts.added),
-        (2, 1, 1),
+        (1, 1, 1),
         "{diff:#?}"
     );
     assert_eq!(counts.moved, 1, "{diff:#?}");
@@ -432,4 +432,43 @@ fn a_revision_that_reads_as_an_option_is_refused() {
     let bad = Series::new("--output=x", "HEAD");
     assert!(range_diff(dir, &bad, &bad).is_err());
     assert!(lone_patch(dir, "--output=x", '+').is_err());
+}
+
+#[test]
+fn a_carriage_return_in_a_patch_is_kept() {
+    let out = "1:  abcdef1 ! 1:  1234567 crlf\r\n     @@ a.txt\r\n    -+20\n    ++20\r\n";
+    let pairs = parse(out);
+    assert_eq!(pairs.len(), 1);
+    assert_eq!(pairs[0].summary, "crlf");
+    assert_eq!(pairs[0].body, [" @@ a.txt\r", "-+20", "++20\r"]);
+}
+
+/// Numbered as range-diff numbers them, whatever order the listing came in: a series in
+/// another order than the listing's isn't taken for moved.
+#[test]
+fn places_are_range_diffs_own() {
+    let out = [
+        line(Some((1, 'a')), '=', Some((1, 'b')), "one"),
+        line(Some((2, 'c')), '=', Some((2, 'd')), "two"),
+    ]
+    .join("\n");
+    let listed = |x: char, y: char| {
+        vec![
+            SeriesCommit {
+                hash: y.to_string().repeat(40),
+                summary: "two".into(),
+                index: 1,
+                empty: false,
+            },
+            SeriesCommit {
+                hash: x.to_string().repeat(40),
+                summary: "one".into(),
+                index: 2,
+                empty: false,
+            },
+        ]
+    };
+    let diff = resolve(parse(&out), &listed('a', 'c'), &listed('b', 'd'));
+    assert_eq!(diff.counts().moved, 0, "{diff:#?}");
+    assert_eq!(diff.pairs[0].old.as_ref().map(|c| c.index), Some(1));
 }

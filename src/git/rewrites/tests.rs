@@ -176,3 +176,63 @@ fn branches_with_slashes_are_read_back() {
         }]
     );
 }
+
+/// An interrupted record (some ends made, not all) is pruned once it is old, and a new record
+/// at the same second goes beside it.
+#[test]
+fn what_an_interrupted_record_left_is_cleaned_up() -> Result<(), String> {
+    let repo = Repo::new("partial")?;
+    let a = repo.commit("a")?;
+    let b = repo.commit("b")?;
+    repo.git(&["update-ref", &format!("{ROOT}main/100/old-tip"), &b])?;
+    assert!(rewrites(&repo.0)?.is_empty());
+    let series = Series::new(&a, &b);
+    let made = record_rewrite(&repo.0, "main", &series, &series, 100)?;
+    assert_eq!(made.time, 101);
+    // Too fresh to be taken for left over: it may still be being written.
+    assert_eq!(prune_rewrites(&repo.0, 100 + PARTIAL_SECS)?, 0);
+    assert_eq!(prune_rewrites(&repo.0, 101 + PARTIAL_SECS)?, 1);
+    assert_eq!(rewrites(&repo.0)?, [made]);
+    let left = repo.git(&["for-each-ref", &format!("{ROOT}main/100/")])?;
+    assert!(left.is_empty(), "{left}");
+    Ok(())
+}
+
+/// A record that fails partway takes back the refs it made.
+#[test]
+fn a_failed_record_leaves_nothing() -> Result<(), String> {
+    let repo = Repo::new("rollback")?;
+    let a = repo.commit("a")?;
+    let bad = Series::new(&a, &"0".repeat(39));
+    assert!(record_rewrite(&repo.0, "main", &Series::new(&a, &a), &bad, 5).is_err());
+    let left = repo.git(&["for-each-ref", ROOT])?;
+    assert!(left.is_empty(), "{left}");
+    Ok(())
+}
+
+/// `pull --rebase` after the upstream was force-pushed: the old upstream commits were never
+/// the branch's own, so the old version doesn't list them as dropped.
+#[test]
+fn a_pull_after_a_force_push_starts_at_the_fork_point() -> Result<(), String> {
+    let up = Repo::new("fork-up")?;
+    up.commit("base")?;
+    let old_upstream = up.commit("U1")?;
+    let clone = Repo::new("fork-clone")?;
+    clone.git(&["remote", "add", "origin", &up.0.to_string_lossy()])?;
+    clone.git(&["fetch", "-q", "origin"])?;
+    clone.git(&["checkout", "-q", "-B", "main", "--track", "origin/main"])?;
+    let before = clone.commit("L1")?;
+    up.git(&["commit", "-q", "--amend", "-m", "U1 rewritten"])?;
+    clone.git(&["pull", "-q", "--rebase"])?;
+    let after = clone.git(&["rev-parse", "HEAD"])?;
+    let upstream = clone.git(&["rev-parse", "@{upstream}"])?;
+    let found = rewritten(&clone.0, &before, &after, Some("@{upstream}"))?;
+    assert_eq!(
+        found,
+        Some((
+            Series::new(&old_upstream, &before),
+            Series::new(&upstream, &after)
+        ))
+    );
+    Ok(())
+}

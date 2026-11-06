@@ -210,3 +210,43 @@ fn what_the_forge_names_is_checked_before_git_gets_it() -> Result<(), String> {
     assert_eq!(pull_ref(Some(Forge::Gitea), 3), "refs/pull/3/head");
     Ok(())
 }
+
+#[test]
+fn the_banner_says_how_the_commits_changed() {
+    let since = |rewritten, counts| Since {
+        number: 1,
+        old: Series::new("a", "b"),
+        new: Series::new("c", "d"),
+        counts,
+        rewritten,
+    };
+    let counts = |same, changed, added| Counts {
+        same,
+        changed,
+        added,
+        dropped: 0,
+        moved: 0,
+    };
+    assert_eq!(
+        banner_text(&since(true, counts(3, 2, 1))),
+        (
+            "Rewritten since you last looked: 2 commits changed, 1 added, 3 identical".to_owned(),
+            true
+        )
+    );
+    assert_eq!(
+        banner_text(&since(false, counts(3, 0, 2))),
+        (
+            "New commits since you last looked: 2 commits added, 3 identical".to_owned(),
+            true
+        )
+    );
+    // Onto a newer base, nothing else: said quietly.
+    assert_eq!(
+        banner_text(&since(true, counts(5, 0, 0))),
+        (
+            "Rebased since you last looked; no commit changed".to_owned(),
+            false
+        )
+    );
+}

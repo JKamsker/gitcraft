@@ -90,14 +90,21 @@ fn have_head(repo: &Path, pr: &PrHead, creds: Option<&Credentials>) -> Result<()
         .remote
         .as_deref()
         .ok_or("no remote of this repository has the pull request")?;
-    let mut args = vec!["fetch", "--no-tags", "--no-write-fetch-head", remote];
-    if is_plain_ref(&pr.fetch_ref) {
-        args.push(&pr.fetch_ref);
-    }
-    // The branch may have moved on since it was read: the commit itself too.
-    args.push(&pr.head);
     // Nobody waits on this: it asks nobody to sign in.
-    git::run_unattended(Some(repo), &args, creds)?;
+    let fetch = |what: &str| {
+        let args = ["fetch", "--no-tags", "--no-write-fetch-head", remote, what];
+        git::run_unattended(Some(repo), &args, creds)
+    };
+    // The forge's ref first (every server gives it); the commit itself only when the ref has
+    // moved on since it was read, as not every server hands out a commit asked by its id.
+    let by_ref = if is_plain_ref(&pr.fetch_ref) {
+        fetch(&pr.fetch_ref)
+    } else {
+        Err("the forge named no ref git can fetch".to_owned())
+    };
+    if !has(&pr.head) {
+        fetch(&pr.head).map_err(|e| by_ref.err().unwrap_or(e))?;
+    }
     if has(&pr.head) {
         Ok(())
     } else {
@@ -106,9 +113,10 @@ fn have_head(repo: &Path, pr: &PrHead, creds: Option<&Credentials>) -> Result<()
 }
 
 /// Where the pull request's commits start: where its head forks off its base branch (as the
-/// forge names it, else the remote's default branch), else where it forks off the version
-/// last looked at.
-fn base_of(repo: &Path, pr: &PrHead, seen: Option<&Series>) -> String {
+/// forge names it, else the remote's default branch), else where the version last looked at
+/// started or ended. None found is an error rather than an empty version, which would make
+/// every later comparison all "added".
+fn base_of(repo: &Path, pr: &PrHead, seen: Option<&Series>) -> Result<String, String> {
     let default = pr.remote.as_ref().map(|r| format!("refs/remotes/{r}/HEAD"));
     let candidates = pr
         .base
@@ -116,13 +124,17 @@ fn base_of(repo: &Path, pr: &PrHead, seen: Option<&Series>) -> String {
         .filter(|b| is_oid(b))
         .cloned()
         .chain(default)
+        .chain(seen.filter(|s| s.base != s.tip).map(|s| s.base.clone()))
         .chain(seen.map(|s| s.tip.clone()));
     for candidate in candidates {
         if let Ok(base) = git::merge_base(repo, &candidate, &pr.head) {
-            return base;
+            return Ok(base);
         }
     }
-    pr.head.clone()
+    Err(format!(
+        "can't tell where the commits of #{} start: open its page, or fetch its base branch",
+        pr.number
+    ))
 }
 
 /// Looks at `pr`: how it changed since the version last looked at, remembering this one as
@@ -138,7 +150,7 @@ fn look(
         return Ok(Found::Same);
     }
     have_head(repo, pr, creds)?;
-    let new = Series::new(&base_of(repo, pr, seen.as_ref()), &pr.head);
+    let new = Series::new(&base_of(repo, pr, seen.as_ref())?, &pr.head);
     let Some(old) = seen else {
         git::mark_reviewed(repo, repo_key, pr.number, &new)?;
         return Ok(Found::First);
@@ -163,7 +175,7 @@ fn mark_seen(
 ) -> Result<Series, String> {
     have_head(repo, pr, creds)?;
     let seen = git::reviewed(repo, repo_key, pr.number)?;
-    let new = Series::new(&base_of(repo, pr, seen.as_ref()), &pr.head);
+    let new = Series::new(&base_of(repo, pr, seen.as_ref())?, &pr.head);
     git::mark_reviewed(repo, repo_key, pr.number, &new)?;
     Ok(new)
 }
@@ -193,9 +205,7 @@ impl RepoTab {
             head: pr.sha.clone(),
             fetch_ref: pull_ref(self.forge(), number),
             base: None,
-            remote: crate::pull_request::remote_for(&self.remotes, &pr.url)
-                .map(str::to_owned)
-                .or_else(|| self.default_remote()),
+            remote: crate::pull_request::remote_for(&self.remotes, &pr.url).map(str::to_owned),
         })
     }
 
@@ -205,9 +215,7 @@ impl RepoTab {
             head: d.head_oid.clone(),
             fetch_ref: d.head_ref.clone(),
             base: Some(d.base_oid.clone()),
-            remote: crate::pull_request::remote_for(&self.remotes, &d.url)
-                .map(str::to_owned)
-                .or_else(|| self.default_remote()),
+            remote: crate::pull_request::remote_for(&self.remotes, &d.url).map(str::to_owned),
         }
     }
 
@@ -224,6 +232,15 @@ impl RepoTab {
             .is_some_and(|s| s.number != details.number)
         {
             self.versions.since = None;
+        }
+        // Looked at already for this head (the page read again, a review sent): nothing new.
+        if self
+            .versions
+            .since
+            .as_ref()
+            .is_some_and(|s| s.number == details.number && s.new.tip == details.head_oid)
+        {
+            return;
         }
         let pr = self.pr_head_of_details(details);
         let (path, creds) = (self.path.clone(), self.credentials.clone());
@@ -260,8 +277,16 @@ impl RepoTab {
             return;
         }
         let (Some(key), Some(pr)) = (self.pr_repo_key(), self.pr_head(number)) else {
+            self.status = Some((
+                format!(
+                    "What changed in #{number}: it isn't in the list of this repository's pull requests"
+                ),
+                true,
+            ));
             return;
         };
+        // It may fetch from the forge first: say so meanwhile.
+        self.status = Some((format!("Reading #{number}…"), false));
         let (path, creds) = (self.path.clone(), self.credentials.clone());
         self.then(
             ctx,
@@ -280,15 +305,59 @@ impl RepoTab {
         );
     }
 
-    fn show_pr_since(&mut self, since: Since, ctx: &egui::Context) {
+    pub(super) fn show_pr_since(&mut self, since: Since, ctx: &egui::Context) {
         let number = since.number;
         let title = format!("#{number} since you last looked");
         let labels = (
             format!("Last looked at ({})", short(&since.old.tip)),
             format!("Now ({})", short(&since.new.tip)),
         );
+        let seen = since.new.clone();
         self.open_versions(title, labels, since.old, since.new, ctx);
-        self.mark_pr_seen(number, ctx);
+        // Seen once it is shown: a comparison that fails leaves the banner and the version
+        // last looked at as they were.
+        if let Some(view) = &mut self.versions.view {
+            view.seen_when_shown = Some((number, seen));
+        }
+        if self
+            .status
+            .as_ref()
+            .is_some_and(|(s, _)| s.starts_with("Reading #"))
+        {
+            self.status = None;
+        }
+    }
+
+    /// Takes the version `seen` of pull request `number` (the one just compared) as seen.
+    pub(super) fn mark_version_seen(&mut self, number: u64, seen: Series, ctx: &egui::Context) {
+        let Some(key) = self.pr_repo_key() else {
+            return;
+        };
+        if self
+            .versions
+            .since
+            .as_ref()
+            .is_some_and(|s| s.number == number)
+        {
+            self.versions.since = None;
+        }
+        self.versions.seen_heads.insert(number, seen.tip.clone());
+        let path = self.path.clone();
+        self.then(
+            ctx,
+            move || git::mark_reviewed(&path, &key, number, &seen),
+            move |tab, marked, _| tab.seen_marked(number, marked),
+        );
+    }
+
+    fn seen_marked(&mut self, number: u64, marked: Result<(), String>) {
+        if let Err(e) = marked {
+            self.versions.seen_heads.remove(&number);
+            self.status = Some((
+                format!("Couldn't remember the version of #{number} seen: {e}"),
+                true,
+            ));
+        }
     }
 
     /// Takes pull request `number` as it is now as seen: the banner goes, and the next push
@@ -303,22 +372,20 @@ impl RepoTab {
             self.versions.since = None;
         }
         let (Some(key), Some(pr)) = (self.pr_repo_key(), self.pr_head(number)) else {
+            self.status = Some((
+                format!(
+                    "Mark as seen: #{number} isn't in the list of this repository's pull requests"
+                ),
+                true,
+            ));
             return;
         };
         self.versions.seen_heads.insert(number, pr.head.clone());
         let (path, creds) = (self.path.clone(), self.credentials.clone());
         self.then(
             ctx,
-            move || mark_seen(&path, &key, &pr, creds.as_ref()),
-            move |tab, marked, _| {
-                if let Err(e) = marked {
-                    tab.versions.seen_heads.remove(&number);
-                    tab.status = Some((
-                        format!("Couldn't remember the version of #{number} seen: {e}"),
-                        true,
-                    ));
-                }
-            },
+            move || mark_seen(&path, &key, &pr, creds.as_ref()).map(|_| ()),
+            move |tab, marked, _| tab.seen_marked(number, marked),
         );
     }
 
@@ -329,9 +396,18 @@ impl RepoTab {
             return;
         };
         let path = self.path.clone();
+        // The list holds at most 100: only a shorter one names every open pull request.
+        let open: Option<Vec<u64>> =
+            (self.prs.len() < 100).then(|| self.prs.iter().map(|p| p.number).collect());
         self.then(
             ctx,
-            move || git::reviewed_heads(&path, &key),
+            move || {
+                if let Some(open) = open {
+                    // What can't be pruned (a read-only repository) is only kept longer.
+                    let _ = git::prune_reviewed(&path, &key, &open);
+                }
+                git::reviewed_heads(&path, &key)
+            },
             |tab, heads, _| {
                 if let Ok(heads) = heads {
                     tab.versions.seen_heads = heads.into_iter().collect();
@@ -357,7 +433,7 @@ impl RepoTab {
     ) {
         if self.pr_moved_since_seen(pr)
             && ui
-                .button("What changed since I last looked")
+                .button("What changed since you last looked")
                 .on_hover_text("Its commits as you last saw them and as they are now, paired up")
                 .clicked()
         {
@@ -374,6 +450,29 @@ impl RepoTab {
     }
 }
 
+/// What the banner says, and whether something in the commits changed (else it only moved
+/// onto a newer base, every commit the same).
+pub(in crate::repo) fn banner_text(since: &Since) -> (String, bool) {
+    let c = &since.counts;
+    if since.rewritten && c.changed == 0 && c.added == 0 && c.dropped == 0 {
+        let moved = if c.moved > 0 {
+            ", only their order"
+        } else {
+            ""
+        };
+        return (
+            format!("Rebased since you last looked; no commit changed{moved}"),
+            c.moved > 0,
+        );
+    }
+    let what = if since.rewritten {
+        "Rewritten since you last looked"
+    } else {
+        "New commits since you last looked"
+    };
+    (format!("{what}: {}", super::summary(c)), true)
+}
+
 /// The banner on the page of a pull request that changed since it was last looked at.
 pub(in crate::repo) fn since_banner(
     ui: &mut Ui,
@@ -385,21 +484,17 @@ pub(in crate::repo) fn since_banner(
         return;
     };
     let t = Tokens::get(ui.ctx());
-    let what = if since.rewritten {
-        "Rewritten since you last looked"
-    } else {
-        "New commits since you last looked"
-    };
+    let (text, loud) = banner_text(since);
+    let tint = if loud { t.warning } else { t.text_dim };
     egui::Frame::new()
-        .fill(t.warning.gamma_multiply(0.14))
-        .stroke(egui::Stroke::new(1.0, t.warning.gamma_multiply(0.6)))
+        .fill(tint.gamma_multiply(0.14))
+        .stroke(egui::Stroke::new(1.0, tint.gamma_multiply(0.6)))
         .corner_radius(t.radius_sm)
         .inner_margin(egui::Margin::symmetric(12, 6))
         .outer_margin(egui::Margin::symmetric(12, 6))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                crate::icons::inline(ui, "history", 14.0, t.warning);
-                let text = format!("{what}: {}", super::summary(&since.counts));
+                crate::icons::inline(ui, "history", 14.0, tint);
                 let r = ui
                     .add(
                         egui::Label::new(RichText::new(text).color(t.text))

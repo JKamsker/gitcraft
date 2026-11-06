@@ -117,7 +117,7 @@ so your config, credentials and hooks apply as usual.
   commits under `refs/gitcraft/rewrites/`, so `git gc` can't take them and the graph doesn't
   list them. _Compare before / after_ beside the message saying it's done, _Compare before /
   after the last rewrite_ in the branch's menu, or the palette compares the two. A branch that
-  has diverged from its upstream has _Compare versions with origin/x_. Rewrites are kept for 30
+  has diverged from its upstream has _Compare commits with origin/x_. Rewrites are kept for 30
   days, the newest 20 of each branch.
 
 **Branches, remotes, worktrees, stashes, tags** (left)
@@ -149,13 +149,14 @@ so your config, credentials and hooks apply as usual.
   and above the changed files of an open pull request) opens the worktree its branch is checked
   out in, or makes one beside the repository first: on the local branch, on a new one tracking
   the remote branch, or fetched from the forge for a fork that isn't a remote here.
-- What changed since I last looked: gitcraft remembers which version of each pull request you
-  looked at, in refs of the repository (`refs/gitcraft/reviewed/…`, which also keep its commits
+- What changed since you last looked: gitcraft remembers which version of each pull request you
+  looked at (its page opened for the first time, or its comparison shown), in refs of the repository (`refs/gitcraft/reviewed/…`, which also keep its commits
   here once the forge no longer has them). After the author pushes again, the page says
   _Rewritten since you last looked: 2 commits changed, 1 added, 3 identical_ (or _New commits_
   when they were only added to); click it to compare the two versions, or ✕ to take the new one
   as seen. In the list (every forge, GitLab too) a request that changed says _changed since you
-  looked_, and its menu has _What changed since I last looked_ and _Mark as seen_.
+  last looked_, and its menu has _What changed since you last looked_ and _Mark as seen_. A
+  request that only moved onto a newer base, every commit the same, says so quietly.
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
 
 **Changes and commits** (right)

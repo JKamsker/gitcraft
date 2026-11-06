@@ -31,7 +31,9 @@ impl RepoTab {
             self.versions.pending = None;
             return;
         }
-        let (op_label, before, after, onto) = match kind {
+        // The branch as the operation found it once done (`heads` says), not as it is when the
+        // background job runs: it may have been checked out of since.
+        let (op_label, before, after, branch, onto) = match kind {
             OpKind::Normal(Undo::HeadMove { .. }, heads) => {
                 let mut parts = heads.split('\u{0}');
                 let (before, after) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""));
@@ -39,6 +41,7 @@ impl RepoTab {
                     label.to_owned(),
                     before.to_owned(),
                     Some(after.to_owned()),
+                    Some(parts.next().unwrap_or("").to_owned()),
                     self.onto_of_last_op(label),
                 )
             }
@@ -46,7 +49,7 @@ impl RepoTab {
                 let Some(pending) = self.versions.pending.take() else {
                     return;
                 };
-                (pending.label, pending.before, None, pending.onto)
+                (pending.label, pending.before, None, None, pending.onto)
             }
             _ => return,
         };
@@ -56,11 +59,7 @@ impl RepoTab {
             ctx,
             move || {
                 let after = after.unwrap_or_else(|| git::head(&path));
-                let branch =
-                    git::run_ok_codes(Some(&path), &["symbolic-ref", "-q", "HEAD"], &[0, 1])
-                        .map(|s| s.trim().to_owned())
-                        .unwrap_or_default();
-                keep_rewrite(&path, &before, &after, &branch, onto.as_deref())
+                keep_rewrite(&path, &before, &after, branch, onto.as_deref())
             },
             move |tab, kept, _| tab.rewrite_kept(&op_label, &done, kept),
         );
@@ -199,8 +198,12 @@ impl RepoTab {
         }
         if diverged
             && ui
-                .button(format!("Compare versions with {}", b.upstream))
-                .on_hover_text("The commits each has that the other hasn't, paired up")
+                .button(format!("Compare commits with {}", b.upstream))
+                .on_hover_text(format!(
+                    "Left, the commits only {} has; right, those only {} has; the same \
+                     change on both sides paired up",
+                    b.upstream, b.name
+                ))
                 .clicked()
         {
             acts.push(Action::Versions(VersionsAct::Branches {
@@ -214,7 +217,11 @@ impl RepoTab {
 
     /// The palette's entry for the newest rewrite kept, if any.
     pub(in crate::repo) fn versions_palette_item(&self) -> Option<(String, String, Action)> {
-        let rewrite = self.versions.rewrites.first()?;
+        // The checked-out branch's, else the newest of any.
+        let current = self.refs.current.as_deref().unwrap_or("HEAD");
+        let rewrite = self
+            .latest_rewrite(current)
+            .or_else(|| self.versions.rewrites.first())?;
         Some((
             format!("Compare {} before / after its last rewrite", rewrite.branch),
             "compare".into(),
@@ -229,14 +236,20 @@ fn keep_rewrite(
     path: &std::path::Path,
     before: &str,
     after: &str,
-    branch: &str,
+    branch: Option<String>,
     onto: Option<&str>,
 ) -> Result<Option<(git::Rewrite, Vec<git::Rewrite>)>, String> {
     let Some((old, new)) = git::rewritten(path, before, after, onto)? else {
         return Ok(None);
     };
+    // Only for a continued rebase, which says nothing of it: the branch checked out now.
+    let branch = branch.unwrap_or_else(|| {
+        git::run_ok_codes(Some(path), &["symbolic-ref", "-q", "HEAD"], &[0, 1])
+            .map(|s| s.trim().to_owned())
+            .unwrap_or_default()
+    });
     let now = git::now();
-    let rewrite = git::record_rewrite(path, branch, &old, &new, now)?;
+    let rewrite = git::record_rewrite(path, &branch, &old, &new, now)?;
     let _ = git::prune_rewrites(path, now);
     Ok(Some((rewrite, git::rewrites(path)?)))
 }

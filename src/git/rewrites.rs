@@ -55,13 +55,15 @@ pub fn rewritten(
     if is_ancestor(repo, &before, &after) {
         return Ok(None);
     }
-    let onto = onto.and_then(|o| super::resolve(repo, o).ok());
-    let bases = match onto {
-        Some(onto) => (
-            super::merge_base(repo, &before, &onto),
+    let resolved = onto.and_then(|o| super::resolve(repo, o).ok());
+    let bases = match (onto, resolved) {
+        // Where the branch forked off what it went onto, as its reflog remembers it: after
+        // the upstream was force-pushed, its old commits are not the branch's own.
+        (Some(name), Some(onto)) => (
+            fork_point(repo, name, &before).or_else(|_| super::merge_base(repo, &before, &onto)),
             super::merge_base(repo, &after, &onto),
         ),
-        None => {
+        _ => {
             let base = super::merge_base(repo, &before, &after);
             (base.clone(), base)
         }
@@ -75,13 +77,24 @@ pub fn rewritten(
     )))
 }
 
+/// `git merge-base --fork-point upstream commit`: where `commit` forked off `upstream` by the
+/// upstream's reflog.
+fn fork_point(repo: &Path, upstream: &str, commit: &str) -> Result<String, String> {
+    super::not_an_option(upstream)?;
+    run(
+        Some(repo),
+        &["merge-base", "--fork-point", upstream, commit],
+    )
+    .map(|s| s.trim().to_owned())
+}
+
 /// Whether `a` is `b` or an ancestor of it.
 pub fn is_ancestor(repo: &Path, a: &str, b: &str) -> bool {
     run(Some(repo), &["merge-base", "--is-ancestor", END_OPTS, a, b]).is_ok()
 }
 
 /// Keeps the two versions of `branch` (`refs/heads/x` or `x`; empty for a detached HEAD) as a
-/// rewrite made at `time`.
+/// rewrite made at `time`. Should one of its refs fail, those made are taken back.
 pub fn record_rewrite(
     repo: &Path,
     branch: &str,
@@ -91,11 +104,12 @@ pub fn record_rewrite(
 ) -> Result<Rewrite, String> {
     let branch = branch.strip_prefix("refs/heads/").unwrap_or(branch);
     let branch = if branch.is_empty() { "HEAD" } else { branch };
-    // Two rewrites in the same second each get their own.
-    let taken: Vec<i64> = rewrites(repo)?
+    // Two rewrites in the same second each get their own, as does one beside what an
+    // interrupted one left.
+    let taken: Vec<i64> = kept(repo)?
         .into_iter()
-        .filter(|r| r.branch == branch)
-        .map(|r| r.time)
+        .filter(|k| k.branch == branch)
+        .map(|k| k.time)
         .collect();
     let mut time = time;
     while taken.contains(&time) {
@@ -108,9 +122,9 @@ pub fn record_rewrite(
         new: new.clone(),
     };
     let targets = [&old.base, &old.tip, &new.base, &new.tip];
-    for (role, target) in ROLES.iter().zip(targets) {
+    for (made, (role, target)) in ROLES.iter().zip(targets).enumerate() {
         // `update-ref <ref> <new> ""`: made, never moved over one that is there already.
-        run(
+        let result = run(
             Some(repo),
             &[
                 "update-ref",
@@ -120,13 +134,42 @@ pub fn record_rewrite(
                 target,
                 "",
             ],
-        )?;
+        );
+        if let Err(e) = result {
+            for role in &ROLES[..made] {
+                let _ = run(Some(repo), &["update-ref", "-d", &rewrite.ref_name(role)]);
+            }
+            return Err(e);
+        }
     }
     Ok(rewrite)
 }
 
-/// Every rewrite kept, newest first.
-pub fn rewrites(repo: &Path) -> Result<Vec<Rewrite>, String> {
+/// What `refs/gitcraft/rewrites/` holds for one branch and time: its ends found, a whole
+/// rewrite when there are all four.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Kept {
+    branch: String,
+    time: i64,
+    ends: [Option<String>; 4],
+}
+
+impl Kept {
+    fn rewrite(&self) -> Option<Rewrite> {
+        let [Some(old_base), Some(old_tip), Some(new_base), Some(new_tip)] = &self.ends else {
+            return None;
+        };
+        Some(Rewrite {
+            branch: self.branch.clone(),
+            time: self.time,
+            old: Series::new(old_base, old_tip),
+            new: Series::new(new_base, new_tip),
+        })
+    }
+}
+
+/// Everything kept, whole rewrites or not.
+fn kept(repo: &Path) -> Result<Vec<Kept>, String> {
     let out = run(
         Some(repo),
         &[
@@ -135,12 +178,24 @@ pub fn rewrites(repo: &Path) -> Result<Vec<Rewrite>, String> {
             ROOT,
         ],
     )?;
-    Ok(parse_rewrites(&out))
+    Ok(parse_kept(&out))
 }
 
-/// `for-each-ref`'s lines grouped into rewrites; one that misses an end is left out.
-fn parse_rewrites(out: &str) -> Vec<Rewrite> {
-    let mut found: Vec<(String, i64, [Option<String>; 4])> = Vec::new();
+/// Every rewrite kept, newest first.
+pub fn rewrites(repo: &Path) -> Result<Vec<Rewrite>, String> {
+    Ok(whole(&kept(repo)?))
+}
+
+/// The whole rewrites among `kept`, newest first.
+fn whole(kept: &[Kept]) -> Vec<Rewrite> {
+    let mut list: Vec<Rewrite> = kept.iter().filter_map(Kept::rewrite).collect();
+    list.sort_by(|a, b| b.time.cmp(&a.time).then_with(|| a.branch.cmp(&b.branch)));
+    list
+}
+
+/// `for-each-ref`'s lines grouped by branch and time.
+fn parse_kept(out: &str) -> Vec<Kept> {
+    let mut found: Vec<Kept> = Vec::new();
     for line in out.lines() {
         let Some((name, oid)) = line.split_once(FS) else {
             continue;
@@ -156,31 +211,29 @@ fn parse_rewrites(out: &str) -> Vec<Rewrite> {
         let (Some(slot), Ok(time)) = (ROLES.iter().position(|r| *r == role), time.parse()) else {
             continue;
         };
-        let at = match found.iter().position(|(b, t, _)| b == branch && *t == time) {
+        let at = match found
+            .iter()
+            .position(|k| k.branch == branch && k.time == time)
+        {
             Some(at) => at,
             None => {
-                found.push((branch.to_owned(), time, Default::default()));
+                found.push(Kept {
+                    branch: branch.to_owned(),
+                    time,
+                    ends: Default::default(),
+                });
                 found.len() - 1
             }
         };
-        found[at].2[slot] = Some(oid.to_owned());
+        found[at].ends[slot] = Some(oid.to_owned());
     }
-    let mut list: Vec<Rewrite> = found
-        .into_iter()
-        .filter_map(|(branch, time, ends)| {
-            let [Some(old_base), Some(old_tip), Some(new_base), Some(new_tip)] = ends else {
-                return None;
-            };
-            Some(Rewrite {
-                branch,
-                time,
-                old: Series::new(&old_base, &old_tip),
-                new: Series::new(&new_base, &new_tip),
-            })
-        })
-        .collect();
-    list.sort_by(|a, b| b.time.cmp(&a.time).then_with(|| a.branch.cmp(&b.branch)));
-    list
+    found
+}
+
+/// `for-each-ref`'s lines as whole rewrites, newest first; one that misses an end is left out.
+#[cfg(test)]
+fn parse_rewrites(out: &str) -> Vec<Rewrite> {
+    whole(&parse_kept(out))
 }
 
 /// The rewrites to let go of at `now`: older than [`KEEP_SECS`], or past the newest
@@ -196,28 +249,51 @@ pub fn to_prune(list: &[Rewrite], now: i64) -> Vec<&Rewrite> {
         .collect()
 }
 
-/// Deletes the rewrites [`to_prune`] picks; says how many.
+/// What an interrupted record left (some ends, not all) is let go of after this long: by
+/// then it is no record still being written.
+const PARTIAL_SECS: i64 = 60 * 60;
+
+/// Deletes the rewrites [`to_prune`] picks, and what interrupted ones left behind; says how
+/// many.
 pub fn prune_rewrites(repo: &Path, now: i64) -> Result<usize, String> {
-    let list = rewrites(repo)?;
+    let all = kept(repo)?;
+    let list = whole(&all);
     let old = to_prune(&list, now);
+    let partial: Vec<&Kept> = all
+        .iter()
+        .filter(|k| k.rewrite().is_none() && now.saturating_sub(k.time) > PARTIAL_SECS)
+        .collect();
     for rewrite in &old {
         delete_rewrite(repo, rewrite)?;
     }
-    Ok(old.len())
+    for k in &partial {
+        delete_refs(repo, &k.branch, k.time)?;
+    }
+    Ok(old.len() + partial.len())
 }
 
 /// Lets go of the refs of `rewrite` (the commits only it kept can then be collected).
 pub fn delete_rewrite(repo: &Path, rewrite: &Rewrite) -> Result<(), String> {
+    delete_refs(repo, &rewrite.branch, rewrite.time)
+}
+
+/// Deletes every end kept for `branch` at `time`, all it can even when one fails.
+fn delete_refs(repo: &Path, branch: &str, time: i64) -> Result<(), String> {
+    let mut left = Vec::new();
     for role in ROLES {
+        let name = format!("{ROOT}{branch}/{time}/{role}");
         // Gone already (another window pruned it): what was asked is done.
-        let name = rewrite.ref_name(role);
         if run(Some(repo), &["update-ref", "-d", &name]).is_err()
             && super::resolve(repo, &name).is_ok()
         {
-            return Err(format!("could not delete {name}"));
+            left.push(name);
         }
     }
-    Ok(())
+    if left.is_empty() {
+        Ok(())
+    } else {
+        Err(format!("could not delete {}", left.join(", ")))
+    }
 }
 
 #[cfg(test)]

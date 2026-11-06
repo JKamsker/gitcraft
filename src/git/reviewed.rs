@@ -88,6 +88,28 @@ pub fn reviewed_heads(repo: &Path, repo_key: &str) -> Result<Vec<(u64, String)>,
         .collect())
 }
 
+/// Lets go of what is kept of the pull requests of `repo_key` that aren't in `open` (closed or
+/// merged ones): their refs, and with them the commits only they kept. Says how many.
+pub fn prune_reviewed(repo: &Path, repo_key: &str, open: &[u64]) -> Result<usize, String> {
+    let root = reviewed_prefix(repo_key, 0);
+    let root = root.strip_suffix("0/").unwrap_or(&root).to_owned();
+    let out = run(Some(repo), &["for-each-ref", "--format=%(refname)", &root])?;
+    let mut gone = std::collections::BTreeSet::new();
+    for name in out.lines() {
+        let Some((number, _)) = name.strip_prefix(&root).and_then(|r| r.split_once('/')) else {
+            continue;
+        };
+        let Ok(number) = number.parse::<u64>() else {
+            continue;
+        };
+        if !open.contains(&number) {
+            run(Some(repo), &["update-ref", "-d", name])?;
+            gone.insert(number);
+        }
+    }
+    Ok(gone.len())
+}
+
 /// Remembers `version` as the one of pull request `number` last looked at. The one before is
 /// kept as `previous-head` / `previous-base`, so that a comparison of the two opened just now
 /// still has its commits whatever `git gc` does.
@@ -125,6 +147,46 @@ pub fn mark_reviewed(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn closed_pull_requests_are_let_go_of() -> Result<(), String> {
+        let dir = std::env::temp_dir().join(format!("gitcraft-reviewed-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let git = |args: &[&str]| run(Some(&dir), args).map(|s| s.trim().to_owned());
+        let result = (|| {
+            git(&["init", "-q"])?;
+            git(&[
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@t",
+                "-c",
+                "commit.gpgSign=false",
+                "commit",
+                "-q",
+                "--allow-empty",
+                "-m",
+                "a",
+            ])?;
+            let head = git(&["rev-parse", "HEAD"])?;
+            let version = Series::new(&head, &head);
+            for n in [1, 2, 3] {
+                mark_reviewed(&dir, "h/o/r", n, &version)?;
+            }
+            mark_reviewed(&dir, "other/o/r", 9, &version)?;
+            let pruned = prune_reviewed(&dir, "h/o/r", &[2])?;
+            let left = reviewed_heads(&dir, "h/o/r")?;
+            let other = reviewed_heads(&dir, "other/o/r")?;
+            Ok::<_, String>((pruned, left, other, head))
+        })();
+        let _ = std::fs::remove_dir_all(&dir);
+        let (pruned, left, other, head) = result?;
+        assert_eq!(pruned, 2);
+        assert_eq!(left, [(2, head.clone())]);
+        assert_eq!(other, [(9, head)]);
+        Ok(())
+    }
 
     #[test]
     fn a_pull_request_has_a_ref_folder_git_takes() {

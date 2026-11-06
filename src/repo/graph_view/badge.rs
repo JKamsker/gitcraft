@@ -99,6 +99,11 @@ pub(super) fn badges(decorations: &[String], refs: &Refs) -> Vec<Badge> {
     }
     let mut out: Vec<Badge> = Vec::new();
     for d in decorations {
+        // What gitcraft keeps of earlier versions (`refs/gitcraft/`) is no branch: an older
+        // git, or `log.initialDecorationSet=all`, lists it among the decorations.
+        if d.starts_with("refs/gitcraft/") || d.starts_with("tag: refs/gitcraft/") {
+            continue;
+        }
         // With `log.decorate=full` in the user's config, `%D` gives full ref names.
         if let Some(name) = d.strip_prefix("HEAD -> ") {
             let name = name.strip_prefix("refs/heads/").unwrap_or(name);
@@ -187,6 +192,22 @@ mod tests {
         assert!(b[0].head && b[0].local && b[0].remotes == ["origin"]);
         assert!(!b[1].local && b[1].remotes == ["origin"]);
         assert_eq!(b[2].kind, BadgeKind::Tag);
+    }
+
+    /// The refs gitcraft keeps earlier versions in make no pill, however git lists them.
+    #[test]
+    fn kept_versions_are_no_branches() {
+        let decos = [
+            "HEAD -> main",
+            "refs/gitcraft/rewrites/main/12/new-tip",
+            "refs/gitcraft/reviewed/github.com/a/b/3/head",
+        ]
+        .map(String::from);
+        let labels: Vec<String> = badges(&decos, &refs_with_origin())
+            .into_iter()
+            .map(|b| b.label)
+            .collect();
+        assert_eq!(labels, ["main"]);
     }
 
     fn branch(name: &str) -> git::Branch {
