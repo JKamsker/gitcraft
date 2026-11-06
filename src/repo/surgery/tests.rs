@@ -67,7 +67,7 @@ pub(super) fn git_out(dir: &Path, args: &[&str]) -> String {
         .to_owned()
 }
 
-fn subjects(dir: &Path) -> Vec<String> {
+pub(super) fn subjects(dir: &Path) -> Vec<String> {
     git_out(dir, &["log", "--format=%s", "HEAD"])
         .lines()
         .map(str::to_owned)

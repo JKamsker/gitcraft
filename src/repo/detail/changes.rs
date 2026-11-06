@@ -137,6 +137,15 @@ impl RepoTab {
         ) {
             acts.push(stage_action("Unstage all", vec![unstage_all_args(head)]));
         }
+        if !staged.is_empty()
+            && self.work.in_progress.is_none()
+            && ui
+                .add_enabled(idle, egui::Button::new("Distribute staged fixes…").small())
+                .on_hover_text("Put each staged change into the earlier commit of the branch that last changed those lines")
+                .clicked()
+        {
+            acts.push(Action::OpenAbsorb);
+        }
         let buttons = [("minus", "Unstage")];
         self.work_list(
             ui,

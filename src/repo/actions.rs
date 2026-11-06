@@ -162,6 +162,13 @@ pub(crate) enum Action {
     CheckSplit,
     RunSplit,
     CloseSplit,
+    /// Open the editor distributing the staged changes into the commits they belong to.
+    OpenAbsorb,
+    CheckAbsorb,
+    RunAbsorb,
+    /// Run the installed `git-absorb` instead.
+    RunGitAbsorb,
+    CloseAbsorb,
     /// Remember these HTTPS credentials and run the operation that needed them again.
     SignIn(git::Credentials),
     /// Ask before deleting the local tag `name` (at the commit `target`), once what it points
@@ -332,6 +339,11 @@ impl RepoTab {
         );
         items.extend([
             ("Apply patch…".into(), "patch".into(), Action::ApplyPatch),
+            (
+                "Distribute staged fixes…".into(),
+                "absorb".into(),
+                Action::OpenAbsorb,
+            ),
             ("Undo".into(), "Ctrl+Z".into(), Action::Undo),
             ("Redo".into(), "Ctrl+Y".into(), Action::Redo),
             (
