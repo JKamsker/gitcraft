@@ -1,5 +1,5 @@
-//! The settings tab: its pages listed on the left under a search field, the chosen page on the
-//! right; while searching, what the search matches on every page instead.
+//! The settings tab, along the window's left edge: its pages listed under a search field, the
+//! chosen page beside them; while searching, what the search matches on every page instead.
 
 use egui::{Align2, Id, Key, Modifiers, RichText, Sense, Stroke, Ui, vec2};
 
@@ -17,6 +17,8 @@ fn nav_size(available: f32) -> (f32, f32) {
 }
 /// Widest a page gets.
 const CONTENT_WIDTH: f32 = 720.0;
+/// Room left of the list: the settings keep to the window's left edge.
+const SIDE: f32 = 24.0;
 /// Room above the page's title and the list's.
 const TOP: f32 = 32.0;
 
@@ -56,9 +58,8 @@ impl Settings {
         };
 
         let (nav_width, gap) = nav_size(ui.available_width());
-        let side = ((ui.available_width() - (nav_width + gap + CONTENT_WIDTH)) / 2.0).max(16.0);
         ui.horizontal_top(|ui| {
-            ui.add_space(side);
+            ui.add_space(SIDE);
             ui.vertical(|ui| {
                 ui.set_width(nav_width);
                 nav(ui, &mut view, &counts);
