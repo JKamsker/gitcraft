@@ -7,3 +7,12 @@ Terminal=false
 Categories=Development;RevisionControl;
 Icon=gitcraft
 StartupWMClass=gitcraft
+Actions=clone;open;
+
+[Desktop Action clone]
+Name=Clone…
+Exec=gitcraft --clone
+
+[Desktop Action open]
+Name=Open…
+Exec=gitcraft --open

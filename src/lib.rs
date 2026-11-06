@@ -12,6 +12,7 @@ mod icons;
 mod image_fit;
 mod manual;
 mod mergiraf;
+mod os_shell;
 mod pr_post;
 mod pr_threads;
 mod pull_request;

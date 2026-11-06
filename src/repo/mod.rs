@@ -196,6 +196,8 @@ pub struct RepoTab {
     running: Option<running::Running>,
     /// Operations asked for while another ran, to run after it.
     waiting: running::Waiting,
+    /// A network operation failed (taken by `App`, for the taskbar button).
+    network_failed: bool,
     /// The running operation moves the checkout: update the submodules after it, if asked to.
     update_submodules: bool,
     status: Option<(String, bool)>,
@@ -341,6 +343,7 @@ impl RepoTab {
             op_started: None,
             running: None,
             waiting: Default::default(),
+            network_failed: false,
             update_submodules: false,
             status: None,
             branch_filter: String::new(),

@@ -212,6 +212,17 @@ so your config, credentials and hooks apply as usual.
   toolbar says which, and Cancel or a failure drops them, saying so). Anything else asked for
   meanwhile is not started and says why, and the toolbar's other buttons say what they wait
   for.
+- The taskbar button shows how far a clone, fetch, pull or push is (the least advanced, when
+  several run), and turns red when one fails, until the window is looked at or another starts.
+  On Windows that is the taskbar's own progress; on Linux the launcher's (the `LauncherEntry`
+  signal that Ubuntu's dock, Dash to Dock, KDE's task manager and others show), red there meaning
+  it asks for attention.
+- The taskbar button's menu (Windows: its jump list; Linux: the launcher's actions) lists the
+  recent repositories, then _Clone…_ and _Open…_ (`gitcraft --clone`, `gitcraft --open`). On
+  Linux they go into the AppImage's menu entry, or, for the .deb and .rpm, into a copy of the
+  package's entry in `~/.local/share/applications` (one you wrote yourself is left alone); the
+  package's own entry has _Clone…_ and _Open…_. The OS calls this takes on Windows are in a small
+  crate of their own, `crates/gitcraft-os`, so that gitcraft itself keeps forbidding unsafe code.
 - Background fetch every few minutes (Settings; 0 turns it off).
 - HTTPS sign-in: when a remote wants a username and password (or token) and no credential helper
   provides them, a dialog asks and the operation runs again. They stay in memory for the tab;

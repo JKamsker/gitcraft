@@ -70,6 +70,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",
             "Right-click a pull request and choose Open in worktree to work on its branch in a worktree of its own, made for it when there is none.",
             "A terminal panel with tabs, in the repository's folder.",
+            "The taskbar button shows how far a clone, fetch, pull or push is, and turns red when one fails. Its menu (right-click it) lists the recent repositories, Clone… and Open….",
             "Fetch, pull, push and clone show how far git is (“Receiving objects: 45%”) and a thin bar under the toolbar; Cancel stops git and what it started, and leaves undo as it was. A cancelled clone removes what it had cloned.",
             "Fetch, Pull and Push can be clicked while another operation runs: they start once it is done (up to three wait, in order; Cancel or a failure drops them). The other buttons say what they wait for.",
         ],
