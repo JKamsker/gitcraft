@@ -109,7 +109,7 @@ pub(crate) fn with_codex_notify(config: &str, words: &[String]) -> Result<String
         Some(i) if ours(&lines[i]) => lines[i] = line,
         Some(_) => {
             return Err(
-                "Codex runs another notify program already: add gitcraft's (\"checkpoint\", \
+                "it runs another notify program already: add gitcraft's (\"checkpoint\", \
                  \"--codex\") to it yourself"
                     .to_owned(),
             );
@@ -152,7 +152,7 @@ fn edit(
 ) -> Result<String, String> {
     if crate::git::run(Some(worktree), &["ls-files", "--error-unmatch", "--", rel]).is_ok() {
         return Ok(format!(
-            "{agent}: {rel} is committed in this repository, so it was left as it is"
+            "{agent}: {rel} is committed in this repository, so it was left as it is: no hooks."
         ));
     }
     let path = crate::remote::join(worktree, rel);
@@ -168,7 +168,9 @@ fn edit(
     }
     crate::remote::write(&path, new.as_bytes())
         .map_err(|e| format!("could not write {rel}: {e}"))?;
-    Ok(format!("{agent}: hooks in {rel}"))
+    Ok(format!(
+        "{agent}: hooks in {rel}, from the next time it starts in this worktree."
+    ))
 }
 
 /// Keeps `paths` out of git in every worktree of the repository (`info/exclude`).

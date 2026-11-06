@@ -261,9 +261,10 @@ impl StartForm {
             }
         }
         if self.takes_hooks() {
-            ui.checkbox(&mut self.hooks, "Save each turn as a review step (installs its hooks in the worktree)")
+            ui.checkbox(&mut self.hooks, "Save each turn to review on its own")
                 .on_hover_text(
-                    "After each turn the agent's hook runs gitcraft checkpoint: Uncommitted changes then lists the turns, each to diff on its own",
+                    "Installs the agent's hooks in the worktree: after each turn they run gitcraft \
+                     checkpoint, and Uncommitted changes lists the turns, each to diff on its own",
                 );
         }
     }
