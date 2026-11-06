@@ -132,7 +132,7 @@ impl RepoTab {
                 "No identity set (git config user.name)".to_owned()
             } else {
                 let source = if id.local {
-                    String::new()
+                    " · this repository".to_owned()
                 } else if from_profile {
                     format!(" · profile {}", profile.title())
                 } else {
