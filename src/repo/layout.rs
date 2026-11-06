@@ -114,7 +114,15 @@ impl RepoTab {
             self.dialog.is_none() && !self.keys_blocked && !ctx.egui_wants_keyboard_input();
         if free_keys {
             let commands = ctx.input(|i| keymap::pressed(i, keymap::Scope::Repository));
-            acts.extend(commands.into_iter().map(Action::Key));
+            // While a commit's message is being edited, Ctrl+Enter saves it (the editor takes
+            // the key also when nothing has the focus): it doesn't commit the changes too.
+            let rewording = self.reword.is_some();
+            acts.extend(
+                commands
+                    .into_iter()
+                    .filter(|&c| !(rewording && c == keymap::Command::Commit))
+                    .map(Action::Key),
+            );
             let (esc, undo, redo, find) = ctx.input(|i| {
                 (
                     i.key_pressed(Key::Escape),

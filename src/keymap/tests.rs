@@ -208,3 +208,32 @@ fn hints_that_are_keys_are_told_from_categories() {
         assert!(!is_keys(word), "{word}");
     }
 }
+
+/// On AZERTY the key under 4 reads as `'` without Shift: the tab keys go by the key's place.
+#[test]
+fn tab_digits_go_by_their_place_on_the_keyboard() {
+    let azerty_4 = Event::Key {
+        key: Key::Quote,
+        physical_key: Some(Key::Num4),
+        pressed: true,
+        repeat: false,
+        modifiers: Modifiers::COMMAND,
+    };
+    // Elsewhere the logical key wins: Ctrl+J on a layout where J sits elsewhere is still J.
+    let moved_j = Event::Key {
+        key: Key::J,
+        physical_key: Some(Key::Num4),
+        pressed: true,
+        repeat: false,
+        modifiers: Modifiers::COMMAND,
+    };
+    assert_eq!(
+        pressed_with(vec![azerty_4], Scope::Window),
+        [Command::GoToTab(4)]
+    );
+    assert_eq!(
+        pressed_with(vec![moved_j.clone()], Scope::Repository),
+        [Command::Terminal]
+    );
+    assert!(pressed_with(vec![moved_j], Scope::Window).is_empty());
+}

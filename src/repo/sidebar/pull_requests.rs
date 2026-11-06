@@ -233,6 +233,8 @@ impl RepoTab {
                 .refused(here.then_some(tip.as_str()))
                 .show(ui)
                 .on_hover_text(&tip)
+                // Greyed out while an operation runs: what it would do, still.
+                .on_disabled_hover_text(&tip)
         } else {
             let t = Tokens::get(ui.ctx());
             let button = egui::Button::image_and_text(

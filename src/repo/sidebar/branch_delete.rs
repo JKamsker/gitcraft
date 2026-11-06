@@ -28,9 +28,22 @@ impl RepoTab {
         // undoing would bring back.
         let at_seen = || vec![expect_ref_at(&format!("refs/heads/{}", b.name), &b.target)];
         let guarded = |steps: Vec<Vec<String>>| [at_seen(), steps].concat();
+        // Where the upstream is, on the remote and here.
+        let upstream = (!b.upstream_gone())
+            .then(|| self.split_upstream(&b.upstream))
+            .flatten()
+            .zip(
+                self.refs
+                    .remotes
+                    .iter()
+                    .flat_map(|(_, bs)| bs)
+                    .find(|r| r.name == b.upstream),
+            );
         if MenuItem::new("Delete…")
             .enabled(idle)
             .refused(refused)
+            // The entry below, for the remote too, says the same reason.
+            .explained_below(upstream.is_some())
             .show(ui)
             .clicked()
         {
@@ -51,17 +64,6 @@ impl RepoTab {
                 }),
             ));
         }
-        // Where the upstream is, on the remote and here.
-        let upstream = (!b.upstream_gone())
-            .then(|| self.split_upstream(&b.upstream))
-            .flatten()
-            .zip(
-                self.refs
-                    .remotes
-                    .iter()
-                    .flat_map(|(_, bs)| bs)
-                    .find(|r| r.name == b.upstream),
-            );
         let Some(((remote, name), tracked)) = upstream else {
             return;
         };

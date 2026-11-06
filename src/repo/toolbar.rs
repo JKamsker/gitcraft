@@ -78,6 +78,7 @@ impl RepoTab {
         );
         if icons::tool_button(ui, "cloud-download", "Fetch", idle && has_remote)
             .on_hover_text(fetched)
+            .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Fetch))
             .clicked()
         {
             acts.push(Action::Fetch);
@@ -92,7 +93,8 @@ impl RepoTab {
         let mode = Settings::get(ui.ctx()).pull_mode;
         let pull =
             icons::tool_button_count(ui, "arrow-down-to-line", "Pull", behind, idle && has_remote)
-                .on_hover_text(mode.tip());
+                .on_hover_text(mode.tip())
+                .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Pull));
         if pull.clicked() {
             acts.push(Action::Pull);
         }
@@ -110,9 +112,17 @@ impl RepoTab {
                 "Push the current branch (publishes it if it has no upstream yet)",
                 Command::Push,
             ))
+            .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Push))
             .clicked()
         {
             acts.push(Action::Push);
+        }
+    }
+
+    /// Why the greyed-out button of `command` can't be used now: what its key would say.
+    fn why_not(&self, ui: &mut Ui, command: Command) {
+        if let Err(why) = self.key_action(command) {
+            ui.label(why);
         }
     }
 
@@ -122,6 +132,7 @@ impl RepoTab {
         let head = self.refs.head.clone();
         if icons::tool_button(ui, "git-branch-plus", "Branch", idle && !head.is_empty())
             .on_hover_text(keymap::tip("Create a branch at HEAD", Command::NewBranch))
+            .on_disabled_hover_ui(|ui| self.why_not(ui, Command::NewBranch))
             .clicked()
         {
             acts.push(Action::Dialog(Dialog::create_branch(&head, "HEAD")));
@@ -131,7 +142,7 @@ impl RepoTab {
                 "Stash all changes, untracked files included",
                 Command::Stash,
             ))
-            .on_disabled_hover_text("No changes to stash")
+            .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Stash))
             .clicked()
         {
             acts.push(Action::Dialog(Dialog::stash()));
@@ -173,6 +184,7 @@ impl RepoTab {
                 let why = here.as_ref().err().map(String::as_str);
                 if MenuItem::new(reveal_label())
                     .refused(why)
+                    .explained_below(true)
                     .show(ui)
                     .clicked()
                 {
