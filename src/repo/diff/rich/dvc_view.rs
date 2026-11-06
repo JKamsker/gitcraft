@@ -42,7 +42,9 @@ fn pair(
     let state = match (old, new) {
         (None, _) => "now tracked",
         (_, None) => "no longer tracked",
-        (Some(o), Some(n)) if o == n || (o.hash == n.hash && o.size == n.size) => "unchanged",
+        (Some(o), Some(n)) if o.hash == n.hash && o.size == n.size && o.repo == n.repo => {
+            "unchanged"
+        }
         _ => "changed",
     };
     ui.horizontal(|ui| {
@@ -64,12 +66,11 @@ fn pair(
             };
             acts.push(Action::DiffGoToLine { old: o, new: n });
         }
-        let what = if any.list == "deps" {
-            "imported from"
-        } else {
-            ""
-        };
-        if !what.is_empty() {
+        if any.list == "deps" {
+            let what = match &any.repo {
+                Some(url) => format!("imported from {url}"),
+                None => "where the data was imported from".to_owned(),
+            };
             ui.label(RichText::new(what).color(t.text_faint));
         }
         ui.label(RichText::new(state).color(t.text_dim));
@@ -92,16 +93,25 @@ fn side(ui: &mut Ui, t: &Tokens, title: &str, tracked: Option<&Tracked>) {
                 ui.label(RichText::new("not tracked").color(t.text_faint));
                 return;
             };
-            let size = x.size.map_or("size not recorded".to_owned(), human_size);
+            let size = match (x.size, &x.repo) {
+                (Some(size), _) => human_size(size),
+                (None, Some(_)) => "imported".to_owned(),
+                (None, None) => "size not recorded".to_owned(),
+            };
             ui.label(RichText::new(size).font(theme::semibold(16.0)));
             if let Some(files) = x.files {
-                ui.label(RichText::new(format!("a folder of {files} files")).color(t.text_dim));
+                let s = if files == 1 { "" } else { "s" };
+                ui.label(RichText::new(format!("a folder of {files} file{s}")).color(t.text_dim));
             }
             if let Some(hash) = &x.hash {
                 ui.label(
-                    RichText::new(format!("hash {}", hash.get(..12).unwrap_or(hash)))
-                        .color(t.text_faint)
-                        .small(),
+                    RichText::new(format!(
+                        "{} {}",
+                        if x.repo.is_some() { "commit" } else { "hash" },
+                        hash.get(..12).unwrap_or(hash)
+                    ))
+                    .color(t.text_faint)
+                    .small(),
                 )
                 .on_hover_text(hash);
             }

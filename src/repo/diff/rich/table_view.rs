@@ -5,7 +5,7 @@
 use egui::{Color32, Rect, RichText, Sense, Stroke, Ui, pos2, vec2};
 
 use super::RichState;
-use super::table::{Change, Row, TableDiff};
+use super::table::{Change, Column, Row, TableDiff};
 use crate::repo::Action;
 use crate::theme::{self, Tokens};
 
@@ -15,8 +15,6 @@ const MIN_CHARS: usize = 6;
 const MAX_CHARS: usize = 48;
 /// Unchanged rows kept in view next to a change.
 const AROUND: usize = 1;
-/// Rows looked at to size the columns.
-const SAMPLE: usize = 500;
 const NUM_W: f32 = 54.0;
 
 /// What the grid shows, in order.
@@ -111,39 +109,13 @@ pub(super) fn show(ui: &mut Ui, diff: &TableDiff, state: &mut RichState, acts: &
         .layout_no_wrap("M".to_owned(), font.clone(), t.text)
         .size()
         .x;
-    let widths: Vec<f32> = (0..diff.columns.len())
-        .map(|c| {
-            let longest = diff
-                .rows
-                .iter()
-                .filter(|r| r.change != Change::Kept)
-                .chain(diff.rows.iter().take(SAMPLE))
-                .take(SAMPLE * 2)
-                .map(|r| {
-                    // A changed cell shows `old → new`.
-                    let len = |side: &Option<Vec<String>>| {
-                        side.as_ref()
-                            .and_then(|v| v.get(c))
-                            .map_or(0, |v| v.chars().count())
-                    };
-                    let (o, n) = (len(&r.old), len(&r.new));
-                    let both = r.old.as_ref().and_then(|v| v.get(c))
-                        != r.new.as_ref().and_then(|v| v.get(c));
-                    if r.change == Change::Changed && both {
-                        o + n + 3
-                    } else {
-                        o.max(n)
-                    }
-                })
-                .chain(std::iter::once(header_text(diff, c).chars().count()))
-                .max()
-                .unwrap_or(0);
-            longest.clamp(MIN_CHARS, MAX_CHARS) as f32 * char_w + 16.0
-        })
+    let widths: Vec<f32> = diff
+        .widths
+        .iter()
+        .map(|w| (*w).clamp(MIN_CHARS, MAX_CHARS) as f32 * char_w + 16.0)
         .collect();
     let total_w = NUM_W + widths.iter().sum::<f32>();
     let items = layout(&diff.rows, &state.opened);
-    let col_changes: Vec<Change> = diff.columns.iter().map(|c| c.change).collect();
     egui::ScrollArea::both()
         .id_salt("rich_table")
         .auto_shrink(false)
@@ -170,7 +142,7 @@ pub(super) fn show(ui: &mut Ui, diff: &TableDiff, state: &mut RichState, acts: &
                         &font,
                         &widths,
                         &diff.rows[i],
-                        &col_changes,
+                        &diff.columns,
                         rect,
                         i,
                         acts,
@@ -212,18 +184,10 @@ pub(super) fn show(ui: &mut Ui, diff: &TableDiff, state: &mut RichState, acts: &
         });
 }
 
-fn header_text(diff: &TableDiff, c: usize) -> String {
-    let col = &diff.columns[c];
-    match (&col.old, &col.new) {
-        (Some((_, o)), Some((_, n))) if o != n => format!("{o} → {n}"),
-        (_, Some((_, n))) => n.clone(),
-        (Some((_, o)), None) => o.clone(),
-        _ => String::new(),
-    }
-}
-
 fn header(ui: &mut Ui, t: &Tokens, widths: &[f32], diff: &TableDiff, rect: Rect) {
-    let p = ui.painter();
+    // Clicks on the header don't reach the row scrolled under it.
+    ui.interact(rect, ui.id().with("table_head"), Sense::click());
+    let p = ui.painter().clone();
     p.rect_filled(rect, 0.0, t.chrome);
     p.line_segment(
         [rect.left_bottom(), rect.right_bottom()],
@@ -239,13 +203,14 @@ fn header(ui: &mut Ui, t: &Tokens, widths: &[f32], diff: &TableDiff, rect: Rect)
         };
         let cell = Rect::from_min_size(pos2(x, rect.top()), vec2(*w, ROW_H));
         p.rect_filled(cell, 0.0, fill);
-        p.with_clip_rect(cell.shrink(2.0)).text(
-            pos2(x + 8.0, rect.center().y),
-            egui::Align2::LEFT_CENTER,
-            header_text(diff, c),
-            theme::medium(12.0),
-            color,
-        );
+        p.with_clip_rect(cell.shrink(2.0).intersect(ui.clip_rect()))
+            .text(
+                pos2(x + 8.0, rect.center().y),
+                egui::Align2::LEFT_CENTER,
+                diff.columns[c].name(),
+                theme::medium(12.0),
+                color,
+            );
         if !tip.is_empty() {
             ui.interact(cell, ui.id().with(("table_head", c)), Sense::hover())
                 .on_hover_text(tip);
@@ -261,7 +226,7 @@ fn row(
     font: &egui::FontId,
     widths: &[f32],
     r: &Row,
-    cols: &[Change],
+    cols: &[Column],
     rect: Rect,
     i: usize,
     acts: &mut Vec<Action>,
@@ -312,7 +277,8 @@ fn row(
             ..Default::default()
         };
         let shown = |v: &str| v.replace(['\n', '\r'], " ");
-        let column = cols.get(c).copied().unwrap_or(Change::Kept);
+        let column = cols.get(c).map_or(Change::Kept, |c| c.change);
+        let shared = cols.get(c).is_some_and(Column::shared);
         match (r.change, column) {
             // A column only on one side: its value, not a change of it.
             (_, Change::Added) => job.append(
@@ -323,7 +289,7 @@ fn row(
             (_, Change::Removed) => {
                 job.append(&shown(old), 0.0, fmt(t.danger, Color32::TRANSPARENT, false))
             }
-            (Change::Changed, _) if old != new => {
+            (Change::Changed, _) if shared && old != new => {
                 job.append(
                     &shown(old),
                     0.0,
@@ -335,7 +301,8 @@ fn row(
                     0.0,
                     fmt(t.text, t.success.gamma_multiply(0.3), false),
                 );
-                tip.push_str(&format!("{}: {old} → {new}\n", c + 1));
+                let name = cols.get(c).map(Column::name).unwrap_or_default();
+                tip.push_str(&format!("{name}: {old} → {new}\n"));
             }
             (Change::Removed, _) => {
                 job.append(&shown(old), 0.0, fmt(t.text, Color32::TRANSPARENT, false))

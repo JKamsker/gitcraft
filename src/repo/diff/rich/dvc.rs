@@ -15,6 +15,8 @@ pub struct Tracked {
     pub files: Option<u64>,
     /// `outs` (the data) or `deps` (where it was imported from).
     pub list: &'static str,
+    /// For data imported from another git repository (`dvc import`): its URL.
+    pub repo: Option<String>,
     pub line: u32,
 }
 
@@ -28,15 +30,16 @@ pub fn is_dvc(path: &str) -> bool {
     super::extension(path) == "dvc"
 }
 
-fn scalar<'a>(node: &'a Node, key: &str) -> Option<&'a str> {
+fn field<'a>(node: &'a Node, key: &str) -> Option<&'a Node> {
     match node {
-        Node::Map(fields) => fields
-            .iter()
-            .find(|f| f.key == key)
-            .and_then(|f| match &f.node {
-                Node::Scalar { text, .. } => Some(text.as_str()),
-                _ => None,
-            }),
+        Node::Map(fields) => fields.iter().find(|f| f.key == key).map(|f| &f.node),
+        _ => None,
+    }
+}
+
+fn scalar<'a>(node: &'a Node, key: &str) -> Option<&'a str> {
+    match field(node, key)? {
+        Node::Scalar { text, .. } => Some(text.as_str()),
         _ => None,
     }
 }
@@ -44,6 +47,10 @@ fn scalar<'a>(node: &'a Node, key: &str) -> Option<&'a str> {
 /// What a `.dvc` file's text tracks.
 pub fn tracked(text: &str) -> Result<Vec<Tracked>, String> {
     let root = yaml::parse(text)?;
+    // Paths are relative to `wdir` when it is set.
+    let wdir = scalar(&root, "wdir")
+        .map(|w| w.trim_end_matches('/'))
+        .filter(|w| !w.is_empty() && *w != ".");
     let mut out = Vec::new();
     for list in ["outs", "deps"] {
         let Node::Map(fields) = &root else { break };
@@ -59,17 +66,25 @@ pub fn tracked(text: &str) -> Result<Vec<Tracked>, String> {
             let Some(path) = scalar(n, "path") else {
                 continue;
             };
+            // Imported from another git repository: the commit it was taken at.
+            let repo = field(n, "repo");
             // DVC 3 writes `md5: …` with `hash: md5`; others `etag`, `checksum`.
             let hash = ["md5", "etag", "checksum", "sha256"]
                 .iter()
                 .find_map(|k| scalar(n, k))
+                .or_else(|| repo.and_then(|r| scalar(r, "rev_lock")))
                 .map(str::to_owned);
+            let path = match wdir {
+                Some(w) if list == "outs" => format!("{w}/{path}"),
+                _ => path.to_owned(),
+            };
             out.push(Tracked {
-                path: path.to_owned(),
+                path,
                 hash,
                 size: scalar(n, "size").and_then(|s| s.parse().ok()),
                 files: scalar(n, "nfiles").and_then(|s| s.parse().ok()),
                 list,
+                repo: repo.and_then(|r| scalar(r, "url")).map(str::to_owned),
                 line: item.line,
             });
         }

@@ -64,8 +64,8 @@ fn rows_and_cells_changed_added_and_removed() -> Result<(), String> {
 
 #[test]
 fn renamed_columns_are_told_from_added_and_removed_ones() -> Result<(), String> {
-    let old = "id,name,city,zip\n1,Ann,Oslo,0150\n2,Bob,Rome,00100\n";
-    let new = "id,full name,town,country\n1,Ann,Oslo,NO\n2,Bob,Rome,IT\n";
+    let old = "id,name,city,zip\n1,Ann,Oslo,0150\n2,Bob,Rome,00100\n3,Cid,Lima,15001\n";
+    let new = "id,full name,town,country\n1,Ann,Oslo,NO\n2,Bob,Rome,IT\n3,Cid,Lima,PE\n";
     let d = table::diff("a.csv", &sides(old, new))?;
     let cols: Vec<(Change, Option<&str>, Option<&str>)> = d
         .columns
@@ -88,8 +88,67 @@ fn renamed_columns_are_told_from_added_and_removed_ones() -> Result<(), String> 
             (Change::Removed, Some("zip"), None),
         ]
     );
-    // The rows only differ in the columns added and removed.
-    assert!(d.rows.iter().all(|r| r.change == Change::Changed));
+    // The rows only differ in the columns added and removed: their shared cells are the same.
+    assert!(d.rows.iter().all(|r| r.change == Change::Kept));
+    assert_eq!(d.columns[1].name(), "name → full name");
+    Ok(())
+}
+
+#[test]
+fn tsv_has_no_quoting_and_lone_cr_breaks_lines() -> Result<(), String> {
+    let t = table::parse("a\t\"b\nc\t\"d\"\n", '\t')?;
+    assert_eq!(t.rows, vec![vec!["a", "\"b"], vec!["c", "\"d\""]]);
+    let t = table::parse("a,b\r1,2\r3,4", ',')?;
+    assert_eq!(t.rows, vec![vec!["a", "b"], vec!["1", "2"], vec!["3", "4"]]);
+    assert_eq!(t.lines, [1, 2, 3]);
+    // A line of one empty quoted cell is a row, unlike a blank line.
+    let t = table::parse("a\n\"\"\n\nb\n", ',')?;
+    assert_eq!(t.rows, vec![vec!["a"], vec![""], vec!["b"]]);
+    Ok(())
+}
+
+#[test]
+fn cells_past_the_header_get_a_column_of_their_own() -> Result<(), String> {
+    let d = table::diff("a.csv", &sides("id,v\n1,a\n", "id,v\n1,a,extra\n"))?;
+    let names: Vec<String> = d.columns.iter().map(|c| c.name()).collect();
+    assert_eq!(names, ["id", "v", "(column 3)"]);
+    assert_eq!(d.columns[2].change, Change::Added);
+    assert_eq!(d.widths.len(), 3);
+    Ok(())
+}
+
+#[test]
+fn look_alike_columns_are_not_renames() -> Result<(), String> {
+    // Columns of only `true`/`false` or empty cells look alike without being the same.
+    let old = "id,active\n1,true\n2,false\n3,true\n";
+    let new = "id,admin\n1,true\n2,false\n3,true\n";
+    let d = table::diff("a.csv", &sides(old, new))?;
+    // One column swapped for one in the same place is still taken as renamed.
+    assert_eq!(d.columns[1].change, Change::Changed);
+    let old = "id,active,x\n1,true,\n2,false,\n3,true,\n";
+    let new = "id,admin,y,z\n1,true,,a\n2,false,,b\n3,true,,c\n";
+    let d = table::diff("a.csv", &sides(old, new))?;
+    let changes: Vec<Change> = d.columns.iter().map(|c| c.change).collect();
+    assert!(!changes.contains(&Change::Changed), "{changes:?}");
+    Ok(())
+}
+
+#[test]
+fn renumbered_ids_are_not_a_key() -> Result<(), String> {
+    // Every id moved by one: matching by id would call every row changed.
+    let old = "id,name,city\n1,Ann,Oslo\n2,Bob,Rome\n3,Cid,Lima\n4,Dee,Kyiv\n";
+    let new = "id,name,city\n1,Zed,Bonn\n2,Ann,Oslo\n3,Bob,Rome\n4,Cid,Lima\n5,Dee,Kyiv\n";
+    let d = table::diff("a.csv", &sides(old, new))?;
+    assert!(!d.keyed);
+    // One row added; the others found again by their content, with their ids changed.
+    let changes: Vec<Change> = d.rows.iter().map(|r| r.change).collect();
+    assert_eq!(changes[0], Change::Added);
+    assert!(changes[1..].iter().all(|c| *c == Change::Changed));
+    assert!(
+        d.rows[1..]
+            .iter()
+            .all(|r| r.old.as_ref().map(|v| &v[1]) == r.new.as_ref().map(|v| &v[1]))
+    );
     Ok(())
 }
 
@@ -163,6 +222,25 @@ fn dvc_files_show_the_data_they_track() -> Result<(), String> {
     assert_eq!(d.pairs[1].1.as_ref().map(|t| t.line), Some(7));
     assert!(dvc::diff(&sides(old, "foo: 1\n")).is_err_and(|e| e.contains("tracks nothing")));
     assert_eq!(RichKind::of("data/raw.csv.dvc"), [RichKind::Dvc]);
+    // `dvc import`: the data comes from another repository at a commit.
+    let import = |rev: &str| {
+        format!(
+            "wdir: data\ndeps:\n- path: models/m.pt\n  repo:\n    url: https://example.com/m.git\n    rev_lock: {rev}\nouts:\n- md5: aa\n  size: 4\n  path: m.pt\n"
+        )
+    };
+    let d = dvc::diff(&sides(&import("1111"), &import("2222")))?;
+    let paths: Vec<&str> = d
+        .pairs
+        .iter()
+        .filter_map(|p| p.1.as_ref().map(|t| t.path.as_str()))
+        .collect();
+    assert_eq!(paths, ["data/m.pt", "models/m.pt"]);
+    let (o, n) = &d.pairs[1];
+    assert_eq!(o.as_ref().and_then(|t| t.hash.as_deref()), Some("1111"));
+    assert_eq!(
+        n.as_ref().and_then(|t| t.repo.as_deref()),
+        Some("https://example.com/m.git")
+    );
     assert_eq!(RichKind::of("A B/ñ.TSV"), [RichKind::Table]);
     Ok(())
 }
