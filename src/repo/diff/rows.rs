@@ -267,9 +267,6 @@ impl<'a> Rows<'a> {
         if let Some((origin, galley)) = placed.filter(|_| kind.is_some_and(|k| side.shows(k))) {
             self.hit_test(rect, (i, side), origin, &galley, pickable);
         }
-        if let Some(spot) = spot {
-            self.comment_gutter(ui, rect, i, side, spot, acts);
-        }
         if pickable {
             let resp = ui
                 .interact(rect, ui.id().with(("diff_line", i)), Sense::click())
@@ -277,6 +274,10 @@ impl<'a> Rows<'a> {
             if resp.clicked() {
                 self.clicked = Some(i);
             }
+        }
+        // After the line's own click: its numbers take a note, the rest of it picks it.
+        if let Some(spot) = spot {
+            self.comment_gutter(ui, rect, i, side, spot, acts);
         }
         if kind == Some(Kind::Hunk) && !self.hunk_picks.is_empty() {
             self.hunk_buttons(ui, rect, i, acts);
@@ -350,16 +351,25 @@ impl<'a> Rows<'a> {
                 Sense::click(),
             )
             .on_hover_cursor(egui::CursorIcon::PointingHand)
-            .on_hover_text("Comment on this line");
+            .on_hover_text(if review.local {
+                "Note for the agent on this line"
+            } else {
+                "Comment on this line"
+            });
         let count = review.marks.get(&(spot_side, number)).copied();
         let active = self.is_target((spot_side, number));
         paint_gutter_mark(ui, area, count, resp.hovered(), active);
         if resp.clicked() {
-            acts.push(Action::Pr(PrAct::OpenLine(LineTarget {
+            let target = LineTarget {
                 path: review.path.clone(),
                 line: number,
                 side: spot_side,
-            })));
+            };
+            acts.push(if review.local {
+                Action::Agent(crate::repo::agents::AgentAct::OpenNote(target))
+            } else {
+                Action::Pr(PrAct::OpenLine(target))
+            });
         }
     }
 

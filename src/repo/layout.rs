@@ -34,6 +34,7 @@ impl RepoTab {
             )
             .show(ui, |ui| self.toolbar(ui, &mut acts));
         self.side_panels(ui, &mut acts);
+        self.tray_panel(ui, &mut acts);
         if self.terminal_open {
             egui::Panel::bottom("repo_terminal")
                 .resizable(true)
@@ -128,7 +129,11 @@ impl RepoTab {
                     i.modifiers.command && i.key_pressed(Key::F),
                 )
             });
-            if esc && self.diff.is_some() && self.line_comment_open() {
+            if esc && self.diff.is_some() && self.agents.tray.target.is_some() {
+                acts.push(Action::Agent(super::agents::AgentAct::Tray(
+                    super::agents::TrayAct::Close,
+                )));
+            } else if esc && self.diff.is_some() && self.line_comment_open() {
                 acts.push(Action::Pr(pr_review::PrAct::CloseLine));
             } else if esc && self.diff.is_some() {
                 acts.push(Action::CloseDiff);

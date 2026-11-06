@@ -47,6 +47,7 @@ impl RepoTab {
                 .and_then(|d| d.target.clone())
                 .filter(|t| t.path == *path),
             path: path.clone(),
+            local: false,
         })
     }
 

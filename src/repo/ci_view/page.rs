@@ -133,7 +133,21 @@ fn page(ui: &mut Ui, view: &CiView, runs: &[Run], acts: &mut Vec<Action>) {
                         .italics(),
                 );
             }
-            Some(Ok(text)) => steps::log(ui, text),
+            Some(Ok(text)) => {
+                if ui
+                    .button("Send to agent")
+                    .on_hover_text(
+                        "Types the end of this log into the agent's terminal, to fix the failure",
+                    )
+                    .clicked()
+                {
+                    acts.push(Action::Agent(crate::repo::agents::AgentAct::Send(
+                        crate::agent::handoff::ci_message(&run.name, text),
+                        "the log",
+                    )));
+                }
+                steps::log(ui, text);
+            }
         }
     }
 }

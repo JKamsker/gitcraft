@@ -173,6 +173,23 @@ fn threads(
                 if thread.can_reply && shown.reply_to.is_none() {
                     shown.reply_to = Some(thread.id.clone());
                 }
+                if ui
+                    .small_button("Send to agent")
+                    .on_hover_text(
+                        "Types this thread, with its file and line, into the agent's terminal",
+                    )
+                    .clicked()
+                {
+                    let comments: Vec<(String, String)> = thread
+                        .comments
+                        .iter()
+                        .map(|c| (c.author.clone(), c.body.clone()))
+                        .collect();
+                    acts.push(Action::Agent(crate::repo::agents::AgentAct::Send(
+                        crate::agent::handoff::thread_message(&thread.path, thread.line, &comments),
+                        "the thread",
+                    )));
+                }
                 for comment in &thread.comments {
                     comment_header(ui, comment);
                     if let Some(body) = bodies.get(&comment.id) {
