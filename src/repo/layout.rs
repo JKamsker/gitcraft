@@ -104,11 +104,14 @@ impl RepoTab {
         });
     }
 
-    /// Escape closes the innermost view; Ctrl+Z / Ctrl+Y undo and redo, Ctrl+F searches, F7 and
-    /// Shift+F7 (or Alt+↓ / Alt+↑) go to the next and previous change of a diff.
+    /// Escape closes the innermost view; Ctrl+Z / Ctrl+Y undo and redo, Ctrl+F searches (in the
+    /// diff, file or blame shown, else the commits), F7 and Shift+F7 (or Alt+↓ / Alt+↑) go to
+    /// the next and previous change of a diff.
     fn shortcuts(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         let free_keys =
             self.dialog.is_none() && !self.keys_blocked && !ctx.egui_wants_keyboard_input();
+        // Ctrl+F, Esc and the steps of the find bar, when a diff, file or blame is shown.
+        self.find_keys(ctx, free_keys);
         if free_keys {
             let (esc, undo, redo, find) = ctx.input(|i| {
                 (
