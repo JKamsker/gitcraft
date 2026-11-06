@@ -285,7 +285,20 @@ impl<'a> Rows<'a> {
             right = self.hunk_buttons(ui, rect, i, acts) - 8.0;
         }
         if matches!(kind, Some(Kind::Hunk | Kind::Fold)) {
-            super::fold_view::controls(ui, data, i, (right, rect.center().y), acts);
+            // Right of where the header's own text ends.
+            let gutter = if side == Side::Unified {
+                NUM_W * 2.0
+            } else {
+                0.0
+            };
+            let text = data.lines.get(i).map_or(String::new(), |l| l.text.clone());
+            let text_w = ui
+                .painter()
+                .layout_no_wrap(text, self.font.clone(), self.t.text)
+                .size()
+                .x;
+            let left = (rect.left() + gutter + 24.0 + text_w + 12.0).max(ui.clip_rect().left());
+            super::fold_view::controls(ui, data, i, (left, right, rect.center().y), acts);
         }
         if kind.is_some_and(|k| side.shows(k)) {
             self.moved_button(ui, rect, i, acts);

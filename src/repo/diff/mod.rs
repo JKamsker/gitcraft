@@ -168,7 +168,7 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
     };
     let mut lines = parse(&text);
     // Read only when the diff doesn't show the whole file already.
-    let context = (!opts.whole_file)
+    let context = (!opts.whole_file && !is_image(&path))
         .then(|| context::read(repo, key, &lines, dark))
         .flatten();
     if context

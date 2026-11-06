@@ -58,7 +58,8 @@ fn the_enclosing_function_runs_from_its_header_to_its_end() {
         "use x;\n\nfn outer(a: u32) -> u32 {\n    let b = a;\n\n    b + 1\n}\n\nfn next() {}\n";
     let ctx = Context {
         raw: file.lines().map(str::to_owned).collect(),
-        spans: None,
+        path: "a.rs".to_owned(),
+        dark: true,
         no_newline_at_end: false,
         gaps: Vec::new(),
     };
@@ -337,6 +338,7 @@ fn a_commented_line_in_a_fold_opens_from_the_nearer_hunk() {
                 last: 40,
                 old_offset: 0,
                 trailing: false,
+                function: None,
             },
             Gap {
                 row: 9,
@@ -344,6 +346,7 @@ fn a_commented_line_in_a_fold_opens_from_the_nearer_hunk() {
                 last: 100,
                 old_offset: -2,
                 trailing: true,
+                function: None,
             },
         ],
         ..Context::default()
@@ -387,4 +390,109 @@ fn the_enclosing_function_opens_from_its_first_line() -> Result<(), String> {
         "@@ -13,13 +13,13 @@ fn function_1(a: u32) -> u32 {"
     );
     Ok(())
+}
+
+/// With `core.autocrlf` the file on disk isn't what git diffed: no folds rather than context
+/// that would make wrong patches.
+#[test]
+fn no_folds_when_the_file_on_disk_is_not_what_git_diffed() -> Result<(), String> {
+    let dir = repo("autocrlf", "f.txt", &numbered(40, ""));
+    git::run(Some(&dir), &["config", "core.autocrlf", "true"])?;
+    let crlf = numbered(40, "\r").replace("línea 20\t", "veinte\t");
+    let _ = std::fs::write(dir.join("f.txt"), crlf);
+    let data = load(&dir, &unstaged("f.txt"), DiffOptions::default(), true)?;
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(data.lines.iter().any(|l| l.kind == Kind::Add));
+    assert!(data.context.is_none());
+    Ok(())
+}
+
+/// Opening down below a hunk that only removed lines numbers its header from the line after
+/// the empty range, and the patch still applies.
+#[test]
+fn opening_below_a_hunk_with_an_empty_side_numbers_it_right() -> Result<(), String> {
+    let base = numbered(40, "");
+    let dir = repo("empty-side", "f.txt", &base);
+    // Lines 10 and 11 removed, nothing else: `@@ -7,8 +7,6 @@` with -U3; with no context the
+    // new side is empty. Use the user's `diff.context=0`-like shape by removing at the top.
+    let edited: String = base
+        .lines()
+        .enumerate()
+        .filter(|(k, _)| *k != 9 && *k != 10)
+        .map(|(_, l)| format!("{l}\n"))
+        .collect();
+    let _ = std::fs::write(dir.join("f.txt"), edited);
+    let key = unstaged("f.txt");
+    let mut view = view_of(&dir, &key)?;
+    view.unfold(1, Unfold::Down(5));
+    let d = data(&view)?;
+    let header = d.lines[0].raw.clone();
+    let hunk = hunk_changes(&d.lines, 0);
+    apply(&dir, &view, &hunk, Pick::Stage)?;
+    let _ = std::fs::remove_dir_all(&dir);
+    // Staged: the two lines are gone from the index.
+    assert!(header.starts_with("@@ -7,"), "{header}");
+    Ok(())
+}
+
+#[test]
+fn header_counts_from_an_empty_range_after_opening_down() {
+    let lines = parse("@@ -4,0 +5,2 @@\n+x\n+y\n");
+    let mut data = data_from(lines);
+    data.context = Some(Context {
+        gaps: gaps_of(&data.lines, 12).unwrap_or_default(),
+        raw: (1..=12)
+            .map(|n| {
+                if n == 5 || n == 6 {
+                    "new".to_owned()
+                } else {
+                    format!("l{n}")
+                }
+            })
+            .collect(),
+        path: "f.txt".to_owned(),
+        dark: true,
+        no_newline_at_end: false,
+    });
+    data.unfold(1, Unfold::Down(3));
+    assert_eq!(data.lines[0].raw, "@@ -5,3 +5,5 @@");
+    assert_eq!(data.lines[3].old, Some(5));
+    assert_eq!(data.lines[3].new, Some(7));
+}
+
+/// A hunk past the end of the function git names has no _Function_ to open.
+#[test]
+fn no_function_button_when_the_named_line_does_not_enclose_the_hunk() {
+    let file = "fn first() {\n    1\n}\n\nstatic X: u8 = 1;\nstatic Y: u8 = 2;\n";
+    let lines = parse("@@ -5,1 +5,1 @@ fn first() {\n-static X: u8 = 0;\n+static X: u8 = 1;\n");
+    let mut ctx = Context {
+        raw: file.lines().map(str::to_owned).collect(),
+        path: "a.rs".to_owned(),
+        dark: true,
+        no_newline_at_end: false,
+        gaps: gaps_of(&lines, 6).unwrap_or_default(),
+    };
+    ctx.gaps[0].function = ctx.function_for(&lines, 0);
+    assert_eq!(ctx.gaps[0].function, None);
+    assert!(!ctx.function_opens(0));
+}
+
+fn data_from(lines: Vec<DiffLine>) -> DiffData {
+    let (changed, split) = crate::repo::diff::parse::pair_lines(&lines);
+    DiffData {
+        spans: vec![None; lines.len()],
+        changed,
+        split,
+        image: None,
+        lfs: None,
+        header: String::new(),
+        partial: false,
+        moves: Default::default(),
+        context: None,
+        new_file: false,
+        longest: 0,
+        uncut: Default::default(),
+        map: Default::default(),
+        lines,
+    }
 }
