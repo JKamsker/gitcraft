@@ -151,10 +151,11 @@ fn a_commit_lost_in_the_terminal_comes_back_as_a_branch() -> Result<(), String> 
     assert_eq!(repo.git(&["rev-parse", "recovered"])?, lost);
     let row = tab.index.get(&lost).copied();
     assert!(row.is_some() && tab.selected == row);
-    assert_eq!(
-        tab.detail.as_ref().map(|d| d.hash.clone()),
-        Some(lost.clone())
-    );
+    // Selecting the row reads its detail again, in the background.
+    assert!(until(&mut tab, &ctx, |t| t
+        .detail
+        .as_ref()
+        .is_some_and(|d| d.hash == lost)));
 
     // The branch's own reflog.
     act(
