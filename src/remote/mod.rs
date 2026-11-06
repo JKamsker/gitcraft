@@ -27,6 +27,12 @@ pub use fs::{
 pub use session::{Output, Request, exec, is_missing_folder, spawn};
 pub use ui_guard::{mark_ui_thread, refused_on_ui_thread};
 
+/// Whether gitcraft has a connection open to `host` now: asking it something won't connect
+/// (and so won't ask for a password). For what looks at repositories unasked.
+pub fn is_connected(host: &Host) -> bool {
+    pool::connected(host)
+}
+
 /// The machine a repository is on, when it isn't this one.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Host {

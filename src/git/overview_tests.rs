@@ -112,6 +112,8 @@ fn finds_all_the_work_that_is_only_here() -> Result<(), String> {
         unpushed,
         vec![
             ("feature/ünïcode", None, 3),
+            // Its remote branch is gone: its commits are on no remote any more.
+            ("gone-branch", None, 2),
             ("main", Some("origin/main"), 2),
             ("side", None, 2),
         ]
@@ -161,6 +163,70 @@ fn a_repository_without_commits_or_remote() -> Result<(), String> {
     commit(&repo, "a", "one")?;
     let o = overview(&repo, Duration::from_secs(60))?;
     assert!(o.unpushed.is_empty());
+    Ok(())
+}
+
+/// A tag named like the checked-out branch doesn't hide the branch's upstream; a branch
+/// tracking another branch of this repository counts its commits on no remote.
+#[test]
+fn a_tag_named_like_the_branch_and_a_local_upstream() -> Result<(), String> {
+    let root = scratch("tagged")?;
+    git(&root, &["init", "-q", "--bare", "-b", "main", "o.git"])?;
+    let repo = root.join("r");
+    std::fs::create_dir_all(&repo).map_err(|e| e.to_string())?;
+    init(&repo)?;
+    git(&repo, &["remote", "add", "origin", "../o.git"])?;
+    commit(&repo, "a", "one")?;
+    git(&repo, &["push", "-q", "-u", "origin", "main"])?;
+    git(&repo, &["tag", "main"])?;
+    commit(&repo, "a", "two")?;
+    git(&repo, &["branch", "--track", "follower", "refs/heads/main"])?;
+    git(&repo, &["checkout", "-q", "follower"])?;
+    commit(&repo, "a", "three")?;
+    git(&repo, &["checkout", "-q", "main"])?;
+    let o = overview(&repo, Duration::from_secs(60))?;
+    assert_eq!(o.branch.as_deref(), Some("main"));
+    assert_eq!(o.upstream, "origin/main");
+    assert_eq!((o.ahead, o.behind), (1, 0));
+    let follower = o.unpushed.iter().find(|u| u.branch == "follower");
+    assert_eq!(
+        follower.map(|u| (u.upstream.clone(), u.commits)),
+        Some((None, 2))
+    );
+    Ok(())
+}
+
+/// A bare repository's linked worktree: the bare one isn't asked for a status, here or there.
+#[test]
+fn a_bare_repositorys_worktree() -> Result<(), String> {
+    let root = scratch("bare-wt")?;
+    let seed = root.join("seed");
+    std::fs::create_dir_all(&seed).map_err(|e| e.to_string())?;
+    init(&seed)?;
+    commit(&seed, "a", "one")?;
+    git(&root, &["clone", "-q", "--bare", "seed", "b.git"])?;
+    let bare = root.join("b.git");
+    git(&bare, &["worktree", "add", "-q", "../wt one", "main"])?;
+    let wt = root.join("wt one");
+    std::fs::write(wt.join("x"), "x").map_err(|e| e.to_string())?;
+    let o = overview(&wt, Duration::from_secs(60))?;
+    assert_eq!(o.changed, 1);
+    assert!(o.dirty_worktrees.is_empty(), "{o:?}");
+    #[cfg(unix)]
+    {
+        let out = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(script())
+            .current_dir(&wt)
+            .output()
+            .map_err(|e| e.to_string())?;
+        let sections = split_sections(&out.stdout);
+        assert!(
+            !sections.iter().any(|s| s.key.starts_with("wt:")),
+            "{sections:?}"
+        );
+        assert_eq!(parse(&sections, plain)?, o);
+    }
     Ok(())
 }
 

@@ -53,13 +53,16 @@ impl Workspaces {
 
     /// Adds `repo` to the workspace at `index`; `false` when it was in it already.
     pub fn add_repo(&mut self, index: usize, repo: &Path) -> bool {
-        let Some(ws) = self.list.get_mut(index) else {
+        let Some(ws) = self.list.get(index) else {
             return false;
         };
         if ws.repos.iter().any(|r| same(r, repo)) {
             return false;
         }
-        ws.repos.push(repo.to_owned());
+        let spelled = self.spelling_of(repo);
+        if let Some(ws) = self.list.get_mut(index) {
+            ws.repos.push(spelled);
+        }
         true
     }
 
@@ -69,15 +72,27 @@ impl Workspaces {
         }
     }
 
-    /// Every repository of every workspace, each once, in the order they first appear.
+    /// Every repository of every workspace, each once, in the order they first appear. Plain
+    /// comparison: [`Workspaces::add_repo`] already keeps one spelling of each.
     pub fn all_repos(&self) -> Vec<PathBuf> {
         let mut all: Vec<PathBuf> = Vec::new();
         for repo in self.list.iter().flat_map(|w| &w.repos) {
-            if !all.iter().any(|r| same(r, repo)) {
+            if !all.contains(repo) {
                 all.push(repo.clone());
             }
         }
         all
+    }
+
+    /// The spelling `repo` already has in any workspace, so that one repository is one path
+    /// everywhere; `repo` itself when it is new.
+    pub fn spelling_of(&self, repo: &Path) -> PathBuf {
+        self.list
+            .iter()
+            .flat_map(|w| &w.repos)
+            .find(|r| same(r, repo))
+            .cloned()
+            .unwrap_or_else(|| repo.to_owned())
     }
 
     /// `name` trimmed, if it can be a workspace's (that isn't the one at `except`).
@@ -106,9 +121,18 @@ impl Workspaces {
     }
 }
 
-/// Whether two saved paths are the same repository: equal, or the same folder here.
+/// Whether two paths are the same repository: equal, the same folder of the same other machine
+/// however written (`\\wsl$\…` or `\\wsl.localhost\…`), or the same folder here. Only when a
+/// repository is added: it reads the disk.
 fn same(a: &Path, b: &Path) -> bool {
-    a == b || (!crate::remote::is_remote(a) && crate::remote::same_dir(a, b))
+    if a == b {
+        return true;
+    }
+    match (crate::remote::parse(a), crate::remote::parse(b)) {
+        (Some(x), Some(y)) => x == y,
+        (None, None) => crate::remote::same_dir(a, b),
+        _ => false,
+    }
 }
 
 #[cfg(test)]
@@ -146,6 +170,17 @@ mod tests {
         assert!(!ws.add_repo(a, &ssh));
         assert!(ws.add_repo(a, &wsl));
         assert!(ws.add_repo(b, &ssh));
+        // The same folder of the same machine written another way is the same repository,
+        // in its first spelling everywhere.
+        let ssh_upper = PathBuf::from("SSH://build/home/me//x y/");
+        assert!(!ws.add_repo(a, &ssh_upper));
+        ws.remove_repo(b, &ssh);
+        assert!(ws.add_repo(b, &ssh_upper));
+        assert_eq!(ws.list[b].repos.last(), Some(&ssh));
+        if cfg!(windows) {
+            let wsl_dollar = PathBuf::from(r"\\wsl$\Ubuntu\home\me\r");
+            assert!(!ws.add_repo(a, &wsl_dollar));
+        }
         assert!(!ws.add_repo(7, &ssh));
         assert_eq!(ws.all_repos(), vec![ssh.clone(), wsl.clone()]);
         ws.remove_repo(a, &ssh);
