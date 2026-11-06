@@ -68,8 +68,8 @@ fn chunks(paths: &[String], max: usize) -> Vec<&[String]> {
 fn parse_check_attr(out: &str) -> HashMap<String, FoldAttr> {
     let mut found: HashMap<String, FoldAttr> = HashMap::new();
     let fields: Vec<&str> = out.split('\0').collect();
-    for triple in fields.chunks_exact(3) {
-        let [path, attr, value] = [triple[0], triple[1], triple[2]];
+    let (triples, _) = fields.as_chunks::<3>();
+    for &[path, attr, value] in triples {
         let said = match (attr, value) {
             ("linguist-generated", "set" | "true") => FoldAttr::Generated,
             ("linguist-generated", "unset" | "false") => FoldAttr::NotGenerated,
