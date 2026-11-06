@@ -28,6 +28,8 @@ pub struct FoldRead {
     /// Number of files staged.
     pub staged: usize,
     pub in_progress: Option<InProgress>,
+    /// A shallow clone: a commit without parents may only be where its history was cut.
+    pub shallow: bool,
 }
 
 /// Reads what folding the staged changes into `target` would rewrite.
@@ -46,6 +48,9 @@ pub fn fold_read(repo: &Path, target: &str) -> Result<FoldRead, String> {
         .filter(|b| !b.is_empty());
     let parents = run(Some(repo), &["rev-list", "--parents", "-n", "1", &target])?;
     let root = parents.split_whitespace().count() == 1;
+    let shallow = root
+        && run(Some(repo), &["rev-parse", "--is-shallow-repository"])
+            .is_ok_and(|s| s.trim() == "true");
     // Exit 1 with nothing printed: no common ancestor. Anything else (a machine not reached)
     // is an error, not an answer.
     let base = run_ok_codes(Some(repo), &["merge-base", &target, &head], &[0, 1])?;
@@ -84,5 +89,6 @@ pub fn fold_read(repo: &Path, target: &str) -> Result<FoldRead, String> {
         unpushed,
         staged,
         in_progress: in_progress(repo)?,
+        shallow,
     })
 }
