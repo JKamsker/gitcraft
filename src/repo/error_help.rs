@@ -12,10 +12,16 @@ pub(super) const RELOAD: &str = "Reload";
 
 impl RepoTab {
     /// Shows the card for `error` (what git said when `label` failed), if it is a failure
-    /// gitcraft knows. Another failure leaves a card that is there as it is.
+    /// gitcraft knows. Another failure leaves a card that is there as it is, and so does the
+    /// same failure again (a reload the watcher started, Try again failing the same way): the
+    /// question it asks, or the undo it offers, stays.
     pub(super) fn explain_failure(&mut self, error: &str, label: &str, ctx: &egui::Context) {
+        if let Some(card) = self.error_card.as_mut().filter(|c| c.is_about(error)) {
+            card.failed_again();
+            return;
+        }
         if let Some(card) = ErrorCard::for_error(error, &self.path, label, ctx) {
-            self.error_card = Some(card);
+            self.error_card = Some(card.replacing(self.error_card.take()));
         }
     }
 

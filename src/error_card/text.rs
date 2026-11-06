@@ -78,15 +78,16 @@ pub fn explanation(problem: &GitProblem, place: Place) -> Vec<String> {
         GitProblem::Certificate { detail } => certificate(detail, place),
         GitProblem::Transfer { too_large: true } => vec![
             "The server, or a proxy in front of it, limits how large a request may be. Push \
-             fewer commits at a time (an older commit first: git push origin <commit>:<branch> \
-             in the terminal), keep large files in Git LFS, or ask the server's administrator \
+             fewer commits at a time (an older commit first: git push origin \
+             <commit>:refs/heads/<branch> in the terminal), keep large files in Git LFS, or ask the server's administrator \
              to raise the limit (client_max_body_size on nginx)."
                 .to_owned(),
         ],
         GitProblem::Transfer { .. } => vec![
-            "The server or the network stopped before git had everything (RPC failed, early \
-             EOF). Try again. On a slow or unreliable network, a shallow clone (git clone \
-             --depth 1) or the SSH address of the repository instead of HTTPS gets less at \
+            "The server or the network stopped before the transfer was done (RPC failed, early \
+             EOF): often a proxy or server limit on long HTTPS requests, or an unreliable \
+             network. Try again. If it keeps failing, the repository's SSH address avoids the \
+             HTTP proxy and its limits; for a clone, git clone --depth 1 transfers less at \
              once."
                 .to_owned(),
         ],
@@ -123,7 +124,7 @@ fn line_endings(files: &[String], fatal: bool) -> Vec<String> {
         paragraphs.push(format!("Files: {}{more}.", shown.join(", ")));
     }
     paragraphs.push(
-        "core.autocrlf, in your own config, applies to every repository of this machine: true \
+        "core.autocrlf, wherever it is set (see below), applies to every repository it covers: true \
          turns LF into CRLF when files are checked out and back into LF when they are committed \
          (the usual choice on Windows); input turns CRLF into LF when committing and changes \
          nothing on checkout; false leaves line endings alone."
@@ -131,15 +132,16 @@ fn line_endings(files: &[String], fatal: bool) -> Vec<String> {
     );
     paragraphs.push(
         ".gitattributes, committed with the repository, is the same for everyone who clones \
-         it: * text=auto stores text files with LF and checks them out with each machine's \
-         ending; eol=lf or eol=crlf on a pattern gives those files that ending everywhere. A \
-         .gitattributes rule wins over core.autocrlf."
+         it: * text=auto has text files stored with LF (which files are text, git decides); \
+         eol=lf or eol=crlf on a pattern gives those files that ending on checkout everywhere, \
+         and -text leaves them alone. eol= and -text win over core.autocrlf; text=auto alone \
+         still leaves the checkout ending to core.autocrlf."
             .to_owned(),
     );
     if fatal {
         paragraphs.push(
-            "core.safecrlf is set, so git refused rather than warned: change one of the two, or \
-             unset core.safecrlf."
+            "core.safecrlf is set, so git refused rather than warned: change core.autocrlf or \
+             the file's .gitattributes rule, or unset core.safecrlf."
                 .to_owned(),
         );
     }
@@ -154,8 +156,9 @@ fn certificate(detail: &str, place: Place) -> Vec<String> {
     paragraphs.push(if place.git_for_windows() {
         "Git for Windows checks certificates against its own list by default. With \
          http.sslBackend = schannel it uses Windows' certificate store instead, where your IT \
-         department adds its certificate: Use Windows' certificates sets that in your global \
-         git config."
+         department adds its certificate (a self-signed server certificate has to be imported \
+         there first; http.sslCAInfo no longer applies then): Use Windows' certificates sets \
+         that in your global git config."
             .to_owned()
     } else {
         "Add the certificate authority to this machine's trusted ones, or point git at it with \

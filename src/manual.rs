@@ -79,7 +79,7 @@ const FEATURES: &[(&str, &[&str])] = &[
         &[
             "A failure gitcraft knows shows a card under the toolbar (or on the start page) saying what happened and what to do; What git said holds git's own words.",
             "Its button fixes what can be fixed: Trust this folder (a repository owned by another user: safe.directory, that folder only), Remove stale lock (after saying how old the lock is and whether git is running), Enable long paths and Use Windows' certificates (Git for Windows).",
-            "A fix first says exactly what it changes and in which config file, and runs only once confirmed; a config change has an Undo. Try again runs what failed again.",
+            "A fix first says exactly what it changes and in which config file, and runs only once confirmed; a config change has an Undo on the card. Try again runs what failed again, when it can.",
             "Line endings (core.autocrlf against .gitattributes), a broken transfer or a request too large (HTTP 413), unrelated histories, a push from a shallow clone and an SSH key refused are explained.",
         ],
     ),

@@ -495,3 +495,74 @@ fn git_processes_here() -> Result<(), String> {
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())
 }
+
+/// Review findings: each one's case, as git really prints it.
+#[test]
+fn a_bang_in_the_folder_name_is_unquoted() {
+    // git quotes `!` as `'\!'` for a shell, besides `'`.
+    assert_eq!(
+        explain(&sample("dubious_bang_2.43.txt")),
+        Some(GitProblem::DubiousOwnership {
+            path: "/home/me/work/bang!dir".to_owned()
+        })
+    );
+}
+
+#[test]
+fn a_hook_refusing_a_commit_is_not_a_line_ending_problem() {
+    // The warning came along; the hook is why it failed.
+    assert_eq!(explain(&sample("hook_with_crlf_2.43.txt")), None);
+    // Warnings alone, or a refusal, still are.
+    assert!(explain(&sample("crlf_warn_2.36.txt")).is_some());
+    let refusal = format!(
+        "{}\n{}",
+        sample("crlf_warn_2.43.txt"),
+        sample("crlf_fatal_2.43.txt")
+    );
+    assert!(matches!(
+        explain(&refusal),
+        Some(GitProblem::LineEndings { fatal: true, .. })
+    ));
+}
+
+#[test]
+fn a_file_with_in_in_its_name() {
+    let warn = "warning: LF will be replaced by CRLF in notes in progress.txt.\n\
+                The file will have its original line endings in your working directory";
+    assert_eq!(
+        explain(warn),
+        Some(GitProblem::LineEndings {
+            files: vec!["notes in progress.txt".to_owned()],
+            to_crlf: true,
+            fatal: false,
+        })
+    );
+}
+
+/// No config file yet (git exits 128 listing it): the file named is the one git will make.
+#[test]
+fn the_file_of_a_config_not_made_yet() -> Result<(), String> {
+    let dir = repo("config-missing")?;
+    let file = dir.join("not yet.gitconfig");
+    let scope = Scope::File(file.clone());
+    assert_eq!(fix::file_of(&dir, &scope)?, file.display().to_string());
+    assert_eq!(
+        fix::get_all(&dir, &scope, "safe.directory")?,
+        Vec::<String>::new()
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+/// With both global files there, git writes ~/.gitconfig, whichever it lists first.
+#[test]
+fn the_global_file_written_is_named() {
+    let both = "file:/h/.config/git/config\0core.x\ny\0file:/h/.gitconfig\0user.name\nme\0file:/h/.gitconfig\0a.b\nc\0";
+    assert_eq!(
+        fix::origins(both),
+        ["/h/.config/git/config", "/h/.gitconfig"]
+    );
+    let xdg_only = "file:/h/.config/git/config\0core.x\ny\0";
+    assert_eq!(fix::origins(xdg_only), ["/h/.config/git/config"]);
+    assert!(fix::origins("").is_empty());
+}

@@ -235,7 +235,19 @@ impl App {
         match repo_root(path) {
             Ok(root) => self.open_root(root, ctx),
             Err(e) => {
-                self.error_card = crate::error_card::ErrorCard::for_error(&e, path, "Open", ctx);
+                let old = self.error_card.take();
+                self.error_card = match old {
+                    // The same again: the card stays as it is.
+                    Some(mut card) if card.is_about(&e) && card.dir() == path => {
+                        card.failed_again();
+                        Some(card)
+                    }
+                    old => match crate::error_card::ErrorCard::for_error(&e, path, "Open", ctx) {
+                        Some(card) => Some(card.replacing(old)),
+                        // A fix made stays undoable.
+                        None => old.filter(|card| card.fixed()),
+                    },
+                };
                 self.report(e);
             }
         }

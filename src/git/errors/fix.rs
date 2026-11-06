@@ -98,18 +98,23 @@ pub fn get_all(dir: &Path, scope: &Scope, key: &str) -> Result<Vec<String>, Stri
         .collect())
 }
 
-/// The file `scope` is, on the machine `dir` is on: what git names as the origin of its
-/// first value, or where git puts a global config it creates.
+/// The file a change to `scope` is written to, on the machine `dir` is on, as git names it.
+/// For the global scope git reads `~/.gitconfig` and `$XDG_CONFIG_HOME/git/config` but writes
+/// the first when it is there: of the files it names, that one wins.
 pub fn file_of(dir: &Path, scope: &Scope) -> Result<String, String> {
-    let out = config(dir, scope, &["--show-origin", "--null", "--list"], &[0, 1])?;
-    // `file:<path>\0key\nvalue\0…`, unquoted with --null.
-    let first = out
-        .split('\0')
-        .next()
-        .and_then(|origin| origin.strip_prefix("file:"))
-        .filter(|path| !path.is_empty());
-    match (first, scope) {
-        (Some(path), _) => Ok(path.to_owned()),
+    let out = match config(dir, scope, &["--show-origin", "--null", "--list"], &[0, 1]) {
+        Ok(out) => out,
+        // No such file yet (git exits 128): git makes it on the first write.
+        Err(e) if e.contains("unable to read config file") => String::new(),
+        Err(e) => return Err(e),
+    };
+    let origins = origins(&out);
+    let chosen = origins
+        .iter()
+        .find(|path| path.ends_with("/.gitconfig") || path.ends_with("\\.gitconfig"))
+        .or_else(|| origins.first());
+    match (chosen, scope) {
+        (Some(path), _) => Ok(path.clone()),
         // Nothing in it yet: git writes ~/.gitconfig.
         (None, Scope::Global) => Ok("~/.gitconfig".to_owned()),
         (None, Scope::Repo) => {
@@ -122,6 +127,23 @@ pub fn file_of(dir: &Path, scope: &Scope) -> Result<String, String> {
         #[cfg(test)]
         (None, Scope::File(path)) => Ok(path.display().to_string()),
     }
+}
+
+/// The files `git config --show-origin --null --list` names, in order, each once:
+/// `file:<path>\0key\nvalue\0…`.
+pub(super) fn origins(out: &str) -> Vec<String> {
+    let mut found: Vec<String> = Vec::new();
+    for (i, field) in out.split('\0').enumerate() {
+        if i % 2 != 0 {
+            continue;
+        }
+        if let Some(path) = field.strip_prefix("file:").filter(|p| !p.is_empty())
+            && !found.iter().any(|f| f == path)
+        {
+            found.push(path.to_owned());
+        }
+    }
+    found
 }
 
 /// Makes the change, in `dir`.

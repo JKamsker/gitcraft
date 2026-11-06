@@ -60,10 +60,13 @@ impl Fix {
     pub fn confirm(&self) -> String {
         match self {
             Fix::Config { edit, file } if edit.add => {
-                format!("Adds {} to {file}. Undo takes it out again.", edit.line())
+                format!(
+                    "Adds {} to {file}. Undo, on this card, takes it out again.",
+                    edit.line()
+                )
             }
             Fix::Config { edit, file } => format!(
-                "Sets {} in {file} ({}). Undo puts it back.",
+                "Sets {} in {file} ({}). Undo, on this card, puts it back.",
                 edit.line(),
                 edit.previous.as_ref().map_or_else(
                     || "it isn't set now".to_owned(),
@@ -158,8 +161,9 @@ fn trust(dir: &Path, path: &str) -> Result<Found, String> {
     if listed.iter().any(|p| p == path) {
         return Ok(Found {
             notes: vec![Note::warning(format!(
-                "{file} lists this folder in safe.directory already; git may be reading \
-                 another global config (GIT_CONFIG_GLOBAL), or the folder's owner changed."
+                "{file} lists this folder in safe.directory already, so git still refusing \
+                 means the path git checks is spelled another way (a trailing slash, letter \
+                 case, a network share's %(prefix)/ form): compare it with What git said."
             ))],
             fix: None,
         });
@@ -181,7 +185,8 @@ fn stale_lock(dir: &Path, lock_path: &str) -> Result<Found, String> {
     let Some(seen) = lock::inspect(dir, lock_path)? else {
         return Ok(Found {
             notes: vec![Note::plain(format!(
-                "{lock_path} is gone now: the git that held it is done. Try again."
+                "{lock_path} is gone now: the git that held it is done, and nothing is left \
+                 to remove."
             ))],
             fix: None,
         });
@@ -191,15 +196,24 @@ fn stale_lock(dir: &Path, lock_path: &str) -> Result<Found, String> {
         text::file_name(&seen.shown),
         text::age(seen.age)
     ))];
-    std::thread::sleep(SETTLE);
+    // On another machine, the tab's own reads take a round trip or more.
+    let remote = crate::remote::is_remote(dir);
+    std::thread::sleep(if remote { SETTLE * 4 } else { SETTLE });
+    // Only on this machine, outside Windows, are gitcraft's own git processes told apart.
+    let ours_hidden = cfg!(unix) && !remote;
     notes.push(match lock::git_processes(dir) {
         Ok(running) if running.is_empty() => {
             Note::plain("No other git is running on this machine.".to_owned())
         }
         Ok(running) => Note::warning(format!(
-            "git is running on this machine: {}. If it is working in this repository, let it \
-             finish (or close the editor it opened) instead.",
-            running.join("; ")
+            "git is running on this machine: {}.{} If one is working in this repository, let \
+             it finish (or close the editor it opened) instead.",
+            running.join("; "),
+            if ours_hidden {
+                ""
+            } else {
+                " Some may be gitcraft's own, reading the repository."
+            }
         )),
         Err(e) => Note::warning(format!("Whether git is running couldn't be checked: {e}.")),
     });
@@ -213,6 +227,21 @@ fn stale_lock(dir: &Path, lock_path: &str) -> Result<Found, String> {
 fn set_once(dir: &Path, scope: Scope, key: &'static str, value: &str) -> Result<Found, String> {
     let edit = ConfigEdit::set(dir, scope.clone(), key, value)?;
     let file = config::file_of(dir, &scope)?;
+    // Set in the repository's own config, which wins over the global one: changing that
+    // would change nothing.
+    if scope == Scope::Global
+        && let Some(local) = config::get(dir, &Scope::Repo, key).ok().flatten()
+        && local != value
+    {
+        let there = config::file_of(dir, &Scope::Repo)
+            .unwrap_or_else(|_| "the repository's config".to_owned());
+        return Ok(Found {
+            notes: vec![Note::warning(format!(
+                "{key} is {local} in {there}, which wins over {file}: change it there."
+            ))],
+            fix: None,
+        });
+    }
     if edit.previous.as_deref() == Some(value) {
         return Ok(Found {
             notes: vec![Note::warning(format!(

@@ -152,11 +152,19 @@ fn name_too_long(err: &str) -> Option<GitProblem> {
         .then_some(GitProblem::NameTooLong)
 }
 
+/// What older git adds under each line-ending warning.
+const ORIGINAL_ENDINGS: &str =
+    "The file will have its original line endings in your working directory";
+
+/// Line-ending warnings, or `core.safecrlf`'s refusal. Warnings alone count only when git said
+/// nothing else: they come with many commands that worked, and with failures that have another
+/// cause (a hook that refused a commit), which they must not be taken for.
 fn line_endings(err: &str) -> Option<GitProblem> {
     let mut files = Vec::new();
-    let (mut to_crlf, mut fatal, mut seen) = (true, false, false);
+    let (mut to_crlf, mut fatal, mut seen, mut other) = (true, false, false, false);
     for line in err.lines() {
         let Some((direction, file)) = line_ending_line(line) else {
+            other |= !line.trim().is_empty() && !line.starts_with(ORIGINAL_ENDINGS);
             continue;
         };
         if !seen {
@@ -168,7 +176,7 @@ fn line_endings(err: &str) -> Option<GitProblem> {
             files.push(file);
         }
     }
-    seen.then_some(GitProblem::LineEndings {
+    (seen && (fatal || !other)).then_some(GitProblem::LineEndings {
         files,
         to_crlf,
         fatal,
@@ -197,7 +205,10 @@ fn line_ending_line(line: &str) -> Option<(bool, String)> {
         .and_then(|(_, rest)| rest.rsplit_once("', "))
         .map(|(file, _)| file.to_owned());
     let file = working_copy.or_else(|| {
-        let (_, rest) = line.rsplit_once(" in ")?;
+        // "replaced by CRLF in <file>.": the file is all that follows, " in " in it too.
+        let (_, rest) = line
+            .split_once("replaced by CRLF in ")
+            .or_else(|| line.split_once("replaced by LF in "))?;
         let rest = rest.trim_end();
         Some(rest.strip_suffix('.').unwrap_or(rest).to_owned())
     })?;
@@ -212,11 +223,11 @@ fn quoted_after(text: &str, marker: &str) -> Option<String> {
     line.rfind('\'').map(|end| line[..end].to_owned())
 }
 
-/// A value as git quotes it for a shell (`'a b'`, `'it'\''s'`), or as it is.
+/// A value as git quotes it for a shell (`'a b'`, `'it'\''s'`, `'a'\!'b'`), or as it is.
 fn unquote(value: &str) -> String {
     let value = value.trim();
     match value.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')) {
-        Some(inner) => inner.replace("'\\''", "'"),
+        Some(inner) => inner.replace("'\\''", "'").replace("'\\!'", "!"),
         None => value.to_owned(),
     }
 }
