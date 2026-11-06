@@ -182,20 +182,27 @@ impl RepoTab {
             .add_enabled(idle, egui::Button::new("Delete from remote…"))
             .clicked()
         {
-            acts.push(Action::Dialog(Dialog::confirm(
-                "Delete remote branch",
-                format!("Delete “{short}” from {remote}? This changes the remote for everyone.",),
-                "Delete",
-                // Only while it is where it was last fetched: commits pushed since are others'.
-                ops(&[&[
-                    "push",
-                    &format!("--force-with-lease=refs/heads/{short}:{}", b.target),
-                    remote,
-                    "--delete",
-                    &format!("refs/heads/{short}"),
-                ]]),
-                None,
-            )));
+            acts.push(Action::Dialog(
+                Dialog::confirm(
+                    "Delete remote branch",
+                    format!(
+                        "Delete “{short}” from {remote}? This changes the remote for everyone.",
+                    ),
+                    "Delete",
+                    // Only while it is where it was last fetched: commits pushed since are others'.
+                    ops(&[&[
+                        "push",
+                        &format!("--force-with-lease=refs/heads/{short}:{}", b.target),
+                        remote,
+                        "--delete",
+                        &format!("refs/heads/{short}"),
+                    ]]),
+                    None,
+                )
+                .preview_of(
+                    self.delete_preview(&b.target, vec![format!("refs/remotes/{}", b.name)]),
+                ),
+            ));
         }
     }
 }

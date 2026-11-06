@@ -2,6 +2,7 @@
 
 mod branch;
 mod confirm;
+mod preview;
 mod remote;
 mod upstream;
 mod worktree;
@@ -9,6 +10,8 @@ mod worktree;
 use std::path::{Path, PathBuf};
 
 use egui::{Key, RichText};
+
+pub(crate) use preview::WhatItDoes;
 
 use super::widgets;
 use super::{Action, Refresh, RepoTab, Undo};
@@ -50,6 +53,9 @@ pub enum Dialog {
         use_alternative: bool,
         refresh: Refresh,
         undo: Undo,
+        /// What the operation changes, read when the dialog opens, and an action that runs
+        /// in place of `ops`, if any.
+        preview: Box<WhatItDoes>,
     },
     Stash {
         message: String,
@@ -132,7 +138,31 @@ impl Dialog {
             use_alternative: false,
             refresh: Refresh::All,
             undo: Undo::None,
+            preview: Box::default(),
         }
+    }
+
+    /// Has a confirmation show what its operation changes, read from git with `ask`; `heading`
+    /// goes over the commits leaving.
+    pub fn preview(mut self, ask: crate::git::PreviewAsk, heading: String) -> Self {
+        if let Dialog::Confirm { preview, .. } = &mut self {
+            preview.ask = ask;
+            preview.heading = heading;
+        }
+        self
+    }
+
+    /// [`Self::preview`] of an (ask, heading) pair.
+    pub fn preview_of(self, (ask, heading): (crate::git::PreviewAsk, String)) -> Self {
+        self.preview(ask, heading)
+    }
+
+    /// Has a confirmation take `action` rather than run its ops; `described` says what it runs.
+    pub fn instead(mut self, action: Action, described: Vec<String>) -> Self {
+        if let Dialog::Confirm { preview, .. } = &mut self {
+            preview.instead = Some(Instead { action, described });
+        }
+        self
     }
 
     /// Makes a confirmed operation undoable.
@@ -246,12 +276,18 @@ impl Dialog {
     }
 }
 
+/// An action a confirmation takes in place of its ops, and the commands it is shown as.
+pub(crate) struct Instead {
+    pub(super) action: Action,
+    pub(super) described: Vec<String>,
+}
+
 enum Outcome {
     Open,
     /// Still open; the branch changed, so suggest a folder again.
     Suggest,
     Cancel,
-    Done(Action),
+    Done(Box<Action>),
 }
 
 impl RepoTab {
@@ -381,23 +417,27 @@ impl RepoTab {
                     use_alternative,
                     refresh,
                     undo,
+                    preview,
                 } => confirm::confirm(
                     ui,
-                    title,
-                    body,
-                    button,
-                    ops,
-                    alternative,
+                    confirm::Asked {
+                        title,
+                        body,
+                        button,
+                        ops,
+                        alternative,
+                        refresh: *refresh,
+                        undo,
+                    },
                     use_alternative,
-                    *refresh,
-                    undo,
+                    preview,
                 ),
             }
         });
 
         match response.inner {
             Outcome::Done(action) => {
-                acts.push(action);
+                acts.push(*action);
                 self.dialog = None;
             }
             Outcome::Cancel => self.dialog = None,
@@ -455,7 +495,7 @@ fn buttons(
     let mut outcome = Outcome::Open;
     ui.horizontal(|ui| {
         if widgets::primary_button(ui, label, valid, 90.0).clicked() || (enter && valid) {
-            outcome = Outcome::Done(done());
+            outcome = Outcome::Done(Box::new(done()));
         }
         if cancel_button(ui) {
             outcome = Outcome::Cancel;
