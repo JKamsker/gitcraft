@@ -263,8 +263,15 @@ fn missing_attributes(
 pub(crate) fn parse_attrs(out: &str) -> std::collections::HashMap<(String, String), String> {
     out.split('\0')
         .collect::<Vec<_>>()
-        .chunks_exact(3)
-        .map(|f| ((f[0].to_owned(), f[1].to_owned()), f[2].to_owned()))
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|[path, attr, value]| {
+            (
+                ((*path).to_owned(), (*attr).to_owned()),
+                (*value).to_owned(),
+            )
+        })
         .collect()
 }
 
