@@ -386,18 +386,20 @@ impl RepoTab {
             return;
         };
         let path = self.path.clone();
-        let theirs = move || -> Result<bool, String> {
+        // The fixup commit, when the rebase going on is the fold's.
+        let theirs = move || -> Result<Option<String>, String> {
             let branch = format!("refs/heads/{}", stopped.branch);
             let rebasing = git::rebasing_branch(&path)?;
             let parent = git::resolve(&path, &format!("{branch}~1")).unwrap_or_default();
-            Ok(rebasing.as_deref() == Some(branch.as_str()) && parent == stopped.before)
+            let ours = rebasing.as_deref() == Some(branch.as_str()) && parent == stopped.before;
+            Ok(ours.then(|| git::resolve(&path, &branch).ok()).flatten())
         };
         self.then(ctx, theirs, |tab, ours, _| {
             if tab.dialog.is_some() {
                 return;
             }
             let action = match (ours, &tab.fold.stopped) {
-                (Ok(true), Some(stopped)) => fold_abort_dialog(stopped),
+                (Ok(Some(fixup)), Some(stopped)) => fold_abort_dialog(stopped, &fixup),
                 (Err(e), _) => {
                     tab.status = Some((format!("Abort rebase: {e}"), true));
                     return;
@@ -412,7 +414,7 @@ impl RepoTab {
 }
 
 /// Asks before aborting the fold `stopped`: back to before it, the changes staged again.
-fn fold_abort_dialog(stopped: &Stopped) -> Action {
+fn fold_abort_dialog(stopped: &Stopped, fixup: &str) -> Action {
     Action::Dialog(Dialog::confirm(
         &abort_label(stopped),
         "Stop the fold and go back to where it started? The branch is put back as it was, \
@@ -420,7 +422,7 @@ fn fold_abort_dialog(stopped: &Stopped) -> Action {
          brought back."
             .to_owned(),
         "Abort",
-        stopped.abort_steps(),
+        stopped.abort_steps(fixup),
         None,
     ))
 }

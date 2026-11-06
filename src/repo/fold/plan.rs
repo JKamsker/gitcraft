@@ -267,9 +267,14 @@ impl Stopped {
     /// Aborting: the rebase, back to the fixup commit. Only while the branch is still one
     /// commit (the fixup) past where the fold started; [`Self::unfixup_steps`] then stages its
     /// changes again.
-    pub(crate) fn abort_steps(&self) -> Vec<Vec<String>> {
+    /// `fixup`: the fixup commit, which the branch and `ORIG_HEAD` (set by the rebase as it
+    /// started) are still at while the rebase going on is the fold's; another started in its
+    /// place since sets `ORIG_HEAD` to its own branch, and is left alone.
+    pub(crate) fn abort_steps(&self, fixup: &str) -> Vec<Vec<String>> {
         vec![
             expect_ref_at(&format!("refs/heads/{}~1", self.branch), &self.before),
+            expect_ref_at(&format!("refs/heads/{}", self.branch), fixup),
+            expect_ref_at("ORIG_HEAD", fixup),
             vec!["rebase".to_owned(), "--abort".to_owned()],
         ]
     }
@@ -540,9 +545,10 @@ mod tests {
     #[test]
     fn aborting_a_stopped_fold_puts_the_staged_changes_back() {
         let stopped = plan("b", &["b", "c"]).stopped();
-        let steps = stopped.abort_steps();
+        let steps = stopped.abort_steps("f");
         assert_eq!(steps[0], expect_ref_at("refs/heads/main~1", "c"));
-        assert_eq!(steps[1], ["rebase", "--abort"]);
+        assert_eq!(steps[2], expect_ref_at("ORIG_HEAD", "f"));
+        assert_eq!(steps[3], ["rebase", "--abort"]);
         let after = stopped.unfixup_steps();
         assert_eq!(after[0], expect_symref("HEAD", "refs/heads/main"));
         assert_eq!(after[2], ["reset", "--soft", "c"]);

@@ -313,7 +313,7 @@ fn a_conflict_aborted_goes_back_to_before_the_fold() {
         _ => None,
     };
     assert!(
-        steps.as_ref().is_some_and(|(_, ops)| ops.len() == 2),
+        steps.as_ref().is_some_and(|(_, ops)| ops.len() == 4),
         "the fold's abort"
     );
     let Some((label, ops)) = steps else { return };
@@ -819,8 +819,7 @@ fn a_patch_stopped_since_the_dialog_stops_the_fold() {
 }
 
 /// The fold's abort asked for, then (while its dialog was open) the rebase replaced in the
-/// terminal by one of another branch: confirming aborts that one, and the step that stages
-/// the changes again refuses rather than reset the other branch.
+/// terminal by one of another branch: confirming refuses, and that rebase goes on untouched.
 #[test]
 fn an_abort_confirmed_after_the_rebase_was_replaced_resets_no_other_branch() {
     let (dir, before, _) = conflicting("abort-replaced");
@@ -857,7 +856,14 @@ fn an_abort_confirmed_after_the_rebase_was_replaced_resets_no_other_branch() {
         },
         &ctx,
     );
-    let _ = finish(&mut tab, &ctx);
+    let result = finish(&mut tab, &ctx);
+    assert!(matches!(result, Some(Err(_))), "{result:?}");
+    // The other rebase goes on, its branches as they were.
+    assert_eq!(git::in_progress(&dir), Ok(Some(InProgress::Rebase)));
+    assert_eq!(
+        git::rebasing_branch(&dir),
+        Ok(Some("refs/heads/third".to_owned()))
+    );
     assert_eq!(git::resolve(&dir, "refs/heads/third"), third);
     assert_eq!(git::resolve(&dir, "refs/heads/other"), Ok(other));
     let _ = std::fs::remove_dir_all(&dir);
