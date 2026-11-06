@@ -52,6 +52,7 @@ impl RepoTab {
             Action::OpenCi { sha, run } => self.open_ci(sha, run, ctx),
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),
+            Action::Issue(act) => self.issue_act(act, ctx),
             Action::CloseDiff => {
                 self.diff = None;
                 self.conflict = None;

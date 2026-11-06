@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use super::pull::PullMode;
 use super::toolbar::reveal_label;
 use super::{
-    Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view, ops,
-    pr_review, quick_edit,
+    Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view,
+    issue_work, ops, pr_review, quick_edit,
 };
 use crate::git::{self, InProgress};
 use crate::terminal::ShellSpec;
@@ -38,6 +38,8 @@ pub(crate) enum Action {
     CloseCi,
     /// Something done in the pipeline view.
     Ci(ci_view::CiAct),
+    /// Something asked of the issues assigned to you.
+    Issue(issue_work::IssueAct),
     CloseDiff,
     Ops {
         label: String,
@@ -392,6 +394,13 @@ impl RepoTab {
                     },
                 ));
             }
+        }
+        if self.hosting.is_some() {
+            items.push((
+                "Start work from an issue…".into(),
+                "issue".into(),
+                Action::Issue(issue_work::IssueAct::OpenPicker),
+            ));
         }
         if !self.refs.head.is_empty() && self.ci_project().is_some() {
             items.push((

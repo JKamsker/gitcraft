@@ -278,17 +278,21 @@ impl RepoTab {
                     .clicked()
                 {
                     let base = self.default_base();
-                    let title = self
-                        .history
-                        .iter()
-                        .find(|c| c.hash == b.target)
-                        .map(|c| c.summary.clone())
-                        .unwrap_or_default();
+                    // A branch made for an issue: its title, and closing it once merged.
+                    let (title, body) =
+                        self.issue_pull_request_text(&b.name).unwrap_or_else(|| {
+                            let summary = self.history.iter().find(|c| c.hash == b.target);
+                            (
+                                summary.map(|c| c.summary.clone()).unwrap_or_default(),
+                                String::new(),
+                            )
+                        });
                     acts.push(Action::Dialog(Dialog::create_pr(
                         forge.noun(),
                         &b.name,
                         &base,
                         &title,
+                        &body,
                     )));
                 }
             }
@@ -318,7 +322,7 @@ impl RepoTab {
 
     /// The branch pull requests go into by default: main, master or develop on the default
     /// remote, else main.
-    fn default_base(&self) -> String {
+    pub(in crate::repo) fn default_base(&self) -> String {
         let remote = self.default_remote().unwrap_or_else(|| "origin".to_owned());
         let names: Vec<&str> = self
             .remote_branches(&remote)
