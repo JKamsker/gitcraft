@@ -105,12 +105,19 @@ impl RepoTab {
             pr.author,
             if pr.draft { " · draft" } else { "" }
         );
-        p.text(
+        let sub = p.text(
             pos2(rect.left() + 48.0, y + 8.0),
             Align2::LEFT_CENTER,
             sub,
             egui::FontId::proportional(11.0),
             t.text_faint,
+        );
+        let badges = crate::repo::forks::paint_badges(
+            self,
+            &p,
+            pos2(sub.right() + 8.0, y + 8.0),
+            pr.number,
+            &pr.sha,
         );
         if let Some(status) = ci {
             let center = pos2(rect.right() - 14.0, y);
@@ -122,6 +129,10 @@ impl RepoTab {
         } else {
             format!("{}\nDouble-click to open in the browser", pr.url)
         });
+        let r = match badges {
+            Some(why) => r.on_hover_text(why),
+            None => r,
+        };
         if has_view {
             // A double-click opens it as a click does: its first click already did.
             if r.clicked() && !r.double_clicked() {
@@ -157,6 +168,7 @@ impl RepoTab {
                         acts.push(Action::CheckoutRemote(format!("{remote}/{}", pr.branch)));
                     }
                 }
+                self.fork_items(ui, acts, pr.number, idle, false);
                 if ui.button("Copy URL").clicked() {
                     ui.ctx().copy_text(pr.url.clone());
                 }

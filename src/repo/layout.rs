@@ -22,6 +22,7 @@ impl RepoTab {
             return;
         }
         let mut acts: Vec<Action> = std::mem::take(&mut self.queued);
+        self.forks_frame(&ctx);
         self.shortcuts(&ctx, &mut acts);
 
         egui::Panel::top("repo_toolbar")

@@ -15,6 +15,7 @@ mod dialogs;
 mod diff;
 mod file_text;
 mod file_view;
+pub(crate) mod forks;
 pub(crate) mod graph_view;
 pub(crate) mod highlight;
 mod keep_submodules;
@@ -137,6 +138,8 @@ pub struct RepoTab {
     prs_loaded: Option<Instant>,
     /// The build status of the commits that show one.
     ci: ci_status::CiStatuses,
+    /// Where the pull requests come from (forks), and how their branches are set up here.
+    forks: forks::Forks,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -299,6 +302,7 @@ impl RepoTab {
             pr_error: None,
             prs_loaded: None,
             ci: ci_status::CiStatuses::default(),
+            forks: forks::Forks::default(),
             selected: None,
             stash_view: None,
             scroll_to: None,

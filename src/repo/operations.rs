@@ -240,6 +240,7 @@ impl RepoTab {
                 ),
             });
         }
+        self.forks_op_done(&label, &result, ctx);
         match refresh {
             Refresh::Status => self.reload_status(ctx),
             Refresh::All => self.reload(ctx),

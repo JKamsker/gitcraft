@@ -9,7 +9,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use super::{Hosting, NewPullRequest, Pages, Provider, PullRequest, cli};
+use super::{ForkInfo, Hosting, NewPullRequest, Pages, Provider, PullRequest, cli};
 use crate::avatars::Hint;
 use crate::pr_post::Target;
 use crate::pull_request::{PrDetails, at};
@@ -21,6 +21,15 @@ const NOUN: &str = "pull request";
 
 fn gh(repo: &Path, args: &[&str]) -> Result<String, String> {
     cli::run(TOOL, NOUN, repo, args)
+}
+
+/// `gh api …` about the repository's host (GitHub Enterprise named with `--hostname`).
+fn api(repo: &Path, hosting: &Hosting, args: &[&str]) -> Result<String, String> {
+    let mut args = args.to_vec();
+    if hosting.host != "github.com" {
+        args.extend(["--hostname", &hosting.host]);
+    }
+    gh(repo, &args)
 }
 
 /// [`gh`], with `input` on its stdin.
@@ -73,6 +82,24 @@ impl Provider for GitHub {
             args.push("--draft");
         }
         gh(repo, &args).map(|out| out.trim().to_owned())
+    }
+
+    fn forks(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<ForkInfo>, String> {
+        let endpoint = format!("repos/{}/pulls?state=open&per_page=100", hosting.path);
+        super::forks::parse_github(&api(repo, hosting, &["api", &endpoint])?)
+    }
+
+    fn waiting_runs(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<(String, u64)>, String> {
+        let endpoint = format!(
+            "repos/{}/actions/runs?status=action_required&per_page=100",
+            hosting.path
+        );
+        super::forks::parse_waiting_runs(&api(repo, hosting, &["api", &endpoint])?)
+    }
+
+    fn approve_run(&self, repo: &Path, hosting: &Hosting, run: u64) -> Result<(), String> {
+        let endpoint = format!("repos/{}/actions/runs/{run}/approve", hosting.path);
+        api(repo, hosting, &["api", "-X", "POST", &endpoint]).map(|_| ())
     }
 
     /// The authors' GitHub accounts, from the repository's latest commits (the API ties each
