@@ -158,6 +158,11 @@ impl RepoTab {
                 Some(why) => button.on_disabled_hover_text(why),
                 None => button,
             };
+            if edit == Edit::Drop {
+                super::ghost::offer(&button, || super::ghost::GhostOp::DropCommit {
+                    hash: hash.to_owned(),
+                });
+            }
             if button.clicked() {
                 acts.push(match edit {
                     Edit::Message => Action::EditMessage(hash.to_owned()),

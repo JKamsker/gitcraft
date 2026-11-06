@@ -1,5 +1,6 @@
 //! The remotes and their branches.
 
+use crate::repo::ghost::{GhostOp, offer};
 use egui::{Align2, Rect, Response, Ui, pos2, vec2};
 
 use super::{REMOTE_INDENT, ROW_H, matches, visibility};
@@ -158,10 +159,13 @@ impl RepoTab {
             {
                 acts.push(merge_action(BranchRef::remote(&b.name), current));
             }
-            if ui
-                .add_enabled(idle, egui::Button::new(format!("Rebase {current} onto it")))
-                .clicked()
-            {
+            let rebase =
+                ui.add_enabled(idle, egui::Button::new(format!("Rebase {current} onto it")));
+            offer(&rebase, || GhostOp::Rebase {
+                onto: BranchRef::remote(&b.name).full(),
+                label: b.name.clone(),
+            });
+            if rebase.clicked() {
                 acts.push(rebase_action(BranchRef::remote(&b.name), current));
             }
             ui.separator();

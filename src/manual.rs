@@ -34,6 +34,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Search messages, authors and hashes, or switch to Code to find the commits that added or removed some text.",
             "Drag the borders in the column header to resize; right-click it to pick the columns, make the graph column compact or reset the columns.",
             "Interactive rebase: reorder, reword, squash, fix up or drop commits, then start it.",
+            "Ghost run: rest the pointer on Rebase, Reset hard, Pull, Force push, Delete or Drop commit in a menu or the toolbar (or hold Alt for no wait), and the graph shows the result before you click: the new commits and moved pills drawn faint and dashed, the commits that would be lost crossed out. A strip above lists those commits with their authors, the files of the working tree that would change, and where it would stop on a conflict. Nothing is done until you click.",
         ],
     ),
     (
@@ -98,6 +99,10 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("Enter / Shift+Enter", "Next / previous search result"),
             ("Cmd+click", "Compare with the selected commit"),
             ("Double-click a pill", "Check out that branch or tag"),
+            (
+                "Alt over Rebase, Reset hard, Pull…",
+                "Preview the result in the graph (ghost run)",
+            ),
             ("Esc", "Close the diff, comparison or search"),
         ],
     ),

@@ -62,6 +62,7 @@ impl RepoTab {
             });
 
         self.dialogs(&ctx, &mut acts);
+        self.ghost_frame(&ctx);
         for action in acts {
             self.apply(action, &ctx);
         }

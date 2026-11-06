@@ -3,6 +3,7 @@
 use egui::Ui;
 
 use crate::git::Branch;
+use crate::repo::ghost::{GhostOp, offer};
 use crate::repo::operations::{expect_ref, expect_ref_at};
 use crate::repo::{Action, Dialog, RepoTab, Undo, ops};
 
@@ -27,11 +28,14 @@ impl RepoTab {
         // undoing would bring back.
         let at_seen = || vec![expect_ref_at(&format!("refs/heads/{}", b.name), &b.target)];
         let guarded = |steps: Vec<Vec<String>>| [at_seen(), steps].concat();
-        if ui
+        let delete = ui
             .add_enabled(can, egui::Button::new("Delete…"))
-            .on_disabled_hover_text(why)
-            .clicked()
-        {
+            .on_disabled_hover_text(why);
+        offer(&delete, || GhostOp::DeleteBranch {
+            branch: b.name.clone(),
+            remote: false,
+        });
+        if delete.clicked() {
             acts.push(Action::Dialog(
                 Dialog::confirm(
                     "Delete branch",
@@ -63,15 +67,18 @@ impl RepoTab {
         let Some(((remote, name), tracked)) = upstream else {
             return;
         };
-        if ui
+        let both = ui
             .add_enabled(
                 can,
                 egui::Button::new(format!("Delete locally and on {remote}…")),
             )
             .on_hover_text(format!("Also delete {} from {remote}", b.upstream))
-            .on_disabled_hover_text(why)
-            .clicked()
-        {
+            .on_disabled_hover_text(why);
+        offer(&both, || GhostOp::DeleteBranch {
+            branch: b.name.clone(),
+            remote: true,
+        });
+        if both.clicked() {
             let remote_ref = format!("refs/heads/{name}");
             let delete =
                 |flag: &str| guarded(delete_both(flag, &b.name, &remote, name, &tracked.target));

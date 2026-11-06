@@ -5,6 +5,7 @@ use egui::{Color32, CornerRadius, Painter, Pos2, Rect, Stroke, Ui, pos2, vec2};
 use super::CORNER_R;
 use super::row::Row;
 use crate::icons;
+use crate::repo::ghost::{Kind, RowGhost};
 use crate::repo::{RepoTab, WIP_HASH};
 use crate::theme::Tokens;
 
@@ -27,17 +28,30 @@ impl RepoTab {
         let x = |lane: usize| row.lane_x(lane);
         let node = pos2(x(graph_row.col), row.mid());
         let width = 2.0;
+        // In a ghost run: the lanes to and from the commits it would make, dashed.
+        let ghost = self.ghost.row(row.i);
+        let new = ghost.is_some_and(|g| g.kind == Kind::New);
+        let ghost_lane = |lanes: fn(&RowGhost) -> &Vec<usize>, lane: usize| {
+            new || ghost.is_some_and(|g| lanes(g).contains(&lane))
+        };
 
         for &lane in &graph_row.through {
             if lane < lanes {
-                gp.line_segment(
-                    [pos2(x(lane), top), pos2(x(lane), bottom)],
-                    Stroke::new(width, t.lane(lane)),
-                );
+                let ends = [pos2(x(lane), top), pos2(x(lane), bottom)];
+                if ghost_lane(|g| &g.through, lane) {
+                    dashed(&gp, &ends, t.lane(lane), width);
+                } else {
+                    gp.line_segment(ends, Stroke::new(width, t.lane(lane)));
+                }
             }
         }
         for &lane in &graph_row.incoming {
-            edge(&gp, node, pos2(x(lane), top), t.lane(lane), width);
+            let end = pos2(x(lane), top);
+            if ghost_lane(|g| &g.incoming, lane) {
+                dashed(&gp, &edge_points(node, end), t.lane(lane), width);
+            } else {
+                edge(&gp, node, end, t.lane(lane), width);
+            }
         }
         for &lane in &graph_row.outgoing {
             let color = if is_wip || stash.is_some() {
@@ -45,7 +59,12 @@ impl RepoTab {
             } else {
                 t.lane(lane)
             };
-            edge(&gp, node, pos2(x(lane), bottom), color, width);
+            let end = pos2(x(lane), bottom);
+            if new {
+                dashed(&gp, &edge_points(node, end), color, width);
+            } else {
+                edge(&gp, node, end, color, width);
+            }
         }
 
         if stash.is_some() {
@@ -66,7 +85,36 @@ impl RepoTab {
                 gp.circle_filled(node, 2.5, t.dock);
             }
         }
+        match ghost.map(|g| g.kind) {
+            // A commit it would make: a dashed ring around its dot.
+            Some(Kind::New) => {
+                gp.add(egui::Shape::dashed_line(
+                    &circle_points(node, 9.0, 24),
+                    Stroke::new(1.2, t.text),
+                    2.5,
+                    2.0,
+                ));
+            }
+            // One it would leave on no ref: crossed out.
+            Some(Kind::Going) => {
+                let stroke = Stroke::new(1.8, t.danger);
+                let d = 5.0;
+                gp.line_segment([node + vec2(-d, -d), node + vec2(d, d)], stroke);
+                gp.line_segment([node + vec2(-d, d), node + vec2(d, -d)], stroke);
+            }
+            _ => {}
+        }
     }
+}
+
+/// A ghost lane along `points`: dashed and translucent.
+fn dashed(p: &Painter, points: &[Pos2], color: Color32, width: f32) {
+    p.add(egui::Shape::dashed_line(
+        points,
+        Stroke::new(width, color.gamma_multiply(0.7)),
+        4.0,
+        3.0,
+    ));
 }
 
 /// A stash's dot: a dashed box with the stash icon, as the toolbar's Stash button shows it.
@@ -106,10 +154,19 @@ fn circle_points(center: Pos2, radius: f32, n: usize) -> Vec<Pos2> {
 /// the row from the dot, a small rounded corner, then straight along the lane.
 pub(crate) fn edge(p: &Painter, node: Pos2, end: Pos2, color: Color32, width: f32) {
     let stroke = Stroke::new(width, color);
+    let points = edge_points(node, end);
+    if points.len() == 2 {
+        p.line_segment([node, end], stroke);
+    } else {
+        p.add(egui::Shape::line(points, stroke));
+    }
+}
+
+/// The points of [`edge`]'s line.
+fn edge_points(node: Pos2, end: Pos2) -> Vec<Pos2> {
     let dx = end.x - node.x;
     if dx.abs() < 0.5 {
-        p.line_segment([node, end], stroke);
-        return;
+        return vec![node, end];
     }
     let dy = end.y - node.y;
     let r = CORNER_R.min(dx.abs()).min(dy.abs());
@@ -123,5 +180,5 @@ pub(crate) fn edge(p: &Painter, node: Pos2, end: Pos2, color: Color32, width: f3
         points.push(c + vec2(sx * r * a.sin(), -sy * r * a.cos()));
     }
     points.push(end);
-    p.add(egui::Shape::line(points, stroke));
+    points
 }

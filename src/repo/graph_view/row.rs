@@ -105,7 +105,15 @@ impl RepoTab {
             self.wip_description(&painter, &t, &row);
         } else {
             let ci = self.ci_status(&commit.hash);
-            description(ui, &painter, &t, &row, is_match, ci.is_some());
+            let end = description(ui, &painter, &t, &row, is_match, ci.is_some());
+            if self.ghost.kind(i) == crate::repo::ghost::Kind::Going {
+                // Left on no ref by the operation a ghost run shows: struck through.
+                let x = row.gx + row.cols.graph + 6.0;
+                painter.line_segment(
+                    [pos2(x, row.mid()), pos2(end, row.mid())],
+                    Stroke::new(1.2, t.text),
+                );
+            }
             trailing_columns(ui, &painter, &t, &row, now);
             if let Some(status) = ci {
                 let center = pos2(rect.right() - cols.trailing() - 9.0, row.mid());
@@ -195,9 +203,16 @@ fn row_background(
     }
 }
 
-/// The summary, then the rest of the message faded, cut with an ellipsis.
-/// `dot`: room is left at the end for the build status.
-fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool, dot: bool) {
+/// The summary, then the rest of the message faded, cut with an ellipsis; returns where the
+/// summary ends. `dot`: room is left at the end for the build status.
+fn description(
+    ui: &Ui,
+    painter: &Painter,
+    t: &Tokens,
+    row: &Row,
+    is_match: bool,
+    dot: bool,
+) -> f32 {
     let (rect, mid) = (row.rect, row.mid());
     let x = row.gx + row.cols.graph + 6.0;
     let text_right = rect.right() - row.cols.trailing() - 10.0 - if dot { 14.0 } else { 0.0 };
@@ -218,6 +233,7 @@ fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool
         t.text,
     );
     let room = text_right - summary.right() - 12.0;
+    let end = summary.right().min(text_right);
     if !row.commit.body.is_empty() && room > 24.0 {
         let mut job = egui::text::LayoutJob::single_section(
             row.commit.body.clone(),
@@ -231,6 +247,7 @@ fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool
             t.text,
         );
     }
+    end
 }
 
 /// The hash, author, when and date columns, those the settings show.
