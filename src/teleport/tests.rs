@@ -20,8 +20,14 @@ fn scratch(name: &str) -> Result<PathBuf, String> {
     let dir = std::env::temp_dir().join(format!("gitcraft-tp-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    // Its real path: `/tmp` is a link on macOS, and git prints real paths.
-    std::fs::canonicalize(&dir).map_err(|e| e.to_string())
+    // Its real path: `/tmp` is a link on macOS, and git prints real paths. Not in the `\\?\`
+    // form Windows gives it, which git doesn't take.
+    let real = std::fs::canonicalize(&dir).map_err(|e| e.to_string())?;
+    let shown = real.to_string_lossy();
+    Ok(match shown.strip_prefix(r"\\?\") {
+        Some(rest) if !rest.starts_with("UNC") => PathBuf::from(rest),
+        _ => real,
+    })
 }
 
 fn git(dir: &Path, args: &[&str]) -> Result<String, String> {
@@ -860,7 +866,12 @@ fn what_would_be_lost_is_refused() -> Result<(), String> {
     std::fs::remove_dir_all(src.join("assets")).map_err(|e| e.to_string())?;
 
     let shallow = root.join("shallow");
-    let url = format!("file://{}", src.to_string_lossy().replace('\\', "/"));
+    let path = src.to_string_lossy().replace('\\', "/");
+    let url = if path.starts_with('/') {
+        format!("file://{path}")
+    } else {
+        format!("file:///{path}")
+    };
     git(
         &root,
         &[
