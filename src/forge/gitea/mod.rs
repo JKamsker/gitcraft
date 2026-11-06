@@ -83,11 +83,7 @@ impl Provider for GiteaFamily {
 
     /// The accounts the latest commits belong to, as the API ties them to their emails.
     fn retarget(&self, _: &Path, hosting: &Hosting, number: u64, base: &str) -> Result<(), String> {
-        let endpoint = format!("repos/{}/pulls/{number}", hosting.path);
-        self.api(hosting)
-            .send("PATCH", &endpoint, Some(&json!({ "base": base })))
-            .map(drop)
-            .map_err(String::from)
+        retarget(&self.api(hosting), hosting, number, base)
     }
 
     fn avatars(&self, _: &Path, hosting: &Hosting, _: &[String]) -> Vec<(String, Hint)> {
@@ -124,6 +120,14 @@ fn list(api: &Api, hosting: &Hosting) -> Result<Vec<PullRequest>, String> {
     let endpoint = format!("repos/{}/pulls?state=open&sort=recentupdate", hosting.path);
     let items = api.get_all(&endpoint, 100)?;
     Ok(items.iter().map(parse_pull_request).collect())
+}
+
+/// Points pull request `number` at `base`.
+fn retarget(api: &Api, hosting: &Hosting, number: u64, base: &str) -> Result<(), String> {
+    let endpoint = format!("repos/{}/pulls/{number}", hosting.path);
+    api.send("PATCH", &endpoint, Some(&json!({ "base": base })))
+        .map(drop)
+        .map_err(String::from)
 }
 
 fn create(api: &Api, hosting: &Hosting, new: &NewPullRequest) -> Result<String, String> {
