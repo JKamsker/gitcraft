@@ -261,7 +261,17 @@ impl RepoTab {
 
     /// Reads the commits the rebase for `edit` replays.
     pub(super) fn quick_edit(&mut self, edit: Edit, hash: String, ctx: &egui::Context) {
-        if self.busy_op.is_some() {
+        // Confirmed (a drop) while something started meanwhile (the background fetch): said,
+        // not dropped without a word.
+        if let Some(busy) = &self.busy_op {
+            self.status = Some((
+                format!(
+                    "{} {}: {busy} is still running, try again when it's done",
+                    edit.label(),
+                    short(&hash)
+                ),
+                true,
+            ));
             return;
         }
         let path = self.path.clone();
