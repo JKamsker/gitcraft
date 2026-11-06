@@ -181,7 +181,7 @@ fn server() -> Option<&'static Server> {
 }
 
 /// 128 random bits as hex, from the standard library's own randomly seeded hashers.
-fn random_token() -> String {
+pub(crate) fn random_token() -> String {
     use std::hash::{BuildHasher, Hasher};
     (0..2)
         .map(|i| {
@@ -470,7 +470,7 @@ fn remember(server: &Server, session: u64, host: &str, prompt: &str, secret: &st
 }
 
 /// Whether two tokens are the same, in a time that doesn't tell how much of one matched.
-fn same(a: &[u8], b: &[u8]) -> bool {
+pub(crate) fn same(a: &[u8], b: &[u8]) -> bool {
     a.len() == b.len() && a.iter().zip(b).fold(0u8, |d, (x, y)| d | (x ^ y)) == 0
 }
 

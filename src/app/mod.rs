@@ -2,6 +2,7 @@
 
 mod askpass_dialog;
 mod clone;
+mod handoff;
 mod home;
 mod palette;
 mod panels;
@@ -131,6 +132,8 @@ impl App {
         crate::remote::mark_ui_thread();
         // ssh's questions (passwords, new host keys) come to this window.
         crate::remote::askpass::set_repaint(cc.egui_ctx.clone());
+        // So do later starts' requests (see `crate::instance`).
+        crate::instance::set_repaint(cc.egui_ctx.clone());
         let saved: Saved = cc
             .storage
             .and_then(|s| eframe::get_value(s, eframe::APP_KEY))
@@ -475,6 +478,7 @@ impl eframe::App for App {
             }
         }
 
+        self.take_handoffs(&ctx);
         if let Err(err) = self.git_version.clone() {
             egui::CentralPanel::default()
                 .frame(egui::Frame::new().fill(t.dock))
@@ -554,6 +558,11 @@ impl eframe::App for App {
         };
         eframe::set_value(storage, eframe::APP_KEY, &saved);
     }
+
+    fn on_exit(&mut self) {
+        // Saved: what later starts ask is no longer taken here.
+        crate::instance::closing();
+    }
 }
 
 /// Where the tab that was active at `active` is once the tabs not `kept` (their folder is gone)
@@ -604,8 +613,30 @@ pub fn warm_up() {
     });
 }
 
-/// Once the window closed: starts the version an update put in place, if it did.
+pub use crate::instance::Start;
+
+/// Settles, before any window is made, whether this start opens the window or hands `open_arg`
+/// to the gitcraft already running (see `crate::instance`).
+pub fn single_instance(open_arg: Option<&Path>) -> Start {
+    crate::instance::start(open_arg)
+}
+
+/// Tells the user why this start ends without a window: in a dialog, and on stderr for a start
+/// from a terminal.
+pub fn report_failed_start(message: &str) {
+    eprintln!("gitcraft: {message}");
+    let _ = rfd::MessageDialog::new()
+        .set_level(rfd::MessageLevel::Error)
+        .set_title("gitcraft")
+        .set_description(message)
+        .set_buttons(rfd::MessageButtons::Ok)
+        .show();
+}
+
+/// Once the window closed: lets the next start be the running instance, then starts the
+/// version an update put in place, if it did.
 pub fn after_exit() {
+    crate::instance::shut_down();
     update::relaunch();
 }
 
