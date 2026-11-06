@@ -43,6 +43,8 @@ pub(super) struct Palette {
 struct Step {
     /// The verb's label, shown above the field.
     title: String,
+    /// What the verb is remembered by, once one of its choices runs.
+    key: String,
     pick: Pick,
     choices: Vec<Item>,
     /// What was typed in the first step, back when going back.
@@ -114,6 +116,12 @@ impl App {
         if self.palette.is_none() {
             return;
         }
+        // A dialog that asks something (ssh's password, a new host key) came up over it: the
+        // keys are that dialog's, and Enter must not also run an entry.
+        if self.clone_form.is_some() || self.remote_form.is_some() || self.askpass_open() {
+            self.palette = None;
+            return;
+        }
         let key = self.entries_key();
         self.refresh_palette(&key);
         let outcome = match &mut self.palette {
@@ -150,13 +158,14 @@ impl App {
         let Some(item) = list.get(i) else {
             return;
         };
-        self.palette_recent.used(&item.key);
+        // A verb is remembered once something is done with it, not when it is only looked at.
         if let Entry::Pick(pick) = &item.run {
-            let (title, pick) = (item.label.clone(), pick.clone());
+            let (title, key, pick) = (item.label.clone(), item.key.clone(), pick.clone());
             let choices = self.palette_choices(&pick);
             if let Some(p) = &mut self.palette {
                 p.step = Some(Step {
                     title,
+                    key,
                     pick,
                     choices,
                     query: std::mem::take(&mut p.query),
@@ -165,16 +174,21 @@ impl App {
             }
             return;
         }
+        let key = item.key.clone();
         let mut list = match self.palette.take() {
             Some(Palette {
                 step: Some(step), ..
-            }) => step.choices,
+            }) => {
+                self.palette_recent.used(&step.key);
+                step.choices
+            }
             Some(Palette {
                 entries: Some((_, entries)),
                 ..
             }) => entries,
             _ => return,
         };
+        self.palette_recent.used(&key);
         if i < list.len() {
             let item = list.swap_remove(i);
             self.run_entry(item.run, ctx);
@@ -216,7 +230,19 @@ impl Palette {
                 i.key_pressed(Key::ArrowDown),
                 i.key_pressed(Key::Enter),
                 i.key_pressed(Key::Escape),
-                i.key_pressed(Key::Backspace),
+                // Not the repeats of a held key, which emptied the field: going back takes a
+                // press of its own.
+                i.events.iter().any(|e| {
+                    matches!(
+                        e,
+                        egui::Event::Key {
+                            key: Key::Backspace,
+                            pressed: true,
+                            repeat: false,
+                            ..
+                        }
+                    )
+                }),
             )
         });
         if self.step.is_some() && (esc || (backspace && self.query.is_empty())) {
@@ -253,6 +279,8 @@ impl Palette {
                 }
             });
         });
+        // What was typed this frame is ranked before Enter picks from the list.
+        self.ranked(key, recent);
         if enter
             && let Some((_, shown)) = &self.shown
             && let Some(s) = shown.get(self.selected)
@@ -290,8 +318,9 @@ impl Palette {
                 .font(theme::medium(14.0)),
         );
         // The field has the keyboard while the palette is open: what is clicked or selected
-        // underneath doesn't take it.
-        if !edit.has_focus() {
+        // underneath doesn't take it, but a modal shown over it does.
+        let modal = ui.ctx().memory(|m| m.top_modal_layer().is_some());
+        if !edit.has_focus() && !modal {
             edit.request_focus();
         }
         if edit.changed() {

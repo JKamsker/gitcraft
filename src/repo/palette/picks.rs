@@ -144,7 +144,9 @@ impl RepoTab {
                     "reset",
                     reset_action(&rewrite, mode),
                 )
-                .key(format!("reset:{}", mode.label))
+                // Not remembered: the way to reset is chosen each time, never preselected (a
+                // hard reset last time is no reason to offer it first).
+                .key(String::new())
             })
             .collect()
     }

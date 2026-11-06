@@ -220,12 +220,12 @@ impl RepoTab {
         }
         if !self.refs.head.is_empty() {
             items.push(PaletteItem::action(
-                "Create branch",
+                "Create branch…",
                 "branch",
                 Action::Dialog(Dialog::create_branch(&self.refs.head, "HEAD")),
             ));
             items.push(PaletteItem::action(
-                "Create tag",
+                "Create tag…",
                 "tag",
                 Action::Dialog(Dialog::tag(&self.refs.head, "HEAD", self.default_remote())),
             ));

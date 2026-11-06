@@ -170,6 +170,23 @@ fn typing_reb_ranks_rebase_first_and_its_branch_is_picked_next() {
     assert_eq!(recent.rank("pick:rebase"), Some(1));
 }
 
+/// A letter typed and Enter pressed in the same frame run the best match for the whole query.
+#[test]
+fn enter_with_the_last_letter_in_the_same_frame_runs_the_new_best_match() {
+    let dir = repo("same-frame");
+    let mut harness = window(&dir);
+    open_and_type(&mut harness, "pu");
+    harness.event(Event::Text("ll (r".to_owned()));
+    harness.key_press(Key::Enter);
+    harness.step();
+    harness.step();
+    let _ = std::fs::remove_dir_all(&dir);
+    // "pu" alone ranks Push or Pull first; "pull (r" only Pull (rebase), which runs and closes.
+    assert!(harness.state().palette.is_none());
+    let recent = &harness.state().palette_recent;
+    assert_eq!(recent.rank("Pull (rebase)"), Some(0));
+}
+
 #[test]
 fn the_selected_commit_is_cherry_picked_from_the_palette() {
     let dir = repo("cherry");
@@ -206,11 +223,34 @@ fn going_back_from_the_second_step_restores_what_was_typed() {
     // Esc in the second step goes back to the first, not out.
     harness.key_press(Key::Escape);
     harness.step();
+    // Only looked at: the verb is not remembered.
+    assert_eq!(harness.state().palette_recent.rank("pick:merge"), None);
     assert_eq!(step_title(&harness), None);
     assert_eq!(query(&harness), Some("merge"));
-    // Backspace in the second step's empty field goes back too.
+    // Backspace in the second step's empty field goes back too, but not a held one that
+    // emptied it.
     enter(&mut harness);
+    type_text(&mut harness, "x");
+    for _ in 0..3 {
+        harness.event(Event::Key {
+            key: Key::Backspace,
+            physical_key: None,
+            pressed: true,
+            repeat: true,
+            modifiers: egui::Modifiers::NONE,
+        });
+        harness.step();
+    }
+    harness.event(Event::Key {
+        key: Key::Backspace,
+        physical_key: None,
+        pressed: false,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    });
+    harness.step();
     assert_eq!(step_title(&harness), Some("Merge into main…"));
+    assert_eq!(query(&harness), Some(""));
     harness.key_press(Key::Backspace);
     harness.step();
     assert_eq!(step_title(&harness), None);
