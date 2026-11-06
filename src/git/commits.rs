@@ -399,7 +399,7 @@ pub fn count_apart(repo: &Path, a: &str, b: &str) -> Result<(u32, u32), String> 
 
 /// Where a log starts, the last of its arguments: the revisions `from` when given, else every
 /// branch (stashes aside).
-fn push_revisions<'a>(args: &mut Vec<&'a str>, from: Option<&'a [String]>) {
+pub(super) fn push_revisions<'a>(args: &mut Vec<&'a str>, from: Option<&'a [String]>) {
     match from {
         Some(revs) => {
             args.push(END_OPTS);
