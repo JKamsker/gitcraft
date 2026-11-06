@@ -24,9 +24,11 @@ pub(crate) enum RemoveState {
     Running {
         id: u64,
     },
+    /// `confirm`: discarding the attempt (on a conflict) was asked, waiting to be confirmed.
     Finished {
         id: u64,
         outcome: Outcome,
+        confirm: bool,
     },
 }
 
@@ -65,7 +67,7 @@ impl RepoTab {
             .unwrap_or_default();
         self.set_remove(Some(RemoveState::Planning(id)));
         let path = self.path.clone();
-        self.then(
+        self.run_job(
             ctx,
             move || remove::plan(&path, &entry, &now),
             move |tab, plan, _| {
@@ -117,7 +119,11 @@ impl RepoTab {
             ));
             return;
         }
-        let label = format!("Remove “{}” from {name}", self.entry_label(plan.id));
+        let label = format!(
+            "Remove “{}” from {}, as {name}",
+            self.entry_label(plan.id),
+            plan.branch
+        );
         self.busy_op = Some(label.clone());
         self.op_started = Some(std::time::Instant::now());
         self.timeline_op_started(false, Refresh::All);
@@ -157,15 +163,21 @@ impl RepoTab {
                 };
                 let status = format!("{label}: done, on the new branch {branch}");
                 let outcome = Outcome::Done { branch, tip };
-                (
-                    Some(undo),
-                    RemoveState::Finished { id, outcome },
-                    (status, false),
-                )
+                let state = RemoveState::Finished {
+                    id,
+                    outcome,
+                    confirm: false,
+                };
+                (Some(undo), state, (status, false))
             }
             Ok(outcome @ Outcome::Conflict { .. }) => {
                 let status = format!("{label}: stopped on a conflict, resolve it in its worktree");
-                (None, RemoveState::Finished { id, outcome }, (status, true))
+                let state = RemoveState::Finished {
+                    id,
+                    outcome,
+                    confirm: false,
+                };
+                (None, state, (status, true))
             }
             Err(error) => {
                 let status = format!("{label} failed: {error}");
@@ -173,9 +185,21 @@ impl RepoTab {
             }
         };
         let ok = !matches!(state, RemoveState::Failed { .. });
+        let stopped = matches!(
+            state,
+            RemoveState::Finished {
+                outcome: Outcome::Conflict { .. },
+                ..
+            }
+        );
+        let entry_label = if stopped {
+            format!("{label} (stopped on a conflict)")
+        } else {
+            label.to_owned()
+        };
         self.status = Some(status);
         self.set_remove(Some(state));
-        self.timeline_op_ended(label, &OpKind::plain(), undo, ok, Refresh::All, ctx);
+        self.timeline_op_ended(&entry_label, &OpKind::plain(), undo, ok, Refresh::All, ctx);
         self.reload(ctx);
     }
 
@@ -185,9 +209,14 @@ impl RepoTab {
             return;
         }
         let Some(RemoveState::Finished {
-            outcome: Outcome::Conflict {
-                branch, folder_arg, ..
-            },
+            outcome:
+                Outcome::Conflict {
+                    branch,
+                    folder_arg,
+                    stopped_at,
+                    ..
+                },
+            confirm: true,
             ..
         }) = self.remove_state().cloned()
         else {
@@ -195,13 +224,15 @@ impl RepoTab {
         };
         let label = format!("Discard {branch}");
         self.busy_op = Some(label.clone());
+        self.op_started = Some(std::time::Instant::now());
         self.timeline_op_started(false, Refresh::All);
         let path = self.path.clone();
         self.run_job(
             ctx,
-            move || remove::discard(&path, &folder_arg, &branch),
+            move || remove::discard(&path, &folder_arg, &branch, &stopped_at),
             move |tab, result, ctx| {
                 tab.busy_op = None;
+                tab.op_started = None;
                 let ok = result.is_ok();
                 tab.status = Some(match result {
                     Ok(()) => (format!("{label}: done"), false),
@@ -214,6 +245,15 @@ impl RepoTab {
                 tab.reload(ctx);
             },
         );
+    }
+
+    /// Asks before discarding an attempt that stopped on a conflict (or takes the question back).
+    pub(in crate::repo) fn confirm_discard(&mut self, ask: bool) {
+        if let Some(view) = &mut self.timeline_view
+            && let Some(RemoveState::Finished { confirm, .. }) = &mut view.remove
+        {
+            *confirm = ask;
+        }
     }
 
     /// The label of entry `id`.
