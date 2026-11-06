@@ -79,6 +79,7 @@ impl RepoTab {
                 // The text being sent is only cleared once it has been, so it stays where it is.
                 if let Some(draft) = self.pr_draft().filter(|draft| !draft.posting) {
                     draft.target = Some(target);
+                    draft.line_head = None;
                     draft.focus_line = true;
                 }
             }

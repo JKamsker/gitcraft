@@ -33,6 +33,11 @@ pub(crate) struct PrView {
 }
 
 impl PrView {
+    /// The pull request's latest commit as last read.
+    pub(super) fn head(&self) -> Option<&str> {
+        self.seen_head.as_deref()
+    }
+
     /// Makes the texts of `details` safe to show, to show them from now on.
     fn prepare_texts(&mut self, details: &PrDetails) {
         let host = pr::repo_of_url(&details.url).map_or(String::new(), |(host, _)| host);
@@ -134,7 +139,15 @@ impl RepoTab {
             view.seen_head = Some(now.head_oid.clone());
         }
         if let Some(draft) = self.pr_drafts.get_mut(&view.number) {
-            if moved {
+            // A line restored from the last run was picked at the head it was saved with.
+            let restored_moved = match &result {
+                Ok(now) => draft
+                    .line_head
+                    .take()
+                    .is_some_and(|then| then != now.head_oid),
+                Err(_) => false,
+            };
+            if moved || restored_moved {
                 draft.head_moved();
             }
             // With details come the files, which is when it's settled. Without, nothing comes.

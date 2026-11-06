@@ -19,6 +19,13 @@ so your config, credentials and hooks apply as usual.
   Profile); the other settings pages are shared. Switching closes this profile's tabs and opens the
   other one's (refused while a tab has unfinished work).
 - Changes made elsewhere (editor, terminal) show up by themselves: the folder is watched.
+- What you typed survives a crash or a restart: the commit message, unsent pull-request
+  comments, reviews and replies, and an interactive-rebase list being set up are saved per
+  repository every few seconds and when the window loses the focus, and come back when the
+  repository is opened again. Each goes once it is used (committed, sent, the rebase started)
+  or emptied. After a crash, the next start says _gitcraft closed unexpectedly: your drafts and
+  tabs were restored_. They are kept in gitcraft's data folder (never in the repository), each
+  file written whole or not at all, up to 256 KB per box; passwords and tokens are never saved.
 - Repositories on another machine, in a WSL distribution or over SSH: the window stays here and
   git runs there (see below).
 

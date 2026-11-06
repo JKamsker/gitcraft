@@ -2,6 +2,7 @@
 
 mod askpass_dialog;
 mod clone;
+mod draft_saving;
 mod home;
 mod palette;
 mod panels;
@@ -122,6 +123,10 @@ pub struct App {
     /// The folders of the last repository tabs closed, the last one at the end.
     closed: Vec<PathBuf>,
     tab_drag: Option<TabDrag>,
+    /// When what the tabs have typed is saved.
+    keeper: crate::drafts::Keeper,
+    /// This run's marker, and whether the last run ended without closing.
+    session: crate::drafts::Session,
 }
 
 impl App {
@@ -164,6 +169,8 @@ impl App {
             toasts: Vec::new(),
             closed: Vec::new(),
             tab_drag: None,
+            keeper: Default::default(),
+            session: crate::drafts::Session::start(),
             error: None,
             was_focused: true,
             clone_form: None,
@@ -183,6 +190,7 @@ impl App {
             tab_looks: saved.tab_looks,
         };
         update::clean_up();
+        app.say_if_unclean();
         let mut kept = Vec::new();
         if app.git_version.is_ok() {
             for path in saved.open {
@@ -527,6 +535,8 @@ impl eframe::App for App {
         self.askpass_dialog(&ctx);
         self.palette_ui(&ctx);
         self.manual_ui(&ctx);
+        // After the tabs are drawn, so what was typed in this frame is in.
+        self.keep_drafts(&ctx, focused);
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
     }
@@ -546,6 +556,10 @@ impl eframe::App for App {
             profile_states: self.profile_states.clone(),
         };
         eframe::set_value(storage, eframe::APP_KEY, &saved);
+    }
+
+    fn on_exit(&mut self) {
+        self.close_drafts();
     }
 }
 
