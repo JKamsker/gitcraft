@@ -19,6 +19,12 @@ impl RepoTab {
                 acts.push(Action::ToggleSearch);
                 if let Some(file) = self.work.unstaged.first() {
                     acts.push(Action::OpenDiff(DiffKey::Work(file.clone())));
+                    // Read again as prose (a.txt), both sides read on that machine.
+                    acts.push(Action::DiffRich(Some(diff::rich::RichKind::Prose)));
+                    acts.push(Action::DiffGoToLine {
+                        old: None,
+                        new: Some(1),
+                    });
                 }
                 acts.push(Action::FileView {
                     path: "a.txt".to_owned(),

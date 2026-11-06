@@ -5,9 +5,9 @@ use egui::{Sense, Stroke, Ui};
 
 use super::images::image_view;
 use super::lfs::lfs_view;
-use super::rendered;
 use super::rows::Rows;
 use super::{DiffData, Kind, Pick, unstage_args};
+use super::{rendered, rich};
 use crate::git::{Area, StatusFile};
 use crate::icons;
 use crate::pull_request::DiffSide;
@@ -34,13 +34,20 @@ impl RepoTab {
         let as_file = self.diff_as_file;
         // A Markdown file can show rendered: `Some(whether it does)`.
         let markdown = rendered::is_markdown(&path).then_some(self.diff_rendered);
+        // The rich views the file has, and the one shown (not with the file, nor rendered).
+        let rich_kinds = rich::RichKind::of(&path);
+        let rich_on = self
+            .diff_rich_kind()
+            .filter(|_| !as_file && markdown != Some(true));
+        let rich_ready =
+            rich_on.is_some() && !matches!(&view.rich, Some((_, Ok(rich::Rich::Plain(_)))));
         let clear = self.diff_header(
             ui,
             view,
             (&path, &origin),
-            partial,
+            partial && !rich_ready,
             (split, ignore_ws, whole_file, as_file),
-            markdown,
+            (markdown, &rich_kinds, rich_on, rich_ready),
             acts,
         );
 
@@ -65,6 +72,29 @@ impl RepoTab {
             file_text::show(ui, ("diff_file", &path), view.file.as_ref());
             return;
         }
+        if let Some(kind) = rich_on {
+            let Some(view) = &mut self.diff else { return };
+            match &view.rich {
+                None => {
+                    ui.centered_and_justified(|ui| ui.add(crate::spinner::Spinner::new()));
+                    return;
+                }
+                Some((_, Err(e))) => {
+                    ui.add_space(12.0);
+                    ui.horizontal(|ui| {
+                        ui.add_space(12.0);
+                        ui.colored_label(t.danger, e);
+                    });
+                    return;
+                }
+                Some((_, Ok(rich::Rich::Ready(diff)))) => {
+                    rich::show(ui, diff, &mut view.rich_state, acts);
+                    return;
+                }
+                Some((_, Ok(rich::Rich::Plain(note)))) => rich::fallback_note(ui, kind, note),
+            }
+        }
+        let Some(view) = &self.diff else { return };
         let Some(data) = ready_data(ui, view, ignore_ws, &t) else {
             return;
         };
@@ -144,8 +174,9 @@ impl RepoTab {
     }
 
     /// Header: file, where it comes from, options, actions, close. `opts`: (side by side,
-    /// ignore whitespace, whole file, the file instead of the diff); `markdown`: for a Markdown
-    /// file, whether it shows rendered. True when the picked lines are to be cleared.
+    /// ignore whitespace, whole file, the file instead of the diff); `views`: for a Markdown
+    /// file, whether it shows rendered; the rich views of the file, the one on, and whether it
+    /// is shown in place of the lines. True when the picked lines are to be cleared.
     #[allow(clippy::too_many_arguments)]
     fn diff_header(
         &self,
@@ -154,10 +185,15 @@ impl RepoTab {
         (path, origin): (&str, &str),
         partial: bool,
         (split, ignore_ws, whole_file, as_file): (bool, bool, bool, bool),
-        markdown: Option<bool>,
+        (markdown, rich_kinds, rich_on, rich_ready): (
+            Option<bool>,
+            &[rich::RichKind],
+            Option<rich::RichKind>,
+            bool,
+        ),
         acts: &mut Vec<Action>,
     ) -> bool {
-        let rendered = markdown == Some(true);
+        let rendered = markdown == Some(true) || rich_ready;
         let t = Tokens::get(ui.ctx());
         let mut clear = false;
         egui::Frame::new()
@@ -179,7 +215,7 @@ impl RepoTab {
                     };
                     widgets::file_menu(&title, path, rev, ignorable, acts);
                     widgets::chip(ui, origin, t.text_dim);
-                    let before = if rendered {
+                    let before = if markdown == Some(true) {
                         matches!(&view.rendered, Some(Ok(md)) if md.before)
                     } else {
                         matches!(&view.file, Some(Ok(f)) if f.before)
@@ -202,18 +238,28 @@ impl RepoTab {
                             change_steps(ui, acts);
                             ui.add_space(8.0);
                         }
+                        for &kind in rich_kinds.iter().rev() {
+                            let on = rich_on == Some(kind);
+                            let r = icons::small_button(ui, kind.icon(), kind.tip());
+                            if on {
+                                widgets::active_underline(ui, r.rect, t.accent);
+                            }
+                            if r.clicked() {
+                                acts.push(Action::DiffRich((!on).then_some(kind)));
+                            }
+                        }
                         if markdown.is_some() {
-                            let tip = match (rendered, as_file) {
+                            let tip = match (markdown == Some(true), as_file) {
                                 (true, _) => "Show the Markdown as text",
                                 (false, false) => "Show the changes rendered",
                                 (false, true) => "Show the file rendered",
                             };
                             let r = icons::small_button(ui, "eye", tip);
-                            if rendered {
+                            if markdown == Some(true) {
                                 widgets::active_underline(ui, r.rect, t.accent);
                             }
                             if r.clicked() {
-                                acts.push(Action::DiffRendered(!rendered));
+                                acts.push(Action::DiffRendered(markdown != Some(true)));
                             }
                             ui.add_space(4.0);
                         }

@@ -215,6 +215,7 @@ impl RepoTab {
         });
         self.load_diff_file(ctx);
         self.load_diff_rendered(ctx);
+        self.load_diff_rich(ctx);
     }
 
     /// Renders the Markdown file of the open diff, when diffs show Markdown rendered.
@@ -239,6 +240,9 @@ impl RepoTab {
     /// Shows Markdown files rendered in diffs, or as text.
     pub(super) fn show_diff_rendered(&mut self, on: bool, ctx: &egui::Context) {
         self.diff_rendered = on;
+        if on {
+            self.diff_rich = None;
+        }
         // Read again each time it's turned on: the file may have changed since.
         if on {
             self.load_diff_rendered(ctx);

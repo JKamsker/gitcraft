@@ -107,6 +107,12 @@ pub(crate) struct DiffView {
     /// Which reading of the rendered Markdown is the latest: an older one arriving last is
     /// dropped.
     pub(super) rendered_load: u64,
+    /// The diff read as a rich view, when one is on.
+    pub(super) rich: Option<(diff::rich::RichKind, Result<diff::rich::Rich, String>)>,
+    /// Which reading of the rich view is the latest.
+    pub(super) rich_load: u64,
+    /// What the rich view keeps between frames.
+    pub(super) rich_state: diff::rich::RichState,
     /// What the rendered Markdown keeps between frames.
     pub(super) markdown: egui_commonmark::CommonMarkCache,
     /// How far the lines were scrolled down last frame.
@@ -143,6 +149,9 @@ impl DiffView {
             file: None,
             rendered: None,
             rendered_load: 0,
+            rich: None,
+            rich_load: 0,
+            rich_state: Default::default(),
             markdown: Default::default(),
             scroll: 0.0,
             jump: None,

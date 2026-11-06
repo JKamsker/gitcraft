@@ -116,10 +116,10 @@ struct Side {
     path: String,
 }
 
-type SideAt = Option<(Option<String>, String)>;
+pub(super) type SideAt = Option<(Option<String>, String)>;
 
 /// Where the file is before and after the change, when it is on that side.
-fn sides(key: &DiffKey) -> (SideAt, SideAt) {
+pub(super) fn sides(key: &DiffKey) -> (SideAt, SideAt) {
     let at = |rev: Option<&str>, path: &str| Some((rev.map(str::to_owned), path.to_owned()));
     match key {
         DiffKey::Commit { hash, path } => {

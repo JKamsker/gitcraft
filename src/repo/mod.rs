@@ -171,6 +171,8 @@ pub struct RepoTab {
     diff_as_file: bool,
     /// Markdown files show rendered in diffs (their changes, or the file).
     diff_rendered: bool,
+    /// Diffs show as this rich view, for the files it reads.
+    diff_rich: Option<diff::rich::RichKind>,
     /// Whether the commit pane lists every file of the commit, and those read.
     all_files: detail::AllFiles,
     conflict: Option<conflict::ConflictEditor>,
@@ -321,6 +323,7 @@ impl RepoTab {
             diff_ignore_ws: false,
             diff_as_file: false,
             diff_rendered: false,
+            diff_rich: None,
             all_files: Default::default(),
             conflict: None,
             conflict_generation: 0,
