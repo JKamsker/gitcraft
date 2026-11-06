@@ -122,6 +122,14 @@ pub(super) fn patch_header(text: &str) -> String {
     String::new()
 }
 
+/// Whether the diff adds the file: git says so before the first hunk (`new file mode`, or the
+/// old side is `/dev/null` for an untracked file compared with `--no-index`).
+pub(super) fn is_new_file(text: &str) -> bool {
+    text.split_terminator('\n')
+        .take_while(|l| !l.starts_with("@@"))
+        .any(|l| l.starts_with("new file mode ") || l.trim_end() == "--- /dev/null")
+}
+
 /// `@@ -12,5 +14,7 @@` → (11, 13): the numbers before the first line of the hunk.
 pub(super) fn hunk_start(header: &str) -> (u32, u32) {
     let mut old = 0;
