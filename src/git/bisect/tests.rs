@@ -18,6 +18,8 @@ fn culprit_repo(name: &str, n: usize, bad_from: usize) -> Result<(PathBuf, Vec<S
         &["config", "user.name", "t"],
         &["config", "user.email", "t@t"],
         &["config", "commit.gpgSign", "false"],
+        // `f` as written on every system: the test commands read its first line.
+        &["config", "core.autocrlf", "false"],
     ] {
         git::run(Some(&dir), args)?;
     }
