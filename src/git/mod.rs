@@ -7,6 +7,7 @@ mod diff;
 mod files;
 mod lfs;
 mod refs;
+pub mod simulate;
 mod status;
 mod submodule;
 mod worktree;
