@@ -75,8 +75,8 @@ const FEATURES: &[(&str, &[&str])] = &[
     (
         "Maintainers",
         &[
-            "Sign off in the commit box adds Signed-off-by with your name and email (DCO). It turns on by itself when the repository has a DCO file or .github/dco.yml, or a pull request's DCO check fails; what you set it to is kept for the repository.",
-            "Where sign-offs are asked for, a commit without its author's Signed-off-by says so under its author, and a pull request's page lists them under Sign-off (DCO). With its branch checked out, Sign off my commits on this branch rewrites them (rebase --signoff) and force-pushes with a lease, after showing what it will do; Ctrl+Z puts the old commits back, here and on the remote.",
+            "Sign off in the commit box adds Signed-off-by with your name and email (DCO). It is on by itself in a repository with a DCO file or .github/dco.yml, and while a pull request whose DCO check fails is open; turning it the other way is kept for the repository.",
+            "Where sign-offs are asked for, a commit without its author's says so under its author, and a pull request's page lists those the DCO check refuses under Sign-off (DCO). With its branch checked out, Sign off the branch's commits… adds your sign-off to each (rebase --signoff) and force-pushes with a lease, after showing what it will do; Ctrl+Z puts the old commits back, on the remote and here.",
         ],
     ),
 ];
