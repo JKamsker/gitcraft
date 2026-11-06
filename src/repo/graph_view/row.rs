@@ -7,6 +7,7 @@ use egui::{Ui, pos2, vec2};
 use super::{AVATAR_D, ROW_GAP, ROW_H, ROW_PITCH};
 use crate::git::{self, Commit};
 use crate::repo::columns::Cols;
+use crate::repo::test_lane::LANE_W;
 use crate::repo::{Action, RepoTab, WIP_HASH, ci_status, widgets};
 use crate::theme::{self, Tokens};
 
@@ -109,12 +110,24 @@ impl RepoTab {
             self.wip_description(&painter, &t, &row);
         } else {
             let ci = self.ci_status(&commit.hash);
-            description(ui, &painter, &t, &row, is_match, ci.is_some());
+            let lane = if self.test_lane.visible { LANE_W } else { 0.0 };
+            // With the lane, the CI dot's place is kept on every row, so the lane is straight.
+            let dots = if lane > 0.0 || ci.is_some() {
+                14.0
+            } else {
+                0.0
+            } + lane;
+            description(ui, &painter, &t, &row, is_match, dots);
             trailing_columns(ui, &painter, &t, &row, now);
             if let Some(status) = ci {
                 let center = pos2(rect.right() - cols.trailing() - 9.0, row.mid());
                 let id = ui.id().with(("ci-dot", &commit.hash));
                 acts.extend(ci_status::dot(ui, id, center, &commit.hash, status));
+            }
+            if lane > 0.0 {
+                let center = pos2(rect.right() - cols.trailing() - 9.0 - 14.0, row.mid());
+                let id = ui.id().with(("test-dot", &commit.hash));
+                acts.extend(self.test_dot(ui, id, center, &commit.tree));
             }
         }
         resp
@@ -233,10 +246,11 @@ fn row_background(
 
 /// The summary, then the rest of the message faded, cut with an ellipsis.
 /// `dot`: room is left at the end for the build status.
-fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool, dot: bool) {
+/// `dots`: the room the CI dot and the test lane take at its end.
+fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool, dots: f32) {
     let (rect, mid) = (row.rect, row.mid());
     let x = row.gx + row.cols.graph + 6.0;
-    let text_right = rect.right() - row.cols.trailing() - 10.0 - if dot { 14.0 } else { 0.0 };
+    let text_right = rect.right() - row.cols.trailing() - 10.0 - dots;
     let font = if is_match {
         theme::medium(12.5)
     } else {

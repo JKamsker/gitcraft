@@ -425,6 +425,7 @@ impl RepoTab {
         self.reload_compare(ctx);
         // A bisect started or moved on in a terminal shows too.
         self.read_bisect(ctx);
+        self.read_test_lane(ctx);
     }
 
     /// Appends a page of older history that `load_more` read.

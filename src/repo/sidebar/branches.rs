@@ -296,6 +296,11 @@ impl RepoTab {
     }
 
     /// The branch to compare the current one with: the local default base, or its remote one.
+    /// The name of the branch pull requests go into (see [`Self::base_ref`]).
+    pub(in crate::repo) fn base_branch_name(&self) -> Option<String> {
+        self.base_ref().map(|b| b.name)
+    }
+
     fn base_ref(&self) -> Option<OwnedBranch> {
         let base = self.default_base();
         if self.refs.local.iter().any(|b| b.name == base) {

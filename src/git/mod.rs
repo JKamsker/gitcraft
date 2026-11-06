@@ -11,6 +11,7 @@ mod refs;
 mod status;
 mod stream;
 mod submodule;
+mod testlane;
 mod worktree;
 
 pub use self::bisect::*;
@@ -23,6 +24,9 @@ pub use self::refs::*;
 pub use self::status::*;
 pub use self::stream::*;
 pub use self::submodule::*;
+#[cfg(test)]
+pub(crate) use self::testlane::fixture;
+pub use self::testlane::*;
 pub use self::worktree::*;
 
 use std::path::{Path, PathBuf};

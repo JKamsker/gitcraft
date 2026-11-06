@@ -190,6 +190,8 @@ pub(crate) enum Action {
     SearchCode(bool),
     /// Start, move on or stop a bisect, or run a command for it.
     Bisect(super::bisect::BisectAct),
+    /// Test commits for the test lane, stop them, show what one printed.
+    TestLane(super::test_lane::LaneAct),
 }
 
 /// Compares two branches, given to git by their full refs (a tag of the same name is not
@@ -418,6 +420,7 @@ impl RepoTab {
             ));
         }
         items.extend(self.bisect_palette_items());
+        items.extend(self.test_palette_items());
         for b in &self.refs.local {
             if !b.is_head {
                 items.push((

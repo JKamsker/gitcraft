@@ -38,6 +38,7 @@ mod samples;
 mod sidebar;
 mod state;
 mod terminals;
+mod test_lane;
 #[cfg(test)]
 mod tests;
 mod toolbar;
@@ -65,6 +66,7 @@ pub use dialogs::Dialog;
 use messages::{Msg, spawn};
 pub(crate) use state::{Compare, CompareData, DiffKey, DiffView, Refresh, Reword, Undo, UndoEntry};
 use state::{OpKind, PendingOp, Search};
+pub(crate) use test_lane::TEST_LANE_TIP;
 pub(crate) use toolbar::reveal_label;
 pub use widgets::primary_button;
 
@@ -180,6 +182,8 @@ pub struct RepoTab {
     conflict_generation: u64,
     /// The bisect going on, and the output of `git bisect run`.
     bisect: bisect::Bisecting,
+    /// The test lane's results, and the run filling it.
+    test_lane: test_lane::TestLane,
 
     commit_summary: String,
     commit_body: String,
@@ -328,6 +332,7 @@ impl RepoTab {
             conflict: None,
             conflict_generation: 0,
             bisect: Default::default(),
+            test_lane: Default::default(),
             commit_summary: String::new(),
             commit_body: String::new(),
             amend: false,
