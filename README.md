@@ -184,16 +184,17 @@ so your config, credentials and hooks apply as usual.
   before you check the result. Settings → Git installs it in one click and can have git merge
   with it everywhere ([docs/mergiraf.md](docs/mergiraf.md)). gitcraft only runs the `mergiraf`
   program: it neither bundles nor links Mergiraf (GPL-3.0), so gitcraft's licence is unchanged.
-- Conflict warnings before you act: in the menus of branches, pills and commits, _Merge_,
-  _Rebase_ and _Cherry-pick_ say _conflicts in 3 files_, _applies cleanly_ or _may conflict_
-  before they are clicked. Hover one to see which files would conflict (for a rebase, at which
+- Conflict warnings before you act: in the menus of branches and pills, _Merge_ and _Rebase_,
+  and in a commit's menu _Cherry-pick_ (not for merge commits), say _conflicts in 3 files_,
+  _applies cleanly_ or _may conflict_ before they are clicked. Hover one to see which files would conflict (for a rebase, at which
   of its commits) and whether Mergiraf could likely solve each one. A badge beside the branch in
   the toolbar says when merging its upstream (or the default branch, without one) would
   conflict. It is worked out with `git merge-tree --write-tree` in the background, a rebase or
   cherry-pick commit by commit, and never touches the working tree, the index or a ref, so it
-  works in WSL and over SSH too; results are kept by the commits involved. Merges need git
+  works in WSL and over SSH too; results are remembered until the commits change. Merges need git
   2.38, rebases and cherry-picks 2.40; with an older git the entries say so on hover instead.
-  Uncommitted changes are not part of the check.
+  Uncommitted changes aren't part of the check; git may refuse to start if they touch the same
+  files.
 - A merge, rebase, cherry-pick, revert or patch stopped on conflicts shows a banner with
   _Abort_; the commit box finishes it (_Continue rebase_ during a rebase, _Continue patch_ while
   `git am` applies one).

@@ -238,17 +238,38 @@ fn mergiraf_hints(ctx: &egui::Context, files: &[ConflictFile]) -> Vec<Mergiraf> 
 /// isn't installed).
 pub(super) fn mergiraf_hint(file: &ConflictFile, patterns: Option<&[String]>) -> Mergiraf {
     if !file.text_only() {
-        let kinds = if file.kinds.is_empty() {
-            "not a text conflict".to_owned()
-        } else {
-            file.kinds.join(", ")
-        };
+        let kinds = plain_kinds(&file.kinds);
         return Mergiraf::NotText(kinds);
     }
     match patterns {
         None => Mergiraf::NotInstalled,
         Some(patterns) if crate::mergiraf::knows(patterns, &file.path) => Mergiraf::Likely,
         Some(_) => Mergiraf::UnknownLanguage,
+    }
+}
+
+/// git's names for what conflicts in a file, in plain words. `contents` is left out beside
+/// another kind (a binary file conflicts in both).
+fn plain_kinds(kinds: &[String]) -> String {
+    let words: Vec<&str> = kinds
+        .iter()
+        .filter(|k| kinds.len() == 1 || *k != "contents")
+        .map(|k| match k.as_str() {
+            "contents" => "both sides changed it",
+            "binary" => "binary file",
+            "modify/delete" => "changed on one side, deleted on the other",
+            "rename/delete" => "renamed on one side, deleted on the other",
+            "rename/rename" => "renamed differently on each side",
+            "file/directory" | "directory/file" => "a file on one side, a folder on the other",
+            "add/add" => "added on both sides",
+            "submodule" => "submodule",
+            other => other,
+        })
+        .collect();
+    if words.is_empty() {
+        "not a text conflict".to_owned()
+    } else {
+        words.join("; ")
     }
 }
 
@@ -265,10 +286,13 @@ pub(super) fn label(op: Op, check: &Check) -> Option<(String, Tone)> {
     match check {
         Check::Checking => Some(("checking…".to_owned(), Tone::Faint)),
         Check::Unavailable(_) => None,
-        Check::Failed(_) => Some(("not checked".to_owned(), Tone::Faint)),
+        Check::Failed(_) => Some(("check failed".to_owned(), Tone::Faint)),
         Check::Done(verdict) => Some(match &verdict.prediction.outcome {
             Outcome::Clean { changes: false } if op == Op::CherryPick => {
                 ("already applied".to_owned(), Tone::Faint)
+            }
+            Outcome::Clean { changes: false } if op == Op::Merge => {
+                ("already merged".to_owned(), Tone::Faint)
             }
             Outcome::Clean { .. } => ("applies cleanly".to_owned(), Tone::Good),
             Outcome::Conflicts { files, .. } => (
@@ -297,14 +321,17 @@ const LISTED: usize = 15;
 pub(super) fn tooltip(op: Op, check: &Check, dirty: bool) -> String {
     let mut text = match check {
         Check::Checking => {
-            "Checking for conflicts in the background; nothing is changed meanwhile".to_owned()
+            "Checking for conflicts; nothing in the repository is changed".to_owned()
         }
         Check::Unavailable(why) => return why.clone(),
         Check::Failed(e) => format!("Couldn't check for conflicts: {e}"),
         Check::Done(verdict) => verdict_text(op, verdict),
     };
-    if dirty && matches!(check, Check::Done(_)) {
-        text.push_str("\n\nUncommitted changes are not part of the check.");
+    if dirty && !matches!(check, Check::Unavailable(_)) {
+        text.push_str(
+            "\n\nUncommitted changes aren't part of the check; git may refuse to start if they \
+             touch these files",
+        );
     }
     text
 }
@@ -313,7 +340,12 @@ fn verdict_text(op: Op, verdict: &Verdict) -> String {
     let commits = verdict.prediction.commits;
     match &verdict.prediction.outcome {
         Outcome::Clean { changes: false } if op == Op::CherryPick => {
-            "Its changes are already there: there is nothing to pick".to_owned()
+            "Its changes are already on the current branch: git would stop with an empty \
+             cherry-pick"
+                .to_owned()
+        }
+        Outcome::Clean { changes: false } if op == Op::Merge => {
+            "Already merged: there is nothing to bring in".to_owned()
         }
         Outcome::Clean { .. } if op == Op::Rebase && commits > 0 => {
             let all = if commits == 1 {
@@ -362,7 +394,7 @@ fn file_lines(files: &[ConflictFile], mergiraf: &[Mergiraf]) -> String {
         let hint = match mergiraf.get(n) {
             Some(Mergiraf::Likely) => "Mergiraf can likely solve it".to_owned(),
             Some(Mergiraf::UnknownLanguage) => "a file type Mergiraf doesn't know".to_owned(),
-            Some(Mergiraf::NotText(kinds)) => format!("{kinds}: to solve by hand"),
+            Some(Mergiraf::NotText(kinds)) => format!("{kinds}: solve by hand"),
             Some(Mergiraf::NotInstalled) | None => "text conflict".to_owned(),
         };
         text.push_str(&format!("\n• {} — {hint}", file.path));
@@ -383,6 +415,8 @@ const SETTLE: Duration = Duration::from_millis(800);
 pub(super) struct TargetWatch {
     key: Option<Key>,
     target: String,
+    /// `target` is the branch's upstream, not the default branch.
+    upstream: bool,
     since: Option<Instant>,
 }
 
@@ -418,11 +452,12 @@ impl RepoTab {
 
     /// The branch the checked-out one is compared with for the toolbar's badge, and its
     /// commit: its upstream, or the default branch when it has none (or it is gone).
-    fn conflict_target(&self) -> Option<(String, String)> {
+    fn conflict_target(&self) -> Option<(String, String, bool)> {
         let current = self.refs.current.as_deref()?;
         let branch = self.refs.local.iter().find(|b| b.name == current)?;
         let upstream = (!branch.upstream.is_empty() && !branch.upstream_gone())
             .then(|| branch.upstream.clone());
+        let is_upstream = upstream.is_some();
         let name = upstream.or_else(|| self.base_ref().map(|b| b.name))?;
         if name == current {
             return None;
@@ -435,7 +470,7 @@ impl RepoTab {
             .find(|b| b.name == name)?
             .target
             .clone();
-        Some((name, target))
+        Some((name, target, is_upstream))
     }
 
     /// The toolbar's badge, when merging the checked-out branch's target into it would
@@ -444,12 +479,13 @@ impl RepoTab {
         let target = self.conflict_target();
         let key = target
             .as_ref()
-            .filter(|(_, commit)| !self.refs.head.is_empty() && *commit != self.refs.head)
-            .map(|(_, commit)| Key::new(Op::Merge, &self.refs.head, commit));
+            .filter(|(_, commit, _)| !self.refs.head.is_empty() && *commit != self.refs.head)
+            .map(|(_, commit, _)| Key::new(Op::Merge, &self.refs.head, commit));
         let watch = &mut self.target_watch;
         if watch.key != key {
             watch.key = key;
-            watch.target = target.map(|(name, _)| name).unwrap_or_default();
+            watch.upstream = target.as_ref().is_some_and(|(_, _, upstream)| *upstream);
+            watch.target = target.map(|(name, _, _)| name).unwrap_or_default();
             watch.since = Some(Instant::now());
         }
         let Some(key) = watch.key.clone() else {
@@ -467,19 +503,24 @@ impl RepoTab {
         let Check::Done(verdict) = &check else {
             return;
         };
-        let what = match &verdict.prediction.outcome {
-            Outcome::Conflicts { .. } => "Conflicts with",
-            Outcome::Unsure(_) => "May conflict with",
-            Outcome::Clean { .. } => return,
+        let Outcome::Conflicts { .. } = &verdict.prediction.outcome else {
+            return;
         };
         let t = Tokens::get(ui.ctx());
         let target = self.target_watch.target.clone();
         let current = self.refs.current.clone().unwrap_or_default();
         ui.add_space(6.0);
-        super::widgets::chip(ui, &format!("{what} {target}"), t.warning).on_hover_text(format!(
-            "Merging {target} into {current} (as a pull would):\n{}",
-            tooltip(Op::Merge, &check, !self.work.is_clean())
-        ));
+        let why = if self.target_watch.upstream {
+            "its upstream"
+        } else {
+            "the default branch; it has no upstream"
+        };
+        super::widgets::chip(ui, &format!("Conflicts with {target}"), t.warning).on_hover_text(
+            format!(
+                "Merging {target} ({why}) into {current} would conflict.\n{}",
+                tooltip(Op::Merge, &check, !self.work.is_clean())
+            ),
+        );
     }
 }
 
@@ -515,6 +556,10 @@ mod tests {
             Some(("already applied".to_owned(), Tone::Faint))
         );
         assert_eq!(label(Op::Rebase, &nothing).map(|l| l.1), Some(Tone::Good));
+        assert_eq!(
+            label(Op::Merge, &nothing),
+            Some(("already merged".to_owned(), Tone::Faint))
+        );
         let three = done(
             Outcome::Conflicts {
                 files: vec![file("a", &[]), file("b", &[]), file("c", &[])],
@@ -553,11 +598,11 @@ mod tests {
         );
         assert_eq!(
             mergiraf_hint(&file("img.rs", &["binary", "contents"]), known),
-            Mergiraf::NotText("binary, contents".to_owned())
+            Mergiraf::NotText("binary file".to_owned())
         );
         assert_eq!(
             mergiraf_hint(&file("gone.rs", &["modify/delete"]), known),
-            Mergiraf::NotText("modify/delete".to_owned())
+            Mergiraf::NotText("changed on one side, deleted on the other".to_owned())
         );
         assert_eq!(
             mergiraf_hint(&file("a.rs", &["contents"]), None),
@@ -594,10 +639,7 @@ mod tests {
             text.contains("• src/a.rs — Mergiraf can likely solve it"),
             "{text}"
         );
-        assert!(
-            text.contains("• b.png — binary: to solve by hand"),
-            "{text}"
-        );
+        assert!(text.contains("• b.png — binary: solve by hand"), "{text}");
         assert!(text.contains("aren't checked"), "{text}");
         assert!(text.contains("Uncommitted changes"), "{text}");
         assert!(!text.contains("Settings → Git"), "{text}");
