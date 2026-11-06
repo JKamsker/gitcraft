@@ -11,6 +11,7 @@ use egui::{
 
 use super::select::Side;
 use super::{DiffData, Kind, LINE_H, NUM_W, Pick};
+use crate::repo::find::{LineMarks, paint_marks};
 use crate::theme::{self, Tokens};
 
 pub(super) fn filler(ui: &Ui, rect: Rect, t: &Tokens) {
@@ -32,6 +33,8 @@ pub(super) fn paint_line(
     selected: bool,
     // Characters of the text selected by dragging.
     text_sel: Option<Range<usize>>,
+    // The find bar's matches in the line.
+    found: Option<LineMarks<'_>>,
 ) -> Option<(Pos2, Arc<egui::Galley>)> {
     let line = data.lines.get(i)?;
     let p = ui.painter().with_clip_rect(rect.intersect(ui.clip_rect()));
@@ -142,6 +145,9 @@ pub(super) fn paint_line(
             0.0,
             t.accent.gamma_multiply(0.35),
         );
+    }
+    if let Some(found) = found {
+        paint_marks(&p, origin, &galley, rect.y_range(), found, t);
     }
     p.galley(origin, galley.clone(), fg);
     Some((origin, galley))

@@ -23,6 +23,8 @@ notify-rust = "4"
 open = "5"
 portable-pty = "0.9"
 pulldown-cmark = { version = "0.13", default-features = false }
+# Find in a diff, a file or blame: its regular expressions and whole-word matching.
+regex = "1"
 rfd = "0.17"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

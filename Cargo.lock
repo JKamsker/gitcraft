@@ -1633,6 +1633,7 @@ dependencies = [
  "open",
  "portable-pty",
  "pulldown-cmark",
+ "regex",
  "rfd",
  "rustix 1.1.6",
  "serde",

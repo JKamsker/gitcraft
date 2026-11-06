@@ -10,6 +10,7 @@ use super::select::{Hit, Side, TextSel, copy_selection, drag_selection};
 use super::{DiffData, Kind, LINE_H, MAP_W, NUM_W, Pick, hunk_changes};
 use crate::git::Area;
 use crate::pull_request::DiffSide;
+use crate::repo::find::{Find, Hit as FoundHit, Seen};
 use crate::repo::pr_review::{
     DiffReview, LineTarget, PrAct, paint_gutter_mark, target_of, unified_spot,
 };
@@ -45,6 +46,11 @@ pub(super) struct Rows<'a> {
     /// Each with whether the pointer is over that line's half, not only at its height.
     pointer_hits: Vec<(Hit, bool)>,
     text_hover: bool,
+    /// The find bar's search, and its match to scroll to this frame.
+    find: Option<&'a Find>,
+    reveal: Option<FoundHit>,
+    /// Where the lines were scrolled this frame, for the find bar.
+    pub(super) seen: Seen,
 }
 
 impl<'a> Rows<'a> {
@@ -80,7 +86,17 @@ impl<'a> Rows<'a> {
             press_hit: None,
             pointer_hits: Vec::new(),
             text_hover: false,
+            find: None,
+            reveal: None,
+            seen: Seen::default(),
         }
+    }
+
+    /// Marks the find bar's matches, and scrolls to `reveal`.
+    pub(super) fn with_find(mut self, find: &'a Find, reveal: Option<FoundHit>) -> Self {
+        self.find = Some(find);
+        self.reveal = reveal;
+        self
     }
 
     /// Shows the lines and the change map; returns the text selection after this frame's drag.
@@ -149,6 +165,15 @@ impl<'a> Rows<'a> {
         if let Some(change) = self.jumped.and_then(|i| changes.get(i)) {
             scroll = scroll.vertical_scroll_offset(offset_of(change.start));
         }
+        if let (Some(find), Some(hit)) = (self.find, self.reveal) {
+            let (y, x) = find.offsets_for(&hit, char_w);
+            if let Some(y) = y {
+                scroll = scroll.vertical_scroll_offset(y);
+            }
+            if let Some(x) = x {
+                scroll = scroll.horizontal_scroll_offset(x);
+            }
+        }
         let out = ui.scope_builder(egui::UiBuilder::new().max_rect(body), |ui| {
             scroll.show_rows(ui, LINE_H, count, |ui, range| {
                 if split {
@@ -172,6 +197,19 @@ impl<'a> Rows<'a> {
         });
         let shown = out.inner;
         self.offset = shown.state.offset.y;
+        let view_w = shown.inner_rect.width();
+        self.seen = Seen {
+            x: shown.state.offset.x,
+            y: shown.state.offset.y,
+            height: shown.inner_rect.height(),
+            // The text's width beside the numbers: in each half side by side.
+            text_w: if split {
+                (view_w / 2.0).floor() - NUM_W - 24.0
+            } else {
+                view_w - NUM_W * 2.0 - 24.0
+            },
+            line_h: LINE_H,
+        };
         change_map(
             ui,
             strip,
@@ -260,8 +298,12 @@ impl<'a> Rows<'a> {
             .text_sel
             .and_then(|s| s.chars_of(i, side))
             .filter(|_| kind.is_some_and(|k| side.shows(k)));
+        let found = self
+            .find
+            .and_then(|f| f.marks(i))
+            .filter(|_| kind.is_some_and(|k| side.shows(k)));
         let placed = paint_line(
-            ui, rect, data, i, side, scroll_x, &self.font, &self.t, picked, sel_chars,
+            ui, rect, data, i, side, scroll_x, &self.font, &self.t, picked, sel_chars, found,
         );
         // Where the drag started and where the pointer is, in this line's text.
         if let Some((origin, galley)) = placed.filter(|_| kind.is_some_and(|k| side.shows(k))) {

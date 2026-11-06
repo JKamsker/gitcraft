@@ -15,6 +15,7 @@ mod dialogs;
 mod diff;
 mod file_text;
 mod file_view;
+mod find;
 pub(crate) mod graph_view;
 pub(crate) mod highlight;
 mod keep_submodules;
@@ -183,6 +184,8 @@ pub struct RepoTab {
     amend: bool,
     dialog: Option<Dialog>,
     search: Search,
+    /// Find in the diff, file or blame shown.
+    find: find::Find,
     /// A commit to select once enough history is loaded (search results, links).
     pending_goto: Option<String>,
 
@@ -329,6 +332,7 @@ impl RepoTab {
             amend: false,
             dialog: None,
             search: Search::default(),
+            find: find::Find::default(),
             pending_goto: None,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
