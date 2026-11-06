@@ -124,7 +124,7 @@ pub fn detect(lines: &[DiffLine]) -> Moves {
         }
     }
     pieces.extend(followers);
-    let blocks = merge_pieces(lines, pieces);
+    let blocks = merge_pieces(lines, &used, pieces);
     let mut of_line = vec![None; lines.len()];
     for (b, block) in blocks.iter().enumerate() {
         for i in block.del.clone().chain(block.add.clone()) {
@@ -191,7 +191,7 @@ fn follow(
             }
             let (d, a) = (del.end + skip_d, add.end + skip_a);
             let between = |from: usize, to: usize, kind: Kind| {
-                (from..to).all(|i| lines.get(i).is_some_and(|l| l.kind == kind))
+                (from..to).all(|i| lines.get(i).is_some_and(|l| l.kind == kind) && !used[i])
             };
             if !between(del.end, d, Kind::Del) || !between(add.end, a, Kind::Add) {
                 continue;
@@ -215,14 +215,15 @@ fn follow(
 /// Joins pieces moved together, with a few lines edited between them, into one block.
 fn merge_pieces(
     lines: &[DiffLine],
+    used: &[bool],
     mut pieces: Vec<(Range<usize>, Range<usize>)>,
 ) -> Vec<MovedBlock> {
     pieces.sort_by_key(|(del, _)| del.start);
     let mut blocks: Vec<MovedBlock> = Vec::new();
     for (del, add) in pieces {
         if let Some(last) = blocks.last_mut()
-            && joins(lines, &last.del, &del, Kind::Del)
-            && joins(lines, &last.add, &add, Kind::Add)
+            && joins(lines, used, &last.del, &del, Kind::Del)
+            && joins(lines, used, &last.add, &add, Kind::Add)
         {
             let edited = last.del.end != del.start || last.add.end != add.start;
             last.exact &= !edited;
@@ -241,10 +242,17 @@ fn merge_pieces(
 
 /// Whether `next` follows `prev` closely enough, with only lines of `kind` between them, to be
 /// the same block.
-fn joins(lines: &[DiffLine], prev: &Range<usize>, next: &Range<usize>, kind: Kind) -> bool {
+fn joins(
+    lines: &[DiffLine],
+    used: &[bool],
+    prev: &Range<usize>,
+    next: &Range<usize>,
+    kind: Kind,
+) -> bool {
+    // Lines of another block between them would end up in two blocks.
     next.start >= prev.end
         && next.start - prev.end <= MAX_EDIT_GAP
-        && lines[prev.end..next.start].iter().all(|l| l.kind == kind)
+        && (prev.end..next.start).all(|i| lines[i].kind == kind && !used[i])
 }
 
 /// One row of a moved block's comparison: the line where it was, the line where it is now.
