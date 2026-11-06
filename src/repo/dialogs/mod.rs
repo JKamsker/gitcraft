@@ -4,6 +4,7 @@ mod bisect;
 mod branch;
 mod confirm;
 mod remote;
+mod test_commits;
 mod upstream;
 mod worktree;
 
@@ -114,6 +115,12 @@ pub enum Dialog {
     /// `git bisect run` with the command typed.
     BisectRun {
         command: String,
+        focus: bool,
+    },
+    /// Test a range of commits; `stored` is the repository's test command.
+    TestCommits {
+        start: crate::repo::test_lane::StartTests,
+        stored: Option<String>,
         focus: bool,
     },
 }
@@ -426,6 +433,13 @@ impl RepoTab {
                 ),
                 Dialog::BisectRun { command, focus } => {
                     bisect::bisect_run(ui, enter, &machine, command, focus)
+                }
+                Dialog::TestCommits {
+                    start,
+                    stored,
+                    focus,
+                } => {
+                    test_commits::test_commits(ui, enter, &machine, start, stored.as_deref(), focus)
                 }
                 Dialog::Confirm {
                     title,

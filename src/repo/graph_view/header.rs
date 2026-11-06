@@ -62,6 +62,8 @@ pub(super) fn header_menu(resp: &Response, settings: &Settings) {
             ui.checkbox(&mut next.show_author, "Author");
             ui.checkbox(&mut next.show_when, "When");
             ui.checkbox(&mut next.show_date, "Date");
+            ui.checkbox(&mut next.show_test_lane, "Tests")
+                .on_hover_text(crate::repo::TEST_LANE_TIP);
             ui.separator();
             let mut compact = next.compact_graph;
             if ui
