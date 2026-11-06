@@ -532,9 +532,11 @@ impl RepoTab {
     fn restore_selection(&mut self, previous: Option<String>, ctx: &egui::Context) {
         // A commit of the reflog view that the graph didn't have: shown there once it has it
         // (made a branch of), kept in the detail pane until then.
-        if let Some(hash) = self.reflog_commit_off_graph() {
+        // An operation that left conflicts goes to the changes row first.
+        if let Some(hash) = self.reflog_commit_off_graph().filter(|_| !self.focus_wip) {
             if let Some(row) = self.index.get(&hash).copied() {
                 self.select(row, ctx);
+                self.scroll_to = Some(row);
             }
             return;
         }
@@ -562,6 +564,7 @@ impl RepoTab {
             None => {
                 self.selected = None;
                 self.detail = None;
+                self.detail_hash = None;
             }
         }
     }

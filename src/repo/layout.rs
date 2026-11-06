@@ -136,10 +136,10 @@ impl RepoTab {
                 acts.push(Action::ClosePr);
             } else if esc && self.compare.is_some() {
                 acts.push(Action::CloseCompare);
-            } else if esc && self.reflog.is_some() {
-                acts.push(Action::CloseReflog);
             } else if esc && self.search.open {
                 acts.push(Action::ToggleSearch);
+            } else if esc && self.reflog.is_some() {
+                acts.push(Action::CloseReflog);
             }
             let diff_shown =
                 self.diff.is_some() && self.conflict.is_none() && self.rebase.is_none();

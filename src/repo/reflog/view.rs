@@ -16,8 +16,10 @@ const KIND_W: f32 = 96.0;
 const DATE_W: f32 = 112.0;
 const AGO_W: f32 = 104.0;
 const MOVE_W: f32 = 160.0;
-/// Narrower than this, the date column is left out.
-const ROOM_FOR_DATE: f32 = 680.0;
+/// Narrower than this, the date column is left out (it is in the hover too)…
+const ROOM_FOR_DATE: f32 = 900.0;
+/// …and narrower than this, the old → new hashes: what the entry says goes last.
+const ROOM_FOR_MOVE: f32 = 600.0;
 /// How close to the end of the list scrolling reads the next page.
 const READ_AHEAD: usize = 30;
 
@@ -53,16 +55,19 @@ impl RepoTab {
                     .stroke(Stroke::new(1.0, t.separator)),
             )
             .show(ui, |ui| {
-                ui.horizontal(|ui| match view.selected_pick() {
+                // Wrapped: a narrow pane must not push the buttons past its edge.
+                ui.horizontal_wrapped(|ui| match view.selected_pick() {
                     Some(pick) => self.reflog_buttons(ui, &pick, acts),
                     None => {
-                        ui.label(
-                            egui::RichText::new(
-                                "Select an entry to see its commit, then make a branch there or \
-                                 cherry-pick it",
-                            )
-                            .color(t.text_faint),
-                        );
+                        let hint = match view.source {
+                            Source::Ref(_) => {
+                                "Select an entry to see its commit; Create branch here gets it back"
+                            }
+                            Source::Lost => {
+                                "Select a commit to see it; Create branch here gets it back"
+                            }
+                        };
+                        ui.label(egui::RichText::new(hint).color(t.text_faint));
                     }
                 });
             });
@@ -76,19 +81,7 @@ impl RepoTab {
     fn reflog_bar(&self, ui: &mut Ui, view: &ReflogView, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         ui.horizontal(|ui| {
-            icons::inline(ui, "history", 16.0, t.icon);
-            ui.label(egui::RichText::new("Reflog").font(theme::medium(13.0)));
-            ui.add_space(8.0);
-            let on = usize::from(view.source == Source::Lost);
-            match widgets::switch(ui, &["Reflog", "Lost commits"], on) {
-                Some(0) => acts.push(Action::Reflog(ReflogAct::Show(Source::head()))),
-                Some(_) => acts.push(Action::Reflog(ReflogAct::Show(Source::Lost))),
-                None => {}
-            }
-            if let Source::Ref(reference) = &view.source {
-                ui.add_space(8.0);
-                self.ref_picker(ui, reference, acts);
-            }
+            // Close and reload first, from the right: the rest gets what is left, never them.
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if icons::small_button(ui, "x", "Close (Esc)").clicked() {
                     acts.push(Action::CloseReflog);
@@ -100,6 +93,20 @@ impl RepoTab {
                 if icons::small_button(ui, "refresh-cw", tip).clicked() {
                     acts.push(Action::Reflog(ReflogAct::Reload));
                 }
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    ui.set_clip_rect(ui.max_rect().intersect(ui.clip_rect()));
+                    icons::inline(ui, "history", 16.0, t.icon);
+                    let on = usize::from(view.source == Source::Lost);
+                    match widgets::switch(ui, &["Reflog", "Lost commits"], on) {
+                        Some(0) => acts.push(Action::Reflog(ReflogAct::Show(Source::head()))),
+                        Some(_) => acts.push(Action::Reflog(ReflogAct::Show(Source::Lost))),
+                        None => {}
+                    }
+                    if let Source::Ref(reference) = &view.source {
+                        ui.add_space(8.0);
+                        self.ref_picker(ui, reference, acts);
+                    }
+                });
             });
         });
     }
@@ -149,7 +156,7 @@ impl RepoTab {
         let rows = view.entries.len() + usize::from(view.more);
         ui.spacing_mut().item_spacing.y = 0.0;
         egui::ScrollArea::vertical()
-            .id_salt(("reflog-list", self.repo_key(), reference))
+            .id_salt(("reflog-list", &self.path, reference))
             .auto_shrink(false)
             .show_rows(ui, ROW_H, rows, |ui, range| {
                 if range.end + READ_AHEAD >= view.entries.len() && view.more && !view.loading {
@@ -174,7 +181,19 @@ impl RepoTab {
         acts: &mut Vec<Action>,
     ) {
         let t = Tokens::get(ui.ctx());
-        let (rect, resp) = widgets::keyed_row(ui, ROW_H, ("reflog-entry", i));
+        // Known by the entry, not its place: a reload adds entries on top, and a menu left open
+        // must stay this entry's.
+        let (rect, resp) = widgets::keyed_row(
+            ui,
+            ROW_H,
+            (
+                "reflog-entry",
+                &e.new,
+                e.time,
+                &e.message.action,
+                &e.message.detail,
+            ),
+        );
         paint_row_back(ui, rect, view.selected == Some(i), resp.hovered());
         let mid = rect.center().y;
         let cols = Columns::of(rect);
@@ -206,17 +225,19 @@ impl RepoTab {
                 t.text_faint,
             );
         }
-        let moved = match &e.old {
-            Some(old) if *old != e.new => format!("{} → {}", short(old), short(&e.new)),
-            _ => short(&e.new).to_owned(),
-        };
-        p.text(
-            pos2(cols.move_end, mid),
-            Align2::RIGHT_CENTER,
-            moved,
-            theme::mono(11.0),
-            t.text_dim,
-        );
+        if let Some(move_end) = cols.move_end {
+            let moved = match &e.old {
+                Some(old) if *old != e.new => format!("{} → {}", short(old), short(&e.new)),
+                _ => short(&e.new).to_owned(),
+            };
+            p.text(
+                pos2(move_end, mid),
+                Align2::RIGHT_CENTER,
+                moved,
+                theme::mono(11.0),
+                t.text_dim,
+            );
+        }
         times(&p, &t, &cols, mid, e.time, &e.date, now);
         let resp = resp.on_hover_text(entry_tip(e, now));
         self.row_clicks(&resp, i, &Pick::of_entry(e), acts);
@@ -247,7 +268,7 @@ impl RepoTab {
         let now = git::now();
         ui.spacing_mut().item_spacing.y = 0.0;
         egui::ScrollArea::vertical()
-            .id_salt(("lost-list", self.repo_key()))
+            .id_salt(("lost-list", &self.path))
             .auto_shrink(false)
             .show_rows(ui, ROW_H, found.len(), |ui, range| {
                 for i in range {
@@ -281,7 +302,7 @@ impl RepoTab {
             t.text_dim,
         );
         let text = ui.painter_at(Rect::from_x_y_ranges(
-            hash.right() + 12.0..=cols.move_end,
+            hash.right() + 12.0..=cols.ago_end - AGO_W,
             rect.y_range(),
         ));
         let said = text.text(
@@ -300,7 +321,7 @@ impl RepoTab {
         );
         times(&p, &t, &cols, mid, c.time, &c.date, now);
         let tip = format!(
-            "{}\n{}\n{}, {} ({})",
+            "{}\n{}\nBy {}, committed {} ({})",
             c.hash,
             c.summary,
             c.author,
@@ -326,11 +347,11 @@ impl RepoTab {
     }
 }
 
-/// Where a row's columns end, from the right.
+/// Where a row's columns end, from the right; those there is no room for are `None`.
 struct Columns {
     date_end: Option<f32>,
     ago_end: f32,
-    move_end: f32,
+    move_end: Option<f32>,
     /// Where the entry's text has to stop.
     text_end: f32,
 }
@@ -344,12 +365,16 @@ impl Columns {
         } else {
             right
         };
-        let move_end = ago_end - AGO_W;
+        let move_end = (rect.width() >= ROOM_FOR_MOVE).then_some(ago_end - AGO_W);
+        let text_end = match move_end {
+            Some(end) => end - MOVE_W,
+            None => ago_end - AGO_W,
+        };
         Self {
             date_end,
             ago_end,
             move_end,
-            text_end: move_end - MOVE_W,
+            text_end,
         }
     }
 }

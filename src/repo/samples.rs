@@ -22,7 +22,7 @@ impl RepoTab {
                 acts.push(Action::Reflog(ReflogAct::Show(Source::head())));
                 acts.push(Action::Reflog(ReflogAct::Select(0)));
                 acts.push(Action::Reflog(ReflogAct::Show(Source::branch("main"))));
-                acts.push(Action::Reflog(ReflogAct::Show(Source::Lost)));
+                acts.push(Action::Reflog(ReflogAct::FindLost));
                 acts.push(Action::CloseReflog);
                 if let Some(file) = self.work.unstaged.first() {
                     acts.push(Action::OpenDiff(DiffKey::Work(file.clone())));

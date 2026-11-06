@@ -339,3 +339,55 @@ fn a_scan_cancelled_while_it_runs_says_so() -> Result<(), String> {
     assert!(cancel.is_cancelled());
     Ok(())
 }
+
+/// A branch moved from another worktree leaves no entry in this one's HEAD reflog: the commit
+/// made after it doesn't claim to come from the entry before.
+#[test]
+fn a_move_made_from_another_worktree_leaves_where_it_came_from_unknown() -> Result<(), String> {
+    let repo = Repo::new("worktree-move")?;
+    repo.commit("c1")?;
+    let c2 = repo.commit("c2")?;
+    repo.commit("c3")?;
+    let other = repo.path().with_file_name(format!(
+        "gitcraft-reflog-worktree-move-wt-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&other);
+    let path = other.to_string_lossy().into_owned();
+    repo.git(&["worktree", "add", "-q", &path, "-b", "other", &c2])?;
+    let moved = run(Some(&other), &["update-ref", "refs/heads/main", "HEAD"]);
+    let c4 = repo.commit("c4");
+    let _ = repo.git(&["worktree", "remove", "--force", &path]);
+    let _ = std::fs::remove_dir_all(&other);
+    moved?;
+    let c4 = c4?;
+    let page = repo.read("HEAD")?;
+    assert_eq!(page.entries[0].new, c4);
+    assert_eq!(page.entries[0].parents, std::slice::from_ref(&c2));
+    assert_eq!(page.entries[0].old, None);
+    // The commits made one after the other still say where they came from.
+    assert_eq!(page.entries[1].old.as_deref(), Some(c2.as_str()));
+    Ok(())
+}
+
+/// A stash still there (`stash@{1}` is only in the stash's reflog) isn't lost; a dropped one
+/// is, once, without its index commit.
+#[test]
+fn live_stashes_are_not_lost_and_a_dropped_one_is() -> Result<(), String> {
+    let repo = Repo::new("stashes")?;
+    repo.commit("base")?;
+    for n in ["one", "two", "three"] {
+        std::fs::write(repo.path().join("work.txt"), n).map_err(|e| e.to_string())?;
+        repo.git(&["add", "-A"])?;
+        repo.git(&["stash", "push", "-q", "-m", n])?;
+    }
+    assert!(repo.lost()?.is_empty());
+    let dropped = repo.git(&["rev-parse", "stash@{1}"])?;
+    repo.git(&["stash", "drop", "-q", "stash@{1}"])?;
+    let found = lost_commits(repo.path(), &Cancel::default())?;
+    let hashes: Vec<&str> = found.iter().map(|c| c.hash.as_str()).collect();
+    assert_eq!(hashes, [dropped.as_str()]);
+    assert!(found[0].stash);
+    assert_eq!(found[0].summary, "On main: two");
+    Ok(())
+}

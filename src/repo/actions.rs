@@ -349,7 +349,7 @@ impl RepoTab {
             (
                 "Find lost commits".into(),
                 "recovery".into(),
-                Action::Reflog(reflog::ReflogAct::Show(reflog::Source::Lost)),
+                Action::Reflog(reflog::ReflogAct::FindLost),
             ),
             (
                 "Toggle terminal".into(),

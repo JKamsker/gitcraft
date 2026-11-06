@@ -195,6 +195,13 @@ fn the_scan_finds_what_an_expired_reflog_lost_and_a_cancelled_scan_keeps_it() ->
         &ctx,
         Action::Reflog(ReflogAct::Show(Source::Lost)),
     )?;
+    // The tab only explains the scan: it reads every object, so it waits to be asked.
+    assert!(
+        tab.reflog
+            .as_ref()
+            .is_some_and(|v| v.lost.is_none() && v.scan.is_none())
+    );
+    act(&mut tab, &ctx, Action::Reflog(ReflogAct::FindLost))?;
     let found = |tab: &RepoTab| -> Vec<String> {
         tab.reflog
             .as_ref()
@@ -240,7 +247,7 @@ fn closing_the_view_stops_its_scan() -> Result<(), String> {
     if !until(&mut tab, &ctx, idle) {
         return Err("the repository never opened".to_owned());
     }
-    tab.apply(Action::Reflog(ReflogAct::Show(Source::Lost)), &ctx);
+    tab.apply(Action::Reflog(ReflogAct::FindLost), &ctx);
     let cancel = tab
         .reflog
         .as_ref()
@@ -252,6 +259,94 @@ fn closing_the_view_stops_its_scan() -> Result<(), String> {
     // Its answer, when it comes, goes nowhere.
     std::thread::sleep(Duration::from_millis(200));
     tab.poll(&ctx);
+    assert!(tab.reflog.is_none());
+    Ok(())
+}
+
+/// Leaving the view (closing it, or another list) takes the detail pane off a commit the
+/// graph doesn't have; a lost commit made a branch of drops off the lost list; an operation
+/// that leaves conflicts still goes to the changes row.
+#[test]
+fn leaving_an_off_graph_commit_and_recovering_one() -> Result<(), String> {
+    let repo = Repo::new("leave")?;
+    repo.commit("base.txt")?;
+    let lost = repo.commit("lost.txt")?;
+    repo.git(&["reset", "-q", "--hard", "HEAD~1"])?;
+    let head = git::head(repo.path());
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new(repo.path().to_owned(), &ctx);
+    if !until(&mut tab, &ctx, idle) {
+        return Err("the repository never opened".to_owned());
+    }
+    act(
+        &mut tab,
+        &ctx,
+        Action::Reflog(ReflogAct::Show(Source::head())),
+    )?;
+    let at = tab
+        .reflog
+        .as_ref()
+        .and_then(|v| v.entries.iter().position(|e| e.new == lost))
+        .ok_or("not listed")?;
+    act(&mut tab, &ctx, Action::Reflog(ReflogAct::Select(at)))?;
+    assert_eq!(tab.detail_hash.as_deref(), Some(lost.as_str()));
+    // Another list: the entries of the one before are not shown under its name.
+    tab.apply(
+        Action::Reflog(ReflogAct::Show(Source::branch("main"))),
+        &ctx,
+    );
+    assert!(tab.reflog.as_ref().is_some_and(|v| v.entries.is_empty()));
+    assert_eq!(tab.detail_hash.as_deref(), Some(head.as_str()));
+    until(&mut tab, &ctx, idle);
+
+    // An operation left conflicts: the changes row, not the lost commit.
+    act(
+        &mut tab,
+        &ctx,
+        Action::Reflog(ReflogAct::Show(Source::head())),
+    )?;
+    act(&mut tab, &ctx, Action::Reflog(ReflogAct::Select(at)))?;
+    std::fs::write(repo.path().join("dirty.txt"), "x").map_err(|e| e.to_string())?;
+    tab.focus_wip = true;
+    act(&mut tab, &ctx, Action::Reload)?;
+    assert!(until(&mut tab, &ctx, |t| t
+        .selected
+        .is_some_and(|r| t.is_wip(r))));
+    assert!(!tab.focus_wip);
+
+    // Found by the scan, made a branch of: no longer lost.
+    act(&mut tab, &ctx, Action::Reflog(ReflogAct::FindLost))?;
+    let listed = |t: &RepoTab| {
+        t.reflog
+            .as_ref()
+            .and_then(|v| v.lost_commits())
+            .map(<[_]>::len)
+    };
+    assert_eq!(listed(&tab), Some(1));
+    act(
+        &mut tab,
+        &ctx,
+        Action::Ops {
+            label: "Create branch back".to_owned(),
+            ops: crate::repo::ops(&[&["branch", "back", &lost]]),
+            refresh: crate::repo::Refresh::All,
+        },
+    )?;
+    assert!(until(&mut tab, &ctx, |t| listed(t) == Some(0)));
+
+    // Closing the view with a lost commit shown goes back to the graph's selection.
+    act(
+        &mut tab,
+        &ctx,
+        Action::Reflog(ReflogAct::Show(Source::head())),
+    )?;
+    let reset_at = tab
+        .reflog
+        .as_ref()
+        .and_then(|v| v.entries.iter().position(|e| e.new == lost))
+        .ok_or("not listed")?;
+    act(&mut tab, &ctx, Action::Reflog(ReflogAct::Select(reset_at)))?;
+    act(&mut tab, &ctx, Action::CloseReflog)?;
     assert!(tab.reflog.is_none());
     Ok(())
 }

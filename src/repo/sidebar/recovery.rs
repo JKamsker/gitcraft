@@ -21,21 +21,29 @@ impl RepoTab {
                 "Reflog",
                 "Where HEAD and each branch have been",
                 Source::head(),
+                ReflogAct::Show(Source::head()),
             ),
             (
                 "search",
                 "Find lost commits",
                 "Commits no branch, tag or stash has any more",
                 Source::Lost,
+                ReflogAct::FindLost,
             ),
         ];
+        // What the last scan found, still lost.
+        let found = self
+            .reflog
+            .as_ref()
+            .and_then(|v| v.lost_commits())
+            .map_or(0, <[_]>::len);
         let open = sections.add(
             ui,
             Header {
                 key: "recovery",
                 icon: "history",
-                title: "REFLOG",
-                count: rows.len(),
+                title: "RECOVERY",
+                count: found,
                 default_open: false,
                 button: None,
             },
@@ -45,7 +53,7 @@ impl RepoTab {
         }
         let t = Tokens::get(ui.ctx());
         let shown = self.reflog.as_ref().map(|v| &v.source);
-        for (icon, title, about, source) in rows {
+        for (icon, title, about, source, act) in rows {
             let (_, rect) = ui.allocate_space(vec2(ui.available_width(), 36.0));
             let r = ui.interact(rect, ui.id().with(("recovery-row", title)), Sense::click());
             let on = matches!(
@@ -80,8 +88,9 @@ impl RepoTab {
                 egui::FontId::proportional(11.0),
                 t.text_faint,
             );
+            let r = r.on_hover_text(about);
             if r.clicked() {
-                acts.push(Action::Reflog(ReflogAct::Show(source)));
+                acts.push(Action::Reflog(act));
             }
         }
     }

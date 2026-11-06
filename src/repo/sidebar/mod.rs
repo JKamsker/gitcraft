@@ -143,7 +143,11 @@ impl RepoTab {
             ("worktrees", "folder-tree", Some("Worktrees")),
             ("submodules", "package", submodules),
             ("stashes", "archive", Some("Stashes")),
-            ("recovery", "history", Some("Reflog and lost commits")),
+            (
+                "recovery",
+                "history",
+                Some("Recovery: reflog and lost commits"),
+            ),
             ("prs", "git-pull-request", prs),
             ("tags", "tag", tags),
         ];
