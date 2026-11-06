@@ -6,7 +6,7 @@ use super::pull::PullMode;
 use super::toolbar::reveal_label;
 use super::{
     Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view, ops,
-    pr_review, quick_edit,
+    pr_review, quick_edit, reflog,
 };
 use crate::git::{self, InProgress};
 use crate::terminal::ShellSpec;
@@ -38,6 +38,9 @@ pub(crate) enum Action {
     CloseCi,
     /// Something done in the pipeline view.
     Ci(ci_view::CiAct),
+    /// Something done in the reflog view (opening it on a reflog, or on the lost commits).
+    Reflog(reflog::ReflogAct),
+    CloseReflog,
     CloseDiff,
     Ops {
         label: String,
@@ -337,6 +340,16 @@ impl RepoTab {
                 "Search commits".into(),
                 "Ctrl+F".into(),
                 Action::ToggleSearch,
+            ),
+            (
+                "Reflog".into(),
+                "recovery".into(),
+                Action::Reflog(reflog::ReflogAct::Show(reflog::Source::head())),
+            ),
+            (
+                "Find lost commits".into(),
+                "recovery".into(),
+                Action::Reflog(reflog::ReflogAct::Show(reflog::Source::Lost)),
             ),
             (
                 "Toggle terminal".into(),

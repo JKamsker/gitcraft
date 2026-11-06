@@ -423,6 +423,7 @@ impl RepoTab {
         self.rebuild(ctx);
         self.hint_avatars(ctx);
         self.reload_compare(ctx);
+        self.reflog_after_reload(ctx);
     }
 
     /// Appends a page of older history that `load_more` read.
@@ -529,6 +530,14 @@ impl RepoTab {
 
     /// Keeps the selection; otherwise starts on the changes, or HEAD.
     fn restore_selection(&mut self, previous: Option<String>, ctx: &egui::Context) {
+        // A commit of the reflog view that the graph didn't have: shown there once it has it
+        // (made a branch of), kept in the detail pane until then.
+        if let Some(hash) = self.reflog_commit_off_graph() {
+            if let Some(row) = self.index.get(&hash).copied() {
+                self.select(row, ctx);
+            }
+            return;
+        }
         let mut keep = previous.as_ref().and_then(|h| self.index.get(h).copied());
         if std::mem::take(&mut self.focus_wip) && self.index.contains_key(WIP_HASH) {
             keep = None;

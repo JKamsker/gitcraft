@@ -42,7 +42,7 @@ impl RepoTab {
         }
         let Some(detail) = &self.detail else {
             ui.centered_and_justified(|ui| {
-                if self.selected.is_some() {
+                if self.selected.is_some() || self.detail_hash.is_some() {
                     ui.add(crate::spinner::Spinner::new());
                 } else {
                     ui.label(RichText::new("Select a commit").color(t.text_dim));
