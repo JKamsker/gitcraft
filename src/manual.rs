@@ -5,7 +5,7 @@ use egui::{RichText, Ui};
 use crate::theme::{self, Tokens};
 
 /// Ctrl, or Cmd on macOS, as the shortcuts are written.
-fn command() -> &'static str {
+pub(crate) fn command() -> &'static str {
     if cfg!(target_os = "macos") {
         "Cmd"
     } else {
@@ -71,7 +71,7 @@ const FEATURES: &[(&str, &[&str])] = &[
 ];
 
 /// Keyboard and mouse shortcuts: (keys, what they do). `Cmd` stands for Ctrl outside macOS.
-const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
+pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
     (
         "Window",
         &[
@@ -79,6 +79,7 @@ const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("Cmd+W", "Close the tab (or middle-click it)"),
             ("Cmd+Shift+T", "Reopen the tab closed last"),
             ("Cmd+P", "Command palette: every action and branch"),
+            ("Cmd+,", "Settings"),
             ("F5", "Reload the repository"),
             ("F1", "This manual"),
         ],
@@ -116,6 +117,14 @@ const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
                 "Copy the selection (without one, it goes to the shell)",
             ),
             ("Cmd+Shift+C", "Copy the selection"),
+        ],
+    ),
+    (
+        "Settings",
+        &[
+            ("Cmd+F", "Search the settings"),
+            ("Esc", "Clear the search"),
+            ("Alt+↑ / Alt+↓", "Previous / next page"),
         ],
     ),
 ];
@@ -160,19 +169,23 @@ pub fn ui(ui: &mut Ui) {
             .min_col_width(170.0)
             .show(ui, |ui| {
                 for (combo, what) in *keys {
-                    ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing.x = 4.0;
-                        for (n, part) in combo.split(" / ").enumerate() {
-                            if n > 0 {
-                                ui.label(RichText::new("/").color(t.text_faint));
-                            }
-                            key_chip(ui, &part.replace("Cmd", command()));
-                        }
-                    });
+                    ui.horizontal(|ui| key_combo(ui, &combo.replace("Cmd", command())));
                     ui.label(RichText::new(*what).color(t.text_dim));
                     ui.end_row();
                 }
             });
+    }
+}
+
+/// Key combinations, `a / b`, each drawn like a keycap.
+pub(crate) fn key_combo(ui: &mut Ui, combo: &str) {
+    let t = Tokens::get(ui.ctx());
+    ui.spacing_mut().item_spacing.x = 4.0;
+    for (n, part) in combo.split(" / ").enumerate() {
+        if n > 0 {
+            ui.label(RichText::new("/").color(t.text_faint));
+        }
+        key_chip(ui, part);
     }
 }
 
