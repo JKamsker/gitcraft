@@ -56,6 +56,22 @@ pub struct Unpushed {
     /// Its upstream, when it has one; without, the commits counted are those on no remote.
     pub upstream: Option<String>,
     pub commits: u32,
+    pub tracks: Tracks,
+}
+
+/// What a branch with unpushed commits tracks, which says where a push of it would go.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Tracks {
+    /// A remote's branch of the same name.
+    SameName,
+    /// A remote's branch of another name (`feature` made from `origin/main` tracks it).
+    OtherName,
+    /// Nothing.
+    Nothing,
+    /// A remote's branch that was deleted there.
+    Gone,
+    /// A branch of this repository.
+    Local,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -412,6 +428,11 @@ fn parse(sections: &[Section], path: impl Fn(&str) -> PathBuf) -> Result<Overvie
         .strip_prefix("refs/heads/")
         .map(str::to_owned);
     let refs = read_refs(&text(find(sections, "refs")));
+    let remotes: Vec<String> = text(find(sections, "remotes"))
+        .lines()
+        .map(|r| r.trim().to_owned())
+        .filter(|r| !r.is_empty())
+        .collect();
     let mut o = Overview {
         head: line("head"),
         changed: parse_status(&String::from_utf8_lossy(&status.out)).changed_files(),
@@ -432,21 +453,36 @@ fn parse(sections: &[Section], path: impl Fn(&str) -> PathBuf) -> Result<Overvie
         if r.gone() {
             o.gone.push(r.name.clone());
         } else if r.tracks_remote() && ahead > 0 {
+            // By the full name: a remote's own name can hold a `/`.
+            let same = remotes
+                .iter()
+                .any(|remote| r.upstream_ref == format!("refs/remotes/{remote}/{}", r.name));
             o.unpushed.push(Unpushed {
                 branch: r.name.clone(),
                 upstream: Some(r.upstream.clone()),
                 commits: ahead,
+                tracks: if same {
+                    Tracks::SameName
+                } else {
+                    Tracks::OtherName
+                },
             });
         }
     }
     for s in sections.iter().filter(|s| s.code == 0) {
         if let Some(name) = s.key.strip_prefix("count:") {
             let commits = String::from_utf8_lossy(&s.out).trim().parse().unwrap_or(0);
+            let tracks = match refs.iter().find(|r| r.name == name) {
+                Some(r) if r.gone() => Tracks::Gone,
+                Some(r) if !r.upstream_ref.is_empty() => Tracks::Local,
+                _ => Tracks::Nothing,
+            };
             if commits > 0 {
                 o.unpushed.push(Unpushed {
                     branch: name.to_owned(),
                     upstream: None,
                     commits,
+                    tracks,
                 });
             }
         } else if let Some(p) = s.key.strip_prefix("wt:") {

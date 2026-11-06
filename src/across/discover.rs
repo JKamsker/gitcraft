@@ -1,6 +1,7 @@
 //! Finding the repositories on a machine gitcraft hasn't opened yet: here, in a WSL
 //! distribution, or on an SSH host of `~/.ssh/config`. The home folder is searched a few levels
-//! deep (hidden folders and `node_modules` skipped), in one round trip for another machine.
+//! deep (hidden folders, `node_modules`, `AppData` and `Library` skipped, and not inside a
+//! repository), in one round trip for another machine.
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -16,6 +17,16 @@ pub const MAX_FOUND: usize = 300;
 /// How long a search of another machine may take.
 const SEARCH_FOR: Duration = Duration::from_secs(60);
 
+/// Hosts of `~/.ssh/config` that are forges, where nobody's home folder holds their work.
+const FORGES: [&str; 6] = [
+    "github.com",
+    "gitlab.com",
+    "codeberg.org",
+    "bitbucket.org",
+    "ssh.github.com",
+    "altssh.gitlab.com",
+];
+
 /// A machine whose repositories can be looked for.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Machine {
@@ -30,10 +41,24 @@ impl Machine {
             Machine::There(host) => host.label(),
         }
     }
+
+    /// The machine `repo` (in the form the app gives paths) is on.
+    pub fn of(repo: &Path) -> Machine {
+        remote::parse(repo).map_or(Machine::Here, |t| Machine::There(t.host))
+    }
 }
 
-/// This computer, the WSL distributions installed and the hosts of `~/.ssh/config`. Asks
-/// `wsl.exe` on Windows: not on the window's thread.
+/// What a search found.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Found {
+    /// The repositories, sorted.
+    pub repos: Vec<PathBuf>,
+    /// Whether the search stopped at [`MAX_FOUND`], with more left unsearched.
+    pub cut: bool,
+}
+
+/// This computer, the WSL distributions installed and the hosts of `~/.ssh/config` (less the
+/// forges). Asks `wsl.exe` on Windows: not on the window's thread.
 pub fn machines() -> Vec<Machine> {
     let mut all = vec![Machine::Here];
     all.extend(
@@ -44,14 +69,21 @@ pub fn machines() -> Vec<Machine> {
     all.extend(
         remote::ssh_config_hosts()
             .into_iter()
-            .filter(|h| remote::valid_ssh_host(h))
+            .filter(|h| remote::valid_ssh_host(h) && !is_forge(h))
             .map(|h| Machine::There(Host::Ssh(h))),
     );
     all
 }
 
+/// Whether `host` (`git@github.com`, `gitlab.com:22`) is one of the [`FORGES`].
+fn is_forge(host: &str) -> bool {
+    let name = host.rsplit('@').next().unwrap_or(host);
+    let name = name.split(':').next().unwrap_or(name);
+    FORGES.iter().any(|f| f.eq_ignore_ascii_case(name))
+}
+
 /// The repositories under the home folder of `machine`, in the form the app gives paths.
-pub fn find_repos(machine: &Machine) -> Result<Vec<PathBuf>, String> {
+pub fn find_repos(machine: &Machine) -> Result<Found, String> {
     match machine {
         Machine::Here => {
             let home = home_dir().ok_or("couldn't tell where your home folder is")?;
@@ -68,23 +100,25 @@ fn home_dir() -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
-/// Whether a folder met on the way down is skipped: hidden ones (caches, `.cargo`…) and
-/// dependency folders, which hold copies of other people's repositories.
+/// Whether a folder met on the way down is skipped: hidden ones (caches, `.cargo`…),
+/// dependency folders, which hold copies of other people's repositories, and the system's own
+/// folders of a home (Windows' `AppData`, macOS' `Library`).
 fn skipped(name: &str) -> bool {
-    name.starts_with('.') || name == "node_modules"
+    name.starts_with('.') || ["node_modules", "AppData", "Library"].contains(&name)
 }
 
 /// The repositories under `root` here, at most `depth` folders down: a folder with a `.git`
 /// (folder, or file for a worktree) is one, and isn't looked into further.
-pub fn find_under(root: &Path, depth: usize) -> Vec<PathBuf> {
-    let mut found = Vec::new();
+pub fn find_under(root: &Path, depth: usize) -> Found {
+    let mut found = Found::default();
     let mut todo = vec![(root.to_owned(), 0)];
     while let Some((dir, level)) = todo.pop() {
-        if found.len() >= MAX_FOUND {
+        if found.repos.len() >= MAX_FOUND {
+            found.cut = true;
             break;
         }
         if level > 0 && dir.join(".git").exists() {
-            found.push(dir);
+            found.repos.push(dir);
             continue;
         }
         if level >= depth {
@@ -102,55 +136,53 @@ pub fn find_under(root: &Path, depth: usize) -> Vec<PathBuf> {
         subdirs.sort();
         todo.extend(subdirs.into_iter().rev().map(|d| (d, level + 1)));
     }
-    found.sort();
+    found.repos.sort();
     found
 }
 
 /// The script that lists, from the home folder, the folders holding a `.git` (see
-/// [`find_under`]): `$HOME` on the first line, then each one relative to it.
+/// [`find_under`]): `$HOME` on the first line, then each one relative to it, one more than
+/// [`MAX_FOUND`] at most (to tell a cut list). It doesn't look into a repository: its nested
+/// ones (submodules, vendored copies) aren't the user's.
 fn script() -> String {
     format!(
         concat!(
-            "cd \"$HOME\" 2>/dev/null || {{ echo 'gitcraft: no home folder' >&2; exit 1; }}\n",
+            "[ -n \"$HOME\" ] && cd \"$HOME\" 2>/dev/null || ",
+            "{{ echo 'gitcraft: no home folder' >&2; exit 1; }}\n",
             "printf '%s\\n' \"$HOME\"\n",
-            "find . -maxdepth {depth} \\( -name .git -print -prune \\) -o ",
-            "\\( -type d \\( -name '.?*' -o -name node_modules \\) -prune \\) 2>/dev/null ",
+            "find . -mindepth 1 -maxdepth {depth} -type d ",
+            "\\( -name '.?*' -o -name node_modules -o -name AppData -o -name Library \\) -prune ",
+            "-o -type d -exec test -e '{{}}/.git' \\; -print -prune 2>/dev/null ",
             "| head -n {max}\n",
             "exit 0\n",
         ),
-        depth = DEPTH + 1,
-        max = MAX_FOUND,
+        depth = DEPTH,
+        max = MAX_FOUND + 1,
     )
 }
 
 /// The repositories [`script`]'s output names, as paths of `host`.
-fn parse_found(out: &str, host: &Host) -> Vec<PathBuf> {
+fn parse_found(out: &str, host: &Host) -> Found {
     let mut lines = out.lines();
     let Some(home) = lines.next().map(|h| h.trim_end_matches('/')) else {
-        return Vec::new();
+        return Found::default();
     };
-    let mut found: Vec<PathBuf> = lines
-        .filter_map(|line| line.strip_prefix("./")?.strip_suffix("/.git"))
+    let mut rels: Vec<&str> = lines
+        .filter_map(|line| line.strip_prefix("./"))
+        .filter(|rel| !rel.is_empty())
+        .collect();
+    let cut = rels.len() > MAX_FOUND;
+    rels.truncate(MAX_FOUND);
+    let mut repos: Vec<PathBuf> = rels
+        .into_iter()
         .map(|rel| remote::encode(host, &format!("{home}/{rel}")))
         .collect();
-    found.sort();
-    found.dedup();
-    without_nested(found)
+    repos.sort();
+    repos.dedup();
+    Found { repos, cut }
 }
 
-/// `sorted` less the repositories inside another of them (find doesn't stop at a repository
-/// the way [`find_under`] does).
-fn without_nested(sorted: Vec<PathBuf>) -> Vec<PathBuf> {
-    let mut kept: Vec<PathBuf> = Vec::new();
-    for path in sorted {
-        if !kept.iter().any(|outer| path.starts_with(outer)) {
-            kept.push(path);
-        }
-    }
-    kept
-}
-
-fn find_there(host: &Host) -> Result<Vec<PathBuf>, String> {
+fn find_there(host: &Host) -> Result<Found, String> {
     let out = remote::exec(
         host,
         &remote::Request {
@@ -182,6 +214,8 @@ mod tests {
             "work/too/deep/for/it/.git",
             ".cache/hidden/.git",
             "web/node_modules/dep/.git",
+            "AppData/Local/x/.git",
+            "Library/y/.git",
             "notes",
         ] {
             std::fs::create_dir_all(root.join(dir)).map_err(|e| e.to_string())?;
@@ -189,6 +223,8 @@ mod tests {
         // A worktree's `.git` is a file.
         std::fs::create_dir_all(root.join("code/wt")).map_err(|e| e.to_string())?;
         std::fs::write(root.join("code/wt/.git"), "gitdir: x").map_err(|e| e.to_string())?;
+        // The home folder being a repository itself (dotfiles) doesn't hide the rest.
+        std::fs::create_dir_all(root.join(".git")).map_err(|e| e.to_string())?;
         Ok(root)
     }
 
@@ -205,7 +241,7 @@ mod tests {
         let root = tree("here")?;
         let found = find_under(&root, DEPTH);
         assert_eq!(
-            relative(&root, &found),
+            relative(&root, &found.repos),
             [
                 "code/app",
                 "code/wt",
@@ -213,24 +249,43 @@ mod tests {
                 "work/client/deep/er"
             ]
         );
-        assert!(find_under(&root.join("missing"), DEPTH).is_empty());
+        assert!(!found.cut);
+        assert!(find_under(&root.join("missing"), DEPTH).repos.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn says_when_it_stopped_at_the_most() -> Result<(), String> {
+        let root = tree("many")?;
+        for i in 0..=MAX_FOUND {
+            std::fs::create_dir_all(root.join(format!("many/r{i:03}/.git")))
+                .map_err(|e| e.to_string())?;
+        }
+        let found = find_under(&root, DEPTH);
+        assert_eq!(found.repos.len(), MAX_FOUND);
+        assert!(found.cut);
         Ok(())
     }
 
     #[test]
     fn reads_what_the_script_printed() {
-        let out = "/home/me\n./code/app/.git\n./a b/c/.git\n./weird\n./code/app/.git\n./.git\n./code/app/sub/.git\n";
+        let out = "/home/me\n./code/app\n./a b/c\n./code/app\n./\n";
         let host = Host::Ssh("build".into());
         let found = parse_found(out, &host);
         assert_eq!(
-            found,
+            found.repos,
             vec![
                 PathBuf::from("ssh://build/home/me/a b/c"),
                 PathBuf::from("ssh://build/home/me/code/app"),
             ]
         );
-        assert!(parse_found("", &host).is_empty());
-        assert!(parse_found("/root/\n", &host).is_empty());
+        assert!(!found.cut);
+        assert!(parse_found("", &host).repos.is_empty());
+        assert!(parse_found("/root/\n", &host).repos.is_empty());
+        let many: String = (0..=MAX_FOUND).map(|i| format!("./r{i}\n")).collect();
+        let found = parse_found(&format!("/h\n{many}"), &host);
+        assert_eq!(found.repos.len(), MAX_FOUND);
+        assert!(found.cut);
     }
 
     /// The script another machine is searched with, run here by `sh` with the scratch tree as
@@ -249,7 +304,8 @@ mod tests {
         let host = Host::Ssh("h".into());
         let there = parse_found(&String::from_utf8_lossy(&out.stdout), &host);
         let prefix = format!("ssh://h{}", root.to_string_lossy());
-        let there: Vec<String> = there
+        let mut there: Vec<String> = there
+            .repos
             .iter()
             .filter_map(|p| {
                 p.to_string_lossy()
@@ -257,11 +313,25 @@ mod tests {
                     .map(|r| r.trim_start_matches('/').to_owned())
             })
             .collect();
-        let mut here = relative(&root, &find_under(&root, DEPTH));
+        let mut here = relative(&root, &find_under(&root, DEPTH).repos);
         here.sort();
-        let mut there = there;
         there.sort();
         assert_eq!(here, there);
+        Ok(())
+    }
+
+    /// Without a home folder the script says so instead of searching where it happens to be.
+    #[cfg(unix)]
+    #[test]
+    fn the_script_needs_a_home_folder() -> Result<(), String> {
+        let out = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(script())
+            .env_remove("HOME")
+            .output()
+            .map_err(|e| e.to_string())?;
+        assert!(!out.status.success());
+        assert!(String::from_utf8_lossy(&out.stderr).contains("no home folder"));
         Ok(())
     }
 
@@ -273,5 +343,19 @@ mod tests {
             Machine::There(Host::Wsl("Ubuntu".into())).label(),
             "WSL · Ubuntu"
         );
+        assert_eq!(Machine::of(Path::new("/home/me/x")), Machine::Here);
+        assert_eq!(
+            Machine::of(Path::new("ssh://build/x")),
+            Machine::There(Host::Ssh("build".into()))
+        );
+    }
+
+    #[test]
+    fn forges_arent_machines() {
+        assert!(is_forge("github.com"));
+        assert!(is_forge("git@GitLab.com"));
+        assert!(is_forge("ssh.github.com:443"));
+        assert!(!is_forge("build"));
+        assert!(!is_forge("github.example.org"));
     }
 }

@@ -48,7 +48,8 @@ impl App {
                 || self.remote_form.is_some()
                 || self.askpass_open()
                 || self.palette.is_some()
-                || self.manual_open,
+                || self.manual_open
+                || self.my_work.open,
             update: self.update_check(),
             check_updates_now: false,
             request: None,
