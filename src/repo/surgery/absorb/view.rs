@@ -22,6 +22,14 @@ impl RepoTab {
         let Some(editor) = self.absorb.as_deref_mut() else {
             return;
         };
+        if editor.verdicts.len() != editor.hunks.len() {
+            editor.verdicts = (0..editor.hunks.len())
+                .map(|h| {
+                    let hunk = &editor.hunks[h];
+                    verdict(&t, editor, hunk.found, &hunk.touched)
+                })
+                .collect();
+        }
         header(ui, &t, acts);
         footer(ui, &t, editor, idle, acts);
         egui::CentralPanel::default()
@@ -90,7 +98,7 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut AbsorbEditor, idle: bool, acts: 
                     && ui
                         .add_enabled(free, egui::Button::new("Run git-absorb instead"))
                         .on_hover_text(
-                            "The installed git-absorb picks the commits itself and rebases its fixups in",
+                            "The installed git-absorb picks the commits itself (with its own limits, at most 10 commits by default), ignoring the picks here, and rebases its fixups in",
                         )
                         .clicked()
                 {
@@ -103,13 +111,30 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut AbsorbEditor, idle: bool, acts: 
                     let (text, color) = match (&editor.error, &problem, &editor.checked) {
                         (Some(e), _, _) => (format!("Can't absorb them this way: {e}"), t.danger),
                         (None, Some(p), _) => (p.clone(), t.text_dim),
-                        (None, None, Some(c)) => (
-                            format!(
-                                "Checked. Absorbing rewrites the branch from the oldest of them{}; Ctrl+Z undoes it",
-                                if c.rest.is_some() { ", the rest staged again" } else { "" }
-                            ),
-                            t.text_dim,
-                        ),
+                        (None, None, Some(c)) => {
+                            let oldest = c
+                                .fixups
+                                .iter()
+                                .map(|(i, _)| *i)
+                                .max()
+                                .and_then(|i| editor.targets.get(i));
+                            let pushed = c
+                                .fixups
+                                .iter()
+                                .filter(|(i, _)| editor.targets.get(*i).is_some_and(|t| t.pushed))
+                                .count();
+                            let text = format!(
+                                "Checked. Absorbing rewrites the branch from {}{}{}; Ctrl+Z undoes it",
+                                oldest.map(|t| short(&t.hash)).unwrap_or_default(),
+                                if c.rest.is_some() { ", the rest staged again" } else { "" },
+                                if pushed > 0 {
+                                    " · pushed commits change: push with force (with lease) after"
+                                } else {
+                                    ""
+                                },
+                            );
+                            (text, if pushed > 0 { t.warning } else { t.text_dim })
+                        }
                         (None, None, None) => (
                             "Check to see each commit's fixup and what stays staged".to_owned(),
                             t.text_dim,
@@ -137,23 +162,19 @@ fn verdict(
             .unwrap_or_default()
     };
     match found {
-        Match::Clear(_) => (
-            "its lines were last changed by this commit".to_owned(),
+        Match::Clear(i) => (
+            format!("its lines were last changed by {}", name(i)),
             t.success,
         ),
-        Match::Several(_) => (
+        Match::Several(i) => (
             format!(
-                "several commits changed these lines ({}{}): the newest of the branch's is suggested",
+                "several commits changed these lines ({}, or older ones): {} is suggested, the newest; pick it to absorb",
                 touched
                     .iter()
                     .map(|&i| name(i))
                     .collect::<Vec<_>>()
                     .join(", "),
-                if touched.len() == 1 {
-                    " and older ones"
-                } else {
-                    ""
-                }
+                name(i)
             ),
             t.warning,
         ),
@@ -165,9 +186,72 @@ fn verdict(
     }
 }
 
-/// Each run of staged changes with where it goes.
+/// A commit as the picker lists it: ● when it changed the lines, ⇡ when it is pushed.
+fn target_text(editor: &AbsorbEditor, i: usize, touched: bool, suggested: bool) -> String {
+    let Some(c) = editor.targets.get(i) else {
+        return String::new();
+    };
+    format!(
+        "{}{}  {}{}{}",
+        if touched { "● " } else { "   " },
+        short(&c.hash),
+        c.summary,
+        if c.pushed { "  (pushed)" } else { "" },
+        if suggested { "  (suggested)" } else { "" },
+    )
+}
+
+/// The picker of where hunk `h` goes: those that changed its lines first.
+fn picker(
+    ui: &mut Ui,
+    editor: &AbsorbEditor,
+    h: usize,
+    chosen: &mut Option<(usize, Option<usize>)>,
+) {
+    let Some(hunk) = editor.hunks.get(h) else {
+        return;
+    };
+    let choice = editor.choice.get(h).copied().flatten();
+    let suggested = match hunk.found {
+        Match::Several(i) | Match::Clear(i) => Some(i),
+        Match::None => None,
+    };
+    let shown = match choice {
+        Some(c) => target_text(editor, c, hunk.touched.contains(&c), suggested == Some(c)),
+        None => "Leave staged".to_owned(),
+    };
+    egui::ComboBox::from_id_salt("into")
+        .width(320.0)
+        .truncate()
+        .selected_text(shown.trim_start())
+        .show_ui(ui, |ui| {
+            if ui
+                .selectable_label(choice.is_none(), "Leave staged")
+                .clicked()
+            {
+                *chosen = Some((h, None));
+            }
+            let others = (0..editor.targets.len()).filter(|i| !hunk.touched.contains(i));
+            for (n, i) in hunk.touched.iter().copied().chain(others).enumerate() {
+                if n == hunk.touched.len() && n > 0 {
+                    ui.separator();
+                }
+                let text = target_text(editor, i, hunk.touched.contains(&i), suggested == Some(i));
+                if ui
+                    .selectable_label(choice == Some(i), text)
+                    .on_hover_text("● changed these lines")
+                    .clicked()
+                {
+                    *chosen = Some((h, Some(i)));
+                }
+            }
+        });
+}
+
+/// Each run of staged changes with where it goes; those out of sight only take their place.
 fn hunks(ui: &mut Ui, t: &Tokens, editor: &mut AbsorbEditor) {
     let mut chosen: Option<(usize, Option<usize>)> = None;
+    let mut heights = std::mem::take(&mut editor.heights);
     egui::ScrollArea::vertical()
         .id_salt(("absorb_hunks", editor.id))
         .auto_shrink(false)
@@ -176,111 +260,98 @@ fn hunks(ui: &mut Ui, t: &Tokens, editor: &mut AbsorbEditor) {
                 ui.disable();
             }
             ui.add_space(6.0);
-            for (h, hunk) in editor.hunks.iter().enumerate() {
-                let Some(file) = editor.files.get(hunk.file) else {
-                    continue;
-                };
-                let choice = editor.choice.get(h).copied().flatten();
-                ui.push_id(("absorb_hunk", h), |ui| {
-                    egui::Frame::new()
-                        .fill(t.card)
-                        .stroke(Stroke::new(1.0, t.separator))
-                        .corner_radius(t.radius)
-                        .inner_margin(egui::Margin::same(8))
-                        .show(ui, |ui| {
-                            ui.set_min_width(ui.available_width());
-                            ui.horizontal(|ui| {
-                                let first = hunk.lines.first().and_then(|&i| file.lines.get(i));
-                                let at = first.and_then(|l| l.new.or(l.old)).unwrap_or(0);
-                                ui.label(RichText::new(&file.path).font(theme::medium(12.5)));
-                                ui.label(RichText::new(format!("line {at}")).color(t.text_faint));
-                                ui.with_layout(
-                                    egui::Layout::right_to_left(egui::Align::Center),
-                                    |ui| {
-                                        let shown = match choice.and_then(|c| editor.targets.get(c))
-                                        {
-                                            Some(c) => format!("{} {}", short(&c.hash), c.summary),
-                                            None => "Leave staged".to_owned(),
-                                        };
-                                        egui::ComboBox::from_id_salt("into")
-                                            .width(280.0)
-                                            .truncate()
-                                            .selected_text(shown)
-                                            .show_ui(ui, |ui| {
-                                                if ui
-                                                    .selectable_label(
-                                                        choice.is_none(),
-                                                        "Leave staged",
-                                                    )
-                                                    .clicked()
-                                                {
-                                                    chosen = Some((h, None));
-                                                }
-                                                for (i, c) in editor.targets.iter().enumerate() {
-                                                    let text =
-                                                        format!("{} {}", short(&c.hash), c.summary);
-                                                    let mark = if hunk.touched.contains(&i) {
-                                                        " ●"
-                                                    } else {
-                                                        ""
-                                                    };
-                                                    if ui
-                                                        .selectable_label(
-                                                            choice == Some(i),
-                                                            format!("{text}{mark}"),
-                                                        )
-                                                        .clicked()
-                                                    {
-                                                        chosen = Some((h, Some(i)));
-                                                    }
-                                                }
-                                            });
-                                        ui.label(RichText::new("into").color(t.text_dim));
-                                    },
-                                );
-                            });
-                            let (why, color) = verdict(t, editor, hunk.found, &hunk.touched);
-                            ui.label(RichText::new(why).color(color).small());
-                            for &i in hunk.lines.iter().take(SHOWN) {
-                                if let Some(line) = file.lines.get(i) {
-                                    code_line(ui, t, line.kind == Kind::Add, &line.text);
-                                }
-                            }
-                            if hunk.lines.len() > SHOWN {
-                                ui.label(
-                                    RichText::new(format!(
-                                        "… {} more lines",
-                                        hunk.lines.len() - SHOWN
-                                    ))
-                                    .color(t.text_faint)
-                                    .small(),
-                                );
-                            }
-                        });
+            let width = ui.available_width();
+            for h in 0..editor.hunks.len() {
+                let top = ui.cursor().top();
+                let known = heights.get(h).copied().flatten();
+                let unseen = known.is_some_and(|height| {
+                    !ui.is_rect_visible(egui::Rect::from_min_size(
+                        egui::pos2(ui.cursor().left(), top),
+                        egui::vec2(width, height),
+                    ))
                 });
+                if let (true, Some(height)) = (unseen, known) {
+                    ui.allocate_space(egui::vec2(width, height));
+                    continue;
+                }
+                card(ui, t, editor, h, &mut chosen);
                 ui.add_space(6.0);
+                if heights.len() <= h {
+                    heights.resize(h + 1, None);
+                }
+                heights[h] = Some(ui.cursor().top() - top);
             }
-            let whole: Vec<&str> = editor
-                .files
-                .iter()
-                .enumerate()
-                .filter(|(f, _)| !editor.hunks.iter().any(|h| h.file == *f))
-                .map(|(_, file)| file.path.as_str())
-                .collect();
-            if !whole.is_empty() {
+            if !editor.whole.is_empty() {
                 ui.label(
                     RichText::new(format!(
-                        "Staying staged (new files, or changes that only go whole): {}",
-                        whole.join(", ")
+                        "Staying staged (new files, and whole-file changes: binary, deleted, links, mode changes): {}",
+                        editor.whole.join(", ")
                     ))
                     .color(t.text_faint)
                     .small(),
                 );
             }
         });
+    editor.heights = heights;
     if let Some((h, target)) = chosen {
         editor.choose(h, target);
     }
+}
+
+/// Hunk `h`: its file and place, where it goes, why, and its first lines.
+fn card(
+    ui: &mut Ui,
+    t: &Tokens,
+    editor: &AbsorbEditor,
+    h: usize,
+    chosen: &mut Option<(usize, Option<usize>)>,
+) {
+    let (Some(hunk), Some(why)) = (editor.hunks.get(h), editor.verdicts.get(h)) else {
+        return;
+    };
+    let Some(file) = editor.files.get(hunk.file) else {
+        return;
+    };
+    ui.push_id(("absorb_hunk", h), |ui| {
+        egui::Frame::new()
+            .fill(t.card)
+            .stroke(Stroke::new(1.0, t.separator))
+            .corner_radius(t.radius)
+            .inner_margin(egui::Margin::same(8))
+            .show(ui, |ui| {
+                ui.set_min_width(ui.available_width());
+                ui.horizontal(|ui| {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        picker(ui, editor, h, chosen);
+                        ui.label(RichText::new("into").color(t.text_dim));
+                        ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                            let first = hunk.lines.first().and_then(|&i| file.lines.get(i));
+                            let at = first.and_then(|l| l.old.or(l.new)).unwrap_or(0);
+                            ui.add(
+                                egui::Label::new(
+                                    RichText::new(&file.path).font(theme::medium(12.5)),
+                                )
+                                .truncate(),
+                            );
+                            ui.label(RichText::new(format!("line {at}")).color(t.text_faint));
+                        });
+                    });
+                });
+                ui.label(RichText::new(&why.0).color(why.1).small());
+                for &i in hunk.lines.iter().take(SHOWN) {
+                    if let Some(line) = file.lines.get(i) {
+                        code_line(ui, t, line.kind == Kind::Add, &line.text);
+                    }
+                }
+                if hunk.lines.len() > SHOWN {
+                    ui.label(
+                        RichText::new(format!("… {} more lines", hunk.lines.len() - SHOWN))
+                            .color(t.text_faint)
+                            .small(),
+                    );
+                }
+            });
+    });
 }
 
 fn code_line(ui: &mut Ui, t: &Tokens, add: bool, text: &str) {

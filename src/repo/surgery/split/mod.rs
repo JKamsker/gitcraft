@@ -393,6 +393,13 @@ impl RepoTab {
             self.status = Some((format!("Split commit: {why}"), true));
             return;
         }
+        if self.absorb.is_some() {
+            self.status = Some((
+                "Split commit: close the staged fixes editor first".to_owned(),
+                true,
+            ));
+            return;
+        }
         self.status = Some((format!("Split commit: reading {}…", short(&hash)), false));
         let path = self.path.clone();
         self.then(

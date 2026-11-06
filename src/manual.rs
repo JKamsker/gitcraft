@@ -34,7 +34,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Search messages, authors and hashes, or switch to Code to find the commits that added or removed some text.",
             "Drag the borders in the column header to resize; right-click it to pick the columns, make the graph column compact or reset the columns.",
             "Split commit… (the menu of a commit of the checked-out branch): select one of the new commits on the left (or press its number), then click files, hunks or lines on the right to put them in it; each new commit has its own message. Check split shows each one's patch, Split commit replaces the old commit with them and replays the commits after it. Ctrl+Z undoes it.",
-            "Distribute staged fixes… (above the staged files): each staged change goes into the earlier commit of the branch that last changed its lines; clear matches are taken, the rest suggested or left staged. Check, then absorb. Ctrl+Z undoes it; an installed git-absorb can do it instead.",
+            "Distribute staged fixes… (above the staged files, or the palette): each staged change goes into the earlier commit of the branch that last changed its lines; clear matches are taken, the rest suggested or left staged. Check, then absorb. Ctrl+Z undoes it; an installed git-absorb can do it instead.",
             "Interactive rebase: reorder, reword, squash, fix up or drop commits, then start it.",
         ],
     ),
