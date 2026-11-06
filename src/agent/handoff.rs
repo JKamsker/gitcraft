@@ -17,6 +17,8 @@ pub(crate) struct Note {
     /// The line itself, so the agent finds it even after its number moved.
     pub code: String,
     pub text: String,
+    /// Which diff it was written on ("Unstaged changes", "Commit 1a2b3c4d"…).
+    pub source: String,
 }
 
 /// At most this much of a CI log goes to the agent: its end, where the failure is.
@@ -25,14 +27,26 @@ const LOG_CHARS: usize = 16_000;
 
 /// The notes as one message.
 pub(crate) fn notes_message(notes: &[Note]) -> String {
-    let mut msg = String::from("Review notes on your changes. Please address each one:\n");
+    let mut msg = String::from("Review notes. Please address each one:\n");
     for (i, note) in notes.iter().enumerate() {
-        let side = if note.old {
-            " (a line you removed)"
+        let mut about: Vec<&str> = Vec::new();
+        if !note.source.is_empty() {
+            about.push(&note.source);
+        }
+        if note.old {
+            about.push("a removed line");
+        }
+        let about = if about.is_empty() {
+            String::new()
         } else {
-            ""
+            format!(" ({})", about.join(", "))
         };
-        msg.push_str(&format!("\n{}. {}:{}{side}\n", i + 1, note.path, note.line));
+        msg.push_str(&format!(
+            "\n{}. {}:{}{about}\n",
+            i + 1,
+            note.path,
+            note.line
+        ));
         if !note.code.trim().is_empty() {
             msg.push_str(&format!("   > {}\n", note.code.trim_end()));
         }
@@ -127,16 +141,24 @@ fn fenced(text: &str) -> String {
     format!("{fence}\n{text}\n{fence}")
 }
 
-/// Which terminal a message goes to: the newest one an agent was started in (by its tab's
-/// name), else the one shown. `None` without terminals.
-pub(crate) fn pick_terminal(labels: &[&str], agents: &[String], active: usize) -> Option<usize> {
-    if labels.is_empty() {
-        return None;
+/// Which terminal a message goes to: the one picked (while it still is the terminal of that
+/// name), else the newest one an agent was started in, by its tab's name, whose program
+/// hasn't ended. Never just any terminal: a shell would take the paste as a command to run.
+pub(crate) fn pick_terminal(
+    terminals: &[(&str, bool)],
+    agents: &[String],
+    picked: Option<(usize, &str)>,
+) -> Option<usize> {
+    if let Some((i, name)) = picked
+        && terminals
+            .get(i)
+            .is_some_and(|(label, ended)| *label == name && !ended)
+    {
+        return Some(i);
     }
-    labels
+    terminals
         .iter()
-        .rposition(|l| agents.iter().any(|a| a == l))
-        .or(Some(active.min(labels.len() - 1)))
+        .rposition(|(label, ended)| !ended && agents.iter().any(|a| a == label))
 }
 
 /// The tray of a worktree, kept in its own git folder until it is sent.
@@ -170,8 +192,16 @@ pub(crate) fn load(worktree: &Path) -> Result<Vec<Note>, String> {
     }
 }
 
-/// Saves the tray as it was at change `seq` of it: saves run on threads of their own, and one
-/// that comes after a later change's is dropped, so the file always ends up with the latest.
+/// A number for a change of a tray, larger than every one before it in this process: saves
+/// run on threads of their own, and one older than the last saved is dropped (see
+/// [`save_in_order`]).
+pub(crate) fn next_change() -> u64 {
+    static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Saves the tray as it was at change `seq` (from [`next_change`]): one that comes after a
+/// later change's save is dropped, so the file always ends up with the latest.
 pub(crate) fn save_in_order(worktree: &Path, notes: &[Note], seq: u64) -> Result<(), String> {
     use std::collections::HashMap;
     use std::sync::Mutex;
@@ -208,6 +238,7 @@ mod tests {
             old: false,
             code: "let x = 1;".to_owned(),
             text: text.to_owned(),
+            source: String::new(),
         }
     }
 
@@ -225,10 +256,7 @@ mod tests {
             ),
             "{msg}"
         );
-        assert!(
-            msg.contains("2. src/ü b.rs:4 (a line you removed)"),
-            "{msg}"
-        );
+        assert!(msg.contains("2. src/ü b.rs:4 (a removed line)"), "{msg}");
     }
 
     #[test]
@@ -288,13 +316,33 @@ mod tests {
     #[test]
     fn the_agent_terminal_is_found_by_its_name() {
         let agents = ["Claude Code".to_owned(), "Codex".to_owned()];
+        let list = [
+            ("zsh", false),
+            ("Claude Code", false),
+            ("Codex", true),
+            ("zsh", false),
+        ];
         assert_eq!(
-            pick_terminal(&["zsh", "Claude Code", "setup", "zsh"], &agents, 3),
-            Some(1)
+            pick_terminal(&list, &agents, None),
+            Some(1),
+            "an ended agent is skipped"
         );
-        assert_eq!(pick_terminal(&["zsh", "bash"], &agents, 1), Some(1));
-        assert_eq!(pick_terminal(&["zsh"], &agents, 5), Some(0));
-        assert_eq!(pick_terminal(&[], &agents, 0), None);
+        assert_eq!(
+            pick_terminal(&[("zsh", false), ("bash", false)], &agents, None),
+            None,
+            "never a shell by itself"
+        );
+        assert_eq!(
+            pick_terminal(&list, &agents, Some((3, "zsh"))),
+            Some(3),
+            "one picked"
+        );
+        assert_eq!(
+            pick_terminal(&list, &agents, Some((0, "Codex"))),
+            Some(1),
+            "picked, then moved"
+        );
+        assert_eq!(pick_terminal(&[], &agents, None), None);
     }
 
     #[test]

@@ -129,7 +129,7 @@ impl RepoTab {
                     i.modifiers.command && i.key_pressed(Key::F),
                 )
             });
-            if esc && self.diff.is_some() && self.agents.tray.target.is_some() {
+            if esc && self.diff.is_some() && self.note_open(ctx) {
                 acts.push(Action::Agent(super::agents::AgentAct::Tray(
                     super::agents::TrayAct::Close,
                 )));

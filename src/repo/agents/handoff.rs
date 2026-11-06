@@ -21,22 +21,32 @@ use crate::theme::{self, Tokens};
 pub(crate) struct Tray {
     pub(super) notes: Vec<Note>,
     loaded: bool,
+    /// The tray kept for the worktree has been read: before, a save would write over it.
+    read: bool,
+    /// Something changed before it was read: saved once it is.
+    unsaved: bool,
     pub(in crate::repo) target: Option<LineTarget>,
     pub(super) text: String,
     focus: bool,
-    /// The terminal picked to send to, by its place.
-    pub(super) send_to: Option<usize>,
-    /// Counts the changes, so that saves landing out of order keep the latest.
-    changes: u64,
+    /// The pass in which the note panel was last drawn (Esc closes it only while it shows).
+    shown: u64,
+    /// The terminal picked to send to: its place and its name then.
+    pub(super) send_to: Option<(usize, String)>,
+    /// Clear was clicked once: the next click empties the tray.
+    confirm_clear: bool,
 }
 
 impl RepoTab {
-    /// The notes of the file `path` as a review of its diff: marks on the lines that have one,
-    /// the line being written on.
-    pub(in crate::repo) fn note_review(&self, path: &str) -> DiffReview {
+    /// The notes of the file `path` written on the diff `source` as a review of that diff:
+    /// marks on the lines that have one, the line being written on.
+    pub(in crate::repo) fn note_review(&self, path: &str, source: &str) -> DiffReview {
         let tray = &self.agents.tray;
         let mut marks: HashMap<(DiffSide, u64), usize> = HashMap::new();
-        for note in tray.notes.iter().filter(|n| n.path == path) {
+        for note in tray
+            .notes
+            .iter()
+            .filter(|n| n.path == path && n.source == source)
+        {
             let side = if note.old {
                 DiffSide::Left
             } else {
@@ -52,6 +62,11 @@ impl RepoTab {
         }
     }
 
+    /// Whether a note is being written under the diff shown (Esc closes it first).
+    pub(in crate::repo) fn note_open(&self, ctx: &egui::Context) -> bool {
+        self.agents.tray.target.is_some() && self.agents.tray.shown + 1 >= ctx.cumulative_pass_nr()
+    }
+
     /// Reads the tray kept for this worktree, once.
     pub(super) fn load_tray(&mut self, ctx: &egui::Context) {
         if std::mem::replace(&mut self.agents.tray.loaded, true) {
@@ -61,20 +76,30 @@ impl RepoTab {
         self.then(
             ctx,
             move || handoff::load(&repo),
-            |tab, result, _| match result {
-                Ok(mut notes) => {
-                    // Written meanwhile: kept after those read.
-                    notes.append(&mut tab.agents.tray.notes);
-                    tab.agents.tray.notes = notes;
+            |tab, result, ctx| {
+                let tray = &mut tab.agents.tray;
+                tray.read = true;
+                match result {
+                    Ok(mut notes) => {
+                        // Written meanwhile: kept after those read.
+                        notes.append(&mut tray.notes);
+                        tray.notes = notes;
+                    }
+                    Err(e) => tab.status = Some((e, true)),
                 }
-                Err(e) => tab.status = Some((e, true)),
+                if std::mem::take(&mut tab.agents.tray.unsaved) {
+                    tab.save_tray(ctx);
+                }
             },
         );
     }
 
     fn save_tray(&mut self, ctx: &egui::Context) {
-        self.agents.tray.changes += 1;
-        let seq = self.agents.tray.changes;
+        if !self.agents.tray.read {
+            self.agents.tray.unsaved = true;
+            return;
+        }
+        let seq = handoff::next_change();
         let repo = self.path.clone();
         let notes = self.agents.tray.notes.clone();
         self.then(
@@ -90,6 +115,9 @@ impl RepoTab {
 
     pub(super) fn tray_act(&mut self, act: TrayAct, ctx: &egui::Context) {
         let tray = &mut self.agents.tray;
+        if !matches!(act, TrayAct::Clear) {
+            tray.confirm_clear = false;
+        }
         match act {
             TrayAct::Open(target) => {
                 tray.target = Some(target);
@@ -99,7 +127,7 @@ impl RepoTab {
                 tray.target = None;
                 tray.text.clear();
             }
-            TrayAct::Add(code) => {
+            TrayAct::Add { code, source } => {
                 let Some(target) = tray.target.take() else {
                     return;
                 };
@@ -109,6 +137,7 @@ impl RepoTab {
                     old: target.side == DiffSide::Left,
                     code,
                     text: std::mem::take(&mut tray.text).trim().to_owned(),
+                    source,
                 });
                 self.save_tray(ctx);
             }
@@ -119,10 +148,16 @@ impl RepoTab {
                 }
             }
             TrayAct::Clear => {
-                tray.notes.clear();
-                self.save_tray(ctx);
+                let confirmed = tray.confirm_clear;
+                tray.confirm_clear = !confirmed;
+                if confirmed {
+                    tray.notes.clear();
+                    self.save_tray(ctx);
+                }
             }
-            TrayAct::SendTo(i) => tray.send_to = Some(i),
+            TrayAct::SendTo(i) => {
+                tray.send_to = self.terminals.get(i).map(|t| (i, t.shell.clone()));
+            }
             TrayAct::SendNotes => {
                 let message = handoff::notes_message(&self.agents.tray.notes);
                 if self.send_to_agent(&message, "the notes") {
@@ -133,25 +168,36 @@ impl RepoTab {
         }
     }
 
-    /// Types `message` into the agent's terminal of this tab: whether it went.
-    pub(super) fn send_to_agent(&mut self, message: &str, what: &str) -> bool {
-        let labels: Vec<&str> = self.terminals.iter().map(|t| t.shell.as_str()).collect();
+    /// Which terminal a message would go to now (see [`handoff::pick_terminal`]).
+    fn agent_terminal(&mut self) -> Option<usize> {
         let agents: Vec<String> = KNOWN
             .iter()
             .map(|a| a.label.to_owned())
             .chain(self.agents.tasks.iter().map(|t| agent_label(&t.agent)))
             .collect();
+        let ended: Vec<bool> = self.terminals.iter_mut().map(|t| t.has_exited()).collect();
+        let list: Vec<(&str, bool)> = self
+            .terminals
+            .iter()
+            .map(|t| t.shell.as_str())
+            .zip(ended)
+            .collect();
         let picked = self
             .agents
             .tray
             .send_to
-            .filter(|i| *i < labels.len())
-            .or_else(|| handoff::pick_terminal(&labels, &agents, self.active_terminal));
-        let Some(i) = picked else {
+            .as_ref()
+            .map(|(i, name)| (*i, name.as_str()));
+        handoff::pick_terminal(&list, &agents, picked)
+    }
+
+    /// Types `message` (`what` it is) into the agent's terminal of this tab: whether it went.
+    pub(super) fn send_to_agent(&mut self, message: &str, what: &str) -> bool {
+        let Some(i) = self.agent_terminal() else {
             self.status = Some((
                 format!(
-                    "No terminal to send {what} to: start the agent (Start agent task…, or its \
-                     command in a terminal of this worktree) first"
+                    "No agent terminal in this worktree to send {what} to: start the agent \
+                     (Start agent task…), or pick its terminal next to Send to agent"
                 ),
                 true,
             ));
@@ -161,25 +207,32 @@ impl RepoTab {
             return false;
         };
         let label = term.shell.clone();
+        let them = if what.ends_with('s') { "them" } else { "it" };
         match term.paste_message(message) {
             Ok(()) => {
                 self.terminal_open = true;
                 self.active_terminal = i;
                 self.status = Some((
-                    format!("Typed {what} into {label}'s terminal: press Enter there to send them"),
+                    format!(
+                        "Typed {what} into the {label} terminal: press Enter there to send {them}"
+                    ),
                     false,
                 ));
                 true
             }
             Err(e) => {
-                self.status = Some((format!("{what} weren't sent to {label}: {e}"), true));
+                self.status = Some((
+                    format!("Couldn't send {what} to the {label} terminal: {e}"),
+                    true,
+                ));
                 false
             }
         }
     }
 
     /// The tray under the big area, while it has notes.
-    pub(in crate::repo) fn tray_panel(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
+    pub(in crate::repo) fn tray_panel(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        let to = self.agent_terminal();
         let tray = &self.agents.tray;
         if tray.notes.is_empty() {
             return;
@@ -202,15 +255,22 @@ impl RepoTab {
                     )
                     .on_hover_text("Only here: they go to the agent's terminal, nowhere else");
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if crate::repo::primary_button(ui, "Send to agent", !self.terminals.is_empty(), 110.0)
+                        if crate::repo::primary_button(ui, "Send to agent", to.is_some(), 110.0)
                             .on_hover_text("Types them into the agent's terminal as one message; then they're cleared")
-                            .on_disabled_hover_text("Start the agent in a terminal of this worktree first")
+                            .on_disabled_hover_text(
+                                "No agent terminal here: start the agent (Start agent task…), or pick its terminal",
+                            )
                             .clicked()
                         {
                             acts.push(tray_act(TrayAct::SendNotes));
                         }
-                        self.terminal_choice(ui, acts);
-                        if ui.button("Clear").clicked() {
+                        self.terminal_choice(ui, to, acts);
+                        let clear = if tray.confirm_clear {
+                            format!("Clear {} notes?", tray.notes.len())
+                        } else {
+                            "Clear".to_owned()
+                        };
+                        if ui.button(clear).clicked() {
                             acts.push(tray_act(TrayAct::Clear));
                         }
                     });
@@ -236,29 +296,26 @@ impl RepoTab {
             });
     }
 
-    fn terminal_choice(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
-        if self.terminals.len() < 2 {
+    /// Which terminal gets the notes: the one they would go to, and the others to pick.
+    fn terminal_choice(&self, ui: &mut Ui, to: Option<usize>, acts: &mut Vec<Action>) {
+        if self.terminals.is_empty() {
             return;
         }
         let labels: Vec<&str> = self.terminals.iter().map(|t| t.shell.as_str()).collect();
-        let shown = self
-            .agents
-            .tray
-            .send_to
+        let shown = to
             .and_then(|i| labels.get(i).copied())
-            .unwrap_or("the agent's terminal");
+            .unwrap_or("no agent terminal");
         egui::ComboBox::from_id_salt("handoff-terminal")
             .selected_text(format!("to {shown}"))
             .show_ui(ui, |ui| {
                 for (i, label) in labels.iter().enumerate() {
-                    if ui
-                        .selectable_label(self.agents.tray.send_to == Some(i), *label)
-                        .clicked()
-                    {
+                    if ui.selectable_label(to == Some(i), *label).clicked() {
                         acts.push(tray_act(TrayAct::SendTo(i)));
                     }
                 }
-            });
+            })
+            .response
+            .on_hover_text("The terminal the notes are typed into");
     }
 }
 
@@ -266,8 +323,11 @@ impl RepoTab {
 pub(crate) enum TrayAct {
     Open(LineTarget),
     Close,
-    /// Adds the note being written (the line's code given).
-    Add(String),
+    /// Adds the note being written: the line's code, and which diff it is on.
+    Add {
+        code: String,
+        source: String,
+    },
     Remove(usize),
     Clear,
     SendTo(usize),
@@ -301,12 +361,14 @@ pub(in crate::repo) fn note_panel(
     t: &Tokens,
     agents: &mut AgentsState,
     data: &DiffData,
+    source: &str,
     acts: &mut Vec<Action>,
 ) {
     let tray = &mut agents.tray;
     let Some(target) = tray.target.clone() else {
         return;
     };
+    tray.shown = ui.ctx().cumulative_pass_nr();
     let code = data
         .lines
         .iter()
@@ -357,16 +419,19 @@ pub(in crate::repo) fn note_panel(
                 && ui.input(|i| i.modifiers.command && i.key_pressed(egui::Key::Enter));
             let valid = !tray.text.trim().is_empty();
             ui.horizontal(|ui| {
-                if crate::repo::primary_button(ui, "Add to the tray", valid, 120.0)
+                if crate::repo::primary_button(ui, "Add note", valid, 120.0)
                     .on_hover_text(format!("{}+Enter", crate::manual::command()))
                     .on_disabled_hover_text("Write the note first")
                     .clicked()
                     || submit && valid
                 {
-                    acts.push(tray_act(TrayAct::Add(code.clone())));
+                    acts.push(tray_act(TrayAct::Add {
+                        code: code.clone(),
+                        source: source.to_owned(),
+                    }));
                 }
                 ui.label(
-                    RichText::new("Kept here only, until you send the tray to the agent")
+                    RichText::new("Kept in this worktree until you send the notes to the agent")
                         .small()
                         .color(t.text_faint),
                 );
