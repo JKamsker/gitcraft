@@ -265,6 +265,10 @@ impl RepoTab {
         let over = |s: &Stopped| label == s.label || label == abort_label(s);
         if ok && self.fold.stopped.as_ref().is_some_and(over) {
             self.fold.stopped = None;
+            // As after any rebase continued: what the box held was the rebase's.
+            self.commit_summary.clear();
+            self.commit_body.clear();
+            self.amend = false;
         }
     }
 
@@ -323,21 +327,61 @@ impl RepoTab {
     /// Abort, asked first: for a fold stopped on a conflict, back to before the fold with the
     /// changes staged again.
     pub(super) fn abort_for(&self, state: InProgress) -> Action {
-        let Some(stopped) = self.fold_stopped_here(state) else {
-            return abort_action(state);
-        };
-        Action::Dialog(Dialog::confirm(
-            &abort_label(stopped),
-            "Stop the fold and go back to where it started? The branch is put back as it was, \
-             with the changes staged again. Conflicts resolved so far are lost, and can't be \
-             brought back."
-                .to_owned(),
-            "Abort",
-            stopped.abort_steps(),
-            None,
-        ))
+        match &self.fold.stopped {
+            Some(_) if state == InProgress::Rebase => Action::AbortFold,
+            _ => abort_action(state),
+        }
     }
 
+    /// Abort with a fold stopped: checks first (in the background) that the rebase going on is
+    /// the fold's, on its branch, with the fixup commit right on top of where it started; a
+    /// rebase started in its place (in the terminal) is aborted the ordinary way, and no other
+    /// branch is reset.
+    pub(super) fn abort_fold(&mut self, ctx: &egui::Context) {
+        let Some(stopped) = self.fold.stopped.clone() else {
+            return;
+        };
+        let path = self.path.clone();
+        let theirs = move || -> Result<bool, String> {
+            let branch = format!("refs/heads/{}", stopped.branch);
+            let rebasing = git::rebasing_branch(&path)?;
+            let parent = git::resolve(&path, &format!("{branch}~1")).unwrap_or_default();
+            Ok(rebasing.as_deref() == Some(branch.as_str()) && parent == stopped.before)
+        };
+        self.then(ctx, theirs, |tab, ours, _| {
+            if tab.dialog.is_some() {
+                return;
+            }
+            let action = match (ours, &tab.fold.stopped) {
+                (Ok(true), Some(stopped)) => fold_abort_dialog(stopped),
+                (Err(e), _) => {
+                    tab.status = Some((format!("Abort rebase: {e}"), true));
+                    return;
+                }
+                _ => abort_action(InProgress::Rebase),
+            };
+            if let Action::Dialog(dialog) = action {
+                tab.dialog = Some(dialog);
+            }
+        });
+    }
+}
+
+/// Asks before aborting the fold `stopped`: back to before it, the changes staged again.
+fn fold_abort_dialog(stopped: &Stopped) -> Action {
+    Action::Dialog(Dialog::confirm(
+        &abort_label(stopped),
+        "Stop the fold and go back to where it started? The branch is put back as it was, \
+         with the changes staged again. Conflicts resolved so far are lost, and can't be \
+         brought back."
+            .to_owned(),
+        "Abort",
+        stopped.abort_steps(),
+        None,
+    ))
+}
+
+impl RepoTab {
     /// Continuing the rebase of a fold stopped on a conflict: its label and how it is undone
     /// (as the whole fold).
     pub(super) fn fold_continue(&self, state: InProgress) -> Option<(String, OpKind)> {

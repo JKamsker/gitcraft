@@ -30,6 +30,42 @@ pub struct FoldRead {
     pub in_progress: Option<InProgress>,
     /// A shallow clone: a commit without parents may only be where its history was cut.
     pub shallow: bool,
+    /// An ignored file (or folder) where a replayed commit has a file: checking that commit out
+    /// would overwrite it, which git does without asking for ignored files.
+    pub ignored_in_way: Option<String>,
+}
+
+/// The ignored file or folder of `ignored` (`--directory` listing: folders end with `/`) that
+/// one of the `touched` paths would be written over, if any.
+fn in_the_way(ignored: &str, touched: &str) -> Option<String> {
+    let ignored: Vec<&str> = ignored.split('\0').filter(|p| !p.is_empty()).collect();
+    touched
+        .split('\0')
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .find_map(|path| {
+            ignored
+                .iter()
+                .find(|i| match i.strip_suffix('/') {
+                    Some(dir) => path == dir || path.starts_with(*i),
+                    None => path == **i,
+                })
+                .map(|i| (*i).to_owned())
+        })
+}
+
+/// The branch the rebase going on was started on (`refs/heads/main`), if one is going on.
+pub fn rebasing_branch(repo: &Path) -> Result<Option<String>, String> {
+    let printed = run(
+        Some(repo),
+        &["rev-parse", "--git-path", "rebase-merge/head-name"],
+    )?;
+    let path = crate::remote::resolve(repo, printed.trim());
+    match crate::remote::read_to_string(&path) {
+        Ok(name) => Ok(Some(name.trim().to_owned())),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(format!("could not read the rebase's state: {e}")),
+    }
 }
 
 /// Reads what folding the staged changes into `target` would rewrite.
@@ -75,6 +111,30 @@ pub fn fold_read(repo: &Path, target: &str) -> Result<FoldRead, String> {
     } else {
         HashSet::new()
     };
+    let ignored_in_way = if ancestor {
+        let ignored = run(
+            Some(repo),
+            &[
+                "ls-files",
+                "-z",
+                "--others",
+                "--ignored",
+                "--exclude-standard",
+                "--directory",
+            ],
+        )?;
+        if ignored.is_empty() {
+            None
+        } else {
+            let touched = run(
+                Some(repo),
+                &["log", "--format=", "--name-only", "-z", &range],
+            )?;
+            in_the_way(&ignored, &touched)
+        }
+    } else {
+        None
+    };
     let staged = run(Some(repo), &["diff", "--cached", "--name-only", "-z"])?
         .split('\0')
         .filter(|p| !p.is_empty())
@@ -90,5 +150,26 @@ pub fn fold_read(repo: &Path, target: &str) -> Result<FoldRead, String> {
         staged,
         in_progress: in_progress(repo)?,
         shallow,
+        ignored_in_way,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::in_the_way;
+
+    #[test]
+    fn ignored_files_a_commit_would_write_over() {
+        let ignored = "build/\0notes.txt\0";
+        assert_eq!(
+            in_the_way(ignored, "src/a.rs\0build/out.o\0"),
+            Some("build/".into())
+        );
+        assert_eq!(
+            in_the_way(ignored, "\nnotes.txt\0"),
+            Some("notes.txt".into())
+        );
+        assert_eq!(in_the_way(ignored, "notes.txt.bak\0buildx/y\0"), None);
+        assert_eq!(in_the_way("", "a\0"), None);
+    }
 }

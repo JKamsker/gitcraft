@@ -302,11 +302,20 @@ fn a_conflict_aborted_goes_back_to_before_the_fold() {
     let said = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
     assert!(said.contains("stopped on a conflict"), "{said}");
     assert!(tab.fold_stopped_here(InProgress::Rebase).is_some());
-    let steps = match tab.abort_for(InProgress::Rebase) {
-        Action::Dialog(Dialog::Confirm { ops, title, .. }) => Some((title, ops)),
+    assert!(matches!(
+        tab.abort_for(InProgress::Rebase),
+        Action::AbortFold
+    ));
+    tab.apply(Action::AbortFold, &ctx);
+    settle(&mut tab, &ctx);
+    let steps = match tab.dialog.take() {
+        Some(Dialog::Confirm { ops, title, .. }) => Some((title, ops)),
         _ => None,
     };
-    assert!(steps.as_ref().is_some_and(|(_, ops)| ops.len() == 3));
+    assert!(
+        steps.as_ref().is_some_and(|(_, ops)| ops.len() == 3),
+        "the fold's abort"
+    );
     let Some((label, ops)) = steps else { return };
     tab.apply(
         Action::Ops {
@@ -386,6 +395,7 @@ fn a_commit_made_since_the_dialog_stops_the_fold() {
         &["commit", "-q", "--only", "--allow-empty", "-m", "since"],
     );
     let since = git::head(&dir);
+    assert!(read.is_ok(), "{read:?}");
     let Ok(read) = read else { return };
     tab.apply(Action::RunFold(Box::new(read)), &ctx);
     let result = finish(&mut tab, &ctx);
@@ -558,6 +568,7 @@ fn the_dialog_runs_the_fold_it_shows() {
     git_ok(&dir, &["add", "f1.txt"]);
     let found = plan(&dir, "HEAD~2");
     let _ = std::fs::remove_dir_all(&dir);
+    assert!(found.is_ok(), "{found:?}");
     let Ok(found) = found else { return };
     let ctx = egui::Context::default();
     crate::theme::install_fonts(&ctx);
@@ -628,9 +639,9 @@ fn a_rebase_that_never_started_leaves_an_undoable_fixup_commit() {
     write(&dir, "f2.txt", "2 fixed\n");
     git_ok(&dir, &["add", "f2.txt"]);
     let was_staged = staged(&dir);
-    let Ok(found) = plan(&dir, "HEAD~1") else {
-        return;
-    };
+    let found = plan(&dir, "HEAD~1");
+    assert!(found.is_ok(), "{found:?}");
+    let Ok(found) = found else { return };
     // A rebase git refuses outright, as one that can't begin would be.
     let refused = vec!["rebase".to_owned(), "--no-such-option".to_owned()];
     tab.fold_ready(&found, Ok((refused, String::new())), &ctx);
@@ -676,5 +687,89 @@ fn staged_changes_a_later_commit_would_undo_are_never_lost() {
     assert_eq!(git::in_progress(&dir), Ok(None));
     let said = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
     assert!(said.contains("nothing was changed"), "{said}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A fold stopped, then aborted in the terminal and another branch's rebase stopped in its
+/// place: Abort is the ordinary one for that rebase, and resets no branch to the fold's start.
+#[test]
+fn abort_is_the_folds_only_while_its_rebase_is_going_on() {
+    let (dir, before, _) = conflicting("abort-other");
+    let ctx = egui::Context::default();
+    let mut tab = tab(&dir, &ctx);
+    let result = fold(&mut tab, &ctx, "HEAD~3", false);
+    assert!(matches!(result, Some(Err(_))), "{result:?}");
+    git_ok(&dir, &["rebase", "--abort"]);
+    git_ok(&dir, &["reset", "-q", "--hard", &before]);
+    // Another branch, whose rebase stops on a conflict too.
+    git_ok(&dir, &["checkout", "-q", "-b", "other", "HEAD~1"]);
+    write(&dir, "f1.txt", "other\n");
+    git_ok(&dir, &["commit", "-q", "-am", "other"]);
+    let other = git::head(&dir);
+    let _ = git::run(Some(&dir), &["rebase", "main"]);
+    assert_eq!(git::in_progress(&dir), Ok(Some(InProgress::Rebase)));
+    tab.reload(&ctx);
+    settle(&mut tab, &ctx);
+
+    tab.apply(tab.abort_for(InProgress::Rebase), &ctx);
+    settle(&mut tab, &ctx);
+    let ops = match tab.dialog.take() {
+        Some(Dialog::Confirm { ops, .. }) => ops,
+        _ => Vec::new(),
+    };
+    assert_eq!(ops, crate::repo::ops(&[&["rebase", "--abort"]]));
+    assert_eq!(git::resolve(&dir, "refs/heads/other"), Ok(other));
+    let _ = git::run(Some(&dir), &["rebase", "--abort"]);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// An ignored file where a commit to replay has a file would be written over by the rebase
+/// (git doesn't ask for ignored files): the fold is refused before anything runs.
+#[test]
+fn an_ignored_file_in_the_way_is_refused() {
+    let dir = repo("ignored", 1);
+    write(&dir, "build.log", "tracked once\n");
+    git_ok(&dir, &["add", "build.log"]);
+    git_ok(&dir, &["commit", "-q", "-m", "log"]);
+    git_ok(&dir, &["rm", "-q", "--cached", "build.log"]);
+    write(&dir, ".gitignore", "build.log\n");
+    git_ok(&dir, &["add", ".gitignore"]);
+    git_ok(&dir, &["commit", "-q", "-m", "ignore it"]);
+    write(&dir, "build.log", "mine, not to lose\n");
+    write(&dir, "f1.txt", "1 fixed\n");
+    git_ok(&dir, &["add", "f1.txt"]);
+    let refused = plan(&dir, "HEAD~2").err().unwrap_or_default();
+    assert!(refused.contains("build.log"), "{refused}");
+    assert_eq!(read(&dir, "build.log"), "mine, not to lose\n");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A merge started after the dialog read the branch (the same branch, the same HEAD): the
+/// fold refuses rather than commit the merge as its fixup.
+#[test]
+fn a_merge_started_since_the_dialog_stops_the_fold() {
+    let dir = repo("merge-since", 2);
+    git_ok(&dir, &["checkout", "-q", "-b", "side", "HEAD~1"]);
+    write(&dir, "side.txt", "side\n");
+    git_ok(&dir, &["add", "-A"]);
+    git_ok(&dir, &["commit", "-q", "-m", "side"]);
+    git_ok(&dir, &["checkout", "-q", "main"]);
+    let ctx = egui::Context::default();
+    let mut tab = tab(&dir, &ctx);
+    write(&dir, "f1.txt", "1 fixed\n");
+    git_ok(&dir, &["add", "f1.txt"]);
+    let found = plan(&dir, "HEAD~1");
+    assert!(found.is_ok(), "{found:?}");
+    let Ok(found) = found else { return };
+    // git merges only with nothing staged: the change staged again once it has started.
+    git_ok(&dir, &["reset", "-q", "f1.txt"]);
+    git_ok(&dir, &["merge", "-q", "--no-ff", "--no-commit", "side"]);
+    git_ok(&dir, &["add", "f1.txt"]);
+    let before = git::head(&dir);
+    tab.apply(Action::RunFold(Box::new(found)), &ctx);
+    let result = finish(&mut tab, &ctx);
+    assert!(matches!(result, Some(Err(_))), "{result:?}");
+    assert_eq!(git::head(&dir), before);
+    assert_eq!(git::in_progress(&dir), Ok(Some(InProgress::Merge)));
     let _ = std::fs::remove_dir_all(&dir);
 }
