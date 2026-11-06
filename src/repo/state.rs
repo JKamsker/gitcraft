@@ -249,4 +249,8 @@ pub(super) struct Search {
     pub(super) current: usize,
     pub(super) running: bool,
     pub(super) edited: Option<Instant>,
+    /// Why the query can't be searched (its operators written wrong), or what git said.
+    pub(super) problem: Option<String>,
+    /// What the field suggests while an operator is typed.
+    pub(super) suggest: super::graph_view::suggest::SuggestState,
 }
