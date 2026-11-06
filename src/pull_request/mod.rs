@@ -1,5 +1,6 @@
-//! One pull request in full, through `gh`: its description, build status, commits and comments,
-//! and the changes it proposes. Only GitHub for now; the list of `forge.rs` covers GitLab too.
+//! One pull request in full, whichever forge it's on: its description, build status, commits and
+//! comments, and the changes it proposes. The forges' modules (`forge/`) read it; this is what they
+//! read it into, and what the page makes of it.
 
 mod html;
 mod markdown;
@@ -10,15 +11,11 @@ use std::path::Path;
 
 use crate::forge::{self, Forge};
 use crate::git::{self, ChangedFile, Credentials, Remote};
-use crate::pr_threads::{self, PrExtras};
+use crate::pr_threads::PrExtras;
 
 pub use markdown::{safe_blocks, safe_markdown};
-pub(crate) use parse::{at, check, items, login, parse_details, parse_time};
+pub(crate) use parse::{at, check, items, parse_time};
 pub use tables::Block;
-
-const FIELDS: &str = "number,title,body,state,isDraft,author,url,baseRefName,baseRefOid,\
-    headRefName,headRefOid,createdAt,updatedAt,additions,deletions,changedFiles,mergeable,\
-    mergeStateStatus,reviewDecision,labels,statusCheckRollup,commits,comments,reviews";
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum CheckState {
@@ -85,6 +82,8 @@ pub struct Entry {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PrDetails {
+    /// The forge it was read from.
+    pub forge: Option<Forge>,
     pub number: u64,
     pub title: String,
     pub body: String,
@@ -96,6 +95,8 @@ pub struct PrDetails {
     pub base_oid: String,
     pub head_branch: String,
     pub head_oid: String,
+    /// Where the forge keeps the proposed commits (`refs/pull/12/head`), to fetch them by.
+    pub head_ref: String,
     pub created_at: i64,
     pub updated_at: i64,
     pub additions: u64,
@@ -106,6 +107,8 @@ pub struct PrDetails {
     pub review_decision: String,
     pub labels: Vec<String>,
     pub checks: Vec<Check>,
+    /// The checks couldn't be read: why. Without it, no checks means none ran.
+    pub checks_error: Option<String>,
     pub commits: Vec<PrCommit>,
     /// Oldest first.
     pub timeline: Vec<Entry>,
@@ -116,7 +119,7 @@ pub struct PrDetails {
 }
 
 /// The sent comments of the threads, for the conversation.
-fn line_entries(extras: &PrExtras) -> Vec<Entry> {
+pub(crate) fn line_entries(extras: &PrExtras) -> Vec<Entry> {
     extras
         .threads
         .iter()
@@ -166,48 +169,6 @@ pub struct PrFiles {
     pub files: Vec<ChangedFile>,
 }
 
-/// Reads the pull request numbered `number` of the repository at `repo`.
-pub fn details(repo: &Path, number: u64) -> Result<PrDetails, String> {
-    let details = read_details(repo, number)?;
-    // It's read in two goes. A push in between would put the threads' line numbers on another
-    // commit than the one the page takes for the pull request's, so that goes again.
-    if read_in_step(&details) {
-        return Ok(details);
-    }
-    let details = read_details(repo, number)?;
-    if read_in_step(&details) {
-        Ok(details)
-    } else {
-        Err("The pull request changed while it was read. Load it again.".to_owned())
-    }
-}
-
-/// Whether both goes of reading `details` saw the same commit (or the threads weren't read).
-fn read_in_step(details: &PrDetails) -> bool {
-    details.inline_error.is_some() || details.extras.head_oid == details.head_oid
-}
-
-fn read_details(repo: &Path, number: u64) -> Result<PrDetails, String> {
-    let view = forge::tool(
-        Forge::GitHub,
-        repo,
-        &["pr", "view", &number.to_string(), "--json", FIELDS],
-    )?;
-    let mut details = parse_details(&view)?;
-    match repo_of_url(&details.url) {
-        Some((host, path)) => match pr_threads::fetch(repo, &host, &path, number) {
-            Ok(extras) => {
-                details.timeline.extend(line_entries(&extras));
-                details.extras = extras;
-            }
-            Err(e) => details.inline_error = Some(e),
-        },
-        None => details.inline_error = Some("unexpected pull request URL".to_owned()),
-    }
-    details.timeline.sort_by_key(|entry| entry.at);
-    Ok(details)
-}
-
 /// Finds the changes of `details`, fetching its commits first if they aren't here yet.
 pub fn files(
     repo: &Path,
@@ -215,9 +176,16 @@ pub fn files(
     remotes: &[Remote],
     credentials: Option<&Credentials>,
 ) -> Result<PrFiles, String> {
-    // They go to git as arguments, so they have to be what they say they are.
+    // What the forge says goes to git as refspecs: anything but a commit id or a branch name could
+    // make the fetch write a ref (`+x:refs/heads/main`) or read as an option.
     if !is_oid(&details.head_oid) || !is_oid(&details.base_oid) {
-        return Err("GitHub didn't say which commits the pull request is between".to_owned());
+        return Err("the forge named commits that aren't commit ids".to_owned());
+    }
+    if !is_branch_name(&details.base_branch) {
+        return Err(format!(
+            "the forge named a base branch git can't take: {:?}",
+            details.base_branch
+        ));
     }
     let has = |oid: &str| {
         git::run(
@@ -230,18 +198,14 @@ pub fn files(
         let remote = remote_for(remotes, &details.url)
             .ok_or("no remote of this repository is the one the pull request belongs to")?;
         // No refs and no FETCH_HEAD: nothing here changes but the objects being available.
-        let head = format!("refs/pull/{}/head", details.number);
         let base = format!("refs/heads/{}", details.base_branch);
+        let mut args = vec!["fetch", "--no-tags", "--no-write-fetch-head", remote];
+        if is_branch_ref(&details.head_ref) {
+            args.push(&details.head_ref);
+        }
+        args.push(&base);
         // The branches may have moved on since the details were read (a force push even leaves
         // the old commits out), so the very commits are asked for too.
-        let mut args = vec![
-            "fetch",
-            "--no-tags",
-            "--no-write-fetch-head",
-            remote,
-            &head,
-            &base,
-        ];
         args.extend([details.head_oid.as_str(), details.base_oid.as_str()]);
         git::run_with(Some(repo), &args, credentials)?;
     }
@@ -254,9 +218,29 @@ pub fn files(
     })
 }
 
-/// Whether `oid` is a full commit id (SHA-1 or SHA-256), not anything git could take for an option.
+/// Whether `oid` is a whole commit id (SHA-1 or SHA-256), nothing else.
 fn is_oid(oid: &str) -> bool {
     matches!(oid.len(), 40 | 64) && oid.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+/// Whether `name` is a branch name git takes, and nothing a refspec or an option could be made of:
+/// `git check-ref-format`'s rules.
+fn is_branch_name(name: &str) -> bool {
+    let forbidden = |c: char| c.is_ascii_control() || " ~^:?*[\\".contains(c);
+    !name.is_empty()
+        && !name.starts_with(['-', '/', '.'])
+        && !name.ends_with(['/', '.'])
+        && !name.split('/').any(|part| part.ends_with(".lock"))
+        && !name.contains("..")
+        && !name.contains("//")
+        && !name.contains("@{")
+        && !name.contains("/.")
+        && !name.chars().any(forbidden)
+}
+
+/// Whether `r` is a ref the fetch may name, like the `refs/pull/12/head` the forges' modules set.
+fn is_branch_ref(r: &str) -> bool {
+    r.strip_prefix("refs/").is_some_and(is_branch_name)
 }
 
 /// How many checks passed, failed, are running and were skipped.
@@ -270,13 +254,24 @@ pub fn tally(checks: &[Check]) -> (usize, usize, usize, usize) {
     )
 }
 
-/// The host and `owner/repo` of a pull request's URL. The last `/pull/` is the one before the
-/// number: a repository may well be called `pull` itself.
+/// The host and `owner/repo` of a pull request's URL: `…/pull/12` on GitHub, `…/pulls/12` on
+/// Forgejo and Gitea, `…/-/merge_requests/12` on GitLab.
 pub(crate) fn repo_of_url(url: &str) -> Option<(String, String)> {
-    forge::location(url.rsplit_once("/pull/")?.0)
+    // The marker nearest the end: a repository may well be called `pull` or `pulls`.
+    let repo = ["/-/merge_requests/", "/pulls/", "/pull/"]
+        .iter()
+        .filter_map(|marker| url.rsplit_once(marker))
+        .filter(|(_, number)| number.split(['/', '#', '?']).next().is_some_and(is_number))
+        .map(|(repo, _)| repo)
+        .max_by_key(|repo| repo.len())?;
+    forge::location(repo)
 }
 
-/// The remote of the repository a pull request's URL belongs to. GitHub doesn't mind the case of
+fn is_number(text: &str) -> bool {
+    !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit())
+}
+
+/// The remote of the repository a pull request's URL belongs to. Forges don't mind the case of
 /// owner and name, so a clone of `Owner/Repo` may well be from `owner/repo`.
 pub(crate) fn remote_for<'a>(remotes: &'a [Remote], url: &str) -> Option<&'a str> {
     let (host, path) = repo_of_url(url)?;
@@ -306,9 +301,30 @@ mod tests {
             repo_of_url("https://github.com/o/r/pull/12"),
             Some(("github.com".to_owned(), "o/r".to_owned()))
         );
-        assert_eq!(repo_of_url("https://github.com/o/r"), None);
         assert_eq!(
-            repo_of_url("https://github.com/o/pull/pull/3"),
+            repo_of_url("https://codeberg.org/o/r/pulls/12"),
+            Some(("codeberg.org".to_owned(), "o/r".to_owned()))
+        );
+        assert_eq!(
+            repo_of_url("https://gitlab.com/g/sub/r/-/merge_requests/3"),
+            Some(("gitlab.com".to_owned(), "g/sub/r".to_owned()))
+        );
+        assert_eq!(repo_of_url("https://github.com/o/r"), None);
+        // A repository may be called what the markers say.
+        assert_eq!(
+            repo_of_url("https://codeberg.org/o/pull/pulls/3"),
+            Some(("codeberg.org".to_owned(), "o/pull".to_owned()))
+        );
+        assert_eq!(
+            repo_of_url("https://github.com/acme/pulls/pull/3"),
+            Some(("github.com".to_owned(), "acme/pulls".to_owned()))
+        );
+        assert_eq!(
+            repo_of_url("https://codeberg.org/o/pulls/pulls/3#issuecomment-1"),
+            Some(("codeberg.org".to_owned(), "o/pulls".to_owned()))
+        );
+        assert_eq!(
+            repo_of_url("https://github.com/o/pull/pull/12"),
             Some(("github.com".to_owned(), "o/pull".to_owned()))
         );
     }
@@ -386,18 +402,58 @@ mod tests {
     }
 
     #[test]
-    fn threads_read_on_another_commit_are_not_shown_on_this_one() {
-        let mut details = PrDetails {
-            head_oid: "h1".to_owned(),
+    fn only_commit_ids_and_branch_names_reach_the_fetch() {
+        assert!(is_oid(&"a".repeat(40)) && is_oid(&"0".repeat(64)));
+        for bad in [
+            "",
+            "abc",
+            "+refs/pull/1/head:refs/heads/main",
+            "--update-head-ok",
+        ] {
+            assert!(!is_oid(bad), "{bad}");
+        }
+        for good in ["main", "feat/x", "release-1.2", "a@b"] {
+            assert!(is_branch_name(good), "{good}");
+        }
+        for bad in [
+            "",
+            "-x",
+            "x:refs/heads/main",
+            "a..b",
+            "a b",
+            "x.lock",
+            "x.lock/y",
+            "/x",
+            "x/",
+            "a@{1}",
+            "a/.b",
+        ] {
+            assert!(!is_branch_name(bad), "{bad}");
+        }
+        assert!(is_branch_ref("refs/pull/12/head"));
+        assert!(!is_branch_ref("+refs/pull/1/head:refs/heads/main"));
+        assert!(!is_branch_ref(""));
+    }
+
+    #[test]
+    fn a_forge_naming_anything_but_commits_gets_nothing_fetched() {
+        let details = PrDetails {
+            head_oid: "+refs/pull/1/head:refs/heads/main".to_owned(),
+            base_oid: "--update-head-ok".to_owned(),
+            base_branch: "main".to_owned(),
             ..PrDetails::default()
         };
-        details.extras.head_oid = "h1".to_owned();
-        assert!(read_in_step(&details));
-        details.extras.head_oid = "h0".to_owned();
-        assert!(!read_in_step(&details));
-        // Without threads there are no line numbers to put on the wrong commit.
-        details.inline_error = Some("offline".to_owned());
-        assert!(read_in_step(&details));
+        let refused = files(Path::new("."), &details, &[], None);
+        assert!(refused.is_err_and(|e| e.contains("aren't commit ids")));
+        let details = PrDetails {
+            head_oid: "a".repeat(40),
+            base_oid: "b".repeat(40),
+            base_branch: "x:refs/heads/main".to_owned(),
+            ..PrDetails::default()
+        };
+        assert!(
+            files(Path::new("."), &details, &[], None).is_err_and(|e| e.contains("can't take"))
+        );
     }
 
     #[test]

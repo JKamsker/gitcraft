@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use super::branch_visibility::Visibility;
 use super::{DiffKey, DiffView, MAX_HISTORY, Msg, RepoTab, WIP_HASH, spawn};
-use crate::forge::{self, Forge};
+use crate::forge::{self, Hosting};
 use crate::git::{self, Commit, Identity, Refs, Remote, Stash, Submodule, WorkStatus, Worktree};
 use crate::graph;
 use crate::settings::Settings;
@@ -18,6 +18,8 @@ pub(super) struct Loaded {
     pub(super) worktrees: Vec<Worktree>,
     pub(super) stashes: Vec<Stash>,
     pub(super) remotes: Vec<Remote>,
+    /// The forge `origin` is on, if gitcraft knows it.
+    pub(super) hosting: Option<Hosting>,
     pub(super) submodules: Vec<Submodule>,
     /// It keeps files in Git LFS, and git-lfs is installed.
     pub(super) lfs: bool,
@@ -28,6 +30,18 @@ pub(super) struct Loaded {
     pub(super) log_from: Option<Vec<String>>,
     /// Which read this is (see `RepoTab::reads`).
     pub(super) read: u64,
+}
+
+/// Whether two hostings are the same repository on the same forge, however it's reached (HTTPS
+/// or SSH): the first load, with nothing before it, moves nothing anywhere.
+pub(super) fn same_repository(before: Option<&Hosting>, now: Option<&Hosting>) -> bool {
+    match (before, now) {
+        (None, _) => true,
+        (Some(a), Some(b)) => {
+            a.forge == b.forge && a.host == b.host && a.path.eq_ignore_ascii_case(&b.path)
+        }
+        (Some(_), None) => false,
+    }
 }
 
 impl RepoTab {
@@ -94,6 +108,7 @@ impl RepoTab {
                             identity,
                         ))
                     })?;
+                let hosting = forge::detect(path, &remotes);
                 Ok(Box::new(Loaded {
                     refs,
                     history,
@@ -101,6 +116,7 @@ impl RepoTab {
                     worktrees,
                     stashes,
                     remotes,
+                    hosting,
                     submodules,
                     lfs,
                     identity,
@@ -212,12 +228,14 @@ impl RepoTab {
     }
 
     pub(super) fn load_prs(&mut self, ctx: &egui::Context) {
-        let Some(forge) = self.forge else { return };
+        let Some(hosting) = self.hosting.clone() else {
+            return;
+        };
         let asked = Instant::now();
         self.prs_loaded = Some(asked);
         let path = self.path.clone();
         spawn(&self.tx, ctx, move || {
-            Msg::Prs(asked, forge::list(&path, forge))
+            Msg::Prs(asked, hosting.forge.provider().list(&path, &hosting))
         });
     }
 
@@ -270,15 +288,24 @@ impl RepoTab {
             self.submodules = loaded.submodules;
         }
         self.lfs = loaded.lfs;
-        let forge = forge::detect(&loaded.remotes);
         // Another project (origin pointed elsewhere): its pull requests are other ones, under
         // the same numbers, and a list asked of the old one is not to be taken in.
-        let moved = loaded.remotes != self.remotes;
+        let remotes_changed = loaded.remotes != self.remotes;
         self.remotes = loaded.remotes;
-        if forge != self.forge || moved {
-            self.forge = forge;
+        if loaded.hosting != self.hosting || remotes_changed {
+            let moved = !same_repository(self.hosting.as_ref(), loaded.hosting.as_ref());
+            self.hosting = loaded.hosting;
             self.prs.clear();
+            self.pr_error = None;
             self.prs_loaded = None;
+            if moved {
+                // The page and what was written for it are another repository's now: sent, they
+                // would go to this one, under that number.
+                self.close_pr();
+                self.ci_view = None;
+                self.pr_drafts.clear();
+                self.avatars_hinted = false;
+            }
         }
         if self
             .prs_loaded
@@ -471,23 +498,16 @@ impl RepoTab {
         }
     }
 
-    /// Once per tab, on a GitHub / GitLab repository: tells the avatar loader where its authors'
-    /// account pictures are.
+    /// Once per tab, on a forge's repository: tells the avatar loader where its authors' account
+    /// pictures are.
     pub(super) fn hint_avatars(&mut self, ctx: &egui::Context) {
         if self.avatars_hinted || !Settings::get(ctx).avatars {
             return;
         }
-        let Some(forge) = self.forge else { return };
-        let Some((remote, (host, path))) = self
-            .remotes
-            .iter()
-            .find(|r| r.name == "origin")
-            .or_else(|| self.remotes.first())
-            .and_then(|r| Some((r.url.clone(), forge::location(&r.url)?)))
-        else {
+        // A local mirror has no host to ask.
+        let Some(hosting) = self.hosting.clone().filter(|h| !h.host.is_empty()) else {
             return;
         };
-        let gitlab = gitlab_authority(&remote).unwrap_or_else(|| host.clone());
         self.avatars_hinted = true;
         let repo = self.path.clone();
         let mut emails: Vec<String> = self.history.iter().map(|c| c.email.clone()).collect();
@@ -495,50 +515,16 @@ impl RepoTab {
         emails.dedup();
         let ctx = ctx.clone();
         std::thread::spawn(move || {
-            match forge {
-                Forge::GitHub => {
-                    for (email, url) in forge::github_avatars(&repo, &host, &path) {
-                        crate::avatars::hint(&email, crate::avatars::Hint::Url(url));
-                    }
-                }
-                Forge::GitLab => {
-                    for email in emails {
-                        crate::avatars::hint(&email, crate::avatars::Hint::GitLab(gitlab.clone()));
-                    }
-                }
+            for (email, hint) in hosting.forge.provider().avatars(&repo, &hosting, &emails) {
+                crate::avatars::hint(&email, hint);
             }
             ctx.request_repaint();
         });
     }
 }
 
-/// Where a self-hosted GitLab's API is, from the remote `url`: its host, with the port of an
-/// `https://host:8443/…` remote (its web pages and API are on that port too).
-fn gitlab_authority(url: &str) -> Option<String> {
-    let web = forge::web_url(url)?;
-    let (_, rest) = web.split_once("://")?;
-    rest.split('/').next().map(str::to_owned)
-}
-
 #[cfg(test)]
 mod tests {
-    use super::gitlab_authority;
-
-    #[test]
-    fn gitlab_avatars_are_asked_on_the_remotes_port() {
-        let at = |url: &str| gitlab_authority(url);
-        assert_eq!(
-            at("https://gitlab.example.com:8443/g/p.git").as_deref(),
-            Some("gitlab.example.com:8443")
-        );
-        assert_eq!(at("git@gitlab.com:g/p.git").as_deref(), Some("gitlab.com"));
-        // An SSH port says nothing about the web pages'.
-        assert_eq!(
-            at("ssh://git@gitlab.example.com:2222/g/p.git").as_deref(),
-            Some("gitlab.example.com")
-        );
-    }
-
     /// The pull requests read before a merge answer after those read since: the merged one
     /// doesn't come back.
     #[test]

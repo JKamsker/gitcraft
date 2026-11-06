@@ -27,7 +27,9 @@ serde_json = "1"
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
 # bat's syntax set: TypeScript, Vue, TOML, Dockerfile, PowerShell… beyond syntect's own.
 two-face = { version = "0.5.2", default-features = false, features = ["syntect-default-fancy"] }
-ureq = "2"
+# The system's certificates, as git uses them: a self-hosted forge may have its own CA. (The proxy
+# is picked in src/forge/http.rs: ureq's own reading of the environment ignores NO_PROXY.)
+ureq = { version = "2", features = ["native-certs"] }
 base64 = "0.22"
 vt100 = "0.18"
 

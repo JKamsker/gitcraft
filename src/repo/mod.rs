@@ -48,7 +48,7 @@ use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::Instant;
 
-use crate::forge::{Forge, PullRequest};
+use crate::forge::{Forge, Hosting, PullRequest};
 use crate::git::{
     self, Commit, CommitDetail, Identity, Refs, Remote, Stash, Submodule, WorkStatus, Worktree,
 };
@@ -127,7 +127,8 @@ pub struct RepoTab {
     /// It keeps files in Git LFS, and git-lfs is installed.
     lfs: bool,
     identity: Identity,
-    forge: Option<Forge>,
+    /// Where `origin` is hosted, when it's on a forge gitcraft knows.
+    hosting: Option<Hosting>,
     prs: Vec<PullRequest>,
     pr_error: Option<String>,
     prs_loaded: Option<Instant>,
@@ -274,7 +275,7 @@ impl RepoTab {
             submodules: Vec::new(),
             lfs: false,
             identity: Identity::default(),
-            forge: None,
+            hosting: None,
             prs: Vec::new(),
             pr_error: None,
             prs_loaded: None,
@@ -357,6 +358,11 @@ impl RepoTab {
     /// Queues an action from outside the tab (the command palette).
     pub(crate) fn queue(&mut self, action: Action) {
         self.queued.push(action);
+    }
+
+    /// The forge `origin` is on.
+    pub(super) fn forge(&self) -> Option<Forge> {
+        self.hosting.as_ref().map(|h| h.forge)
     }
 
     /// HTTPS credentials for this tab's git commands (from the clone that made it).

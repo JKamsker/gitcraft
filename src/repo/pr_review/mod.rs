@@ -1,6 +1,6 @@
 //! Saying something on the pull request shown: a comment on its page, a review from the box under
 //! its files, threads on lines from the diff. What is only typed stays as a draft of the tab; a
-//! comment added to the review is on GitHub already, in a pending review only its author sees.
+//! comment added to the review is on the forge already, in a pending review only its author sees.
 
 mod boxes;
 mod line_panel;

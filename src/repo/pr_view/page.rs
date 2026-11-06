@@ -303,6 +303,10 @@ fn chips(ui: &mut Ui, d: &PrDetails) {
 
 fn checks(ui: &mut Ui, d: &PrDetails, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
+    if let Some(e) = &d.checks_error {
+        ui.colored_label(t.warning, format!("Couldn't read the checks: {e}"));
+        return;
+    }
     if d.checks.is_empty() {
         ui.label(
             RichText::new("No checks ran on this pull request.")
@@ -336,7 +340,10 @@ fn checks(ui: &mut Ui, d: &PrDetails, acts: &mut Vec<Action>) {
     for check in sorted {
         let (rect, r) = ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::click());
         // A run of GitHub Actions opens in the pipeline view, anything else in the browser.
-        let run = crate::ci::github::run_of_url(&check.url);
+        // Forgejo's and Gitea's Actions have the same URLs, but gitcraft doesn't read their runs.
+        let run = (d.forge == Some(crate::forge::Forge::GitHub))
+            .then(|| crate::ci::github::run_of_url(&check.url))
+            .flatten();
         let opens = pr::is_web_url(&check.url);
         if r.hovered() && opens {
             ui.painter().rect_filled(rect, t.radius_sm, t.hover);
