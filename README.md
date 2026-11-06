@@ -213,10 +213,11 @@ so your config, credentials and hooks apply as usual.
   meanwhile is not started and says why, and the toolbar's other buttons say what they wait
   for.
 - The taskbar button shows how far a clone, fetch, pull or push is (the least advanced, when
-  several run), and turns red when one fails, until the window is looked at or another starts.
-  On Windows that is the taskbar's own progress; on Linux the launcher's (the `LauncherEntry`
-  signal that Ubuntu's dock, Dash to Dock, KDE's task manager and others show), red there meaning
-  it asks for attention.
+  several run). When one fails while the window is in the background it turns red on Windows
+  (on Linux the launcher asks for attention, as each dock shows it), until the window is looked
+  at or another operation starts. On Windows that is the taskbar's own progress; on Linux the
+  launcher's (the `LauncherEntry` signal that Ubuntu's dock, Dash to Dock, KDE's task manager
+  and others show).
 - The taskbar button's menu (Windows: its jump list; Linux: the launcher's actions) lists the
   recent repositories, then _Clone…_ and _Open…_ (`gitcraft --clone`, `gitcraft --open`). On
   Linux they go into the AppImage's menu entry, or, for the .deb and .rpm, into a copy of the

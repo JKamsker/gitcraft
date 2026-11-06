@@ -12,7 +12,7 @@ use windows::Win32::System::Com::{
     CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx,
 };
 use windows::Win32::UI::Shell::Common::{IObjectArray, IObjectCollection};
-use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
+use windows::Win32::UI::Shell::PropertiesSystem::{IPropertyStore, PSCoerceToCanonicalValue};
 use windows::Win32::UI::Shell::{
     DestinationList, EnumerableObjectCollection, ICustomDestinationList, IShellLinkW,
     ITaskbarList3, ShellLink, TBPF_ERROR, TBPF_INDETERMINATE, TBPF_NOPROGRESS, TBPF_NORMAL,
@@ -26,8 +26,10 @@ fn error(what: &str, e: &windows::core::Error) -> String {
     format!("{what}: {e}")
 }
 
-/// COM for this thread, as a single-threaded apartment (the window's thread already is one;
-/// asking again is harmless).
+/// COM for this thread, as a single-threaded apartment. The window's thread already is one
+/// (winit sets OLE up there), so this only adds a reference, which keeps COM up for the
+/// taskbar interface kept on it; the jump list is set from one thread that lives as long as
+/// the app. Neither is ever uninitialised: both live until the process ends.
 fn com() {
     // SAFETY: no reserved argument; a second call on the thread only adds a reference, and a
     // thread already in another apartment just says so (the call fails, nothing changes).
@@ -95,7 +97,11 @@ fn shortcut(exe: &Path, link: &Link) -> windows::core::Result<IShellLinkW> {
         shell_link.SetDescription(&HSTRING::from(link.tooltip.as_str()))?;
         shell_link.SetIconLocation(&exe_s, 0)?;
         let store: IPropertyStore = shell_link.cast()?;
-        store.SetValue(&PKEY_Title, &PROPVARIANT::from(link.title.as_str()))?;
+        // A string as the title's own type (a wide string, as the shell's samples set it),
+        // not the BSTR a PROPVARIANT is made from.
+        let mut title = PROPVARIANT::from(link.title.as_str());
+        PSCoerceToCanonicalValue(&PKEY_Title, &mut title)?;
+        store.SetValue(&PKEY_Title, &title)?;
         store.Commit()?;
     }
     Ok(shell_link)
@@ -132,6 +138,10 @@ fn collection(exe: &Path, links: &[&Link]) -> windows::core::Result<IObjectArray
     items.cast()
 }
 
+/// The arguments of the items the user removed from the jump list while gitcraft runs: Windows
+/// says so once (at the next BeginList), and adding one again is refused.
+static REMOVED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
 pub(super) fn set_jump_list(
     exe: &Path,
     category: &str,
@@ -143,23 +153,33 @@ pub(super) fn set_jump_list(
         let mut slots = 0u32;
         // SAFETY: `slots` lives for the call; the list is ours until CommitList or AbortList.
         let removed: IObjectArray = unsafe { list.BeginList(&mut slots)? };
-        let gone = removed_args(&removed);
+        let gone = {
+            let mut all = REMOVED.lock().map(|r| r.clone()).unwrap_or_default();
+            all.extend(removed_args(&removed));
+            if let Ok(mut r) = REMOVED.lock() {
+                r.clone_from(&all);
+            }
+            all
+        };
         let kept: Vec<&Link> = recent
             .iter()
             .filter(|l| !gone.contains(&command_line(&l.args)))
-            .take(slots.max(1) as usize)
             .collect();
         let tasks: Vec<&Link> = tasks.iter().collect();
         let done = (|| {
-            if !kept.is_empty() {
-                let items = collection(exe, &kept)?;
-                // SAFETY: a title that lives for the call, a collection made above.
-                unsafe { list.AppendCategory(&HSTRING::from(category), &items)? };
-            }
+            // The tasks first: the category can be refused on its own (the user turned off
+            // "Show recently opened items", or an item they removed came back), which must
+            // not cost Clone… and Open….
             if !tasks.is_empty() {
                 let items = collection(exe, &tasks)?;
-                // SAFETY: as above.
+                // SAFETY: a collection made above.
                 unsafe { list.AddUserTasks(&items)? };
+            }
+            if !kept.is_empty()
+                && let Ok(items) = collection(exe, &kept)
+            {
+                // SAFETY: a title that lives for the call, a collection made above.
+                let _ = unsafe { list.AppendCategory(&HSTRING::from(category), &items) };
             }
             // SAFETY: the list begun above.
             unsafe { list.CommitList() }

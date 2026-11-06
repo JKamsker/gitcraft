@@ -96,6 +96,8 @@ pub struct App {
     clone_failed: bool,
     /// What the taskbar button shows.
     taskbar: crate::os_shell::Taskbar,
+    /// The recent repositories the taskbar button's menu was made for.
+    menu_for: Option<Vec<PathBuf>>,
     /// The dialog that opens a repository in WSL or over SSH.
     remote_form: Option<RemoteForm>,
     /// Repositories on other machines being reached, each tab to open once it answers.
@@ -179,6 +181,7 @@ impl App {
             pick_on_start: false,
             clone_failed: false,
             taskbar: Default::default(),
+            menu_for: None,
             remote_form: None,
             connecting: Vec::new(),
             askpass: Default::default(),
