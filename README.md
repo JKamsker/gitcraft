@@ -88,7 +88,8 @@ so your config, credentials and hooks apply as usual.
   find the commits that added or removed a piece of text in a file (`git log -S`); Enter /
   Shift+Enter jump between results, loading older history when needed.
 - Search operators, combined with each other and with free text: `author:`, `committer:`,
-  `path:`, `after:` / `before:` (`2024-05-01`, `2w`, `3m`, `1y`, `today`), `message:`,
+  `path:`, `after:` / `before:` (`2024-05-01`, `2024-05`, `today`, `yesterday`, `12h`, `3d`,
+  `2w`, `6m` for months, `1y`), `message:`,
   `contents:` (`git log -S`), `regex:` (`git log -G`) and `merges:` / `-merges:`; quote values
   with spaces (`author:"Jane Doe"`). Typing one suggests authors (as `.mailmap` names them),
   files and folders, or dates (↑ / ↓, then Tab or Enter); a mistake is explained under the

@@ -4,16 +4,22 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use super::Plan;
+use super::args::HashLookup;
+use crate::git::END_OPTS;
 use crate::git::commits::push_revisions;
 use crate::git::{NO_SIGNATURE, UTF8, run as git, search, search_code};
 
 /// The commits `plan` finds, newest first; among those of the revisions `from` when given
 /// (as the graph shows them), else of every branch.
 pub fn run(repo: &Path, from: Option<&[String]>, plan: &Plan) -> Result<Vec<String>, String> {
-    let (passes, paths) = match plan {
+    let (passes, paths, hash) = match plan {
         Plan::Plain { query, code: true } => return search_code(repo, from, query),
         Plan::Plain { query, code: false } => return search(repo, from, query),
-        Plan::Operators { passes, paths } => (passes, paths),
+        Plan::Operators {
+            passes,
+            paths,
+            hash,
+        } => (passes, paths, hash),
     };
     if from.is_some_and(|revs| revs.is_empty()) {
         return Ok(Vec::new());
@@ -28,7 +34,25 @@ pub fn run(repo: &Path, from: Option<&[String]>, plan: &Plan) -> Result<Vec<Stri
             }
         }
     }
+    // First, and once, as in a plain search: the commit the text names, if it matches.
+    if let Some(named) = hash.as_ref().and_then(|h| named_commit(repo, h, paths)) {
+        hashes.retain(|x| *x != named);
+        hashes.insert(0, named);
+    }
     Ok(hashes)
+}
+
+/// The commit `lookup` names, when the filters and `paths` match it.
+fn named_commit(repo: &Path, lookup: &HashLookup, paths: &[String]) -> Option<String> {
+    let rev = format!("{}^{{commit}}", lookup.prefix);
+    let full = git(Some(repo), &["rev-parse", "--verify", "-q", &rev]).ok()?;
+    let full = full.trim();
+    let mut args = vec!["log", NO_SIGNATURE, UTF8, "--no-walk", "--format=%H"];
+    args.extend(lookup.filters.iter().map(String::as_str));
+    args.extend([END_OPTS, full, "--"]);
+    args.extend(paths.iter().map(String::as_str));
+    let out = git(Some(repo), &args).ok()?;
+    out.lines().next().map(str::to_owned)
 }
 
 /// `git log` with the filters `pass`, over `from`, limited to `paths`.
