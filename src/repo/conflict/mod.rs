@@ -1,6 +1,7 @@
 //! Three-pane conflict editor: each conflict's "ours" and "theirs" side by side with buttons to
 //! pick a side (or both), and the resulting file below, editable by hand.
 
+pub mod archaeology;
 mod view;
 
 use std::path::Path;
@@ -48,6 +49,8 @@ pub struct ConflictEditor {
     /// Being written on another machine, in the background: neither edited nor saved again
     /// until that is done, so an older save can't land after a newer one.
     pub saving: bool,
+    /// Each side's commits that touched the file, and where the conflict started.
+    pub history: archaeology::History,
 }
 
 /// Whether `line` (without its line ending) is git's `kind` conflict marker: exactly seven
@@ -319,6 +322,7 @@ impl ConflictEditor {
             on_disk: conflicts,
             generation: 0,
             saving: false,
+            history: Default::default(),
         })
     }
 
@@ -487,6 +491,7 @@ mod tests {
             on_disk: 1,
             generation: 0,
             saving: false,
+            history: Default::default(),
         };
         assert_eq!(ed.unresolved(), 1);
         ed.choose(0, Choice::Ours);
@@ -513,6 +518,7 @@ mod tests {
             on_disk: conflicts,
             generation: 0,
             saving: false,
+            history: Default::default(),
         }
     }
 

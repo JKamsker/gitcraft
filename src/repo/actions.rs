@@ -120,6 +120,8 @@ pub(crate) enum Action {
     /// The commit pane lists every file of the commit, or only those it changed.
     ViewAllFiles(bool),
     SaveConflict,
+    /// The conflict editor's history of the file on each side.
+    Archaeology(super::conflict::archaeology::Act),
     /// Let Mergiraf solve what it can of the open conflict.
     SolveWithMergiraf,
     /// A file's history, blame or contents in the central pane (`rev`: the commit they are at).

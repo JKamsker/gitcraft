@@ -65,6 +65,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Submodules show whether they are modified, not initialised or out of date; right-click one to update it or open it in a tab. Settings → Git can keep them up to date after each checkout, pull, merge and rebase.",
             "Hover a branch and click its eye to hide it from the graph, or Solo it from its menu to see only the branches soloed; “Show all” at the top brings them all back.",
             "Conflicts open in a three-pane editor with Ours, Theirs and Both for each conflict.",
+            "How this conflict came about, above the conflicts, lists each side's commits that touched the file since they diverged; click one to see what it changed in the file. Find where it started finds the first pair of commits, one from each side, whose merge already conflicts in the file (test merges with git merge-tree, git 2.38 or newer, which change nothing); Cancel stops it.",
             "Right-click a file for its history, its blame or the whole file as it is at the commit.",
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",
