@@ -42,6 +42,7 @@ mod tests;
 mod toolbar;
 mod watch;
 mod watch_remote;
+mod weakened_marks;
 pub(crate) mod widgets;
 pub(crate) mod worktree_tab;
 
@@ -137,6 +138,8 @@ pub struct RepoTab {
     prs_loaded: Option<Instant>,
     /// The build status of the commits that show one.
     ci: ci_status::CiStatuses,
+    /// The _weakens checks_ scans of the file lists shown.
+    weakened: weakened_marks::WeakenedMarks,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -299,6 +302,7 @@ impl RepoTab {
             pr_error: None,
             prs_loaded: None,
             ci: ci_status::CiStatuses::default(),
+            weakened: Default::default(),
             selected: None,
             stash_view: None,
             scroll_to: None,
