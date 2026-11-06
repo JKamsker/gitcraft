@@ -200,6 +200,7 @@ impl RepoTab {
             Action::ViewAllFiles(on) => self.all_files.on = on,
             Action::FileView { path, rev, tab } => self.open_file_view(path, rev, tab, ctx),
             Action::CloseFileView => self.file_view = None,
+            Action::Navigate(step) => self.navigate(step, ctx),
             Action::InteractiveRebase { onto, label } => self.interactive_rebase(onto, label, ctx),
             Action::Reword { hash, message } => self.reword_commit(hash, message, ctx),
             Action::EditMessage(hash) => self.edit_message(hash, ctx),

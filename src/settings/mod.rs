@@ -69,6 +69,8 @@ pub struct Settings {
     pub diff_split: bool,
     /// Diffs show the whole file, not just the lines around the changes.
     pub diff_whole_file: bool,
+    /// Diffs of commits and of the working tree show below the graph, not in its place.
+    pub diff_beside_graph: bool,
     /// Background fetch interval in minutes; 0 turns it off.
     pub auto_fetch_minutes: u32,
     /// What the toolbar's Pull does.
@@ -128,6 +130,7 @@ impl Default for Settings {
             files_as_tree: true,
             diff_split: false,
             diff_whole_file: false,
+            diff_beside_graph: false,
             auto_fetch_minutes: 10,
             pull_mode: Default::default(),
             avatars: true,

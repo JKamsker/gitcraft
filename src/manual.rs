@@ -34,6 +34,8 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Search messages, authors and hashes, or switch to Code to find the commits that added or removed some text.",
             "Drag the borders in the column header to resize; right-click it to pick the columns, make the graph column compact or reset the columns.",
             "Interactive rebase: reorder, reword, squash, fix up or drop commits, then start it.",
+            "Back and forward (Alt+← / Alt+→, the mouse's back and forward buttons, or the arrows at the start of the toolbar) go through the tab's recent views: the graph with its selected commit, diffs, a file's history, blame or contents, pull requests and builds.",
+            "The panel button in a diff's header shows the diff below the graph instead of in its place: the graph stays usable, the diff follows the file opened next, and the border between them drags to resize. Esc still closes the diff.",
         ],
     ),
     (
@@ -99,6 +101,11 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("Cmd+click", "Compare with the selected commit"),
             ("Double-click a pill", "Check out that branch or tag"),
             ("Esc", "Close the diff, comparison or search"),
+            ("Alt+← / Alt+→", "Back / forward through the recent views"),
+            (
+                "Mouse back / forward buttons",
+                "Back / forward through the recent views",
+            ),
         ],
     ),
     (

@@ -13,6 +13,7 @@ mod conflict;
 mod detail;
 mod dialogs;
 mod diff;
+mod diff_split;
 mod file_text;
 mod file_view;
 pub(crate) mod graph_view;
@@ -21,7 +22,9 @@ mod keep_submodules;
 mod layout;
 mod load;
 mod messages;
+mod nav_history;
 mod navigate;
+mod navigation;
 mod operations;
 mod patches;
 mod pinned_sections;
@@ -157,6 +160,8 @@ pub struct RepoTab {
     pr_drafts: HashMap<u64, pr_review::PrDraft>,
     compare_requests: u64,
     file_view: Option<file_view::FileView>,
+    /// The recent views, for back and forward.
+    nav: nav_history::NavHistory<navigation::View>,
     rebase: Option<rebase::RebaseEditor>,
     /// The selected commit's message, being edited in the right pane.
     reword: Option<Reword>,
@@ -313,6 +318,7 @@ impl RepoTab {
             pr_drafts: HashMap::new(),
             compare_requests: 0,
             file_view: None,
+            nav: Default::default(),
             rebase: None,
             reword: None,
             credentials: None,

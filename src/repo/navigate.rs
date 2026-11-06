@@ -35,17 +35,20 @@ impl RepoTab {
             return;
         }
         let hash = commit.hash.clone();
+        // Below the graph, the diff stays and follows what is opened next.
+        let keep_diff = self.diff_beside_graph(ctx);
         self.selected = Some(row);
         self.stash_view = stash;
         self.file_view = None;
         self.compare = None;
-        if matches!(
-            self.diff,
-            Some(DiffView {
-                key: DiffKey::Commit { .. } | DiffKey::Range { .. },
-                ..
-            })
-        ) || hash != WIP_HASH
+        if !keep_diff
+            && (matches!(
+                self.diff,
+                Some(DiffView {
+                    key: DiffKey::Commit { .. } | DiffKey::Range { .. },
+                    ..
+                })
+            ) || hash != WIP_HASH)
         {
             self.diff = None;
             self.conflict = None;
