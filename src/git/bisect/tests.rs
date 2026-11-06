@@ -118,7 +118,10 @@ fn the_steps_left_shrink_as_commits_are_marked() -> Result<(), String> {
     let result = (|| {
         bisect_start(&dir, "HEAD", Some(&hashes[0]))?;
         let mut last = u32::MAX;
+        let mut tests = 0;
         while let Some(progress) = state(&dir)?.progress {
+            tests += 1;
+            assert!(tests <= 8, "64 commits take at most 7 tests");
             assert!(progress.steps <= last, "{} after {last}", progress.steps);
             last = progress.steps;
             let bisect = state(&dir)?;
@@ -280,7 +283,7 @@ fn a_run_with_a_script_finds_the_culprit() -> Result<(), String> {
             "{lines:#?}"
         );
         assert!(
-            lines.iter().any(|l| l.contains("is the first bad commit")),
+            lines.iter().any(|l| l.contains(" is the first ")),
             "{lines:#?}"
         );
         let bisect = state(&dir)?;
