@@ -26,6 +26,9 @@ impl RepoTab {
         .default_width(520.0)
         .show(ctx, |ui| match &search.ended {
             None => going(ui, &t, search, acts),
+            Some(Err(e)) if e == "stopped" => {
+                ui.label(RichText::new("Stopped before it found anything.").color(t.text_dim));
+            }
             Some(Err(e)) => {
                 ui.label(RichText::new(format!("The search failed: {e}")).color(t.danger));
             }

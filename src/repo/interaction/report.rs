@@ -5,7 +5,22 @@ use crate::git::{Found, Interaction, Probe, SearchProgress, Side};
 /// The finding, in a sentence, for the branches `a` and `b`.
 pub(crate) fn found_line(found: &Found, a: &str, b: &str, budget: usize) -> String {
     match found {
-        Found::Together { commits, minimal } => {
+        Found::Together {
+            commits,
+            minimal,
+            gaps: true,
+        } if *minimal => match commits.len() {
+            2 => "These two commits fail together; leaving either out passes or can't be \
+                  tested (it doesn't apply without the other):"
+                .to_owned(),
+            n => format!(
+                "These {n} commits fail together; leaving any one out passes or can't be tested \
+                 (it doesn't apply without the others):"
+            ),
+        },
+        Found::Together {
+            commits, minimal, ..
+        } => {
             let sides = (
                 commits.iter().any(|c| c.side == Side::A),
                 commits.iter().any(|c| c.side == Side::B),
@@ -90,6 +105,7 @@ mod tests {
         let found = Found::Together {
             commits: vec![change(Side::A), change(Side::B)],
             minimal: true,
+            gaps: false,
         };
         assert_eq!(
             found_line(&found, "a", "b", 40),
@@ -98,11 +114,13 @@ mod tests {
         let three = Found::Together {
             commits: vec![change(Side::A), change(Side::A), change(Side::B)],
             minimal: true,
+            gaps: false,
         };
         assert!(found_line(&three, "a", "b", 40).starts_with("These 3 commits fail together"));
         let cut = Found::Together {
             commits: vec![change(Side::A); 5],
             minimal: false,
+            gaps: false,
         };
         assert!(found_line(&cut, "a", "b", 9).starts_with("Out of tests (9): these 5"));
         assert_eq!(
@@ -110,6 +128,12 @@ mod tests {
             "x and ü y pass together: there is nothing to find."
         );
         assert!(found_line(&Found::FailsAlone(Side::B), "x", "y", 1).starts_with("y fails"));
+        let gaps = Found::Together {
+            commits: vec![change(Side::A), change(Side::B)],
+            minimal: true,
+            gaps: true,
+        };
+        assert!(found_line(&gaps, "a", "b", 40).contains("passes or can't be tested"));
     }
 
     #[test]

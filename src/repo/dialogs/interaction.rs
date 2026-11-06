@@ -23,8 +23,8 @@ pub(super) fn find_interaction(
         "Find the interaction",
         &format!(
             "For two branches that pass alone but fail together: tests subsets of their commits \
-             {machine}, in a scratch worktree, until it finds the ones that fail together. Each \
-             branch may have up to {MAX_CHANGES} commits since they diverged, and no merges."
+             {machine}, in a scratch worktree, until it finds the ones that fail together. The two \
+             may have up to {MAX_CHANGES} commits together since they diverged, and no merges."
         ),
         &t,
     );

@@ -72,7 +72,10 @@ fn the_search_finds_the_pair_from_a_branch_s_menu() -> Result<(), String> {
     settle(&mut tab, &ctx)?;
     let search = tab.interactions.search.as_ref().ok_or("no search")?;
     let found = search.ended.clone().ok_or("not ended")??;
-    let Found::Together { commits, minimal } = &found.found else {
+    let Found::Together {
+        commits, minimal, ..
+    } = &found.found
+    else {
         return Err(format!("{:?}", found.found));
     };
     assert!(minimal);
