@@ -129,7 +129,7 @@ pub(crate) fn files_of(patch: &[u8], paths: Vec<String>) -> Result<Vec<FilePatch
             Ok(raw) => Ok(FilePatch::new(path, raw)),
             // A patch of it read with its odd bytes replaced would write the replacements.
             Err(_) => Err(format!(
-                "{path} isn't UTF-8 text (Latin-1…), which can't be split here: split it in the terminal"
+                "{path} isn't UTF-8 text (Latin-1…), whose lines can't be picked apart here: do it in the terminal"
             )),
         })
         .collect()
