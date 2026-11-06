@@ -69,7 +69,7 @@ impl RepoTab {
         // Offline mode: off, saying why, rather than left to wait for a network.
         let offline = super::offline::refused_text();
         let has_remote = !self.remotes.is_empty() && offline.is_none();
-        let off_why = offline.unwrap_or_default();
+        let off_why = offline.unwrap_or_else(|| "This repository has no remote".to_owned());
         let fetched = format!(
             "Fetch all remotes (git fetch --all --prune)\nLast fetched {} ago",
             short_duration(self.last_fetch.elapsed())

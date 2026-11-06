@@ -414,7 +414,7 @@ impl RepoTab {
             }
         }
         // The forge is asked by itself only while gitcraft may go on the network by itself.
-        let paused = crate::network::background_paused().is_some();
+        let paused = !crate::network::background_may_run();
         if !paused
             && self
                 .prs_loaded
@@ -630,7 +630,7 @@ impl RepoTab {
         // Offline or metered: asked on the next read once that is over.
         if self.avatars_hinted
             || !Settings::get(ctx).avatars
-            || crate::network::background_paused().is_some()
+            || !crate::network::background_may_run()
         {
             return;
         }

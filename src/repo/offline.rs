@@ -14,9 +14,32 @@ pub(super) fn refused_text() -> Option<String> {
     network::refused().map(|p| format!("{}: turn it off to fetch, pull or push", p.why()))
 }
 
-/// The chip's text: "Offline · last fetched 3 h ago".
-pub(super) fn chip_text(pause: Pause, since_fetch: std::time::Duration) -> String {
-    format!("{} · last fetched {} ago", pause.label(), ago(since_fetch))
+/// The chip's text: "Offline · last fetched 3 h ago" (or "never fetched").
+pub(super) fn chip_text(pause: Pause, since_fetch: Option<std::time::Duration>) -> String {
+    match since_fetch {
+        Some(d) => format!("{} · last fetched {} ago", pause.label(), ago(d)),
+        None => format!("{} · never fetched", pause.label()),
+    }
+}
+
+/// When `FETCH_HEAD` of the repository at `path` (one of this machine) was written.
+fn last_fetched(path: &std::path::Path) -> Option<std::time::SystemTime> {
+    if crate::remote::is_remote(path) {
+        return None;
+    }
+    let file = crate::git::run(
+        Some(path),
+        &[
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            "FETCH_HEAD",
+        ],
+    )
+    .ok()?;
+    std::fs::metadata(file.trim())
+        .and_then(|m| m.modified())
+        .ok()
 }
 
 /// What is paused, and how to get it going again, for the chip's hover.
@@ -41,10 +64,10 @@ pub(super) fn chip_tip(pause: Pause) -> String {
     }
 }
 
-/// "12 s", "3 min", "2 h", "4 days".
+/// "under a minute", "3 min", "2 h", "4 days" (the chip is repainted every half minute).
 fn ago(d: std::time::Duration) -> String {
     match d.as_secs() {
-        s @ 0..60 => format!("{s} s"),
+        0..60 => "under a minute".to_owned(),
         s @ 60..3600 => format!("{} min", s / 60),
         s @ 3600..172_800 => format!("{} h", s / 3600),
         s => format!("{} days", s / 86_400),
@@ -61,7 +84,59 @@ pub(super) fn set_offline(ctx: &egui::Context, offline: bool) {
     }
 }
 
+/// Whether the background fetch of the repository at `path` may run: as other background
+/// work, except that one over SSH fetches on that machine's network, which a metered
+/// connection here doesn't pay for.
+pub(super) fn background_fetch_may_run(path: &std::path::Path) -> bool {
+    if network::background_may_run() {
+        return true;
+    }
+    let over_ssh =
+        crate::remote::parse(path).is_some_and(|t| matches!(t.host, crate::remote::Host::Ssh(_)));
+    over_ssh && network::background_paused() == Some(Pause::Metered)
+}
+
 impl RepoTab {
+    /// Once background work may go on the network again (the connection came back, offline
+    /// mode was turned off, the system answered first): the forge is asked what it was not
+    /// asked meanwhile (pull requests, builds, avatars), and when this repository was last
+    /// fetched is read.
+    pub(super) fn follow_network(&mut self, ctx: &egui::Context) {
+        let may_run = network::background_may_run();
+        let was = std::mem::replace(&mut self.network_paused, !may_run);
+        if was && may_run && self.history_gen > 0 {
+            self.avatars_hinted = false;
+            self.prs_loaded = None;
+            self.load_prs(ctx);
+            self.refresh_ci(ctx);
+            self.hint_avatars(ctx);
+        }
+        if !self.fetch_time_asked {
+            self.fetch_time_asked = true;
+            let (path, slot) = (self.path.clone(), std::sync::Arc::clone(&self.fetched_at));
+            std::thread::spawn(move || {
+                let at = last_fetched(&path);
+                if let Ok(mut s) = slot.lock() {
+                    *s = s.or(at);
+                }
+            });
+        }
+    }
+
+    /// When this repository was last fetched: by gitcraft since it started, or else as
+    /// `FETCH_HEAD` says (another machine's isn't read: its clock isn't this one's).
+    fn fetched_ago(&self) -> Option<std::time::Duration> {
+        let at = self.fetched_at.lock().ok().and_then(|a| *a)?;
+        std::time::SystemTime::now().duration_since(at).ok()
+    }
+
+    /// Notes a fetch that went through, for the chip.
+    pub(super) fn note_fetched(&self) {
+        if let Ok(mut at) = self.fetched_at.lock() {
+            *at = Some(std::time::SystemTime::now());
+        }
+    }
+
     /// The chip saying gitcraft stays off the network, when it does; a click goes online
     /// when that is offline mode.
     pub(super) fn network_chip(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
@@ -70,11 +145,8 @@ impl RepoTab {
         };
         let t = Tokens::get(ui.ctx());
         ui.add_space(10.0);
-        let color = match pause {
-            Pause::Switch | Pause::NoConnection => t.warning,
-            Pause::Metered => t.text_dim,
-        };
-        let chip = widgets::chip(ui, &chip_text(pause, self.last_fetch.elapsed()), color)
+        let color = t.warning;
+        let chip = widgets::chip(ui, &chip_text(pause, self.fetched_ago()), color)
             .on_hover_text(chip_tip(pause));
         if pause == Pause::Switch && chip.interact(egui::Sense::click()).clicked() {
             acts.push(Action::SetOffline(false));
@@ -213,18 +285,114 @@ mod tests {
     #[test]
     fn the_chip_says_why_and_when_it_last_fetched() {
         assert_eq!(
-            chip_text(Pause::Switch, Duration::from_secs(3 * 3600 + 5)),
+            chip_text(Pause::Switch, Some(Duration::from_secs(3 * 3600 + 5))),
             "Offline · last fetched 3 h ago"
         );
         assert_eq!(
-            chip_text(Pause::Metered, Duration::from_secs(90)),
+            chip_text(Pause::Metered, Some(Duration::from_secs(90))),
             "Metered network · last fetched 1 min ago"
         );
         assert_eq!(
-            chip_text(Pause::NoConnection, Duration::from_secs(3 * 86_400)),
+            chip_text(Pause::NoConnection, Some(Duration::from_secs(3 * 86_400))),
             "No connection · last fetched 3 days ago"
         );
+        assert_eq!(
+            chip_text(Pause::Switch, Some(Duration::from_secs(5))),
+            "Offline · last fetched under a minute ago"
+        );
+        assert_eq!(chip_text(Pause::Switch, None), "Offline · never fetched");
         assert!(chip_tip(Pause::Switch).contains("Click to go online"));
         assert!(chip_tip(Pause::Metered).contains("still runs"));
+    }
+
+    /// Only what reaches a remote is refused offline: not the `remote` commands that only
+    /// write the config, nor `submodule update` (after a checkout).
+    #[test]
+    fn only_what_reaches_a_remote_is_refused_offline() {
+        use super::super::operations::reaches_a_remote;
+        let op = |a: &[&str]| a.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+        for (args, reaches) in [
+            (&["fetch", "--all"][..], true),
+            (&["-c", "push.default=simple", "push", "-u", "o"], true),
+            (&["pull", "--rebase"], true),
+            (&["ls-remote", "o"], true),
+            (&["remote", "update"], true),
+            (&["remote", "prune", "origin"], true),
+            (&["remote", "show", "origin"], true),
+            (&["remote", "show", "-n", "origin"], false),
+            (&["remote", "add", "o", "https://x/y"], false),
+            (&["remote", "set-url", "o", "https://x/y"], false),
+            (&["remote", "rename", "o", "p"], false),
+            (&["remote", "remove", "o"], false),
+            (&["submodule", "update", "--init", "--recursive"], false),
+            (&["lfs", "pull"], true),
+            (&["lfs", "ls-files"], false),
+            (&["status"], false),
+            (&[], false),
+        ] {
+            assert_eq!(reaches_a_remote(&op(args)), reaches, "{args:?}");
+        }
+    }
+
+    /// A repository over SSH fetches on that machine's network: a metered connection here
+    /// doesn't stop its background fetch; offline mode or no connection does.
+    #[test]
+    fn an_ssh_repository_still_fetches_on_a_metered_connection_here() {
+        let ssh = std::path::Path::new("ssh://build/home/me/r");
+        let here = std::path::Path::new("/home/me/r");
+        let _metered = test_pause::set(Some(Pause::Metered));
+        assert!(background_fetch_may_run(ssh));
+        assert!(!background_fetch_may_run(here));
+        drop(_metered);
+        for pause in [Pause::Switch, Pause::NoConnection] {
+            let _p = test_pause::set(Some(pause));
+            assert!(!background_fetch_may_run(ssh));
+        }
+    }
+
+    /// Back on the network, the forge is asked again what it wasn't asked meanwhile.
+    #[test]
+    fn coming_back_asks_the_forge_again() {
+        let dir = repo("resume");
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+        tab.history_gen = 1;
+        tab.avatars_hinted = true;
+        let asked = Instant::now();
+        tab.prs_loaded = Some(asked);
+        {
+            let _paused = test_pause::set(Some(Pause::Metered));
+            tab.follow_network(&ctx);
+        }
+        let while_paused = (tab.avatars_hinted, tab.prs_loaded);
+        {
+            let _back = test_pause::set(None);
+            tab.follow_network(&ctx);
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(while_paused, (true, Some(asked)));
+        // No forge here: nothing is asked, but what was asked before counts no more.
+        assert!(!tab.avatars_hinted);
+        assert_ne!(tab.prs_loaded, Some(asked));
+    }
+
+    /// When the repository was last fetched comes from `FETCH_HEAD`, and from a fetch that
+    /// went through.
+    #[test]
+    fn the_last_fetch_is_read_from_fetch_head() {
+        let dir = repo("fetch-head");
+        let none = last_fetched(&dir);
+        let _ = std::fs::write(dir.join(".git/FETCH_HEAD"), "");
+        let some = last_fetched(&dir);
+        let ctx = egui::Context::default();
+        let tab = RepoTab::new_deferred(dir.clone(), &ctx);
+        let before = tab.fetched_ago();
+        tab.note_fetched();
+        let after = tab.fetched_ago();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(none, None);
+        assert!(some.is_some());
+        assert_eq!(before, None);
+        assert!(after.is_some_and(|d| d < Duration::from_secs(5)));
     }
 }

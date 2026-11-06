@@ -2,6 +2,7 @@
 //! Windows through its connection profile (PowerShell reads it), Linux through NetworkManager
 //! (`busctl`). Elsewhere, or when that fails, nothing is known and nothing pauses by itself.
 
+#[cfg(target_os = "linux")]
 use std::process::{Command, Stdio};
 
 /// What the system says about the connection; `None`: it couldn't be told.
@@ -18,24 +19,11 @@ impl Detected {
     };
 }
 
-/// The PowerShell that prints the internet connection profile's level and cost:
-/// `<level> <cost type> <roaming> <over the limit> <approaching it>`, or `none` without one.
-#[cfg(windows)]
-const WINDOWS_SCRIPT: &str = "$n=[Windows.Networking.Connectivity.NetworkInformation,Windows.Networking.Connectivity,ContentType=WindowsRuntime];\
-$p=$n::GetInternetConnectionProfile();\
-if($p -eq $null){'none'}else{$c=$p.GetConnectionCost();\
-\"$([int]$p.GetNetworkConnectivityLevel()) $([int]$c.NetworkCostType) $($c.Roaming) $($c.OverDataLimit) $($c.ApproachingDataLimit)\"}";
-
-/// What the system says now (a second or so: not on the window's thread).
+/// What the system says now (on Linux a moment: not on the window's thread).
 pub(super) fn ask_system() -> Detected {
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        let mut cmd = Command::new("powershell");
-        cmd.args(["-NoProfile", "-NonInteractive", "-Command", WINDOWS_SCRIPT])
-            .creation_flags(CREATE_NO_WINDOW);
-        output(&mut cmd).map_or(Detected::UNKNOWN, |out| parse_windows(&out))
+        ask_windows()
     }
     #[cfg(target_os = "linux")]
     {
@@ -60,8 +48,34 @@ pub(super) fn ask_system() -> Detected {
     }
 }
 
+/// Windows' internet connection profile, through WinRT (`NetworkInformation`): its
+/// connectivity level and its cost.
+#[cfg(windows)]
+fn ask_windows() -> Detected {
+    use windows::Networking::Connectivity::NetworkInformation;
+    // No profile: Windows found no internet connection, which a proxy or VPN can also make it
+    // say: not trusted to pause anything.
+    let Ok(profile) = NetworkInformation::GetInternetConnectionProfile() else {
+        return Detected::UNKNOWN;
+    };
+    let level = profile.GetNetworkConnectivityLevel().ok().map(|l| l.0);
+    let cost = profile.GetConnectionCost().ok();
+    let flag = |f: Option<windows::core::Result<bool>>| f.and_then(Result::ok).unwrap_or(false);
+    let cost_type = cost
+        .as_ref()
+        .and_then(|c| c.NetworkCostType().ok())
+        .map(|t| t.0);
+    from_windows(
+        level,
+        cost_type,
+        flag(cost.as_ref().map(|c| c.Roaming())),
+        flag(cost.as_ref().map(|c| c.OverDataLimit())),
+        flag(cost.as_ref().map(|c| c.ApproachingDataLimit())),
+    )
+}
+
 /// What `cmd` printed, when it ran and went well.
-#[allow(dead_code)]
+#[cfg(target_os = "linux")]
 fn output(cmd: &mut Command) -> Option<String> {
     let out = cmd
         .stdin(Stdio::null())
@@ -73,28 +87,26 @@ fn output(cmd: &mut Command) -> Option<String> {
         .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
 }
 
-/// Reads `WINDOWS_SCRIPT`'s answer. Connected: the profile has internet access (level 3);
-/// metered: a fixed or variable cost (2, 3), roaming, or at or near its data limit.
+/// Reads Windows' answer. No connection only at level 0 (`None`): 1 and 2 (local, or limited)
+/// are what Windows says when its own probe is blocked (a proxy, a VPN), while git may well
+/// reach its remotes. Metered: a fixed or variable cost (2, 3), roaming, or at or near the
+/// data limit.
 #[cfg_attr(not(windows), allow(dead_code))]
-pub fn parse_windows(out: &str) -> Detected {
-    let out = out.trim();
-    if out == "none" {
-        return Detected {
-            connected: Some(false),
-            metered: None,
-        };
+pub fn from_windows(
+    level: Option<i32>,
+    cost: Option<i32>,
+    roaming: bool,
+    over_limit: bool,
+    near_limit: bool,
+) -> Detected {
+    Detected {
+        connected: match level {
+            Some(0) => Some(false),
+            Some(3) => Some(true),
+            _ => None,
+        },
+        metered: cost.map(|c| matches!(c, 2 | 3) || roaming || over_limit || near_limit),
     }
-    let words: Vec<&str> = out.split_whitespace().collect();
-    let [level, cost, roaming, over, near] = words[..] else {
-        return Detected::UNKNOWN;
-    };
-    let yes = |w: &str| w.eq_ignore_ascii_case("true");
-    let connected = level.parse::<u8>().ok().map(|l| l == 3);
-    let metered = cost
-        .parse::<u8>()
-        .ok()
-        .map(|c| matches!(c, 2 | 3) || yes(roaming) || yes(over) || yes(near));
-    Detected { connected, metered }
 }
 
 /// Reads NetworkManager's `Connectivity` and `Metered` (as `busctl` prints them: `u 4`).

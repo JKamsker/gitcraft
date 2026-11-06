@@ -109,8 +109,9 @@ they don't run instead of waiting for a network that isn't there.";
 
 /// What pausing on a metered connection does.
 const METERED_TIP: &str = "When the system says the connection is metered (Windows: a metered \
-or roaming network; Linux: NetworkManager), the background fetch, avatars, update downloads \
-and the polling of builds and pull requests wait. What you ask for still runs.";
+or roaming network; Linux: NetworkManager), the background fetch, avatars, update checks and \
+downloads and the polling of builds and pull requests wait (a repository over SSH still \
+fetches: on that machine's network). What you ask for still runs.";
 
 impl Default for Settings {
     fn default() -> Self {

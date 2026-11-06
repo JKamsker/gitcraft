@@ -161,7 +161,7 @@ impl RepoTab {
         let Some(next) = self.ci.next else { return };
         let now = Instant::now();
         // Offline or metered: asked again once that is over.
-        if crate::network::background_paused().is_some() {
+        if !crate::network::background_may_run() {
             ctx.request_repaint_after(std::time::Duration::from_secs(30));
             return;
         }

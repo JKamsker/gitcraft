@@ -285,8 +285,10 @@ fn fetch(agent: &ureq::Agent, email: &str, hint: Option<&Hint>) -> State {
             return State::Missing;
         }
     }
-    if crate::network::background_paused().is_some() {
-        return State::Deferred(crate::network::resumed());
+    // Read first: a resume coming in between makes this asked for again, not lost.
+    let resumed = crate::network::resumed();
+    if !crate::network::background_may_run() {
+        return State::Deferred(resumed);
     }
     let (url, keep) = source(agent, email, hint);
     let dir = dir.filter(|_| keep);
@@ -322,8 +324,7 @@ pub fn paint(ui: &egui::Ui, rect: Rect, email: &str) -> bool {
         match map.get(&k) {
             // Put off while off the network, which it may go on again since.
             Some(State::Deferred(at))
-                if *at != crate::network::resumed()
-                    && crate::network::background_paused().is_none() =>
+                if *at != crate::network::resumed() && crate::network::background_may_run() =>
             {
                 map.insert(k.clone(), State::Pending);
                 let _ = lock(&av.queue).send(k.clone());

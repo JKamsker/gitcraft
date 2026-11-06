@@ -6,7 +6,9 @@
 //! whether it is metered (see [`detect`]); without one, or on a metered one (unless the user
 //! says otherwise), only the background work pauses: the background fetch, avatars, update
 //! checks and downloads, and the polling of builds and pull requests. What the user asks for
-//! still runs: the system can be wrong (a proxy, a captive portal).
+//! still runs: the system can be wrong (a proxy, a captive portal). The background work also
+//! waits for the system's first answer (a few seconds at most), so that a metered connection
+//! is known before the first update check goes out.
 
 mod detect;
 
@@ -65,17 +67,48 @@ pub fn set_choices(offline: bool, pause_on_metered: bool) {
 }
 
 fn set_detected(detected: Detected) {
-    let before = background_paused();
+    let before = background_may_run();
     if let Ok(mut d) = DETECTED.lock() {
         *d = detected;
     }
-    note_resume(before);
+    ANSWERED.store(true, Ordering::SeqCst);
+    if !before && background_may_run() {
+        RESUMED.fetch_add(1, Ordering::SeqCst);
+    }
 }
 
 fn note_resume(before: Option<Pause>) {
     if before.is_some() && background_paused().is_none() {
         RESUMED.fetch_add(1, Ordering::SeqCst);
     }
+}
+
+/// The system has answered once (or was given long enough to).
+static ANSWERED: AtomicBool = AtomicBool::new(false);
+/// When the system was first asked.
+static WATCHING_SINCE: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+
+/// How long the background work waits for the system's first answer at most.
+const FIRST_ANSWER_WITHIN: Duration = Duration::from_secs(5);
+
+/// Whether the system has said what the connection is (a metered one must be known before the
+/// first update check or avatar goes out); true once it was given long enough, or when it
+/// isn't asked at all.
+fn answered() -> bool {
+    ANSWERED.load(Ordering::SeqCst)
+        || WATCHING_SINCE
+            .get()
+            .is_none_or(|t| t.elapsed() > FIRST_ANSWER_WITHIN)
+}
+
+/// Whether background work may go on the network now: nothing pauses it, and the system has
+/// been asked first.
+pub fn background_may_run() -> bool {
+    #[cfg(test)]
+    if let Some(pause) = test_pause::get() {
+        return pause.is_none();
+    }
+    answered() && background_paused().is_none()
 }
 
 /// How many times the background work could start again: what was put off while paused (an
@@ -163,13 +196,17 @@ pub fn start_watching(ctx: &egui::Context) {
     if STARTED.swap(true, Ordering::SeqCst) {
         return;
     }
+    let _ = WATCHING_SINCE.set(std::time::Instant::now());
     let ctx = ctx.clone();
     std::thread::spawn(move || {
         loop {
-            let now = detect::ask_system();
-            if now != detected() {
-                set_detected(now);
-                ctx.request_repaint();
+            // With offline mode on, what the system says changes nothing: not asked.
+            if !OFFLINE.load(Ordering::SeqCst) || !ANSWERED.load(Ordering::SeqCst) {
+                let now = detect::ask_system();
+                if now != detected() || !ANSWERED.load(Ordering::SeqCst) {
+                    set_detected(now);
+                    ctx.request_repaint();
+                }
             }
             std::thread::sleep(DETECT_EVERY);
         }

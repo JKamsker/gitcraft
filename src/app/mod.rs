@@ -289,7 +289,7 @@ impl App {
         let s = &self.settings;
         let want = (s.check_updates, s.update_channel, s.download_updates);
         // Offline or metered: looked for once that is over.
-        if self.update_looked != Some(want) && crate::network::background_paused().is_none() {
+        if self.update_looked != Some(want) && crate::network::background_may_run() {
             self.update_looked = Some(want);
             self.update = None;
             self.update_rx = None;
