@@ -117,6 +117,10 @@ pub(crate) enum Action {
     DiffRendered(bool),
     /// Scroll the diff to the next change (`1`) or the previous one (`-1`).
     DiffStep(i32),
+    /// Show the two places of a moved block of the diff together (by its index), or stop.
+    DiffMoved(Option<usize>),
+    /// Scroll the diff to one of its lines (by its index).
+    DiffJumpLine(usize),
     /// The commit pane lists every file of the commit, or only those it changed.
     ViewAllFiles(bool),
     SaveConflict,

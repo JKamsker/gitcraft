@@ -115,6 +115,10 @@ pub(crate) struct DiffView {
     pub(super) jump: Option<usize>,
     /// The change jumped to last, and the scroll offset that left.
     pub(super) at_change: Option<(usize, f32)>,
+    /// A line (by its index in the diff) to scroll to on the next frame.
+    pub(super) jump_line: Option<usize>,
+    /// The moved block whose two places are shown together (by its index in the diff's moves).
+    pub(super) moved: Option<usize>,
     /// The latest read of this diff: only its answer is shown, so a slower answer to an older
     /// read (before the whitespace or whole-file setting changed…) can't replace it.
     pub(super) request: u64,
@@ -138,6 +142,8 @@ impl DiffView {
             scroll: 0.0,
             jump: None,
             at_change: None,
+            jump_line: None,
+            moved: None,
             request: 0,
         }
     }
@@ -159,6 +165,8 @@ impl DiffView {
         self.anchor = None;
         self.text_sel = None;
         self.at_change = None;
+        // The blocks are found again, numbered anew.
+        self.moved = None;
     }
 
     /// Shows the whole file read along with the read numbered `request`, unless a newer read

@@ -7,6 +7,10 @@ mod images;
 mod jump;
 mod lfs;
 mod map;
+pub(super) mod moved;
+#[cfg(test)]
+mod moved_tests;
+mod moved_view;
 mod paint;
 mod parse;
 mod patch;
@@ -76,6 +80,8 @@ pub struct DiffData {
     pub header: String,
     /// Hunks and lines can be staged, unstaged or discarded on their own.
     pub partial: bool,
+    /// Blocks removed in one place and added in another.
+    pub moves: moved::Moves,
     /// The file is new: it has no old side, so it shows unified even side by side.
     pub new_file: bool,
     /// Characters in the longest line, for the width to scroll (counted once, not every frame).
@@ -165,6 +171,7 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         None
     };
     let mut spans = highlight_sides(&path, &lines, dark);
+    let moves = find_moves(&lines);
     let (mut changed, split) = pair_lines(&lines);
     let mut lines = lines;
     let mut uncut = std::collections::HashMap::new();
@@ -190,11 +197,27 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         lfs,
         header,
         partial,
+        moves,
         new_file,
         longest,
         uncut,
         map: Default::default(),
     })
+}
+
+/// The moved blocks of a two-sided diff; a combined one (a conflict's) has no line numbers to
+/// tell its sides by.
+fn find_moves(lines: &[DiffLine]) -> moved::Moves {
+    let numbered = lines.iter().all(|l| match l.kind {
+        Kind::Add => l.new.is_some(),
+        Kind::Del => l.old.is_some(),
+        _ => true,
+    });
+    if numbered {
+        moved::detect(lines)
+    } else {
+        moved::Moves::default()
+    }
 }
 
 /// Whether hunks and lines of this diff can be picked on their own.

@@ -169,6 +169,12 @@ so your config, credentials and hooks apply as usual.
 - The arrows in a diff's header (F7 / Shift+F7, or Alt+↓ / Alt+↑) jump to the next and previous
   change. The strip beside the scrollbar marks where the changes are, removals red and additions
   green; click a mark to jump to its change, or anywhere else on the strip to scroll there.
+- Moved code: a block removed in one place of the file and added in another (the whitespace
+  around its lines aside, so re-indenting doesn't hide it) shows in a muted colour of its own
+  instead of red and green, with a bar beside both places. _Moved to line…_ / _Moved from
+  line…_ on its first line opens a panel with the two places together: the lines kept, those
+  edited on the way (the changed part of each marked), and buttons to go to either place. Lines
+  can still be picked and staged as usual.
 - The _Diff_ / _File_ switch shows the whole file as it is after the change instead (before it,
   for a deleted file), coloured and with line numbers.
 - A Markdown file's diff has an eye button that renders it: the changes block by block (removed
