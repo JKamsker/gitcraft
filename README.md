@@ -224,13 +224,14 @@ so your config, credentials and hooks apply as usual.
   Hooks take effect the next time the agent starts in the worktree. On a WSL or SSH machine, where gitcraft isn't,
   the hooks run a `sh` script gitcraft writes into the repository's git folder. The turns are
   not history: the graph leaves them out.
-- Hand it to the agent: click a line's number in any diff to write a note for the agent on it
-  (kept in this worktree only, never published). Notes collect in NOTES FOR THE AGENT under the
-  big area; _Send to agent_ types them into the worktree's agent terminal as one message
-  (pasted, not sent: press Enter there) and clears them. The same _Send to agent_ is on a
-  conflict (each conflict's three sides), on a failing CI run's log (its end) and on a pull
-  request's thread (with its file and line). It goes only to a program that takes a pasted
-  message, as agent CLIs do, never as lines a shell would run.
+- Hand it to the agent: click a line's number in a diff (Alt+click in a diff of uncommitted
+  changes, where a click picks the line to stage it) to write a note for the agent on it. Notes
+  are kept per worktree until they are sent, never published, and collect in NOTES FOR THE
+  AGENT under the big area; _Send to agent_ types them into the worktree's agent terminal (a
+  terminal named after the agent, or the one picked beside the button) as one message, pasted
+  for you to send with Enter, and clears them. The same _Send to agent_ is on a conflict (each
+  conflict's three sides), on a failing CI run's log (its end) and on a pull request's thread
+  (with its file and line). Nothing is typed into a program that hasn't asked for pastes.
 - _Bake-off: compare attempts…_ (palette, or _Compare them_ under AGENTS): pick 2–4 worktrees or
   branches that tried the same task (the agent tasks come picked when there are 2–4 of them).
   A grid compares them with the commit they all start from (their merge base; one that started

@@ -52,7 +52,9 @@ impl ConflictEditor {
                         if ui
                             .button("Send to agent")
                             .on_hover_text(
-                                "Types the conflicts, each with its three sides, into the agent's terminal",
+                                "Types the conflicts, each with its three sides, into the agent's \
+                                 terminal. The agent then edits the file itself: close this editor \
+                                 then, and don't save over its work",
                             )
                             .clicked()
                         {

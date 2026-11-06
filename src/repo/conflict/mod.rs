@@ -63,12 +63,9 @@ impl ConflictEditor {
                 Segment::Common(_) => None,
             })
             .collect();
-        crate::agent::handoff::conflict_message(
-            &self.path,
-            &self.ours_label,
-            &self.theirs_label,
-            &conflicts,
-        )
+        // The sides as the editor names them (during a rebase, "ours" is upstream's).
+        let (ours, theirs) = self.side_names();
+        crate::agent::handoff::conflict_message(&self.path, &ours, &theirs, &conflicts)
     }
 }
 
@@ -450,12 +447,18 @@ mod tests {
     fn an_agent_is_told_every_conflict_with_its_three_sides() {
         let msg = editor(FILE).for_agent();
         assert!(msg.contains("has 2 merge conflicts"), "{msg}");
-        assert!(msg.contains("ours (HEAD):\n```\nours 1\n```"), "{msg}");
+        assert!(
+            msg.contains("ours (Ours (HEAD)):\n```\nours 1\n```"),
+            "{msg}"
+        );
         assert!(
             msg.contains("base (what both started from):\n```\nbase\n```"),
             "{msg}"
         );
-        assert!(msg.contains("theirs (feature):\n```\ny\n```"), "{msg}");
+        assert!(
+            msg.contains("theirs (Theirs (feature)):\n```\ny\n```"),
+            "{msg}"
+        );
     }
 
     #[test]

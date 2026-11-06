@@ -41,7 +41,10 @@ fn add_note(tab: &mut RepoTab, ctx: &egui::Context, path: &str, line: u64, text:
     );
     tab.agents.tray.text = text.to_owned();
     tab.apply(
-        Action::Agent(AgentAct::Tray(TrayAct::Add("let x = 1;".to_owned()))),
+        Action::Agent(AgentAct::Tray(TrayAct::Add {
+            code: "let x = 1;".to_owned(),
+            source: "Unstaged changes".to_owned(),
+        })),
         ctx,
     );
 }
@@ -54,9 +57,12 @@ fn notes_collect_in_the_tray_mark_their_lines_and_outlive_the_tab() {
     tab.load_tray(&ctx);
     add_note(&mut tab, &ctx, "src/a b.rs", 3, "Name this ü");
     add_note(&mut tab, &ctx, "src/a b.rs", 3, "And test it");
-    let review = tab.note_review("src/a b.rs");
+    let review = tab.note_review("src/a b.rs", "Unstaged changes");
     let marked = review.marks.get(&(DiffSide::Right, 3)).copied();
-    let other = tab.note_review("other.rs").marks.is_empty();
+    let other = tab
+        .note_review("other.rs", "Unstaged changes")
+        .marks
+        .is_empty();
     // Saved in the background; a new tab of the worktree reads them back.
     let saved = pump(&mut tab, &ctx, |_| {
         dir.join(".git/gitcraft-handoff.json").is_file()
@@ -131,13 +137,41 @@ fn the_tray_is_typed_into_the_agent_terminal_as_one_paste() {
     let _ = std::fs::remove_dir_all(&dir);
     assert!(refused && kept, "{:?}", tab.status);
     assert!(sent && arrived, "{:?} {typed:?}", tab.status);
-    assert!(typed.starts_with("\u{1b}[200~Review notes"), "{typed:?}");
+    assert!(typed.starts_with("\u{1b}[200~Review notes."), "{typed:?}");
     assert!(
-        typed.contains("1. a.rs:1\r   > let x = 1;\r   Fix\r   this\r"),
+        typed.contains("1. a.rs:1 (Unstaged changes)\r   > let x = 1;\r   Fix\r   this\r"),
         "{typed:?}"
     );
     assert!(
         !typed.ends_with('\r'),
         "no Enter after the paste: {typed:?}"
     );
+}
+
+/// A note added before the tray kept for the worktree was read is saved with those, not over
+/// them; Clear asks a second click.
+#[test]
+fn a_note_added_while_the_tray_is_read_joins_it_and_clear_asks_twice() {
+    let dir = repo("race");
+    let kept = vec![crate::agent::handoff::Note {
+        path: "old.rs".to_owned(),
+        line: 1,
+        text: "kept".to_owned(),
+        ..Default::default()
+    }];
+    assert!(crate::agent::handoff::save(&dir, &kept).is_ok());
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    tab.load_tray(&ctx);
+    add_note(&mut tab, &ctx, "new.rs", 2, "new");
+    let both = pump(&mut tab, &ctx, |_| {
+        crate::agent::handoff::load(&dir).is_ok_and(|n| n.len() == 2)
+    });
+    tab.apply(Action::Agent(AgentAct::Tray(TrayAct::Clear)), &ctx);
+    let after_one = tab.agents.tray.notes.len();
+    tab.apply(Action::Agent(AgentAct::Tray(TrayAct::Clear)), &ctx);
+    let after_two = tab.agents.tray.notes.len();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(both);
+    assert_eq!((after_one, after_two), (2, 0));
 }
