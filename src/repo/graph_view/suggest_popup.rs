@@ -61,6 +61,7 @@ impl RepoTab {
     pub(super) fn load_suggestions(&mut self, kind: SourceKind, ctx: &egui::Context) {
         let repo = self.path.clone();
         let s = &mut self.search.suggest;
+        s.version += 1;
         match kind {
             SourceKind::Authors => s.authors = Source::Loading,
             SourceKind::Committers => s.committers = Source::Loading,
@@ -74,6 +75,7 @@ impl RepoTab {
                     move || git::search_query::people(&repo, committers),
                     move |tab, found, _| {
                         let source = into_source(found.map(Arc::new));
+                        tab.search.suggest.version += 1;
                         if committers {
                             tab.search.suggest.committers = source;
                         } else {
@@ -90,7 +92,10 @@ impl RepoTab {
                     Err(e) if e.contains("HEAD") => Ok(PathIndex::new(Vec::new())),
                     Err(e) => Err(e),
                 },
-                |tab, found, _| tab.search.suggest.paths = into_source(found.map(Arc::new)),
+                |tab, found, _| {
+                    tab.search.suggest.paths = into_source(found.map(Arc::new));
+                    tab.search.suggest.version += 1;
+                },
             ),
         }
     }
@@ -105,6 +110,7 @@ fn into_source<T>(found: Result<Arc<T>, String>) -> Source<T> {
 
 /// One suggestion: its label, then its detail, faded. True when clicked.
 fn suggestion_row(ui: &mut Ui, t: &Tokens, label: &str, detail: &str, chosen: bool) -> bool {
+    let full_label = label;
     let width = ui.available_width();
     let (rect, resp) = ui.allocate_exact_size(vec2(width, ROW_H), Sense::click());
     if chosen || resp.hovered() {
@@ -116,10 +122,13 @@ fn suggestion_row(ui: &mut Ui, t: &Tokens, label: &str, detail: &str, chosen: bo
     }
     let painter = ui.painter_at(rect.shrink2(vec2(8.0, 0.0)));
     let font = theme::medium(13.0);
+    // The label keeps both ends (a path's file name), the detail what fits after it.
+    let room = rect.width() - 16.0;
+    let label = elide_middle(ui, label, &font, room * 0.75);
     let label_rect = painter.text(
         rect.left_center() + vec2(8.0, 0.0),
         Align2::LEFT_CENTER,
-        label,
+        &label,
         font,
         t.text,
     );
@@ -130,6 +139,49 @@ fn suggestion_row(ui: &mut Ui, t: &Tokens, label: &str, detail: &str, chosen: bo
         egui::FontId::proportional(12.0),
         t.text_dim,
     );
+    let resp =
+        if label_rect.width() + 10.0 + text_width(ui, detail, &egui::FontId::proportional(12.0))
+            > room
+        {
+            resp.on_hover_text(format!("{full}\n{detail}", full = full_label))
+        } else {
+            resp
+        };
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
         .clicked()
+}
+
+fn text_width(ui: &Ui, text: &str, font: &egui::FontId) -> f32 {
+    ui.fonts_mut(|f| {
+        f.layout_no_wrap(text.to_owned(), font.clone(), egui::Color32::WHITE)
+            .size()
+            .x
+    })
+}
+
+/// `text`, its middle replaced by “…” until it is at most `max` wide.
+fn elide_middle(ui: &Ui, text: &str, font: &egui::FontId, max: f32) -> String {
+    if text_width(ui, text, font) <= max {
+        return text.to_owned();
+    }
+    let chars: Vec<char> = text.chars().collect();
+    let cut = |keep: usize| -> String {
+        let head = keep / 2;
+        let tail = keep - head;
+        let mut out: String = chars[..head].iter().collect();
+        out.push('…');
+        out.extend(&chars[chars.len() - tail..]);
+        out
+    };
+    // The most characters kept that still fit.
+    let (mut lo, mut hi) = (0, chars.len());
+    while lo < hi {
+        let mid = (lo + hi).div_ceil(2);
+        if text_width(ui, &cut(mid), font) <= max {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    cut(lo)
 }

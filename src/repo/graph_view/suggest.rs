@@ -67,6 +67,8 @@ pub(in crate::repo) struct SuggestState {
     pub(in crate::repo) chosen: Option<usize>,
     /// How many were listed last frame: the keys are the list's while it has any.
     pub(in crate::repo) shown: usize,
+    /// Whether the list was up last frame (items or a status line): Esc closes it then.
+    pub(in crate::repo) open: bool,
     /// What the list was for (the piece at the cursor), so that a new one starts unhighlighted.
     pub(in crate::repo) listed_for: String,
     /// The query the list was closed for (Esc): it stays closed until the query changes.
@@ -77,9 +79,28 @@ pub(in crate::repo) struct SuggestState {
     pub(in crate::repo) authors: Source<Vec<Person>>,
     pub(in crate::repo) committers: Source<Vec<Person>>,
     pub(in crate::repo) paths: Source<PathIndex>,
+    /// Bumped when a source changes, so a list worked out before is worked out again.
+    pub(in crate::repo) version: u64,
+    /// The last list, with the query, cursor and version it is for: it is worked out only
+    /// when one of them changes, not every frame.
+    pub(in crate::repo) cached: Option<(String, usize, u64, Listing)>,
 }
 
 impl SuggestState {
+    /// The list for the piece of `query` at `cursor`, from the cache when nothing changed.
+    pub(in crate::repo) fn listing_for(&mut self, query: &str, cursor: usize) -> Listing {
+        if let Some((q, c, v, listing)) = &self.cached
+            && q == query
+            && *c == cursor
+            && *v == self.version
+        {
+            return listing.clone();
+        }
+        let listing = listing(query, cursor, self);
+        self.cached = Some((query.to_owned(), cursor, self.version, listing.clone()));
+        listing
+    }
+
     pub(in crate::repo) fn source_idle(&self, kind: SourceKind) -> bool {
         match kind {
             SourceKind::Authors => matches!(self.authors, Source::Idle),
@@ -100,7 +121,7 @@ pub(in crate::repo) struct Item {
 }
 
 /// What to list for the piece at the cursor.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(in crate::repo) struct Listing {
     pub(in crate::repo) items: Vec<Item>,
     /// The piece the items replace, in bytes.
@@ -164,12 +185,14 @@ fn operators(word: &str) -> Vec<Item> {
     let mut out = Vec::new();
     for op in Operator::ALL {
         let name = format!("{}:", op.name());
+        // merges: takes no value: a space follows it, as after a value.
+        let operator = op != Operator::Merges;
         if name.starts_with(&lower) {
             out.push(Item {
                 label: name.clone(),
                 detail: op.help().to_owned(),
                 insert: name.clone(),
-                operator: true,
+                operator,
             });
         }
         if op.negatable() && format!("-{name}").starts_with(&lower) {
@@ -177,7 +200,7 @@ fn operators(word: &str) -> Vec<Item> {
                 label: format!("-{name}"),
                 detail: "leave merge commits out".to_owned(),
                 insert: format!("-{name}"),
-                operator: true,
+                operator,
             });
         }
     }
@@ -246,19 +269,47 @@ fn people(
         .chain(rest)
         .take(MAX_SHOWN)
         .map(|p| Item {
-            label: p.name.clone(),
+            insert: format!("{name}:{}", quote_value(person_key(p, people))),
+            label: if p.name.is_empty() {
+                p.email.clone()
+            } else {
+                p.name.clone()
+            },
             detail: format!(
                 "{} · {} commit{}",
                 p.email,
                 p.commits,
                 if p.commits == 1 { "" } else { "s" }
             ),
-            insert: format!("{name}:{}", quote_value(&p.name)),
             operator: false,
         })
         .collect();
     if out.items.is_empty() {
         out.status = Some(format!("No {what} match"));
+    }
+}
+
+/// What finds `p` alone: the name, or the email when the name is empty or someone else's too.
+fn person_key<'a>(p: &'a Person, people: &[Person]) -> &'a str {
+    let shared = people
+        .iter()
+        .filter(|other| other.name == p.name)
+        .take(2)
+        .count()
+        > 1;
+    if p.name.is_empty() || shared {
+        &p.email
+    } else {
+        &p.name
+    }
+}
+
+/// `path` as a pathspec that means only it: git would read `*`, `?`, `[` and a leading `:`.
+fn literal_path(path: &str) -> String {
+    if path.starts_with(':') || path.contains(['*', '?', '[', '\\']) {
+        format!(":(literal){path}")
+    } else {
+        path.to_owned()
     }
 }
 
@@ -303,7 +354,7 @@ fn paths(out: &mut Listing, value: &str, source: &Source<PathIndex>) {
                 "file"
             }
             .to_owned(),
-            insert: format!("path:{}", quote_value(path)),
+            insert: format!("path:{}", quote_value(&literal_path(path))),
             operator: false,
         })
         .collect();
@@ -492,6 +543,63 @@ mod tests {
             accept("é path:sr", &(3..10), &item("path:src/", false)),
             ("é path:src/ ".to_owned(), 12)
         );
+    }
+
+    #[test]
+    fn people_without_a_name_of_their_own_are_put_in_by_email() {
+        let s = SuggestState {
+            authors: Source::Ready(Arc::new(vec![
+                person("Sam", "sam@a.org", 3),
+                person("Sam", "sam@b.org", 2),
+                person("", "ghost@c.org", 1),
+            ])),
+            ..SuggestState::default()
+        };
+        let l = listing("author:", 7, &s);
+        let inserts: Vec<&str> = l.items.iter().map(|i| i.insert.as_str()).collect();
+        assert_eq!(
+            inserts,
+            ["author:sam@a.org", "author:sam@b.org", "author:ghost@c.org"]
+        );
+        assert_eq!(labels(&l), ["Sam", "Sam", "ghost@c.org"]);
+    }
+
+    #[test]
+    fn odd_file_names_are_put_in_as_literal_paths() {
+        let s = SuggestState {
+            paths: Source::Ready(Arc::new(PathIndex::new(vec![
+                ":odd".to_owned(),
+                "a[1].txt".to_owned(),
+                "plain.txt".to_owned(),
+            ]))),
+            ..SuggestState::default()
+        };
+        let insert = |q: &str| listing(q, q.chars().count(), &s).items[0].insert.clone();
+        assert_eq!(insert("path::od"), "path::(literal):odd");
+        assert_eq!(insert("path:a["), "path::(literal)a[1].txt");
+        assert_eq!(insert("path:pla"), "path:plain.txt");
+    }
+
+    #[test]
+    fn merges_is_followed_by_a_space() {
+        let s = state();
+        let l = listing("-mer", 4, &s);
+        assert_eq!(
+            accept("-mer", &l.range, &l.items[0]),
+            ("-merges: ".to_owned(), 9)
+        );
+    }
+
+    #[test]
+    fn lists_are_cached_until_the_query_cursor_or_sources_change() {
+        let mut s = state();
+        let first = s.listing_for("author:", 7);
+        assert_eq!(first.items.len(), 3);
+        s.authors = Source::Ready(Arc::new(Vec::new()));
+        // Same query and cursor, sources not marked changed: the list from before.
+        assert_eq!(s.listing_for("author:", 7), first);
+        s.version += 1;
+        assert!(s.listing_for("author:", 7).items.is_empty());
     }
 
     #[test]
