@@ -97,16 +97,19 @@ pub(super) fn can_update() -> bool {
     })
 }
 
-/// Where releases are parked: on Windows the local app data, not the roaming one that travels
+/// Where releases are parked: in the portable folder when gitcraft runs portable (nothing is
+/// written outside it), else on Windows the local app data, not the roaming one that travels
 /// with the profile.
 fn parking() -> Option<PathBuf> {
-    if cfg!(windows) {
+    if let Some(dir) = crate::portable::portable_dir() {
+        Some(dir.join("update"))
+    } else if cfg!(windows) {
         std::env::var_os("LOCALAPPDATA")
             .map(PathBuf::from)
             .filter(|d| d.is_absolute())
             .map(|d| d.join("gitcraft").join("update"))
     } else {
-        eframe::storage_dir("gitcraft").map(|d| d.join("update"))
+        crate::portable::data_dir().map(|d| d.join("update"))
     }
 }
 
