@@ -137,10 +137,10 @@ fn only_a_number_after_the_last_colon_is_a_line() {
 
 #[test]
 fn what_is_refused() {
-    assert!(fails(&["log"]).contains("gitcraft log takes a file"));
-    assert!(fails(&["show", "a", "b"]).contains("gitcraft show takes a commit"));
-    assert!(fails(&["--frobnicate"]).contains("Unknown option --frobnicate"));
-    assert!(fails(&["a", "b"]).contains("Too many arguments"));
+    assert!(fails(&["log"]).starts_with("log takes a file"));
+    assert!(fails(&["show", "a", "b"]).starts_with("show takes a commit"));
+    assert!(fails(&["--frobnicate"]).starts_with("unknown option --frobnicate"));
+    assert!(fails(&["a", "b"]).starts_with("too many arguments"));
     // What git would take for an option, or no name at all.
     assert!(fails(&["show", "--output=/tmp/x"]).contains("starts with -"));
     assert!(fails(&["compare", "main..--all"]).contains("starts with -"));
@@ -149,6 +149,12 @@ fn what_is_refused() {
     assert!(fails(&["show", ""]).contains("No commit given"));
     assert!(fails(&["show", &"x".repeat(300)]).contains("not a commit name"));
     assert!(fails(&["compare", "main"]).contains("a..b"));
+}
+
+#[test]
+fn what_macos_adds_is_left_out() {
+    let args = from_system(["-psn_0_12345", "."].map(OsString::from));
+    assert_eq!(args, [OsString::from(".")]);
 }
 
 #[test]

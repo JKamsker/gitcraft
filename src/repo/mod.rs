@@ -378,6 +378,12 @@ impl RepoTab {
         self.file_view.as_ref().map(|v| v.path.clone())
     }
 
+    /// An editor holds work that showing something else would close: a conflict being
+    /// solved, an interactive rebase being set up.
+    pub(crate) fn editor_open(&self) -> bool {
+        self.conflict.is_some() || self.rebase.is_some()
+    }
+
     /// Nothing read yet: the tab shows its opening screen.
     pub fn opening(&self) -> bool {
         self.history_gen == 0 && self.load_error.is_none()

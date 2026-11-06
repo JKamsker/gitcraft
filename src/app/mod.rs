@@ -639,6 +639,27 @@ pub fn single_instance(
 
 /// Tells the user why this start ends without a window: in a dialog, and on stderr for a start
 /// from a terminal.
+/// What the command line asked to be told (`--help`, a mistake in it): on the terminal it was
+/// typed in, or in a dialog when there is none to see it (a Windows release has no console; a
+/// menu or a file manager starts gitcraft without one).
+pub fn tell(message: &str, error: bool) {
+    use std::io::IsTerminal;
+    let terminal = !cfg!(all(windows, not(debug_assertions))) && std::io::stderr().is_terminal();
+    match (terminal, error) {
+        (true, true) => eprintln!("gitcraft: {message}"),
+        (true, false) => println!("{message}"),
+        (false, true) => report_failed_start(message),
+        (false, false) => {
+            let _ = rfd::MessageDialog::new()
+                .set_level(rfd::MessageLevel::Info)
+                .set_title("gitcraft")
+                .set_description(message)
+                .set_buttons(rfd::MessageButtons::Ok)
+                .show();
+        }
+    }
+}
+
 pub fn report_failed_start(message: &str) {
     eprintln!("gitcraft: {message}");
     // rfd's dialogs are zenity's on Linux; without it (KDE, minimal installs) a start from the

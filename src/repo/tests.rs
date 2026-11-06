@@ -679,7 +679,7 @@ fn the_command_line_opens_a_file_s_blame_at_a_line() -> Result<(), String> {
     assert!(blamed);
     assert_eq!(path, "sub dir/a b.txt");
     assert_eq!(marked, Some(2));
-    // Scrolled to once the blame is drawn.
+    // Asked for, and taken (scrolled to) when the blame is first drawn, which hasn't happened.
     assert_eq!(goto, Some(2));
     Ok(())
 }

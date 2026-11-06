@@ -31,7 +31,7 @@ const FEATURES: &[(&str, &[&str])] = &[
         &[
             "gitcraft . opens the repository the current folder is in, from any of its subfolders or worktrees; gitcraft <folder> does the same for that folder.",
             "gitcraft log <file> opens the file's history, gitcraft blame <file>:<line> its blame scrolled to that line, gitcraft show <rev> a commit and gitcraft compare a..b (or a...b, since they diverged) the files that differ. gitcraft --help lists them. While gitcraft is running, each goes to its window.",
-            "Files have History in gitcraft and Blame in gitcraft in their right-click menu: in Explorer when the installer adds them, in the Linux applications menu entry's actions, and in Finder's Quick Actions once Settings → General → Finder adds them.",
+            "Files have History in gitcraft and Blame in gitcraft in their right-click menu: in Explorer when the installer adds them, in Dolphin from the .deb and .rpm packages, and in Finder (Quick Actions) and Files (Scripts) once Settings → General adds them there.",
         ],
     ),
     (

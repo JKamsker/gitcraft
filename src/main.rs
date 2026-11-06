@@ -12,15 +12,15 @@ fn main() -> eframe::Result {
     if let Some(code) = app::askpass_helper() {
         std::process::exit(code);
     }
-    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    let args = gitcraft::launch::args::from_system(std::env::args_os().skip(1));
     let launch = match gitcraft::launch::parse(args.clone()) {
         gitcraft::launch::Parsed::Run(cmd) => cmd,
         gitcraft::launch::Parsed::Print(text) => {
-            println!("{text}");
+            app::tell(&text, false);
             return Ok(());
         }
         gitcraft::launch::Parsed::Fail(why) => {
-            eprintln!("gitcraft: {why}");
+            app::tell(&why, true);
             std::process::exit(2);
         }
     };

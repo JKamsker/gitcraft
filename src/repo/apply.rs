@@ -198,7 +198,13 @@ impl RepoTab {
                 }
             }
             Action::ViewAllFiles(on) => self.all_files.on = on,
-            Action::FileView { path, rev, tab } => self.open_file_view(path, rev, tab, ctx),
+            Action::FileView { path, rev, tab } => {
+                self.open_file_view(path, rev, tab, ctx);
+                // A line marked by an earlier `BlameAt` isn't what this one asks for.
+                if let Some(view) = &mut self.file_view {
+                    view.marked_line = None;
+                }
+            }
             Action::CloseFileView => self.file_view = None,
             Action::BlameAt { path, line } => {
                 self.open_file_view(path, None, super::file_view::FileTab::Blame, ctx);
