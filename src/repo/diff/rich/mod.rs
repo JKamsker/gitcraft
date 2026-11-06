@@ -3,12 +3,20 @@
 //! both sides of the file on a background thread; a file they can't read (malformed, too big)
 //! falls back to the plain diff with a note saying why. Staging stays in the plain diff.
 
+pub(super) mod config;
+#[cfg(test)]
+mod config_tests;
+mod config_view;
+mod json;
 pub(super) mod prose;
 pub(super) mod prose_view;
 mod tab;
 #[cfg(test)]
 mod tests;
+mod toml;
+mod tree;
 mod words;
+mod yaml;
 
 use std::path::Path;
 
@@ -26,6 +34,8 @@ const MAX_SIDE_BYTES: usize = 8 * 1024 * 1024;
 pub enum RichKind {
     /// Paragraphs wrapped, the words that changed marked.
     Prose,
+    /// JSON, YAML and TOML compared key by key.
+    Config,
 }
 
 impl RichKind {
@@ -36,6 +46,9 @@ impl RichKind {
         if prose::EXTENSIONS.contains(&ext.as_str()) {
             kinds.push(RichKind::Prose);
         }
+        if config::EXTENSIONS.contains(&ext.as_str()) {
+            kinds.push(RichKind::Config);
+        }
         kinds
     }
 
@@ -43,6 +56,7 @@ impl RichKind {
     pub fn icon(self) -> &'static str {
         match self {
             RichKind::Prose => "book-open",
+            RichKind::Config => "list",
         }
     }
 
@@ -53,6 +67,9 @@ impl RichKind {
             (RichKind::Prose, false) => {
                 "Show the changes as prose: wrapped paragraphs, the words that changed marked"
             }
+            (RichKind::Config, false) => {
+                "Show the changes by key: the keys added, removed, changed and moved"
+            }
         }
     }
 
@@ -60,6 +77,7 @@ impl RichKind {
     pub fn name(self) -> &'static str {
         match self {
             RichKind::Prose => "prose",
+            RichKind::Config => "keys",
         }
     }
 }
@@ -82,6 +100,7 @@ pub struct Sides {
 /// A reading of the diff, ready to show.
 pub enum RichDiff {
     Prose(prose::ProseDiff),
+    Config(config::ConfigDiff),
 }
 
 /// What reading the diff for a rich view gave.
@@ -167,6 +186,10 @@ pub fn load(
     };
     Ok(match kind {
         RichKind::Prose => Rich::Ready(RichDiff::Prose(prose::diff(&sides))),
+        RichKind::Config => match config::diff(key.path(), &sides) {
+            Ok(diff) => Rich::Ready(RichDiff::Config(diff)),
+            Err(note) => Rich::Plain(note),
+        },
     })
 }
 
@@ -184,6 +207,7 @@ pub struct RichState {
 pub fn show(ui: &mut Ui, diff: &RichDiff, state: &mut RichState, acts: &mut Vec<Action>) {
     match diff {
         RichDiff::Prose(prose) => prose_view::show(ui, prose, state, acts),
+        RichDiff::Config(config) => config_view::show(ui, config, acts),
     }
 }
 

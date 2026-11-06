@@ -34,6 +34,9 @@ two-face = { version = "0.5.2", default-features = false, features = ["syntect-d
 ureq = { version = "2", features = ["native-certs"] }
 base64 = "0.22"
 vt100 = "0.18"
+# Config files read by key in diffs (with where each key is): TOML and YAML.
+toml_edit = { version = "0.25.17", default-features = false, features = ["parse"] }
+yaml-rust2 = "0.13.0"
 
 # Reading a repository's file without following a link swapped in on the way (safe_read.rs).
 [target.'cfg(unix)'.dependencies]
