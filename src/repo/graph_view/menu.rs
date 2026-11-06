@@ -186,6 +186,9 @@ impl RepoTab {
         {
             acts.push(interactive_rebase_action(git_ref));
         }
+        if branch != current {
+            crate::repo::interaction::interaction_item(ui, acts, branch);
+        }
         ui.separator();
         compare_items(ui, acts, git_ref, current);
     }
