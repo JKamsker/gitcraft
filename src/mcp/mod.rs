@@ -23,6 +23,12 @@ use std::path::PathBuf;
 /// How to start this gitcraft from an agent's settings: `gitcraft` when that is the one found on
 /// the PATH, else its whole path (quoted when it has spaces).
 pub fn program() -> String {
+    // Read once: the settings page asks on every frame, and this looks through the PATH.
+    static PROGRAM: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    PROGRAM.get_or_init(find_program).clone()
+}
+
+fn find_program() -> String {
     let Ok(exe) = std::env::current_exe() else {
         return "gitcraft".to_owned();
     };
@@ -72,6 +78,10 @@ one in WSL or over SSH as gitcraft names it: ssh://host/path). Reading tools wor
 own; the tools that change the repository need a gitcraft window with it open.
 ";
 
+/// How much longer the agent's end waits than the window's: the window's own answer (it took
+/// too long) arrives, rather than the connection just ending.
+const ANSWER_MARGIN: std::time::Duration = std::time::Duration::from_secs(30);
+
 /// What `gitcraft mcp …` was asked for.
 #[derive(Debug, PartialEq, Eq)]
 enum Command {
@@ -102,13 +112,17 @@ pub fn main(args: &[OsString]) -> i32 {
             print!("{USAGE}");
             0
         }
-        Ok(Command::Serve(repo)) => match serve(repo) {
-            Ok(()) => 0,
-            Err(e) => {
-                eprintln!("gitcraft mcp: {e}");
-                1
+        Ok(Command::Serve(repo)) => {
+            // No window here to ask ssh's questions in: over SSH it signs in with keys only.
+            crate::remote::askpass::no_window();
+            match serve(repo) {
+                Ok(()) => 0,
+                Err(e) => {
+                    eprintln!("gitcraft mcp: {e}");
+                    1
+                }
             }
-        },
+        }
         Err(e) => {
             eprintln!("gitcraft mcp: {e}\n\n{USAGE}");
             2
@@ -117,7 +131,7 @@ pub fn main(args: &[OsString]) -> i32 {
 }
 
 /// The repository the server works on, named as the window names it, or why there is none.
-fn repository(repo: Option<PathBuf>) -> Result<PathBuf, String> {
+pub(crate) fn repository(repo: Option<PathBuf>) -> Result<PathBuf, String> {
     let start = match repo {
         Some(path) => path,
         None => std::env::current_dir().map_err(|e| format!("no working folder: {e}"))?,
@@ -133,7 +147,7 @@ fn repository(repo: Option<PathBuf>) -> Result<PathBuf, String> {
 fn serve(repo: Option<PathBuf>) -> Result<(), String> {
     use rmcp::ServiceExt;
     // Started without a repository, the server still answers, and says so on every call.
-    let server = server::Gitcraft::new(repository(repo), link::dir(), link::ANSWER_WITHIN);
+    let server = server::Gitcraft::new(repo, link::dir(), link::ANSWER_WITHIN + ANSWER_MARGIN);
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

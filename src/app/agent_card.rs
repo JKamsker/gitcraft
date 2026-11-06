@@ -179,6 +179,7 @@ mod tests {
             agent: "a".into(),
             op: WriteOp::Push { force: true },
             reply,
+            gone: Default::default(),
         };
         route(writes, tabs, incoming, &ctx);
         rx.try_recv().ok()

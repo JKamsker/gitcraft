@@ -33,7 +33,14 @@ fn send(ctx: &Ctx, op: &WriteOp) -> Result<Value, String> {
         .link_dir
         .as_deref()
         .ok_or("gitcraft can't tell where its windows are on this system")?;
-    let reply = link::ask(dir, &ctx.repo.to_string_lossy(), &ctx.agent, op, ctx.wait);
+    let reply = link::ask(
+        dir,
+        &ctx.repo.to_string_lossy(),
+        &ctx.agent,
+        op,
+        ctx.wait,
+        &*ctx.cancelled,
+    );
     match reply.outcome {
         Outcome::Done => Ok(json!({ "done": reply.message })),
         Outcome::Denied => Err(format!(
@@ -509,6 +516,7 @@ mod tests {
             agent: "t".into(),
             link_dir: Some(dir),
             wait: std::time::Duration::from_secs(2),
+            cancelled: std::sync::Arc::new(|| false),
         };
         let paths = args(json!({"paths": ["a"]}));
         let e = (STAGE.run)(&ctx, &Args::new(&paths));

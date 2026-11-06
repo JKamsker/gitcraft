@@ -52,7 +52,7 @@ fn repo(name: &str) -> Result<PathBuf> {
 /// The server, and its replies line by line.
 struct Server {
     child: Child,
-    stdin: ChildStdin,
+    stdin: Option<ChildStdin>,
     lines: Receiver<String>,
     next_id: u64,
 }
@@ -83,7 +83,7 @@ impl Server {
         });
         Ok(Self {
             child,
-            stdin,
+            stdin: Some(stdin),
             lines,
             next_id: 1,
         })
@@ -92,9 +92,10 @@ impl Server {
     fn send(&mut self, message: &Value) -> Result {
         let mut line = message.to_string();
         line.push('\n');
-        self.stdin
+        let stdin = self.stdin.as_mut().ok_or("stdin is closed")?;
+        stdin
             .write_all(line.as_bytes())
-            .and_then(|()| self.stdin.flush())
+            .and_then(|()| stdin.flush())
             .map_err(|e| e.to_string())
     }
 
@@ -428,6 +429,101 @@ fn with_changes_turned_off_the_agent_is_told() -> Result {
             denied && denial.contains("denied"),
             &format!("denied: {denial}"),
         )
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(&windows);
+    outcome
+}
+
+#[test]
+fn huge_content_comes_back_bounded() -> Result {
+    let dir = repo("huge")?;
+    let windows = empty_dir("huge-windows");
+    let outcome = (|| {
+        std::fs::write(dir.join("min.js"), "x".repeat(2_000_000)).map_err(|e| e.to_string())?;
+        git(&dir, &["add", "min.js"])?;
+        let message = dir.join("message.txt");
+        std::fs::write(&message, format!("Big\n\n{}", "y".repeat(1_000_000)))
+            .map_err(|e| e.to_string())?;
+        git(&dir, &["commit", "-q", "-F", &message.to_string_lossy()])?;
+        let mut server = Server::start(&dir, &windows)?;
+        server.initialize()?;
+        for (tool, args) in [
+            ("blame", json!({"path": "min.js"})),
+            ("show_commit", json!({})),
+            ("log", json!({"limit": 1})),
+            ("diff", json!({"commit": "HEAD"})),
+        ] {
+            let (failed, text) = server.call(tool, args)?;
+            check(
+                !failed,
+                &format!("{tool} answers: {}", &text[..text.len().min(200)]),
+            )?;
+            check(
+                text.len() < 300_000,
+                &format!("{tool} is {} bytes", text.len()),
+            )?;
+        }
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    outcome
+}
+
+#[test]
+fn closing_stdin_ends_a_wait_for_the_window() -> Result {
+    let dir = repo("cancel")?;
+    let windows = empty_dir("cancel-windows");
+    let outcome = (|| {
+        // A window that takes the request and never answers it.
+        let held = std::sync::Arc::new(std::sync::Mutex::new(Vec::<Incoming>::new()));
+        let keep = held.clone();
+        let _listener = link::listen(&windows, move |incoming: Incoming| {
+            if let Ok(mut held) = keep.lock() {
+                held.push(incoming);
+            }
+        })?;
+        let mut server = Server::start(&dir, &windows)?;
+        server.initialize()?;
+        server.send(&json!({"jsonrpc": "2.0", "id": 99, "method": "tools/call",
+            "params": {"name": "stage", "arguments": {"paths": ["a.txt"]}}}))?;
+        let started = std::time::Instant::now();
+        while held.lock().map(|h| h.is_empty()).unwrap_or(true) {
+            check(
+                started.elapsed() < Duration::from_secs(10),
+                "the window got it",
+            )?;
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        // The agent goes away.
+        server.stdin = None;
+        let started = std::time::Instant::now();
+        loop {
+            if let Ok(Some(_)) = server.child.try_wait() {
+                break;
+            }
+            check(
+                started.elapsed() < Duration::from_secs(10),
+                "gitcraft mcp ends",
+            )?;
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        // And the window learns it: the request is dropped, not run.
+        let started = std::time::Instant::now();
+        loop {
+            let gone = held.lock().map(|h| {
+                h.iter()
+                    .all(|i| i.gone.load(std::sync::atomic::Ordering::SeqCst))
+            });
+            if gone.unwrap_or(false) {
+                return Ok(());
+            }
+            check(
+                started.elapsed() < Duration::from_secs(5),
+                "the window sees it gone",
+            )?;
+            std::thread::sleep(Duration::from_millis(50));
+        }
     })();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::remove_dir_all(&windows);

@@ -7,6 +7,8 @@
 pub(crate) mod plan;
 
 use std::collections::VecDeque;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::time::{Duration, Instant};
 
@@ -26,17 +28,25 @@ pub(crate) struct Job {
     pub(crate) agent: String,
     pub(crate) op: WriteOp,
     reply: Sender<Reply>,
+    /// The agent stopped waiting for it (see `Incoming::gone`).
+    gone: Arc<AtomicBool>,
     came: Instant,
 }
 
 impl Job {
-    pub(crate) fn new(agent: String, op: WriteOp, reply: Sender<Reply>) -> Self {
+    pub(crate) fn new(incoming: Incoming) -> Self {
         Self {
-            agent,
-            op,
-            reply,
+            agent: incoming.agent,
+            op: incoming.op,
+            reply: incoming.reply,
+            gone: incoming.gone,
             came: Instant::now(),
         }
+    }
+
+    /// The agent no longer waits for it: nothing of it is done any more.
+    fn abandoned(&self) -> bool {
+        self.gone.load(Ordering::SeqCst)
     }
 
     fn answer(self, outcome: Outcome, message: impl Into<String>) {
@@ -140,8 +150,7 @@ fn shown_command(args: &[String]) -> Option<String> {
 impl RepoTab {
     /// Takes a request from an agent: it waits its turn, and is planned once the tab is free.
     pub(crate) fn agent_request(&mut self, incoming: Incoming, ctx: &egui::Context) {
-        let job = Job::new(incoming.agent, incoming.op, incoming.reply);
-        self.agents.queue.push_back(job);
+        self.agents.queue.push_back(Job::new(incoming));
         self.agent_step(ctx);
     }
 
@@ -169,6 +178,9 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         self.agents.planning = false;
+        if job.abandoned() {
+            return self.agent_step(ctx);
+        }
         let mut plan = match planned {
             Ok(plan) => plan,
             Err(e) => {
@@ -185,7 +197,10 @@ impl RepoTab {
             });
         }
         if self.busy_op.is_some() || self.loading {
-            // Something started meanwhile: planned again when it is done.
+            // Something started meanwhile: planned again when it is done, its wait counted
+            // from now (an approved request isn't dropped for the time its card was open).
+            let mut job = job;
+            job.came = Instant::now();
             self.agents.queue.push_front(job);
             return;
         }
@@ -214,6 +229,16 @@ impl RepoTab {
     /// planned once the tab is free. Called on every poll.
     pub(super) fn agent_step(&mut self, ctx: &egui::Context) {
         let agents = &mut self.agents;
+        // The agent stopped waiting: its card goes away, its queued requests are dropped.
+        if agents
+            .card
+            .as_ref()
+            .is_some_and(|w| w.ready.job.abandoned())
+        {
+            agents.card = None;
+            ctx.request_repaint();
+        }
+        agents.queue.retain(|job| !job.abandoned());
         if agents
             .card
             .as_ref()

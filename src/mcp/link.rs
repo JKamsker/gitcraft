@@ -87,6 +87,9 @@ pub struct Incoming {
     pub agent: String,
     pub op: WriteOp,
     pub reply: Sender<Reply>,
+    /// Set once the agent stopped waiting (it cancelled the call, or ended): a request not
+    /// started yet is dropped, its card taken away.
+    pub gone: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// The window's end, listening while it lives: dropping it takes its discovery file away.
@@ -210,6 +213,13 @@ fn read_line(stream: &TcpStream, within: Duration) -> Option<String> {
     String::from_utf8(line).ok()
 }
 
+/// Whether the other end closed the connection (sends nothing more, waits for nothing).
+fn closed(stream: &TcpStream) -> bool {
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(1)));
+    let mut byte = [0u8; 1];
+    matches!(stream.peek(&mut byte), Ok(0))
+}
+
 /// Writes `value` as one line.
 fn write_line(mut stream: &TcpStream, value: &impl Serialize) -> bool {
     match serde_json::to_string(value) {
@@ -264,22 +274,39 @@ fn serve(stream: TcpStream, token: &str, deliver: &(dyn Fn(Incoming) + Send + Sy
         Err(reply) => return send(&stream, &reply),
     };
     let (tx, rx) = channel();
+    let gone = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     deliver(Incoming {
         repo: request.repo,
         agent: request.agent,
         op: request.op,
         reply: tx,
+        gone: gone.clone(),
     });
-    let reply = rx.recv_timeout(ANSWER_WITHIN).unwrap_or_else(|e| {
-        let why = match e {
-            std::sync::mpsc::RecvTimeoutError::Timeout => "gitcraft took too long to answer",
-            std::sync::mpsc::RecvTimeoutError::Disconnected => {
-                "The repository's tab in gitcraft was closed before it was done; nothing more \
-                 will happen."
+    let until = Instant::now() + ANSWER_WITHIN;
+    let reply = loop {
+        match rx.recv_timeout(Duration::from_millis(500)) {
+            Ok(reply) => break reply,
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                break Reply::new(
+                    Outcome::TimedOut,
+                    "The repository's tab in gitcraft was closed before it answered. It may \
+                     have run: check `status` and `log` before trying again.",
+                );
             }
-        };
-        Reply::new(Outcome::TimedOut, why)
-    });
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) if Instant::now() >= until => {
+                break Reply::new(
+                    Outcome::TimedOut,
+                    "gitcraft took too long to answer. It may still be running: check \
+                     `status` and `log` before trying again.",
+                );
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+        }
+        if closed(&stream) {
+            gone.store(true, Ordering::SeqCst);
+            return;
+        }
+    };
     send(&stream, &reply);
 }
 
@@ -332,8 +359,18 @@ fn windows(dir: &Path) -> Vec<(PathBuf, Discovery)> {
 
 /// Asks the windows listed in `dir`, newest first, to run `op` in `repo` for `agent`; the
 /// first that has `repo` open answers. `wait` bounds how long one answer may take.
-pub fn ask(dir: &Path, repo: &str, agent: &str, op: &WriteOp, wait: Duration) -> Reply {
+/// `cancelled` stops the wait (the connection closes, and the window drops the request if it
+/// hasn't started it).
+pub fn ask(
+    dir: &Path,
+    repo: &str,
+    agent: &str,
+    op: &WriteOp,
+    wait: Duration,
+    cancelled: &dyn Fn() -> bool,
+) -> Reply {
     let mut reached = false;
+    let mut refused = None;
     for (file, window) in windows(dir) {
         let request = Request {
             v: VERSION,
@@ -342,7 +379,7 @@ pub fn ask(dir: &Path, repo: &str, agent: &str, op: &WriteOp, wait: Duration) ->
             agent: agent.to_owned(),
             op: op.clone(),
         };
-        match ask_one(&window, request, wait) {
+        match ask_one(&window, request, wait, cancelled) {
             Err(Unreachable::Gone) => {
                 // A window that ended without taking its file away (it crashed).
                 let _ = std::fs::remove_file(&file);
@@ -350,9 +387,20 @@ pub fn ask(dir: &Path, repo: &str, agent: &str, op: &WriteOp, wait: Duration) ->
             Err(Unreachable::NoAnswer(e)) => {
                 return Reply::new(Outcome::Failed, format!("gitcraft didn't answer: {e}"));
             }
+            Err(Unreachable::TooBig) => {
+                return Reply::new(
+                    Outcome::Failed,
+                    "the request is too big to send (name fewer or shorter paths)",
+                );
+            }
             Ok(reply) if reply.outcome == Outcome::NotOpen => reached = true,
+            // Another gitcraft (another version) that took nothing in: the next may have it.
+            Ok(reply) if reply.outcome == Outcome::BadRequest => refused = Some(reply),
             Ok(reply) => return reply,
         }
+    }
+    if let Some(refused) = refused.filter(|_| !reached) {
+        return Reply::new(Outcome::Failed, refused.message);
     }
     let message = if reached {
         format!(
@@ -373,10 +421,22 @@ enum Unreachable {
     Gone,
     /// It took the request but didn't answer.
     NoAnswer(String),
+    /// The request is longer than a window takes.
+    TooBig,
 }
 
 /// Hands `request` to `window`, once it has proved it holds its token.
-fn ask_one(window: &Discovery, mut request: Request, wait: Duration) -> Result<Reply, Unreachable> {
+fn ask_one(
+    window: &Discovery,
+    mut request: Request,
+    wait: Duration,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<Reply, Unreachable> {
+    // Refused here rather than cut off there.
+    let size = serde_json::to_string(&request).map_or(0, |s| s.len() as u64);
+    if size + 256 > MAX_LINE {
+        return Err(Unreachable::TooBig);
+    }
     let address = SocketAddr::from((Ipv4Addr::LOCALHOST, window.port));
     let stream = TcpStream::connect_timeout(&address, Duration::from_secs(2))
         .map_err(|_| Unreachable::Gone)?;
@@ -400,7 +460,34 @@ fn ask_one(window: &Discovery, mut request: Request, wait: Duration) -> Result<R
     if !write_line(&stream, &request) {
         return Err(Unreachable::NoAnswer("the connection closed".to_owned()));
     }
-    let answer = read_line(&stream, wait).ok_or_else(|| {
+    // Waits for the answer in short steps, to stop as soon as the call is cancelled.
+    let until = Instant::now() + wait;
+    loop {
+        if cancelled() {
+            return Err(Unreachable::NoAnswer(
+                "the call was cancelled; gitcraft drops the request unless it had started it"
+                    .to_owned(),
+            ));
+        }
+        let left = until
+            .checked_duration_since(Instant::now())
+            .ok_or_else(|| {
+                Unreachable::NoAnswer("no answer in time; it may still be running".to_owned())
+            })?;
+        let _ = stream.set_read_timeout(Some(left.min(Duration::from_millis(300))));
+        let mut byte = [0u8; 1];
+        match stream.peek(&mut byte) {
+            Ok(0) => break,
+            Ok(_) => break,
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) => {}
+            Err(e) => return Err(Unreachable::NoAnswer(e.to_string())),
+        }
+    }
+    let answer = read_line(&stream, Duration::from_secs(30)).ok_or_else(|| {
         Unreachable::NoAnswer("the connection ended without an answer".to_owned())
     })?;
     serde_json::from_str(&answer).map_err(|e| Unreachable::NoAnswer(e.to_string()))
@@ -430,7 +517,14 @@ mod tests {
             let _ = incoming.reply.send(Reply::new(Outcome::Done, message));
         });
         assert!(listener.is_ok());
-        let reply = ask(&dir, "/r", "Claude Code", &stage(), Duration::from_secs(5));
+        let reply = ask(
+            &dir,
+            "/r",
+            "Claude Code",
+            &stage(),
+            Duration::from_secs(5),
+            &|| false,
+        );
         drop(listener);
         let gone = !dir
             .join(format!("window-{}.json", std::process::id()))
@@ -444,7 +538,7 @@ mod tests {
     #[test]
     fn without_a_window_the_agent_is_told_to_open_one() {
         let dir = temp("none");
-        let reply = ask(&dir, "/r", "a", &stage(), Duration::from_secs(5));
+        let reply = ask(&dir, "/r", "a", &stage(), Duration::from_secs(5), &|| false);
         assert_eq!(reply.outcome, Outcome::NotOpen);
         assert!(reply.message.contains("isn't running"));
     }
@@ -455,7 +549,7 @@ mod tests {
         let listener = listen(&dir, |incoming: Incoming| {
             let _ = incoming.reply.send(Reply::new(Outcome::NotOpen, ""));
         });
-        let reply = ask(&dir, "/r", "a", &stage(), Duration::from_secs(5));
+        let reply = ask(&dir, "/r", "a", &stage(), Duration::from_secs(5), &|| false);
         drop(listener);
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(reply.outcome, Outcome::NotOpen);
@@ -478,7 +572,7 @@ mod tests {
             pid: 1,
         };
         assert!(write_private(&dir, &file, &stale).is_ok());
-        let reply = ask(&dir, "/r", "a", &stage(), Duration::from_secs(5));
+        let reply = ask(&dir, "/r", "a", &stage(), Duration::from_secs(5), &|| false);
         let cleared = !file.exists();
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(reply.outcome, Outcome::NotOpen);
@@ -559,7 +653,14 @@ mod tests {
             pid: 1,
         };
         assert!(write_private(&dir, &file, &stale).is_ok());
-        let reply = ask(&dir, "/secret/repo", "a", &stage(), Duration::from_secs(5));
+        let reply = ask(
+            &dir,
+            "/secret/repo",
+            "a",
+            &stage(),
+            Duration::from_secs(5),
+            &|| false,
+        );
         std::thread::sleep(Duration::from_millis(100));
         let seen = seen.lock().map(|s| s.clone()).unwrap_or_default();
         let _ = std::fs::remove_dir_all(&dir);

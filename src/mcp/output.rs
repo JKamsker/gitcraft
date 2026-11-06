@@ -47,6 +47,14 @@ fn ceil_char(text: &str, mut i: usize) -> usize {
     i
 }
 
+/// `text` cut to at most `max` characters, marked where it was cut.
+pub fn clip(text: &str, max: usize) -> String {
+    match text.char_indices().nth(max) {
+        Some((i, _)) => format!("{}… [{} more bytes]", &text[..i], text.len() - i),
+        None => text.to_owned(),
+    }
+}
+
 /// At most `max` of `items`, and how many more there were when cut.
 pub fn capped<T>(items: Vec<T>, max: usize) -> (Vec<T>, usize) {
     let more = items.len().saturating_sub(max);
@@ -105,6 +113,13 @@ mod tests {
         assert_eq!(stuck["text"], "x");
         let past = text_page("abc", 99, 10);
         assert_eq!(past["text"], "");
+    }
+
+    #[test]
+    fn long_text_is_cut_and_says_so() {
+        assert_eq!(clip("short", 10), "short");
+        assert_eq!(clip("abcdef", 3), "abc… [3 more bytes]");
+        assert_eq!(clip("éééé", 2), "éé… [4 more bytes]");
     }
 
     #[test]

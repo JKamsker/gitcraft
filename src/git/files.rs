@@ -192,17 +192,23 @@ pub fn blame(repo: &Path, rev: Option<&str>, path: &str) -> Result<Vec<BlameLine
     blame_with(repo, rev, path, &[])
 }
 
-/// [`blame`] without the text conversions the repository's attributes name, for what an agent
-/// asks (no program the repository configures runs for it).
-pub fn blame_plain(repo: &Path, rev: Option<&str>, path: &str) -> Result<Vec<BlameLine>, String> {
-    blame_with(repo, rev, path, &["--no-textconv"])
-}
-
-fn blame_with(
+/// [`blame`] of lines `first` to `last` only, without the text conversions the repository's
+/// attributes name: for what an agent asks (no program the repository configures runs for it).
+pub fn blame_plain(
     repo: &Path,
     rev: Option<&str>,
     path: &str,
-    extra: &[&'static str],
+    (first, last): (u64, u64),
+) -> Result<Vec<BlameLine>, String> {
+    let range = format!("{first},{last}");
+    blame_with(repo, rev, path, &["--no-textconv", "-L", &range])
+}
+
+fn blame_with<'a>(
+    repo: &Path,
+    rev: Option<&'a str>,
+    path: &'a str,
+    extra: &[&'a str],
 ) -> Result<Vec<BlameLine>, String> {
     // Names and summaries in UTF-8, whatever `i18n.logOutputEncoding` says (`blame` has no
     // `--encoding`).

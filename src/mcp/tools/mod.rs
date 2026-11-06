@@ -25,6 +25,8 @@ pub struct Ctx {
     pub link_dir: Option<PathBuf>,
     /// How long a changing tool waits for the window's answer.
     pub wait: Duration,
+    /// Whether the call was cancelled (or the session ended): a wait for the window stops.
+    pub cancelled: std::sync::Arc<dyn Fn() -> bool + Send + Sync>,
 }
 
 /// What a tool does to the repository.

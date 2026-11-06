@@ -56,6 +56,7 @@ fn ask(tab: &mut RepoTab, ctx: &egui::Context, op: WriteOp) -> Receiver<Reply> {
         agent: "Claude Code".to_owned(),
         op,
         reply,
+        gone: Default::default(),
     };
     tab.agent_request(incoming, ctx);
     answer
@@ -321,4 +322,36 @@ fn an_approval_holds_only_for_what_the_card_showed() {
     assert_ne!(first, second, "the card shows the branch as it is now");
     assert!(kept, "not deleted on an approval of what it was before");
     assert_eq!(reply.map(|r| r.outcome), Some(Outcome::Denied));
+}
+
+#[test]
+fn a_card_goes_away_once_the_agent_stops_waiting() {
+    let ctx = egui::Context::default();
+    let dir = repo("abandoned");
+    let mut tab = tab(&dir, &ctx);
+    let (reply, rx) = channel();
+    let gone = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    tab.agent_request(
+        Incoming {
+            repo: tab.path.to_string_lossy().into_owned(),
+            agent: "Codex".into(),
+            op: delete_old(),
+            reply,
+            gone: gone.clone(),
+        },
+        &ctx,
+    );
+    settle(&mut tab, &ctx, |t| t.agent_card().is_some());
+    let shown = tab.agent_card().is_some();
+    // The call was cancelled (its connection closed).
+    gone.store(true, std::sync::atomic::Ordering::SeqCst);
+    settle(&mut tab, &ctx, |t| t.agent_card().is_none());
+    let gone_card = tab.agent_card().is_none();
+    tab.agent_decide(true, &ctx);
+    settle(&mut tab, &ctx, |t| !t.is_busy());
+    let kept = git::resolve(&dir, "refs/heads/old").is_ok();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(shown && gone_card);
+    assert!(kept, "nothing runs for an agent that left");
+    assert!(rx.try_recv().is_err());
 }
