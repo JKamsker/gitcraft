@@ -112,8 +112,12 @@ impl RepoTab {
     /// Escape closes the innermost view; Ctrl+Z / Ctrl+Y undo and redo, Ctrl+F searches, F7 and
     /// Shift+F7 (or Alt+↓ / Alt+↑) go to the next and previous change of a diff.
     fn shortcuts(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
-        let free_keys =
-            self.dialog.is_none() && !self.keys_blocked && !ctx.egui_wants_keyboard_input();
+        // The agent and bake-off dialogs take Esc themselves.
+        let free_keys = self.dialog.is_none()
+            && self.agents.dialog.is_none()
+            && self.bakeoff.picker.is_none()
+            && !self.keys_blocked
+            && !ctx.egui_wants_keyboard_input();
         if free_keys {
             let (esc, undo, redo, find) = ctx.input(|i| {
                 (

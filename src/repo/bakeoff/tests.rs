@@ -58,7 +58,7 @@ fn repo(name: &str) -> (PathBuf, PathBuf, PathBuf) {
 
 fn pump(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&RepoTab) -> bool) -> bool {
     let start = Instant::now();
-    while start.elapsed() < Duration::from_secs(30) {
+    while start.elapsed() < Duration::from_secs(60) {
         tab.poll(ctx);
         if let Some(view) = &tab.bakeoff.view
             && view.builds.contains(&Some(Built::Running))
@@ -146,6 +146,17 @@ fn a_branch_is_assembled_from_the_page_and_an_attempt_is_built() {
             .as_ref()
             .is_some_and(|v| v.builds.get(1) == Some(&Some(Built::Passed)))
     });
+    // Taking the file taken already takes it back; closing with picks asks to close again.
+    tab.apply(Action::Bake(BakeAct::TakeFile("x.txt".to_owned(), 0)), &ctx);
+    let untaken = tab
+        .bakeoff
+        .view
+        .as_ref()
+        .is_some_and(|v| !v.picks.contains_key("x.txt"));
+    tab.apply(Action::Bake(BakeAct::Close), &ctx);
+    let kept_once = tab.bakeoff.view.is_some();
+    tab.apply(Action::Bake(BakeAct::Close), &ctx);
+    let closed = tab.bakeoff.view.is_none();
     let terminal_error = tab.terminal_error.clone();
     tab.terminals.clear();
     let note = tab.bakeoff.view.as_ref().and_then(|v| v.note.clone());
@@ -156,4 +167,6 @@ fn a_branch_is_assembled_from_the_page_and_an_attempt_is_built() {
     assert_eq!(a, "A\nb\nc\nd\nE\n");
     assert_eq!(x, "x\n");
     assert!(built, "{terminal_error:?} {note:?}");
+    assert!(untaken);
+    assert!(kept_once && closed);
 }

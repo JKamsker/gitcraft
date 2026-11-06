@@ -211,14 +211,19 @@ so your config, credentials and hooks apply as usual.
   (`npm ci`). A step that fails says so; the setup command and the agent are then not run. It runs with `sh` on the repository's machine (Git's own `sh` on Windows),
   WSL and SSH included; the script it makes can be read in the editor, and tried on a worktree
   before saving. Kept in `.git/gitcraft/`, never committed.
-- _Bake-off: compare attempts…_ (palette): pick 2–4 worktrees or branches that tried the same
-  task (the agent tasks come picked). A grid compares them with the commit they all start from:
+- _Bake-off: compare attempts…_ (palette, or _Compare them_ under AGENTS): pick 2–4 worktrees or
+  branches that tried the same task (the agent tasks come picked when there are 2–4 of them).
+  A grid compares them with the commit they all start from (their merge base; one that started
+  from a newer commit is named):
   the files each touched, its size, the dependencies it adds (Cargo, npm, Go, Python, Ruby,
-  Composer manifests) and whether it builds (a command you type, run in a terminal in each
-  worktree). A worktree's uncommitted work is compared too, read through an index of
-  gitcraft's own. Click a file to see it side by side across the attempts; take it whole from
-  one, or tick hunks of several, and _Assemble_ makes a new branch from the base with what you
-  picked, without checking anything out. Hunks that change the same lines can't both be taken.
+  Composer manifests) and whether it builds (a command you type, kept for the repository, run
+  in a terminal in each worktree). A worktree's uncommitted work is compared too, read through
+  an index of gitcraft's own. Click a file to see it side by side across the attempts that
+  changed it; take it whole from one (click again to take it back), or tick hunks of several
+  (a binary file only goes whole), and _Assemble_ makes a new branch from the base with what
+  you picked, without checking anything out; the commit message lists where each file came
+  from, and _Show in graph_ goes to it. Hunks of two attempts that change the same lines are
+  flagged, and Assemble refuses them.
 
 **Toolbar, terminal, app**
 

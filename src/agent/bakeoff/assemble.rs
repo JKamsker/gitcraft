@@ -59,21 +59,10 @@ pub(crate) fn file_hunks(
     tree: &str,
     path: &str,
 ) -> Result<Vec<Hunk>, String> {
-    let patch = git::run(
-        Some(repo),
-        &[
-            "diff",
-            "--no-color",
-            "--no-ext-diff",
-            "--no-renames",
-            "-U0",
-            base,
-            tree,
-            "--",
-            path,
-        ],
-    )?;
-    Ok(hunks::parse(&patch))
+    Ok(hunks::parse(&super::diff(
+        repo,
+        &["-U0", base, tree, "--", path],
+    )?))
 }
 
 /// Makes the branch of `plan` and returns its commit.
@@ -99,15 +88,9 @@ pub(crate) fn assemble(repo: &Path, plan: &Plan) -> Result<String, String> {
     if plan.picks.is_empty() {
         return Err("Pick at least one file or hunk to assemble".to_owned());
     }
-    let index = git::run(
-        Some(repo),
-        &["rev-parse", "--git-path", "gitcraft-assemble.index"],
-    )?;
-    let index = index.trim_end_matches(['\n', '\r']).to_owned();
+    let index = crate::agent::snapshot::temporary_index(repo, "assemble")?;
     let result = write(repo, plan, branch, &index);
-    if !crate::remote::is_remote(repo) {
-        let _ = std::fs::remove_file(crate::remote::join(repo, &index));
-    }
+    crate::agent::snapshot::remove(repo, &index);
     result
 }
 
@@ -121,7 +104,7 @@ fn write(repo: &Path, plan: &Plan, branch: &str, index: &str) -> Result<String, 
                 let tree = plan.trees.get(*n).ok_or("no such attempt")?;
                 entry(repo, tree, path)?
             }
-            Take::Hunks(list) => Some(merged(repo, plan, path, list)?),
+            Take::Hunks(list) => merged(repo, plan, path, list)?,
         };
         match entry {
             Some((mode, blob)) => step(&[
@@ -157,7 +140,10 @@ fn write(repo: &Path, plan: &Plan, branch: &str, index: &str) -> Result<String, 
 
 /// The mode and blob of `path` in `tree`, `None` when it isn't there.
 fn entry(repo: &Path, tree: &str, path: &str) -> Result<Option<(String, String)>, String> {
-    let out = git::run(Some(repo), &["ls-tree", "-z", tree, "--", path])?;
+    let out = git::run(
+        Some(repo),
+        &["--literal-pathspecs", "ls-tree", "-z", tree, "--", path],
+    )?;
     let Some(line) = out
         .split('\0')
         .find(|l| l.split_once('\t').is_some_and(|(_, p)| p == path))
@@ -177,8 +163,24 @@ fn merged(
     plan: &Plan,
     path: &str,
     list: &[(usize, usize)],
-) -> Result<(String, String), String> {
+) -> Result<Option<(String, String)>, String> {
     let base_entry = entry(repo, &plan.base, path)?;
+    // Only text files go hunk by hunk: a link or a submodule is taken whole.
+    let not_text = |mode: &str| mode == "120000" || mode == "160000";
+    let attempt_entry = |n: usize| -> Result<Option<(String, String)>, String> {
+        let tree = plan.trees.get(n).ok_or("no such attempt")?;
+        entry(repo, tree, path)
+    };
+    let first = list.first().map_or(0, |(n, _)| *n);
+    let first_entry = attempt_entry(first)?;
+    if [&base_entry, &first_entry]
+        .iter()
+        .any(|e| e.as_ref().is_some_and(|(mode, _)| not_text(mode)))
+    {
+        return Err(format!(
+            "{path} is a link or a submodule in an attempt or the base: take it whole"
+        ));
+    }
     let base_text = match &base_entry {
         Some(_) => {
             let bytes = super::file_in(repo, &plan.base, path)?.unwrap_or_default();
@@ -203,10 +205,21 @@ fn merged(
             .ok_or_else(|| format!("{path}: a hunk picked is no longer there: compare again"))?;
         picked.push(hunk);
     }
+    // Every hunk of the one attempt that deleted the file: the file goes, as it did there.
+    let one_attempt = list.iter().all(|(n, _)| *n == first);
+    let all_of_it = by_attempt
+        .first()
+        .is_some_and(|(_, hunks)| hunks.len() == list.len());
+    if one_attempt && all_of_it && first_entry.is_none() {
+        return Ok(None);
+    }
     let text = hunks::apply(&base_text, &picked).map_err(|e| format!("{path}: {e}"))?;
     let blob = write_blob(repo, text.as_bytes())?;
-    let mode = base_entry.map_or_else(|| "100644".to_owned(), |(mode, _)| mode);
-    Ok((mode, blob))
+    // A new file gets the mode the attempt gave it (an executable script stays one).
+    let mode = base_entry
+        .or(first_entry)
+        .map_or_else(|| "100644".to_owned(), |(mode, _)| mode);
+    Ok(Some((mode, blob)))
 }
 
 /// Stores `bytes` in the repository as they are (no filters: no line endings changed).
@@ -214,10 +227,11 @@ fn write_blob(repo: &Path, bytes: &[u8]) -> Result<String, String> {
     let file = match crate::remote::parse(repo) {
         Some(target) => crate::remote::host_temp_file(&target, "assemble", bytes)?,
         None => {
+            static SEQ: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
             let path = std::env::temp_dir().join(format!(
                 "gitcraft-assemble-{}-{}",
                 std::process::id(),
-                crate::git::now()
+                SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
             ));
             std::fs::write(&path, bytes)
                 .map_err(|e| format!("could not write a file to hash: {e}"))?;

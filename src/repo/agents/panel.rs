@@ -102,6 +102,20 @@ impl RepoTab {
                 .style(theme::menu_style)
                 .show(|ui| menu(ui, &row, acts));
         }
+        if self.agents.tasks.len() >= 2 {
+            ui.horizontal(|ui| {
+                ui.add_space(12.0);
+                if ui
+                    .small_button("Compare them (bake-off)…")
+                    .on_hover_text(
+                        "Puts the tasks' worktrees side by side, to assemble the best of them",
+                    )
+                    .clicked()
+                {
+                    acts.push(Action::Bake(crate::repo::bakeoff::BakeAct::OpenPicker));
+                }
+            });
+        }
     }
 }
 
