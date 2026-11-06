@@ -32,6 +32,14 @@ impl RepoTab {
                     .stroke(egui::Stroke::new(1.0, t.separator)),
             )
             .show(ui, |ui| self.toolbar(ui, &mut acts));
+        if self.running.as_ref().is_some_and(|r| r.network) {
+            egui::Panel::top("repo_progress")
+                .exact_size(3.0)
+                .resizable(false)
+                .show_separator_line(false)
+                .frame(egui::Frame::new())
+                .show(ui, |ui| self.progress_bar(ui));
+        }
         self.side_panels(ui, &mut acts);
         if self.terminal_open {
             egui::Panel::bottom("repo_terminal")

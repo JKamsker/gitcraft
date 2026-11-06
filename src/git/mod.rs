@@ -1,11 +1,15 @@
 //! Thin wrapper over the `git` command line. Every call shells out to the installed git, so
 //! gitcraft behaves exactly like the user's own git (config, credentials, hooks).
 
+#[cfg(test)]
+mod clone_tests;
 mod command;
 mod commits;
 mod diff;
 mod files;
 mod lfs;
+mod locks;
+pub mod progress;
 mod refs;
 mod status;
 mod submodule;
@@ -16,6 +20,7 @@ pub use self::commits::*;
 pub use self::diff::*;
 pub use self::files::*;
 pub use self::lfs::*;
+pub use self::locks::*;
 pub use self::refs::*;
 pub use self::status::*;
 pub use self::submodule::*;
@@ -58,16 +63,67 @@ fn not_an_option(rev: &str) -> Result<&str, String> {
     }
 }
 
-/// `git clone url dest`, run from `dest`'s parent.
-/// For a `dest` in WSL or over SSH, git there clones it, from that machine's home folder.
-pub fn clone(url: &str, dest: &Path, creds: Option<&Credentials>) -> Result<(), String> {
-    if let Some(target) = crate::remote::parse(dest) {
-        let (from, there) = clone_from(&target.path);
-        let from = crate::remote::encode(&target.host, from);
-        return run_with(Some(&from), &["clone", "--", url, &there], creds).map(|_| ());
+/// Clones `url` into `dest` (a folder of this machine or another one), followed through
+/// `control`: its progress reported there, and stopped on a cancel. A clone stopped so leaves
+/// no folder behind that wasn't there before.
+pub fn clone(
+    url: &str,
+    dest: &Path,
+    creds: Option<&Credentials>,
+    control: &std::sync::Arc<OpControl>,
+) -> Result<(), String> {
+    let existed = dest_exists(dest);
+    let result = match crate::remote::parse(dest) {
+        Some(target) => {
+            let (from, there) = clone_from(&target.path);
+            let from = crate::remote::encode(&target.host, from);
+            run_watched(
+                Some(&from),
+                &["clone", "--", url, &there],
+                creds,
+                false,
+                control,
+            )
+        }
+        None => {
+            let dest = dest.to_string_lossy();
+            run_watched(None, &["clone", "--", url, &dest], creds, false, control)
+        }
+    };
+    if result.is_err() && control.is_cancelled() && existed == Some(false) {
+        remove_cancelled_clone(dest);
     }
-    let dest = dest.to_string_lossy();
-    run_with(None, &["clone", "--", url, &dest], creds).map(|_| ())
+    result.map(|_| ())
+}
+
+/// Whether `dest` is there (`None`: it couldn't be told).
+fn dest_exists(dest: &Path) -> Option<bool> {
+    if crate::remote::is_remote(dest) {
+        crate::remote::try_is_dir(dest).ok()
+    } else {
+        Some(dest.exists())
+    }
+}
+
+/// Removes what a cancelled clone left in `dest`, which wasn't there before it (git removes it
+/// itself when stopped politely, but not when killed outright).
+fn remove_cancelled_clone(dest: &Path) {
+    match crate::remote::parse(dest) {
+        // Never a home or the root, whatever went wrong before.
+        Some(target) if matches!(target.path.as_str(), "" | "/" | "~" | "~/") => {}
+        Some(target) => {
+            let _ = crate::remote::exec(
+                &target.host,
+                &crate::remote::Request {
+                    script: format!("rm -rf -- {}", crate::remote::sh_path(&target.path)),
+                    ..Default::default()
+                },
+            );
+        }
+        None => {
+            let _ = std::fs::remove_dir_all(dest);
+        }
+    }
 }
 
 /// Where git clones into `dest` (a path on another machine) from, and `dest` as it is given:

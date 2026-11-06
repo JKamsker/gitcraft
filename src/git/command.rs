@@ -53,6 +53,9 @@ fn with_profile(cmd: &mut Command, args: &[&str]) {
 
 use crate::remote::{self, Target};
 
+mod watched;
+pub use watched::{CANCELLED, OpControl, run_watched};
+
 /// What every git call is run with.
 /// - `GIT_TERMINAL_PROMPT`: never block on an interactive prompt (credential helpers with a
 ///   GUI still work).
@@ -110,6 +113,19 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
     if let Some(target) = dir.and_then(remote::parse) {
         return execute_there(&target, extra, args);
     }
+    let out = local_command(dir, extra, args)
+        .output()
+        .map_err(|e| format!("could not run git: {e}"))?;
+    Ok(Ran {
+        code: out.status.code(),
+        status: out.status.to_string(),
+        stdout: out.stdout,
+        stderr: out.stderr,
+    })
+}
+
+/// git with `args` in `dir` on this machine, `extra` before them.
+fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Command {
     let mut cmd = git_cmd();
     with_profile(&mut cmd, args);
     if let Some(dir) = dir {
@@ -120,15 +136,7 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
         cmd.env(name, value);
     }
     cmd.args(args);
-    let out = cmd
-        .output()
-        .map_err(|e| format!("could not run git: {e}"))?;
-    Ok(Ran {
-        code: out.status.code(),
-        status: out.status.to_string(),
-        stdout: out.stdout,
-        stderr: out.stderr,
-    })
+    cmd
 }
 
 /// The request that runs git with `args` in `target`'s folder, on its machine.
@@ -156,7 +164,7 @@ fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Requ
 }
 
 /// Whether the git command `args` (its options first) talks to a remote and may take minutes.
-fn goes_over_network(args: &[&str]) -> bool {
+pub fn goes_over_network(args: &[&str]) -> bool {
     matches!(
         after_options(args).first().copied(),
         Some("fetch" | "pull" | "push" | "clone" | "ls-remote" | "remote" | "submodule" | "lfs")
@@ -300,13 +308,9 @@ pub fn is_auth_error(err: &str) -> bool {
     .any(|s| e.contains(s))
 }
 
-fn run_inner(
-    dir: Option<&Path>,
-    args: &[&str],
-    ok: &[i32],
-    creds: Option<&Credentials>,
-    quiet: bool,
-) -> Result<String, String> {
+/// What a call is run with on top of [`GIT_ENV`]: nobody asked to sign in when `quiet`,
+/// `creds` given to git when there are some.
+fn extra_for(dir: Option<&Path>, creds: Option<&Credentials>, quiet: bool) -> Extra {
     let mut extra = Extra::default();
     if quiet {
         // Unix on the machine git runs on: another one is always Linux (WSL, an SSH server).
@@ -322,20 +326,39 @@ fn run_inner(
             .env
             .push(("GITCRAFT_GIT_PASSWORD", c.password.clone()));
     }
+    extra
+}
+
+/// The error of a git call that failed: what it said, or how it ended when it said nothing.
+fn failure_message(args: &[&str], status: &str, stdout: &str, stderr: &str) -> String {
+    // Merges and pulls report conflicts on stdout and the summary on stderr.
+    let (stderr, stdout) = (stderr.trim(), stdout.trim());
+    match (stderr.is_empty(), stdout.is_empty()) {
+        (true, true) => format!("git {} failed ({status})", args.join(" ")),
+        (false, true) => stderr.to_owned(),
+        (true, false) => stdout.to_owned(),
+        (false, false) => format!("{stderr}\n{stdout}"),
+    }
+}
+
+fn run_inner(
+    dir: Option<&Path>,
+    args: &[&str],
+    ok: &[i32],
+    creds: Option<&Credentials>,
+    quiet: bool,
+) -> Result<String, String> {
+    let extra = extra_for(dir, creds, quiet);
     let out = execute(dir, &extra, args)?;
     if out.code.is_some_and(|c| ok.contains(&c)) {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {
-        // Merges and pulls report conflicts on stdout and the summary on stderr.
-        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_owned();
-        let stdout = String::from_utf8_lossy(&out.stdout).trim().to_owned();
-        let err = match (stderr.is_empty(), stdout.is_empty()) {
-            (true, true) => format!("git {} failed ({})", args.join(" "), out.status),
-            (false, true) => stderr,
-            (true, false) => stdout,
-            (false, false) => format!("{stderr}\n{stdout}"),
-        };
-        Err(err)
+        Err(failure_message(
+            args,
+            &out.status,
+            &String::from_utf8_lossy(&out.stdout),
+            &String::from_utf8_lossy(&out.stderr),
+        ))
     }
 }
 
