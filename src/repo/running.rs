@@ -20,6 +20,8 @@ pub(super) struct Running {
     pub(super) control: Arc<git::OpControl>,
     /// It goes over the network: it reports progress and can be cancelled.
     pub(super) network: bool,
+    /// Nobody asked for it (the background fetch): not shown on the taskbar button.
+    pub(super) background: bool,
 }
 
 /// What can be asked for while an operation runs, to start once it is done. Only these: they
@@ -70,6 +72,7 @@ impl RepoTab {
     pub(super) fn follow_op(
         &mut self,
         ops: &[Vec<String>],
+        background: bool,
         ctx: &egui::Context,
     ) -> Arc<git::OpControl> {
         let repaint = ctx.clone();
@@ -81,6 +84,7 @@ impl RepoTab {
         self.running = Some(Running {
             control: Arc::clone(&control),
             network,
+            background,
         });
         control
     }
@@ -149,6 +153,22 @@ impl RepoTab {
         {
             self.apply(waiter.action(), ctx);
         }
+    }
+
+    /// For the taskbar button: how far the network operation the user asked for is (`None`
+    /// inside: not known), when one runs.
+    pub fn taskbar_progress(&self) -> Option<Option<f32>> {
+        let running = self
+            .running
+            .as_ref()
+            .filter(|r| r.network && !r.background)?;
+        Some(running.control.progress().and_then(|p| p.fraction()))
+    }
+
+    /// Whether a network operation the user asked for failed since this was last asked (for the
+    /// taskbar button, which turns red).
+    pub fn take_network_failure(&mut self) -> bool {
+        std::mem::take(&mut self.network_failed)
     }
 
     /// What the running operation says it is doing ("Receiving objects: 45%").

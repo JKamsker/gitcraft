@@ -77,6 +77,84 @@ pub fn refresh() {
     }
 }
 
+/// The actions the entries list (the recent repositories, Clone…, Open…), as last set.
+fn actions() -> Vec<crate::os_shell::MenuItem> {
+    ACTIONS.lock().map(|a| a.clone()).unwrap_or_default()
+}
+
+static ACTIONS: std::sync::Mutex<Vec<crate::os_shell::MenuItem>> =
+    std::sync::Mutex::new(Vec::new());
+
+/// What marks the user's own copy of the package's entry as written by gitcraft (one written by
+/// the user is never touched).
+const OURS: &str = "X-Gitcraft-Actions=true";
+
+/// The entry of the package, which a copy of the user's own takes the place of.
+const PACKAGE_ENTRY: &str = "/usr/share/applications/gitcraft.desktop";
+
+/// Puts `items` in the launcher's menu: the AppImage's entry, when it is in the applications
+/// menu; for the .deb or .rpm, a copy of the package's entry in the user's applications folder
+/// (which takes its place), unless the user has one of their own there.
+pub fn set_actions(items: &[crate::os_shell::MenuItem]) {
+    if let Ok(mut a) = ACTIONS.lock() {
+        *a = items.to_vec();
+    }
+    let Some(data) = data_home() else {
+        return;
+    };
+    if let Some(appimage) = appimage() {
+        if entry_path(&data).is_file() {
+            let _ = write_entry(&data, &appimage);
+        }
+        return;
+    }
+    if !cfg!(target_os = "linux") || !Path::new(PACKAGE_ENTRY).is_file() {
+        return;
+    }
+    let path = data.join("applications/gitcraft.desktop");
+    let ours = std::fs::read_to_string(&path).map_or(true, |t| t.contains(OURS));
+    if ours {
+        let _ = std::fs::create_dir_all(data.join("applications"));
+        let _ = std::fs::write(&path, package_entry(items));
+    }
+}
+
+/// The package's entry with `items` as its actions.
+fn package_entry(items: &[crate::os_shell::MenuItem]) -> String {
+    format!(
+        "[Desktop Entry]\n\
+         Type=Application\n\
+         Name=gitcraft\n\
+         Comment=A small visual git client\n\
+         Exec=gitcraft %f\n\
+         Terminal=false\n\
+         Categories=Development;RevisionControl;\n\
+         Icon=gitcraft\n\
+         StartupWMClass=gitcraft\n\
+         {OURS}\n{}",
+        action_sections("gitcraft", items)
+    )
+}
+
+/// `Actions=…` and a `[Desktop Action …]` section for each of `items`, starting `exec` (the
+/// first word of `Exec`, quoted as it must be) with the item's arguments.
+fn action_sections(exec: &str, items: &[crate::os_shell::MenuItem]) -> String {
+    if items.is_empty() {
+        return String::new();
+    }
+    let ids: Vec<String> = (0..items.len()).map(|i| format!("item{i}")).collect();
+    let mut out = format!("Actions={};\n", ids.join(";"));
+    for (id, item) in ids.iter().zip(items) {
+        let args: Vec<String> = item.args.iter().map(|a| quote_exec(a)).collect();
+        out.push_str(&format!(
+            "\n[Desktop Action {id}]\nName={}\nExec={exec} {}\n",
+            escape_value(&item.title),
+            args.join(" ")
+        ));
+    }
+    out
+}
+
 fn write_entry(data: &Path, appimage: &Path) -> std::io::Result<()> {
     let icon = icon_path(data);
     if let Some(dir) = icon.parent() {
@@ -92,6 +170,7 @@ fn write_entry(data: &Path, appimage: &Path) -> std::io::Result<()> {
 
 fn entry(appimage: &Path) -> String {
     let exec = quote_exec(&appimage.to_string_lossy());
+    let actions = action_sections(&exec, &actions());
     format!(
         "[Desktop Entry]\n\
          Type=Application\n\
@@ -102,7 +181,7 @@ fn entry(appimage: &Path) -> String {
          Terminal=false\n\
          Categories=Development;RevisionControl;\n\
          Icon=gitcraft\n\
-         StartupWMClass=gitcraft\n",
+         StartupWMClass=gitcraft\n{actions}",
         escape_value(&appimage.to_string_lossy())
     )
 }
@@ -160,5 +239,26 @@ mod tests {
         assert!(text.contains("TryExec=/opt/gitcraft-v0.2.0.AppImage\n"));
         assert_eq!(icon, ICON.len() as u64);
         assert_ne!(text, entry(Path::new("/opt/gitcraft-v0.2.1.AppImage")));
+    }
+
+    #[test]
+    fn the_menu_becomes_the_entry_s_actions() {
+        let items = crate::os_shell::menu_items(&[
+            std::path::PathBuf::from("/home/me/my repo"),
+            std::path::PathBuf::from("/home/me/100% $x"),
+        ]);
+        let text = action_sections("\"/opt/gitcraft.AppImage\"", &items);
+        assert_eq!(
+            text,
+            "Actions=item0;item1;item2;item3;\n\
+             \n[Desktop Action item0]\nName=my repo\nExec=\"/opt/gitcraft.AppImage\" \"/home/me/my repo\"\n\
+             \n[Desktop Action item1]\nName=100% $x\nExec=\"/opt/gitcraft.AppImage\" \"/home/me/100%% \\\\$x\"\n\
+             \n[Desktop Action item2]\nName=Clone…\nExec=\"/opt/gitcraft.AppImage\" \"--clone\"\n\
+             \n[Desktop Action item3]\nName=Open…\nExec=\"/opt/gitcraft.AppImage\" \"--open\"\n"
+        );
+        assert_eq!(action_sections("x", &[]), "");
+        let package = package_entry(&items);
+        assert!(package.contains(OURS));
+        assert!(package.contains("Exec=gitcraft \"--clone\"\n"));
     }
 }
