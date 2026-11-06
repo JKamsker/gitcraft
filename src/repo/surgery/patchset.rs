@@ -97,11 +97,6 @@ fn why_whole(raw: &str, header: &str, lines: &[DiffLine]) -> Option<&'static str
 /// The files of `patch` (as [`crate::git::patch_between`] writes it), named by `paths` (in its
 /// order, from [`crate::git::paths_between`]).
 pub(crate) fn files_of(patch: &str, paths: Vec<String>) -> Result<Vec<FilePatch>, String> {
-    if patch.contains(char::REPLACEMENT_CHARACTER) {
-        return Err(
-            "some of its changes aren't UTF-8 text, which can't be picked apart here".to_owned(),
-        );
-    }
     let mut sections: Vec<String> = Vec::new();
     for line in patch.split_inclusive('\n') {
         if line.starts_with("diff --git ") || sections.is_empty() {
@@ -117,6 +112,16 @@ pub(crate) fn files_of(patch: &str, paths: Vec<String>) -> Result<Vec<FilePatch>
             "git listed {} files but its patch has {}",
             paths.len(),
             sections.len()
+        ));
+    }
+    // Read with its odd bytes replaced: a patch of it would write the replacements.
+    if let Some((path, _)) = paths
+        .iter()
+        .zip(&sections)
+        .find(|(_, s)| s.contains(char::REPLACEMENT_CHARACTER))
+    {
+        return Err(format!(
+            "{path} isn't UTF-8 text (Latin-1…), which can't be split here: split it in the terminal"
         ));
     }
     Ok(paths

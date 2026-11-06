@@ -33,7 +33,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Right-click a commit or a pill for branches, tags, merge, rebase, cherry-pick, revert, reset and more.",
             "Search messages, authors and hashes, or switch to Code to find the commits that added or removed some text.",
             "Drag the borders in the column header to resize; right-click it to pick the columns, make the graph column compact or reset the columns.",
-            "Split commit… (a commit's menu): click its files, hunks or lines to put them in one of two or more new commits, each with its own message; Check split shows each new commit's patch, Split commit replaces the old one with them. Ctrl+Z undoes it.",
+            "Split commit… (the menu of a commit of the checked-out branch): select one of the new commits on the left (or press its number), then click files, hunks or lines on the right to put them in it; each new commit has its own message. Check split shows each one's patch, Split commit replaces the old commit with them and replays the commits after it. Ctrl+Z undoes it.",
             "Interactive rebase: reorder, reword, squash, fix up or drop commits, then start it.",
         ],
     ),

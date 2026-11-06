@@ -123,12 +123,14 @@ impl RepoTab {
             });
             if esc && self.diff.is_some() && self.line_comment_open() {
                 acts.push(Action::Pr(pr_review::PrAct::CloseLine));
+            } else if esc && self.conflict.is_none() && self.rebase.is_some() {
+                // What is drawn first (see the central panel) closes first: a diff opened
+                // meanwhile is under it.
+                acts.push(Action::CloseRebase);
+            } else if esc && self.conflict.is_none() && self.split.is_some() {
+                acts.push(Action::CloseSplit);
             } else if esc && self.diff.is_some() {
                 acts.push(Action::CloseDiff);
-            } else if esc && self.rebase.is_some() {
-                acts.push(Action::CloseRebase);
-            } else if esc && self.split.is_some() {
-                acts.push(Action::CloseSplit);
             } else if esc && self.file_view.is_some() {
                 acts.push(Action::CloseFileView);
             } else if esc && self.ci_view.is_some() {
