@@ -20,7 +20,7 @@ impl Settings {
         );
         card.row_hint(
             "Also fold",
-            "Patterns, e.g. *.snap, dist/**",
+            "Glob patterns of your own",
             "fold patterns glob generated",
             |ui| {
                 ui.add_enabled(
@@ -32,7 +32,7 @@ impl Settings {
                 .on_hover_text(
                     "Separated by commas or spaces. A pattern without a / matches the file's \
                      name; one with a / its whole path, where * stays within a folder and ** \
-                     goes through folders.",
+                     goes through folders; one ending in / everything in that folder.",
                 );
             },
         );
@@ -41,7 +41,10 @@ impl Settings {
             "myers minimal patience histogram algorithm file type",
             |ui| {
                 if self.diff_algorithms.is_empty() {
-                    layout::note(ui, "git's default for every file type; pick one in a diff");
+                    layout::note(
+                        ui,
+                        "git's default for every file type; pick one in a diff's header",
+                    );
                     return;
                 }
                 ui.vertical(|ui| {
@@ -57,6 +60,7 @@ impl Settings {
                     if let Some(kind) = forget {
                         self.diff_algorithms.remove(&kind);
                     }
+                    layout::note(ui, "Diffs read from now on use what is listed");
                 });
             },
         );

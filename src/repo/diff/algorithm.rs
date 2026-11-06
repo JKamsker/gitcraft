@@ -30,9 +30,9 @@ pub(in crate::repo) fn keep_algorithm(
     before != algorithm
 }
 
-/// What the switch shows for a file type that uses `algorithm`.
+/// What the drop-down shows for a file type that uses `algorithm` (`None`: git's default).
 fn shown_label(algorithm: Option<DiffAlgorithm>) -> &'static str {
-    algorithm.map_or("Default", DiffAlgorithm::label)
+    algorithm.map_or("Algorithm", DiffAlgorithm::label)
 }
 
 /// The algorithm drop-down of the diff header for the file at `path`.
@@ -44,10 +44,9 @@ pub(in crate::repo) fn algorithm_menu(ui: &mut Ui, path: &str, acts: &mut Vec<Ac
         .rsplit('/')
         .next()
         .unwrap_or(path);
-    let kept_for = if name.to_lowercase() == kind {
-        format!("files named {name}")
-    } else {
-        format!(".{kind} files")
+    let kept_for = match kind.strip_prefix('*') {
+        Some(ext) => format!("{ext} files"),
+        None => format!("files named {name}"),
     };
     let mut picked = current;
     egui::ComboBox::from_id_salt(("diff-algorithm", path))
@@ -55,7 +54,7 @@ pub(in crate::repo) fn algorithm_menu(ui: &mut Ui, path: &str, acts: &mut Vec<Ac
         .width(92.0)
         .show_ui(ui, |ui| {
             ui.selectable_value(&mut picked, None, "Default")
-                .on_hover_text("What your git config says (diff.algorithm), Myers if nothing");
+                .on_hover_text("What your git config says (diff.algorithm), else Myers");
             for a in DiffAlgorithm::ALL {
                 ui.selectable_value(&mut picked, Some(a), a.label())
                     .on_hover_text(a.about());

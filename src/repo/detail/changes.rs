@@ -178,12 +178,12 @@ impl RepoTab {
         let rules = fold::Rules::from_settings(&Settings::get(ui.ctx()));
         let group = fold::split(ui, id, files, |f| &f.path, (&self.folding, &rules), acts);
         let selected = |f: &&&StatusFile| self.open_key() == Some(&DiffKey::Work((**f).clone()));
-        let mut row = |ui: &mut Ui, indent, f: &StatusFile, acts: &mut Vec<Action>, unfold| {
+        let mut row = |ui: &mut Ui, indent, f: &StatusFile, acts: &mut Vec<Action>| {
             let click = self.work_row(ui, acts, f, indent, buttons);
             let opened = matches!(click, RowClick::Open);
             on(acts, f, click);
-            if opened && unfold {
-                // Opened from the folded ones: its lines are what was asked for.
+            if opened {
+                // Clicked: its lines are what was asked for, folded or not.
                 acts.push(Action::UnfoldDiff);
             }
         };
@@ -195,7 +195,7 @@ impl RepoTab {
                 &group.shown,
                 |f| &f.path,
                 &selected,
-                &mut |ui, indent, f| row(ui, indent, f, acts, false),
+                &mut |ui, indent, f| row(ui, indent, f, acts),
             );
             let holds_open = group.folded.iter().any(|f| selected(&f));
             if group.header(ui, id.with("folded-open"), None, holds_open) {
@@ -205,7 +205,7 @@ impl RepoTab {
                     &group.folded,
                     |f| &f.path,
                     &selected,
-                    &mut |ui, indent, f| row(ui, indent, f, acts, true),
+                    &mut |ui, indent, f| row(ui, indent, f, acts),
                 );
             }
         });

@@ -2,6 +2,7 @@
 //! their attributes; on real repositories, through what the lists and diffs use.
 
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 use super::list::group_title;
 use super::rules::{glob_for_tests as glob, thousands};
@@ -73,7 +74,9 @@ fn folding_turned_off_folds_nothing() {
 
 #[test]
 fn patterns_of_the_settings_fold_too() {
-    let r = Rules::new(true, "*.snap, dist/**\n/top.txt  docs/*.html");
+    let r = Rules::new(true, "*.snap, dist/**\n/top.txt  docs/*.html vendor/");
+    assert_eq!(r.reason("vendor/a/b.js", None), Some(FoldReason::Pattern));
+    assert_eq!(r.reason("vendor", None), None);
     assert_eq!(
         r.reason("tests/__snapshots__/a b.snap", None),
         Some(FoldReason::Pattern)
@@ -115,10 +118,7 @@ fn the_folded_line_says_what_changed_and_why() {
         stats_line(Some(0), Some(0), FoldReason::Lockfile),
         "+0 −0, lockfile"
     );
-    assert_eq!(
-        stats_line(None, None, FoldReason::NoDiff),
-        "-diff in .gitattributes"
-    );
+    assert_eq!(stats_line(None, None, FoldReason::NoDiff), "marked -diff");
     assert_eq!(thousands(0), "0");
     assert_eq!(thousands(999), "999");
     assert_eq!(thousands(1000), "1,000");
@@ -149,14 +149,15 @@ fn attributes_are_asked_once_and_remembered() {
         unknown,
         vec!["src/gen.rs".to_owned(), "Cargo.lock".to_owned()]
     );
-    let epoch = folding.asking(&unknown);
+    let (epoch, _) = folding.asking(&unknown);
     // Asked: not again while the answer is on its way.
     assert!(folding.unknown(paths).is_empty());
     let generation = folding.generation;
     let answer = HashMap::from([("src/gen.rs".to_owned(), FoldAttr::Generated)]);
-    folding.arrived(epoch, unknown, Ok(answer));
+    folding.arrived(epoch, unknown, answer, None);
     assert!(folding.generation > generation);
     assert!(folding.unknown(paths).is_empty());
+    assert!(folding.knows("Cargo.lock"));
     let r = rules();
     assert_eq!(
         folding.reason(&r, "src/gen.rs"),
@@ -166,12 +167,18 @@ fn attributes_are_asked_once_and_remembered() {
 }
 
 #[test]
-fn a_failed_answer_leaves_names_to_decide() {
+fn a_failed_answer_keeps_what_was_read_and_leaves_names_to_decide() {
     let mut folding = Folding::default();
-    let unknown = folding.unknown(["Cargo.lock", "a.rs"]);
-    let epoch = folding.asking(&unknown);
-    folding.arrived(epoch, unknown, Err("git is gone".to_owned()));
-    assert!(folding.unknown(["Cargo.lock", "a.rs"]).is_empty());
+    let unknown = folding.unknown(["gen.rs", "Cargo.lock", "a.rs"]);
+    let (epoch, _) = folding.asking(&unknown);
+    // The first run of paths was read before git failed on the next.
+    let found = HashMap::from([("gen.rs".to_owned(), FoldAttr::Generated)]);
+    folding.arrived(epoch, unknown, found, Some("git is gone".to_owned()));
+    assert!(folding.unknown(["gen.rs", "Cargo.lock", "a.rs"]).is_empty());
+    assert_eq!(
+        folding.reason(&rules(), "gen.rs"),
+        Some(FoldReason::Generated)
+    );
     assert_eq!(
         folding.reason(&rules(), "Cargo.lock"),
         Some(FoldReason::Lockfile)
@@ -194,40 +201,68 @@ fn work_with(paths: &[(&str, char)]) -> git::WorkStatus {
     }
 }
 
+/// Reads `paths` as git answering `attr` for each.
+fn read(folding: &mut Folding, paths: &[&str], attr: FoldAttr) {
+    let unknown = folding.unknown(paths.iter().copied());
+    let (epoch, _) = folding.asking(&unknown);
+    let found = unknown.iter().map(|p| (p.clone(), attr)).collect();
+    folding.arrived(epoch, unknown, found, None);
+}
+
 #[test]
 fn a_changed_gitattributes_or_checkout_forgets_what_was_read() {
+    let start = Instant::now();
     let mut folding = Folding::default();
-    folding.saw_status(&work_with(&[("a.rs", 'M')]), "head1");
-    let unknown = folding.unknown(["gen.rs"]);
-    let epoch = folding.asking(&unknown);
-    folding.arrived(
-        epoch,
-        unknown,
-        Ok(HashMap::from([("gen.rs".to_owned(), FoldAttr::Generated)])),
-    );
+    folding.saw_status(&work_with(&[("a.rs", 'M')]), "head1", start);
+    read(&mut folding, &["gen.rs"], FoldAttr::Generated);
     // The same status: still known.
-    folding.saw_status(&work_with(&[("a.rs", 'M')]), "head1");
+    folding.saw_status(&work_with(&[("a.rs", 'M')]), "head1", start);
     assert!(folding.unknown(["gen.rs"]).is_empty());
-    // Another commit checked out: asked again.
-    folding.saw_status(&work_with(&[("a.rs", 'M')]), "head2");
+    // Another commit checked out: asked again, the last answer applying meanwhile.
+    folding.saw_status(&work_with(&[("a.rs", 'M')]), "head2", start);
     assert_eq!(folding.unknown(["gen.rs"]), vec!["gen.rs".to_owned()]);
-    // A `.gitattributes` being edited: forgotten at every status read.
-    let unknown = folding.unknown(["gen.rs"]);
-    let epoch = folding.asking(&unknown);
-    folding.arrived(epoch, unknown, Ok(HashMap::new()));
-    folding.saw_status(&work_with(&[("sub/.gitattributes", 'M')]), "head2");
+    assert_eq!(
+        folding.reason(&rules(), "gen.rs"),
+        Some(FoldReason::Generated)
+    );
+    // A `.gitattributes` starts being edited: asked again.
+    read(&mut folding, &["gen.rs"], FoldAttr::Generated);
+    folding.saw_status(&work_with(&[("sub/.gitattributes", 'M')]), "head2", start);
+    assert_eq!(folding.unknown(["gen.rs"]), vec!["gen.rs".to_owned()]);
+}
+
+/// While a `.gitattributes` stays changed, its files are read again now and then, not at
+/// every status read: a busy working tree (or a slow SSH machine) would ask without end.
+#[test]
+fn a_changed_gitattributes_is_read_again_now_and_then() {
+    let start = Instant::now();
+    let edited = work_with(&[(".gitattributes", 'M')]);
+    let mut folding = Folding::default();
+    folding.saw_status(&edited, "h", start);
+    read(&mut folding, &["gen.rs"], FoldAttr::Generated);
+    for secs in [1, 5, 29] {
+        folding.saw_status(&edited, "h", start + Duration::from_secs(secs));
+        assert!(folding.unknown(["gen.rs"]).is_empty(), "after {secs} s");
+    }
+    folding.saw_status(&edited, "h", start + Duration::from_secs(31));
     assert_eq!(folding.unknown(["gen.rs"]), vec!["gen.rs".to_owned()]);
 }
 
 #[test]
-fn an_answer_asked_before_forgetting_is_dropped() {
+fn an_answer_asked_before_forgetting_is_taken_but_asked_again() {
+    let start = Instant::now();
     let mut folding = Folding::default();
     let unknown = folding.unknown(["gen.rs"]);
-    let epoch = folding.asking(&unknown);
-    folding.saw_status(&work_with(&[(".gitattributes", 'M')]), "h");
+    let (epoch, now) = folding.asking(&unknown);
+    folding.saw_status(&work_with(&[(".gitattributes", 'M')]), "h", start);
+    // The read under way is told it's no longer wanted.
+    assert_ne!(now.load(std::sync::atomic::Ordering::Relaxed), epoch);
     let stale = HashMap::from([("gen.rs".to_owned(), FoldAttr::Generated)]);
-    folding.arrived(epoch, unknown, Ok(stale));
-    assert_eq!(folding.reason(&rules(), "gen.rs"), None);
+    folding.arrived(epoch, unknown, stale, None);
+    assert_eq!(
+        folding.reason(&rules(), "gen.rs"),
+        Some(FoldReason::Generated)
+    );
     assert_eq!(folding.unknown(["gen.rs"]), vec!["gen.rs".to_owned()]);
 }
 
@@ -287,7 +322,8 @@ fn gitattributes_are_read_from_a_real_repository() -> Result<(), String> {
     .iter()
     .map(|p| (*p).to_owned())
     .collect();
-    let found = git::fold_attributes(&repo.0, &paths)?;
+    let (found, error) = git::fold_attributes(&repo.0, &paths, &|| true);
+    assert_eq!(error, None);
     assert_eq!(found["gen/a/b.rs"], FoldAttr::Generated);
     assert_eq!(found["blob.dat"], FoldAttr::NoDiff);
     assert_eq!(found["Cargo.lock"], FoldAttr::NotGenerated);
@@ -296,7 +332,10 @@ fn gitattributes_are_read_from_a_real_repository() -> Result<(), String> {
     assert_eq!(found["plain.rs"], FoldAttr::Unspecified);
     assert_eq!(found["-starts-with-dash.rs"], FoldAttr::Unspecified);
     // Nothing asked, nothing run.
-    assert!(git::fold_attributes(&repo.0, &[])?.is_empty());
+    assert!(git::fold_attributes(&repo.0, &[], &|| true).0.is_empty());
+    // Not wanted any more: nothing is read.
+    let (none, error) = git::fold_attributes(&repo.0, &paths, &|| false);
+    assert!(none.is_empty() && error.is_none());
     Ok(())
 }
 
@@ -307,7 +346,8 @@ fn thousands_of_paths_are_asked_in_a_few_commands() -> Result<(), String> {
     let paths: Vec<String> = (0..5000)
         .map(|i| format!("some/rather/deep/folder/file number {i}.gen"))
         .collect();
-    let found = git::fold_attributes(&repo.0, &paths)?;
+    let (found, error) = git::fold_attributes(&repo.0, &paths, &|| true);
+    assert_eq!(error, None);
     assert_eq!(found.len(), paths.len());
     assert!(found.values().all(|a| *a == FoldAttr::Generated));
     Ok(())
@@ -317,11 +357,10 @@ fn thousands_of_paths_are_asked_in_a_few_commands() -> Result<(), String> {
 fn a_folder_that_is_no_repository_says_so() {
     let dir = std::env::temp_dir().join(format!("gitcraft-fold-none-{}", std::process::id()));
     let _ = std::fs::create_dir_all(&dir);
-    let result = git::fold_attributes(&dir.join("missing"), &["a".to_owned()]);
+    let (found, error) = git::fold_attributes(&dir.join("missing"), &["a".to_owned()], &|| true);
     let _ = std::fs::remove_dir_all(&dir);
-    let Err(e) = result else {
-        unreachable!("a missing folder has no attributes")
-    };
+    assert!(found.is_empty());
+    let e = error.unwrap_or_default();
     assert!(e.starts_with("Couldn't read .gitattributes"), "{e}");
 }
 
@@ -342,7 +381,7 @@ fn a_folded_diff_counts_the_lines_of_its_change() -> Result<(), String> {
         area: Area::Unstaged,
     });
     let data = crate::repo::diff::load(&repo.0, &key, git::DiffOptions::default(), true)?;
-    let (added, removed) = banner::line_counts(&data);
+    let (added, removed) = data.line_counts;
     let rules = rules();
     let reason = Folding::default()
         .reason(&rules, "Cargo.lock")
@@ -359,4 +398,26 @@ fn a_folded_diff_counts_the_lines_of_its_change() -> Result<(), String> {
         format!("+{n} −{n}, lockfile")
     );
     Ok(())
+}
+
+/// A list replaced by another of the same length and ends, in the same memory (as a reloaded
+/// status can be), is told apart: the folds of the old one don't stick to the new one's files.
+#[test]
+fn a_list_changed_in_place_is_worked_out_again() {
+    use super::list::list_fingerprint;
+    let mut files: Vec<String> = ["README.md", "Cargo.lock", "z.rs"]
+        .map(String::from)
+        .to_vec();
+    let before = list_fingerprint(&files, String::as_str);
+    files[1] = "src/b.rs".to_owned();
+    assert_ne!(list_fingerprint(&files, String::as_str), before);
+    // A long list too, changed far from its ends.
+    let mut many: Vec<String> = (0..20_000).map(|i| format!("f{i}")).collect();
+    let before = list_fingerprint(&many, String::as_str);
+    many[10_000] = "changed".to_owned();
+    assert_ne!(list_fingerprint(&many, String::as_str), before);
+    assert_eq!(
+        list_fingerprint(&many, String::as_str),
+        list_fingerprint(&many, String::as_str)
+    );
 }

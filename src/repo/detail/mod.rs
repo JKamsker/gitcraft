@@ -58,7 +58,7 @@ impl RepoTab {
             acts,
         );
         let selected = |f: &&&ChangedFile| self.open_key() == Some(&key(&f.path));
-        let row = |ui: &mut Ui, indent, f: &ChangedFile, acts: &mut Vec<Action>, unfold| {
+        let row = |ui: &mut Ui, indent, f: &ChangedFile, acts: &mut Vec<Action>| {
             let r = widgets::file_row(
                 ui,
                 f.status,
@@ -71,10 +71,8 @@ impl RepoTab {
             widgets::file_menu(&r.row, &f.path, rev, false, acts);
             if r.row.clicked() {
                 acts.push(Action::OpenDiff(key(&f.path)));
-                if unfold {
-                    // Opened from the folded ones: its lines are what was asked for.
-                    acts.push(Action::UnfoldDiff);
-                }
+                // Clicked: its lines are what was asked for, folded or not.
+                acts.push(Action::UnfoldDiff);
             }
         };
         // Rows are known by their path within the list of this commit (or range): a menu left
@@ -86,7 +84,7 @@ impl RepoTab {
                 &group.shown,
                 |f| &f.path,
                 &selected,
-                &mut |ui, indent, f| row(ui, indent, f, acts, false),
+                &mut |ui, indent, f| row(ui, indent, f, acts),
             );
             let stats = group.folded.iter().fold((0u32, 0u32), |(a, d), f| {
                 (
@@ -103,7 +101,7 @@ impl RepoTab {
                     &group.folded,
                     |f| &f.path,
                     &selected,
-                    &mut |ui, indent, f| row(ui, indent, f, acts, true),
+                    &mut |ui, indent, f| row(ui, indent, f, acts),
                 );
             }
         });
