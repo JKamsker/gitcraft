@@ -43,7 +43,8 @@ impl RepoTab {
     fn parallel_buttons(&self, ui: &mut Ui, view: &View, acts: &mut Vec<Action>) {
         if view.running() {
             if ui
-                .button("Cancel")
+                .add_enabled(!view.cancelling, egui::Button::new("Cancel"))
+                .on_disabled_hover_text("Stopping the tests and removing the worktrees…")
                 .on_hover_text("Stops every test running and removes the worktrees")
                 .clicked()
             {
@@ -54,7 +55,11 @@ impl RepoTab {
         if ui.button("Close").clicked() {
             acts.push(Action::ParallelBisect(ParallelAct::Close));
         }
-        let bisecting = self.bisect.state().is_some_and(|b| b.outcome.is_none());
+        // Only between the same marks: another range may say nothing of the bisect's.
+        let bisecting = self
+            .bisect
+            .state()
+            .is_some_and(|b| b.outcome.is_none() && view.same_ends(b));
         if bisecting && matches!(view.outcome, Some(Outcome::FirstBad(_))) {
             let idle = self.busy_op.is_none();
             if ui
@@ -168,7 +173,7 @@ fn progress(ui: &mut Ui, view: &View, t: &Tokens) {
 /// "Round 2, about 1 more · 37 of 412 commits left · 8 at once on SSH · build".
 fn progress_text(view: &View) -> String {
     let round = match (view.round, view.rounds_left) {
-        (0, _) => "Starting".to_owned(),
+        (0, _) => "Getting ready".to_owned(),
         (n, 0) => format!("Round {n}, the last"),
         (n, 1) => format!("Round {n}, about 1 more"),
         (n, more) => format!("Round {n}, about {more} more"),
@@ -243,7 +248,7 @@ mod tests {
         let mut v = view();
         assert_eq!(
             progress_text(&v),
-            "Starting · 0 of 0 commits left · 8 at once on this computer"
+            "Getting ready · 0 of 0 commits left · 8 at once on this computer"
         );
         v.round = 2;
         v.rounds_left = 1;

@@ -115,12 +115,13 @@ so your config, credentials and hooks apply as usual.
   changes or conflicts, or a merge, rebase, cherry-pick or revert is in progress.
 - Parallel bisect: _Run in parallel…_ in the bisect banner (or _Bisect in parallel from
   here…_ in a commit's menu) tests k commits at once, each in its own worktree on the machine
-  chosen (this one, a WSL distribution or an SSH host), so it takes about log_k+1(n) rounds
-  instead of log₂(n). The test command reads as for `git bisect run`; k defaults to that
-  machine's cores. The ends are checked first (_the good end already fails_), the graph tints
-  results as they come and the range still in question visibly shrinks; a tree tested before
-  isn't tested again, and a test past its time limit is stopped and skipped. The checkout isn't
-  touched; Cancel stops every test and removes the worktrees.
+  chosen (this one, a WSL distribution or an SSH host), so it takes about log₍ₖ₊₁₎(n) rounds
+  instead of log₂(n). The test command's exit code is read as `git bisect run` reads it; k
+  defaults to that machine's cores (at most 16). The ends are tested in the first round (_the
+  good end already fails_), the graph tints results as they come and the range still in
+  question visibly shrinks; a tree tested before isn't tested again, and a test past its time
+  limit is stopped and skipped. The checkout isn't touched; Cancel stops every test and removes
+  the worktrees.
 - Quick edits from a commit's menu, for commits of the checked-out branch: _Edit commit
   message_, _Drop commit_, _Move commit up_ / _down_, each a rebase without the editor and undone
   with Ctrl+Z. What can't be done (a merge, merges after the commit) is greyed out with why.
