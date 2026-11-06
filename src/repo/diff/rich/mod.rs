@@ -15,10 +15,16 @@ pub(super) mod deps;
 #[cfg(test)]
 mod deps_tests;
 mod deps_view;
+pub(super) mod dvc;
+mod dvc_view;
 mod json;
 pub(super) mod prose;
 pub(super) mod prose_view;
 mod tab;
+pub(super) mod table;
+#[cfg(test)]
+mod table_tests;
+pub(super) mod table_view;
 #[cfg(test)]
 mod tests;
 mod toml;
@@ -48,6 +54,10 @@ pub enum RichKind {
     Api,
     /// A lockfile's packages upgraded, added and removed.
     Deps,
+    /// CSV and TSV as a grid.
+    Table,
+    /// What a `.dvc` file tracks.
+    Dvc,
 }
 
 impl RichKind {
@@ -57,6 +67,12 @@ impl RichKind {
         let mut kinds = Vec::new();
         if deps::lockfile(path).is_some() {
             kinds.push(RichKind::Deps);
+        }
+        if table::separator(path).is_some() {
+            kinds.push(RichKind::Table);
+        }
+        if dvc::is_dvc(path) {
+            kinds.push(RichKind::Dvc);
         }
         if prose::EXTENSIONS.contains(&ext.as_str()) {
             kinds.push(RichKind::Prose);
@@ -88,6 +104,8 @@ impl RichKind {
             RichKind::Config => "list",
             RichKind::Api => "server",
             RichKind::Deps => "package",
+            RichKind::Table => "columns-2",
+            RichKind::Dvc => "database",
         }
     }
 
@@ -101,6 +119,10 @@ impl RichKind {
             (RichKind::Config, false) => {
                 "Show the changes by key: the keys added, removed, changed and moved"
             }
+            (RichKind::Table, false) => {
+                "Show the changes as a table: rows and cells added, removed and changed"
+            }
+            (RichKind::Dvc, false) => "Show the data this file tracks, before and after",
             (RichKind::Deps, false) => {
                 "Show the dependency changes: packages upgraded, downgraded, added, removed and relicensed"
             }
@@ -117,6 +139,8 @@ impl RichKind {
             RichKind::Config => "by key",
             RichKind::Api => "as API contract changes",
             RichKind::Deps => "as dependency changes",
+            RichKind::Table => "as a table",
+            RichKind::Dvc => "as the data it tracks",
         }
     }
 }
@@ -142,6 +166,8 @@ pub enum RichDiff {
     Config(config::ConfigDiff),
     Api(api::ApiDiff),
     Deps(deps::DepsDiff),
+    Table(table::TableDiff),
+    Dvc(dvc::DvcDiff),
 }
 
 /// What reading the diff for a rich view gave.
@@ -231,6 +257,14 @@ pub fn load(
             Ok(diff) => Rich::Ready(RichDiff::Config(diff)),
             Err(note) => Rich::Plain(note),
         },
+        RichKind::Table => match table::diff(key.path(), &sides) {
+            Ok(diff) => Rich::Ready(RichDiff::Table(diff)),
+            Err(note) => Rich::Plain(note),
+        },
+        RichKind::Dvc => match dvc::diff(&sides) {
+            Ok(diff) => Rich::Ready(RichDiff::Dvc(diff)),
+            Err(note) => Rich::Plain(note),
+        },
         RichKind::Deps => match deps::diff(key.path(), &sides) {
             Ok(diff) => Rich::Ready(RichDiff::Deps(diff)),
             Err(note) => Rich::Plain(note),
@@ -259,6 +293,8 @@ pub fn show(ui: &mut Ui, diff: &RichDiff, state: &mut RichState, acts: &mut Vec<
         RichDiff::Config(config) => config_view::show(ui, config, acts),
         RichDiff::Api(api) => api_view::show(ui, api, acts),
         RichDiff::Deps(deps) => deps_view::show(ui, deps, acts),
+        RichDiff::Table(table) => table_view::show(ui, table, state, acts),
+        RichDiff::Dvc(dvc) => dvc_view::show(ui, dvc, acts),
     }
 }
 
