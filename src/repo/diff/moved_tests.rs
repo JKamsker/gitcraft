@@ -319,6 +319,7 @@ fn data_of(text: &str) -> DiffData {
         header: String::new(),
         partial: false,
         moves,
+        context: None,
         new_file: false,
         longest: 0,
         uncut: Default::default(),

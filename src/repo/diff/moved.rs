@@ -73,7 +73,7 @@ fn change_ids(lines: &[DiffLine]) -> Vec<usize> {
                 }
                 // A "\ No newline at end of file" note doesn't end the change.
                 Kind::Add | Kind::Del | Kind::Meta => {}
-                Kind::Context | Kind::Hunk => in_change = false,
+                Kind::Context | Kind::Hunk | Kind::Fold => in_change = false,
             }
             id
         })

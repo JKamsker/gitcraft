@@ -205,6 +205,11 @@ impl RepoTab {
                     };
                 }
             }
+            Action::DiffUnfold { gap, how } => {
+                if let Some(view) = &mut self.diff {
+                    view.unfold(gap, how);
+                }
+            }
             Action::DiffJumpLine(i) => {
                 if let Some(view) = &mut self.diff {
                     view.jump_line = Some(i);

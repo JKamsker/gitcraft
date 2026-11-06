@@ -77,6 +77,17 @@ impl RepoTab {
             let draft = self.pr_drafts.entry(pr.number).or_default();
             line_comment_panel(ui, &t, pr, draft, data, acts);
         }
+        // Lines commented on in the pull request stay in view, their fold opened.
+        if let (Some(review), Some(ctx)) = (&review, &data.context) {
+            let folded = review.marks.keys().find_map(|&(side, line)| {
+                let line = u32::try_from(line).ok()?;
+                let old = side == crate::pull_request::DiffSide::Left;
+                super::context::unfold_to(ctx, line, old, 3)
+            });
+            if let Some((gap, how)) = folded {
+                acts.push(Action::DiffUnfold { gap, how });
+            }
+        }
         if let Some(open) = &view.moved {
             super::moved_view::panel(ui, &t, data, open, acts);
         }
