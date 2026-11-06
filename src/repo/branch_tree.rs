@@ -10,6 +10,7 @@ use egui::{Align2, Id, Rect, Response, Sense, Ui, pos2, vec2};
 
 use super::sidebar::ROW_H;
 use super::widgets;
+use crate::a11y::labels;
 use crate::icons;
 use crate::settings::Settings;
 use crate::theme::{self, Tokens};
@@ -383,6 +384,10 @@ fn folder_row<T>(
     let t = Tokens::get(ui.ctx());
     let x = view.left + view.indent;
     let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), ROW_H), Sense::click());
+    crate::a11y::a11y(&resp, egui::WidgetType::CollapsingHeader, || {
+        let count = labels::count(folder.leaves(), "item", "items");
+        labels::section(&format!("folder {}", folder.name), &count, open)
+    });
     let painter = ui.painter_at(rect);
     if resp.hovered() {
         painter.rect_filled(rect, 0.0, t.hover);

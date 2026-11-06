@@ -65,6 +65,7 @@ fn terminal_tab(
         ui.painter()
             .layout_no_wrap(label, font, if selected { t.text } else { t.text_dim });
     let (rect, resp) = ui.allocate_exact_size(vec2(galley.size().x + 44.0, 26.0), Sense::click());
+    super::a11y_selected(&resp, || format!("Terminal {}", galley.text()), selected);
     let shape = top_rounded(t.radius as u8);
     if selected {
         ui.painter().rect_filled(rect, shape, t.card);
@@ -88,6 +89,11 @@ fn terminal_tab(
     let x = ui
         .interact(x_rect, resp.id.with("close"), Sense::click())
         .on_hover_text("Close (ends the shell)");
+    super::a11y(
+        &x,
+        egui::WidgetType::Button,
+        "Close terminal (ends the shell)",
+    );
     if x.hovered() {
         ui.painter().rect_filled(x_rect, t.radius_sm, t.pressed);
     }

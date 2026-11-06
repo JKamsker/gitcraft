@@ -103,6 +103,14 @@ impl RepoTab {
                     let mid = rect.center().y;
                     let gutter_resp =
                         ui.interact(gutter, ui.id().with(("blame", i)), Sense::click());
+                    crate::repo::widgets::a11y(&gutter_resp, egui::WidgetType::Button, || {
+                        let short = line.hash.get(..7).unwrap_or(&line.hash);
+                        if line.uncommitted() {
+                            format!("line {}, not committed yet", i + 1)
+                        } else {
+                            format!("line {}, go to commit {short}", i + 1)
+                        }
+                    });
                     if first {
                         let small = FontId::proportional(11.5);
                         if line.uncommitted() {

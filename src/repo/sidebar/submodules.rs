@@ -101,6 +101,13 @@ fn submodule_row(ui: &mut Ui, sub: &Submodule) -> Response {
     let t = Tokens::get(ui.ctx());
     // Known by its path, not its place: a menu left open (Update) must stay this submodule's.
     let (rect, resp) = widgets::keyed_row(ui, ROW_H, ("submodule-row", &sub.path));
+    widgets::a11y(&resp, egui::WidgetType::Button, || {
+        let commit = sub
+            .describe
+            .as_deref()
+            .unwrap_or(crate::repo::short(&sub.hash));
+        crate::a11y::labels::submodule(&sub.path, commit, sub.modified)
+    });
     if resp.hovered() {
         ui.painter().rect_filled(rect, 0.0, t.hover);
     }

@@ -529,6 +529,7 @@ impl eframe::App for App {
         self.manual_ui(&ctx);
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
+        crate::a11y::end_frame(&ctx);
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {

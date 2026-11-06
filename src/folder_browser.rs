@@ -261,6 +261,14 @@ impl FolderBrowser {
                     let selected = self.selected == Some(i);
                     let (rect, resp) =
                         ui.allocate_exact_size(vec2(ui.available_width(), row_h), Sense::click());
+                    crate::repo::widgets::a11y_selected(
+                        &resp,
+                        || {
+                            let kind = if folder.repo { "repository" } else { "folder" };
+                            crate::a11y::labels::join([folder.name.as_str(), kind])
+                        },
+                        selected,
+                    );
                     if selected || resp.hovered() {
                         let fill = if selected { t.row_selected } else { t.hover };
                         ui.painter().rect_filled(rect, t.radius_sm, fill);

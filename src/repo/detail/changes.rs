@@ -314,6 +314,9 @@ fn list_header(ui: &mut Ui, title: &str, count: usize, button: Option<&str>) -> 
         vec2(galley.size().x + 12.0, 22.0),
     );
     let resp = ui.interact(b, ui.id().with(("list_btn", title)), Sense::click());
+    crate::repo::widgets::a11y(&resp, egui::WidgetType::Button, || {
+        crate::a11y::labels::join([label, title])
+    });
     if resp.hovered() {
         ui.painter().rect_filled(b, t.radius_sm, t.hover);
     }
