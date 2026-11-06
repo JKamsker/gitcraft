@@ -77,6 +77,8 @@ impl App {
             .inner_margin(egui::Margin::same(18))
             .shadow(ctx.global_style().visuals.window_shadow);
         let mut close = false;
+        let mut copy = false;
+        let collecting = self.diagnostics.is_some();
         let resp = egui::Modal::new(egui::Id::new("manual"))
             .frame(frame)
             .backdrop_color(egui::Color32::from_black_alpha(110))
@@ -91,6 +93,17 @@ impl App {
                         if icons::small_button(ui, "x", "Close (Esc)").clicked() {
                             close = true;
                         }
+                        let tip = "Copies what a bug report needs: versions, system, graphics, \
+                                   git, gh, glab and tea (signed in or not, never a token), and \
+                                   the git settings in effect (no name or email)";
+                        if ui
+                            .add_enabled(!collecting, egui::Button::new("Copy diagnostics"))
+                            .on_hover_text(tip)
+                            .on_disabled_hover_text("Collecting…")
+                            .clicked()
+                        {
+                            copy = true;
+                        }
                     });
                 });
                 let max = (ctx.content_rect().height() - 140.0).max(240.0);
@@ -101,6 +114,9 @@ impl App {
             });
         if close || resp.should_close() {
             self.manual_open = false;
+        }
+        if copy {
+            self.copy_diagnostics(ctx);
         }
     }
 

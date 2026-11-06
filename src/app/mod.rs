@@ -2,6 +2,7 @@
 
 mod askpass_dialog;
 mod clone;
+mod diagnostics;
 mod home;
 mod palette;
 mod panels;
@@ -117,6 +118,10 @@ pub struct App {
     /// What the profile set for git when the repository tabs last read who commits are by.
     profile_git_seen: String,
     manual_open: bool,
+    /// The graphics adapter wgpu draws with, for diagnostics.
+    adapter: Option<String>,
+    /// Diagnostics being collected for the clipboard.
+    diagnostics: Option<diagnostics::Collecting>,
     palette: Option<Palette>,
     toasts: Vec<Toast>,
     /// The folders of the last repository tabs closed, the last one at the end.
@@ -160,6 +165,8 @@ impl App {
             profile_states: saved.profile_states,
             profile_git_seen: String::new(),
             manual_open: false,
+            adapter: diagnostics::adapter(cc),
+            diagnostics: None,
             palette: None,
             toasts: Vec::new(),
             closed: Vec::new(),
@@ -527,6 +534,7 @@ impl eframe::App for App {
         self.askpass_dialog(&ctx);
         self.palette_ui(&ctx);
         self.manual_ui(&ctx);
+        self.poll_diagnostics(&ctx);
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
     }

@@ -231,6 +231,13 @@ so your config, credentials and hooks apply as usual.
   (Ctrl+C with a selection, Ctrl+Shift+C or right-click).
 - Command palette (Ctrl+P): every action and branch, fuzzy matched.
 - Manual (F1, or the book in the title bar): what each part does and every keyboard shortcut.
+- _Copy diagnostics_ (at the top of the manual, or _Help: Copy diagnostics_ in the palette):
+  what a bug report needs, as Markdown on the clipboard. gitcraft's version and channel, the
+  system, the graphics adapter and backend wgpu draws with, the versions of git, `gh`, `glab`
+  and `tea` and whether each is signed in (`auth status`'s exit code, `tea`'s logins counted;
+  never a token or an account), and the settings of the doctor's allowlist in effect in the
+  repository shown, with their scope and file. Never your name, email or signing key, and the
+  home folder is written `~`.
 - Avatars: on a GitHub repository, the authors' GitHub accounts (through `gh` when installed, else
   GitHub's API); on Forgejo and Gitea, the accounts the host ties the commits to; on GitLab, the
   host's avatar API; elsewhere Gravatar (a hash of the email).
@@ -382,6 +389,7 @@ was made this way, on a demo repository.
 | `src/shell_path.rs`      | on macOS, the login shell's PATH for the commands gitcraft starts                  |
 | `src/remote/` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
 | `src/settings/`          | user settings, profiles, and the settings pages                                    |
+| `src/diagnostics.rs`     | Help → Copy diagnostics: what a bug report needs, nothing personal                 |
 | `src/manual.rs`          | the manual (F1): features and keyboard shortcuts                                   |
 | `src/theme.rs`           | colour tokens, fonts, egui style (PhotoCraft's Pro themes)                         |
 | `src/icons.rs`           | embedded Lucide SVG icons, tinted                                                  |
