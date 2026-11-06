@@ -146,6 +146,16 @@ pub(super) fn tab_ui(ui: &mut Ui, placed: Placed<'_>, env: &mut TabEnv<'_>) {
             }
             if let Tab::Repo(r) = tab {
                 ui.separator();
+                if ui
+                    .button("Teleport to…")
+                    .on_hover_text(
+                        "Carry the branch and its uncommitted work to another machine, in a new worktree",
+                    )
+                    .clicked()
+                {
+                    env.actions.teleport = Some(r.path.clone());
+                }
+                ui.separator();
                 if let Some(new) = tab_look::menu(ui, look) {
                     env.actions.restyle = Some((r.path.clone(), new));
                 }
