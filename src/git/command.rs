@@ -196,6 +196,23 @@ pub fn run_bytes(dir: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
     }
 }
 
+/// Runs git and returns its exit code with stdout as raw bytes, when the code is one of `ok`
+/// (`merge-tree` answers on stdout and exits 1 on conflicts); else the error output.
+pub fn run_code(dir: Option<&Path>, args: &[&str], ok: &[i32]) -> Result<(i32, Vec<u8>), String> {
+    let out = execute(dir, &Extra::default(), args)?;
+    match out.code {
+        Some(code) if ok.contains(&code) => Ok((code, out.stdout)),
+        _ => {
+            let stderr = String::from_utf8_lossy(&out.stderr).trim().to_owned();
+            Err(if stderr.is_empty() {
+                format!("git {} failed ({})", args.join(" "), out.status)
+            } else {
+                stderr
+            })
+        }
+    }
+}
+
 /// Starts git in `dir` with its output piped, for a caller that reads it bit by bit.
 pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Child, String> {
     if let Some(target) = remote::parse(dir) {
