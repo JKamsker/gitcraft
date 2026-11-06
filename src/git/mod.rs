@@ -6,6 +6,7 @@ mod commits;
 mod diff;
 mod files;
 mod lfs;
+mod preview;
 mod refs;
 mod status;
 mod submodule;
@@ -16,6 +17,7 @@ pub use self::commits::*;
 pub use self::diff::*;
 pub use self::files::*;
 pub use self::lfs::*;
+pub use self::preview::*;
 pub use self::refs::*;
 pub use self::status::*;
 pub use self::submodule::*;
@@ -169,3 +171,6 @@ pub fn now() -> i64 {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod preview_tests;
