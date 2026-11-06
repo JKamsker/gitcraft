@@ -138,6 +138,19 @@ so your config, credentials and hooks apply as usual.
   out in, or makes one beside the repository first: on the local branch, on a new one tracking
   the remote branch, or fetched from the forge for a fork that isn't a remote here.
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
+- CODEOWNERS: the file at HEAD, found where the forge of `origin` looks for it (GitHub:
+  `.github/`, the root, `docs/`; GitLab: the root, `docs/`, `.gitlab/`; Gitea: the root, `docs/`,
+  `.gitea/`, and `.forgejo/` first on Forgejo) and read its way: gitignore-like patterns where the
+  last match wins on GitHub; the same in GitLab's sections (`[Docs]`, `^[Optional][2] @owner`,
+  `!exclusions`), whose owners add up; regular expressions on the whole path on Gitea and
+  Forgejo, where every match adds its owners and `!regex` stands for the other files. Each file
+  row (changes, a commit, a comparison, a pull request) shows its owners; a line above the files
+  of a commit, comparison or pull request, and above the staged files, says who they need
+  ("Needs payments and infra · 2 files without an owner"). _Create pull request_ suggests the
+  owners of what the branch changes since its base as reviewers (ticked; GitHub takes accounts and
+  teams, GitLab accounts, Forgejo and Gitea both). _Check CODEOWNERS_ in the palette lists the
+  lines the forge would skip or read otherwise, the patterns that match no file and the files
+  without an owner.
 
 **Changes and commits** (right)
 
@@ -354,6 +367,8 @@ was made this way, on a demo repository.
 | `src/pull_request/mod.rs` | one pull request in full, whatever the forge: details, checks, comments, changes, safe markdown |
 | `src/pr_post/mod.rs` | what goes out: the `Target` trait each forge implements, and what they share (suggestions, merge rules) |
 | `src/pr_threads.rs` | review threads, the pending review and permissions                          |
+| `src/codeowners/` | CODEOWNERS of GitHub, GitLab and Gitea / Forgejo: where each looks, its patterns, who owns a file, the check |
+| `src/repo/owners/` | CODEOWNERS in the tab: owners on file rows, who a change needs, reviewers to suggest, the check's window |
 | `src/avatars.rs`         | avatars from GitHub, Forgejo / Gitea, GitLab or Gravatar, cached on disk           |
 | `src/update.rs`          | new-release check                                                                  |
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |

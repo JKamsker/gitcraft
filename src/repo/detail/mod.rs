@@ -50,6 +50,7 @@ impl RepoTab {
         let selected = |f: &&ChangedFile| self.open_key() == Some(&key(&f.path));
         // Rows are known by their path within the list of this commit (or range): a menu left
         // open while another one is shown is not that one's file of the same path.
+        self.owners_summary(ui, files.iter().map(|f| f.path.as_str()));
         ui.push_id(("file-list", tree, rev), |ui| {
             branch_tree::files(
                 ui,
@@ -58,7 +59,7 @@ impl RepoTab {
                 |f| &f.path,
                 &selected,
                 &mut |ui, indent, f| {
-                    let r = widgets::file_row(
+                    let r = widgets::file_row_owned(
                         ui,
                         f.status,
                         &f.path,
@@ -66,6 +67,7 @@ impl RepoTab {
                         indent,
                         selected(&f),
                         RowExtra::Stats(f.added, f.removed),
+                        self.owner_tag(&f.path).as_ref(),
                     );
                     widgets::file_menu(&r.row, &f.path, rev, false, acts);
                     if r.row.clicked() {

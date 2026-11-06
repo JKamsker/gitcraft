@@ -23,6 +23,7 @@ mod load;
 mod messages;
 mod navigate;
 mod operations;
+mod owners;
 mod patches;
 mod pinned_sections;
 mod pr_merge;
@@ -137,6 +138,8 @@ pub struct RepoTab {
     prs_loaded: Option<Instant>,
     /// The build status of the commits that show one.
     ci: ci_status::CiStatuses,
+    /// Who owns which files (CODEOWNERS).
+    owners: owners::Owners,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -299,6 +302,7 @@ impl RepoTab {
             pr_error: None,
             prs_loaded: None,
             ci: ci_status::CiStatuses::default(),
+            owners: owners::Owners::default(),
             selected: None,
             stash_view: None,
             scroll_to: None,

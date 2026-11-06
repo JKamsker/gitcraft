@@ -22,6 +22,7 @@ impl RepoTab {
             return;
         }
         let mut acts: Vec<Action> = std::mem::take(&mut self.queued);
+        self.owners_frame(&ctx);
         self.shortcuts(&ctx, &mut acts);
 
         egui::Panel::top("repo_toolbar")
@@ -62,6 +63,7 @@ impl RepoTab {
             });
 
         self.dialogs(&ctx, &mut acts);
+        self.owners_lint_window(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
         }

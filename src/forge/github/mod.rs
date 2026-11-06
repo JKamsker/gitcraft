@@ -72,6 +72,10 @@ impl Provider for GitHub {
         if new.draft {
             args.push("--draft");
         }
+        let reviewers = new.reviewers.join(",");
+        if !reviewers.is_empty() {
+            args.extend(["--reviewer", &reviewers]);
+        }
         gh(repo, &args).map(|out| out.trim().to_owned())
     }
 

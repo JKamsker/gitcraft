@@ -101,6 +101,8 @@ pub struct NewPullRequest<'a> {
     pub title: &'a str,
     pub body: &'a str,
     pub draft: bool,
+    /// Who to ask for a review: accounts (`ann`) and teams (`acme/payments`).
+    pub reviewers: &'a [String],
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
