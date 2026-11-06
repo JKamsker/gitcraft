@@ -6,7 +6,7 @@ use egui::{Align2, Key, RichText, Sense, Stroke, Ui, pos2, vec2};
 
 use super::{App, Tab};
 use crate::repo::Action;
-use crate::theme::{self, ThemeKind, Tokens};
+use crate::theme::{self, ThemeId, Tokens};
 
 /// The command palette (Ctrl+P): type to filter, Enter runs.
 pub(super) struct Palette {
@@ -37,7 +37,9 @@ enum AppCommand {
     ForgetSignIns,
     Settings,
     Manual,
-    Theme(ThemeKind),
+    Theme(ThemeId),
+    /// The settings' themes.
+    Themes,
     Profile(u64),
     NewProfile,
 }
@@ -112,13 +114,23 @@ impl App {
                 ),
             );
         }
-        for kind in ThemeKind::ALL {
+        for t in theme::themes().iter() {
             list.push((
-                format!("Theme: {}", kind.label()),
-                "theme".to_owned(),
-                Entry::App(AppCommand::Theme(kind)),
+                format!("Theme: {}", t.name),
+                if t.dark() {
+                    "dark theme"
+                } else {
+                    "light theme"
+                }
+                .to_owned(),
+                Entry::App(AppCommand::Theme(t.id.clone())),
             ));
         }
+        list.push((
+            "Browse themes…".to_owned(),
+            "settings".to_owned(),
+            Entry::App(AppCommand::Themes),
+        ));
         for p in &self.settings.user_profiles {
             if p.id != self.settings.active_profile {
                 list.push((
@@ -155,7 +167,11 @@ impl App {
             }
             Entry::App(AppCommand::Settings) => self.open_settings(),
             Entry::App(AppCommand::Manual) => self.manual_open = true,
-            Entry::App(AppCommand::Theme(kind)) => self.set_theme(ctx, kind),
+            Entry::App(AppCommand::Theme(id)) => self.set_theme(ctx, id),
+            Entry::App(AppCommand::Themes) => {
+                crate::settings::show_page(ctx, crate::settings::Page::Appearance);
+                self.open_settings();
+            }
             Entry::App(AppCommand::Profile(id)) => {
                 self.switch_profile(id, ctx);
             }

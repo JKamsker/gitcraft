@@ -168,7 +168,7 @@ fn found(query: &str) -> Vec<(Page, usize)> {
             .map(|&page| {
                 let filter = Filter::new(query, page.title(), true);
                 let mut view = SettingsView {
-                    theme: crate::theme::ThemeKind::Dark,
+                    theme: crate::theme::ThemeId::default(),
                     git_version: "2.45.0",
                     dialog_open: false,
                     request: None,
@@ -196,7 +196,66 @@ fn a_search_finds_settings_by_name_keyword_section_or_page() {
     assert_eq!(found("reopen"), vec![(Page::Shortcuts, 1)]);
     // The profile's own settings are found too.
     assert_eq!(found("user.email"), vec![(Page::Profile, 1)]);
-    assert_eq!(found("theme dark"), vec![(Page::Profile, 1)]);
+    assert_eq!(
+        found("theme dark"),
+        vec![(Page::Profile, 1), (Page::Appearance, 1)]
+    );
     assert_eq!(found("ssh passphrase"), vec![(Page::Git, 1)]);
     assert!(found("nothing like this qqq").is_empty());
+}
+
+/// Every preview draws, with the settings as they come and pushed to their ends (every column,
+/// the widest branch column, compact lanes, square corners and your own accent), in a dark and
+/// a light theme; and every page draws with the preview beside it.
+#[test]
+fn every_preview_and_page_draws() {
+    let ctx = egui::Context::default();
+    // The semibold and medium faces are gitcraft's own; they take a frame to arrive.
+    crate::theme::install_fonts(&ctx);
+    // Nothing renders here: the font texture is left unapplied on purpose.
+    let frame = |ui: &mut dyn FnMut(&mut egui::Ui)| {
+        let mut output = ctx.run_ui(egui::RawInput::default(), |u| ui(u));
+        output.textures_delta.clear();
+    };
+    frame(&mut |_| {});
+    let mut ends = Settings {
+        refs_width: 2000.0,
+        compact_graph: true,
+        show_hash: true,
+        show_date: true,
+        diff_split: true,
+        diff_whole_file: true,
+        files_as_tree: false,
+        avatars: false,
+        shell: "pwsh".to_owned(),
+        terminal_font: 20.0,
+        ..Settings::default()
+    };
+    ends.theme_tweaks.roundness = 0.0;
+    ends.theme_tweaks.accent = Some([200, 40, 120]);
+    ends.theme_tweaks.lanes = crate::theme::LaneColors::ColorBlind;
+    for theme_id in ["Dark", "catppuccin-latte", "no such theme"] {
+        let theme_id = crate::theme::ThemeId::new(theme_id);
+        for settings in [Settings::default(), ends.clone()] {
+            crate::theme::apply(&ctx, &theme_id, &settings.theme_tweaks);
+            frame(&mut |ui| {
+                for preview in preview::Preview::ALL {
+                    preview::panel(ui, preview, &settings, &theme_id);
+                }
+            });
+            for page in Page::ALL {
+                page::show(&ctx, page);
+                let mut settings = settings.clone();
+                frame(&mut |ui| {
+                    let mut view = SettingsView {
+                        theme: theme_id.clone(),
+                        git_version: "2.45.0",
+                        dialog_open: false,
+                        request: None,
+                    };
+                    settings.page(ui, &mut view);
+                });
+            }
+        }
+    }
 }

@@ -11,7 +11,7 @@ use super::panels::Toast;
 use super::{App, MAX_RECENT, Tab, active_among_kept};
 use crate::repo::RepoTab;
 use crate::settings::{self, ProfileRequest};
-use crate::theme::{self, ThemeKind, Tokens};
+use crate::theme::{self, ThemeId, Tokens};
 
 /// What a profile not in use had open, to open again when it is switched back to.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -21,7 +21,7 @@ pub(super) struct ProfileState {
     /// The active tab among `open`.
     pub active: usize,
     pub recent: Vec<PathBuf>,
-    pub theme: ThemeKind,
+    pub theme: ThemeId,
 }
 
 /// The profiles not in use, by id.
@@ -67,7 +67,7 @@ impl App {
             open,
             active,
             recent: self.recent.clone(),
-            theme: self.theme,
+            theme: self.theme.clone(),
         }
     }
 
@@ -161,7 +161,7 @@ impl App {
             .remove(&id)
             .unwrap_or_else(|| ProfileState {
                 // A new profile starts with the look of the one it was made from.
-                theme: self.theme,
+                theme: self.theme.clone(),
                 ..ProfileState::default()
             });
         self.settings.active_profile = id;
@@ -227,7 +227,7 @@ impl App {
             ProfileRequest::New => self.new_profile(false, ctx),
             ProfileRequest::Duplicate => self.new_profile(true, ctx),
             ProfileRequest::Delete(id) => self.delete_profile(id, ctx),
-            ProfileRequest::Theme(kind) => self.set_theme(ctx, kind),
+            ProfileRequest::Theme(id) => self.set_theme(ctx, id),
         }
     }
 

@@ -26,7 +26,7 @@ use crate::git;
 use crate::repo::{OpenRequest, RepoTab};
 use crate::settings::Settings;
 use crate::tab_look::TabLook;
-use crate::theme::{self, ThemeKind, Tokens};
+use crate::theme::{self, ThemeId, Tokens};
 use crate::update;
 use clone::CloneForm;
 use palette::Palette;
@@ -48,7 +48,7 @@ struct Saved {
     open: Vec<PathBuf>,
     active: usize,
     recent: Vec<PathBuf>,
-    theme: ThemeKind,
+    theme: ThemeId,
     clone_parent: Option<PathBuf>,
     settings: Settings,
     /// A release the user chose to skip.
@@ -80,7 +80,7 @@ pub struct App {
     close_worktree: bool,
     active: usize,
     recent: Vec<PathBuf>,
-    theme: ThemeKind,
+    theme: ThemeId,
     clone_parent: Option<PathBuf>,
     error: Option<String>,
     was_focused: bool,
@@ -135,8 +135,8 @@ impl App {
         egui_extras::install_image_loaders(ctx);
         crate::image_fit::install(ctx);
         theme::install_fonts(ctx);
-        theme::apply(ctx, saved.theme);
         let mut settings = saved.settings;
+        theme::apply(ctx, &saved.theme, &settings.theme_tweaks);
         settings.ensure_profile();
         settings.set(ctx);
         crate::desktop_entry::refresh();
@@ -150,7 +150,7 @@ impl App {
             close_worktree: false,
             active: 0,
             recent: saved.recent,
-            theme: saved.theme,
+            theme: saved.theme.clone(),
             clone_parent: saved.clone_parent,
             settings,
             profile_states: saved.profile_states,
@@ -272,9 +272,14 @@ impl App {
         self.recent.truncate(MAX_RECENT);
     }
 
-    fn set_theme(&mut self, ctx: &egui::Context, kind: ThemeKind) {
-        self.theme = kind;
-        theme::apply(ctx, kind);
+    fn set_theme(&mut self, ctx: &egui::Context, id: ThemeId) {
+        self.theme = id;
+        self.apply_theme(ctx);
+    }
+
+    /// Paints the app with its theme and the settings' tweaks of it.
+    fn apply_theme(&self, ctx: &egui::Context) {
+        theme::apply(ctx, &self.theme, &self.settings.theme_tweaks);
     }
 
     /// Looks for a newer release once on start, and again when the update settings change;
@@ -408,6 +413,8 @@ impl eframe::App for App {
         let t = Tokens::get(&ctx);
         // Column widths dragged in a graph header live in the context; keep them for saving.
         self.settings = Settings::get(&ctx);
+        // A theme file being edited, VS Code's theme switched: shown as they change.
+        theme::poll(&ctx);
 
         // eframe shows the window after the first frame; maximize it on the next one.
         if MAXIMIZE_WHEN_SHOWN.load(Ordering::Relaxed) {
@@ -489,7 +496,7 @@ impl eframe::App for App {
             open,
             active,
             recent: self.recent.clone(),
-            theme: self.theme,
+            theme: self.theme.clone(),
             clone_parent: self.clone_parent.clone(),
             settings: self.settings.clone(),
             skipped_version: self.skipped_version.clone(),

@@ -6,6 +6,8 @@ use std::cell::Cell;
 
 use egui::{Align, Layout, Margin, RichText, Stroke, Ui, vec2};
 
+use super::Page;
+use super::preview::{self, Preview};
 use crate::theme::{self, Tokens};
 
 /// Width of the column of setting names, the same in every card so their controls line up.
@@ -25,6 +27,8 @@ pub(super) struct Filter {
     /// Only count the matching rows, drawing nothing.
     counting: bool,
     found: Cell<usize>,
+    /// The page drawn, or `None` in the search results: where a row's preview shows.
+    at: Option<Page>,
 }
 
 impl Filter {
@@ -34,7 +38,26 @@ impl Filter {
             page,
             counting,
             found: Cell::new(0),
+            at: None,
         }
+    }
+
+    /// Drawn as the page `page` (not among search results).
+    pub fn on_page(mut self, page: Page) -> Self {
+        self.at = Some(page);
+        self
+    }
+
+    /// The page drawn, `None` in the search results.
+    pub fn at_page(&self) -> Option<Page> {
+        self.at
+    }
+
+    /// Whether `text` has one of the search's words: what of a long list to show while
+    /// searching (only those, when any has one).
+    pub fn names(&self, text: &str) -> bool {
+        let text = text.to_lowercase();
+        self.words.iter().any(|w| text.contains(w.as_str()))
     }
 
     pub fn searching(&self) -> bool {
@@ -65,6 +88,8 @@ pub(super) struct Card<'a> {
     margin: Margin,
     first: bool,
     t: Tokens,
+    /// What the next row previews.
+    next_preview: Option<Preview>,
 }
 
 /// A section of a page: its title (left out when it is the page's own), an optional line
@@ -89,6 +114,7 @@ pub(super) fn section(
             margin: ROW_MARGIN,
             first: true,
             t,
+            next_preview: None,
         };
         rows(&mut card);
         card.found
@@ -132,6 +158,11 @@ pub(super) fn section(
 impl Card<'_> {
     pub fn ctx(&self) -> egui::Context {
         self.ui.ctx().clone()
+    }
+
+    /// The next row shows `preview` beside the page while it is pointed at.
+    pub fn preview(&mut self, preview: Preview) {
+        self.next_preview = Some(preview);
     }
 
     /// Less room above and below the rows that follow, for a long list of short rows.
@@ -202,6 +233,7 @@ impl Card<'_> {
     }
 
     fn full_with<R>(&mut self, found_by: &[&str], add: impl FnOnce(&mut Ui) -> R) {
+        let preview = self.next_preview.take();
         if self.filter.searching() {
             let mut parts = vec![self.filter.page, self.section];
             parts.extend(found_by);
@@ -222,13 +254,33 @@ impl Card<'_> {
         }
         self.first = false;
         let spacing = self.spacing;
-        egui::Frame::new()
+        let row = egui::Frame::new()
             .inner_margin(self.margin)
             .show(self.ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.spacing_mut().item_spacing = spacing;
                 add(ui);
-            });
+            })
+            .response
+            .rect;
+        if let Some(preview) = preview {
+            let at = self.filter.at;
+            let ctx = self.ui.ctx().clone();
+            if self.ui.rect_contains_pointer(row) {
+                preview::point(&ctx, at, preview);
+            }
+            if at.is_none() {
+                preview::found(&ctx, preview);
+            }
+            // The row whose preview shows is marked along its left edge.
+            if preview::is_shown(&ctx, at, preview) {
+                let bar = egui::Rect::from_min_size(
+                    row.left_top() + vec2(0.0, 8.0),
+                    vec2(3.0, (row.height() - 16.0).max(8.0)),
+                );
+                self.ui.painter().rect_filled(bar, 1.5, self.t.accent);
+            }
+        }
     }
 }
 

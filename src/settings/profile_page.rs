@@ -9,10 +9,10 @@ use super::layout::{self, Filter, section};
 use super::profiles::{self, UserProfile};
 use super::signing::{self, RECHECK};
 use super::{FIELD_WIDTH, Settings};
-use crate::theme::{self, ThemeKind, Tokens};
+use crate::theme::{self, ThemeId, Tokens};
 
 /// What the profile page asks the app for: profiles switch with the tabs, which are the app's.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ProfileRequest {
     Switch(u64),
     /// A new, empty profile, switched to.
@@ -20,13 +20,13 @@ pub enum ProfileRequest {
     /// A copy of the profile in use, switched to.
     Duplicate,
     Delete(u64),
-    Theme(ThemeKind),
+    Theme(ThemeId),
 }
 
 /// What the settings page needs of the app, and what its Profile page asks the app to do.
 pub struct SettingsView<'a> {
     /// The app's theme, which is the profile's.
-    pub theme: ThemeKind,
+    pub theme: ThemeId,
     /// What `git --version` said.
     pub git_version: &'a str,
     /// A dialog is over the page (the manual, the palette, the clone or remote dialog): the
@@ -140,7 +140,9 @@ impl Settings {
                         {
                             request = Some(ProfileRequest::Duplicate);
                         }
-                        request = request.or(delete_button(ui, &current, self.user_profiles.len()));
+                        if request.is_none() {
+                            request = delete_button(ui, &current, self.user_profiles.len());
+                        }
                     });
                 });
                 card.row("Name", "rename title", |ui| {
@@ -150,18 +152,28 @@ impl Settings {
                             .desired_width(layout::fit(ui, 200.0)),
                     );
                 });
-                card.row("Theme", "dark light colours colors appearance", |ui| {
-                    ui.horizontal_wrapped(|ui| {
-                        ui.spacing_mut().item_spacing.x = 18.0;
-                        for kind in ThemeKind::ALL {
-                            if ui.radio(view.theme == kind, kind.label()).clicked()
-                                && view.theme != kind
-                            {
-                                request = Some(ProfileRequest::Theme(kind));
-                            }
-                        }
-                    });
-                });
+                card.row_hint(
+                    "Theme",
+                    "More on the Appearance page",
+                    "dark light colours colors appearance",
+                    |ui| {
+                        egui::ComboBox::from_id_salt("settings-profile-theme")
+                            .width(layout::fit(ui, 230.0))
+                            .selected_text(view.theme.label())
+                            .height(360.0)
+                            .show_ui(ui, |ui| {
+                                for info in theme::themes().iter() {
+                                    if ui
+                                        .selectable_label(view.theme == info.id, &info.name)
+                                        .clicked()
+                                        && view.theme != info.id
+                                    {
+                                        request = Some(ProfileRequest::Theme(info.id.clone()));
+                                    }
+                                }
+                            });
+                    },
+                );
             },
         );
 
