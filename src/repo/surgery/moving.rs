@@ -3,10 +3,14 @@
 //! (staged). It uses the split editor: commit 1 is what stays, commit 2 what moves.
 //!
 //! Checking makes two trees on the commit's parent: what stays, and what moves. Moving makes a
-//! commit of each; the rebase picks the first in place of the old commit (or drops it when
-//! nothing stays) and puts the second right after the destination as a `fixup`, so it melds
-//! into it with the destination's message. Moved to the working changes, the second is applied
-//! (`apply --3way`) once the rebase is done; a conflict there is the usual conflicted file.
+//! commit of each, one on the other so that together they are the old commit: into an older
+//! commit, what moves first and what stays on it; otherwise the other way round. The rebase
+//! picks what stays in place of the old commit (or drops it when nothing stays) and puts what
+//! moves right after the destination as a `fixup`, so it melds into it with the destination's
+//! message. Moved to the working changes, it is picked last and taken back out of the commits
+//! (`reset --soft`) once the rebase is done: stopped on a conflict, it is still a commit there.
+//! Before anything runs, the new todo list is played through (`merge-tree`): the branch must
+//! end with the files it has now, or the move is refused.
 
 use std::path::Path;
 
@@ -42,6 +46,8 @@ pub(crate) struct Move {
     /// How far down the branch the commit moved out of is.
     pub depth: usize,
     pub dest: Option<Dest>,
+    /// The branch goes on below the commits loaded: older ones aren't listed yet.
+    pub truncated: bool,
 }
 
 impl Move {
@@ -92,8 +98,6 @@ pub(crate) fn prepare(
     parent: &str,
     stay: &str,
     moved: &str,
-    leaving: &str,
-    arriving: &str,
 ) -> Result<Checked, String> {
     let base = git::tree_of(repo, parent)?;
     let stay_tree = if stay.is_empty() {
@@ -103,55 +107,27 @@ pub(crate) fn prepare(
         git::tree_after(repo, parent, &[file]).map_err(|e| format!("what stays: {e}"))?
     };
     let moved_file = git::save_patch_for(repo, moved)?;
-    let moved_tree = git::tree_after(repo, parent, std::slice::from_ref(&moved_file))
-        .map_err(|e| format!("what moves: {e}"))?;
-    let leaving_patch = git::patch_between(repo, &base, &stay_tree)?;
-    let mut leaving_files = git::paths_between(repo, &base, &stay_tree)?;
-    if leaving_files.is_empty() {
-        leaving_files.push(format!("nothing: {leaving} is dropped"));
-    }
-    let arriving_files = git::paths_between(repo, &base, &moved_tree)?;
+    let moved_tree =
+        git::tree_after(repo, parent, &[moved_file]).map_err(|e| format!("what moves: {e}"))?;
     let preview = Preview::new(&[
-        (leaving_patch, leaving_files),
+        (
+            git::patch_between(repo, &base, &stay_tree)?,
+            git::paths_between(repo, &base, &stay_tree)?,
+        ),
         (
             git::patch_between(repo, &base, &moved_tree)?,
-            arriving_files
-                .iter()
-                .map(|f| format!("{f} → {arriving}"))
-                .collect(),
+            git::paths_between(repo, &base, &moved_tree)?,
         ),
     ]);
     Ok(Checked {
         trees: vec![base, stay_tree, moved_tree],
         preview,
-        moved: Some(moved_file),
     })
 }
 
-/// Why the moved changes can't land in the working changes: one of their files has changes
-/// there already.
-fn work_refusal(repo: &Path, paths: &[String]) -> Result<(), String> {
-    let mut args = vec![
-        "--literal-pathspecs",
-        "status",
-        "--porcelain=v1",
-        "-z",
-        "--untracked-files=all",
-        "--",
-    ];
-    args.extend(paths.iter().map(String::as_str));
-    let out = git::run(Some(repo), &args)?;
-    match out.split('\0').find(|e| e.len() > 3) {
-        Some(entry) => Err(format!(
-            "{} has uncommitted changes, where the moved ones would land: commit or stash them first",
-            &entry[3..]
-        )),
-        None => Ok(()),
-    }
-}
-
 /// The todo list of a move out of `from` (`stay`: what stays of it, `None` when nothing does)
-/// into `to` (`moved`, melded into it), or out of the branch when `to` is `None`.
+/// into `to` (`moved`, melded into it), or, when `to` is `None`, `moved` picked last, to be
+/// taken out of the commits into the working changes once the rebase is done.
 fn todo(
     entries: Vec<Entry>,
     from: &str,
@@ -181,6 +157,8 @@ fn todo(
             out.push(m);
         }
     }
+    // To the working changes: picked last, then taken out of the commits (`reset --soft`).
+    out.extend(moved);
     Ok(out)
 }
 
@@ -196,6 +174,8 @@ impl RepoTab {
             return;
         };
         let targets = targets(&line, depth);
+        // Neither a merge nor the first commit ended the line: its history isn't all loaded.
+        let truncated = line.iter().all(|c| c.parents.len() == 1);
         self.status = Some((format!("Move changes: reading {}…", short(&hash)), false));
         let path = self.path.clone();
         self.then(
@@ -207,7 +187,11 @@ impl RepoTab {
                     tab.status = None;
                     tab.diff = None;
                     tab.file_view = None;
-                    tab.split = Some(Box::new(SplitEditor::moving(read, targets, depth)));
+                    let mut editor = SplitEditor::moving(read, targets, depth);
+                    if let Mode::Move(m) = &mut editor.mode {
+                        m.truncated = truncated;
+                    }
+                    tab.split = Some(Box::new(editor));
                 }
                 Err(e) => tab.status = Some((format!("Move changes: {e}"), true)),
             },
@@ -219,29 +203,18 @@ impl RepoTab {
         let Some(editor) = self.split.as_mut().filter(|e| !e.busy) else {
             return;
         };
-        let Mode::Move(m) = &editor.mode else {
-            return;
-        };
-        if editor.problem().is_some() {
+        if !matches!(editor.mode, Mode::Move(_)) || editor.problem().is_some() {
             return;
         }
-        let arriving = match m.target() {
-            Some(t) => short(&t.hash).to_owned(),
-            None => "working changes".to_owned(),
-        };
         let stay = patchset::patch_of(&editor.files, |f, u| editor.group_of(f, u) == 0);
         let moved = patchset::patch_of(&editor.files, |f, u| editor.group_of(f, u) == 1);
-        let (id, parent, leaving) = (
-            editor.id,
-            editor.parent.clone(),
-            short(&editor.hash).to_owned(),
-        );
+        let (id, parent) = (editor.id, editor.parent.clone());
         editor.busy = true;
         editor.error = None;
         let path = self.path.clone();
         self.then(
             ctx,
-            move || prepare(&path, &parent, &stay, &moved, &leaving, &arriving),
+            move || prepare(&path, &parent, &stay, &moved),
             move |tab, result, _| {
                 let Some(editor) = tab.split.as_mut().filter(|e| e.id == id) else {
                     return;
@@ -264,9 +237,6 @@ impl RepoTab {
         let (Mode::Move(m), Some(checked)) = (&editor.mode, editor.checked.clone()) else {
             return;
         };
-        let Some(moved_file) = checked.moved.clone() else {
-            return;
-        };
         let target = m.target().cloned();
         // From below the older of the two.
         let onto = match &target {
@@ -279,18 +249,6 @@ impl RepoTab {
             editor.parent.clone(),
             editor.message.clone(),
         );
-        let moved_paths: Vec<String> = editor
-            .files
-            .iter()
-            .enumerate()
-            .filter(|(f, _)| {
-                editor
-                    .units
-                    .get(*f)
-                    .is_some_and(|us| us.iter().any(|&u| editor.group_of(*f, u) == 1))
-            })
-            .map(|(_, file)| file.path.clone())
-            .collect();
         let label = match &target {
             Some(t) => format!("Move changes from {} to {}", short(&hash), short(&t.hash)),
             None => format!("Move changes from {} to the working changes", short(&hash)),
@@ -299,16 +257,15 @@ impl RepoTab {
             (Vec::new(), Undo::HeadMove { mode: "--keep" })
         } else {
             (
-                vec![
-                    ["apply", "--3way", "--whitespace=nowarn", &moved_file]
-                        .map(str::to_owned)
-                        .to_vec(),
-                ],
+                // Picked last by the rebase, which went through: out of the commits, staged.
+                vec![["reset", "--soft", "HEAD^"].map(str::to_owned).to_vec()],
                 // Back with the moved changes staged again in their old commit's place:
                 // HEAD's tree before is HEAD's now with them.
                 Undo::HeadMove { mode: "--soft" },
             )
         };
+        let older = target.as_ref().is_some_and(|t| t.depth > m.depth);
+        let onto_for_replay = onto.clone();
         editor.busy = true;
         editor.error = None;
         let path = self.path.clone();
@@ -319,33 +276,54 @@ impl RepoTab {
                 let Some(old) = entries.iter().find(|e| e.commit.hash == hash).cloned() else {
                     return Err("the commit is no longer on the checked-out branch".to_owned());
                 };
-                if target.is_none() {
-                    work_refusal(&path, &moved_paths)?;
-                }
+                let Some(head) = entries.last().map(|e| e.commit.hash.clone()) else {
+                    return Err("the branch has no commits to rewrite".to_owned());
+                };
                 let author = git::author_of(&path, &hash)?;
-                let [_, stay_tree, moved_tree] = &checked.trees[..] else {
+                let [base, stay_tree, moved_tree] = &checked.trees[..] else {
                     return Err("the move was not checked".to_owned());
                 };
-                let base = git::tree_of(&path, &parent)?;
-                let stay = if *stay_tree == base {
-                    None
-                } else {
-                    let made =
-                        git::commit_tree(&path, stay_tree, &parent, &message, Some(&author))?;
-                    Some(prepared(made, &message, &old.commit))
-                };
+                let whole = git::tree_of(&path, &hash)?;
                 let note = format!("fixup! moved from {}", short(&hash));
-                let made = git::commit_tree(&path, moved_tree, &parent, &note, Some(&author))?;
-                let moved = prepared(made, &note, &old.commit);
-                todo(
+                let commit = |tree: &str, parent: &str, message: &str| {
+                    git::commit_tree(&path, tree, parent, message, Some(&author))
+                };
+                // Each part made on the other, so that together they are the old commit and
+                // neither repeats what the other does (a file both would create…).
+                let (stay, moved) = if older {
+                    // What moves goes first (into the older commit), what stays on top of it.
+                    let moved = commit(moved_tree, &parent, &note)?;
+                    let stay = (*moved_tree != whole)
+                        .then(|| commit(&whole, &moved, &message))
+                        .transpose()?;
+                    (stay, moved)
+                } else {
+                    let stay = (stay_tree != base)
+                        .then(|| commit(stay_tree, &parent, &message))
+                        .transpose()?;
+                    let moved = commit(&whole, stay.as_deref().unwrap_or(&parent), &note)?;
+                    (stay, moved)
+                };
+                let todo = todo(
                     entries,
                     &hash,
-                    stay,
+                    stay.map(|s| prepared(s, &message, &old.commit)),
                     target.as_ref().map(|t| t.hash.as_str()),
-                    moved,
-                )
+                    prepared(moved, &note, &old.commit),
+                )?;
+                // Played through first: the branch must end with the files it has now. A commit
+                // in between that undoes (or redoes) the moved lines would make them vanish.
+                if let Some(end) = super::replay::ends_as(&path, &onto_for_replay, &todo)?
+                    && end != git::tree_of(&path, &head)?
+                {
+                    return Err(
+                        "a commit in between undoes or redoes these lines, so the branch would end up different: move them by hand"
+                            .to_owned(),
+                    );
+                }
+                Ok(todo)
             },
-            after,
+            (Vec::new(), after),
             undo,
             move |tab, started| {
                 let Some(editor) = tab.split.as_mut().filter(|e| e.id == id) else {
@@ -380,6 +358,7 @@ impl SplitEditor {
             targets,
             depth,
             dest: None,
+            truncated: false,
         });
         editor.recount();
         editor
@@ -444,11 +423,11 @@ mod tests {
             newer.map(|t| line(&t)),
             Ok(vec![pick("x"), pick("a"), pick("y"), fix("m")])
         );
-        // To the working changes: out of the todo list.
+        // To the working changes: picked last.
         let work = todo(all(), "x", Some(entry("x2")), None, entry("m"));
         assert_eq!(
             work.map(|t| line(&t)),
-            Ok(vec![pick("b"), pick("x2"), pick("a"), pick("y")])
+            Ok(vec![pick("b"), pick("x2"), pick("a"), pick("y"), pick("m")])
         );
         assert!(todo(all(), "gone", None, None, entry("m")).is_err());
         assert!(todo(all(), "a", None, Some("gone"), entry("m")).is_err());
@@ -486,6 +465,7 @@ mod tests {
             targets: vec![],
             depth: 0,
             dest: None,
+            truncated: false,
         };
         assert!(
             m.problem(&[3, 0])

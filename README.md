@@ -112,7 +112,7 @@ so your config, credentials and hooks apply as usual.
   first commit are greyed out with why.
 - _Move changes to another commit…_ (same menu): click the files, hunks or lines to take out of
   the commit, then pick where they go: another commit of the branch (newer or older), or the
-  working changes, staged. _Check move_ shows what leaves the commit and what arrives;
+  working changes, staged. _Check move_ shows what stays in the commit and what moves;
   _Move changes_ rewrites the branch from the older of the two (a commit left with nothing is
   dropped). Ctrl+Z undoes it; a conflict stops the rebase as usual.
 - Quick edits from a commit's menu, for commits of the checked-out branch: _Edit commit

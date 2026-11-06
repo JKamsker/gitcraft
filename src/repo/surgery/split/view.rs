@@ -62,7 +62,7 @@ impl RepoTab {
         let Some(editor) = self.split.as_deref_mut() else {
             return;
         };
-        if keys_free {
+        if keys_free && editor.mode == Mode::Split {
             pick_with_keys(ui, editor);
         }
         header(ui, &t, editor, acts);
@@ -123,7 +123,11 @@ fn header(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, acts: &mut Vec<Action>)
         .stroke(Stroke::new(1.0, t.separator))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                icons::inline(ui, "rows-2", 16.0, t.icon);
+                let icon = match editor.mode {
+                    Mode::Split => "rows-2",
+                    Mode::Move(_) => "file-diff",
+                };
+                icons::inline(ui, icon, 16.0, t.icon);
                 let verb = match editor.mode {
                     Mode::Split => "Split",
                     Mode::Move(_) => "Move changes out of",
@@ -202,6 +206,9 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor, idle: bool, acts: &
 /// What the footer says, and in which colour.
 fn note(t: &Tokens, editor: &SplitEditor, problem: Option<(String, bool)>) -> (String, Color32) {
     match (&editor.error, problem, &editor.checked) {
+        (Some(e), _, _) if matches!(editor.mode, Mode::Move(_)) => {
+            (format!("Can't move them this way: {e}"), t.danger)
+        }
         (Some(e), _, _) => (format!("Can't split it this way: {e}"), t.danger),
         (None, Some((p, hint)), _) => (p, if hint { t.text_dim } else { t.danger }),
         (None, None, Some(_)) if matches!(editor.mode, Mode::Move(_)) => (
@@ -216,7 +223,7 @@ fn note(t: &Tokens, editor: &SplitEditor, problem: Option<(String, bool)>) -> (S
             t.text_dim,
         ),
         (None, None, None) if matches!(editor.mode, Mode::Move(_)) => (
-            "Check the move to see what leaves the commit and what arrives".to_owned(),
+            "Check the move to see what stays in the commit and what moves".to_owned(),
             t.text_dim,
         ),
         (None, None, None) => (
@@ -347,7 +354,6 @@ fn destinations(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
     let Mode::Move(m) = &editor.mode else {
         return;
     };
-    let (targets, dest) = (m.targets.clone(), m.dest.clone());
     let mut picked = None;
     ui.label(
         RichText::new(
@@ -366,41 +372,63 @@ fn destinations(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
         ui.add(egui::Label::new(RichText::new(&editor.groups[1].subject)).truncate());
     });
     ui.add_space(8.0);
+    if editor.busy {
+        ui.disable();
+    }
+    if ui
+        .selectable_label(m.dest == Some(Dest::Work), "Working changes (staged)")
+        .on_hover_text("Out of the commit, staged; their files must have no other changes")
+        .clicked()
+    {
+        picked = Some(Dest::Work);
+    }
+    ui.separator();
+    // Newest first, the commit itself in its place (not a choice): above it newer commits,
+    // below it older ones, from which more of the branch is rewritten.
+    let rows = m.targets.len() + 1 + usize::from(m.truncated);
+    let mine = m.targets.iter().take_while(|t| t.depth < m.depth).count();
     egui::ScrollArea::vertical()
         .id_salt(("move_targets", editor.id))
         .auto_shrink(false)
-        .show(ui, |ui| {
-            if editor.busy {
-                ui.disable();
-            }
-            if ui
-                .selectable_label(dest == Some(Dest::Work), "Working changes (staged)")
-                .on_hover_text("Out of the commit, staged; their files must have no other changes")
-                .clicked()
-            {
-                picked = Some(Dest::Work);
-            }
-            ui.separator();
-            if targets.is_empty() {
-                ui.label(
-                    RichText::new("No other commit of the branch can take them (a merge or the first commit is next).")
+        .show_rows(ui, 22.0, rows, |ui, range| {
+            for row in range {
+                if row == mine {
+                    ui.label(
+                        RichText::new(format!("{}  this commit", short(&editor.hash)))
+                            .color(t.text_faint)
+                            .italics(),
+                    );
+                    continue;
+                }
+                let i = if row < mine { row } else { row - 1 };
+                let Some(target) = m.targets.get(i) else {
+                    ui.label(
+                        RichText::new(
+                            "Older commits aren't loaded yet: scroll the graph down to load them.",
+                        )
                         .color(t.text_faint)
                         .small(),
-                );
-            }
-            for (i, target) in targets.iter().enumerate() {
+                    );
+                    continue;
+                };
                 let text = format!("{}  {}", short(&target.hash), target.summary);
                 if ui
-                    .add(
-                        egui::Button::selectable(dest == Some(Dest::Commit(i)), text)
-                            .truncate(),
-                    )
+                    .add(egui::Button::selectable(m.dest == Some(Dest::Commit(i)), text).truncate())
                     .clicked()
                 {
                     picked = Some(Dest::Commit(i));
                 }
             }
         });
+    if m.targets.is_empty() && !m.truncated {
+        ui.label(
+            RichText::new(
+                "No other commit of the branch can take them: a merge or the first commit is next.",
+            )
+            .color(t.text_faint)
+            .small(),
+        );
+    }
     if let Some(dest) = picked {
         editor.set_dest(dest);
     }
@@ -488,7 +516,6 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
             .layout(egui::Layout::left_to_right(egui::Align::Center)),
     );
     let ui = &mut child;
-    let target = editor.active + 1;
     match row {
         Row::File(f) => {
             let file = editor.files.get(f)?;
@@ -535,7 +562,8 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
             if fold.clicked() {
                 return Some(Click::Fold(f));
             }
-            let resp = resp.on_hover_text(format!("Put the whole file in commit {target}"));
+            let units = editor.units.get(f).cloned().unwrap_or_default();
+            let resp = resp.on_hover_text(tip(editor, f, &units, "the whole file"));
             resp.clicked().then_some(Click::File(f))
         }
         Row::Line(f, i) => {
@@ -592,9 +620,39 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
                 None
             };
             let (name, click) = what?;
-            let resp = resp.on_hover_text(format!("Put {name} in commit {target}"));
+            let units: Vec<usize> = match click {
+                Click::Hunk(_, h) => {
+                    let range = editor.hunk_range(f, h);
+                    editor
+                        .units
+                        .get(f)
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter(|u| range.contains(u))
+                        .collect()
+                }
+                Click::File(_) => vec![0],
+                _ => vec![i],
+            };
+            let resp = resp.on_hover_text(tip(editor, f, &units, name));
             resp.clicked().then_some(click)
         }
+    }
+}
+
+/// What a click on `name` (units `units` of file `f`) does.
+fn tip(editor: &SplitEditor, f: usize, units: &[usize], name: &str) -> String {
+    let Mode::Move(m) = &editor.mode else {
+        return format!("Put {name} in commit {}", editor.active + 1);
+    };
+    if !units.is_empty() && units.iter().all(|&u| editor.group_of(f, u) == 1) {
+        return format!("Keep {name} in {}", short(&editor.hash));
+    }
+    match (&m.dest, m.target()) {
+        (_, Some(t)) => format!("Move {name} to {}", short(&t.hash)),
+        (Some(Dest::Work), None) => format!("Move {name} to the working changes"),
+        _ => format!("Move {name} (pick where on the left)"),
     }
 }
 
@@ -635,11 +693,16 @@ fn preview_line(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, look: Look, text:
                 .map(|g| g.subject.as_str())
                 .unwrap_or_default();
             ui.label(RichText::new(subject).font(theme::medium(13.0)));
-            RichText::new(format!(
-                "· {files} file{}: {text}",
-                if files == 1 { "" } else { "s" }
-            ))
-            .color(t.text_dim)
+            if files == 0 {
+                RichText::new(format!("· nothing: {} is dropped", short(&editor.hash)))
+                    .color(t.text_dim)
+            } else {
+                RichText::new(format!(
+                    "· {files} file{}: {text}",
+                    if files == 1 { "" } else { "s" }
+                ))
+                .color(t.text_dim)
+            }
         }
         Look::Header => mono(t.accent),
         Look::Meta => mono(t.text_faint),
