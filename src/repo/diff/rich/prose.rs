@@ -177,6 +177,12 @@ fn pair_up<'a>(
     added.clear();
 }
 
+/// Whether `n` items against `m` can be aligned item by item (or [`align`] gives up past
+/// what both start and end with).
+pub(super) fn fits(n: usize, m: usize) -> bool {
+    n.saturating_mul(m) <= MAX_CELLS
+}
+
 /// `old` against `new` in order: pairs of equal items, and those on one side only.
 pub(super) fn align<T: PartialEq>(old: &[T], new: &[T]) -> Vec<(Option<usize>, Option<usize>)> {
     let prefix = old.iter().zip(new).take_while(|(a, b)| a == b).count();

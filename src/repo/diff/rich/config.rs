@@ -2,8 +2,10 @@
 //! key paths such as `server.timeout: 30 → 60`, keys added and removed, values whose type
 //! changed, and keys that only moved within their map (told apart from changed values).
 
-use super::prose::align;
-use super::tree::{Node, path_key};
+use std::collections::HashMap;
+
+use super::prose::{align, fits};
+use super::tree::{Field, Item, Node, path_key, shape_hash};
 use super::{Sides, extension};
 
 /// The extensions read by key, and how.
@@ -62,7 +64,7 @@ pub fn read(
     let read = |text: &Option<String>, side: &str| -> Result<Option<Node>, String> {
         text.as_deref()
             .map(|t| {
-                parse(t).map_err(|e| format!("the {format} {side} the change doesn't read: {e}"))
+                parse(t).map_err(|e| format!("the {format} {side} the change isn't valid ({e})"))
             })
             .transpose()
     };
@@ -83,6 +85,8 @@ pub fn diff(path: &str, sides: &Sides) -> Result<ConfigDiff, String> {
         new.as_ref().map(|n| (n, 1)),
         &mut entries,
     );
+    // Changes in the file's order, then the keys that only moved.
+    entries.sort_by_key(|e| e.change == Change::Reordered);
     Ok(ConfigDiff { format, entries })
 }
 
@@ -91,12 +95,11 @@ pub fn same(a: &Node, b: &Node) -> bool {
     match (a, b) {
         (Node::Scalar { text: x, ty: s }, Node::Scalar { text: y, ty: t }) => x == y && s == t,
         (Node::Map(x), Node::Map(y)) => {
-            x.len() == y.len()
-                && x.iter().all(|f| {
-                    y.iter()
-                        .find(|g| g.key == f.key)
-                        .is_some_and(|g| same(&f.node, &g.node))
-                })
+            let (ix, iy) = (keys(x), keys(y));
+            ix.len() == iy.len()
+                && ix
+                    .iter()
+                    .all(|(k, &i)| iy.get(k).is_some_and(|&j| same(&x[i].node, &y[j].node)))
         }
         (Node::List(x), Node::List(y)) => {
             x.len() == y.len() && x.iter().zip(y).all(|(a, b)| same(&a.node, &b.node))
@@ -105,12 +108,21 @@ pub fn same(a: &Node, b: &Node) -> bool {
     }
 }
 
-/// A value compared by [`same`], to align lists by.
-struct Shape<'a>(&'a Node);
+/// Where each key of a map is (its last time, for a key written twice: the one parsers keep).
+fn keys(fields: &[Field]) -> HashMap<&str, usize> {
+    let mut index = HashMap::with_capacity(fields.len());
+    for (i, f) in fields.iter().enumerate() {
+        index.insert(f.key.as_str(), i);
+    }
+    index
+}
+
+/// A value compared by its content, its hash first.
+struct Shape<'a>(u64, &'a Node);
 
 impl PartialEq for Shape<'_> {
     fn eq(&self, other: &Self) -> bool {
-        same(self.0, other.0)
+        self.0 == other.0 && same(self.1, other.1)
     }
 }
 
@@ -134,8 +146,8 @@ fn entry(
         old: old.map(|(n, _)| n.preview()),
         new: new.map(|(n, _)| n.preview()),
         kinds,
-        old_line: old.map(|(_, l)| l),
-        new_line: new.map(|(_, l)| l),
+        old_line: old.map(|(_, l)| l).filter(|&l| l > 0),
+        new_line: new.map(|(_, l)| l).filter(|&l| l > 0),
     }
 }
 
@@ -155,12 +167,40 @@ fn compare(path: &str, old: Option<(&Node, u32)>, new: Option<(&Node, u32)>, out
     }
 }
 
-fn maps(path: &str, a: &[super::tree::Field], b: &[super::tree::Field], out: &mut Vec<Entry>) {
-    let find = |fields: &[super::tree::Field], key: &str| fields.iter().position(|f| f.key == key);
-    for f in b {
+fn maps(path: &str, a: &[Field], b: &[Field], out: &mut Vec<Entry>) {
+    let (ia, ib) = (keys(a), keys(b));
+    // Removed keys where they were among the others: before the first key after them that
+    // is still there.
+    let mut removed_before: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut removed_at_end = Vec::new();
+    for (i, f) in a.iter().enumerate() {
+        if ib.contains_key(f.key.as_str()) || ia.get(f.key.as_str()) != Some(&i) {
+            continue;
+        }
+        match a[i + 1..].iter().find_map(|g| ib.get(g.key.as_str())) {
+            Some(&j) => removed_before.entry(j).or_default().push(i),
+            None => removed_at_end.push(i),
+        }
+    }
+    let removed = |i: usize, out: &mut Vec<Entry>| {
+        let f = &a[i];
+        out.push(entry(
+            &path_key(path, &f.key),
+            Change::Removed,
+            Some((&f.node, f.line)),
+            None,
+        ));
+    };
+    for (j, f) in b.iter().enumerate() {
+        for &i in removed_before.get(&j).into_iter().flatten() {
+            removed(i, out);
+        }
+        if ib.get(f.key.as_str()) != Some(&j) {
+            continue;
+        }
         let p = path_key(path, &f.key);
-        match find(a, &f.key) {
-            Some(i) => compare(
+        match ia.get(f.key.as_str()) {
+            Some(&i) => compare(
                 &p,
                 Some((&a[i].node, a[i].line)),
                 Some((&f.node, f.line)),
@@ -169,31 +209,31 @@ fn maps(path: &str, a: &[super::tree::Field], b: &[super::tree::Field], out: &mu
             None => out.push(entry(&p, Change::Added, None, Some((&f.node, f.line)))),
         }
     }
-    for f in a.iter().filter(|f| find(b, &f.key).is_none()) {
-        out.push(entry(
-            &path_key(path, &f.key),
-            Change::Removed,
-            Some((&f.node, f.line)),
-            None,
-        ));
+    for i in removed_at_end {
+        removed(i, out);
     }
     // Keys on both sides, in each side's order: those out of the longest run in the same order
     // moved. Only those whose value is the same are said to have moved; a changed one already
-    // says so.
+    // says so. Too many to compare: no moves are told.
     let common_old: Vec<&str> = a
         .iter()
-        .filter(|f| find(b, &f.key).is_some())
-        .map(|f| f.key.as_str())
+        .enumerate()
+        .filter(|(i, f)| ia.get(f.key.as_str()) == Some(i) && ib.contains_key(f.key.as_str()))
+        .map(|(_, f)| f.key.as_str())
         .collect();
     let common_new: Vec<&str> = b
         .iter()
-        .filter(|f| find(a, &f.key).is_some())
-        .map(|f| f.key.as_str())
+        .enumerate()
+        .filter(|(j, f)| ib.get(f.key.as_str()) == Some(j) && ia.contains_key(f.key.as_str()))
+        .map(|(_, f)| f.key.as_str())
         .collect();
+    if !fits_middle(&common_old, &common_new) {
+        return;
+    }
     for (o, n) in align(&common_old, &common_new) {
         let (Some(j), None) = (n, o) else { continue };
         let key = common_new[j];
-        let (Some(i), Some(k)) = (find(a, key), find(b, key)) else {
+        let (Some(&i), Some(&k)) = (ia.get(key), ib.get(key)) else {
             continue;
         };
         if same(&a[i].node, &b[k].node) {
@@ -207,23 +247,48 @@ fn maps(path: &str, a: &[super::tree::Field], b: &[super::tree::Field], out: &mu
     }
 }
 
-fn lists(path: &str, a: &[super::tree::Item], b: &[super::tree::Item], out: &mut Vec<Entry>) {
-    let sa: Vec<Shape> = a.iter().map(|i| Shape(&i.node)).collect();
-    let sb: Vec<Shape> = b.iter().map(|i| Shape(&i.node)).collect();
+/// Whether what differs between the start and the end `a` and `b` share can be aligned.
+fn fits_middle<T: PartialEq>(a: &[T], b: &[T]) -> bool {
+    let prefix = a.iter().zip(b).take_while(|(x, y)| x == y).count();
+    let suffix = a[prefix..]
+        .iter()
+        .rev()
+        .zip(b[prefix..].iter().rev())
+        .take_while(|(x, y)| x == y)
+        .count();
+    fits(a.len() - prefix - suffix, b.len() - prefix - suffix)
+}
+
+fn lists(path: &str, a: &[Item], b: &[Item], out: &mut Vec<Entry>) {
     let at = |i: usize| format!("{path}[{i}]");
+    let pair = |i: Option<usize>, j: Option<usize>, out: &mut Vec<Entry>| {
+        let o = i.map(|i| (&a[i].node, a[i].line));
+        let n = j.map(|j| (&b[j].node, b[j].line));
+        if let Some(p) = j.or(i).map(at) {
+            compare(&p, o, n, out);
+        }
+    };
+    let sa: Vec<Shape> = a
+        .iter()
+        .map(|i| Shape(shape_hash(&i.node), &i.node))
+        .collect();
+    let sb: Vec<Shape> = b
+        .iter()
+        .map(|i| Shape(shape_hash(&i.node), &i.node))
+        .collect();
+    // What differs between the same start and end too long to align: compared by place.
+    if !fits_middle(&sa, &sb) {
+        for k in 0..a.len().max(b.len()) {
+            pair((k < a.len()).then_some(k), (k < b.len()).then_some(k), out);
+        }
+        return;
+    }
     let mut removed: Vec<usize> = Vec::new();
     let mut added: Vec<usize> = Vec::new();
     let flush = |removed: &mut Vec<usize>, added: &mut Vec<usize>, out: &mut Vec<Entry>| {
         // Items replaced in place are compared with what replaced them, one for one.
         for k in 0..removed.len().max(added.len()) {
-            let o = removed.get(k).map(|&i| (&a[i].node, a[i].line));
-            let n = added.get(k).map(|&j| (&b[j].node, b[j].line));
-            let p = match (removed.get(k), added.get(k)) {
-                (_, Some(&j)) => at(j),
-                (Some(&i), None) => at(i),
-                (None, None) => continue,
-            };
-            compare(&p, o, n, out);
+            pair(removed.get(k).copied(), added.get(k).copied(), out);
         }
         removed.clear();
         added.clear();

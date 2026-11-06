@@ -28,25 +28,25 @@ pub(super) fn show(ui: &mut Ui, diff: &ConfigDiff, acts: &mut Vec<Action>) {
                         .color(t.text),
                 );
                 let summary = if diff.entries.is_empty() {
-                    "the same keys and values: only formatting, comments or quoting changed"
-                        .to_owned()
+                    "the same keys and values: only formatting or comments changed".to_owned()
                 } else {
-                    format!("{changed} changed · {added} added · {removed} removed · {moved} moved")
+                    [
+                        (changed, "changed"),
+                        (added, "added"),
+                        (removed, "removed"),
+                        (moved, "moved"),
+                    ]
+                    .iter()
+                    .filter(|(n, _)| *n > 0)
+                    .map(|(n, what)| format!("{n} {what}"))
+                    .collect::<Vec<_>>()
+                    .join(" · ")
                 };
                 ui.label(egui::RichText::new(summary).color(t.text_dim));
             });
         });
-    // Changes first, then the keys that only moved.
-    let rows: Vec<&Entry> = diff
-        .entries
-        .iter()
-        .filter(|e| e.change != Change::Reordered)
-        .chain(
-            diff.entries
-                .iter()
-                .filter(|e| e.change == Change::Reordered),
-        )
-        .collect();
+    // Changes first, then the keys that only moved (sorted so when read).
+    let rows = &diff.entries;
     let font = theme::mono(12.0);
     ui.spacing_mut().item_spacing.y = 0.0;
     egui::ScrollArea::both()
@@ -54,7 +54,7 @@ pub(super) fn show(ui: &mut Ui, diff: &ConfigDiff, acts: &mut Vec<Action>) {
         .auto_shrink(false)
         .show_rows(ui, ROW_H, rows.len(), |ui, range| {
             for k in range {
-                row(ui, &t, &font, rows[k], acts);
+                row(ui, &t, &font, &rows[k], acts);
             }
         });
 }
@@ -94,11 +94,12 @@ fn row(ui: &mut Ui, t: &Tokens, font: &egui::FontId, e: &Entry, acts: &mut Vec<A
         (_, _, Some(n)) => add(n, t.text_dim),
         _ => {}
     }
-    let width = ui.available_width().max(200.0);
+    let galley = ui.fonts_mut(|f| f.layout_job(job));
+    // As wide as its text, so a long value scrolls sideways rather than being cut.
+    let width = ui.available_width().max(galley.size().x + 32.0);
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, ROW_H), egui::Sense::click());
     let fill = if resp.hovered() { t.hover } else { fill };
     ui.painter().rect_filled(rect, 0.0, fill);
-    let galley = ui.fonts_mut(|f| f.layout_job(job));
     ui.painter().galley(
         egui::pos2(rect.left() + 16.0, rect.center().y - galley.size().y / 2.0),
         galley,
@@ -115,10 +116,14 @@ fn row(ui: &mut Ui, t: &Tokens, font: &egui::FontId, e: &Entry, acts: &mut Vec<A
         }
     );
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &text));
-    let line = e.new_line.or(e.old_line).unwrap_or(0);
+    let tip = match (e.change, e.old_line, e.new_line) {
+        (Change::Removed, Some(o), _) => format!("Go to line {o} of the file before the change"),
+        (_, _, Some(n)) => format!("Go to line {n}"),
+        _ => "Go to the lines".to_owned(),
+    };
     let resp = resp
         .on_hover_cursor(egui::CursorIcon::PointingHand)
-        .on_hover_text(format!("Go to line {line} in the diff"));
+        .on_hover_text(tip);
     if resp.clicked() {
         // A removed key is only before the change; anything else is shown where it is now.
         let (old, new) = match e.change {

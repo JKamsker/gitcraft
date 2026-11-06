@@ -3,7 +3,7 @@
 
 use toml_edit::{Document, Item as TItem, Table, Value};
 
-use super::tree::{Field, Item, MAX_DEPTH, Node, Ty, line_at};
+use super::tree::{Field, Item, Lines, MAX_DEPTH, Node, Ty, line_at};
 
 /// Reads `text`, or says what is wrong and where.
 pub fn parse(text: &str) -> Result<Node, String> {
@@ -11,18 +11,29 @@ pub fn parse(text: &str) -> Result<Node, String> {
         let line = e.span().map_or(1, |s| line_at(text, s.start));
         format!("line {line}: {}", e.message().trim())
     })?;
-    let mut r = Reader { text, depth: 0 };
+    let mut r = Reader {
+        text,
+        lines: Lines::new(text),
+        depth: 0,
+    };
     r.table(doc.as_table())
 }
 
 struct Reader<'a> {
     text: &'a str,
+    lines: Lines,
     depth: usize,
 }
 
 impl Reader<'_> {
     fn line(&self, span: Option<std::ops::Range<usize>>) -> u32 {
-        span.map_or(0, |s| line_at(self.text, s.start))
+        span.map_or(0, |s| self.lines.at(s.start))
+    }
+
+    /// A value as the file writes it.
+    fn written(&self, v: &Value) -> Option<String> {
+        let span = v.span()?;
+        self.text.get(span).map(|s| s.trim().to_owned())
     }
 
     fn deeper(&mut self) -> Result<(), String> {
@@ -80,8 +91,15 @@ impl Reader<'_> {
         let scalar = |text: String, ty| Ok(Node::Scalar { text, ty });
         match v {
             Value::String(s) => scalar(s.value().clone(), Ty::String),
-            Value::Integer(i) => scalar(i.value().to_string(), Ty::Number),
-            Value::Float(f) => scalar(f.value().to_string(), Ty::Number),
+            // Numbers as written: `1` and `1.0` differ, `0x10` stays hexadecimal.
+            Value::Integer(i) => scalar(
+                self.written(v).unwrap_or_else(|| i.value().to_string()),
+                Ty::Number,
+            ),
+            Value::Float(f) => scalar(
+                self.written(v).unwrap_or_else(|| f.value().to_string()),
+                Ty::Number,
+            ),
             Value::Boolean(b) => scalar(b.value().to_string(), Ty::Bool),
             Value::Datetime(d) => scalar(d.value().to_string(), Ty::Date),
             Value::Array(a) => {

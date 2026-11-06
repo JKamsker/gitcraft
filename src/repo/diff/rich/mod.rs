@@ -73,11 +73,11 @@ impl RichKind {
         }
     }
 
-    /// What it's called in a note.
-    pub fn name(self) -> &'static str {
+    /// How it shows a file, in a note: "Can't show this …".
+    pub fn how(self) -> &'static str {
         match self {
-            RichKind::Prose => "prose",
-            RichKind::Config => "keys",
+            RichKind::Prose => "as prose",
+            RichKind::Config => "by key",
         }
     }
 }
@@ -223,8 +223,8 @@ pub fn fallback_note(ui: &mut Ui, kind: RichKind, note: &str) {
                 crate::icons::inline(ui, "circle-alert", 14.0, t.warning);
                 ui.label(
                     egui::RichText::new(format!(
-                        "Can't show this as {}: {note}. Showing the plain diff.",
-                        kind.name()
+                        "Can't show this {}: {note}. Showing the plain diff.",
+                        kind.how()
                     ))
                     .color(t.text),
                 );

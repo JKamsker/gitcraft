@@ -177,7 +177,7 @@ fn malformed_config_falls_back_with_a_note() -> Result<(), String> {
     assert_eq!(
         err,
         Err(
-            "the JSON after the change doesn't read: line 1: expected a key in quotes or `}`"
+            "the JSON after the change isn't valid (line 1: expected a key in quotes or `}`)"
                 .to_owned()
         )
     );
@@ -282,5 +282,122 @@ fn the_config_view_goes_to_the_line_of_a_key() -> Result<(), String> {
             new: Some(2)
         }
     )));
+    Ok(())
+}
+
+/// TOML numbers as written: `1` → `1.0` is a change; hexadecimal stays so.
+#[test]
+fn toml_numbers_keep_how_they_are_written() {
+    let e = entries("a.toml", "x = 1\ny = 0x10\n", "x = 1.0\ny = 0x10\n");
+    assert_eq!(e.len(), 1);
+    assert_eq!(
+        (e[0].old.as_deref(), e[0].new.as_deref()),
+        (Some("1"), Some("1.0"))
+    );
+}
+
+/// An alias is what its anchor holds: renaming anchors changes nothing, changing what the
+/// anchor holds shows where it is used.
+#[test]
+fn yaml_aliases_compare_by_what_they_repeat() {
+    let old = "base: &a {x: 1}\nuse: *a\n";
+    let renamed = "extra: &z 5\nbase: &b {x: 1}\nuse: *b\n";
+    let e = entries("a.yaml", old, renamed);
+    let paths: Vec<&str> = e.iter().map(|e| e.path.as_str()).collect();
+    assert_eq!(paths, ["extra"]);
+    let changed = entries("a.yaml", old, "base: &a {x: 2}\nuse: *a\n");
+    let paths: Vec<&str> = changed.iter().map(|e| e.path.as_str()).collect();
+    assert_eq!(paths, ["base.x", "use.x"]);
+    // An alias bomb is cut short, not followed for ever.
+    let mut bomb = String::from("a0: &a0 [x, x, x, x, x, x, x, x, x, x]\n");
+    for k in 1..12 {
+        let refs = vec![format!("*a{}", k - 1); 10].join(", ");
+        bomb.push_str(&format!("a{k}: &a{k} [{refs}]\n"));
+    }
+    let started = std::time::Instant::now();
+    assert!(yaml::parse(&bomb).is_ok());
+    assert!(started.elapsed() < std::time::Duration::from_secs(10));
+}
+
+/// Maps with tens of thousands of keys, and one item inserted in a long list.
+#[test]
+fn big_maps_and_lists_compare_quickly_and_align() {
+    let map = |v: usize| -> String {
+        let keys: Vec<String> = (0..50_000)
+            .map(|n| format!("k{n} = {}", if n == 9 { v } else { n }))
+            .collect();
+        keys.join("\n")
+    };
+    let started = std::time::Instant::now();
+    let e = entries("big.toml", &map(1), &map(2));
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(10),
+        "{:?}",
+        started.elapsed()
+    );
+    assert_eq!(e.len(), 1);
+    let list = |extra: bool| -> String {
+        let mut items: Vec<String> = (0..3000).map(|n| n.to_string()).collect();
+        if extra {
+            items.insert(1500, "\"new\"".to_owned());
+        }
+        format!("[{}]", items.join(","))
+    };
+    let e = entries("l.json", &list(false), &list(true));
+    assert_eq!(e.len(), 1);
+    assert_eq!((e[0].change, e[0].path.as_str()), (Change::Added, "[1500]"));
+}
+
+/// A key written twice counts as its last value, as parsers keep it.
+#[test]
+fn a_key_written_twice_is_its_last_value() {
+    let e = entries("a.json", "{\"a\": 1, \"a\": 2}", "{\"a\": 1}");
+    assert_eq!(e.len(), 1);
+    assert_eq!(
+        (e[0].old.as_deref(), e[0].new.as_deref()),
+        (Some("2"), Some("1"))
+    );
+    assert!(entries("a.json", "{\"a\": 1, \"a\": 1}", "{\"a\": 1, \"a\": 2}").len() == 1);
+}
+
+#[test]
+fn json_is_strict_where_it_should_be() -> Result<(), String> {
+    // A lone half of a surrogate pair doesn't swallow what follows.
+    let Node::Scalar { text, .. } = json::parse("\"\\ud800A\"")? else {
+        return Err("not a string".to_owned());
+    };
+    assert_eq!(text, "\u{fffd}A");
+    for bad in ["01", "1.", "-.5", "1.e3", "\"a\tb\""] {
+        assert!(json::parse(bad).is_err(), "{bad}");
+    }
+    for good in ["0", "-0.5", "1e300", "1E-3", "10"] {
+        assert!(json::parse(good).is_ok(), "{good}");
+    }
+    Ok(())
+}
+
+#[test]
+fn yaml_types_follow_its_core_schema() -> Result<(), String> {
+    let Node::Map(f) = yaml::parse(
+        "a: inf\nb: .inf\nc: nan\nd: !!str 1\ne: 2024-01-01xyz\nf: 2024-01-01T10:00:00Z\ng: 0x1F\n",
+    )?
+    else {
+        return Err("not a map".to_owned());
+    };
+    let kinds: Vec<&str> = f.iter().map(|f| f.node.kind()).collect();
+    assert_eq!(
+        kinds,
+        [
+            "string", "number", "string", "string", "string", "date", "number"
+        ]
+    );
+    // Keys that are lists are told apart by what they hold.
+    let e = entries(
+        "a.yaml",
+        "? [a, b]\n: 1\n? [c, d]\n: 2\n",
+        "? [a, b]\n: 1\n? [c, e]\n: 3\n",
+    );
+    let paths: Vec<&str> = e.iter().map(|e| e.path.as_str()).collect();
+    assert_eq!(paths, ["\"[c, e]\"", "\"[c, d]\""]);
     Ok(())
 }

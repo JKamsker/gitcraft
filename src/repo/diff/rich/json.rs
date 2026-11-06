@@ -129,7 +129,15 @@ impl Reader<'_> {
             self.pos += 1;
         }
         let text = &self.text[start..self.pos];
-        if text.parse::<f64>().is_err() {
+        // JSON's numbers: no leading zero, digits on both sides of the point.
+        let digits = text.trim_start_matches('-');
+        let strict =
+            !(digits.len() > 1 && digits.starts_with('0') && digits.as_bytes()[1].is_ascii_digit())
+                && !text.contains(".e")
+                && !text.contains(".E")
+                && !text.ends_with('.')
+                && !digits.starts_with('.');
+        if !strict || text.parse::<f64>().is_err() {
             return Err(self.error(&format!("`{text}` isn't a number")));
         }
         Ok(Node::Scalar {
@@ -143,7 +151,7 @@ impl Reader<'_> {
         let mut out = String::new();
         loop {
             let rest = &self.text[self.pos..];
-            let Some(at) = rest.find(['"', '\\', '\n']) else {
+            let Some(at) = rest.find(|c: char| c == '"' || c == '\\' || c < ' ') else {
                 return Err(self.error("a string that never ends"));
             };
             out.push_str(&rest[..at]);
@@ -151,7 +159,11 @@ impl Reader<'_> {
             match self.bump() {
                 Some(b'"') => return Ok(out),
                 Some(b'\\') => out.push(self.escape()?),
-                _ => return Err(self.error("a line break inside a string")),
+                _ => {
+                    return Err(
+                        self.error("a control character (a line break, a tab) inside a string")
+                    );
+                }
             }
         }
     }
@@ -168,12 +180,18 @@ impl Reader<'_> {
             Some(b't') => '\t',
             Some(b'u') => {
                 let hi = self.hex4()?;
-                if (0xD800..0xDC00).contains(&hi) && self.text[self.pos..].starts_with("\\u") {
-                    self.pos += 2;
-                    let lo = self.hex4()?;
-                    let code = 0x10000 + ((hi - 0xD800) << 10) + (lo.wrapping_sub(0xDC00) & 0x3FF);
+                let low = self
+                    .text
+                    .get(self.pos + 2..self.pos + 6)
+                    .filter(|_| self.text[self.pos..].starts_with("\\u"))
+                    .and_then(|d| u32::from_str_radix(d, 16).ok())
+                    .filter(|lo| (0xDC00..0xE000).contains(lo));
+                if let (true, Some(lo)) = ((0xD800..0xDC00).contains(&hi), low) {
+                    self.pos += 6;
+                    let code = 0x10000 + ((hi - 0xD800) << 10) + (lo - 0xDC00);
                     char::from_u32(code).unwrap_or(char::REPLACEMENT_CHARACTER)
                 } else {
+                    // A lone half of a pair: what follows is read on its own.
                     char::from_u32(hi).unwrap_or(char::REPLACEMENT_CHARACTER)
                 }
             }
