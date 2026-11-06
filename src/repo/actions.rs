@@ -136,6 +136,11 @@ pub(crate) enum Action {
         hash: String,
         message: String,
     },
+    /// Have the AI tool review what `branch` adds to `base` (see `ai::review`).
+    ReviewBranch {
+        branch: String,
+        base: String,
+    },
     /// Open the editor of a commit's message in the detail pane.
     EditMessage(String),
     /// Save a commit as a patch file, asking where.

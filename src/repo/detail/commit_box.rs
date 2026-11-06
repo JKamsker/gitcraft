@@ -34,6 +34,7 @@ impl RepoTab {
                     );
                 amend_started =
                     amend.changed() && self.amend && self.commit_summary.trim().is_empty();
+                self.ai_message_button(ui, !rebasing);
             });
         });
         if amend_started {
@@ -87,6 +88,7 @@ impl RepoTab {
                 .desired_rows(3)
                 .margin(egui::Margin::symmetric(8, 6)),
         );
+        self.ai_message_status(ui);
         if rebasing {
             ui.label(
                 RichText::new("The commit keeps its message: reword it once this is done.")
