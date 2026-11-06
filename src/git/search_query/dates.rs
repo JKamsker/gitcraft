@@ -49,7 +49,7 @@ pub fn git_date(value: &str) -> Result<GitDate, String> {
 fn relative(value: &str) -> Option<String> {
     let unit = value.chars().last()?;
     let number = &value[..value.len() - unit.len_utf8()];
-    if number.is_empty() || number.len() > 5 || !number.chars().all(|c| c.is_ascii_digit()) {
+    if number.is_empty() || number.len() > 6 || !number.chars().all(|c| c.is_ascii_digit()) {
         return None;
     }
     let n: u32 = number.parse().ok()?;
@@ -163,6 +163,7 @@ mod tests {
             ("50y", "50.years.ago"),
             ("600m", "600.months.ago"),
             ("18250d", "18250.days.ago"),
+            ("438000h", "438000.hours.ago"),
             ("today", "midnight"),
             ("Yesterday", "yesterday.midnight"),
         ] {
@@ -215,6 +216,16 @@ mod tests {
             "2024-05-01T10:00",
             "1.weeks.ago",
             "now",
+            "51y",
+            "601m",
+            "18251d",
+            "2601w",
+            "438001h",
+            "1000000h",
+            "99999y",
+            "2100",
+            "2100-01-01",
+            "9999-12-31",
         ] {
             assert!(git_date(value).is_err(), "{value}");
         }

@@ -84,6 +84,9 @@ pub(in crate::repo) struct SuggestState {
     /// The last list, with the query, cursor and version it is for: it is worked out only
     /// when one of them changes, not every frame.
     pub(in crate::repo) cached: Option<(String, usize, u64, Listing)>,
+    /// Bumped when the sources are let go of (the search closed, the repository reloaded):
+    /// a read started before then is not taken in.
+    pub(in crate::repo) generation: u64,
 }
 
 impl SuggestState {
@@ -99,6 +102,25 @@ impl SuggestState {
         let listing = listing(query, cursor, self);
         self.cached = Some((query.to_owned(), cursor, self.version, listing.clone()));
         listing
+    }
+
+    /// Lets the sources go, to be read again when next needed (history or files may have
+    /// changed); reads still running are not taken in.
+    pub(in crate::repo) fn forget_sources(&mut self) {
+        self.authors = Source::Idle;
+        self.committers = Source::Idle;
+        self.paths = Source::Idle;
+        self.generation += 1;
+        self.version += 1;
+    }
+
+    /// Everything back to how a new search starts, reads still running not taken in.
+    pub(in crate::repo) fn reset(&mut self) {
+        let generation = self.generation + 1;
+        let version = self.version + 1;
+        *self = SuggestState::default();
+        self.generation = generation;
+        self.version = version;
     }
 
     pub(in crate::repo) fn source_idle(&self, kind: SourceKind) -> bool {
@@ -269,7 +291,7 @@ fn people(
         .chain(rest)
         .take(MAX_SHOWN)
         .map(|p| Item {
-            insert: format!("{name}:{}", quote_value(person_key(p, people))),
+            insert: format!("{name}:{}", quote_value(&person_key(p, people))),
             label: if p.name.is_empty() {
                 p.email.clone()
             } else {
@@ -289,18 +311,21 @@ fn people(
     }
 }
 
-/// What finds `p` alone: the name, or the email when the name is empty or someone else's too.
-fn person_key<'a>(p: &'a Person, people: &[Person]) -> &'a str {
-    let shared = people
-        .iter()
-        .filter(|other| other.name == p.name)
-        .take(2)
-        .count()
-        > 1;
-    if p.name.is_empty() || shared {
-        &p.email
+/// What finds `p` alone, as git matches `--author` (any part of `Name <email>`, any case of
+/// A to Z): the name, unless it is empty or in someone else's name or email too (Ann and
+/// Anna); then the email in its brackets.
+fn person_key(p: &Person, people: &[Person]) -> String {
+    let name = p.name.to_lowercase();
+    let ambiguous = name.is_empty()
+        || people.iter().any(|other| {
+            !std::ptr::eq(other, p)
+                && (other.name.to_lowercase().contains(&name)
+                    || other.email.to_lowercase().contains(&name))
+        });
+    if ambiguous {
+        format!("<{}>", p.email)
     } else {
-        &p.name
+        p.name.clone()
     }
 }
 
@@ -559,9 +584,43 @@ mod tests {
         let inserts: Vec<&str> = l.items.iter().map(|i| i.insert.as_str()).collect();
         assert_eq!(
             inserts,
-            ["author:sam@a.org", "author:sam@b.org", "author:ghost@c.org"]
+            [
+                "author:<sam@a.org>",
+                "author:<sam@b.org>",
+                "author:<ghost@c.org>"
+            ]
         );
         assert_eq!(labels(&l), ["Sam", "Sam", "ghost@c.org"]);
+    }
+
+    #[test]
+    fn a_name_inside_another_is_put_in_by_email() {
+        let s = SuggestState {
+            authors: Source::Ready(Arc::new(vec![
+                person("Ann", "ann@a.org", 3),
+                person("Anna Berg", "anna@b.org", 2),
+                person("Bob", "joann@c.org", 1),
+            ])),
+            ..SuggestState::default()
+        };
+        let l = listing("author:", 7, &s);
+        let inserts: Vec<&str> = l.items.iter().map(|i| i.insert.as_str()).collect();
+        assert_eq!(
+            inserts,
+            ["author:<ann@a.org>", "author:\"Anna Berg\"", "author:Bob"]
+        );
+    }
+
+    #[test]
+    fn forgotten_sources_are_read_again() {
+        let mut s = state();
+        let g = s.generation;
+        s.forget_sources();
+        assert!(s.source_idle(SourceKind::Authors) && s.source_idle(SourceKind::Paths));
+        assert!(s.generation > g);
+        s.chosen = Some(1);
+        s.reset();
+        assert!(s.chosen.is_none() && s.generation > g + 1);
     }
 
     #[test]

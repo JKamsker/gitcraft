@@ -62,6 +62,7 @@ impl RepoTab {
         let repo = self.path.clone();
         let s = &mut self.search.suggest;
         s.version += 1;
+        let generation = s.generation;
         match kind {
             SourceKind::Authors => s.authors = Source::Loading,
             SourceKind::Committers => s.committers = Source::Loading,
@@ -74,6 +75,9 @@ impl RepoTab {
                     ctx,
                     move || git::search_query::people(&repo, committers),
                     move |tab, found, _| {
+                        if tab.search.suggest.generation != generation {
+                            return;
+                        }
                         let source = into_source(found.map(Arc::new));
                         tab.search.suggest.version += 1;
                         if committers {
@@ -92,7 +96,10 @@ impl RepoTab {
                     Err(e) if e.contains("HEAD") => Ok(PathIndex::new(Vec::new())),
                     Err(e) => Err(e),
                 },
-                |tab, found, _| {
+                move |tab, found, _| {
+                    if tab.search.suggest.generation != generation {
+                        return;
+                    }
                     tab.search.suggest.paths = into_source(found.map(Arc::new));
                     tab.search.suggest.version += 1;
                 },

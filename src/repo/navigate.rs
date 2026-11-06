@@ -459,6 +459,7 @@ impl RepoTab {
         self.search.searched = query;
         match result {
             Ok(hashes) => {
+                self.search.problem = None;
                 self.search.matches = hashes.iter().cloned().collect();
                 self.search.results = hashes;
                 self.search.current = 0;
@@ -498,7 +499,7 @@ impl RepoTab {
             self.search.searched.clear();
             self.search.problem = None;
             // Read again next time: history and files may have changed by then.
-            self.search.suggest = Default::default();
+            self.search.suggest.reset();
         }
     }
 }
@@ -569,9 +570,17 @@ mod tests {
     fn a_failed_search_says_why_under_the_field() {
         let ctx = egui::Context::default();
         let mut tab = tab();
+        tab.search.results = vec!["a".to_owned()];
+        tab.search.matches.insert("a".to_owned());
         tab.search.query = "regex:[".to_owned();
         tab.search.running = true;
         let e = "git could not search: invalid regex".to_owned();
+        tab.search_done("regex:[".to_owned(), false, Err(e.clone()), &ctx);
+        assert!(tab.search.results.is_empty() && tab.search.matches.is_empty());
+        // Answered right afterwards, the hint goes.
+        tab.search.running = true;
+        tab.search_done("regex:[".to_owned(), false, Ok(Vec::new()), &ctx);
+        assert!(tab.search.problem.is_none());
         tab.search_done("regex:[".to_owned(), false, Err(e.clone()), &ctx);
         assert_eq!(tab.search.problem, Some(e));
         assert!(!tab.search.running);
