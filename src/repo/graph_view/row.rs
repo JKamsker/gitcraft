@@ -105,12 +105,19 @@ impl RepoTab {
             self.wip_description(&painter, &t, &row);
         } else {
             let ci = self.ci_status(&commit.hash);
-            description(ui, &painter, &t, &row, is_match, ci.is_some());
+            let resolved = self.remerge_badge(commit);
+            let dot_w = if ci.is_some() { 14.0 } else { 0.0 };
+            let badge_w = resolved.map_or(0.0, |b| b.width(&painter) + 6.0);
+            description(ui, &painter, &t, &row, is_match, dot_w + badge_w);
             trailing_columns(ui, &painter, &t, &row, now);
             if let Some(status) = ci {
                 let center = pos2(rect.right() - cols.trailing() - 9.0, row.mid());
                 let id = ui.id().with(("ci-dot", &commit.hash));
                 acts.extend(ci_status::dot(ui, id, center, &commit.hash, status));
+            }
+            if let Some(badge) = resolved {
+                let end = pos2(rect.right() - cols.trailing() - 6.0 - dot_w, row.mid());
+                self.show_remerge_badge(ui, &painter, (i, &commit.hash), badge, end, acts);
             }
         }
         resp
@@ -196,11 +203,11 @@ fn row_background(
 }
 
 /// The summary, then the rest of the message faded, cut with an ellipsis.
-/// `dot`: room is left at the end for the build status.
-fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool, dot: bool) {
+/// `reserved`: room left at the end (for the build status, a merge's badge).
+fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool, reserved: f32) {
     let (rect, mid) = (row.rect, row.mid());
     let x = row.gx + row.cols.graph + 6.0;
-    let text_right = rect.right() - row.cols.trailing() - 10.0 - if dot { 14.0 } else { 0.0 };
+    let text_right = rect.right() - row.cols.trailing() - 10.0 - reserved;
     let font = if is_match {
         theme::medium(12.5)
     } else {

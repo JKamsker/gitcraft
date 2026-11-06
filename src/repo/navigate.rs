@@ -42,7 +42,7 @@ impl RepoTab {
         if matches!(
             self.diff,
             Some(DiffView {
-                key: DiffKey::Commit { .. } | DiffKey::Range { .. },
+                key: DiffKey::Commit { .. } | DiffKey::Range { .. } | DiffKey::Remerge { .. },
                 ..
             })
         ) || hash != WIP_HASH

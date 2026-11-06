@@ -109,6 +109,8 @@ impl RepoTab {
         let idle = self.busy_op.is_none();
         let now = git::now();
         let total = self.commits.len() + usize::from(self.has_more);
+        // The merges shown, for their badges: only those are read.
+        let mut shown_merges = Vec::new();
         let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
             // Near the end: fetch the next page of history.
             if range.end + 40 >= self.commits.len() && self.has_more && !self.loading_more {
@@ -118,6 +120,9 @@ impl RepoTab {
                 if i >= self.commits.len() {
                     loading_row(ui, &t);
                     continue;
+                }
+                if self.commits[i].parents.len() == 2 {
+                    shown_merges.push(self.commits[i].hash.clone());
                 }
                 let resp = self.commit_row(ui, i, cols, lanes, now, acts);
                 if resp.clicked() {
@@ -132,6 +137,7 @@ impl RepoTab {
             }
         });
         ui.data_mut(|d| d.insert_temp(offset_id, out.state.offset.y));
+        self.want_remerge_badges(&shown_merges, ui.ctx());
     }
 
     /// Up and down select the row above or below the selected one.

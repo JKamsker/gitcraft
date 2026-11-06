@@ -87,6 +87,8 @@ pub(crate) fn load_for_diff(repo: &Path, key: &DiffKey, dark: bool) -> Result<Fi
             Area::Untracked | Area::Conflicted => (&file.path, None, None),
         },
         DiffKey::Range { from, to, path } => (path, to.clone(), Some(Some(from.clone()))),
+        // git's own merge was never written anywhere: only the recorded one can be read.
+        DiffKey::Remerge { hash, path, .. } => (path, Some(hash.clone()), None),
     };
     match load(repo, after.as_deref(), path, dark) {
         Err(e) => {
