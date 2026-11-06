@@ -12,6 +12,7 @@ mod tabs;
 #[cfg(test)]
 mod tests;
 mod update_banner;
+mod workspaces;
 mod worktrees;
 
 use std::collections::BTreeMap;
@@ -58,6 +59,8 @@ struct Saved {
     /// What the profiles not in use had open; `open`, `active`, `recent` and `theme` are the
     /// profile's in use.
     profile_states: profiles::ProfileStates,
+    /// Named groups of repositories, on the start page.
+    workspaces: crate::across::workspaces::Workspaces,
 }
 
 enum Tab {
@@ -122,6 +125,9 @@ pub struct App {
     /// The folders of the last repository tabs closed, the last one at the end.
     closed: Vec<PathBuf>,
     tab_drag: Option<TabDrag>,
+    workspaces: crate::across::workspaces::Workspaces,
+    /// How the workspaces' repositories stand, as last looked at.
+    workspaces_view: workspaces::WorkspacesView,
 }
 
 impl App {
@@ -181,6 +187,8 @@ impl App {
             update_error: None,
             skipped_version: saved.skipped_version,
             tab_looks: saved.tab_looks,
+            workspaces: saved.workspaces,
+            workspaces_view: Default::default(),
         };
         update::clean_up();
         let mut kept = Vec::new();
@@ -544,6 +552,7 @@ impl eframe::App for App {
             skipped_version: self.skipped_version.clone(),
             tab_looks: self.tab_looks.clone(),
             profile_states: self.profile_states.clone(),
+            workspaces: self.workspaces.clone(),
         };
         eframe::set_value(storage, eframe::APP_KEY, &saved);
     }

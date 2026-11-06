@@ -19,6 +19,7 @@ const FEATURES: &[(&str, &[&str])] = &[
         "Repositories and tabs",
         &[
             "Open, create or clone a repository from the start page; recent ones are listed there.",
+            "Workspaces (start page, +): named groups of repositories, here or on other machines. Each shows every repository's branch, uncommitted files, ahead / behind and when it last fetched; the refresh button looks again, the cloud fetches them all (asking no password: a remote that needs one says so), the folder opens them all in tabs. + on a workspace adds an open or recent repository, or another folder; ✕ on a row takes it out; the gear renames or deletes the workspace.",
             "One tab per repository. Changes made elsewhere (editor, terminal) show up by themselves.",
             "Right-click a tab to give it its own icon and highlight colour.",
             "Drag a tab along the strip to reorder the tabs.",

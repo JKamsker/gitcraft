@@ -172,7 +172,7 @@ fn split_counted(mut bytes: &[u8]) -> Vec<Option<String>> {
 
 /// `worktree list --porcelain -z`: `key value\0` lines, an empty line between worktrees
 /// (`sep` is `\n` without `-z`).
-fn parse_worktrees(out: &str, sep: char) -> Vec<Worktree> {
+pub(super) fn parse_worktrees(out: &str, sep: char) -> Vec<Worktree> {
     let mut list: Vec<Worktree> = Vec::new();
     let mut current: Option<Worktree> = None;
     for line in out.split(sep) {
