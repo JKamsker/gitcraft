@@ -133,7 +133,7 @@ pub fn bisect_state(repo: &Path) -> Result<Option<Bisect>, String> {
     })?;
     let terms = parse::terms(files.terms.as_deref());
     let marks = parse::marks(&refs, &terms);
-    let outcome = parse::outcome(&log, &terms.bad);
+    let mut outcome = parse::outcome(&log, &terms.bad);
     let progress = match (&outcome, &marks.bad) {
         // Marks git took but can't bisect between (a good commit after the bad one) leave
         // nothing to count: no progress, the rest of the state still shown.
@@ -146,6 +146,15 @@ pub fn bisect_state(repo: &Path) -> Result<Option<Bisect>, String> {
             }),
         _ => None,
     };
+    // Only the bad commit left: it is the first bad one, however a git version words its log.
+    if outcome.is_none()
+        && progress.is_some_and(|p| p.steps == 0 && p.left == 0)
+        && let Some(bad) = &marks.bad
+        && range_is_only(repo, bad, &marks.good, &files)
+    {
+        outcome = Some(Outcome::FirstBad(bad.clone()));
+    }
+    let progress = progress.filter(|_| outcome.is_none());
     Ok(Some(Bisect {
         terms,
         marks,
@@ -247,6 +256,20 @@ fn range_vars(
     args.extend(files.names.iter().map(String::as_str));
     let out = run(Some(repo), &args)?;
     parse::vars(&out).ok_or_else(|| format!("git gave no counts for the bisect: {}", out.trim()))
+}
+
+/// Whether `bad` is the only commit left between it and the `good` ones.
+fn range_is_only(repo: &Path, bad: &str, good: &[String], files: &Files) -> bool {
+    let mut args = vec!["rev-list", "--count"];
+    if files.first_parent {
+        args.push("--first-parent");
+    }
+    args.push(bad);
+    args.push("--not");
+    args.extend(good.iter().map(String::as_str));
+    args.push("--");
+    args.extend(files.names.iter().map(String::as_str));
+    run(Some(repo), &args).is_ok_and(|n| n.trim() == "1")
 }
 
 /// Why a bisect can't start in this working tree, if it can't: it checks out commit after

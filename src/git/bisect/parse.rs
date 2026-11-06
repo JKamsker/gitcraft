@@ -42,11 +42,18 @@ pub(super) fn marks(text: &str, terms: &Terms) -> Marks {
 
 /// How the bisect ended, as `git bisect log` says it: after the last command in it, the first
 /// bad commit, or the commits it could be when only skipped ones were left (`bad`: the
-/// bisect's word for bad, which git says them with). A mark given after the end (which git
-/// takes) starts it again, so what was said before it no longer holds.
+/// bisect's word for bad, which git says them with: as it is before git 2.50 or so, in quotes
+/// since). A mark given after the end (which git takes) starts it again, so what was said
+/// before it no longer holds.
 pub(super) fn outcome(log: &str, bad: &str) -> Option<Outcome> {
-    let first = format!("# first {bad} commit: ");
-    let possible_first = format!("# possible first {bad} commit: ");
+    let said = |prefix: &str, line: &str| {
+        [
+            format!("{prefix} {bad} commit: "),
+            format!("{prefix} '{bad}' commit: "),
+        ]
+        .iter()
+        .find_map(|p| bracketed_hash(line, p))
+    };
     let after_last_command = log
         .lines()
         .rev()
@@ -55,10 +62,10 @@ pub(super) fn outcome(log: &str, bad: &str) -> Option<Outcome> {
     let mut possible = Vec::new();
     // Back in the order git wrote them.
     for line in after_last_command.into_iter().rev() {
-        if let Some(hash) = bracketed_hash(line, &first) {
+        if let Some(hash) = said("# first", line) {
             return Some(Outcome::FirstBad(hash));
         }
-        if let Some(hash) = bracketed_hash(line, &possible_first) {
+        if let Some(hash) = said("# possible first", line) {
             possible.push(hash);
         }
     }
@@ -193,6 +200,21 @@ mod tests {
         assert_eq!(m.bad.as_deref(), Some("fff"));
         assert_eq!(m.good, ["ggg"]);
         assert_eq!(marks(text, &terms).bad, None);
+    }
+
+    #[test]
+    fn newer_gits_say_it_with_the_term_in_quotes() {
+        let quoted = "git bisect bad ccc\n# first 'bad' commit: [ccc] c5\n";
+        assert_eq!(
+            outcome(quoted, "bad"),
+            Some(Outcome::FirstBad("ccc".to_owned()))
+        );
+        let quoted =
+            "# only skipped commits left to test\n# possible first 'bad' commit: [ddd] c7\n";
+        assert_eq!(
+            outcome(quoted, "bad"),
+            Some(Outcome::OnlySkipped(vec!["ddd".to_owned()]))
+        );
     }
 
     #[test]

@@ -402,7 +402,7 @@ fn said_briefly(said: &str) -> String {
     let lines: Vec<&str> = said.lines().map(str::trim).collect();
     let pick = lines
         .iter()
-        .find(|l| l.ends_with("is the first bad commit"))
+        .find(|l| l.contains(" is the first ") && l.ends_with(" commit"))
         .or_else(|| lines.iter().find(|l| l.starts_with("There are only")))
         .or_else(|| lines.iter().find(|l| l.starts_with("Bisecting:")))
         .or_else(|| lines.iter().find(|l| !l.is_empty()));
@@ -463,6 +463,10 @@ mod said_tests {
         assert_eq!(
             said_briefly("abc is the first bad commit\ncommit abc\n"),
             "abc is the first bad commit"
+        );
+        assert_eq!(
+            said_briefly("abc is the first 'bad' commit\ncommit abc\n"),
+            "abc is the first 'bad' commit"
         );
         assert_eq!(said_briefly(""), "done");
     }
