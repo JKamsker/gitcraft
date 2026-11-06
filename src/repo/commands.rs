@@ -7,7 +7,7 @@ use super::messages::spawn_or;
 use super::operations::{expect_ref, stash_push_args};
 use super::{Action, Msg, OpKind, Refresh, RepoTab, Undo, ops, sidebar};
 use crate::forge::{self, NewPullRequest};
-use crate::git::{self, Branch};
+use crate::git::{self, Branch, InProgress};
 
 impl RepoTab {
     /// The checked-out branch, or HEAD's commit when detached (empty without commits).
@@ -268,7 +268,15 @@ impl RepoTab {
         // A rebase or patch stopped on conflicts finishes with `--continue`, not a new commit.
         if let Some(state) = self.work.in_progress.filter(|s| s.continues()) {
             let label = format!("Continue {}", state.label().to_lowercase());
-            let steps = ops(&[&[state.command(), "--continue"]]);
+            let mut steps = ops(&[&[state.command(), "--continue"]]);
+            // Stopped at a commit to edit, with the changes not staged: they go into it, as a
+            // commit stages everything when nothing is (git would refuse, talking of conflicts).
+            if state == InProgress::Rebase
+                && self.work.staged.is_empty()
+                && !self.work.unstaged.is_empty()
+            {
+                steps.insert(0, vec!["add".to_owned(), "-A".to_owned()]);
+            }
             self.run_ops(&label, steps, Refresh::All, OpKind::plain(), ctx);
             return;
         }
