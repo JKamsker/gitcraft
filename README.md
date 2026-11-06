@@ -158,6 +158,22 @@ so your config, credentials and hooks apply as usual.
 - Undo / redo (Ctrl+Z / Ctrl+Y) of commits, amends, merges, rebases, pulls, resets,
   cherry-picks, reverts, checkouts, branch create / rename / delete, tags and stashes.
 
+**Reflog and lost commits** (above the graph)
+
+- What undo can't reach: what was done in the terminal, in another client or before gitcraft
+  was opened. _Reflog_ (the left pane's _Reflog_ section, _Show reflog_ in a branch's menu, or
+  the palette) lists where HEAD or a local branch has been, newest first and read page by page:
+  how long ago and when, what moved it (commit, amend, checkout, reset, rebase, merge, pull,
+  cherry-pick…), from which commit to which, and the commit's summary.
+- Select an entry to see its commit in the right pane, and in the graph when it is there.
+  _Create branch here_ (or a double-click) gets it back without touching anything else; or
+  cherry-pick it, check it out detached, copy its SHA. Resetting the checked-out branch to it is
+  in its menu, behind the usual confirmation.
+- _Find lost commits_ scans for the commits no branch, tag or stash reaches any more, even once
+  their reflog has expired (dropped stashes too), newest first, with the same buttons
+  (`git fsck --unreachable --no-reflogs`, in the background: it reads every object, so it can be
+  cancelled).
+
 **Diffs and conflicts** (centre)
 
 - Unified or side by side (a new file takes the whole width, with no empty old side), syntax
@@ -410,6 +426,7 @@ was made this way, on a demo repository.
 | `src/repo/conflict.rs`   | three-pane conflict editor                                                         |
 | `src/mergiraf.rs` | Mergiraf, run as the user's own command when it is installed |
 | `src/repo/rebase.rs`     | interactive rebase editor and its todo list                                        |
+| `src/repo/reflog/` | the reflog view and the scan for lost commits (`src/git/reflog/`: reading and parsing them) |
 | `src/repo/file_view.rs`  | a file's history, blame and contents at a commit                                   |
 | `src/repo/file_text.rs`  | a whole file at a commit, coloured, for the file view and diffs                    |
 | `src/repo/dialogs.rs`    | branch, tag, stash, remote, worktree, pull request and confirm dialogs             |
