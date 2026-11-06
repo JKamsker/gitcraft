@@ -276,6 +276,7 @@ fn one_hunk_of_a_commit_is_reverted_and_the_others_stay() -> Result<(), String> 
     let second = diff::hunk_changes(&lines, hunks[1]);
     let (said, error) = run(&mut tab, &ctx, revert_picked(second))?;
     assert!(!error, "{said}");
+    assert!(said.starts_with("Revert a hunk of h.txt"), "{said}");
     assert_eq!(read(&dir, "h.txt")?, numbered(40, &[(5, "five")]));
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())
@@ -327,6 +328,105 @@ fn a_hunk_whose_lines_changed_since_conflicts() -> Result<(), String> {
     )?;
     assert!(error);
     assert!(said.contains("conflicts"), "{said}");
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+#[test]
+fn reverting_works_with_no_context_lines_in_the_users_config() -> Result<(), String> {
+    let dir = scratch("revert-no-context", &[("n.txt", &numbered(20, &[]))])?;
+    must(&dir, &["config", "diff.context", "0"])?;
+    let both = numbered(20, &[(4, "four"), (15, "fifteen")]);
+    let two = commit(&dir, &[("n.txt", &both)], "two")?;
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let lines = open_diff(&mut tab, &ctx, &two, "n.txt")?;
+    let hunk = *hunks(&lines).first().ok_or("no hunk")?;
+    let (said, error) = run(
+        &mut tab,
+        &ctx,
+        revert_picked(diff::hunk_changes(&lines, hunk)),
+    )?;
+    assert!(!error, "{said}");
+    assert_eq!(read(&dir, "n.txt")?, numbered(20, &[(15, "fifteen")]));
+    let (said, error) = run(&mut tab, &ctx, Action::Undo)?;
+    assert!(!error, "{said}");
+    let (said, error) = run(&mut tab, &ctx, revert_file(&two, "n.txt"))?;
+    assert!(!error, "{said}");
+    assert_eq!(read(&dir, "n.txt")?, numbered(20, &[]));
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+#[test]
+fn ctrl_z_brings_back_a_revert_whatever_apply_whitespace_says() -> Result<(), String> {
+    let dir = scratch("revert-whitespace", &[("s.txt", &numbered(6, &[]))])?;
+    must(&dir, &["config", "apply.whitespace", "error"])?;
+    let two = commit(
+        &dir,
+        &[("s.txt", &numbered(6, &[(3, "3 ")]))],
+        "trailing space",
+    )?;
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let (said, error) = run(&mut tab, &ctx, revert_file(&two, "s.txt"))?;
+    assert!(!error, "{said}");
+    assert_eq!(read(&dir, "s.txt")?, numbered(6, &[]));
+    let (said, error) = run(&mut tab, &ctx, Action::Undo)?;
+    assert!(!error, "{said}");
+    assert_eq!(read(&dir, "s.txt")?, numbered(6, &[(3, "3 ")]));
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+#[test]
+fn a_submodule_change_offers_no_pieces_to_revert() -> Result<(), String> {
+    let dir = scratch("revert-submodule", &[("x.txt", "x\n")])?;
+    let a = must(&dir, &["rev-parse", "HEAD"])?.trim().to_owned();
+    must(
+        &dir,
+        &[
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            &format!("160000,{a},lib"),
+        ],
+    )?;
+    must(&dir, &["commit", "-q", "-m", "submodule"])?;
+    let sub = must(&dir, &["rev-parse", "HEAD"])?.trim().to_owned();
+    let key = DiffKey::Commit {
+        hash: sub.clone(),
+        path: "lib".to_owned(),
+    };
+    let data = diff::load(&dir, &key, git::DiffOptions::default(), true)?;
+    assert!(!data.revertable);
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let (said, error) = run(&mut tab, &ctx, revert_file(&sub, "lib"))?;
+    assert!(error && said.contains("submodule"), "{said}");
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+#[test]
+fn lines_picked_stay_picked_when_another_operation_holds_the_revert_up() -> Result<(), String> {
+    let dir = scratch("revert-busy", &[("b.txt", &numbered(6, &[]))])?;
+    let two = commit(&dir, &[("b.txt", &numbered(6, &[(2, "two")]))], "two")?;
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let lines = open_diff(&mut tab, &ctx, &two, "b.txt")?;
+    let picked: BTreeSet<usize> = (0..lines.len())
+        .filter(|&i| lines[i].text == "two")
+        .collect();
+    if let Some(view) = &mut tab.diff {
+        view.chosen = picked.clone();
+    }
+    tab.busy_op = Some("Push".to_owned());
+    tab.apply(revert_picked(picked.clone()), &ctx);
+    let (said, error) = tab.status.clone().unwrap_or_default();
+    assert!(error && said.contains("Push was still running"), "{said}");
+    assert!(tab.diff.as_ref().is_some_and(|d| d.chosen == picked));
+    assert_eq!(read(&dir, "b.txt")?, numbered(6, &[(2, "two")]));
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())
 }

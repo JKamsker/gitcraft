@@ -39,10 +39,14 @@ pub fn line_history(
     path: &str,
     range: LineRange,
 ) -> Result<Vec<FileCommit>, String> {
-    let (rev, range) = match at {
-        LinesAt::Rev(rev) => (rev.as_str(), ordered(range)),
-        LinesAt::Index | LinesAt::WorkTree => ("HEAD", committed_range(repo, at, path, range)?),
+    let (rev, path, range) = match at {
+        LinesAt::Rev(rev) => (rev.as_str(), path.to_owned(), ordered(range)),
+        LinesAt::Index | LinesAt::WorkTree => {
+            let (path, range) = committed_range(repo, at, path, range)?;
+            ("HEAD", path, range)
+        }
     };
+    let path = path.as_str();
     let spec = line_spec(range, path);
     let args = [
         "log",
@@ -114,17 +118,41 @@ fn line_log_error(err: &str, path: &str) -> String {
     }
 }
 
-/// Lines `range` of `path` as it is on disk or in the index, found in HEAD: the lines added
-/// since have no history and are left out; `Err` when every one of them is new.
+/// The name `path` had in HEAD, when a rename of it is staged.
+fn name_in_head(repo: &Path, path: &str) -> Option<String> {
+    let out = run(
+        Some(repo),
+        &["diff", "--cached", "-M", "--name-status", "-z", "HEAD"],
+    )
+    .ok()?;
+    let mut fields = out.split('\0');
+    while let Some(status) = fields.next() {
+        if status.starts_with('R') || status.starts_with('C') {
+            let (from, to) = (fields.next()?, fields.next()?);
+            if to == path && status.starts_with('R') {
+                return Some(from.to_owned());
+            }
+        } else {
+            fields.next()?;
+        }
+    }
+    None
+}
+
+/// Lines `range` of `path` as it is on disk or in the index, found in HEAD, with the name the
+/// file has there (it may be renamed since): the lines added since have no history and are
+/// left out; `Err` when every one of them is new.
 fn committed_range(
     repo: &Path,
     at: &LinesAt,
     path: &str,
     range: LineRange,
-) -> Result<LineRange, String> {
+) -> Result<(String, LineRange), String> {
+    let old = name_in_head(repo, path);
     let mut args = vec![
         super::LITERAL_PATHS,
         "diff",
+        "-M",
         "--unified=0",
         PLAIN_PATCH[0],
         PLAIN_PATCH[1],
@@ -135,6 +163,8 @@ fn committed_range(
         args.push("--cached");
     }
     args.extend(["HEAD", "--", path]);
+    // A rename limited to its new name would look like a new file.
+    args.extend(old.as_deref());
     let diff = run(Some(repo), &args).map_err(|e| line_log_error(&e, path))?;
     if diff
         .lines()
@@ -145,11 +175,12 @@ fn committed_range(
             "{path} isn't committed yet, so its lines have no history"
         ));
     }
-    map_to_old(&diff, ordered(range)).ok_or_else(|| {
+    let range = map_to_old(&diff, ordered(range)).ok_or_else(|| {
         "These lines aren't committed yet, so they have no history. Commit them, or pick lines \
          that are already committed."
             .to_owned()
-    })
+    })?;
+    Ok((old.unwrap_or_else(|| path.to_owned()), range))
 }
 
 /// The lines of the old side that lines `range` of the new side of a `--unified=0` diff were,
@@ -221,6 +252,7 @@ fn hunk_ranges(header: &str) -> Option<((u32, u32), (u32, u32))> {
 /// path of the commit listed before it, `path` for the newest.
 pub(crate) fn parse_line_log(out: &str, path: &str) -> Vec<FileCommit> {
     let mut commits: Vec<FileCommit> = Vec::new();
+    let mut in_header = false;
     for line in out.split('\n') {
         // Only at the start of a line: a line of the patch starts with its mark, so a record
         // separator in the file's text can't start a commit.
@@ -230,6 +262,7 @@ pub(crate) fn parse_line_log(out: &str, path: &str) -> Vec<FileCommit> {
             if hash.is_empty() {
                 continue;
             }
+            in_header = false;
             let last_path = commits.last().map_or(path, |c| c.path.as_str()).to_owned();
             commits.push(FileCommit {
                 hash,
@@ -245,14 +278,18 @@ pub(crate) fn parse_line_log(out: &str, path: &str) -> Vec<FileCommit> {
         let Some(commit) = commits.last_mut() else {
             continue;
         };
-        if let Some(name) = line.strip_prefix("+++ ") {
+        // The file's name only in a diff's header: an added line `++ b/x` reads `+++ b/x`.
+        if line.starts_with("diff ") {
+            in_header = true;
+        } else if in_header && let Some(name) = line.strip_prefix("+++ ") {
             if let Some(name) = unquote_path(name).strip_prefix("b/") {
                 commit.path = name.to_owned();
             }
-        } else if let Some(((_, _), (start, count))) = hunk_ranges(line)
-            && count > 0
-        {
-            commit.lines.push((start, start + count - 1));
+        } else if let Some(((_, _), (start, count))) = hunk_ranges(line) {
+            in_header = false;
+            if count > 0 {
+                commit.lines.push((start, start + count - 1));
+            }
         }
     }
     commits
@@ -343,6 +380,18 @@ mod tests {
         let h = parse_line_log(&out, "f");
         assert_eq!(h.len(), 1);
         assert_eq!(h[0].lines, vec![(1, 1)]);
+    }
+
+    #[test]
+    fn an_added_line_that_looks_like_a_file_header_is_not_one() {
+        // The file's text has a line `++ b/evil`: added, git prints it `+++ b/evil`.
+        let out = format!(
+            "{RS}aaa{FS}Ann{FS}a@x{FS}1{FS}S\n\ndiff --git a/real.txt b/real.txt\n--- a/real.txt\n\
+             +++ b/real.txt\n@@ -1,0 +2,1 @@\n+++ b/evil\n"
+        );
+        let h = parse_line_log(&out, "real.txt");
+        assert_eq!(h[0].path, "real.txt");
+        assert_eq!(h[0].lines, vec![(2, 2)]);
     }
 
     #[test]

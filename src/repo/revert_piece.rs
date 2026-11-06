@@ -23,6 +23,9 @@ impl RepoTab {
     /// Undoes the changed `lines` (indices into the open commit diff's lines) in the working
     /// tree: a hunk's, or those clicked.
     pub(super) fn revert_lines(&mut self, lines: &BTreeSet<usize>, ctx: &egui::Context) {
+        if self.refused_while_busy("Revert") {
+            return;
+        }
         let Some(view) = &mut self.diff else { return };
         let DiffView {
             key: DiffKey::Commit { hash, path },
@@ -36,16 +39,29 @@ impl RepoTab {
         if !data.revertable {
             return;
         }
+        // A submodule's change: `git apply` would say it did it, and change nothing.
+        if let Err(e) = git::check_revertable(&data.header, path) {
+            self.status = Some((e, true));
+            return;
+        }
         let Some(patch) = diff::partial_patch(&data.header, &data.lines, lines, diff::Pick::Revert)
         else {
             return;
         };
         let n = lines.len();
-        let label = format!(
-            "Revert {n} line{} of {path} from {}",
-            if n == 1 { "" } else { "s" },
-            short(hash)
-        );
+        // The hunk's button picks all its changes.
+        let whole_hunk = (0..data.lines.len())
+            .filter(|&h| data.lines[h].kind == diff::Kind::Hunk)
+            .any(|h| diff::hunk_changes(&data.lines, h) == *lines);
+        let label = if whole_hunk {
+            format!("Revert a hunk of {path} from {}", short(hash))
+        } else {
+            format!(
+                "Revert {n} line{} of {path} from {}",
+                if n == 1 { "" } else { "s" },
+                short(hash)
+            )
+        };
         view.chosen.clear();
         view.anchor = None;
         let repo = self.path.clone();
@@ -60,11 +76,7 @@ impl RepoTab {
         ctx: &egui::Context,
         prepare: impl FnOnce() -> Result<String, String> + Send + 'static,
     ) {
-        if let Some(busy) = &self.busy_op {
-            self.status = Some((
-                format!("{label}: not done, {busy} was still running. Try again once it's done."),
-                true,
-            ));
+        if self.refused_while_busy(&label) {
             return;
         }
         self.busy_op = Some(label.clone());
@@ -90,6 +102,18 @@ impl RepoTab {
         });
     }
 
+    /// Whether another operation is running, which `label` then waits for (the user is told).
+    fn refused_while_busy(&mut self, label: &str) -> bool {
+        let Some(busy) = &self.busy_op else {
+            return false;
+        };
+        self.status = Some((
+            format!("{label}: not done, {busy} was still running. Try again once it's done."),
+            true,
+        ));
+        true
+    }
+
     /// Says how the revert went, and makes one that went in as it was undoable.
     fn reverted(
         &mut self,
@@ -102,9 +126,10 @@ impl RepoTab {
         self.status = Some(match outcome {
             Ok((file, Reverted::Clean)) => {
                 // Applying the same patch forward brings the changes back.
+                // Whatever `apply.whitespace` says: the revert itself ignored it too.
                 let undo = Undo::Custom {
-                    undo: ops(&[&["apply", &file]]),
-                    redo: ops(&[&["apply", "--reverse", &file]]),
+                    undo: ops(&[&["apply", "--whitespace=nowarn", &file]]),
+                    redo: ops(&[&["apply", "--reverse", "--whitespace=nowarn", &file]]),
                 };
                 self.record_undo(label, OpKind::Normal(undo, self.refs.head.clone()));
                 (
@@ -118,7 +143,8 @@ impl RepoTab {
             Ok((_, Reverted::Merged)) => (
                 format!(
                     "{label}: the file has changed since, so the revert was merged in with a \
-                     3-way merge and staged. Look it over before committing."
+                     3-way merge and staged. Look it over before committing; Ctrl+Z can't undo \
+                     this one (unstage the file and discard its changes instead)."
                 ),
                 false,
             ),

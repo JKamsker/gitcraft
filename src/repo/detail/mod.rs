@@ -68,7 +68,8 @@ impl RepoTab {
                         RowExtra::Stats(f.added, f.removed),
                     );
                     match key(&f.path) {
-                        DiffKey::Commit { hash, .. } => {
+                        // A stash's changes aren't a commit's to revert.
+                        DiffKey::Commit { hash, .. } if self.stash_view.is_none() => {
                             widgets::commit_file_menu(&r.row, &f.path, &hash, acts)
                         }
                         _ => widgets::file_menu(&r.row, &f.path, rev, false, acts),

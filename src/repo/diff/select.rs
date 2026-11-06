@@ -126,12 +126,15 @@ pub(super) fn drag_selection(
     sel
 }
 
-/// Ctrl+C and the "Copy" of the context menu on the lines (`drag`) copy the selected text.
-/// The menu also has "History of these lines": `history` makes its action, or says why there
-/// is none.
+/// Ctrl+C and the "Copy" of the context menu on the lines (`drag`, and the changed lines that
+/// can be clicked, `picks`, which take the right-click over them) copy the selected text. The
+/// menu also has "History of these lines": `history` makes its action, or says why there is
+/// none.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn copy_selection(
     ui: &Ui,
     drag: &egui::Response,
+    picks: &[egui::Response],
     sel: Option<TextSel>,
     lines: &[DiffLine],
     uncut: &HashMap<usize, String>,
@@ -146,7 +149,19 @@ pub(super) fn copy_selection(
     if copy && let Some(text) = selected_text() {
         ui.ctx().copy_text(text);
     }
-    egui::Popup::context_menu(drag)
+    for resp in std::iter::once(drag).chain(picks) {
+        lines_menu(resp, &selected_text, history, acts);
+    }
+}
+
+/// The right-click menu of the lines: copy what is selected, or read the lines' history.
+fn lines_menu(
+    resp: &egui::Response,
+    selected_text: &dyn Fn() -> Option<String>,
+    history: &dyn Fn() -> Result<crate::repo::Action, &'static str>,
+    acts: &mut Vec<crate::repo::Action>,
+) {
+    egui::Popup::context_menu(resp)
         .style(crate::theme::menu_style)
         .show(|ui| {
             let selected_text = selected_text();
@@ -160,7 +175,8 @@ pub(super) fn copy_selection(
             match history() {
                 Ok(action) => {
                     let b = ui.button("History of these lines").on_hover_text(
-                        "Every commit that changed the selected lines, followed through renames",
+                        "Every commit up to this version that changed the selected lines, \
+                         followed back through earlier edits and renames",
                     );
                     if b.clicked() {
                         acts.push(action);

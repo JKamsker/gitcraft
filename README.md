@@ -157,9 +157,10 @@ so your config, credentials and hooks apply as usual.
   to switch a repository to; _Use the profile's author_ takes the repository's own out again.
 - Undo part of a past commit: _Revert changes to this file_ in a commit's file list, _Revert
   file_, _Revert hunk_ and _Revert N lines_ (after clicking lines) in its diff. The piece is
-  reverse-applied to the working tree (`git apply -R`), to look over before committing, and
-  Ctrl+Z takes it out again. When the file has changed since, a 3-way merge puts it in (staged);
-  overlapping changes are left as conflicts to settle. Binary files are refused.
+  reverse-applied to the working tree (`git apply -R`), to look over before committing; when it
+  applies as it is, Ctrl+Z takes it out again. When the file has changed since, a 3-way merge
+  puts it in (staged); overlapping changes are left as conflicts to settle. Binary files and
+  submodules are refused.
 - Undo / redo (Ctrl+Z / Ctrl+Y) of commits, amends, merges, rebases, pulls, resets,
   cherry-picks, reverts, checkouts, branch create / rename / delete, tags and stashes.
 
@@ -194,8 +195,9 @@ so your config, credentials and hooks apply as usual.
   `git am` applies one).
 - File history (every commit that changed the file, following renames; click one for its diff
   or the file as it was, beside the list), the history of a few lines (select them in a diff or
-  a file, right-click → _History of these lines_: every commit that touched them, `git log -L`,
-  followed through later edits and renames, each showing only what it did to them), blame (who last changed each line, newer changes
+  a file, right-click → _History of these lines_: every commit up to that version that touched
+  them, `git log -L`, followed back through earlier edits and renames, each showing only what it
+  did to them), blame (who last changed each line, newer changes
   marked brighter; click to go to the commit) and the whole file at a commit (_View file_ in a
   file's menu).
 - _View all files_ under a commit's files lists every file of the commit, not only those it
