@@ -178,7 +178,8 @@ impl RepoTab {
         let Some(search) = self.interactions.search.as_mut().filter(|s| s.id == id) else {
             return;
         };
-        if search.started.elapsed() > Duration::from_secs(4) {
+        let stopped = matches!(&found, Err(e) if e == "stopped");
+        if search.started.elapsed() > Duration::from_secs(4) && !stopped {
             let failed = found.is_err();
             self.finished.push((
                 format!(

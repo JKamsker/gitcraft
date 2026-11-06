@@ -54,7 +54,10 @@ fn find(repo: &Repo, spec: &InteractionSpec) -> Result<(Interaction, Vec<SearchP
 fn finds_the_two_commits_that_fail_together() -> Result<(), String> {
     let repo = two_branches("pair")?;
     let (found, told) = find(&repo, &spec(BOTH))?;
-    let Found::Together { commits, minimal } = &found.found else {
+    let Found::Together {
+        commits, minimal, ..
+    } = &found.found
+    else {
         return Err(format!("{:?}", found.found));
     };
     assert!(minimal);
@@ -132,10 +135,13 @@ fn branches_that_conflict_say_so() -> Result<(), String> {
 fn a_budget_cuts_the_search_short() -> Result<(), String> {
     let repo = two_branches("budget")?;
     let mut tight = spec(BOTH);
-    tight.budget = 2;
+    tight.budget = 4;
     tight.reruns = 0;
     let (found, _) = find(&repo, &tight)?;
-    let Found::Together { commits, minimal } = &found.found else {
+    let Found::Together {
+        commits, minimal, ..
+    } = &found.found
+    else {
         return Err(format!("{:?}", found.found));
     };
     assert!(!minimal);
@@ -201,5 +207,69 @@ fn a_stopped_search_cleans_up() -> Result<(), String> {
     assert_eq!(result.err().as_deref(), Some("stopped"));
     assert_eq!(repo.worktree_count()?, 1);
     assert_eq!(repo.scratch_left(), 0);
+    Ok(())
+}
+
+/// What a test leaves behind (here, the very file a commit of `a` adds) is cleaned away
+/// before the next subset, so it never makes one look as if it didn't apply.
+#[test]
+fn what_a_test_leaves_behind_is_cleaned_away() -> Result<(), String> {
+    let repo = two_branches("leftovers")?;
+    let command = format!("{BOTH}; s=$?; [ -e a2.txt ] || echo left > a2.txt; exit $s");
+    let (found, _) = find(&repo, &spec(&command))?;
+    let Found::Together { commits, gaps, .. } = &found.found else {
+        return Err(format!("{:?}", found.found));
+    };
+    let names: Vec<&str> = commits.iter().map(|c| c.summary.as_str()).collect();
+    assert_eq!(names, ["a step 3", "b step 4"]);
+    assert!(!gaps);
+    Ok(())
+}
+
+/// A commit that breaks its branch until a later commit fixes it is not taken for the
+/// interaction: the pair across the two branches is found.
+#[test]
+fn a_break_fixed_later_on_its_branch_is_not_the_interaction() -> Result<(), String> {
+    let repo = Repo::new("interaction-breakfix")?;
+    repo.commit("base", &[("README.md", Some("hi\n"))])?;
+    repo.git(&["checkout", "-q", "-b", "a", "main"])?;
+    repo.commit("a breaks", &[("broken", Some("x"))])?;
+    repo.commit(
+        "a fixes, adds flag",
+        &[("broken", None), ("flag", Some("x"))],
+    )?;
+    repo.git(&["checkout", "-q", "-b", "b", "main"])?;
+    repo.commit("b one", &[("b1", Some("x"))])?;
+    repo.commit("b uses flag", &[("uses-flag", Some("x"))])?;
+    let command = format!("test ! -e broken && {BOTH}");
+    let mut s = spec(&command);
+    s.reruns = 0;
+    let (found, _) = find(&repo, &s)?;
+    let Found::Together { commits, .. } = &found.found else {
+        return Err(format!("{:?}", found.found));
+    };
+    let names: Vec<&str> = commits.iter().map(|c| c.summary.as_str()).collect();
+    // The fix doesn't apply without the break before it: both are named, with the gap said.
+    assert_eq!(names, ["a breaks", "a fixes, adds flag", "b uses flag"]);
+    assert!(matches!(found.found, Found::Together { gaps: true, .. }));
+    Ok(())
+}
+
+/// A commit hook that refuses every commit doesn't stop the search: its picks run no hooks.
+#[cfg(unix)]
+#[test]
+fn hooks_do_not_get_in_the_way() -> Result<(), String> {
+    let repo = two_branches("hooks")?;
+    let hook = repo.path().join(".git/hooks/prepare-commit-msg");
+    std::fs::write(&hook, "#!/bin/sh\nexit 1\n").map_err(|e| e.to_string())?;
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755))
+        .map_err(|e| e.to_string())?;
+    let (found, _) = find(&repo, &spec(BOTH))?;
+    assert!(
+        matches!(found.found, Found::Together { .. }),
+        "{:?}",
+        found.found
+    );
     Ok(())
 }

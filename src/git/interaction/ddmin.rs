@@ -20,6 +20,8 @@ pub enum Halt {
     Stopped,
     /// A test couldn't be run.
     Error(String),
+    /// The test is out of budget (it counts tests of its own): what was found so far stands.
+    OutOfBudget,
 }
 
 /// What `ddmin` found.
@@ -29,18 +31,22 @@ pub struct Reduced {
     pub failing: Vec<usize>,
     /// It is 1-minimal: none was cut short by the budget.
     pub minimal: bool,
+    /// Some of it left out one at a time couldn't be told (didn't apply…): those may not pass.
+    pub gaps: bool,
     /// How many tests were run (each subset once).
     pub tests: usize,
 }
 
 /// Reduces `n` changes (0..n), known to fail together, with `test` (given a subset in order),
-/// running at most `budget` tests. Each subset is tested once.
+/// running at most `budget` tests. Each subset is tested once; `known` are subsets tested
+/// already, with what they said.
 pub fn ddmin(
     n: usize,
     budget: usize,
+    known: &[(Vec<usize>, Probe)],
     test: &mut dyn FnMut(&[usize]) -> Result<Probe, Halt>,
 ) -> Result<Reduced, Halt> {
-    let mut seen: HashMap<Vec<usize>, Probe> = HashMap::new();
+    let mut seen: HashMap<Vec<usize>, Probe> = known.iter().cloned().collect();
     let mut tests = 0;
     let mut probe = |subset: &[usize], tests: &mut usize| -> Result<Option<Probe>, Halt> {
         if subset.is_empty() {
@@ -54,7 +60,10 @@ pub fn ddmin(
             return Ok(None);
         }
         *tests += 1;
-        let p = test(subset)?;
+        let p = match test(subset) {
+            Err(Halt::OutOfBudget) => return Ok(None),
+            other => other?,
+        };
         seen.insert(subset.to_vec(), p);
         Ok(Some(p))
     };
@@ -107,6 +116,7 @@ pub fn ddmin(
             return Ok(Reduced {
                 failing: current,
                 minimal: false,
+                gaps: false,
                 tests,
             });
         }
@@ -118,9 +128,16 @@ pub fn ddmin(
         }
         granularity = (granularity * 2).min(current.len());
     }
+    // Each change left out of the result was tested (the last round splits it one by one):
+    // those that couldn't be told leave a gap in "leaving any out passes".
+    let gaps = current.iter().any(|left_out| {
+        let rest: Vec<usize> = current.iter().copied().filter(|i| i != left_out).collect();
+        seen.get(&rest) == Some(&Probe::Unresolved)
+    });
     Ok(Reduced {
         failing: current,
         minimal: true,
+        gaps,
         tests,
     })
 }
@@ -171,7 +188,7 @@ mod tests {
             (33, [0, 32]),
             (16, [7, 8]),
         ] {
-            let reduced = ddmin(n, 500, &mut oracle(&pair))?;
+            let reduced = ddmin(n, 500, &[], &mut oracle(&pair))?;
             assert_eq!(reduced.failing, pair, "n = {n}");
             assert!(reduced.minimal);
             assert!(reduced.tests <= 4 * n, "n = {n}: {} tests", reduced.tests);
@@ -181,9 +198,9 @@ mod tests {
 
     #[test]
     fn finds_a_single_culprit_and_a_triple() -> Result<(), Halt> {
-        assert_eq!(ddmin(10, 500, &mut oracle(&[4]))?.failing, [4]);
+        assert_eq!(ddmin(10, 500, &[], &mut oracle(&[4]))?.failing, [4]);
         assert_eq!(
-            ddmin(12, 500, &mut oracle(&[1, 5, 11]))?.failing,
+            ddmin(12, 500, &[], &mut oracle(&[1, 5, 11]))?.failing,
             [1, 5, 11]
         );
         Ok(())
@@ -202,14 +219,16 @@ mod tests {
                 Probe::Pass
             })
         };
-        let reduced = ddmin(8, 500, &mut test)?;
+        let reduced = ddmin(8, 500, &[], &mut test)?;
         assert_eq!(reduced.failing, [2, 3, 6]);
+        // Leaving 2 out doesn't apply: "leaving any out passes" isn't quite so.
+        assert!(reduced.gaps);
         Ok(())
     }
 
     #[test]
     fn a_budget_stops_it_with_what_it_has() -> Result<(), Halt> {
-        let reduced = ddmin(64, 3, &mut oracle(&[5, 40]))?;
+        let reduced = ddmin(64, 3, &[], &mut oracle(&[5, 40]))?;
         assert!(!reduced.minimal);
         assert_eq!(reduced.tests, 3);
         assert!(reduced.failing.contains(&5) && reduced.failing.contains(&40));
@@ -219,12 +238,32 @@ mod tests {
     #[test]
     fn a_halt_comes_through() {
         let mut test = |_: &[usize]| Err(Halt::Stopped);
-        assert_eq!(ddmin(4, 10, &mut test), Err(Halt::Stopped));
+        assert_eq!(ddmin(4, 10, &[], &mut test), Err(Halt::Stopped));
+    }
+
+    /// Subsets tested before aren't tested again.
+    #[test]
+    fn known_results_are_not_tested_again() -> Result<(), Halt> {
+        let known = [(vec![0, 1, 2], Probe::Pass), (vec![3, 4, 5], Probe::Pass)];
+        let mut asked = Vec::new();
+        let mut test = |subset: &[usize]| {
+            asked.push(subset.to_vec());
+            Ok(if subset.contains(&1) && subset.contains(&4) {
+                Probe::Fail
+            } else {
+                Probe::Pass
+            })
+        };
+        let reduced = ddmin(6, 100, &known, &mut test)?;
+        assert_eq!(reduced.failing, [1, 4]);
+        assert!(!reduced.gaps);
+        assert!(!asked.contains(&vec![0, 1, 2]) && !asked.contains(&vec![3, 4, 5]));
+        Ok(())
     }
 
     #[test]
     fn nothing_to_reduce() -> Result<(), Halt> {
-        let reduced = ddmin(1, 10, &mut oracle(&[0]))?;
+        let reduced = ddmin(1, 10, &[], &mut oracle(&[0]))?;
         assert_eq!((reduced.failing, reduced.tests), (vec![0], 0));
         Ok(())
     }

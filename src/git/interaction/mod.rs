@@ -18,7 +18,7 @@ use crate::git::{run, run_ok_codes};
 /// How many tests a search runs at most unless asked otherwise.
 pub const DEFAULT_BUDGET: usize = 40;
 
-/// How many commits the two branches may have between them.
+/// How many commits the two branches may have together.
 pub const MAX_CHANGES: usize = 200;
 
 /// Which branch a commit is from.
@@ -35,6 +35,10 @@ pub struct Change {
     pub summary: String,
     pub side: Side,
 }
+
+/// No hooks for the checkouts and picks of a search: a commit hook refusing a picked commit
+/// would make every subset unresolved. (A folder that isn't there: git finds no hook in it.)
+const NO_HOOKS: [&str; 2] = ["-c", "core.hooksPath=.gitcraft-no-hooks"];
 
 /// What to look for.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -53,8 +57,13 @@ pub struct InteractionSpec {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Found {
     /// These commits fail together; with any one left out, they pass (when `minimal`; else
-    /// the budget ran out first and a smaller set may fail too).
-    Together { commits: Vec<Change>, minimal: bool },
+    /// the budget ran out first and a smaller set may fail too), or, with `gaps`, some of those
+    /// couldn't be told (they don't apply without the one left out).
+    Together {
+        commits: Vec<Change>,
+        minimal: bool,
+        gaps: bool,
+    },
     /// The two pass together: there is nothing to find.
     PassTogether,
     /// A branch fails on its own: it isn't an interaction.
@@ -113,6 +122,7 @@ pub fn find_interaction(
         stop,
         tests: 0,
         probes: 0,
+        seen: Default::default(),
         flaky: Vec::new(),
         stored: testlane::test_command(repo, testlane::DEFAULT_TEST)
             .ok()
@@ -123,10 +133,12 @@ pub fn find_interaction(
     };
     let found = search.run(progress);
     let (tests, flaky) = (search.tests, search.flaky);
-    scratch.remove()?;
+    // A worktree that couldn't be removed doesn't make what was found any less true.
+    let _ = scratch.remove();
     let found = found.map_err(|halt| match halt {
         Halt::Stopped => "stopped".to_owned(),
         Halt::Error(e) => e,
+        Halt::OutOfBudget => "out of tests before the checks were done".to_owned(),
     })?;
     Ok(Interaction {
         found,
@@ -212,6 +224,8 @@ struct Search<'a> {
     tests: usize,
     /// Subsets tested (what the budget counts).
     probes: usize,
+    /// What each subset tested said.
+    seen: std::collections::HashMap<Vec<usize>, Probe>,
     flaky: Vec<Vec<String>>,
     /// The command is the repository's test command: results are shared with the lane.
     stored: bool,
@@ -233,15 +247,19 @@ impl Search<'_> {
             Probe::Unresolved => return Ok(Found::Flaky),
             Probe::Fail => {}
         }
+        let mut known = vec![(all.clone(), Probe::Fail)];
         for s in [Side::A, Side::B] {
-            if self.probe(&side(s), progress)? == Probe::Fail {
-                return Ok(Found::FailsAlone(s));
+            let alone = side(s);
+            match self.probe(&alone, progress)? {
+                Probe::Fail => return Ok(Found::FailsAlone(s)),
+                // A branch's own commits always apply: it didn't repeat.
+                Probe::Unresolved => return Ok(Found::Flaky),
+                Probe::Pass => known.push((alone, Probe::Pass)),
             }
         }
-        // What the checks above took counts too.
-        let budget = self.spec.budget.saturating_sub(self.probes);
-        let mut test = |subset: &[usize]| self.probe(subset, progress);
-        let reduced = ddmin(all.len(), budget, &mut test)?;
+        // The checks above count against the budget too, and their results are known.
+        let mut test = |subset: &[usize]| self.probe_interaction(subset, progress);
+        let reduced = ddmin(all.len(), usize::MAX, &known, &mut test)?;
         Ok(Found::Together {
             commits: reduced
                 .failing
@@ -249,16 +267,53 @@ impl Search<'_> {
                 .map(|&i| self.changes[i].clone())
                 .collect(),
             minimal: reduced.minimal,
+            gaps: reduced.gaps,
         })
     }
 
-    /// Tests the commits `subset` applied on the base, running a failure again to be sure.
+    /// Whether `subset` fails as an interaction: it fails, and each branch's part of it alone
+    /// passes. One that fails because of one branch's commits alone (taken without the later
+    /// commit that fixes them, say) can't be told: it is no interaction.
+    fn probe_interaction(
+        &mut self,
+        subset: &[usize],
+        progress: &(dyn Fn(SearchProgress) + Sync),
+    ) -> Result<Probe, Halt> {
+        let probe = self.probe(subset, progress)?;
+        if probe != Probe::Fail {
+            return Ok(probe);
+        }
+        for side in [Side::A, Side::B] {
+            let part: Vec<usize> = subset
+                .iter()
+                .copied()
+                .filter(|&i| self.changes[i].side == side)
+                .collect();
+            if part.len() == subset.len() || self.probe(&part, progress)? != Probe::Pass {
+                return Ok(Probe::Unresolved);
+            }
+        }
+        Ok(Probe::Fail)
+    }
+
+    /// Tests the commits `subset` applied on the base, running a failure again to be sure;
+    /// each subset once, within the budget.
     fn probe(
         &mut self,
         subset: &[usize],
         progress: &(dyn Fn(SearchProgress) + Sync),
     ) -> Result<Probe, Halt> {
+        if subset.is_empty() {
+            return Ok(Probe::Pass);
+        }
+        if let Some(probe) = self.seen.get(subset) {
+            return Ok(*probe);
+        }
+        if self.probes >= self.spec.budget {
+            return Err(Halt::OutOfBudget);
+        }
         let probe = self.probe_once(subset)?;
+        self.seen.insert(subset.to_vec(), probe);
         self.probes += 1;
         progress(SearchProgress {
             tests: self.probes,
@@ -321,10 +376,26 @@ impl Search<'_> {
     fn apply(&self, subset: &[usize]) -> Result<Option<String>, Halt> {
         let git = |args: &[&str], ok: &[i32]| run_ok_codes(Some(self.dir), args, ok);
         let _ = git(&["cherry-pick", "--abort"], &[0, 128]);
-        git(&["checkout", "--detach", "--force", "-q", self.base], &[0])
-            .map_err(|e| Halt::Error(format!("could not check out the base: {e}")))?;
+        git(
+            &[
+                NO_HOOKS[0],
+                NO_HOOKS[1],
+                "checkout",
+                "--detach",
+                "--force",
+                "-q",
+                self.base,
+            ],
+            &[0],
+        )
+        .map_err(|e| Halt::Error(format!("could not check out the base: {e}")))?;
+        // What the last test left (its files that git doesn't ignore) would be in the way of a
+        // commit adding them, or change what the next test sees; ignored ones (build output)
+        // stay, as a build can reuse them.
+        git(&["clean", "-ffdq"], &[0])
+            .map_err(|e| Halt::Error(format!("could not clean the scratch worktree: {e}")))?;
         if !subset.is_empty() {
-            let mut args = vec!["-c", "commit.gpgSign=false"];
+            let mut args = vec![NO_HOOKS[0], NO_HOOKS[1], "-c", "commit.gpgSign=false"];
             if self.fallback_identity {
                 args.extend([
                     "-c",

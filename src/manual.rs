@@ -68,7 +68,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "When two branches each pass their tests but fail once together, right-click one of them (its pill, or in the left pane) and choose Find the interaction… (or type Find the interaction in the palette): it looks for the commits of the checked-out branch and that one that fail together.",
             "It tests subsets of their commits, each applied on the commit the two diverged from, in a scratch worktree on the repository's machine, in the background (delta debugging), until it can say, for instance, these two commits fail together; either alone passes. Click a commit to select it in the graph.",
             "It first checks that the two fail together and that each passes alone, and says so when they don't (or when their commits don't apply together). It runs at most the number of tests you set; out of tests, it shows the smallest failing set it got to. A failure is run again (once by default) before it is believed: one that doesn't repeat is set aside as flaky. Stop ends it.",
-            "Each branch may have up to 200 commits between the two, and no merges. With the repository's test command, results are shared with the test lane (kept by tree).",
+            "The two branches may have up to 200 commits together since they diverged, and no merges; the search's checkouts run no hooks. Commits of one branch that fail without the other's (one taken without the later commit that fixes it) don't count as an interaction. With the repository's test command, results are shared with the test lane (kept by tree).",
         ],
     ),
     (
