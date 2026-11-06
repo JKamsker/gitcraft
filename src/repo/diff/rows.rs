@@ -221,7 +221,7 @@ impl<'a> Rows<'a> {
             && let Some(i) = l
             && matches!(
                 self.data.lines.get(i).map(|x| x.kind),
-                Some(Kind::Hunk | Kind::Meta)
+                Some(Kind::Hunk | Kind::Meta | Kind::Fold)
             )
         {
             self.line(ui, left.union(right), i, Side::Both, 0.0, acts);
@@ -280,8 +280,12 @@ impl<'a> Rows<'a> {
                 self.clicked = Some(i);
             }
         }
+        let mut right = rect.right().min(ui.clip_rect().right()) - 6.0;
         if kind == Some(Kind::Hunk) && !self.hunk_picks.is_empty() {
-            self.hunk_buttons(ui, rect, i, acts);
+            right = self.hunk_buttons(ui, rect, i, acts) - 8.0;
+        }
+        if matches!(kind, Some(Kind::Hunk | Kind::Fold)) {
+            super::fold_view::controls(ui, data, i, (right, rect.center().y), acts);
         }
         if kind.is_some_and(|k| side.shows(k)) {
             self.moved_button(ui, rect, i, acts);
@@ -416,8 +420,8 @@ impl<'a> Rows<'a> {
     }
 
     /// The hunk actions in the header at line `i`, at the visible right end, however wide the
-    /// line is.
-    fn hunk_buttons(&self, ui: &mut Ui, rect: Rect, i: usize, acts: &mut Vec<Action>) {
+    /// line is; returns their left edge.
+    fn hunk_buttons(&self, ui: &mut Ui, rect: Rect, i: usize, acts: &mut Vec<Action>) -> f32 {
         let mut right = rect.right().min(ui.clip_rect().right()) - 6.0;
         for &pick in self.hunk_picks.iter().rev() {
             let (resp, left) = hunk_button(ui, right, rect.center().y, pick, i);
@@ -429,6 +433,7 @@ impl<'a> Rows<'a> {
             }
             right = left - 4.0;
         }
+        right + 4.0
     }
 }
 

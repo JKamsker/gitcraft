@@ -121,6 +121,11 @@ pub(crate) enum Action {
     DiffMoved(Option<usize>),
     /// Scroll the diff to one of its lines (by its index).
     DiffJumpLine(usize),
+    /// Show some of the unchanged lines folded in a gap of the diff (by its index).
+    DiffUnfold {
+        gap: usize,
+        how: diff::Unfold,
+    },
     /// The commit pane lists every file of the commit, or only those it changed.
     ViewAllFiles(bool),
     SaveConflict,

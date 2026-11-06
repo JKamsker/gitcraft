@@ -62,6 +62,11 @@ impl RepoTab {
                         pick: diff::Pick::Stage,
                         lines: diff::hunk_changes(&data.lines, 0),
                     });
+                    // After the pick, whose lines it numbers.
+                    acts.push(Action::DiffUnfold {
+                        gap: 0,
+                        how: diff::Unfold::All,
+                    });
                 }
                 acts.push(Action::RunRebase);
                 acts.push(Action::StashPush("sample".to_owned()));

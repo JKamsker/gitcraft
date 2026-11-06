@@ -40,6 +40,7 @@ pub(super) fn paint_line(
         Kind::Del => (Some(t.diff_del_bg), t.text),
         Kind::Hunk => (Some(t.accent.gamma_multiply(0.12)), t.accent),
         Kind::Meta => (None, t.text_faint),
+        Kind::Fold => (Some(t.accent.gamma_multiply(0.06)), t.text_dim),
         Kind::Context => (None, t.text_dim),
     };
     // Moved here or away unchanged: the block's own muted colour instead of red or green.

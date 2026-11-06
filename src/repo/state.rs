@@ -119,6 +119,9 @@ pub(crate) struct DiffView {
     pub(super) jump_line: Option<usize>,
     /// The moved block whose two places are shown together.
     pub(super) moved: Option<diff::moved_view::Opened>,
+    /// Unchanged lines opened from their folds (by their number on the new side), opened again
+    /// when the diff is read again.
+    pub(super) revealed: std::collections::BTreeSet<u32>,
     /// The latest read of this diff: only its answer is shown, so a slower answer to an older
     /// read (before the whitespace or whole-file setting changed…) can't replace it.
     pub(super) request: u64,
@@ -144,6 +147,7 @@ impl DiffView {
             at_change: None,
             jump_line: None,
             moved: None,
+            revealed: Default::default(),
             request: 0,
         }
     }
@@ -172,6 +176,8 @@ impl DiffView {
         self.at_change = None;
         self.jump_line = None;
         // The blocks are found again, numbered anew.
+        self.moved = None;
+        self.reopen();
         self.moved = match (&self.data, place) {
             (Some(Ok(data)), Some(place)) => (0..data.moves.blocks.len())
                 .find(|&b| diff::moved_view::Opened::place(data, b) == Some(place))

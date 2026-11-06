@@ -3,6 +3,8 @@
 //! their objects. Uncommitted changes can be staged, unstaged or discarded a hunk or a few
 //! lines at a time.
 
+pub(super) mod context;
+mod fold_view;
 mod images;
 mod jump;
 mod lfs;
@@ -27,6 +29,7 @@ use super::DiffKey;
 use super::highlight::{self, MAX_LINE_CHARS, Spans, cap_line};
 use crate::git::{self, Area, DiffOptions};
 
+pub use context::Unfold;
 pub use images::ImagePair;
 use images::{is_image, load_images, renamed_from};
 pub use lfs::LfsPair;
@@ -51,6 +54,8 @@ pub enum Kind {
     Hunk,
     /// Binary notices, "No newline at end of file".
     Meta,
+    /// The unchanged lines after the last hunk, folded (see [`context`]).
+    Fold,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -82,6 +87,8 @@ pub struct DiffData {
     pub partial: bool,
     /// Blocks removed in one place and added in another.
     pub moves: moved::Moves,
+    /// The unchanged lines between the hunks, folded, and the file they open from.
+    pub context: Option<context::Context>,
     /// The file is new: it has no old side, so it shows unified even side by side.
     pub new_file: bool,
     /// Characters in the longest line, for the width to scroll (counted once, not every frame).
@@ -159,7 +166,18 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
             path.clone(),
         ),
     };
-    let lines = parse(&text);
+    let mut lines = parse(&text);
+    // Read only when the diff doesn't show the whole file already.
+    let context = (!opts.whole_file)
+        .then(|| context::read(repo, key, &lines, dark))
+        .flatten();
+    if context
+        .as_ref()
+        .and_then(|c| c.gaps.last())
+        .is_some_and(|g| g.trailing && g.hidden() > 0)
+    {
+        lines.push(context::fold_row());
+    }
     let header = patch_header(&text);
     let partial = can_pick(key, opts, &header, &lines);
     let new_file = is_new_file(&text);
@@ -173,7 +191,7 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
     let mut spans = highlight_sides(&path, &lines, dark);
     let moves = find_moves(&lines);
     let (mut changed, split) = pair_lines(&lines);
-    let mut lines = lines;
+
     let mut uncut = std::collections::HashMap::new();
     for (i, (line, spans)) in lines.iter_mut().zip(spans.iter_mut()).enumerate() {
         if let Some(whole) = cap_line(&mut line.text, spans.as_mut()) {
@@ -198,6 +216,7 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         header,
         partial,
         moves,
+        context,
         new_file,
         longest,
         uncut,
