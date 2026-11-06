@@ -216,14 +216,18 @@ so your config, credentials and hooks apply as usual.
   symbolic link, and asks once more for a file outside the repository; closing the doctor
   with unsaved edits asks first.
 - _Hooks_: the folder git runs hooks from (`git rev-parse --git-path hooks`, so
-  `core.hooksPath` too), every hook in it with the operations that run it, and what keeps one
-  from running: not executable (git skips it), CRLF line endings (a `#!/bin/sh\r` line fails
-  with "bad interpreter"), an interpreter its `#!` line names that isn't installed where git
-  runs, no `#!` line, a name git doesn't run (`pre-commit.old`). _Make executable_ and _Convert
-  to LF_ fix those in one click. husky, lefthook and pre-commit are recognised, with the file
-  their hooks come from. What git and its hooks printed during commits, merges, pushes,
-  checkouts, rebases… (the error output, also when the operation succeeded) is kept in memory,
-  per repository, to read after. On WSL and SSH the folder is read in one round trip there.
+  `core.hooksPath` too; set to nothing, hooks are off and said so), every hook in it with the
+  operations that run it, and what keeps one from running: not executable (git skips it with a
+  hint), CRLF line endings (a `#!/bin/sh\r` line makes git fail with "cannot exec … No such
+  file or directory"), an interpreter its `#!` line names that isn't installed where git runs
+  (looked up on the PATH git gets), a folder with a hook's name (git fails on it), no `#!` line
+  (Git for Windows only). Files git never runs (`pre-commit.old`) are listed apart. _Make
+  executable_ and _Convert to LF_ fix those in one click (never through a symbolic link).
+  husky, lefthook and pre-commit are recognised, with where to change their hooks; with husky
+  the scripts in `.husky/` its stubs run are checked too. What git and its hooks printed during
+  the last dozen operations gitcraft ran in the repository (commit, merge, push, checkout,
+  rebase…, also when they succeeded) is kept in memory, colours taken out and passwords in URLs
+  hidden. On WSL and SSH the folder is read in a few round trips there.
 - _Which configuration wins_: the settings that explain why git behaves differently here (pull
   strategy, push, signing, line endings, file handling, performance…), each with the value in
   effect and its scope and file (`git config --list --show-origin --show-scope --includes`).
