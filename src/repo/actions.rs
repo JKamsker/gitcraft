@@ -38,6 +38,8 @@ pub(crate) enum Action {
     CloseCi,
     /// Something done in the pipeline view.
     Ci(ci_view::CiAct),
+    /// Agent tasks and the worktree setup recipe.
+    Agent(super::agents::AgentAct),
     CloseDiff,
     Ops {
         label: String,
@@ -352,6 +354,16 @@ impl RepoTab {
                 },
             ),
             ("Reload".into(), "F5".into(), Action::Reload),
+            (
+                "Start agent task…".into(),
+                "agent".into(),
+                Action::Agent(super::agents::AgentAct::OpenStart),
+            ),
+            (
+                "Worktree setup…".into(),
+                "agent".into(),
+                Action::Agent(super::agents::AgentAct::OpenRecipe),
+            ),
             (
                 reveal_label().into(),
                 "folder".into(),

@@ -39,6 +39,7 @@ impl RepoTab {
         self.busy_op = Some(label.to_owned());
         self.op_started = Some(Instant::now());
         self.note_checkout_move(&ops, ctx);
+        self.note_worktree_add(label, &ops);
         if !quiet {
             self.status = None;
         }
@@ -245,6 +246,7 @@ impl RepoTab {
             Refresh::All => self.reload(ctx),
         }
         self.follow_checkout_move(result.is_ok(), ctx);
+        self.after_worktree_add(&label, result.is_ok(), ctx);
     }
 
     fn record_undo(&mut self, label: &str, kind: OpKind) {
