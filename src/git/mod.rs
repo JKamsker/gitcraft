@@ -4,6 +4,7 @@
 mod command;
 mod commits;
 mod diff;
+pub mod external_tool;
 mod files;
 mod lfs;
 mod refs;
