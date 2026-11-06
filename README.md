@@ -121,6 +121,13 @@ so your config, credentials and hooks apply as usual.
 - Worktrees: a yellow dot in place of the folder icon marks the others with uncommitted changes,
   here and in the switcher. Add (existing or new branch), open in the same tab (the tab then shows the branch, a searchable switcher and a button to close the worktree, and what you left keeps running; can be turned off in Settings) or a new one, open a terminal there, lock, remove,
   prune.
+- Collision matrix (a worktree's menu → _Collision matrix…_): for branches worked on side by side,
+  by agents in worktrees or otherwise, every pair is merged in memory (`git merge-tree`, git 2.38
+  or later; nothing is checked out or changed) and each with the branch they land on. The
+  branches of the linked worktrees are ticked; tick others, or pick another branch to land on.
+  Each cell says how many files the pair conflicts on (hover for them, click to compare the
+  two), and below it is the order to land them in: as many as can land cleanly first, then the
+  rest, fewest files to resolve first.
 - Submodules (shown when the repository has any): each with its commit and whether it is
   modified, not initialised or out of date. Update one or all (`git submodule update --init
   --recursive`), open one in a new tab (or double-click it), show it in its folder. _Keep

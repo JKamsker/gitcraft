@@ -62,6 +62,7 @@ impl RepoTab {
             });
 
         self.dialogs(&ctx, &mut acts);
+        self.collision_window(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
         }
