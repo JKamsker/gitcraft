@@ -17,6 +17,9 @@ pub enum Ecosystem {
     Go,
 }
 
+/// A package as its registry knows it: (name, version); `None` for one of the project's own.
+pub type Registry = Option<(String, String)>;
+
 /// One package pinned, and the line it is pinned on.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Pkg {
@@ -24,6 +27,27 @@ pub struct Pkg {
     pub version: String,
     pub license: Option<String>,
     pub line: u32,
+    /// The package as its registry knows it (name, version); `None` for one of the project's
+    /// own (a workspace member, a path dependency), which no registry has.
+    pub registry: Registry,
+}
+
+impl Pkg {
+    fn new(name: &str, version: &str, license: Option<String>, line: u32) -> Self {
+        Pkg {
+            name: name.to_owned(),
+            version: version.to_owned(),
+            license,
+            line,
+            registry: Some((name.to_owned(), version.to_owned())),
+        }
+    }
+
+    /// One of the project's own: no registry page.
+    fn local(mut self) -> Self {
+        self.registry = None;
+        self
+    }
 }
 
 /// What happened to a package.
@@ -47,6 +71,8 @@ pub struct DepChange {
     pub license: Option<(Option<String>, Option<String>)>,
     pub old_line: Option<u32>,
     pub new_line: Option<u32>,
+    /// The package on its registry before and after, for the links.
+    pub registry: (Registry, Registry),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -180,14 +206,41 @@ fn toml_packages(root: &Node) -> Vec<Pkg> {
     items
         .iter()
         .filter_map(|i| {
+            let (name, version) = (text(&i.node, "name")?, text(&i.node, "version")?);
+            // Cargo: a git source pins a commit (shown, so a bump of it is seen); no source
+            // at all is a workspace member or path dependency. uv: an editable or virtual
+            // source is the project itself.
+            let source = text(&i.node, "source");
+            let git = source
+                .filter(|s| s.starts_with("git+"))
+                .and_then(|s| s.rsplit_once('#'))
+                .map(|(_, rev)| rev.get(..7).unwrap_or(rev));
+            let shown = match git {
+                Some(rev) => format!("{version} (git {rev})"),
+                None => version.to_owned(),
+            };
+            let pkg = Pkg::new(name, &shown, None, i.line);
+            let uv_local = matches!(
+                get(&i.node, "source").map(|f| &f.node),
+                Some(Node::Map(m)) if m.iter().any(|f| matches!(f.key.as_str(), "editable" | "virtual" | "directory" | "path"))
+            );
+            let cargo_local = source.is_none() && get(&i.node, "checksum").is_none() && get(&i.node, "source").is_none();
+            let pkg = if git.is_some() || uv_local || (cargo_local && !is_poetry(root)) {
+                pkg.local()
+            } else {
+                pkg
+            };
             Some(Pkg {
-                name: text(&i.node, "name")?.to_owned(),
-                version: text(&i.node, "version")?.to_owned(),
-                license: None,
-                line: i.line,
+                registry: pkg.registry.map(|(n, _)| (n, version.to_owned())),
+                ..pkg
             })
         })
         .collect()
+}
+
+/// Whether a `[[package]]` lockfile is Poetry's, whose packages name no source.
+fn is_poetry(root: &Node) -> bool {
+    get(root, "metadata").is_some_and(|m| get(&m.node, "content-hash").is_some())
 }
 
 /// npm's lockfile: `packages` keyed by their folder (v2, v3), or nested `dependencies` (v1).
@@ -207,12 +260,16 @@ fn npm_packages(root: &Node) -> Vec<Pkg> {
                     .rsplit_once("node_modules/")
                     .map_or(f.key.as_str(), |(_, n)| n);
                 let name = text(&f.node, "name").unwrap_or(name);
-                Some(Pkg {
-                    name: name.to_owned(),
-                    version: text(&f.node, "version")?.to_owned(),
-                    license: license(&f.node, "license"),
-                    line: f.line,
-                })
+                let pkg = Pkg::new(
+                    name,
+                    text(&f.node, "version")?,
+                    license(&f.node, "license"),
+                    f.line,
+                );
+                // A workspace (not under `node_modules`) or a link is the project's own.
+                let local =
+                    !f.key.contains("node_modules/") || text(&f.node, "link") == Some("true");
+                Some(if local { pkg.local() } else { pkg })
             })
             .collect();
     }
@@ -234,12 +291,19 @@ fn npm_v1(node: &Node, out: &mut Vec<Pkg>, depth: usize) {
     }
     for f in fields {
         if let Some(version) = text(&f.node, "version") {
-            out.push(Pkg {
-                name: f.key.clone(),
-                version: version.to_owned(),
-                license: None,
-                line: f.line,
-            });
+            let mut pkg = Pkg::new(&f.key, version, None, f.line);
+            // An alias, `npm:other@1.2.0`: the registry has `other`.
+            if let Some((real, v)) = version.strip_prefix("npm:").and_then(|a| {
+                a.rfind('@')
+                    .filter(|&at| at > 0)
+                    .map(|at| (&a[..at], &a[at + 1..]))
+            }) {
+                pkg.registry = Some((real.to_owned(), v.to_owned()));
+            }
+            if version.starts_with("file:") || version.starts_with("link:") {
+                pkg = pkg.local();
+            }
+            out.push(pkg);
         }
         npm_v1(&f.node, out, depth + 1);
     }
@@ -260,20 +324,27 @@ fn pnpm_packages(root: &Node) -> Vec<Pkg> {
             let key = f.key.trim_start_matches('/');
             // `(react@18.2.0)` after the version names the peers it was resolved with.
             let key = key.split_once('(').map_or(key, |(k, _)| k);
-            // The last `@` past the first character: `@scope/name@1.0.0`.
-            let (name, version) = match key.rfind('@').filter(|&at| at > 0) {
-                Some(at) => (&key[..at], &key[at + 1..]),
-                None => key.rsplit_once('/')?,
+            // pnpm 5 and older: `name/1.0.0`, peers after `_` (`name/1.0.0_react@18.2.0`).
+            let old_style = key
+                .rsplit_once('/')
+                .filter(|(_, v)| v.starts_with(|c: char| c.is_ascii_digit()))
+                .or_else(|| {
+                    let (k, _) = key.split_once('_')?;
+                    k.rsplit_once('/')
+                        .filter(|(_, v)| v.starts_with(|c: char| c.is_ascii_digit()))
+                });
+            // Newer: the last `@` past the first character, `@scope/name@1.0.0`.
+            let (name, version) = match old_style {
+                Some((name, version)) => (name, version.split('_').next().unwrap_or(version)),
+                None => {
+                    let at = key.rfind('@').filter(|&at| at > 0)?;
+                    (&key[..at], &key[at + 1..])
+                }
             };
             if name.is_empty() || version.is_empty() {
                 return None;
             }
-            Some(Pkg {
-                name: name.to_owned(),
-                version: version.to_owned(),
-                license: None,
-                line: f.line,
-            })
+            Some(Pkg::new(name, version, None, f.line))
         })
         .collect()
 }
@@ -290,63 +361,102 @@ fn composer_packages(root: &Node) -> Vec<Pkg> {
             continue;
         };
         out.extend(items.iter().filter_map(|i| {
-            Some(Pkg {
-                name: text(&i.node, "name")?.to_owned(),
-                version: text(&i.node, "version")?.to_owned(),
-                license: license(&i.node, "license"),
-                line: i.line,
-            })
+            let (name, version) = (text(&i.node, "name")?, text(&i.node, "version")?);
+            // A branch (`dev-main`) is pinned by its commit: shown, so a bump of it is seen.
+            let reference = get(&i.node, "dist")
+                .or_else(|| get(&i.node, "source"))
+                .and_then(|d| text(&d.node, "reference"))
+                .filter(|_| version.starts_with("dev-"));
+            let shown = match reference {
+                Some(r) => format!("{version} ({})", r.get(..7).unwrap_or(r)),
+                None => version.to_owned(),
+            };
+            let mut pkg = Pkg::new(name, &shown, license(&i.node, "license"), i.line);
+            pkg.registry = Some((name.to_owned(), version.to_owned()));
+            Some(pkg)
         }));
     }
     out
 }
 
-/// `go.sum`: `module version hash` lines; the `/go.mod` line of a version is the same version.
+/// `go.sum`: `module version hash` lines. It keeps the `/go.mod` lines of versions no longer
+/// used, so each module is read as its newest version there.
 fn go_packages(text: &str) -> Vec<Pkg> {
-    let mut out: Vec<Pkg> = Vec::new();
+    let mut newest: Vec<Pkg> = Vec::new();
+    let mut at: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     for (n, line) in text.lines().enumerate() {
         let mut parts = line.split_whitespace();
         let (Some(name), Some(version)) = (parts.next(), parts.next()) else {
             continue;
         };
         let version = version.trim_end_matches("/go.mod");
-        if out
-            .iter()
-            .rev()
-            .take(4)
-            .any(|p| p.name == name && p.version == version)
-        {
-            continue;
+        let pkg = Pkg::new(name, version, None, n as u32 + 1);
+        match at.get(name) {
+            Some(&k) if version_cmp(version, &newest[k].version).is_gt() => newest[k] = pkg,
+            Some(_) => {}
+            None => {
+                at.insert(name.to_owned(), newest.len());
+                newest.push(pkg);
+            }
         }
-        out.push(Pkg {
-            name: name.to_owned(),
-            version: version.to_owned(),
-            license: None,
-            line: n as u32 + 1,
-        });
     }
-    out
+    newest
 }
 
-/// Compares two versions part by part, numbers as numbers (`1.10` after `1.9`).
+/// Compares two versions part by part, numbers as numbers (`1.10` after `1.9`); a
+/// pre-release comes before its release (`1.0.0-rc.1` before `1.0.0`, `2.0rc1` before `2.0`).
 pub fn version_cmp(a: &str, b: &str) -> std::cmp::Ordering {
-    let parts = |v: &str| -> Vec<String> {
-        v.trim_start_matches('v')
-            .split(['.', '-', '+'])
-            .map(str::to_owned)
-            .collect()
+    use std::cmp::Ordering::*;
+    // `1.2.3-rc.1+build` → release `1.2.3`, pre-release `rc.1` (the build is left out).
+    let split = |v: &str| -> (Vec<String>, String) {
+        let v = v.trim_start_matches('v');
+        let v = v.split_once('+').map_or(v, |(v, _)| v);
+        let (release, pre) = v.split_once('-').unwrap_or((v, ""));
+        let mut parts: Vec<String> = release.split('.').map(str::to_owned).collect();
+        let mut pre = pre.to_owned();
+        // `2.0rc1`: letters in the last part start a pre-release.
+        if pre.is_empty()
+            && let Some(last) = parts.last_mut()
+            && let Some(at) = last.find(|c: char| c.is_ascii_alphabetic())
+            && at > 0
+        {
+            pre = last[at..].to_owned();
+            last.truncate(at);
+        }
+        (parts, pre)
     };
-    let (pa, pb) = (parts(a), parts(b));
-    for (x, y) in pa.iter().zip(&pb) {
-        let ord = match (x.parse::<u64>(), y.parse::<u64>()) {
-            (Ok(x), Ok(y)) => x.cmp(&y),
-            _ => x.cmp(y),
-        };
+    let part = |x: &str, y: &str| match (x.parse::<u64>(), y.parse::<u64>()) {
+        (Ok(x), Ok(y)) => x.cmp(&y),
+        (Ok(_), Err(_)) => Less,
+        (Err(_), Ok(_)) => Greater,
+        _ => x.cmp(y),
+    };
+    let ((ra, pa), (rb, pb)) = (split(a), split(b));
+    for k in 0..ra.len().max(rb.len()) {
+        let ord = part(
+            ra.get(k).map_or("0", String::as_str),
+            rb.get(k).map_or("0", String::as_str),
+        );
         if ord.is_ne() {
             return ord;
         }
     }
-    pa.len().cmp(&pb.len())
+    match (pa.is_empty(), pb.is_empty()) {
+        (true, true) => Equal,
+        (true, false) => Greater,
+        (false, true) => Less,
+        _ => {
+            let (xa, xb): (Vec<&str>, Vec<&str>) =
+                (pa.split('.').collect(), pb.split('.').collect());
+            for (x, y) in xa.iter().zip(&xb) {
+                let ord = part(x, y);
+                if ord.is_ne() {
+                    return ord;
+                }
+            }
+            xa.len().cmp(&xb.len())
+        }
+    }
 }
 
 /// Compares the packages pinned on each side of the lockfile `path`.
@@ -371,12 +481,20 @@ pub fn diff(path: &str, sides: &Sides) -> Result<DepsDiff, String> {
 
 /// Each package's versions before and after, as changes.
 pub fn compare(old: &[Pkg], new: &[Pkg]) -> Vec<DepChange> {
+    // A version installed in several places (npm's nested copies, pnpm's peer variants) is
+    // one version of the package.
     let mut by_name: BTreeMap<&str, (Vec<&Pkg>, Vec<&Pkg>)> = BTreeMap::new();
     for p in old {
-        by_name.entry(&p.name).or_default().0.push(p);
+        let side = &mut by_name.entry(&p.name).or_default().0;
+        if !side.iter().any(|q| q.version == p.version) {
+            side.push(p);
+        }
     }
     for p in new {
-        by_name.entry(&p.name).or_default().1.push(p);
+        let side = &mut by_name.entry(&p.name).or_default().1;
+        if !side.iter().any(|q| q.version == p.version) {
+            side.push(p);
+        }
     }
     let mut out = Vec::new();
     for (name, (olds, news)) in by_name {
@@ -443,5 +561,9 @@ fn change(kind: Change, name: &str, old: Option<&Pkg>, new: Option<&Pkg>) -> Dep
         license,
         old_line: old.map(|p| p.line),
         new_line: new.map(|p| p.line),
+        registry: (
+            old.and_then(|p| p.registry.clone()),
+            new.and_then(|p| p.registry.clone()),
+        ),
     }
 }

@@ -218,8 +218,11 @@ so your config, credentials and hooks apply as usual.
     a link to its registry page (crates.io, npm, PyPI, Packagist, pkg.go.dev) and one to what
     changed between the two versions (diff.rs for crates, npmdiff.dev for npm packages, the
     release history elsewhere); changes of licence are shown where the lockfile records them
-    (npm, Composer). A package kept at several versions is listed per version added or
-    removed. A click on a package's name goes to its line. The links open in the browser only
+    (npm, Composer). A version installed in several places counts once; a package kept at
+    several versions is listed per version added or removed; a git dependency or a Composer
+    branch shows its commit, so moving it is seen; `go.sum` is read as the newest version of
+    each module (it keeps lines of older ones). The project's own packages (workspace members,
+    path dependencies) get no registry links. A click on a package's name goes to its line. The links open in the browser only
     when clicked: reading the lockfile asks nothing of any server.
   - _API contract changes_ (the server, for an OpenAPI or Swagger file: offered on files named
     like one, and from the view by key of any JSON or YAML file that is one): what breaks the
