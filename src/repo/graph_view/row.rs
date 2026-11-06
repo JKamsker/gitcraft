@@ -105,7 +105,12 @@ impl RepoTab {
             self.wip_description(&painter, &t, &row);
         } else {
             let ci = self.ci_status(&commit.hash);
-            description(ui, &painter, &t, &row, is_match, ci.is_some());
+            let robot = self.authorship.of(commit).map_or(0.0, |a| {
+                let left = row.gx + row.cols.graph + 6.0;
+                let id = ui.id().with(("robot", &commit.hash));
+                crate::repo::authorship_view::robot(ui, left, row.mid(), &a, id)
+            });
+            description(ui, &painter, &t, &row, is_match, ci.is_some(), robot);
             trailing_columns(ui, &painter, &t, &row, now);
             if let Some(status) = ci {
                 let center = pos2(rect.right() - cols.trailing() - 9.0, row.mid());
@@ -196,10 +201,19 @@ fn row_background(
 }
 
 /// The summary, then the rest of the message faded, cut with an ellipsis.
-/// `dot`: room is left at the end for the build status.
-fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool, dot: bool) {
+/// `dot`: room is left at the end for the build status; `robot`: at the start, for the robot of
+/// an agent-written commit.
+fn description(
+    ui: &Ui,
+    painter: &Painter,
+    t: &Tokens,
+    row: &Row,
+    is_match: bool,
+    dot: bool,
+    robot: f32,
+) {
     let (rect, mid) = (row.rect, row.mid());
-    let x = row.gx + row.cols.graph + 6.0;
+    let x = row.gx + row.cols.graph + 6.0 + robot;
     let text_right = rect.right() - row.cols.trailing() - 10.0 - if dot { 14.0 } else { 0.0 };
     let font = if is_match {
         theme::medium(12.5)

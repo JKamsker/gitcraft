@@ -95,6 +95,19 @@ impl RepoTab {
                     }
                     let gutter = Rect::from_min_size(rect.min, vec2(GUTTER_W, LINE_H));
                     p.rect_filled(gutter, 0.0, t.card);
+                    // Who wrote it, as its commit records: at the gutter's right edge.
+                    if let Some(a) = self.authorship.map.get(&line.hash) {
+                        let edge = Rect::from_min_size(
+                            pos2(gutter.right() - 4.0, rect.top()),
+                            vec2(3.0, LINE_H),
+                        );
+                        crate::repo::authorship_view::stripe(
+                            &p,
+                            &t,
+                            edge,
+                            a.line(&line.file, line.orig),
+                        );
+                    }
                     p.rect_filled(
                         Rect::from_min_size(rect.min, vec2(3.0, LINE_H)),
                         0.0,

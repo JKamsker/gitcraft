@@ -3,6 +3,7 @@
 
 mod actions;
 mod apply;
+mod authorship_view;
 mod branch_tree;
 mod branch_visibility;
 mod ci_status;
@@ -137,6 +138,8 @@ pub struct RepoTab {
     prs_loaded: Option<Instant>,
     /// The build status of the commits that show one.
     ci: ci_status::CiStatuses,
+    /// What the commits record of who wrote them.
+    authorship: authorship_view::Lens,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -299,6 +302,7 @@ impl RepoTab {
             pr_error: None,
             prs_loaded: None,
             ci: ci_status::CiStatuses::default(),
+            authorship: Default::default(),
             selected: None,
             stash_view: None,
             scroll_to: None,

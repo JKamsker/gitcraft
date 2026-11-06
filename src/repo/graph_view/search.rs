@@ -24,7 +24,7 @@ impl RepoTab {
                             } else {
                                 "Search messages, authors and hashes in all history"
                             })
-                            .desired_width(ui.available_width() - 290.0)
+                            .desired_width(ui.available_width() - 400.0)
                             .margin(egui::Margin::symmetric(8, 4)),
                     );
                     // Where to look: commit messages or the code they changed.
@@ -49,11 +49,14 @@ impl RepoTab {
                             acts.push(Action::SearchCode(on));
                         }
                     }
+                    crate::repo::authorship_view::filter_toggle(ui, self.authorship.filter, acts);
                     if std::mem::take(&mut self.search.focus) {
                         edit.request_focus();
                     }
                     if edit.changed() {
                         self.search.edited = Some(std::time::Instant::now());
+                        // Typing searches again: the filter's results go.
+                        self.authorship.filter = false;
                     }
                     let (enter, shift, esc) = ui.input(|i| {
                         (
