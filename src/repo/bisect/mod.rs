@@ -140,9 +140,7 @@ impl RepoTab {
         match act {
             BisectAct::Start { bad, good } => self.start_bisect(bad, good, ctx),
             BisectAct::Mark { mark, rev } => self.mark_bisect(mark, rev, ctx),
-            BisectAct::Reset => self.bisect_step("Stop bisect", ctx, |path| {
-                git::bisect_reset(path).map(|_| "back where it began".to_owned())
-            }),
+            BisectAct::Reset => self.reset_bisect(ctx),
             BisectAct::Run(command) => self.start_bisect_run(command, ctx),
             BisectAct::StopRun => {
                 if let Some(run) = &self.bisect.run {
@@ -160,6 +158,23 @@ impl RepoTab {
                 }
             }
         }
+    }
+
+    /// Ends the bisect: Finish once it found something, else Stop.
+    fn reset_bisect(&mut self, ctx: &egui::Context) {
+        let state = self.bisect.state.as_ref();
+        let label = if state.is_some_and(|b| b.outcome.is_some()) {
+            "Finish bisect"
+        } else {
+            "Stop bisect"
+        };
+        let back = match state.and_then(Bisect::start_branch) {
+            Some(branch) => format!("back on {branch}"),
+            None => "back on the commit it began at".to_owned(),
+        };
+        self.bisect_step(label, ctx, move |path| {
+            git::bisect_reset(path).map(|_| back)
+        });
     }
 
     /// Why a bisect can't start now, if it can't.
@@ -385,7 +400,14 @@ fn said_briefly(said: &str) -> String {
         .or_else(|| lines.iter().find(|l| l.starts_with("Bisecting:")))
         .or_else(|| lines.iter().find(|l| !l.is_empty()));
     match pick {
-        Some(line) => line.to_string(),
+        // In the banner's words: "4 commits left to test after this (about 2 steps)".
+        Some(line) => match line.strip_prefix("Bisecting: ") {
+            Some(rest) => rest
+                .replace("revisions", "commits")
+                .replace("revision", "commit")
+                .replace("roughly", "about"),
+            None => line.to_string(),
+        },
         None => "done".to_owned(),
     }
 }
@@ -412,5 +434,29 @@ fn run_message(
             (format!("Bisect run ended with {code}: {last_line}"), true)
         }
         Err(e) => (format!("Bisect run failed: {e}"), true),
+    }
+}
+
+#[cfg(test)]
+mod said_tests {
+    use super::said_briefly;
+
+    #[test]
+    fn git_s_answer_to_a_mark_reads_in_the_banner_s_words() {
+        assert_eq!(
+            said_briefly(
+                "Bisecting: 4 revisions left to test after this (roughly 2 steps)\n[abc] c5"
+            ),
+            "4 commits left to test after this (about 2 steps)"
+        );
+        assert_eq!(
+            said_briefly("Bisecting: 1 revision left to test after this (roughly 1 step)"),
+            "1 commit left to test after this (about 1 step)"
+        );
+        assert_eq!(
+            said_briefly("abc is the first bad commit\ncommit abc\n"),
+            "abc is the first bad commit"
+        );
+        assert_eq!(said_briefly(""), "done");
     }
 }

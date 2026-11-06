@@ -53,8 +53,14 @@ impl RepoTab {
             ),
             (Mark::Skip, format!("Skip {at} in the bisect")),
         ] {
+            let wait = if running {
+                super::banner::RUNNING
+            } else {
+                super::banner::BUSY
+            };
             if ui
                 .add_enabled(idle && !running, egui::Button::new(label))
+                .on_disabled_hover_text(wait)
                 .clicked()
             {
                 acts.push(Action::Bisect(BisectAct::Mark {
@@ -80,29 +86,38 @@ impl RepoTab {
             }
             return vec![item(
                 "Start bisect…".to_owned(),
-                Action::Dialog(Dialog::start_bisect(&self.refs.head, false)),
+                Action::Dialog(Dialog::start_bisect("HEAD", false)),
             )];
         };
         let mark = |mark| Action::Bisect(BisectAct::Mark { mark, rev: None });
         let mut items = Vec::new();
+        // Nothing that would do nothing: no marks while a run tests the commits.
+        if self.bisect.running() {
+            return items;
+        }
         if bisect.outcome.is_none() {
+            let at = short(&bisect.current);
             items.extend([
                 item(
-                    format!("Bisect: mark as {}", bisect.word(Mark::Good)),
+                    format!("Bisect: mark {at} as {}", bisect.word(Mark::Good)),
                     mark(Mark::Good),
                 ),
                 item(
-                    format!("Bisect: mark as {}", bisect.word(Mark::Bad)),
+                    format!("Bisect: mark {at} as {}", bisect.word(Mark::Bad)),
                     mark(Mark::Bad),
                 ),
-                item("Bisect: skip this commit".to_owned(), mark(Mark::Skip)),
-                item(
+                item(format!("Bisect: skip {at}"), mark(Mark::Skip)),
+            ]);
+            if bisect.progress.is_some() {
+                items.push(item(
                     "Bisect: run a command…".to_owned(),
                     self.bisect_run_dialog(),
-                ),
-            ]);
+                ));
+            }
+            items.push(item("Bisect: stop".to_owned(), self.stop_bisect_action()));
+        } else {
+            items.push(item("Bisect: finish".to_owned(), self.stop_bisect_action()));
         }
-        items.push(item("Bisect: stop".to_owned(), self.stop_bisect_action()));
         items
     }
 }
