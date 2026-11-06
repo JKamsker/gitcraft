@@ -209,7 +209,7 @@ fn values_are_quoted_when_they_need_it_and_read_back_the_same() {
 
 fn passes(query: &str, code: bool) -> (Vec<Vec<String>>, Vec<String>) {
     match prepare(query, code) {
-        Ok(Plan::Operators { passes, paths }) => (passes, paths),
+        Ok(Plan::Operators { passes, paths, .. }) => (passes, paths),
         other => unreachable!("{query}: {other:?}"),
     }
 }
@@ -240,8 +240,14 @@ fn each_operator_is_one_git_option() {
         ])]
     );
     assert_eq!(paths, ["src", "Read me.md"]);
+    // Changes alone match the case typed (git's -i would apply to them too).
     let (p, _) = passes("regex:^fn merges:", false);
-    assert_eq!(p, [with_base(&["-G^fn", "--merges"])]);
+    assert_eq!(p, [with_base(&["-G^fn", "--merges"])[1..].to_vec()]);
+    let (p, _) = passes("Foo after:2w", true);
+    assert_eq!(
+        p,
+        [with_base(&["--since=2.weeks.ago", "-SFoo"])[1..].to_vec()]
+    );
 }
 
 #[test]
@@ -261,6 +267,8 @@ fn free_text_looks_in_messages_and_authors_or_in_code() {
     assert_eq!(p, [with_base(&["--author=bob", "-Slogin"])]);
     let e = prepare("login contents:x", true).err();
     assert!(e.is_some_and(|e| e.message.contains("switch to Messages")));
+    let (p, _) = passes("login path:src", true);
+    assert_eq!(p, [with_base(&["-Slogin"])[1..].to_vec()]);
     // Without free text, Code changes nothing.
     assert_eq!(passes("contents:x", true), passes("contents:x", false));
 }
@@ -485,7 +493,9 @@ fn contents_regex_and_merges_on_a_real_repository() -> Result<(), String> {
         h.repo.search("contents:login()", false)?,
         [h.login.as_str()]
     );
-    assert_eq!(h.repo.search("contents:NAïVE", false)?, [h.resume.as_str()]);
+    assert_eq!(h.repo.search("contents:naïve", false)?, [h.resume.as_str()]);
+    // With a name or message to match, git ignores the case of A to Z in changes too.
+    assert_eq!(h.repo.search("contents:NAïVE author:zoë", false)?, [h.resume.as_str()]);
     assert_eq!(
         h.repo.search("regex:feature_[a-z]+", false)?,
         [h.feature.as_str()]
@@ -607,5 +617,30 @@ fn a_plain_query_is_the_search_it_always_was() -> Result<(), String> {
     // Quotes and colons in plain text are only characters.
     assert!(h.repo.search("\"login bug\"", false)?.is_empty());
     assert_eq!(h.repo.search("Merge feature", false)?, [h.merge.as_str()]);
+    Ok(())
+}
+
+#[test]
+fn case_and_hashes_with_operators_match_the_plain_search() -> Result<(), String> {
+    let h = history("case-hash")?;
+    // Code is case-sensitive with or without operators that only narrow.
+    assert!(h.repo.search("LOGIN()", true)?.is_empty());
+    assert!(h.repo.search("LOGIN() path:src", true)?.is_empty());
+    assert!(h.repo.search("contents:LOGIN()", false)?.is_empty());
+    assert_eq!(h.repo.search("login() path:src", true)?, [h.login.as_str()]);
+    // A hash in the free text finds its commit first, when the operators match it.
+    let short = &h.login[..7];
+    let found = h.repo.search(&format!("{short} path:src"), false)?;
+    assert_eq!(found.first().map(String::as_str), Some(h.login.as_str()));
+    assert!(
+        h.repo
+            .search(&format!("{short} path:docs"), false)?
+            .is_empty()
+    );
+    assert!(
+        h.repo
+            .search(&format!("{short} author:alice"), false)?
+            .is_empty()
+    );
     Ok(())
 }

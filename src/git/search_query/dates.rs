@@ -13,6 +13,15 @@ pub struct GitDate {
     pub day: Option<(i32, u32, u32)>,
 }
 
+/// The longest span back a relative date may name: further would reach before 1970.
+const MAX_YEARS: u32 = 50;
+/// git reads a day from 2100 on as one of this year.
+const LAST_YEAR: u32 = 2099;
+
+/// How dates are written, for the hints and the help.
+pub const DATE_FORMATS: &str = "2024-05-01, 2024-05, 2024, today, yesterday, or a time ago: \
+    12h, 3d, 2w, 6m (months), 1y";
+
 /// What `value` means as a date, or why it isn't one.
 pub fn git_date(value: &str) -> Result<GitDate, String> {
     let lower = value.to_lowercase();
@@ -26,8 +35,8 @@ pub fn git_date(value: &str) -> Result<GitDate, String> {
     }
     let (y, m, d) = day(&lower).ok_or_else(|| {
         format!(
-            "“{value}” is not a date: write 2024-05-01, 2024-05, 2024, today, yesterday, or a \
-             number with h, d, w, m or y (2w is two weeks ago)"
+            "“{value}” is not a date: write {DATE_FORMATS} (at most {MAX_YEARS} years back, \
+             days up to {LAST_YEAR})"
         )
     })?;
     Ok(GitDate {
@@ -44,15 +53,17 @@ fn relative(value: &str) -> Option<String> {
         return None;
     }
     let n: u32 = number.parse().ok()?;
-    let unit = match unit {
-        'h' => "hours",
-        'd' => "days",
-        'w' => "weeks",
-        'm' => "months",
-        'y' => "years",
+    // git reads spans reaching before 1970 (or overflowing) as some other date: at most
+    // MAX_YEARS back.
+    let (unit, most) = match unit {
+        'h' => ("hours", MAX_YEARS * 8_760),
+        'd' => ("days", MAX_YEARS * 365),
+        'w' => ("weeks", MAX_YEARS * 52),
+        'm' => ("months", MAX_YEARS * 12),
+        'y' => ("years", MAX_YEARS),
         _ => return None,
     };
-    Some(format!("{n}.{unit}.ago"))
+    (n <= most).then(|| format!("{n}.{unit}.ago"))
 }
 
 /// `2024-05-01`, `2024-05` (its first day) or `2024` (its first day).
@@ -61,7 +72,7 @@ fn day(value: &str) -> Option<(i32, u32, u32)> {
     let year = number(parts.next()?, 4, 4)?;
     let month = parts.next().map_or(Some(1), |m| number(m, 1, 2))?;
     let day = parts.next().map_or(Some(1), |d| number(d, 1, 2))?;
-    if parts.next().is_some() || !(1970..=9999).contains(&year) {
+    if parts.next().is_some() || !(1970..=LAST_YEAR).contains(&year) {
         return None;
     }
     let (year, month, day) = (year as i32, month, day);
@@ -98,13 +109,11 @@ pub fn date_suggestions() -> Vec<DateSuggestion> {
         .map_or(0, |d| d.as_secs());
     let (year, month, _) = civil_from_days((now / 86_400) as i64);
     let mut out: Vec<DateSuggestion> = [
-        ("today", "since midnight"),
-        ("yesterday", "since yesterday's midnight"),
+        ("today", "midnight today"),
+        ("yesterday", "midnight yesterday"),
         ("1w", "one week ago"),
-        ("2w", "two weeks ago"),
         ("1m", "one month ago"),
         ("3m", "three months ago"),
-        ("6m", "six months ago"),
         ("1y", "one year ago"),
     ]
     .into_iter()
@@ -151,6 +160,9 @@ mod tests {
             ("6m", "6.months.ago"),
             ("1Y", "1.years.ago"),
             ("0d", "0.days.ago"),
+            ("50y", "50.years.ago"),
+            ("600m", "600.months.ago"),
+            ("18250d", "18250.days.ago"),
             ("today", "midnight"),
             ("Yesterday", "yesterday.midnight"),
         ] {
@@ -219,7 +231,7 @@ mod tests {
     #[test]
     fn suggested_dates_are_all_dates() {
         let suggestions = date_suggestions();
-        assert!(suggestions.len() >= 10);
+        assert_eq!(suggestions.len(), 8);
         for s in suggestions {
             assert!(git_date(&s.value).is_ok(), "{}", s.value);
         }

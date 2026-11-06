@@ -91,7 +91,7 @@ impl<'a> Parser<'a> {
             Some(TokenProblem::Unclosed) => {
                 return Err(self.error(
                     token.value_start,
-                    "This quote is not closed: add a \" at the end of the value".to_owned(),
+                    "This quote is not closed: add a closing \"".to_owned(),
                 ));
             }
             Some(TokenProblem::AfterQuote) => {
@@ -164,7 +164,7 @@ impl<'a> Parser<'a> {
             _ => {
                 return Err(self.error(
                     start,
-                    "merges: takes no value: write merges: for only merges, -merges: for none"
+                    "merges: takes no value (or yes / no): merges: for only merges, -merges: for none"
                         .to_owned(),
                 ));
             }

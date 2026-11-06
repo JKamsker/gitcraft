@@ -13,7 +13,7 @@ mod token;
 mod tests;
 
 pub use self::args::{Plan, prepare};
-pub use self::dates::date_suggestions;
+pub use self::dates::{DATE_FORMATS, date_suggestions};
 pub use self::operator::Operator;
 pub use self::run::{Person, people, run};
 pub use self::token::{quote_value, token_at};
