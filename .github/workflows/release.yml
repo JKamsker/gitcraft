@@ -1,10 +1,13 @@
 # Builds gitcraft for Windows, Linux and macOS and publishes a GitHub release when a `v*` tag is pushed.
+# Every push to `dev` publishes a prerelease of the next patch version, `vX.Y.Z-dev.N` (N is
+# the run number).
 # Run it by hand (Actions › Release › Run workflow) to only build and download the artifacts.
 name: Release
 
 on:
   push:
     tags: ["v*"]
+    branches: [dev]
   workflow_dispatch:
 
 # Read-only for the builds (they run tests, build scripts and downloaded tools); only the
@@ -12,8 +15,48 @@ on:
 permissions:
   contents: read
 
+# A newer push to dev replaces a dev build still running; tag builds always finish.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/dev' }}
+
 jobs:
+  # The version this run builds and the name its files carry. A tag or a run by hand builds
+  # Cargo.toml's version. A dev push builds the next patch after the last release, as a
+  # prerelease (Cargo.toml's version itself while it has no tag yet).
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      label: ${{ steps.version.outputs.label }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        env:
+          DEV: ${{ github.event_name == 'push' && github.ref == 'refs/heads/dev' }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          version="$(grep -m 1 '^version = ' Cargo.toml | cut -d '"' -f 2)"
+          if [ "$DEV" = true ]; then
+            if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
+              patch="${version##*.}"
+              version="${version%.*}.$((patch + 1))"
+            fi
+            version="$version-dev.$RUN_NUMBER"
+            label="v$version"
+          else
+            # Made safe for a file name (a branch like `feature/x` has a slash).
+            label="$(printf '%s' "$REF_NAME" | tr -c 'A-Za-z0-9._-' '-')"
+          fi
+          echo "$version, files named $label"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "label=$label" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$DEV" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -27,21 +70,26 @@ jobs:
           - os: macos-latest
             name: macos-universal
     runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      # The base of every file name.
+      PKG: gitcraft-${{ needs.version.outputs.label }}-${{ matrix.name }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      # The base of every file name. The tag or branch reaches the scripts only through the
-      # environment, made safe for a file name (a branch like `feature/x` has a slash).
-      - name: Package name
+      # The version into Cargo.toml and Cargo.lock, so the app, the .exe's details and the
+      # packages all carry it (nothing changes unless this is a dev build). On Windows the
+      # checkout has CRLF line ends.
+      - name: Version
         shell: bash
-        env:
-          REF_NAME: ${{ github.ref_name }}
-          TARGET: ${{ matrix.name }}
         run: |
-          ref="$(printf '%s' "$REF_NAME" | tr -c 'A-Za-z0-9._-' '-')"
-          echo "PKG=gitcraft-$ref-$TARGET" >> "$GITHUB_ENV"
+          perl -0pi.bak -e 's/^version = "[^"]*"/version = "$ENV{VERSION}"/m' Cargo.toml
+          perl -0pi.bak -e 's/(name = "gitcraft"\r?\nversion = ")[^"]*/$1$ENV{VERSION}/' Cargo.lock
+          rm Cargo.toml.bak Cargo.lock.bak
+          grep -q "^version = \"$VERSION\"" Cargo.toml
+          grep -q "^version = \"$VERSION\"" Cargo.lock
 
       - name: Linux build dependencies
         if: runner.os == 'Linux'
@@ -70,8 +118,8 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           name="$PKG"
-          version="$(grep -m 1 '^version = ' Cargo.toml | cut -d '"' -f 2)"
-          sh packaging/macos/build-app.sh "$version" "$name"
+          # Bundle versions are numbers only, without the `-dev.N`.
+          sh packaging/macos/build-app.sh "${VERSION%%-*}" "$name"
           # Both architectures, signed, and the disk image is sound.
           mkdir check
           ditto -x -k "$name.zip" check
@@ -96,8 +144,7 @@ jobs:
         shell: pwsh
         run: |
           choco install innosetup --no-progress -y
-          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /Qp "/DAppVersion=$version" "/DOutputName=$($env:PKG)-setup" packaging\windows\gitcraft.iss
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /Qp "/DAppVersion=$($env:VERSION)""/DOutputName=$($env:PKG)-setup" packaging\windows\gitcraft.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Move-Item dist\*.exe .
 
@@ -156,8 +203,8 @@ jobs:
             gitcraft-*.rpm
 
   release:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/')
+    needs: [version, build]
+    if: startsWith(github.ref, 'refs/tags/') || needs.version.outputs.prerelease == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -166,7 +213,13 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+      # A dev build tags its own commit and never becomes the latest release, the one the
+      # app's update check follows.
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*
+          tag_name: ${{ needs.version.outputs.label }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ needs.version.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.version.outputs.prerelease != 'true' }}
           generate_release_notes: true
