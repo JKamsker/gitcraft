@@ -26,6 +26,10 @@ pub enum Then {
     },
     /// A commit, by its full hash.
     Commit(String),
+    /// A pull request, by its number.
+    PullRequest(u64),
+    /// No clone of a linked repository was found: offer to clone it from this URL.
+    Clone(String),
     /// Two commits, by full hash, with the names they were given.
     Compare {
         base: String,
@@ -38,7 +42,14 @@ pub enum Then {
 
 /// Resolves `cmd`, its relative paths taken from `cwd`.
 pub fn resolve(cmd: &Command, cwd: &Path) -> Result<Resolved, String> {
+    resolve_among(cmd, cwd, &[])
+}
+
+/// [`resolve`], a link's clone looked for among `clones` (the open tabs, the recent
+/// repositories).
+pub fn resolve_among(cmd: &Command, cwd: &Path, clones: &[PathBuf]) -> Result<Resolved, String> {
     match cmd {
+        Command::Link(link) => super::open_link::resolve_link(link, clones),
         Command::Open(path) => Ok(Resolved {
             root: repo_root(&absolute(cwd, path))?,
             then: Then::Nothing,

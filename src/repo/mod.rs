@@ -372,6 +372,12 @@ impl RepoTab {
         }
     }
 
+    /// The commit selected, for tests of what opens it.
+    #[cfg(test)]
+    pub(crate) fn selected_commit(&self) -> Option<String> {
+        self.selected_hash()
+    }
+
     /// The file whose history, blame or contents the big area shows, if one is.
     #[cfg(test)]
     pub(crate) fn file_view_path(&self) -> Option<String> {

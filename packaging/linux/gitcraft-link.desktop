@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=gitcraft links
+Comment=Opens gitcraft:// links from the browser in gitcraft
+Exec=gitcraft %u
+Terminal=false
+NoDisplay=true
+MimeType=x-scheme-handler/gitcraft;
+Icon=gitcraft
+StartupWMClass=gitcraft

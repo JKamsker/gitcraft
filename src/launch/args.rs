@@ -8,6 +8,8 @@
 //! gitcraft show <rev>                 that commit, in the repository of this folder
 //! gitcraft compare <a>..<b>           what differs between two commits (`a...b`: since they
 //!                                     diverged)
+//! gitcraft gitcraft://open?url=<link>  a forge's pull request, commit or file, in its clone
+//! gitcraft https://<forge>/<o>/<r>/…   the same
 //! gitcraft -- <folder>                a folder called `log`, `show`…
 //! ```
 
@@ -19,9 +21,14 @@ use std::path::PathBuf;
 pub enum Command {
     Open(PathBuf),
     Log(PathBuf),
-    Blame { file: PathBuf, line: Option<u32> },
+    Blame {
+        file: PathBuf,
+        line: Option<u32>,
+    },
     Show(String),
     Compare(Range),
+    /// A forge's page (`gitcraft://open?url=…`, or its web URL): opened in its clone here.
+    Link(super::link::ForgeLink),
 }
 
 /// Two commits to compare.
@@ -53,6 +60,8 @@ Usage:
   gitcraft show <rev>             a commit of the repository of this folder
   gitcraft compare <a>..<b>       the files that differ between two commits
                                   (a...b: what b changed since they diverged)
+  gitcraft <forge link>           a pull request, commit or file of a forge, in its clone
+                                  (or gitcraft://open?url=<link>)
   gitcraft -- <folder>            a folder named like a command
   gitcraft --help | --version";
 
@@ -94,10 +103,22 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Parsed {
             (Some(flag), _) if flag.starts_with('-') && flag != "-" => {
                 Parsed::Fail(format!("unknown option {flag}\n\n{USAGE}"))
             }
+            (Some(link), []) if is_link(link) => match super::link::parse_any(link) {
+                Ok(link) => Parsed::Run(Some(Command::Link(link))),
+                Err(why) => Parsed::Fail(why),
+            },
             (_, []) => Parsed::Run(Some(Command::Open(cmd.into()))),
             _ => Parsed::Fail(format!("too many arguments\n\n{USAGE}")),
         },
     }
+}
+
+/// Whether an argument is a link rather than a folder: `gitcraft://…`, `https://…`.
+fn is_link(arg: &str) -> bool {
+    ["gitcraft:", "https://", "http://"].iter().any(|p| {
+        arg.get(..p.len())
+            .is_some_and(|head| head.eq_ignore_ascii_case(p))
+    })
 }
 
 fn wrong_count(cmd: &OsString) -> String {

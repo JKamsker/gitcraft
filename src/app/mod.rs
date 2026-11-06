@@ -5,6 +5,7 @@ mod clone;
 mod handoff;
 mod home;
 mod launch;
+mod links;
 mod palette;
 mod panels;
 mod profiles;
@@ -126,6 +127,8 @@ pub struct App {
     tab_drag: Option<TabDrag>,
     /// What gitcraft was started for, being carried out.
     launching: launch::Launching,
+    /// A forge link typed or pasted into the start page.
+    home_link: String,
 }
 
 impl App {
@@ -177,6 +180,7 @@ impl App {
             closed: Vec::new(),
             tab_drag: None,
             launching: Default::default(),
+            home_link: String::new(),
             error: None,
             was_focused: true,
             clone_form: None,

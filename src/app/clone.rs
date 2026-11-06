@@ -50,6 +50,20 @@ impl App {
         });
     }
 
+    /// The URL in the clone form, if it is open (for tests).
+    #[cfg(test)]
+    pub(super) fn clone_url(&self) -> Option<String> {
+        self.clone_form.as_ref().map(|f| f.url.clone())
+    }
+
+    /// Puts `url` in the open clone form, and the folder name it gives.
+    pub(super) fn set_clone_url(&mut self, url: &str) {
+        if let Some(form) = &mut self.clone_form {
+            form.url = url.to_owned();
+            form.name = git::clone_dir_name(&form.url);
+        }
+    }
+
     pub(super) fn clone_dialog(&mut self, ctx: &egui::Context) {
         let Some(form) = &mut self.clone_form else {
             return;

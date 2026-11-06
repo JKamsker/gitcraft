@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 
 /// File name of the entry, apart from the `gitcraft.desktop` a package installs.
 const ENTRY: &str = "gitcraft-appimage.desktop";
+/// The entry that opens `gitcraft://` links with this AppImage (not in the menu).
+const LINK_ENTRY: &str = "gitcraft-appimage-link.desktop";
 const ICON: &[u8] = include_bytes!("../assets/app-icon/gitcraft-256.png");
 
 /// The AppImage file gitcraft runs from (its runtime sets `APPIMAGE`), on Linux.
@@ -34,6 +36,10 @@ fn entry_path(data: &Path) -> PathBuf {
     data.join("applications").join(ENTRY)
 }
 
+fn link_entry_path(data: &Path) -> PathBuf {
+    data.join("applications").join(LINK_ENTRY)
+}
+
 fn icon_path(data: &Path) -> PathBuf {
     data.join("icons/hicolor/256x256/apps/gitcraft.png")
 }
@@ -52,7 +58,7 @@ pub fn install(appimage: &Path) -> Result<(), String> {
 /// Removes the menu entry and its icon.
 pub fn uninstall() -> Result<(), String> {
     let data = data_home().ok_or("No home folder")?;
-    for path in [entry_path(&data), icon_path(&data)] {
+    for path in [entry_path(&data), link_entry_path(&data), icon_path(&data)] {
         match std::fs::remove_file(&path) {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
@@ -87,7 +93,25 @@ fn write_entry(data: &Path, appimage: &Path) -> std::io::Result<()> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
-    std::fs::write(&path, entry(appimage))
+    std::fs::write(&path, entry(appimage))?;
+    std::fs::write(link_entry_path(data), link_entry(appimage))
+}
+
+/// The entry that hands `gitcraft://` links to `appimage`.
+fn link_entry(appimage: &Path) -> String {
+    let exec = quote_exec(&appimage.to_string_lossy());
+    format!(
+        "[Desktop Entry]\n\
+         Type=Application\n\
+         Name=gitcraft links\n\
+         Comment=Opens gitcraft:// links from the browser in gitcraft\n\
+         Exec={exec} %u\n\
+         Terminal=false\n\
+         NoDisplay=true\n\
+         MimeType=x-scheme-handler/gitcraft;\n\
+         Icon=gitcraft\n\
+         StartupWMClass=gitcraft\n"
+    )
 }
 
 fn entry(appimage: &Path) -> String {
@@ -154,10 +178,16 @@ mod tests {
         let icon = std::fs::metadata(icon_path(&data))
             .map(|m| m.len())
             .unwrap_or(0);
+        let link = std::fs::read_to_string(link_entry_path(&data)).unwrap_or_default();
         let _ = std::fs::remove_dir_all(&data);
         assert!(ok);
         assert!(text.contains("Exec=\"/opt/gitcraft-v0.2.0.AppImage\" %f\n"));
         assert!(text.contains("TryExec=/opt/gitcraft-v0.2.0.AppImage\n"));
+        assert!(
+            link.contains("Exec=\"/opt/gitcraft-v0.2.0.AppImage\" %u\n"),
+            "{link}"
+        );
+        assert!(link.contains("MimeType=x-scheme-handler/gitcraft;\n"));
         assert_eq!(icon, ICON.len() as u64);
         assert_ne!(text, entry(Path::new("/opt/gitcraft-v0.2.1.AppImage")));
     }
