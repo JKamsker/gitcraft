@@ -171,6 +171,8 @@ fn found(query: &str) -> Vec<(Page, usize)> {
                     theme: crate::theme::ThemeKind::Dark,
                     git_version: "2.45.0",
                     dialog_open: false,
+                    update: UpdateCheck::NotYet,
+                    check_updates_now: false,
                     request: None,
                 };
                 settings.page_ui(ui, page, &filter, &mut view);

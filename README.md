@@ -215,9 +215,10 @@ so your config, credentials and hooks apply as usual.
   Cached on disk; can be turned off.
 - Settings (Ctrl+, or the gear in the title bar), in pages listed on the left: the profile in
   use and what is its own, zoom, branch column width, graph columns, avatars, notifications,
-  update check, background fetch, keeping submodules up to date, editor command, default shell
-  and terminal font size, saved identities, SSH sign-ins, and every keyboard shortcut. Ctrl+F
-  searches all pages at once (Esc clears it); Alt+↑ / Alt+↓ go through the pages.
+  update check (with a Check for updates button), background fetch, keeping submodules up to
+  date, editor command, default shell and terminal font size, saved identities, SSH sign-ins,
+  and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
+  Alt+↓ go through the pages.
 - Commit signing in Settings → Commit signing: the format (OpenPGP, SSH or X.509), signing key
   and program, and whether commits and tags are signed by default. These are your global git
   config's `gpg.format`, `user.signingkey`, `gpg.program` (`gpg.ssh.program`, `gpg.x509.program`),
@@ -357,8 +358,8 @@ was made this way, on a demo repository.
 | `src/update.rs`          | new-release check                                                                  |
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |
 | `src/shell_path.rs`      | on macOS, the login shell's PATH for the commands gitcraft starts                  |
-| `src/remote.rs` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
-| `src/settings.rs`        | user settings and their form                                                       |
+| `src/remote/` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
+| `src/settings/`          | user settings, profiles, and the settings pages                                    |
 | `src/manual.rs`          | the manual (F1): features and keyboard shortcuts                                   |
 | `src/theme.rs`           | colour tokens, fonts, egui style (PhotoCraft's Pro themes)                         |
 | `src/icons.rs`           | embedded Lucide SVG icons, tinted                                                  |

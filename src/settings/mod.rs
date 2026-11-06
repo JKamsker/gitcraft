@@ -376,6 +376,43 @@ impl Settings {
                                 .color(t.text_dim),
                         );
                     });
+                    card.row("Check now", "check for updates new version look", |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            let checking = view.update == UpdateCheck::Checking;
+                            if ui
+                                .add_enabled(!checking, egui::Button::new("Check for updates"))
+                                .on_hover_text(format!(
+                                    "Looks on GitHub for a newer version on the {} channel",
+                                    self.update_channel.label()
+                                ))
+                                .clicked()
+                            {
+                                view.check_updates_now = true;
+                            }
+                            match &view.update {
+                                UpdateCheck::NotYet => {}
+                                UpdateCheck::Checking => {
+                                    ui.add(crate::spinner::Spinner::new());
+                                    layout::note(ui, "Looking…");
+                                }
+                                UpdateCheck::UpToDate => {
+                                    layout::note(ui, "This is the newest version");
+                                }
+                                UpdateCheck::Found(version) => {
+                                    ui.label(
+                                        RichText::new(format!(
+                                            "gitcraft {version} is out: see the bar at the top"
+                                        ))
+                                        .color(t.success)
+                                        .small(),
+                                    );
+                                }
+                                UpdateCheck::Failed(e) => {
+                                    ui.label(RichText::new(e).color(t.danger).small());
+                                }
+                            }
+                        });
+                    });
                     card.row("New versions", "check download github restart", |ui| {
                         ui.checkbox(
                             &mut self.check_updates,
@@ -410,11 +447,26 @@ impl Settings {
                 section(ui, f, "Appearance", None, |card| {
                     card.row("Zoom", "scale size interface ui", |ui| {
                         ui.spacing_mut().slider_width = layout::fit(ui, SLIDER_WIDTH + 70.0) - 70.0;
-                        ui.add(layout::slider(
-                            egui::Slider::new(&mut self.ui_scale, 0.7..=2.0)
+                        // Zooming moves the slider under the pointer, which would move the value
+                        // again: while it is dragged, the value waits aside and is applied when
+                        // it is let go. A click or the arrow keys apply it at once.
+                        let pending = egui::Id::new("settings-zoom-dragged");
+                        let mut zoom = ui
+                            .data(|d| d.get_temp::<f32>(pending))
+                            .unwrap_or(self.ui_scale);
+                        let slider = ui.add(layout::slider(
+                            egui::Slider::new(&mut zoom, 0.7..=2.0)
                                 .step_by(0.05)
                                 .custom_formatter(|v, _| format!("{:.0} %", v * 100.0)),
                         ));
+                        if slider.dragged() {
+                            ui.data_mut(|d| d.insert_temp(pending, zoom));
+                        } else {
+                            ui.data_mut(|d| d.remove::<f32>(pending));
+                            if slider.changed() || slider.drag_stopped() {
+                                self.ui_scale = zoom;
+                            }
+                        }
                     });
                     card.row(
                         "Code colours",
@@ -688,6 +740,19 @@ impl Settings {
             }
         }
     }
+}
+
+/// Where the look for a newer version stands, as the settings page shows it.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum UpdateCheck {
+    /// Not looked yet (looking on start is off).
+    #[default]
+    NotYet,
+    Checking,
+    UpToDate,
+    /// This version is out.
+    Found(String),
+    Failed(String),
 }
 
 /// The pages of the settings, in the order of their tabs.

@@ -162,7 +162,10 @@ impl Images {
             return None;
         }
         self.tried += 1;
-        let bytes = git::file_at(repo, side.rev.as_deref(), &path).ok()?;
+        let bytes = match side.rev {
+            None => working_tree_image(repo, &path)?,
+            Some(_) => git::file_at(repo, side.rev.as_deref(), &path).ok()?,
+        };
         if bytes.is_empty() || bytes.len() > MAX_IMAGE_BYTES {
             return None;
         }
@@ -442,6 +445,41 @@ fn markdown(ui: &mut Ui, cache: &mut CommonMarkCache, text: &str, width: f32) {
         .show(ui, cache, text);
 }
 
+/// The working tree's image `path` (a path in the repository, `/` between names), when it is a
+/// plain file of the repository (see [`working_tree_file_inside`]). On another machine, checked
+/// and read there in one go, never more than an image's limit.
+fn working_tree_image(repo: &Path, path: &str) -> Option<Vec<u8>> {
+    if let Some(read) = crate::remote::read_within(repo, path, MAX_IMAGE_BYTES as u64) {
+        return read.ok().flatten();
+    }
+    if !working_tree_file_inside(repo, path) {
+        return None;
+    }
+    git::file_at(repo, None, path).ok()
+}
+
+/// Whether the working tree's `path` (a path in the repository, `/` between names) is a file
+/// of the repository here, not reached through a folder that is a link (`docs/l -> /` would
+/// read anything), nor larger than an image is taken.
+fn working_tree_file_inside(repo: &Path, path: &str) -> bool {
+    let mut at = repo.to_path_buf();
+    let names: Vec<&str> = path.split('/').filter(|n| !n.is_empty()).collect();
+    for (i, name) in names.iter().enumerate() {
+        at.push(name);
+        let Ok(meta) = std::fs::symlink_metadata(&at) else {
+            return false;
+        };
+        let last = i + 1 == names.len();
+        if !last && meta.file_type().is_symlink() {
+            return false;
+        }
+        if last && meta.is_file() && meta.len() > MAX_IMAGE_BYTES as u64 {
+            return false;
+        }
+    }
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -562,6 +600,38 @@ mod tests {
              [![badge](bytes://markdown/1/badge.svg)](https://ci.example)"
         );
         assert_eq!(kept.len(), 2);
+    }
+
+    /// A folder of the working tree that is a link reads nothing through it; a file in a plain
+    /// folder is read.
+    #[cfg(unix)]
+    #[test]
+    fn working_tree_images_never_go_through_a_linked_folder() -> Result<(), String> {
+        let dir = std::env::temp_dir().join(format!("gitcraft-md-link-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("docs")).map_err(|e| e.to_string())?;
+        std::fs::write(dir.join("docs/s.png"), "picture").map_err(|e| e.to_string())?;
+        std::os::unix::fs::symlink("/", dir.join("docs/l")).map_err(|e| e.to_string())?;
+        let plain = working_tree_file_inside(&dir, "docs/s.png");
+        let linked = working_tree_file_inside(&dir, "docs/l/etc/hostname");
+        let missing = working_tree_file_inside(&dir, "docs/none.png");
+        // And as the rendered file's images are read: nothing through the link.
+        let mut images = Images::default();
+        let side = Side {
+            rev: None,
+            path: "docs/a.md".to_owned(),
+        };
+        let through_link = images.local(&dir, &side, "l/etc/hostname");
+        let read_after_link = images.found.len();
+        let beside = images.local(&dir, &side, "s.png");
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(plain);
+        assert!(!linked);
+        assert!(!missing);
+        assert_eq!((through_link, read_after_link), (None, 0));
+        assert!(beside.is_some());
+        assert_eq!(images.found.len(), 1);
+        Ok(())
     }
 
     #[test]

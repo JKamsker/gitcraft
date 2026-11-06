@@ -49,13 +49,19 @@ impl App {
                 || self.askpass_open()
                 || self.palette.is_some()
                 || self.manual_open,
+            update: self.update_check(),
+            check_updates_now: false,
             request: None,
         };
         if self.settings.page(ui, &mut view) {
             self.settings.set(&ctx);
         }
+        let check_now = view.check_updates_now;
         if let Some(request) = view.request {
             self.profile_request(request, &ctx);
+        }
+        if check_now {
+            self.check_update_now(&ctx);
         }
     }
 
