@@ -1,14 +1,20 @@
 //! The repository doctor, in the big area: a page of sections that explain why git behaves as
-//! it does here (which setting wins, which tracked files it was told not to look at) and fix
+//! it does here (why a file is ignored and what attributes it has, which setting wins, which
+//! tracked files it was told not to look at) and fix
 //! what was set by mistake. Everything is read in the background; changes run as the tab's
 //! operations, and the section is read again once they are done.
 
 mod config_section;
 mod flags_section;
+mod ignore;
+mod ignore_section;
 mod page;
 
 use std::collections::HashSet;
 use std::path::PathBuf;
+
+pub(crate) use ignore::IgnoreAct;
+use ignore::IgnoreState;
 
 use super::{Action, Refresh, RepoTab};
 use crate::git::doctor::config::{self, Origin, Scope};
@@ -17,15 +23,17 @@ use crate::git::doctor::flags::{self, Flag, Flagged, Sparse};
 /// The doctor's sections, in the order they are listed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Section {
+    Ignore,
     Config,
     Flags,
 }
 
 impl Section {
-    pub(crate) const ALL: [Section; 2] = [Section::Config, Section::Flags];
+    pub(crate) const ALL: [Section; 3] = [Section::Ignore, Section::Config, Section::Flags];
 
     pub(crate) fn title(self) -> &'static str {
         match self {
+            Section::Ignore => "Ignore rules and attributes",
             Section::Config => "Which configuration wins",
             Section::Flags => "Hidden changes",
         }
@@ -33,6 +41,7 @@ impl Section {
 
     fn icon(self) -> &'static str {
         match self {
+            Section::Ignore => "eye",
             Section::Config => "settings",
             Section::Flags => "eye-off",
         }
@@ -54,6 +63,8 @@ pub(crate) enum DoctorAct {
     Answer(bool),
     /// Read what a setting is in every worktree of the repository.
     CompareWorktrees(&'static str),
+    /// Something done in the ignore-and-attributes section.
+    Ignore(IgnoreAct),
 }
 
 /// A change the doctor asks about before making it.
@@ -120,6 +131,7 @@ pub(crate) struct DoctorView {
     waiting: bool,
     /// The change being asked about.
     confirm: Option<Confirm>,
+    ignore: IgnoreState,
     config: ConfigState,
     flags: FlagsState,
 }
@@ -151,6 +163,7 @@ impl RepoTab {
                 read: 0,
                 waiting: false,
                 confirm: None,
+                ignore: IgnoreState::default(),
                 config: ConfigState::default(),
                 flags: FlagsState::default(),
             })
@@ -198,6 +211,7 @@ impl RepoTab {
                 }
             }
             DoctorAct::CompareWorktrees(key) => self.compare_worktrees(key, ctx),
+            DoctorAct::Ignore(act) => self.ignore_act(act, ctx),
         }
     }
 
@@ -224,6 +238,7 @@ impl RepoTab {
         doctor.read += 1;
         let read = doctor.read;
         match doctor.section {
+            Section::Ignore => self.load_ignore(read, ctx),
             Section::Config => {
                 doctor.config.origins = None;
                 doctor.config.worktrees = None;
