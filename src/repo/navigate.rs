@@ -53,6 +53,7 @@ impl RepoTab {
         if hash == WIP_HASH {
             self.detail = None;
             self.detail_hash = None;
+            self.drop_extras();
             return;
         }
         self.load_detail(hash, ctx);

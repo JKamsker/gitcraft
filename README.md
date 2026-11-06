@@ -193,14 +193,17 @@ so your config, credentials and hooks apply as usual.
   file's menu).
 - _View all files_ under a commit's files lists every file of the commit, not only those it
   changed; click one to read it as it was in that commit.
-- A commit's details fold out four more sections, each read in the background once the commit
-  is selected: its **Signature** (valid, invalid, unknown key, unsigned or not checked, for GPG,
-  SSH and X.509, with the signer, the key and git's own output; history is read with signature
-  checks off, so only the commit selected is checked), where it is **Contained in** (the
-  branches and tags that have it and the first release after it, `describe --contains`), its
-  **Notes** (add, edit and delete git notes in any namespace; fetch or push a namespace from a
-  remote) and its **Backlinks** (later commits that mention its hash: reverts, cherry-picks and
-  trailers such as `Fixes:` apart from plain mentions; click one to open it).
+- A commit's details fold out four more sections, read in the background once the selection
+  rests on a commit: its **Signature** (whether it is valid, and if not why: untrusted key,
+  expired, revoked, invalid, unknown key, unsigned or not checked, for GPG, SSH and X.509, with
+  the signer, the key and git's own output; history is read with signature checks off, so only
+  the commit selected is checked, and _Check again_ re-checks it after you import a key), where
+  it is **Contained in** (the branches and tags that have it and the first tag after it,
+  `describe --contains`), its **Notes** (add, edit and delete git notes in any namespace; fetch
+  a namespace from a remote or push it to one. Neither overwrites: when both sides have notes
+  the other lacks, it stops, and `git notes merge` on the command line combines them) and its
+  **Backlinks** (later commits that mention its hash: reverts, cherry-picks and trailers such
+  as `Fixes:` apart from plain mentions; click one to open it).
 
 **Toolbar, terminal, app**
 

@@ -38,13 +38,13 @@ pub(super) fn section(
     }
 }
 
-/// "2 branches · 3 tags · first in v1.0".
+/// "2 branches · 3 tags · first tag v1.0".
 pub(super) fn headline(c: &Containment) -> String {
     let branches = c.local.total + c.remote.total;
     let mut parts = vec![count(branches, "branch", "branches")];
     parts.push(count(c.tags.total, "tag", "tags"));
     if let Some(tag) = c.first_tag() {
-        parts.push(format!("first in {tag}"));
+        parts.push(format!("first tag {tag}"));
     }
     parts.join(" · ")
 }
@@ -62,18 +62,25 @@ fn body(ui: &mut Ui, c: &Containment) {
     match (&c.describe, c.first_tag()) {
         (Some(describe), Some(tag)) => {
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("First release").color(t.text_faint));
+                ui.label(RichText::new("First tag with it").color(t.text_faint));
                 widgets::chip(ui, tag, t.success)
                     .on_hover_text(format!("git describe --contains: {describe}"));
             });
         }
-        _ => section::faint(ui, "No tag contains it yet: it isn't in a release."),
+        _ => section::faint(ui, "No tag contains it yet."),
     }
     names(ui, "Branches", &c.local, t.accent);
     names(ui, "Remote branches", &c.remote, t.text_dim);
-    names(ui, "Tags", &c.tags, t.warning);
+    names(ui, "Tags", &c.tags, t.text_dim);
     if c.local.total + c.remote.total == 0 {
-        section::faint(ui, "No branch has it: only tags, or nothing, keep it.");
+        if c.tags.total > 0 {
+            section::faint(ui, "No branch has it, only tags.");
+        } else {
+            section::faint(
+                ui,
+                "No branch or tag has it. Git may delete it when it cleans up; create a branch to keep it.",
+            );
+        }
     }
 }
 
@@ -111,6 +118,6 @@ mod tests {
         c.remote.total = 2;
         c.tags.total = 1;
         c.describe = Some("v1.0~2".to_owned());
-        assert_eq!(headline(&c), "3 branches · 1 tag · first in v1.0");
+        assert_eq!(headline(&c), "3 branches · 1 tag · first tag v1.0");
     }
 }

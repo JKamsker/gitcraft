@@ -30,8 +30,8 @@ pub(super) fn section(
             section::error(ui, e);
         }
         match notes.draft.take() {
-            Some(draft) => notes.draft = editor(ui, notes.saving, draft, cmds),
-            None => note(ui, notes, cmds),
+            Some(draft) => notes.draft = editor(ui, notes.saving, idle, draft, cmds),
+            None => note(ui, notes, idle, cmds),
         }
         ui.add_space(4.0);
         share(ui, notes, remotes, idle, cmds);
@@ -51,13 +51,26 @@ fn first_line(text: &str) -> String {
 fn namespace_picker(ui: &mut Ui, notes: &mut Notes, cmds: &mut Vec<ExtrasCmd>) {
     let t = Tokens::get(ui.ctx());
     let current = notes.namespace.clone().unwrap_or_default();
+    // Not while a note is being written in this one.
+    let writing = notes.draft.is_some();
+    ui.horizontal_wrapped(|ui| {
+        ui.add_enabled_ui(!writing, |ui| namespace_choices(ui, notes, &current, cmds))
+            .response
+            .on_disabled_hover_text("Save or cancel the note first");
+    });
+    let _ = t;
+}
+
+/// The namespace list and the field for a new one.
+fn namespace_choices(ui: &mut Ui, notes: &mut Notes, current: &str, cmds: &mut Vec<ExtrasCmd>) {
+    let t = Tokens::get(ui.ctx());
     ui.horizontal_wrapped(|ui| {
         ui.label(RichText::new("Namespace").color(t.text_faint));
         egui::ComboBox::from_id_salt("notes_namespace")
-            .selected_text(&current)
+            .selected_text(current)
             .show_ui(ui, |ui| {
                 for name in &notes.namespaces {
-                    if ui.selectable_label(*name == current, name).clicked() && *name != current {
+                    if ui.selectable_label(name == current, name).clicked() && name != current {
                         cmds.push(ExtrasCmd::PickNamespace(name.clone()));
                     }
                 }
@@ -78,7 +91,7 @@ fn namespace_picker(ui: &mut Ui, notes: &mut Notes, cmds: &mut Vec<ExtrasCmd>) {
 }
 
 /// The note shown, with Edit and Delete; Add note when there is none.
-fn note(ui: &mut Ui, notes: &mut Notes, cmds: &mut Vec<ExtrasCmd>) {
+fn note(ui: &mut Ui, notes: &mut Notes, idle: bool, cmds: &mut Vec<ExtrasCmd>) {
     let t = Tokens::get(ui.ctx());
     let busy = notes.saving;
     match &notes.note {
@@ -106,7 +119,10 @@ fn note(ui: &mut Ui, notes: &mut Notes, cmds: &mut Vec<ExtrasCmd>) {
             ui.horizontal(|ui| {
                 if notes.confirm_delete {
                     ui.label(RichText::new("Delete this note?").color(t.danger));
-                    if ui.add_enabled(!busy, egui::Button::new("Delete")).clicked() {
+                    if ui
+                        .add_enabled(!busy && idle, egui::Button::new("Delete"))
+                        .clicked()
+                    {
                         cmds.push(ExtrasCmd::DeleteNote);
                     }
                     if ui.button("Keep").clicked() {
@@ -135,6 +151,7 @@ fn note(ui: &mut Ui, notes: &mut Notes, cmds: &mut Vec<ExtrasCmd>) {
 fn editor(
     ui: &mut Ui,
     saving: bool,
+    idle: bool,
     mut draft: String,
     cmds: &mut Vec<ExtrasCmd>,
 ) -> Option<String> {
@@ -148,9 +165,14 @@ fn editor(
     );
     let save_keys =
         edit.has_focus() && ui.input(|i| i.modifiers.command && i.key_pressed(egui::Key::Enter));
-    let mut keep = true;
+    // Escape in the editor (egui has taken the focus away for it) cancels it, and goes no
+    // further: the diff or search behind stays open.
+    let cancel_keys = edit.lost_focus()
+        && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape));
+    let mut keep = !cancel_keys;
     ui.horizontal(|ui| {
-        let can_save = !saving && !draft.trim().is_empty();
+        // Not while an operation runs: a notes fetch or push would hold the same ref.
+        let can_save = !saving && idle && !draft.trim().is_empty();
         if widgets::primary_button(ui, "Save note", can_save, 90.0).clicked()
             || (save_keys && can_save)
         {
@@ -166,9 +188,12 @@ fn editor(
             ui.add(crate::spinner::Spinner::new().size(12.0));
         } else {
             ui.label(
-                RichText::new(format!("{}+Enter saves", crate::manual::command()))
-                    .small()
-                    .color(t.text_faint),
+                RichText::new(format!(
+                    "{}+Enter saves · Esc cancels",
+                    crate::manual::command()
+                ))
+                .small()
+                .color(t.text_faint),
             );
         }
     });
@@ -207,16 +232,25 @@ fn share(
                 }
             });
         let fetch = ui
-            .add_enabled(idle, egui::Button::new("Fetch"))
+            .add_enabled(idle, egui::Button::new("Fetch notes"))
             .on_hover_text(format!(
-                "Fetch refs/notes/{namespace} from {remote}. Notes made here that {remote} doesn't have stop it rather than being replaced."
-            ));
+                "Gets the notes in “{namespace}” from {remote}. If you have notes here that {remote} doesn't, nothing is changed and the fetch stops: your notes are kept."
+            ))
+            .on_disabled_hover_text("Wait for the operation running to end");
         if fetch.clicked() {
             cmds.push(ExtrasCmd::FetchNotes(remote.clone()));
         }
+        let has_notes = notes.existing.contains(&namespace);
         let push = ui
-            .add_enabled(idle, egui::Button::new("Push"))
-            .on_hover_text(format!("Push refs/notes/{namespace} to {remote}"));
+            .add_enabled(idle && has_notes, egui::Button::new("Push notes"))
+            .on_hover_text(format!(
+                "Sends your notes in “{namespace}” to {remote}. If {remote} has notes you don't, the push is refused."
+            ))
+            .on_disabled_hover_text(if has_notes {
+                "Wait for the operation running to end".to_owned()
+            } else {
+                format!("No notes in “{namespace}” to push yet")
+            });
         if push.clicked() {
             cmds.push(ExtrasCmd::PushNotes(remote.clone()));
         }

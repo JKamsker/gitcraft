@@ -66,7 +66,11 @@ pub(super) fn headline(links: &[Backlink], more: bool) -> String {
         ));
     }
     let text = parts.join(" · ");
-    if more { format!("{text} (more)") } else { text }
+    if more {
+        format!("{text} · only the {BACKLINK_CAP} most recent")
+    } else {
+        text
+    }
 }
 
 fn body(ui: &mut Ui, links: &[Backlink], more: bool, cmds: &mut Vec<ExtrasCmd>) {
@@ -183,6 +187,9 @@ mod tests {
             link(LinkKind::Mention),
         ];
         assert_eq!(headline(&links, false), "2 links · 1 mention");
-        assert_eq!(headline(&links[2..], true), "1 mention (more)");
+        assert_eq!(
+            headline(&links[2..], true),
+            "1 mention · only the 200 most recent"
+        );
     }
 }

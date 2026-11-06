@@ -15,12 +15,17 @@ pub(super) fn section(
     let t = Tokens::get(ui.ctx());
     let summary = match signature {
         None => Summary::Loading,
-        Some(Err(_)) => Summary::Text("Could not check".to_owned(), t.danger),
+        Some(Err(_)) => Summary::Text("Could not be checked".to_owned(), t.danger),
         Some(Ok(sig)) => Summary::Text(headline(sig), verdict_color(&t, &sig.verdict)),
     };
     let mut again = false;
-    let signed = matches!(signature, Some(Ok(sig)) if sig.verdict != Verdict::Unsigned);
-    let refresh = signed.then_some(("Check the signature again", &mut again));
+    // Anything but unsigned can turn out otherwise: a key imported, allowed signers set up.
+    let checkable = match signature {
+        Some(Ok(sig)) => sig.verdict != Verdict::Unsigned,
+        Some(Err(_)) => true,
+        None => false,
+    };
+    let refresh = checkable.then_some(("Check the signature again", &mut again));
     section::section(
         ui,
         "Signature",
@@ -95,7 +100,11 @@ fn body(ui: &mut Ui, sig: &Signature) {
                 row(ui, "Primary key", &sig.primary_key, true);
             }
         });
-    if !sig.raw.trim().is_empty() {
+    if sig.raw.trim().is_empty() {
+        if sig.verdict == Verdict::NotChecked {
+            section::faint(ui, "git gave no output.");
+        }
+    } else {
         section::output_box(ui, "git's output", sig.raw.trim());
     }
 }

@@ -58,6 +58,8 @@ impl RepoTab {
         let mut reword = self.reword.take();
         let mut extras = std::mem::take(&mut self.extras);
         let mut extras_cmds = Vec::new();
+        // How tall the sections are: they don't take room from the message (they scroll).
+        let mut extras_h = 0.0;
         let remotes: Vec<String> = self.remotes.iter().map(|r| r.name.clone()).collect();
         let head = &self.refs.head;
         // A commit of the checked-out branch: double-click its message to edit it (the root
@@ -87,7 +89,9 @@ impl RepoTab {
                         ui.add_space(10.0);
                         meta_grid(ui, acts, detail, builds);
                         if stash.is_none() {
+                            let before = ui.cursor().top();
                             extras.ui(ui, &detail.hash, &remotes, idle, &mut extras_cmds);
+                            extras_h = ui.cursor().top() - before;
                         }
                     });
 
@@ -110,7 +114,7 @@ impl RepoTab {
                         },
                     );
                 }
-                let below = ui.cursor().top() - message_end;
+                let below = ui.cursor().top() - message_end - extras_h;
                 if (below - rest).abs() > 0.5 {
                     ui.data_mut(|d| d.insert_temp(rest_id, below));
                     ui.ctx().request_discard("commit message room");
@@ -119,6 +123,9 @@ impl RepoTab {
         self.reword = reword;
         self.extras = extras;
         self.extras_cmds(extras_cmds, acts, ui.ctx());
+        if stash.is_none() {
+            self.extras_tick(ui.ctx());
+        }
     }
 }
 

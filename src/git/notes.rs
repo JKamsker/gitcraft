@@ -10,9 +10,17 @@ pub const DEFAULT_NOTES: &str = "commits";
 
 const NOTES_PREFIX: &str = "refs/notes/";
 
-/// The namespaces there are notes in, and the one git uses by default (first, whether it has
-/// notes yet or not), as short names (`commits`, `review/ci`).
-pub fn notes_namespaces(repo: &Path) -> Result<Vec<String>, String> {
+/// The notes namespaces of a repository, as short names (`commits`, `review/ci`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct NotesNamespaces {
+    /// The one git uses by default first, whether it has notes yet or not, then the others.
+    pub names: Vec<String>,
+    /// Those that have notes here (a ref).
+    pub existing: Vec<String>,
+}
+
+/// The namespaces there are notes in, and the one git uses by default.
+pub fn notes_namespaces(repo: &Path) -> Result<NotesNamespaces, String> {
     let default = run(Some(repo), &["notes", "get-ref"])
         .map(|r| short_namespace(r.trim()).to_owned())
         .unwrap_or_else(|_| DEFAULT_NOTES.to_owned());
@@ -25,15 +33,20 @@ pub fn notes_namespaces(repo: &Path) -> Result<Vec<String>, String> {
 }
 
 /// `default` first, then the others `refs` (full ref names, one a line) lists.
-pub(super) fn namespace_list(default: &str, refs: &str) -> Vec<String> {
-    let mut list = vec![default.to_owned()];
-    for name in refs.lines().map(str::trim).filter(|l| !l.is_empty()) {
-        let short = short_namespace(name);
-        if !list.iter().any(|n| n == short) {
-            list.push(short.to_owned());
+pub(super) fn namespace_list(default: &str, refs: &str) -> NotesNamespaces {
+    let existing: Vec<String> = refs
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .map(|name| short_namespace(name).to_owned())
+        .collect();
+    let mut names = vec![default.to_owned()];
+    for name in &existing {
+        if !names.contains(name) {
+            names.push(name.clone());
         }
     }
-    list
+    NotesNamespaces { names, existing }
 }
 
 /// `commits` of `refs/notes/commits`.
@@ -170,14 +183,15 @@ mod tests {
 
     #[test]
     fn the_default_namespace_comes_first_and_once() {
-        assert_eq!(
-            namespace_list(
-                "commits",
-                "refs/notes/ci\nrefs/notes/commits\nrefs/notes/review/x\n"
-            ),
-            ["commits", "ci", "review/x"]
+        let list = namespace_list(
+            "commits",
+            "refs/notes/ci\nrefs/notes/commits\nrefs/notes/review/x\n",
         );
-        assert_eq!(namespace_list("mine", ""), ["mine"]);
+        assert_eq!(list.names, ["commits", "ci", "review/x"]);
+        assert_eq!(list.existing, ["ci", "commits", "review/x"]);
+        let none = namespace_list("mine", "");
+        assert_eq!(none.names, ["mine"]);
+        assert!(none.existing.is_empty());
     }
 
     #[test]

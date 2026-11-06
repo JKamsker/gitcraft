@@ -141,7 +141,8 @@ fn ssh_signatures_valid_tampered_unknown_and_unchecked() -> Result<(), String> {
 fn notes_round_trip_in_two_namespaces() -> Result<(), String> {
     let dir = repo("notes")?;
     let hash = commit(&dir, "noted")?;
-    assert_eq!(notes_namespaces(&dir)?, [DEFAULT_NOTES]);
+    assert_eq!(notes_namespaces(&dir)?.names, [DEFAULT_NOTES]);
+    assert!(notes_namespaces(&dir)?.existing.is_empty());
     assert_eq!(read_note(&dir, DEFAULT_NOTES, &hash)?, None);
 
     write_note(
@@ -159,7 +160,8 @@ fn notes_round_trip_in_two_namespaces() -> Result<(), String> {
         read_note(&dir, "refs/notes/review/ci", &hash)?.as_deref(),
         Some("CI passed\n")
     );
-    assert_eq!(notes_namespaces(&dir)?, ["commits", "review/ci"]);
+    assert_eq!(notes_namespaces(&dir)?.names, ["commits", "review/ci"]);
+    assert_eq!(notes_namespaces(&dir)?.existing, ["commits", "review/ci"]);
 
     // Edited in one namespace, the other stays.
     write_note(&dir, "review/ci", &hash, "CI failed, then passed")?;
