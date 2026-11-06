@@ -14,6 +14,7 @@ impl RepoTab {
         // Shown: its first read can't wait any more.
         self.start_deferred(&ctx);
         self.poll(&ctx);
+        self.agents_frame(&ctx);
         let t = Tokens::get(&ctx);
         if self.opening() {
             egui::CentralPanel::default()
@@ -62,6 +63,7 @@ impl RepoTab {
             });
 
         self.dialogs(&ctx, &mut acts);
+        self.agent_dialogs(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
         }

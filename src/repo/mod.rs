@@ -2,6 +2,7 @@
 //! (branches on the left, commit graph or diff in the middle, commit detail / changes on the right).
 
 mod actions;
+mod agents;
 mod apply;
 mod branch_tree;
 mod branch_visibility;
@@ -238,6 +239,8 @@ pub struct RepoTab {
     parked_status: Vec<(PathBuf, &'static str)>,
     /// The app has a dialog of its own open (palette, settings): leave the keys to it.
     pub keys_blocked: bool,
+    /// Agent tasks, the worktree setup recipe and their dialogs.
+    agents: agents::AgentsState,
     /// Long operations that just ended, its own and its parked worktrees': (message, failed),
     /// for a notification each (taken by `App`).
     pub finished: Vec<(String, bool)>,
@@ -359,6 +362,7 @@ impl RepoTab {
             parked: Vec::new(),
             parked_status: Vec::new(),
             keys_blocked: false,
+            agents: Default::default(),
             finished: Vec::new(),
         };
         tab.watch(ctx);

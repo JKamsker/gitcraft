@@ -194,6 +194,21 @@ so your config, credentials and hooks apply as usual.
 - _View all files_ under a commit's files lists every file of the commit, not only those it
   changed; click one to read it as it was in that commit.
 
+**Coding agents**
+
+- _Start agent task…_ (the + of AGENTS on the left, or the palette) makes a branch and a
+  worktree beside the repository, opens it and starts a terminal there running the agent you
+  pick: Claude Code, Codex, Gemini CLI, Cursor Agent, Aider or a command of your own, the task
+  given as its first message. AGENTS lists the tasks with their uncommitted changes; click one to
+  open its worktree and review what the agent did with the normal diff.
+- _Worktree setup…_ (palette): a recipe per repository that runs in every new worktree, for an
+  agent or not, in a terminal with its output: it copies or links ignored files from the main
+  worktree (`.env.local`, `node_modules`), sets variables per worktree
+  (`PORT=$((3000 + GITCRAFT_WORKTREE_INDEX))`, a `CARGO_TARGET_DIR` of its own) and runs a setup
+  command (`npm ci`). It runs with `sh` on the repository's machine (Git's own `sh` on Windows),
+  WSL and SSH included; the script it makes can be read in the editor, and tried on a worktree
+  before saving. Kept in `.git/gitcraft/`, never committed.
+
 **Toolbar, terminal, app**
 
 - Undo, redo, Fetch, Pull and Push (with incoming / outgoing counts), new branch, stash, terminal,
@@ -359,6 +374,8 @@ was made this way, on a demo repository.
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |
 | `src/shell_path.rs`      | on macOS, the login shell's PATH for the commands gitcraft starts                  |
 | `src/remote/` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
+| `src/agent/` | coding agents: the worktree setup recipe, the agent tasks, the terminal script that runs them |
+| `src/repo/agents/` | the AGENTS section and the agent task and setup recipe dialogs |
 | `src/settings/`          | user settings, profiles, and the settings pages                                    |
 | `src/manual.rs`          | the manual (F1): features and keyboard shortcuts                                   |
 | `src/theme.rs`           | colour tokens, fonts, egui style (PhotoCraft's Pro themes)                         |
