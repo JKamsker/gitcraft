@@ -132,6 +132,14 @@ fn file_in_repo(file: &Path) -> Result<(PathBuf, String), String> {
     } else {
         nearest_folder(folder)?
     };
+    // In the case the folder really has (Windows and macOS take any): git names it as given.
+    let existing = if remote {
+        existing
+    } else {
+        std::fs::canonicalize(&existing)
+            .map(crate::app::strip_verbatim)
+            .unwrap_or(existing)
+    };
     let root = repo_root(&existing)?;
     let prefix = git::run(Some(&existing), &["rev-parse", "--show-prefix"])?;
     let prefix = prefix.trim_end_matches(['\n', '\r']);
