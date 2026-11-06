@@ -1,6 +1,6 @@
 //! Modal dialogs: create a branch, confirm a destructive operation.
 
-mod branch;
+pub(super) mod branch;
 mod confirm;
 mod remote;
 mod upstream;

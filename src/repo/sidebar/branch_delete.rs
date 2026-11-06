@@ -109,7 +109,7 @@ impl RepoTab {
 /// Redoing the delete of `branch` with `steps` (`-D`): only while the branch is where undoing put
 /// it back. Commits it got since (in the terminal) are on no other branch, and `-D` would drop
 /// them along with the branch's reflog.
-fn redo_delete(branch: &str, steps: Vec<Vec<String>>) -> Vec<Vec<String>> {
+pub(in crate::repo) fn redo_delete(branch: &str, steps: Vec<Vec<String>>) -> Vec<Vec<String>> {
     [expect_ref(&format!("refs/heads/{branch}"))]
         .into_iter()
         .chain(steps)
@@ -291,6 +291,7 @@ mod tests {
             undo: ops(&[&["branch", "--", "feat", &at]]),
             redo: redo_delete("feat", ops(&[&["branch", "-D", "--", "feat"]])),
             heads: None,
+            agent: None,
         };
         let deleted = run_all(&dir, &ops(&[&["branch", "-D", "--", "feat"]]));
         let (undone, kind) = run_steps(&dir, &entry.undo, OpKind::Undo(entry.clone()), None);

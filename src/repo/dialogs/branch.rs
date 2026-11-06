@@ -51,7 +51,12 @@ pub(super) fn create_branch(
 /// undone: back to `previous`, and the branch deleted while it is still at `at`. Commits made on
 /// it since (in the terminal: undoing one made here comes first) are on no other branch, and
 /// `branch -D` would throw them away.
-fn create_branch_undo(name: &str, at: &str, checkout: bool, previous: &str) -> Vec<Vec<String>> {
+pub(in crate::repo) fn create_branch_undo(
+    name: &str,
+    at: &str,
+    checkout: bool,
+    previous: &str,
+) -> Vec<Vec<String>> {
     // Checked first, so that a refused undo hasn't switched the checkout already.
     let mut undo = vec![expect_ref_at(&format!("refs/heads/{name}"), at)];
     if checkout && !previous.is_empty() {

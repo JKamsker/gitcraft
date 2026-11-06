@@ -178,6 +178,7 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         self.busy_op = None;
+        let mut undoable = false;
         let long = self
             .op_started
             .take()
@@ -199,9 +200,10 @@ impl RepoTab {
                 if let Some((_, path)) = self.open_when_done.take_if(|(l, _)| *l == label) {
                     self.open_request = Some(super::OpenRequest::Worktree(path));
                 }
-                self.record_undo(&label, kind);
+                undoable = self.record_undo(&label, kind);
             }
             Err(e) if git::is_auth_error(e) && !quiet => {
+                self.agent_needs_sign_in(&label);
                 // Typed credentials that were refused are forgotten.
                 let refused = self.credentials.take().is_some();
                 self.status = Some((format!("{label}: sign-in needed"), true));
@@ -231,6 +233,7 @@ impl RepoTab {
                 }
             }
         }
+        self.agent_op_done(&label, &result, undoable);
         if long && !quiet {
             self.finished.push(match &result {
                 Ok(_) => (format!("{} · {label}: done", self.name), false),
@@ -247,14 +250,17 @@ impl RepoTab {
         self.follow_checkout_move(result.is_ok(), ctx);
     }
 
-    fn record_undo(&mut self, label: &str, kind: OpKind) {
+    /// Puts what `kind` did on the undo (or redo) stack. Returns whether a new step went on
+    /// the undo list.
+    fn record_undo(&mut self, label: &str, kind: OpKind) -> bool {
+        let mut added = false;
         match kind {
             OpKind::Normal(Undo::None, _) => {}
             OpKind::Normal(Undo::HeadMove { mode }, heads) => {
                 let mut parts = heads.split('\u{0}');
                 let (before, after) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""));
                 if before.is_empty() || after.is_empty() || before == after {
-                    return;
+                    return false;
                 }
                 // Resetting moves whatever branch is checked out: another one at the same
                 // commit passes the check of HEAD's commit, so the branch is checked too.
@@ -268,8 +274,10 @@ impl RepoTab {
                     undo: reset(before),
                     redo: reset(after),
                     heads: Some((before.to_owned(), after.to_owned())),
+                    agent: None,
                 });
                 self.redo_stack.clear();
+                added = true;
             }
             OpKind::Normal(Undo::Custom { undo, redo }, _) => {
                 self.undo_stack.push(UndoEntry {
@@ -277,8 +285,10 @@ impl RepoTab {
                     undo,
                     redo,
                     heads: None,
+                    agent: None,
                 });
                 self.redo_stack.clear();
+                added = true;
             }
             OpKind::Undo(entry) => self.redo_stack.push(entry),
             OpKind::Redo(entry) => self.undo_stack.push(entry),
@@ -287,6 +297,7 @@ impl RepoTab {
         if self.undo_stack.len() > 50 {
             self.undo_stack.remove(0);
         }
+        added
     }
 }
 
@@ -558,6 +569,7 @@ mod tests {
                 undo,
                 redo,
                 heads: None,
+                agent: None,
             }),
             _ => None,
         }

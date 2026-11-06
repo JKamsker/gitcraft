@@ -40,6 +40,9 @@ pub(crate) struct UndoEntry {
     /// checked out, so it only runs while HEAD is still where the operation left it (and redo
     /// while it is back where it was), not after a checkout or commit made elsewhere since.
     pub(super) heads: Option<(String, String)>,
+    /// The agent that asked for it over `gitcraft mcp`, when it wasn't the user: the toolbar
+    /// marks it with a robot.
+    pub(super) agent: Option<String>,
 }
 
 /// An operation as `run_ops_ex` got it, kept to retry it with credentials.

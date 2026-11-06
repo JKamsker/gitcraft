@@ -12,6 +12,7 @@ mod icons;
 mod image_fit;
 mod instance;
 mod manual;
+pub mod mcp;
 mod mergiraf;
 mod pr_post;
 mod pr_threads;

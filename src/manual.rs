@@ -62,6 +62,16 @@ const FEATURES: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "Coding agents",
+        &[
+            "Add gitcraft to an agent as an MCP server: claude mcp add gitcraft -- gitcraft mcp (Claude Code), or codex mcp add gitcraft -- gitcraft mcp (Codex). Settings → Agents has both, ready to copy.",
+            "Agents read the graph, status, diffs, blame, branches, conflicts, CI builds and pull requests, with or without a window open.",
+            "What an agent changes (stage, commit, branches, checkout, stash, cherry-pick, revert, reset, moving a commit) runs in the repository's tab, as a step of its undo list: the robot on the undo button says the next Ctrl+Z takes back the agent's step.",
+            "A push, deleting a branch, a hard reset or dropping a commit waits on an Approve / Deny card naming the agent and the git commands; no answer in two minutes denies it.",
+            "Settings → Agents turns agents' changes off; reading still works.",
+        ],
+    ),
+    (
         "Branches, remotes and more",
         &[
             "Left pane: local branches with ahead / behind counts, remotes, worktrees, submodules, stashes, pull requests and tags.",

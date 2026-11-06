@@ -12,6 +12,11 @@ fn main() -> eframe::Result {
     if let Some(code) = app::askpass_helper() {
         std::process::exit(code);
     }
+    // `gitcraft mcp`: the MCP server for coding agents, on stdin and stdout; no window.
+    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    if args.first().is_some_and(|a| a == "mcp") {
+        std::process::exit(gitcraft::mcp::main(&args[1..]));
+    }
     // gitcraft is running already: what this start was given goes to its window.
     let open_arg = std::env::args_os().nth(1).map(std::path::PathBuf::from);
     match app::single_instance(open_arg.as_deref()) {

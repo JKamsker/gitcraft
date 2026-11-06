@@ -221,6 +221,7 @@ impl RepoTab {
         while let Ok(msg) = self.rx.try_recv() {
             self.handle(msg, ctx);
         }
+        self.agent_step(ctx);
         if !shown {
             return;
         }
