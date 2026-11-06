@@ -78,10 +78,10 @@ impl Bisecting {
         }
     }
 
-    /// Whether the banner shows: a bisect is going on, couldn't be read, or a run's output is
-    /// still there.
+    /// Whether the banner shows: a bisect is going on (a later read that failed says so
+    /// there), or a run's output is still there.
     pub(super) fn shows(&self) -> bool {
-        self.state.is_some() || self.error.is_some() || self.run.is_some()
+        self.state.is_some() || self.run.is_some()
     }
 
     /// Whether `git bisect run` is going on.
@@ -269,6 +269,8 @@ impl RepoTab {
         if read <= self.bisect.shown {
             return;
         }
+        // The first read finds what was there already: an end found before isn't news.
+        let first = self.bisect.shown == 0;
         self.bisect.shown = read;
         let state = match result {
             Ok(state) => state,
@@ -284,7 +286,8 @@ impl RepoTab {
             .as_ref()
             .is_some_and(|b| b.outcome.is_some());
         // Just found: the first bad commit's details show.
-        if !was_over
+        if !first
+            && !was_over
             && let Some(Outcome::FirstBad(hash)) = state.as_ref().and_then(|b| b.outcome.as_ref())
         {
             self.goto(&hash.clone(), ctx);
@@ -328,7 +331,11 @@ impl RepoTab {
             .lines
             .lock()
             .map(|lines| {
-                let last = lines.iter().rev().find(|l| !l.trim().is_empty()).cloned();
+                // git's own error says why, more than the line printed last.
+                let last = (lines.iter().rev())
+                    .find(|l| l.starts_with("error:") || l.starts_with("fatal:"))
+                    .or_else(|| lines.iter().rev().find(|l| !l.trim().is_empty()))
+                    .cloned();
                 (
                     last.unwrap_or_default(),
                     lines.iter().any(|l| l.starts_with("There are only")),

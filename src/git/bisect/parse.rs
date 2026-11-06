@@ -90,7 +90,11 @@ pub(super) fn vars(text: &str) -> Option<Vars> {
     let value = |name: &str| {
         text.lines().find_map(|line| {
             let (key, value) = line.trim().split_once('=')?;
-            (key == name).then(|| value.trim_matches('\'').parse::<usize>().ok())?
+            // Negative when git found nothing to test (`-1`): none left.
+            (key == name).then(|| {
+                let n = value.trim_matches('\'').parse::<i64>().ok()?;
+                usize::try_from(n.max(0)).ok()
+            })?
         })
     };
     Some(Vars {
@@ -286,6 +290,14 @@ mod tests {
             })
         );
         assert_eq!(vars("bisect_nr=1\n"), None);
+        // Nothing testable left in a pathspec bisect.
+        assert_eq!(
+            vars("bisect_nr=-1\nbisect_all=0\n"),
+            Some(Vars {
+                left: 0,
+                candidates: 0
+            })
+        );
         assert_eq!(vars(""), None);
     }
 

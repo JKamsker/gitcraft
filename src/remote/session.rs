@@ -144,8 +144,9 @@ pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
 
 /// Stops the process `pid` on `host` (a command that hung, or the shell it hung in) and
 /// everything it started, however deep, in the background: politely, then for good. The
-/// processes are listed first, as one stopped leaves what it started to another parent.
-pub fn stop(host: Host, pid: u32) {
+/// processes are listed first, as one stopped leaves what it started to another parent. The
+/// thread doing it is given back, for a caller that has to wait for it.
+pub fn stop(host: Host, pid: u32) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let _ = exec(
             &host,
@@ -155,7 +156,7 @@ pub fn stop(host: Host, pid: u32) {
                 ..Request::default()
             },
         );
-    });
+    })
 }
 
 /// The script [`stop`] runs: `pid` and its descendants (from `ps`, which every system has with
