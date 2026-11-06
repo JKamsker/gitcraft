@@ -1,12 +1,20 @@
-//! The path patterns of GitHub's and GitLab's CODEOWNERS: gitignore's, as those forges read them.
+//! The path patterns of GitHub's and GitLab's CODEOWNERS, each read the way that forge reads it.
 //!
+//! GitHub (gitignore's rules):
 //! - A pattern with a `/` at its start or in its middle is from the repository's root; one
 //!   without (`*.js`, `apps/`) matches a file or folder of that name at any depth.
 //! - A pattern that matches a folder matches every file under it (`/docs/`, `apps`), except one
-//!   ending in `/*`, which matches only the files right in that folder.
+//!   whose last part is `*` (`docs/*`), which matches only the files right in that folder.
 //! - A trailing `/` matches only folders.
-//! - `*` and `?` stop at `/`; `**` crosses folders (`**/logs`, `a/**/b`, `a/**`); `[a-z]` is a
-//!   class; `\` takes the next character as it is (`\#`, `\ `).
+//!
+//! GitLab (`File.fnmatch` on the path, after making the pattern absolute):
+//! - Only a leading `/` anchors a pattern to the root: `docs/api/` matches `x/docs/api/y` too.
+//! - A pattern without a trailing `/` matches a file only, never what is in a folder of that
+//!   name; one with it matches everything under the folder.
+//!
+//! Both: `*` and `?` stop at `/`; `**/` stands for any folders (or none), and on GitHub a `**`
+//! between slashes or at an end crosses folders too, while elsewhere it is a `*`; `[a-z]` is a
+//! class; `\` takes the next character as it is (`\ `).
 
 /// A pattern, ready to match paths with: a regular expression made from it once.
 #[derive(Clone, Debug)]
@@ -17,21 +25,26 @@ pub(crate) struct Pattern {
 }
 
 impl Pattern {
-    pub(crate) fn new(pattern: &str) -> Self {
+    /// `pattern` as GitHub reads it, or as GitLab does (`gitlab`).
+    pub(crate) fn new(pattern: &str, gitlab: bool) -> Self {
         let dir_only = pattern.ends_with('/') && !pattern.ends_with("\\/");
         let trimmed = pattern.trim_end_matches('/');
-        let anchored = trimmed.starts_with('/') || trimmed.trim_start_matches('/').contains('/');
+        let anchored = if gitlab {
+            trimmed.starts_with('/')
+        } else {
+            trimmed.starts_with('/') || trimmed.trim_start_matches('/').contains('/')
+        };
         let glob = trimmed.trim_start_matches('/');
-        // `docs/*`: only the files right in the folder. The pattern alone, as `*`, stays
-        // everything.
-        let shallow = glob.ends_with("/*") && !glob.ends_with("*/*");
-        let body = translate(glob);
+        let body = translate(glob, gitlab);
         let lead = if anchored { "^" } else { "^(?:.*/)?" };
         // What may follow what the pattern matched: the files under a folder it matched.
-        let tail = match (shallow, dir_only) {
-            (true, _) => "",
-            (false, true) => "/.+",
-            (false, false) => "(?:/.+)?",
+        let tail = if dir_only {
+            "/.+"
+        } else if gitlab || glob.rsplit('/').next() == Some("*") && glob.contains('/') {
+            // GitLab matches files only; GitHub's `docs/*` only what is right in the folder.
+            ""
+        } else {
+            "(?:/.+)?"
         };
         Pattern {
             regex: (!glob.is_empty())
@@ -57,7 +70,7 @@ impl Pattern {
 
 /// The regular expression of a glob: `*` and `?` within a name, `**` across names, `[…]` a
 /// class, `\x` the character x.
-fn translate(glob: &str) -> String {
+fn translate(glob: &str, gitlab: bool) -> String {
     let chars: Vec<char> = glob.chars().collect();
     let mut out = String::new();
     let mut i = 0;
@@ -65,12 +78,18 @@ fn translate(glob: &str) -> String {
         match chars[i] {
             '*' if chars.get(i + 1) == Some(&'*') => {
                 let at_start = i == 0 || chars[i - 1] == '/';
-                if at_start && chars.get(i + 2) == Some(&'/') {
+                let next = chars.get(i + 2);
+                if at_start && next == Some(&'/') {
                     // `**/`: any folders, or none.
                     out.push_str("(?:.*/)?");
                     i += 3;
-                } else {
+                } else if at_start && next.is_none() && !gitlab {
+                    // `a/**`: everything in `a`, at any depth.
                     out.push_str(".*");
+                    i += 2;
+                } else {
+                    // Within a name, `**` is a `*`.
+                    out.push_str("[^/]*");
                     i += 2;
                 }
             }
@@ -136,7 +155,39 @@ mod tests {
     use super::*;
 
     fn m(pattern: &str, path: &str) -> bool {
-        Pattern::new(pattern).matches(path)
+        Pattern::new(pattern, false).matches(path)
+    }
+
+    fn gl(pattern: &str, path: &str) -> bool {
+        Pattern::new(pattern, true).matches(path)
+    }
+
+    /// As GitLab's `File.fnmatch` reads them, made absolute (checked against Ruby).
+    #[test]
+    fn gitlabs_patterns() {
+        // Only a leading `/` anchors.
+        assert!(gl("docs/api/", "x/docs/api/y.md"));
+        assert!(gl("/docs/api/", "docs/api/y.md"));
+        assert!(!gl("/docs/api/", "x/docs/api/y.md"));
+        // Without a trailing `/`, a file only.
+        assert!(!gl("/docs", "docs/a.md"));
+        assert!(gl("/docs", "docs"));
+        assert!(!gl("*.md", "a.md/b.txt"));
+        assert!(gl("*.md", "deep/a.md"));
+        // `**` not followed by `/` is a `*`.
+        assert!(gl("/src/**", "src/a.rs"));
+        assert!(!gl("/src/**", "src/a/b.rs"));
+        assert!(gl("/src/**/*.rs", "src/a/b.rs"));
+        assert!(gl("docs/*", "docs/a.md"));
+        assert!(!gl("docs/*", "docs/a/b.md"));
+    }
+
+    #[test]
+    fn double_stars_within_a_name_are_single_ones() {
+        assert!(m("/foo**bar", "fooxbar"));
+        assert!(!m("/foo**bar", "foo/x/bar"));
+        assert!(!m("/a/*/*", "a/x/y/z"));
+        assert!(m("/a/*/*", "a/x/y"));
     }
 
     /// The examples of GitHub's documentation of CODEOWNERS.
@@ -208,7 +259,7 @@ mod tests {
         let started = std::time::Instant::now();
         assert!(!m(pattern, &path));
         assert!(started.elapsed() < std::time::Duration::from_secs(2));
-        assert!(Pattern::new(pattern).is_wild());
+        assert!(Pattern::new(pattern, false).is_wild());
     }
 
     #[test]

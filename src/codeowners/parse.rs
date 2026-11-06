@@ -70,6 +70,10 @@ pub(super) fn parse(flavor: Flavor, text: &str) -> Parsed {
         sections: vec![Section::default()],
         problems: Vec::new(),
     };
+    // The section lines go in (GitLab merges headers of the same name), and the owners its
+    // header gives lines that name none.
+    let mut section = 0;
+    let mut defaults: Vec<String> = Vec::new();
     for (i, raw) in text.lines().enumerate() {
         let line = i + 1;
         let trimmed = raw.trim();
@@ -77,39 +81,105 @@ pub(super) fn parse(flavor: Flavor, text: &str) -> Parsed {
             continue;
         }
         if flavor == Flavor::GitLab
-            && let Some(section) = section_header(trimmed)
+            && let Some(header) = section_header(trimmed)
         {
-            match section {
-                Ok(section) => {
-                    check_owners(&section.defaults, flavor, line, &mut parsed.problems);
-                    parsed.sections.push(section);
+            match header {
+                Ok(header) => {
+                    check_owners(&header.defaults, flavor, line, &mut parsed.problems);
+                    defaults = header.defaults.clone();
+                    section = match parsed
+                        .sections
+                        .iter()
+                        .position(|s| s.name.eq_ignore_ascii_case(&header.name))
+                    {
+                        Some(i) => i,
+                        None => {
+                            parsed.sections.push(header);
+                            parsed.sections.len() - 1
+                        }
+                    };
                 }
                 Err(why) => parsed.problems.push(Problem { line, text: why }),
             }
             continue;
         }
-        let tokens = tokenize(trimmed);
-        let Some((pattern, owners)) = tokens.split_first() else {
+        let tokens = match flavor {
+            Flavor::Gitea => tokenize_gitea(trimmed),
+            Flavor::GitLab => tokenize_with(trimmed, false),
+            Flavor::GitHub => tokenize(trimmed),
+        };
+        let Some((pattern, rest)) = tokens.split_first() else {
             continue;
         };
-        let owners = owners.to_vec();
-        let section = parsed.sections.len() - 1;
-        if let Some(rule) = rule(flavor, line, pattern, owners, section, &mut parsed.problems) {
-            if rule.owners.is_empty()
-                && !rule.negated
-                && flavor == Flavor::GitLab
-                && parsed.sections[section].defaults.is_empty()
-            {
-                parsed.problems.push(Problem {
-                    line,
-                    text: format!("{pattern} has no owners, and its section none to give it"),
-                });
+        let owners = owners_of_line(flavor, pattern, rest, line, &mut parsed.problems);
+        if flavor == Flavor::GitHub && pattern.starts_with("\\#") {
+            parsed.problems.push(Problem {
+                line,
+                text: format!("GitHub doesn't take \\# escapes: {pattern} may match nothing"),
+            });
+        }
+        if flavor == Flavor::Gitea && owners.is_empty() {
+            parsed.problems.push(Problem {
+                line,
+                text: format!("{pattern} has no owners: Gitea / Forgejo skip the line"),
+            });
+            continue;
+        }
+        if let Some(mut rule) = rule(flavor, line, pattern, owners, section, &mut parsed.problems) {
+            if flavor == Flavor::GitLab && rule.owners.is_empty() && !rule.negated {
+                if defaults.is_empty() {
+                    parsed.problems.push(Problem {
+                        line,
+                        text: format!("{pattern} has no owners, and its section has none to give"),
+                    });
+                }
+                rule.owners = defaults.clone();
             }
             check_owners(&rule.owners, flavor, line, &mut parsed.problems);
             parsed.rules.push(rule);
         }
     }
     parsed
+}
+
+/// The owners on a line after its pattern, as the forge takes them. GitLab reads the whole rest
+/// of the line for `@names` and emails (a `#` there starts no comment); Gitea and Forgejo take
+/// a name with or without its `@`.
+fn owners_of_line(
+    flavor: Flavor,
+    pattern: &str,
+    rest: &[String],
+    line: usize,
+    problems: &mut Vec<Problem>,
+) -> Vec<String> {
+    match flavor {
+        Flavor::GitLab => {
+            if rest.iter().any(|w| w.starts_with('#')) {
+                problems.push(Problem {
+                    line,
+                    text: format!(
+                        "{pattern}: GitLab has no comments after a pattern, and reads any \
+                         @name in them as an owner"
+                    ),
+                });
+            }
+            rest.iter()
+                .filter(|w| w.starts_with('@') || is_email(w))
+                .cloned()
+                .collect()
+        }
+        Flavor::Gitea => rest
+            .iter()
+            .map(|w| {
+                if w.starts_with('@') {
+                    w.clone()
+                } else {
+                    format!("@{w}")
+                }
+            })
+            .collect(),
+        Flavor::GitHub => rest.to_vec(),
+    }
 }
 
 /// The rule of one line, or why it has none (noted in `problems`).
@@ -122,9 +192,10 @@ fn rule(
     problems: &mut Vec<Problem>,
 ) -> Option<Rule> {
     let negated = pattern.starts_with('!');
-    let bare = pattern.trim_start_matches('!');
+    let bare = pattern.strip_prefix('!').unwrap_or(pattern);
     let matcher = match flavor {
-        Flavor::Gitea => match regex::Regex::new(&format!("^(?:{bare})$")) {
+        // As Gitea and Forgejo compile it: `^pattern$`, no group, so that `a|b` is `^a` or `b$`.
+        Flavor::Gitea => match regex::Regex::new(&format!("^{bare}$")) {
             Ok(re) => Matcher::Regex(re),
             Err(e) => {
                 problems.push(Problem {
@@ -151,7 +222,7 @@ fn rule(
                     text: format!("GitHub doesn't take [ ] ranges: {pattern} may match nothing"),
                 });
             }
-            Matcher::Glob(Pattern::new(bare))
+            Matcher::Glob(Pattern::new(bare, flavor == Flavor::GitLab))
         }
     };
     if negated && flavor == Flavor::GitLab && !owners.is_empty() {
@@ -174,7 +245,8 @@ fn rule(
 fn check_owners(owners: &[String], flavor: Flavor, line: usize, problems: &mut Vec<Problem>) {
     for owner in owners {
         let ok = match flavor {
-            Flavor::Gitea => owner.starts_with('@') && owner.len() > 1,
+            // An account or `org/team`, by name: an email is no owner there.
+            Flavor::Gitea => owner.len() > 1 && !owner[1..].contains('@'),
             Flavor::GitHub => {
                 (owner.starts_with('@') && owner.len() > 1 && !owner.starts_with("@@"))
                     || is_email(owner)
@@ -206,6 +278,12 @@ fn is_email(text: &str) -> bool {
 /// The words of a line: split on unescaped whitespace, up to a `#` that starts a word (a
 /// comment). `\ ` and `\#` stay in the word, as written (the pattern reads the `\` itself).
 pub(super) fn tokenize(line: &str) -> Vec<String> {
+    tokenize_with(line, true)
+}
+
+/// [`tokenize`], where a `#` after the first word starts a comment only when `comments`
+/// (GitLab reads the rest of the line for owners, `#` and all).
+fn tokenize_with(line: &str, comments: bool) -> Vec<String> {
     let mut words = Vec::new();
     let mut word = String::new();
     let mut chars = line.chars().peekable();
@@ -217,7 +295,35 @@ pub(super) fn tokenize(line: &str) -> Vec<String> {
                     word.push(next);
                 }
             }
-            '#' if word.is_empty() => break,
+            '#' if word.is_empty() && (comments || words.is_empty()) => break,
+            c if c.is_whitespace() => {
+                if !word.is_empty() {
+                    words.push(std::mem::take(&mut word));
+                }
+            }
+            c => word.push(c),
+        }
+    }
+    if !word.is_empty() {
+        words.push(word);
+    }
+    words
+}
+
+/// The words of a line as Gitea and Forgejo split it: a `\\` takes the next character as it is
+/// (and is dropped, so `\\.` is a `.`), a `#` anywhere starts a comment.
+pub(super) fn tokenize_gitea(line: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut word = String::new();
+    let mut chars = line.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => {
+                if let Some(next) = chars.next() {
+                    word.push(next);
+                }
+            }
+            '#' => break,
             c if c.is_whitespace() => {
                 if !word.is_empty() {
                     words.push(std::mem::take(&mut word));
@@ -254,6 +360,11 @@ fn section_header(line: &str) -> Option<Result<Section, String>> {
             return Some(Err(format!("{line}: the approvals count has no closing ]")));
         };
         match count[..close].trim().parse() {
+            Ok(_) if optional => {
+                return Some(Err(format!(
+                    "{line}: an optional section (^) can't ask for approvals"
+                )));
+            }
             Ok(n) => approvals = n,
             Err(_) => return Some(Err(format!("{line}: the approvals count isn't a number"))),
         }
@@ -284,11 +395,20 @@ mod tests {
     }
 
     #[test]
+    fn gitea_words_drop_their_escapes_and_stop_at_any_hash() {
+        assert_eq!(tokenize_gitea(".*\\.go @a#b @c"), [".*.go", "@a"]);
+        assert_eq!(tokenize_gitea("a\\ b @x"), ["a b", "@x"]);
+    }
+
+    #[test]
     fn section_headers() {
         let s = section_header("[Docs] @ann @acme/writers");
         assert!(matches!(&s, Some(Ok(s)) if s.name == "Docs" && s.defaults.len() == 2));
-        let s = section_header("^[Optional][2]");
-        assert!(matches!(&s, Some(Ok(s)) if s.optional && s.approvals == 2));
+        let s = section_header("^[Optional]");
+        assert!(matches!(&s, Some(Ok(s)) if s.optional));
+        let s = section_header("[Two][2]");
+        assert!(matches!(&s, Some(Ok(s)) if s.approvals == 2));
+        assert!(matches!(section_header("^[Optional][2]"), Some(Err(_))));
         assert!(matches!(section_header("[Broken"), Some(Err(_))));
         assert!(matches!(section_header("[]"), Some(Err(_))));
         assert!(matches!(section_header("[A][x]"), Some(Err(_))));
@@ -300,7 +420,9 @@ mod tests {
         let parsed = parse(Flavor::GitHub, "*.rs ann @ok me@example.org\n");
         assert_eq!(parsed.problems.len(), 1);
         assert!(parsed.problems[0].text.contains("ann"));
-        let parsed = parse(Flavor::Gitea, "a me@example.org\n");
-        assert_eq!(parsed.problems.len(), 1);
+        // Gitea takes a name without its `@` as an owner.
+        let parsed = parse(Flavor::Gitea, "a ann\n");
+        assert!(parsed.problems.is_empty(), "{:?}", parsed.problems);
+        assert_eq!(parsed.rules[0].owners, ["@ann"]);
     }
 }

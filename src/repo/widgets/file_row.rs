@@ -20,6 +20,9 @@ pub struct FileRowResponse {
     pub button: Option<usize>,
 }
 
+/// How wide each hover button is, with its gap: room kept for them beside the owners.
+const BUTTON_ROOM: f32 = 22.0;
+
 /// Who owns a file (CODEOWNERS), as its row shows it.
 pub struct OwnerTag {
     /// Short, on the row: `payments +1`.
@@ -94,6 +97,9 @@ pub fn file_row_owned(
         RowExtra::Buttons(buttons) => {
             if hovered || selected {
                 (right, button) = hover_buttons(ui, &painter, &t, &row, right, buttons);
+            } else if owners.is_some() {
+                // The owners stay put when the buttons come with the pointer.
+                right -= BUTTON_ROOM * buttons.len() as f32;
             }
         }
     }

@@ -158,7 +158,7 @@ pub(super) fn create_pr(
         ui.add(egui::TextEdit::singleline(base).desired_width(160.0));
         ui.checkbox(draft, "Draft");
     });
-    crate::repo::owners::reviewers_ui(ui, reviewers);
+    crate::repo::owners::reviewers_ui(ui, reviewers, *draft);
     ui.add_space(8.0);
     let valid = !pr_title.trim().is_empty() && !base.trim().is_empty();
     buttons(ui, "Create", valid, false, || Action::CreatePr {
@@ -167,7 +167,11 @@ pub(super) fn create_pr(
         title: pr_title.trim().to_owned(),
         body: body.trim().to_owned(),
         draft: *draft,
-        reviewers: crate::repo::owners::asked(reviewers),
+        reviewers: if *draft {
+            Vec::new()
+        } else {
+            crate::repo::owners::asked(reviewers)
+        },
     })
 }
 

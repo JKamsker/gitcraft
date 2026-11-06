@@ -4,7 +4,8 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use super::{Suggested, asked, summary_text};
+use super::view::summary_text;
+use super::{Suggested, asked};
 use crate::codeowners::Reviewer;
 use crate::git;
 use crate::repo::{Dialog, RepoTab};
@@ -22,7 +23,7 @@ fn the_summary_says_who_a_change_needs() {
     );
     assert_eq!(
         summary_text(&[], 2, 2).as_deref(),
-        Some("None of them has an owner")
+        Some("No file here has an owner")
     );
     assert_eq!(summary_text(&[], 1, 1).as_deref(), Some("No owner"));
     assert_eq!(summary_text(&[], 0, 0), None);
@@ -96,7 +97,7 @@ fn open(dir: &Path, ctx: &egui::Context) -> RepoTab {
     let mut tab = RepoTab::new_deferred(dir.to_path_buf(), ctx);
     tab.reload(ctx);
     wait(&mut tab, ctx, |tab| {
-        !tab.loading && tab.owners.read_for == tab.history_gen && tab.history_gen > 0
+        !tab.loading && !tab.owners.reading && tab.owners.read_for.is_some()
     });
     tab
 }
@@ -109,9 +110,14 @@ fn rows_show_their_owners_and_the_file_is_read_again_when_it_changes() {
     let pay = tab.owner_tag("pay ment/ü.rs").map(|t| t.label);
     let infra = tab.owner_tag("infra/main.tf").map(|t| (t.label, t.full));
     let none = tab.owner_tag("README.md").map(|t| t.label);
+    let paths = ["pay ment/ü.rs", "infra/main.tf", "README.md"];
+    wait(&mut tab, &ctx, |tab| {
+        tab.owners_summary_of(&paths, &egui::Context::default())
+            .is_some()
+    });
     let needed = tab
-        .owners
-        .needed(["pay ment/ü.rs", "infra/main.tf", "README.md"]);
+        .owners_summary_of(&paths, &ctx)
+        .map(|s| (s.owners.clone(), s.unowned));
     // A new CODEOWNERS committed: read again on the next reload, the old answers dropped.
     write(&dir, ".github/CODEOWNERS", "* @everyone\n");
     run(&dir, &["commit", "-q", "-am", "owners"]);
@@ -130,14 +136,14 @@ fn rows_show_their_owners_and_the_file_is_read_again_when_it_changes() {
     assert_eq!(none, None);
     assert_eq!(
         needed,
-        (
+        Some((
             vec![
                 "@acme/payments".to_owned(),
                 "@acme/infra".to_owned(),
                 "@ann".to_owned()
             ],
             1
-        )
+        ))
     );
     assert_eq!(after.as_deref(), Some("everyone"));
 }
@@ -157,21 +163,42 @@ fn the_create_pull_request_dialog_suggests_the_owners_of_what_the_branch_changes
         Some(Dialog::CreatePr { reviewers, .. }) => asked(reviewers),
         _ => Vec::new(),
     };
-    // Another base, with nothing to compare: no suggestion, and no error in the dialog.
-    if let Some(Dialog::CreatePr { base, .. }) = &mut tab.dialog {
-        *base = "nope".to_owned();
+    // Unticked, then a base being typed that isn't a branch: what was suggested stays, as it
+    // was ticked.
+    if let Some(Dialog::CreatePr {
+        base, reviewers, ..
+    }) = &mut tab.dialog
+    {
+        *base = "mai".to_owned();
+        for r in reviewers.iter_mut() {
+            r.ask = false;
+        }
     }
-    tab.owners_frame(&ctx);
-    wait(
-        &mut tab,
-        &ctx,
-        |tab| matches!(&tab.dialog, Some(Dialog::CreatePr { reviewers, .. }) if reviewers.is_empty()),
-    );
-    let cleared =
-        matches!(&tab.dialog, Some(Dialog::CreatePr { reviewers, .. }) if reviewers.is_empty());
+    let settle = |tab: &mut RepoTab| {
+        for _ in 0..50 {
+            tab.owners_frame(&ctx);
+            std::thread::sleep(Duration::from_millis(10));
+            tab.poll(&ctx);
+        }
+    };
+    settle(&mut tab);
+    let kept = match &tab.dialog {
+        Some(Dialog::CreatePr { reviewers, .. }) => reviewers.len(),
+        _ => 0,
+    };
+    // Back to main: worked out again, still unticked.
+    if let Some(Dialog::CreatePr { base, .. }) = &mut tab.dialog {
+        *base = "main".to_owned();
+    }
+    settle(&mut tab);
+    let again = match &tab.dialog {
+        Some(Dialog::CreatePr { reviewers, .. }) => (reviewers.len(), asked(reviewers)),
+        _ => (0, vec!["?".to_owned()]),
+    };
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(suggested, ["acme/payments"]);
-    assert!(cleared);
+    assert_eq!(kept, 1);
+    assert_eq!(again, (1, Vec::new()));
 }
 
 #[test]
