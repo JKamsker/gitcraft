@@ -1,7 +1,7 @@
 //! A conflict card's Original section: the base, and what each side inserted and deleted
 //! relative to it.
 
-use egui::{Color32, RichText, Sense, Stroke, Ui};
+use egui::{Color32, RichText, Stroke, Ui};
 
 use super::original::{Change, Lines, Original};
 use crate::icons;
@@ -49,42 +49,41 @@ pub(super) fn section(
     diffs: Option<&(Lines, Lines)>,
     names: (&str, &str),
 ) -> bool {
-    let header = ui
-        .horizontal(|ui| {
-            let icon = if open {
-                "chevron-down"
-            } else {
-                "chevron-right"
-            };
-            icons::inline(ui, icon, 12.0, t.text_dim);
-            ui.label(
-                RichText::new("Original")
-                    .font(theme::medium(11.5))
-                    .color(t.text_dim),
-            );
-            let note = match (original, diffs) {
-                (Original::Loading, _) => "reading the base…".to_owned(),
-                (Original::Added, _) => "none: both sides added this file".to_owned(),
-                (Original::Unknown(_), _) => "not available".to_owned(),
-                (Original::Text(_), Some((ours, theirs))) => format!(
-                    "{}: {} · {}: {}",
-                    names.0,
-                    super::original::summary(ours),
-                    names.1,
-                    super::original::summary(theirs)
-                ),
-                (Original::Text(_), None) => "what each side changed".to_owned(),
-            };
-            ui.label(RichText::new(note).color(t.text_faint).small());
-        })
-        .response
-        .interact(Sense::click())
-        .on_hover_text(if open {
-            "Hide the original"
+    let tip = if open {
+        "Hide the original"
+    } else {
+        "Show the text both sides started from, and what each changed"
+    };
+    let mut clicked = false;
+    ui.horizontal_wrapped(|ui| {
+        let icon = if open {
+            "chevron-down"
         } else {
-            "Show the text both sides started from, and what each changed"
-        });
-    let clicked = header.clicked();
+            "chevron-right"
+        };
+        icons::inline(ui, icon, 12.0, t.text_dim);
+        let button = egui::Button::new(
+            RichText::new("Original")
+                .font(theme::medium(11.5))
+                .color(t.text_dim),
+        )
+        .frame(false);
+        clicked = ui.add(button).on_hover_text(tip).clicked();
+        let note = match (original, diffs) {
+            (Original::Loading, _) => "reading the base…".to_owned(),
+            (Original::Added, _) => "none: both sides added this file".to_owned(),
+            (Original::Unknown(_), _) => "not available".to_owned(),
+            (Original::Text(_), Some((ours, theirs))) => format!(
+                "{}: {} · {}: {}",
+                names.0,
+                super::original::summary(ours),
+                names.1,
+                super::original::summary(theirs)
+            ),
+            (Original::Text(_), None) => "what each side changed".to_owned(),
+        };
+        ui.label(RichText::new(note).color(t.text_faint).small());
+    });
     if open {
         ui.add_space(4.0);
         body(ui, t, k, original, diffs, names);

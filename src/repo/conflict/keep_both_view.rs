@@ -35,6 +35,7 @@ impl KeepBoth {
 /// What a click in the dialog asks for.
 enum Step {
     Write,
+    Retry,
     Stage,
     Close,
 }
@@ -101,13 +102,12 @@ impl RepoTab {
             .corner_radius(t.radius_lg)
             .inner_margin(egui::Margin::same(18))
             .shadow(ctx.global_style().visuals.window_shadow);
-        let rebase = self.work.in_progress == Some(crate::git::InProgress::Rebase);
         let title = format!("Keep both versions of {}", state.path());
         let body = |ui: &mut Ui| {
-            ui.set_width(440.0);
+            ui.set_width(440.0_f32.min(ctx.content_rect().width() - 64.0).max(200.0));
             ui.label(RichText::new(&title).font(theme::semibold(15.0)));
             ui.add_space(8.0);
-            contents(ui, &t, state, rebase)
+            contents(ui, &t, state)
         };
         // Once written, out of the way (not modal): the files are checked in the window.
         let step = if matches!(state, KeepBoth::Written(_)) {
@@ -133,6 +133,10 @@ impl RepoTab {
         };
         match step {
             Some(Step::Write) => self.keep_both_write(ctx),
+            Some(Step::Retry) => {
+                let path = state.path().to_owned();
+                self.keep_both(path, ctx);
+            }
             Some(Step::Stage) => {
                 if let Some(KeepBoth::Written(plan)) = self.keep_both.take() {
                     acts.push(Action::Ops {
@@ -149,7 +153,7 @@ impl RepoTab {
 }
 
 /// The dialog's body for `state`, and what was clicked.
-fn contents(ui: &mut Ui, t: &Tokens, state: &KeepBoth, rebase: bool) -> Option<Step> {
+fn contents(ui: &mut Ui, t: &Tokens, state: &KeepBoth) -> Option<Step> {
     match state {
         KeepBoth::Reading(_) => {
             ui.horizontal(|ui| {
@@ -159,16 +163,18 @@ fn contents(ui: &mut Ui, t: &Tokens, state: &KeepBoth, rebase: bool) -> Option<S
             buttons(ui, None, "Cancel")
         }
         KeepBoth::Failed { error, .. } => {
+            ui.label(RichText::new("Both versions could not be kept").font(theme::medium(13.0)));
+            ui.add_space(4.0);
             ui.add(egui::Label::new(RichText::new(error).color(t.danger)).wrap());
-            buttons(ui, None, "Close")
+            buttons(ui, Some(("Try again", Step::Retry)), "Close")
         }
         KeepBoth::Preview(plan) | KeepBoth::Writing(plan) => {
             let writing = matches!(state, KeepBoth::Writing(_));
-            preview(ui, t, plan, rebase);
+            preview(ui, t, plan);
             if writing {
                 ui.horizontal(|ui| {
                     ui.add(crate::spinner::Spinner::new());
-                    ui.label("Writing…");
+                    ui.label("Writing both files…");
                 });
                 return None;
             }
@@ -194,13 +200,25 @@ fn contents(ui: &mut Ui, t: &Tokens, state: &KeepBoth, rebase: bool) -> Option<S
                 )
                 .wrap(),
             );
+            ui.add_space(6.0);
+            ui.add(
+                egui::Label::new(
+                    RichText::new(format!(
+                        "Not now leaves them as they are: to finish later, stage both files and \
+                         delete {}.",
+                        plan.path
+                    ))
+                    .color(t.text_dim),
+                )
+                .wrap(),
+            );
             buttons(ui, Some(("Stage both", Step::Stage)), "Not now")
         }
     }
 }
 
 /// The two files to be written, and the warning about references to the old name.
-fn preview(ui: &mut Ui, t: &Tokens, plan: &Plan, rebase: bool) {
+fn preview(ui: &mut Ui, t: &Tokens, plan: &Plan) {
     ui.add(
         egui::Label::new(format!(
             "Neither version is thrown away: each is written as a file of its own, beside {}. \
@@ -210,14 +228,9 @@ fn preview(ui: &mut Ui, t: &Tokens, plan: &Plan, rebase: bool) {
         .wrap(),
     );
     ui.add_space(8.0);
-    let (ours, theirs) = if rebase {
-        ("the branch you rebase onto", "your commit")
-    } else {
-        ("your branch", "the branch merged in")
-    };
-    version_row(ui, t, &plan.ours, ours);
+    version_row(ui, t, &plan.ours);
     ui.add_space(4.0);
-    version_row(ui, t, &plan.theirs, theirs);
+    version_row(ui, t, &plan.theirs);
     ui.add_space(8.0);
     let name = plan.path.rsplit('/').next().unwrap_or(&plan.path);
     egui::Frame::new()
@@ -232,7 +245,7 @@ fn preview(ui: &mut Ui, t: &Tokens, plan: &Plan, rebase: bool) {
                         "Anything that refers to {name} (code, stylesheets, scenes, docs) may \
                          need updating to one of the new names."
                     ))
-                    .color(t.warning),
+                    .color(t.text),
                 )
                 .wrap(),
             );
@@ -240,7 +253,7 @@ fn preview(ui: &mut Ui, t: &Tokens, plan: &Plan, rebase: bool) {
 }
 
 /// One version: the file it becomes, where it comes from, its size.
-fn version_row(ui: &mut Ui, t: &Tokens, version: &Version, whose: &str) {
+fn version_row(ui: &mut Ui, t: &Tokens, version: &Version) {
     egui::Frame::new()
         .fill(t.field)
         .stroke(Stroke::new(1.0, t.field_border))
@@ -251,7 +264,7 @@ fn version_row(ui: &mut Ui, t: &Tokens, version: &Version, whose: &str) {
             ui.add(egui::Label::new(RichText::new(&version.target).font(theme::mono(12.5))).wrap());
             ui.label(
                 RichText::new(format!(
-                    "{} ({whose}) · {} · {}",
+                    "{} · {} · {}",
                     version.origin,
                     crate::git::human_size(version.size),
                     version.oid.get(..8).unwrap_or(&version.oid)

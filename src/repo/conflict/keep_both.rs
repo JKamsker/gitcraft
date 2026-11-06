@@ -68,7 +68,7 @@ pub(super) fn tagged(path: &str, tag: &str) -> String {
 /// are never the same.
 pub(super) fn tags(branches: (Option<&str>, Option<&str>), rebase: bool) -> (String, String) {
     let fallback = if rebase {
-        ("upstream", "mine")
+        ("upstream", "your-commit")
     } else {
         ("ours", "theirs")
     };
@@ -156,8 +156,8 @@ fn exists(file: &Path) -> Result<bool, String> {
 fn writable<'a>(stage: Option<&'a Stage>, path: &str, who: &str) -> Result<&'a Stage, String> {
     let stage = stage.ok_or_else(|| {
         format!(
-            "{who} deleted {path}, so there is only one version to keep: keep or delete the \
-             file instead"
+            "{who} deleted {path}, so there is only one version to keep. To keep it, use \
+             Mark resolved; to drop it, delete the file, then Mark resolved"
         )
     })?;
     match stage.mode.as_str() {
@@ -190,7 +190,7 @@ pub fn plan(repo: &Path, path: &str, state: Option<InProgress>) -> Result<Plan, 
     let version = |stage: &Stage, who: &str, branch: Option<String>, target, taken| {
         Ok::<_, String>(Version {
             origin: match branch {
-                Some(b) => format!("{who}, {b}"),
+                Some(b) => format!("{who} ({b})"),
                 None => who.to_owned(),
             },
             oid: stage.oid.clone(),
@@ -220,14 +220,14 @@ pub fn write(repo: &Path, plan: &Plan) -> Result<(), String> {
     let mut written: Option<&str> = None;
     for version in [&plan.ours, &plan.theirs] {
         let done = git::blob(repo, &version.oid)
-            .map_err(|e| format!("could not read {}'s version: {e}", version.origin))
+            .map_err(|e| format!("Could not read the version of {}: {e}", version.origin))
             .and_then(|bytes| {
                 create_new(
                     &crate::remote::join(repo, &version.target),
                     &bytes,
                     version.executable,
                 )
-                .map_err(|e| format!("could not write {}: {e}", version.target))
+                .map_err(|e| format!("Could not write {}: {e}", version.target))
             });
         if let Err(e) = done {
             if let Some(first) = written {
@@ -239,6 +239,10 @@ pub fn write(repo: &Path, plan: &Plan) -> Result<(), String> {
     }
     Ok(())
 }
+
+/// Why a version was not written when something appeared at its name since the preview.
+const APPEARED: &str = "a file appeared there after the preview, so nothing was overwritten \
+                        and nothing is left written. Try again to pick free names";
 
 /// What the create script ends with when something is at the path already.
 const EXISTS: i32 = 17;
@@ -269,7 +273,7 @@ fn create_new(file: &Path, bytes: &[u8], executable: bool) -> Result<(), String>
     )?;
     match out.code {
         0 => Ok(()),
-        EXISTS => Err("a file is there already (nothing was overwritten)".to_owned()),
+        EXISTS => Err(APPEARED.to_owned()),
         _ => Err(String::from_utf8_lossy(&out.stderr).trim().to_owned()),
     }
 }
@@ -281,9 +285,7 @@ fn create_new_here(file: &Path, bytes: &[u8], executable: bool) -> Result<(), St
         .create_new(true)
         .open(file)
         .map_err(|e| match e.kind() {
-            std::io::ErrorKind::AlreadyExists => {
-                "a file is there already (nothing was overwritten)".to_owned()
-            }
+            std::io::ErrorKind::AlreadyExists => APPEARED.to_owned(),
             _ => e.to_string(),
         })?;
     opened.write_all(bytes).map_err(|e| e.to_string())?;
@@ -373,6 +375,10 @@ mod tests {
         assert_eq!(
             tags((None, Some("t")), true),
             ("upstream".into(), "t".into())
+        );
+        assert_eq!(
+            tags((Some("m"), None), true),
+            ("m".into(), "your-commit".into())
         );
         // The same branch on both sides (a stash popped on its own branch), or names that
         // only differ in case (one file on Windows and macOS).
