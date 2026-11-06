@@ -143,7 +143,7 @@ fn a_file_with_spaces_and_unicode_links_to_its_lines() -> Result<(), String> {
             let page = format!("https://codeberg.org/o/r/src/commit/{sha}/{encoded}");
             assert_eq!(
                 resolve(dir, "origin", &target(path, Lines::new(3, 2)))?.map(|l| l.url),
-                Ok(format!("{page}#L2-L3"))
+                Ok(format!("{page}?display=source#L2-L3"))
             );
             assert_eq!(
                 resolve(dir, "origin", &target(path, None))?.map(|l| l.url),
@@ -172,7 +172,9 @@ fn removed_lines_link_to_the_parent() -> Result<(), String> {
             };
             assert_eq!(
                 resolve(dir, "origin", &target)?.map(|l| l.url),
-                Ok(format!("https://github.com/o/r/blob/{before}/f.txt#L2"))
+                Ok(format!(
+                    "https://github.com/o/r/blob/{before}/f.txt?plain=1#L2"
+                ))
             );
             Ok(())
         },
@@ -227,17 +229,38 @@ fn a_self_hosted_server_is_told_by_git_config() -> Result<(), String> {
 }
 
 #[test]
+fn the_repositorys_forge_setting_is_origins_not_every_remotes() -> Result<(), String> {
+    let remotes = [
+        ("origin", "git@git.corp.example:o/r.git"),
+        ("upstream", "https://github.com/up/r.git"),
+    ];
+    with(repo("forge-setting", &remotes)?, |dir| {
+        git(dir, &["config", "gitcraft.forge", "gitlab"])?;
+        let sha = git::head(dir);
+        assert_eq!(
+            resolve(dir, "origin", &at("HEAD"))?.map(|l| l.url),
+            Ok(format!("https://git.corp.example/o/r/-/commit/{sha}"))
+        );
+        assert_eq!(
+            resolve(dir, "upstream", &at("HEAD"))?.map(|l| l.url),
+            Ok(format!("https://github.com/up/r/commit/{sha}"))
+        );
+        Ok(())
+    })
+}
+
+#[test]
 fn what_cant_be_linked_says_why() -> Result<(), String> {
     with(
         repo("errors", &[("origin", "git@github.com:o/r.git")])?,
         |dir| {
             assert_eq!(
                 resolve(dir, "upstream", &at("HEAD"))?,
-                Err("There is no remote called upstream any more".into())
+                Err("the remote upstream is gone".into())
             );
             let bad = resolve(dir, "origin", &at("no-such-branch"))?;
             let bad = bad.err().ok_or("a link to no commit")?;
-            assert!(bad.contains("names no commit"), "{bad}");
+            assert!(bad.contains("isn't a commit in this repository"), "{bad}");
             let root = git::head(dir);
             let parent = resolve(dir, "origin", &at(&format!("{root}^")))?;
             assert_eq!(parent, Err(format!("{} has no parent commit", &root[..8])));
@@ -293,7 +316,8 @@ fn the_tab_copies_the_link_in_the_background() -> Result<(), String> {
             };
             let url = format!("https://github.com/o/r/commit/{sha}");
             let (said, warns) = status_after(&mut tab, copy(&sha), &ctx)?;
-            assert!(said.starts_with(&format!("Copied {url}. ")), "{said}");
+            assert!(said.starts_with("Copied the link, but "), "{said}");
+            assert!(said.ends_with(&format!(": {url}")), "{said}");
             assert!(warns, "an unpushed commit is a warning");
 
             fetched(dir, "origin", "main", &sha)?;
@@ -301,7 +325,7 @@ fn the_tab_copies_the_link_in_the_background() -> Result<(), String> {
             assert_eq!(pushed, (format!("Copied {url}"), false));
 
             let (said, failed) = status_after(&mut tab, copy("nothing-here"), &ctx)?;
-            assert!(said.starts_with("No link: "), "{said}");
+            assert!(said.starts_with("Copy link: "), "{said}");
             assert!(failed);
             Ok(())
         },
@@ -371,4 +395,19 @@ fn no_remote_on_a_forge_means_no_links() -> Result<(), String> {
         assert!(tab.branch_link_menu("main").is_none());
         Ok(())
     })
+}
+
+#[test]
+fn a_stash_has_no_links() -> Result<(), String> {
+    with(
+        repo("stash", &[("origin", "git@github.com:o/r.git")])?,
+        |dir| {
+            let ctx = egui::Context::default();
+            let mut tab = tab_on(dir, &ctx)?;
+            assert!(tab.link_menu(None).is_some());
+            tab.stash_view = Some(0);
+            assert!(tab.link_menu(None).is_none());
+            Ok(())
+        },
+    )
 }

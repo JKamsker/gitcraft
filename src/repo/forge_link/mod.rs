@@ -41,7 +41,16 @@ impl LinkMenu {
             })
         };
         if let [one] = self.choices.as_slice() {
-            let tip = format!("A permanent link, on {} ({})", one.remote, one.place);
+            let tip = match target {
+                Target::Branch { .. } => format!(
+                    "The branch's page on {} ({}): it follows the branch as it moves",
+                    one.remote, one.place
+                ),
+                _ => format!(
+                    "A permanent link (by the commit's hash), on {} ({})",
+                    one.remote, one.place
+                ),
+            };
             if ui
                 .button(format!("Copy link to {what}"))
                 .on_hover_text(&tip)
@@ -60,14 +69,18 @@ impl LinkMenu {
         }
         for open in [false, true] {
             let label = if open {
-                format!("Open {what} on…")
+                format!("Open {what} on")
             } else {
                 format!("Copy link to {what}")
             };
             ui.menu_button(label, |ui| {
                 for c in &self.choices {
-                    let text = format!("{} · {}", c.remote, c.place);
-                    let b = ui.button(text).on_hover_text(format!("On {}", c.forge));
+                    let text = format!("{} ({})", c.remote, c.place);
+                    let tip = format!(
+                        "On {}. The branch tracks no remote and there is no origin: pick one",
+                        c.forge
+                    );
+                    let b = ui.button(text).on_hover_text(tip);
                     if b.clicked() {
                         acts.push(ask(&c.remote, open));
                         ui.close();
@@ -82,6 +95,10 @@ impl RepoTab {
     /// The menu of links for what is on `branch` (the checked-out one when `None`): to the
     /// remote it tracks, else `origin`, else a choice. `None` when no remote is on a forge.
     pub(in crate::repo) fn link_menu(&self, branch: Option<&str>) -> Option<LinkMenu> {
+        // A stash is never pushed: what it holds has no page on any forge.
+        if self.stash_view.is_some() {
+            return None;
+        }
         let branch = branch.or(self.refs.current.as_deref());
         let tracked = branch.and_then(|name| self.tracked_remote(name));
         self.link_menu_of(links::candidates(&self.remotes, tracked.as_deref()))
@@ -172,7 +189,10 @@ fn choice(remote: &Remote, hosting: Option<&crate::forge::Hosting>) -> Choice {
 fn deliver(result: Result<Link, String>, open: bool, ctx: &egui::Context) -> (String, bool) {
     let link = match result {
         Ok(link) => link,
-        Err(e) => return (format!("No link: {e}"), true),
+        Err(e) => {
+            let what = if open { "Open link" } else { "Copy link" };
+            return (format!("{what}: {e}"), true);
+        }
     };
     let done = if open {
         if !crate::pull_request::is_web_url(&link.url) {
@@ -184,14 +204,18 @@ fn deliver(result: Result<Link, String>, open: bool, ctx: &egui::Context) -> (St
                 true,
             );
         }
-        format!("Opened {}", link.url)
+        "Opened"
     } else {
         ctx.copy_text(link.url.clone());
-        format!("Copied {}", link.url)
+        "Copied"
     };
+    // The warning before the address, which is long and would push it out of sight.
     match link.warning {
-        Some(warning) => (format!("{done}. {warning}"), true),
-        None => (done, false),
+        Some(warning) => (
+            format!("{done} the link, but {warning}: {}", link.url),
+            true,
+        ),
+        None => (format!("{done} {}", link.url), false),
     }
 }
 

@@ -77,10 +77,12 @@ impl RepoTab {
                     menu.items(ui, &lines.label(), &target, acts);
                 }
             };
-            let links = rev
-                .is_some()
+            // Lines are picked only when there's something to link them to.
+            let links = (rev.is_some() && self.link_menu(None).is_some())
                 .then_some(&mut link as file_text::LineMenu<'_>);
-            file_text::show(ui, ("diff_file", &path), view.file.as_ref(), links);
+            // Lines picked in one commit's file aren't picked in another's.
+            let id = ("diff_file", &path, sides(&view.key));
+            file_text::show(ui, id, view.file.as_ref(), links);
             return;
         }
         let Some(data) = ready_data(ui, view, ignore_ws, &t) else {
@@ -181,10 +183,15 @@ impl RepoTab {
                         DiffKey::Range { to: None, .. } => (None, false),
                         DiffKey::Work(_) => (None, true),
                     };
-                    // Linked as it is in the last commit: a new file isn't there yet.
+                    // Linked as it is in the last commit: a new or renamed file isn't there by
+                    // this name. Compared with the working tree, the file shown is in no commit.
                     let links = || {
-                        self.link_menu(None).filter(|_| {
-                            !matches!(&view.key, DiffKey::Work(f) if matches!(f.code, 'A' | '?'))
+                        self.link_menu(None).filter(|_| match &view.key {
+                            DiffKey::Work(f) => {
+                                !matches!(f.code, 'A' | '?') && f.old_path.is_none()
+                            }
+                            DiffKey::Range { to: None, .. } => false,
+                            DiffKey::Commit { .. } | DiffKey::Range { .. } => true,
                         })
                     };
                     widgets::file_menu(&title, path, rev, ignorable, &links, acts);

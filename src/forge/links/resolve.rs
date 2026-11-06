@@ -27,13 +27,19 @@ pub fn resolve(
     let chosen = remotes
         .iter()
         .find(|r| r.name == remote)
-        .ok_or_else(|| format!("There is no remote called {remote} any more"))?;
-    let hosting = forge::detect_with(
-        std::slice::from_ref(chosen),
-        &forge::gitcraft_config(repo),
-        &gitea::tea_servers(),
-    )
-    .ok_or_else(|| unknown_forge(chosen))?;
+        .ok_or_else(|| format!("the remote {remote} is gone"))?;
+    let mut config = forge::gitcraft_config(repo);
+    // `gitcraft.forge` says what `origin` (the remote detection reads) is on, not every remote:
+    // another remote goes by `gitcraft.<host>.forge` and its host's name.
+    let primary = remotes
+        .iter()
+        .find(|r| r.name == "origin")
+        .or(remotes.first());
+    if primary.is_some_and(|r| r.name != remote) {
+        config.remove("gitcraft.forge");
+    }
+    let hosting = forge::detect_with(std::slice::from_ref(chosen), &config, &gitea::tea_servers())
+        .ok_or_else(|| unknown_forge(chosen))?;
     let (place, warning) = match target {
         Target::Commit { rev } => {
             let sha = commit_sha(repo, rev)?;
@@ -71,7 +77,7 @@ pub fn resolve(
 fn unknown_forge(remote: &Remote) -> String {
     let host = forge::location(&remote.url).map_or_else(|| remote.url.clone(), |(host, _)| host);
     format!(
-        "gitcraft doesn't know which forge {host} (remote {}) is. If it's GitHub, GitLab, \
+        "gitcraft doesn't know which forge {host} (remote {}) is; if it's GitHub, GitLab, \
          Forgejo or Gitea, say which with: git config gitcraft.{host}.forge forgejo",
         remote.name
     )
@@ -89,7 +95,7 @@ fn commit_sha(repo: &Path, rev: &str) -> Result<String, String> {
     if sha.is_empty() {
         return Err(match rev.strip_suffix('^') {
             Some(child) => format!("{} has no parent commit", short(child)),
-            None => format!("{} names no commit here", short(rev)),
+            None => format!("{} isn't a commit in this repository", short(rev)),
         });
     }
     Ok(sha.to_owned())

@@ -128,9 +128,8 @@ impl RepoTab {
                         menu.items(ui, &lines.label(), &target, acts);
                     }
                 };
-                let links = view
-                    .rev
-                    .is_some()
+                // Lines are picked only when there's something to link them to.
+                let links = (view.rev.is_some() && self.link_menu(None).is_some())
                     .then_some(&mut link as file_text::LineMenu<'_>);
                 let id = ("file_view", &view.path, &view.rev);
                 file_text::show(ui, id, view.text.as_ref(), links);
