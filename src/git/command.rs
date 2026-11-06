@@ -209,6 +209,8 @@ pub struct Captured {
     pub code: Option<i32>,
     pub stdout: String,
     pub stderr: String,
+    /// Stdout as git wrote it (`stdout` is it decoded, invalid UTF-8 replaced).
+    pub raw: Vec<u8>,
 }
 
 /// Runs git in `dir` and returns how it ended, its exit code whatever it is, with `input` on
@@ -240,6 +242,7 @@ pub fn run_captured(dir: &Path, args: &[&str], input: Option<&[u8]>) -> Result<C
         code: out.code,
         stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+        raw: out.stdout,
     })
 }
 
@@ -479,6 +482,14 @@ mod tests {
             (&["-c", "credential.helper=x", "push", "origin"][..], true),
             (&["--literal-pathspecs", "pull"][..], true),
             (&["submodule", "update"][..], true),
+            (
+                &[
+                    "-c",
+                    "alias.gitcraft-user-command=!cargo test",
+                    USER_COMMAND_ALIAS,
+                ][..],
+                true,
+            ),
             (&["status", "--porcelain"][..], false),
             (&["-c", "fetch.x=1", "log"][..], false),
             (&["--no-optional-locks", "status"][..], false),

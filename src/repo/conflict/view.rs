@@ -17,6 +17,9 @@ impl RepoTab {
         // The switch waits for what is being read or set, and for the operation running.
         let switchable = idle && !self.rerere.busy;
         let Some(ed) = &mut self.conflict else { return };
+        // "Note why…" under each conflict from the start, whatever becomes of the read.
+        let conflicts = ed.choices.len();
+        ed.memo.drafts.resize_with(conflicts, Default::default);
         if ed.memo.offers.is_none() && !ed.memo.reading {
             acts.push(Action::Decisions(super::decisions::Act::Load));
         }
@@ -263,8 +266,9 @@ impl ConflictEditor {
                                     .is_some_and(|o| {
                                         Some(o.decision.resolution.as_str()) == recorded
                                     });
-                            if super::decisions::view::card(ui, t, k, memo, applied) {
-                                use_offer = Some(k);
+                            let state = (applied, self.manual);
+                            if let Some(p) = super::decisions::view::card(ui, t, k, memo, state) {
+                                use_offer = Some((k, p));
                             }
                         });
                     let (sep, _) =
@@ -275,8 +279,10 @@ impl ConflictEditor {
                 if let Some((k, choice)) = pick {
                     self.choose(k, choice);
                 }
-                if let Some(k) = use_offer {
-                    self.use_offer(k);
+                match use_offer {
+                    Some((k, super::decisions::view::Pick::Use)) => self.use_offer(k),
+                    Some((k, super::decisions::view::Pick::TakeNote)) => self.take_note(k),
+                    None => {}
                 }
             });
     }

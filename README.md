@@ -191,10 +191,12 @@ so your config, credentials and hooks apply as usual.
   _Forget this resolution_ runs `git rerere forget` and brings the conflict markers back.
 - _Note why…_ under a conflict keeps a reason ("keep the new validation, keep the old wire
   format") and a test command with how it is resolved, in git
-  (`refs/gitcraft/conflict-decisions/*`, sent or fetched only from the palette). When the same
-  conflict comes back, it is resolved the same way with the reason shown, and how its test last
-  went; if the code around it changed since, it is only offered, marked stale. _Run the tests
-  after saving_ runs them in the repository's folder once the file is saved.
+  (`refs/gitcraft/conflict-decisions/*`). When the same conflict comes back, it is resolved the
+  same way with the reason shown, and how its test last went; if the code around it changed
+  since, it is only offered, marked stale. _Test after saving_ runs the tests you wrote in the
+  repository's folder once the file is saved; a decision's own test runs only once you take it
+  as yours (_Keep its note and test_). The palette's _Get conflict decisions_ and _Send
+  conflict decisions_ share them through a remote; for the same conflict, the newer one wins.
 - A merge, rebase, cherry-pick, revert or patch stopped on conflicts shows a banner with
   _Abort_; the commit box finishes it (_Continue rebase_ during a rebase, _Continue patch_ while
   `git am` applies one).
