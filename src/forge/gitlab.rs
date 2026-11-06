@@ -36,6 +36,19 @@ impl Provider for GitLab {
         parse_list(&self.run(repo, &args)?)
     }
 
+    fn merged(&self, repo: &Path, _: &Hosting) -> Result<Vec<PullRequest>, String> {
+        let args = [
+            "mr",
+            "list",
+            "--merged",
+            "--output",
+            "json",
+            "--per-page",
+            "100",
+        ];
+        parse_list(&self.run(repo, &args)?)
+    }
+
     fn create(&self, repo: &Path, _: &Hosting, new: &NewPullRequest) -> Result<String, String> {
         let mut args = vec![
             "mr",

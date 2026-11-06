@@ -48,20 +48,11 @@ impl Provider for GitHub {
     }
 
     fn list(&self, repo: &Path, _: &Hosting) -> Result<Vec<PullRequest>, String> {
-        let out = gh(
-            repo,
-            &[
-                "pr",
-                "list",
-                "--state",
-                "open",
-                "--limit",
-                "100",
-                "--json",
-                "number,title,headRefName,headRefOid,author,url,isDraft",
-            ],
-        )?;
-        parse_list(&out)
+        parse_list(&gh(repo, &list_args("open"))?)
+    }
+
+    fn merged(&self, repo: &Path, _: &Hosting) -> Result<Vec<PullRequest>, String> {
+        parse_list(&gh(repo, &list_args("merged"))?)
     }
 
     fn create(&self, repo: &Path, _: &Hosting, new: &NewPullRequest) -> Result<String, String> {
@@ -120,6 +111,20 @@ impl Pages for GitHub {
     fn target(&self, repo: &Path, _: &Hosting, details: &PrDetails) -> Option<Box<dyn Target>> {
         post::GitHubTarget::of(repo, details).map(|t| Box::new(t) as Box<dyn Target>)
     }
+}
+
+/// `gh pr list` of the pull requests in `state` (`open`, `merged`), the latest 100.
+fn list_args(state: &str) -> [&str; 8] {
+    [
+        "pr",
+        "list",
+        "--state",
+        state,
+        "--limit",
+        "100",
+        "--json",
+        "number,title,headRefName,headRefOid,author,url,isDraft",
+    ]
 }
 
 fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {

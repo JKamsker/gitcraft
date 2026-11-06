@@ -132,6 +132,12 @@ pub trait Provider: Sync {
     /// The open pull requests.
     fn list(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<PullRequest>, String>;
 
+    /// The latest pull requests merged (up to 100): a local branch still at or behind the last
+    /// commit of one it proposed was merged, even squashed or rebased into other commits.
+    fn merged(&self, _repo: &Path, _hosting: &Hosting) -> Result<Vec<PullRequest>, String> {
+        Ok(Vec::new())
+    }
+
     /// Opens a pull request; returns its URL (or whatever the forge said).
     fn create(
         &self,
