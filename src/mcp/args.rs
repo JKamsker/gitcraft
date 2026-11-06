@@ -112,6 +112,15 @@ pub fn repo_path(path: &str) -> Result<&str, String> {
     if path.split(['/', '\\']).any(|part| part == "..") {
         return bad("must stay inside the repository (no `..`)");
     }
+    // One spelling per file: `./f`, `a//f` and `a/./f` are all `f` to git, and must be to the
+    // checks made on the path too. `.` alone is the whole repository.
+    let parts: Vec<&str> = path
+        .trim_end_matches(['/', '\\'])
+        .split(['/', '\\'])
+        .collect();
+    if path != "." && parts.iter().any(|part| part.is_empty() || *part == ".") {
+        return bad("must be written plainly (no `.` or empty parts: `a/b`, not `./a//b`)");
+    }
     Ok(path)
 }
 
@@ -198,6 +207,8 @@ mod tests {
             "a.txt",
             "src/main.rs",
             "dir/sub dir/f",
+            "dir/",
+            ".",
             "[ab].txt",
             ".github/x.yml",
         ] {
@@ -215,6 +226,11 @@ mod tests {
             "-rf",
             ":(top)x",
             "a\nb",
+            "./f",
+            "a//f",
+            "a/./f",
+            "a/.",
+            "/",
         ] {
             assert!(repo_path(bad).is_err(), "{bad:?} must be refused");
         }

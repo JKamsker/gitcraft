@@ -1,19 +1,24 @@
 //! The local channel between `gitcraft mcp` and a running window: the window listens on
 //! 127.0.0.1, on a port of its own, and writes the port and a random token into a discovery
 //! file only this user can read. A `gitcraft mcp` process reads those files and hands its
-//! request to each window in turn, with that window's token, until one has the repository
-//! open. Anything else that connects without the token is refused before its request is read
-//! any further.
+//! request to each window in turn until one has the repository open.
 //!
-//! One request line and one reply line ([`super::wire`]) per connection. The window answers
+//! The token itself never crosses the connection. Each side proves it holds it on the other's
+//! random challenge: the window first (so that whatever took the port of a window that crashed
+//! learns nothing of the request), then the request, which is refused before it is read any
+//! further without its proof.
+//!
+//! Per connection: a hello and the window's challenge, then one request line and one reply
+//! line ([`super::wire`]). The window answers
 //! from a thread of the connection's own; the window's own thread only gets the request
 //! through [`Incoming`], and never waits on the connection.
 
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{Sender, channel};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
@@ -32,8 +37,35 @@ pub fn dir() -> Option<PathBuf> {
 /// is refused, never held.
 const MAX_LINE: u64 = 1024 * 1024;
 
-/// How long a connection may take to send its request.
+/// How long a connection may take to send its hello, and then its request, each in whole.
 const READ_REQUEST: Duration = Duration::from_secs(10);
+
+/// The most connections a window serves at once: more are closed unread.
+const MAX_CONNECTIONS: usize = 16;
+
+/// The first line of a connection: who connects, and its challenge to the window.
+#[derive(Serialize, Deserialize)]
+struct Hello {
+    v: u32,
+    challenge: String,
+}
+
+/// The window's answer to a hello: its proof, and its own challenge.
+#[derive(Serialize, Deserialize)]
+struct Challenge {
+    v: u32,
+    proof: String,
+    challenge: String,
+}
+
+/// Proves holding `token` on `challenge`, for `side` ("window" or "agent"): what the other
+/// side can check without the token ever being sent.
+fn proof(token: &str, challenge: &str, side: &str) -> String {
+    format!(
+        "{:x}",
+        md5::compute(format!("{side}\0{token}\0{challenge}"))
+    )
+}
 
 /// How long the window may take to answer: an operation that runs long (a push), or an
 /// approval card waiting for the user, ends before this (see `repo::agent`).
@@ -92,10 +124,19 @@ pub fn listen(
         },
     )?;
     let deliver = std::sync::Arc::new(deliver);
+    let open = std::sync::Arc::new(AtomicUsize::new(0));
     std::thread::spawn(move || {
         for stream in listener.incoming().flatten() {
-            let (token, deliver) = (token.clone(), deliver.clone());
-            std::thread::spawn(move || serve(stream, &token, &*deliver));
+            if open.fetch_add(1, Ordering::SeqCst) >= MAX_CONNECTIONS {
+                // Closed unread: whoever opens this many isn't a window's agent.
+                open.fetch_sub(1, Ordering::SeqCst);
+                continue;
+            }
+            let (token, deliver, open) = (token.clone(), deliver.clone(), open.clone());
+            std::thread::spawn(move || {
+                serve(stream, &token, &*deliver);
+                open.fetch_sub(1, Ordering::SeqCst);
+            });
         }
     });
     Ok(Listener { file })
@@ -135,23 +176,53 @@ fn create_private_dir(dir: &Path) -> std::io::Result<()> {
     }
 }
 
-/// One line, its `\n` included; `None` when longer than [`MAX_LINE`], cut short or not text.
-fn read_line(stream: &TcpStream) -> Option<String> {
+/// One line, its `\n` included, read within `within` in whole; `None` when longer than
+/// [`MAX_LINE`], cut short, too slow or not text.
+fn read_line(stream: &TcpStream, within: Duration) -> Option<String> {
+    let until = Instant::now() + within;
     let mut line = Vec::new();
-    BufReader::new(stream.take(MAX_LINE))
-        .read_until(b'\n', &mut line)
-        .ok()?;
-    if line.last() != Some(&b'\n') {
+    let mut byte = [0u8; 4096];
+    let mut reader = stream;
+    loop {
+        let left = until.checked_duration_since(Instant::now())?;
+        stream
+            .set_read_timeout(Some(left.max(Duration::from_millis(1))))
+            .ok()?;
+        let n = reader.read(&mut byte).ok()?;
+        if n == 0 {
+            return None;
+        }
+        let chunk = &byte[..n];
+        match chunk.iter().position(|&b| b == b'\n') {
+            Some(end) => {
+                line.extend_from_slice(&chunk[..=end]);
+                break;
+            }
+            None => line.extend_from_slice(chunk),
+        }
+        if line.len() as u64 > MAX_LINE {
+            return None;
+        }
+    }
+    if line.len() as u64 > MAX_LINE {
         return None;
     }
     String::from_utf8(line).ok()
 }
 
-fn send(mut stream: &TcpStream, reply: &Reply) {
-    if let Ok(mut text) = serde_json::to_string(reply) {
-        text.push('\n');
-        let _ = stream.write_all(text.as_bytes());
+/// Writes `value` as one line.
+fn write_line(mut stream: &TcpStream, value: &impl Serialize) -> bool {
+    match serde_json::to_string(value) {
+        Ok(mut text) => {
+            text.push('\n');
+            stream.write_all(text.as_bytes()).is_ok()
+        }
+        Err(_) => false,
     }
+}
+
+fn send(stream: &TcpStream, reply: &Reply) {
+    write_line(stream, reply);
 }
 
 /// Compares the token in time that doesn't depend on where they differ.
@@ -164,13 +235,31 @@ fn same_token(given: &str, token: &str) -> bool {
             == 0
 }
 
-/// Answers one connection: its request checked, handed to `deliver`, the answer sent back.
+/// Answers one connection: the window proves itself, the request is checked, handed to
+/// `deliver`, and the answer sent back.
 fn serve(stream: TcpStream, token: &str, deliver: &(dyn Fn(Incoming) + Send + Sync)) {
-    let _ = stream.set_read_timeout(Some(READ_REQUEST));
-    let Some(line) = read_line(&stream) else {
+    let Some(hello) =
+        read_line(&stream, READ_REQUEST).and_then(|line| serde_json::from_str::<Hello>(&line).ok())
+    else {
         return;
     };
-    let request = match check(&line, token) {
+    // Any challenge but a sensible one is no agent's.
+    if hello.challenge.len() < 16 || hello.challenge.len() > 128 {
+        return;
+    }
+    let mine = crate::remote::askpass::random_token();
+    let challenge = Challenge {
+        v: VERSION,
+        proof: proof(token, &hello.challenge, "window"),
+        challenge: mine.clone(),
+    };
+    if !write_line(&stream, &challenge) {
+        return;
+    }
+    let Some(line) = read_line(&stream, READ_REQUEST) else {
+        return;
+    };
+    let request = match check(&line, &proof(token, &mine, "agent")) {
         Ok(request) => request,
         Err(reply) => return send(&stream, &reply),
     };
@@ -185,7 +274,8 @@ fn serve(stream: TcpStream, token: &str, deliver: &(dyn Fn(Incoming) + Send + Sy
         let why = match e {
             std::sync::mpsc::RecvTimeoutError::Timeout => "gitcraft took too long to answer",
             std::sync::mpsc::RecvTimeoutError::Disconnected => {
-                "gitcraft's window dropped the request (its tab was closed?)"
+                "The repository's tab in gitcraft was closed before it was done; nothing more \
+                 will happen."
             }
         };
         Reply::new(Outcome::TimedOut, why)
@@ -193,13 +283,13 @@ fn serve(stream: TcpStream, token: &str, deliver: &(dyn Fn(Incoming) + Send + Sy
     send(&stream, &reply);
 }
 
-/// The request in `line`, if it has the right version and token.
-fn check(line: &str, token: &str) -> Result<Request, Reply> {
-    // The version and token are looked at before the rest is believed.
+/// The request in `line`, if it has the right version and `expected` as its proof.
+fn check(line: &str, expected: &str) -> Result<Request, Reply> {
+    // The version and proof are looked at before the rest is believed.
     let value: serde_json::Value = serde_json::from_str(line)
         .map_err(|_| Reply::new(Outcome::BadRequest, "not a gitcraft request"))?;
-    let given = value.get("token").and_then(|t| t.as_str()).unwrap_or("");
-    if !same_token(given, token) {
+    let given = value.get("proof").and_then(|t| t.as_str()).unwrap_or("");
+    if !same_token(given, expected) {
         return Err(Reply::new(Outcome::BadRequest, "wrong token"));
     }
     let v = value.get("v").and_then(|v| v.as_u64()).unwrap_or(0);
@@ -247,12 +337,12 @@ pub fn ask(dir: &Path, repo: &str, agent: &str, op: &WriteOp, wait: Duration) ->
     for (file, window) in windows(dir) {
         let request = Request {
             v: VERSION,
-            token: window.token.clone(),
+            proof: String::new(),
             repo: repo.to_owned(),
             agent: agent.to_owned(),
             op: op.clone(),
         };
-        match ask_one(window.port, &request, wait) {
+        match ask_one(&window, request, wait) {
             Err(Unreachable::Gone) => {
                 // A window that ended without taking its file away (it crashed).
                 let _ = std::fs::remove_file(&file);
@@ -279,24 +369,38 @@ pub fn ask(dir: &Path, repo: &str, agent: &str, op: &WriteOp, wait: Duration) ->
 }
 
 enum Unreachable {
-    /// Nothing listens there any more.
+    /// Nothing listens there any more, or what does isn't that window.
     Gone,
     /// It took the request but didn't answer.
     NoAnswer(String),
 }
 
-fn ask_one(port: u16, request: &Request, wait: Duration) -> Result<Reply, Unreachable> {
-    let address = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
+/// Hands `request` to `window`, once it has proved it holds its token.
+fn ask_one(window: &Discovery, mut request: Request, wait: Duration) -> Result<Reply, Unreachable> {
+    let address = SocketAddr::from((Ipv4Addr::LOCALHOST, window.port));
     let stream = TcpStream::connect_timeout(&address, Duration::from_secs(2))
         .map_err(|_| Unreachable::Gone)?;
-    let mut line =
-        serde_json::to_string(request).map_err(|e| Unreachable::NoAnswer(e.to_string()))?;
-    line.push('\n');
-    (&stream)
-        .write_all(line.as_bytes())
-        .map_err(|e| Unreachable::NoAnswer(e.to_string()))?;
-    let _ = stream.set_read_timeout(Some(wait));
-    let answer = read_line(&stream).ok_or_else(|| {
+    let mine = crate::remote::askpass::random_token();
+    let hello = Hello {
+        v: VERSION,
+        challenge: mine.clone(),
+    };
+    if !write_line(&stream, &hello) {
+        return Err(Unreachable::Gone);
+    }
+    let challenge = read_line(&stream, READ_REQUEST)
+        .and_then(|line| serde_json::from_str::<Challenge>(&line).ok())
+        .ok_or(Unreachable::Gone)?;
+    // Not the window that wrote the file (it ended, and something else took its port): it
+    // learns nothing of the request.
+    if !same_token(&challenge.proof, &proof(&window.token, &mine, "window")) {
+        return Err(Unreachable::Gone);
+    }
+    request.proof = proof(&window.token, &challenge.challenge, "agent");
+    if !write_line(&stream, &request) {
+        return Err(Unreachable::NoAnswer("the connection closed".to_owned()));
+    }
+    let answer = read_line(&stream, wait).ok_or_else(|| {
         Unreachable::NoAnswer("the connection ended without an answer".to_owned())
     })?;
     serde_json::from_str(&answer).map_err(|e| Unreachable::NoAnswer(e.to_string()))
@@ -382,28 +486,116 @@ mod tests {
     }
 
     #[test]
-    fn a_request_without_the_token_is_refused_before_it_is_delivered() {
-        let token = "0123456789abcdef";
-        let request = |token: &str, v: u32| {
+    fn a_request_without_its_proof_is_refused_before_it_is_delivered() {
+        let expected = proof("0123456789abcdef", "challenge", "agent");
+        let request = |proof: &str, v: u32| {
             serde_json::to_string(&Request {
                 v,
-                token: token.into(),
+                proof: proof.into(),
                 repo: "/r".into(),
                 agent: "a".into(),
                 op: stage(),
             })
             .unwrap_or_default()
         };
-        let refused = |line: String| check(&line, token).err().map(|r| r.outcome);
+        let refused = |line: String| check(&line, &expected).err().map(|r| r.outcome);
         assert_eq!(refused(request("wrong", 1)), Some(Outcome::BadRequest));
         assert_eq!(refused(request("", 1)), Some(Outcome::BadRequest));
-        assert_eq!(refused(request(token, 2)), Some(Outcome::BadRequest));
-        assert_eq!(refused("{not json".into()), Some(Outcome::BadRequest));
+        // The token itself is no proof.
         assert_eq!(
-            refused(r#"{"v":1,"token":"0123456789abcdef","op":{"op":"rm_rf"}}"#.into()),
+            refused(request("0123456789abcdef", 1)),
             Some(Outcome::BadRequest)
         );
-        assert!(check(&request(token, 1), token).is_ok());
+        assert_eq!(refused(request(&expected, 2)), Some(Outcome::BadRequest));
+        assert_eq!(refused("{not json".into()), Some(Outcome::BadRequest));
+        let unknown = format!(r#"{{"v":1,"proof":"{expected}","op":{{"op":"rm_rf"}}}}"#);
+        assert_eq!(refused(unknown), Some(Outcome::BadRequest));
+        assert!(check(&request(&expected, 1), &expected).is_ok());
+    }
+
+    #[test]
+    fn proofs_depend_on_the_token_the_challenge_and_the_side() {
+        let p = proof("t", "c", "agent");
+        assert_ne!(p, proof("u", "c", "agent"));
+        assert_ne!(p, proof("t", "d", "agent"));
+        assert_ne!(p, proof("t", "c", "window"));
+        assert!(!p.contains('t') || p.len() == 32);
+    }
+
+    #[test]
+    fn a_port_taken_over_after_a_crash_learns_nothing() {
+        let dir = temp("impostor");
+        // Something else listens where the file says the window is, without its token.
+        let impostor = TcpListener::bind((Ipv4Addr::LOCALHOST, 0));
+        let port = impostor
+            .as_ref()
+            .ok()
+            .and_then(|l| l.local_addr().ok())
+            .map(|a| a.port());
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
+        if let Ok(impostor) = impostor {
+            let seen = seen.clone();
+            std::thread::spawn(move || {
+                for stream in impostor.incoming().flatten().take(1) {
+                    let hello = read_line(&stream, Duration::from_secs(5)).unwrap_or_default();
+                    let fake = Challenge {
+                        v: VERSION,
+                        proof: "f".repeat(32),
+                        challenge: "c".repeat(32),
+                    };
+                    write_line(&stream, &fake);
+                    let rest = read_line(&stream, Duration::from_secs(2)).unwrap_or_default();
+                    if let Ok(mut seen) = seen.lock() {
+                        *seen = format!("{hello}{rest}");
+                    }
+                }
+            });
+        }
+        let file = dir.join("window-1.json");
+        let stale = Discovery {
+            v: VERSION,
+            port: port.unwrap_or(1),
+            token: "the-real-windows-token".into(),
+            pid: 1,
+        };
+        assert!(write_private(&dir, &file, &stale).is_ok());
+        let reply = ask(&dir, "/secret/repo", "a", &stage(), Duration::from_secs(5));
+        std::thread::sleep(Duration::from_millis(100));
+        let seen = seen.lock().map(|s| s.clone()).unwrap_or_default();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(reply.outcome, Outcome::NotOpen);
+        assert!(!seen.contains("/secret/repo"), "{seen}");
+        assert!(!seen.contains("the-real-windows-token"), "{seen}");
+    }
+
+    #[test]
+    fn a_slow_or_endless_line_is_given_up_on() {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0));
+        let Ok(listener) = listener else { return };
+        let Ok(address) = listener.local_addr() else {
+            return;
+        };
+        std::thread::spawn(move || {
+            if let Ok(mut s) = TcpStream::connect(address) {
+                // One byte now and then, never a line's end.
+                for _ in 0..50 {
+                    if s.write_all(b"x").is_err() {
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(40));
+                }
+            }
+        });
+        let Some(Ok(stream)) = listener.incoming().next() else {
+            return;
+        };
+        let started = Instant::now();
+        let line = read_line(&stream, Duration::from_millis(300));
+        assert!(line.is_none());
+        assert!(
+            started.elapsed() < Duration::from_secs(1),
+            "the whole line has a deadline"
+        );
     }
 
     #[test]

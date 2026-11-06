@@ -16,15 +16,15 @@ impl Settings {
             f,
             "Add gitcraft to an agent",
             Some(
-                "Run one of these once. The agent then starts gitcraft mcp in the repository it \
-                 works in, and can read the graph, status, diffs, blame, conflicts, builds and \
-                 pull requests.",
+                "Run one of these once; it adds gitcraft for every project. The agent then starts \
+                 gitcraft mcp in the repository it works in, and can read the graph, status, \
+                 diffs, blame, conflicts, builds and pull requests.",
             ),
             |card| {
                 for (agent, command) in crate::mcp::register_commands(&program) {
                     card.row(
                         agent,
-                        "mcp register add claude codex command server",
+                        "mcp register add claude codex command server ai agent",
                         |ui| {
                             ui.horizontal(|ui| {
                                 ui.add(
@@ -46,10 +46,19 @@ impl Settings {
                 }
             },
         );
-        section(ui, f, "Changes by agents", None, |card| {
-            card.row(
-                "Let agents change",
-                "write tools allow off disable mcp",
+        section(
+            ui,
+            f,
+            "Changes by agents",
+            Some(
+                "Each change is a step of the repository's undo list, marked with a robot. A \
+                 push, deleting a branch, a hard reset, dropping a commit or staging a \
+                 conflicted file waits for you to approve it.",
+            ),
+            |card| {
+                card.row(
+                "Agents may change repositories",
+                "write tools allow off disable mcp ai robot approve approval permission read only",
                 |ui| {
                     ui.checkbox(
                         &mut self.agent_writes,
@@ -63,12 +72,13 @@ impl Settings {
                     );
                 },
             );
-            card.row("Needs", "window open tab", |ui| {
+                card.row("Needs", "window open tab", |ui| {
                 layout::note(
                     ui,
-                    "The repository open in a tab of this window; reading works without it",
+                    "Changes need the repository open in a tab of this window; reading works without it",
                 );
             });
-        });
+            },
+        );
     }
 }

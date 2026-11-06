@@ -2,7 +2,7 @@
 //! in the background ([`plan`]), waits its turn, and runs as the tab's own operations do, so
 //! that it lands in the undo list, marked as the agent's. One that can't be undone waits on an
 //! Approve / Deny card first (drawn by the app, see `app::agent_card`), for a while; then it is
-//! denied by itself.
+//! denied automatically.
 
 pub(crate) mod plan;
 
@@ -44,7 +44,7 @@ impl Job {
     }
 }
 
-/// A request planned, waiting to run.
+/// A request planned, about to run or on its card.
 struct Ready {
     job: Job,
     plan: Plan,
@@ -53,6 +53,7 @@ struct Ready {
 /// A request waiting for the user's Approve or Deny.
 struct Waiting {
     ready: Ready,
+    shown: Instant,
     until: Instant,
 }
 
@@ -65,7 +66,11 @@ struct Running {
 
 /// The tab's agents' requests.
 pub(crate) struct Agents {
-    queue: VecDeque<Ready>,
+    /// Waiting their turn, not planned yet: each is planned when the tab is free for it, so that
+    /// what it checks (a conflict, where a branch is) is the repository as it will run on.
+    queue: VecDeque<Job>,
+    /// A request being planned (on a background thread).
+    planning: bool,
     card: Option<Waiting>,
     running: Option<Running>,
     /// How long a card waits ([`APPROVAL_WAIT`]; less in the tests).
@@ -76,6 +81,7 @@ impl Default for Agents {
     fn default() -> Self {
         Self {
             queue: VecDeque::new(),
+            planning: false,
             card: None,
             running: None,
             approval_wait: APPROVAL_WAIT,
@@ -93,6 +99,21 @@ pub(crate) struct CardView {
     /// Whether gitcraft can undo it once done.
     pub undoable: bool,
     pub left: Duration,
+    /// How long it has been on screen: Approve takes no click at first, which was surely meant
+    /// for what the card popped up over.
+    pub shown_for: Duration,
+}
+
+/// `text` without the characters that change how text around them reads: bidirectional
+/// overrides and isolates, zero-width ones, other format and control characters.
+fn visible(text: &str) -> String {
+    text.chars()
+        .filter(|&c| {
+            !(c.is_control()
+                || matches!(c, '\u{200b}'..='\u{200f}' | '\u{202a}'..='\u{202e}'
+                    | '\u{2060}'..='\u{2069}' | '\u{feff}' | '\u{061c}' | '\u{00ad}'))
+        })
+        .collect()
 }
 
 /// `args` as typed in a shell, quoted where it needs it; `None` for a step that runs nothing (a
@@ -117,9 +138,17 @@ fn shown_command(args: &[String]) -> Option<String> {
 }
 
 impl RepoTab {
-    /// Takes a request from an agent: planned in the background, then queued.
+    /// Takes a request from an agent: it waits its turn, and is planned once the tab is free.
     pub(crate) fn agent_request(&mut self, incoming: Incoming, ctx: &egui::Context) {
         let job = Job::new(incoming.agent, incoming.op, incoming.reply);
+        self.agents.queue.push_back(job);
+        self.agent_step(ctx);
+    }
+
+    /// Plans `job` in the background. `approved`: the card the user approved for it, which the
+    /// plan made now must still show for it to run without asking again.
+    fn agent_plan(&mut self, job: Job, approved: Option<Ask>, ctx: &egui::Context) {
+        self.agents.planning = true;
         let path = self.path.clone();
         self.then(
             ctx,
@@ -127,30 +156,62 @@ impl RepoTab {
                 let planned = plan::plan(&path, &job.op);
                 (job, planned)
             },
-            |tab, (job, planned), ctx| tab.agent_planned(job, planned, ctx),
+            move |tab, (job, planned), ctx| tab.agent_planned(job, planned, approved, ctx),
         );
     }
 
-    /// A request planned: queued, or answered with why it can't be done.
-    fn agent_planned(&mut self, job: Job, planned: Result<Plan, String>, ctx: &egui::Context) {
-        match planned {
-            Ok(mut plan) => {
-                // What can't be undone always asks, whatever the plan made of it.
-                if job.op.needs_approval() && plan.ask.is_none() {
-                    plan.ask = Some(Ask {
-                        title: plan.label.clone(),
-                        body: "This can't be undone from gitcraft.".to_owned(),
-                    });
-                }
-                self.agents.queue.push_back(Ready { job, plan });
-                self.agent_step(ctx);
+    /// A request planned: run, shown on its card, or answered with why it can't be done.
+    fn agent_planned(
+        &mut self,
+        job: Job,
+        planned: Result<Plan, String>,
+        approved: Option<Ask>,
+        ctx: &egui::Context,
+    ) {
+        self.agents.planning = false;
+        let mut plan = match planned {
+            Ok(plan) => plan,
+            Err(e) => {
+                job.answer(Outcome::Failed, e);
+                return self.agent_step(ctx);
             }
-            Err(e) => job.answer(Outcome::Failed, e),
+        };
+        // What can't be undone always asks, whatever the plan made of it.
+        if job.op.needs_approval() && plan.ask.is_none() {
+            plan.ask = Some(Ask {
+                title: plan.label.clone(),
+                body: plan.label.clone(),
+                undo_note: "This can't be undone from gitcraft.".to_owned(),
+            });
+        }
+        if self.busy_op.is_some() || self.loading {
+            // Something started meanwhile: planned again when it is done.
+            self.agents.queue.push_front(job);
+            return;
+        }
+        match plan.ask.take() {
+            // What the user approved is still what it would do.
+            Some(ask) if approved.as_ref() == Some(&ask) => {
+                self.agent_start(Ready { job, plan }, ctx)
+            }
+            Some(ask) => {
+                plan.ask = Some(ask);
+                self.agents.card = Some(Waiting {
+                    ready: Ready { job, plan },
+                    shown: Instant::now(),
+                    until: Instant::now() + self.agents.approval_wait,
+                });
+                ctx.send_viewport_cmd(egui::ViewportCommand::RequestUserAttention(
+                    egui::UserAttentionType::Informational,
+                ));
+                ctx.request_repaint();
+            }
+            None => self.agent_start(Ready { job, plan }, ctx),
         }
     }
 
-    /// Moves the requests along: a card that waited too long is denied, the next request
-    /// starts (or shows its card) once the tab is free. Called on every poll.
+    /// Moves the requests along: a card that waited too long is denied, the next request is
+    /// planned once the tab is free. Called on every poll.
     pub(super) fn agent_step(&mut self, ctx: &egui::Context) {
         let agents = &mut self.agents;
         if agents
@@ -162,7 +223,8 @@ impl RepoTab {
             waiting.ready.job.answer(
                 Outcome::TimedOut,
                 format!(
-                    "Nobody approved it in gitcraft within {} seconds, so nothing was done.",
+                    "Nobody answered gitcraft's approval card within {} seconds, so nothing was \
+                     done. Ask the user to watch for the card in gitcraft before trying again.",
                     agents.approval_wait.as_secs()
                 ),
             );
@@ -170,12 +232,16 @@ impl RepoTab {
         while agents
             .queue
             .front()
-            .is_some_and(|r| r.job.came.elapsed() > QUEUE_WAIT)
+            .is_some_and(|job| job.came.elapsed() > QUEUE_WAIT)
         {
             if let Some(stale) = agents.queue.pop_front() {
-                stale.job.answer(
+                stale.answer(
                     Outcome::TimedOut,
-                    "gitcraft was busy with other work the whole time; nothing was done",
+                    format!(
+                        "gitcraft was busy for {} minutes (another operation or an approval \
+                         card), so nothing was done. Try again.",
+                        QUEUE_WAIT.as_secs() / 60
+                    ),
                 );
             }
         }
@@ -184,23 +250,11 @@ impl RepoTab {
             ctx.request_repaint_after(Duration::from_secs(1));
             return;
         }
-        if agents.running.is_some() || self.busy_op.is_some() || self.loading {
+        if agents.planning || agents.running.is_some() || self.busy_op.is_some() || self.loading {
             return;
         }
-        let Some(ready) = self.agents.queue.pop_front() else {
-            return;
-        };
-        if ready.plan.ask.is_some() {
-            self.agents.card = Some(Waiting {
-                ready,
-                until: Instant::now() + self.agents.approval_wait,
-            });
-            ctx.send_viewport_cmd(egui::ViewportCommand::RequestUserAttention(
-                egui::UserAttentionType::Informational,
-            ));
-            ctx.request_repaint();
-        } else {
-            self.agent_start(ready, ctx);
+        if let Some(job) = self.agents.queue.pop_front() {
+            self.agent_plan(job, None, ctx);
         }
     }
 
@@ -225,33 +279,46 @@ impl RepoTab {
         }
     }
 
-    /// The card waiting for the user, if there is one.
+    /// The card waiting for the user, if there is one. What the agent wrote into it (a branch
+    /// name, a commit's summary) is shown without characters that reorder or hide text.
     pub(crate) fn agent_card(&self) -> Option<CardView> {
         let waiting = self.agents.card.as_ref()?;
         let plan = &waiting.ready.plan;
+        let ask = plan.ask.as_ref()?;
         Some(CardView {
-            agent: waiting.ready.job.agent.clone(),
-            ask: plan.ask.clone()?,
-            commands: plan.ops.iter().filter_map(|op| shown_command(op)).collect(),
+            agent: visible(&waiting.ready.job.agent),
+            ask: Ask {
+                title: visible(&ask.title),
+                body: visible(&ask.body),
+                undo_note: visible(&ask.undo_note),
+            },
+            commands: plan
+                .ops
+                .iter()
+                .filter_map(|op| shown_command(op))
+                .map(|c| visible(&c))
+                .collect(),
             undoable: plan.undo != Undo::None,
             left: waiting.until.saturating_duration_since(Instant::now()),
+            shown_for: waiting.shown.elapsed(),
         })
     }
 
-    /// The user's answer to the card: runs it, or tells the agent no.
+    /// The user's answer to the card. Approved, the request is planned again, and runs if it
+    /// still does what the card said; if the repository changed meanwhile, its new card shows.
     pub(crate) fn agent_decide(&mut self, approve: bool, ctx: &egui::Context) {
         let Some(waiting) = self.agents.card.take() else {
             return;
         };
-        let mut ready = waiting.ready;
+        let Ready { job, plan } = waiting.ready;
         if !approve {
-            ready.job.answer(Outcome::Denied, "The user chose Deny.");
+            job.answer(
+                Outcome::Denied,
+                "Don't try it again unless the user asks you to.",
+            );
             return;
         }
-        // Approved: it runs next, without asking again.
-        ready.plan.ask = None;
-        self.agents.queue.push_front(ready);
-        self.agent_step(ctx);
+        self.agent_plan(job, plan.ask, ctx);
     }
 
     /// An operation ended (see `op_done`): when it was an agent's, its undo step is marked as
@@ -320,5 +387,13 @@ mod tests {
             Some("git commit -m 'it'\\''s done'")
         );
         assert_eq!(shown(&["\u{0}expect", "refs/heads/x", "abc"]), None);
+    }
+
+    #[test]
+    fn what_an_agent_wrote_cant_reorder_the_card() {
+        assert_eq!(visible("evil\u{202e}txt.exe"), "eviltxt.exe");
+        assert_eq!(visible("a\u{200b}b\u{2066}c\u{feff}"), "abc");
+        assert_eq!(visible("line\nbreak"), "linebreak");
+        assert_eq!(visible("plain “quoted” text"), "plain “quoted” text");
     }
 }

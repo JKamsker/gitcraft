@@ -12,10 +12,10 @@ use crate::icons;
 use crate::settings::Settings;
 use crate::theme::Tokens;
 
-/// "Undo Commit (Ctrl+Z)", saying which agent did it when one did.
+/// "Undo Commit (Ctrl+Z)", or "Undo Claude Code's Commit (Ctrl+Z)" for an agent's step.
 fn step_tip(what: &str, entry: &super::UndoEntry, keys: &str) -> String {
     match &entry.agent {
-        Some(agent) => format!("{what} {}, done by {agent} ({keys})", entry.label),
+        Some(agent) => format!("{what} {agent}'s {} ({keys})", entry.label),
         None => format!("{what} {} ({keys})", entry.label),
     }
 }

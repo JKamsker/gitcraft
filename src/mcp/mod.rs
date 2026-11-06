@@ -53,7 +53,7 @@ pub fn register_commands(program: &str) -> [(&'static str, String); 2] {
     [
         (
             "Claude Code",
-            format!("claude mcp add gitcraft -- {program} mcp"),
+            format!("claude mcp add --scope user gitcraft -- {program} mcp"),
         ),
         ("Codex", format!("codex mcp add gitcraft -- {program} mcp")),
     ]
@@ -64,7 +64,7 @@ gitcraft mcp [--repo <path>]
 
 Speaks the Model Context Protocol over stdin and stdout, for coding agents:
 
-  claude mcp add gitcraft -- gitcraft mcp
+  claude mcp add --scope user gitcraft -- gitcraft mcp
   codex mcp add gitcraft -- gitcraft mcp
 
 It works on the git repository it is started in, or the one --repo names (a folder here, or
@@ -162,7 +162,10 @@ mod tests {
     #[test]
     fn agents_are_told_how_to_start_it() {
         let [claude, codex] = register_commands("gitcraft");
-        assert_eq!(claude.1, "claude mcp add gitcraft -- gitcraft mcp");
+        assert_eq!(
+            claude.1,
+            "claude mcp add --scope user gitcraft -- gitcraft mcp"
+        );
         assert_eq!(codex.1, "codex mcp add gitcraft -- gitcraft mcp");
         assert!(!program().is_empty());
     }
