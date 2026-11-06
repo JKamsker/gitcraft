@@ -61,7 +61,7 @@ use crate::remote::{self, Target};
 /// - `LANGUAGE`: messages in English whatever the user's language: errors are told apart by
 ///   their words (`is_auth_error`…). `C` in LANGUAGE wins over LC_ALL / LANG for messages only,
 ///   so the character set (and what hooks see of it) stays the user's.
-const GIT_ENV: [(&str, &str); 4] = [
+pub(super) const GIT_ENV: [(&str, &str); 4] = [
     ("GIT_TERMINAL_PROMPT", "0"),
     ("GIT_OPTIONAL_LOCKS", "0"),
     ("GIT_EDITOR", "true"),
@@ -69,7 +69,7 @@ const GIT_ENV: [(&str, &str); 4] = [
 ];
 
 /// Interactive rebases set `sequence.editor` themselves; an inherited one would win.
-const GIT_ENV_REMOVED: [&str; 1] = ["GIT_SEQUENCE_EDITOR"];
+pub(super) const GIT_ENV_REMOVED: [&str; 1] = ["GIT_SEQUENCE_EDITOR"];
 
 fn git_cmd() -> Command {
     let mut cmd = Command::new("git");
@@ -193,6 +193,17 @@ pub fn run_bytes(dir: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
         Ok(out.stdout)
     } else {
         Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
+    }
+}
+
+/// Runs git in `dir` (on this machine) and returns its exit code and output: stdout when it
+/// succeeds, stderr when it doesn't. For a caller that reads failures as answers (see
+/// [`super::overview`]), which runs a repository elsewhere through one script instead.
+pub(super) fn run_coded(dir: &Path, args: &[&str]) -> Result<(i32, Vec<u8>), String> {
+    let out = execute(Some(dir), &Extra::default(), args)?;
+    match out.code {
+        Some(0) => Ok((0, out.stdout)),
+        code => Ok((code.unwrap_or(-1), out.stderr)),
     }
 }
 

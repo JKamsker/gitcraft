@@ -12,6 +12,9 @@ so your config, credentials and hooks apply as usual.
 
 - Start page: checks that `git` is installed; open, create (`git init`) or clone a repository;
   recent repositories.
+- Workspaces on the start page: named groups of repositories (here, in WSL or over SSH). Each
+  shows every repository's branch, uncommitted files, ahead / behind and last fetch, looked at in
+  the background a few at a time; _Fetch all_ and _Open all_ work on the whole group.
 - Browser-like tabs, one per repository (Ctrl+T, Ctrl+W, middle-click; Ctrl+Shift+T reopens a
   closed one). Open tabs, recents, theme and settings are remembered.
 - Profiles, as in GitKraken: switch between them from the title bar (or the palette). Each has
