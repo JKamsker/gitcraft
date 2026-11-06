@@ -43,6 +43,7 @@ pub(super) fn poll(
     repo: &Path,
     tx: &Sender<FsChange>,
     arrived: &Sender<Msg>,
+    watch: u64,
     ctx: &egui::Context,
     alive: &Weak<()>,
 ) {
@@ -56,7 +57,7 @@ pub(super) fn poll(
             let change = match &last {
                 Some(before) => compare(before, &look),
                 None => {
-                    if arrived.send(Msg::Watcher(None)).is_err() {
+                    if arrived.send(Msg::Watcher(watch, None)).is_err() {
                         return;
                     }
                     ctx.request_repaint();
