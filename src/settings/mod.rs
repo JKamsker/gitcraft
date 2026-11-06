@@ -532,6 +532,39 @@ impl Settings {
                     Some("Solves merge conflicts from the syntax of the code."),
                     |card| self.mergiraf_ui(card),
                 );
+                section(
+                    ui,
+                    f,
+                    "Remote machines",
+                    Some(
+                        "Repositories in WSL or over SSH run git there, with that machine's own \
+                         git config: the settings above that write this machine's global git \
+                         config, and a profile's author and signing, don't reach it.",
+                    ),
+                    |card| {
+                        card.row_hint(
+                            "SSH sign-ins",
+                            "Kept with \"Remember connection\"",
+                            "ssh password passphrase forget saved credential keyring wsl remote",
+                            |ui| {
+                                ui.horizontal_wrapped(|ui| {
+                                    // The system's store can take a while (the Secret Service
+                                    // is another process): not on the window's thread.
+                                    if ui
+                                        .button("Forget saved sign-ins")
+                                        .on_hover_text(
+                                            "Takes every SSH password and passphrase gitcraft \
+                                             saved out of the system's credential store",
+                                        )
+                                        .clicked()
+                                    {
+                                        std::thread::spawn(crate::remote::askpass::forget_saved);
+                                    }
+                                });
+                            },
+                        );
+                    },
+                );
             }
             Page::Signing => signing::signing_ui(ui, f),
             Page::Terminal => {

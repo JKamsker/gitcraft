@@ -196,5 +196,6 @@ fn a_search_finds_settings_by_name_keyword_section_or_page() {
     // The profile's own settings are found too.
     assert_eq!(found("user.email"), vec![(Page::Profile, 1)]);
     assert_eq!(found("theme dark"), vec![(Page::Profile, 1)]);
+    assert_eq!(found("ssh passphrase"), vec![(Page::Git, 1)]);
     assert!(found("nothing like this qqq").is_empty());
 }

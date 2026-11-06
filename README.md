@@ -51,7 +51,7 @@ so your config, credentials and hooks apply as usual.
   signed in with it (a wrong one is never saved), it is saved encrypted in the system's
   credential store (Windows Credential Manager, the macOS Keychain, the Secret Service on
   Linux), never in gitcraft's own files, and forgotten when it stops working or with
-  **Forget saved SSH sign-ins** in the command palette.
+  **Forget saved SSH sign-ins** in the command palette (or Settings → Git).
 - Names with a `\` in them (Linux allows one) work like any other.
 - Network operations (fetch, pull, push, clone) run in shells of their own, so the reads never
   wait behind them. A command that hangs is stopped there, with what it started, after 5
