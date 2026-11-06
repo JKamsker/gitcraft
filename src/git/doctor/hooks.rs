@@ -468,7 +468,9 @@ pub fn parse_scan(out: &str) -> Vec<Scanned> {
     let b64 = base64::engine::general_purpose::STANDARD;
     let lines: Vec<&str> = out.lines().collect();
     let mut list: Vec<Scanned> = lines
-        .chunks_exact(3)
+        .as_chunks::<3>()
+        .0
+        .iter()
         .filter_map(|c| {
             let name = String::from_utf8(b64.decode(c[0]).ok()?).ok()?;
             let folder = c[1].starts_with('1');
