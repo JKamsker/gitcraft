@@ -37,6 +37,7 @@ enum AppCommand {
     ForgetSignIns,
     Settings,
     Manual,
+    MyWork,
     Theme(ThemeKind),
     Profile(u64),
     NewProfile,
@@ -101,6 +102,11 @@ impl App {
                 "F1".to_owned(),
                 Entry::App(AppCommand::Manual),
             ),
+            (
+                "Where's my work? (unpushed commits, stashes, changes everywhere)".to_owned(),
+                "app".to_owned(),
+                Entry::App(AppCommand::MyWork),
+            ),
         ];
         if !self.closed.is_empty() {
             list.insert(
@@ -155,6 +161,7 @@ impl App {
             }
             Entry::App(AppCommand::Settings) => self.open_settings(),
             Entry::App(AppCommand::Manual) => self.manual_open = true,
+            Entry::App(AppCommand::MyWork) => self.open_my_work(ctx),
             Entry::App(AppCommand::Theme(kind)) => self.set_theme(ctx, kind),
             Entry::App(AppCommand::Profile(id)) => {
                 self.switch_profile(id, ctx);

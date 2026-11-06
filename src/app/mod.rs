@@ -3,6 +3,7 @@
 mod askpass_dialog;
 mod clone;
 mod home;
+mod my_work;
 mod palette;
 mod panels;
 mod profiles;
@@ -61,6 +62,8 @@ struct Saved {
     profile_states: profiles::ProfileStates,
     /// Named groups of repositories, on the start page.
     workspaces: crate::across::workspaces::Workspaces,
+    /// Repositories found on a machine by "Where's my work?".
+    found_repos: Vec<PathBuf>,
 }
 
 enum Tab {
@@ -128,6 +131,9 @@ pub struct App {
     workspaces: crate::across::workspaces::Workspaces,
     /// How the workspaces' repositories stand, as last looked at.
     workspaces_view: workspaces::WorkspacesView,
+    /// Repositories found on a machine by "Where's my work?", looked at with the others.
+    found_repos: Vec<PathBuf>,
+    my_work: my_work::MyWork,
 }
 
 impl App {
@@ -189,6 +195,8 @@ impl App {
             tab_looks: saved.tab_looks,
             workspaces: saved.workspaces,
             workspaces_view: Default::default(),
+            found_repos: saved.found_repos,
+            my_work: Default::default(),
         };
         update::clean_up();
         let mut kept = Vec::new();
@@ -368,6 +376,7 @@ impl App {
         // A focused text field or the terminal keeps these keys for itself.
         let modal_open = self.clone_form.is_some()
             || self.remote_form.is_some()
+            || self.my_work.open
             || self.askpass_open()
             || self.palette.is_some()
             || self.manual_open
@@ -535,6 +544,7 @@ impl eframe::App for App {
         self.askpass_dialog(&ctx);
         self.palette_ui(&ctx);
         self.manual_ui(&ctx);
+        self.my_work_ui(&ctx);
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
     }
@@ -553,6 +563,7 @@ impl eframe::App for App {
             tab_looks: self.tab_looks.clone(),
             profile_states: self.profile_states.clone(),
             workspaces: self.workspaces.clone(),
+            found_repos: self.found_repos.clone(),
         };
         eframe::set_value(storage, eframe::APP_KEY, &saved);
     }

@@ -1,6 +1,8 @@
 //! Across repositories: what looks over many repositories at once, wherever they are (here, in
 //! WSL, over SSH). The window's parts that show it are in [`crate::app`].
 
+pub mod discover;
+pub mod my_work;
 pub mod runner;
 pub mod workspaces;
 
