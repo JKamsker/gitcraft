@@ -87,6 +87,7 @@ fn section_ui(ui: &mut Ui, doctor: &mut DoctorView, env: &TabEnv, acts: &mut Vec
     let (worktrees, remote, top) = (env.worktrees, env.remote, env.top.as_str());
     match doctor.section {
         Section::Ignore => super::ignore_section::ui(ui, &mut doctor.ignore, top, locked, acts),
+        Section::Hooks => super::hooks_section::ui(ui, &doctor.hooks, locked, acts),
         Section::Config => {
             let env = super::config_section::Env::new(worktrees, remote, locked);
             super::config_section::ui(ui, &mut doctor.config, env, acts)

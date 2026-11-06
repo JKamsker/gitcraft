@@ -4,9 +4,13 @@
 
 pub mod config;
 pub mod flags;
+pub mod hook_log;
+pub mod hooks;
 pub mod ignore;
 pub mod rules;
 
+#[cfg(test)]
+mod hooks_tests;
 #[cfg(test)]
 mod ignore_tests;
 #[cfg(test)]
