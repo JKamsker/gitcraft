@@ -17,7 +17,9 @@ so your config, credentials and hooks apply as usual.
   the background a few at a time; _Fetch all_ and _Open all_ work on the whole group.
 - A pull-request inbox on the start page: across every repository opened and every forge (GitHub,
   GitLab, Forgejo, Gitea), the pull requests waiting for your review, and yours with failing checks
-  or comments you haven't seen. A click opens one in its repository's tab.
+  or comments you haven't seen. A click opens one in its repository's tab (a GitLab merge request
+  in the browser). It uses the logins gh and glab have; for Forgejo and Gitea, one from the
+  environment, tea's, or one gitcraft already used: it never runs git's credential helper unasked.
 - Browser-like tabs, one per repository (Ctrl+T, Ctrl+W, middle-click; Ctrl+Shift+T reopens a
   closed one). Open tabs, recents, theme and settings are remembered.
 - Profiles, as in GitKraken: switch between them from the title bar (or the palette). Each has
