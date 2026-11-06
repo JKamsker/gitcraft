@@ -213,7 +213,7 @@ mod tests {
     #[test]
     fn writes_and_removes_both_workflows() -> Result<(), String> {
         let services =
-            std::env::temp_dir().join(format!("gitcraft-services <&> {}", std::process::id()));
+            std::env::temp_dir().join(format!("gitcraft-services &' {}", std::process::id()));
         let _ = std::fs::remove_dir_all(&services);
         let written = write_all(&services);
         let read = |name: &str, file: &str| {
