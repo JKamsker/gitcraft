@@ -574,10 +574,12 @@ fn finds_what_git_bisect_run_finds_across_merges() -> Result<(), String> {
     let found = git(&["bisect", "run", "sh", "-c", "test ! -e bug"])?;
     git(&["bisect", "reset"])?;
     let want = hashes[7].clone();
-    assert!(
-        found.contains(&format!("{want} is the first bad commit")),
-        "{found}"
-    );
+    // Newer gits put the term in quotes: "is the first 'bad' commit".
+    let said = found
+        .lines()
+        .find(|l| l.contains("is the first") && l.contains("bad"))
+        .unwrap_or_default();
+    assert!(said.starts_with(&want), "{found}");
     for k in [1, 2, 4, 8] {
         let setup = Setup {
             bad: tip.clone(),
