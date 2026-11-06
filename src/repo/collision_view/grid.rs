@@ -15,13 +15,25 @@ const NAMES: f32 = 190.0;
 pub(super) fn results(ui: &mut Ui, m: &Matrix, order: &[Step], acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
     if let Some(e) = m.first_error() {
-        ui.colored_label(t.warning, format!("Some pairs couldn't be told: {e}"));
+        ui.colored_label(
+            readable(&t, t.warning),
+            format!("Some pairs couldn't be merged in memory: {e}"),
+        );
         ui.add_space(6.0);
     }
     egui::ScrollArea::both()
         .id_salt("collision-grid")
         .max_height(300.0)
         .show(ui, |ui| matrix(ui, m, acts));
+    ui.label(
+        egui::RichText::new(format!(
+            "→ is each branch merged into {}. A number is how many files conflict: hover for \
+             them, click to compare the two.",
+            m.target
+        ))
+        .size(11.5)
+        .color(t.text_faint),
+    );
     ui.add_space(12.0);
     ui.label(egui::RichText::new("Suggested landing order").font(theme::semibold(13.0)));
     ui.add_space(4.0);
@@ -97,7 +109,7 @@ fn matrix(ui: &mut Ui, m: &Matrix, acts: &mut Vec<Action>) {
                 other,
                 cell,
             ));
-            if r.clicked() && j < n && cell.as_ref().is_ok_and(|p| !p.clean()) {
+            if r.clicked() && cell.as_ref().is_ok_and(|p| !p.clean()) {
                 acts.push(compare(other, &m.branches[i]));
             }
         }
@@ -111,9 +123,13 @@ fn paint_cell(ui: &mut Ui, rect: Rect, cell: &Cell, id: egui::Id) -> egui::Respo
         Ok(pair) => (
             t.danger.gamma_multiply(0.25),
             pair.files.len().to_string(),
-            t.danger,
+            readable(&t, t.danger),
         ),
-        Err(_) => (t.warning.gamma_multiply(0.18), "?".to_owned(), t.warning),
+        Err(_) => (
+            t.warning.gamma_multiply(0.18),
+            "?".to_owned(),
+            readable(&t, t.warning),
+        ),
     };
     let painter = ui.painter();
     painter.rect_filled(rect, CornerRadius::same(4), fill);
@@ -166,7 +182,13 @@ fn landing(ui: &mut Ui, m: &Matrix, order: &[Step]) {
         ui.horizontal_wrapped(|ui| {
             ui.label(egui::RichText::new(format!("{}.", at + 1)).color(t.text_faint));
             ui.label(egui::RichText::new(name).font(theme::medium(12.5)));
-            let color = if step.clean() { t.success } else { t.danger };
+            let color = if step.clean() {
+                readable(&t, t.success)
+            } else if step.with_target == 0 && step.with_earlier.is_empty() {
+                readable(&t, t.warning)
+            } else {
+                readable(&t, t.danger)
+            };
             ui.label(egui::RichText::new(note).size(12.0).color(color));
         });
     }
@@ -175,7 +197,7 @@ fn landing(ui: &mut Ui, m: &Matrix, order: &[Step]) {
 /// "lands cleanly", or what the branch conflicts with by then.
 pub(super) fn step_note(m: &Matrix, step: &Step) -> String {
     if step.clean() {
-        return "lands cleanly".to_owned();
+        return "merges cleanly with each one before it".to_owned();
     }
     let mut parts: Vec<String> = Vec::new();
     if step.with_target > 0 {
@@ -184,7 +206,32 @@ pub(super) fn step_note(m: &Matrix, step: &Step) -> String {
     for &(other, n) in &step.with_earlier {
         parts.push(format!("{} ({})", m.branches[other], files(n)));
     }
-    format!("conflicts with {}", parts.join(", "))
+    let unknown: Vec<&str> = step
+        .unknown
+        .iter()
+        .map(|u| u.map_or(m.target.as_str(), |i| m.branches[i].as_str()))
+        .collect();
+    let mut note = Vec::new();
+    if !parts.is_empty() {
+        note.push(format!("conflicts with {}", parts.join(", ")));
+    }
+    if !unknown.is_empty() {
+        note.push(format!(
+            "couldn't be merged with {} in memory",
+            unknown.join(", ")
+        ));
+    }
+    note.join("; ")
+}
+
+/// `color` darkened on light themes, so small text on its own tint stays readable.
+fn readable(t: &Tokens, color: egui::Color32) -> egui::Color32 {
+    if t.dark() {
+        return color;
+    }
+    let [r, g, b, _] = color.to_array();
+    let dim = |c: u8| (f32::from(c) * 0.7) as u8;
+    egui::Color32::from_rgb(dim(r), dim(g), dim(b))
 }
 
 fn files(n: usize) -> String {

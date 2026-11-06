@@ -20,18 +20,24 @@ pub struct Step {
     pub with_target: usize,
     /// The branches landed before this one that it conflicts with, and on how many files.
     pub with_earlier: Vec<(usize, usize)>,
+    /// The branches landed before this one (or the target, as `None`) it couldn't be merged
+    /// with in memory: whether it lands cleanly is not known.
+    pub unknown: Vec<Option<usize>>,
 }
 
 impl Step {
+    /// Known to land cleanly.
     pub fn clean(&self) -> bool {
-        self.with_target == 0 && self.with_earlier.is_empty()
+        self.with_target == 0 && self.with_earlier.is_empty() && self.unknown.is_empty()
     }
 }
 
 /// The suggested landing order of the matrix's branches.
 pub fn landing_order(m: &Matrix) -> Vec<Step> {
     let n = m.branches.len();
-    let candidates: Vec<usize> = (0..n).filter(|&i| m.target_count(i) == 0).collect();
+    let candidates: Vec<usize> = (0..n)
+        .filter(|&i| m.target_count(i) == 0 && !m.target_unknown(i))
+        .collect();
     let mut first = clean_set(m, &candidates);
     // Fewest conflicts with the others first: what they would hit comes later and smaller.
     first.sort_by_key(|&i| (total(m, i), i));
@@ -62,8 +68,24 @@ pub fn landing_order(m: &Matrix) -> Vec<Step> {
                 .filter(|&&e| m.conflict(branch, e))
                 .map(|&e| (e, m.count(branch, e)))
                 .collect(),
+            unknown: m
+                .target_unknown(branch)
+                .then_some(None)
+                .into_iter()
+                .chain(
+                    order[..at]
+                        .iter()
+                        .filter(|&&e| m.unknown(branch, e))
+                        .map(|&e| Some(e)),
+                )
+                .collect(),
         })
         .collect()
+}
+
+/// Whether `i` and `j` can't both land cleanly: they conflict, or it isn't known.
+fn clash(m: &Matrix, i: usize, j: usize) -> bool {
+    m.conflict(i, j) || m.unknown(i, j)
 }
 
 /// Conflicted files of `i` with every other branch.
@@ -95,12 +117,13 @@ fn exact_clean_set(m: &Matrix, candidates: &[usize]) -> Vec<usize> {
             candidates
                 .iter()
                 .enumerate()
-                .filter(|&(_, &j)| m.conflict(i, j))
+                .filter(|&(_, &j)| clash(m, i, j))
                 .fold(0u32, |bits, (b, _)| bits | (1 << b))
         })
         .collect();
     let mut best = 0u32;
-    // Ties go to the set with fewer conflicted files with the rest, then the earlier branches.
+    // Ties go to the set with fewer conflicted files with the rest, then to the first such
+    // set counted (by the candidates' bits).
     let mut best_key = (0usize, usize::MAX);
     for set in 0u32..(1u32 << k) {
         let independent = (0..k).all(|b| set & (1 << b) == 0 || conflicts[b] & set == 0);
@@ -133,7 +156,7 @@ fn greedy_clean_set(m: &Matrix, candidates: &[usize]) -> Vec<usize> {
     });
     let mut set: Vec<usize> = Vec::new();
     for i in sorted {
-        if set.iter().all(|&j| !m.conflict(i, j)) {
+        if set.iter().all(|&j| !clash(m, i, j)) {
             set.push(i);
         }
     }

@@ -93,6 +93,59 @@ fn worktree_branches_are_ticked_and_checked_in_the_background() -> Result<(), St
 }
 
 #[test]
+fn an_answer_for_a_window_closed_since_is_dropped() -> Result<(), String> {
+    let dir = repo("reopen")?;
+    agent(&dir, "agent/one", "1\nONE\n3\n")?;
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    tab.refs = git::refs(&dir)?;
+    tab.worktrees = git::worktrees(&dir, None)?;
+    tab.open_collisions();
+    tab.check_collisions(&ctx);
+    let first = tab.collisions.as_ref().map(|v| v.request);
+    // Closed (the run stopped) and opened again, then checked: a new number.
+    tab.collisions = None;
+    tab.open_collisions();
+    tab.check_collisions(&ctx);
+    let second = tab.collisions.as_ref().map(|v| v.request);
+    assert_ne!(first, second);
+    let started = Instant::now();
+    while tab.collisions.as_ref().is_some_and(|v| v.run.is_some()) {
+        tab.poll(&ctx);
+        if started.elapsed() > Duration::from_secs(30) {
+            return Err("never came back".into());
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let view = tab.collisions.as_ref().ok_or("open")?;
+    assert!(matches!(view.result, Some(Ok(_))), "{:?}", view.note);
+    // Put away, it comes back as it was.
+    if let Some(v) = &mut tab.collisions {
+        v.hidden = true;
+    }
+    tab.open_collisions();
+    assert!(
+        tab.collisions
+            .as_ref()
+            .is_some_and(|v| !v.hidden && v.result.is_some())
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(dir.with_extension("wt"));
+    Ok(())
+}
+
+#[test]
+fn an_empty_target_is_never_a_branch() {
+    let names: Vec<String> = ["a", "b"].iter().map(|s| (*s).to_owned()).collect();
+    let view = super::CollisionView::new(&names, &["a".to_owned()], "");
+    assert_eq!(view.picks.len(), 2);
+    assert_eq!(
+        view.cannot_check().as_deref(),
+        Some("Pick the branch they land on")
+    );
+}
+
+#[test]
 fn the_target_can_be_changed_and_drops_out_of_the_picks() {
     let names: Vec<String> = ["a", "b", "main"].iter().map(|s| (*s).to_owned()).collect();
     let view = super::CollisionView::new(&names, &["a".to_owned()], "main");
