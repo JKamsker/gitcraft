@@ -13,6 +13,7 @@ mod gitea;
 mod github;
 mod gitlab;
 mod http;
+pub mod inbox;
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -142,6 +143,17 @@ pub trait Provider: Sync {
 
     /// Where the account pictures of the authors (by commit email) are.
     fn avatars(&self, repo: &Path, hosting: &Hosting, emails: &[String]) -> Vec<(String, Hint)>;
+
+    /// The open pull requests that wait for the person logged in: those whose review is asked
+    /// of them, and theirs (see [`inbox::needs_you`] for which of them need them now).
+    fn inbox(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<inbox::InboxPr>, String> {
+        let _ = (repo, hosting);
+        Err(format!(
+            "gitcraft can't list the {}s waiting for you on {}",
+            self.noun(),
+            self.name()
+        ))
+    }
 
     /// The page of one pull request, if gitcraft has one for this forge.
     fn pages(&self) -> Option<&dyn Pages> {
