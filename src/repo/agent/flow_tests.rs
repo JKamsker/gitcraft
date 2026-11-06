@@ -1,0 +1,236 @@
+//! Requests going through a real tab, as the window takes them from the channel: an operation
+//! that runs at once and lands in the undo list as the agent's, and the approval card
+//! approved, denied, or left to time out.
+
+use std::path::{Path, PathBuf};
+use std::sync::mpsc::{Receiver, channel};
+use std::time::{Duration, Instant};
+
+use crate::git;
+use crate::mcp::link::Incoming;
+use crate::mcp::wire::{Outcome, Reply, WriteOp};
+use crate::repo::RepoTab;
+
+/// A repository with one commit and a branch `old`, in a fresh folder named after `name`.
+fn repo(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("gitcraft-flow-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::create_dir_all(&dir);
+    for args in [
+        &["init", "-q", "-b", "main"][..],
+        &["config", "user.name", "t"],
+        &["config", "user.email", "t@t"],
+        &["config", "commit.gpgsign", "false"],
+        &["commit", "-q", "--allow-empty", "-m", "base"],
+        &["branch", "old"],
+    ] {
+        assert!(git::run(Some(&dir), args).is_ok());
+    }
+    dir
+}
+
+/// A tab of `dir`, read.
+fn tab(dir: &Path, ctx: &egui::Context) -> RepoTab {
+    let mut tab = RepoTab::new(dir.to_owned(), ctx);
+    settle(&mut tab, ctx, |t| !t.loading && !t.refs.head.is_empty());
+    tab
+}
+
+/// Polls the tab, as frames do, until `done` (or a few seconds pass).
+fn settle(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&RepoTab) -> bool) {
+    let until = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < until {
+        tab.poll(ctx);
+        if done(tab) {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+/// Hands `op` to the tab as the window's inbox does; the agent's end of the answer.
+fn ask(tab: &mut RepoTab, ctx: &egui::Context, op: WriteOp) -> Receiver<Reply> {
+    let (reply, answer) = channel();
+    let incoming = Incoming {
+        repo: tab.path.to_string_lossy().into_owned(),
+        agent: "Claude Code".to_owned(),
+        op,
+        reply,
+    };
+    tab.agent_request(incoming, ctx);
+    answer
+}
+
+/// The answer, polling the tab until it comes.
+fn answer(tab: &mut RepoTab, ctx: &egui::Context, rx: &Receiver<Reply>) -> Option<Reply> {
+    let until = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < until {
+        tab.poll(ctx);
+        if let Ok(reply) = rx.try_recv() {
+            return Some(reply);
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    None
+}
+
+fn delete_old() -> WriteOp {
+    WriteOp::DeleteBranch {
+        name: "old".into(),
+        force: false,
+    }
+}
+
+#[test]
+fn an_undoable_request_runs_at_once_and_is_marked_the_agents() {
+    let ctx = egui::Context::default();
+    let dir = repo("runs");
+    let mut tab = tab(&dir, &ctx);
+    let rx = ask(
+        &mut tab,
+        &ctx,
+        WriteOp::CreateBranch {
+            name: "feature".into(),
+            start: None,
+            checkout: false,
+        },
+    );
+    let reply = answer(&mut tab, &ctx, &rx);
+    let made = git::resolve(&dir, "refs/heads/feature").is_ok();
+    let top = tab.undo_stack.last().cloned();
+    let card = tab.agent_card();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(card.is_none(), "an undoable operation asks nobody");
+    assert_eq!(reply.as_ref().map(|r| r.outcome), Some(Outcome::Done));
+    assert!(reply.is_some_and(|r| r.message.contains("Ctrl+Z")));
+    assert!(made);
+    let top = top.unwrap_or_else(|| crate::repo::UndoEntry {
+        label: String::new(),
+        undo: Vec::new(),
+        redo: Vec::new(),
+        heads: None,
+        agent: None,
+    });
+    assert_eq!(top.label, "Create branch feature");
+    assert_eq!(top.agent.as_deref(), Some("Claude Code"));
+}
+
+#[test]
+fn an_approved_request_runs_and_stays_undoable() {
+    let ctx = egui::Context::default();
+    let dir = repo("approve");
+    let mut tab = tab(&dir, &ctx);
+    let rx = ask(&mut tab, &ctx, delete_old());
+    settle(&mut tab, &ctx, |t| t.agent_card().is_some());
+    let card = tab.agent_card();
+    let before = git::resolve(&dir, "refs/heads/old").is_ok();
+    tab.agent_decide(true, &ctx);
+    let reply = answer(&mut tab, &ctx, &rx);
+    let gone = git::resolve(&dir, "refs/heads/old").is_err();
+    let top = tab.undo_stack.last().and_then(|e| e.agent.clone());
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(before, "nothing runs before the user answers");
+    let card = card.map(|c| (c.agent, c.ask.title, c.commands, c.undoable));
+    assert_eq!(
+        card,
+        Some((
+            "Claude Code".to_owned(),
+            "Delete branch".to_owned(),
+            vec!["git branch -d -- old".to_owned()],
+            true,
+        ))
+    );
+    assert_eq!(reply.map(|r| r.outcome), Some(Outcome::Done));
+    assert!(gone);
+    assert_eq!(top.as_deref(), Some("Claude Code"));
+}
+
+#[test]
+fn a_denied_request_changes_nothing() {
+    let ctx = egui::Context::default();
+    let dir = repo("deny");
+    let mut tab = tab(&dir, &ctx);
+    let rx = ask(&mut tab, &ctx, delete_old());
+    settle(&mut tab, &ctx, |t| t.agent_card().is_some());
+    tab.agent_decide(false, &ctx);
+    let reply = answer(&mut tab, &ctx, &rx);
+    let kept = git::resolve(&dir, "refs/heads/old").is_ok();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(reply.map(|r| r.outcome), Some(Outcome::Denied));
+    assert!(kept);
+    assert!(tab.agent_card().is_none());
+    assert!(tab.undo_stack.is_empty());
+}
+
+#[test]
+fn a_card_nobody_answers_is_denied_by_itself() {
+    let ctx = egui::Context::default();
+    let dir = repo("timeout");
+    let mut tab = tab(&dir, &ctx);
+    tab.agents.approval_wait = Duration::from_millis(50);
+    let rx = ask(&mut tab, &ctx, WriteOp::Push { force: true });
+    let reply = answer(&mut tab, &ctx, &rx);
+    let _ = std::fs::remove_dir_all(&dir);
+    // No remote: the plan fails before any card. With one, the card times out.
+    assert_eq!(reply.map(|r| r.outcome), Some(Outcome::Failed));
+
+    let dir = repo("timeout-card");
+    let mut tab = self::tab(&dir, &ctx);
+    tab.agents.approval_wait = Duration::from_millis(50);
+    let rx = ask(&mut tab, &ctx, delete_old());
+    let reply = answer(&mut tab, &ctx, &rx);
+    let kept = git::resolve(&dir, "refs/heads/old").is_ok();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(reply.as_ref().map(|r| r.outcome), Some(Outcome::TimedOut));
+    assert!(reply.is_some_and(|r| r.message.contains("nothing was done")));
+    assert!(kept);
+    assert!(tab.agent_card().is_none());
+}
+
+#[test]
+fn requests_wait_their_turn_behind_the_card() {
+    let ctx = egui::Context::default();
+    let dir = repo("queue");
+    let mut tab = tab(&dir, &ctx);
+    let first = ask(&mut tab, &ctx, delete_old());
+    settle(&mut tab, &ctx, |t| t.agent_card().is_some());
+    let second = ask(
+        &mut tab,
+        &ctx,
+        WriteOp::CreateBranch {
+            name: "next".into(),
+            start: None,
+            checkout: false,
+        },
+    );
+    // Planned, but not run while the card is open.
+    settle(&mut tab, &ctx, |t| !t.agents.queue.is_empty());
+    let waited = git::resolve(&dir, "refs/heads/next").is_err();
+    tab.agent_decide(false, &ctx);
+    let first = answer(&mut tab, &ctx, &first);
+    let second = answer(&mut tab, &ctx, &second);
+    let made = git::resolve(&dir, "refs/heads/next").is_ok();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(waited);
+    assert_eq!(first.map(|r| r.outcome), Some(Outcome::Denied));
+    assert_eq!(second.map(|r| r.outcome), Some(Outcome::Done));
+    assert!(made);
+}
+
+#[test]
+fn a_request_that_cant_be_planned_says_why() {
+    let ctx = egui::Context::default();
+    let dir = repo("refused");
+    let mut tab = tab(&dir, &ctx);
+    let rx = ask(
+        &mut tab,
+        &ctx,
+        WriteOp::Checkout {
+            branch: "missing".into(),
+        },
+    );
+    let reply = answer(&mut tab, &ctx, &rx);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(reply.as_ref().map(|r| r.outcome), Some(Outcome::Failed));
+    assert!(reply.is_some_and(|r| r.message.contains("no local branch called missing")));
+}
