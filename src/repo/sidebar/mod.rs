@@ -1,7 +1,7 @@
 //! Left pane: local branches, remotes and their branches, worktrees, submodules, stashes, pull
 //! requests, tags.
 
-mod branch_delete;
+pub(super) mod branch_delete;
 mod branches;
 mod pull_requests;
 mod remotes;

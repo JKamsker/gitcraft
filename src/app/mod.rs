@@ -1,5 +1,6 @@
 //! Window shell: git check, browser-like tabs, the start page and cloning.
 
+mod agent_card;
 mod askpass_dialog;
 mod clone;
 mod handoff;
@@ -123,6 +124,8 @@ pub struct App {
     /// The folders of the last repository tabs closed, the last one at the end.
     closed: Vec<PathBuf>,
     tab_drag: Option<TabDrag>,
+    /// Requests from agents over `gitcraft mcp`.
+    agent_inbox: crate::mcp::window::Inbox,
 }
 
 impl App {
@@ -167,6 +170,7 @@ impl App {
             toasts: Vec::new(),
             closed: Vec::new(),
             tab_drag: None,
+            agent_inbox: crate::mcp::window::Inbox::start(ctx),
             error: None,
             was_focused: true,
             clone_form: None,
@@ -185,6 +189,12 @@ impl App {
             skipped_version: saved.skipped_version,
             tab_looks: saved.tab_looks,
         };
+        if let Some(e) = &app.agent_inbox.error {
+            app.toasts.push(Toast::new(
+                format!("Agents can't reach this window: {e}"),
+                true,
+            ));
+        }
         update::clean_up();
         let mut kept = Vec::new();
         if app.git_version.is_ok() {
@@ -490,6 +500,7 @@ impl eframe::App for App {
         self.poll_update(&ctx);
         self.notice_profile_git(&ctx);
         let focused = self.shortcuts(&ctx);
+        self.agent_requests(&ctx);
 
         // Background repos still need their results drained. Those restored on start are read
         // once the one shown is: they would otherwise all compete with it.
@@ -536,6 +547,7 @@ impl eframe::App for App {
         self.clone_dialog(&ctx);
         self.remote_dialog(&ctx);
         self.askpass_dialog(&ctx);
+        self.agent_card(&ctx);
         self.palette_ui(&ctx);
         self.manual_ui(&ctx);
         self.toast_finished(focused);
@@ -581,7 +593,7 @@ fn repo_scope(path: &Path) -> egui::Id {
 }
 
 /// The top of the repository `path` is in, in the form tabs are told apart by.
-fn repo_root(path: &Path) -> Result<PathBuf, String> {
+pub(crate) fn repo_root(path: &Path) -> Result<PathBuf, String> {
     let root = git::toplevel(path)?;
     // Already in its one form; resolving it here would mean nothing.
     if crate::remote::is_remote(&root) {

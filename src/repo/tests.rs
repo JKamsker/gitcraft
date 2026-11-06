@@ -86,6 +86,7 @@ fn undoing_a_head_move_refuses_once_head_moved_elsewhere() {
         undo: ops(&[&["reset", "--soft", &before]]),
         redo: ops(&[&["reset", "--soft", &after]]),
         heads: Some((before.clone(), after.clone())),
+        agent: None,
     };
     // Then a checkout of another branch, elsewhere: undoing must not reset that one.
     let side = [
@@ -559,6 +560,7 @@ fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
         undo: ops(&[&["push", "terminal prompts disabled", "refs/tags/v1"]]),
         redo: Vec::new(),
         heads: None,
+        agent: None,
     };
     tab.undo_stack.push(entry.clone());
     tab.undo(&ctx);

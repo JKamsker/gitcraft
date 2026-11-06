@@ -2,6 +2,7 @@
 //! (branches on the left, commit graph or diff in the middle, commit detail / changes on the right).
 
 mod actions;
+pub(crate) mod agent;
 mod apply;
 mod branch_tree;
 mod branch_visibility;
@@ -188,6 +189,8 @@ pub struct RepoTab {
 
     undo_stack: Vec<UndoEntry>,
     redo_stack: Vec<UndoEntry>,
+    /// What agents asked for over `gitcraft mcp`, waiting, on its card or running.
+    agents: agent::Agents,
 
     busy_op: Option<String>,
     op_started: Option<Instant>,
@@ -332,6 +335,7 @@ impl RepoTab {
             pending_goto: None,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
+            agents: Default::default(),
             busy_op: None,
             op_started: None,
             update_submodules: false,

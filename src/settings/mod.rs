@@ -1,5 +1,6 @@
 //! User settings: stored with the app state, readable from anywhere through the egui context.
 
+mod agents;
 mod layout;
 mod page;
 mod preview;
@@ -101,6 +102,9 @@ pub struct Settings {
     pub user_profiles: Vec<UserProfile>,
     /// The id of the profile in use.
     pub active_profile: u64,
+    /// Agents connected over `gitcraft mcp` may change repositories (through the window, as
+    /// steps of the undo list); otherwise they only read.
+    pub agent_writes: bool,
 }
 
 impl Default for Settings {
@@ -143,6 +147,7 @@ impl Default for Settings {
             identities: Vec::new(),
             user_profiles: vec![UserProfile::default()],
             active_profile: UserProfile::default().id,
+            agent_writes: true,
         }
     }
 }
@@ -793,6 +798,7 @@ impl Settings {
                     },
                 );
             }
+            Page::Agents => self.agents_ui(ui, f),
             Page::Shortcuts => {
                 for (group, keys) in crate::manual::SHORTCUTS {
                     section(ui, f, group, None, |card| {
@@ -842,11 +848,12 @@ pub(crate) enum Page {
     Signing,
     Terminal,
     Identities,
+    Agents,
     Shortcuts,
 }
 
 impl Page {
-    pub const ALL: [Page; 9] = [
+    pub const ALL: [Page; 10] = [
         Page::Profile,
         Page::General,
         Page::Appearance,
@@ -855,6 +862,7 @@ impl Page {
         Page::Signing,
         Page::Terminal,
         Page::Identities,
+        Page::Agents,
         Page::Shortcuts,
     ];
 
@@ -868,6 +876,7 @@ impl Page {
             Page::Signing => "Commit signing",
             Page::Terminal => "Terminal",
             Page::Identities => "Identities",
+            Page::Agents => "Agents",
             Page::Shortcuts => "Keyboard shortcuts",
         }
     }
@@ -882,6 +891,7 @@ impl Page {
             Page::Signing => "key-round",
             Page::Terminal => "square-terminal",
             Page::Identities => "user-round",
+            Page::Agents => "bot",
             Page::Shortcuts => "keyboard",
         }
     }

@@ -34,6 +34,9 @@ two-face = { version = "0.5.2", default-features = false, features = ["syntect-d
 ureq = { version = "2", features = ["native-certs"] }
 base64 = "0.22"
 vt100 = "0.18"
+# `gitcraft mcp`: the Model Context Protocol over stdio (the official SDK), on a small runtime.
+rmcp = { version = "3.7", default-features = false, features = ["server", "transport-io"] }
+tokio = { version = "1", features = ["rt", "io-std"] }
 
 # Reading a repository's file without following a link swapped in on the way (safe_read.rs).
 [target.'cfg(unix)'.dependencies]

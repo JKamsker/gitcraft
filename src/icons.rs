@@ -22,6 +22,7 @@ const SOURCES: &[(&str, &str)] = icons![
     "arrow-up",
     "arrow-up-from-line",
     "book-open",
+    "bot",
     "check",
     "chevron-down",
     "chevron-right",

@@ -201,6 +201,40 @@ so your config, credentials and hooks apply as usual.
 - _View all files_ under a commit's files lists every file of the commit, not only those it
   changed; click one to read it as it was in that commit.
 
+**Coding agents (MCP)**
+
+- `gitcraft mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server over
+  stdio, for Claude Code, Codex and other agents. Add it once:
+
+  ```sh
+  claude mcp add gitcraft -- gitcraft mcp
+  codex mcp add gitcraft -- gitcraft mcp
+  ```
+
+  (or, in Codex's `~/.codex/config.toml`, `[mcp_servers.gitcraft]` with `command = "gitcraft"`
+  and `args = ["mcp"]`). Settings → Agents shows the same commands with this copy's own path when
+  `gitcraft` isn't on the PATH. The agent starts it in the repository it works in; `--repo
+  <path>` names another one (also one in WSL or over SSH, as gitcraft names it:
+  `ssh://host/path`).
+- Reading tools work on their own, with no window open: `log` (the graph: commits with their
+  branches and tags, paged, or one file's history), `show_commit`, `status`, `diff` (working
+  tree, index or a commit, paged by bytes), `blame` (a range of lines), `branches` (with
+  remotes, tags, stashes and worktrees), `conflicts`, `ci_status` (runs, jobs and the failed log
+  through `gh` / `glab`) and `pull_requests`. Paths must stay inside the repository, revisions
+  can't be taken for options, and a remote's URL never carries a token out.
+- Changing tools run in the gitcraft window that has the repository open: `stage`, `unstage`,
+  `commit`, `create_branch`, `rename_branch`, `checkout`, `stash`, `cherry_pick`, `revert`,
+  `reset` (soft, mixed) and `move_commit`. Each is a step of that tab's undo list, marked with a
+  robot on the undo button and named in its tooltip, so Ctrl+Z also takes back what the agent
+  did. With no window for the repository, they fail and say to open it.
+- What can't be undone, or throws work away, waits on an _Approve / Deny_ card in the window
+  that names the agent, says what will happen and shows the git commands: `push` (forced or
+  not), `delete_branch`, a `hard` reset, `drop_commit`, and staging a conflicted file (which ends
+  the conflict). The call waits for the answer; after two minutes it is denied by itself.
+- Settings → Agents turns agents' changes off; the reading tools still work. The window and
+  `gitcraft mcp` talk over 127.0.0.1 with a random token kept in a file only you can read, in
+  gitcraft's data folder (`agents/`).
+
 **Toolbar, terminal, app**
 
 - Undo, redo, Fetch, Pull and Push (with incoming / outgoing counts), new branch, stash, terminal,
@@ -224,7 +258,7 @@ so your config, credentials and hooks apply as usual.
   use and what is its own, zoom, branch column width, graph columns, avatars, notifications,
   update check (with a Check for updates button), background fetch, keeping submodules up to
   date, editor command, default shell and terminal font size, saved identities, SSH sign-ins,
-  and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
+  agents, and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
   Alt+↓ go through the pages.
 - Previews beside the settings: point at a setting and a panel on the right (above the page in
   a narrow window) draws what it does with the values set now, as the app draws it. The branch
@@ -401,6 +435,8 @@ was made this way, on a demo repository.
 | `src/icons.rs`           | embedded Lucide SVG icons, tinted                                                  |
 | `src/terminal.rs`        | integrated terminal: pty, VT parsing (`vt100`), painting, keys, selection          |
 | `src/repo/mod.rs`        | one repository tab: state, background git work, undo / redo, toolbar               |
+| `src/mcp/`               | `gitcraft mcp`: the MCP server (`rmcp`), its tools, and the token-checked channel to the window |
+| `src/repo/agent/`        | agents' requests in a tab: planned as undoable steps, queued, the approval card's state |
 | `src/repo/sidebar.rs`    | branches, remotes, worktrees, stashes, pull requests, tags                         |
 | `src/repo/pr_view.rs` | a pull request in the big area, its changed files on the right |
 | `src/repo/pr_review.rs` | comments and reviews being written, and the threads on lines of a diff |
