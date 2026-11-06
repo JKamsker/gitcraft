@@ -315,6 +315,9 @@ impl Settings {
                 });
                 ui.end_row();
             }
+            ui.label("Version");
+            ui.label(RichText::new(format!("gitcraft {}", crate::update::CURRENT)).color(t.text_dim));
+            ui.end_row();
             ui.label("Updates");
             ui.checkbox(&mut self.check_updates, "Look for a new version on GitHub on every start");
             ui.end_row();

@@ -208,6 +208,17 @@ impl RepoTab {
                     if panel_toggle(ui, "panel-right", "detail", open) {
                         acts.push(Action::ToggleDetail);
                     }
+                    // This build's version, at the other end.
+                    if open {
+                        ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                            ui.add_space(6.0);
+                            ui.label(
+                                egui::RichText::new(format!("gitcraft {}", crate::update::CURRENT))
+                                    .size(11.0)
+                                    .color(t.text_faint),
+                            );
+                        });
+                    }
                 });
                 if open {
                     self.detail_panel(ui, acts);
