@@ -135,7 +135,7 @@ mod tests {
     fn a_section_opens_as_told_until_chosen_by_hand() {
         let ctx = egui::Context::default();
         crate::theme::install_fonts(&ctx);
-        let mut drawn_open = |open_at_first: bool| {
+        let drawn_open = |open_at_first: bool| {
             let mut open = false;
             ctx.run_ui(egui::RawInput::default(), |ui| {
                 section(ui, "Test", Summary::Loading, open_at_first, None, |_| {
