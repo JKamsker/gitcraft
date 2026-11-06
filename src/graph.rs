@@ -28,7 +28,6 @@ pub struct Graph {
 }
 
 /// [`layout_with`] of a history read with every parent.
-#[cfg(test)]
 pub fn layout<C: Borrow<Commit>>(commits: &[C]) -> Graph {
     layout_with(commits, false)
 }
