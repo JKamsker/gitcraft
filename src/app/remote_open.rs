@@ -183,7 +183,10 @@ impl App {
         let (tx, rx) = channel();
         let ctx2 = ctx.clone();
         std::thread::spawn(move || {
-            let _ = tx.send(find());
+            // Said in the window, even if finding it fails unexpectedly.
+            let found = std::panic::catch_unwind(std::panic::AssertUnwindSafe(find))
+                .unwrap_or_else(|_| Err("Connecting failed unexpectedly.".to_owned()));
+            let _ = tx.send(found);
             ctx2.request_repaint();
         });
         self.error = None;
@@ -227,6 +230,8 @@ impl App {
             return;
         };
         form.take_distros();
+        // ssh asking something (in its own dialog, over this one) has the keys.
+        let asked = crate::remote::askpass::pending().is_some();
         let t = Tokens::get(ctx);
         let frame = egui::Frame::new()
             .fill(t.card)
@@ -268,7 +273,7 @@ impl App {
                         Kind::Ssh => !form.host.trim().is_empty(),
                     };
                 ui.horizontal(|ui| {
-                    let enter = ui.input(|i| i.key_pressed(Key::Enter));
+                    let enter = !asked && ui.input(|i| i.key_pressed(Key::Enter));
                     if crate::repo::primary_button(ui, "Open", valid, 90.0).clicked()
                         || (enter && valid)
                     {
@@ -282,7 +287,7 @@ impl App {
                     }
                 });
             });
-        if resp.should_close() {
+        if resp.should_close() && !asked {
             // Esc in the browser goes back to the form.
             if form.browser.is_some() {
                 form.browser = None;

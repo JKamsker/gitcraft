@@ -62,17 +62,24 @@ fn not_an_option(rev: &str) -> Result<&str, String> {
 /// For a `dest` in WSL or over SSH, git there clones it, from that machine's home folder.
 pub fn clone(url: &str, dest: &Path, creds: Option<&Credentials>) -> Result<(), String> {
     if let Some(target) = crate::remote::parse(dest) {
-        // From `/` for an absolute path; under `~` as a path relative to it (git doesn't expand
-        // `~` itself; only an SSH path can say `~`, a WSL one is always absolute).
-        let (from, there) = match target.path.strip_prefix("~/") {
-            Some(rest) => ("~", rest.to_owned()),
-            None => ("/", target.path.clone()),
-        };
+        let (from, there) = clone_from(&target.path);
         let from = crate::remote::encode(&target.host, from);
         return run_with(Some(&from), &["clone", "--", url, &there], creds).map(|_| ());
     }
     let dest = dest.to_string_lossy();
     run_with(None, &["clone", "--", url, &dest], creds).map(|_| ())
+}
+
+/// Where git clones into `dest` (a path on another machine) from, and `dest` as it is given:
+/// from `/` for an absolute path; under `~` as a path relative to it (git doesn't expand `~`
+/// itself; only an SSH path can say `~`, a WSL one is always absolute); the home folder itself
+/// as `.` there (git takes it when empty).
+fn clone_from(dest: &str) -> (&'static str, String) {
+    match dest.strip_prefix("~/") {
+        Some(rest) => ("~", rest.to_owned()),
+        None if dest == "~" => ("~", ".".to_owned()),
+        None => ("/", dest.to_owned()),
+    }
 }
 
 /// The folder name `git clone` would pick for `url`.

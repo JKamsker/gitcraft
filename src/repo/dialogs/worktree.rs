@@ -210,10 +210,13 @@ fn folder_field(ui: &mut Ui, repo: &std::path::Path, path: &mut String, path_edi
                 .set_title("Worktree folder")
                 .pick_folder()
         {
+            // In WSL, a path there when it is of the repository's distribution; one of another
+            // stays as picked, so the field says why it can't be used (see `folder_for_git`).
+            let picked = dir.display().to_string();
             *path = if crate::remote::is_remote(repo) {
-                crate::remote::git_path(&dir)
+                crate::remote::folder_for_git(repo, &picked).unwrap_or(picked)
             } else {
-                dir.display().to_string()
+                picked
             };
             *path_edited = true;
         }

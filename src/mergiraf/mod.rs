@@ -218,17 +218,48 @@ pub fn use_in_merges(ctx: &egui::Context, on: bool) {
 /// with every conflict it could solve solved, the others still marked. The file itself is left
 /// as it is.
 pub fn solve(repo: &Path, path: &str) -> Result<String, String> {
-    if crate::remote::is_remote(repo) {
-        return Err(
-            "Mergiraf runs on this machine and can't read a repository on another one".to_owned(),
-        );
-    }
     let found = current().found.ok_or("Mergiraf isn't installed")?;
+    if crate::remote::is_remote(repo) {
+        return solve_copy(&found.program, repo, path);
+    }
     let out = quiet(Command::new(&found.program))
         .current_dir(repo)
         .args(["solve", "--stdout", "--", path])
         .output()
         .map_err(|e| format!("Could not run mergiraf: {e}"))?;
+    solved(&out, path)
+}
+
+/// [`solve`] for a repository on another machine (WSL, SSH): Mergiraf runs here, on a copy of
+/// the file in a folder of its own, under the file's own name (its language is told by it).
+/// Blocking: from a thread of its own.
+fn solve_copy(program: &Path, repo: &Path, path: &str) -> Result<String, String> {
+    let text = crate::remote::read_to_string(&crate::remote::join(repo, path))
+        .map_err(|e| format!("Could not read {path}: {e}"))?;
+    let name = path.rsplit(['/', '\\']).next().unwrap_or("file");
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let dir =
+        std::env::temp_dir().join(format!("gitcraft-mergiraf-{}-{nanos}", std::process::id()));
+    std::fs::create_dir_all(&dir).map_err(|e| format!("Could not copy {path}: {e}"))?;
+    let result = std::fs::write(dir.join(name), text)
+        .map_err(|e| format!("Could not copy {path}: {e}"))
+        .and_then(|()| {
+            quiet(Command::new(program))
+                .current_dir(&dir)
+                .args(["solve", "--stdout", "--", name])
+                .output()
+                .map_err(|e| format!("Could not run mergiraf: {e}"))
+        })
+        .and_then(|out| solved(&out, path));
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}
+
+/// What Mergiraf printed: the file, solved as far as it could be.
+fn solved(out: &std::process::Output, path: &str) -> Result<String, String> {
     // 0: all solved; 2: some conflicts remain, still a file to show.
     let solved = out.status.success() || (out.status.code() == Some(2) && !out.stdout.is_empty());
     if solved {
@@ -260,6 +291,58 @@ fn error_message(stderr: &str, path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A conflicted file in WSL is solved by Mergiraf here, from a copy (run with
+    /// `GITCRAFT_TEST_MERGIRAF=<mergiraf program>` and `GITCRAFT_TEST_WSL=<distro>`; skipped
+    /// otherwise).
+    #[test]
+    fn a_file_elsewhere_is_solved_from_a_copy() -> Result<(), String> {
+        let (Ok(program), Ok(distro)) = (
+            std::env::var("GITCRAFT_TEST_MERGIRAF"),
+            std::env::var("GITCRAFT_TEST_WSL"),
+        ) else {
+            return Ok(());
+        };
+        if !cfg!(windows) {
+            return Ok(());
+        }
+        let host = crate::remote::Host::Wsl(distro);
+        let dir = format!("/tmp/gitcraft-mergiraf-{}", std::process::id());
+        let conflicted = concat!(
+            "fn main() {}\n",
+            "<<<<<<< ours\n",
+            "fn a() {}\n",
+            "||||||| base\n",
+            "=======\n",
+            "fn b() {}\n",
+            ">>>>>>> theirs\n",
+        );
+        let made = crate::remote::exec(
+            &host,
+            &crate::remote::Request {
+                script: format!("mkdir -p {dir} && cat > {dir}/both.rs"),
+                stdin: Some(conflicted.as_bytes().to_vec()),
+                ..crate::remote::Request::default()
+            },
+        )?;
+        assert_eq!(made.code, 0);
+        let repo = crate::remote::encode(&host, &dir);
+        let solved = solve_copy(Path::new(&program), &repo, "both.rs");
+        let _ = crate::remote::exec(
+            &host,
+            &crate::remote::Request {
+                script: format!("rm -rf {dir}"),
+                ..crate::remote::Request::default()
+            },
+        );
+        let solved = solved?;
+        assert!(!solved.contains("<<<<<<<"), "{solved}");
+        assert!(
+            solved.contains("fn a()") && solved.contains("fn b()"),
+            "{solved}"
+        );
+        Ok(())
+    }
 
     #[test]
     fn errors_lose_their_log_level() {

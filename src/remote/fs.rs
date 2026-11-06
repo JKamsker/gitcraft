@@ -134,6 +134,12 @@ pub fn is_link(path: &Path) -> bool {
     test(path, "-L").unwrap_or(true)
 }
 
+/// Whether `path` is a symbolic link itself, or why that couldn't be asked: for a caller that
+/// says which it was.
+pub fn try_is_link(path: &Path) -> io::Result<bool> {
+    test(path, "-L")
+}
+
 /// A file of a working tree as git sees it: a symbolic link is the path it holds, not what it
 /// points to; anything else but a file is refused (see `git::worktree_file`).
 pub fn worktree_file(file: &Path) -> Option<io::Result<Vec<u8>>> {

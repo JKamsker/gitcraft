@@ -70,8 +70,10 @@ pub fn add_to_gitignore(repo: &Path, pattern: &str) -> Result<bool, String> {
     let file = repo.join(".gitignore");
     // A `.gitignore` a repository made a link (to `~/.bashrc`…) is not written through: the
     // line added comes from a file name the repository chose too.
-    if crate::remote::is_link(&file) {
-        return Err(".gitignore is a symbolic link: not changed".to_owned());
+    match crate::remote::try_is_link(&file) {
+        Ok(false) => {}
+        Ok(true) => return Err(".gitignore is a symbolic link: not changed".to_owned()),
+        Err(e) => return Err(format!("could not check .gitignore: {e}")),
     }
     let existing = match crate::remote::read_to_string(&file) {
         Ok(s) => s,

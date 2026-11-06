@@ -317,10 +317,12 @@ impl App {
                 i.key_pressed(Key::F1),
             )
         });
-        if manual && self.clone_form.is_none() && self.palette.is_none() {
+        // Not over a dialog that asks something (the clone, the remote one, ssh's question).
+        let asking = self.clone_form.is_some() || self.remote_form.is_some() || self.askpass_open();
+        if manual && !asking && self.palette.is_none() {
             self.manual_open = !self.manual_open;
         }
-        if palette && self.clone_form.is_none() {
+        if palette && !asking {
             if self.palette.is_some() {
                 self.palette = None;
             } else {

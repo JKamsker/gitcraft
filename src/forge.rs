@@ -5,10 +5,11 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 use crate::git::Remote;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Forge {
     GitHub,
     GitLab,
@@ -142,46 +143,56 @@ fn gitlab_takes_repo(args: &[&str]) -> bool {
 }
 
 /// The web host and `owner/repo` of the remote the forge is found from (see [`detect`]), for a
-/// repository on another machine; asked there once per repository.
+/// repository on another machine. Asked there each time (one round trip in a shell kept
+/// open), so a changed `origin` is followed at once. For an `http(s)` remote on a port of its
+/// own, GitLab's host keeps that port: its web pages and API are on it.
 fn remote_location(repo: &Path, forge: Forge) -> Result<(String, String), String> {
-    use std::sync::{Mutex, OnceLock};
-    type Known = Mutex<HashMap<std::path::PathBuf, (String, String)>>;
-    static KNOWN: OnceLock<Known> = OnceLock::new();
-    let known = KNOWN.get_or_init(Known::default);
-    let lock = || {
-        known
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-    };
-    if let Some(found) = lock().get(repo) {
-        return Ok(found.clone());
-    }
     let remotes = crate::git::remotes(repo)?;
-    let found = remotes
+    let url = remotes
         .iter()
         .find(|r| r.name == "origin")
         .or_else(|| remotes.first())
-        .and_then(|r| location(&r.url))
+        .map(|r| r.url.as_str())
+        .unwrap_or_default();
+    let (host, path) = tool_location(forge, url)
         .ok_or_else(|| format!("{} needs a remote with an owner/repo URL", forge.tool()))?;
     // Named to the tool, a host is used whether or not the user signed in to it (in a folder,
     // the tool skips remotes on hosts it doesn't know): only the forge's own or one signed in
     // to, so a repository can't send the tool, and a token, to a host of its choosing.
-    if !trusted_host(forge, &found.0) {
+    if !trusted_host(forge, &host) {
         return Err(format!(
-            "{} isn't signed in to {}: `{} auth login --hostname {}` to use it",
+            "{} isn't signed in to {host}: `{} auth login --hostname {host}` to use it",
             forge.tool(),
-            found.0,
             forge.tool(),
-            found.0
         ));
     }
-    lock().insert(repo.to_owned(), found.clone());
-    Ok(found)
+    Ok((host, path))
 }
 
+/// The host and `owner/repo` the tool is given for remote `url`: GitLab's host with the port of
+/// an `http(s)` URL, an SSH port left out (it says nothing of the web pages).
+fn tool_location(forge: Forge, url: &str) -> Option<(String, String)> {
+    let (host, path) = location(url)?;
+    let host = match (forge, http_port(url)) {
+        (Forge::GitLab, Some(port)) => format!("{host}:{port}"),
+        _ => host,
+    };
+    Some((host, path))
+}
+
+/// How long the tool may take to say whether it is signed in to a host.
+const AUTH_CHECK_FOR: Duration = Duration::from_secs(10);
+/// How long a host the tool isn't signed in to is taken as such before it is asked again (the
+/// user may sign in meanwhile).
+const NOT_SIGNED_IN_FOR: Duration = Duration::from_secs(60);
+
 /// Whether `forge`'s tool may be pointed at `host`: the forge's own host, or one the tool is
-/// signed in to. A host that isn't a plain name (`a.b:8443` at most) never is.
+/// signed in to. A host that isn't a plain name (`a.b:8443` at most) never is. What the tool
+/// said is remembered: yes while the app runs, no for [`NOT_SIGNED_IN_FOR`].
 fn trusted_host(forge: Forge, host: &str) -> bool {
+    use std::sync::{Mutex, OnceLock};
+    type Known = Mutex<HashMap<(Forge, String), (bool, Instant)>>;
+    static KNOWN: OnceLock<Known> = OnceLock::new();
     let plain = !host.is_empty()
         && host
             .chars()
@@ -197,12 +208,48 @@ fn trusted_host(forge: Forge, host: &str) -> bool {
     if host.eq_ignore_ascii_case(own) {
         return true;
     }
+    let known = KNOWN.get_or_init(Known::default);
+    let lock = || {
+        known
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    };
+    let key = (forge, host.to_lowercase());
+    if let Some(&(signed_in, at)) = lock().get(&key)
+        && (signed_in || at.elapsed() < NOT_SIGNED_IN_FOR)
+    {
+        return signed_in;
+    }
+    let signed_in = signed_in_to(forge, host);
+    lock().insert(key, (signed_in, Instant::now()));
+    signed_in
+}
+
+/// Whether `forge`'s tool says it is signed in to `host`; no when it doesn't say so within
+/// [`AUTH_CHECK_FOR`] (it is stopped).
+fn signed_in_to(forge: Forge, host: &str) -> bool {
     let mut cmd = tool_command(forge);
     cmd.args(["auth", "status", "--hostname", host])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
-    cmd.status().is_ok_and(|s| s.success())
+    let Ok(mut child) = cmd.spawn() else {
+        return false;
+    };
+    let until = Instant::now() + AUTH_CHECK_FOR;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return status.success(),
+            Ok(None) if Instant::now() < until => {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return false;
+            }
+        }
+    }
 }
 
 /// The forge's tool, set to answer this repository in plain JSON.
@@ -465,6 +512,29 @@ fn parse_github_avatars(json: &str) -> HashMap<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A self-hosted GitLab on a port of its own is reached on it; an SSH port isn't a web one.
+    #[test]
+    fn gitlab_keeps_the_port_of_its_web_pages() {
+        let at = |forge, url| tool_location(forge, url);
+        assert_eq!(
+            at(Forge::GitLab, "https://git.example.org:8443/team/app.git"),
+            Some(("git.example.org:8443".to_owned(), "team/app".to_owned()))
+        );
+        assert_eq!(
+            at(Forge::GitLab, "ssh://git@git.example.org:2222/team/app.git"),
+            Some(("git.example.org".to_owned(), "team/app".to_owned()))
+        );
+        assert_eq!(
+            at(Forge::GitLab, "git@gitlab.com:team/app.git"),
+            Some(("gitlab.com".to_owned(), "team/app".to_owned()))
+        );
+        // `GH_REPO` takes a plain host.
+        assert_eq!(
+            at(Forge::GitHub, "https://ghe.example.org:8443/team/app"),
+            Some(("ghe.example.org".to_owned(), "team/app".to_owned()))
+        );
+    }
 
     /// `glab api` would refuse `--repo`; the commands about a project take it.
     #[test]

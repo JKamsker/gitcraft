@@ -57,9 +57,12 @@ impl App {
         };
         let root = match main {
             Some(Ok(root)) => root,
-            // Not found (the machine it's on not reached…): the tab stays as it is.
+            // Not found (its folder gone): nothing to go back to, so closing the worktree closes
+            // the tab, and says why. (One elsewhere is never looked up here: see
+            // `worktree_root`.)
             Some(Err(e)) => {
                 self.toasts.push(Toast::new(e, true));
+                self.close_tab(self.active, ctx);
                 return;
             }
             // No main worktree to show (a bare repository): this is the end of the tab.

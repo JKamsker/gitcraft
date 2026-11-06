@@ -72,8 +72,8 @@ impl ConflictEditor {
         } else {
             ("--ours", "--theirs")
         };
+        // Also for a repository elsewhere: Mergiraf solves a copy of the file here.
         let offer_mergiraf = crate::settings::Settings::get(ui.ctx()).mergiraf
-            && !self.remote
             && crate::mergiraf::found(ui.ctx()).is_some();
         if offer_mergiraf {
             if self.solving {

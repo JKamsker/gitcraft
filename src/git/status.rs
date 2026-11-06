@@ -139,27 +139,19 @@ fn in_progress(repo: &Path) -> Result<Option<InProgress>, String> {
 /// [`in_progress`] for a repository on another machine: asked there in one go, not in six
 /// round trips on every read of the status.
 fn in_progress_there(target: &crate::remote::Target) -> Result<Option<InProgress>, String> {
+    // Its git folder as git names it: relative to here, or absolute (`--absolute-git-dir`
+    // is git 2.13+).
     const SCRIPT: &str = concat!(
-        "g=$(git rev-parse --absolute-git-dir) || exit 1
-",
-        "for d in rebase-merge rebase-apply; do
-",
-        "  if [ -d \"$g/$d\" ]; then
-",
-        "    if [ -f \"$g/$d/applying\" ]; then echo am; else echo rebase; fi; exit 0
-",
-        "  fi
-",
-        "done
-",
-        "for h in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD; do
-",
-        "  git rev-parse -q --verify \"$h\" >/dev/null && { echo \"$h\"; exit 0; }
-",
-        "done
-",
-        "echo none
-",
+        "g=$(git rev-parse --git-dir) || exit 1\n",
+        "for d in rebase-merge rebase-apply; do\n",
+        "  if [ -d \"$g/$d\" ]; then\n",
+        "    if [ -f \"$g/$d/applying\" ]; then echo am; else echo rebase; fi; exit 0\n",
+        "  fi\n",
+        "done\n",
+        "for h in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD; do\n",
+        "  git rev-parse -q --verify \"$h\" >/dev/null && { echo \"$h\"; exit 0; }\n",
+        "done\n",
+        "echo none\n",
     );
     let out = crate::remote::exec(
         &target.host,

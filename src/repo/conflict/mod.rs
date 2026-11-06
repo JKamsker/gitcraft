@@ -38,8 +38,6 @@ pub struct ConflictEditor {
     rebase: bool,
     /// Mergiraf is working on the file.
     pub solving: bool,
-    /// The file is on another machine, where this machine's Mergiraf can't read it.
-    remote: bool,
     /// How many conflicts the file has on disk, which Mergiraf starts from.
     pub on_disk: usize,
     /// The file as it was opened: while it stays so, a refresh keeps the choices made.
@@ -267,7 +265,6 @@ impl ConflictEditor {
             theirs_label,
             rebase: state == Some(InProgress::Rebase),
             solving: false,
-            remote: crate::remote::is_remote(repo),
             on_disk: conflicts,
         })
     }
@@ -433,7 +430,6 @@ mod tests {
             theirs_label: t,
             rebase: false,
             solving: false,
-            remote: false,
             on_disk: 1,
         };
         assert_eq!(ed.unresolved(), 1);
@@ -458,7 +454,6 @@ mod tests {
             theirs_label,
             rebase: false,
             solving: false,
-            remote: false,
             on_disk: conflicts,
         }
     }
