@@ -3,6 +3,7 @@
 pub mod app;
 mod avatars;
 mod ci;
+mod codeowners;
 mod desktop_entry;
 mod folder_browser;
 mod forge;

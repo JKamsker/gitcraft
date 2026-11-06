@@ -125,7 +125,8 @@ impl RepoTab {
                 title,
                 body,
                 draft,
-            } => self.create_pr(branch, base, title, body, draft, ctx),
+                reviewers,
+            } => self.create_pr(branch, base, title, body, draft, reviewers, ctx),
             Action::OpenUrl(url) => {
                 if crate::pull_request::is_web_url(&url) {
                     let _ = open::that_detached(url);
@@ -249,6 +250,7 @@ impl RepoTab {
             }
             Action::SolveWithMergiraf => self.solve_with_mergiraf(ctx),
             Action::SaveConflict => self.save_conflict(ctx),
+            Action::Owners(act) => self.owners_act(act, ctx),
         }
     }
 

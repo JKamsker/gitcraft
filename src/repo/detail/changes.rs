@@ -156,6 +156,8 @@ impl RepoTab {
         );
         if staged.is_empty() {
             empty_hint(ui, "Stage files to choose what goes in the commit");
+        } else {
+            self.owners_summary(ui, staged.iter().map(|f| f.path.as_str()));
         }
     }
 
@@ -200,7 +202,7 @@ impl RepoTab {
         let key = DiffKey::Work(f.clone());
         let selected = self.open_key() == Some(&key);
         let buttons = if self.busy_op.is_none() { buttons } else { &[] };
-        let r = widgets::file_row(
+        let r = widgets::file_row_owned(
             ui,
             f.code,
             &f.path,
@@ -208,6 +210,7 @@ impl RepoTab {
             indent,
             selected,
             RowExtra::Buttons(buttons),
+            self.owner_tag(&f.path).as_ref(),
         );
         if f.code != 'D' {
             widgets::file_menu(&r.row, &f.path, None, true, acts);

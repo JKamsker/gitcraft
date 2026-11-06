@@ -93,6 +93,8 @@ pub(crate) enum Action {
         title: String,
         body: String,
         draft: bool,
+        /// Who is asked to review it (`ann`, `acme/payments` for a team).
+        reviewers: Vec<String>,
     },
     OpenUrl(String),
     /// Open a path (relative to the repository) with the system's default app.
@@ -188,6 +190,8 @@ pub(crate) enum Action {
     CloseCompare,
     /// Search commit messages, or what commits changed in files.
     SearchCode(bool),
+    /// The check of the CODEOWNERS file.
+    Owners(super::owners::OwnersAct),
 }
 
 /// Compares two branches, given to git by their full refs (a tag of the same name is not
@@ -368,6 +372,13 @@ impl RepoTab {
                 "Open in browser".into(),
                 "remote".into(),
                 Action::OpenUrl(url),
+            ));
+        }
+        if self.owners.file().is_some() {
+            items.push((
+                "Check CODEOWNERS".into(),
+                "owners".into(),
+                Action::Owners(super::owners::OwnersAct::Check),
             ));
         }
         if !self.submodules.is_empty() {

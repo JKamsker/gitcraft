@@ -101,6 +101,8 @@ pub enum Dialog {
         title: String,
         body: String,
         draft: bool,
+        /// The owners of what it changes (CODEOWNERS), to ask for reviews.
+        reviewers: Vec<super::owners::Suggested>,
         focus: bool,
     },
 }
@@ -208,6 +210,7 @@ impl Dialog {
             title: title.to_owned(),
             body: String::new(),
             draft: false,
+            reviewers: Vec::new(),
             focus: true,
         }
     }
@@ -370,8 +373,11 @@ impl RepoTab {
                     title,
                     body,
                     draft,
+                    reviewers,
                     focus,
-                } => remote::create_pr(ui, noun, branch, base, title, body, draft, focus),
+                } => {
+                    remote::create_pr(ui, noun, branch, base, title, body, draft, reviewers, focus)
+                }
                 Dialog::Confirm {
                     title,
                     body,

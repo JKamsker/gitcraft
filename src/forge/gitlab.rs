@@ -53,6 +53,11 @@ impl Provider for GitLab {
         if new.draft {
             args.push("--draft");
         }
+        // glab asks accounts only: a group (`acme/payments`) would fail the whole request.
+        let reviewers = gitlab_reviewers(new.reviewers);
+        if !reviewers.is_empty() {
+            args.extend(["--reviewer", &reviewers]);
+        }
         self.run(repo, &args).map(|out| out.trim().to_owned())
     }
 
@@ -64,6 +69,16 @@ impl Provider for GitLab {
             .map(|email| (email.clone(), Hint::GitLab(api.clone())))
             .collect()
     }
+}
+
+/// The reviewers `glab` can ask, as it takes them: accounts, comma-separated.
+fn gitlab_reviewers(reviewers: &[String]) -> String {
+    reviewers
+        .iter()
+        .filter(|r| !r.contains('/'))
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 /// Where a self-hosted GitLab's API is: its host, with the port of an `https://host:8443/…`

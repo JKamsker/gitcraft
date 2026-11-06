@@ -144,13 +144,39 @@ fn create(api: &Api, hosting: &Hosting, new: &NewPullRequest) -> Result<String, 
             answer => break answer?,
         }
     };
-    match at(&answer, "/html_url") {
-        "" => Err(format!(
-            "{} didn't say which pull request it opened",
-            api.name()
-        )),
-        url => Ok(url.to_owned()),
+    let url = match at(&answer, "/html_url") {
+        "" => {
+            return Err(format!(
+                "{} didn't say which pull request it opened",
+                api.name()
+            ));
+        }
+        url => url.to_owned(),
+    };
+    let number = answer.get("number").and_then(Value::as_u64).unwrap_or(0);
+    if !new.reviewers.is_empty() && number > 0 {
+        let endpoint = format!("repos/{}/pulls/{number}/requested_reviewers", hosting.path);
+        api.send("POST", &endpoint, Some(&reviewers_payload(new.reviewers)))
+            .map_err(|e| {
+                format!(
+                    "Opened {url}, but couldn't ask for the reviews: {}",
+                    e.message
+                )
+            })?;
     }
+    Ok(url)
+}
+
+/// Who to ask, as the API takes them: accounts, and teams by their name (the organisation is
+/// the repository's).
+fn reviewers_payload(reviewers: &[String]) -> Value {
+    let (teams, users): (Vec<&String>, Vec<&String>) =
+        reviewers.iter().partition(|r| r.contains('/'));
+    let teams: Vec<&str> = teams
+        .iter()
+        .map(|t| t.rsplit('/').next().unwrap_or(t))
+        .collect();
+    json!({ "reviewers": users, "team_reviewers": teams })
 }
 
 /// Whether a title marks its pull request a draft (work in progress), as both forges read it.
