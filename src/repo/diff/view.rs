@@ -80,7 +80,7 @@ impl RepoTab {
         }
 
         if let Some(program) = &data.textconv {
-            textconv_note(ui, program);
+            textconv_note(ui, program, matches!(view.key, DiffKey::Work(_)));
         }
         let split = data.shows_split(split);
         let shift = ui.input(|i| i.modifiers.shift);

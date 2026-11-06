@@ -134,8 +134,8 @@ fn image_facts(b: &[u8]) -> Option<(String, Vec<Fact>)> {
     None
 }
 
-/// A PDF's version, page count and the title and author its Info dictionary gives in plain
-/// text.
+/// A PDF's version, page count and the title and author its Info dictionary gives as plain
+/// strings. Read from the bytes as they are (a PDF is mostly not text).
 fn pdf_facts(b: &[u8]) -> Vec<Fact> {
     let mut facts = Vec::new();
     let version: String = b[5..]
@@ -147,11 +147,7 @@ fn pdf_facts(b: &[u8]) -> Vec<Fact> {
     if !version.is_empty() {
         facts.push(("Version".to_owned(), version));
     }
-    let text = String::from_utf8_lossy(b);
-    let pages = text.matches("/Type /Page").count() + text.matches("/Type/Page").count()
-        - text.matches("/Type /Pages").count()
-        - text.matches("/Type/Pages").count();
-    if pages > 0 {
+    if let Some(pages) = page_count(b) {
         facts.push(("Pages".to_owned(), pages.to_string()));
     }
     for (key, label) in [
@@ -159,47 +155,92 @@ fn pdf_facts(b: &[u8]) -> Vec<Fact> {
         ("/Author", "Author"),
         ("/Producer", "Made with"),
     ] {
-        if let Some(value) = info_string(&text, key) {
+        if let Some(value) = info_string(b, key.as_bytes()) {
             facts.push((label.to_owned(), value));
         }
     }
     facts
 }
 
-/// `/Title (Report)`: the plain string after `key`.
-fn info_string(text: &str, key: &str) -> Option<String> {
-    let at = text.find(&format!("{key} ("))? + key.len() + 2;
-    let rest = &text[at..];
-    let mut out = String::new();
-    let mut chars = rest.chars();
-    while let Some(c) = chars.next() {
-        match c {
-            ')' => break,
-            '\\' => {
-                let digits: String = chars
-                    .clone()
-                    .take(3)
-                    .take_while(|c| ('0'..='7').contains(c))
-                    .collect();
-                if digits.is_empty() {
-                    if let Some(next) = chars.next() {
-                        out.push(next);
-                    }
-                } else {
-                    for _ in 0..digits.len() {
-                        chars.next();
-                    }
-                    out.push(char::from(u8::from_str_radix(&digits, 8).unwrap_or(b'?')));
-                }
-            }
-            c => out.push(c),
+fn find_from(hay: &[u8], from: usize, needle: &[u8]) -> Option<usize> {
+    hay.get(from..)?
+        .windows(needle.len())
+        .position(|w| w == needle)
+        .map(|i| i + from)
+}
+
+/// The pages: the largest `/Count` of a `/Type /Pages` dictionary (the root's), which
+/// incremental updates and object streams don't fool as counting `/Page`s would.
+fn page_count(b: &[u8]) -> Option<u64> {
+    let mut best = None;
+    let mut at = 0;
+    while let Some(i) = find_from(b, at, b"/Count") {
+        at = i + 6;
+        let window = &b[i.saturating_sub(300)..(i + 300).min(b.len())];
+        let pages = window.windows(6).any(|w| w == b"/Pages");
+        if !pages {
+            continue;
         }
-        if out.len() > 200 {
-            break;
+        let digits: String = b[at..]
+            .iter()
+            .skip_while(|c| c.is_ascii_whitespace())
+            .take_while(|c| c.is_ascii_digit())
+            .map(|&c| char::from(c))
+            .collect();
+        if let Ok(n) = digits.parse::<u64>() {
+            best = Some(best.map_or(n, |m: u64| m.max(n)));
         }
     }
-    let out = out.trim().to_owned();
-    (!out.is_empty()).then_some(out)
+    best
+}
+
+/// `/Title (Report)` or `/Title(Report)`: the plain string after `key`, as Latin-1 or, when
+/// marked, UTF-16.
+fn info_string(b: &[u8], key: &[u8]) -> Option<String> {
+    let mut at = 0;
+    while let Some(i) = find_from(b, at, key) {
+        at = i + key.len();
+        let rest = &b[at..];
+        let skip = rest.iter().take_while(|c| c.is_ascii_whitespace()).count();
+        if rest.get(skip) != Some(&b'(') {
+            continue;
+        }
+        let mut out = Vec::new();
+        let mut j = skip + 1;
+        while let Some(&c) = rest.get(j) {
+            match c {
+                b')' => break,
+                b'\\' => {
+                    let digits: Vec<u8> = rest[j + 1..]
+                        .iter()
+                        .take(3)
+                        .take_while(|c| (b'0'..=b'7').contains(c))
+                        .copied()
+                        .collect();
+                    if digits.is_empty() {
+                        if let Some(&next) = rest.get(j + 1) {
+                            out.push(next);
+                        }
+                        j += 2;
+                    } else {
+                        out.push(digits.iter().fold(0u32, |n, d| n * 8 + u32::from(d - b'0')) as u8);
+                        j += 1 + digits.len();
+                    }
+                    continue;
+                }
+                c => out.push(c),
+            }
+            j += 1;
+            if out.len() > 400 {
+                break;
+            }
+        }
+        let text = super::extract::latin1(&out).trim().to_owned();
+        if !text.is_empty() {
+            return Some(text);
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -236,5 +277,16 @@ mod tests {
         let gif = b"GIF89a\x20\x00\x10\x00";
         assert_eq!(describe("g.gif", gif).1[0].1, "32 × 16");
         assert_eq!(describe("e.pdf", b"%PDF-").0, "PDF document");
+        // Without a space, in UTF-16, and the page count of the root, not every /Page.
+        let pdf = b"%PDF-1.7 /Title(\xfe\xff\x00R\x00\xe9) /Type /Pages /Kids [] /Count 12 /Type /Page /Type /Page";
+        let facts = describe("u.pdf", pdf).1;
+        assert!(
+            facts.contains(&("Title".to_owned(), "R\u{e9}".to_owned())),
+            "{facts:?}"
+        );
+        assert!(
+            facts.contains(&("Pages".to_owned(), "12".to_owned())),
+            "{facts:?}"
+        );
     }
 }
