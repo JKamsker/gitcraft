@@ -244,6 +244,7 @@ impl RepoTab {
         if minutes > 0
             && !self.remotes.is_empty()
             && self.busy_op.is_none()
+            && crate::network::background_paused().is_none()
             && self.last_fetch.elapsed() > Duration::from_secs(u64::from(minutes) * 60)
         {
             self.last_fetch = Instant::now();

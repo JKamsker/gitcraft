@@ -288,7 +288,8 @@ impl App {
     fn poll_update(&mut self, ctx: &egui::Context) {
         let s = &self.settings;
         let want = (s.check_updates, s.update_channel, s.download_updates);
-        if self.update_looked != Some(want) {
+        // Offline or metered: looked for once that is over.
+        if self.update_looked != Some(want) && crate::network::background_paused().is_none() {
             self.update_looked = Some(want);
             self.update = None;
             self.update_rx = None;
@@ -457,6 +458,8 @@ impl eframe::App for App {
         let t = Tokens::get(&ctx);
         // Column widths dragged in a graph header live in the context; keep them for saving.
         self.settings = Settings::get(&ctx);
+        crate::network::set_choices(self.settings.offline, self.settings.pause_on_metered);
+        crate::network::start_watching(&ctx);
 
         // eframe shows the window after the first frame; maximize it on the next one.
         if MAXIMIZE_WHEN_SHOWN.load(Ordering::Relaxed) {

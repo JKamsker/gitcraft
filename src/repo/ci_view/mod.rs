@@ -230,6 +230,11 @@ impl RepoTab {
             return;
         };
         let now = Instant::now();
+        // Offline or metered: followed again once that is over.
+        if crate::network::background_paused().is_some() {
+            ctx.request_repaint_after(std::time::Duration::from_secs(30));
+            return;
+        }
         if now >= next {
             self.load_ci_view(ctx);
         } else {

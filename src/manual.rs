@@ -70,6 +70,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",
             "Right-click a pull request and choose Open in worktree to work on its branch in a worktree of its own, made for it when there is none.",
             "A terminal panel with tabs, in the repository's folder.",
+            "Offline mode (Settings → Git, or Go offline in the palette) keeps gitcraft off the network: no background fetch, avatars, update checks or build and pull request polling, and Fetch, Pull and Push say why they don't run. On a metered connection, or without one, only the background work pauses. The toolbar says so, with when it last fetched.",
         ],
     ),
 ];

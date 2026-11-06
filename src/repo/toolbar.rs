@@ -31,6 +31,7 @@ impl RepoTab {
             }
             widgets::toolbar_separator(ui);
             self.head_label(ui, idle, acts);
+            self.network_chip(ui, acts);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 self.op_status(ui);
             });
@@ -65,13 +66,17 @@ impl RepoTab {
 
     /// Fetch, pull and push, with how far the current branch is behind and ahead.
     fn remote_buttons(&self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
-        let has_remote = !self.remotes.is_empty();
+        // Offline mode: off, saying why, rather than left to wait for a network.
+        let offline = super::offline::refused_text();
+        let has_remote = !self.remotes.is_empty() && offline.is_none();
+        let off_why = offline.unwrap_or_default();
         let fetched = format!(
             "Fetch all remotes (git fetch --all --prune)\nLast fetched {} ago",
             short_duration(self.last_fetch.elapsed())
         );
         if icons::tool_button(ui, "cloud-download", "Fetch", idle && has_remote)
             .on_hover_text(fetched)
+            .on_disabled_hover_text(&off_why)
             .clicked()
         {
             acts.push(Action::Fetch);
@@ -86,7 +91,8 @@ impl RepoTab {
         let mode = Settings::get(ui.ctx()).pull_mode;
         let pull =
             icons::tool_button_count(ui, "arrow-down-to-line", "Pull", behind, idle && has_remote)
-                .on_hover_text(mode.tip());
+                .on_hover_text(mode.tip())
+                .on_disabled_hover_text(&off_why);
         if pull.clicked() {
             acts.push(Action::Pull);
         }
@@ -101,6 +107,7 @@ impl RepoTab {
             .show(|ui| pull_menu(ui, acts));
         if icons::tool_button_count(ui, "arrow-up-from-line", "Push", ahead, idle && has_remote)
             .on_hover_text("Push the current branch (publishes it if it has no upstream yet)")
+            .on_disabled_hover_text(&off_why)
             .clicked()
         {
             acts.push(Action::Push);

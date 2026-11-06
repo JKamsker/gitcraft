@@ -160,6 +160,11 @@ impl RepoTab {
     pub(super) fn poll_ci(&mut self, ctx: &egui::Context) {
         let Some(next) = self.ci.next else { return };
         let now = Instant::now();
+        // Offline or metered: asked again once that is over.
+        if crate::network::background_paused().is_some() {
+            ctx.request_repaint_after(std::time::Duration::from_secs(30));
+            return;
+        }
         if now >= next {
             self.load_ci(ctx);
         } else {

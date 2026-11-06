@@ -13,6 +13,8 @@ use crate::terminal::ShellSpec;
 
 /// Everything the views ask for; applied after drawing so views only borrow the state.
 pub(crate) enum Action {
+    /// Turn offline mode on or off.
+    SetOffline(bool),
     Select(usize),
     SelectHash(String),
     SelectStash(usize),
@@ -343,6 +345,19 @@ impl RepoTab {
                 "terminal".into(),
                 Action::ToggleTerminal,
             ),
+            if crate::network::refused().is_some() {
+                (
+                    "Go online".into(),
+                    "network offline".into(),
+                    Action::SetOffline(false),
+                )
+            } else {
+                (
+                    "Go offline".into(),
+                    "network offline metered".into(),
+                    Action::SetOffline(true),
+                )
+            },
             (
                 "New terminal".into(),
                 "terminal".into(),

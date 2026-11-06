@@ -156,7 +156,7 @@ fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Requ
 }
 
 /// Whether the git command `args` (its options first) talks to a remote and may take minutes.
-fn goes_over_network(args: &[&str]) -> bool {
+pub fn goes_over_network(args: &[&str]) -> bool {
     matches!(
         after_options(args).first().copied(),
         Some("fetch" | "pull" | "push" | "clone" | "ls-remote" | "remote" | "submodule" | "lfs")
