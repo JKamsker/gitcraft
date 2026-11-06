@@ -6,15 +6,14 @@
 //!
 //! - [`server`]: the protocol, through the official SDK (`rmcp`).
 //! - [`tools`]: what each tool takes and does.
-//! - [`link`] and [`wire`]: the local channel to the window and what goes over it.
-//! - [`window`]: the window's end of it.
+//! - [`link`] and [`wire`]: reaching the window over the single-instance channel
+//!   (`crate::instance`), and the operations and answers that go over it.
 
 pub(crate) mod args;
 pub mod link;
 pub(crate) mod output;
 pub(crate) mod server;
 pub(crate) mod tools;
-pub(crate) mod window;
 pub mod wire;
 
 use std::ffi::OsString;

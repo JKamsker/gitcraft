@@ -15,6 +15,8 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
+use crate::mcp::wire::{self, WriteOp};
+
 /// The protocol spoken.
 pub const VERSION: u64 = 1;
 
@@ -33,6 +35,18 @@ pub enum Request {
     /// Open (or switch to) the repository at this path, then come to the front: an absolute
     /// folder of this machine, or one elsewhere (`ssh://…`, `\\wsl.localhost\…`).
     Open(PathBuf),
+    /// An agent's change, from `gitcraft mcp` (see `crate::mcp`): run in the tab of its
+    /// repository, answered once done (see `server`).
+    Agent(AgentCall),
+}
+
+/// What an agent asks the window to do: `op` in the repository `repo` (as a tab names it).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AgentCall {
+    pub repo: String,
+    /// Who asks, as the agent names itself.
+    pub agent: String,
+    pub op: WriteOp,
 }
 
 impl Request {
@@ -40,6 +54,7 @@ impl Request {
         match self {
             Request::Focus => "focus",
             Request::Open(_) => "open",
+            Request::Agent(_) => "agent",
         }
     }
 }
@@ -64,13 +79,28 @@ pub enum Reply {
     Refused(String),
     /// The window is closing; the request was not taken.
     Closing,
+    /// How an agent's call ended.
+    Agent(wire::Reply),
 }
 
 /// `request` for the instance whose token is `token`, as the line sent.
 pub fn encode_request(token: &str, request: &Request) -> String {
     let mut value = json!({ "v": VERSION, "token": token, "kind": request.kind() });
-    if let (Request::Open(path), Some(object)) = (request, value.as_object_mut()) {
-        object.insert("path".to_owned(), path.to_string_lossy().into());
+    if let Some(object) = value.as_object_mut() {
+        match request {
+            Request::Focus => {}
+            Request::Open(path) => {
+                object.insert("path".to_owned(), path.to_string_lossy().into());
+            }
+            Request::Agent(call) => {
+                object.insert("repo".to_owned(), call.repo.clone().into());
+                object.insert("agent".to_owned(), call.agent.clone().into());
+                object.insert(
+                    "op".to_owned(),
+                    serde_json::to_value(&call.op).unwrap_or_default(),
+                );
+            }
+        }
     }
     format!("{value}\n")
 }
@@ -104,11 +134,40 @@ pub fn decode_request(line: &str, token: &str) -> Result<Request, Refusal> {
                 .map(Request::Open)
                 .map_err(Refusal::Unusable)
         }
+        Some("agent") => decode_agent(object).map(Request::Agent),
         Some(kind) => Err(Refusal::Unusable(format!(
             "this gitcraft can't do \"{kind}\""
         ))),
         None => Err(Refusal::Unusable("no kind".to_owned())),
     }
+}
+
+/// An agent's call: the repository (named as a tab names it), who asks, and what.
+fn decode_agent(object: &serde_json::Map<String, Value>) -> Result<AgentCall, Refusal> {
+    let text = |key: &str| object.get(key).and_then(Value::as_str).unwrap_or("");
+    let repo = text("repo");
+    if repo.is_empty() || repo.len() > MAX_PATH || repo.chars().any(char::is_control) {
+        return Err(Refusal::Unusable("no repository, or not one".to_owned()));
+    }
+    let agent: String = text("agent")
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(64)
+        .collect();
+    let op = object
+        .get("op")
+        .cloned()
+        .and_then(|op| serde_json::from_value::<WriteOp>(op).ok())
+        .ok_or_else(|| Refusal::Unusable("not an operation this gitcraft knows".to_owned()))?;
+    Ok(AgentCall {
+        repo: repo.to_owned(),
+        agent: if agent.trim().is_empty() {
+            "An agent".to_owned()
+        } else {
+            agent
+        },
+        op,
+    })
 }
 
 /// `path` as a folder to open, when it is one: not empty, not too long, no control characters
@@ -137,6 +196,12 @@ pub fn encode_reply(reply: &Reply) -> String {
         Reply::Ok => json!({ "v": VERSION, "status": "ok" }),
         Reply::Refused(why) => json!({ "v": VERSION, "status": "refused", "error": why }),
         Reply::Closing => json!({ "v": VERSION, "status": "closing" }),
+        Reply::Agent(reply) => json!({
+            "v": VERSION,
+            "status": "agent",
+            "outcome": reply.outcome,
+            "message": reply.message,
+        }),
     };
     format!("{value}\n")
 }
@@ -147,6 +212,13 @@ pub fn decode_reply(line: &str) -> Option<Reply> {
     match value.get("status")?.as_str()? {
         "ok" => Some(Reply::Ok),
         "closing" => Some(Reply::Closing),
+        "agent" => Some(Reply::Agent(wire::Reply::new(
+            serde_json::from_value(value.get("outcome")?.clone()).ok()?,
+            value
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or_default(),
+        ))),
         "refused" => Some(Reply::Refused(
             value
                 .get("error")
@@ -196,8 +268,55 @@ mod tests {
     }
 
     #[test]
+    fn an_agents_call_goes_there_and_back() {
+        let call = Request::Agent(AgentCall {
+            repo: "/home/me/app".into(),
+            agent: "Claude Code".into(),
+            op: WriteOp::DeleteBranch {
+                name: "old".into(),
+                force: true,
+            },
+        });
+        let line = encode_request(TOKEN, &call);
+        assert_eq!(line.matches('\n').count(), 1);
+        assert_eq!(decode_request(&line, TOKEN), Ok(call));
+        // Without its token it is a stranger's, like any other.
+        assert_eq!(
+            decode_request(&line, &"f".repeat(32)),
+            Err(Refusal::Stranger)
+        );
+    }
+
+    #[test]
+    fn an_agents_call_is_checked_before_it_is_taken() {
+        let refused = |rest: &str| {
+            let line = format!(r#"{{"v":1,"token":"{TOKEN}","kind":"agent",{rest}}}"#);
+            matches!(decode_request(&line, TOKEN), Err(Refusal::Unusable(_)))
+        };
+        assert!(refused(r#""repo":"/r","agent":"a","op":{"op":"rm_rf"}"#));
+        assert!(refused(
+            r#""repo":"","agent":"a","op":{"op":"push","force":false}"#
+        ));
+        assert!(refused(
+            r#""repo":"/r\n","agent":"a","op":{"op":"push","force":false}"#
+        ));
+        let named = format!(
+            r#"{{"v":1,"token":"{TOKEN}","kind":"agent","repo":"/r","agent":"\u0007","op":{{"op":"push","force":false}}}}"#
+        );
+        assert!(matches!(
+            decode_request(&named, TOKEN),
+            Ok(Request::Agent(AgentCall { agent, .. })) if agent == "An agent"
+        ));
+    }
+
+    #[test]
     fn replies_go_there_and_back() {
-        for reply in [Reply::Ok, Reply::Closing, Reply::Refused("why".to_owned())] {
+        for reply in [
+            Reply::Ok,
+            Reply::Closing,
+            Reply::Refused("why".to_owned()),
+            Reply::Agent(wire::Reply::new(wire::Outcome::Denied, "no")),
+        ] {
             assert_eq!(decode_reply(&encode_reply(&reply)), Some(reply));
         }
         assert_eq!(decode_reply("HTTP/1.1 200 OK"), None);

@@ -124,8 +124,6 @@ pub struct App {
     /// The folders of the last repository tabs closed, the last one at the end.
     closed: Vec<PathBuf>,
     tab_drag: Option<TabDrag>,
-    /// Requests from agents over `gitcraft mcp`.
-    agent_inbox: crate::mcp::window::Inbox,
 }
 
 impl App {
@@ -170,7 +168,6 @@ impl App {
             toasts: Vec::new(),
             closed: Vec::new(),
             tab_drag: None,
-            agent_inbox: crate::mcp::window::Inbox::start(ctx),
             error: None,
             was_focused: true,
             clone_form: None,
@@ -189,12 +186,6 @@ impl App {
             skipped_version: saved.skipped_version,
             tab_looks: saved.tab_looks,
         };
-        if let Some(e) = &app.agent_inbox.error {
-            app.toasts.push(Toast::new(
-                format!("Agents can't reach this window: {e}"),
-                true,
-            ));
-        }
         update::clean_up();
         let mut kept = Vec::new();
         if app.git_version.is_ok() {

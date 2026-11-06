@@ -19,7 +19,7 @@ enum Answer {
 impl App {
     /// Hands the requests that came in to the tabs of their repositories, or answers them.
     pub(super) fn agent_requests(&mut self, ctx: &egui::Context) {
-        for incoming in self.agent_inbox.take() {
+        for incoming in crate::instance::take_agent_calls() {
             route(self.settings.agent_writes, &mut self.tabs, incoming, ctx);
         }
     }

@@ -239,9 +239,11 @@ so your config, credentials and hooks apply as usual.
   it signs in with keys (an agent or a key without a passphrase) only. An agent running inside
   WSL starts the Linux gitcraft, which can't reach a window on Windows: start it from Windows
   with `--repo \\wsl.localhost\<distro>\path` instead.
-- Settings → Agents turns agents' changes off; the reading tools still work. The window and
-  `gitcraft mcp` talk over 127.0.0.1 with a random token kept in a file only you can read, in
-  gitcraft's data folder (`agents/`).
+- Settings → Agents turns agents' changes off; the reading tools still work. `gitcraft mcp`
+  reaches the window the way a second start of gitcraft does (see one window, above): over
+  127.0.0.1, with the running window's random token from a file only you can read, believed only
+  while that window holds its lock. An agent's change is a request of its own kind there, and
+  its connection stays open until the window answers.
 
 **Toolbar, terminal, app**
 

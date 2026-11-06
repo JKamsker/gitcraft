@@ -34,6 +34,8 @@ struct State {
     /// What later starts asked, the oldest first, until the window takes it, each with where
     /// to say that it was taken.
     requests: Vec<(Request, Sender<Reply>)>,
+    /// Agents' calls, until the window takes them (see `Primary::take_agent_calls`).
+    agent_calls: Vec<crate::mcp::link::Incoming>,
     /// The window closed: nothing more is taken.
     closing: bool,
     repaint: Option<egui::Context>,
@@ -132,12 +134,20 @@ impl Primary {
             .collect()
     }
 
+    /// Agents' calls since the last call, the oldest first; each is answered through its
+    /// `reply` once done.
+    pub fn take_agent_calls(&self) -> Vec<crate::mcp::link::Incoming> {
+        std::mem::take(&mut lock(&self.shared.state).agent_calls)
+    }
+
     /// The window is closing: later requests are answered "closing" (the start that sent one
     /// waits for the lock, see [`Self::shut_down`]).
     pub fn closing(&self) {
         let left = {
             let mut state = lock(&self.shared.state);
             state.closing = true;
+            // Dropped unanswered: their agents are told the window went away.
+            state.agent_calls.clear();
             std::mem::take(&mut state.requests)
         };
         // Not taken by the window: their starts wait for the lock instead.
@@ -246,9 +256,77 @@ fn serve(shared: &Shared, mut stream: TcpStream) -> std::io::Result<()> {
         // Not a gitcraft's, or not this user's: nothing is told.
         Err(Refusal::Malformed | Refusal::Stranger) => return Ok(()),
         Err(Refusal::Unusable(why)) => Reply::Refused(why),
+        Ok(Request::Agent(call)) => match agent(shared, call, &stream) {
+            Some(reply) => reply,
+            // The agent went away: there is nobody to answer.
+            None => return Ok(()),
+        },
         Ok(request) => take(shared, request),
     };
     stream.write_all(message::encode_reply(&reply).as_bytes())
+}
+
+/// Hands an agent's call to the window and waits for how it ended: long (an operation, or an
+/// approval card waiting for the user), checking all the while that the agent still waits.
+/// `None` when it stopped waiting (it cancelled the call, or ended): the window then drops the
+/// call if it hadn't started it.
+fn agent(shared: &Shared, call: message::AgentCall, stream: &TcpStream) -> Option<Reply> {
+    use crate::mcp::link::{ANSWER_WITHIN, Incoming};
+    use crate::mcp::wire::{self, Outcome};
+    use std::sync::atomic::AtomicBool;
+    use std::sync::mpsc::RecvTimeoutError;
+
+    let (tx, rx) = channel();
+    let gone = Arc::new(AtomicBool::new(false));
+    let repaint = {
+        let mut state = lock(&shared.state);
+        if state.closing {
+            return Some(Reply::Closing);
+        }
+        state.agent_calls.push(Incoming {
+            repo: call.repo,
+            agent: call.agent,
+            op: call.op,
+            reply: tx,
+            gone: Arc::clone(&gone),
+        });
+        state.repaint.clone()
+    };
+    if let Some(ctx) = repaint {
+        ctx.request_repaint();
+    }
+    let until = Instant::now() + ANSWER_WITHIN;
+    loop {
+        match rx.recv_timeout(Duration::from_millis(500)) {
+            Ok(reply) => return Some(Reply::Agent(reply)),
+            Err(RecvTimeoutError::Disconnected) => {
+                return Some(Reply::Agent(wire::Reply::new(
+                    Outcome::TimedOut,
+                    "gitcraft's window, or the repository's tab, closed before it answered. It \
+                     may have run: check `status` and `log` before trying again.",
+                )));
+            }
+            Err(RecvTimeoutError::Timeout) if Instant::now() >= until => {
+                return Some(Reply::Agent(wire::Reply::new(
+                    Outcome::TimedOut,
+                    "gitcraft took too long to answer. It may still be running: check `status` \
+                     and `log` before trying again.",
+                )));
+            }
+            Err(RecvTimeoutError::Timeout) => {}
+        }
+        if closed(stream) {
+            gone.store(true, Ordering::SeqCst);
+            return None;
+        }
+    }
+}
+
+/// Whether the other end closed the connection.
+fn closed(stream: &TcpStream) -> bool {
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(1)));
+    let mut byte = [0u8; 1];
+    matches!(stream.peek(&mut byte), Ok(0))
 }
 
 /// Keeps `request` for the window, unless it is closing, and waits a while for the window to
