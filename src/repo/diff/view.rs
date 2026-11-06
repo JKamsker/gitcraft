@@ -169,6 +169,7 @@ impl RepoTab {
                         if icons::small_button(ui, "x", "Close (Esc)").clicked() {
                             acts.push(Action::CloseDiff);
                         }
+                        self.split_toggle(ui);
                         if let DiffKey::Work(file) = &view.key {
                             let partial = partial && !as_file && !rendered;
                             clear = self.file_actions(ui, view, file, partial, acts);

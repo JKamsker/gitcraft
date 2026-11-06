@@ -136,7 +136,14 @@ impl RepoTab {
 
     /// Up and down select the row above or below the selected one.
     fn arrow_keys(&mut self, ui: &Ui, acts: &mut Vec<Action>) {
-        let (up, down) = ui.input(|i| (i.key_pressed(Key::ArrowUp), i.key_pressed(Key::ArrowDown)));
+        // Alt+↑ / Alt+↓ go from change to change of the diff shown below the graph.
+        let (up, down) = ui.input(|i| {
+            let plain = !i.modifiers.alt;
+            (
+                plain && i.key_pressed(Key::ArrowUp),
+                plain && i.key_pressed(Key::ArrowDown),
+            )
+        });
         let current = self.selected.unwrap_or(0);
         let next = if up {
             Some(current.saturating_sub(1))
