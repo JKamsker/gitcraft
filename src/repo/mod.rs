@@ -19,6 +19,8 @@ pub(crate) mod graph_view;
 pub(crate) mod highlight;
 mod keep_submodules;
 mod layout;
+#[cfg(test)]
+mod line_history_tests;
 mod load;
 mod messages;
 mod navigate;
@@ -31,6 +33,9 @@ mod pr_view;
 pub(crate) mod pull;
 mod quick_edit;
 mod rebase;
+mod revert_piece;
+#[cfg(test)]
+mod revert_tests;
 mod rewrite;
 #[cfg(test)]
 mod samples;

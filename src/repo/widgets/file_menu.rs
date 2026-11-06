@@ -17,6 +17,24 @@ pub fn file_menu(
     ignorable: bool,
     acts: &mut Vec<Action>,
 ) {
+    menu(resp, path, rev, ignorable, false, acts);
+}
+
+/// [`file_menu`] of a file changed in commit `hash`, which can also undo the commit's changes
+/// to it.
+pub fn commit_file_menu(resp: &Response, path: &str, hash: &str, acts: &mut Vec<Action>) {
+    menu(resp, path, Some(hash), false, true, acts);
+}
+
+/// The menu of [`file_menu`]; `revert`: with "Revert changes to this file" of commit `rev`.
+fn menu(
+    resp: &Response,
+    path: &str,
+    rev: Option<&str>,
+    ignorable: bool,
+    revert: bool,
+    acts: &mut Vec<Action>,
+) {
     egui::Popup::context_menu(resp)
         .style(crate::theme::menu_style)
         .show(|ui| {
@@ -53,6 +71,19 @@ pub fn file_menu(
                     rev: rev.map(str::to_owned),
                     tab: FileTab::Blame,
                 });
+            }
+            if revert && let Some(hash) = rev {
+                ui.separator();
+                let b = ui.button("Revert changes to this file").on_hover_text(
+                    "Undo this commit's changes to the file in the working tree, to look over \
+                     before committing",
+                );
+                if b.clicked() {
+                    acts.push(Action::RevertFile {
+                        hash: hash.to_owned(),
+                        path: path.to_owned(),
+                    });
+                }
             }
             if ignorable {
                 ui.menu_button("Ignore", |ui| {

@@ -59,6 +59,7 @@ impl<'a> Rows<'a> {
         let hunk_picks: &[Pick] = match &view.key {
             DiffKey::Work(f) if partial && f.area == Area::Staged => &[Pick::Unstage],
             DiffKey::Work(_) if partial => &[Pick::Stage, Pick::Discard],
+            DiffKey::Commit { .. } if partial => &[Pick::Revert],
             _ => &[],
         };
         let (press, pointer) = ui.input(|i| (i.pointer.press_origin(), i.pointer.interact_pos()));
@@ -191,7 +192,30 @@ impl<'a> Rows<'a> {
         if self.text_hover || text_drag.dragged() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::Text);
         }
-        copy_selection(ui, &text_drag, sel, &data.lines, &data.uncut);
+        let history = || {
+            let old_path = super::old_name(&data.header);
+            super::picked_lines(
+                &self.view.key,
+                old_path.as_deref(),
+                &data.lines,
+                sel.as_ref(),
+                &self.view.chosen,
+            )
+            .map(|p| Action::LineHistory {
+                path: p.path,
+                at: p.at,
+                range: p.range,
+            })
+        };
+        copy_selection(
+            ui,
+            &text_drag,
+            sel,
+            &data.lines,
+            &data.uncut,
+            &history,
+            acts,
+        );
         sel
     }
 

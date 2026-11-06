@@ -127,12 +127,16 @@ pub(super) fn drag_selection(
 }
 
 /// Ctrl+C and the "Copy" of the context menu on the lines (`drag`) copy the selected text.
+/// The menu also has "History of these lines": `history` makes its action, or says why there
+/// is none.
 pub(super) fn copy_selection(
     ui: &Ui,
     drag: &egui::Response,
     sel: Option<TextSel>,
     lines: &[DiffLine],
     uncut: &HashMap<usize, String>,
+    history: &dyn Fn() -> Result<crate::repo::Action, &'static str>,
+    acts: &mut Vec<crate::repo::Action>,
 ) {
     // Put together only when asked for: a selection can span thousands of lines.
     let selected_text = || sel.map(|s| s.text(lines, uncut)).filter(|s| !s.is_empty());
@@ -152,6 +156,20 @@ pub(super) fn copy_selection(
                 && let Some(text) = &selected_text
             {
                 ui.ctx().copy_text(text.clone());
+            }
+            match history() {
+                Ok(action) => {
+                    let b = ui.button("History of these lines").on_hover_text(
+                        "Every commit that changed the selected lines, followed through renames",
+                    );
+                    if b.clicked() {
+                        acts.push(action);
+                    }
+                }
+                Err(why) => {
+                    ui.add_enabled(false, egui::Button::new("History of these lines"))
+                        .on_disabled_hover_text(why);
+                }
             }
         });
 }

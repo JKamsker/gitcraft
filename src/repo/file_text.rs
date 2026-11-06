@@ -99,17 +99,58 @@ pub(crate) fn load_for_diff(repo: &Path, key: &DiffKey, dark: bool) -> Result<Fi
     }
 }
 
-/// The file, or a spinner, the error or a note in its place. `id`: what keeps its scrolling.
+/// Lines picked in a file shown: where the pick started and where it ends (0-based).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct LinePick {
+    anchor: usize,
+    cursor: usize,
+}
+
+impl LinePick {
+    fn range(self) -> (usize, usize) {
+        (self.anchor.min(self.cursor), self.anchor.max(self.cursor))
+    }
+
+    fn contains(self, i: usize) -> bool {
+        let (a, b) = self.range();
+        (a..=b).contains(&i)
+    }
+
+    /// The pick after a click on line `i` (`extend`: with Shift, from where it started).
+    fn clicked(pick: Option<Self>, i: usize, extend: bool) -> Option<Self> {
+        match pick {
+            Some(p) if extend => Some(Self { cursor: i, ..p }),
+            Some(p) if p.anchor == i && p.cursor == i => None,
+            _ => Some(Self {
+                anchor: i,
+                cursor: i,
+            }),
+        }
+    }
+
+    /// The lines as git numbers them (from 1).
+    fn numbers(self) -> (u32, u32) {
+        let (a, b) = self.range();
+        let n = |i: usize| u32::try_from(i + 1).unwrap_or(u32::MAX);
+        (n(a), n(b))
+    }
+}
+
+/// The file, or a spinner, the error or a note in its place. `id`: what keeps its scrolling
+/// and the lines picked in it (click, Shift+click or drag over them). `history`: why the lines
+/// picked can have no history, if they can't. Returns the lines (from 1) whose history was
+/// asked for from their right-click menu.
 pub(crate) fn show(
     ui: &mut Ui,
     id: impl std::hash::Hash + std::fmt::Debug,
     text: Option<&Result<FileText, String>>,
-) {
+    history: Result<(), &str>,
+) -> Option<(u32, u32)> {
     let t = Tokens::get(ui.ctx());
     let data = match text {
         None => {
             ui.centered_and_justified(|ui| ui.add(crate::spinner::Spinner::new()));
-            return;
+            return None;
         }
         Some(Err(e)) => {
             ui.add_space(12.0);
@@ -117,7 +158,7 @@ pub(crate) fn show(
                 ui.add_space(12.0);
                 ui.colored_label(t.danger, e);
             });
-            return;
+            return None;
         }
         Some(Ok(data)) => data,
     };
@@ -130,8 +171,20 @@ pub(crate) fn show(
         ui.centered_and_justified(|ui| {
             ui.label(egui::RichText::new(note).color(t.text_dim));
         });
-        return;
+        return None;
     }
+    let pick_id = egui::Id::new(("file_text_pick", &id));
+    let mut pick: Option<LinePick> = ui.data(|d| d.get_temp(pick_id)).flatten();
+    let mut asked = None;
+    let extend = ui.input(|i| i.modifiers.shift);
+    let drag_id = pick_id.with("drag");
+    let (down, pointer_y) = ui.input(|i| {
+        (
+            i.pointer.primary_down(),
+            i.pointer.interact_pos().map(|p| p.y),
+        )
+    });
+    let mut dragging = down && ui.data(|d| d.get_temp::<bool>(drag_id)).unwrap_or(false);
     let font = theme::mono(12.0);
     let char_w = ui
         .painter()
@@ -148,8 +201,37 @@ pub(crate) fn show(
                 let Some(line) = data.lines.get(i) else {
                     continue;
                 };
-                let (rect, _) = ui.allocate_exact_size(vec2(width, LINE_H), Sense::hover());
+                let (rect, resp) =
+                    ui.allocate_exact_size(vec2(width, LINE_H), Sense::click_and_drag());
+                if resp.drag_started() {
+                    // A drag picks the lines it goes over, from where it started.
+                    dragging = true;
+                    pick = Some(LinePick {
+                        anchor: i,
+                        cursor: i,
+                    });
+                } else if resp.clicked() {
+                    pick = LinePick::clicked(pick, i, extend);
+                } else if resp.secondary_clicked() && !pick.is_some_and(|p| p.contains(i)) {
+                    // The menu is for the line right-clicked, unless it is among those picked.
+                    pick = Some(LinePick {
+                        anchor: i,
+                        cursor: i,
+                    });
+                }
+                if dragging
+                    && let Some(p) = &mut pick
+                    && pointer_y.is_some_and(|y| rect.y_range().contains(y))
+                {
+                    p.cursor = i;
+                }
                 let p = ui.painter().with_clip_rect(rect.intersect(ui.clip_rect()));
+                if pick.is_some_and(|p| p.contains(i)) {
+                    p.rect_filled(rect, 0.0, t.row_selected);
+                }
+                if let Some(picked) = pick {
+                    lines_menu(&resp, data, picked, history, &mut asked);
+                }
                 let gutter = Rect::from_min_size(rect.min, vec2(NUM_W, LINE_H));
                 p.rect_filled(gutter, 0.0, t.card.gamma_multiply(0.6));
                 let mid = rect.center().y;
@@ -190,11 +272,79 @@ pub(crate) fn show(
                 }
             }
         });
+    ui.data_mut(|d| {
+        d.insert_temp(pick_id, pick);
+        d.insert_temp(drag_id, dragging);
+    });
+    asked
+}
+
+/// The right-click menu of the lines `picked`: their history, or copying them.
+fn lines_menu(
+    resp: &egui::Response,
+    data: &FileText,
+    picked: LinePick,
+    history: Result<(), &str>,
+    asked: &mut Option<(u32, u32)>,
+) {
+    egui::Popup::context_menu(resp)
+        .style(theme::menu_style)
+        .show(|ui| {
+            let (start, end) = picked.numbers();
+            let which = if start == end {
+                format!("line {start}")
+            } else {
+                format!("lines {start}–{end}")
+            };
+            match history {
+                Ok(()) => {
+                    let b = ui.button("History of these lines").on_hover_text(format!(
+                        "Every commit that changed {which}, followed through renames"
+                    ));
+                    if b.clicked() {
+                        *asked = Some((start, end));
+                    }
+                }
+                Err(why) => {
+                    ui.add_enabled(false, egui::Button::new("History of these lines"))
+                        .on_disabled_hover_text(why);
+                }
+            }
+            if ui.button(format!("Copy {which}")).clicked() {
+                let (a, b) = picked.range();
+                let text = data
+                    .lines
+                    .get(a..=b.min(data.lines.len().saturating_sub(1)));
+                ui.ctx()
+                    .copy_text(text.map(|l| l.join("\n")).unwrap_or_default());
+            }
+        });
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lines_are_picked_by_click_and_shift_click() {
+        let one = LinePick::clicked(None, 4, false);
+        assert_eq!(one.map(LinePick::numbers), Some((5, 5)));
+        // Shift+click goes from where the pick started, either way.
+        let up = LinePick::clicked(one, 1, true);
+        assert_eq!(up.map(LinePick::numbers), Some((2, 5)));
+        assert!(up.is_some_and(|p| p.contains(3) && !p.contains(5)));
+        // A click elsewhere starts again; on the one line picked, unpicks it.
+        assert_eq!(
+            LinePick::clicked(up, 9, false).map(LinePick::numbers),
+            Some((10, 10))
+        );
+        assert_eq!(LinePick::clicked(one, 4, false), None);
+        // Shift+click with nothing picked picks that line.
+        assert_eq!(
+            LinePick::clicked(None, 2, true).map(LinePick::numbers),
+            Some((3, 3))
+        );
+    }
 
     #[test]
     fn lines_lose_their_endings_and_tabs() {

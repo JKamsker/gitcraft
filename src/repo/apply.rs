@@ -200,6 +200,12 @@ impl RepoTab {
             Action::ViewAllFiles(on) => self.all_files.on = on,
             Action::FileView { path, rev, tab } => self.open_file_view(path, rev, tab, ctx),
             Action::CloseFileView => self.file_view = None,
+            Action::LineHistory { path, at, range } => self.open_line_history(path, at, range, ctx),
+            Action::OpenDiffOfLines { hash, path, lines } => {
+                let lines = (!lines.is_empty()).then_some(lines);
+                self.open_diff_of_lines(DiffKey::Commit { hash, path }, lines, ctx);
+            }
+            Action::RevertFile { hash, path } => self.revert_file(hash, path, ctx),
             Action::InteractiveRebase { onto, label } => self.interactive_rebase(onto, label, ctx),
             Action::Reword { hash, message } => self.reword_commit(hash, message, ctx),
             Action::EditMessage(hash) => self.edit_message(hash, ctx),
@@ -210,6 +216,10 @@ impl RepoTab {
             Action::CloseRebase => self.rebase = None,
             Action::SignIn(creds) => self.sign_in(creds, ctx),
             Action::Ignore { pattern, path } => self.ignore(&pattern, &path, ctx),
+            Action::PickLines {
+                pick: diff::Pick::Revert,
+                lines,
+            } => self.revert_lines(&lines, ctx),
             Action::PickLines { pick, lines } => self.pick_lines(pick, &lines, ctx),
             Action::Compare {
                 base,

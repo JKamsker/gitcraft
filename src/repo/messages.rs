@@ -361,10 +361,12 @@ impl RepoTab {
                 self.run_quick_edit(edit, hash, result, ctx)
             }
             Msg::FileHistory(path, rev, result) => {
-                // Only the history of the revision shown: an older read may answer last.
+                // Only the history of the revision shown: an older read may answer last. Nor
+                // the whole file's, once the history of some of its lines is shown.
                 if let Some(view) = &mut self.file_view
                     && view.path == path
                     && view.rev == rev
+                    && view.lines.is_none()
                 {
                     view.history = Some(result);
                 }
