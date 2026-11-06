@@ -72,6 +72,12 @@ impl Plan {
                 short(&read.target)
             ));
         }
+        if let Some(file) = &read.ignored_in_way {
+            return Err(format!(
+                "The ignored {file} is where a commit to rewrite has a file: the rebase would \
+                 write over it. Move it away first"
+            ));
+        }
         if !read.ancestor {
             return Err(format!(
                 "{} is not on the checked-out branch",
@@ -130,11 +136,22 @@ impl Plan {
 
     /// Steps that refuse the fold unless the branch read is still checked out, at the commit
     /// read: a commit made since (in the terminal) would be rewritten without being shown.
-    fn guards(&self) -> [Vec<String>; 2] {
-        [
+    fn guards(&self) -> Vec<Vec<String>> {
+        let mut guards = vec![
             expect_symref("HEAD", &self.branch_ref()),
             expect_ref_at("HEAD", &self.head),
-        ]
+        ];
+        // Nor anything started since that a commit would finish (a merge would get the
+        // fixup's message and become a merge commit).
+        for pending in [
+            "MERGE_HEAD",
+            "CHERRY_PICK_HEAD",
+            "REVERT_HEAD",
+            "REBASE_HEAD",
+        ] {
+            guards.push(expect_ref_at(pending, ""));
+        }
+        guards
     }
 
     /// The staged changes as a commit `fixup! <target's summary>` on top (with the hooks and
@@ -145,7 +162,7 @@ impl Plan {
 
     /// Keep as fixup: the commit only, undone like a commit (its changes staged again).
     pub(crate) fn keep_steps(&self) -> (Vec<Vec<String>>, Undo) {
-        let steps = [self.guards().to_vec(), vec![self.fixup_commit()]].concat();
+        let steps = [self.guards(), vec![self.fixup_commit()]].concat();
         (steps, Undo::HeadMove { mode: "--soft" })
     }
 
@@ -181,11 +198,7 @@ impl Plan {
     /// soft reset, which puts the branch back and leaves the changes staged.
     pub(crate) fn fold_steps(&self, rebase: Vec<String>) -> (Vec<Vec<String>>, Undo) {
         let check = VERIFY.map(str::to_owned).to_vec();
-        let steps = [
-            self.guards().to_vec(),
-            vec![self.fixup_commit(), rebase, check],
-        ]
-        .concat();
+        let steps = [self.guards(), vec![self.fixup_commit(), rebase, check]].concat();
         (steps, Undo::HeadMove { mode: "--soft" })
     }
 
@@ -480,9 +493,10 @@ mod tests {
         let (steps, undo) = p.fold_steps(vec!["rebase".to_owned()]);
         assert_eq!(steps[0], expect_symref("HEAD", "refs/heads/main"));
         assert_eq!(steps[1], expect_ref_at("HEAD", "c"));
-        assert_eq!(steps[2], ["commit", "--fixup=b"]);
-        assert_eq!(steps[3], ["rebase"]);
-        assert_eq!(steps[4], VERIFY);
+        assert_eq!(steps[2], expect_ref_at("MERGE_HEAD", ""));
+        assert_eq!(steps[6], ["commit", "--fixup=b"]);
+        assert_eq!(steps[7], ["rebase"]);
+        assert_eq!(steps[8], VERIFY);
         assert_eq!(undo, Undo::HeadMove { mode: "--soft" });
         let failed = format!("git {} failed (exit status: 1)", VERIFY.join(" "));
         assert!(lost_in_rebase(&failed));
@@ -492,7 +506,7 @@ mod tests {
             ..p
         };
         let (steps, _) = kept.keep_steps();
-        assert_eq!(steps.len(), 3);
+        assert_eq!(steps.len(), 7);
         assert_eq!(kept.label(), "Commit fixup! for b");
     }
 
