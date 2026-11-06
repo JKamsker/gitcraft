@@ -86,6 +86,8 @@ impl RepoTab {
             Action::Pull => self.pull(Settings::get(ctx).pull_mode, ctx),
             Action::PullWith(mode) => self.pull(mode, ctx),
             Action::Push => self.push(ctx),
+            Action::Sync => self.sync(ctx),
+            Action::PushFlow(act) => self.push_act(act, ctx),
             Action::Reload => self.reload(ctx),
             Action::LoadMore => self.load_more(ctx),
             Action::Undo => self.undo(ctx),

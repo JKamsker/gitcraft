@@ -196,10 +196,18 @@ so your config, credentials and hooks apply as usual.
 
 **Toolbar, terminal, app**
 
-- Undo, redo, Fetch, Pull and Push (with incoming / outgoing counts), new branch, stash, terminal,
+- Undo, redo, Fetch, Pull, Push (with incoming / outgoing counts) and Sync, new branch, stash, terminal,
   search, open the folder (Explorer / Finder, your editor), refresh (F5).
 - Pull's arrow (or a right-click on it) sets what it does: fast-forward, merging when the branch
   has diverged; fast-forward only; or rebase. Also in Settings, and the menu has _Fetch all_.
+- _Sync_ pulls (the way Pull is set to), then pushes; it stops at the pull on conflicts.
+- A refused push gets a banner instead of "failed to push some refs": _origin/dev has 3 commits
+  you don't have_, saying whether the branch was rewritten here or both moved on, with _Pull,
+  then push_ and _Force push (with lease)…_. The force push names the commits it removes from the
+  remote, and runs `git push --force-with-lease=<ref>:<commit checked>` (and
+  `--force-if-includes` where git has it), so a remote that moved since pushes nothing. A hook's
+  or a protected branch's refusal shows git's message in full, with no force push offered. Read
+  from `git push --porcelain`, not from git's sentences.
 - Background fetch every few minutes (Settings; 0 turns it off).
 - HTTPS sign-in: when a remote wants a username and password (or token) and no credential helper
   provides them, a dialog asks and the operation runs again. They stay in memory for the tab;
@@ -398,6 +406,7 @@ was made this way, on a demo repository.
 | `src/repo/pr_view.rs` | a pull request in the big area, its changed files on the right |
 | `src/repo/pr_review.rs` | comments and reviews being written, and the threads on lines of a diff |
 | `src/repo/pr_merge.rs` | the box that merges a pull request |
+| `src/repo/push/` | Push and Sync; a refused push read from `--porcelain`, the remote checked, the banner and the force push with lease |
 | `src/repo/pinned_sections.rs` | sidebar section headers that stay in view and jump to their section |
 | `src/repo/branch_tree.rs` | branch names and file paths as a tree of folders, and its rows |
 | `src/repo/columns.rs` | widths of the graph's columns: what a drag changes and what gets squeezed |
