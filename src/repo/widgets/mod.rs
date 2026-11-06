@@ -9,7 +9,7 @@ use egui::{Align2, Color32, CornerRadius, Rect, Response, Sense, Ui, pos2, vec2}
 use crate::theme::{self, Tokens};
 
 pub use file_menu::file_menu;
-pub use file_row::{FileRowResponse, RowExtra, file_row};
+pub use file_row::{FileRowResponse, RowExtra, badge_text, file_row};
 pub use terminal_tabs::terminal_tabs;
 
 pub const ROW_H: f32 = 24.0;

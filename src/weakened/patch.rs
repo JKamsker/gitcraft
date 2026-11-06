@@ -19,6 +19,9 @@ pub struct Line {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Hunk {
+    /// Where the hunk starts in the old file, and how many of its lines it covers.
+    pub old_start: u32,
+    pub old_count: u32,
     pub lines: Vec<Line>,
 }
 
@@ -59,7 +62,11 @@ pub fn parse(text: &str) -> Vec<FilePatch> {
         if line.starts_with("@@") {
             in_hunk = true;
             (old, new) = hunk_start(line);
-            file.hunks.push(Hunk::default());
+            file.hunks.push(Hunk {
+                old_start: old.saturating_add(1),
+                old_count: old_count(line),
+                lines: Vec::new(),
+            });
             continue;
         }
         if !in_hunk {
@@ -138,6 +145,19 @@ fn hunk_start(header: &str) -> (u32, u32) {
     let old = start(parts.next(), '-');
     let new = start(parts.next(), '+');
     (old, new)
+}
+
+/// How many old lines `@@ -a,b +c,d @@` covers: `b`, or 1 when it isn't given.
+fn old_count(header: &str) -> u32 {
+    header
+        .split_whitespace()
+        .nth(1)
+        .and_then(|p| p.strip_prefix('-'))
+        .map_or(0, |p| {
+            p.split_once(',')
+                .map_or(Some(1), |(_, n)| n.parse().ok())
+                .unwrap_or(0)
+        })
 }
 
 /// The path of `diff --git a/x b/x` (its new side), until `+++` names it for sure.

@@ -48,8 +48,8 @@ impl RepoTab {
     ) {
         let id = egui::Id::new(("file-folder", self.repo_key(), tree));
         let selected = |f: &&ChangedFile| self.open_key() == Some(&key(&f.path));
-        let scope = super::weakened_marks::scope_of(&key(""), self.work_read);
-        let found = self.weakened.get(ui.ctx(), &self.path, scope);
+        let (scope, generation) = super::weakened_marks::scope_of(&key(""), self.work_read);
+        let found = self.weakened.get(ui.ctx(), &self.path, scope, generation);
         // Rows are known by their path within the list of this commit (or range): a menu left
         // open while another one is shown is not that one's file of the same path.
         ui.push_id(("file-list", tree, rev), |ui| {
@@ -80,6 +80,7 @@ impl RepoTab {
                 },
             );
         });
+        super::weakened_marks::error_note(ui, found.as_ref());
     }
 }
 
