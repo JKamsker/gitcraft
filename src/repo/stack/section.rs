@@ -4,7 +4,7 @@
 
 use egui::{Align2, Rect, Response, Ui, pos2, vec2};
 
-use super::{StackAct, Tree, looped, trees};
+use super::{StackAct, Tree, dependents, looped, to_restack, trees};
 use crate::git::Branch;
 use crate::git::stack::Layer;
 use crate::icons;
@@ -29,7 +29,12 @@ impl RepoTab {
     ) {
         let stacks = trees(&self.stacks.layers);
         let looped = looped(&self.stacks.layers);
-        if stacks.is_empty() && looped.is_empty() && self.stacks.error.is_none() {
+        let pending = self.stacks.pending.as_ref();
+        if stacks.is_empty()
+            && looped.is_empty()
+            && self.stacks.error.is_none()
+            && pending.is_none()
+        {
             return;
         }
         let open = sections.add(
@@ -53,6 +58,7 @@ impl RepoTab {
                 ui.colored_label(t.danger, e);
             });
         }
+        self.restack_banner(ui, idle, acts);
         // Filtered, a stack shows only its layers that match, under its title.
         let shown = |l: &Layer| filter.is_empty() || l.branch.to_lowercase().contains(filter);
         for tree in &stacks {
@@ -68,6 +74,83 @@ impl RepoTab {
         if !looped.is_empty() {
             self.loop_row(ui, &looped, idle, acts);
         }
+    }
+
+    /// Above the stacks: the restack that stopped, with Continue and Abort; else how many
+    /// branches need updating, with Restack….
+    fn restack_banner(&self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
+        let t = Tokens::get(ui.ctx());
+        let frame = egui::Frame::new()
+            .fill(t.warning.gamma_multiply(0.12))
+            .corner_radius(t.radius)
+            .inner_margin(egui::Margin::symmetric(10, 6))
+            .outer_margin(egui::Margin::symmetric(8, 4));
+        if let Some(pending) = &self.stacks.pending {
+            let branch = pending.current().map_or("", |s| s.branch.as_str());
+            let elsewhere = self
+                .worktrees
+                .iter()
+                .find(|w| !w.current && w.branch.as_deref() == Some(branch));
+            frame.show(ui, |ui| {
+                let place = match elsewhere {
+                    Some(wt) => format!(" in its worktree at {}", wt.path.display()),
+                    None => String::new(),
+                };
+                ui.label(
+                    egui::RichText::new(format!(
+                        "Restack stopped at {branch} ({} of {}): resolve its conflicts{place}, \
+                         then continue.",
+                        pending.done + 1,
+                        pending.steps.len()
+                    ))
+                    .color(t.text),
+                );
+                ui.horizontal_wrapped(|ui| {
+                    if ui
+                        .add_enabled(idle, egui::Button::new("Continue restack"))
+                        .clicked()
+                    {
+                        acts.push(Action::Stack(StackAct::ResumeRestack));
+                    }
+                    if ui
+                        .add_enabled(idle, egui::Button::new("Abort restack"))
+                        .on_hover_text("Every branch back where it was before the restack")
+                        .clicked()
+                    {
+                        acts.push(Action::Stack(StackAct::AbortRestack));
+                    }
+                    if let Some(wt) = elsewhere
+                        && ui.button("Open its worktree").clicked()
+                    {
+                        acts.push(Action::OpenWorktree(wt.path.clone()));
+                    }
+                });
+            });
+            return;
+        }
+        let n = to_restack(&self.stacks.layers).len();
+        if n == 0 {
+            return;
+        }
+        frame.show(ui, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(
+                    egui::RichText::new(if n == 1 {
+                        "1 dependent branch needs updating".to_owned()
+                    } else {
+                        format!("{n} dependent branches need updating")
+                    })
+                    .color(t.text),
+                );
+                if ui
+                    .add_enabled(idle, egui::Button::new("Restack…"))
+                    .on_hover_text("Preview their new bases, then replay them onto them")
+                    .clicked()
+                {
+                    acts.push(Action::Stack(StackAct::OpenRestack(None)));
+                }
+            });
+        });
     }
 
     /// Branches based on each other in a loop (the config edited by hand): named, with a way
@@ -242,6 +325,22 @@ impl RepoTab {
             .clicked()
         {
             acts.push(Action::Stack(StackAct::OpenBasedOn(b.name.clone())));
+        }
+        let on_it = dependents(&self.stacks.layers, &b.name).len();
+        if on_it > 0
+            && ui
+                .add_enabled(
+                    idle && self.stacks.pending.is_none(),
+                    egui::Button::new(if on_it == 1 {
+                        "Restack the branch on it…".to_owned()
+                    } else {
+                        format!("Restack the {on_it} branches on it…")
+                    }),
+                )
+                .on_hover_text("Replay them onto its tip, after it changed")
+                .clicked()
+        {
+            acts.push(Action::Stack(StackAct::OpenRestack(Some(b.name.clone()))));
         }
         if self.stacks.recorded.contains_key(&b.name)
             && ui

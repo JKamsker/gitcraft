@@ -4,6 +4,9 @@
 //! A layer of a stack is a branch with a parent; its parent may be a layer too
 //! (`main → schema → api → ui`).
 
+pub mod restack;
+#[cfg(test)]
+mod restack_tests;
 mod suggest;
 #[cfg(test)]
 pub(crate) mod test_repo;
@@ -41,6 +44,23 @@ pub fn recorded(repo: &Path) -> Result<BTreeMap<String, Recorded>, String> {
         &[0, 1],
     )?;
     Ok(parse_recorded(&out))
+}
+
+/// What the config records ([`recorded`]) and the restack under way ([`restack::pending`]),
+/// read in one go.
+pub fn read_all(
+    repo: &Path,
+) -> Result<(BTreeMap<String, Recorded>, Option<restack::Pending>), String> {
+    let pattern = format!(
+        r"^(branch\..*\.({PARENT_KEY}|{BASE_KEY})|{}\..*)$",
+        restack::SECTION
+    );
+    let out = run_ok_codes(
+        Some(repo),
+        &["config", "--local", "-z", "--get-regexp", &pattern],
+        &[0, 1],
+    )?;
+    Ok((parse_recorded(&out), restack::parse_pending(&out)))
 }
 
 /// `git config -z --get-regexp` output (`key\nvalue\0`…) → branch → what it is based on.
@@ -124,7 +144,7 @@ pub fn set_op(key: &str, value: &str) -> Vec<String> {
 
 /// Unsets `key` whether it is set or not: `git config --unset` fails on a key that isn't
 /// there, which would stop the steps after it, so it is set (to nothing) first.
-fn unset_ops(key: &str) -> Vec<Vec<String>> {
+pub(crate) fn unset_ops(key: &str) -> Vec<Vec<String>> {
     vec![
         set_op(key, ""),
         ["config", "--local", "--unset-all", key]

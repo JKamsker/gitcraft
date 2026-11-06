@@ -109,7 +109,7 @@ impl RepoTab {
     /// Shift+F7 (or Alt+↓ / Alt+↑) go to the next and previous change of a diff.
     fn shortcuts(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         let free_keys = self.dialog.is_none()
-            && self.stacks.dialog.is_none()
+            && !self.stacks.modal_open()
             && !self.keys_blocked
             && !ctx.egui_wants_keyboard_input();
         if free_keys {

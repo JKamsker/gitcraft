@@ -163,3 +163,142 @@ fn an_operation_that_cannot_start_says_so() -> Result<(), String> {
     tab.busy_op = None;
     Ok(())
 }
+
+fn is_ancestor(repo: &TestRepo, a: &str, b: &str) -> bool {
+    repo.git(&["merge-base", "--is-ancestor", a, b]).is_ok()
+}
+
+/// Opens the restack of every layer that needs it, waits for its preview, starts it.
+fn restack_all(tab: &mut RepoTab, ctx: &egui::Context) -> Result<(), String> {
+    tab.apply(Action::Stack(StackAct::OpenRestack(None)), ctx);
+    settle(tab, ctx, |t| {
+        t.stacks
+            .preview
+            .as_ref()
+            .is_some_and(|p| p.previews.is_some())
+    })?;
+    tab.apply(Action::Stack(StackAct::StartRestack), ctx);
+    settle(tab, ctx, |t| {
+        t.stacks.preview.is_none() && t.status.is_some()
+    })
+}
+
+#[test]
+fn restacking_from_the_tab_is_one_undo() -> Result<(), String> {
+    let repo = TestRepo::new("tab restack undo")?;
+    repo.stack(&["schema", "api", "ui"])?;
+    // ui is checked out in another worktree: restacked there, and put back there.
+    let wt = repo.dir.with_file_name(format!(
+        "{} ui wt",
+        repo.dir
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    ));
+    let _ = std::fs::remove_dir_all(&wt);
+    repo.git(&["worktree", "add", "-q", &wt.to_string_lossy(), "ui"])?;
+    let result = (|| -> Result<(), String> {
+        repo.checkout("schema")?;
+        repo.git(&["commit", "-q", "--amend", "-m", "schema amended"])?;
+        repo.checkout("main")?;
+        let (api, ui) = (repo.tip("api")?, repo.tip("ui")?);
+        let ctx = egui::Context::default();
+        let mut tab = open(&repo, &ctx)?;
+        settle(&mut tab, &ctx, |t| {
+            t.stacks.layer("api").is_some_and(|l| l.needs_restack())
+        })?;
+        let preview_len = {
+            tab.apply(Action::Stack(StackAct::OpenRestack(None)), &ctx);
+            settle(&mut tab, &ctx, |t| {
+                t.stacks
+                    .preview
+                    .as_ref()
+                    .is_some_and(|p| p.previews.is_some())
+            })?;
+            tab.stacks.preview.as_ref().map(|p| p.layers.len())
+        };
+        assert_eq!(preview_len, Some(2));
+        tab.apply(Action::Stack(StackAct::StartRestack), &ctx);
+        settle(&mut tab, &ctx, |t| {
+            t.stacks.preview.is_none() && t.status.is_some()
+        })?;
+        assert!(is_ancestor(&repo, "schema", "api") && is_ancestor(&repo, "api", "ui"));
+        let worktree_head = crate::git::run(Some(&wt), &["rev-parse", "HEAD"])?;
+        assert_eq!(worktree_head.trim(), repo.tip("ui")?);
+        let moved = (repo.tip("api")?, repo.tip("ui")?);
+        let bases = stack::recorded(repo.path())?;
+
+        tab.apply(Action::Undo, &ctx);
+        settle(&mut tab, &ctx, |t| {
+            t.status.as_ref().is_some_and(|s| s.0.starts_with("Undo"))
+        })?;
+        assert_eq!(
+            (repo.tip("api")?, repo.tip("ui")?),
+            (api.clone(), ui.clone())
+        );
+        let worktree_head = crate::git::run(Some(&wt), &["rev-parse", "HEAD"])?;
+        assert_eq!(worktree_head.trim(), ui);
+        assert!(
+            crate::git::run(Some(&wt), &["status", "--porcelain"])?
+                .trim()
+                .is_empty()
+        );
+        tab.apply(Action::Redo, &ctx);
+        settle(&mut tab, &ctx, |t| {
+            t.status.as_ref().is_some_and(|s| s.0.starts_with("Redo"))
+        })?;
+        assert_eq!((repo.tip("api")?, repo.tip("ui")?), moved);
+        assert_eq!(stack::recorded(repo.path())?, bases);
+        Ok(())
+    })();
+    let _ = repo.git(&["worktree", "remove", "--force", &wt.to_string_lossy()]);
+    let _ = std::fs::remove_dir_all(&wt);
+    result
+}
+
+#[test]
+fn a_restack_stopped_on_conflicts_continues_or_aborts_from_the_tab() -> Result<(), String> {
+    for resolve in [true, false] {
+        let repo = TestRepo::new(&format!("tab restack conflict {resolve}"))?;
+        repo.stack(&["schema", "api"])?;
+        repo.checkout("api")?;
+        repo.commit("schema.txt", "api's\n", "api changes schema's file")?;
+        repo.checkout("schema")?;
+        repo.commit("schema.txt", "schema 2\n", "schema again")?;
+        repo.checkout("main")?;
+        let api = repo.tip("api")?;
+        let ctx = egui::Context::default();
+        let mut tab = open(&repo, &ctx)?;
+        settle(&mut tab, &ctx, |t| {
+            t.stacks.layer("api").is_some_and(|l| l.needs_restack())
+        })?;
+        restack_all(&mut tab, &ctx)?;
+        settle(&mut tab, &ctx, |t| t.stacks.pending.is_some())?;
+        let status = tab.status.clone().unwrap_or_default();
+        assert!(
+            status.1 && status.0.contains("stopped at api"),
+            "{status:?}"
+        );
+        if resolve {
+            std::fs::write(repo.dir.join("schema.txt"), "both\n").map_err(|e| e.to_string())?;
+            repo.git(&["add", "schema.txt"])?;
+            tab.apply(Action::Stack(StackAct::ResumeRestack), &ctx);
+            settle(&mut tab, &ctx, |t| {
+                t.stacks.pending.is_none() && t.status.is_some()
+            })?;
+            assert!(is_ancestor(&repo, "schema", "api"));
+            assert_eq!(repo.git(&["show", "api:schema.txt"])?, "both\n");
+        } else {
+            tab.apply(Action::Stack(StackAct::AbortRestack), &ctx);
+            settle(&mut tab, &ctx, |t| {
+                t.stacks.pending.is_none() && t.status.is_some()
+            })?;
+            assert_eq!(repo.tip("api")?, api);
+        }
+        assert_eq!(
+            repo.git(&["symbolic-ref", "--short", "HEAD"])?.trim(),
+            "main"
+        );
+    }
+    Ok(())
+}
