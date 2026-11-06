@@ -180,6 +180,8 @@ mod tests {
             &["init", "-q"][..],
             &["config", "user.name", "t"],
             &["config", "user.email", "t@t"],
+            // The file comes back as written, not with Windows line ends.
+            &["config", "core.autocrlf", "false"],
         ] {
             assert!(git(args).is_ok());
         }

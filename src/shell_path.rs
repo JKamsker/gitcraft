@@ -181,6 +181,7 @@ fn marked(out: &str) -> Option<String> {
 mod tests {
     use super::*;
 
+    #[cfg(unix)]
     #[test]
     fn folders_are_kept_once_in_order() {
         let shell = std::env::join_paths(["/opt/homebrew/bin", "/usr/bin"]).unwrap_or_default();

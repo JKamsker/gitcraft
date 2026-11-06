@@ -250,14 +250,21 @@ mod tests {
         git(&["init", "-q"])?;
         std::fs::write(dir.join("a.txt"), "a\n").map_err(|e| e.to_string())?;
         git(&["add", "a.txt"])?;
-        // No such file on disk: `:` isn't allowed in Windows file names.
-        let oid = git(&["hash-object", "-w", "a.txt"])?;
-        let info = format!("100644,{},1:x", oid.trim());
-        git(&["update-index", "--add", "--cacheinfo", &info])?;
-        let staged = file_at(&dir, Some(""), "1:x");
+        // No such file on disk: `:` isn't allowed in Windows file names, and Git for Windows
+        // refuses it even in the index.
+        let staged = if cfg!(windows) {
+            None
+        } else {
+            let oid = git(&["hash-object", "-w", "a.txt"])?;
+            let info = format!("100644,{},1:x", oid.trim());
+            git(&["update-index", "--add", "--cacheinfo", &info])?;
+            Some(file_at(&dir, Some(""), "1:x"))
+        };
         let tracked = (is_tracked(&dir, "[ab].txt"), is_tracked(&dir, "a.txt"));
         let _ = std::fs::remove_dir_all(&dir);
-        assert_eq!(staged?, b"a\n");
+        if let Some(staged) = staged {
+            assert_eq!(staged?, b"a\n");
+        }
         assert_eq!(tracked, (false, true));
         Ok(())
     }
