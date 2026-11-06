@@ -6,7 +6,7 @@ use super::pull::PullMode;
 use super::toolbar::reveal_label;
 use super::{
     Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view, ops,
-    pr_review, quick_edit,
+    pr_review, quick_edit, timeline,
 };
 use crate::git::{self, InProgress};
 use crate::terminal::ShellSpec;
@@ -65,6 +65,10 @@ pub(crate) enum Action {
     LoadMore,
     Undo,
     Redo,
+    /// Show the timeline (undo tree) in the big area, or close it.
+    ToggleTimeline,
+    /// Something done in the timeline.
+    Timeline(timeline::view::TimelineAct),
     StashPush(String),
     /// Open a folder (a worktree) in its own tab.
     OpenTab(PathBuf),
@@ -328,6 +332,11 @@ impl RepoTab {
             ("Apply patch…".into(), "patch".into(), Action::ApplyPatch),
             ("Undo".into(), "Ctrl+Z".into(), Action::Undo),
             ("Redo".into(), "Ctrl+Y".into(), Action::Redo),
+            (
+                "Timeline and undo tree".into(),
+                "Ctrl+Shift+Z".into(),
+                Action::ToggleTimeline,
+            ),
             (
                 "Stash changes".into(),
                 "stash".into(),

@@ -59,6 +59,16 @@ const FEATURES: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "Timeline and undo tree",
+        &[
+            "Ctrl+Shift+Z (or the clock in the toolbar) shows the timeline: each operation with the branches it moved and the files it changed, kept after a restart.",
+            "Branch moves made elsewhere (the terminal, another app, while gitcraft was closed) show up too, marked outside, named from the reflog; Ctrl+Z undoes them as well.",
+            "Undo a few steps and do something new: the steps undone stay, as a branch of the tree. Pick any entry and Go here (or double-click it) to put the branches back as it left them; uncommitted changes are kept.",
+            "An entry's old branch tips come back with Put … back, or as a new branch with New branch there, even after git gc: they are kept under refs/gitcraft/undo/.",
+            "Forget… drops the older entries; the oldest go by themselves past 300.",
+        ],
+    ),
+    (
         "Branches, remotes and more",
         &[
             "Left pane: local branches with ahead / behind counts, remotes, worktrees, submodules, stashes, pull requests and tags.",
@@ -110,7 +120,8 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("F7 / Shift+F7", "Next / previous change in a diff"),
             ("Alt+↓ / Alt+↑", "Next / previous change in a diff"),
             ("Cmd+Z", "Undo"),
-            ("Cmd+Y / Cmd+Shift+Z", "Redo"),
+            ("Cmd+Y", "Redo"),
+            ("Cmd+Shift+Z", "Timeline and undo tree"),
         ],
     ),
     (

@@ -1,6 +1,7 @@
 //! For the tests that drive the window: actions a user takes, made from what a tab shows.
 
 use super::file_view::FileTab;
+use super::timeline::view::TimelineAct;
 use super::{Action, Dialog, DiffKey, DiffView, RepoTab, diff};
 
 impl RepoTab {
@@ -65,6 +66,10 @@ impl RepoTab {
                 }
                 acts.push(Action::RunRebase);
                 acts.push(Action::StashPush("sample".to_owned()));
+                // The timeline, an entry picked and a jump asked about (not made).
+                acts.push(Action::ToggleTimeline);
+                acts.push(Action::Timeline(TimelineAct::Select(self.timeline.current)));
+                acts.push(Action::Timeline(TimelineAct::AskJump(None)));
             }
         }
         acts

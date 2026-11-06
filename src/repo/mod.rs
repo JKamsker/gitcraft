@@ -39,6 +39,7 @@ mod state;
 mod terminals;
 #[cfg(test)]
 mod tests;
+mod timeline;
 mod toolbar;
 mod watch;
 mod watch_remote;
@@ -186,8 +187,12 @@ pub struct RepoTab {
     /// A commit to select once enough history is loaded (search results, links).
     pending_goto: Option<String>,
 
-    undo_stack: Vec<UndoEntry>,
-    redo_stack: Vec<UndoEntry>,
+    /// Every operation and change seen, kept across restarts; undo and redo walk it.
+    timeline: timeline::Timeline,
+    /// The timeline (undo tree) shown in the big area.
+    timeline_view: Option<timeline::view::TimelineView>,
+    /// Why the timeline isn't kept on disk, or what it couldn't do.
+    timeline_error: Option<String>,
 
     busy_op: Option<String>,
     op_started: Option<Instant>,
@@ -330,8 +335,9 @@ impl RepoTab {
             dialog: None,
             search: Search::default(),
             pending_goto: None,
-            undo_stack: Vec::new(),
-            redo_stack: Vec::new(),
+            timeline: Default::default(),
+            timeline_view: None,
+            timeline_error: None,
             busy_op: None,
             op_started: None,
             update_submodules: false,
@@ -362,6 +368,7 @@ impl RepoTab {
             finished: Vec::new(),
         };
         tab.watch(ctx);
+        tab.load_timeline(ctx);
         tab
     }
 

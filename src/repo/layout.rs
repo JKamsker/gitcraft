@@ -48,6 +48,8 @@ impl RepoTab {
                     self.conflict_view(ui, &mut acts);
                 } else if self.rebase.is_some() {
                     self.rebase_view(ui, &mut acts);
+                } else if self.timeline_view.is_some() {
+                    self.timeline_view_ui(ui, &mut acts);
                 } else if self.diff.is_some() && !self.history_beside_diff() {
                     self.diff_view(ui, &mut acts);
                 } else if self.file_view.is_some() {
@@ -104,22 +106,25 @@ impl RepoTab {
         });
     }
 
-    /// Escape closes the innermost view; Ctrl+Z / Ctrl+Y undo and redo, Ctrl+F searches, F7 and
+    /// Escape closes the innermost view; Ctrl+Z / Ctrl+Y undo and redo, Ctrl+Shift+Z shows the
+    /// undo tree, Ctrl+F searches, F7 and
     /// Shift+F7 (or Alt+↓ / Alt+↑) go to the next and previous change of a diff.
     fn shortcuts(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         let free_keys =
             self.dialog.is_none() && !self.keys_blocked && !ctx.egui_wants_keyboard_input();
         if free_keys {
-            let (esc, undo, redo, find) = ctx.input(|i| {
+            let (esc, undo, redo, tree, find) = ctx.input(|i| {
                 (
                     i.key_pressed(Key::Escape),
                     i.modifiers.command && !i.modifiers.shift && i.key_pressed(Key::Z),
-                    i.modifiers.command
-                        && (i.key_pressed(Key::Y) || (i.modifiers.shift && i.key_pressed(Key::Z))),
+                    i.modifiers.command && i.key_pressed(Key::Y),
+                    i.modifiers.command && i.modifiers.shift && i.key_pressed(Key::Z),
                     i.modifiers.command && i.key_pressed(Key::F),
                 )
             });
-            if esc && self.diff.is_some() && self.line_comment_open() {
+            if esc && self.timeline_view.is_some() && self.rebase.is_none() {
+                acts.push(Action::ToggleTimeline);
+            } else if esc && self.diff.is_some() && self.line_comment_open() {
                 acts.push(Action::Pr(pr_review::PrAct::CloseLine));
             } else if esc && self.diff.is_some() {
                 acts.push(Action::CloseDiff);
@@ -146,6 +151,9 @@ impl RepoTab {
             }
             if redo {
                 acts.push(Action::Redo);
+            }
+            if tree {
+                acts.push(Action::ToggleTimeline);
             }
             if find {
                 self.search.open = true;
