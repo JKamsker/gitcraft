@@ -9,7 +9,9 @@ use egui::{Align, Layout, Margin, RichText, Stroke, Ui, vec2};
 use crate::theme::{self, Tokens};
 
 /// Width of the column of setting names, the same in every card so their controls line up.
-pub(super) const LABEL_WIDTH: f32 = 190.0;
+const LABEL_WIDTH: f32 = 190.0;
+/// Rows narrower than this put the setting's name above its controls.
+const STACK_BELOW: f32 = 440.0;
 /// Room around a row's content.
 const ROW_MARGIN: Margin = Margin::symmetric(16, 11);
 
@@ -164,21 +166,31 @@ impl Card<'_> {
         let t = self.t;
         let found_by = [label, hint.unwrap_or_default(), keywords];
         self.full_with(&found_by, |ui| {
+            let name = |ui: &mut Ui| {
+                ui.label(RichText::new(label).color(t.text));
+                if let Some(hint) = hint {
+                    ui.spacing_mut().item_spacing.y = 2.0;
+                    ui.label(RichText::new(hint).color(t.text_faint).small());
+                }
+            };
+            // Too narrow for the names' column (a small window, a large zoom): the name goes
+            // above its controls.
+            if ui.available_width() < STACK_BELOW {
+                ui.vertical(|ui| {
+                    ui.scope(name);
+                    ui.add_space(4.0);
+                    add(ui);
+                });
+                return;
+            }
+            let width = label_width(ui);
             ui.horizontal_top(|ui| {
-                ui.allocate_ui_with_layout(
-                    vec2(LABEL_WIDTH, 0.0),
-                    Layout::top_down(Align::Min),
-                    |ui| {
-                        ui.set_width(LABEL_WIDTH);
-                        // Level with the text of a control of the usual height.
-                        ui.add_space(4.0);
-                        ui.label(RichText::new(label).color(t.text));
-                        if let Some(hint) = hint {
-                            ui.spacing_mut().item_spacing.y = 2.0;
-                            ui.label(RichText::new(hint).color(t.text_faint).small());
-                        }
-                    },
-                );
+                ui.allocate_ui_with_layout(vec2(width, 0.0), Layout::top_down(Align::Min), |ui| {
+                    ui.set_width(width);
+                    // Level with the text of a control of the usual height.
+                    ui.add_space(4.0);
+                    name(ui);
+                });
                 ui.vertical(add);
             });
         });
@@ -218,6 +230,16 @@ impl Card<'_> {
                 add(ui);
             });
     }
+}
+
+/// Width of the names' column in a row of `ui`: less in a narrow card.
+pub(super) fn label_width(ui: &Ui) -> f32 {
+    LABEL_WIDTH.min(ui.available_width() * 0.36)
+}
+
+/// `width`, or less when `ui` has less room.
+pub(super) fn fit(ui: &Ui, width: f32) -> f32 {
+    width.min(ui.available_width()).max(60.0)
 }
 
 /// Faint text beside or under a control: what a value means, or what was found.

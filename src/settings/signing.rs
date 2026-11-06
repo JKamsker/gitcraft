@@ -196,7 +196,7 @@ pub(super) fn signing_ui(ui: &mut Ui, filter: &Filter) {
                     .find(|(value, _)| *value == form.edit.format())
                     .map_or(form.edit.format(), |(_, label)| label);
                 egui::ComboBox::from_id_salt("settings-signing-format")
-                    .width(super::COMBO_WIDTH)
+                    .width(super::layout::fit(ui, super::COMBO_WIDTH))
                     .selected_text(shown)
                     .show_ui(ui, |ui| {
                         for (value, label) in FORMATS {
@@ -229,7 +229,7 @@ pub(super) fn signing_ui(ui: &mut Ui, filter: &Filter) {
                         .add(
                             super::layout::field(&mut form.edit.key)
                                 .hint_text(key_hint)
-                                .desired_width(super::FIELD_WIDTH),
+                                .desired_width(super::layout::fit(ui, super::FIELD_WIDTH)),
                         )
                         .on_hover_text(
                             "user.signingkey; empty lets git pick one from your identity",
@@ -247,7 +247,7 @@ pub(super) fn signing_ui(ui: &mut Ui, filter: &Filter) {
                         .add(
                             super::layout::field(&mut form.edit.program)
                                 .hint_text(program_hint)
-                                .desired_width(super::FIELD_WIDTH),
+                                .desired_width(super::layout::fit(ui, super::FIELD_WIDTH)),
                         )
                         .on_hover_text(format!(
                             "{}; empty runs {program_hint} from the PATH",
