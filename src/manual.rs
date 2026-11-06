@@ -55,7 +55,9 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Profiles (title bar, or Settings → Profile): each has its own tabs, recent repositories, theme, git author and commit signing. A repository's own git config (user.name, user.email, signing) still wins over the profile's.",
             "Settings → Commit signing sets the format, key and program git signs with, and whether it signs commits and tags by default, in your global git config; Settings → Profile can sign just for the profile instead.",
             "Double-click a commit's message in the right pane to edit it (any commit of the checked-out branch with no merges after it).",
-            "Undo and redo commits, merges, rebases, resets, checkouts, branches, tags and stashes.",
+            "Stash (toolbar, or the palette) everything, the files picked, only what is staged, or a Snapshot: a stash of every change that leaves the files and the staging as they are. A message and untracked files are up to you.",
+            "Ctrl+click files in the changes to pick them for stashing (or right-click one: Stash this file…); the bar over the list stashes those picked. A staged rename or deletion can't be stashed by file: unstage it first, or stash what is staged.",
+            "Undo and redo commits, merges, rebases, resets, checkouts, branches, tags and stashes. Undoing a stash puts its changes back (a snapshot's stash just goes, the files never moved).",
         ],
     ),
     (
@@ -107,6 +109,7 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
                 "Click / Shift+click",
                 "Pick lines in a diff, or a range of them",
             ),
+            ("Cmd+click a file", "Pick it to stash (or unpick it)"),
             ("F7 / Shift+F7", "Next / previous change in a diff"),
             ("Alt+↓ / Alt+↑", "Next / previous change in a diff"),
             ("Cmd+Z", "Undo"),

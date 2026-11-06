@@ -90,7 +90,9 @@ impl RepoTab {
             Action::LoadMore => self.load_more(ctx),
             Action::Undo => self.undo(ctx),
             Action::Redo => self.redo(ctx),
-            Action::StashPush(message) => self.stash_push(&message, ctx),
+            Action::Stash(request) => self.stash(request, ctx),
+            Action::PickToStash(path) => self.stash_picks.toggle(&path),
+            Action::ClearStashPicks => self.stash_picks.picked.clear(),
             Action::OpenTab(path) => self.open_request = Some(OpenRequest::NewTab(path)),
             Action::OpenWorktree(path) => self.open_request = Some(OpenRequest::Worktree(path)),
             Action::ToggleBranches => {

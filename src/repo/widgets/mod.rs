@@ -8,7 +8,7 @@ use egui::{Align2, Color32, CornerRadius, Rect, Response, Sense, Ui, pos2, vec2}
 
 use crate::theme::{self, Tokens};
 
-pub use file_menu::file_menu;
+pub use file_menu::{file_menu, file_menu_with};
 pub use file_row::{RowExtra, file_row};
 pub use terminal_tabs::terminal_tabs;
 

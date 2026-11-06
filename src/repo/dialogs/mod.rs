@@ -3,6 +3,7 @@
 mod branch;
 mod confirm;
 mod remote;
+mod stash;
 mod upstream;
 mod worktree;
 
@@ -10,6 +11,7 @@ use std::path::{Path, PathBuf};
 
 use egui::{Key, RichText};
 
+pub use self::stash::Choice as StashChoice;
 use super::widgets;
 use super::{Action, Refresh, RepoTab, Undo};
 use crate::theme::{self, Tokens};
@@ -51,10 +53,7 @@ pub enum Dialog {
         refresh: Refresh,
         undo: Undo,
     },
-    Stash {
-        message: String,
-        focus: bool,
-    },
+    Stash(stash::StashDialog),
     Tag {
         at: String,
         at_label: String,
@@ -153,11 +152,19 @@ impl Dialog {
         }
     }
 
+    /// Stash everything (or the files picked in the changes, when there are some).
     pub fn stash() -> Self {
-        Dialog::Stash {
-            message: String::new(),
-            focus: true,
-        }
+        Self::stash_as(StashChoice::Everything)
+    }
+
+    /// The stash dialog with `choice` chosen.
+    pub fn stash_as(choice: StashChoice) -> Self {
+        Dialog::Stash(stash::StashDialog::new(choice, Vec::new()))
+    }
+
+    /// The stash dialog for just `files`.
+    pub fn stash_files(files: Vec<String>) -> Self {
+        Dialog::Stash(stash::StashDialog::new(StashChoice::Files, files))
     }
 
     pub fn tag(at: &str, at_label: &str, remote: Option<String>) -> Self {
@@ -256,6 +263,10 @@ enum Outcome {
 
 impl RepoTab {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
+        if let Some(Dialog::Stash(d)) = &mut self.dialog {
+            d.seed(self.stash_picks.picked.iter().cloned());
+            self.check_staged_stash(ctx);
+        }
         let Some(dialog) = &mut self.dialog else {
             return;
         };
@@ -271,6 +282,8 @@ impl RepoTab {
             .backdrop_color(egui::Color32::from_black_alpha(110));
 
         let local = &self.refs.local;
+        let work = &self.work;
+        let staged_support = &self.stash_picks.staged;
         let worktrees = &self.worktrees;
         let remote_names: Vec<&str> = self.remotes.iter().map(|r| r.name.as_str()).collect();
         let remote_branches = &self.refs.remotes;
@@ -320,7 +333,7 @@ impl RepoTab {
                         focus,
                     )
                 }
-                Dialog::Stash { message, focus } => branch::stash(ui, enter, message, focus),
+                Dialog::Stash(d) => stash::stash(ui, enter, d, work, staged_support),
                 Dialog::Tag {
                     at,
                     at_label,

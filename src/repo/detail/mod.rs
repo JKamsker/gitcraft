@@ -5,6 +5,7 @@ mod changes;
 mod commit;
 mod commit_box;
 mod compare;
+mod stash_picks;
 
 pub(super) use all_files::AllFiles;
 

@@ -339,10 +339,10 @@ pub(super) fn run_steps_counted(
     // terminal since must not be undone along with this.
     let head_before =
         matches!(kind, OpKind::Normal(Undo::HeadMove { .. }, _)).then(|| git::head(path));
-    let pushes_stash = ops.first().is_some_and(|op| {
-        let stash = stash_push_args();
-        op.len() >= stash.len() && op.iter().zip(stash).all(|(a, b)| a == b)
-    });
+    // Any `git stash push`: of everything, of some files, of what is staged.
+    let pushes_stash = ops
+        .first()
+        .is_some_and(|op| op.len() >= 2 && op[0] == "stash" && op[1] == "push");
     let stash_before = pushes_stash.then(|| git::resolve(path, "refs/stash").ok());
     // Checked before anything runs, so a refused undo changes nothing.
     if let Err(e) = check_expected(path, ops) {
@@ -446,7 +446,7 @@ fn expected_symref(op: &[String]) -> Option<(&str, &str)> {
 }
 
 /// Whether `op` is a step that runs nothing, only checks.
-fn is_expectation(op: &[String]) -> bool {
+pub(super) fn is_expectation(op: &[String]) -> bool {
     expected_ref(op).is_some() || expected_symref(op).is_some()
 }
 
@@ -500,7 +500,7 @@ fn fill_expected(path: &Path, ops: &mut [Vec<String>]) {
     }
 }
 
-/// How the app stashes (and how `run_ops_ex` knows an operation for one).
+/// How the app stashes everything, untracked files included.
 pub(super) fn stash_push_args() -> [&'static str; 3] {
     ["stash", "push", "--include-untracked"]
 }
