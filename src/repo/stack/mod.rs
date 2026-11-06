@@ -61,6 +61,11 @@ pub(crate) struct Stacks {
 }
 
 impl Stacks {
+    /// The restack stopped in this worktree's rebase (not in another worktree's), if one is.
+    pub fn restack_here(&self) -> Option<&stack::restack::Pending> {
+        self.pending.as_ref().filter(|p| p.at.is_none())
+    }
+
     /// Whether one of its dialogs is open (the keys are left to it).
     pub fn modal_open(&self) -> bool {
         self.dialog.is_some() || self.preview.is_some()

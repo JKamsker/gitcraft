@@ -302,3 +302,100 @@ fn a_restack_stopped_on_conflicts_continues_or_aborts_from_the_tab() -> Result<(
     }
     Ok(())
 }
+
+/// The interactive rebase of a stack's top with Update dependent branches: one undo puts the
+/// layers it moved back too, and redo moves them again.
+#[test]
+fn undoing_a_rebase_that_updated_dependent_branches_puts_them_back() -> Result<(), String> {
+    let repo = TestRepo::new("tab update refs undo")?;
+    repo.stack(&["schema", "api", "ui"])?;
+    repo.commit("m2.txt", "2\n", "main moves on")?;
+    repo.checkout("ui")?;
+    let before = (repo.tip("schema")?, repo.tip("api")?, repo.tip("ui")?);
+    let ctx = egui::Context::default();
+    let mut tab = open(&repo, &ctx)?;
+    let commits = crate::git::rebase_commits(repo.path(), "main")?;
+    let mut editor = crate::repo::rebase::RebaseEditor::new("main".into(), "main".into(), commits);
+    editor.update_refs = true;
+    tab.rebase = Some(editor);
+    tab.apply(Action::RunRebase, &ctx);
+    settle(&mut tab, &ctx, |t| t.rebase.is_none() && t.status.is_some())?;
+    assert!(is_ancestor(&repo, "main", "schema") && is_ancestor(&repo, "main", "api"));
+    let tips = || -> Result<(String, String, String), String> {
+        Ok((repo.tip("schema")?, repo.tip("api")?, repo.tip("ui")?))
+    };
+    tab.apply(Action::Undo, &ctx);
+    settle(&mut tab, &ctx, |t| {
+        t.status.as_ref().is_some_and(|s| s.0.starts_with("Undo"))
+    })?;
+    assert_eq!(tips()?, before, "{:?}", tab.status);
+    tab.apply(Action::Redo, &ctx);
+    settle(&mut tab, &ctx, |t| {
+        t.status.as_ref().is_some_and(|s| s.0.starts_with("Redo"))
+    })?;
+    assert!(is_ancestor(&repo, "main", "schema") && is_ancestor(&repo, "schema", "ui"));
+    assert_eq!(repo.git(&["symbolic-ref", "--short", "HEAD"])?.trim(), "ui");
+    // And undone again, after the redo.
+    tab.apply(Action::Undo, &ctx);
+    settle(&mut tab, &ctx, |t| {
+        t.status.as_ref().is_some_and(|s| s.0.starts_with("Undo"))
+    })?;
+    assert_eq!(tips()?, before, "{:?}", tab.status);
+    Ok(())
+}
+
+/// Undoing a restack refuses when the worktree a layer was checked out in has another branch
+/// checked out since: resetting there would move that branch instead.
+#[test]
+fn undo_refuses_once_a_layers_worktree_switched_branch() -> Result<(), String> {
+    use crate::git::stack::restack::{Moved, Place};
+    let repo = TestRepo::new("undo wt switched")?;
+    repo.stack(&["api"])?;
+    repo.git(&["branch", "other", "main"])?;
+    let wt = repo.dir.with_file_name(format!(
+        "{} switched wt",
+        repo.dir
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    ));
+    let _ = std::fs::remove_dir_all(&wt);
+    repo.git(&["worktree", "add", "-q", &wt.to_string_lossy(), "api"])?;
+    let result = (|| -> Result<(), String> {
+        let api = repo.tip("api")?;
+        let moved = [Moved {
+            branch: "api".into(),
+            before: repo.tip("main")?,
+            after: api.clone(),
+            base_before: None,
+            base_after: repo.tip("main")?,
+            place: Place::Worktree(wt.clone()),
+        }];
+        let (undo, _) = super::restack::undo_steps(&moved);
+        crate::git::run(Some(&wt), &["checkout", "-q", "other"])?;
+        let other = repo.tip("other")?;
+        let (result, _) = crate::repo::operations::run_steps(
+            repo.path(),
+            &undo,
+            crate::repo::OpKind::plain(),
+            None,
+        );
+        let err = result.err().unwrap_or_default();
+        assert!(err.contains("in the worktree at"), "{err}");
+        assert_eq!((repo.tip("api")?, repo.tip("other")?), (api, other));
+        // Back on api there, it goes through.
+        crate::git::run(Some(&wt), &["checkout", "-q", "api"])?;
+        let (result, _) = crate::repo::operations::run_steps(
+            repo.path(),
+            &undo,
+            crate::repo::OpKind::plain(),
+            None,
+        );
+        result?;
+        assert_eq!(repo.tip("api")?, repo.tip("main")?);
+        Ok(())
+    })();
+    let _ = repo.git(&["worktree", "remove", "--force", &wt.to_string_lossy()]);
+    let _ = std::fs::remove_dir_all(&wt);
+    result
+}

@@ -12,6 +12,9 @@ use crate::git::RebaseCommit;
 use crate::icons;
 use crate::theme::{self, Tokens};
 
+/// A rebase's command, and the branches it moves along: (their commit now, the ref).
+pub(crate) type Moving = (Vec<String>, Vec<(String, String)>);
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Step {
     Pick,
@@ -152,6 +155,12 @@ impl RebaseEditor {
     /// git command that runs the rebase with them. For a repository in WSL or over SSH, on
     /// that machine, where git reads them.
     pub fn command(&self, repo: &Path) -> Result<Vec<String>, String> {
+        self.command_with_refs(repo).map(|(command, _)| command)
+    }
+
+    /// [`Self::command`], and the branches Update dependent branches moves along: (their
+    /// commit now, `refs/heads/<branch>`).
+    pub fn command_with_refs(&self, repo: &Path) -> Result<Moving, String> {
         if let Some(target) = crate::remote::parse(repo) {
             return self.command_there(repo, &target);
         }
@@ -178,16 +187,12 @@ impl RebaseEditor {
             &refs,
         );
         let todo_file = write("todo.txt", &todo)?;
-        Ok(self.rebase_args(&sh_path(&todo_file)))
+        Ok((self.rebase_args(&sh_path(&todo_file)), refs))
     }
 
     /// [`Self::command`] for a repository on another machine: the files in a private folder
     /// there.
-    fn command_there(
-        &self,
-        repo: &Path,
-        target: &crate::remote::Target,
-    ) -> Result<Vec<String>, String> {
+    fn command_there(&self, repo: &Path, target: &crate::remote::Target) -> Result<Moving, String> {
         let write = |name: &str, text: &str| {
             crate::remote::host_temp_file(target, name, text.as_bytes())
                 .map_err(|e| format!("could not prepare the rebase: {e}"))
@@ -213,7 +218,7 @@ impl RebaseEditor {
             &refs,
         );
         let todo_file = write("rebase-todo.txt", &todo)?;
-        Ok(self.rebase_args(&crate::remote::sh_quote(&todo_file)))
+        Ok((self.rebase_args(&crate::remote::sh_quote(&todo_file)), refs))
     }
 
     /// The branches moved along with the commits, when Update dependent branches is ticked.
@@ -385,6 +390,18 @@ impl RepoTab {
                     .stroke(Stroke::new(1.0, t.separator)),
             )
             .show(ui, |ui| {
+                // An option of the rebase, above what starts it.
+                ui.add_enabled(
+                    !editor.starting,
+                    egui::Checkbox::new(&mut editor.update_refs, "Update dependent branches"),
+                )
+                .on_hover_text(
+                    "Move the branches on these commits along with them (git rebase \
+                     --update-refs, git 2.38+): the lower layers of a stack rebased from its \
+                     top. Branches checked out in other worktrees are left where they are; \
+                     Restack… in STACKS handles those. One Ctrl+Z puts every branch back.",
+                );
+                ui.add_space(4.0);
                 ui.horizontal(|ui| {
                     match &problem {
                         Some(p) => {
@@ -418,19 +435,6 @@ impl RepoTab {
                         if ui.button("Cancel").clicked() {
                             acts.push(Action::CloseRebase);
                         }
-                        ui.add_enabled(
-                            !editor.starting,
-                            egui::Checkbox::new(
-                                &mut editor.update_refs,
-                                "Update dependent branches",
-                            ),
-                        )
-                        .on_hover_text(
-                            "Move the branches on these commits along with them (git rebase \
-                             --update-refs, git 2.38+): the lower layers of a stack rebased from \
-                             its top. Branches checked out in other worktrees are left where they \
-                             are; Restack in STACKS handles those.",
-                        );
                     });
                 });
             });

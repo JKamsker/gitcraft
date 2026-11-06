@@ -9,7 +9,7 @@ use super::{Dialog, Msg, OpKind, PendingOp, Refresh, RepoTab, Undo, UndoEntry, o
 use crate::git;
 
 /// An operation that takes longer than this gets a notification when it ends.
-const LONG_OP: Duration = Duration::from_secs(4);
+pub(super) const LONG_OP: Duration = Duration::from_secs(4);
 
 impl RepoTab {
     /// Runs git commands one after another (stopping at the first failure), then refreshes.
@@ -429,6 +429,14 @@ pub(super) fn expect_symref(name: &str, target: &str) -> Vec<String> {
     vec![EXPECT_SYMREF.to_owned(), name.to_owned(), target.to_owned()]
 }
 
+/// [`expect_symref`] in another worktree of the repository: `dir` is its folder as git on the
+/// repository's machine knows it.
+pub(super) fn expect_symref_in(dir: &str, name: &str, target: &str) -> Vec<String> {
+    let mut step = expect_symref(name, target);
+    step.push(dir.to_owned());
+    step
+}
+
 /// The ref and the commit an `expect_ref` step expects.
 fn expected_ref(op: &[String]) -> Option<(&str, &str)> {
     match op {
@@ -437,10 +445,12 @@ fn expected_ref(op: &[String]) -> Option<(&str, &str)> {
     }
 }
 
-/// The symbolic ref and the ref it should point to of an `expect_symref` step.
-fn expected_symref(op: &[String]) -> Option<(&str, &str)> {
+/// The symbolic ref, the ref it should point to and the worktree (`None`: this one) of an
+/// `expect_symref` step.
+fn expected_symref(op: &[String]) -> Option<(&str, &str, Option<&str>)> {
     match op {
-        [mark, name, target] if mark == EXPECT_SYMREF => Some((name, target)),
+        [mark, name, target] if mark == EXPECT_SYMREF => Some((name, target, None)),
+        [mark, name, target, dir] if mark == EXPECT_SYMREF => Some((name, target, Some(dir))),
         _ => None,
     }
 }
@@ -451,10 +461,14 @@ fn is_expectation(op: &[String]) -> bool {
 }
 
 fn check_expected(path: &Path, ops: &[Vec<String>]) -> Result<(), String> {
-    for (name, target) in ops.iter().filter_map(|op| expected_symref(op)) {
+    for (name, target, dir) in ops.iter().filter_map(|op| expected_symref(op)) {
+        let mut args = Vec::new();
+        if let Some(dir) = dir {
+            args.extend(["-C", dir]);
+        }
+        args.extend(["symbolic-ref", "-q", name]);
         // Exit 1, nothing printed: detached.
-        let now = git::run_ok_codes(Some(path), &["symbolic-ref", "-q", name], &[0, 1])
-            .map(|s| s.trim().to_owned());
+        let now = git::run_ok_codes(Some(path), &args, &[0, 1]).map(|s| s.trim().to_owned());
         if now.as_deref() != Ok(target) {
             let says = |r: &str| {
                 if r.is_empty() {
@@ -464,8 +478,9 @@ fn check_expected(path: &Path, ops: &[Vec<String>]) -> Result<(), String> {
                 }
             };
             let now = now.map_or_else(|_| "something else".to_owned(), |r| says(&r));
+            let place = dir.map_or(String::new(), |d| format!(" in the worktree at {d}"));
             return Err(format!(
-                "{now} is checked out now, not {}: going ahead would change it instead",
+                "{now} is checked out{place} now, not {}: going ahead would change it instead",
                 says(target)
             ));
         }
