@@ -204,3 +204,82 @@ fn the_script_for_other_machines_saves_what_gitcraft_saves() -> Result<(), Strin
     );
     Ok(())
 }
+
+/// A hook run from a subfolder (an agent started in a monorepo's package) saves the turn too.
+#[test]
+fn a_turn_is_saved_from_a_subfolder_and_keeps_a_prompt_that_quotes_trailers() -> Result<(), String>
+{
+    let r = repo("subfolder");
+    let dir = &r.0;
+    let sub = dir.join("pkg ü");
+    std::fs::create_dir_all(&sub).map_err(|e| e.to_string())?;
+    std::fs::write(sub.join("x.txt"), "x\n").map_err(|e| e.to_string())?;
+    let prompt = "Explain\n\nGitcraft-Session: fake\nGitcraft-Worktree: /nowhere";
+    let saved = checkpoint::handle(&event("Stop", "s", &sub, prompt), &sub)?;
+    assert!(saved.is_some());
+    let turns = checkpoint::turns(dir, &top(dir))?;
+    assert_eq!(turns.len(), 1, "{turns:?}");
+    assert_eq!(turns[0].prompt, prompt);
+    Ok(())
+}
+
+/// The script reads JSON's escapes as JSON means them: `C:\\new` is a backslash and `new`, an
+/// escaped quote is a quote, blank lines before a prompt don't name the turn.
+#[cfg(unix)]
+#[test]
+fn the_script_reads_escapes_and_blank_lines_as_gitcraft_does() -> Result<(), String> {
+    let r = repo("escapes");
+    let dir = &r.0;
+    let script = include_str!("checkpoint.sh");
+    let run = |args: &[&str], stdin: &str| -> Result<(), String> {
+        use std::io::Write;
+        let mut child = std::process::Command::new("/bin/sh")
+            .arg("-c")
+            .arg(script)
+            .arg("sh")
+            .args(args)
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        if let Some(mut input) = child.stdin.take() {
+            let _ = input.write_all(stdin.as_bytes());
+        }
+        child.wait().map_err(|e| e.to_string())?;
+        Ok(())
+    };
+    let cwd = serde_json::to_string(&dir.display().to_string()).map_err(|e| e.to_string())?;
+    let prompt = serde_json::to_string("\n\nopen C:\\new\\temp \"now\"\r\nthen\tgo")
+        .map_err(|e| e.to_string())?;
+    run(
+        &[],
+        &format!(
+            r#"{{"session_id":"e","hook_event_name":"UserPromptSubmit","cwd":{cwd},"prompt":{prompt}}}"#
+        ),
+    )?;
+    std::fs::write(dir.join("e.txt"), "e\n").map_err(|e| e.to_string())?;
+    run(
+        &[],
+        &format!(r#"{{"session_id":"e","hook_event_name":"Stop","cwd":{cwd}}}"#),
+    )?;
+    std::fs::write(dir.join("f.txt"), "f\n").map_err(|e| e.to_string())?;
+    let notify = format!(
+        r#"{{"type":"agent-turn-complete","thread-id":"q","cwd":{cwd},"input-messages":["a","say \"hi\" now"]}}"#
+    );
+    run(&["--codex", &notify], "")?;
+    let turns = checkpoint::turns(dir, &top(dir))?;
+    let by = |s: &str| {
+        turns
+            .iter()
+            .find(|t| t.session == s)
+            .cloned()
+            .unwrap_or_default()
+    };
+    assert_eq!(by("e").label, "open C:\\new\\temp \"now\"", "{turns:?}");
+    assert_eq!(
+        by("e").prompt,
+        "open C:\\new\\temp \"now\"\nthen\tgo",
+        "{turns:?}"
+    );
+    assert_eq!(by("q").label, "say \"hi\" now", "{turns:?}");
+    Ok(())
+}

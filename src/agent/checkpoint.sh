@@ -5,11 +5,16 @@
 # agent: it always exits with 0.
 if [ "$1" = --codex ]; then gitcraft_json=$2; else gitcraft_json=$(cat); fi
 gitcraft_json=$(printf '%s' "$gitcraft_json" | tr '\n\r' '  ')
+# JSON's escapes undone, from left to right: `\\` first set aside (as \001), so `C:\\new`
+# stays `C:\new`; a \uXXXX is left as it is, but for a control character, dropped.
+gitcraft_unescape() {
+  sed 's/\\\\/\x01/g; s/\\u00[01][0-9a-fA-F]//g; s/\\n/\n/g; s/\\t/\t/g; s/\\r//g; s/\\"/"/g; s/\\\//\//g; s/\x01/\\/g'
+}
 # A string field of the JSON (its last one of that name), unescaped.
 gitcraft_field() {
   printf '%s' "$gitcraft_json" |
     sed -n 's/.*"'"$1"'"[[:space:]]*:[[:space:]]*"\(\([^"\\]\|\\.\)*\)".*/\1/p' | head -n 1 |
-    sed 's/\\n/\n/g; s/\\t/\t/g; s/\\"/"/g; s/\\\//\//g; s/\\\\/\\/g'
+    gitcraft_unescape
 }
 if [ "$1" = --codex ]; then
   gitcraft_event=$(gitcraft_field type)
@@ -18,8 +23,8 @@ if [ "$1" = --codex ]; then
   # The last of "input-messages".
   gitcraft_prompt=$(printf '%s' "$gitcraft_json" |
     sed -n 's/.*"input-messages"[[:space:]]*:[[:space:]]*\[\(\([^]"]\|"\([^"\\]\|\\.\)*"\)*\)\].*/\1/p' |
-    sed -n 's/.*"\(\([^"\\]\|\\.\)*\)"[[:space:]]*$/\1/p' |
-    sed 's/\\n/\n/g; s/\\t/\t/g; s/\\"/"/g; s/\\\//\//g; s/\\\\/\\/g')
+    grep -o '"\([^"\\]\|\\.\)*"' | tail -n 1 | sed 's/^"//; s/"$//' |
+    gitcraft_unescape)
 else
   gitcraft_event=$(gitcraft_field hook_event_name)
   gitcraft_session=$(gitcraft_field session_id)
@@ -66,7 +71,7 @@ else
   if gitcraft_head=$(git rev-parse -q --verify HEAD); then set -- -p "$gitcraft_head"; else set --; fi
 fi
 # The prompt without the spaces around it; its first line names the turn.
-gitcraft_prompt=$(printf '%s' "$gitcraft_prompt" | sed -e ':a' -e '/^[[:space:]]*$/{$d;N;ba' -e '}' | sed -e '1s/^[[:space:]]*//' -e '$s/[[:space:]]*$//')
+gitcraft_prompt=$(printf '%s\n' "$gitcraft_prompt" | sed '/[^[:space:]]/,$!d' | sed -e ':a' -e '/^[[:space:]]*$/{$d;N;ba' -e '}' | sed -e '1s/^[[:space:]]*//' -e '$s/[[:space:]]*$//')
 gitcraft_subject=$(printf '%s\n' "$gitcraft_prompt" | head -n 1 | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
 [ -n "$gitcraft_subject" ] || gitcraft_subject="Turn $gitcraft_n"
 gitcraft_msg=$(printf '%s\n\n%s\n\nGitcraft-Session: %s\nGitcraft-Worktree: %s\nGitcraft-Turn: %s' \

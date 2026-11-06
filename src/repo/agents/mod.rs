@@ -30,8 +30,11 @@ pub(crate) struct AgentsState {
     made: Option<Made>,
     /// The agent turns saved in this worktree (see [`crate::agent::checkpoint`]).
     pub(super) turns: Vec<crate::agent::checkpoint::Turn>,
-    /// What the turns were read for: (history read, working tree read).
-    turns_for: Option<(u64, u64)>,
+    /// The history read the turns were read for: saving a turn moves a ref, which reads the
+    /// history again.
+    turns_for: Option<u64>,
+    /// This worktree's top folder as git names it, which its turns are marked with.
+    turns_top: Option<String>,
     turns_reading: bool,
 }
 

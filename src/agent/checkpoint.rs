@@ -74,11 +74,14 @@ fn message(prompt: &str, session: &str, top: &str, n: u32) -> String {
 
 /// Saves the worktree at `worktree` as the next turn of `session`, labelled `prompt`. `None`
 /// when nothing changed since the session's last turn.
-pub(crate) fn save(worktree: &Path, session: &str, prompt: &str) -> Result<Option<String>, String> {
+pub(crate) fn save(cwd: &Path, session: &str, prompt: &str) -> Result<Option<String>, String> {
     let session = session_name(session);
-    let top = git::run(Some(worktree), &["rev-parse", "--show-toplevel"])?
+    let top = git::run(Some(cwd), &["rev-parse", "--show-toplevel"])?
         .trim_end_matches(['\n', '\r'])
         .to_owned();
+    // From the top folder: the agent may run in a subfolder, where the paths git prints (the
+    // temporary index's) are relative to it, but git reads them from the top.
+    let worktree = &crate::remote::resolve(cwd, &top);
     let tree = super::snapshot::take(worktree)?;
     let last = numbers(worktree, &session)?.into_iter().max();
     let (parent, n) = match last {
@@ -201,10 +204,10 @@ fn parse_record(record: &str, top: &str) -> Option<Turn> {
         return None;
     }
     let (label, body) = contents.split_once('\n').unwrap_or((contents, ""));
+    // At the trailers gitcraft wrote, the last ones: the prompt may say anything.
     let prompt = body
-        .split("\n\nGitcraft-Session: ")
-        .next()
-        .unwrap_or("")
+        .rsplit_once("\n\nGitcraft-Session: ")
+        .map_or(body, |(prompt, _)| prompt)
         .trim()
         .to_owned();
     Some(Turn {
@@ -307,11 +310,21 @@ pub(crate) fn handle(event: &HookEvent, worktree: &Path) -> Result<Option<String
 /// stdin, Codex's `notify` as the last argument. It never fails the agent: whatever goes wrong
 /// is said on stderr, and it exits with 0. `None` when the arguments are for another command.
 pub fn cli() -> Option<i32> {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    use std::io::IsTerminal;
+    // Never `args()`, which panics on a path that isn't UTF-8 (a folder to open).
+    let args: Vec<String> = std::env::args_os()
+        .skip(1)
+        .map(|a| a.to_string_lossy().into_owned())
+        .collect();
     if args.first().map(String::as_str) != Some("checkpoint") {
         return None;
     }
     let codex = args.iter().any(|a| a == "--codex");
+    // `gitcraft checkpoint` typed to open a folder of that name, not run by a hook (which gives
+    // its JSON on stdin, or `--codex`): the window opens it.
+    if !codex && (std::io::stdin().is_terminal() || Path::new("checkpoint").is_dir()) {
+        return None;
+    }
     let json = if codex {
         args.iter()
             .skip(1)
