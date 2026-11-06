@@ -188,6 +188,8 @@ pub(crate) enum Action {
     CloseCompare,
     /// Search commit messages, or what commits changed in files.
     SearchCode(bool),
+    /// Start, move on or stop a bisect, or run a command for it.
+    Bisect(super::bisect::BisectAct),
 }
 
 /// Compares two branches, given to git by their full refs (a tag of the same name is not
@@ -415,6 +417,7 @@ impl RepoTab {
                 Action::Dialog(Dialog::tag(&self.refs.head, "HEAD", self.default_remote())),
             ));
         }
+        items.extend(self.bisect_palette_items());
         for b in &self.refs.local {
             if !b.is_head {
                 items.push((

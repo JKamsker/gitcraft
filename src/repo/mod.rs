@@ -3,6 +3,7 @@
 
 mod actions;
 mod apply;
+mod bisect;
 mod branch_tree;
 mod branch_visibility;
 mod ci_status;
@@ -177,6 +178,8 @@ pub struct RepoTab {
     /// How many times a conflict editor was opened in the tab: the one open is the latest, and
     /// what is read in the background for an earlier one is not taken for it.
     conflict_generation: u64,
+    /// The bisect going on, and the output of `git bisect run`.
+    bisect: bisect::Bisecting,
 
     commit_summary: String,
     commit_body: String,
@@ -324,6 +327,7 @@ impl RepoTab {
             all_files: Default::default(),
             conflict: None,
             conflict_generation: 0,
+            bisect: Default::default(),
             commit_summary: String::new(),
             commit_body: String::new(),
             amend: false,

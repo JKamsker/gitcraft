@@ -1,5 +1,6 @@
 //! Modal dialogs: create a branch, confirm a destructive operation.
 
+mod bisect;
 mod branch;
 mod confirm;
 mod remote;
@@ -101,6 +102,18 @@ pub enum Dialog {
         title: String,
         body: String,
         draft: bool,
+        focus: bool,
+    },
+    /// Start a bisect from the commit `hash`, good or bad, with the other end `other`.
+    StartBisect {
+        hash: String,
+        this_good: bool,
+        other: String,
+        focus: bool,
+    },
+    /// `git bisect run` with the command typed.
+    BisectRun {
+        command: String,
         focus: bool,
     },
 }
@@ -238,6 +251,25 @@ impl Dialog {
         dialog
     }
 
+    /// Starts a bisect from `hash`: good with HEAD as the bad end, or bad with a good end to
+    /// pick.
+    pub fn start_bisect(hash: &str, this_good: bool) -> Self {
+        Dialog::StartBisect {
+            hash: hash.to_owned(),
+            this_good,
+            other: if this_good { "HEAD" } else { "" }.to_owned(),
+            focus: true,
+        }
+    }
+
+    /// Runs a command for the bisect, `last` (the one run before) offered.
+    pub fn bisect_run(last: &str) -> Self {
+        Dialog::BisectRun {
+            command: last.to_owned(),
+            focus: true,
+        }
+    }
+
     pub fn refresh(mut self, what: Refresh) -> Self {
         if let Dialog::Confirm { refresh, .. } = &mut self {
             *refresh = what;
@@ -256,6 +288,12 @@ enum Outcome {
 
 impl RepoTab {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
+        // What the bisect dialogs say.
+        let bisect_blocker = self.bisect_blocker();
+        let machine = match crate::remote::parse(&self.path) {
+            Some(target) => format!("on {}", target.host.label()),
+            None => "on this machine".to_owned(),
+        };
         let Some(dialog) = &mut self.dialog else {
             return;
         };
@@ -372,6 +410,23 @@ impl RepoTab {
                     draft,
                     focus,
                 } => remote::create_pr(ui, noun, branch, base, title, body, draft, focus),
+                Dialog::StartBisect {
+                    hash,
+                    this_good,
+                    other,
+                    focus,
+                } => bisect::start_bisect(
+                    ui,
+                    enter,
+                    hash,
+                    this_good,
+                    other,
+                    focus,
+                    bisect_blocker.as_deref(),
+                ),
+                Dialog::BisectRun { command, focus } => {
+                    bisect::bisect_run(ui, enter, &machine, command, focus)
+                }
                 Dialog::Confirm {
                     title,
                     body,

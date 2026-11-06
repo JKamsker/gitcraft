@@ -145,7 +145,7 @@ pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
 /// Stops the process `pid` on `host` (a command that hung, or the shell it hung in) and
 /// everything it started, however deep, in the background: politely, then for good. The
 /// processes are listed first, as one stopped leaves what it started to another parent.
-fn stop(host: Host, pid: u32) {
+pub fn stop(host: Host, pid: u32) {
     std::thread::spawn(move || {
         let _ = exec(
             &host,

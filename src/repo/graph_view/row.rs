@@ -85,6 +85,10 @@ impl RepoTab {
             is_match,
             self.is_compared(commit, is_wip),
         );
+        let resp = match self.bisect_mark(&painter, &t, rect, &commit.hash) {
+            Some(said) => resp.on_hover_text(said),
+            None => resp,
+        };
 
         let gx = rect.left() + cols.refs;
         let graph_row = self.graph.rows.get(i);
@@ -156,6 +160,38 @@ impl RepoTab {
                 x += pill(painter, pos2(x, mid), &format!("{n} {label}"), color) + 6.0;
             }
         }
+    }
+}
+
+impl RepoTab {
+    /// Tints the row of a commit the bisect going on marked (good, bad, skipped, or the first
+    /// bad one it found) and gives what it was marked, to show on hover.
+    fn bisect_mark(&self, painter: &Painter, t: &Tokens, rect: Rect, hash: &str) -> Option<String> {
+        let bisect = self.bisect.state()?;
+        let culprit = self.bisect.is_culprit(hash);
+        let mark = self.bisect.mark_of(hash);
+        let (color, said) = match (culprit, mark) {
+            (true, _) => (
+                t.danger,
+                "The first bad commit, as the bisect found".to_owned(),
+            ),
+            (false, Some(mark)) => {
+                let word = match mark {
+                    git::Mark::Skip => "skipped",
+                    _ => bisect.word(mark),
+                };
+                (
+                    crate::repo::bisect::mark_color(t, mark),
+                    format!("Marked {word} in the bisect"),
+                )
+            }
+            (false, None) => return None,
+        };
+        let band = rect.shrink2(vec2(0.0, ROW_GAP / 2.0));
+        let tint = if culprit { 0.16 } else { 0.08 };
+        painter.rect_filled(band, 0.0, color.gamma_multiply(tint));
+        painter.rect_filled(Rect::from_min_size(band.min, vec2(3.0, ROW_H)), 0.0, color);
+        Some(said)
     }
 }
 
