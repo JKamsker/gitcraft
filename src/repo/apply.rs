@@ -39,6 +39,7 @@ impl RepoTab {
                 self.open_pr(number, ctx);
                 if self.pr_requests != requests {
                     self.ci_view = None;
+                    self.doctor = None;
                 }
             }
             Action::OpenPrWorktree {
@@ -52,7 +53,13 @@ impl RepoTab {
             }
             Action::ReloadPr => self.load_pr(ctx),
             Action::Pr(act) => self.pr_act(act, ctx),
-            Action::OpenCi { sha, run } => self.open_ci(sha, run, ctx),
+            Action::OpenCi { sha, run } => {
+                self.open_ci(sha, run, ctx);
+                // Over the doctor, which then closes: the toolbar's wrench says what shows.
+                if self.ci_view.is_some() {
+                    self.doctor = None;
+                }
+            }
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),
             Action::OpenDoctor(section) => self.open_doctor(section, ctx),

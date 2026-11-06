@@ -79,7 +79,7 @@ pub const SETTINGS: &[Setting] = &[
     setting(
         "fetch.prune",
         "Pull and push",
-        "Whether fetch deletes remote branches that are gone on the remote.",
+        "Whether fetch deletes your remote-tracking branches (origin/…) whose branch is gone from the remote. Nothing on the remote is deleted.",
         BOOL,
     ),
     setting(
@@ -109,7 +109,7 @@ pub const SETTINGS: &[Setting] = &[
     setting(
         "gpg.format",
         "Signing",
-        "What signs: OpenPGP, SSH keys or X.509 certificates.",
+        "What commits and tags are signed with: OpenPGP, SSH keys or X.509 certificates.",
         &["openpgp", "ssh", "x509"],
     ),
     setting(
@@ -133,37 +133,37 @@ pub const SETTINGS: &[Setting] = &[
     setting(
         "core.autocrlf",
         "Line endings",
-        "Whether git turns CRLF into LF when it stores files, and back when it writes them out.",
+        "true: git turns CRLF into LF when it stores files, and back when it writes them out; input: only on the way in.",
         &["true", "input", "false"],
     ),
     setting(
         "core.eol",
         "Line endings",
-        "The line ending text files get in the working tree, when .gitattributes doesn't say.",
+        "The line ending text files get in the working tree, when .gitattributes doesn't say and core.autocrlf is false.",
         &["native", "lf", "crlf"],
     ),
     setting(
         "core.safecrlf",
         "Line endings",
-        "Whether git warns, or refuses, when converting line endings would change a file.",
+        "Whether git warns, or refuses, when converting line endings couldn't be reversed.",
         &["true", "warn", "false"],
     ),
     setting(
         "core.ignoreCase",
         "Files",
-        "Whether file names that differ only in case are the same file.",
+        "Whether file names that differ only in case are the same file. Git sets this itself from what the disk supports; change it only if that was wrong.",
         BOOL,
     ),
     setting(
         "core.fileMode",
         "Files",
-        "Whether a change of a file's executable bit counts as a change.",
+        "Whether a change of a file's executable bit counts as a change. Git sets this itself from what the disk supports.",
         BOOL,
     ),
     setting(
         "core.symlinks",
         "Files",
-        "Whether symbolic links are checked out as links or as small text files.",
+        "Whether symbolic links are checked out as links or as small text files. Git sets this itself from what the disk supports.",
         BOOL,
     ),
     setting(
@@ -388,7 +388,8 @@ pub fn set_args(scope: Scope, key: &str, value: &str) -> Result<Vec<String>, Str
     if value.contains(['\n', '\r', '\0']) {
         return Err("A value can't hold a line break".to_owned());
     }
-    Ok(["config", option, "--", key, value]
+    // A file that holds the key twice would refuse a plain set.
+    Ok(["config", option, "--replace-all", "--", key, value]
         .map(str::to_owned)
         .to_vec())
 }
@@ -405,6 +406,16 @@ pub fn unset_args(origin: &Origin) -> Result<Vec<String>, String> {
     Ok(["config", "--file", file, "--unset-all", "--", &origin.key]
         .map(|s| s.to_owned())
         .to_vec())
+}
+
+/// Whether `extensions.worktreeConfig` is on, so `--worktree` writes a file of the worktree's
+/// own (without it, git writes the repository's file, or refuses with several worktrees).
+pub fn worktree_config(repo: &Path) -> bool {
+    run(
+        Some(repo),
+        &["config", "--bool", "--get", "extensions.worktreeConfig"],
+    )
+    .is_ok_and(|v| v.trim() == "true")
 }
 
 /// What `key` is in each of `worktrees` (folders of the repository's worktrees): the value in
@@ -478,9 +489,16 @@ mod tests {
     fn writes_are_checked() {
         assert_eq!(
             set_args(Scope::Local, "pull.rebase", "true"),
-            Ok(["config", "--local", "--", "pull.rebase", "true"]
-                .map(str::to_owned)
-                .to_vec())
+            Ok([
+                "config",
+                "--local",
+                "--replace-all",
+                "--",
+                "pull.rebase",
+                "true"
+            ]
+            .map(str::to_owned)
+            .to_vec())
         );
         assert!(set_args(Scope::Command, "pull.rebase", "true").is_err());
         assert!(set_args(Scope::Local, "credential.helper", "store").is_err());

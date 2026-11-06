@@ -141,7 +141,7 @@ impl RepoTab {
             acts.push(Action::ToggleSearch);
         }
         let doctor = icons::tool_button(ui, "wrench", "", true)
-            .on_hover_text("Repository doctor: settings, hidden changes and more");
+            .on_hover_text("Repository doctor: which configuration wins, hidden changes");
         if self.doctor.is_some() {
             widgets::active_underline(ui, doctor.rect, t.accent);
         }

@@ -133,7 +133,7 @@ impl RepoTab {
                 acts.push(Action::CloseCi);
             } else if esc && self.pr_view.is_some() {
                 acts.push(Action::ClosePr);
-            } else if esc && self.doctor.is_some() {
+            } else if esc && self.doctor.as_ref().is_some_and(|d| !d.asking()) {
                 acts.push(Action::CloseDoctor);
             } else if esc && self.compare.is_some() {
                 acts.push(Action::CloseCompare);

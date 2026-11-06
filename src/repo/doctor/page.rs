@@ -33,7 +33,14 @@ impl RepoTab {
                 acts.push(Action::Doctor(DoctorAct::Reload));
             }
         });
-        let worktrees = self.worktrees.len();
+        // Those whose config can be read: not bare, not gone.
+        let worktrees = self
+            .worktrees
+            .iter()
+            .filter(|w| !w.bare && w.prunable.is_none())
+            .count();
+        let remote = crate::remote::is_remote(&self.path);
+        confirm_modal(ui, doctor, acts);
         ui.horizontal_top(|ui| {
             ui.add_space(20.0);
             ui.vertical(|ui| {
@@ -45,12 +52,12 @@ impl RepoTab {
                 .id_salt(("doctor", doctor.section as u8))
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
-                    let width = CONTENT_WIDTH.min(ui.available_width() - 16.0);
+                    let width = CONTENT_WIDTH.min(ui.available_width() - 16.0).max(240.0);
                     ui.vertical(|ui| {
                         ui.set_width(width);
                         ui.add_space(22.0);
                         title(ui, doctor.section.title());
-                        section_ui(ui, doctor, worktrees, busy, acts);
+                        section_ui(ui, doctor, worktrees, remote, busy, acts);
                         ui.add_space(40.0);
                     });
                 });
@@ -62,15 +69,50 @@ fn section_ui(
     ui: &mut Ui,
     doctor: &mut DoctorView,
     worktrees: usize,
+    remote: bool,
     busy: bool,
     acts: &mut Vec<Action>,
 ) {
     let locked = busy || doctor.waiting;
     match doctor.section {
         Section::Config => {
-            super::config_section::ui(ui, &mut doctor.config, worktrees, locked, acts)
+            let env = super::config_section::Env::new(worktrees, remote, locked);
+            super::config_section::ui(ui, &mut doctor.config, env, acts)
         }
         Section::Flags => super::flags_section::ui(ui, &mut doctor.flags, locked, acts),
+    }
+}
+
+/// The question asked before a change that can't be undone here.
+fn confirm_modal(ui: &mut Ui, doctor: &DoctorView, acts: &mut Vec<Action>) {
+    let Some(confirm) = &doctor.confirm else {
+        return;
+    };
+    let t = Tokens::get(ui.ctx());
+    let frame = egui::Frame::new()
+        .fill(t.card)
+        .stroke(Stroke::new(1.0, t.field_border))
+        .corner_radius(t.radius_lg)
+        .inner_margin(egui::Margin::same(18));
+    let resp = egui::Modal::new(egui::Id::new("doctor-confirm"))
+        .frame(frame)
+        .show(ui.ctx(), |ui| {
+            ui.set_width(420.0);
+            ui.label(RichText::new(&confirm.title).font(theme::semibold(15.0)));
+            ui.add_space(8.0);
+            ui.add(egui::Label::new(RichText::new(&confirm.body).color(t.text_dim)).wrap());
+            ui.add_space(14.0);
+            ui.horizontal(|ui| {
+                if widgets::primary_button(ui, &confirm.button, true, 90.0).clicked() {
+                    acts.push(Action::Doctor(DoctorAct::Answer(true)));
+                }
+                if ui.button("Cancel").clicked() {
+                    acts.push(Action::Doctor(DoctorAct::Answer(false)));
+                }
+            });
+        });
+    if resp.should_close() {
+        acts.push(Action::Doctor(DoctorAct::Answer(false)));
     }
 }
 

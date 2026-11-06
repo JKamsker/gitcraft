@@ -228,6 +228,76 @@ fn sparse_checkout_entries_are_not_manual_flags() -> Result<(), String> {
 }
 
 #[test]
+fn sparse_files_with_both_flags_and_quoted_folders() -> Result<(), String> {
+    let dir = repo(
+        "flags-sparse-both",
+        &[
+            ("top.txt", b"a\n"),
+            ("in é dir/a.txt", b"a\n"),
+            ("out/b.txt", b"b\n"),
+        ],
+    )?;
+    let result = (|| {
+        git(&dir, &["sparse-checkout", "set", "--cone", "in é dir"])?;
+        // assume-unchanged on top of sparse-checkout's skip-worktree.
+        git(
+            &dir,
+            &["update-index", "--assume-unchanged", "--", "out/b.txt"],
+        )?;
+        let (list, sparse) = flags::flagged(&dir)?;
+        // Read unquoted: the folder's files are checked out.
+        assert_eq!(sparse, Sparse::Cone(vec!["in é dir".to_owned()]));
+        let flag_of = |p: &str| list.iter().find(|f| f.path == p).map(|f| f.flag);
+        assert_eq!(flag_of("out/b.txt"), Some(Flag::AssumeOnSparse));
+        assert_eq!(flag_of("in é dir/a.txt"), None);
+        // Clearing it takes only assume-unchanged off: it stays left out, not deleted.
+        for op in flags::clear_ops(&list) {
+            git(&dir, &borrowed(&op))?;
+        }
+        let (after, _) = flags::flagged(&dir)?;
+        let b = after.iter().find(|f| f.path == "out/b.txt").map(|f| f.flag);
+        assert_eq!(b, Some(Flag::Sparse));
+        assert_eq!(git(&dir, &["status", "--porcelain"])?, "");
+
+        // Patterns instead of cone: every skip-worktree file is sparse-checkout's.
+        git(&dir, &["sparse-checkout", "set", "--no-cone", "/top.txt"])?;
+        let (list, sparse) = flags::flagged(&dir)?;
+        assert_eq!(sparse, Sparse::Patterns);
+        assert!(list.iter().all(|f| f.flag == Flag::Sparse), "{list:?}");
+        assert!(flags::clear_ops(&list).is_empty());
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}
+
+#[test]
+fn setting_a_key_a_file_holds_twice_replaces_both() -> Result<(), String> {
+    let dir = repo("config-twice", &[])?;
+    let result = (|| {
+        git(&dir, &["config", "--add", "pull.rebase", "true"])?;
+        git(&dir, &["config", "--add", "pull.rebase", "false"])?;
+        git(
+            &dir,
+            &borrowed(&config::set_args(Scope::Local, "pull.rebase", "merges")?),
+        )?;
+        let all = config::origins(&dir)?;
+        let local: Vec<_> = config::values_of(&all, "pull.rebase")
+            .into_iter()
+            .filter(|o| o.scope == Scope::Local)
+            .map(|o| o.shown_value().to_owned())
+            .collect();
+        assert_eq!(local, ["merges"]);
+        assert!(!config::worktree_config(&dir));
+        git(&dir, &["config", "extensions.worktreeConfig", "true"])?;
+        assert!(config::worktree_config(&dir));
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}
+
+#[test]
 fn a_folder_that_is_no_repository_says_so() {
     let dir = std::env::temp_dir().join(format!("gitcraft-doctor-none-{}", std::process::id()));
     let _ = std::fs::create_dir_all(&dir);

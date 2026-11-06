@@ -7,11 +7,12 @@ mod config_section;
 mod flags_section;
 mod page;
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use super::{Action, Refresh, RepoTab};
 use crate::git::doctor::config::{self, Origin, Scope};
-use crate::git::doctor::flags::{self, Flagged, Sparse};
+use crate::git::doctor::flags::{self, Flag, Flagged, Sparse};
 
 /// The doctor's sections, in the order they are listed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -47,8 +48,23 @@ pub(crate) enum DoctorAct {
         label: String,
         ops: Vec<Vec<String>>,
     },
+    /// Ask before running git commands that can't be undone here.
+    Confirm(Confirm),
+    /// The question asked was answered: run them (`true`) or not.
+    Answer(bool),
     /// Read what a setting is in every worktree of the repository.
     CompareWorktrees(&'static str),
+}
+
+/// A change the doctor asks about before making it.
+#[derive(Clone)]
+pub(crate) struct Confirm {
+    pub(crate) title: String,
+    pub(crate) body: String,
+    /// The button that makes it.
+    pub(crate) button: String,
+    pub(crate) label: String,
+    pub(crate) ops: Vec<Vec<String>>,
 }
 
 /// Something read in the background, `None` while it is read.
@@ -57,10 +73,25 @@ type Read<T> = Option<Result<T, String>>;
 /// What a setting is in each worktree: its folder, and the value in effect there.
 type InWorktrees = Vec<(PathBuf, Result<Option<Origin>, String>)>;
 
+/// The configuration as read.
+#[derive(Clone)]
+pub(crate) struct ConfigData {
+    pub(crate) origins: Vec<Origin>,
+    /// `extensions.worktreeConfig` is on: worktrees have files of their own.
+    pub(crate) worktree_config: bool,
+}
+
+/// The flagged files as read, split once as they come in.
+pub(crate) struct FlagsData {
+    pub(crate) manual: Vec<Flagged>,
+    pub(crate) left_out: Vec<Flagged>,
+    pub(crate) sparse: Sparse,
+}
+
 /// What the configuration section shows.
 #[derive(Default)]
 pub(crate) struct ConfigState {
-    origins: Read<Vec<Origin>>,
+    origins: Read<ConfigData>,
     /// The setting opened, by key.
     open: Option<&'static str>,
     /// Lists settings no file sets, too.
@@ -76,7 +107,7 @@ pub(crate) struct ConfigState {
 /// What the hidden-changes section shows.
 #[derive(Default)]
 pub(crate) struct FlagsState {
-    list: Read<(Vec<Flagged>, Sparse)>,
+    list: Read<FlagsData>,
     /// The manual flags ticked to be cleared, by path.
     ticked: std::collections::BTreeSet<String>,
 }
@@ -87,8 +118,17 @@ pub(crate) struct DoctorView {
     read: u64,
     /// An operation of the doctor's is running: read the section again once the tab is idle.
     waiting: bool,
+    /// The change being asked about.
+    confirm: Option<Confirm>,
     config: ConfigState,
     flags: FlagsState,
+}
+
+impl DoctorView {
+    /// A change is being asked about: Esc answers it rather than closing the doctor.
+    pub(crate) fn asking(&self) -> bool {
+        self.confirm.is_some()
+    }
 }
 
 impl RepoTab {
@@ -110,6 +150,7 @@ impl RepoTab {
                 section,
                 read: 0,
                 waiting: false,
+                confirm: None,
                 config: ConfigState::default(),
                 flags: FlagsState::default(),
             })
@@ -138,6 +179,23 @@ impl RepoTab {
                     },
                     ctx,
                 );
+            }
+            DoctorAct::Confirm(confirm) => {
+                if let Some(doctor) = &mut self.doctor {
+                    doctor.confirm = Some(confirm);
+                }
+            }
+            DoctorAct::Answer(yes) => {
+                let asked = self.doctor.as_mut().and_then(|d| d.confirm.take());
+                if let Some(c) = asked.filter(|_| yes) {
+                    self.doctor_act(
+                        DoctorAct::Run {
+                            label: c.label,
+                            ops: c.ops,
+                        },
+                        ctx,
+                    );
+                }
             }
             DoctorAct::CompareWorktrees(key) => self.compare_worktrees(key, ctx),
         }
@@ -171,7 +229,12 @@ impl RepoTab {
                 doctor.config.worktrees = None;
                 self.then(
                     ctx,
-                    move || config::origins(&path),
+                    move || {
+                        config::origins(&path).map(|origins| ConfigData {
+                            origins,
+                            worktree_config: config::worktree_config(&path),
+                        })
+                    },
                     move |tab, found, _| {
                         if let Some(d) = tab.doctor.as_mut().filter(|d| d.read == read) {
                             d.config.origins = Some(found);
@@ -183,12 +246,24 @@ impl RepoTab {
                 doctor.flags.list = None;
                 self.then(
                     ctx,
-                    move || flags::flagged(&path),
+                    move || {
+                        flags::flagged(&path).map(|(list, sparse)| {
+                            let (manual, left_out) =
+                                list.into_iter().partition(|f| f.flag != Flag::Sparse);
+                            FlagsData {
+                                manual,
+                                left_out,
+                                sparse,
+                            }
+                        })
+                    },
                     move |tab, found, _| {
                         if let Some(d) = tab.doctor.as_mut().filter(|d| d.read == read) {
                             // What was ticked and is no longer flagged is let go of.
-                            if let Ok((list, _)) = &found {
-                                d.flags.ticked.retain(|p| list.iter().any(|f| &f.path == p));
+                            if let Ok(data) = &found {
+                                let flagged: HashSet<&str> =
+                                    data.manual.iter().map(|f| f.path.as_str()).collect();
+                                d.flags.ticked.retain(|p| flagged.contains(p.as_str()));
                             }
                             d.flags.list = Some(found);
                         }
