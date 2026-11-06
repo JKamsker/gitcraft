@@ -41,9 +41,9 @@ pub(crate) struct GhostView {
     pub(crate) graph: Graph,
     pub(crate) index: HashMap<String, usize>,
     pub(crate) rows: Vec<RowGhost>,
-    /// The pills (by the name they show) drawn where the operation would put them.
+    /// The refs (full names) drawn where the operation would put them.
     pub(crate) moved: HashSet<String>,
-    /// The pills of refs it would delete, drawn struck out where they are.
+    /// The refs (full names) it would delete, drawn struck out where they are.
     pub(crate) gone: HashSet<String>,
     /// How many rows it adds above the first of the rows shown now.
     pub(crate) added: usize,
@@ -56,25 +56,22 @@ impl GhostView {
     }
 }
 
-/// The name a pill shows for the ref `full`, and the decorations `git log --format=%D` gives
-/// it (short and, with `log.decorate=full`, full).
-fn decorations(full: &str) -> (String, Vec<String>) {
+/// The decorations `git log --format=%D` gives the ref `full` (short and, with
+/// `log.decorate=full`, full).
+fn decorations(full: &str) -> Vec<String> {
     if let Some(name) = full.strip_prefix("refs/heads/") {
-        let forms = vec![
+        vec![
             name.to_owned(),
             full.to_owned(),
             format!("HEAD -> {name}"),
             format!("HEAD -> {full}"),
-        ];
-        (name.to_owned(), forms)
+        ]
     } else if let Some(name) = full.strip_prefix("refs/remotes/") {
-        let label = name.split_once('/').map_or(name, |(_, b)| b);
-        (label.to_owned(), vec![name.to_owned(), full.to_owned()])
+        vec![name.to_owned(), full.to_owned()]
     } else if let Some(name) = full.strip_prefix("refs/tags/") {
-        let forms = vec![format!("tag: {name}"), format!("tag: {full}")];
-        (name.to_owned(), forms)
+        vec![format!("tag: {name}"), format!("tag: {full}")]
     } else {
-        ("HEAD".to_owned(), vec![full.to_owned()])
+        vec![full.to_owned()]
     }
 }
 
@@ -102,11 +99,11 @@ pub(crate) fn build(rows: &[Arc<Commit>], outcome: &Outcome, head_ref: Option<&s
     let mut added: HashMap<&str, Vec<String>> = HashMap::new();
     let mut head_to = None;
     for m in &outcome.moves {
-        let (label, forms) = decorations(&m.full);
+        let forms = decorations(&m.full);
         let on_head = head_ref == Some(m.full.as_str()) || m.full == "HEAD";
         match (&m.from, &m.to) {
             (_, None) => {
-                view.gone.insert(label);
+                view.gone.insert(m.full.clone());
             }
             (from, Some(to)) => {
                 if let Some(from) = from {
@@ -116,7 +113,7 @@ pub(crate) fn build(rows: &[Arc<Commit>], outcome: &Outcome, head_ref: Option<&s
                     .entry(to.as_str())
                     .or_default()
                     .push(decoration_at(&m.full, on_head && m.full != "HEAD"));
-                view.moved.insert(label);
+                view.moved.insert(m.full.clone());
                 if on_head {
                     head_to = Some(to.clone());
                 }
@@ -274,7 +271,7 @@ mod tests {
             "{:?}",
             view.commits[3].refs
         );
-        assert!(view.moved.contains("feature"));
+        assert!(view.moved.contains("refs/heads/feature"));
         assert_eq!(view.added, 2);
         // The copies' lane comes into main's dot as a ghost lane; main's own lane is real.
         let main = &view.rows[2];
@@ -309,7 +306,7 @@ mod tests {
     }
 
     /// A deleted branch keeps its pill where it is, struck out; a remote one (`origin/x`) moved
-    /// by a force push shows as moved under its branch's name.
+    /// by a force push is marked by its own name, not the local branch's.
     #[test]
     fn deleted_and_remote_refs_are_marked() {
         let outcome = Outcome {
@@ -326,9 +323,10 @@ mod tests {
         let mut list = rows();
         list[2] = c("m1", &["base"], &["origin/feature"]);
         let view = build(&list, &outcome, Some("refs/heads/feature"));
-        assert!(view.gone.contains("main"));
+        assert!(view.gone.contains("refs/heads/main"));
         assert_eq!(view.commits[0].refs, ["main"]);
-        assert!(view.moved.contains("feature"));
+        assert!(view.moved.contains("refs/remotes/origin/feature"));
+        assert!(!view.moved.contains("refs/heads/feature"));
         assert_eq!(view.commits[1].refs, ["HEAD -> feature", "origin/feature"]);
         assert!(view.commits[2].refs.is_empty());
     }

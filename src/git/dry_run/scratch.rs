@@ -46,8 +46,9 @@ impl Scratch {
                 (dir, Removal::There(target, folder), dest)
             }
             None => {
+                sweep_stale();
                 let folder = std::env::temp_dir().join(format!(
-                    "gitcraft-ghost-run-{}-{}-{}",
+                    "{PREFIX}{}-{}-{}",
                     std::process::id(),
                     SEQ.fetch_add(1, Ordering::Relaxed),
                     super::super::now()
@@ -113,6 +114,31 @@ impl Drop for Scratch {
         }
     }
 }
+
+/// Removes the scratch clones a gitcraft that ended mid-way left in the temporary folder: those
+/// of other runs, older than a day.
+fn sweep_stale() {
+    let ours = format!("{PREFIX}{}-", std::process::id());
+    let day = std::time::Duration::from_secs(24 * 3600);
+    let Ok(entries) = std::fs::read_dir(std::env::temp_dir()) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let old = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.elapsed().ok())
+            .is_some_and(|age| age > day);
+        if name.starts_with(PREFIX) && !name.starts_with(&ours) && old {
+            remove_all(&entry.path());
+        }
+    }
+}
+
+/// How the scratch clones in the temporary folder are named.
+const PREFIX: &str = "gitcraft-ghost-run-";
 
 /// Removes `folder` and all in it. git makes its object files read-only, which Windows won't
 /// delete: they are made writable and the removal tried again.

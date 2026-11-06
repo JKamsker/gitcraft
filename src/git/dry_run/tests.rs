@@ -404,3 +404,23 @@ fn a_partial_clone_is_not_simulated() -> Result<(), String> {
     assert!(merged.is_err_and(|e| e.contains("partial clone")));
     Ok(())
 }
+
+/// An empty commit is replayed even when upstream has an empty commit too, as `git rebase`
+/// keeps it; a commit whose change upstream has is still left out.
+#[test]
+fn an_empty_commit_is_kept_as_git_rebase_keeps_it() -> Result<(), String> {
+    let repo = TestRepo::new("empty-kept")?;
+    let base = repo.commit(&[("a", "1\n")], "base")?;
+    repo.commit(&[], "main marker")?;
+    repo.commit(&[("x", "x\n")], "main adds x")?;
+    repo.git(&["switch", "-q", "-c", "feature", &base])?;
+    let marker = repo.commit(&[], "feature marker")?;
+    repo.commit(&[("x", "x\n")], "feature adds x too")?;
+    let last = repo.commit(&[("b", "b\n")], "feature adds b")?;
+    let picks = rebase_picks(&repo.dir, "main", "feature")?;
+    repo.git(&["rebase", "-q", "main"])?;
+    let kept = repo.git(&["rev-list", "--count", "main..feature"])?;
+    assert_eq!(picks, [marker, last]);
+    assert_eq!(kept.trim(), "2");
+    Ok(())
+}

@@ -40,7 +40,7 @@ impl RepoTab {
         let refs_clip = Rect::from_min_max(rect.min, pos2(gx - 4.0, rect.bottom()));
         let mut rp = painter.with_clip_rect(refs_clip);
         // In a ghost run: a pill where the operation would put it, or one it would delete.
-        let (moved, gone) = self.ghost.pill(&first.label);
+        let (moved, gone) = self.ghost.pill(&first.full_refs());
         if moved || gone {
             rp.multiply_opacity(if gone { 0.5 } else { 0.8 });
         }

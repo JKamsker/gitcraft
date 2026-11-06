@@ -108,6 +108,11 @@ struct Rewrite<'a> {
     onto: &'a str,
     base: &'a str,
     picks: Vec<String>,
+    /// An interactive rebase (a quick edit): it stops on a commit that becomes empty, where
+    /// a plain one drops it.
+    interactive: bool,
+    /// Other refs that move along (a pull's remote-tracking branch): (full name, from, to).
+    along: Vec<(String, String, String)>,
 }
 
 impl Ctx<'_> {
@@ -124,6 +129,20 @@ impl Ctx<'_> {
         let onto_oid = git::resolve(self.repo, onto)?;
         let head = branch.target.as_str();
         let mut out = Outcome::default();
+        // git looks at the working tree first, even when there is nothing to replay.
+        if self.facts.dirty {
+            if self.config_set("rebase.autoStash") {
+                out.notes.push(
+                    "Uncommitted changes are stashed first and put back after (rebase.autoStash)."
+                        .to_owned(),
+                );
+            } else {
+                out.refused = Some(
+                    "git rebase refuses to start with uncommitted changes: commit or stash them first"
+                        .to_owned(),
+                );
+            }
+        }
         if dry_run::is_ancestor(self.repo, &onto_oid, head) {
             out.notes
                 .push("Already up to date: nothing to replay, nothing changes.".to_owned());
@@ -132,18 +151,14 @@ impl Ctx<'_> {
         self.check()?;
         let tip = local_ref(&branch.name);
         let picks = dry_run::rebase_picks(self.repo, onto, &tip)?;
-        if self.facts.dirty {
-            out.refused = Some(
-                "git rebase refuses to start with uncommitted changes: commit or stash them first"
-                    .to_owned(),
-            );
-        }
         self.rewrite(
             &Rewrite {
                 branch,
                 onto: &onto_oid,
                 base: onto,
                 picks,
+                interactive: false,
+                along: Vec::new(),
             },
             &mut out,
         )?;
@@ -173,7 +188,8 @@ impl Ctx<'_> {
             &[moved, "HEAD".to_owned()],
         )?;
         self.check()?;
-        out.files = Some(git::diff_files(self.repo, &to, None)?);
+        // From the working tree to `to`: what the reset does to each file.
+        out.files = Some(reversed(git::diff_files(self.repo, &to, None)?));
         if self.facts.dirty {
             out.notes.push(
                 "Uncommitted changes to these files are thrown away, and can't be brought back."
@@ -212,6 +228,16 @@ impl Ctx<'_> {
         )?;
         out.created = fetched;
         self.check()?;
+        // What only the old remote-tracking branch had goes when the fetch moves it (a force
+        // push there); the paths below that move the branch too count again with it.
+        if new != tracking {
+            self.lose(
+                &mut out,
+                std::slice::from_ref(&tracking),
+                &[new.clone(), head.clone()],
+                &[tracking_ref(&up)],
+            )?;
+        }
         if dry_run::is_ancestor(self.repo, &new, &head) {
             out.notes
                 .push("Already up to date: the branch has everything its remote has.".to_owned());
@@ -226,6 +252,17 @@ impl Ctx<'_> {
             out.notes
                 .push("Fast-forward: the branch moves to its remote's commit.".to_owned());
             self.check()?;
+            let moved = [
+                local_ref(&branch.name),
+                "HEAD".to_owned(),
+                tracking_ref(&up),
+            ];
+            self.lose(
+                &mut out,
+                &[head.clone(), tracking.clone()],
+                std::slice::from_ref(&new),
+                &moved,
+            )?;
             out.files = Some(git::diff_files(self.repo, &head, Some(&new))?);
             return Ok(out);
         }
@@ -244,15 +281,17 @@ impl Ctx<'_> {
                         "Uncommitted changes are stashed first and put back after.".to_owned(),
                     );
                 }
-                let fork = self.fork_point(&up, &new, &head);
+                let base = self.pull_rebase_base(&up, &new, &head);
                 self.check()?;
-                let picks = dry_run::rebase_picks(self.repo, &fork, &local_ref(&branch.name))?;
+                let picks = dry_run::rebase_picks(self.repo, &base, &local_ref(&branch.name))?;
                 self.rewrite(
                     &Rewrite {
                         branch,
                         onto: &new,
-                        base: &fork,
+                        base: &base,
                         picks,
+                        interactive: false,
+                        along: vec![(tracking_ref(&up), tracking.clone(), new.clone())],
                     },
                     &mut out,
                 )?;
@@ -386,19 +425,42 @@ impl Ctx<'_> {
         .is_ok()
     }
 
-    /// Where `git pull --rebase` replays the branch's commits from: the fork point of HEAD
-    /// from the remote-tracking branch's history, else the merge base with `new`.
-    fn fork_point(&self, up: &Upstream<'_>, new: &str, head: &str) -> String {
-        let tracking = format!("refs/remotes/{}", up.tracking.name);
-        git::run(
+    /// The upstream `git pull --rebase` rebases from (`git rebase --onto new <it>`), as
+    /// git's pull works it out: the fork point of HEAD in the remote-tracking branch's history
+    /// (read before the fetch, as git does), unless that is just where HEAD and `new` meet
+    /// anyway, or there is none: then `new` itself, whose commits are compared with the
+    /// branch's to leave out those already upstream.
+    fn pull_rebase_base(&self, up: &Upstream<'_>, new: &str, head: &str) -> String {
+        let fork = git::run(
             Some(self.repo),
-            &["merge-base", "--fork-point", &tracking, head],
+            &["merge-base", "--fork-point", &tracking_ref(up), head],
         )
         .map(|s| s.trim().to_owned())
         .ok()
-        .filter(|s| !s.is_empty())
-        .or_else(|| git::merge_base(self.repo, new, head).ok())
-        .unwrap_or_else(|| new.to_owned())
+        .filter(|s| !s.is_empty());
+        let Some(fork) = fork else {
+            return new.to_owned();
+        };
+        let meet = git::run(
+            Some(self.repo),
+            &["merge-base", "--octopus", head, new, &fork],
+        )
+        .map(|s| s.trim().to_owned());
+        if meet.as_deref() == Ok(fork.as_str()) {
+            new.to_owned()
+        } else {
+            fork
+        }
+    }
+
+    /// Whether the git config `key` is set to anything but false.
+    fn config_set(&self, key: &str) -> bool {
+        git::run(Some(self.repo), &["config", "--get", key]).is_ok_and(|v| {
+            !matches!(
+                v.trim().to_ascii_lowercase().as_str(),
+                "" | "false" | "no" | "off" | "0"
+            )
+        })
     }
 
     fn force_push(&self, name: &str) -> Result<Outcome, String> {
@@ -468,10 +530,9 @@ impl Ctx<'_> {
         self.lose(&mut out, &old, &[], &moved)?;
         self.check()?;
         let head = self.facts.refs.head.as_str();
-        let merged = dry_run::is_ancestor(self.repo, &branch.target, head)
-            || up.as_ref().is_some_and(|u| {
-                dry_run::is_ancestor(self.repo, &branch.target, &u.tracking.target)
-            });
+        // As `git branch -d` decides: merged into its upstream when it has one, else HEAD.
+        let into = up.as_ref().map_or(head, |u| u.tracking.target.as_str());
+        let merged = dry_run::is_ancestor(self.repo, &branch.target, into);
         if !merged {
             out.notes.push(format!(
                 "{name} isn't merged: Delete refuses, and Force (-D) leaves its own commits on no branch."
@@ -515,10 +576,8 @@ impl Ctx<'_> {
         }
         let mut out = Outcome::default();
         if self.facts.dirty {
-            out.notes.push(
-                "Uncommitted changes: the rebase may refuse to start if they touch the same files."
-                    .to_owned(),
-            );
+            out.notes
+                .push("Uncommitted changes are stashed first and put back after.".to_owned());
         }
         self.rewrite(
             &Rewrite {
@@ -526,16 +585,25 @@ impl Ctx<'_> {
                 onto: &parent,
                 base: &hash,
                 picks,
+                interactive: true,
+                along: Vec::new(),
             },
             &mut out,
         )?;
         Ok(out)
     }
 
-    /// The commits of `w` replayed: the copies drawn, where it stops, the branch moved, what
-    /// it leaves behind and the files that change.
+    /// The commits of `w` replayed: the copies drawn, where it stops, the branch moved (and
+    /// with `rebase.updateRefs` the branches on its commits), what it leaves behind and the
+    /// files that change.
     fn rewrite(&self, w: &Rewrite<'_>, out: &mut Outcome) -> Result<(), String> {
         let tip = local_ref(&w.branch.name);
+        if self.config_set("rebase.rebaseMerges") && self.has_merges(w.base, &tip)? {
+            return Err(
+                "rebase.rebaseMerges is set and merges are among the commits: git keeps them, which the preview can't replay yet"
+                    .to_owned(),
+            );
+        }
         let replay = dry_run::replay(
             self.repo,
             w.onto,
@@ -545,13 +613,19 @@ impl Ctx<'_> {
             self.cancel,
         )?;
         out.engine = Some(replay.engine);
-        out.tree = replay.steps.last().map(|s| s.tree.clone());
         self.check()?;
         let originals = git::commits_of(self.repo, &w.picks)?;
         let find = |hash: &str| originals.iter().find(|c| c.hash == hash);
+        // An interactive rebase stops on a commit that becomes empty, asking what to do.
+        let emptied = w
+            .interactive
+            .then(|| replay.steps.iter().position(|s| s.copy.is_none()))
+            .flatten();
+        let steps = &replay.steps[..emptied.unwrap_or(replay.steps.len())];
+        out.tree = steps.last().map(|s| s.tree.clone());
         let mut parent = replay.onto.clone();
         let mut copies = Vec::new();
-        for step in &replay.steps {
+        for step in steps {
             let (Some(copy), Some(original)) = (&step.copy, find(&step.original)) else {
                 continue;
             };
@@ -567,7 +641,7 @@ impl Ctx<'_> {
         copies.reverse();
         copies.append(&mut out.created);
         out.created = copies;
-        let dropped = replay.steps.iter().filter(|s| s.copy.is_none()).count();
+        let dropped = steps.iter().filter(|s| s.copy.is_none()).count();
         if dropped > 0 {
             out.notes.push(format!(
                 "{dropped} commit{} dropped: {} already there.",
@@ -579,17 +653,24 @@ impl Ctx<'_> {
                 }
             ));
         }
-        if let Some(stop) = &replay.stop {
-            out.conflict = Some(Conflict {
-                step: stop.step + 1,
-                of: w.picks.len(),
-                commit: find(&stop.commit).cloned(),
-                files: stop.files.clone(),
-            });
-            out.notes.push(
+        let stop = match (&replay.stop, emptied) {
+            (_, Some(i)) => Some((i, replay.steps[i].original.clone(), Vec::new())),
+            (Some(stop), None) => Some((stop.step, stop.commit.clone(), stop.files.clone())),
+            (None, None) => None,
+        };
+        if let Some((step, commit, files)) = stop {
+            let why = if files.is_empty() {
+                "The rebase stops there, asking whether to keep the commit that became empty; the branch doesn't move yet."
+            } else {
                 "The rebase stops there until the conflicts are resolved; the branch doesn't move yet."
-                    .to_owned(),
-            );
+            };
+            out.conflict = Some(Conflict {
+                step: step + 1,
+                of: w.picks.len(),
+                commit: find(&commit).cloned(),
+                files,
+            });
+            out.notes.push(why.to_owned());
             return Ok(());
         }
         let head = w.branch.target.clone();
@@ -599,15 +680,30 @@ impl Ctx<'_> {
             from: Some(head.clone()),
             to: Some(new_tip.clone()),
         });
+        if self.config_set("rebase.updateRefs") {
+            out.moves.extend(self.updated_refs(w, &replay));
+        }
+        let mut old = vec![head.clone()];
+        let mut new = vec![replay.onto.clone()];
+        let mut moved = vec!["HEAD".to_owned()];
+        for m in &out.moves {
+            moved.push(m.full.clone());
+            old.extend(m.from.clone());
+            new.extend(m.to.clone().filter(|t| t.as_str() != new_tip.as_str()));
+        }
+        for (full, from, to) in &w.along {
+            moved.push(full.clone());
+            old.push(from.clone());
+            new.push(to.clone());
+        }
+        // Copies aren't in the repository when made in a scratch clone: their originals'
+        // parents (where they go) stand in, as `onto` does for the branch.
+        let known: Vec<String> = new.into_iter().filter(|h| self.has_commit(h)).collect();
+        old.retain(|h| self.has_commit(h));
+        old.dedup();
         self.check()?;
-        self.lose(
-            out,
-            std::slice::from_ref(&head),
-            std::slice::from_ref(&replay.onto),
-            &[tip, "HEAD".to_owned()],
-        )?;
-        let rewritten: HashSet<&str> = replay
-            .steps
+        self.lose(out, &old, &known, &moved)?;
+        let rewritten: HashSet<&str> = steps
             .iter()
             .filter(|s| s.copy.is_some())
             .map(|s| s.original.as_str())
@@ -629,6 +725,47 @@ impl Ctx<'_> {
         Ok(())
     }
 
+    /// Whether the commits from `base` to `tip` include a merge.
+    fn has_merges(&self, base: &str, tip: &str) -> Result<bool, String> {
+        let range = format!("{base}..{tip}");
+        let count = git::run(
+            Some(self.repo),
+            &[
+                "rev-list",
+                "--merges",
+                "--count",
+                "--end-of-options",
+                &range,
+            ],
+        )?;
+        Ok(count.trim() != "0")
+    }
+
+    /// With `rebase.updateRefs`: the other local branches on the rebased commits move to the
+    /// copies, as git moves them (one on a dropped commit to the copy before it).
+    fn updated_refs(&self, w: &Rewrite<'_>, replay: &dry_run::Replay) -> Vec<RefMove> {
+        let mut moves = Vec::new();
+        for b in &self.facts.refs.local {
+            if b.name == w.branch.name {
+                continue;
+            }
+            let Some(i) = replay.steps.iter().position(|s| s.original == b.target) else {
+                continue;
+            };
+            let to = replay.steps[..=i]
+                .iter()
+                .rev()
+                .find_map(|s| s.copy.clone())
+                .unwrap_or_else(|| replay.onto.clone());
+            moves.push(RefMove {
+                full: local_ref(&b.name),
+                from: Some(b.target.clone()),
+                to: Some(to),
+            });
+        }
+        moves
+    }
+
     /// Lists in `out` the commits left on no ref once `moved` go from `old` to `new`.
     fn lose(
         &self,
@@ -644,6 +781,36 @@ impl Ctx<'_> {
         out.vanish = listed.iter().cloned().collect();
         Ok(())
     }
+}
+
+/// The full name of `up`'s remote-tracking branch.
+fn tracking_ref(up: &Upstream<'_>) -> String {
+    format!("refs/remotes/{}", up.tracking.name)
+}
+
+/// `files` as they change going the other way: added ones deleted and the other way round,
+/// line counts swapped.
+fn reversed(files: Vec<ChangedFile>) -> Vec<ChangedFile> {
+    files
+        .into_iter()
+        .map(|f| {
+            let (path, old_path) = match (f.status, f.old_path) {
+                ('R', Some(old)) => (old, Some(f.path)),
+                (_, old) => (f.path, old),
+            };
+            ChangedFile {
+                status: match f.status {
+                    'A' => 'D',
+                    'D' => 'A',
+                    other => other,
+                },
+                path,
+                old_path,
+                added: f.removed,
+                removed: f.added,
+            }
+        })
+        .collect()
 }
 
 fn local_ref(name: &str) -> String {

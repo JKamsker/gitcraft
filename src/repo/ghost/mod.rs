@@ -125,9 +125,9 @@ impl Ghost {
         self.row(i).map(|r| r.kind).unwrap_or_default()
     }
 
-    /// Whether the pill named `label` is drawn where the operation would put it, and whether
-    /// it is one the operation deletes.
-    pub(crate) fn pill(&self, label: &str) -> (bool, bool) {
+    /// For a pill standing for the refs `refs` (full names): whether one of them is drawn
+    /// where the operation would put it, and whether the operation deletes them all.
+    pub(crate) fn pill(&self, refs: &[String]) -> (bool, bool) {
         let Some(view) = self
             .shown
             .as_ref()
@@ -136,7 +136,9 @@ impl Ghost {
         else {
             return (false, false);
         };
-        (view.moved.contains(label), view.gone.contains(label))
+        let moved = refs.iter().any(|r| view.moved.contains(r));
+        let gone = !refs.is_empty() && refs.iter().all(|r| view.gone.contains(r));
+        (moved, gone)
     }
 
     /// Puts the ghost graph in the place of the tab's rows (`commits`, `graph`, `index`) for
@@ -306,7 +308,7 @@ impl RepoTab {
         let facts = Facts {
             refs: self.refs.clone(),
             remotes: self.remotes.iter().map(|r| r.name.clone()).collect(),
-            dirty: !self.work.is_clean(),
+            dirty: op::tracked_changes(&self.work),
             credentials: self.credentials.clone(),
         };
         let rows = self.commits.clone();
