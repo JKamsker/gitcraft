@@ -285,7 +285,9 @@ fn renames_odd_names_config_and_modes_are_assembled_right() -> Result<(), String
     git_ok(repo, &["config", "diff.interHunkContext", "5"]);
     git_ok(repo, &["checkout", "-q", "-b", "odd", "main"]);
     git_ok(repo, &["mv", "c.txt", "moved.txt"]);
-    write(&repo.join(":memo"), "m\n");
+    // A name pathspec magic would misread: `:memo` (no `:` in names on Windows: `[x].txt`).
+    let odd_name = if cfg!(windows) { "[x].txt" } else { ":memo" };
+    write(&repo.join(odd_name), "m\n");
     write(&repo.join("run.sh"), "#!/bin/sh\necho hi\n");
     // Two changes three lines apart: one hunk each, whatever interHunkContext says.
     write(&repo.join("a.txt"), "ONE\n2\n3\n4\nFIVE\n");
@@ -307,7 +309,7 @@ fn renames_odd_names_config_and_modes_are_assembled_right() -> Result<(), String
     let status = |path: &str| odd.files.iter().find(|f| f.path == path).map(|f| f.status);
     assert_eq!(status("c.txt"), Some('D'), "a rename is the old file gone");
     assert_eq!(status("moved.txt"), Some('A'));
-    assert_eq!(status(":memo"), Some('A'));
+    assert_eq!(status(odd_name), Some('A'));
     let trees: Vec<String> = cmp.attempts.iter().map(|a| a.tree.clone()).collect();
     assert_eq!(file_hunks(repo, &cmp.base, &trees[1], "a.txt")?.len(), 2);
     let plan = Plan {
@@ -315,7 +317,7 @@ fn renames_odd_names_config_and_modes_are_assembled_right() -> Result<(), String
         trees,
         names: vec!["try-a".to_owned(), "odd".to_owned()],
         picks: vec![
-            (":memo".to_owned(), Take::File(1)),
+            (odd_name.to_owned(), Take::File(1)),
             ("moved.txt".to_owned(), Take::File(1)),
             ("c.txt".to_owned(), Take::Hunks(vec![(1, 0)])),
             ("run.sh".to_owned(), Take::Hunks(vec![(1, 0)])),
@@ -325,7 +327,7 @@ fn renames_odd_names_config_and_modes_are_assembled_right() -> Result<(), String
     };
     assemble(repo, &plan)?;
     let tree = git_ok(repo, &["ls-tree", "-r", "odd-best"]);
-    assert!(tree.contains("\t:memo\n"), "{tree}");
+    assert!(tree.contains(&format!("\t{odd_name}\n")), "{tree}");
     assert!(tree.contains("\tmoved.txt\n"), "{tree}");
     assert!(
         !tree.contains("\tc.txt\n"),
