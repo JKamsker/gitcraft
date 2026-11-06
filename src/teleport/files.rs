@@ -185,10 +185,15 @@ impl Upload {
                 .and_then(|()| file.flush())
                 .map_err(|e| format!("could not write {}: {e}", self.there));
         };
-        let out = sh(
+        // As long as a network operation may take: a piece over a slow link takes a while.
+        let out = remote::exec(
             &t.host,
-            format!("exec cat >> {}", sh_path(&t.path)),
-            Some(chunk.to_vec()),
+            &Request {
+                script: format!("exec cat >> {}", sh_path(&t.path)),
+                stdin: Some(chunk.to_vec()),
+                long: true,
+                ..Request::default()
+            },
         )?;
         match out.code {
             0 => Ok(()),
@@ -253,6 +258,20 @@ fn private_new_file(path: &Path) -> std::io::Result<std::fs::File> {
     options.open(path)
 }
 
+/// The home folder of `host`, as a path there.
+pub(super) fn home(host: &Host) -> Result<String, String> {
+    let out = sh(host, "printf '%s' \"$HOME\"".to_owned(), None)?;
+    let home = String::from_utf8_lossy(&out.stdout).into_owned();
+    if out.code != 0 || !home.starts_with('/') {
+        return Err(format!(
+            "could not find the home folder on {}: {}",
+            host.label(),
+            failure(&out)
+        ));
+    }
+    Ok(home.trim_end_matches('/').to_owned())
+}
+
 /// `path` with a `~` at its start (a path typed for another machine) made that machine's home
 /// folder: git there takes `~` for a name.
 pub(super) fn expand_home(path: &Path) -> Result<PathBuf, String> {
@@ -262,17 +281,8 @@ pub(super) fn expand_home(path: &Path) -> Result<PathBuf, String> {
     let Some(rest) = t.path.strip_prefix('~') else {
         return Ok(path.to_path_buf());
     };
-    let out = sh(&t.host, "printf '%s' \"$HOME\"".to_owned(), None)?;
-    let home = String::from_utf8_lossy(&out.stdout).into_owned();
-    if out.code != 0 || !home.starts_with('/') {
-        return Err(format!(
-            "could not find the home folder on {}: {}",
-            t.host.label(),
-            failure(&out)
-        ));
-    }
     Ok(remote::encode(
         &t.host,
-        &format!("{}{rest}", home.trim_end_matches('/')),
+        &format!("{}{rest}", home(&t.host)?),
     ))
 }
