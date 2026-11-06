@@ -42,17 +42,30 @@ pub struct Eol {
     pub attr: String,
 }
 
+/// A driver an attribute names that the configuration here doesn't define.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MissingDriver {
+    /// `merge`, `diff` or `filter`.
+    pub attr: String,
+    pub name: String,
+    /// A filter marked `filter.<name>.required`: git refuses to add or check the file out.
+    pub required: bool,
+}
+
 /// Everything the doctor says about one path.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Explained {
     pub path: String,
+    /// It is a folder: the rule decides for everything in it.
+    pub folder: bool,
+    /// Nothing of that name is in the working tree (the rules are read as for a file).
+    pub missing: bool,
     pub tracked: bool,
     /// The last rule that matches it, `None` when none does.
     pub rule: Option<Rule>,
     pub attrs: Vec<Attr>,
     pub eol: Option<Eol>,
-    /// Drivers an attribute names that the configuration doesn't define: (attribute, driver).
-    pub missing_drivers: Vec<(String, String)>,
+    pub missing_drivers: Vec<MissingDriver>,
 }
 
 impl Explained {
@@ -63,22 +76,25 @@ impl Explained {
     }
 }
 
-/// Explains `path` (relative to the repository's top, `/` between names).
-pub fn explain(repo: &Path, path: &str) -> Result<Explained, String> {
-    let path = clean_path(path)?;
+/// Explains `path` (as typed: relative to the repository's top, or absolute inside it).
+pub fn explain(repo: &Path, typed: &str) -> Result<Explained, String> {
+    let path = clean_path(typed, &crate::remote::git_path(repo))?;
     let rule = rule_for(repo, &path)?;
     let attrs = attributes(repo, &path)?;
-    let tracked = crate::git::is_tracked(repo, &path);
-    let eol = if tracked
-        || crate::remote::try_is_file(&crate::remote::join(repo, &path)).unwrap_or(false)
-    {
-        line_endings(repo, &path)?
+    let on_disk = crate::remote::join(repo, &path);
+    let folder = crate::remote::try_is_dir(&on_disk).unwrap_or(false);
+    let (tracked, eol) = if folder {
+        (false, None)
     } else {
-        None
+        let eol = line_endings(repo, &path)?;
+        (eol.as_ref().is_some_and(|e| !e.index.is_empty()), eol)
     };
+    let missing = !folder && eol.as_ref().is_none_or(|e| e.worktree.is_empty());
     let missing_drivers = missing_drivers(repo, &attrs);
     Ok(Explained {
         path,
+        folder,
+        missing,
         tracked,
         rule,
         attrs,
@@ -87,19 +103,32 @@ pub fn explain(repo: &Path, path: &str) -> Result<Explained, String> {
     })
 }
 
-/// A path as typed: trimmed of line ends, `\` as `/`, no leading `./` or `/`. A path with a line
-/// break, or empty, or outside the repository (`..`) is refused.
-pub fn clean_path(typed: &str) -> Result<String, String> {
+/// A path as typed: trimmed of line ends, `\` as `/`, no leading `./`; an absolute path inside
+/// the repository (whose top is `top`, as git names it) is made relative to it. Empty, `.`, a
+/// line break, `..`, or an absolute path elsewhere are refused.
+pub fn clean_path(typed: &str, top: &str) -> Result<String, String> {
     let trimmed = typed.trim_matches(['\n', '\r']);
     if trimmed.contains(['\n', '\r', '\0']) {
         return Err("A path can't hold a line break".to_owned());
     }
     let mut path = trimmed.replace('\\', "/");
-    while let Some(rest) = path.strip_prefix("./").or_else(|| path.strip_prefix('/')) {
+    let top = top.replace('\\', "/");
+    let top = top.trim_end_matches('/');
+    if !top.is_empty()
+        && let Some(rest) = path.strip_prefix(top).and_then(|r| r.strip_prefix('/'))
+    {
+        path = rest.to_owned();
+    } else if path.starts_with('/') || path.as_bytes().get(1) == Some(&b':') {
+        return Err(
+            "That path is outside the repository: type it from the repository's top".to_owned(),
+        );
+    }
+    while let Some(rest) = path.strip_prefix("./") {
         path = rest.to_owned();
     }
-    if path.trim().is_empty() {
-        return Err("Type the path of a file in the repository".to_owned());
+    let path = path.trim_end_matches('/').to_owned();
+    if path.trim().is_empty() || path == "." {
+        return Err("Type the path of a file or folder in the repository".to_owned());
     }
     if path.split('/').any(|part| part == "..") {
         return Err("The path must be inside the repository (no ..)".to_owned());
@@ -120,7 +149,9 @@ fn rule_for(repo: &Path, path: &str) -> Result<Option<Rule>, String> {
             "-n",
             "--no-index",
             "--",
-            path,
+            // `./` keeps a name starting with `:` from being read as pathspec magic (which
+            // check-ignore refuses to take literally).
+            &format!("./{path}"),
         ],
         &[0, 1],
     )
@@ -150,7 +181,8 @@ pub fn parse_check_ignore(line: &str) -> Option<Rule> {
             && bytes[end] == b':'
         {
             return Some(Rule {
-                source: head[..colon].to_owned(),
+                // Quoted by git when it holds a quote or a control character.
+                source: super::flags::unquote(&head[..colon]),
                 line: head[colon + 1..end].parse().ok()?,
                 pattern: head[end + 1..].to_owned(),
             });
@@ -184,15 +216,27 @@ pub fn parse_check_attr(out: &str) -> Vec<Attr> {
     list
 }
 
-/// `path`'s line endings (`ls-files --eol`); `None` when git says nothing about it.
+/// `path`'s line endings (`ls-files --eol`, a file's name taken literally); `None` when git
+/// says nothing about it (no such file). Untracked and ignored files too (`-o`, no excludes).
 fn line_endings(repo: &Path, path: &str) -> Result<Option<Eol>, String> {
-    // Untracked files too (`-o`), as long as they aren't ignored.
     let out = run(
         Some(repo),
-        &["ls-files", "--eol", "-c", "-o", "-z", "--", path],
+        &[
+            crate::git::LITERAL_PATHS,
+            "ls-files",
+            "--eol",
+            "-c",
+            "-o",
+            "-z",
+            "--",
+            path,
+        ],
     )
     .map_err(|e| format!("Could not read the line endings: {e}"))?;
-    Ok(out.split('\0').find_map(parse_eol))
+    Ok(out
+        .split('\0')
+        .filter(|entry| entry.split_once('\t').is_some_and(|(_, p)| p == path))
+        .find_map(parse_eol))
 }
 
 /// Reads one entry of `ls-files --eol -z`: `i/<eol> w/<eol> attr/<attrs> TAB path`.
@@ -215,24 +259,75 @@ pub fn parse_eol(entry: &str) -> Option<Eol> {
     Some(eol)
 }
 
-/// Merge, diff and filter drivers named by `attrs` that no `merge.<name>.driver`,
-/// `diff.<name>.*` or `filter.<name>.*` defines: git then quietly does without them.
-fn missing_drivers(repo: &Path, attrs: &[Attr]) -> Vec<(String, String)> {
-    attrs
+/// The diff drivers git has itself (userdiff's built-in patterns).
+const BUILTIN_DIFF: &[&str] = &[
+    "ada", "bash", "bibtex", "cpp", "csharp", "css", "dts", "elixir", "fortran", "fountain",
+    "golang", "html", "java", "kotlin", "markdown", "matlab", "objc", "pascal", "perl", "php",
+    "python", "r", "ruby", "rust", "scheme", "tex",
+];
+
+/// Merge, diff and filter drivers named by `attrs` that the configuration doesn't define: git
+/// then merges or diffs as usual, or, for a required filter, refuses the file. One read of the
+/// configuration for all of them.
+fn missing_drivers(repo: &Path, attrs: &[Attr]) -> Vec<MissingDriver> {
+    let named: Vec<&Attr> = attrs
+        .iter()
+        .filter(|a| match a.name.as_str() {
+            "merge" => !builtin_merge(&a.value),
+            "diff" => !builtin_value(&a.value) && !BUILTIN_DIFF.contains(&a.value.as_str()),
+            "filter" => !builtin_value(&a.value),
+            _ => false,
+        })
+        .collect();
+    if named.is_empty() {
+        return Vec::new();
+    }
+    let config = run_ok_codes(
+        Some(repo),
+        &["config", "-z", "--get-regexp", r"^(merge|diff|filter)\."],
+        &[0, 1],
+    )
+    .unwrap_or_default();
+    drivers_missing(&named, &config)
+}
+
+/// [`missing_drivers`] from the configuration read (`config -z --get-regexp`: `key LF value`
+/// per entry; keys lowercase but for their middle part).
+pub fn drivers_missing(named: &[&Attr], config: &str) -> Vec<MissingDriver> {
+    let entries: Vec<(&str, &str)> = config
+        .split('\0')
+        .filter(|e| !e.is_empty())
+        .map(|e| e.split_once('\n').unwrap_or((e, "")))
+        .collect();
+    named
         .iter()
         .filter_map(|a| {
-            let keys: &[&str] = match a.name.as_str() {
-                "merge" if !builtin_merge(&a.value) => &["driver"],
-                "diff" if !builtin_value(&a.value) => &["textconv", "command", "xfuncname"],
-                "filter" if !builtin_value(&a.value) => &["clean", "smudge", "process"],
-                _ => return None,
+            let prefix = format!("{}.{}.", a.name, a.value);
+            let keys: Vec<(&str, &str)> = entries
+                .iter()
+                .filter_map(|(k, v)| Some((k.strip_prefix(&prefix)?, *v)))
+                .collect();
+            let wanted: &[&str] = match a.name.as_str() {
+                "merge" => &["driver"],
+                "filter" => &["clean", "smudge", "process"],
+                // Any key defines a diff driver (textconv, funcname, binary, wordregex…).
+                _ => &[],
             };
-            let defined = keys.iter().any(|k| {
-                let key = format!("{}.{}.{k}", a.name, a.value);
-                run(Some(repo), &["config", "--get", "--", &key])
-                    .is_ok_and(|v| !v.trim().is_empty())
-            });
-            (!defined).then(|| (a.name.clone(), a.value.clone()))
+            let defined = if wanted.is_empty() {
+                !keys.is_empty()
+            } else {
+                keys.iter()
+                    .any(|(k, v)| wanted.contains(k) && !v.trim().is_empty())
+            };
+            let required = a.name == "filter"
+                && keys.iter().any(|(k, v)| {
+                    *k == "required" && matches!(v.trim(), "true" | "yes" | "on" | "1")
+                });
+            (!defined).then(|| MissingDriver {
+                attr: a.name.clone(),
+                name: a.value.clone(),
+                required,
+            })
         })
         .collect()
 }
@@ -260,7 +355,10 @@ pub fn meaning(attrs: &[Attr]) -> Vec<String> {
         Some("set") => {
             out.push("Text: git normalises its line endings to LF when storing it.".to_owned())
         }
-        Some("unset") => out.push("Binary: git never converts its line endings.".to_owned()),
+        Some("unset") if get("binary") != Some("set") => out.push(
+            "-text: git never converts its line endings (it is still diffed and merged as text)."
+                .to_owned(),
+        ),
         Some("auto") => out.push(
             "text=auto: git decides from its contents whether it is text, and normalises text."
                 .to_owned(),
@@ -268,29 +366,44 @@ pub fn meaning(attrs: &[Attr]) -> Vec<String> {
         _ => {}
     }
     match get("eol") {
-        Some("lf") => out.push("Checked out with LF line endings.".to_owned()),
-        Some("crlf") => out.push("Checked out with CRLF line endings.".to_owned()),
+        Some("lf") => out.push("Text, checked out with LF line endings.".to_owned()),
+        Some("crlf") => out.push("Text, checked out with CRLF line endings.".to_owned()),
         _ => {}
     }
     if get("binary") == Some("set") {
         out.push("binary: no diff, no merge, no line-ending conversion.".to_owned());
     }
-    if get("filter") == Some("lfs") {
-        out.push("Stored in Git LFS: the repository keeps a pointer, LFS the contents.".to_owned());
+    match get("filter") {
+        Some("lfs") => out.push(
+            "Stored in Git LFS: the repository keeps a pointer, LFS the contents.".to_owned(),
+        ),
+        Some(v) if !builtin_value(v) => out.push(format!(
+            "Run through the {v} filter when added and checked out."
+        )),
+        _ => {}
     }
+    let binary = get("binary") == Some("set");
     match get("merge") {
-        Some("unset") => out.push(
-            "merge unset: any change on both sides is a conflict, the file is never merged."
+        Some("unset") if !binary => out.push(
+            "-merge: any change on both sides is a conflict; your version is left in the working \
+             tree."
                 .to_owned(),
         ),
-        Some("union") => {
-            out.push("merge=union: both sides' lines are kept, without conflicts.".to_owned())
-        }
+        Some("union") => out.push(
+            "merge=union: both sides' lines are kept, in no set order and without conflicts: \
+             check the result."
+                .to_owned(),
+        ),
         Some(v) if !builtin_merge(v) => out.push(format!("Merged with the {v} merge driver.")),
         _ => {}
     }
     match get("diff") {
-        Some("unset") => out.push("diff unset: diffs say only \"Binary files differ\".".to_owned()),
+        Some("unset") if !binary => {
+            out.push("-diff: diffs say only \"Binary files differ\".".to_owned())
+        }
+        Some(v) if BUILTIN_DIFF.contains(&v) => out.push(format!(
+            "Diffed with git's own {v} patterns (function names in hunks)."
+        )),
         Some(v) if !builtin_value(v) => out.push(format!("Diffed with the {v} diff driver.")),
         _ => {}
     }
@@ -320,12 +433,29 @@ pub fn ignored_files(repo: &Path, max: usize) -> Result<(Vec<String>, usize), St
         ],
     )
     .map_err(|e| format!("Could not list the ignored files: {e}"))?;
-    let all: Vec<&str> = out.split('\0').filter(|p| !p.is_empty()).collect();
+    let all = collapse(out.split('\0').filter(|p| !p.is_empty()));
     let total = all.len();
-    Ok((
-        all.into_iter().take(max).map(str::to_owned).collect(),
-        total,
-    ))
+    Ok((all.into_iter().take(max).collect(), total))
+}
+
+/// Paths as `ls-files --directory` lists them, without those inside a folder listed whole
+/// (git lists both a folder and some files in it).
+pub fn collapse<'a>(paths: impl Iterator<Item = &'a str>) -> Vec<String> {
+    let mut sorted: Vec<&str> = paths.collect();
+    sorted.sort_unstable();
+    sorted.dedup();
+    let mut out: Vec<String> = Vec::with_capacity(sorted.len());
+    let mut folder: Option<&str> = None;
+    for path in sorted {
+        if folder.is_some_and(|f| path.starts_with(f)) {
+            continue;
+        }
+        if path.ends_with('/') {
+            folder = Some(path);
+        }
+        out.push(path.to_owned());
+    }
+    out
 }
 
 #[cfg(test)]
@@ -382,14 +512,84 @@ mod tests {
 
     #[test]
     fn typed_paths_are_cleaned_or_refused() {
-        assert_eq!(clean_path("./src\\a b.rs\n"), Ok("src/a b.rs".to_owned()));
-        assert_eq!(clean_path("/é.txt"), Ok("é.txt".to_owned()));
-        assert!(clean_path("").is_err());
-        assert!(clean_path("  ").is_err());
-        assert!(clean_path("a\nb").is_err());
-        assert!(clean_path("../outside").is_err());
-        // A name that only starts with dots is a name.
-        assert_eq!(clean_path("..hidden"), Ok("..hidden".to_owned()));
+        let top = "/home/me/my repo";
+        assert_eq!(
+            clean_path("./src\\a b.rs\n", top),
+            Ok("src/a b.rs".to_owned())
+        );
+        assert_eq!(clean_path("src/", top), Ok("src".to_owned()));
+        // Absolute inside the repository: made relative; elsewhere: refused.
+        assert_eq!(
+            clean_path("/home/me/my repo/é.txt", top),
+            Ok("é.txt".to_owned())
+        );
+        assert!(clean_path("/home/me/other/x", top).is_err());
+        assert!(clean_path("/home/me/my repository/x", top).is_err());
+        assert!(clean_path("C:\\x\\y", top).is_err());
+        assert_eq!(
+            clean_path("C:\\code\\r\\a.txt", "C:/code/r"),
+            Ok("a.txt".to_owned())
+        );
+        for refused in ["", "  ", ".", "./", "a\nb", "../outside", "a/../../b"] {
+            assert!(clean_path(refused, top).is_err(), "{refused:?}");
+        }
+        // A name that only starts with dots is a name; one starting with `:` too.
+        assert_eq!(clean_path("..hidden", top), Ok("..hidden".to_owned()));
+        assert_eq!(clean_path(":x", top), Ok(":x".to_owned()));
+    }
+
+    #[test]
+    fn drivers_are_checked_against_the_configuration() {
+        let attr = |n: &str, v: &str| Attr {
+            name: n.into(),
+            value: v.into(),
+        };
+        let named = [
+            attr("merge", "ours-driver"),
+            attr("diff", "word"),
+            attr("filter", "crypt"),
+            attr("filter", "lfs"),
+        ];
+        let refs: Vec<&Attr> = named.iter().collect();
+        let config = "merge.ours-driver.name\nours\0diff.word.wordregex\n.\0\
+                      filter.crypt.required\ntrue\0filter.lfs.clean\ngit-lfs clean -- %f\0";
+        let missing = drivers_missing(&refs, config);
+        // The merge driver has a name but no driver command; the diff driver is defined by
+        // any key; the required filter has nothing to run; LFS is set up.
+        assert_eq!(
+            missing,
+            [
+                MissingDriver {
+                    attr: "merge".into(),
+                    name: "ours-driver".into(),
+                    required: false,
+                },
+                MissingDriver {
+                    attr: "filter".into(),
+                    name: "crypt".into(),
+                    required: true,
+                },
+            ]
+        );
+        assert_eq!(drivers_missing(&refs, "").len(), 4);
+    }
+
+    #[test]
+    fn folders_listed_whole_hide_their_files() {
+        let listed = [
+            "e/",
+            "e/only.log",
+            "a.log",
+            "build/",
+            "build/x/",
+            "buildx.log",
+            "a.log",
+        ];
+        assert_eq!(
+            collapse(listed.into_iter()),
+            ["a.log", "build/", "buildx.log", "e/"]
+        );
+        assert!(collapse(std::iter::empty()).is_empty());
     }
 
     #[test]
@@ -404,8 +604,17 @@ mod tests {
             attr("text", "unset"),
         ]);
         assert!(words.iter().any(|w| w.contains("LFS")));
-        assert!(words.iter().any(|w| w.contains("never merged")));
-        assert!(words.iter().any(|w| w.starts_with("Binary")));
+        assert!(words.iter().any(|w| w.starts_with("-merge")));
+        assert!(words.iter().any(|w| w.starts_with("-text")));
+        // binary sets -diff -merge -text too: said once.
+        let binary = meaning(&[
+            attr("binary", "set"),
+            attr("diff", "unset"),
+            attr("merge", "unset"),
+            attr("text", "unset"),
+        ]);
+        assert_eq!(binary.len(), 1, "{binary:?}");
+        assert!(meaning(&[attr("diff", "rust")])[0].contains("git's own rust"));
         assert!(meaning(&[]).is_empty());
     }
 }

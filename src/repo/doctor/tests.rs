@@ -276,6 +276,34 @@ fn a_file_is_explained_and_its_rules_edited_through_the_tab() -> Result<(), Stri
         wait(&mut tab, &ctx, |t| {
             explained(t).is_some_and(|e| !e.ignored())
         })?;
+
+        // Edits not saved: Esc and the close button don't drop them without asking.
+        if let Some(e) = tab.doctor.as_mut().and_then(|d| d.ignore.editing.as_mut()) {
+            e.text = "*.other\n".into();
+        }
+        assert!(tab.doctor.as_ref().is_some_and(|d| d.asking()));
+        tab.apply(Action::Doctor(DoctorAct::Close), &ctx);
+        draw(&mut tab, &ctx);
+        assert!(tab.doctor.as_ref().is_some_and(|d| d.closing));
+        tab.apply(Action::Doctor(DoctorAct::AnswerClose(false)), &ctx);
+        assert!(tab.doctor.as_ref().is_some_and(|d| !d.closing));
+        // Another section shown meanwhile: the ignore section's reads don't pull the page
+        // back to it.
+        tab.apply(Action::Doctor(DoctorAct::Show(Section::Flags)), &ctx);
+        tab.apply(
+            Action::Doctor(DoctorAct::Ignore(IgnoreAct::CloseEditor)),
+            &ctx,
+        );
+        wait(&mut tab, &ctx, |t| {
+            t.doctor.as_ref().is_some_and(|d| d.flags.list.is_some())
+        })?;
+        assert!(
+            tab.doctor
+                .as_ref()
+                .is_some_and(|d| d.section == Section::Flags)
+        );
+        tab.apply(Action::Doctor(DoctorAct::Close), &ctx);
+        assert!(tab.doctor.is_none());
         Ok(())
     })();
     let _ = std::fs::remove_dir_all(&dir);

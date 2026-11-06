@@ -109,10 +109,12 @@ fn attributes_line_endings_and_missing_drivers() -> Result<(), String> {
 
         // A merge driver nobody defined: git quietly merges as usual.
         let lock = explain(&dir, "x.lock")?;
-        assert_eq!(
-            lock.missing_drivers,
-            [("merge".to_owned(), "ours-driver".to_owned())]
-        );
+        let missing: Vec<(&str, &str)> = lock
+            .missing_drivers
+            .iter()
+            .map(|d| (d.attr.as_str(), d.name.as_str()))
+            .collect();
+        assert_eq!(missing, [("merge", "ours-driver")]);
         git(&dir, &["config", "merge.ours-driver.driver", "true"])?;
         assert!(explain(&dir, "x.lock")?.missing_drivers.is_empty());
         // Built in: never missing.
@@ -168,7 +170,8 @@ fn editing_rules_previews_and_saves() -> Result<(), String> {
         let new = "*.cfg\n";
         let preview = rules::preview(&dir, &sub, &old, new)?;
         assert_eq!(preview.newly_ignored, ["sub/c.cfg"]);
-        assert_eq!(preview.no_longer_ignored, ["sub/a.tmp", "sub/deep/b.tmp"]);
+        // A folder ignored whole shows as the folder.
+        assert_eq!(preview.no_longer_ignored, ["sub/a.tmp", "sub/deep/"]);
         assert_eq!(preview.tracked_matching, ["sub/kept.cfg"]);
 
         // Changed elsewhere since it was read: not written over.
@@ -207,6 +210,98 @@ fn a_rules_file_that_is_a_link_is_not_written_through() -> Result<(), String> {
         let err = rules::save(&top, "x\n", "*\n");
         assert!(err.is_err_and(|e| e.contains("symbolic link")));
         assert_eq!(std::fs::read(&target).map_err(|e| e.to_string())?, b"x\n");
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}
+
+#[test]
+fn folders_odd_names_and_missing_files() -> Result<(), String> {
+    let dir = repo(
+        "ignore-odd",
+        &[
+            (".gitignore", b":x\nt/\n"),
+            ("src/one.txt", b"a\r\n"),
+            ("a1.txt", b"lf\n"),
+            ("t/a", b"tracked\n"),
+        ],
+    )?;
+    let result = (|| {
+        git(&dir, &["add", "-f", "t/a"])?;
+        git(&dir, &["commit", "-q", "-m", "t"])?;
+        write(&dir.join(":x"), b"x\n")?;
+        write(&dir.join("t/b"), b"x\n")?;
+        // Glob characters are a name, not a pattern: a[1].txt isn't a1.txt.
+        if !cfg!(windows) {
+            write(&dir.join("a[1].txt"), b"crlf\r\n")?;
+            let glob = explain(&dir, "a[1].txt")?;
+            assert_eq!(glob.eol.map(|e| e.worktree), Some("crlf".to_owned()));
+            // A name starting with `:` is a name too.
+            let colon = explain(&dir, ":x")?;
+            assert!(colon.ignored(), "{colon:?}");
+        }
+        // A folder: not "tracked", no line endings of some file in it.
+        let src = explain(&dir, "src/")?;
+        assert!(src.folder && !src.tracked && src.eol.is_none());
+        let t = explain(&dir, "t")?;
+        assert!(t.folder && t.ignored());
+        // Nothing of that name: said so.
+        let gone = explain(&dir, "nowhere.txt")?;
+        assert!(gone.missing && !gone.tracked);
+        // Absolute inside the repository works; "." doesn't.
+        let top = crate::git::toplevel(&dir)?;
+        let absolute = format!("{}/src/one.txt", top.display());
+        assert_eq!(explain(&dir, &absolute)?.path, "src/one.txt");
+        assert!(explain(&dir, ".").is_err());
+        // t/ holds a tracked file: git lists its ignored files one by one, each once.
+        let (list, _) = ignore::ignored_files(&dir, 100)?;
+        assert_eq!(
+            list.iter().filter(|p| p.as_str() == "t/b").count(),
+            1,
+            "{list:?}"
+        );
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}
+
+#[test]
+fn required_filters_and_builtin_diff_drivers() -> Result<(), String> {
+    let dir = repo(
+        "ignore-drivers",
+        &[(".gitattributes", b"*.rs diff=rust\n*.sec filter=crypt\n")],
+    )?;
+    let result = (|| {
+        assert!(explain(&dir, "a.rs")?.missing_drivers.is_empty());
+        git(&dir, &["config", "filter.crypt.required", "true"])?;
+        let sec = explain(&dir, "x.sec")?;
+        assert_eq!(sec.missing_drivers.len(), 1);
+        assert!(sec.missing_drivers[0].required);
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}
+
+#[test]
+fn saving_keeps_crlf_and_previews_leave_no_files() -> Result<(), String> {
+    let dir = repo("ignore-crlf", &[(".gitignore", b"*.a\r\n")])?;
+    let result = (|| {
+        for f in ["x.a", "x.b", "big/1.js", "big/2.js"] {
+            write(&dir.join(f), b"x\n")?;
+        }
+        let files = rules::files(&dir)?;
+        let top = files[0].clone();
+        let old = rules::read(&top)?;
+        let preview = rules::preview(&dir, &top, &old, "*.a\nbig/\n")?;
+        // A folder ignored whole is one entry.
+        assert_eq!(preview.newly_ignored, ["big/"]);
+        rules::save(&top, &old, "*.a\n*.b\n")?;
+        assert_eq!(rules::read(&top)?, "*.a\r\n*.b\r\n");
+        // Every file of rules the doctor lists is reachable, the default excludes file too.
+        assert!(files.iter().any(|f| f.outside), "{files:?}");
         Ok(())
     })();
     let _ = std::fs::remove_dir_all(&dir);

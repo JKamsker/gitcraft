@@ -18,6 +18,8 @@ pub struct RulesFile {
     pub base: String,
     /// What it is for, in a few words.
     pub kind: &'static str,
+    /// It isn't a file of the repository: saving asks first.
+    pub outside: bool,
 }
 
 /// Every file of ignore rules the repository uses, the top `.gitignore` first (listed even when
@@ -51,23 +53,80 @@ pub fn files(repo: &Path) -> Result<Vec<RulesFile>, String> {
             location: crate::remote::resolve(repo, printed),
             base: String::new(),
             kind: "This clone only, never committed",
+            outside: false,
         });
     }
-    if let Ok(printed) = run(
+    out.extend(excludes_file(repo));
+    Ok(out)
+}
+
+/// The excludes file of `core.excludesFile` (labelled by the scope that set it), or git's
+/// default one (`$XDG_CONFIG_HOME/git/ignore`, `~/.config/git/ignore`) when it isn't set.
+fn excludes_file(repo: &Path) -> Option<RulesFile> {
+    let set = run(
         Some(repo),
-        &["config", "--path", "--get", "core.excludesFile"],
-    ) {
-        let printed = printed.trim_end_matches(['\n', '\r']);
-        if !printed.is_empty() {
-            out.push(RulesFile {
-                label: printed.to_owned(),
-                location: crate::remote::resolve(repo, printed),
-                base: String::new(),
-                kind: "Your own (core.excludesFile), every repository",
-            });
+        &[
+            "config",
+            "--show-scope",
+            "--path",
+            "--get",
+            "core.excludesFile",
+        ],
+    )
+    .ok();
+    let line = set.as_deref().map(|l| l.trim_end_matches(['\n', '\r']));
+    let (scope, printed) = match line.and_then(|l| l.split_once('\t')) {
+        Some((scope, path)) if !path.is_empty() => (Some(scope.to_owned()), path.to_owned()),
+        _ => (None, default_excludes(repo)?),
+    };
+    let kind = match scope.as_deref() {
+        None => "Your own (git's default place), every repository",
+        Some("global" | "system") => "Your own (core.excludesFile), every repository",
+        Some(_) => "Named by this repository's config (core.excludesFile)",
+    };
+    Some(RulesFile {
+        label: printed.clone(),
+        location: crate::remote::resolve(repo, &printed),
+        base: String::new(),
+        kind,
+        outside: true,
+    })
+}
+
+/// Where git looks for the excludes file when `core.excludesFile` isn't set, on the
+/// repository's machine.
+fn default_excludes(repo: &Path) -> Option<String> {
+    let script = "printf '%s' \"${XDG_CONFIG_HOME:-$HOME/.config}/git/ignore\"";
+    match crate::remote::parse(repo) {
+        Some(t) => crate::remote::exec(
+            &t.host,
+            &crate::remote::Request {
+                script: script.to_owned(),
+                ..Default::default()
+            },
+        )
+        .ok()
+        .filter(|out| out.code == 0)
+        .map(|out| String::from_utf8_lossy(&out.stdout).into_owned())
+        .filter(|p| p.starts_with('/')),
+        None => {
+            let config = std::env::var_os("XDG_CONFIG_HOME")
+                .filter(|v| !v.is_empty())
+                .map(PathBuf::from)
+                .or_else(|| {
+                    std::env::var_os("HOME")
+                        .or_else(|| std::env::var_os("USERPROFILE"))
+                        .map(|h| PathBuf::from(h).join(".config"))
+                })?;
+            Some(
+                config
+                    .join("git")
+                    .join("ignore")
+                    .to_string_lossy()
+                    .into_owned(),
+            )
         }
     }
-    Ok(out)
 }
 
 fn in_repo(repo: &Path, rel: &str) -> RulesFile {
@@ -78,11 +137,12 @@ fn in_repo(repo: &Path, rel: &str) -> RulesFile {
         label: rel.to_owned(),
         location: crate::remote::join(repo, rel),
         kind: if base.is_empty() {
-            "The repository's, committed"
+            "The repository's, shared once committed"
         } else {
-            "This folder's and below, committed"
+            "This folder and below, shared once committed"
         },
         base,
+        outside: false,
     }
 }
 
@@ -106,7 +166,8 @@ pub fn save(file: &RulesFile, expected: &str, text: &str) -> Result<(), String> 
     }
     if read(file)? != expected {
         return Err(format!(
-            "{} changed since it was read: read it again before saving",
+            "{} changed on disk since you opened it. Read it again (your changes stay in the \
+             editor) before saving.",
             file.label
         ));
     }
@@ -114,8 +175,25 @@ pub fn save(file: &RulesFile, expected: &str, text: &str) -> Result<(), String> 
         crate::remote::create_dir_all(parent)
             .map_err(|e| format!("Could not make the folder of {}: {e}", file.label))?;
     }
+    // Checked again right before writing: here `write` follows a link (elsewhere it checks
+    // and writes in one script).
+    if crate::remote::try_is_link(&file.location).unwrap_or(false) {
+        return Err(format!("{} is a symbolic link: not changed", file.label));
+    }
+    let text = same_line_endings(expected, text);
     crate::remote::write(&file.location, text.as_bytes())
         .map_err(|e| format!("Could not write {}: {e}", file.label))
+}
+
+/// `text` with the line endings `original` has: a CRLF file stays CRLF (the editor's new lines
+/// are LF), an LF one stays LF.
+pub fn same_line_endings(original: &str, text: &str) -> String {
+    let lf = text.replace("\r\n", "\n");
+    if original.contains("\r\n") {
+        lf.replace('\n', "\r\n")
+    } else {
+        lf
+    }
 }
 
 /// The rules of a file in folder `base`, rewritten to mean the same from the repository's
@@ -136,7 +214,9 @@ pub fn from_top(text: &str, base: &str) -> String {
                 Some(rest) => ("!", rest),
                 None => ("", line),
             };
-            let anchored = body.trim_end_matches('/').contains('/');
+            // As git reads it: unescaped trailing spaces dropped, then one trailing `/`.
+            let body = trim_trailing_spaces(body);
+            let anchored = body.strip_suffix('/').unwrap_or(body).contains('/');
             if anchored {
                 out.push_str(&format!("{neg}/{base}/{}", body.trim_start_matches('/')));
             } else {
@@ -146,6 +226,20 @@ pub fn from_top(text: &str, base: &str) -> String {
         out.push('\n');
     }
     out
+}
+
+/// `pattern` without its trailing spaces, but those escaped with `\\`.
+fn trim_trailing_spaces(pattern: &str) -> &str {
+    let mut end = pattern.len();
+    while pattern[..end].ends_with(' ') {
+        let before = &pattern[..end - 1];
+        let backslashes = before.len() - before.trim_end_matches('\\').len();
+        if backslashes % 2 == 1 {
+            break;
+        }
+        end -= 1;
+    }
+    &pattern[..end]
 }
 
 /// A folder name as a pattern matching only itself.
@@ -174,9 +268,11 @@ pub struct Preview {
 /// The difference between `old` and `new` as the rules of `file`. Other rules files are left
 /// out: one of them may still ignore (or un-ignore) a path listed here.
 pub fn preview(repo: &Path, file: &RulesFile, old: &str, new: &str) -> Result<Preview, String> {
-    let before = matched(repo, &from_top(old, &file.base), "-o")?;
-    let after = matched(repo, &from_top(new, &file.base), "-o")?;
-    let tracked = matched(repo, &from_top(new, &file.base), "-c")?;
+    let old_rules = RulesTemp::new(repo, &from_top(old, &file.base))?;
+    let new_rules = RulesTemp::new(repo, &from_top(new, &file.base))?;
+    let before = matched(repo, &old_rules, "-o")?;
+    let after = matched(repo, &new_rules, "-o")?;
+    let tracked = matched(repo, &new_rules, "-c")?;
     Ok(Preview {
         newly_ignored: after
             .iter()
@@ -192,29 +288,73 @@ pub fn preview(repo: &Path, file: &RulesFile, old: &str, new: &str) -> Result<Pr
     })
 }
 
-/// The files (`-o`: untracked, `-c`: tracked) `rules` match, read by git from a temporary file
-/// on the repository's machine.
+/// Rules written to a temporary file on the repository's machine for `--exclude-from`,
+/// removed once dropped. No file when there is no rule.
+struct RulesTemp<'a> {
+    repo: &'a Path,
+    file: Option<String>,
+}
+
+impl<'a> RulesTemp<'a> {
+    fn new(repo: &'a Path, rules: &str) -> Result<Self, String> {
+        let empty = rules
+            .lines()
+            .all(|l| l.trim().is_empty() || l.starts_with('#'));
+        let file = if empty {
+            None
+        } else {
+            Some(
+                crate::git::save_patch_for(repo, rules)
+                    .map_err(|e| format!("Could not prepare the preview: {e}"))?,
+            )
+        };
+        Ok(Self { repo, file })
+    }
+}
+
+impl Drop for RulesTemp<'_> {
+    fn drop(&mut self) {
+        let Some(file) = &self.file else {
+            return;
+        };
+        match crate::remote::parse(self.repo) {
+            Some(t) => {
+                let _ = crate::remote::exec(
+                    &t.host,
+                    &crate::remote::Request {
+                        script: format!("rm -f -- {}", crate::remote::sh_quote(file)),
+                        ..Default::default()
+                    },
+                );
+            }
+            None => {
+                let _ = std::fs::remove_file(file);
+            }
+        }
+    }
+}
+
+/// The files the rules match: `-o` untracked ones (a folder ignored whole as one entry), `-c`
+/// tracked ones.
 fn matched(
     repo: &Path,
-    rules: &str,
+    rules: &RulesTemp,
     which: &str,
 ) -> Result<std::collections::BTreeSet<String>, String> {
-    if rules
-        .lines()
-        .all(|l| l.trim().is_empty() || l.starts_with('#'))
-    {
+    let Some(file) = &rules.file else {
         return Ok(Default::default());
-    }
-    let file = crate::git::save_patch_for(repo, rules)
-        .map_err(|e| format!("Could not prepare the preview: {e}"))?;
+    };
     let from = format!("--exclude-from={file}");
-    let out = run(Some(repo), &["ls-files", "-z", which, "-i", &from])
-        .map_err(|e| format!("Could not preview the rules: {e}"))?;
-    Ok(out
-        .split('\0')
-        .filter(|p| !p.is_empty())
-        .map(str::to_owned)
-        .collect())
+    let mut args = vec!["ls-files", "-z", which, "-i", from.as_str()];
+    if which == "-o" {
+        args.push("--directory");
+    }
+    let out = run(Some(repo), &args).map_err(|e| format!("Could not preview the rules: {e}"))?;
+    Ok(
+        super::ignore::collapse(out.split('\0').filter(|p| !p.is_empty()))
+            .into_iter()
+            .collect(),
+    )
 }
 
 #[cfg(test)]
@@ -232,5 +372,18 @@ mod tests {
         assert_eq!(from_top(text, ""), text);
         assert_eq!(from_top("a\r\n", "[x]"), "/\\[x]/**/a\n");
         assert_eq!(from_top("", "d"), "");
+        // Trailing spaces go before the slash is looked at; an escaped one stays.
+        assert_eq!(from_top("foo/ \n", "s"), "/s/**/foo/\n");
+        assert_eq!(from_top("a\\ \n", "s"), "/s/**/a\\ \n");
+    }
+
+    #[test]
+    fn line_endings_are_kept() {
+        assert_eq!(
+            same_line_endings("a\r\nb\r\n", "a\r\nb\nc\n"),
+            "a\r\nb\r\nc\r\n"
+        );
+        assert_eq!(same_line_endings("a\n", "a\r\nb\n"), "a\nb\n");
+        assert_eq!(same_line_endings("", "x\n"), "x\n");
     }
 }

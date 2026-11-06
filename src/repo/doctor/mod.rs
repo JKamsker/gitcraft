@@ -65,6 +65,10 @@ pub(crate) enum DoctorAct {
     CompareWorktrees(&'static str),
     /// Something done in the ignore-and-attributes section.
     Ignore(IgnoreAct),
+    /// Close the doctor, asking first when edited rules aren't saved.
+    Close,
+    /// Keep editing (`false`) or drop the edits and close (`true`).
+    AnswerClose(bool),
 }
 
 /// A change the doctor asks about before making it.
@@ -131,15 +135,18 @@ pub(crate) struct DoctorView {
     waiting: bool,
     /// The change being asked about.
     confirm: Option<Confirm>,
+    /// Closing was asked for with rules edited and not saved: asking whether to drop them.
+    closing: bool,
     ignore: IgnoreState,
     config: ConfigState,
     flags: FlagsState,
 }
 
 impl DoctorView {
-    /// A change is being asked about: Esc answers it rather than closing the doctor.
+    /// A change is being asked about, or rules are being edited and not saved: Esc doesn't
+    /// close the doctor then.
     pub(crate) fn asking(&self) -> bool {
-        self.confirm.is_some()
+        self.confirm.is_some() || self.closing || self.ignore.unsaved()
     }
 }
 
@@ -163,6 +170,7 @@ impl RepoTab {
                 read: 0,
                 waiting: false,
                 confirm: None,
+                closing: false,
                 ignore: IgnoreState::default(),
                 config: ConfigState::default(),
                 flags: FlagsState::default(),
@@ -212,6 +220,17 @@ impl RepoTab {
             }
             DoctorAct::CompareWorktrees(key) => self.compare_worktrees(key, ctx),
             DoctorAct::Ignore(act) => self.ignore_act(act, ctx),
+            DoctorAct::Close => match &mut self.doctor {
+                Some(d) if d.ignore.unsaved() => d.closing = true,
+                _ => self.doctor = None,
+            },
+            DoctorAct::AnswerClose(drop) => {
+                if drop {
+                    self.doctor = None;
+                } else if let Some(d) = &mut self.doctor {
+                    d.closing = false;
+                }
+            }
         }
     }
 

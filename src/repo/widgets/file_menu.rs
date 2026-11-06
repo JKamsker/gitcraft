@@ -54,10 +54,12 @@ pub fn file_menu(
                     tab: FileTab::Blame,
                 });
             }
-            if ui
-                .button("Ignore rules and attributes")
-                .on_hover_text("Why it is ignored or not, and how git treats it")
-                .clicked()
+            // Of the working tree: its rules and attributes, not a commit's.
+            if rev.is_none()
+                && ui
+                    .button("Ignore rules and attributes")
+                    .on_hover_text("Why it is ignored or not, and how git treats it")
+                    .clicked()
             {
                 acts.push(Action::Doctor(crate::repo::doctor::DoctorAct::Ignore(
                     crate::repo::doctor::IgnoreAct::Explain(path.to_owned()),
