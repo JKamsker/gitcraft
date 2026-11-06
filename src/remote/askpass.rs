@@ -522,6 +522,17 @@ pub fn run_helper() -> Option<i32> {
     }
 }
 
+/// Held by the tests that put questions in the window's queue (one queue for the process),
+/// and by the tests of a window that would show them: a question from one test closes the
+/// other's command palette.
+#[cfg(test)]
+pub(crate) fn asking() -> std::sync::MutexGuard<'static, ()> {
+    static ASKING: Mutex<()> = Mutex::new(());
+    ASKING
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::vault;
@@ -579,6 +590,7 @@ mod tests {
 
     #[test]
     fn questions_come_to_the_window_and_answers_go_back() {
+        let _asking = asking();
         let prompt = "me@one's password: (answers)";
         let asked = ask_in_background(session_for("SSH · one"), prompt, Kind::Secret);
         let shown = answer_shown(prompt, Some("s3cret"));
@@ -597,6 +609,7 @@ mod tests {
     /// makes it asked of the user again.
     #[test]
     fn a_secret_typed_serves_the_machine_until_it_is_wrong() {
+        let _asking = asking();
         let prompt = "me@two's password: (remembered)";
         let first = session_for("SSH · two");
         let asked = ask_in_background(first.clone(), prompt, Kind::Secret);
@@ -625,6 +638,7 @@ mod tests {
     /// restart without asking; wrong, it is forgotten there too, and the user told so.
     #[test]
     fn a_remembered_secret_outlives_the_app_until_it_is_wrong() {
+        let _asking = asking();
         let (host, prompt) = ("SSH · four", "me@four's password: (kept)");
         let (found, attempt) = start_for(host);
         assert_eq!(
@@ -660,6 +674,7 @@ mod tests {
     /// A connection that isn't made keeps nothing, even ticked.
     #[test]
     fn a_secret_is_not_kept_for_a_connection_that_failed() {
+        let _asking = asking();
         let (host, prompt) = ("SSH · five", "me@five's password: (failed)");
         let (found, attempt) = start_for(host);
         assert_eq!(
@@ -673,6 +688,7 @@ mod tests {
     /// Wrong, then right, in one connection: the right one is kept, the wrong one never.
     #[test]
     fn only_the_secret_that_signed_in_is_kept() {
+        let _asking = asking();
         let (host, prompt) = ("SSH · six", "me@six's password: (retyped)");
         let (found, attempt) = start_for(host);
         assert_eq!(
@@ -722,6 +738,7 @@ mod tests {
     /// never answered, nothing asked.
     #[test]
     fn an_endless_request_is_cut_off() -> Result<(), String> {
+        let _asking = asking();
         let found = session_for("SSH · seven");
         let port: u16 = found
             .split_whitespace()
@@ -745,6 +762,7 @@ mod tests {
     /// Without the token, nothing is asked and nothing answered.
     #[test]
     fn a_stranger_gets_no_answer() {
+        let _asking = asking();
         let real = session_for("SSH · three");
         let mut parts = real.split_whitespace();
         let (port, session) = (
@@ -759,6 +777,7 @@ mod tests {
 
     #[test]
     fn what_ssh_asks_is_told_apart() {
+        let _asking = asking();
         assert_eq!(Kind::of("me@h's password: ", None), Kind::Secret);
         assert_eq!(
             Kind::of("Enter passphrase for key 'k': ", None),
