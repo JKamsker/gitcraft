@@ -36,6 +36,8 @@ enum AppCommand {
     Settings,
     Manual,
     Theme(ThemeKind),
+    Profile(u64),
+    NewProfile,
 }
 
 enum Entry {
@@ -105,6 +107,20 @@ impl App {
                 Entry::App(AppCommand::Theme(kind)),
             ));
         }
+        for p in &self.settings.user_profiles {
+            if p.id != self.settings.active_profile {
+                list.push((
+                    format!("Switch to profile: {}", p.title()),
+                    "profile".to_owned(),
+                    Entry::App(AppCommand::Profile(p.id)),
+                ));
+            }
+        }
+        list.push((
+            "New profile".to_owned(),
+            "profile".to_owned(),
+            Entry::App(AppCommand::NewProfile),
+        ));
         if let Some(Tab::Repo(repo)) = self.tabs.get(self.active) {
             for (label, hint, action) in repo.palette_items() {
                 list.push((label, hint, Entry::Repo(action)));
@@ -123,6 +139,12 @@ impl App {
             Entry::App(AppCommand::Settings) => self.open_settings(),
             Entry::App(AppCommand::Manual) => self.manual_open = true,
             Entry::App(AppCommand::Theme(kind)) => self.set_theme(ctx, kind),
+            Entry::App(AppCommand::Profile(id)) => {
+                self.switch_profile(id, ctx);
+            }
+            Entry::App(AppCommand::NewProfile) => {
+                self.profile_request(crate::settings::ProfileRequest::New, ctx);
+            }
             Entry::Repo(action) => {
                 if let Some(Tab::Repo(repo)) = self.tabs.get_mut(self.active) {
                     repo.queue(action);
