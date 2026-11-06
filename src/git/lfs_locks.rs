@@ -323,9 +323,11 @@ pub fn pushed_paths(repo: &Path) -> Result<Vec<String>, String> {
 pub(crate) fn parse_check_attr(out: &str) -> Vec<String> {
     let fields: Vec<&str> = out.split('\0').collect();
     fields
-        .chunks_exact(3)
-        .filter(|f| f[2] == "set" || f[2] == "true")
-        .map(|f| f[0].to_owned())
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .filter(|[_, _, value]| *value == "set" || *value == "true")
+        .map(|[path, _, _]| (*path).to_owned())
         .collect()
 }
 
