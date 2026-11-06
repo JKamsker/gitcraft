@@ -10,9 +10,10 @@ use crate::git::Commit;
 
 /// The ancestors and descendants of a few commits among the loaded rows.
 pub(crate) struct Reach {
-    /// How many rows there were: once a reload changes them, the rows found are no longer
-    /// where they were, and nothing is known.
-    rows: usize,
+    /// The rows it was worked out on (shared, not copied): once a reload changes them, a row
+    /// may hold another commit than when the drag started, and only rows still holding the
+    /// same commit are answered for.
+    rows: Vec<Arc<Commit>>,
     sets: Vec<Set>,
 }
 
@@ -51,7 +52,7 @@ impl Reach {
             });
         }
         Self {
-            rows: commits.len(),
+            rows: commits.to_vec(),
             sets,
         }
     }
@@ -113,13 +114,19 @@ impl Ancestry for GraphAncestry<'_> {
         if ancestor == of {
             return Some(true);
         }
-        if self.commits.len() != self.reach.rows {
+        let (a, b) = (*self.index.get(ancestor)?, *self.index.get(of)?);
+        // Both still in the rows they were in when it was worked out.
+        let same = |row: usize| {
+            matches!(
+                (self.commits.get(row), self.reach.rows.get(row)),
+                (Some(now), Some(then)) if Arc::ptr_eq(now, then)
+            )
+        };
+        if !same(a) || !same(b) {
             return None;
         }
-        let (a, b) = (*self.index.get(ancestor)?, *self.index.get(of)?);
         for set in &self.reach.sets {
-            // Still the row it was: rows shifted by a reload know nothing.
-            if self.commits.get(set.row).is_none_or(|c| c.hash != set.hash) {
+            if !same(set.row) {
                 continue;
             }
             if set.hash == of {
@@ -181,6 +188,33 @@ mod tests {
         // Neither end worked out, or not loaded.
         assert_eq!(known.is_ancestor("a", "b"), None);
         assert_eq!(known.is_ancestor("g", "e"), None);
+    }
+
+    /// A reload that keeps the number of rows but puts other commits in them (a stash gone, a
+    /// fetched commit come in further down) answers nothing about the rows that changed,
+    /// rather than reading another commit's answer.
+    #[test]
+    fn a_reload_with_as_many_rows_knows_nothing_of_the_rows_that_changed() {
+        let (commits, index) = rows(&[
+            ("h", &["a"]),
+            ("a", &["b"]),
+            ("s", &["b"]),
+            ("b", &["c"]),
+            ("c", &[]),
+        ]);
+        let reach = Reach::new(&commits, &index, &["h"]);
+        let (mut now, _) = rows(&[("f", &["c"])]);
+        let mut reloaded: Vec<Arc<Commit>> = commits.clone();
+        reloaded[2] = Arc::clone(&reloaded[3]);
+        reloaded[3] = now.remove(0);
+        let reloaded_index = reloaded
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (c.hash.clone(), i))
+            .collect();
+        let known = reach.ancestry(&reloaded, &reloaded_index);
+        assert_eq!(known.is_ancestor("f", "h"), None);
+        assert_eq!(known.is_ancestor("a", "h"), Some(true));
     }
 
     #[test]
