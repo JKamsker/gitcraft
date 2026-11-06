@@ -18,6 +18,8 @@ egui_extras = { version = "0.36", default-features = false, features = ["svg", "
 keyring = "4.2"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 md5 = "0.7"
+# Inflating the members of .docx / .odt / .zip files and PDF streams, for their text in diffs.
+miniz_oxide = "0.8"
 notify = "8"
 notify-rust = "4"
 open = "5"

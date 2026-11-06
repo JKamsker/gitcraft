@@ -3,6 +3,7 @@
 
 use egui::{Sense, Stroke, Ui};
 
+use super::binary::{binary_view, textconv_note};
 use super::images::image_view;
 use super::lfs::lfs_view;
 use super::rendered;
@@ -78,6 +79,9 @@ impl RepoTab {
             line_comment_panel(ui, &t, pr, draft, data, acts);
         }
 
+        if let Some(program) = &data.textconv {
+            textconv_note(ui, program);
+        }
         let split = data.shows_split(split);
         let shift = ui.input(|i| i.modifiers.shift);
         let mut rows = Rows::new(ui, view, data, review.as_ref(), partial, split);
@@ -404,6 +408,10 @@ fn ready_data<'a>(
     }
     if let Some(images) = &data.image {
         image_view(ui, images);
+        return None;
+    }
+    if let Some(binary) = &data.binary {
+        binary_view(ui, binary, view.key.path());
         return None;
     }
     if data.lines.is_empty() {

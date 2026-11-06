@@ -3,9 +3,11 @@
 //! their objects. Uncommitted changes can be staged, unstaged or discarded a hunk or a few
 //! lines at a time.
 
+mod binary;
 mod images;
 mod jump;
 mod lfs;
+pub(super) mod line_diff;
 mod map;
 mod paint;
 mod parse;
@@ -72,6 +74,11 @@ pub struct DiffData {
     pub image: Option<ImagePair>,
     /// The file is kept in Git LFS: the objects before and after, shown instead of the lines.
     pub lfs: Option<LfsPair>,
+    /// A binary file (not an image, not in LFS): both versions, shown instead of git's
+    /// "Binary files differ".
+    pub binary: Option<binary::BinaryPair>,
+    /// The program git turned the file into text with (`textconv`), when it did.
+    pub textconv: Option<String>,
     /// The patch's file header (`diff --git`, `index`, `---`, `+++`), for partial patches.
     pub header: String,
     /// Hunks and lines can be staged, unstaged or discarded on their own.
@@ -164,6 +171,13 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
     } else {
         None
     };
+    let binary = (image.is_none() && lfs.is_none() && binary::is_binary_patch(&text))
+        .then(|| binary::load_pair(repo, key, &path, renamed_from(&text)));
+    // A diff of what the file's textconv made of it: its lines aren't the file's.
+    let textconv = (binary.is_none() && !lines.is_empty())
+        .then(|| binary::textconv_for(repo, &path))
+        .flatten();
+    let partial = partial && textconv.is_none();
     let mut spans = highlight_sides(&path, &lines, dark);
     let (mut changed, split) = pair_lines(&lines);
     let mut lines = lines;
@@ -188,6 +202,8 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         split,
         image,
         lfs,
+        binary,
+        textconv,
         header,
         partial,
         new_file,

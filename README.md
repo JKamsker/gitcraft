@@ -166,6 +166,13 @@ so your config, credentials and hooks apply as usual.
 - A file kept in Git LFS shows as its LFS objects before and after, with their sizes, rather
   than the text of the pointer git stores. With git-lfs installed, the palette (Ctrl+P) of a
   repository that uses LFS has _LFS: Fetch_ and _LFS: Pull_.
+- Other binary files show what they are instead of "Binary files differ": their kind, sizes
+  before and after and what can be told about them (a PDF's pages and title, an image's
+  dimensions, an archive's members), then _Text_, _Members_ or _Bytes_: the text of Word,
+  Excel, PowerPoint, OpenDocument and (plain) PDF files diffed line by line, the members of a
+  ZIP-based file added, removed and changed, and the first 64 KB of both sides in hex with the
+  bytes that differ marked. A file with a `textconv` driver shows git's text of it, said so
+  above the diff, and is staged as a whole.
 - The arrows in a diff's header (F7 / Shift+F7, or Alt+↓ / Alt+↑) jump to the next and previous
   change. The strip beside the scrollbar marks where the changes are, removals red and additions
   green; click a mark to jump to its change, or anywhere else on the strip to scroll there.
