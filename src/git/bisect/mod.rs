@@ -117,7 +117,7 @@ pub fn bisect_state(repo: &Path) -> Result<Option<Bisect>, String> {
     let log = match run(Some(repo), &["bisect", "log"]) {
         Ok(log) => log,
         Err(e) if parse::not_bisecting(&e) => return Ok(None),
-        Err(e) => return Err(format!("could not read the bisect: {e}")),
+        Err(e) => return Err(format!("Couldn't read the bisect: {e}")),
     };
     let files = Files::read(repo)?;
     let terms = parse::terms(files.terms.as_deref());

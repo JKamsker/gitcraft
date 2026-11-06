@@ -13,7 +13,7 @@ use crate::theme::{self, Tokens};
 const MAX_NAMED: usize = 8;
 
 /// From this width on, the banner's buttons share a row with what it says.
-const ONE_ROW_W: f32 = 980.0;
+const ONE_ROW_W: f32 = 760.0;
 
 /// The height of the run's output.
 const LOG_H: f32 = 180.0;
@@ -39,8 +39,23 @@ impl RepoTab {
                 });
             }
         } else if let Some(e) = &self.bisect.error {
-            let t = Tokens::get(ui.ctx());
-            ui.colored_label(t.danger, format!("Couldn't read the bisect: {e}"));
+            // Never read: what is wrong, and a way out.
+            ui.horizontal(|ui| {
+                let t = Tokens::get(ui.ctx());
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .add_enabled(self.busy_op.is_none(), egui::Button::new("Stop bisect"))
+                        .on_hover_text("git bisect reset: ends the bisect gitcraft can't read")
+                        .on_disabled_hover_text(BUSY)
+                        .clicked()
+                    {
+                        acts.push(Action::Bisect(BisectAct::Reset));
+                    }
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        ui.add(egui::Label::new(RichText::new(e).color(t.danger)).truncate());
+                    });
+                });
+            });
         }
         if let Some(run) = &self.bisect.run {
             run_log(ui, run, acts);
@@ -61,7 +76,7 @@ impl RepoTab {
     fn where_it_is(&self, ui: &mut Ui, bisect: &Bisect, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         if let Some(e) = &self.bisect.error {
-            ui.colored_label(t.danger, format!("Couldn't read the bisect again: {e}"));
+            ui.add(egui::Label::new(RichText::new(e).color(t.danger)).truncate());
             return;
         }
         match (&bisect.outcome, &bisect.progress, &bisect.marks.bad) {
@@ -77,8 +92,9 @@ impl RepoTab {
                     ))
                     .color(t.text),
                 );
+                // Short hashes only, so that they all fit.
                 for hash in possible.iter().take(MAX_NAMED) {
-                    self.commit_link(ui, hash, acts);
+                    hash_link(ui, hash, acts);
                 }
                 if possible.len() > MAX_NAMED {
                     ui.label(
@@ -90,14 +106,19 @@ impl RepoTab {
             (None, Some(progress), _) => {
                 // The count first: the commit's summary is cut to fit.
                 ui.label(RichText::new(steps_text(progress.steps, progress.left)).color(t.text));
-                ui.label(RichText::new("· testing").color(t.text_dim));
+                ui.label(RichText::new("· Testing").color(t.text_dim));
                 self.commit_link(ui, &bisect.current, acts);
             }
             (None, None, None) => {
-                waiting(ui, &t, bisect.word(Mark::Bad), "has the change");
+                waiting(ui, &t, bisect.word(Mark::Bad), "one with the change");
             }
             (None, None, Some(_)) => {
-                waiting(ui, &t, bisect.word(Mark::Good), "is from before the change");
+                waiting(
+                    ui,
+                    &t,
+                    bisect.word(Mark::Good),
+                    "one from before the change",
+                );
             }
         }
     }
@@ -138,15 +159,18 @@ impl RepoTab {
         if bisect.outcome.is_some() {
             if widgets::primary_button(ui, "Finish", idle, 80.0)
                 .on_hover_text(&back)
+                .on_disabled_hover_text(BUSY)
                 .clicked()
             {
                 acts.push(Action::Bisect(BisectAct::Reset));
             }
             return;
         }
+        let wait = if running { RUNNING } else { BUSY };
         if ui
             .add_enabled(idle && !running, egui::Button::new("Stop"))
             .on_hover_text(&back)
+            .on_disabled_hover_text(wait)
             .clicked()
         {
             acts.push(self.stop_bisect_action());
@@ -156,7 +180,7 @@ impl RepoTab {
             .add_enabled(idle && ready, egui::Button::new("Run a command…"))
             .on_hover_text("git bisect run: a command tests each commit for you")
             .on_disabled_hover_text(if ready {
-                "Wait for the operation going on to finish"
+                wait
             } else {
                 "Mark a good and a bad commit first"
             })
@@ -181,6 +205,7 @@ impl RepoTab {
             if ui
                 .add_enabled(idle && !running, egui::Button::new(word))
                 .on_hover_text(tip)
+                .on_disabled_hover_text(wait)
                 .clicked()
             {
                 acts.push(Action::Bisect(BisectAct::Mark { mark, rev: None }));
@@ -189,11 +214,29 @@ impl RepoTab {
     }
 }
 
+/// Why the banner's buttons are greyed out while another operation runs.
+pub(super) const BUSY: &str = "Wait for the operation going on to finish";
+
+/// Why they are while `git bisect run` tests the commits.
+pub(super) const RUNNING: &str = "Wait for the run to end, or stop it";
+
+/// A commit's short hash; a click selects it and shows its details.
+fn hash_link(ui: &mut Ui, hash: &str, acts: &mut Vec<Action>) {
+    let t = Tokens::get(ui.ctx());
+    let link =
+        egui::Label::new(RichText::new(short(hash)).color(t.accent)).sense(egui::Sense::click());
+    let resp = ui.add(link).on_hover_cursor(egui::CursorIcon::PointingHand);
+    if resp.on_hover_text("Show this commit").clicked() {
+        acts.push(Action::SelectHash(hash.to_owned()));
+    }
+}
+
 /// What a bisect still needs before it can pick commits to test.
 fn waiting(ui: &mut Ui, t: &Tokens, word: &str, meaning: &str) {
     let text = format!(
-        "Mark a {word} commit, one that {meaning}: right-click it in the graph, or mark the one \
-         checked out with the buttons."
+        "Mark a {word} commit ({meaning}): right-click it in the graph, or use {} for the one \
+         checked out.",
+        capitalised(word)
     );
     ui.add(egui::Label::new(RichText::new(&text).color(t.text)).truncate())
         .on_hover_text(text);

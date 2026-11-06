@@ -48,8 +48,8 @@ const FEATURES: &[(&str, &[&str])] = &[
         &[
             "Right-click a commit and choose Start bisect here… to find the commit that brought a change in: say whether it is good (from before the change) or bad (it has the change), and give the other end (HEAD is the bad one unless you name another). It refuses while there are uncommitted changes, conflicts, or a merge or rebase in progress.",
             "A banner over the graph then names the commit checked out for you to test and about how many steps are left; Good, Bad and Skip mark it, and right-clicking another commit marks that one. The graph tints good commits green, bad ones red and skipped ones grey.",
-            "Run a command… in the banner lets git bisect run test each commit for you, on the repository's machine (here, in WSL or over SSH): exit code 0 is good, 125 skips the commit, 1 to 127 is bad, and 128 or more stops. Its output shows under the banner as it comes; Stop run stops it, and the bisect stays where it got to.",
-            "At the end the first bad commit is selected and its details open. Finish (or Stop, before the end) runs git bisect reset, which checks out again the branch you were on.",
+            "Run a command… in the banner lets git bisect run test each commit for you, on the repository's machine (here, in WSL or over SSH): exit code 0 is good, 125 skips the commit, any other code up to 127 is bad, and 128 or more stops. Its output shows under the banner as it comes; Stop run stops it, and the bisect stays where it got to.",
+            "At the end the first bad commit is selected and its details open. Finish (or Stop, which asks first, before the end) runs git bisect reset, which checks out again what was checked out when it began.",
             "A bisect started in a terminal shows in the banner as soon as gitcraft sees it, and goes on from there; each worktree has its own.",
         ],
     ),
