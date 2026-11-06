@@ -629,8 +629,21 @@ fn an_operation_that_panics_leaves_the_tab_idle() {
     assert_eq!(job_status.as_deref(), Some("Internal error: bang"));
 }
 
+/// Waits for the dropped patch given to the tab to be done, and takes how it went.
+fn dropped_outcome(tab: &mut super::RepoTab, ctx: &egui::Context) -> Option<Result<(), String>> {
+    for _ in 0..400 {
+        tab.poll(ctx);
+        if let Some(outcome) = tab.take_dropped_patch_outcome() {
+            return Some(outcome);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(25));
+    }
+    None
+}
+
 /// A patch dropped on the window goes through the same path as _Apply patch_: a bare diff onto
-/// the working tree, a mail as a commit; a file that isn't there says so.
+/// the working tree, a mail as a commit. Each tells how it went itself, whatever the tab's
+/// status line says; a file that isn't there, or a patch that doesn't apply, fails.
 #[test]
 fn dropped_patches_are_applied() {
     use super::RepoTab;
@@ -649,30 +662,39 @@ fn dropped_patches_are_applied() {
     let _ = std::fs::create_dir_all(&patches);
     let diff_file = patches.join("change.DIFF");
     let _ = std::fs::write(&diff_file, &diff);
-    tab.apply_dropped_patch(diff_file, &ctx);
-    finish(&mut tab, &ctx);
+    // Something else on the status line already says it failed: no matter.
+    tab.status = Some(("Fetch failed: offline".to_owned(), true));
+    let given = tab.apply_dropped_patch(diff_file.clone(), &ctx);
+    // A second one while the first is applied is refused, not lost silently.
+    let second = tab.apply_dropped_patch(diff_file.clone(), &ctx);
+    let diff_outcome = dropped_outcome(&mut tab, &ctx);
     let applied = std::fs::read_to_string(&file).unwrap_or_default();
-    let diff_failed = tab.last_failed();
+    // Applied twice: it doesn't apply any more.
+    let again = tab.apply_dropped_patch(diff_file, &ctx);
+    let again_outcome = dropped_outcome(&mut tab, &ctx);
     // A mail: a commit, made and taken back, to apply again.
     assert!(git::run(Some(&dir), &["commit", "-q", "-am", "two lines"]).is_ok());
     let mail = git::run_bytes(Some(&dir), &["format-patch", "-1", "--stdout"]).unwrap_or_default();
     assert!(git::run(Some(&dir), &["reset", "-q", "--hard", "HEAD~1"]).is_ok());
     let mail_file = patches.join("0001-two lines.patch");
     let _ = std::fs::write(&mail_file, mail);
-    tab.apply_dropped_patch(mail_file, &ctx);
-    finish(&mut tab, &ctx);
+    let _ = tab.apply_dropped_patch(mail_file, &ctx);
+    let mail_outcome = dropped_outcome(&mut tab, &ctx);
     let subject = git::run(Some(&dir), &["log", "-1", "--format=%s"]).unwrap_or_default();
-    let mail_failed = tab.last_failed();
     // Gone before it was applied.
-    tab.apply_dropped_patch(patches.join("gone.patch"), &ctx);
-    let gone_failed = tab.last_failed();
-    let pending_after = tab.patch_pending;
+    let _ = tab.apply_dropped_patch(patches.join("gone.patch"), &ctx);
+    let gone_outcome = tab.take_dropped_patch_outcome();
+    let waits_after = tab.dropped_patch_waits();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::remove_dir_all(&patches);
+    assert_eq!(given, Ok(()));
+    assert!(second.is_err());
+    assert_eq!(diff_outcome, Some(Ok(())));
     assert_eq!(applied, "one\ntwo\n");
-    assert!(!diff_failed);
+    assert_eq!(again, Ok(()));
+    assert!(matches!(again_outcome, Some(Err(_))), "{again_outcome:?}");
+    assert_eq!(mail_outcome, Some(Ok(())));
     assert_eq!(subject.trim(), "two lines");
-    assert!(!mail_failed);
-    assert!(gone_failed);
-    assert!(!pending_after);
+    assert!(matches!(gone_outcome, Some(Err(e)) if e.contains("gone.patch")));
+    assert!(!waits_after);
 }

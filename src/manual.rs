@@ -19,9 +19,9 @@ const FEATURES: &[(&str, &[&str])] = &[
         "Repositories and tabs",
         &[
             "Open, create or clone a repository from the start page; recent ones are listed there, each with its branch (or the commit it is detached at), a dot when it has uncommitted changes, and when it was last opened. One on another machine shows its branch only while a connection to it is open (it is never connected to just for this).",
-            "Type on the start page to filter the recent repositories by name or path; ↑ / ↓ pick one, Enter opens it, Esc clears the filter.",
-            "Drop a folder on the window to open its repository; drop a .patch, .diff, .eml or .mbox file on a repository tab to apply it (a mail as commits, as Apply patch does). Several dropped at once are handled one after the other.",
-            "Scan a folder for repositories (start page) looks a few folders deep (skipping hidden ones, node_modules, target and the like) and lists the repositories found, to open one or add them to the recent list.",
+            "When there are recent repositories, type on the start page to filter them by name or path; ↑ / ↓ pick one, Enter opens it, Esc clears the filter.",
+            "Drop a folder on the window to open its repository; drop a .patch, .diff, .eml or .mbox file on a repository tab to apply it (a mail as commits, as Apply patch does). Several dropped at once are applied one after the other, each to the tab it was dropped on; if one fails, the ones after it are not applied.",
+            "Scan a folder for repositories (start page) looks a few folders deep (skipping hidden ones, node_modules, target and the like) and lists the repositories found, to open one or add those not listed yet to the recent list (as many as fit: it is never emptied for them). Stop keeps what was found so far.",
             "One tab per repository. Changes made elsewhere (editor, terminal) show up by themselves.",
             "Right-click a tab to give it its own icon and highlight colour.",
             "Drag a tab along the strip to reorder the tabs.",

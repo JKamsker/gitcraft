@@ -1,15 +1,20 @@
 //! What the start page shows of each recent repository: its branch and whether it has
 //! uncommitted changes, read in the background now and then and kept by folder.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, channel};
 use std::time::{Duration, Instant};
 
 use crate::git;
 
-/// How often the start page reads its repositories again while it is shown.
+/// How often the start page reads its repositories again while it is shown (and the window
+/// has the focus).
 const REFRESH_EVERY: Duration = Duration::from_secs(60);
+
+/// How long a reading may take: a repository that hasn't answered by then (a folder on a
+/// network share that hangs) is left out of the next readings.
+const READ_FOR: Duration = Duration::from_secs(90);
 
 /// What HEAD is in a recent repository.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -33,6 +38,8 @@ pub(super) enum RecentStatus {
     NotFound,
     /// The folder is there, but no repository.
     NotRepo,
+    /// It didn't answer in time.
+    TimedOut,
     /// git could not tell (the reason, one line).
     Failed(String),
 }
@@ -48,7 +55,16 @@ impl RecentStatus {
             },
             RecentStatus::NotFound => "folder not found".to_owned(),
             RecentStatus::NotRepo => "not a repository any more".to_owned(),
+            RecentStatus::TimedOut => "didn't answer in time".to_owned(),
             RecentStatus::Failed(_) => "couldn't read it".to_owned(),
+        }
+    }
+
+    /// Why it couldn't be read, for the label's tooltip.
+    pub(super) fn reason(&self) -> Option<&str> {
+        match self {
+            RecentStatus::Failed(why) => Some(why),
+            _ => None,
         }
     }
 
@@ -62,22 +78,34 @@ impl RecentStatus {
     }
 }
 
+/// The `git status` the start page reads a recent repository with.
+/// - `core.fsmonitor=false`: a repository's own config could name a program for git to run;
+///   a repository found by a scan was never opened, and nobody asked for this read.
+/// - `--no-optional-locks`: never takes the index lock from a git running there.
+const STATUS_ARGS: [&str; 8] = [
+    "-c",
+    "core.fsmonitor=false",
+    "--no-optional-locks",
+    "status",
+    "--porcelain=v2",
+    "--branch",
+    "--untracked-files=normal",
+    "--ignore-submodules=dirty",
+];
+
 /// Reads `repo`'s branch and whether it has uncommitted changes. `None` for one on another
 /// machine no connection is open to (it is not connected to just for this).
 pub(super) fn read(repo: &Path) -> Option<RecentStatus> {
-    if !crate::remote::is_remote(repo) && !repo.is_dir() {
-        return Some(RecentStatus::NotFound);
+    if !crate::remote::is_remote(repo) {
+        if !repo.is_dir() {
+            return Some(RecentStatus::NotFound);
+        }
+        // Its own repository, not one of a folder above it (whose `.git` it lost).
+        if !repo.join(".git").exists() {
+            return Some(RecentStatus::NotRepo);
+        }
     }
-    // `--no-optional-locks`: never takes the index lock from a git running there.
-    let args = [
-        "--no-optional-locks",
-        "status",
-        "--porcelain=v2",
-        "--branch",
-        "--untracked-files=normal",
-        "--ignore-submodules=dirty",
-    ];
-    Some(match git::run_if_connected(repo, &args)? {
+    Some(match git::run_if_connected(repo, &STATUS_ARGS)? {
         Ok(out) => parse(&out),
         Err(e) => from_error(&e),
     })
@@ -116,10 +144,20 @@ fn from_error(err: &str) -> RecentStatus {
         RecentStatus::NotRepo
     } else if lower.contains("isn't a folder on") || lower.contains("cannot change to") {
         RecentStatus::NotFound
+    } else if lower.contains("didn't answer in time") {
+        RecentStatus::TimedOut
     } else {
         let first = err.lines().next().unwrap_or_default();
         RecentStatus::Failed(first.chars().take(200).collect())
     }
+}
+
+/// A reading under way: one thread per repository, so that one that hangs holds up no other.
+struct Reading {
+    rx: Receiver<(PathBuf, Option<RecentStatus>)>,
+    /// Not answered yet.
+    waiting: HashSet<PathBuf>,
+    started: Instant,
 }
 
 /// The statuses read so far, by folder, and the reading under way.
@@ -127,11 +165,14 @@ fn from_error(err: &str) -> RecentStatus {
 pub(super) struct RecentStatuses {
     /// `None`: one on another machine that wasn't read, as no connection is open to it.
     found: HashMap<PathBuf, Option<RecentStatus>>,
-    reading: Option<Receiver<(PathBuf, Option<RecentStatus>)>>,
+    reading: Option<Reading>,
     /// When the last reading started.
     started: Option<Instant>,
     /// The frame the start page was last drawn in.
     seen_frame: Option<u64>,
+    /// Repositories that didn't answer a reading in time: not read again (a thread may still
+    /// wait for them).
+    hung: HashSet<PathBuf>,
 }
 
 impl RecentStatuses {
@@ -139,8 +180,9 @@ impl RecentStatuses {
         self.found.get(path)?.as_ref()
     }
 
-    /// Called each frame the start page is drawn: takes in what was read, and reads all of
-    /// `paths` again when the page was just shown, after a while, or when one was never read.
+    /// Called each frame the start page is drawn: takes in what was read, and reads `paths`
+    /// again when the page was just shown, after a while (while the window has the focus),
+    /// or when one was never read.
     pub(super) fn update(&mut self, paths: &[PathBuf], ctx: &egui::Context) {
         self.take_in();
         let frame = ctx.cumulative_frame_nr();
@@ -149,44 +191,67 @@ impl RecentStatuses {
         if self.reading.is_some() {
             return;
         }
-        let stale = self.started.is_none_or(|t| t.elapsed() >= REFRESH_EVERY);
+        let focused = ctx.input(|i| i.focused);
+        let stale = focused && self.started.is_none_or(|t| t.elapsed() >= REFRESH_EVERY);
         let unread = paths.iter().any(|p| !self.found.contains_key(p));
         if just_shown || stale || unread {
-            self.start(paths.to_vec(), ctx);
+            let wanted = self.to_read(paths, just_shown);
+            self.start(wanted, ctx);
         }
         ctx.request_repaint_after(REFRESH_EVERY);
     }
 
+    /// Which of `paths` a reading reads: not those that hung, nor one on another machine that
+    /// didn't answer in time last time (until the page is shown again).
+    fn to_read(&self, paths: &[PathBuf], just_shown: bool) -> Vec<PathBuf> {
+        paths
+            .iter()
+            .filter(|p| !self.hung.contains(*p))
+            .filter(|p| {
+                just_shown
+                    || !crate::remote::is_remote(p)
+                    || self.get(p) != Some(&RecentStatus::TimedOut)
+            })
+            .cloned()
+            .collect()
+    }
+
     fn start(&mut self, paths: Vec<PathBuf>, ctx: &egui::Context) {
         let (tx, rx) = channel();
-        let ctx = ctx.clone();
-        std::thread::spawn(move || {
-            for path in paths {
+        for path in &paths {
+            let (tx, ctx, path) = (tx.clone(), ctx.clone(), path.clone());
+            std::thread::spawn(move || {
                 let status = read(&path);
-                if tx.send((path, status)).is_err() {
-                    return;
-                }
+                let _ = tx.send((path, status));
                 ctx.request_repaint();
-            }
+            });
+        }
+        self.reading = Some(Reading {
+            rx,
+            waiting: paths.into_iter().collect(),
+            started: Instant::now(),
         });
-        self.reading = Some(rx);
         self.started = Some(Instant::now());
     }
 
     fn take_in(&mut self) {
-        let Some(rx) = &self.reading else { return };
-        loop {
-            match rx.try_recv() {
-                // `None`, not reachable without connecting: nothing is shown for it.
-                Ok((path, status)) => {
-                    self.found.insert(path, status);
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => return,
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    self.reading = None;
-                    return;
-                }
+        let Some(reading) = &mut self.reading else {
+            return;
+        };
+        // `None`, not reachable without connecting: nothing is shown for it.
+        while let Ok((path, status)) = reading.rx.try_recv() {
+            reading.waiting.remove(&path);
+            self.found.insert(path, status);
+        }
+        if reading.waiting.is_empty() {
+            self.reading = None;
+        } else if reading.started.elapsed() > READ_FOR {
+            for path in std::mem::take(&mut reading.waiting) {
+                self.found
+                    .insert(path.clone(), Some(RecentStatus::TimedOut));
+                self.hung.insert(path);
             }
+            self.reading = None;
         }
     }
 }
@@ -303,6 +368,42 @@ mod tests {
             "{status:?} (is the temporary folder inside a repository?)"
         );
         assert_eq!(read(&dir), Some(RecentStatus::NotFound));
+    }
+
+    /// A recent folder that lost its `.git` but sits inside another repository isn't shown
+    /// with that repository's branch.
+    #[test]
+    fn a_folder_inside_another_repository_is_not_one() {
+        let dir = repo("parent");
+        git_ok(&dir, &["commit", "-q", "--allow-empty", "-m", "one"]);
+        let inner = dir.join("was a repo");
+        let _ = std::fs::create_dir_all(&inner);
+        let status = read(&inner);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(status, Some(RecentStatus::NotRepo));
+    }
+
+    #[test]
+    fn timed_out_remote_ones_wait_until_the_page_is_shown_again() {
+        assert_eq!(
+            from_error("exec git status didn't answer in time"),
+            RecentStatus::TimedOut
+        );
+        let remote = PathBuf::from("ssh://box/home/me/api");
+        let here = PathBuf::from("/home/me/app");
+        let hung = PathBuf::from("/mnt/nfs/stuck");
+        let mut statuses = RecentStatuses::default();
+        statuses
+            .found
+            .insert(remote.clone(), Some(RecentStatus::TimedOut));
+        statuses
+            .found
+            .insert(here.clone(), Some(RecentStatus::TimedOut));
+        statuses.hung.insert(hung.clone());
+        let all = [remote.clone(), here.clone(), hung];
+        assert_eq!(statuses.to_read(&all, false), vec![here.clone()]);
+        assert_eq!(statuses.to_read(&all, true), vec![remote, here]);
+        assert_eq!(RecentStatus::Failed("boom".into()).reason(), Some("boom"));
     }
 
     #[test]

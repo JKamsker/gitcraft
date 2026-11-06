@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, channel};
+use std::time::{Duration, Instant};
 
 use egui::{RichText, Stroke, vec2};
 
@@ -12,7 +13,8 @@ use super::panels::Toast;
 use super::{App, MAX_RECENT};
 use crate::theme::{self, Tokens};
 
-/// Folders never looked in: what tools fill with thousands of folders of their own.
+/// Folders never looked in: what tools fill with thousands of folders of their own. One of
+/// them that is itself a repository is still found (a project called `build`).
 const SKIPPED: [&str; 10] = [
     "node_modules",
     "target",
@@ -33,7 +35,7 @@ pub(super) struct ScanLimits {
     pub depth: usize,
     /// The most repositories listed.
     pub max_repos: usize,
-    /// The most folders looked in.
+    /// The most folders looked in (and kept in memory to look in).
     pub max_dirs: usize,
 }
 
@@ -44,13 +46,31 @@ pub(super) const LIMITS: ScanLimits = ScanLimits {
     max_dirs: 50_000,
 };
 
+/// Why a scan ended before it looked everywhere.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Stopped {
+    /// It found [`ScanLimits::max_repos`].
+    Repos,
+    /// It looked in [`ScanLimits::max_dirs`] folders.
+    Folders,
+    /// It was asked to stop.
+    Asked,
+}
+
 /// What a scan found.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct Found {
     /// The repositories' folders, sorted.
     pub repos: Vec<PathBuf>,
-    /// It stopped at a limit: there may be more.
-    pub cut: bool,
+    /// It stopped before it looked everywhere: there may be more.
+    pub stopped: Option<Stopped>,
+}
+
+/// How a scan is going, now and then.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) struct Progress {
+    pub folders: usize,
+    pub repos: usize,
 }
 
 /// Whether the folder `name` is looked in.
@@ -64,66 +84,149 @@ fn is_repo(dir: &Path) -> bool {
     dir.join(".git").exists()
 }
 
-/// The repositories in `root` and the folders under it, as far as `limits` go, skipping hidden
-/// folders, the [`SKIPPED`] ones and links (which could go round in circles). Repositories
-/// inside repositories are found too. `visited` is told how many folders were looked in, now
-/// and then; `cancel` stops it.
+/// Why `dir` couldn't be looked in, in words.
+fn unreadable(dir: &Path, e: &std::io::Error) -> String {
+    let dir = crate::remote::display(dir);
+    match e.kind() {
+        std::io::ErrorKind::PermissionDenied => {
+            format!("gitcraft isn't allowed to look in {dir}.")
+        }
+        std::io::ErrorKind::NotFound => format!("{dir} isn't there any more."),
+        _ => format!("Could not look in {dir}: {e}"),
+    }
+}
+
+/// The repositories in `root` and the folders under it, as far as `limits` go. Hidden folders,
+/// the [`SKIPPED`] ones and links (which could go round in circles) aren't looked in, though one
+/// of the first two that is a repository is found. Repositories inside repositories are found
+/// too. `progress` is told how it goes, now and then; `cancel` stops it, with what it found.
 pub(super) fn scan(
     root: &Path,
     limits: ScanLimits,
     cancel: &AtomicBool,
-    visited: &mut dyn FnMut(usize),
+    progress: &mut dyn FnMut(Progress),
 ) -> Result<Found, String> {
-    std::fs::read_dir(root).map_err(|e| format!("Could not look in {}: {e}", root.display()))?;
+    std::fs::read_dir(root).map_err(|e| unreadable(root, &e))?;
     let mut found = Found::default();
-    let mut level = vec![root.to_owned()];
+    // Each folder, and whether to look in it (not when it is only checked for being one).
+    let mut level = vec![(root.to_owned(), true)];
     let mut seen = 0usize;
+    let mut told = Instant::now();
     'walk: for depth in 0..=limits.depth {
         let mut next = Vec::new();
-        for dir in level {
+        for (dir, look_in) in level {
             if cancel.load(Ordering::Relaxed) {
+                found.stopped = Some(Stopped::Asked);
                 break 'walk;
             }
             seen += 1;
-            if seen.is_multiple_of(200) {
-                visited(seen);
+            if told.elapsed() >= Duration::from_millis(100) {
+                told = Instant::now();
+                progress(Progress {
+                    folders: seen,
+                    repos: found.repos.len(),
+                });
             }
             if is_repo(&dir) {
                 found.repos.push(dir.clone());
                 if found.repos.len() >= limits.max_repos {
-                    found.cut = true;
+                    found.stopped = Some(Stopped::Repos);
                     break 'walk;
                 }
             }
             if seen >= limits.max_dirs {
-                found.cut = true;
+                found.stopped = Some(Stopped::Folders);
                 break 'walk;
             }
-            if depth == limits.depth {
+            if depth == limits.depth || !look_in {
                 continue;
             }
             let Ok(entries) = std::fs::read_dir(&dir) else {
                 continue;
             };
             for entry in entries.flatten() {
-                // A link's own type: never followed.
-                let is_dir = entry.file_type().is_ok_and(|t| t.is_dir());
-                if is_dir && walked(&entry.file_name().to_string_lossy()) {
-                    next.push(entry.path());
+                // Never more kept than will be looked in.
+                if seen + next.len() >= limits.max_dirs {
+                    found.stopped = Some(Stopped::Folders);
+                    break;
                 }
+                // A link's own type: never followed.
+                if !entry.file_type().is_ok_and(|t| t.is_dir()) {
+                    continue;
+                }
+                let name = entry.file_name();
+                let name = name.to_string_lossy();
+                if name == ".git" {
+                    continue;
+                }
+                next.push((entry.path(), walked(&name)));
             }
         }
         next.sort();
         level = next;
     }
-    visited(seen);
+    progress(Progress {
+        folders: seen,
+        repos: found.repos.len(),
+    });
     found.repos.sort();
     Ok(found)
 }
 
+/// Adds the `found` repositories missing from `recent` at its end, as many as there is room
+/// for (`max` in all): never pushing out those it has. Returns how many were added, how many
+/// it had already, and how many there was no room for.
+pub(super) fn add_to_recent(
+    recent: &mut Vec<PathBuf>,
+    found: &[PathBuf],
+    max: usize,
+) -> (usize, usize, usize) {
+    let (mut added, mut had, mut no_room) = (0, 0, 0);
+    for repo in found {
+        if recent.contains(repo) {
+            had += 1;
+        } else if recent.len() < max {
+            recent.push(repo.clone());
+            added += 1;
+        } else {
+            no_room += 1;
+        }
+    }
+    (added, had, no_room)
+}
+
+/// What [`add_to_recent`] did, in words.
+fn added_message(added: usize, had: usize, no_room: usize) -> String {
+    let n = |k: usize| {
+        if k == 1 {
+            "1 repository".to_owned()
+        } else {
+            format!("{k} repositories")
+        }
+    };
+    let mut said = format!("Added {} to the recent list", n(added));
+    let mut notes = Vec::new();
+    if had > 0 {
+        notes.push(format!(
+            "{had} {} already there",
+            if had == 1 { "was" } else { "were" }
+        ));
+    }
+    if no_room > 0 {
+        notes.push(format!(
+            "{} didn't fit: it holds {MAX_RECENT}, remove some to make room",
+            n(no_room)
+        ));
+    }
+    if !notes.is_empty() {
+        said.push_str(&format!(" ({})", notes.join("; ")));
+    }
+    said
+}
+
 /// What the scan's thread sends.
 enum ScanMsg {
-    Visited(usize),
+    Progress(Progress),
     Done(Result<Found, String>),
 }
 
@@ -131,7 +234,7 @@ enum ScanMsg {
 pub(super) struct RepoScan {
     root: PathBuf,
     rx: Receiver<ScanMsg>,
-    visited: usize,
+    progress: Progress,
     result: Option<Result<Found, String>>,
     cancel: Arc<AtomicBool>,
 }
@@ -142,11 +245,11 @@ impl RepoScan {
         let cancel = Arc::new(AtomicBool::new(false));
         let (dir, stop, ctx) = (root.clone(), cancel.clone(), ctx.clone());
         std::thread::spawn(move || {
-            let mut visited = |n| {
-                let _ = tx.send(ScanMsg::Visited(n));
+            let mut progress = |p| {
+                let _ = tx.send(ScanMsg::Progress(p));
                 ctx.request_repaint();
             };
-            let result = scan(&dir, LIMITS, &stop, &mut visited).map(|mut found| {
+            let result = scan(&dir, LIMITS, &stop, &mut progress).map(|mut found| {
                 found.repos = found.repos.into_iter().map(top_folder).collect();
                 found
             });
@@ -156,7 +259,7 @@ impl RepoScan {
         Self {
             root,
             rx,
-            visited: 0,
+            progress: Progress::default(),
             result: None,
             cancel,
         }
@@ -165,10 +268,15 @@ impl RepoScan {
     fn poll(&mut self) {
         while let Ok(msg) = self.rx.try_recv() {
             match msg {
-                ScanMsg::Visited(n) => self.visited = n,
+                ScanMsg::Progress(p) => self.progress = p,
                 ScanMsg::Done(result) => self.result = Some(result),
             }
         }
+    }
+
+    /// Stops looking; what was found so far stays listed.
+    fn stop(&self) {
+        self.cancel.store(true, Ordering::Relaxed);
     }
 }
 
@@ -190,6 +298,7 @@ fn top_folder(dir: PathBuf) -> PathBuf {
 enum ScanClick {
     Open(PathBuf),
     AddAll,
+    Stop,
     Close,
 }
 
@@ -217,13 +326,19 @@ impl App {
             .corner_radius(t.radius_lg)
             .inner_margin(egui::Margin::same(18))
             .shadow(ctx.global_style().visuals.window_shadow);
+        let done = scan.result.is_some();
         let mut click = None;
         let resp = egui::Modal::new(egui::Id::new("repo-scan-dialog"))
             .frame(frame)
             .backdrop_color(egui::Color32::from_black_alpha(110))
             .show(ctx, |ui| {
                 ui.set_width(520.0);
-                ui.label(RichText::new("Repositories found").font(theme::semibold(15.0)));
+                let title = if done {
+                    "Repositories found"
+                } else {
+                    "Scanning for repositories…"
+                };
+                ui.label(RichText::new(title).font(theme::semibold(15.0)));
                 ui.label(
                     RichText::new(crate::remote::display(&scan.root))
                         .color(t.text_faint)
@@ -237,29 +352,33 @@ impl App {
                         Some(Ok(found)) => found.repos.len(),
                         _ => 0,
                     };
-                    let label = if count > MAX_RECENT {
-                        format!("Add the first {MAX_RECENT} to the recent list")
-                    } else {
-                        "Add all to the recent list".to_owned()
-                    };
-                    if crate::repo::primary_button(ui, &label, count > 0, 220.0).clicked() {
+                    let add =
+                        crate::repo::primary_button(ui, "Add to the recent list", count > 0, 200.0)
+                            .on_hover_text(format!(
+                                "Adds those not in it yet, as many as fit (it holds {MAX_RECENT})"
+                            ));
+                    if add.clicked() {
                         click = Some(ScanClick::AddAll);
                     }
-                    let close = if scan.result.is_some() {
-                        "Close"
+                    let (label, what) = if done {
+                        ("Close", ScanClick::Close)
                     } else {
-                        "Stop"
+                        ("Stop", ScanClick::Stop)
                     };
                     if ui
-                        .add(egui::Button::new(close).min_size(vec2(80.0, 30.0)))
+                        .add(egui::Button::new(label).min_size(vec2(80.0, 30.0)))
                         .clicked()
                     {
-                        click = Some(ScanClick::Close);
+                        click = Some(what);
                     }
                 });
             });
         if resp.should_close() && click.is_none() {
-            click = Some(ScanClick::Close);
+            click = Some(if done {
+                ScanClick::Close
+            } else {
+                ScanClick::Stop
+            });
         }
         match click {
             Some(ScanClick::Open(path)) => {
@@ -268,33 +387,36 @@ impl App {
             }
             Some(ScanClick::AddAll) => {
                 if let Some(Some(Ok(found))) = self.repo_scan.take().map(|mut s| s.result.take()) {
-                    let added = self.add_recent(&found.repos);
+                    let (added, had, no_room) =
+                        add_to_recent(&mut self.recent, &found.repos, MAX_RECENT);
                     self.toasts.push(Toast::new(
-                        format!(
-                            "Added {added} {} to the recent list",
-                            if added == 1 {
-                                "repository"
-                            } else {
-                                "repositories"
-                            }
-                        ),
-                        false,
+                        added_message(added, had, no_room),
+                        added == 0 && no_room > 0,
                     ));
+                }
+            }
+            Some(ScanClick::Stop) => {
+                if let Some(scan) = &self.repo_scan {
+                    scan.stop();
                 }
             }
             Some(ScanClick::Close) => self.repo_scan = None,
             None => {}
         }
     }
+}
 
-    /// Puts `repos` at the top of the recent list, in their order, as many as it holds.
-    /// Returns how many of them it has now.
-    fn add_recent(&mut self, repos: &[PathBuf]) -> usize {
-        let take: Vec<PathBuf> = repos.iter().take(MAX_RECENT).cloned().collect();
-        self.recent.retain(|p| !take.contains(p));
-        self.recent.splice(0..0, take.iter().cloned());
-        self.recent.truncate(MAX_RECENT);
-        take.len()
+/// What the dialog says of how the scan ended, when it didn't look everywhere.
+fn stopped_message(stopped: Stopped, found: usize) -> String {
+    match stopped {
+        Stopped::Repos => format!(
+            "Stopped after {found} repositories: pick a folder further down to see the rest."
+        ),
+        Stopped::Folders => format!(
+            "Stopped after looking in {} folders: pick a folder further down to see the rest.",
+            LIMITS.max_dirs
+        ),
+        Stopped::Asked => format!("Stopped: found {found} so far."),
     }
 }
 
@@ -304,7 +426,11 @@ fn scan_body(ui: &mut egui::Ui, scan: &RepoScan, t: &Tokens) -> Option<ScanClick
         None => {
             ui.horizontal(|ui| {
                 ui.add(crate::spinner::Spinner::new());
-                ui.label(format!("Looking… {} folders so far", scan.visited));
+                let p = scan.progress;
+                ui.label(format!(
+                    "Looked in {} folders, found {} repositories…",
+                    p.folders, p.repos
+                ));
             });
             return None;
         }
@@ -315,11 +441,15 @@ fn scan_body(ui: &mut egui::Ui, scan: &RepoScan, t: &Tokens) -> Option<ScanClick
         Some(Ok(found)) => found,
     };
     if found.repos.is_empty() {
-        ui.label(format!(
-            "No repositories found ({} folders down, hidden folders and ones like node_modules \
-             skipped).",
-            LIMITS.depth
-        ));
+        let said = match found.stopped {
+            Some(stopped) => stopped_message(stopped, 0),
+            None => format!(
+                "No repositories found within {} folders of this one. Hidden folders and folders \
+                 like node_modules, target and build aren't looked in.",
+                LIMITS.depth
+            ),
+        };
+        ui.label(said);
         return None;
     }
     let mut click = None;
@@ -347,10 +477,10 @@ fn scan_body(ui: &mut egui::Ui, scan: &RepoScan, t: &Tokens) -> Option<ScanClick
                 ui.add_space(2.0);
             }
         });
-    if found.cut {
+    if let Some(stopped) = found.stopped {
         ui.add_space(4.0);
         ui.label(
-            RichText::new("It stopped at its limit: there may be more.")
+            RichText::new(stopped_message(stopped, found.repos.len()))
                 .color(t.text_faint)
                 .small(),
         );
@@ -414,7 +544,7 @@ mod tests {
                 "my projects/Größe 日本"
             ]
         );
-        assert!(!found.cut);
+        assert_eq!(found.stopped, None);
         // Not as deep.
         let shallow = ScanLimits { depth: 1, ..LIMITS };
         assert_eq!(names(&root, &run(&root, shallow)), vec!["app"]);
@@ -425,11 +555,50 @@ mod tests {
         };
         let cut = run(&root, few);
         assert_eq!(cut.repos.len(), 2);
-        assert!(cut.cut);
+        assert_eq!(cut.stopped, Some(Stopped::Repos));
         // The folder picked is itself one.
         let inner = run(&root.join("app"), LIMITS);
         assert_eq!(names(&root, &inner), vec!["app", "app/plugins/inner"]);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A repository named like a folder that isn't looked in (`build`, `.dotfiles`) is still
+    /// found; what is inside it isn't looked at.
+    #[test]
+    fn repositories_named_like_skipped_folders_are_found() {
+        let root = tree("skipped-names");
+        init(&root.join("build"));
+        init(&root.join("tools/target"));
+        init(&root.join(".dotfiles"));
+        init(&root.join("vendor/inside/repo"));
+        let found = run(&root, LIMITS);
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(
+            names(&root, &found),
+            vec![".dotfiles", "build", "tools/target"]
+        );
+    }
+
+    /// No more folders are kept to look in than the limit, however many a folder holds.
+    #[test]
+    fn the_folders_kept_stay_within_the_limit() {
+        let root = tree("many");
+        for i in 0..40 {
+            let _ = std::fs::create_dir_all(root.join(format!("d{i:02}/x")));
+        }
+        init(&root.join("d00"));
+        let mut most = 0;
+        let stop = AtomicBool::new(false);
+        let limits = ScanLimits {
+            max_dirs: 10,
+            ..LIMITS
+        };
+        let found = scan(&root, limits, &stop, &mut |p| most = most.max(p.folders));
+        let _ = std::fs::remove_dir_all(&root);
+        let found = found.unwrap_or_default();
+        assert_eq!(found.stopped, Some(Stopped::Folders));
+        assert!(most <= 10, "{most}");
+        assert_eq!(names(&root, &found), vec!["d00"]);
     }
 
     #[test]
@@ -440,13 +609,17 @@ mod tests {
             scan(&root, LIMITS, &stop, &mut |_| {}),
             Ok(Found::default())
         );
-        assert!(scan(&root.join("gone"), LIMITS, &stop, &mut |_| {}).is_err());
-        // Stopped at once.
+        let gone = scan(&root.join("gone"), LIMITS, &stop, &mut |_| {});
+        assert!(gone.is_err_and(|e| e.ends_with("isn't there any more.")));
+        // Stopped at once: it says so, with nothing found.
         init(&root.join("r"));
         let stopped = AtomicBool::new(true);
         assert_eq!(
             scan(&root, LIMITS, &stopped, &mut |_| {}),
-            Ok(Found::default())
+            Ok(Found {
+                repos: Vec::new(),
+                stopped: Some(Stopped::Asked)
+            })
         );
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -473,5 +646,28 @@ mod tests {
         assert!(!walked(".cache"));
         assert!(!walked("node_modules"));
         assert!(!walked("target"));
+    }
+
+    /// Adding what a scan found never pushes out what the recent list has.
+    #[test]
+    fn adding_found_ones_keeps_the_recent_list() {
+        let p = |s: &str| PathBuf::from(s);
+        let mut recent: Vec<PathBuf> = (0..10).map(|i| p(&format!("/r{i}"))).collect();
+        let found = [p("/r3"), p("/new1"), p("/new2"), p("/new3"), p("/new4")];
+        assert_eq!(add_to_recent(&mut recent, &found, 12), (2, 1, 2));
+        assert_eq!(recent.len(), 12);
+        assert_eq!(recent[0], p("/r0"));
+        assert_eq!(recent[10..], [p("/new1"), p("/new2")]);
+        assert_eq!(
+            added_message(2, 1, 2),
+            format!(
+                "Added 2 repositories to the recent list (1 was already there; 2 repositories \
+                 didn't fit: it holds {MAX_RECENT}, remove some to make room)"
+            )
+        );
+        assert_eq!(
+            added_message(1, 0, 0),
+            "Added 1 repository to the recent list"
+        );
     }
 }

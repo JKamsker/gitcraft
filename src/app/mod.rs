@@ -135,8 +135,8 @@ pub struct App {
     recent_status: recent_status::RecentStatuses,
     /// See [`Saved::last_opened`].
     last_opened: BTreeMap<PathBuf, i64>,
-    /// Files and folders dropped on the window, still to be handled.
-    drops: dropped::Drops,
+    /// Patches dropped on repository tabs, still to be applied.
+    patches: dropped::PatchQueue,
     /// _Scan a folder for repositories_, while its dialog is open.
     repo_scan: Option<repo_scan::RepoScan>,
 }
@@ -184,7 +184,7 @@ impl App {
             recent_filter: Default::default(),
             recent_status: Default::default(),
             last_opened: saved.last_opened,
-            drops: Default::default(),
+            patches: Default::default(),
             repo_scan: None,
             error: None,
             was_focused: true,
@@ -244,6 +244,7 @@ impl App {
                 .iter()
                 .position(|t| matches!(t, Tab::Repo(r) if r.path == path))
             {
+                self.remember(path);
                 self.active = i;
                 return;
             }

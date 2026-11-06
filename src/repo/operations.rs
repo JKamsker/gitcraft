@@ -178,6 +178,7 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         self.busy_op = None;
+        self.dropped_patch_done(&label, &result);
         let long = self
             .op_started
             .take()
