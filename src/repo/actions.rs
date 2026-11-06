@@ -120,6 +120,8 @@ pub(crate) enum Action {
     /// The commit pane lists every file of the commit, or only those it changed.
     ViewAllFiles(bool),
     SaveConflict,
+    /// Remembered conflict resolutions (git rerere): the switch, forgetting one.
+    Rerere(super::conflict::rerere::RerereAct),
     /// Let Mergiraf solve what it can of the open conflict.
     SolveWithMergiraf,
     /// A file's history, blame or contents in the central pane (`rev`: the commit they are at).
@@ -368,6 +370,18 @@ impl RepoTab {
                 "Open in browser".into(),
                 "remote".into(),
                 Action::OpenUrl(url),
+            ));
+        }
+        if let Some(on) = self.rerere.enabled {
+            items.push((
+                if on {
+                    "Stop remembering conflict resolutions (rerere)"
+                } else {
+                    "Remember conflict resolutions (rerere)"
+                }
+                .into(),
+                "conflicts".into(),
+                Action::Rerere(super::conflict::rerere::RerereAct::SetEnabled(!on)),
             ));
         }
         if !self.submodules.is_empty() {

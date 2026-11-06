@@ -220,6 +220,7 @@ impl RepoTab {
                 }
             }
             Err(e) => {
+                self.note_reused(e);
                 self.open_when_done.take_if(|(l, _)| *l == label);
                 self.focus_wip = e.contains("CONFLICT") || e.contains("could not apply");
                 self.status = Some((format!("{label} failed: {e}"), true));

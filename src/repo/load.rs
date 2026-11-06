@@ -331,7 +331,12 @@ impl RepoTab {
     pub(super) fn loaded(&mut self, result: Result<Box<Loaded>, String>, ctx: &egui::Context) {
         self.loading = false;
         match result {
-            Ok(loaded) => self.take_loaded(*loaded, ctx),
+            Ok(loaded) => {
+                self.take_loaded(*loaded, ctx);
+                if self.rerere.enabled.is_none() {
+                    self.read_rerere(ctx);
+                }
+            }
             Err(e) => self.load_error = Some(e),
         }
         if std::mem::take(&mut self.reload_again) {

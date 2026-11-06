@@ -1,11 +1,16 @@
 //! Three-pane conflict editor: each conflict's "ours" and "theirs" side by side with buttons to
 //! pick a side (or both), and the resulting file below, editable by hand.
 
+mod align;
+pub mod rerere;
+mod reused;
 mod view;
 
 use std::path::Path;
 
 use crate::git::InProgress;
+
+use self::align::split_resolutions;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Segment {
@@ -23,12 +28,25 @@ pub enum Choice {
     Theirs,
     OursThenTheirs,
     TheirsThenOurs,
+    /// The text recorded for the conflict (see [`ConflictEditor::recorded`]).
+    Recorded,
+}
+
+/// Why a conflicted file opened without conflict markers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Reused {
+    /// git said it reused a resolution recorded by rerere.
+    Rerere,
+    /// Its markers are gone though git still has it unmerged (rerere earlier, an editor…).
+    NoMarkers,
 }
 
 pub struct ConflictEditor {
     pub path: String,
     segments: Vec<Segment>,
     choices: Vec<Option<Choice>>,
+    /// A text recorded for each conflict ([`Choice::Recorded`]): what rerere reused.
+    recorded: Vec<Option<String>>,
     pub result: String,
     /// The result was edited by hand; choices no longer rewrite it.
     manual: bool,
@@ -48,6 +66,8 @@ pub struct ConflictEditor {
     /// Being written on another machine, in the background: neither edited nor saved again
     /// until that is done, so an older save can't land after a newer one.
     pub saving: bool,
+    /// Opened from a file whose markers are gone: what stands in their place is shown.
+    pub reused: Option<Reused>,
 }
 
 /// Whether `line` (without its line ending) is git's `kind` conflict marker: exactly seven
@@ -129,15 +149,25 @@ fn parse(text: &str) -> (Vec<Segment>, String, String) {
     (segments, ours_label, theirs_label)
 }
 
-/// The file for the current choices; undecided conflicts keep their markers.
-fn render(segments: &[Segment], choices: &[Option<Choice>], labels: (&str, &str)) -> String {
+/// The file for the current choices (`recorded`: the text of each [`Choice::Recorded`]);
+/// undecided conflicts keep their markers.
+fn render(
+    segments: &[Segment],
+    choices: &[Option<Choice>],
+    recorded: &[Option<String>],
+    labels: (&str, &str),
+) -> String {
     let mut out = String::new();
     let mut k = 0;
     for seg in segments {
         match seg {
             Segment::Common(text) => out.push_str(text),
             Segment::Conflict { ours, base, theirs } => {
+                let recorded = recorded.get(k).and_then(Option::as_deref);
                 match choices.get(k).copied().flatten() {
+                    Some(Choice::Recorded) if recorded.is_some() => {
+                        out.push_str(recorded.unwrap_or_default());
+                    }
                     Some(Choice::Ours) => out.push_str(ours),
                     Some(Choice::Theirs) => out.push_str(theirs),
                     Some(Choice::OursThenTheirs) => {
@@ -148,7 +178,7 @@ fn render(segments: &[Segment], choices: &[Option<Choice>], labels: (&str, &str)
                         out.push_str(theirs);
                         out.push_str(ours);
                     }
-                    None => {
+                    None | Some(Choice::Recorded) => {
                         out.push_str(&format!("<<<<<<< {}\n", labels.0));
                         out.push_str(ours);
                         if let Some(base) = base {
@@ -308,6 +338,7 @@ impl ConflictEditor {
         Some(Self {
             path: path.to_owned(),
             choices: vec![None; conflicts],
+            recorded: vec![None; conflicts],
             segments,
             opened: text.clone(),
             result: text,
@@ -319,6 +350,7 @@ impl ConflictEditor {
             on_disk: conflicts,
             generation: 0,
             saving: false,
+            reused: None,
         })
     }
 
@@ -346,6 +378,8 @@ impl ConflictEditor {
             self.theirs_label = theirs_label;
         }
         self.choices = vec![None; left];
+        self.recorded = vec![None; left];
+        self.reused = None;
         self.segments = segments;
         self.result = text;
         self.manual = false;
@@ -362,12 +396,23 @@ impl ConflictEditor {
         }
         // Edited by hand: the choice waits for "Back to choices" rather than undo the edits.
         if !self.manual {
-            self.result = render(
-                &self.segments,
-                &self.choices,
-                (&self.ours_label, &self.theirs_label),
-            );
+            self.result = self.rendered();
         }
+    }
+
+    /// The file for the choices made.
+    fn rendered(&self) -> String {
+        render(
+            &self.segments,
+            &self.choices,
+            &self.recorded,
+            (&self.ours_label, &self.theirs_label),
+        )
+    }
+
+    /// The text recorded for conflict `k`, if any.
+    fn recorded(&self, k: usize) -> Option<&str> {
+        self.recorded.get(k).and_then(Option::as_deref)
     }
 
     /// The conflicts left in the result, by its markers (also after editing it by hand).
@@ -449,10 +494,11 @@ mod tests {
         let out = render(
             &segs,
             &[Some(Choice::Theirs), Some(Choice::OursThenTheirs)],
+            &[],
             (&o, &t),
         );
         assert_eq!(out, "a\ntheirs 1\nb\nx\ny\nc\n");
-        let partial = render(&segs, &[Some(Choice::Ours), None], (&o, &t));
+        let partial = render(&segs, &[Some(Choice::Ours), None], &[], (&o, &t));
         assert!(partial.starts_with("a\nours 1\nb\n<<<<<<< HEAD\nx\n"));
         assert!(partial.contains("||||||| base\nbase\n=======\ny\n>>>>>>> feature\n"));
     }
@@ -469,13 +515,14 @@ mod tests {
             .count();
         assert_eq!(conflicts, 1);
         assert_eq!(
-            render(&segs, &[Some(Choice::Ours)], (&o, &t)),
+            render(&segs, &[Some(Choice::Ours)], &[], (&o, &t)),
             "a\nx\nc\n<<<<<<< not a conflict\nd\n=======\ne\n"
         );
         // Once the real one is chosen, nothing is left to resolve.
         let mut ed = ConflictEditor {
             path: "f".into(),
             choices: vec![None],
+            recorded: vec![None],
             segments: segs,
             opened: text.into(),
             result: text.into(),
@@ -487,6 +534,7 @@ mod tests {
             on_disk: 1,
             generation: 0,
             saving: false,
+            reused: None,
         };
         assert_eq!(ed.unresolved(), 1);
         ed.choose(0, Choice::Ours);
@@ -502,6 +550,7 @@ mod tests {
         ConflictEditor {
             path: "f".into(),
             choices: vec![None; conflicts],
+            recorded: vec![None; conflicts],
             segments,
             opened: text.into(),
             result: text.into(),
@@ -513,6 +562,7 @@ mod tests {
             on_disk: conflicts,
             generation: 0,
             saving: false,
+            reused: None,
         }
     }
 
@@ -738,7 +788,7 @@ mod tests {
                 theirs: "y\n".into(),
             }]
         );
-        assert_eq!(render(&segs, &[Some(Choice::Theirs)], (&o, &t)), "y\n");
+        assert_eq!(render(&segs, &[Some(Choice::Theirs)], &[], (&o, &t)), "y\n");
         assert!(is_marker("<<<<<<<", '<'));
         assert!(is_marker(">>>>>>> feature", '>'));
         assert!(!is_marker("<<<<<<<x", '<'));
@@ -750,7 +800,7 @@ mod tests {
         let crlf = "a\r\n<<<<<<< HEAD\r\nmine\r\n=======\r\nyours\r\n>>>>>>> b\r\nz\r\n";
         let (segs, o, t) = parse(crlf);
         assert_eq!(
-            render(&segs, &[Some(Choice::Ours)], (&o, &t)),
+            render(&segs, &[Some(Choice::Ours)], &[], (&o, &t)),
             "a\r\nmine\r\nz\r\n"
         );
     }
