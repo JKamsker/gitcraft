@@ -8,6 +8,7 @@ use std::sync::mpsc::{Receiver, TryRecvError, channel};
 
 use super::panels::Toast;
 use super::{App, Tab};
+use crate::launch::open_link::Known;
 use crate::launch::{Command, Resolved, Then};
 
 /// Requests being made sense of, and those waiting for their repository's tab.
@@ -30,19 +31,30 @@ impl App {
                 return;
             }
         }
-        // Where a link's clone may be: the open tabs (also elsewhere, already reached) and the
-        // recent repositories of this machine (one elsewhere would be reached just to look).
-        let mut clones: Vec<PathBuf> = self
+        // Where a link's clone may be: the open tabs, with the remotes they read (a tab
+        // elsewhere not read yet is left out: it would be reached just to look), then the
+        // recent repositories of this machine.
+        let mut clones: Vec<Known> = self
             .tabs
             .iter()
             .filter_map(|t| match t {
-                Tab::Repo(r) => Some(r.path.clone()),
+                Tab::Repo(r) => {
+                    let remotes = r.remotes_read();
+                    let skip = remotes.is_none() && crate::remote::is_remote(&r.path);
+                    (!skip).then(|| Known {
+                        path: r.path.clone(),
+                        remotes,
+                    })
+                }
                 _ => None,
             })
             .collect();
         for path in &self.recent {
-            if !crate::remote::is_remote(path) && !clones.contains(path) {
-                clones.push(path.clone());
+            if !crate::remote::is_remote(path) && !clones.iter().any(|c| c.path == *path) {
+                clones.push(Known {
+                    path: path.clone(),
+                    remotes: None,
+                });
             }
         }
         let (tx, rx) = channel();

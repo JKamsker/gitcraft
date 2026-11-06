@@ -3,7 +3,7 @@
 
 pub mod args;
 pub mod link;
-mod open_link;
+pub mod open_link;
 pub mod resolve;
 
 pub use args::{Command, Parsed, parse};
@@ -31,6 +31,25 @@ pub(crate) fn actions(then: Then) -> Vec<Action> {
             line: Some(line),
         } => vec![Action::BlameAt {
             path,
+            rev: None,
+            line: line as usize,
+        }],
+        Then::FileAt {
+            rev,
+            path,
+            line: None,
+        } => vec![Action::FileView {
+            path,
+            rev,
+            tab: FileTab::Blame,
+        }],
+        Then::FileAt {
+            rev,
+            path,
+            line: Some(line),
+        } => vec![Action::BlameAt {
+            path,
+            rev,
             line: line as usize,
         }],
         Then::Commit(hash) => vec![Action::SelectHash(hash)],

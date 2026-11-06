@@ -78,7 +78,9 @@ pub fn refresh() {
     let Ok(current) = std::fs::read_to_string(&path) else {
         return;
     };
-    if current != entry(&appimage) {
+    // An entry added by an older version has no link entry yet.
+    let link = std::fs::read_to_string(link_entry_path(&data)).unwrap_or_default();
+    if current != entry(&appimage) || link != link_entry(&appimage) {
         let _ = write_entry(&data, &appimage);
     }
 }

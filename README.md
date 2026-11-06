@@ -48,10 +48,10 @@ so your config, credentials and hooks apply as usual.
 - Links from the browser: `gitcraft://open?url=<forge link>` opens that pull request, commit or
   file (`#L40` scrolls the blame to the line) in your clone of the repository, found by its
   remotes' URLs among the open tabs and the recent repositories; with none, the clone dialog
-  opens with the repository's URL. The link itself pasted into the palette (Ctrl+P) or the start
+  opens with the repository's URL (clone, then open the link again). A link to a pull request opens in a clone whose `origin` is that repository (a fork's `upstream` isn't where its pull requests come from); a file link opens at the linked commit when the clone has it, else as the clone has the file, and a branch with `/` in its name is told from the folders by what the clone has. The link itself pasted into the palette (Ctrl+P) or the start
   page's field, or given as `gitcraft <link>`, does the same. GitHub, GitLab (groups too),
   Gitea / Forgejo (Codeberg) and Bitbucket links are read by their paths; every link is checked
-  (https or http only, a plain host name, no `..`, a revision that can't be an option) and
+  (https or http only, a host name with a dot such as `git.example.com`, so not `localhost`, no `..`, a revision that can't be an option) and
   anything else is refused with why. The Windows installer registers the `gitcraft://` scheme
   (an option), the .deb / .rpm install `gitcraft-link.desktop` (`x-scheme-handler/gitcraft`),
   and the AppImage's menu entry adds one. macOS hands a link to an app as an Apple Event, which
@@ -322,7 +322,7 @@ until GitHub's macOS runners pick it up again, so on a Mac build from source (be
   `gitcraft-….AppImage` runs on any distribution: make it executable (`chmod +x`) and run it;
   _Add gitcraft to the applications menu_ on its start page (or in Settings) adds a menu entry,
   which follows the AppImage when you replace it with a newer one. The `.tar.gz` holds the bare
-  binary and a `.desktop` file.
+  binary and the `.desktop` files (the menu entry, the `gitcraft://` handler and Dolphin's service menu).
 - **macOS** (11 or later): open `gitcraft-…-macos-universal.dmg` and drag gitcraft to
   Applications; the `.zip` holds the same app. It isn't notarized by Apple, so the first time
   macOS refuses to open it: go to _System Settings › Privacy & Security_ and click _Open
