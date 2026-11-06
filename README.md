@@ -20,9 +20,11 @@ so your config, credentials and hooks apply as usual.
   other one's (refused while a tab has unfinished work).
 - One window: `gitcraft <folder>` or _Open in gitcraft_ while gitcraft is running opens that
   folder in a tab of the running window (or switches to its tab) and brings it to the front; a
-  bare `gitcraft` just brings it to the front. Two windows never save their tabs over each
-  other's. The handoff goes over 127.0.0.1 with a random token kept in a file of the data
-  folder only you can read.
+  bare `gitcraft` just brings it to the front. Where the system doesn't let a window come to
+  the front by itself (Windows, Wayland), its taskbar button flashes instead. Two windows no
+  longer save their tabs over each other's. The handoff goes over 127.0.0.1 with a random
+  token kept in a file of the data folder only you can read. Every build shares that folder, so
+  `cargo run` while an installed gitcraft runs goes to that window: close it first.
 - Changes made elsewhere (editor, terminal) show up by themselves: the folder is watched.
 - Repositories on another machine, in a WSL distribution or over SSH: the window stays here and
   git runs there (see below).

@@ -625,12 +625,28 @@ pub fn single_instance(open_arg: Option<&Path>) -> Start {
 /// from a terminal.
 pub fn report_failed_start(message: &str) {
     eprintln!("gitcraft: {message}");
+    // rfd's dialogs are zenity's on Linux; without it (KDE, minimal installs) a start from the
+    // menu would end with nothing shown: a desktop notification says it instead.
+    if cfg!(all(unix, not(target_os = "macos"))) && !on_path("zenity") {
+        let _ = notify_rust::Notification::new()
+            .appname("gitcraft")
+            .summary("gitcraft")
+            .body(&panels::notification_body(message))
+            .show();
+        return;
+    }
     let _ = rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Error)
         .set_title("gitcraft")
         .set_description(message)
         .set_buttons(rfd::MessageButtons::Ok)
         .show();
+}
+
+/// Whether a program called `name` is on the PATH.
+fn on_path(name: &str) -> bool {
+    std::env::var_os("PATH")
+        .is_some_and(|path| std::env::split_paths(&path).any(|dir| dir.join(name).is_file()))
 }
 
 /// Once the window closed: lets the next start be the running instance, then starts the

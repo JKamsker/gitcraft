@@ -177,7 +177,7 @@ fn notify(text: &str) {
 /// `text` as a notification's body. Linux notification servers read the body as markup, and
 /// what is shown comes partly from a remote's messages: its `<` and `&` are text, not tags or
 /// links.
-fn notification_body(text: &str) -> String {
+pub(super) fn notification_body(text: &str) -> String {
     if cfg!(all(unix, not(target_os = "macos"))) {
         text.replace('&', "&amp;")
             .replace('<', "&lt;")
