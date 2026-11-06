@@ -34,6 +34,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Search messages, authors and hashes, or switch to Code to find the commits that added or removed some text.",
             "Drag the borders in the column header to resize; right-click it to pick the columns, make the graph column compact or reset the columns.",
             "Split commit… (the menu of a commit of the checked-out branch): select one of the new commits on the left (or press its number), then click files, hunks or lines on the right to put them in it; each new commit has its own message. Check split shows each one's patch, Split commit replaces the old commit with them and replays the commits after it. Ctrl+Z undoes it.",
+            "Move changes to another commit… (same menu): click what to take out of the commit, pick another commit of the branch or the working changes (staged), check what leaves and what arrives, then move it. Ctrl+Z undoes it.",
             "Interactive rebase: reorder, reword, squash, fix up or drop commits, then start it.",
         ],
     ),

@@ -158,6 +158,8 @@ pub(crate) enum Action {
     CloseRebase,
     /// Open the split editor on a commit of the checked-out branch.
     OpenSplit(String),
+    /// Open the editor moving some changes of a commit to another one, or out of the branch.
+    OpenMove(String),
     /// Prepare the split being edited and show each new commit's patch.
     CheckSplit,
     RunSplit,
