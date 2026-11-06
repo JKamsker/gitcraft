@@ -446,38 +446,15 @@ fn markdown(ui: &mut Ui, cache: &mut CommonMarkCache, text: &str, width: f32) {
 }
 
 /// The working tree's image `path` (a path in the repository, `/` between names), when it is a
-/// plain file of the repository (see [`working_tree_file_inside`]). On another machine, checked
-/// and read there in one go, never more than an image's limit.
+/// plain file of the repository, not reached through a link (`docs/l -> /` would read
+/// anything), and at most an image's limit. Checked on the file that is read, so that nothing
+/// swapped in meanwhile is read instead (see [`crate::safe_read`]); on another machine, checked
+/// and read there in one go.
 fn working_tree_image(repo: &Path, path: &str) -> Option<Vec<u8>> {
     if let Some(read) = crate::remote::read_within(repo, path, MAX_IMAGE_BYTES as u64) {
         return read.ok().flatten();
     }
-    if !working_tree_file_inside(repo, path) {
-        return None;
-    }
-    git::file_at(repo, None, path).ok()
-}
-
-/// Whether the working tree's `path` (a path in the repository, `/` between names) is a file
-/// of the repository here, not reached through a folder that is a link (`docs/l -> /` would
-/// read anything), nor larger than an image is taken.
-fn working_tree_file_inside(repo: &Path, path: &str) -> bool {
-    let mut at = repo.to_path_buf();
-    let names: Vec<&str> = path.split('/').filter(|n| !n.is_empty()).collect();
-    for (i, name) in names.iter().enumerate() {
-        at.push(name);
-        let Ok(meta) = std::fs::symlink_metadata(&at) else {
-            return false;
-        };
-        let last = i + 1 == names.len();
-        if !last && meta.file_type().is_symlink() {
-            return false;
-        }
-        if last && meta.is_file() && meta.len() > MAX_IMAGE_BYTES as u64 {
-            return false;
-        }
-    }
-    true
+    crate::safe_read::read_inside(repo, path, MAX_IMAGE_BYTES as u64)
 }
 
 #[cfg(test)]
@@ -612,9 +589,9 @@ mod tests {
         std::fs::create_dir_all(dir.join("docs")).map_err(|e| e.to_string())?;
         std::fs::write(dir.join("docs/s.png"), "picture").map_err(|e| e.to_string())?;
         std::os::unix::fs::symlink("/", dir.join("docs/l")).map_err(|e| e.to_string())?;
-        let plain = working_tree_file_inside(&dir, "docs/s.png");
-        let linked = working_tree_file_inside(&dir, "docs/l/etc/hostname");
-        let missing = working_tree_file_inside(&dir, "docs/none.png");
+        let plain = working_tree_image(&dir, "docs/s.png").is_some();
+        let linked = working_tree_image(&dir, "docs/l/etc/hostname").is_some();
+        let missing = working_tree_image(&dir, "docs/none.png").is_some();
         // And as the rendered file's images are read: nothing through the link.
         let mut images = Images::default();
         let side = Side {

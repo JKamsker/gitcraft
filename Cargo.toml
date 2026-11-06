@@ -35,6 +35,10 @@ ureq = { version = "2", features = ["native-certs"] }
 base64 = "0.22"
 vt100 = "0.18"
 
+# Reading a repository's file without following a link swapped in on the way (safe_read.rs).
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1", features = ["fs"] }
+
 [lints.rust]
 unsafe_code = "forbid"
 
