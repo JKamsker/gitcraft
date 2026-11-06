@@ -274,7 +274,7 @@ impl RepoTab {
         }
     }
 
-    fn handle(&mut self, msg: Msg, ctx: &egui::Context) {
+    pub(super) fn handle(&mut self, msg: Msg, ctx: &egui::Context) {
         match msg {
             Msg::Loaded(result) => self.loaded(result, ctx),
             Msg::Submodules(read, list) => {
@@ -322,6 +322,7 @@ impl RepoTab {
                     }
                     let wip_row_changed = work.is_clean() != self.work.is_clean();
                     self.work = work;
+                    self.fold_status_read(read);
                     if wip_row_changed {
                         self.rebuild(ctx);
                     } else {

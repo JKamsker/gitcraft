@@ -267,8 +267,13 @@ impl RepoTab {
         }
         // A rebase or patch stopped on conflicts finishes with `--continue`, not a new commit.
         if let Some(state) = self.work.in_progress.filter(|s| s.continues()) {
-            let label = format!("Continue {}", state.label().to_lowercase());
             let steps = ops(&[&[state.command(), "--continue"]]);
+            // A fold stopped on a conflict: done, it is undone as the whole fold.
+            if let Some((label, kind)) = self.fold_continue(state) {
+                self.run_ops(&label, steps, Refresh::All, kind, ctx);
+                return;
+            }
+            let label = format!("Continue {}", state.label().to_lowercase());
             self.run_ops(&label, steps, Refresh::All, OpKind::plain(), ctx);
             return;
         }

@@ -207,6 +207,8 @@ impl RepoTab {
             Action::ApplyPatch => self.apply_patch(ctx),
             Action::QuickEdit { edit, hash } => self.quick_edit(edit, hash, ctx),
             Action::RunRebase => self.run_rebase(ctx),
+            Action::FoldInto(hash) => self.fold_into(hash, ctx),
+            Action::RunFold(plan) => self.run_fold(*plan, ctx),
             Action::CloseRebase => self.rebase = None,
             Action::SignIn(creds) => self.sign_in(creds, ctx),
             Action::Ignore { pattern, path } => self.ignore(&pattern, &path, ctx),

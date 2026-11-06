@@ -178,6 +178,7 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         self.busy_op = None;
+        self.fold_op_done(&label, result.is_ok());
         let long = self
             .op_started
             .take()

@@ -61,7 +61,8 @@ pub(crate) struct Entry {
 
 #[derive(Clone)]
 pub(crate) struct RebaseEditor {
-    /// What the commits are replayed onto (a commit or a branch).
+    /// What the commits are replayed onto (a commit or a branch); empty to rewrite from the
+    /// root commit on (`--root`).
     pub onto: String,
     pub onto_label: String,
     /// Oldest first, as git lists them.
@@ -202,15 +203,19 @@ impl RebaseEditor {
 
     /// The rebase, its todo list copied from `todo_file` (quoted for `sh`).
     fn rebase_args(&self, todo_file: &str) -> Vec<String> {
-        vec![
+        let mut args = vec![
             "-c".to_owned(),
             format!("sequence.editor=cp {todo_file}"),
             "rebase".to_owned(),
             "-i".to_owned(),
             "--autostash".to_owned(),
-            "--end-of-options".to_owned(),
-            self.onto.clone(),
-        ]
+        ];
+        if self.onto.is_empty() {
+            args.push("--root".to_owned());
+        } else {
+            args.extend(["--end-of-options".to_owned(), self.onto.clone()]);
+        }
+        args
     }
 }
 
