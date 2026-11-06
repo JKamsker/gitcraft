@@ -491,14 +491,19 @@ impl RepoTab {
             (Vec::new(), Vec::new()),
             Undo::HeadMove { mode: "--keep" },
             move |tab, started| {
+                // Cancelled meanwhile: nothing runs.
                 let Some(editor) = tab.split.as_mut().filter(|e| e.id == id) else {
-                    return;
+                    return false;
                 };
                 match started {
-                    Ok(()) => tab.split = None,
+                    Ok(()) => {
+                        tab.split = None;
+                        true
+                    }
                     Err(e) => {
                         editor.busy = false;
                         editor.error = Some(e);
+                        false
                     }
                 }
             },

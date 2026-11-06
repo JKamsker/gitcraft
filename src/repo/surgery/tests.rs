@@ -391,3 +391,34 @@ fn links_type_changes_and_a_config_without_context_split_cleanly() {
     assert_eq!(top, tree);
     assert_eq!(clean, "");
 }
+
+/// Cancelled while it was being prepared: nothing is rewritten.
+#[test]
+fn a_split_cancelled_while_it_starts_does_not_run() {
+    let dir = repo(
+        "split-cancelled",
+        "printf 'a\\nb\\n' > f && git add -A && git commit -q -m base \
+         && printf 'A\\nB\\n' > f && git commit -q -am both",
+    );
+    let (mut tab, ctx) = opened(&dir);
+    let before = git_out(&dir, &["rev-parse", "HEAD"]);
+    open(&mut tab, &ctx, "HEAD");
+    let a = line(&tab, 0, "A");
+    if let Some(s) = tab.split.as_mut() {
+        s.assign_line(0, a, 0);
+        s.groups[1].subject = "B".to_owned();
+    }
+    check(&mut tab, &ctx);
+    tab.run_split(&ctx);
+    tab.split = None;
+    let until = Instant::now() + Duration::from_secs(3);
+    while Instant::now() < until {
+        if let Ok(msg) = tab.rx.recv_timeout(Duration::from_millis(100)) {
+            tab.handle(msg, &ctx);
+        }
+    }
+    let head = git_out(&dir, &["rev-parse", "HEAD"]);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(tab.busy_op.is_none());
+    assert_eq!(head, before);
+}
