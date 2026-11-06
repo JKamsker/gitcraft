@@ -103,7 +103,14 @@ fn a_merge_finds_where_its_conflict_started() -> Result<(), String> {
     let _ = std::fs::remove_dir_all(&dir);
     assert!(merged.is_err_and(|e| e.contains("CONFLICT")));
     assert_eq!(timelines?.ours.len(), 4);
-    assert_eq!(found?.0, Ok(Found::Pair { ours: 2, theirs: 1 }));
+    assert_eq!(
+        found?.0,
+        Ok(Found::Pair {
+            ours: 2,
+            theirs: 1,
+            checked: true
+        })
+    );
     Ok(())
 }
 
@@ -135,9 +142,16 @@ fn the_first_conflicting_pair_is_found() -> Result<(), String> {
         summaries(&t.theirs),
         ["side: one", "side: change ownership", "side: three"]
     );
-    assert!(!t.truncated);
+    assert_eq!(t.truncated, (false, false));
     let (found, merges) = found?;
-    assert_eq!(found, Ok(Found::Pair { ours: 2, theirs: 1 }));
+    assert_eq!(
+        found,
+        Ok(Found::Pair {
+            ours: 2,
+            theirs: 1,
+            checked: true
+        })
+    );
     assert!(merges <= 6, "{merges} test merges");
     let change = change.ok_or("no change")??;
     assert!(change.contains("+main caches line 12"), "{change}");
@@ -168,7 +182,14 @@ fn a_rebase_finds_where_its_conflict_started() -> Result<(), String> {
     );
     assert_eq!(summaries(&t.theirs), ["side: change ownership"]);
     let (found, _) = found?;
-    assert_eq!(found, Ok(Found::Pair { ours: 2, theirs: 0 }));
+    assert_eq!(
+        found,
+        Ok(Found::Pair {
+            ours: 2,
+            theirs: 0,
+            checked: true
+        })
+    );
     Ok(())
 }
 
@@ -247,15 +268,15 @@ fn the_tab_reads_and_searches_for_the_open_editor() -> Result<(), String> {
         _ => None,
     }
     .ok_or("no commits")?;
-    tab.archaeology_act(Act::ShowChange(hash.clone()), &ctx);
+    tab.archaeology_act(Act::ShowChange(hash.clone(), "short".to_owned()), &ctx);
     wait(&mut tab, &ctx, |tab| {
         history(tab)
             .and_then(|h| h.change.as_ref())
-            .is_some_and(|(_, r)| *r != Read::Reading)
+            .is_some_and(|(_, _, r)| *r != Read::Reading)
     });
     let shown = history(&tab).and_then(|h| h.change.clone());
     // Asked again for the same commit: hidden.
-    tab.archaeology_act(Act::ShowChange(hash.clone()), &ctx);
+    tab.archaeology_act(Act::ShowChange(hash.clone(), "short".to_owned()), &ctx);
     let hidden = history(&tab).is_some_and(|h| h.change.is_none());
 
     // A read for an earlier opening isn't taken by the one open now.
@@ -271,9 +292,16 @@ fn the_tab_reads_and_searches_for_the_open_editor() -> Result<(), String> {
     let untouched = history(&tab).is_some_and(|h| h.timelines == Read::NotAsked);
     let _ = std::fs::remove_dir_all(&dir);
 
-    assert_eq!(found, Some(Read::Done(Found::Pair { ours: 2, theirs: 1 })));
+    assert_eq!(
+        found,
+        Some(Read::Done(Found::Pair {
+            ours: 2,
+            theirs: 1,
+            checked: true
+        }))
+    );
     match shown {
-        Some((h, Read::Done(text))) => {
+        Some((h, _, Read::Done(text))) => {
             assert_eq!(h, hash);
             assert!(text.contains("+main one"), "{text}");
         }
@@ -299,6 +327,7 @@ fn the_strip_shows_both_sides_and_the_answer() -> Result<(), String> {
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
     let _ = std::fs::remove_dir_all(&dir);
     tab.conflict = Some(ed);
+    tab.work.in_progress = Some(InProgress::Merge);
     let draw = |ui: &mut egui::Ui, (tab, acts, fonts): &mut State| {
         // gitcraft's fonts first: they apply from the next frame.
         if !*fonts {
@@ -326,22 +355,203 @@ fn the_strip_shows_both_sides_and_the_answer() -> Result<(), String> {
         ed.history.timelines = Read::Done(Timelines {
             ours: vec![step("a1", "add caching"), step("a2", "tune")],
             theirs: vec![step("b1", "change ownership")],
-            truncated: false,
+            truncated: (false, false),
+            base: None,
+            theirs_rev: None,
         });
         ed.history.search = Some(Search {
             cancel: Default::default(),
             merges: Default::default(),
-            result: Read::Done(Found::Pair { ours: 0, theirs: 0 }),
+            result: Read::Done(Found::Pair {
+                ours: 0,
+                theirs: 0,
+                checked: true,
+            }),
         });
     }
     harness.run();
     harness.get_by_label("Find where it started");
-    harness.get_by_label_contains("It started with a1 “add caching” and b1");
-    harness.get_by_label("Change of b1").click();
+    harness.get_by_label_contains("First conflicting pair: a1 “add caching”");
+    // Picking a commit on each side offers its change and a test merge of the two.
+    harness.get_by_label_contains("a2  tune").click();
     harness.run();
-    let acts = &harness.state().1;
+    harness
+        .get_by_label_contains("b1  change ownership")
+        .click();
+    harness.run();
+    harness.get_by_label("What b1 changed").click();
+    harness.get_by_label("Test these two").click();
+    harness.run();
+    let state = harness.state();
+    let acts = &state.1;
     assert!(asked);
     assert!(acts.iter().any(|a| matches!(a,
-        crate::repo::Action::Archaeology(Act::ShowChange(h)) if h == "b1ffff")));
+        crate::repo::Action::Archaeology(Act::ShowChange(h, s)) if h == "b1ffff" && s == "b1")));
+    assert!(
+        acts.iter()
+            .any(|a| matches!(a, crate::repo::Action::Archaeology(Act::TestPair(1, 0))))
+    );
+    Ok(())
+}
+
+/// A stash popped with conflicts (no operation) has no other branch: no strip, nothing read.
+#[test]
+fn a_conflict_from_no_branch_shows_no_strip() -> Result<(), String> {
+    use egui_kittest::kittest::Queryable;
+    type State = (RepoTab, Vec<crate::repo::Action>, bool);
+    let dir = std::env::temp_dir().join(format!("gitcraft-arch-stash-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join("f"), "<<<<<<< HEAD\na\n=======\nb\n>>>>>>> x\n")
+        .map_err(|e| e.to_string())?;
+    let ed = ConflictEditor::open(&dir, "f", None).ok_or("not opened")?;
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let _ = std::fs::remove_dir_all(&dir);
+    tab.conflict = Some(ed);
+    let draw = |ui: &mut egui::Ui, (tab, acts, fonts): &mut State| {
+        if !*fonts {
+            crate::theme::install_fonts(ui.ctx());
+            *fonts = true;
+            return;
+        }
+        tab.conflict_view(ui, acts);
+    };
+    let mut harness = egui_kittest::Harness::new_ui_state(draw, (tab, Vec::new(), false));
+    harness.run_steps(2);
+    assert!(
+        harness
+            .query_by_label("HOW THIS CONFLICT CAME ABOUT")
+            .is_none()
+    );
+    assert!(
+        !harness
+            .state()
+            .1
+            .iter()
+            .any(|a| matches!(a, crate::repo::Action::Archaeology(_)))
+    );
+    Ok(())
+}
+
+/// A fresh repository with the 30-line file at its base, `main` checked out.
+fn based(name: &str, path: &str) -> Result<PathBuf, String> {
+    let dir = std::env::temp_dir().join(format!("gitcraft-arch-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    for args in [
+        &["init", "-q", "-b", "main"][..],
+        &["config", "user.name", "t"],
+        &["config", "user.email", "t@t"],
+        &["config", "commit.gpgSign", "false"],
+    ] {
+        git(&dir, args)?;
+    }
+    commit(&dir, path, &[], "base")?;
+    Ok(dir)
+}
+
+/// A cherry-pick conflicts on what the picked commit changes from its parent: an earlier
+/// commit of its branch that conflicts elsewhere isn't blamed.
+#[test]
+fn a_cherry_pick_blames_what_the_picked_commit_changes() -> Result<(), String> {
+    let path = "f.txt";
+    let dir = based("pick", path)?;
+    git(&dir, &["checkout", "-qb", "side"])?;
+    commit(&dir, path, &[(1, "t1")], "side: line 1")?;
+    commit(&dir, path, &[(1, "t1"), (5, "t5")], "side: line 5")?;
+    let picked = git(&dir, &["rev-parse", "HEAD"])?;
+    git(&dir, &["checkout", "-q", "main"])?;
+    commit(&dir, path, &[(1, "o1")], "main: line 1")?;
+    commit(&dir, path, &[(1, "o1"), (5, "o5")], "main: line 5")?;
+    let _ = git(&dir, &["cherry-pick", picked.trim()]);
+    let t = timelines(&dir, path, Some(InProgress::CherryPick));
+    let found = t
+        .as_ref()
+        .map(|t| search(&dir, path, t))
+        .map_err(String::clone);
+    let _ = std::fs::remove_dir_all(&dir);
+    let t = t?;
+    assert_eq!(summaries(&t.ours), ["main: line 1", "main: line 5"]);
+    assert_eq!(summaries(&t.theirs), ["side: line 5"]);
+    assert_eq!(
+        found?.0,
+        Ok(Found::Pair {
+            ours: 1,
+            theirs: 0,
+            checked: true
+        })
+    );
+    Ok(())
+}
+
+/// Reverting a commit that a later one changed again: the later one is where it started.
+#[test]
+fn a_revert_blames_the_later_change() -> Result<(), String> {
+    let path = "f.txt";
+    let dir = based("revert", path)?;
+    commit(&dir, path, &[(3, "c1")], "first change")?;
+    let reverted = git(&dir, &["rev-parse", "HEAD"])?;
+    commit(&dir, path, &[(3, "c2")], "later change")?;
+    let _ = git(&dir, &["revert", "--no-edit", reverted.trim()]);
+    let t = timelines(&dir, path, Some(InProgress::Revert));
+    let found = t
+        .as_ref()
+        .map(|t| search(&dir, path, t))
+        .map_err(String::clone);
+    let _ = std::fs::remove_dir_all(&dir);
+    let t = t?;
+    assert_eq!(summaries(&t.ours), ["later change"]);
+    assert_eq!(summaries(&t.theirs), ["first change"]);
+    assert_eq!(
+        found?.0,
+        Ok(Found::Pair {
+            ours: 0,
+            theirs: 0,
+            checked: true
+        })
+    );
+    Ok(())
+}
+
+/// Ours merged another branch in after the commit that conflicts: only its first-parent line
+/// is searched, so the commit that started it is found, not the merge; the merge's change is
+/// shown from its first parent.
+#[test]
+fn merges_on_a_side_do_not_hide_where_it_started() -> Result<(), String> {
+    let path = "f.txt";
+    let dir = based("merged", path)?;
+    git(&dir, &["checkout", "-qb", "theirs"])?;
+    commit(&dir, path, &[(1, "T")], "theirs: line 1")?;
+    git(&dir, &["checkout", "-q", "main"])?;
+    git(&dir, &["checkout", "-qb", "other"])?;
+    commit(&dir, path, &[(10, "m10")], "other: line 10")?;
+    commit(&dir, path, &[(10, "m10"), (13, "m13")], "other: line 13")?;
+    git(&dir, &["checkout", "-q", "main"])?;
+    commit(&dir, path, &[(1, "S")], "main: line 1")?;
+    git(&dir, &["merge", "-q", "--no-edit", "other"])?;
+    let _ = git(&dir, &["merge", "theirs"]);
+    let t = timelines(&dir, path, Some(InProgress::Merge));
+    let found = t
+        .as_ref()
+        .map(|t| search(&dir, path, t))
+        .map_err(String::clone);
+    let merge_change = t
+        .as_ref()
+        .ok()
+        .and_then(|t| t.ours.last())
+        .map(|s| git::change(&dir, &s.hash, path));
+    let _ = std::fs::remove_dir_all(&dir);
+    let t = t?;
+    assert_eq!(summaries(&t.ours), ["main: line 1", "Merge branch 'other'"]);
+    assert_eq!(
+        found?.0,
+        Ok(Found::Pair {
+            ours: 0,
+            theirs: 0,
+            checked: true
+        })
+    );
+    let shown = merge_change.ok_or("no merge")??;
+    assert!(shown.contains("+m13"), "{shown}");
     Ok(())
 }

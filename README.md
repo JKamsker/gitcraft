@@ -184,11 +184,13 @@ so your config, credentials and hooks apply as usual.
   before you check the result. Settings → Git installs it in one click and can have git merge
   with it everywhere ([docs/mergiraf.md](docs/mergiraf.md)). gitcraft only runs the `mergiraf`
   program: it neither bundles nor links Mergiraf (GPL-3.0), so gitcraft's licence is unchanged.
-- Above the conflicts, _How this conflict came about_ lists each side's commits that touched
-  the file since the two diverged (click one for what it changed in the file). _Find where it
-  started_ finds the first pair of commits, one from each side, whose merge already conflicts
-  in the file: a few test merges with `git merge-tree` (git 2.38 or newer), apart from your
-  files, in the background and cancelable.
+- Above the conflicts of a merge, rebase, cherry-pick or revert, _How this conflict came
+  about_ lists each side's commits that touched the file (a rebase's, cherry-pick's or
+  revert's other side is the commit being applied). Pick one on each side to see what it
+  changed or test-merge the two. _Find where it started_ finds the first pair whose merge
+  already conflicts in the file: a few test merges with `git merge-tree` (git 2.38, or 2.40
+  for a rebase, cherry-pick or revert), using the base git uses, with your files and the index
+  left as they are, in the background and cancelable.
 - A merge, rebase, cherry-pick, revert or patch stopped on conflicts shows a banner with
   _Abort_; the commit box finishes it (_Continue rebase_ during a rebase, _Continue patch_ while
   `git am` applies one).
