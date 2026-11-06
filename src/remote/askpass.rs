@@ -205,11 +205,23 @@ pub fn set_repaint(ctx: egui::Context) {
     }
 }
 
+/// Set in a process without a window (`gitcraft mcp`): nobody could answer ssh's questions, so
+/// ssh asks none and fails at once, saying why, rather than wait for an answer forever.
+static NO_WINDOW: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Says that this process has no window to ask ssh's questions in (see [`NO_WINDOW`]).
+pub fn no_window() {
+    NO_WINDOW.store(true, Ordering::Relaxed);
+}
+
 /// The program and environment an ssh connecting to `host` is started with, so that its
 /// questions come to the window, and the attempt to tell once it has connected; `None` when
 /// there's no way to (no listener could be made).
 pub(super) fn env_for(host_label: &str) -> Option<(Vec<(&'static str, String)>, Attempt)> {
     static SESSIONS: AtomicU64 = AtomicU64::new(1);
+    if NO_WINDOW.load(Ordering::Relaxed) {
+        return None;
+    }
     let server = server()?;
     let program = std::env::current_exe().ok()?;
     let session = SESSIONS.fetch_add(1, Ordering::Relaxed);

@@ -10,6 +10,8 @@ pub(super) const TOOLS: &[&ToolDef] = &[&BRANCHES];
 
 /// The most branches (of each remote, too), tags and stashes listed.
 const MAX_REFS: usize = 500;
+/// The most remotes listed.
+const MAX_REMOTES: usize = 50;
 
 static BRANCHES: ToolDef = ToolDef {
     name: "branches",
@@ -67,7 +69,11 @@ fn branches(ctx: &Ctx, a: &crate::mcp::args::Args) -> Result<Value, String> {
             })
         })
         .collect();
+    let (remotes, more) = capped(remotes, MAX_REMOTES);
     out["remotes"] = json!(remotes);
+    if more > 0 {
+        out["remotes_not_listed"] = json!(more);
+    }
     let tags: Vec<Value> = refs
         .tags
         .iter()

@@ -20,16 +20,21 @@ use super::tools::{self, Ctx, Kind, ToolDef};
 /// What every call is made with.
 #[derive(Clone)]
 pub struct Gitcraft {
-    /// The repository, or why there is none.
-    repo: Arc<Result<PathBuf, String>>,
+    /// Where the repository is looked for: `--repo`, or the working folder.
+    start: Option<PathBuf>,
+    /// The repository, once found: looked for on the first call that needs it (over SSH that
+    /// connects, which must not hold up `initialize`), and again after a call that didn't find
+    /// it (the machine was unreachable for a moment).
+    repo: Arc<std::sync::OnceLock<PathBuf>>,
     link_dir: Option<PathBuf>,
     wait: Duration,
 }
 
 impl Gitcraft {
-    pub fn new(repo: Result<PathBuf, String>, link_dir: Option<PathBuf>, wait: Duration) -> Self {
+    pub fn new(start: Option<PathBuf>, link_dir: Option<PathBuf>, wait: Duration) -> Self {
         Self {
-            repo: Arc::new(repo),
+            start,
+            repo: Arc::default(),
             link_dir,
             wait,
         }
@@ -45,6 +50,9 @@ const INSTRUCTIONS: &str = "gitcraft is the user's git client. Its tools read th
     window. If no window has the repository open, changing tools fail: ask the user to open it \
     in gitcraft.";
 
+/// The largest answer a tool gives, in bytes.
+const MAX_ANSWER: usize = 512 * 1024;
+
 /// The tool as MCP lists it.
 fn listed(def: &ToolDef) -> Tool {
     let schema = match (def.schema)() {
@@ -53,7 +61,8 @@ fn listed(def: &ToolDef) -> Tool {
     };
     let annotations = ToolAnnotations::with_title(def.title)
         .read_only(def.kind == Kind::Read)
-        .destructive(def.kind == Kind::Approve)
+        // `reset` asks first only in its `hard` mode, but the hint is per tool.
+        .destructive(def.kind == Kind::Approve || def.name == "reset")
         .idempotent(def.kind == Kind::Read)
         // The forge's tools reach beyond the repository; the rest stay in it.
         .open_world(matches!(def.name, "ci_status" | "pull_requests" | "push"));
@@ -68,6 +77,15 @@ pub fn result(outcome: Result<Value, String>) -> CallToolResult {
     match outcome {
         Ok(value) => {
             let text = serde_json::to_string_pretty(&value).unwrap_or_else(|e| e.to_string());
+            // Every tool bounds what it says; this is the last word on it.
+            if text.len() > MAX_ANSWER {
+                return CallToolResult::error(vec![ContentBlock::text(format!(
+                    "the answer is {} KB, more than the {} KB a tool returns: ask for less \
+                     (a smaller limit, a path, a range of lines)",
+                    text.len() / 1024,
+                    MAX_ANSWER / 1024
+                ))]);
+            }
             CallToolResult::success(vec![ContentBlock::text(text)])
         }
         Err(e) => CallToolResult::error(vec![ContentBlock::text(e)]),
@@ -140,20 +158,31 @@ impl ServerHandler for Gitcraft {
                 )
             },
         );
-        let repo = match self.repo.as_ref() {
-            Ok(repo) => repo.clone(),
-            Err(e) => return Ok(result(Err(e.clone())).into()),
-        };
-        let ctx = Ctx {
-            repo,
-            agent,
-            link_dir: self.link_dir.clone(),
-            wait: self.wait,
-        };
+        let (start, found) = (self.start.clone(), self.repo.clone());
+        let (link_dir, wait) = (self.link_dir.clone(), self.wait);
+        // Cancelled by the client, or the session ended: a wait for the window stops.
+        let token = context.ct.clone();
+        let cancelled: Arc<dyn Fn() -> bool + Send + Sync> = Arc::new(move || token.is_cancelled());
         let args = request.arguments.unwrap_or_default();
-        let outcome = tokio::task::spawn_blocking(move || tools::call(def, &ctx, &args))
-            .await
-            .unwrap_or_else(|e| Err(format!("the tool stopped: {e}")));
+        let outcome = tokio::task::spawn_blocking(move || {
+            let repo = match found.get() {
+                Some(repo) => repo.clone(),
+                None => {
+                    let repo = super::repository(start)?;
+                    found.get_or_init(|| repo).clone()
+                }
+            };
+            let ctx = Ctx {
+                repo,
+                agent,
+                link_dir,
+                wait,
+                cancelled,
+            };
+            tools::call(def, &ctx, &args)
+        })
+        .await
+        .unwrap_or_else(|e| Err(format!("the tool stopped: {e}")));
         Ok(result(outcome).into())
     }
 }
@@ -180,6 +209,8 @@ mod tests {
         assert_eq!(log.as_ref().and_then(|a| a.read_only_hint), Some(true));
         let push = find("push").and_then(|t| t.annotations);
         assert_eq!(push.as_ref().and_then(|a| a.destructive_hint), Some(true));
+        let reset = find("reset").and_then(|t| t.annotations);
+        assert_eq!(reset.as_ref().and_then(|a| a.destructive_hint), Some(true));
         let commit = find("commit").and_then(|t| t.annotations);
         assert_eq!(commit.as_ref().and_then(|a| a.read_only_hint), Some(false));
         assert_eq!(
@@ -194,5 +225,7 @@ mod tests {
         assert_eq!(failed.is_error, Some(true));
         let done = result(Ok(serde_json::json!({"a": 1})));
         assert_ne!(done.is_error, Some(true));
+        let huge = result(Ok(serde_json::json!({"a": "x".repeat(MAX_ANSWER)})));
+        assert_eq!(huge.is_error, Some(true));
     }
 }

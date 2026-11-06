@@ -8,10 +8,12 @@ use crate::ci::{self, CheckState, Project};
 use crate::forge::{self, Hosting};
 use crate::git;
 use crate::mcp::args::{self, Args};
-use crate::mcp::output::{capped, text_page};
+use crate::mcp::output::{capped, clip, text_page};
 
 pub(super) const TOOLS: &[&ToolDef] = &[&CI, &PULL_REQUESTS];
 
+/// The most jobs, steps of a job, labels and checks listed.
+const MAX_ITEMS: usize = 100;
 /// The longest pull request description returned whole.
 const MAX_BODY: usize = 8_000;
 /// The default and largest page of a failed build's log.
@@ -114,12 +116,13 @@ fn run_jobs(
     let jobs = ci::jobs(&ctx.repo, project, run)?;
     let mut out = json!({
         "run": run,
-        "jobs": jobs.iter().map(|j| json!({
+        "jobs_not_listed": jobs.len().saturating_sub(MAX_ITEMS),
+        "jobs": jobs.iter().take(MAX_ITEMS).map(|j| json!({
             "name": j.name,
             "stage": j.stage,
             "state": state_word(j.state),
             "url": j.url,
-            "steps": j.steps.iter().map(|s| json!({
+            "steps": j.steps.iter().take(MAX_ITEMS).map(|s| json!({
                 "name": s.name,
                 "state": state_word(s.state),
             })).collect::<Vec<_>>(),
@@ -181,7 +184,7 @@ fn pull_requests(ctx: &Ctx, a: &Args) -> Result<Value, String> {
     let body = text_page(&d.body, 0, MAX_BODY);
     Ok(json!({
         "number": d.number,
-        "title": d.title,
+        "title": clip(&d.title, 500),
         "state": d.state,
         "draft": d.draft,
         "author": d.author,
@@ -197,11 +200,12 @@ fn pull_requests(ctx: &Ctx, a: &Args) -> Result<Value, String> {
         "mergeable": d.mergeable,
         "merge_state": d.merge_state,
         "review_decision": d.review_decision,
-        "labels": d.labels,
-        "checks": d.checks.iter().map(|c| json!({
-            "name": c.name,
+        "labels": d.labels.iter().take(MAX_ITEMS).collect::<Vec<_>>(),
+        "checks_not_listed": d.checks.len().saturating_sub(MAX_ITEMS),
+        "checks": d.checks.iter().take(MAX_ITEMS).map(|c| json!({
+            "name": clip(&c.name, 200),
             "state": state_word(c.state),
-            "detail": c.detail,
+            "detail": clip(&c.detail, 300),
             "url": c.url,
         })).collect::<Vec<_>>(),
         "checks_error": d.checks_error,
@@ -220,6 +224,7 @@ mod tests {
             agent: "t".into(),
             link_dir: None,
             wait: std::time::Duration::from_secs(1),
+            cancelled: std::sync::Arc::new(|| false),
         };
         let args = serde_json::Map::from_iter([("failed_log".to_owned(), json!(true))]);
         let e = ci_status(&ctx, &Args::new(&args));

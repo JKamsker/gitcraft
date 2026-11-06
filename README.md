@@ -231,6 +231,14 @@ so your config, credentials and hooks apply as usual.
   that names the agent, says what will happen and shows the git commands: `push` (forced or
   not), `delete_branch`, a `hard` reset, `drop_commit`, and staging a conflicted file (which ends
   the conflict). The call waits for the answer; after two minutes it is denied automatically.
+- An approval can take up to two minutes, longer than some agents wait for a tool by default:
+  give the server more time there (Codex: `tool_timeout_sec = 180` under
+  `[mcp_servers.gitcraft]`). A call the agent cancels, or an agent that quits, takes its card
+  away, and what hadn't started doesn't run.
+- `gitcraft mcp` has no window of its own to ask ssh's questions in: for a repository over SSH
+  it signs in with keys (an agent or a key without a passphrase) only. An agent running inside
+  WSL starts the Linux gitcraft, which can't reach a window on Windows: start it from Windows
+  with `--repo \\wsl.localhost\<distro>\path` instead.
 - Settings → Agents turns agents' changes off; the reading tools still work. The window and
   `gitcraft mcp` talk over 127.0.0.1 with a random token kept in a file only you can read, in
   gitcraft's data folder (`agents/`).

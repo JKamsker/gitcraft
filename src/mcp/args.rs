@@ -77,6 +77,14 @@ impl<'a> Args<'a> {
         if items.len() > MAX_PATHS {
             return Err(format!("`{name}` can name at most {MAX_PATHS} paths"));
         }
+        let total: usize = items.iter().filter_map(Value::as_str).map(str::len).sum();
+        if total > MAX_PATHS_BYTES {
+            return Err(format!(
+                "`{name}` names {} KB of paths, more than {} KB: name folders, or fewer paths",
+                total / 1024,
+                MAX_PATHS_BYTES / 1024
+            ));
+        }
         items
             .iter()
             .map(|item| match item {
@@ -87,8 +95,9 @@ impl<'a> Args<'a> {
     }
 }
 
-/// The most paths one call may name.
+/// The most paths one call may name, and their length all together.
 pub const MAX_PATHS: usize = 500;
+const MAX_PATHS_BYTES: usize = 256 * 1024;
 
 /// Longest a name or revision may be.
 const MAX_NAME: usize = 255;
@@ -318,6 +327,7 @@ mod tests {
         assert!(refused(json!(["ok", "../no"])));
         assert!(refused(json!([1])));
         assert!(refused(json!(vec!["a"; MAX_PATHS + 1])));
+        assert!(refused(json!(vec!["x".repeat(4000); 100])));
         assert!(!refused(json!(["a", "b/c"])));
     }
 

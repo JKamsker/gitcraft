@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use super::{Ctx, Kind, ToolDef, number, object, short, string};
 use crate::git;
 use crate::mcp::args::{self, Args};
-use crate::mcp::output::capped;
+use crate::mcp::output::{capped, clip};
 
 pub(super) const TOOLS: &[&ToolDef] = &[&LOG, &COMMIT, &BLAME];
 
@@ -67,10 +67,18 @@ fn commit_row(c: &git::Commit) -> Value {
         "author": c.author,
         "email": c.email,
         "date": c.date,
-        "summary": c.summary,
-        "refs": c.refs,
+        "summary": clip(&c.summary, MAX_SUMMARY),
+        "refs": capped(c.refs.clone(), MAX_REFS_SHOWN).0,
+        "refs_not_listed": c.refs.len().saturating_sub(MAX_REFS_SHOWN),
     })
 }
+
+/// The longest summary, and the most branches and tags of one commit, a list shows.
+const MAX_SUMMARY: usize = 300;
+const MAX_REFS_SHOWN: usize = 30;
+/// The longest message, and line of a file, shown whole.
+const MAX_MESSAGE: usize = 20_000;
+const MAX_LINE_TEXT: usize = 500;
 
 fn file_log(
     ctx: &Ctx,
@@ -92,7 +100,7 @@ fn file_log(
                 "author": c.author,
                 "email": c.email,
                 "time": c.time,
-                "summary": c.summary,
+                "summary": clip(&c.summary, MAX_SUMMARY),
                 "path": c.path,
             })
         })
@@ -137,7 +145,7 @@ fn commit(ctx: &Ctx, a: &Args) -> Result<Value, String> {
         "author_date": d.author_date,
         "committer": d.committer,
         "commit_date": d.commit_date,
-        "message": d.message,
+        "message": clip(&d.message, MAX_MESSAGE),
         "in_head": d.in_head,
         "files": files.iter().map(|f| json!({
             "status": f.status.to_string(),
@@ -212,7 +220,7 @@ static BLAME: ToolDef = ToolDef {
             json!({
                 "path": string("The file, relative to the top of the repository."),
                 "start_line": number("First line (1 is the first).", 1, 1, u32::MAX.into()),
-                "end_line": number("Last line; default start_line + 199.", 200, 1, u32::MAX.into()),
+                "end_line": { "type": "integer", "minimum": 1, "description": "Last line; default start_line + 199." },
                 "rev": string("Blame the file as it is at this revision. Default: the working tree."),
             }),
             &["path"],
@@ -241,25 +249,27 @@ fn blame(ctx: &Ctx, a: &Args) -> Result<Value, String> {
     if rev.is_none() {
         in_working_tree(ctx, path)?;
     }
-    let lines = git::blame_plain(&ctx.repo, rev, path)?;
-    let total = lines.len();
+    let lines = git::blame_plain(&ctx.repo, rev, path, (start, end))?;
+    let more = lines.len() as u64 == end - start + 1;
     let rows: Vec<Value> = lines
         .iter()
         .enumerate()
-        .skip(start as usize - 1)
-        .take((end - start + 1) as usize)
         .map(|(i, l)| {
             json!({
-                "line": i + 1,
+                "line": start as usize + i,
                 "commit": if l.uncommitted() { "uncommitted".to_owned() } else { short(&l.hash).to_owned() },
                 "author": l.author,
                 "time": l.time,
-                "summary": l.summary,
-                "text": l.text,
+                "summary": clip(&l.summary, MAX_SUMMARY),
+                "text": clip(&l.text, MAX_LINE_TEXT),
             })
         })
         .collect();
-    Ok(json!({ "path": path, "total_lines": total, "lines": rows }))
+    let mut page = json!({ "path": path, "lines": rows });
+    if more {
+        page["next_start_line"] = json!(end + 1);
+    }
+    Ok(page)
 }
 
 #[cfg(all(test, unix))]
@@ -299,6 +309,7 @@ mod tests {
             agent: "t".into(),
             link_dir: None,
             wait: std::time::Duration::from_secs(1),
+            cancelled: std::sync::Arc::new(|| false),
         };
         let at = |rev: Option<&str>| {
             let mut args = serde_json::Map::new();
