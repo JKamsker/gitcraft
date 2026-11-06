@@ -39,8 +39,8 @@ ChangesAssociations=no
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 Name: "foldermenu"; Description: "Add ""Open in gitcraft"" to the right-click menu of folders"; GroupDescription: "Explorer:"
-Name: "links"; Description: "Open gitcraft:// links from the browser in gitcraft"; GroupDescription: "Links:"
 Name: "filemenu"; Description: "Add ""History in gitcraft"" and ""Blame in gitcraft"" to the right-click menu of files"; GroupDescription: "Explorer:"
+Name: "links"; Description: "Open gitcraft:// links from the browser in gitcraft"; GroupDescription: "Links:"
 
 [Files]
 Source: "{#Root}\target\release\gitcraft.exe"; DestDir: "{app}"; Flags: ignoreversion

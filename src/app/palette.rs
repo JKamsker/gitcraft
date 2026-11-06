@@ -266,7 +266,7 @@ impl App {
                 ui.set_width(560.0);
                 let edit = ui.add(
                     egui::TextEdit::singleline(query)
-                        .hint_text("Type a command or a branch…")
+                        .hint_text("Type a command or a branch, or paste a forge link…")
                         .desired_width(f32::INFINITY)
                         .margin(egui::Margin::symmetric(10, 8))
                         .font(theme::medium(14.0)),
@@ -282,18 +282,17 @@ impl App {
                     .max_height(380.0)
                     .show(ui, |ui| {
                         ui.spacing_mut().item_spacing.y = 0.0;
-                        if let Some(link) = &link {
-                            let what = super::links::describe(link);
-                            if palette_row(
-                                ui,
-                                &t,
-                                "Open this link in its clone",
-                                &what,
-                                true,
-                                false,
-                            ) {
-                                open_link = true;
+                        match &link {
+                            Some(Ok(link)) => {
+                                let what = super::links::describe(link);
+                                if palette_row(ui, &t, "Open link", &what, true, false) {
+                                    open_link = true;
+                                }
                             }
+                            Some(Err(why)) => {
+                                ui.label(RichText::new(why).color(t.text_faint));
+                            }
+                            None => {}
                         }
                         for (k, &i) in shown.iter().enumerate() {
                             let (label, _, hint, _) = &entries[i];
@@ -311,7 +310,7 @@ impl App {
         if enter && let Some(&i) = shown.get(*chosen) {
             run = Some(i);
         }
-        if enter && link.is_some() {
+        if enter && matches!(link, Some(Ok(_))) {
             open_link = true;
         }
         if resp.response.clicked_elsewhere()
@@ -320,7 +319,7 @@ impl App {
         {
             close = true;
         }
-        if open_link && let Some(link) = link {
+        if open_link && let Some(Ok(link)) = link {
             self.palette = None;
             self.open_link(link, ctx);
             return;

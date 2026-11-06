@@ -176,3 +176,35 @@ fn matching_a_clone_by_its_remote() -> Result<(), String> {
     );
     Ok(())
 }
+
+#[test]
+fn folders_and_gitlab_paths_that_look_like_others() {
+    // A Gitea / Forgejo branch or folder page, and a GitLab folder: the repository.
+    assert_eq!(
+        web("https://codeberg.org/o/r/src/branch/main"),
+        ok("codeberg.org", "o/r", Target::Repo)
+    );
+    assert_eq!(
+        web("https://gitlab.com/g/r/-/tree/main/src"),
+        ok("gitlab.com", "g/r", Target::Repo)
+    );
+    // A GitLab group or project named like another forge's keyword.
+    assert_eq!(
+        web("https://gitlab.com/org/team/src/-/merge_requests/3"),
+        ok("gitlab.com", "org/team/src", Target::PullRequest(3))
+    );
+    assert_eq!(
+        web("https://gitlab.com/org/commit/-/commit/abcd1234"),
+        ok(
+            "gitlab.com",
+            "org/commit",
+            Target::Commit("abcd1234".into())
+        )
+    );
+    // A forge served over plain http is cloned so too.
+    let http = parse_web_url("http://git.example.lan/o/r/pulls/1");
+    assert_eq!(
+        http.map(|l| l.clone_url()).ok().as_deref(),
+        Some("http://git.example.lan/o/r.git")
+    );
+}

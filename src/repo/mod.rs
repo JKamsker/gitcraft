@@ -384,6 +384,11 @@ impl RepoTab {
         self.file_view.as_ref().map(|v| v.path.clone())
     }
 
+    /// The remotes the tab read, once it has read the repository.
+    pub(crate) fn remotes_read(&self) -> Option<Vec<git::Remote>> {
+        (!self.opening()).then(|| self.remotes.clone())
+    }
+
     /// An editor holds work that showing something else would close: a conflict being
     /// solved, an interactive rebase being set up.
     pub(crate) fn editor_open(&self) -> bool {

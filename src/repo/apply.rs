@@ -206,8 +206,8 @@ impl RepoTab {
                 }
             }
             Action::CloseFileView => self.file_view = None,
-            Action::BlameAt { path, line } => {
-                self.open_file_view(path, None, super::file_view::FileTab::Blame, ctx);
+            Action::BlameAt { path, rev, line } => {
+                self.open_file_view(path, rev, super::file_view::FileTab::Blame, ctx);
                 if let Some(view) = &mut self.file_view {
                     view.goto_line.set(Some(line));
                     view.marked_line = Some(line);

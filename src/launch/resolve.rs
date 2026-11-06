@@ -24,6 +24,13 @@ pub enum Then {
         path: String,
         line: Option<u32>,
     },
+    /// A linked file's blame: at the linked commit (its full hash) when the clone has it, else
+    /// as the clone has the file.
+    FileAt {
+        rev: Option<String>,
+        path: String,
+        line: Option<u32>,
+    },
     /// A commit, by its full hash.
     Commit(String),
     /// A pull request, by its number.
@@ -47,7 +54,11 @@ pub fn resolve(cmd: &Command, cwd: &Path) -> Result<Resolved, String> {
 
 /// [`resolve`], a link's clone looked for among `clones` (the open tabs, the recent
 /// repositories).
-pub fn resolve_among(cmd: &Command, cwd: &Path, clones: &[PathBuf]) -> Result<Resolved, String> {
+pub fn resolve_among(
+    cmd: &Command,
+    cwd: &Path,
+    clones: &[super::open_link::Known],
+) -> Result<Resolved, String> {
     match cmd {
         Command::Link(link) => super::open_link::resolve_link(link, clones),
         Command::Open(path) => Ok(Resolved {

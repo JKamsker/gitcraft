@@ -17,6 +17,8 @@ const MAX_LINK: usize = 4096;
 /// A forge's page, as far as gitcraft can open it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ForgeLink {
+    /// The link came over plain `http://` (a forge serving only that is cloned so too).
+    pub http: bool,
     /// The web host, lowercase, with its port if one was given (`git.example.com:3000`).
     pub host: String,
     /// The repository's path on the forge (`owner/repo`, `group/sub/repo`).
@@ -97,7 +99,9 @@ pub fn parse_web_url(url: &str) -> Result<ForgeLink, String> {
     let segments = path_segments(path).ok_or_else(|| bad("its path isn't a forge's"))?;
     let (repo, target) = read_path(&segments, fragment)
         .ok_or_else(|| bad("it doesn't point at a repository, pull request, commit or file"))?;
+    let http = strip_prefix_ignore_case(url, "http://").is_some();
     Ok(ForgeLink {
+        http,
         host,
         repo,
         target,
@@ -150,31 +154,21 @@ fn path_segments(path: &str) -> Option<Vec<String>> {
 /// The repository and what in it, from the path's names.
 fn read_path(s: &[String], fragment: &str) -> Option<(String, Target)> {
     let line = line_of(fragment);
-    // What follows `owner/repo` on GitHub, Gitea / Forgejo and Bitbucket: a `-` further on is
-    // then a folder's name, not GitLab's separator.
-    const OTHERS: [&str; 8] = [
-        "pull",
-        "pulls",
-        "pull-requests",
-        "commit",
-        "commits",
-        "blob",
-        "src",
-        "tree",
-    ];
-    let others = s.get(2).is_some_and(|k| OTHERS.contains(&k.as_str()));
-    // GitLab: `group/…/repo/-/what…`.
-    if let Some(dash) = s.iter().position(|n| n == "-").filter(|_| !others) {
-        let repo = s.get(..dash).filter(|r| r.len() >= 2)?.join("/");
+    // GitLab: `group/…/repo/-/what…`, told by what follows the `-` (a folder called `-` in
+    // another forge's path is followed by anything else).
+    const GITLAB: [&str; 4] = ["merge_requests", "commit", "blob", "tree"];
+    let dash = s.iter().enumerate().position(|(i, n)| {
+        n == "-" && i >= 2 && s.get(i + 1).is_none_or(|k| GITLAB.contains(&k.as_str()))
+    });
+    if let Some(dash) = dash {
+        let repo = s.get(..dash)?.join("/");
         let what = s.get(dash + 1..)?;
         let target = match what {
             [] => Target::Repo,
-            [mr, n] if mr == "merge_requests" => Target::PullRequest(number(n)?),
             [mr, n, ..] if mr == "merge_requests" => Target::PullRequest(number(n)?),
             [c, sha] if c == "commit" => Target::Commit(hash(sha)?),
-            [b, rev, path @ ..] if (b == "blob" || b == "tree") && !path.is_empty() => {
-                file(rev, path, line)?
-            }
+            [b, rev, path @ ..] if b == "blob" && !path.is_empty() => file(rev, path, line)?,
+            // A folder: the repository.
             [t, ..] if t == "tree" => Target::Repo,
             _ => return None,
         };
@@ -199,6 +193,10 @@ fn read_path(s: &[String], fragment: &str) -> Option<(String, Target)> {
                 && !path.is_empty() =>
         {
             file(rev, path, line)?
+        }
+        // A Gitea / Forgejo folder or branch page (`src/branch/main`): the repository.
+        [src, kind, ..] if src == "src" && matches!(kind.as_str(), "branch" | "tag" | "commit") => {
+            Target::Repo
         }
         // Bitbucket `src/<rev>/<path>`.
         [src, rev, path @ ..] if src == "src" && !path.is_empty() => file(rev, path, line)?,
@@ -295,7 +293,8 @@ impl ForgeLink {
 
     /// The URL to clone it from, over HTTPS.
     pub fn clone_url(&self) -> String {
-        format!("https://{}/{}.git", self.host, self.repo)
+        let scheme = if self.http { "http" } else { "https" };
+        format!("{scheme}://{}/{}.git", self.host, self.repo)
     }
 }
 
