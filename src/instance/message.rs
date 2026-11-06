@@ -1,0 +1,278 @@
+//! What a start of gitcraft says to the one already running, and what that one answers: one
+//! line of JSON each way.
+//!
+//! A request is `{"v":1,"token":"…","kind":"…", …}`: the protocol's version, the running
+//! instance's token, what is asked, and what that kind of request needs (`"path"` for `open`).
+//! The answer is `{"v":1,"status":"ok"}`, `{"v":1,"status":"refused","error":"…"}` or
+//! `{"v":1,"status":"closing"}` (the window is closing: the request was not taken).
+//!
+//! A new kind of request is a new [`Request`] variant with its word in [`Request::kind`] and its
+//! fields read in [`decode_request`]; an older instance refuses a kind it doesn't know (`refused`,
+//! saying so), so a newer client can tell. Nothing in a request is ever run: a path is only
+//! opened as a repository, and only once it is found well formed.
+
+use std::path::{Path, PathBuf};
+
+use serde_json::{Value, json};
+
+/// The protocol spoken.
+pub const VERSION: u64 = 1;
+
+/// The longest line read, request or answer, its `\n` included. Anything can connect to the
+/// port: what is longer is no gitcraft's, and is dropped before it is held whole.
+pub const MAX_LINE: u64 = 64 * 1024;
+
+/// The longest path handed over (Windows' own limit, with room for `ssh://host/`).
+const MAX_PATH: usize = 33 * 1024;
+
+/// What a start asks of the running instance.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Request {
+    /// Come to the front.
+    Focus,
+    /// Open (or switch to) the repository at this path, then come to the front: an absolute
+    /// folder of this machine, or one elsewhere (`ssh://…`, `\\wsl.localhost\…`).
+    Open(PathBuf),
+}
+
+impl Request {
+    fn kind(&self) -> &'static str {
+        match self {
+            Request::Focus => "focus",
+            Request::Open(_) => "open",
+        }
+    }
+}
+
+/// Why a request was not taken.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Refusal {
+    /// Not JSON, not an object, or without a token: no gitcraft's. Left unanswered.
+    Malformed,
+    /// The token isn't this instance's. Left unanswered: whoever sent it learns nothing.
+    Stranger,
+    /// From a gitcraft, but not one this instance can take; answered with this message.
+    Unusable(String),
+}
+
+/// The answer to a request.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Reply {
+    /// Taken: the window does it.
+    Ok,
+    /// Not taken, and why.
+    Refused(String),
+    /// The window is closing; the request was not taken.
+    Closing,
+}
+
+/// `request` for the instance whose token is `token`, as the line sent.
+pub fn encode_request(token: &str, request: &Request) -> String {
+    let mut value = json!({ "v": VERSION, "token": token, "kind": request.kind() });
+    if let (Request::Open(path), Some(object)) = (request, value.as_object_mut()) {
+        object.insert("path".to_owned(), path.to_string_lossy().into());
+    }
+    format!("{value}\n")
+}
+
+/// The request in `line`, for the instance whose token is `token`.
+pub fn decode_request(line: &str, token: &str) -> Result<Request, Refusal> {
+    let value: Value = serde_json::from_str(line.trim_end()).map_err(|_| Refusal::Malformed)?;
+    let object = value.as_object().ok_or(Refusal::Malformed)?;
+    let sent = object
+        .get("token")
+        .and_then(Value::as_str)
+        .ok_or(Refusal::Malformed)?;
+    // Only a start of this user's knows the token: checked before anything else is told.
+    if !crate::remote::askpass::same(sent.as_bytes(), token.as_bytes()) {
+        return Err(Refusal::Stranger);
+    }
+    match object.get("v").and_then(Value::as_u64) {
+        Some(VERSION) => {}
+        Some(v) => {
+            return Err(Refusal::Unusable(format!(
+                "this gitcraft speaks version {VERSION}, not {v}"
+            )));
+        }
+        None => return Err(Refusal::Unusable("no version".to_owned())),
+    }
+    match object.get("kind").and_then(Value::as_str) {
+        Some("focus") => Ok(Request::Focus),
+        Some("open") => {
+            let path = object.get("path").and_then(Value::as_str).unwrap_or("");
+            valid_path(path)
+                .map(Request::Open)
+                .map_err(Refusal::Unusable)
+        }
+        Some(kind) => Err(Refusal::Unusable(format!(
+            "this gitcraft can't do \"{kind}\""
+        ))),
+        None => Err(Refusal::Unusable("no kind".to_owned())),
+    }
+}
+
+/// `path` as a folder to open, when it is one: not empty, not too long, no control characters
+/// (a line break, a NUL), and absolute or on another machine. A relative one would be read
+/// against the running instance's folder, not the start's that sent it.
+pub fn valid_path(path: &str) -> Result<PathBuf, String> {
+    if path.is_empty() {
+        return Err("no path".to_owned());
+    }
+    if path.len() > MAX_PATH {
+        return Err("the path is too long".to_owned());
+    }
+    if path.chars().any(char::is_control) {
+        return Err("the path has control characters".to_owned());
+    }
+    let parsed = Path::new(path);
+    if !parsed.is_absolute() && !crate::remote::is_remote(parsed) {
+        return Err(format!("{path} is not an absolute path"));
+    }
+    Ok(parsed.to_owned())
+}
+
+/// `reply` as the line sent.
+pub fn encode_reply(reply: &Reply) -> String {
+    let value = match reply {
+        Reply::Ok => json!({ "v": VERSION, "status": "ok" }),
+        Reply::Refused(why) => json!({ "v": VERSION, "status": "refused", "error": why }),
+        Reply::Closing => json!({ "v": VERSION, "status": "closing" }),
+    };
+    format!("{value}\n")
+}
+
+/// The reply in `line`; `None` for one that isn't a gitcraft's.
+pub fn decode_reply(line: &str) -> Option<Reply> {
+    let value: Value = serde_json::from_str(line.trim_end()).ok()?;
+    match value.get("status")?.as_str()? {
+        "ok" => Some(Reply::Ok),
+        "closing" => Some(Reply::Closing),
+        "refused" => Some(Reply::Refused(
+            value
+                .get("error")
+                .and_then(Value::as_str)
+                .unwrap_or("no reason given")
+                .to_owned(),
+        )),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TOKEN: &str = "0123456789abcdef0123456789abcdef";
+
+    fn absolute() -> PathBuf {
+        if cfg!(windows) {
+            PathBuf::from(r"C:\code\app")
+        } else {
+            PathBuf::from("/home/me/app")
+        }
+    }
+
+    #[test]
+    fn requests_go_there_and_back() {
+        for request in [
+            Request::Focus,
+            Request::Open(absolute()),
+            Request::Open(PathBuf::from("ssh://build/home/me/app")),
+        ] {
+            let line = encode_request(TOKEN, &request);
+            assert!(line.ends_with('\n') && line.matches('\n').count() == 1);
+            assert_eq!(decode_request(&line, TOKEN), Ok(request));
+        }
+    }
+
+    #[test]
+    fn a_line_break_in_a_path_stays_inside_the_line() {
+        let line = encode_request(TOKEN, &Request::Open(PathBuf::from("/a\nb")));
+        assert_eq!(line.matches('\n').count(), 1);
+        assert!(matches!(
+            decode_request(&line, TOKEN),
+            Err(Refusal::Unusable(_))
+        ));
+    }
+
+    #[test]
+    fn replies_go_there_and_back() {
+        for reply in [Reply::Ok, Reply::Closing, Reply::Refused("why".to_owned())] {
+            assert_eq!(decode_reply(&encode_reply(&reply)), Some(reply));
+        }
+        assert_eq!(decode_reply("HTTP/1.1 200 OK"), None);
+        assert_eq!(decode_reply(r#"{"status":"maybe"}"#), None);
+    }
+
+    #[test]
+    fn a_wrong_or_missing_token_is_a_stranger_or_nothing() {
+        let line = encode_request("ffffffffffffffffffffffffffffffff", &Request::Focus);
+        assert_eq!(decode_request(&line, TOKEN), Err(Refusal::Stranger));
+        assert_eq!(
+            decode_request(r#"{"v":1,"kind":"focus"}"#, TOKEN),
+            Err(Refusal::Malformed)
+        );
+        assert_eq!(
+            decode_request(r#"{"v":1,"token":7,"kind":"focus"}"#, TOKEN),
+            Err(Refusal::Malformed)
+        );
+    }
+
+    /// What a web page can make a browser send to 127.0.0.1, and other garbage.
+    #[test]
+    fn what_no_gitcraft_sends_is_malformed() {
+        for line in [
+            "POST / HTTP/1.1",
+            "GET /?token=x HTTP/1.1",
+            "",
+            "[1,2]",
+            "\"focus\"",
+            "{",
+        ] {
+            assert_eq!(
+                decode_request(line, TOKEN),
+                Err(Refusal::Malformed),
+                "{line}"
+            );
+        }
+    }
+
+    #[test]
+    fn another_version_or_kind_is_refused_and_says_why() {
+        let other = format!(r#"{{"v":2,"token":"{TOKEN}","kind":"focus"}}"#);
+        assert!(
+            matches!(decode_request(&other, TOKEN), Err(Refusal::Unusable(w)) if w.contains("version"))
+        );
+        let none = format!(r#"{{"token":"{TOKEN}","kind":"focus"}}"#);
+        assert!(matches!(
+            decode_request(&none, TOKEN),
+            Err(Refusal::Unusable(_))
+        ));
+        let unknown = format!(r#"{{"v":1,"token":"{TOKEN}","kind":"run","cmd":"rm -rf /"}}"#);
+        assert!(
+            matches!(decode_request(&unknown, TOKEN), Err(Refusal::Unusable(w)) if w.contains("\"run\""))
+        );
+    }
+
+    #[test]
+    fn only_well_formed_paths_are_opened() {
+        assert!(valid_path("").is_err());
+        assert!(valid_path("relative/folder").is_err());
+        assert!(valid_path(".").is_err());
+        assert!(valid_path("--upload-pack=touch x").is_err());
+        assert!(valid_path("ssh://-oProxyCommand=x/repo").is_err());
+        assert!(valid_path("/a\0b").is_err());
+        assert!(valid_path(&format!("/{}", "a".repeat(MAX_PATH))).is_err());
+        assert_eq!(
+            valid_path(&absolute().to_string_lossy()),
+            Ok(absolute()),
+            "an absolute folder"
+        );
+        assert!(valid_path("ssh://me@build:2222/~/repo").is_ok());
+        let open = format!(r#"{{"v":1,"token":"{TOKEN}","kind":"open"}}"#);
+        assert!(matches!(
+            decode_request(&open, TOKEN),
+            Err(Refusal::Unusable(_))
+        ));
+    }
+}

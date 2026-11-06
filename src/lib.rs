@@ -10,6 +10,7 @@ mod git;
 mod graph;
 mod icons;
 mod image_fit;
+mod instance;
 mod manual;
 mod mergiraf;
 mod pr_post;
