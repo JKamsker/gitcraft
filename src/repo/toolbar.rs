@@ -292,9 +292,16 @@ pub(super) fn headline(msg: &str) -> String {
         let files = if conflicts == 1 { "file" } else { "files" };
         return format!("{label}: conflicts in {conflicts} {files}, resolve them in Changes");
     }
-    let line = body
-        .lines()
-        .find(|l| l.starts_with("error:") || l.starts_with("fatal:"))
+    // A hook named as what stopped it (see `git::FailedHook`) says more than git's own
+    // `error: failed to push some refs` after it.
+    let hook = body.lines().next().filter(|l| {
+        (l.starts_with("the ") || l.starts_with("it was done, but the ")) && l.contains(" hook ")
+    });
+    let line = hook
+        .or_else(|| {
+            body.lines()
+                .find(|l| l.starts_with("error:") || l.starts_with("fatal:"))
+        })
         .or_else(|| body.lines().find(|l| !l.trim().is_empty()))
         .unwrap_or_default();
     if label.is_empty() {

@@ -123,7 +123,10 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
     for (name, value) in &extra.env {
         cmd.env(name, value);
     }
-    let trace = extra.trace_hooks.then(super::hooks::TraceFile::new);
+    let trace = extra
+        .trace_hooks
+        .then(super::hooks::TraceFile::new)
+        .flatten();
     if let Some(trace) = &trace {
         cmd.env(super::hooks::TRACE_VAR, trace.path());
     }
@@ -137,7 +140,7 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
         status: out.status.to_string(),
         stdout: out.stdout,
         stderr: out.stderr,
-        failed_hook: trace.filter(|_| failed).and_then(|t| t.failed_hook()),
+        failed_hook: trace.filter(|_| failed).and_then(|t| t.failed_hook(args)),
     })
 }
 
@@ -199,7 +202,7 @@ fn execute_there(target: &Target, extra: &Extra, args: &[&str]) -> Result<Ran, S
         stdout: out.stdout,
         stderr,
         failed_hook: (out.code != 0)
-            .then(|| super::hooks::failed_hook(&events))
+            .then(|| super::hooks::failed_hook(&events, args))
             .flatten(),
     })
 }
@@ -390,7 +393,7 @@ fn run_extra(
             (false, false) => format!("{stderr}\n{stdout}"),
         };
         Err(match (&out.failed_hook, said.is_empty()) {
-            (Some(hook), _) => hook.explain(&said),
+            (Some(hook), _) => hook.explain(&said, args),
             (None, true) => format!("git {} failed ({})", args.join(" "), out.status),
             (None, false) => said,
         })

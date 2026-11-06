@@ -374,6 +374,14 @@ error: failed to push some refs";
         "Push failed: error: failed to push some refs"
     );
     assert_eq!(headline("Fetch: done"), "Fetch: done");
+    // A hook that stopped it is the headline, not git's own error line after its output.
+    let hook = "Push failed: the pre-push hook stopped it (exit code 1)
+error: tests failed
+error: failed to push some refs to 'origin'";
+    assert_eq!(
+        headline(hook),
+        "Push failed: the pre-push hook stopped it (exit code 1)"
+    );
 }
 
 #[test]

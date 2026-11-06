@@ -357,13 +357,13 @@ impl RepoTab {
         self.log_stream = Default::default();
         self.loading_more = false;
         self.refs = loaded.refs;
-        self.refresh_detached(ctx);
         self.has_more = loaded.history.len() >= loaded.requested;
         self.history = loaded.history;
         // A status read since this reload started is newer.
         if Self::newer(loaded.read, &mut self.work_read) {
             self.work = loaded.work;
         }
+        self.refresh_detached(ctx);
         // The last counts of worktrees this read left uncounted (on another machine) stay
         // until they are counted again.
         let counted: Vec<(PathBuf, Option<usize>)> = self

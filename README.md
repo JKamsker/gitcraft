@@ -84,8 +84,8 @@ so your config, credentials and hooks apply as usual.
   so main reads one merge per pull request. Kept per repository; the header names the order
   when it isn't the default.
 - While HEAD is detached, a banner says so in plain words, with _Create branch here_ and _Back
-  to main_ (the branch it was on). Checking out something else after committing there stops
-  first, lists the commits that would be left on no branch, and offers to keep them on a new
+  to main_ (the branch it was on). Checking out something else from the app after committing
+  there stops first, lists the commits that would be left on no branch, and offers to keep them on a new
   branch.
 - The checked-out branch's pill is solid, the others a darker shade. Double-click a pill to
   check that branch (or tag) out; hover `+N` to list every pill of the commit and double-click
@@ -98,7 +98,8 @@ so your config, credentials and hooks apply as usual.
 - Right-click a commit: create a branch, a tag or a worktree on a new branch there, check it
   out, interactive rebase onto it,
   cherry-pick, revert, reset the current branch to it (soft / mixed / keep / hard, confirmed;
-  _Keep_ keeps uncommitted changes and stops with git's message if they'd be touched), the menu
+  _Keep_ drops the commits after it but keeps uncommitted changes, and stops with git's message
+  if a file with changes would be touched), the menu
   of each branch on it, copy the hash, message or branch name. Right-click a branch's pill to get
   check out, fast-forward, merge, rebase and interactive rebase for that branch on top.
 - Compare: Ctrl+click a second commit (or _Compare with…_ in the commit menu, the changes row
@@ -166,7 +167,8 @@ so your config, credentials and hooks apply as usual.
   to switch a repository to; _Use the profile's author_ takes the repository's own out again.
 - _Skip hooks_ in the commit box, or _Push, skipping hooks_ (right-click Push, or the palette),
   runs that one commit or push with `--no-verify`. When a hook makes an operation fail, the
-  error names it (`the pre-commit hook failed (exit code 1)`), then says what it printed.
+  error names it (`the pre-commit hook stopped it (exit code 1)`), then says what it printed;
+  hooks whose exit git ignores (`post-commit`…) are never blamed.
 - Undo / redo (Ctrl+Z / Ctrl+Y) of commits, amends, merges, rebases, pulls, resets,
   cherry-picks, reverts, checkouts, branch create / rename / delete, tags and stashes.
 

@@ -39,6 +39,28 @@ impl Leave {
             Leave::Checkout(t) | Leave::CheckoutPull(t) | Leave::CheckoutRemote(t) => t,
         }
     }
+
+    /// What is checked out, for people: a commit by its short hash, a tag by its name.
+    pub fn label(&self) -> String {
+        let target = self.target();
+        let hash = target.len() == 40 && target.chars().all(|c| c.is_ascii_hexdigit());
+        if hash {
+            return super::short(target).to_owned();
+        }
+        target
+            .strip_prefix("refs/tags/")
+            .unwrap_or(target)
+            .to_owned()
+    }
+
+    /// The checkout as the views ask for it.
+    fn action(self) -> Action {
+        match self {
+            Leave::Checkout(t) => Action::Checkout(t),
+            Leave::CheckoutPull(t) => Action::CheckoutPull(t),
+            Leave::CheckoutRemote(t) => Action::CheckoutRemote(t),
+        }
+    }
 }
 
 /// What the banner and the dialog ask for.
@@ -64,9 +86,9 @@ pub(crate) struct KeepDialog {
 }
 
 impl KeepDialog {
-    /// What the dialog's buttons say they check out.
-    pub fn target(&self) -> &str {
-        self.leave.target()
+    /// What the dialog says it checks out.
+    pub fn target(&self) -> String {
+        self.leave.label()
     }
 
     /// Whether more commits are behind than were listed.
@@ -83,12 +105,19 @@ impl RepoTab {
 
     /// After a read of the refs: reads in the background what the banner needs, while HEAD is
     /// detached.
+    /// Read again only once HEAD moved: what it was on before doesn't change while it stays,
+    /// and while a rebase or the like goes on the banner doesn't show anyway.
     pub(super) fn refresh_detached(&mut self, ctx: &egui::Context) {
-        self.detached.reads += 1;
         if !self.is_detached() {
+            self.detached.reads += 1;
             self.detached.info = None;
             return;
         }
+        let read_for = self.detached.info.as_ref().map(|(head, _)| head);
+        if read_for == Some(&self.refs.head) || self.work.in_progress.is_some() {
+            return;
+        }
+        self.detached.reads += 1;
         let (path, head, read) = (
             self.path.clone(),
             self.refs.head.clone(),
@@ -135,7 +164,14 @@ impl RepoTab {
         if !self.is_detached() || leave.target().starts_with('-') {
             return self.leave_now(leave, ctx);
         }
-        if self.detached.checking || self.busy_op.is_some() {
+        if let Some(busy) = &self.busy_op {
+            self.status = Some((
+                format!("Checkout {}: wait for {busy} to finish", leave.label()),
+                true,
+            ));
+            return;
+        }
+        if self.detached.checking {
             return;
         }
         self.detached.checking = true;
@@ -160,9 +196,9 @@ impl RepoTab {
                     Err(e) => {
                         tab.status = Some((
                             format!(
-                                "Checkout {} stopped: could not list the commits it would \
-                                 leave on no branch: {e}",
-                                leave.target()
+                                "Didn't check out {}: couldn't list the commits it would \
+                                 leave on no branch ({e})",
+                                leave.label()
                             ),
                             true,
                         ))
@@ -182,13 +218,17 @@ impl RepoTab {
     }
 
     pub(super) fn detached_act(&mut self, act: DetachedAct, ctx: &egui::Context) {
+        if let Some(busy) = &self.busy_op {
+            self.status = Some((
+                format!("Wait for {busy} to finish, then check out again"),
+                true,
+            ));
+            return;
+        }
         match act {
             DetachedAct::Leave(leave) => self.leave_now(leave, ctx),
             DetachedAct::Keep { name, head, leave } => {
                 let (label, steps, undo) = keep_steps(&name, &head);
-                if self.busy_op.is_some() {
-                    return;
-                }
                 self.detached.resume = Some((label.clone(), leave));
                 self.run_undoable(&label, steps, Refresh::All, undo, ctx);
             }
@@ -196,14 +236,14 @@ impl RepoTab {
     }
 
     /// An operation ended: once the branch keeping the commits is made, the checkout asked
-    /// for runs (on the next frame).
+    /// for runs (on the next frame the view is shown), checked again first: commits made on
+    /// the detached HEAD meanwhile are asked about too.
     pub(super) fn detached_op_done(&mut self, label: &str, ok: bool) {
         let Some((_, leave)) = self.detached.resume.take_if(|(l, _)| l == label) else {
             return;
         };
         if ok {
-            self.queued
-                .push(Action::Detached(DetachedAct::Leave(leave)));
+            self.queued.push(leave.action());
         }
     }
 }

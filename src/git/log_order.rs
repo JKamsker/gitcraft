@@ -21,7 +21,7 @@ impl Order {
     pub fn label(self) -> &'static str {
         match self {
             Order::Topo => "Topological",
-            Order::Date => "Commit date",
+            Order::Date => "Commit date (default)",
             Order::AuthorDate => "Author date",
         }
     }
@@ -72,14 +72,18 @@ impl LogOrder {
         if self.is_default() {
             return None;
         }
-        let order = (self.order != Order::Date).then(|| self.order.label().to_lowercase());
-        let first = self.first_parent.then(|| "first parent".to_owned());
+        let order = match self.order {
+            Order::Topo => Some("topo"),
+            Order::Date => None,
+            Order::AuthorDate => Some("author date"),
+        };
+        let first = self.first_parent.then_some("first parent");
         Some(
             order
                 .into_iter()
                 .chain(first)
                 .collect::<Vec<_>>()
-                .join(", "),
+                .join(" · "),
         )
     }
 }
@@ -115,7 +119,7 @@ mod tests {
             order: Order::Topo,
             first_parent: true,
         };
-        assert_eq!(both.summary().as_deref(), Some("topological, first parent"));
+        assert_eq!(both.summary().as_deref(), Some("topo · first parent"));
     }
 
     /// What was kept by an older or newer gitcraft still reads: a missing field is its default.

@@ -34,14 +34,6 @@ impl RepoTab {
                     );
                 amend_started =
                     amend.changed() && self.amend && self.commit_summary.trim().is_empty();
-                ui.add_enabled(
-                    !rebasing,
-                    egui::Checkbox::new(&mut self.skip_hooks.commit, "Skip hooks"),
-                )
-                .on_hover_text(
-                    "Commit once without the pre-commit and commit-msg hooks (git commit \
-                     --no-verify); the commit after runs them again",
-                );
             });
         });
         if amend_started {
@@ -109,6 +101,16 @@ impl RepoTab {
                     .color(t.warning)
                     .small(),
             );
+        }
+        if rebasing {
+            // `--continue` takes no `--no-verify`: nothing ticked waits for the next commit.
+            self.skip_hooks.commit = false;
+        } else {
+            ui.checkbox(&mut self.skip_hooks.commit, "Skip hooks")
+                .on_hover_text(
+                    "Commit once without the pre-commit and commit-msg hooks (git commit \
+                     --no-verify); it unticks once the commit runs",
+                );
         }
         ui.add_space(4.0);
         let staged = self.work.staged.len();

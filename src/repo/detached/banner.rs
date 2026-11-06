@@ -33,33 +33,34 @@ impl RepoTab {
         let idle = self.busy_op.is_none() && !self.detached.checking;
         let head = self.refs.head.clone();
         let back = self.back_to().map(str::to_owned);
-        ui.horizontal(|ui| {
-            icons::inline(ui, "circle-alert", 15.0, t.warning);
-            ui.add(
-                egui::Label::new(RichText::new(SAYS).color(t.text).font(theme::medium(12.5)))
-                    .truncate(),
-            )
-            .on_hover_text(format!(
-                "HEAD is detached at {}: it is on no branch. Commits made now are on no \
-                 branch either, and checking out something else leaves them behind.",
-                short(&head)
-            ));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if let Some(branch) = &back
-                    && ui
-                        .add_enabled(idle, egui::Button::new(format!("Back to {branch}")))
-                        .on_hover_text(format!("Check {branch} out again"))
-                        .clicked()
-                {
-                    acts.push(Action::Checkout(branch.clone()));
-                }
-                if ui
-                    .add_enabled(idle, egui::Button::new("Create branch here"))
-                    .on_hover_text("A branch at this commit, checked out: new commits go on it")
+        // The buttons first, from the right: the text takes what is left, cut short if need be.
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if let Some(branch) = &back
+                && ui
+                    .add_enabled(idle, egui::Button::new(format!("Back to {branch}")))
+                    .on_hover_text(format!("Check {branch} out"))
                     .clicked()
-                {
-                    acts.push(Action::Dialog(Dialog::create_branch(&head, short(&head))));
-                }
+            {
+                acts.push(Action::Checkout(branch.clone()));
+            }
+            if ui
+                .add_enabled(idle, egui::Button::new("Create branch here"))
+                .on_hover_text("A branch at this commit, checked out: new commits go on it")
+                .clicked()
+            {
+                acts.push(Action::Dialog(Dialog::create_branch(&head, short(&head))));
+            }
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                icons::inline(ui, "circle-alert", 15.0, t.warning);
+                ui.add(
+                    egui::Label::new(RichText::new(SAYS).color(t.text).font(theme::medium(12.5)))
+                        .truncate(),
+                )
+                .on_hover_text(format!(
+                    "HEAD is detached at {}: it is on no branch. Commits made now are on no \
+                     branch either, and checking out something else leaves them behind.",
+                    short(&head)
+                ));
             });
         });
     }

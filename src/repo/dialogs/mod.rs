@@ -375,7 +375,7 @@ impl RepoTab {
                     draft,
                     focus,
                 } => remote::create_pr(ui, noun, branch, base, title, body, draft, focus),
-                Dialog::KeepDetached(keep) => keep_detached::keep_detached(ui, enter, keep),
+                Dialog::KeepDetached(keep) => keep_detached::keep_detached(ui, enter, keep, local),
                 Dialog::Confirm {
                     title,
                     body,
