@@ -2,11 +2,16 @@
 
 mod askpass_dialog;
 mod clone;
+mod dropped;
 mod home;
+mod home_filter;
+mod home_recent;
 mod palette;
 mod panels;
 mod profiles;
+mod recent_status;
 mod remote_open;
+mod repo_scan;
 mod tab_strip;
 mod tabs;
 #[cfg(test)]
@@ -58,6 +63,8 @@ struct Saved {
     /// What the profiles not in use had open; `open`, `active`, `recent` and `theme` are the
     /// profile's in use.
     profile_states: profiles::ProfileStates,
+    /// When each recent repository was last opened, in seconds since 1970 (of every profile).
+    last_opened: BTreeMap<PathBuf, i64>,
 }
 
 enum Tab {
@@ -122,6 +129,16 @@ pub struct App {
     /// The folders of the last repository tabs closed, the last one at the end.
     closed: Vec<PathBuf>,
     tab_drag: Option<TabDrag>,
+    /// The start page's search of the recent repositories.
+    recent_filter: home_filter::RecentFilter,
+    /// The recent repositories' branches and changes, read in the background.
+    recent_status: recent_status::RecentStatuses,
+    /// See [`Saved::last_opened`].
+    last_opened: BTreeMap<PathBuf, i64>,
+    /// Files and folders dropped on the window, still to be handled.
+    drops: dropped::Drops,
+    /// _Scan a folder for repositories_, while its dialog is open.
+    repo_scan: Option<repo_scan::RepoScan>,
 }
 
 impl App {
@@ -164,6 +181,11 @@ impl App {
             toasts: Vec::new(),
             closed: Vec::new(),
             tab_drag: None,
+            recent_filter: Default::default(),
+            recent_status: Default::default(),
+            last_opened: saved.last_opened,
+            drops: Default::default(),
+            repo_scan: None,
             error: None,
             was_focused: true,
             clone_form: None,
@@ -276,6 +298,15 @@ impl App {
         self.recent.retain(|p| p != path);
         self.recent.insert(0, path.to_owned());
         self.recent.truncate(MAX_RECENT);
+        self.last_opened
+            .insert(path.to_owned(), home_recent::now_secs());
+        // Only what some profile's recent list still has.
+        let kept: Vec<&PathBuf> = self
+            .recent
+            .iter()
+            .chain(self.profile_states.values().flat_map(|s| &s.recent))
+            .collect();
+        self.last_opened.retain(|p, _| kept.contains(&p));
     }
 
     fn set_theme(&mut self, ctx: &egui::Context, kind: ThemeKind) {
@@ -363,7 +394,9 @@ impl App {
             || self.askpass_open()
             || self.palette.is_some()
             || self.manual_open
-            || ctx.egui_wants_keyboard_input();
+            || self.repo_scan.is_some()
+            // The start page's search takes only typing and ↑ ↓ Enter Esc.
+            || (ctx.egui_wants_keyboard_input() && !home_filter::search_has_focus(ctx));
         let (new_tab, reopen, close, refresh, focused, palette, manual, settings) =
             ctx.input(|i| {
                 let t = i.modifiers.command && i.key_pressed(Key::T);
@@ -527,8 +560,10 @@ impl eframe::App for App {
         self.askpass_dialog(&ctx);
         self.palette_ui(&ctx);
         self.manual_ui(&ctx);
+        self.repo_scan_dialog(&ctx);
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
+        self.dropped_files(&ctx);
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
@@ -544,6 +579,7 @@ impl eframe::App for App {
             skipped_version: self.skipped_version.clone(),
             tab_looks: self.tab_looks.clone(),
             profile_states: self.profile_states.clone(),
+            last_opened: self.last_opened.clone(),
         };
         eframe::set_value(storage, eframe::APP_KEY, &saved);
     }

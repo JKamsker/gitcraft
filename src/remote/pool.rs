@@ -146,6 +146,19 @@ impl Pool {
         }
     }
 
+    /// An idle shell that still answers, if there is one: never a new connection (which could
+    /// ask for a password or start WSL).
+    pub(super) fn take_idle(&self) -> Option<Taken<'_>> {
+        loop {
+            let mut shell = lock(&self.state).idle.pop()?;
+            if shell.usable() {
+                return Some(self.taken(shell, true));
+            }
+            drop(shell);
+            self.close_one();
+        }
+    }
+
     fn taken(&self, shell: Shell, reused: bool) -> Taken<'_> {
         Taken {
             pool: self,

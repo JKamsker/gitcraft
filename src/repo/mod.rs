@@ -226,6 +226,8 @@ pub struct RepoTab {
 
     /// Actions queued from outside (the command palette).
     queued: Vec<Action>,
+    /// A patch is being put on the repository's machine before it is applied (see `patches`).
+    patch_pending: bool,
     /// A folder the app should open (taken by `App`).
     pub open_request: Option<OpenRequest>,
     /// A worktree to open once the operation so labelled (which makes it) is done.
@@ -354,6 +356,7 @@ impl RepoTab {
             fs_rx: None,
             fs_pending: None,
             queued: Vec::new(),
+            patch_pending: false,
             open_request: None,
             open_when_done: None,
             parked: Vec::new(),

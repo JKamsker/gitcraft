@@ -142,6 +142,35 @@ pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
     }
 }
 
+/// Runs `req` on `host` only in a shell already open and idle there: `None`, without
+/// connecting, when there is none. For reads nobody asked for (the start page's look at a
+/// recent repository), which must never ask for a password nor start WSL.
+pub fn exec_if_connected(host: &Host, req: &Request) -> Option<Result<Output, String>> {
+    if let Err(e) = super::ui_guard::off_ui_thread(&req.what()) {
+        return Some(Err(e));
+    }
+    let pool = pool(host, Lane::Quick);
+    let mut taken = pool.take_idle()?;
+    let nonce = nonce();
+    let script = framed(req, &nonce);
+    let limit = req.time_limit();
+    let ran = taken.shell()?.run(&script, &nonce, Instant::now() + limit);
+    Some(match ran {
+        Ok(out) => {
+            taken.give_back();
+            Ok(out)
+        }
+        Err(Failure::TimedOut(pid)) => {
+            drop(taken);
+            if let Some(pid) = pid {
+                stop(host.clone(), pid);
+            }
+            Err(format!("{} didn't answer in time", req.what()))
+        }
+        Err(failure) => Err(failure.message()),
+    })
+}
+
 /// Stops the process `pid` on `host` (a command that hung, or the shell it hung in) and
 /// everything it started, however deep, in the background: politely, then for good. The
 /// processes are listed first, as one stopped leaves what it started to another parent.
@@ -455,6 +484,16 @@ pub(super) fn parse_header(line: &str, nonce: &str) -> Option<(i32, usize, usize
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nothing_runs_without_an_open_connection() {
+        let host = Host::Ssh("gitcraft-never-connected.invalid".to_owned());
+        let req = Request {
+            script: "true".to_owned(),
+            ..Request::default()
+        };
+        assert!(exec_if_connected(&host, &req).is_none());
+    }
 
     #[test]
     fn headers_read_with_padded_numbers_for_their_command_only() {
