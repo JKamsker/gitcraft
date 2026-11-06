@@ -230,10 +230,11 @@ fn folders_odd_names_and_missing_files() -> Result<(), String> {
     let result = (|| {
         git(&dir, &["add", "-f", "t/a"])?;
         git(&dir, &["commit", "-q", "-m", "t"])?;
-        write(&dir.join(":x"), b"x\n")?;
         write(&dir.join("t/b"), b"x\n")?;
-        // Glob characters are a name, not a pattern: a[1].txt isn't a1.txt.
+        // Glob characters are a name, not a pattern: a[1].txt isn't a1.txt. Windows allows
+        // neither `[` nor `:` in a file name.
         if !cfg!(windows) {
+            write(&dir.join(":x"), b"x\n")?;
             write(&dir.join("a[1].txt"), b"crlf\r\n")?;
             let glob = explain(&dir, "a[1].txt")?;
             assert_eq!(glob.eol.map(|e| e.worktree), Some("crlf".to_owned()));
