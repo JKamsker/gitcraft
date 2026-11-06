@@ -50,23 +50,50 @@ impl RepoTab {
             .inner_margin(egui::Margin::symmetric(12, 8))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
+                // A restack's rebase: continued and aborted as the restack, not on its own.
+                let restack = self
+                    .stacks
+                    .restack_here()
+                    .filter(|_| state == InProgress::Rebase);
                 ui.horizontal(|ui| {
                     icons::inline(ui, "circle-alert", 16.0, t.warning);
+                    let title = match restack {
+                        Some(p) => format!(
+                            "Restack paused at {} ({} of {})",
+                            p.current().map_or("", |s| s.branch.as_str()),
+                            p.done + 1,
+                            p.steps.len()
+                        ),
+                        None => format!("{} in progress", state.label()),
+                    };
                     ui.label(
-                        RichText::new(format!("{} in progress", state.label()))
+                        RichText::new(title)
                             .color(t.warning)
                             .font(theme::medium(12.5)),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.add_enabled(idle, egui::Button::new("Abort")).clicked() {
+                        if restack.is_some() {
+                            if ui
+                                .add_enabled(idle, egui::Button::new("Abort restack"))
+                                .on_hover_text("Every branch back where it was before the restack")
+                                .clicked()
+                            {
+                                acts.push(Action::Stack(
+                                    crate::repo::stack::StackAct::AbortRestack,
+                                ));
+                            }
+                        } else if ui.add_enabled(idle, egui::Button::new("Abort")).clicked() {
                             acts.push(abort_action(state));
                         }
                     });
                 });
-                let hint = if self.work.conflicted.is_empty() {
-                    "All conflicts resolved: commit to finish."
-                } else {
-                    "Fix the conflicted files, mark them resolved, then commit."
+                let hint = match (restack.is_some(), self.work.conflicted.is_empty()) {
+                    (true, true) => "All conflicts resolved: Continue restack to go on.",
+                    (true, false) => {
+                        "Fix the conflicted files, mark them resolved, then Continue restack."
+                    }
+                    (false, true) => "All conflicts resolved: commit to finish.",
+                    (false, false) => "Fix the conflicted files, mark them resolved, then commit.",
                 };
                 ui.label(RichText::new(hint).color(t.text_dim).small());
             });

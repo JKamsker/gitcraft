@@ -104,7 +104,11 @@ impl RepoTab {
         }
         ui.add_space(4.0);
         let staged = self.work.staged.len();
-        let label = if let Some(s) = continuing {
+        let restack = self.stacks.restack_here().is_some()
+            && continuing == Some(crate::git::InProgress::Rebase);
+        let label = if restack {
+            "Continue restack".to_owned()
+        } else if let Some(s) = continuing {
             format!("Continue {}", s.label().to_lowercase())
         } else if self.amend {
             "Amend last commit".to_owned()

@@ -277,7 +277,9 @@ fn has_changes(repo: &Path) -> Result<bool, String> {
     .is_empty())
 }
 
-/// Keeps `pending` in the config, in place of whatever was kept.
+/// Keeps `pending` in the config, in place of whatever was kept. The steps go last: a restack
+/// is kept only with steps, so one cut short while being written is either not kept at all or
+/// kept with every branch's tip from before (what aborting puts back).
 fn save(repo: &Path, pending: &Pending) -> Result<(), String> {
     clear(repo)?;
     let key = |name: &str| format!("{SECTION}.{name}");
@@ -285,17 +287,17 @@ fn save(repo: &Path, pending: &Pending) -> Result<(), String> {
         set_op(&key("head"), &pending.head),
         set_op(&key("done"), &pending.done.to_string()),
     ];
-    for s in &pending.steps {
-        steps.push(add_op(
-            &key("step"),
-            &format!("{}\t{}\t{}", s.branch, s.parent, s.old_base),
-        ));
-    }
     for b in &pending.before {
         let base = b.base.as_deref().unwrap_or("");
         steps.push(add_op(
             &key("before"),
             &format!("{}\t{}\t{base}", b.branch, b.tip),
+        ));
+    }
+    for s in &pending.steps {
+        steps.push(add_op(
+            &key("step"),
+            &format!("{}\t{}\t{}", s.branch, s.parent, s.old_base),
         ));
     }
     for step in steps {
@@ -329,8 +331,9 @@ fn clear(repo: &Path) -> Result<(), String> {
 
 /// Runs the steps of `pending` from the first not done.
 fn run_from(repo: &Path, mut pending: Pending) -> Result<Outcome, String> {
+    // Which branch is checked out where doesn't change while it runs: listed once.
+    let worktrees = git::worktree_list(repo, None)?;
     while let Some(step) = pending.current().cloned() {
-        let worktrees = git::worktree_list(repo, None)?;
         let new_base = resolve(repo, &local_ref(&step.parent)).map_err(|_| {
             format!(
                 "{}, which {} is based on, is gone",

@@ -10,7 +10,7 @@ use super::{StackAct, dependents, to_restack};
 use crate::git::stack::restack::{self, Moved, Outcome, Place, Preview};
 use crate::git::stack::{BASE_KEY, Layer, config_key, local_ref, set_op};
 use crate::repo::messages::{Msg, spawn_or};
-use crate::repo::operations::{expect_ref_at, expect_symref};
+use crate::repo::operations::{expect_ref_at, expect_symref, expect_symref_in};
 use crate::repo::{Action, OpKind, Refresh, RepoTab, UndoEntry, short, widgets};
 use crate::theme::{self, Tokens};
 
@@ -73,11 +73,11 @@ impl RepoTab {
         self.run_restack("Restack", ctx, move |path| restack::start(path, steps));
     }
 
-    pub(super) fn resume_restack(&mut self, ctx: &egui::Context) {
-        self.run_restack("Continue restack", ctx, restack::resume);
+    pub(in crate::repo) fn resume_restack(&mut self, ctx: &egui::Context) {
+        self.run_restack("Restack", ctx, restack::resume);
     }
 
-    pub(super) fn abort_restack(&mut self, ctx: &egui::Context) {
+    pub(in crate::repo) fn abort_restack(&mut self, ctx: &egui::Context) {
         self.run_restack("Abort restack", ctx, |path| {
             restack::abort(path).map(|()| Outcome::Done(Vec::new()))
         });
@@ -116,22 +116,28 @@ impl RepoTab {
     /// Takes in how a restack (or the part of it run now) ended.
     fn restack_done(&mut self, label: &str, outcome: Outcome, ctx: &egui::Context) {
         self.busy_op = None;
-        self.op_started = None;
+        let long = self
+            .op_started
+            .take()
+            .is_some_and(|t| t.elapsed() > crate::repo::operations::LONG_OP);
         match outcome {
             Outcome::Done(moved) => {
                 let n = moved.len();
                 self.status = Some((
                     match n {
-                        0 => format!("{label}: done"),
-                        1 => format!("{label}: 1 branch moved · Ctrl+Z puts it back"),
-                        n => format!("{label}: {n} branches moved · Ctrl+Z puts them back"),
+                        _ if label == "Abort restack" => {
+                            "Restack aborted: every branch is back where it was".to_owned()
+                        }
+                        0 => "Restack: every branch was already on its parent's tip".to_owned(),
+                        1 => "Restack: 1 branch moved · Ctrl+Z puts it back".to_owned(),
+                        n => format!("Restack: {n} branches moved · Ctrl+Z puts them back"),
                     },
                     false,
                 ));
                 if n > 0 {
                     let (undo, redo) = undo_steps(&moved);
                     self.undo_stack.push(UndoEntry {
-                        label: label.to_owned(),
+                        label: "Restack".to_owned(),
                         undo,
                         redo,
                         heads: None,
@@ -148,13 +154,17 @@ impl RepoTab {
                 };
                 self.status = Some((
                     format!(
-                        "{label} stopped at {branch} on conflicts: resolve them{place}, then \
-                         Continue restack in STACKS (or Abort restack)"
+                        "Restack stopped at {branch} on conflicts: resolve them{place}, then \
+                         Continue restack (or Abort restack)"
                     ),
                     true,
                 ));
                 self.focus_wip = worktree.is_none();
             }
+        }
+        if long && let Some((message, failed)) = self.status.clone() {
+            self.finished
+                .push((format!("{} · {message}", self.name), failed));
         }
         self.reload(ctx);
     }
@@ -211,8 +221,11 @@ impl RepoTab {
                         ui.colored_label(t.danger, format!("Can't restack: {e}"));
                     }
                     Some(Ok(list)) => {
-                        for p in list {
-                            preview_row(ui, &t, p);
+                        for (i, p) in list.iter().enumerate() {
+                            // A parent restacked first lands somewhere new.
+                            let parent_moves =
+                                list[..i].iter().any(|q| q.step.branch == p.step.parent);
+                            preview_row(ui, &t, p, parent_moves);
                         }
                         let here = list.iter().any(|p| p.worktree.is_none());
                         if here && !self.work.is_clean() {
@@ -226,12 +239,17 @@ impl RepoTab {
                         }
                         if self.work.in_progress.is_some() {
                             can = false;
+                            ui.add_space(6.0);
                             ui.colored_label(
                                 t.warning,
                                 "Finish or abort the operation in progress first.",
                             );
                         }
                     }
+                }
+                if let Some(busy) = &self.busy_op {
+                    ui.add_space(6.0);
+                    ui.label(RichText::new(format!("Waiting for {busy}…")).color(t.text_faint));
                 }
                 ui.add_space(14.0);
                 ui.horizontal(|ui| {
@@ -253,20 +271,30 @@ impl RepoTab {
 }
 
 /// One step of the preview: the branch, its new base, how many commits move, where.
-fn preview_row(ui: &mut egui::Ui, t: &Tokens, p: &Preview) {
+/// `parent_moves`: its parent is restacked first, so its new base is that one's new tip.
+fn preview_row(ui: &mut egui::Ui, t: &Tokens, p: &Preview, parent_moves: bool) {
     let commits = |n: u32| format!("{n} commit{}", if n == 1 { "" } else { "s" });
+    let what = if parent_moves {
+        format!(
+            "{} onto {}'s new tip · base {} → its new tip",
+            commits(p.commits),
+            p.step.parent,
+            short(&p.step.old_base)
+        )
+    } else if p.step.old_base == p.new_base {
+        format!("already on {}'s tip: nothing to replay", p.step.parent)
+    } else {
+        format!(
+            "{} onto {} · base {} → {}",
+            commits(p.commits),
+            p.step.parent,
+            short(&p.step.old_base),
+            short(&p.new_base),
+        )
+    };
     ui.horizontal_wrapped(|ui| {
         ui.label(RichText::new(&p.step.branch).font(theme::medium(12.5)));
-        ui.label(
-            RichText::new(format!(
-                "onto {} · {} · base {} → {}",
-                p.step.parent,
-                commits(p.commits),
-                short(&p.step.old_base),
-                short(&p.new_base),
-            ))
-            .color(t.text_dim),
-        );
+        ui.label(RichText::new(what).color(t.text_dim));
         if let Some(wt) = &p.worktree {
             ui.label(
                 RichText::new(format!("· in its worktree at {}", wt.display())).color(t.text_faint),
@@ -297,8 +325,18 @@ pub(crate) fn undo_steps(moved: &[Moved]) -> (Vec<Vec<String>>, Vec<Vec<String>>
         for m in moved {
             let (from, _) = ends(m, back);
             steps.push(expect_ref_at(&local_ref(&m.branch), from));
-            if m.place == Place::Here {
-                steps.push(expect_symref("HEAD", &local_ref(&m.branch)));
+            match &m.place {
+                Place::Here => steps.push(expect_symref("HEAD", &local_ref(&m.branch))),
+                // Still that branch's worktree: another branch checked out there since would
+                // be the one reset.
+                Place::Worktree(path) => {
+                    steps.push(expect_symref_in(
+                        &there(path),
+                        "HEAD",
+                        &local_ref(&m.branch),
+                    ));
+                }
+                Place::Nowhere => {}
             }
         }
         for m in moved {
@@ -338,15 +376,18 @@ fn move_step(m: &Moved, from: &str, to: &str) -> Vec<String> {
     };
     let mut step: Vec<String> = Vec::new();
     if let Place::Worktree(path) = &m.place {
-        // git runs on the repository's machine: the worktree's path as it is there.
-        let there = crate::remote::parse(path)
-            .map(|t| t.path)
-            .unwrap_or_else(|| path.to_string_lossy().into_owned());
-        step.extend(["-C".to_owned(), there]);
+        step.extend(["-C".to_owned(), there(path)]);
     }
     step.extend(words.into_iter().map(str::to_owned));
     if m.place == Place::Nowhere {
         step.extend([local_ref(&m.branch), to.to_owned(), from.to_owned()]);
     }
     step
+}
+
+/// A worktree's folder as git on the repository's machine knows it.
+fn there(path: &std::path::Path) -> String {
+    crate::remote::parse(path)
+        .map(|t| t.path)
+        .unwrap_or_else(|| path.to_string_lossy().into_owned())
 }

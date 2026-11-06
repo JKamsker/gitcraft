@@ -131,8 +131,8 @@ so your config, credentials and hooks apply as usual.
   menu) previews each one's new base and how many commits move, then replays them in order with
   `git rebase --onto <parent's tip> <its old base>`, the old base being the parent's commit it was
   recorded on. A branch checked out in another worktree is rebased in that worktree (which git's
-  `--update-refs` would skip); the others here, which needs this worktree clean, and what was
-  checked out comes back at the end. A conflict stops it, kept in the repository's config
+  `--update-refs` would skip). The others are rebased here, which needs this worktree clean;
+  what you had checked out is checked out again at the end. A conflict stops it, kept in the repository's config
   (`gitcraft-restack.*`), so _Continue restack_ (after resolving) or _Abort restack_ (every
   branch back, with its recorded base) works after a restart too. One Ctrl+Z puts every branch
   it moved back. The interactive rebase has _Update dependent branches_ (`--update-refs`, git

@@ -81,30 +81,42 @@ impl RepoTab {
     fn restack_banner(&self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         let frame = egui::Frame::new()
-            .fill(t.warning.gamma_multiply(0.12))
+            .fill(t.warning.gamma_multiply(0.14))
             .corner_radius(t.radius)
             .inner_margin(egui::Margin::symmetric(10, 6))
             .outer_margin(egui::Margin::symmetric(8, 4));
         if let Some(pending) = &self.stacks.pending {
             let branch = pending.current().map_or("", |s| s.branch.as_str());
-            let elsewhere = self
-                .worktrees
-                .iter()
-                .find(|w| !w.current && w.branch.as_deref() == Some(branch));
+            // Mid-rebase its branch reads as detached there: known by the folder kept.
+            let elsewhere = pending.at.as_ref();
+            // In this worktree, whether its rebase is still stopped (finished or aborted
+            // meanwhile, Continue restack goes on from here).
+            let stopped_here = elsewhere.is_none() && self.work.in_progress.is_some();
             frame.show(ui, |ui| {
-                let place = match elsewhere {
-                    Some(wt) => format!(" in its worktree at {}", wt.path.display()),
-                    None => String::new(),
+                ui.horizontal(|ui| {
+                    crate::icons::inline(ui, "circle-alert", 16.0, t.warning);
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "Restack paused at {branch} ({} of {})",
+                            pending.done + 1,
+                            pending.steps.len()
+                        ))
+                        .color(t.warning)
+                        .font(theme::medium(12.5)),
+                    );
+                });
+                let what = match (elsewhere, stopped_here) {
+                    (Some(wt), _) => format!(
+                        "Resolve its conflicts in its worktree at {}, then Continue restack.",
+                        wt.display()
+                    ),
+                    (None, true) => {
+                        "Resolve its conflicts, mark them resolved, then Continue restack."
+                            .to_owned()
+                    }
+                    (None, false) => "Continue restack goes on from here.".to_owned(),
                 };
-                ui.label(
-                    egui::RichText::new(format!(
-                        "Restack stopped at {branch} ({} of {}): resolve its conflicts{place}, \
-                         then continue.",
-                        pending.done + 1,
-                        pending.steps.len()
-                    ))
-                    .color(t.text),
-                );
+                ui.label(egui::RichText::new(what).color(t.text_dim).small());
                 ui.horizontal_wrapped(|ui| {
                     if ui
                         .add_enabled(idle, egui::Button::new("Continue restack"))
@@ -122,7 +134,7 @@ impl RepoTab {
                     if let Some(wt) = elsewhere
                         && ui.button("Open its worktree").clicked()
                     {
-                        acts.push(Action::OpenWorktree(wt.path.clone()));
+                        acts.push(Action::OpenWorktree(wt.clone()));
                     }
                 });
             });
@@ -144,7 +156,10 @@ impl RepoTab {
                 );
                 if ui
                     .add_enabled(idle, egui::Button::new("Restack…"))
-                    .on_hover_text("Preview their new bases, then replay them onto them")
+                    .on_hover_text(
+                        "Preview each one's new base, then replay their commits onto their \
+                         parents",
+                    )
                     .clicked()
                 {
                     acts.push(Action::Stack(StackAct::OpenRestack(None)));
@@ -337,7 +352,8 @@ impl RepoTab {
                         format!("Restack the {on_it} branches on it…")
                     }),
                 )
-                .on_hover_text("Replay them onto its tip, after it changed")
+                .on_hover_text("Replay their own commits onto its new tip")
+                .on_disabled_hover_text("A restack is paused: continue or abort it in STACKS first")
                 .clicked()
         {
             acts.push(Action::Stack(StackAct::OpenRestack(Some(b.name.clone()))));
