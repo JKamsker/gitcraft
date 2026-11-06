@@ -184,10 +184,11 @@ so your config, credentials and hooks apply as usual.
   before you check the result. Settings → Git installs it in one click and can have git merge
   with it everywhere ([docs/mergiraf.md](docs/mergiraf.md)). gitcraft only runs the `mergiraf`
   program: it neither bundles nor links Mergiraf (GPL-3.0), so gitcraft's licence is unchanged.
-- _Remember resolutions_ (in the conflict editor, or the palette) turns on `git rerere` for the
-  repository: when a conflict you resolved before comes back, git reuses your resolution and
-  the editor says so, showing each conflict with the text reused for it. It stays unstaged
-  until you save; _Forget it and bring the conflicts back_ runs `git rerere forget`.
+- _Remember resolutions_ (above the conflict editor's result, or _Remember conflict resolutions_
+  in the palette) turns on `git rerere` for the repository, with `rerere.autoUpdate` off there:
+  when a conflict you resolved before comes back, git reuses your resolution and the editor
+  says so, showing each conflict with the text reused for it. It stays unstaged until you save;
+  _Forget this resolution_ runs `git rerere forget` and brings the conflict markers back.
 - A merge, rebase, cherry-pick, revert or patch stopped on conflicts shows a banner with
   _Abort_; the commit box finishes it (_Continue rebase_ during a rebase, _Continue patch_ while
   `git am` applies one).

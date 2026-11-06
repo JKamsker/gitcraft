@@ -65,7 +65,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Submodules show whether they are modified, not initialised or out of date; right-click one to update it or open it in a tab. Settings → Git can keep them up to date after each checkout, pull, merge and rebase.",
             "Hover a branch and click its eye to hide it from the graph, or Solo it from its menu to see only the branches soloed; “Show all” at the top brings them all back.",
             "Conflicts open in a three-pane editor with Ours, Theirs and Both for each conflict.",
-            "Remember resolutions (in the conflict editor's header, or the palette) turns on git rerere for the repository: a conflict you resolved before is resolved the same way when it comes back. The editor says so and shows each conflict with the text reused for it (Reused); nothing is staged until you save, and Forget it and bring the conflicts back drops what was recorded.",
+            "Tick Remember resolutions (above the conflict editor's result, or in the palette) and a conflict you resolved before is resolved the same way when it comes back (git rerere). The editor says so and shows the reused text under each conflict; nothing is staged until you save. Forget this resolution brings the conflict back.",
             "Right-click a file for its history, its blame or the whole file as it is at the commit.",
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",

@@ -333,7 +333,7 @@ impl RepoTab {
         match result {
             Ok(loaded) => {
                 self.take_loaded(*loaded, ctx);
-                if self.rerere.enabled.is_none() {
+                if self.rerere.setup.is_none() {
                     self.read_rerere(ctx);
                 }
             }

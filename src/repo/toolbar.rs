@@ -286,16 +286,20 @@ pub(super) fn headline(msg: &str) -> String {
     let conflicts = body.lines().filter(|l| l.starts_with("CONFLICT")).count();
     if conflicts > 0 {
         let files = if conflicts == 1 { "file" } else { "files" };
-        let reused = match super::conflict::rerere::reused_count(body) {
-            0 => String::new(),
+        let them = |n: usize| if n == 1 { "it" } else { "them" };
+        return match super::conflict::rerere::reused_count(body) {
+            0 => format!("{label}: conflicts in {conflicts} {files}, resolve them in Changes"),
+            n if n >= conflicts => format!(
+                "{label}: {n} {} resolved as before, check {} in Changes",
+                if n == 1 { "file" } else { "files" },
+                them(n)
+            ),
             n => format!(
-                " ({n} resolved as before: check {})",
-                if n == 1 { "it" } else { "them" }
+                "{label}: conflicts in {conflicts} {files}, {n} resolved as before: check {}, \
+                 resolve the rest in Changes",
+                them(n)
             ),
         };
-        return format!(
-            "{label}: conflicts in {conflicts} {files}{reused}, resolve them in Changes"
-        );
     }
     let line = body
         .lines()

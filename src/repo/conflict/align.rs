@@ -51,18 +51,23 @@ pub(super) fn split_resolutions(segments: &[Segment], resolved: &str) -> Option<
     Some(texts)
 }
 
-/// Where `needle` first occurs in `hay` at the start of a line (the text around a conflict
-/// starts on a line of its own).
+/// Where `needle` occurs in `hay` at the start of a line (the text around a conflict starts on
+/// a line of its own), if it does so once only: found twice, either could end the conflict
+/// before it, and taking the wrong one would give a conflict lines of the next one.
 fn find_line_start(hay: &str, needle: &str) -> Option<usize> {
+    let mut found = None;
     let mut from = 0;
-    while let Some(found) = hay.get(from..)?.find(needle) {
-        let at = from + found;
+    while let Some(next) = hay.get(from..).and_then(|rest| rest.find(needle)) {
+        let at = from + next;
         if at == 0 || hay.as_bytes().get(at - 1) == Some(&b'\n') {
-            return Some(at);
+            if found.is_some() {
+                return None;
+            }
+            found = Some(at);
         }
         from = at + hay.get(at..)?.chars().next()?.len_utf8();
     }
-    None
+    found
 }
 
 #[cfg(test)]
@@ -123,6 +128,18 @@ mod tests {
             Some(vec!["ü x名前\n".to_owned(), "2\n".to_owned()])
         );
         assert_eq!(split("", ""), Some(vec![]));
+    }
+
+    /// The text between two conflicts found twice: which conflict the lines between belong to
+    /// can't be told, so the file isn't split.
+    #[test]
+    fn ambiguous_text_between_conflicts_is_not_split() {
+        let marked = "<<<<<<< HEAD\nX1o\n=======\nX1t\n>>>>>>> b\n}\n<<<<<<< HEAD\nY1o\n=======\nY1t\n>>>>>>> b\nend\n";
+        assert_eq!(split(marked, "X1o\n}\nfn new() {\n}\nY1t\nend\n"), None);
+        assert_eq!(
+            split(marked, "X1o\n}\nY1t\nend\n"),
+            Some(vec!["X1o\n".to_owned(), "Y1t\n".to_owned()])
+        );
     }
 
     #[test]

@@ -136,9 +136,11 @@ impl RepoTab {
                 let (repo, path, state) =
                     (self.path.clone(), file.path.clone(), self.work.in_progress);
                 let certain = self.rerere.reused.contains(&path);
+                // Not rebuilt again when it couldn't be since the last operation.
+                let skip = self.rerere.unopenable.contains(&path);
                 spawn(&self.tx, ctx, move || {
                     let editor = conflict::ConflictEditor::open(&repo, &path, state);
-                    if editor.is_some() {
+                    if editor.is_some() || skip {
                         return Msg::ConflictOpened(generation, path, editor.map(Box::new));
                     }
                     // Its markers gone: what stands in their place (rerere's resolution).
