@@ -126,8 +126,11 @@ so your config, credentials and hooks apply as usual.
   --recursive`), open one in a new tab (or double-click it), show it in its folder. _Keep
   submodules up to date_ in Settings → Git updates them after every checkout, pull, merge and
   rebase.
-- Stashes: stash (with a message, untracked files included), see what a stash holds, apply, pop,
-  drop.
+- Stashes: stash (with a message, untracked files included or not), see what a stash holds,
+  apply, pop, drop. Stash only some files (`git stash push -- <paths>`: Ctrl+click files in the
+  changes to pick them, or _Stash this file…_ on a file's menu), only what is staged (`git stash
+  push --staged`, git 2.35+), or save a _Snapshot_: a stash of every change that leaves the
+  working tree and the staging exactly as they are. All of them are undone with Ctrl+Z.
 - Pull / merge requests of GitHub (through `gh`), GitLab (through `glab`), Forgejo and Gitea
   (through their API; Codeberg is Forgejo): list, open in the browser, check out, create from a
   branch. On GitHub, Forgejo and Gitea a click opens one in the big area: description, checks,
