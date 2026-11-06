@@ -407,9 +407,11 @@ fn push_revisions<'a>(args: &mut Vec<&'a str>, from: Option<&'a [String]>) {
             args.push("--");
         }
         // Nor the history of notes (`git notes`), nor what `git maintenance` fetches ahead
-        // into `refs/prefetch/`: commits on no branch, not the repository's history.
+        // into `refs/prefetch/`: commits on no branch, not the repository's history. Nor
+        // what gitcraft keeps of earlier versions in `refs/gitcraft/` (see `rewrites`).
         None => args.extend([
             "--exclude=refs/stash",
+            "--exclude=refs/gitcraft/*",
             "--exclude=refs/notes/*",
             "--exclude=refs/prefetch/*",
             "--all",

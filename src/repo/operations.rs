@@ -199,6 +199,7 @@ impl RepoTab {
                 if let Some((_, path)) = self.open_when_done.take_if(|(l, _)| *l == label) {
                     self.open_request = Some(super::OpenRequest::Worktree(path));
                 }
+                self.note_rewrite(&label, &kind, ctx);
                 self.record_undo(&label, kind);
             }
             Err(e) if git::is_auth_error(e) && !quiet => {
@@ -223,6 +224,7 @@ impl RepoTab {
                 self.open_when_done.take_if(|(l, _)| *l == label);
                 self.focus_wip = e.contains("CONFLICT") || e.contains("could not apply");
                 self.status = Some((format!("{label} failed: {e}"), true));
+                self.note_stopped_rewrite(&label, &kind, e);
                 // A failed undo stays undoable.
                 match kind {
                     OpKind::Undo(entry) => self.undo_stack.push(entry),

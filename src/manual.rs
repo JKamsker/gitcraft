@@ -34,6 +34,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Search messages, authors and hashes, or switch to Code to find the commits that added or removed some text.",
             "Drag the borders in the column header to resize; right-click it to pick the columns, make the graph column compact or reset the columns.",
             "Interactive rebase: reorder, reword, squash, fix up or drop commits, then start it.",
+            "After a rebase, an amend or any other rewrite, Compare before / after (beside the message saying it's done, or Compare before / after the last rewrite in the branch's menu) shows the old commits and the new ones paired up: unchanged ones faded, changed, added, dropped and moved ones marked. Click a pair to see how its patch changed. The old commits are kept for 30 days.",
         ],
     ),
     (
@@ -41,6 +42,7 @@ const FEATURES: &[(&str, &[&str])] = &[
         &[
             "Ctrl+click a second commit to list the files that differ between the two (the changes row is the working tree).",
             "On a branch's menu, “Changes x adds to main” shows what it changed since they diverged, like a pull request; “Compare main with x” shows every difference.",
+            "A branch that has diverged from its upstream (rebased, not pushed yet) has “Compare versions with origin/x” in its menu: the commits of each, paired up as git range-diff does.",
         ],
     ),
     (
@@ -71,6 +73,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",
             "Right-click a pull request and choose Open in worktree to work on its branch in a worktree of its own, made for it when there is none.",
+            "gitcraft remembers which version of a pull request you looked at. After the author pushes again (a force push too), its page says what changed, like “Rewritten since you last looked: 2 commits changed, 1 added”; click it to compare the two versions. In the list, “changed since you looked” marks it, and its menu has What changed since I last looked.",
             "A terminal panel with tabs, in the repository's folder.",
         ],
     ),

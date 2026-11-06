@@ -16,16 +16,19 @@ impl RepoTab {
         match action {
             Action::Select(row) => {
                 self.close_pr();
+                self.versions.view = None;
                 self.ci_view = None;
                 self.select(row, ctx);
             }
             Action::SelectHash(hash) => {
                 self.close_pr();
+                self.versions.view = None;
                 self.ci_view = None;
                 self.goto(&hash, ctx);
             }
             Action::SelectStash(i) => {
                 self.close_pr();
+                self.versions.view = None;
                 self.ci_view = None;
                 self.select_stash(i, ctx);
             }
@@ -49,6 +52,7 @@ impl RepoTab {
             }
             Action::ReloadPr => self.load_pr(ctx),
             Action::Pr(act) => self.pr_act(act, ctx),
+            Action::Versions(act) => self.versions_act(act, ctx),
             Action::OpenCi { sha, run } => self.open_ci(sha, run, ctx),
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),
