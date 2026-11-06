@@ -110,9 +110,9 @@ so your config, credentials and hooks apply as usual.
   _Skip_ and _Stop_; the graph tints good, bad and skipped commits. _Run a command…_ has `git
   bisect run` test each commit on the repository's machine, its output streamed under the
   banner and stoppable. At the end the first bad commit is selected and _Finish_ (or _Stop_,
-  which asks first) checks out again what was checked out when it began. A bisect started in a terminal is picked up and goes on from
-  the banner. Refused while there are uncommitted changes or conflicts, or a merge, rebase, cherry-pick or
-  revert is in progress.
+  which asks first) checks out again what was checked out when it began. A bisect started in a
+  terminal is picked up and goes on from the banner. Refused while there are uncommitted
+  changes or conflicts, or a merge, rebase, cherry-pick or revert is in progress.
 - Quick edits from a commit's menu, for commits of the checked-out branch: _Edit commit
   message_, _Drop commit_, _Move commit up_ / _down_, each a rebase without the editor and undone
   with Ctrl+Z. What can't be done (a merge, merges after the commit) is greyed out with why.
