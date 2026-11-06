@@ -77,6 +77,10 @@ impl Provider for GiteaFamily {
         list(&self.api(hosting), hosting)
     }
 
+    fn merged(&self, _: &Path, hosting: &Hosting) -> Result<Vec<PullRequest>, String> {
+        merged(&self.api(hosting), hosting)
+    }
+
     fn create(&self, _: &Path, hosting: &Hosting, new: &NewPullRequest) -> Result<String, String> {
         create(&self.api(hosting), hosting, new)
     }
@@ -116,6 +120,24 @@ fn list(api: &Api, hosting: &Hosting) -> Result<Vec<PullRequest>, String> {
     let endpoint = format!("repos/{}/pulls?state=open&sort=recentupdate", hosting.path);
     let items = api.get_all(&endpoint, 100)?;
     Ok(items.iter().map(parse_pull_request).collect())
+}
+
+/// The latest closed pull requests that were merged; the API lists those closed unmerged too.
+fn merged(api: &Api, hosting: &Hosting) -> Result<Vec<PullRequest>, String> {
+    let endpoint = format!(
+        "repos/{}/pulls?state=closed&sort=recentupdate",
+        hosting.path
+    );
+    let items = api.get_all(&endpoint, 100)?;
+    Ok(merged_only(&items))
+}
+
+fn merged_only(items: &[Value]) -> Vec<PullRequest> {
+    items
+        .iter()
+        .filter(|item| item.get("merged").and_then(Value::as_bool) == Some(true))
+        .map(parse_pull_request)
+        .collect()
 }
 
 fn create(api: &Api, hosting: &Hosting, new: &NewPullRequest) -> Result<String, String> {
@@ -389,6 +411,20 @@ mod tests {
         );
         assert_eq!(pr.url, "https://codeberg.org/o/r/pulls/4");
         assert_eq!(pr.sha, "abc");
+    }
+
+    /// Closed and merged are told apart: only the merged ones say a branch's work is in.
+    #[test]
+    fn only_merged_pull_requests_count_as_merged() {
+        let items = [
+            json!({"number": 1, "head": {"ref": "a", "sha": "1"}, "merged": true}),
+            json!({"number": 2, "head": {"ref": "b", "sha": "2"}, "merged": false}),
+            json!({"number": 3, "head": {"ref": "c", "sha": "3"}}),
+        ];
+        let merged = merged_only(&items);
+        assert_eq!(merged.len(), 1);
+        assert_eq!((merged[0].number, merged[0].branch.as_str()), (1, "a"));
+        assert!(merged_only(&[]).is_empty());
     }
 
     #[test]
