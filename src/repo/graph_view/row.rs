@@ -70,11 +70,19 @@ impl RepoTab {
         let Some(commit) = self.commits.get(i) else {
             return ui.interact(rect, auto_id, Sense::click());
         };
+        let is_wip = commit.hash == WIP_HASH;
+        // Commits are dragged (the changes row and stashes aren't): egui tells a drag from a
+        // click once the pointer moves a few points, so clicks stay clicks.
+        let draggable = !is_wip && self.stash_at(i).is_none();
+        let sense = if draggable {
+            Sense::click_and_drag()
+        } else {
+            Sense::click()
+        };
         // Known by its commit, not its place: rows shift when a reload adds commits or the
         // changes row above them, and a menu opened on one must stay that commit's.
-        let resp = ui.interact(rect, row_id(ui, &commit.hash), Sense::click());
+        let resp = ui.interact(rect, row_id(ui, &commit.hash), sense);
         let painter = ui.painter_at(rect);
-        let is_wip = commit.hash == WIP_HASH;
         let is_match = self.search.matches.contains(&commit.hash);
         row_background(
             &painter,
@@ -99,7 +107,7 @@ impl RepoTab {
             color: graph_row.map(|r| t.lane(r.col)).unwrap_or(t.text_faint),
         };
 
-        let resp = self.refs_cell(ui, &painter, &row, resp, acts);
+        let (resp, pill) = self.refs_cell(ui, &painter, &row, resp, acts);
         self.graph_cell(ui, &painter, &row, lanes.shown);
         if is_wip {
             self.wip_description(&painter, &t, &row);
@@ -112,6 +120,9 @@ impl RepoTab {
                 let id = ui.id().with(("ci-dot", &commit.hash));
                 acts.extend(ci_status::dot(ui, id, center, &commit.hash, status));
             }
+        }
+        if draggable {
+            self.row_drag_drop(ui, &resp, &row, pill.as_ref(), acts);
         }
         resp
     }

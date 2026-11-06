@@ -96,6 +96,7 @@ impl RepoTab {
         };
         let (r, ci_act) = branch_row(ui, &full, row, b.is_head, ahead, behind, marks);
         acts.extend(ci_act);
+        let r = self.branch_drag_drop(ui, r, &b.name, false, &b.target, acts);
         if !b.is_head {
             acts.extend(visibility::eye(ui, &r, &full, shown));
         }
@@ -113,7 +114,10 @@ impl RepoTab {
                 b.name,
                 wt.path.display()
             )),
-            None => r.on_hover_text(format!("{}\n{tip}\nDouble-click to check out", b.name)),
+            None => r.on_hover_text(format!(
+                "{}\n{tip}\nDouble-click to check out, or drag onto another branch",
+                b.name
+            )),
         };
         if r.double_clicked() && elsewhere.is_some() {
             if let Some(wt) = elsewhere {
