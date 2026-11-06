@@ -50,7 +50,10 @@ pub fn parse_line(line: &str) -> Option<Progress> {
     let after = &rest[digits.len()..];
     let (percent, detail) = match after.strip_prefix('%') {
         Some(tail) => (digits.parse::<u8>().ok().map(|p| p.min(100)), tail.trim()),
-        None => (None, rest),
+        // A count alone ("Enumerating objects: 5", "…: 5, done."), not a hook's message that
+        // starts with a number ("remote: GitLab: 3 jobs", "Commit: 8a7b…").
+        None if after.is_empty() || after.starts_with(", done") => (None, rest),
+        None => return None,
     };
     Some(Progress {
         phase: phase.to_owned(),
@@ -111,6 +114,9 @@ impl ProgressReader {
         {
             if self.marked.is_none() {
                 self.marked = Some(rest.trim().to_owned());
+                // What came before is the connection's, not the command's (a login banner).
+                self.text.clear();
+                self.cut = false;
             }
             return false;
         }
@@ -137,7 +143,10 @@ impl ProgressReader {
         self.text.push_str(line);
         self.text.push('\n');
         if self.text.len() > MAX_TEXT {
-            let from = self.text.len() - MAX_TEXT;
+            let mut from = self.text.len() - MAX_TEXT;
+            while !self.text.is_char_boundary(from) {
+                from += 1;
+            }
             let from = self.text[from..]
                 .find('\n')
                 .map_or(self.text.len(), |i| from + i + 1);
@@ -236,6 +245,9 @@ mod tests {
             ),
             ("error: 3 files would be overwritten", None),
             ("hint: Updates were rejected", None),
+            ("remote: GitLab: 3 jobs are waiting", None),
+            ("remote: Commit: 8a7b9c is not signed", None),
+            ("Receiving objects: 12 (oops)", None),
             ("", None),
             ("remote:", None),
         ];
@@ -302,9 +314,14 @@ mod tests {
     #[test]
     fn a_marked_line_is_taken_apart_once() {
         let mut reader = ProgressReader::with_marker("__PID__");
-        reader.feed(b"warning: x\n__PID__ 4242\nfatal: y\n__PID__ 7\n");
+        // A login banner, then the command's own output.
+        reader.feed(b"Welcome to the build server\n\n__PID__ 4242\nfatal: y\n__PID__ 7\n");
         assert_eq!(reader.marked(), Some("4242"));
-        assert_eq!(reader.finish(), "warning: x\nfatal: y\n");
+        assert_eq!(reader.finish(), "fatal: y\n");
+        // No marker (the folder wasn't there): all of it stays.
+        let mut reader = ProgressReader::with_marker("__PID__");
+        reader.feed(b"gitcraft: no such folder: /x\n");
+        assert_eq!(reader.finish(), "gitcraft: no such folder: /x\n");
     }
 
     #[test]
@@ -322,6 +339,9 @@ mod tests {
     #[test]
     fn huge_output_keeps_its_end() {
         let mut reader = ProgressReader::default();
+        // Two-byte characters with an odd count per line: the cut lands inside one too.
+        reader.feed("é".repeat(MAX_TEXT / 2 + 3).as_bytes());
+        reader.feed(b"\n");
         let line = format!("{}\n", "x".repeat(1023));
         for _ in 0..(MAX_TEXT / 1024 + 10) {
             reader.feed(line.as_bytes());

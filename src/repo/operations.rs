@@ -34,23 +34,21 @@ impl RepoTab {
         quiet: bool,
         ctx: &egui::Context,
     ) {
-        if self.busy_op.is_some() {
-            // Asked for meanwhile: it runs once the running one is done. A quiet one (the
-            // background fetch) just comes again later.
+        if let Some(busy) = &self.busy_op {
+            // Fetch, Pull and Push wait for it (see `running::Waiter`); anything else is not
+            // started, and says so. A quiet one (the background fetch) just comes again later.
             if !quiet {
-                self.wait_for_running(PendingOp {
-                    label: label.to_owned(),
-                    ops,
-                    refresh,
-                    kind,
-                    quiet,
-                });
+                self.status = Some((
+                    format!("{label}: not started, {busy} is still running"),
+                    true,
+                ));
             }
             return;
         }
         self.busy_op = Some(label.to_owned());
         self.op_started = Some(Instant::now());
         let control = self.follow_op(&ops, ctx);
+        let cancellable = self.can_cancel();
         self.note_checkout_move(&ops, ctx);
         if !quiet {
             self.status = None;
@@ -85,12 +83,19 @@ impl RepoTab {
             }
         };
         spawn_or(&self.tx, ctx, failed, move || {
+            // The locks there already belong to someone else: only new ones are the cancel's.
+            let locks_before = if cancellable {
+                git::leftover_locks(&path)
+            } else {
+                Vec::new()
+            };
             let (result, kind, stopped) =
                 run_steps_counted(&path, &ops, kind, creds.as_ref(), quiet, Some(&control));
-            let result = if control.is_cancelled() && result.is_err() {
-                Err(cancelled_message(&path))
-            } else {
-                result
+            let result = match result {
+                Err(e) if control.is_cancelled() && !e.contains("CONFLICT") => {
+                    Err(cancelled_message(&path, &ops, &locks_before))
+                }
+                result => result,
             };
             Msg::OpDone {
                 label,
@@ -196,7 +201,9 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         self.busy_op = None;
-        let cancelled = result.is_err() && self.was_cancelled();
+        // Done with it before anything starts after it (updating the submodules).
+        let running = self.running.take();
+        let cancelled = result.is_err() && running.is_some_and(|r| r.control.is_cancelled());
         let long = self
             .op_started
             .take()
@@ -222,9 +229,9 @@ impl RepoTab {
             }
             Err(e) if cancelled => {
                 self.open_when_done.take_if(|(l, _)| *l == label);
-                let (_, more) = e.split_once('\n').unwrap_or_default();
-                let msg = format!("{label}: cancelled\n{more}");
-                self.status = Some((msg.trim_end().to_owned(), !more.is_empty()));
+                // Red only when it left something to clear up.
+                let left_locks = e.starts_with(&format!("{}, but", git::CANCELLED));
+                self.status = Some((format!("{label}: {e}"), left_locks));
                 // Not done: what would undo it stays where it was.
                 match kind {
                     OpKind::Undo(entry) => self.undo_stack.push(entry),
@@ -276,7 +283,7 @@ impl RepoTab {
             Refresh::All => self.reload(ctx),
         }
         self.follow_checkout_move(result.is_ok(), ctx);
-        self.after_op(result.is_ok(), ctx);
+        self.after_op(result.is_ok(), quiet, ctx);
     }
 
     fn record_undo(&mut self, label: &str, kind: OpKind) {
@@ -341,21 +348,42 @@ fn run_step(
     }
 }
 
-/// What a cancelled operation says: that it was, and the lock files a stopped git left behind
-/// (which another git would then refuse to start over).
-fn cancelled_message(path: &Path) -> String {
-    let locks = git::leftover_locks(path);
-    if locks.is_empty() {
-        return git::CANCELLED.to_owned();
+/// What a cancelled operation says: that it was, with what it may have left behind: the lock
+/// files a stopped git couldn't remove (not those `before` it started: they are someone
+/// else's), and for a pull, a merge or rebase it had started.
+fn cancelled_message(path: &Path, ops: &[Vec<String>], before: &[std::path::PathBuf]) -> String {
+    let mut msg = git::CANCELLED.to_owned();
+    let locks: Vec<String> = git::leftover_locks(path)
+        .into_iter()
+        .filter(|l| !before.contains(l))
+        .map(|l| {
+            l.strip_prefix(path)
+                .map_or_else(|_| l.display().to_string(), |r| r.display().to_string())
+        })
+        .collect();
+    if !locks.is_empty() {
+        let (them, are) = if locks.len() == 1 {
+            ("it", "is")
+        } else {
+            ("them", "are")
+        };
+        msg.push_str(&format!(
+            ", but git left {} behind\nUntil {them} {are} deleted, git refuses to work in this \
+             repository. Delete {them} if no other git program is running here.",
+            locks.join(", ")
+        ));
     }
-    let names: Vec<String> = locks.iter().map(|p| p.display().to_string()).collect();
-    format!(
-        "{}\ngit was stopped before it could remove {}. If no other git program is running \
-         in this repository, delete {} so that git can work in it again.",
-        git::CANCELLED,
-        names.join(", "),
-        if locks.len() == 1 { "it" } else { "them" }
-    )
+    let pulls = ops.iter().any(|op| {
+        op.iter().any(|w| w == "pull")
+            && git::goes_over_network(&op.iter().map(String::as_str).collect::<Vec<_>>())
+    });
+    if pulls {
+        msg.push_str(
+            "\nIf the pull had started merging or rebasing, that is left in progress: Abort in \
+             the toolbar goes back to where the branch was.",
+        );
+    }
+    msg
 }
 
 /// [`run_steps_counted`] without where it stopped.

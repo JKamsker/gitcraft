@@ -25,7 +25,8 @@ pub use fs::{
     same_dir, try_is_dir, try_is_file, try_is_link, worktree_file, write,
 };
 pub use session::{
-    LONG_FOR as NETWORK_LIMIT, Output, Request, exec, is_missing_folder, spawn, stop, stop_script,
+    LONG_FOR as NETWORK_LIMIT, Output, Request, exec, is_missing_folder, spawn, stop_now,
+    stop_script,
 };
 pub use ui_guard::{mark_ui_thread, refused_on_ui_thread};
 

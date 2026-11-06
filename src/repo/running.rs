@@ -6,8 +6,10 @@ use std::sync::Arc;
 
 use egui::Ui;
 
-use super::{PendingOp, RepoTab};
+use super::{Action, RepoTab};
 use crate::git;
+use crate::repo::pull::PullMode;
+use crate::settings::Settings;
 use crate::theme::Tokens;
 
 /// The most operations that wait for the running one; more are refused, with why.
@@ -20,8 +22,47 @@ pub(super) struct Running {
     pub(super) network: bool,
 }
 
+/// What can be asked for while an operation runs, to start once it is done. Only these: they
+/// work out what they run when they start (Push looks at the branch checked out then), and
+/// change nothing another operation of the tab relies on while it runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Waiter {
+    Fetch,
+    Pull(PullMode),
+    Push,
+}
+
+impl Waiter {
+    /// The waiter `action` asks for, if it is one.
+    pub(super) fn of(action: &Action, ctx: &egui::Context) -> Option<Self> {
+        match action {
+            Action::Fetch => Some(Self::Fetch),
+            Action::Pull => Some(Self::Pull(Settings::get(ctx).pull_mode)),
+            Action::PullWith(mode) => Some(Self::Pull(*mode)),
+            Action::Push => Some(Self::Push),
+            _ => None,
+        }
+    }
+
+    pub(super) fn label(self) -> &'static str {
+        match self {
+            Self::Fetch => "Fetch",
+            Self::Pull(mode) => mode.label(),
+            Self::Push => "Push",
+        }
+    }
+
+    fn action(self) -> Action {
+        match self {
+            Self::Fetch => Action::Fetch,
+            Self::Pull(mode) => Action::PullWith(mode),
+            Self::Push => Action::Push,
+        }
+    }
+}
+
 /// The operations waiting for the running one, oldest first.
-pub(super) type Waiting = VecDeque<PendingOp>;
+pub(super) type Waiting = VecDeque<Waiter>;
 
 impl RepoTab {
     /// Starts following the operation about to run `ops`: its control, shared with the thread
@@ -52,7 +93,7 @@ impl RepoTab {
     }
 
     /// Stops the running operation: the command running is stopped, with what it started, and
-    /// no later step runs; nothing waiting for it runs either.
+    /// no later step runs. What waited for it doesn't run either (see [`Self::after_op`]).
     pub(super) fn cancel_op(&mut self) {
         if !self.can_cancel() {
             return;
@@ -60,59 +101,53 @@ impl RepoTab {
         if let Some(running) = &self.running {
             running.control.cancel();
         }
-        self.waiting.clear();
     }
 
-    /// Whether the operation that just ended was cancelled.
+    /// Whether the running operation is being cancelled.
     pub(super) fn was_cancelled(&self) -> bool {
         self.running
             .as_ref()
             .is_some_and(|r| r.control.is_cancelled())
     }
 
-    /// Keeps `op` to run once the operation running now ends, and says so; `false` when there
-    /// is no room left for it (it is then dropped, and the status says why).
-    pub(super) fn wait_for_running(&mut self, op: PendingOp) -> bool {
+    /// Keeps `waiter` to start once the operation running now ends (twice is once); refused,
+    /// with why, past [`MAX_WAITING`].
+    pub(super) fn wait_for_running(&mut self, waiter: Waiter) {
         let busy = self.busy_op.clone().unwrap_or_default();
-        // Clicked twice: once is enough.
-        if self
-            .waiting
-            .iter()
-            .any(|w| w.label == op.label && w.ops == op.ops)
-        {
-            return true;
+        if self.waiting.contains(&waiter) {
+            return;
         }
         if self.waiting.len() >= MAX_WAITING {
             self.status = Some((
                 format!(
-                    "{}: not started, {MAX_WAITING} operations are already waiting for {busy}",
-                    op.label
+                    "{}: not started, {MAX_WAITING} operations already wait for {busy}",
+                    waiter.label()
                 ),
                 true,
             ));
-            return false;
+            return;
         }
-        self.status = Some((format!("{} waits for {busy} to finish", op.label), false));
-        self.waiting.push_back(op);
-        true
+        self.waiting.push_back(waiter);
     }
 
-    /// Once an operation ended: runs the next one waiting when it went well, or else drops
-    /// them all, saying so (they were asked for on top of what failed).
-    pub(super) fn after_op(&mut self, ok: bool, ctx: &egui::Context) {
-        self.running = None;
-        if !ok {
+    /// Once an operation ended (and whatever it started itself, like updating the submodules,
+    /// is running): starts the next one waiting. After one the user asked for failed or was
+    /// cancelled, they are dropped instead, and the status says so: they were asked for on top
+    /// of it. A background fetch's failure doesn't drop them.
+    pub(super) fn after_op(&mut self, ok: bool, quiet: bool, ctx: &egui::Context) {
+        if !ok && !quiet {
             let dropped = std::mem::take(&mut self.waiting);
             if !dropped.is_empty()
                 && let Some((msg, _)) = &mut self.status
             {
-                let names: Vec<&str> = dropped.iter().map(|op| op.label.as_str()).collect();
-                msg.push_str(&format!("\n(not run: {})", names.join(", ")));
+                *msg = with_not_run(msg, &dropped);
             }
             return;
         }
-        if let Some(op) = self.waiting.pop_front() {
-            self.run_ops_ex(&op.label, op.ops, op.refresh, op.kind, op.quiet, ctx);
+        if self.busy_op.is_none()
+            && let Some(waiter) = self.waiting.pop_front()
+        {
+            self.apply(waiter.action(), ctx);
         }
     }
 
@@ -140,7 +175,9 @@ impl RepoTab {
                 let width = rect.width() * 0.25;
                 let swing = (time * 1.4).sin() * 0.5 + 0.5;
                 let left = rect.left() + (rect.width() - width) * swing;
-                ui.ctx().request_repaint();
+                // As often as the spinner beside it, not every frame.
+                ui.ctx()
+                    .request_repaint_after(std::time::Duration::from_millis(50));
                 egui::Rect::from_min_size(
                     egui::pos2(left, rect.top()),
                     egui::vec2(width, rect.height()),
@@ -151,12 +188,27 @@ impl RepoTab {
     }
 }
 
+/// `msg` ("Fetch failed: …") with the operations that waited for it named in its first part:
+/// "Fetch failed (Pull not run): …", which is what the toolbar shows of it.
+pub(super) fn with_not_run(msg: &str, dropped: &Waiting) -> String {
+    let names: Vec<&str> = dropped.iter().map(|w| w.label()).collect();
+    let note = format!(" ({} not run)", names.join(", "));
+    match msg.split_once(": ") {
+        Some((head, rest)) => format!("{head}{note}: {rest}"),
+        None => match msg.split_once('\n') {
+            Some((head, rest)) => format!("{head}{note}\n{rest}"),
+            None => format!("{msg}{note}"),
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::{Path, PathBuf};
     use std::time::{Duration, Instant};
 
-    use super::super::{Action, OpKind, Refresh, RepoTab, Undo, UndoEntry, ops};
+    use super::super::{Action, OpKind, Refresh, RepoTab, UndoEntry, ops};
+    use super::{Waiter, Waiting, with_not_run};
     use crate::git;
 
     fn repo(name: &str) -> PathBuf {
@@ -199,8 +251,8 @@ mod tests {
         ops(&[&["-c", &config, "fetch", "ssh://example.invalid/r.git"]])
     }
 
-    /// Cancel stops the fetch, drops what waited for it, leaves undo as it was and the tab idle,
-    /// ready for the next operation.
+    /// Cancel stops the fetch, drops what waited for it (saying so), leaves undo as it was and
+    /// the tab idle, ready for the next operation.
     #[cfg(unix)]
     #[test]
     fn cancelling_stops_the_operation_and_cleans_up() {
@@ -223,99 +275,127 @@ mod tests {
         );
         assert!(tab.can_cancel());
         // Asked for meanwhile: waits.
+        tab.apply(Action::Push, &ctx);
+        assert_eq!(tab.waiting, [Waiter::Push]);
+        // Anything else is not started, and says why.
         tab.run_ops(
             "Tag",
-            ops(&[&["tag", "after-cancel"]]),
+            ops(&[&["tag", "x"]]),
             Refresh::Status,
             OpKind::plain(),
             &ctx,
         );
-        assert_eq!(tab.waiting.len(), 1);
+        let refused = tab.status.clone();
         let pid_file = dir.join("pid");
         let start = Instant::now();
         while !pid_file.exists() && start.elapsed() < Duration::from_secs(10) {
             std::thread::sleep(Duration::from_millis(20));
         }
         tab.apply(Action::CancelOp, &ctx);
-        assert!(tab.waiting.is_empty());
         until(&mut tab, &ctx, |t| t.busy_op.is_none());
-        let tagged = git::run(Some(&dir), &["tag", "--list", "after-cancel"]);
+        let tags = git::run(Some(&dir), &["tag"]);
         let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(
+            refused,
+            Some(("Tag: not started, Fetch is still running".to_owned(), true))
+        );
         assert!(tab.busy_op.is_none());
         assert!(tab.running.is_none());
+        assert!(tab.waiting.is_empty());
         assert!(!tab.can_cancel());
         assert_eq!(
             tab.status.as_ref().map(|(s, e)| (s.as_str(), *e)),
-            Some(("Fetch: cancelled", false))
+            Some(("Fetch (Push not run): cancelled", false))
         );
         assert_eq!(tab.undo_stack, vec![entry]);
-        assert_eq!(tagged.as_deref(), Ok(""));
+        assert_eq!(tags.as_deref(), Ok(""));
         assert!(tab.finished.is_empty(), "a cancel is no notification");
     }
 
-    /// What is asked for while an operation runs runs after it, in order; twice the same is
-    /// once, and past the limit it is refused with why.
+    /// Fetch, Pull and Push asked for meanwhile wait, in order, twice the same once; past the
+    /// limit one is refused with why. They then run one after the other.
     #[test]
-    fn operations_asked_for_meanwhile_run_after_in_order() {
+    fn fetch_pull_and_push_asked_for_meanwhile_run_after_in_order() {
+        use crate::repo::pull::PullMode;
         let dir = repo("waiting");
         let ctx = egui::Context::default();
         let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
-        let tag = |name: &str| ops(&[&["tag", name]]);
-        tab.run_ops("Tag a", tag("a"), Refresh::Status, OpKind::plain(), &ctx);
-        for name in ["b", "b", "c", "d"] {
-            tab.run_ops(
-                &format!("Tag {name}"),
-                tag(name),
-                Refresh::Status,
-                OpKind::plain(),
-                &ctx,
-            );
-        }
-        let waiting: Vec<String> = tab.waiting.iter().map(|w| w.label.clone()).collect();
-        tab.run_ops("Tag e", tag("e"), Refresh::Status, OpKind::plain(), &ctx);
-        let refused_e = tab.status.clone();
-        until(&mut tab, &ctx, |t| {
-            t.busy_op.is_none() && t.waiting.is_empty()
-        });
-        let tags = git::run(Some(&dir), &["tag", "--sort=creatordate"]);
-        let _ = std::fs::remove_dir_all(&dir);
-        assert_eq!(waiting, ["Tag b", "Tag c", "Tag d"]);
-        assert!(refused_e.is_some_and(|(s, err)| err && s.contains("Tag e: not started")));
-        assert_eq!(
-            tags.as_deref()
-                .map(str::lines)
-                .map(Iterator::collect::<Vec<_>>),
-            Ok(vec!["a", "b", "c", "d"])
-        );
-    }
-
-    /// When the running one fails, those waiting don't run, and the status says which.
-    #[test]
-    fn a_failure_drops_what_waited() {
-        let dir = repo("waiting-fails");
-        let ctx = egui::Context::default();
-        let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
-        let undo = Undo::None;
         tab.run_ops(
-            "Checkout",
-            ops(&[&["checkout", "no-such-branch"]]),
-            Refresh::Status,
-            OpKind::Normal(undo, String::new()),
-            &ctx,
-        );
-        tab.run_ops(
-            "Tag x",
-            ops(&[&["tag", "x"]]),
+            "Tag a",
+            ops(&[&["tag", "a"]]),
             Refresh::Status,
             OpKind::plain(),
             &ctx,
         );
-        until(&mut tab, &ctx, |t| t.busy_op.is_none());
-        let tags = git::run(Some(&dir), &["tag"]);
+        let modes = PullMode::ALL;
+        for action in [
+            Action::Fetch,
+            Action::Fetch,
+            Action::PullWith(modes[0]),
+            Action::Push,
+            Action::PullWith(modes[1]),
+        ] {
+            tab.apply(action, &ctx);
+        }
+        let waiting = tab.waiting.clone();
+        let refused = tab.status.clone();
+        let mut ran = Vec::new();
+        let start = Instant::now();
+        while (tab.busy_op.is_some() || !tab.waiting.is_empty())
+            && start.elapsed() < Duration::from_secs(20)
+        {
+            tab.poll(&ctx);
+            if let Some(op) = &tab.busy_op
+                && ran.last() != Some(op)
+            {
+                ran.push(op.clone());
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
         let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(
+            waiting,
+            [Waiter::Fetch, Waiter::Pull(modes[0]), Waiter::Push]
+        );
+        assert!(refused.is_some_and(|(s, err)| err && s.contains("not started, 3 operations")));
+        // Fetch (no remotes: nothing to do) went well, then the pull ran (and failed, with
+        // nothing to pull from), and the push it was asked before is dropped.
+        assert_eq!(ran[..2], ["Tag a".to_owned(), "Fetch".to_owned()]);
+        assert_eq!(ran.get(2).map(String::as_str), Some(modes[0].label()));
         let status = tab.status.map(|(s, _)| s).unwrap_or_default();
-        assert!(status.starts_with("Checkout failed"), "{status}");
-        assert!(status.ends_with("(not run: Tag x)"), "{status}");
-        assert_eq!(tags.as_deref(), Ok(""));
+        assert!(status.contains("(Push not run)"), "{status}");
+    }
+
+    /// A background fetch that fails doesn't drop what the user asked for meanwhile.
+    #[test]
+    fn a_failed_background_fetch_still_runs_what_waited() {
+        let dir = repo("waiting-quiet");
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+        let fails = ops(&[&["fetch", "no-such-remote"]]);
+        tab.run_ops_ex(
+            "Background fetch",
+            fails,
+            Refresh::Status,
+            OpKind::plain(),
+            true,
+            &ctx,
+        );
+        tab.apply(Action::Fetch, &ctx);
+        until(&mut tab, &ctx, |t| {
+            t.busy_op.is_none() && t.waiting.is_empty()
+        });
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(tab.status, Some(("Fetch: done".to_owned(), false)));
+    }
+
+    #[test]
+    fn what_was_not_run_is_named_in_the_first_part() {
+        let dropped: Waiting = [Waiter::Fetch, Waiter::Push].into_iter().collect();
+        assert_eq!(
+            with_not_run("Pull failed: fatal: x\nmore", &dropped),
+            "Pull failed (Fetch, Push not run): fatal: x\nmore"
+        );
+        assert_eq!(with_not_run("Odd", &dropped), "Odd (Fetch, Push not run)");
     }
 }
