@@ -55,6 +55,22 @@ impl Setup {
     }
 }
 
+/// The push of the branch `local`, set up to push to a fork's branch of another name
+/// (`ann/fix` → ann's `fix`): `git push` alone would look for one of its own name there.
+pub(crate) fn renamed_push(setup: &Setup, local: &str) -> Option<Vec<String>> {
+    let b = setup.branches.iter().find(|b| b.name == local)?;
+    let theirs = b.merge.strip_prefix("refs/heads/")?;
+    if b.push_remote.is_empty() || theirs == local {
+        return None;
+    }
+    Some(strings(&[
+        "push",
+        "--",
+        &b.push_remote,
+        &format!("refs/heads/{local}:refs/heads/{theirs}"),
+    ]))
+}
+
 /// Reads [`Setup`] from the repository's config.
 pub(crate) fn read_setup(repo: &Path) -> Result<Setup, String> {
     // Exit 1: nothing matches.
@@ -135,6 +151,26 @@ fn same_repository(a: &str, b: &str) -> bool {
     }
 }
 
+/// Whether a remote URL is reached over SSH: `ssh://…`, or `user@host:path`.
+fn is_ssh(url: &str) -> bool {
+    url.starts_with("ssh://")
+        || (!url.contains("://")
+            && url
+                .split_once(':')
+                .is_some_and(|(left, _)| left.contains('@') && !left.contains('/')))
+}
+
+/// The remote that is `info`'s fork (by its URL, however written), if there is one.
+pub(crate) fn fork_remote(info: &ForkInfo, remotes: &[Remote]) -> Option<String> {
+    remotes
+        .iter()
+        .find(|r| {
+            (!info.clone_https.is_empty() && same_repository(&r.url, &info.clone_https))
+                || (!info.clone_ssh.is_empty() && same_repository(&r.url, &info.clone_ssh))
+        })
+        .map(|r| r.name.clone())
+}
+
 /// A remote name made of `owner`: what git takes in a name, nothing else.
 fn remote_name(owner: &str) -> String {
     let name: String = owner
@@ -147,7 +183,11 @@ fn remote_name(owner: &str) -> String {
             }
         })
         .collect();
-    let name = name.trim_matches(['-', '.']).to_owned();
+    let name = name
+        .replace("..", "-")
+        .trim_matches(['-', '.'])
+        .trim_end_matches(".lock")
+        .to_owned();
     if name.is_empty() {
         "fork".to_owned()
     } else {
@@ -189,7 +229,7 @@ pub(crate) fn checkout(
         .iter()
         .find(|r| r.name == "origin")
         .or_else(|| remotes.first());
-    let ssh = origin.is_some_and(|r| r.url.starts_with("git@") || r.url.starts_with("ssh://"));
+    let ssh = origin.is_some_and(|r| is_ssh(&r.url));
     let url = if ssh && !info.clone_ssh.is_empty() {
         info.clone_ssh.clone()
     } else {
@@ -201,11 +241,8 @@ pub(crate) fn checkout(
             info.owner
         ));
     }
-    let existing = remotes.iter().find(|r| {
-        same_repository(&r.url, &info.clone_https) || same_repository(&r.url, &info.clone_ssh)
-    });
-    let (remote, new_remote) = match existing {
-        Some(r) => (r.name.clone(), false),
+    let (remote, new_remote) = match fork_remote(info, remotes) {
+        Some(r) => (r, false),
         None => {
             let base = remote_name(&info.owner);
             let taken = |n: &str| remotes.iter().any(|r| r.name == n);
@@ -249,7 +286,12 @@ pub(crate) fn checkout(
             undo,
         });
     }
-    let free = |n: &str| !locals.iter().any(|l| l == n);
+    // Free, and no branch is a folder of it nor it a folder of one (`fix` and `fix/a`).
+    let free = |n: &str| {
+        !locals
+            .iter()
+            .any(|l| l == n || l.starts_with(&format!("{n}/")) || n.starts_with(&format!("{l}/")))
+    };
     let local = [
         info.branch.clone(),
         format!("{}/{}", remote_name(&info.owner), info.branch),
@@ -269,30 +311,12 @@ pub(crate) fn checkout(
         &format!("branch.{local}.pushRemote"),
         &remote,
     ]));
-    let refspec = format!("refs/heads/{local}:refs/heads/{}", info.branch);
-    if local != info.branch {
-        // `push.default=simple` pushes to a branch of the same name only: this names the one.
-        steps.push(strings(&[
-            "config",
-            "--add",
-            &format!("remote.{remote}.push"),
-            &refspec,
-        ]));
-    }
     // Back to what was checked out, the branch deleted only while it has nothing new.
     undo.push(strings(&["checkout", previous, "--"]));
     undo.push(expect_ref(&format!("refs/heads/{local}")));
     undo.push(strings(&["branch", "-D", "--", &local]));
     if new_remote {
         undo.push(strings(&["remote", "remove", "--", &remote]));
-    } else if local != info.branch {
-        undo.push(strings(&[
-            "config",
-            "--fixed-value",
-            "--unset",
-            &format!("remote.{remote}.push"),
-            &refspec,
-        ]));
     }
     Ok(Checkout {
         remote,
@@ -345,28 +369,30 @@ pub(crate) fn plan_rebase(
     setup: &Setup,
     creds: Option<&git::Credentials>,
 ) -> Result<Rebase, String> {
+    let remotes = git::remotes(repo)?;
+    let fork = fork_remote(info, &remotes).ok_or_else(|| {
+        format!(
+            "Check out #{}'s branch to push to {} first: no remote is their fork",
+            info.number, info.owner
+        )
+    })?;
     let full = git::run_ok_codes(Some(repo), &["symbolic-ref", "-q", "HEAD"], &[0, 1])?;
     let local = full
         .trim()
         .strip_prefix("refs/heads/")
         .unwrap_or_default()
         .to_owned();
-    let b = setup
-        .branches
-        .iter()
-        .find(|b| b.name == local)
-        .filter(|b| b.merge == format!("refs/heads/{}", info.branch))
+    // The branch checked out must be the one pushing to this pull request's fork: another
+    // fork's branch of the same name is someone else's.
+    setup
+        .pushing_to(&fork, &info.branch)
+        .filter(|b| b.name == local)
         .ok_or_else(|| {
             format!(
                 "Check out #{}'s branch to push to {} first",
                 info.number, info.owner
             )
         })?;
-    let fork = if b.push_remote.is_empty() {
-        b.remote.clone()
-    } else {
-        b.push_remote.clone()
-    };
     let dirty = git::run(
         Some(repo),
         &["status", "--porcelain", "--untracked-files=no"],
@@ -468,6 +494,17 @@ impl Rebase {
             &self.fork,
             &format!("{what}:{target}"),
         ])
+    }
+
+    /// The push alone, of the branch as it is now (after a rebase continued past conflicts, or
+    /// to retry after signing in): replacing the fork's branch only if it is still `seen`.
+    pub(crate) fn push_now(&self) -> Vec<Vec<String>> {
+        vec![self.push(&self.local_ref(), Some(&self.seen))]
+    }
+
+    /// The fork's branch back as it was, only while it is what was pushed.
+    pub(crate) fn fork_undo_steps(&self) -> Vec<Vec<String>> {
+        vec![expect_ref(&self.tracking), self.push(&self.head, None)]
     }
 
     /// Back as it was: on the fork first, then here.
@@ -627,9 +664,10 @@ mod tests {
         assert_eq!(plan.remote, "ann-fork");
         assert_eq!(plan.local, "ann/fix");
         assert!(
-            plan.steps
+            !plan
+                .steps
                 .iter()
-                .any(|s| s.contains(&"remote.ann-fork.push".to_owned()))
+                .any(|s| s.iter().any(|a| a.ends_with(".push")))
         );
         // The fork already a remote: used as it is.
         let remotes = [

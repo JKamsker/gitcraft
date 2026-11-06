@@ -47,11 +47,69 @@ fn items(json: &str) -> Result<Vec<Value>, String> {
     Ok(v.as_array().cloned().unwrap_or_default())
 }
 
+/// GitHub's open pull requests as `gh pr list --json` gives them (`isCrossRepository`,
+/// `maintainerCanModify`, `headRepositoryOwner`, `headRepository`, `headRefName`, `headRefOid`,
+/// `baseRefName`, `number`): the REST list leaves out whether maintainers can edit. The fork's
+/// clone URLs are made from `host`.
+pub(crate) fn parse_github_list(json: &str, host: &str) -> Result<Vec<ForkInfo>, String> {
+    Ok(items(json)?
+        .iter()
+        .map(|pr| {
+            let owner = at(pr, "/headRepositoryOwner/login");
+            let name = at(pr, "/headRepository/name");
+            let known = !owner.is_empty() && !name.is_empty();
+            ForkInfo {
+                number: number(pr, "/number"),
+                cross: flag(pr, "/isCrossRepository") || !known,
+                owner: owner.to_owned(),
+                repo_path: if known {
+                    format!("{owner}/{name}")
+                } else {
+                    String::new()
+                },
+                clone_https: if known {
+                    format!("https://{host}/{owner}/{name}.git")
+                } else {
+                    String::new()
+                },
+                clone_ssh: if known {
+                    format!("git@{host}:{owner}/{name}.git")
+                } else {
+                    String::new()
+                },
+                branch: at(pr, "/headRefName").to_owned(),
+                base: at(pr, "/baseRefName").to_owned(),
+                sha: at(pr, "/headRefOid").to_owned(),
+                maintainers_can_edit: flag(pr, "/maintainerCanModify"),
+                first_time: false,
+                project_id: 0,
+            }
+        })
+        .collect())
+}
+
+/// The pull requests of GitHub's REST list (`repos/o/r/pulls`) whose author is new to the
+/// repository (`author_association`).
+pub(crate) fn github_first_timers(json: &str) -> Result<Vec<u64>, String> {
+    Ok(items(json)?
+        .iter()
+        .filter(|pr| {
+            matches!(
+                at(pr, "/author_association"),
+                "FIRST_TIME_CONTRIBUTOR" | "FIRST_TIMER"
+            )
+        })
+        .map(|pr| number(pr, "/number"))
+        .collect())
+}
+
 /// GitHub's REST list of pull requests (`repos/o/r/pulls`).
+#[cfg(test)]
 pub(crate) fn parse_github(json: &str) -> Result<Vec<ForkInfo>, String> {
     Ok(items(json)?.iter().map(github_one).collect())
 }
 
+#[cfg(test)]
 fn github_one(pr: &Value) -> ForkInfo {
     let head_repo = at(pr, "/head/repo/full_name");
     let base_repo = at(pr, "/base/repo/full_name");
@@ -177,6 +235,34 @@ mod tests {
         assert!(!list[1].cross && !list[1].first_time);
         assert!(list[2].cross, "a deleted fork");
         assert!(parse_github("not json").is_err());
+    }
+
+    #[test]
+    fn gh_pr_list_and_the_first_timers_of_the_rest_list() {
+        let json = r#"[
+          {"number": 7, "isCrossRepository": true, "maintainerCanModify": true,
+           "headRepositoryOwner": {"login": "ann"}, "headRepository": {"name": "app"},
+           "headRefName": "fix", "headRefOid": "abc", "baseRefName": "main"},
+          {"number": 8, "isCrossRepository": false, "maintainerCanModify": false,
+           "headRepositoryOwner": {"login": "acme"}, "headRepository": {"name": "app"},
+           "headRefName": "feat", "headRefOid": "def", "baseRefName": "main"},
+          {"number": 9, "isCrossRepository": true, "headRefName": "gone"}
+        ]"#;
+        let list = parse_github_list(json, "github.example.org").unwrap_or_default();
+        assert!(list[0].cross && list[0].maintainers_can_edit);
+        assert_eq!(
+            list[0].clone_https,
+            "https://github.example.org/ann/app.git"
+        );
+        assert_eq!(list[0].clone_ssh, "git@github.example.org:ann/app.git");
+        assert!(!list[1].cross);
+        assert!(
+            list[2].cross && list[2].repo_path.is_empty(),
+            "a deleted fork"
+        );
+        let rest = r#"[{"number": 7, "author_association": "FIRST_TIME_CONTRIBUTOR"},
+                       {"number": 8, "author_association": "MEMBER"}]"#;
+        assert_eq!(github_first_timers(rest).unwrap_or_default(), [7]);
     }
 
     #[test]

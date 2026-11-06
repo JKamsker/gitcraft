@@ -85,8 +85,25 @@ impl Provider for GitHub {
     }
 
     fn forks(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<ForkInfo>, String> {
+        let fields = "number,isCrossRepository,maintainerCanModify,headRepositoryOwner,\
+                      headRepository,headRefName,headRefOid,baseRefName";
+        let out = gh(
+            repo,
+            &[
+                "pr", "list", "--state", "open", "--limit", "100", "--json", fields,
+            ],
+        )?;
+        let mut list = super::forks::parse_github_list(&out, &hosting.host)?;
+        // Who is new to the repository is only in the REST list; without it, nobody is marked.
         let endpoint = format!("repos/{}/pulls?state=open&per_page=100", hosting.path);
-        super::forks::parse_github(&api(repo, hosting, &["api", &endpoint])?)
+        if let Ok(rest) = api(repo, hosting, &["api", &endpoint])
+            && let Ok(first) = super::forks::github_first_timers(&rest)
+        {
+            for info in &mut list {
+                info.first_time = first.contains(&info.number);
+            }
+        }
+        Ok(list)
     }
 
     fn waiting_runs(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<(String, u64)>, String> {

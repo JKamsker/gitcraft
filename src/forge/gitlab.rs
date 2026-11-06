@@ -65,14 +65,19 @@ impl Provider for GitLab {
         let mut list = super::forks::parse_gitlab(&api(&format!(
             "projects/{project}/merge_requests?state=opened&per_page=100"
         ))?)?;
-        let mut asked: Vec<(u64, Result<String, String>)> = Vec::new();
-        for info in list.iter_mut().filter(|i| i.cross && i.project_id > 0) {
+        // The fork's clone URLs only for those a maintainer can push to: one request per fork
+        // project, and one that fails leaves that one without (Check out then says so).
+        let mut asked: Vec<(u64, Option<String>)> = Vec::new();
+        for info in list
+            .iter_mut()
+            .filter(|i| i.cross && i.maintainers_can_edit && i.project_id > 0)
+        {
             let id = info.project_id;
             if !asked.iter().any(|(p, _)| *p == id) {
-                asked.push((id, api(&format!("projects/{id}"))));
+                asked.push((id, api(&format!("projects/{id}")).ok()));
             }
-            if let Some((_, Ok(json))) = asked.iter().find(|(p, _)| *p == id) {
-                super::forks::fill_gitlab_project(info, json)?;
+            if let Some((_, Some(json))) = asked.iter().find(|(p, _)| *p == id) {
+                let _ = super::forks::fill_gitlab_project(info, json);
             }
         }
         Ok(list)

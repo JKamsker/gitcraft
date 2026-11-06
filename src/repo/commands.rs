@@ -220,6 +220,11 @@ impl RepoTab {
             self.status = Some(("Push needs a checked-out branch".to_owned(), true));
             return;
         };
+        // A pull request's branch checked out under another name than its fork's.
+        if let Some(steps) = super::forks::plan::renamed_push(self.forks.setup(), &current) {
+            self.run_ops("Push", vec![steps], Refresh::All, OpKind::plain(), ctx);
+            return;
+        }
         let has_upstream = self
             .refs
             .local

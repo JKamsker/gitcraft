@@ -137,20 +137,23 @@ so your config, credentials and hooks apply as usual.
   and above the changed files of an open pull request) opens the worktree its branch is checked
   out in, or makes one beside the repository first: on the local branch, on a new one tracking
   the remote branch, or fetched from the forge for a fork that isn't a remote here.
-- Pull requests from forks (GitHub, GitLab, Forgejo, Gitea): the list marks those whose author
-  lets maintainers push to their branch (_maintainers can edit_), first-time contributors
-  (GitHub, GitLab) and, on GitHub, commits whose workflow runs wait for a maintainer's approval,
-  with _Approve and run_ in the menu. _Check out to push to ann_ (in the menu, and on the pull
-  request's page) adds the fork as a remote named after its owner (or uses the remote that
-  already is it, reached like `origin`: SSH or HTTPS), fetches the branch, checks it out
-  tracking it and sets `branch.<name>.pushRemote`, so that Push sends your fixes back to the
-  contributor's branch; when the branch's name is taken here it is checked out as
-  `ann/branch` and still pushed to theirs. Ctrl+Z goes back, deleting the branch (only while it
-  has nothing new) and the remote it added. _Rebase onto main and push to ann_ fetches the base
-  and their branch, refuses if they pushed commits you haven't, rebases, then force-pushes to
-  their fork with a lease, after showing what it will do; Ctrl+Z puts the branch back on their
-  fork and here. _Remove unused fork remotes_ (palette) takes out the remotes added for forks
-  that no branch uses any more (Ctrl+Z adds them back).
+- Pull requests from forks (GitHub, GitLab, Forgejo, Gitea): the list marks those with workflow
+  runs awaiting a maintainer's approval (GitHub; _Approve and run_ in the menu, chosen twice, as
+  it runs the contributor's code on your CI), those whose author lets maintainers push to their
+  branch (_can edit_) and first-time contributors (GitHub, GitLab). _Check out to push to ann_
+  (in the menu, and on the pull request's page) adds the fork as a remote named after its owner
+  (or uses the remote that already is it, by its URL), reached like `origin` (SSH or HTTPS),
+  fetches the branch, checks it out tracking it and sets `branch.<name>.pushRemote`, so that
+  Push sends your fixes back to the contributor's branch. When the branch's name is taken here
+  it is checked out as `ann/branch`, and Push sends it to theirs by name. A remote added this
+  way is marked `remote.<name>.gitcraftFork`. Ctrl+Z goes back, deleting the branch and the
+  remote it added (refused once the branch has commits of yours). _Rebase onto main and push to
+  ann_ fetches the base and their branch, refuses if they pushed commits you haven't, rebases,
+  then force-pushes to their fork with a lease, after showing what it will do; if the rebase
+  stops on conflicts, the push is offered once it is continued. Ctrl+Z puts the branch back on
+  their fork and here. _Remove unused fork remotes_ (in the palette when there are some) takes
+  out the marked remotes no branch uses any more, keeping those whose branches hold commits no
+  branch here has (Ctrl+Z adds them back).
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
 
 **Changes and commits** (right)
