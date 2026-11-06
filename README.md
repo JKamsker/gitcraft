@@ -156,6 +156,16 @@ so your config, credentials and hooks apply as usual.
   there — a release or file the forge has already is kept, not made twice — or skipped; a push
   that needs signing in asks. Ctrl+Z takes the version commit and the tag back off here (the
   tag put back as it was on Ctrl+Y); what was pushed and published stays.
+- Hotfixes, the git-flow way: _Start hotfix from v2.3.1…_ in a version tag's menu offers a branch
+  `hotfix/2.3.2` there (git-flow's prefix when it is set up), checked out. _Finish hotfix…_ (the
+  branch's menu, or the palette while it is checked out) shows the tag it will make (`v2.3.2`,
+  with notes from its commits to edit) and what it will do, then, as one step: tags it (annotated
+  or signed), merges it into the main branch (`main`, `master` or git-flow's) and the development
+  one (`develop` or git-flow's, if there is one) with `--no-ff`, deletes it, and pushes those
+  branches (to their upstreams) and the tag at once (`--atomic`). A merge that would stop on
+  conflicts is said beforehand (git 2.38 or later) and refused. Ctrl+Z puts the hotfix branch
+  back (checked out), the branches where they were and takes the tag off here; what was pushed
+  stays.
 - Conflicted / unstaged / staged lists with stage, unstage, discard and mark-resolved buttons,
   _Stage all_ / _Unstage all_; right-click a file to open it, open it in your editor, show it in
   its folder, see its history or blame, or ignore it (the file, its extension or its folder go
@@ -371,6 +381,7 @@ was made this way, on a demo repository.
 | `src/pr_threads.rs` | review threads, the pending review and permissions                          |
 | `src/release/` | cutting a release: versions, Conventional Commits, notes, manifests, each step |
 | `src/repo/release/` | the release dialog: choices, what it will do, the steps as they run, resume and undo |
+| `src/repo/hotfix/` | the hotfix flow: starting one from a tag, finishing it (tag, merges, push) and its undo |
 | `src/avatars.rs`         | avatars from GitHub, Forgejo / Gitea, GitLab or Gravatar, cached on disk           |
 | `src/update.rs`          | new-release check                                                                  |
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |

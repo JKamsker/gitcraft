@@ -17,6 +17,7 @@ mod file_text;
 mod file_view;
 mod graph_view;
 mod highlight;
+mod hotfix;
 mod keep_submodules;
 mod layout;
 mod load;
@@ -161,6 +162,8 @@ pub struct RepoTab {
     rebase: Option<rebase::RebaseEditor>,
     /// The release being prepared or cut (its dialog).
     release: Option<release::ReleaseView>,
+    /// The hotfix flow: the dialog that finishes one, and the push after it.
+    hotfix: hotfix::Hotfix,
     /// The selected commit's message, being edited in the right pane.
     reword: Option<Reword>,
     /// HTTPS credentials typed in this session, used for every later git command of the tab.
@@ -318,6 +321,7 @@ impl RepoTab {
             file_view: None,
             rebase: None,
             release: None,
+            hotfix: hotfix::Hotfix::default(),
             reword: None,
             credentials: None,
             last_op: None,

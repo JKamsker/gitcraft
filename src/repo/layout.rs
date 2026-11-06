@@ -22,6 +22,7 @@ impl RepoTab {
             return;
         }
         let mut acts: Vec<Action> = std::mem::take(&mut self.queued);
+        self.hotfix_frame(&ctx);
         self.shortcuts(&ctx, &mut acts);
 
         egui::Panel::top("repo_toolbar")
@@ -63,6 +64,7 @@ impl RepoTab {
 
         self.dialogs(&ctx, &mut acts);
         self.release_dialog(&ctx, &mut acts);
+        self.hotfix_dialog(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
         }
@@ -110,6 +112,7 @@ impl RepoTab {
     fn shortcuts(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         let free_keys = self.dialog.is_none()
             && self.release.is_none()
+            && self.hotfix.finish.is_none()
             && !self.keys_blocked
             && !ctx.egui_wants_keyboard_input();
         if free_keys {
