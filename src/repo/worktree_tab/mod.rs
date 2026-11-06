@@ -262,6 +262,8 @@ impl RepoTab {
         // (a dozen parked views would keep the shells there busy); it is looked at again on
         // coming back.
         view.poller = None;
+        // Its windows close while it isn't drawn: its views come back to it.
+        view.popouts.dock_all();
         self.parked.push(view);
         // A worktree whose folder is gone can't be gone back to, but what still runs in it is
         // seen through first.

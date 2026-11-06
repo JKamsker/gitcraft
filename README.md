@@ -209,8 +209,10 @@ so your config, credentials and hooks apply as usual.
   (Ctrl+C with a selection, Ctrl+Shift+C or right-click).
 - Pop out: the diff, the terminal, a pull request or the CI view moves into a window of its own
   (the button in its header, or the command palette), for a second monitor. It keeps working
-  there (staging lines, comments, typing in the shell) and stays open across tab switches;
-  closing the window or _Bring back_ docks it again, and closing the view closes the window.
+  there (staging lines, comments, typing in the shell, undo) and stays open across tab switches
+  and commits selected in the main window, which shows what was underneath and a reminder that
+  raises the window. Closing the window or its bring-back button docks the view again; closing
+  the view itself (its ×, or Esc outside the terminal) closes the window.
 - Command palette (Ctrl+P): every action and branch, fuzzy matched.
 - Manual (F1, or the book in the title bar): what each part does and every keyboard shortcut.
 - Avatars: on a GitHub repository, the authors' GitHub accounts (through `gh` when installed, else

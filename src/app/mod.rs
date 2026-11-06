@@ -372,7 +372,8 @@ impl App {
                     t && i.modifiers.shift,
                     i.modifiers.command && i.key_pressed(Key::W),
                     i.key_pressed(Key::F5),
-                    i.focused,
+                    // The app's: its window or one of the views popped out of it.
+                    i.focused || i.raw.viewports.values().any(|v| v.focused == Some(true)),
                     i.modifiers.command && i.key_pressed(Key::P),
                     i.key_pressed(Key::F1),
                     i.modifiers.command && i.key_pressed(Key::Comma),
@@ -521,13 +522,14 @@ impl eframe::App for App {
             self.close_current_worktree(&ctx);
         }
 
-        // Views popped out of any tab keep their windows, the tab shown or not.
-        for tab in &mut self.tabs {
+        self.active_tab_ui(ui, &t);
+        // Views popped out of any tab keep their windows, the tab shown or not; after it, so
+        // they show what it just took in.
+        for (i, tab) in self.tabs.iter_mut().enumerate() {
             if let Tab::Repo(r) = tab {
-                r.popouts_ui(&ctx);
+                r.popouts_ui(&ctx, i == self.active);
             }
         }
-        self.active_tab_ui(ui, &t);
         self.clone_dialog(&ctx);
         self.remote_dialog(&ctx);
         self.askpass_dialog(&ctx);

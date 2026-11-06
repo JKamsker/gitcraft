@@ -37,8 +37,10 @@ impl Grid {
 impl Terminal {
     /// Paints the screen into all of `ui`'s remaining space and handles input.
     pub fn ui(&mut self, ui: &mut Ui) {
-        self.drawn
-            .store(ui.ctx().cumulative_pass_nr(), Ordering::Relaxed);
+        self.drawn.store(
+            ui.ctx().cumulative_pass_nr_for(egui::ViewportId::ROOT),
+            Ordering::Relaxed,
+        );
         let t = Tokens::get(ui.ctx());
         let font = theme::mono(crate::settings::Settings::get(ui.ctx()).terminal_font);
         let glyph = ui

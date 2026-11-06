@@ -8,7 +8,10 @@
 //! draw from and act on the repository tab itself (`&mut RepoTab`: its channels, its terminals,
 //! its staged lines), which would mean taking the whole tab apart. An immediate viewport is
 //! drawn right where it is asked for, borrowing the tab like the main window does; the cost is
-//! that the main window and the pop-outs repaint together.
+//! that the main window and the pop-outs repaint together, each pop-out adding its drawing to
+//! every frame, and that a pop-out is only drawn in the main window's passes: where a minimized
+//! or hidden main window gets none (Wayland), its pop-outs wait for it too. A minimized pop-out
+//! isn't painted.
 
 use std::sync::{Arc, OnceLock};
 
@@ -38,7 +41,12 @@ pub(super) fn show(
             body(ui, class);
             return false;
         }
-        let closing = ui.input(|i| i.viewport().close_requested());
+        let (closing, minimized) =
+            ui.input(|i| (i.viewport().close_requested(), i.viewport().minimized));
+        if minimized == Some(true) {
+            // Nothing to see; and on macOS painting a hidden window can wait on the system.
+            return closing;
+        }
         let t = Tokens::get(ui.ctx());
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(t.dock))
