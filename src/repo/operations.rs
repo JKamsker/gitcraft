@@ -196,6 +196,9 @@ impl RepoTab {
                 if label.contains("etch") {
                     self.load_prs(ctx);
                 }
+                if let Some((_, path)) = self.open_when_done.take_if(|(l, _)| *l == label) {
+                    self.open_request = Some(super::OpenRequest::Worktree(path));
+                }
                 self.record_undo(&label, kind);
             }
             Err(e) if git::is_auth_error(e) && !quiet => {
@@ -217,6 +220,7 @@ impl RepoTab {
                 }
             }
             Err(e) => {
+                self.open_when_done.take_if(|(l, _)| *l == label);
                 self.focus_wip = e.contains("CONFLICT") || e.contains("could not apply");
                 self.status = Some((format!("{label} failed: {e}"), true));
                 // A failed undo stays undoable.

@@ -60,6 +60,26 @@ impl RepoTab {
         let Some(view) = &self.pr_view else {
             return;
         };
+        // What can be done with the pull request's branch here.
+        if let Some(Ok(details)) = &view.details {
+            let idle = self.busy_op.is_none();
+            egui::Frame::new()
+                .inner_margin(egui::Margin::symmetric(12, 8))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        self.pr_worktree_button(
+                            ui,
+                            acts,
+                            details.number,
+                            &details.head_branch,
+                            &details.head_oid,
+                            idle,
+                            false,
+                        );
+                    });
+                });
+            ui.separator();
+        }
         if let Some(Ok(details)) = view
             .details
             .as_ref()

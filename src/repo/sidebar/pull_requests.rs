@@ -1,5 +1,7 @@
 //! The pull (or merge) requests of the repository's forge.
 
+use std::path::{Path, PathBuf};
+
 use egui::{Align2, Rect, Sense, Ui, pos2, vec2};
 
 use super::remote_short;
@@ -116,14 +118,17 @@ impl RepoTab {
         }
         let has_view = forge.has_pages();
         let r = r.on_hover_text(if has_view {
-            format!("{}\nClick to open, double-click for the browser", pr.url)
+            format!("{}\nClick to open", pr.url)
         } else {
             format!("{}\nDouble-click to open in the browser", pr.url)
         });
-        if r.double_clicked() {
+        if has_view {
+            // A double-click opens it as a click does: its first click already did.
+            if r.clicked() && !r.double_clicked() {
+                acts.push(Action::OpenPr(pr.number));
+            }
+        } else if r.double_clicked() {
             acts.push(Action::OpenUrl(pr.url.clone()));
-        } else if r.clicked() && has_view {
-            acts.push(Action::OpenPr(pr.number));
         } else if r.clicked()
             && let Some(target) = self.pr_target(pr)
         {
@@ -132,9 +137,13 @@ impl RepoTab {
         egui::Popup::context_menu(&r)
             .style(crate::theme::menu_style)
             .show(|ui| {
+                if has_view && ui.button("Open").clicked() {
+                    acts.push(Action::OpenPr(pr.number));
+                }
                 if ui.button("Open in the browser").clicked() {
                     acts.push(Action::OpenUrl(pr.url.clone()));
                 }
+                self.pr_worktree_button(ui, acts, pr.number, &pr.branch, &pr.sha, idle, true);
                 if ui
                     .add_enabled(idle, egui::Button::new(format!("Check out {}", pr.branch)))
                     .clicked()
@@ -167,29 +176,238 @@ impl RepoTab {
     /// The remote-tracking branch `pr` proposes, which can be on any remote (a fork's): the
     /// one at the pull request's latest commit, else the default remote's, else the first.
     fn pr_remote_branch(&self, pr: &PullRequest) -> Option<&Branch> {
+        self.remote_branch_of(&pr.branch, &pr.sha)
+    }
+
+    /// The remote-tracking branch named `branch` on any remote, at `sha` if one is.
+    fn remote_branch_of(&self, branch: &str, sha: &str) -> Option<&Branch> {
         let default = self.default_remote();
         let found: Vec<(&str, &Branch)> = self
             .remotes
             .iter()
             .flat_map(|r| {
                 self.remote_branches(&r.name)
-                    .filter(|b| remote_short(&b.name, &r.name) == Some(pr.branch.as_str()))
+                    .filter(|b| remote_short(&b.name, &r.name) == Some(branch))
                     .map(|b| (r.name.as_str(), b))
             })
             .collect();
         found
             .iter()
-            .find(|(_, b)| !pr.sha.is_empty() && b.target == pr.sha)
+            .find(|(_, b)| !sha.is_empty() && b.target == sha)
             .or_else(|| found.iter().find(|(r, _)| default.as_deref() == Some(*r)))
             .or_else(|| found.first())
             .map(|(_, b)| *b)
     }
+
+    /// The button (`in_menu`: the menu item) that opens the worktree of pull request `number`
+    /// (proposing `branch`, at `sha`), making it first when there is none.
+    #[allow(clippy::too_many_arguments)]
+    pub(in crate::repo) fn pr_worktree_button(
+        &self,
+        ui: &mut Ui,
+        acts: &mut Vec<Action>,
+        number: u64,
+        branch: &str,
+        sha: &str,
+        idle: bool,
+        in_menu: bool,
+    ) {
+        let plan = self.pr_worktree_plan(number, branch, sha);
+        let (enabled, tip) = match &plan {
+            PrWorktree::Here => (false, "Its branch is checked out here".to_owned()),
+            PrWorktree::Open(path) => (true, format!("Opens {}", crate::remote::display(path))),
+            PrWorktree::Create { path, .. } => (
+                idle,
+                format!(
+                    "Makes a worktree in {} and opens it",
+                    crate::remote::display(path)
+                ),
+            ),
+        };
+        let button = if in_menu {
+            egui::Button::new("Open in worktree")
+        } else {
+            let t = Tokens::get(ui.ctx());
+            egui::Button::image_and_text(
+                icons::image("folder-git-2", 14.0, t.icon),
+                "Open in worktree",
+            )
+            .min_size(vec2(0.0, 26.0))
+        };
+        let r = ui
+            .add_enabled(enabled, button)
+            .on_hover_text(&tip)
+            .on_disabled_hover_text(tip);
+        if r.clicked() {
+            acts.push(Action::OpenPrWorktree {
+                number,
+                branch: branch.to_owned(),
+                sha: sha.to_owned(),
+            });
+        }
+    }
+
+    /// Opens the worktree of pull request `number` (proposing `branch`, at `sha`), making it
+    /// first when there is none.
+    pub(in crate::repo) fn open_pr_worktree(
+        &mut self,
+        number: u64,
+        branch: &str,
+        sha: &str,
+        ctx: &egui::Context,
+    ) {
+        match self.pr_worktree_plan(number, branch, sha) {
+            PrWorktree::Here => {
+                self.status = Some((format!("#{number}'s branch is checked out here"), false));
+            }
+            PrWorktree::Open(path) => {
+                self.open_request = Some(crate::repo::OpenRequest::Worktree(path));
+            }
+            PrWorktree::Create { ops, path } => {
+                if self.busy_op.is_some() {
+                    return;
+                }
+                let label = format!("Open #{number} in a worktree");
+                self.open_when_done = Some((label.clone(), path));
+                self.run_ops(
+                    &label,
+                    ops,
+                    crate::repo::Refresh::All,
+                    crate::repo::OpKind::plain(),
+                    ctx,
+                );
+            }
+        }
+    }
+
+    /// How to get to the worktree of pull request `number`, proposing `branch` at `sha`: its
+    /// branch where it is checked out, or a new worktree on it. The branch is the local one of
+    /// that name, made from the remote branch when there is only that. A pull request from a
+    /// fork that isn't a remote here is fetched from the forge into a branch of its own (named
+    /// `pr-N` when one of the name is already another).
+    fn pr_worktree_plan(&self, number: u64, branch: &str, sha: &str) -> PrWorktree {
+        let local = self.refs.local.iter().find(|b| b.name == branch);
+        let remote = self.remote_branch_of(branch, sha);
+        let mut fetch = None;
+        let name = if remote.is_some() || local.is_some_and(|b| sha.is_empty() || b.target == sha) {
+            branch.to_owned()
+        } else {
+            let name = if local.is_some() {
+                format!("pr-{number}")
+            } else {
+                branch.to_owned()
+            };
+            let pull_ref = match self.forge() {
+                Some(Forge::GitLab) => format!("refs/merge-requests/{number}/head"),
+                _ => format!("refs/pull/{number}/head"),
+            };
+            let from = self.default_remote().unwrap_or_else(|| "origin".to_owned());
+            fetch = Some(vec![
+                "fetch".to_owned(),
+                from,
+                format!("+{pull_ref}:refs/heads/{name}"),
+            ]);
+            name
+        };
+        if let Some(wt) = self
+            .worktrees
+            .iter()
+            .find(|w| w.branch.as_deref() == Some(name.as_str()))
+        {
+            return if wt.current {
+                PrWorktree::Here
+            } else {
+                PrWorktree::Open(wt.path.clone())
+            };
+        }
+        let path = self.free_folder(&self.worktree_folder(&name));
+        // As git of the repository's machine names it.
+        let path_arg = crate::remote::git_path(&path);
+        let add: Vec<String> = match (fetch.is_some(), local.is_some(), remote) {
+            (false, false, Some(remote)) => vec![
+                "worktree".into(),
+                "add".into(),
+                "--track".into(),
+                "-b".into(),
+                name.clone(),
+                path_arg,
+                remote.name.clone(),
+            ],
+            _ => vec!["worktree".into(), "add".into(), path_arg, name.clone()],
+        };
+        PrWorktree::Create {
+            ops: fetch.into_iter().chain([add]).collect(),
+            path,
+        }
+    }
+
+    /// The folder a worktree on `branch` goes in, beside the main one: `app` + `feature/x` →
+    /// `app-feature-x`, as the dialog that adds one suggests.
+    /// For a repository on another machine, a folder of that machine.
+    fn worktree_folder(&self, branch: &str) -> PathBuf {
+        let main = self.main_worktree().unwrap_or(&self.path);
+        let suffix = branch.replace(['/', '\\', ' '], "-");
+        if let Some(target) = crate::remote::parse(main) {
+            let parent = crate::remote::parent_there(&target.path);
+            let repo_name = target.path[parent.len()..].trim_start_matches('/');
+            let repo_name = if repo_name.is_empty() {
+                "worktree"
+            } else {
+                repo_name
+            };
+            let there = format!("{}/{repo_name}-{suffix}", parent.trim_end_matches('/'));
+            return crate::remote::encode(&target.host, &there);
+        }
+        let repo_name = main
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "worktree".to_owned());
+        let parent = main.parent().unwrap_or(main);
+        parent.join(format!("{repo_name}-{suffix}"))
+    }
+
+    /// `path`, or `path-2`, `path-3`… when there is something there already. On another
+    /// machine, only the worktrees known here count: asking it would hold up the window, and
+    /// git refuses a folder that isn't empty anyway.
+    fn free_folder(&self, path: &Path) -> PathBuf {
+        let taken = |p: &Path| {
+            if crate::remote::is_remote(p) {
+                self.worktrees.iter().any(|w| w.path == p)
+            } else {
+                p.exists()
+            }
+        };
+        if !taken(path) {
+            return path.to_path_buf();
+        }
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        (2..1000)
+            .map(|i| path.with_file_name(format!("{name}-{i}")))
+            .find(|p| !taken(p))
+            .unwrap_or_else(|| path.to_path_buf())
+    }
+}
+
+/// How to get to a pull request's worktree.
+#[derive(Debug, PartialEq, Eq)]
+enum PrWorktree {
+    /// Its branch is checked out in the worktree shown.
+    Here,
+    Open(PathBuf),
+    /// Run `ops` (which add the worktree), then open `path`.
+    Create {
+        ops: Vec<Vec<String>>,
+        path: PathBuf,
+    },
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::git::Remote;
+    use crate::git::{self, Remote};
 
     fn branch(name: &str, target: &str) -> Branch {
         Branch {
@@ -238,5 +456,140 @@ mod tests {
         assert_eq!(name(&pr("main", "fm")).as_deref(), Some("fork/main"));
         assert_eq!(name(&pr("main", "x")).as_deref(), Some("origin/main"));
         assert_eq!(name(&pr("gone", "x")), None);
+    }
+
+    fn worktree(path: &str, branch: &str, current: bool) -> git::Worktree {
+        git::Worktree {
+            path: path.into(),
+            branch: Some(branch.to_owned()),
+            current,
+            main: path == "/r/app",
+            ..git::Worktree::default()
+        }
+    }
+
+    fn strings(args: &[&str]) -> Vec<String> {
+        args.iter().map(|a| (*a).to_owned()).collect()
+    }
+
+    /// On another machine, the worktree goes beside the repository there, named to git as a
+    /// path of that machine, and nothing is asked of it to pick the folder.
+    #[test]
+    fn a_pull_request_on_another_machine_gets_a_worktree_there() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("ssh://build/home/me/app".into(), &ctx);
+        tab.refs.local = vec![branch("main", "m"), branch("feat", "f")];
+        tab.worktrees = vec![
+            worktree("ssh://build/home/me/app", "main", true),
+            worktree("ssh://build/home/me/app-feat", "other", false),
+        ];
+        assert_eq!(
+            tab.pr_worktree_plan(3, "feat", "f"),
+            PrWorktree::Create {
+                ops: vec![strings(&["worktree", "add", "/home/me/app-feat-2", "feat"])],
+                path: PathBuf::from("ssh://build/home/me/app-feat-2"),
+            }
+        );
+    }
+
+    #[test]
+    fn a_pull_request_opens_in_its_worktree_made_when_needed() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/r/app".into(), &ctx);
+        let hosting = |forge| crate::forge::Hosting {
+            forge,
+            host: "example.org".to_owned(),
+            path: "team/app".to_owned(),
+            web: "https://example.org".to_owned(),
+        };
+        tab.hosting = Some(hosting(Forge::GitHub));
+        tab.remotes = vec![Remote {
+            name: "origin".to_owned(),
+            url: String::new(),
+        }];
+        tab.refs.local = vec![
+            branch("main", "m"),
+            branch("mine", "x"),
+            branch("feat", "f"),
+        ];
+        tab.refs.remotes = vec![(
+            "origin".to_owned(),
+            vec![branch("origin/main", "m"), branch("origin/feat", "f2")],
+        )];
+        tab.worktrees = vec![
+            worktree("/nonexistent/r/app", "main", true),
+            worktree("/nonexistent/r/app-mine", "mine", false),
+        ];
+        let folder = |name: &str| PathBuf::from(format!("/nonexistent/r/app-{name}"));
+        // Checked out here, or in another worktree.
+        assert_eq!(tab.pr_worktree_plan(1, "main", "m"), PrWorktree::Here);
+        assert_eq!(
+            tab.pr_worktree_plan(2, "mine", "x"),
+            PrWorktree::Open(folder("mine"))
+        );
+        // A local branch: a worktree on it.
+        assert_eq!(
+            tab.pr_worktree_plan(3, "feat", "f2"),
+            PrWorktree::Create {
+                ops: vec![strings(&[
+                    "worktree",
+                    "add",
+                    "/nonexistent/r/app-feat",
+                    "feat"
+                ])],
+                path: folder("feat"),
+            }
+        );
+        // Only on the remote: a local branch tracking it, made with the worktree.
+        tab.refs.remotes[0].1.push(branch("origin/fix/x", "fx"));
+        assert_eq!(
+            tab.pr_worktree_plan(4, "fix/x", "fx"),
+            PrWorktree::Create {
+                ops: vec![strings(&[
+                    "worktree",
+                    "add",
+                    "--track",
+                    "-b",
+                    "fix/x",
+                    "/nonexistent/r/app-fix-x",
+                    "origin/fix/x",
+                ])],
+                path: folder("fix-x"),
+            }
+        );
+        // From a fork that isn't a remote: fetched from the pull request's ref, into a branch of
+        // its own when a local one has its name.
+        assert_eq!(
+            tab.pr_worktree_plan(5, "topic", "t"),
+            PrWorktree::Create {
+                ops: vec![
+                    strings(&["fetch", "origin", "+refs/pull/5/head:refs/heads/topic"]),
+                    strings(&["worktree", "add", "/nonexistent/r/app-topic", "topic"]),
+                ],
+                path: folder("topic"),
+            }
+        );
+        tab.refs.remotes[0].1.retain(|b| b.name != "origin/main");
+        assert_eq!(
+            tab.pr_worktree_plan(6, "main", "fork-main"),
+            PrWorktree::Create {
+                ops: vec![
+                    strings(&["fetch", "origin", "+refs/pull/6/head:refs/heads/pr-6"]),
+                    strings(&["worktree", "add", "/nonexistent/r/app-pr-6", "pr-6"]),
+                ],
+                path: folder("pr-6"),
+            }
+        );
+        // Forgejo and Gitea keep them where GitHub does; GitLab, under its own name.
+        tab.hosting = Some(hosting(Forge::Forgejo));
+        assert!(matches!(
+            tab.pr_worktree_plan(7, "topic", "t"),
+            PrWorktree::Create { ops, .. } if ops[0][2] == "+refs/pull/7/head:refs/heads/topic"
+        ));
+        tab.hosting = Some(hosting(Forge::GitLab));
+        assert!(matches!(
+            tab.pr_worktree_plan(7, "topic", "t"),
+            PrWorktree::Create { ops, .. } if ops[0][2] == "+refs/merge-requests/7/head:refs/heads/topic"
+        ));
     }
 }

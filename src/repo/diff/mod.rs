@@ -10,6 +10,7 @@ mod map;
 mod paint;
 mod parse;
 mod patch;
+pub(super) mod rendered;
 mod rows;
 mod select;
 #[cfg(test)]
