@@ -99,13 +99,16 @@ so your config, credentials and hooks apply as usual.
   between the two. The right pane says how many commits each side has that the other hasn't.
 - What a merge resolved: on a merge commit, _What this merge resolved_ lists only what differs
   between the merge git would have made of its parents and the one recorded
-  (`git show --remerge-diff`): the conflicts resolved, then anything edited beyond the merge
-  (an "evil" merge). Each opens in the diff view, git's conflict message on top and every hunk
-  marked _resolves a conflict_ or _edited beyond the merge_; a clean, unedited merge says so.
-  Merge rows of the graph that resolved something carry a _resolved_ (or _edited_) badge, read
-  in the background for the rows on screen only; a click shows what it resolved. Needs git 2.36
-  or newer where the repository is (otherwise the box is greyed out and says why); git doesn't
-  redo octopus merges, which the box says too.
+  (`git show --remerge-diff`): the conflicts resolved, then anything changed beyond that, by
+  hand (an "evil" merge) or by a merge made with other options or an older git. Each opens in
+  the diff view, git's conflict message on top and every hunk marked _resolves a conflict_ or
+  _edited beyond the merge_; a clean, unedited merge says so. Merge rows of the graph that
+  resolved something carry a _resolved_ / _edited_ badge, read in the background for the rows
+  on screen only, a few at a time (not in a repository with merge drivers of its own, which
+  redoing a merge would run); a click shows what it resolved. Needs git 2.36 or newer where
+  the repository is (otherwise the box is greyed out and says why); git doesn't redo octopus
+  merges, which the box says too. Redoing a merge writes temporary objects in `.git/objects`,
+  so it can't be done in a repository that is read-only for you.
 - Patches: _Create patch from commit…_ saves a commit as a file (`git format-patch`). _Apply
   patch…_ (the latest commit's menu, the changes row's menu or the palette) turns one from
   `git format-patch` into commits (`git am`) and puts any other diff on the working tree

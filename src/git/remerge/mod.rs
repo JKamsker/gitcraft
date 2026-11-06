@@ -9,7 +9,7 @@ mod tests;
 use std::path::Path;
 
 pub use self::parse::{is_conflict_marker, parse_git_version, parse_remerge};
-use super::{END_OPTS, LITERAL_PATHS, NO_SIGNATURE, run};
+use super::{DiffOptions, END_OPTS, LITERAL_PATHS, NO_SIGNATURE, run};
 
 /// The first git that can show a remerge diff.
 pub const REMERGE_MIN_GIT: (u32, u32) = (2, 36);
@@ -25,17 +25,40 @@ pub struct RemergeFile {
     /// Lines the recorded merge has that git's own doesn't, and the other way round.
     pub added: u32,
     pub removed: u32,
-    /// What git said of the conflicts it met in this file (`CONFLICT (content): …`).
+    /// What git said of the conflicts it met in this file (`CONFLICT (content): …`), or of a
+    /// conflict over several paths that names it.
     pub conflicts: Vec<String>,
-    /// Some removed lines are conflict markers git left: a conflict was resolved here.
-    pub resolves_markers: bool,
+    /// Hunks that resolve a conflict (see [`hunk_resolves`]).
+    pub resolving_hunks: u32,
+    /// Hunks that change what git merged without a conflict.
+    pub edited_hunks: u32,
 }
 
 impl RemergeFile {
-    /// git met a conflict in this file (rather than it being edited beyond the merge).
+    /// git met a conflict in this file.
     pub fn conflicted(&self) -> bool {
-        !self.conflicts.is_empty() || self.resolves_markers
+        !self.conflicts.is_empty()
     }
+
+    /// Something in it was changed beyond what the merge needed: it had no conflict, or one of
+    /// its hunks is away from the conflicts.
+    pub fn edited(&self) -> bool {
+        !self.conflicted() || self.edited_hunks > 0
+    }
+}
+
+/// Whether a hunk of a file of which git said `conflicts` resolves one of them rather than
+/// editing beyond the merge: it takes away conflict markers (`marked`); or the conflict isn't
+/// one of lines (modify/delete, rename, binary, submodule…), so any change resolves it; or no
+/// hunk of the file has markers (`any_marked`: a link, a driver that writes none), so the
+/// conflict was resolved somewhere among them.
+pub fn hunk_resolves(conflicts: &[String], marked: bool, any_marked: bool) -> bool {
+    !conflicts.is_empty()
+        && (marked
+            || !any_marked
+            || conflicts
+                .iter()
+                .any(|c| !c.starts_with("CONFLICT (content)")))
 }
 
 /// The remerge diff of one merge commit.
@@ -55,9 +78,10 @@ impl Remerge {
         self.files.iter().filter(|f| f.conflicted())
     }
 
-    /// Files edited beyond what the merge needed (an "evil" merge).
+    /// Files with changes beyond what the merge needed (by hand, or a merge made with other
+    /// options or another git than today's); a conflicted file can be one too.
     pub fn edited(&self) -> impl Iterator<Item = &RemergeFile> {
-        self.files.iter().filter(|f| !f.conflicted())
+        self.files.iter().filter(|f| f.edited())
     }
 }
 
@@ -109,11 +133,15 @@ pub fn remerge_file_diff(
     hash: &str,
     path: &str,
     old_path: Option<&str>,
-    ignore_ws: bool,
+    opts: DiffOptions,
 ) -> Result<String, String> {
     let mut args = remerge_args();
-    if ignore_ws {
+    if opts.ignore_ws {
         args.push("-w");
+    }
+    if opts.whole_file {
+        // More context than any file has lines: each file as one hunk.
+        args.push("--unified=999999999");
     }
     args.extend([END_OPTS, hash, "--", path]);
     args.extend(old_path.filter(|old| *old != path));
@@ -125,6 +153,16 @@ pub fn remerge_file_diff(
 pub fn remerge_support(repo: &Path) -> Result<(), String> {
     let version = run(Some(repo), &["--version"])?;
     supports_remerge(version.trim())
+}
+
+/// Whether `repo` has merge drivers of its own configured (`merge.<name>.driver`): git runs
+/// them when it redoes a merge, so merges aren't redone unasked there.
+pub fn has_merge_drivers(repo: &Path) -> bool {
+    run(
+        Some(repo),
+        &["config", "--get-regexp", r"^merge\..*\.driver$"],
+    )
+    .is_ok_and(|out| !out.trim().is_empty())
 }
 
 /// Whether the git that printed `version` (`git --version`) can show remerge diffs.
@@ -142,11 +180,26 @@ pub fn supports_remerge(version: &str) -> Result<(), String> {
 }
 
 /// An error of `git show --remerge-diff` as the user should read it.
-fn explain(repo: &Path, err: &str) -> String {
+pub(super) fn explain(repo: &Path, err: &str) -> String {
     if err.contains("remerge-diff") && (err.contains("unrecognized") || err.contains("unknown")) {
         return remerge_support(repo)
             .err()
             .unwrap_or_else(|| format!("This git can't show what a merge resolved: {err}"));
+    }
+    if err.contains("temporary object directory") {
+        return "Could not redo the merge: git writes its objects to a temporary folder in the \
+                repository's .git/objects to do so, and can't write there (it is read-only for \
+                you)"
+            .to_owned();
+    }
+    if ["bad object", "unable to read", "missing", "could not read"]
+        .iter()
+        .any(|s| err.contains(s))
+    {
+        return format!(
+            "Could not redo the merge: a parent (or a file of one) isn't in this clone; \
+             fetching more history may bring it ({err})"
+        );
     }
     format!("Could not redo the merge to compare it: {err}")
 }

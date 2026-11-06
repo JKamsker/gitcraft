@@ -29,6 +29,9 @@ pub(in crate::repo) struct Remerges {
     /// Whether this repository's git can redo merges, once asked; if not, why.
     support: Option<Result<(), String>>,
     checking: bool,
+    /// The repository has merge drivers of its own, which redoing a merge runs: merges are
+    /// then redone only when asked, not for the graph's badges.
+    drivers: bool,
     /// What each merge read resolved, by its hash.
     found: HashMap<String, Result<Arc<Remerge>, String>>,
     /// Merges being read.
@@ -55,7 +58,7 @@ impl Remerges {
 
     /// The merges among `wanted` to read next for the graph's badges, now marked as asked.
     fn next_batch(&mut self, wanted: &[String]) -> Vec<String> {
-        if self.batch_running || !self.supported() {
+        if self.batch_running || !self.supported() || self.drivers {
             return Vec::new();
         }
         let batch: Vec<String> = wanted
@@ -67,6 +70,15 @@ impl Remerges {
         self.asked.extend(batch.iter().cloned());
         self.batch_running = !batch.is_empty();
         batch
+    }
+
+    /// Forgets what couldn't be read (the machine wasn't reached, the history was short…), to
+    /// read it again: on a reload of the repository.
+    pub(in crate::repo) fn forget_failures(&mut self) {
+        self.found.retain(|_, found| found.is_ok());
+        if matches!(self.support, Some(Err(_))) && !self.checking {
+            self.support = None;
+        }
     }
 
     /// Takes in what merge `hash` resolved.
@@ -89,10 +101,16 @@ impl RepoTab {
         let repo = self.path.clone();
         self.then(
             ctx,
-            move || git::remerge_support(&repo),
-            |tab, support, _| {
+            move || {
+                guarded(|| {
+                    git::remerge_support(&repo)?;
+                    Ok(git::has_merge_drivers(&repo))
+                })
+            },
+            |tab, found, _| {
                 tab.remerges.checking = false;
-                tab.remerges.support = Some(support);
+                tab.remerges.drivers = found.as_ref().is_ok_and(|drivers| *drivers);
+                tab.remerges.support = Some(found.map(|_| ()));
             },
         );
     }
@@ -109,7 +127,7 @@ impl RepoTab {
         self.then(
             ctx,
             move || {
-                let result = git::remerge(&repo, &hash);
+                let result = guarded(|| git::remerge(&repo, &hash));
                 (hash, result)
             },
             |tab, (hash, result), _| tab.remerges.arrived(hash, result),
@@ -134,7 +152,7 @@ impl RepoTab {
                 batch
                     .into_iter()
                     .map(|hash| {
-                        let result = git::remerge(&repo, &hash);
+                        let result = guarded(|| git::remerge(&repo, &hash));
                         (hash, result)
                     })
                     .collect::<Vec<_>>()
@@ -147,4 +165,11 @@ impl RepoTab {
             },
         );
     }
+}
+
+/// `work`'s answer, or an error should it panic: what waits for it (the batch running, the
+/// merge asked) is let go of either way.
+fn guarded<T>(work: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(work))
+        .unwrap_or_else(|_| Err("Internal error while redoing the merge".to_owned()))
 }
