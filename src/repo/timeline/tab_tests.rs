@@ -12,7 +12,7 @@ use crate::repo::actions::{BranchRef, rebase_action};
 use crate::repo::{Action, RepoTab};
 
 /// A repository with one commit, in a folder with spaces and accents in its name.
-fn repo(name: &str) -> PathBuf {
+pub(super) fn repo(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("gitcraft tl ü {name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::create_dir_all(&dir);
@@ -31,14 +31,18 @@ fn repo(name: &str) -> PathBuf {
     dir
 }
 
-fn git_ok(dir: &Path, args: &[&str]) -> String {
+pub(super) fn git_ok(dir: &Path, args: &[&str]) -> String {
     let out = git::run(Some(dir), args);
     assert!(out.is_ok(), "{args:?}: {out:?}");
     out.unwrap_or_default().trim().to_owned()
 }
 
 /// Polls the tab until `done` holds (or ten seconds went by); says whether it did.
-fn wait(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&RepoTab) -> bool) -> bool {
+pub(super) fn wait(
+    tab: &mut RepoTab,
+    ctx: &egui::Context,
+    done: impl Fn(&RepoTab) -> bool,
+) -> bool {
     let start = Instant::now();
     while start.elapsed() < Duration::from_secs(10) {
         tab.poll(ctx);
@@ -51,7 +55,7 @@ fn wait(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&RepoTab) -> bool)
 }
 
 /// Settled: read, nothing running, the timeline in and not waiting for a read.
-fn settled(tab: &RepoTab) -> bool {
+pub(super) fn settled(tab: &RepoTab) -> bool {
     !tab.loading
         && tab.busy_op.is_none()
         && tab.history_gen > 0
@@ -59,19 +63,19 @@ fn settled(tab: &RepoTab) -> bool {
         && tab.timeline.awaiting == super::Awaiting::Nothing
 }
 
-fn open(dir: &Path, ctx: &egui::Context) -> RepoTab {
+pub(super) fn open(dir: &Path, ctx: &egui::Context) -> RepoTab {
     let mut tab = RepoTab::new(dir.to_owned(), ctx);
     assert!(wait(&mut tab, ctx, settled), "the tab never settled");
     tab
 }
 
 /// Runs `action` as the UI would, and waits for the read after it.
-fn act(tab: &mut RepoTab, ctx: &egui::Context, action: Action) {
+pub(super) fn act(tab: &mut RepoTab, ctx: &egui::Context, action: Action) {
     tab.apply(action, ctx);
     assert!(wait(tab, ctx, settled), "{:?}", tab.status);
 }
 
-fn commit(tab: &mut RepoTab, ctx: &egui::Context, file: &str, summary: &str) -> String {
+pub(super) fn commit(tab: &mut RepoTab, ctx: &egui::Context, file: &str, summary: &str) -> String {
     let _ = std::fs::write(tab.path.join(file), format!("{summary}\n"));
     tab.commit_summary = summary.to_owned();
     act(tab, ctx, Action::Commit);
@@ -405,7 +409,9 @@ fn back_to_back_operations_are_both_kept() {
     let _ = std::fs::write(dir.join("b.txt"), "b");
     tab.commit_summary = "second".to_owned();
     tab.apply(Action::Commit, &ctx);
+    let second_ran = tab.busy_op.is_some();
     assert!(wait(&mut tab, &ctx, settled));
+    let status = tab.status.clone();
     let labels: Vec<String> = tab
         .timeline
         .entries
@@ -417,7 +423,8 @@ fn back_to_back_operations_are_both_kept() {
     });
     let path = tab.timeline.path_to(tab.timeline.current);
     let _ = std::fs::remove_dir_all(&dir);
-    assert_eq!(labels.len(), 2, "{labels:?}");
+    assert!(second_ran, "{status:?}");
+    assert_eq!(labels.len(), 2, "{labels:?} {status:?} {refused:?}");
     assert!(named);
     assert_eq!(path.len(), 2);
     if let Some(status) = refused {

@@ -35,6 +35,15 @@ pub(crate) enum TimelineAct {
     CancelForget,
     /// Forget all but the newest entries (all with 0).
     Forget(usize),
+    /// Work out what removing an entry (only commits) takes out and plays again.
+    AskRemove(u64),
+    /// The new branch's name, as typed.
+    RemoveName(String),
+    /// Play the later commits again on the new branch.
+    RunRemove,
+    /// Throw away an attempt that stopped on a conflict.
+    DiscardRemove,
+    CloseRemove,
 }
 
 /// The view's own state.
@@ -46,6 +55,8 @@ pub(crate) struct TimelineView {
     pub(crate) confirm: Option<Option<u64>>,
     /// Forgetting asked for (how many to keep), waiting to be confirmed.
     pub(crate) forget: Option<usize>,
+    /// Removing an entry while keeping later work, under way.
+    pub(crate) remove: Option<super::remove_tab::RemoveState>,
 }
 
 impl RepoTab {
@@ -73,6 +84,7 @@ impl RepoTab {
             selected: None,
             confirm: None,
             forget: None,
+            remove: None,
         });
     }
 
@@ -95,6 +107,11 @@ impl RepoTab {
             TimelineAct::BranchAt { branch, commit } => {
                 self.branch_at_old_tip(&branch, &commit, ctx);
             }
+            TimelineAct::AskRemove(id) => self.ask_remove(id, ctx),
+            TimelineAct::RemoveName(name) => self.set_remove_name(name),
+            TimelineAct::RunRemove => self.run_remove(ctx),
+            TimelineAct::DiscardRemove => self.discard_remove(ctx),
+            TimelineAct::CloseRemove => view.remove = None,
             TimelineAct::AskForget(keep) => view.forget = Some(keep),
             TimelineAct::CancelForget => view.forget = None,
             TimelineAct::Forget(keep) => {
@@ -405,6 +422,8 @@ impl RepoTab {
         self.jump_controls(ui, Some(entry.id), idle, confirm, acts);
         ui.add_space(14.0);
         self.changed_refs(ui, entry, idle, acts);
+        ui.add_space(14.0);
+        self.remove_section(ui, entry, idle, acts);
         ui.add_space(14.0);
         changed_files(ui, entry);
     }

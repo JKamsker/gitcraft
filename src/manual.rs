@@ -66,6 +66,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Undo a few steps and do something new: the steps undone stay, as a side path of the tree. Pick any entry and Go here (or double-click it) to put the branches back as it left them; changes in files are kept (staged ones end up unstaged).",
             "An entry's old branch tips come back with Put … back, or as a new branch with New branch there, even after git gc: they are kept under refs/gitcraft/undo/.",
             "Forget… drops older entries, after asking; past the newest 300 they go by themselves.",
+            "Remove this, keep later work: on an entry that only made commits on a branch (commits, a merge, cherry-picks), plays the commits made on it since again without it, on a new branch in a worktree beside the repository; the branch itself stays. A commit that no longer applies stops it there, its conflicted files listed: resolve them in that worktree, or discard the attempt.",
         ],
     ),
     (
