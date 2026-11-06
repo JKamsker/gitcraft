@@ -15,6 +15,17 @@ pub struct Notebook {
     pub metadata: String,
 }
 
+impl Notebook {
+    /// As the strip filter stages it: code cells without outputs or execution counts.
+    pub fn stripped(mut self) -> Self {
+        for c in self.cells.iter_mut().filter(|c| c.kind == CellKind::Code) {
+            c.outputs.clear();
+            c.execution_count = None;
+        }
+        self
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CellKind {
     Code,
@@ -51,16 +62,22 @@ pub enum Output {
     Stream { name: String, text: String },
     /// A result or display shown as text (`text/plain`, or what an HTML or LaTeX one says).
     Text(String),
-    /// A picture (`image/png`, `image/jpeg`), decoded from base64.
-    Image { mime: String, bytes: Arc<[u8]> },
+    /// A picture (`image/png`, `image/jpeg`), decoded from base64, and the URI it is shown
+    /// under (by its contents: egui keeps an image by its URI).
+    Image {
+        mime: String,
+        bytes: Arc<[u8]>,
+        uri: String,
+    },
     /// An exception: its name, value and traceback (terminal colours taken out).
     Error {
         name: String,
         value: String,
         traceback: String,
     },
-    /// Something with none of the above: its kinds.
-    Other(Vec<String>),
+    /// Something with none of the above: its kinds, and a hash of what it holds (so that a
+    /// change of it counts).
+    Other(Vec<String>, u64),
 }
 
 /// The text of a source or output field: a string, or a list of strings to join.
@@ -131,7 +148,7 @@ fn output(v: &Value) -> Output {
                 .and_then(Value::as_str)
                 .unwrap_or("stdout")
                 .to_owned(),
-            text: v.get("text").map(text).unwrap_or_default(),
+            text: cut(v.get("text").map(text).unwrap_or_default()),
         },
         Some("error") => Output::Error {
             name: v
@@ -160,16 +177,43 @@ fn output(v: &Value) -> Output {
     }
 }
 
-/// A result's richest kind gitcraft shows: a picture, else its plain text.
+/// The most lines of an output's text kept; the rest is said to be left out.
+const MAX_OUTPUT_LINES: usize = 200;
+
+/// `text` cut to [`MAX_OUTPUT_LINES`].
+fn cut(text: String) -> String {
+    match text
+        .match_indices('\n')
+        .nth(MAX_OUTPUT_LINES.saturating_sub(1))
+    {
+        Some((at, _)) => {
+            let more = text[at..].lines().count().saturating_sub(1);
+            format!("{}\n… {more} more lines", &text[..at])
+        }
+        None => text,
+    }
+}
+
+fn hash_of(v: &impl std::hash::Hash) -> u64 {
+    use std::hash::Hasher;
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    v.hash(&mut h);
+    h.finish()
+}
+
+/// A result's richest kind gitcraft shows: a picture, else its plain text, else the source of
+/// its HTML, Markdown, LaTeX or SVG.
 fn data(d: Option<&Value>) -> Output {
     let Some(Value::Object(d)) = d else {
-        return Output::Other(Vec::new());
+        return Output::Other(Vec::new(), 0);
     };
     for mime in ["image/png", "image/jpeg", "image/gif"] {
         if let Some(b64) = d.get(mime) {
             let encoded: String = text(b64).chars().filter(|c| !c.is_whitespace()).collect();
             if let Ok(bytes) = BASE64.decode(encoded) {
+                let ext = mime.rsplit('/').next().unwrap_or("png");
                 return Output::Image {
+                    uri: format!("bytes://notebook/{:016x}.{ext}", hash_of(&bytes)),
                     mime: mime.to_owned(),
                     bytes: Arc::from(bytes.into_boxed_slice()),
                 };
@@ -177,12 +221,17 @@ fn data(d: Option<&Value>) -> Output {
         }
     }
     if let Some(t) = d.get("text/plain") {
-        return Output::Text(text(t));
+        return Output::Text(cut(text(t)));
     }
-    if let Some(t) = d.get("text/markdown").or_else(|| d.get("text/latex")) {
-        return Output::Text(text(t));
+    for mime in ["text/markdown", "text/latex", "text/html", "image/svg+xml"] {
+        if let Some(t) = d.get(mime) {
+            return Output::Text(cut(text(t)));
+        }
     }
-    Output::Other(d.keys().cloned().collect())
+    Output::Other(
+        d.keys().cloned().collect(),
+        hash_of(&serde_json::to_string(d).unwrap_or_default()),
+    )
 }
 
 /// Text without terminal colour codes (`ESC [ … m`).
@@ -262,7 +311,7 @@ pub(crate) mod tests {
         );
         assert_eq!(o[1], Output::Text("42".into()));
         assert!(
-            matches!(&o[2], Output::Image { mime, bytes } if mime == "image/png" && bytes.starts_with(b"\x89PNG"))
+            matches!(&o[2], Output::Image { mime, bytes, uri } if mime == "image/png" && bytes.starts_with(b"\x89PNG") && uri.ends_with(".png"))
         );
         assert_eq!(
             o[3],
@@ -272,9 +321,32 @@ pub(crate) mod tests {
                 traceback: "ValueError: bad".into()
             }
         );
-        assert_eq!(o[4], Output::Other(vec!["application/vnd.widget".into()]));
+        assert!(
+            matches!(&o[4], Output::Other(kinds, _) if kinds == &["application/vnd.widget".to_owned()])
+        );
         assert!(nb.metadata.contains("kernelspec"));
         Ok(())
+    }
+
+    #[test]
+    fn long_outputs_cut_and_html_shown() {
+        let long: String = (0..500).map(|i| format!("line {i}\n")).collect();
+        let out = cut(long);
+        assert_eq!(out.lines().count(), 201);
+        assert!(
+            out.ends_with("… 300 more lines"),
+            "{}",
+            &out[out.len() - 30..]
+        );
+        let html = serde_json::json!({"text/html": ["<b>hi</b>"]});
+        assert_eq!(data(Some(&html)), Output::Text("<b>hi</b>".into()));
+        let a = serde_json::json!({"application/json": {"x": 1}});
+        let b = serde_json::json!({"application/json": {"x": 2}});
+        assert_ne!(
+            data(Some(&a)),
+            data(Some(&b)),
+            "a change of what it holds counts"
+        );
     }
 
     #[test]

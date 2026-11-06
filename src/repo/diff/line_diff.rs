@@ -9,9 +9,9 @@ pub enum Edit {
     Add,
 }
 
-/// How many trace entries the search may keep (each edit keeps a row as long as both texts):
-/// past that the texts are too unlike to diff line by line, and everything before is removed
-/// and everything after added.
+/// How many trace entries the search may keep (the d-th edit keeps 2d + 1): past that the
+/// texts are too unlike to diff line by line, and everything before is removed and everything
+/// after added.
 const TRACE_BUDGET: usize = 20_000_000;
 
 /// The lines of `old` and `new` as a diff: each with what it is, and its index in its text.
@@ -37,7 +37,9 @@ pub fn diff_lines<'a>(old: &[&'a str], new: &[&'a str]) -> Vec<(Edit, &'a str)> 
     out
 }
 
-/// Myers' shortest edit script, or `None` past [`TRACE_BUDGET`].
+/// Myers' shortest edit script, or `None` past [`TRACE_BUDGET`]. Each step keeps only the
+/// diagonals it reached (`2d + 1` of them), so the memory grows with the edits squared, not
+/// with the texts' length.
 fn myers<'a>(a: &[&'a str], b: &[&'a str]) -> Option<Vec<(Edit, &'a str)>> {
     let (n, m) = (a.len(), b.len());
     let max = n + m;
@@ -46,15 +48,19 @@ fn myers<'a>(a: &[&'a str], b: &[&'a str]) -> Option<Vec<(Edit, &'a str)>> {
     }
     let offset = max as isize;
     let mut v = vec![0usize; 2 * max + 2];
+    // Step d: the furthest x on diagonals -d..=d, as they were before it.
     let mut trace: Vec<Vec<usize>> = Vec::new();
-    let limit = max.min(TRACE_BUDGET / (2 * max + 2));
-    let mut found = None;
-    'outer: for d in 0..=limit {
-        trace.push(v.clone());
-        let d = d as isize;
+    let mut kept = 0usize;
+    let at = |k: isize| (k + offset) as usize;
+    let mut found = false;
+    'outer: for d in 0..=max as isize {
+        kept += (2 * d + 1) as usize;
+        if kept > TRACE_BUDGET {
+            return None;
+        }
+        trace.push(v[at(-d)..=at(d)].to_vec());
         let mut k = -d;
         while k <= d {
-            let at = |k: isize| (k + offset) as usize;
             let mut x = if k == -d || (k != d && v[at(k - 1)] < v[at(k + 1)]) {
                 v[at(k + 1)]
             } else {
@@ -67,26 +73,29 @@ fn myers<'a>(a: &[&'a str], b: &[&'a str]) -> Option<Vec<(Edit, &'a str)>> {
             }
             v[at(k)] = x;
             if x >= n && y >= m {
-                found = Some(d as usize);
+                found = true;
                 break 'outer;
             }
             k += 2;
         }
     }
-    found?;
+    if !found {
+        return None;
+    }
     // Back through the trace, from the end to the start.
     let mut script = Vec::with_capacity(max);
     let (mut x, mut y) = (n as isize, m as isize);
-    for (d, v) in trace.iter().enumerate().rev() {
+    for (d, row) in trace.iter().enumerate().rev() {
         let d = d as isize;
+        // `row` holds diagonals -d..=d.
+        let get = |k: isize| row[(k + d) as usize];
         let k = x - y;
-        let at = |k: isize| (k + offset) as usize;
-        let prev_k = if k == -d || (k != d && v[at(k - 1)] < v[at(k + 1)]) {
+        let prev_k = if k == -d || (k != d && get(k - 1) < get(k + 1)) {
             k + 1
         } else {
             k - 1
         };
-        let prev_x = v[at(prev_k)] as isize;
+        let prev_x = if d == 0 { 0 } else { get(prev_k) as isize };
         let prev_y = prev_x - prev_k;
         while x > prev_x && y > prev_y {
             x -= 1;
@@ -135,6 +144,27 @@ mod tests {
         assert_eq!(show("", ""), "");
         assert_eq!(show("a\nb", "a\nb"), " a\n b");
         assert_eq!(show("ä\nb\nc\nd", "b\nc\nd\nü"), "-ä\n b\n c\n d\n+ü");
+    }
+
+    #[test]
+    fn many_edits_still_diff() {
+        // Every other of 3000 lines changed: 3000 edits, within the budget.
+        let old: Vec<String> = (0..3000).map(|i| format!("l{i}")).collect();
+        let new: Vec<String> = (0..3000)
+            .map(|i| {
+                if i % 2 == 0 {
+                    format!("l{i}")
+                } else {
+                    format!("x{i}")
+                }
+            })
+            .collect();
+        let (a, b): (Vec<&str>, Vec<&str>) = (
+            old.iter().map(String::as_str).collect(),
+            new.iter().map(String::as_str).collect(),
+        );
+        let d = diff_lines(&a, &b);
+        assert_eq!(d.iter().filter(|(e, _)| *e == Edit::Same).count(), 1500);
     }
 
     #[test]
