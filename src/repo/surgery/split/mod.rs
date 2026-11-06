@@ -30,7 +30,7 @@ pub(crate) struct Group {
 
 impl Group {
     fn message(&self) -> String {
-        let (subject, body) = (self.subject.trim(), self.body.trim());
+        let (subject, body) = (self.subject.trim(), self.body.trim_matches('\n').trim_end());
         if body.is_empty() {
             format!("{subject}\n")
         } else {
@@ -78,7 +78,7 @@ pub(crate) fn read(repo: &Path, hash: &str) -> Result<Read, String> {
             hash,
         ],
     )?;
-    let patch = git::patch_between(repo, &parent, hash)?;
+    let patch = git::patch_bytes_between(repo, &parent, hash)?;
     let paths = git::paths_between(repo, &parent, hash)?;
     let files = patchset::files_of(&patch, paths)?;
     Ok(Read {
@@ -154,7 +154,7 @@ impl SplitEditor {
             groups: vec![
                 Group {
                     subject,
-                    body: body.trim().to_owned(),
+                    body: body.trim_matches('\n').trim_end().to_owned(),
                 },
                 Group::default(),
             ],
@@ -351,7 +351,10 @@ pub(crate) fn prepare(
     for (g, pair) in trees.windows(2).enumerate() {
         let [before, after] = pair else { continue };
         if before == after {
-            return Err(format!("commit {} would change nothing", g + 1));
+            return Err(format!(
+                "commit {} would change nothing: the commits before it already make its changes (a line added after a last line without a newline gives it one)",
+                g + 1
+            ));
         }
         patches_out.push((
             git::patch_between(repo, before, after)?,
@@ -526,8 +529,8 @@ diff --git a/b.bin b/b.bin
 index 1111111111111111111111111111111111111111..3333333333333333333333333333333333333333 100644
 Binary files a/b.bin and b/b.bin differ
 ";
-        let files =
-            patchset::files_of(patch, vec!["a.txt".into(), "b.bin".into()]).unwrap_or_default();
+        let files = patchset::files_of(patch.as_bytes(), vec!["a.txt".into(), "b.bin".into()])
+            .unwrap_or_default();
         SplitEditor::new(Read {
             hash: "c".into(),
             parent: "p".into(),

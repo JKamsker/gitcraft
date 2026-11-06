@@ -21,7 +21,8 @@ impl Author {
         vec![
             ("GIT_AUTHOR_NAME", self.name.clone()),
             ("GIT_AUTHOR_EMAIL", self.email.clone()),
-            ("GIT_AUTHOR_DATE", self.date.clone()),
+            // `@`: a date before 1973 is a number git doesn't take for a time otherwise.
+            ("GIT_AUTHOR_DATE", format!("@{}", self.date)),
         ]
     }
 }
@@ -69,8 +70,10 @@ pub fn tree_of(repo: &Path, rev: &str) -> Result<String, String> {
 /// What `git apply` reads back exactly: every file whole (`--binary`, full blob names), no
 /// renames (a rename picked in part is a removal and an addition), whatever the user's config
 /// says about colours, prefixes, external diff programs or text conversion.
-const PATCH: [&str; 9] = [
+const PATCH: [&str; 10] = [
     "--binary",
+    // `diff.context=0` would write hunks `git apply` refuses.
+    "--unified=3",
     "--full-index",
     "--no-renames",
     "--no-color",
@@ -83,19 +86,25 @@ const PATCH: [&str; 9] = [
 
 /// The patch that turns `from` (a commit or a tree) into `to`, every file of it.
 pub fn patch_between(repo: &Path, from: &str, to: &str) -> Result<String, String> {
+    Ok(String::from_utf8_lossy(&patch_bytes_between(repo, from, to)?).into_owned())
+}
+
+/// [`patch_between`] as git wrote it, whatever the files' encoding.
+pub fn patch_bytes_between(repo: &Path, from: &str, to: &str) -> Result<Vec<u8>, String> {
     let mut args = vec!["diff"];
     args.extend(PATCH);
     args.extend([END_OPTS, from, to, "--"]);
-    run(Some(repo), &args)
+    super::run_bytes(Some(repo), &args)
 }
 
-/// The paths [`patch_between`] has, in its order.
+/// The paths [`patch_between`] has, in its order: one whose type changes (a file becoming a
+/// link…) twice, as it has a removal and an addition.
 pub fn paths_between(repo: &Path, from: &str, to: &str) -> Result<Vec<String>, String> {
     let out = run(
         Some(repo),
         &[
             "diff",
-            "--name-only",
+            "--raw",
             "-z",
             "--no-renames",
             "--ignore-submodules=none",
@@ -105,11 +114,27 @@ pub fn paths_between(repo: &Path, from: &str, to: &str) -> Result<Vec<String>, S
             "--",
         ],
     )?;
-    Ok(out
-        .split('\0')
-        .filter(|p| !p.is_empty())
-        .map(str::to_owned)
-        .collect())
+    Ok(parse_raw(&out))
+}
+
+/// `--raw -z` output: `:<modes> <blobs> <status>`, then the path, each ended by a NUL.
+fn parse_raw(out: &str) -> Vec<String> {
+    let mut paths = Vec::new();
+    let mut fields = out.split('\0');
+    while let (Some(meta), Some(path)) = (fields.next(), fields.next()) {
+        if !meta.starts_with(':') {
+            break;
+        }
+        paths.push(path.to_owned());
+        if meta
+            .split_whitespace()
+            .last()
+            .is_some_and(|s| s.starts_with('T'))
+        {
+            paths.push(path.to_owned());
+        }
+    }
+    paths
 }
 
 /// The tree `base` becomes with the patches (files where git runs, see `save_patch_for`)
@@ -225,6 +250,25 @@ mod tests {
         assert_eq!(message.trim_end(), "Zoë Ünal|made\n\nbody ünïcode");
         assert_eq!(status, "");
         assert_eq!(paths, ["a b.txt"]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_type_change_is_two_paths_and_old_dates_are_kept() -> Result<(), String> {
+        let raw = ":100644 100644 a b M\0x y\0:100644 120000 a b T\0link\0";
+        assert_eq!(parse_raw(raw), ["x y", "link", "link"]);
+        let dir = repo("old-date");
+        run(Some(&dir), &["commit", "-q", "--allow-empty", "-m", "base"])?;
+        let tree = tree_of(&dir, "HEAD")?;
+        let author = Author {
+            name: "Old".to_owned(),
+            email: "o@t".to_owned(),
+            date: "1234 +0130".to_owned(),
+        };
+        let made = commit_tree(&dir, &tree, "HEAD", "old\n", Some(&author));
+        let back = made.and_then(|m| author_of(&dir, &m));
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(back.map(|a| a.date), Ok("1234 +0130".to_owned()));
         Ok(())
     }
 }

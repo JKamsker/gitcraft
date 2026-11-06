@@ -347,3 +347,47 @@ fn a_check_for_an_editor_closed_since_does_not_land_in_a_new_one() {
     let _ = std::fs::remove_dir_all(&dir);
     assert!(tab.split.as_ref().is_some_and(|s| s.checked.is_none()));
 }
+
+/// A link's new target goes whole (half of it would be no link), `diff.context=0` changes
+/// nothing, and a file that becomes a link is read as its removal and the link's addition.
+#[test]
+fn links_type_changes_and_a_config_without_context_split_cleanly() {
+    let dir = repo(
+        "split-links",
+        "git config diff.context 0 && printf '1\\n2\\n3\\n4\\n5\\n' > f && echo x > t && ln -s a l \
+         && git add -A && git commit -q -m base && printf '1\\nzwei\\n3\\n4\\nfive\\n' > f \
+         && rm l && ln -s b l && rm t && ln -s f t && git add -A && git commit -q -m mixed",
+    );
+    let (mut tab, ctx) = opened(&dir);
+    let tree = git_out(&dir, &["rev-parse", "HEAD^{tree}"]);
+    open(&mut tab, &ctx, "HEAD");
+    let (zwei, two) = (line(&tab, 0, "zwei"), line(&tab, 0, "2"));
+    if let Some(s) = tab.split.as_mut() {
+        let files: Vec<(&str, Option<&str>)> =
+            s.files.iter().map(|f| (f.path.as_str(), f.whole)).collect();
+        assert_eq!(
+            files,
+            [
+                ("f", None),
+                ("l", Some("a symbolic link")),
+                ("t", Some("deleted")),
+                ("t", Some("a symbolic link")),
+            ]
+        );
+        s.assign_line(0, zwei, 0);
+        s.assign_line(0, two, 0);
+        s.assign_file(1, 0);
+        s.groups[1].subject = "rest".to_owned();
+    }
+    check(&mut tab, &ctx);
+    tab.run_split(&ctx);
+    let status = finished(&mut tab, &ctx);
+    let link = git_out(&dir, &["cat-file", "-p", "HEAD~1:l"]);
+    let top = git_out(&dir, &["rev-parse", "HEAD^{tree}"]);
+    let clean = git_out(&dir, &["status", "--porcelain"]);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(status.as_ref().is_some_and(|s| !s.1), "{status:?}");
+    assert_eq!(link, "b");
+    assert_eq!(top, tree);
+    assert_eq!(clean, "");
+}
