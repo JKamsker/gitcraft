@@ -417,9 +417,16 @@ impl Settings {
                                 UpdateCheck::Failed(e) => {
                                     ui.label(RichText::new(e).color(t.danger).small());
                                 }
+                                UpdateCheck::Pinned(version) => {
+                                    layout::note(
+                                        ui,
+                                        format!("Staying on {version}: unpin it to see updates"),
+                                    );
+                                }
                             }
                         });
                     });
+                    rollback_rows(card, view);
                     card.row("New versions", "check download github restart", |ui| {
                         ui.checkbox(
                             &mut self.check_updates,
@@ -828,6 +835,48 @@ pub enum UpdateCheck {
     /// This version is out.
     Found(String),
     Failed(String),
+    /// Gone back to this version: no update is offered until it is unpinned.
+    Pinned(String),
+}
+
+/// The Updates section's rows for going back to the version the last update replaced, and for
+/// the pin that keeps it.
+fn rollback_rows(card: &mut Card, view: &mut SettingsView) {
+    if let Some(version) = view.previous.clone() {
+        card.row(
+            "Previous version",
+            "go back rollback undo update downgrade",
+            |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    if ui
+                        .button(format!("Go back to {version}"))
+                        .on_hover_text(format!(
+                            "Restarts as gitcraft {version}, the version the last update replaced; \
+                         the open tabs stay. No update is offered until you unpin it."
+                        ))
+                        .clicked()
+                    {
+                        view.go_back = true;
+                    }
+                });
+            },
+        );
+    }
+    if !view.pinned.is_empty() {
+        let pinned = view.pinned.clone();
+        card.row("Pinned", "pin stay version unpin", |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(format!("Staying on gitcraft {pinned}"));
+                if ui
+                    .button("Unpin")
+                    .on_hover_text("Look for new versions again, as the settings above say")
+                    .clicked()
+                {
+                    view.unpin = true;
+                }
+            });
+        });
+    }
 }
 
 /// The pages of the settings, in the order of their tabs.

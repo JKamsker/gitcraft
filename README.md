@@ -243,6 +243,12 @@ so your config, credentials and hooks apply as usual.
   on disk; "Update now" in the banner then swaps it in place of the running version and restarts.
   A copy gitcraft can't replace (a .deb or .rpm, an all-users install) offers the release page
   instead. Looking and downloading can each be turned off.
+- Going back after an update: the update keeps the version it replaced next to the program
+  (`gitcraft.previous`, its version in `gitcraft.previous-version`). Settings → General →
+  Updates → _Go back to 0.3.3_ swaps the two and restarts, then stays on that version (no update
+  is offered) until _Unpin_. Going back again goes forward to the newer one. A version from
+  before pins existed doesn't know them: it skips the version you went back from instead, and
+  offers later ones.
 - Toasts, and a desktop notification when a long operation ends while the window is in the
   background.
 - Themes (Settings → Appearance, the palette icon in the title bar, or _Theme:_ in the command
