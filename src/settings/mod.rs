@@ -8,7 +8,7 @@ use egui::{RichText, Ui};
 use serde::{Deserialize, Serialize};
 
 use crate::theme::{self, Tokens};
-pub use profile_page::{ProfileRequest, badge, paint_badge};
+pub use profile_page::{ProfileRequest, paint_badge};
 pub use profiles::UserProfile;
 
 /// A name and email to commit with, applied per repository from its commit box.

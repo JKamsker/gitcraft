@@ -268,13 +268,13 @@ impl App {
                 );
                 for p in &self.settings.user_profiles {
                     let active = p.id == profile.id;
-                    let row = ui.horizontal(|ui| {
-                        settings::badge(ui, 16.0, p);
-                        ui.selectable_label(active, p.title())
-                    });
-                    let row = row
-                        .inner
-                        .on_hover_text(author_line(p).trim_start_matches(" · "));
+                    let row = profile_row(ui, p, active, t);
+                    let author = author_line(p);
+                    let row = if author.is_empty() {
+                        row
+                    } else {
+                        row.on_hover_text(author.trim_start_matches(" · "))
+                    };
                     if row.clicked() && !active {
                         request = Some(ProfileRequest::Switch(p.id));
                     }
@@ -292,6 +292,43 @@ impl App {
             self.profile_request(request, ui.ctx());
         }
     }
+}
+
+/// A profile's row in the title bar's menu: its badge and name across the menu's width, a
+/// check on the one in use.
+fn profile_row(ui: &mut Ui, p: &settings::UserProfile, active: bool, t: &Tokens) -> egui::Response {
+    let width = ui.available_width().clamp(180.0, 260.0);
+    let (rect, resp) = ui.allocate_exact_size(vec2(width, 26.0), Sense::click());
+    if resp.hovered() {
+        ui.painter().rect_filled(rect, t.radius_sm, t.pressed);
+    }
+    settings::paint_badge(ui, egui::pos2(rect.left() + 13.0, rect.center().y), 8.0, p);
+    let color = if active { t.text } else { t.text_dim };
+    let font = if active {
+        theme::medium(12.5)
+    } else {
+        egui::FontId::proportional(12.5)
+    };
+    let name = ui
+        .painter()
+        .layout_no_wrap(p.title().to_owned(), font, color);
+    let text_rect = egui::Rect::from_min_max(
+        egui::pos2(rect.left() + 28.0, rect.top()),
+        egui::pos2(rect.right() - 26.0, rect.bottom()),
+    );
+    ui.painter().with_clip_rect(text_rect).galley(
+        egui::pos2(text_rect.left(), rect.center().y - name.size().y / 2.0),
+        name,
+        color,
+    );
+    if active {
+        let check = egui::Rect::from_center_size(
+            egui::pos2(rect.right() - 13.0, rect.center().y),
+            vec2(14.0, 14.0),
+        );
+        crate::icons::paint(ui, check, "check", 14.0, t.accent);
+    }
+    resp
 }
 
 /// " · Ann <ann@example.com>" for a profile that sets an author, "" otherwise.
