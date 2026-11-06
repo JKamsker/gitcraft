@@ -199,13 +199,16 @@ so your config, credentials and hooks apply as usual.
 - _Start agent task…_ (the + of AGENTS on the left, or the palette) makes a branch and a
   worktree beside the repository, opens it and starts a terminal there running the agent you
   pick: Claude Code, Codex, Gemini CLI, Cursor Agent, Aider or a command of your own, the task
-  given as its first message. AGENTS lists the tasks with their uncommitted changes; click one to
+  given as its first message when the agent takes one. If the agent isn't installed there, the
+  terminal says so. AGENTS lists the tasks with their uncommitted changes; click one to
   open its worktree and review what the agent did with the normal diff.
-- _Worktree setup…_ (palette): a recipe per repository that runs in every new worktree, for an
-  agent or not, in a terminal with its output: it copies or links ignored files from the main
-  worktree (`.env.local`, `node_modules`), sets variables per worktree
-  (`PORT=$((3000 + GITCRAFT_WORKTREE_INDEX))`, a `CARGO_TARGET_DIR` of its own) and runs a setup
-  command (`npm ci`). It runs with `sh` on the repository's machine (Git's own `sh` on Windows),
+- _Worktree setup…_ (palette): a recipe per repository that runs in every worktree gitcraft
+  makes (the Add worktree dialog, a pull request's _Open in worktree_, agent tasks), in a
+  terminal with its output: it copies or links ignored files from the main worktree
+  (`.env.local`, `node_modules`), sets variables per worktree
+  (`PORT=$((3000 + GITCRAFT_WORKTREE_INDEX))`, a `CARGO_TARGET_DIR` of its own; the main
+  worktree is number 0, the others keep the number they were given) and runs a setup command
+  (`npm ci`). A step that fails says so; the setup command and the agent are then not run. It runs with `sh` on the repository's machine (Git's own `sh` on Windows),
   WSL and SSH included; the script it makes can be read in the editor, and tried on a worktree
   before saving. Kept in `.git/gitcraft/`, never committed.
 

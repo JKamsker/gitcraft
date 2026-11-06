@@ -31,6 +31,8 @@ pub(crate) struct StartForm {
     give_prompt: bool,
     focus: bool,
     repo: std::path::PathBuf,
+    /// The local branches, which the new one mustn't be.
+    branches: Vec<String>,
     /// Where the folder suggested for a branch goes: beside the main worktree.
     folder_for: Box<dyn Fn(&str) -> String>,
 }
@@ -57,6 +59,7 @@ impl StartForm {
             give_prompt: true,
             focus: true,
             repo: tab.path.clone(),
+            branches: tab.refs.local.iter().map(|b| b.name.clone()).collect(),
             folder_for,
         };
         form.folder = (form.folder_for)(&form.branch);
@@ -100,6 +103,8 @@ impl StartForm {
         ui.add_space(6.0);
         caption(ui, "Branch", &t);
         if single(ui, &mut self.branch).changed() {
+            // As in the other dialogs: a branch name has no spaces.
+            self.branch = self.branch.replace(' ', "-");
             self.branch_edited = true;
             if !self.folder_edited {
                 self.folder = (self.folder_for)(&self.branch);
@@ -112,28 +117,25 @@ impl StartForm {
             self.folder_edited = true;
         }
         let folder = crate::remote::folder_for_git(&self.repo, &self.folder);
-        if let Err(why) = &folder {
-            ui.colored_label(t.danger, why);
-        }
         ui.add_space(6.0);
         self.agent_choice(ui, &t);
         ui.add_space(6.0);
         ui.label(
             RichText::new(
-                "The worktree setup recipe runs first, in the same terminal (Worktree setup… \
-                 in the palette).",
+                "If the repository has a worktree setup recipe (Worktree setup… in the \
+                 palette), it runs first, in the same terminal.",
             )
             .small()
             .color(t.text_faint),
         );
         ui.add_space(10.0);
-        let usable = |s: &str| !s.trim().is_empty() && !s.trim().starts_with('-');
         let agent = self.agent_command();
-        let valid = usable(&self.branch)
-            && !self.branch.contains(char::is_whitespace)
-            && usable(&self.base)
-            && folder.is_ok()
-            && usable(&agent);
+        let problem = self.problem(&folder, &agent);
+        if let Some(problem) = &problem {
+            ui.colored_label(t.danger, problem);
+            ui.add_space(4.0);
+        }
+        let valid = problem.is_none();
         let mut act = None;
         ui.horizontal(|ui| {
             if crate::repo::primary_button(ui, "Start", valid, 90.0).clicked() || (enter && valid) {
@@ -155,8 +157,50 @@ impl StartForm {
             {
                 act = Some(AgentAct::CloseDialog);
             }
+            ui.label(
+                RichText::new(format!("{}+Enter to start", crate::manual::command()))
+                    .small()
+                    .color(t.text_faint),
+            );
         });
         act
+    }
+
+    /// What keeps the task from starting, in words for the user.
+    fn problem(&self, folder: &Result<String, String>, agent: &str) -> Option<String> {
+        let branch = self.branch.trim();
+        if branch.is_empty() {
+            return Some("Name the branch the agent works on".to_owned());
+        }
+        if branch.starts_with('-') {
+            return Some("A branch name can't start with -".to_owned());
+        }
+        if self.branches.iter().any(|b| b == branch) {
+            return Some(format!(
+                "A branch named {branch} exists already: pick another name"
+            ));
+        }
+        let base = self.base.trim();
+        if base.is_empty() || base.starts_with('-') {
+            return Some("Say where the branch starts: a branch, tag or commit".to_owned());
+        }
+        if let Err(why) = folder {
+            return Some(why.clone());
+        }
+        let typed = self.folder.trim();
+        if typed.is_empty() {
+            return Some("Pick the folder for the worktree".to_owned());
+        }
+        if crate::remote::is_remote(&self.repo) && typed.starts_with('~') {
+            return Some(
+                "Give the folder's full path on that machine (/home/…): git doesn't read ~"
+                    .to_owned(),
+            );
+        }
+        if agent.is_empty() {
+            return Some("Type the command that starts the agent".to_owned());
+        }
+        None
     }
 
     fn agent_choice(&mut self, ui: &mut Ui, t: &Tokens) {
@@ -266,7 +310,8 @@ impl RepoTab {
             .corner_radius(t.radius_lg)
             .inner_margin(egui::Margin::same(18))
             .shadow(ctx.global_style().visuals.window_shadow);
-        let enter = ctx.input(|i| i.key_pressed(egui::Key::Enter) && !i.modifiers.shift);
+        // Ctrl+Enter: Enter alone is a new line in the task, and is typed in the fields.
+        let enter = ctx.input(|i| i.key_pressed(egui::Key::Enter) && i.modifiers.command);
         let in_linked = self.worktrees.iter().any(|w| w.current && !w.main);
         let response = egui::Modal::new(egui::Id::new("gitcraft-agent-dialog"))
             .frame(frame)
@@ -274,9 +319,7 @@ impl RepoTab {
             .show(ctx, |ui| {
                 ui.set_width(520.0);
                 match dialog {
-                    super::AgentDialog::Start(form) => {
-                        form.ui(ui, enter && !ui.ctx().egui_wants_keyboard_input())
-                    }
+                    super::AgentDialog::Start(form) => form.ui(ui, enter),
                     super::AgentDialog::Recipe(form) => form.ui(ui, in_linked),
                 }
             });
@@ -293,6 +336,51 @@ impl RepoTab {
 mod tests {
     use super::suggest_folder;
     use std::path::{Path, PathBuf};
+
+    fn form(branch: &str, folder: &str, repo: &str) -> super::StartForm {
+        super::StartForm {
+            task: String::new(),
+            branch: branch.to_owned(),
+            branch_edited: false,
+            folder: folder.to_owned(),
+            folder_edited: false,
+            base: "main".to_owned(),
+            agent: 0,
+            custom: String::new(),
+            give_prompt: true,
+            focus: false,
+            repo: PathBuf::from(repo),
+            branches: vec!["main".to_owned(), "agent/x".to_owned()],
+            folder_for: Box::new(|_| String::new()),
+        }
+    }
+
+    #[test]
+    fn the_dialog_says_what_keeps_it_from_starting() {
+        let ok = form("agent/new", "/w/app-new", "/w/app");
+        assert_eq!(ok.problem(&Ok("/w/app-new".to_owned()), "claude"), None);
+        let taken = form("agent/x", "/w/app-x", "/w/app");
+        let said = taken
+            .problem(&Ok(String::new()), "claude")
+            .unwrap_or_default();
+        assert!(said.contains("exists already"), "{said}");
+        assert!(
+            form("", "/w", "/w/app")
+                .problem(&Ok(String::new()), "claude")
+                .is_some()
+        );
+        let no_agent = form("agent/new", "/w/app-new", "/w/app");
+        assert!(
+            no_agent
+                .problem(&Ok(String::new()), "")
+                .is_some_and(|p| p.contains("command"))
+        );
+        let home = form("agent/new", "~/app-new", "ssh://h/home/me/app");
+        assert!(
+            home.problem(&Ok("~/app-new".to_owned()), "claude")
+                .is_some_and(|p| p.contains("full path"))
+        );
+    }
 
     #[test]
     fn a_task_folder_goes_beside_the_main_worktree_and_is_never_taken() {

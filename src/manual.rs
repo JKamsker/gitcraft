@@ -75,9 +75,9 @@ const FEATURES: &[(&str, &[&str])] = &[
     (
         "Coding agents",
         &[
-            "Start agent task… (the + of AGENTS, or the palette) makes a branch and a worktree, opens it and starts a terminal there running the agent you pick (Claude Code, Codex, Gemini CLI, Cursor Agent, Aider or a command of your own), with the task as its first message.",
+            "Start agent task… (the + of AGENTS, or the palette) makes a branch and a worktree, opens it and starts a terminal there running the agent you pick (Claude Code, Codex, Gemini CLI, Cursor Agent, Aider or a command of your own), with the task as its first message when it takes one.",
             "AGENTS on the left lists the tasks with their worktrees' uncommitted changes. Click one to open it and review its changes with the normal diff; its menu starts the agent again or opens a terminal there.",
-            "Worktree setup… (palette) is a recipe that runs in every new worktree of the repository, for an agent or not: it copies or links files from the main worktree (.env.local, node_modules), sets variables (PORT=$((3000 + GITCRAFT_WORKTREE_INDEX)), 0 being the main worktree) and runs a setup command, in a terminal where its output shows. It runs with sh on the repository's machine, WSL and SSH included; a step that fails stops it, says so, and the agent isn't started.",
+            "Worktree setup… (palette) is a recipe that runs in every worktree gitcraft makes for the repository, for an agent or not: it copies or links files from the main worktree (.env.local, node_modules), sets variables (PORT=$((3000 + GITCRAFT_WORKTREE_INDEX)): the main worktree is 0, each other keeps the number it was given) and runs a setup command, in a terminal where its output shows. It runs with sh on the repository's machine, WSL and SSH included. A step that fails says so, and then neither the setup command nor the agent runs.",
         ],
     ),
 ];

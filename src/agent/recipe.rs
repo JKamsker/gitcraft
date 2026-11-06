@@ -51,16 +51,21 @@ impl Recipe {
         }
         let mut seen: Vec<&str> = Vec::new();
         for var in &self.env {
-            if !sh::valid_name(&var.name) {
+            if sh::reserved(&var.name) {
                 out.push(format!(
-                    "{}: a variable's name is letters, digits and _, not starting with a digit",
+                    "Variable \"{}\": gitcraft sets that one itself, pick another name",
+                    var.name
+                ));
+            } else if !sh::valid_name(&var.name) {
+                out.push(format!(
+                    "Variable \"{}\": names are letters, digits and _, not starting with a digit",
                     var.name
                 ));
             } else if seen.contains(&var.name.as_str()) {
-                out.push(format!("{} is set twice", var.name));
+                out.push(format!("Variable \"{}\" is set twice", var.name));
             }
             if var.value.contains('\n') {
-                out.push(format!("{}: a value is one line", var.name));
+                out.push(format!("Variable \"{}\": a value is one line", var.name));
             }
             seen.push(&var.name);
         }
@@ -77,6 +82,7 @@ impl Recipe {
         s.push_str("gitcraft_say 'setting up this worktree (Worktree setup recipe)'\n");
         for (verb, paths) in [("copy", &self.copy), ("link", &self.link)] {
             for path in paths {
+                let path = path.trim_end_matches(['/', '\\']);
                 s.push_str(&format!("gitcraft_bring {verb} {}\n", sh::quote(path)));
             }
         }
@@ -94,7 +100,7 @@ impl Recipe {
         }
         s.push_str(
             "if [ \"$gitcraft_failed\" = 0 ]; then gitcraft_say 'setup done'; \
-             else gitcraft_say 'setup failed: fix the recipe (Worktree setup… in the palette) and run it again'; fi\n",
+             else gitcraft_say 'setup failed: fix the recipe (Worktree setup… in the palette), then run it again from there'; fi\n",
         );
         s
     }
@@ -113,12 +119,26 @@ impl Recipe {
 }
 
 /// What every script starts with, recipe or not: where the main worktree is, which number this
-/// worktree is (the main one is 0), and the helpers the steps use.
+/// worktree has (the main one 0, the others 1, 2… in the order they were set up, a number
+/// coming free again once its worktree is gone: kept in `.git/gitcraft/worktree-numbers`), and
+/// the helpers the steps use.
 const PRELUDE: &str = r#"gitcraft_say() { printf '\033[36mgitcraft:\033[0m %s\n' "$*"; }
 gitcraft_failed=0
 gitcraft_top=$(git rev-parse --show-toplevel 2>/dev/null) || gitcraft_top=$PWD
 gitcraft_main=$(git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')
-GITCRAFT_WORKTREE_INDEX=$(git worktree list --porcelain 2>/dev/null | awk -v p="$gitcraft_top" 'substr($0, 1, 9) == "worktree " { if (substr($0, 10) == p) { print n + 0; exit } n++ }')
+gitcraft_numbers="$(git rev-parse --git-common-dir 2>/dev/null)/gitcraft/worktree-numbers"
+mkdir -p -- "${gitcraft_numbers%/*}" 2>/dev/null
+GITCRAFT_WORKTREE_INDEX=$( { git worktree list --porcelain 2>/dev/null | sed -n 's/^worktree /L	/p'
+  [ -f "$gitcraft_numbers" ] && sed 's/^/N	/' "$gitcraft_numbers"; } | awk -F '	' -v me="$gitcraft_top" -v main="$gitcraft_main" -v out="$gitcraft_numbers.new" '
+  $1 == "L" { live[$2] = 1; next }
+  $1 == "N" { num[$3] = $2; next }
+  END {
+    if (me == main) { print 0; exit }
+    for (p in num) if (p in live) { used[num[p]] = 1; keep[p] = num[p] }
+    if (me in keep) n = keep[me]; else { n = 1; while (n in used) n++; keep[me] = n }
+    for (p in keep) printf "%s\t%s\n", keep[p], p > out
+    print n
+  }') && [ -f "$gitcraft_numbers.new" ] && mv -f -- "$gitcraft_numbers.new" "$gitcraft_numbers"
 export GITCRAFT_MAIN_WORKTREE="$gitcraft_main"
 export GITCRAFT_WORKTREE_INDEX="${GITCRAFT_WORKTREE_INDEX:-0}"
 gitcraft_bring() {
@@ -133,7 +153,8 @@ gitcraft_bring() {
   fi
   case $2 in */*) mkdir -p -- "${2%/*}" ;; esac
   if [ "$1" = link ]; then
-    ln -s -- "$gitcraft_main/$2" "$2" && gitcraft_say "linked $2" && return 0
+    # Git for Windows' ln copies unless told to make a real link (or fail saying why).
+    MSYS=winsymlinks:nativestrict ln -s -- "$gitcraft_main/$2" "$2" && gitcraft_say "linked $2" && return 0
   else
     cp -R -- "$gitcraft_main/$2" "$2" && gitcraft_say "copied $2" && return 0
   fi
@@ -245,7 +266,7 @@ mod tests {
         let problems = recipe.problems();
         assert_eq!(problems.len(), 2, "{problems:?}");
         assert!(problems[0].contains("twice"));
-        assert!(problems[1].starts_with("9X"));
+        assert!(problems[1].contains("\"9X\""), "{problems:?}");
         assert_eq!(recipe.env[3].value, "");
     }
 

@@ -23,8 +23,8 @@ impl Row<'_> {
     fn sub(&self) -> String {
         let agent = agent_label(&self.task.agent);
         let state = match self.worktree {
-            None => "worktree gone".to_owned(),
-            Some(w) if w.prunable.is_some() => "worktree missing".to_owned(),
+            None => "worktree removed".to_owned(),
+            Some(w) if w.prunable.is_some() => "folder missing: prune it in WORKTREES".to_owned(),
             Some(w) => match w.changes {
                 Some(0) => "no uncommitted changes".to_owned(),
                 Some(1) => "1 file changed".to_owned(),
@@ -91,7 +91,10 @@ impl RepoTab {
                 .iter()
                 .find(|w| same_path(&w.path, &task.path));
             let row = Row { task, worktree };
-            let r = paint_row(ui, &row, &t).on_hover_text(tip(&row));
+            let r = paint_row(ui, &row, &t);
+            let r = r.on_hover_ui(|ui| {
+                ui.label(tip(&row));
+            });
             if r.clicked() && row.openable() {
                 acts.push(Action::OpenWorktree(std::path::PathBuf::from(&task.path)));
             }
@@ -102,11 +105,10 @@ impl RepoTab {
     }
 }
 
-/// Whether `listed` (a task's folder, resolved when it was made) is the worktree at `path`, as
-/// git lists it: compared as written, every frame, without asking the disk.
+/// Whether `listed` (a task's folder, as git listed it when it was made) is the worktree at
+/// `path`: compared as written (a `/` at the end aside), every frame, without asking the disk.
 fn same_path(path: &std::path::Path, listed: &str) -> bool {
-    let trim = |s: &str| s.trim_end_matches(['/', '\\']).to_owned();
-    trim(&path.to_string_lossy()) == trim(listed)
+    path == std::path::Path::new(listed)
 }
 
 fn paint_row(ui: &mut Ui, row: &Row, t: &Tokens) -> egui::Response {
@@ -159,6 +161,8 @@ fn tip(row: &Row) -> String {
     tip.push_str(&format!("\nAgent: {}", row.task.agent));
     if row.openable() {
         tip.push_str("\nClick to open it and review its changes");
+    } else if row.worktree.is_some_and(|w| w.current) {
+        tip.push_str("\nShown in this tab: its changes are in Uncommitted changes");
     }
     tip
 }
@@ -174,7 +178,10 @@ fn menu(ui: &mut Ui, row: &Row, acts: &mut Vec<Action>) {
     let there = row.worktree.is_some_and(|w| w.prunable.is_none());
     if ui
         .add_enabled(there, egui::Button::new("Start the agent again"))
-        .on_hover_text("In a new terminal of its worktree, without the setup recipe")
+        .on_hover_text(
+            "In a new terminal of its worktree, without the setup recipe and without the task \
+             as its first message",
+        )
         .clicked()
     {
         acts.push(Action::Agent(AgentAct::Restart(row.task.clone())));
@@ -191,7 +198,7 @@ fn menu(ui: &mut Ui, row: &Row, acts: &mut Vec<Action>) {
     ui.separator();
     if ui
         .button("Take off the list")
-        .on_hover_text("The worktree and its branch stay; remove them from WORKTREES")
+        .on_hover_text("The worktree and its branch stay; remove them in WORKTREES")
         .clicked()
     {
         acts.push(Action::Agent(AgentAct::Forget(row.task.path.clone())));
@@ -244,7 +251,7 @@ mod tests {
                 worktree: None
             }
             .sub(),
-            "Codex · worktree gone"
+            "Codex · worktree removed"
         );
         assert!(
             !Row {

@@ -285,7 +285,7 @@ fn git_for_windows_sh_is_looked_for_beside_its_git() {
         found
             .first()
             .map(|p| p.display().to_string().replace('\\', "/")),
-        Some("C:/Program Files/Git/usr/bin/sh.exe".to_owned())
+        Some("C:/Program Files/Git/bin/sh.exe".to_owned())
     );
 }
 
@@ -351,4 +351,109 @@ fn a_folder_that_is_no_repository_says_so() {
     let err = Recipe::load(&dir).err().unwrap_or_default();
     let _ = std::fs::remove_dir_all(&dir);
     assert!(err.contains("could not find the git folder"), "{err}");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_worktree_keeps_its_number_when_others_come_and_go() -> Result<(), String> {
+    let fx = Fixture::new("numbers")?;
+    let recipe = Recipe {
+        command: "printf %s \"$GITCRAFT_WORKTREE_INDEX\" > n.txt".to_owned(),
+        ..Recipe::default()
+    };
+    let number = |wt: &Path| -> Result<String, String> {
+        let launch = Launch {
+            worktree: wt.to_owned(),
+            ..fx.launch(recipe.clone(), None)
+        };
+        let (_, out) = fx.run(&launch)?;
+        std::fs::read_to_string(wt.join("n.txt")).map_err(|e| format!("{e}: {out}"))
+    };
+    assert_eq!(number(&fx.worktree)?, "1");
+    // A worktree whose folder sorts first: git lists it first, it still gets the next number.
+    let early = fx.root.join("aa early");
+    git::run(
+        Some(&fx.main),
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "-b",
+            "aa",
+            &early.display().to_string(),
+        ],
+    )?;
+    assert_eq!(number(&early)?, "2");
+    assert_eq!(number(&fx.worktree)?, "1");
+    assert_eq!(number(&fx.main)?, "0");
+    // Its number comes free once it is gone.
+    git::run(
+        Some(&fx.main),
+        &[
+            "worktree",
+            "remove",
+            "--force",
+            &fx.worktree.display().to_string(),
+        ],
+    )?;
+    let late = fx.root.join("zz late");
+    git::run(
+        Some(&fx.main),
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "-b",
+            "zz",
+            &late.display().to_string(),
+        ],
+    )?;
+    assert_eq!(number(&late)?, "1");
+    assert_eq!(number(&early)?, "2");
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_path_written_with_a_slash_at_its_end_is_brought_once() -> Result<(), String> {
+    let fx = Fixture::new("slash")?;
+    let recipe = Recipe {
+        link: vec!["node_modules/".to_owned()],
+        command: "echo \"don't\" )".to_owned(),
+        ..Recipe::default()
+    };
+    let (_, out) = fx.run(&fx.launch(recipe, None))?;
+    let link =
+        std::fs::symlink_metadata(fx.worktree.join("node_modules")).map_err(|e| e.to_string())?;
+    assert!(link.file_type().is_symlink(), "{out}");
+    assert!(
+        !fx.worktree.join("node_modules/node_modules").exists(),
+        "{out}"
+    );
+    // A lone quote and ) in the command are the command's (bash 3.2 misread them in `$(…)`).
+    assert!(
+        out.contains("syntax error") || out.contains("setup command failed"),
+        "{out}"
+    );
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn an_agent_that_is_not_installed_is_said_to_be_missing() -> Result<(), String> {
+    let fx = Fixture::new("missing")?;
+    let mut launch = fx.launch(Recipe::default(), Some("no-such-agent-xyz 'go'"));
+    launch.label = "No Such".to_owned();
+    let (code, out) = fx.run(&launch)?;
+    assert_eq!(code, 0, "{out}");
+    assert!(
+        out.contains("no-such-agent-xyz isn't installed on this machine"),
+        "{out}"
+    );
+    assert!(
+        out.contains("then start it with: no-such-agent-xyz 'go'"),
+        "{out}"
+    );
+    assert!(!out.contains("starting No Such"), "{out}");
+    Ok(())
 }
