@@ -205,6 +205,7 @@ impl RepoTab {
             files_total: 0,
             undo,
             redo_child: None,
+            receipt: None,
         });
         self.save_timeline(ctx);
         self.release_dropped(ctx);
@@ -226,13 +227,24 @@ impl RepoTab {
                 (found, kept)
             },
             move |tab, (found, kept), ctx| {
+                let mut receipt_error = None;
                 if let Some(entry) = tab.timeline.entries.iter_mut().find(|e| e.id == id) {
                     entry.files = found.files;
                     entry.files_total = found.files_total;
                     if let Some(label) = found.label {
                         entry.label = label;
                     }
+                    match found.receipt {
+                        Some(Ok(receipt)) => entry.receipt = Some(receipt),
+                        Some(Err(e)) => receipt_error = Some(e),
+                        None => {}
+                    }
                 }
+                if let Some(e) = receipt_error {
+                    tab.timeline_error =
+                        Some(format!("The rewrite's receipt couldn't be made: {e}"));
+                }
+                tab.show_receipt(id);
                 if let Err(e) = kept {
                     tab.timeline_error = Some(format!(
                         "The commits of “{}” couldn't be kept from git gc: {e}",
@@ -242,6 +254,31 @@ impl RepoTab {
                 tab.save_timeline(ctx);
             },
         );
+    }
+
+    /// Says what a rewrite gitcraft just did, in the status line, while that still says it's done.
+    fn show_receipt(&mut self, id: u64) {
+        let Some(entry) = self.timeline.get(id) else {
+            return;
+        };
+        let (Some(receipt), Origin::Gitcraft) = (&entry.receipt, entry.origin) else {
+            return;
+        };
+        let done = self
+            .status
+            .as_ref()
+            .and_then(|(s, failed)| (!failed).then_some(s.as_str()))
+            .and_then(|s| s.strip_suffix(": done"))
+            .map(str::to_owned);
+        if let Some(label) = done {
+            self.status = Some((
+                format!(
+                    "{label}: done. {} (receipt in the timeline, Ctrl+Shift+Z)",
+                    receipt.sentence()
+                ),
+                false,
+            ));
+        }
     }
 
     /// Writes the timeline to disk in the background (not over a file that couldn't be read).

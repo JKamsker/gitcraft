@@ -38,6 +38,7 @@ fn entry(label: &str) -> Entry {
         files_total: 0,
         undo: None,
         redo_child: None,
+        receipt: None,
     }
 }
 
