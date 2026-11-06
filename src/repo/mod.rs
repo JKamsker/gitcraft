@@ -13,6 +13,9 @@ mod conflict;
 mod detail;
 mod dialogs;
 mod diff;
+mod drafts;
+#[cfg(test)]
+mod drafts_tests;
 mod file_text;
 mod file_view;
 mod graph_view;
@@ -61,6 +64,7 @@ use crate::terminal::Terminal;
 use actions::abort_action;
 pub(crate) use actions::{Action, fast_forward_action, merge_action, rebase_action};
 pub use dialogs::Dialog;
+pub(crate) use drafts::DraftShape;
 use messages::{Msg, spawn};
 pub(crate) use state::{Compare, CompareData, DiffKey, DiffView, Refresh, Reword, Undo, UndoEntry};
 use state::{OpKind, PendingOp, Search};
@@ -362,6 +366,8 @@ impl RepoTab {
             finished: Vec::new(),
         };
         tab.watch(ctx);
+        // What was typed here and not used, the last time this repository was open.
+        tab.restore_drafts();
         tab
     }
 

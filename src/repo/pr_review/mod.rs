@@ -132,6 +132,9 @@ pub(crate) struct PrDraft {
     pub(super) comment: String,
     pub(super) review: String,
     pub(super) target: Option<LineTarget>,
+    /// The latest commit of the pull request `target` was picked at, for a line restored from
+    /// the last run: it is let go of if the pull request has moved on since.
+    pub(super) line_head: Option<String>,
     pub(super) line_text: String,
     pub(super) focus_line: bool,
     /// Something is being sent, or the page is being loaded again after it.
@@ -153,6 +156,7 @@ impl PrDraft {
     /// The page is being left: only what's typed stays for next time.
     pub(super) fn left(&mut self) {
         self.target = None;
+        self.line_head = None;
         self.confirm_merge = false;
         self.reveal_merge = false;
     }
@@ -161,6 +165,7 @@ impl PrDraft {
     /// line picked in their diff (its number may be another line's now). What's typed stays.
     pub(super) fn head_moved(&mut self) {
         self.target = None;
+        self.line_head = None;
         self.confirm_merge = false;
         self.reveal_merge = false;
     }
