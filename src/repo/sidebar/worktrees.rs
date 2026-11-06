@@ -195,6 +195,16 @@ fn worktree_menu_items(
     if ui.button("Copy path").clicked() {
         ui.ctx().copy_text(path.clone());
     }
+    if !wt.main
+        && ui
+            .add_enabled(!wt.head.is_empty(), egui::Button::new("Scope drift…"))
+            .on_hover_text(
+                "What it changed beyond its task: folders, dependencies, signatures, formatting",
+            )
+            .clicked()
+    {
+        acts.push(Action::OpenDrift(wt.path.clone()));
+    }
     if !wt.main {
         ui.separator();
         let (label, args) = if wt.locked.is_some() {

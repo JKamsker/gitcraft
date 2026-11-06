@@ -13,6 +13,7 @@ mod conflict;
 mod detail;
 mod dialogs;
 mod diff;
+mod drift_view;
 mod file_text;
 mod file_view;
 mod graph_view;
@@ -137,6 +138,8 @@ pub struct RepoTab {
     prs_loaded: Option<Instant>,
     /// The build status of the commits that show one.
     ci: ci_status::CiStatuses,
+    /// The scope drift window of a worktree, while it is open.
+    drift: Option<drift_view::DriftView>,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -299,6 +302,7 @@ impl RepoTab {
             pr_error: None,
             prs_loaded: None,
             ci: ci_status::CiStatuses::default(),
+            drift: None,
             selected: None,
             stash_view: None,
             scroll_to: None,
