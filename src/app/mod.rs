@@ -86,7 +86,7 @@ pub struct App {
     was_focused: bool,
     clone_form: Option<CloneForm>,
     /// A clone running in the background: (destination, result).
-    cloning: Option<(PathBuf, Receiver<Result<(), String>>)>,
+    cloning: Option<clone::Cloning>,
     /// The form of the running clone, back on screen if it needs credentials.
     cloning_form: Option<CloneForm>,
     /// The dialog that opens a repository in WSL or over SSH.

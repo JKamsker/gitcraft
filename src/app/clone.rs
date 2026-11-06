@@ -1,7 +1,8 @@
 //! Cloning: the dialog, the clone in the background, and asking for credentials.
 
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::channel;
+use std::sync::Arc;
+use std::sync::mpsc::{Receiver, channel};
 
 use egui::{Key, RichText, Stroke, Ui, vec2};
 
@@ -21,6 +22,14 @@ pub(super) struct CloneForm {
     auth: bool,
     username: String,
     password: String,
+}
+
+/// A clone running in the background.
+pub(super) struct Cloning {
+    pub(super) dest: PathBuf,
+    rx: Receiver<Result<(), String>>,
+    /// Its progress, and how to cancel it.
+    pub(super) control: Arc<git::OpControl>,
 }
 
 impl App {
@@ -111,10 +120,10 @@ impl App {
         };
         // One clone at a time: a second would take the first one's place, whose result
         // (and its tab) would never come.
-        if let Some((running, _)) = &self.cloning {
+        if let Some(running) = &self.cloning {
             form.error = Some(format!(
-                "Wait for the clone into {} to finish",
-                running.display()
+                "Wait for the clone into {} to finish (or cancel it)",
+                running.dest.display()
             ));
             return;
         }
@@ -138,23 +147,32 @@ impl App {
         let (tx, rx) = channel();
         let ctx2 = ctx.clone();
         let dest2 = dest.clone();
+        let repaint = ctx.clone();
+        let control = git::OpControl::new(move || repaint.request_repaint());
+        let following = Arc::clone(&control);
         std::thread::spawn(move || {
-            let _ = tx.send(git::clone(&url, &dest2, creds.as_ref()));
+            let _ = tx.send(git::clone(&url, &dest2, creds.as_ref(), &following));
             ctx2.request_repaint();
         });
-        self.cloning = Some((dest, rx));
+        self.cloning = Some(Cloning { dest, rx, control });
         self.cloning_form = self.clone_form.take();
         self.error = None;
     }
 
     pub(super) fn poll_clone(&mut self, ctx: &egui::Context) {
-        let Some((dest, rx)) = &self.cloning else {
+        let Some(cloning) = &self.cloning else {
             return;
         };
-        let Ok(result) = rx.try_recv() else { return };
-        let dest = dest.clone();
+        let Ok(result) = cloning.rx.try_recv() else {
+            return;
+        };
+        let dest = cloning.dest.clone();
+        let cancelled = cloning.control.is_cancelled();
         self.cloning = None;
         match result {
+            Err(_) if cancelled => {
+                self.error = Some(format!("Clone into {} cancelled", dest.display()));
+            }
             // On another machine, it opens once reached again, the credentials along.
             Ok(()) if crate::remote::is_remote(&dest) => {
                 let creds =
@@ -200,6 +218,39 @@ impl App {
             Err(e) => self.error = Some(format!("Clone failed: {e}")),
         }
         self.cloning_form = None;
+    }
+}
+
+/// The clone running, on the start page: where to, how far, and _Cancel_.
+pub(super) fn cloning_line(ui: &mut Ui, cloning: &Cloning) {
+    let t = Tokens::get(ui.ctx());
+    ui.horizontal(|ui| {
+        ui.add(crate::spinner::Spinner::new());
+        let cancelled = cloning.control.is_cancelled();
+        let progress = cloning.control.progress();
+        let text = match &progress {
+            _ if cancelled => format!("Cancelling the clone into {}…", cloning.dest.display()),
+            Some(p) => format!("Cloning into {}… {}", cloning.dest.display(), p.label()),
+            None => format!("Cloning into {}…", cloning.dest.display()),
+        };
+        ui.label(text);
+        if !cancelled
+            && ui
+                .button("Cancel")
+                .on_hover_text("Stop the clone; the folder it was making is removed")
+                .clicked()
+        {
+            cloning.control.cancel();
+        }
+    });
+    if let Some(f) = cloning.control.progress().and_then(|p| p.fraction()) {
+        let (rect, _) = ui.allocate_exact_size(
+            vec2(ui.available_width().min(460.0), 3.0),
+            egui::Sense::hover(),
+        );
+        ui.painter().rect_filled(rect, 0.0, t.separator);
+        let done = egui::Rect::from_min_size(rect.min, vec2(rect.width() * f, rect.height()));
+        ui.painter().rect_filled(done, 0.0, t.accent);
     }
 }
 
