@@ -1,15 +1,16 @@
 //! Files and folders dropped on the window: a folder opens as a repository, a patch is applied
-//! to the repository shown, one at a time in the order dropped.
+//! to the repository tab it was dropped on, one at a time in the order dropped.
 
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use egui::{Align2, Color32, Id, LayerId, Order};
+use egui::{Align2, Color32, Id, LayerId, Order, Stroke};
 
 use super::panels::Toast;
 use super::{App, Tab, repo_root};
-use crate::theme;
+use crate::repo::RepoTab;
+use crate::theme::{self, Tokens};
 
 /// The extensions of the patch files a drop applies (as _Apply patch_ offers them).
 const PATCH_EXTENSIONS: [&str; 4] = ["patch", "diff", "eml", "mbox"];
@@ -27,15 +28,33 @@ pub(super) fn classify(path: &Path, is_dir: bool) -> DropKind {
     if is_dir {
         return DropKind::Folder;
     }
-    let ext = path
-        .extension()
-        .map(|e| e.to_string_lossy().to_lowercase())
-        .unwrap_or_default();
-    if PATCH_EXTENSIONS.contains(&ext.as_str()) {
+    if has_patch_extension(path) {
         DropKind::Patch
     } else {
         DropKind::Other
     }
+}
+
+fn has_patch_extension(path: &Path) -> bool {
+    let ext = path
+        .extension()
+        .map(|e| e.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    PATCH_EXTENSIONS.contains(&ext.as_str())
+}
+
+/// What the dropped `path` is. One on another machine (a `\\wsl.localhost\…` path) is told by
+/// its name only, never by asking that machine from the window's thread: a patch by its
+/// extension, anything else a folder (opening it says if it isn't one).
+pub(super) fn kind_of(path: &Path) -> DropKind {
+    if crate::remote::is_remote(path) {
+        return if has_patch_extension(path) {
+            DropKind::Patch
+        } else {
+            DropKind::Folder
+        };
+    }
+    classify(path, path.is_dir())
 }
 
 /// The name of a dropped item, for a message.
@@ -49,114 +68,156 @@ fn name_of(path: &Path) -> String {
 /// a repository.
 pub(super) fn folder_error(folder: &Path, err: &str) -> String {
     let name = name_of(folder);
-    if err.to_lowercase().contains("not a git repository") {
+    let lower = err.to_lowercase();
+    if lower.contains("not a git repository") || lower.contains("not inside a git repository") {
         format!("{name} isn't in a git repository: drop a repository's folder to open it")
     } else {
         format!("Could not open {name}: {err}")
     }
 }
 
-/// What came of giving a dropped patch to the tab.
-enum Applied {
-    /// The tab is busy: it is given again later.
-    Wait,
-    /// Given to it, or refused with a message.
-    Done,
-    /// The patch dropped before it failed: it and the rest are left out.
-    Stopped,
+/// The repository tab of `repo` among `tabs`.
+fn repo_tab<'a>(tabs: &'a mut [Tab], repo: &Path) -> Option<&'a mut RepoTab> {
+    tabs.iter_mut().find_map(|t| match t {
+        Tab::Repo(r) if r.path == repo => Some(&mut **r),
+        _ => None,
+    })
 }
 
-/// The dropped items still to be handled, in order.
+/// The dropped patches, each with the repository whose tab it was dropped on, applied one at a
+/// time; and the one being applied.
 #[derive(Default)]
-pub(super) struct Drops {
-    queue: VecDeque<(PathBuf, DropKind)>,
-    /// A patch of this drop was given to the tab: the next waits until it is done, and stops
-    /// if it failed.
-    applied: bool,
+pub(super) struct PatchQueue {
+    waiting: VecDeque<(PathBuf, PathBuf)>,
+    current: Option<(PathBuf, PathBuf)>,
+}
+
+impl PatchQueue {
+    pub(super) fn push(&mut self, file: PathBuf, repo: PathBuf) {
+        self.waiting.push_back((file, repo));
+    }
+
+    pub(super) fn is_empty(&self) -> bool {
+        self.waiting.is_empty() && self.current.is_none()
+    }
+
+    /// Takes in how the patch being applied went and gives the next one to its tab, until one
+    /// has to wait. Returns what to tell (each an error).
+    pub(super) fn advance(&mut self, tabs: &mut [Tab], ctx: &egui::Context) -> Vec<String> {
+        let mut said = Vec::new();
+        loop {
+            if let Some((file, repo)) = self.current.clone() {
+                let Some(tab) = repo_tab(tabs, &repo) else {
+                    self.current = None;
+                    said.push(closed(&file));
+                    continue;
+                };
+                match tab.take_dropped_patch_outcome() {
+                    None if tab.dropped_patch_waits() => return said,
+                    None | Some(Ok(())) => self.current = None,
+                    Some(Err(e)) => {
+                        self.current = None;
+                        said.push(self.failed(&file, &repo, &e));
+                    }
+                }
+            }
+            let Some((file, repo)) = self.waiting.pop_front() else {
+                return said;
+            };
+            let Some(tab) = repo_tab(tabs, &repo) else {
+                said.push(closed(&file));
+                continue;
+            };
+            if tab.dropped_patch_waits() {
+                self.waiting.push_front((file, repo));
+                return said;
+            }
+            match tab.apply_dropped_patch(file.clone(), ctx) {
+                Ok(()) => self.current = Some((file, repo)),
+                Err(e) => said.push(format!("{} wasn't applied: {e}", name_of(&file))),
+            }
+        }
+    }
+
+    /// `file` failed in `repo`: the patches dropped on it after it are left out.
+    fn failed(&mut self, file: &Path, repo: &Path, err: &str) -> String {
+        let before = self.waiting.len();
+        self.waiting.retain(|(_, r)| r != repo);
+        let left = before - self.waiting.len();
+        let mut said = format!("{} failed: {err}", name_of(file));
+        if left > 0 {
+            said.push_str(&format!(
+                " (so the {left} {} dropped after it {} not applied)",
+                if left == 1 { "patch" } else { "patches" },
+                if left == 1 { "was" } else { "were" }
+            ));
+        }
+        said
+    }
+}
+
+/// What is said of a patch whose repository's tab was closed before it was applied.
+fn closed(file: &Path) -> String {
+    format!(
+        "{} wasn't applied: its repository's tab was closed",
+        name_of(file)
+    )
 }
 
 impl App {
-    /// Takes in what was dropped on the window, handles it one item at a time, and shows a
-    /// hint while files are dragged over the window.
+    /// Takes in what was dropped on the window and handles it: folders open, patches go to the
+    /// repository tab they were dropped on. Shows a hint while files are dragged over it.
     pub(super) fn dropped_files(&mut self, ctx: &egui::Context) {
         let (dropped, hovered) =
             ctx.input(|i| (i.raw.dropped_files.clone(), !i.raw.hovered_files.is_empty()));
+        // The tab dropped on, before a dropped folder opens another.
+        let target = match self.tabs.get(self.active) {
+            Some(Tab::Repo(r)) => Some(r.path.clone()),
+            _ => None,
+        };
         for file in dropped {
             let path = file.path().to_owned();
-            let kind = classify(&path, path.is_dir());
-            self.drops.queue.push_back((path, kind));
-        }
-        self.handle_drops(ctx);
-        if hovered {
-            drop_hint(ctx);
-        }
-    }
-
-    /// Handles the dropped items until one has to wait (a patch being applied).
-    fn handle_drops(&mut self, ctx: &egui::Context) {
-        while let Some((path, kind)) = self.drops.queue.front().cloned() {
-            match kind {
-                DropKind::Patch => match self.apply_dropped(&path, ctx) {
-                    Applied::Wait => {
-                        // Waits for the tab: looked at again shortly.
-                        ctx.request_repaint_after(Duration::from_millis(150));
-                        return;
+            match kind_of(&path) {
+                DropKind::Folder => self.open_dropped_folder(&path, ctx),
+                DropKind::Patch => match &target {
+                    Some(repo) => self.patches.push(path, repo.clone()),
+                    None => {
+                        let msg = self.no_repo_for(&path);
+                        self.report(msg);
                     }
-                    Applied::Done => {
-                        self.drops.queue.pop_front();
-                    }
-                    Applied::Stopped => self.stop_patches(),
                 },
-                DropKind::Folder => {
-                    self.drops.queue.pop_front();
-                    self.open_dropped_folder(&path, ctx);
-                }
-                DropKind::Other => {
-                    self.drops.queue.pop_front();
-                    self.report(format!(
-                        "Can't open {}: drop a folder to open it, or a .patch, .diff, .eml or \
-                         .mbox file to apply it",
-                        name_of(&path)
-                    ));
-                }
+                DropKind::Other => self.report(format!(
+                    "Can't open {}: drop a folder to open it, or a .patch, .diff, .eml or .mbox \
+                     file to apply it",
+                    name_of(&path)
+                )),
             }
         }
-        self.drops.applied = false;
+        if !self.patches.is_empty() {
+            for msg in self.patches.advance(&mut self.tabs, ctx) {
+                self.toasts.push(Toast::new(msg, true));
+            }
+            if !self.patches.is_empty() {
+                // Its tab may be busy with something that doesn't wake the window when done.
+                ctx.request_repaint_after(Duration::from_millis(250));
+            }
+        }
+        if hovered {
+            let on_repo = target.is_some();
+            drop_hint(ctx, on_repo);
+        }
     }
 
-    /// Gives the patch `path` to the repository tab shown, once it is free.
-    fn apply_dropped(&mut self, path: &Path, ctx: &egui::Context) -> Applied {
-        let Some(Tab::Repo(repo)) = self.tabs.get_mut(self.active) else {
-            self.report(format!(
-                "Applying {} needs a repository open first: open one, then drop the patch on it",
-                name_of(path)
-            ));
-            return Applied::Done;
-        };
-        if repo.applying_patch() {
-            return Applied::Wait;
-        }
-        if self.drops.applied && repo.last_failed() {
-            return Applied::Stopped;
-        }
-        repo.apply_dropped_patch(path.to_owned(), ctx);
-        self.drops.applied = true;
-        Applied::Done
-    }
-
-    /// The patch before failed: the patches dropped after it are left out, and a toast says so.
-    fn stop_patches(&mut self) {
-        let before = self.drops.queue.len();
-        self.drops.queue.retain(|(_, k)| *k != DropKind::Patch);
-        let left = before - self.drops.queue.len();
-        self.drops.applied = false;
-        self.toasts.push(Toast::new(
+    /// Why a patch dropped where no repository is shown wasn't applied.
+    fn no_repo_for(&self, patch: &Path) -> String {
+        let name = name_of(patch);
+        if self.tabs.iter().any(|t| matches!(t, Tab::Repo(_))) {
+            format!("To apply {name}, show its repository's tab, then drop the patch there")
+        } else {
             format!(
-                "The patch before failed: {left} more dropped {} not applied",
-                if left == 1 { "was" } else { "were" }
-            ),
-            true,
-        ));
+                "Applying {name} needs a repository open first: open one, then drop the patch on it"
+            )
+        }
     }
 
     /// Opens the dropped folder's repository, or says why it can't.
@@ -173,18 +234,29 @@ impl App {
     }
 }
 
-/// A veil over the window while files are dragged over it, saying what a drop does.
-fn drop_hint(ctx: &egui::Context) {
+/// A veil over the window while files are dragged over it, saying what a drop does there.
+fn drop_hint(ctx: &egui::Context, on_repo: bool) {
+    let t = Tokens::get(ctx);
     let rect = ctx.content_rect();
     let painter = ctx.layer_painter(LayerId::new(Order::Foreground, Id::new("drop-hint")));
-    painter.rect_filled(rect, 0.0, Color32::from_black_alpha(140));
-    painter.text(
-        rect.center(),
-        Align2::CENTER_CENTER,
-        "Drop a folder to open it, or a patch to apply it",
-        theme::semibold(16.0),
-        Color32::WHITE,
+    painter.rect_filled(rect, 0.0, Color32::from_black_alpha(110));
+    let text = if on_repo {
+        "Drop a folder to open it, or a patch to apply it here"
+    } else {
+        "Drop a folder to open its repository"
+    };
+    let galley = painter.layout_no_wrap(text.to_owned(), theme::semibold(16.0), t.text);
+    let pill = Align2::CENTER_CENTER
+        .anchor_size(rect.center(), galley.size())
+        .expand2(egui::vec2(22.0, 14.0));
+    painter.rect(
+        pill,
+        t.radius_lg,
+        t.card,
+        Stroke::new(1.0, t.field_border),
+        egui::StrokeKind::Inside,
     );
+    painter.galley(pill.shrink2(egui::vec2(22.0, 14.0)).min, galley, t.text);
 }
 
 #[cfg(test)]
@@ -225,6 +297,127 @@ mod tests {
         assert_eq!(
             folder_error(Path::new("/x/y"), "detected dubious ownership"),
             "Could not open y: detected dubious ownership"
+        );
+    }
+
+    /// One on another machine is told by its name, without asking that machine.
+    #[test]
+    fn remote_drops_are_told_by_their_name() {
+        assert_eq!(
+            kind_of(Path::new("ssh://box/home/me/fix.PATCH")),
+            DropKind::Patch
+        );
+        assert_eq!(
+            kind_of(Path::new("ssh://box/home/me/repo")),
+            DropKind::Folder
+        );
+        #[cfg(windows)]
+        assert_eq!(
+            kind_of(Path::new(r"\\wsl.localhost\Ubuntu\home\me\repo")),
+            DropKind::Folder
+        );
+    }
+
+    /// The message a dropped folder outside any repository gets, through what opening it
+    /// really says.
+    #[test]
+    fn a_folder_outside_a_repository_says_so_through_repo_root() {
+        let dir =
+            std::env::temp_dir().join(format!("gitcraft-drop plain Ü {}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let err = repo_root(&dir).err().unwrap_or_default();
+        let _ = std::fs::remove_dir_all(&dir);
+        let name = name_of(&dir);
+        assert_eq!(
+            folder_error(&dir, &err),
+            format!("{name} isn't in a git repository: drop a repository's folder to open it"),
+            "{err}"
+        );
+    }
+
+    fn repo(name: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("gitcraft-dropq-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::create_dir_all(&dir);
+        for args in [
+            &["init", "-q"][..],
+            &["config", "user.name", "t"],
+            &["config", "user.email", "t@t"],
+        ] {
+            assert!(crate::git::run(Some(&dir), args).is_ok());
+        }
+        let _ = std::fs::write(dir.join("f.txt"), "one\n");
+        assert!(crate::git::run(Some(&dir), &["add", "-A"]).is_ok());
+        assert!(crate::git::run(Some(&dir), &["commit", "-q", "-m", "one"]).is_ok());
+        dir
+    }
+
+    /// Runs the queue until it is empty (or it took too long).
+    fn drain(queue: &mut PatchQueue, tabs: &mut [Tab], ctx: &egui::Context) -> Vec<String> {
+        let mut said = Vec::new();
+        for _ in 0..400 {
+            for tab in tabs.iter_mut() {
+                if let Tab::Repo(r) = tab {
+                    r.poll(ctx);
+                }
+            }
+            said.extend(queue.advance(tabs, ctx));
+            if queue.is_empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+        said
+    }
+
+    /// Patches go to the tab they were dropped on, whichever tab is shown meanwhile; one that
+    /// fails leaves out the ones dropped after it on the same tab, by its own outcome (not the
+    /// tab's status line); a closed tab's patch says so.
+    #[test]
+    fn dropped_patches_go_to_their_own_tab_and_stop_after_a_failure() {
+        let ctx = egui::Context::default();
+        let a = repo("a");
+        let b = repo("b");
+        let patches = std::env::temp_dir().join(format!("gitcraft-dropq-p-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&patches);
+        let good = patches.join("good.patch");
+        let _ = std::fs::write(
+            &good,
+            "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n@@ -1 +1,2 @@\n one\n+two\n",
+        );
+        let bad = patches.join("bad.diff");
+        let _ = std::fs::write(
+            &bad,
+            "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n@@ -1 +1 @@\n-nothing\n+else\n",
+        );
+        let mut tabs = vec![
+            Tab::Repo(Box::new(RepoTab::new_deferred(a.clone(), &ctx))),
+            Tab::Repo(Box::new(RepoTab::new_deferred(b.clone(), &ctx))),
+        ];
+        let mut queue = PatchQueue::default();
+        // Dropped on A: good, bad, then good again (left out after bad fails).
+        queue.push(good.clone(), a.clone());
+        queue.push(bad.clone(), a.clone());
+        queue.push(good.clone(), a.clone());
+        let said = drain(&mut queue, &mut tabs, &ctx);
+        let in_a = std::fs::read_to_string(a.join("f.txt")).unwrap_or_default();
+        let in_b = std::fs::read_to_string(b.join("f.txt")).unwrap_or_default();
+        // Dropped on B, whose tab is then closed.
+        queue.push(good, b.clone());
+        tabs.pop();
+        let closed_said = drain(&mut queue, &mut tabs, &ctx);
+        for dir in [&a, &b, &patches] {
+            let _ = std::fs::remove_dir_all(dir);
+        }
+        assert_eq!(in_a, "one\ntwo\n");
+        assert_eq!(in_b, "one\n");
+        assert_eq!(said.len(), 1, "{said:?}");
+        assert!(said[0].starts_with("bad.diff failed:"), "{said:?}");
+        assert!(said[0].ends_with("(so the 1 patch dropped after it was not applied)"));
+        assert_eq!(
+            closed_said,
+            vec!["good.patch wasn't applied: its repository's tab was closed".to_owned()]
         );
     }
 }

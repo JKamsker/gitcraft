@@ -75,7 +75,7 @@ impl App {
                         let w = (ui.available_width() - 36.0) / 4.0;
                         for (i, (icon, title, sub)) in [
                             ("folder-open", "Open", "An existing local repository"),
-                            ("folder-plus", "Create", "A new repository (git init)"),
+                            ("folder-plus", "Create", "A new, empty repository"),
                             ("log-in", "Clone", "Copy a remote repository"),
                             ("server", "Remote", "In WSL or over SSH"),
                         ]
@@ -192,7 +192,7 @@ fn action_card(ui: &mut Ui, width: f32, icon: &str, title: &str, subtitle: &str)
     let t = Tokens::get(ui.ctx());
     let (rect, resp) = ui.allocate_exact_size(vec2(width, 122.0), Sense::click());
     let fill = if resp.hovered() { t.hover } else { t.card };
-    let stroke = if resp.hovered() {
+    let stroke = if resp.hovered() || resp.has_focus() {
         t.accent
     } else {
         t.field_border

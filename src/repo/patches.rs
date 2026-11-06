@@ -53,66 +53,131 @@ impl RepoTab {
         else {
             return;
         };
-        self.apply_patch_from(file, ctx);
+        self.apply_patch_from(file, false, ctx);
     }
 
     /// Applies the patch file `file` (of this machine) to the repository, undoably: a mail as
     /// commits (`git am`), a bare diff on the working tree (`git apply`). For a patch dropped on
-    /// the window; the outcome shows in the tab's status line.
-    pub fn apply_dropped_patch(&mut self, file: PathBuf, ctx: &egui::Context) {
+    /// the window; how it went is told by [`Self::take_dropped_patch_outcome`]. Refused while
+    /// the tab runs an operation or applies another dropped patch.
+    pub fn apply_dropped_patch(
+        &mut self,
+        file: PathBuf,
+        ctx: &egui::Context,
+    ) -> Result<(), String> {
         if let Some(busy) = &self.busy_op {
-            self.status = Some((
-                format!("Apply {}: wait until {busy} is done", file_name(&file)),
-                true,
-            ));
-            return;
+            return Err(format!("{} is busy: {busy}", self.name));
+        }
+        if matches!(
+            self.dropped_patch,
+            DroppedPatch::Preparing | DroppedPatch::Running(_)
+        ) {
+            return Err(format!("{} is still applying a patch", self.name));
         }
         self.status = None;
-        self.apply_patch_from(file, ctx);
+        self.dropped_patch = DroppedPatch::Preparing;
+        self.apply_patch_from(file, true, ctx);
+        Ok(())
     }
 
-    /// Whether a patch given to [`Self::apply_dropped_patch`] is still being applied (or put on
-    /// the repository's machine first), or the tab is busy otherwise: another has to wait.
-    pub fn applying_patch(&self) -> bool {
-        self.patch_pending || self.is_busy()
+    /// Whether a dropped patch given now would have to wait: the tab runs an operation, or
+    /// applies the patch dropped before.
+    pub fn dropped_patch_waits(&self) -> bool {
+        self.busy_op.is_some()
+            || matches!(
+                self.dropped_patch,
+                DroppedPatch::Preparing | DroppedPatch::Running(_)
+            )
     }
 
-    /// Whether the last thing done in the tab failed (its status line says why).
-    pub fn last_failed(&self) -> bool {
-        matches!(self.status, Some((_, true)))
+    /// How the dropped patch went, once it is done (taken: asked once).
+    pub fn take_dropped_patch_outcome(&mut self) -> Option<Result<(), String>> {
+        match std::mem::take(&mut self.dropped_patch) {
+            DroppedPatch::Done(result) => Some(result),
+            other => {
+                self.dropped_patch = other;
+                None
+            }
+        }
     }
 
-    /// Reads `file` and applies it (see [`Self::apply_dropped_patch`]).
-    fn apply_patch_from(&mut self, file: PathBuf, ctx: &egui::Context) {
+    /// The operation `label` ended: when it applied the dropped patch, that is how it went.
+    pub(super) fn dropped_patch_done(&mut self, label: &str, result: &Result<String, String>) {
+        if matches!(&self.dropped_patch, DroppedPatch::Running(l) if l == label) {
+            self.dropped_patch = DroppedPatch::Done(result.clone().map(|_| ()));
+        }
+    }
+
+    /// Reads `file` and applies it (see [`Self::apply_dropped_patch`]); `dropped` keeps track
+    /// of how it goes.
+    fn apply_patch_from(&mut self, file: PathBuf, dropped: bool, ctx: &egui::Context) {
         // Copied as it is (a patch can carry bytes of any encoding); read as text only to tell
         // a mail from a bare diff.
         let bytes = match std::fs::read(&file) {
             Ok(bytes) => bytes,
             Err(e) => {
-                self.status = Some((format!("Apply patch: could not read it: {e}"), true));
+                let why = format!("could not read {}: {e}", file_name(&file));
+                self.status = Some((format!("Apply patch: {why}"), true));
+                if dropped {
+                    self.dropped_patch = DroppedPatch::Done(Err(why));
+                }
                 return;
             }
         };
         let label = format!("Apply {}", file_name(&file));
         let mail = is_mail(&String::from_utf8_lossy(&bytes));
         // For a repository on another machine, git there reads a copy put there (in the
-        // background).
+        // background). A panic there still comes back as an error, so that a dropped patch
+        // isn't waited for forever.
         let repo = self.path.clone();
-        self.patch_pending = true;
         self.here_or_later(
             ctx,
-            move || match crate::remote::parse(&repo) {
-                Some(target) => crate::remote::host_temp_file(&target, "apply.patch", &bytes),
-                None => Ok(file.to_string_lossy().into_owned()),
+            move || {
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(
+                    || match crate::remote::parse(&repo) {
+                        Some(target) => {
+                            crate::remote::host_temp_file(&target, "apply.patch", &bytes)
+                        }
+                        None => Ok(file.to_string_lossy().into_owned()),
+                    },
+                ))
+                .unwrap_or_else(|_| Err("internal error while copying it there".to_owned()))
             },
-            move |tab, file, ctx| {
-                tab.patch_pending = false;
-                match file {
-                    Ok(file) => tab.apply_patch_file(&label, &file, mail, ctx),
-                    Err(e) => tab.status = Some((format!("Apply patch: {e}"), true)),
-                }
-            },
+            move |tab, file, ctx| tab.apply_prepared_patch(label, file, mail, dropped, ctx),
         );
+    }
+
+    /// The patch is where git reads it (`file`), or couldn't be put there: applies it.
+    fn apply_prepared_patch(
+        &mut self,
+        label: String,
+        file: Result<String, String>,
+        mail: bool,
+        dropped: bool,
+        ctx: &egui::Context,
+    ) {
+        let started = match file {
+            Err(e) => Err(e),
+            // Another operation started meanwhile: it would not start, silently.
+            Ok(_) if self.busy_op.is_some() => Err(format!(
+                "wait until {} is done",
+                self.busy_op.clone().unwrap_or_default()
+            )),
+            Ok(file) => {
+                self.apply_patch_file(&label, &file, mail, ctx);
+                Ok(())
+            }
+        };
+        match started {
+            Ok(()) if dropped => self.dropped_patch = DroppedPatch::Running(label),
+            Ok(()) => {}
+            Err(e) => {
+                self.status = Some((format!("{label} failed: {e}"), true));
+                if dropped {
+                    self.dropped_patch = DroppedPatch::Done(Err(e));
+                }
+            }
+        }
     }
 
     /// Applies the patch at `file` (as git reads it), as commits when it is a `mail`.
@@ -139,6 +204,19 @@ impl RepoTab {
             );
         }
     }
+}
+
+/// Where a patch dropped on the window is.
+#[derive(Debug, Default)]
+pub(super) enum DroppedPatch {
+    #[default]
+    None,
+    /// Being read, or copied to the repository's machine.
+    Preparing,
+    /// Being applied by the operation so labelled.
+    Running(String),
+    /// Done: how it went.
+    Done(Result<(), String>),
 }
 
 fn file_name(path: &Path) -> String {

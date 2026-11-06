@@ -31,8 +31,9 @@ pub(super) fn repo_name(path: &Path) -> String {
 }
 
 /// How well `path` matches `query` (already lower-cased, trimmed): lower is better, `None` for
-/// no match. A name that contains it comes first, then a path that does, then names and paths
-/// whose letters come in its order.
+/// no match. A name that starts with it comes first, then a name that contains it, then a path
+/// that does, then a name whose letters come in its order (never a path so: almost every path
+/// has the letters of a short query somewhere).
 fn rank(path: &Path, query: &str) -> Option<u8> {
     let name = repo_name(path).to_lowercase();
     let full = crate::remote::display(path).to_lowercase();
@@ -44,8 +45,6 @@ fn rank(path: &Path, query: &str) -> Option<u8> {
         Some(2)
     } else if super::palette::fuzzy(&name, query) {
         Some(3)
-    } else if super::palette::fuzzy(&full, query) {
-        Some(4)
     } else {
         None
     }
@@ -133,6 +132,15 @@ mod tests {
         assert_eq!(filter(&recent, "bknd"), vec![0]);
         assert!(filter(&recent, "zzz").is_empty());
         assert!(filter(&[], "x").is_empty());
+    }
+
+    /// A short query doesn't match everything through the letters of long paths.
+    #[test]
+    fn letters_in_order_count_in_the_name_only() {
+        let recent = paths(&["/tmp/gitcraft-scan-1234/alpha", "/home/me/projects/beta"]);
+        assert_eq!(filter(&recent, "be"), vec![1]);
+        assert_eq!(filter(&recent, "aph"), vec![0]);
+        assert!(filter(&recent, "mrj").is_empty());
     }
 
     #[test]

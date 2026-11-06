@@ -60,6 +60,8 @@ pub(super) struct Taken<'a> {
     shell: Option<Shell>,
     /// It ran commands before (it may have gone away since).
     pub(super) reused: bool,
+    /// Given back with this as the time it was last used (see [`Pool::take_idle`]).
+    keep_used: Option<Instant>,
 }
 
 impl Taken<'_> {
@@ -68,7 +70,10 @@ impl Taken<'_> {
     }
 
     pub(super) fn give_back(mut self) {
-        if let Some(shell) = self.shell.take() {
+        if let Some(mut shell) = self.shell.take() {
+            if let Some(used) = self.keep_used {
+                shell.used = used;
+            }
             lock(&self.pool.state).idle.push(shell);
             self.pool.freed.notify_one();
         }
@@ -148,11 +153,22 @@ impl Pool {
 
     /// An idle shell that still answers, if there is one: never a new connection (which could
     /// ask for a password or start WSL).
-    pub(super) fn take_idle(&self) -> Option<Taken<'_>> {
+    /// Only one used within `fresh`, so that reads nobody asked for don't keep alive a
+    /// connection nothing else uses; and those reads don't count as use (the shell keeps the
+    /// time it was last used, and still closes once idle long enough).
+    pub(super) fn take_idle(&self, fresh: Duration) -> Option<Taken<'_>> {
         loop {
-            let mut shell = lock(&self.state).idle.pop()?;
+            let mut shell = {
+                let mut state = lock(&self.state);
+                let i = state.idle.iter().rposition(|s| s.used.elapsed() < fresh)?;
+                state.idle.remove(i)
+            };
+            let used = shell.used;
             if shell.usable() {
-                return Some(self.taken(shell, true));
+                shell.used = used;
+                let mut taken = self.taken(shell, true);
+                taken.keep_used = Some(used);
+                return Some(taken);
             }
             drop(shell);
             self.close_one();
@@ -164,7 +180,25 @@ impl Pool {
             pool: self,
             shell: Some(shell),
             reused,
+            keep_used: None,
         }
+    }
+
+    /// For tests: `shell` as if it had been opened by the pool and left idle.
+    #[cfg(test)]
+    pub(super) fn add_idle(&self, shell: Shell) {
+        let mut state = lock(&self.state);
+        state.open += 1;
+        state.idle.push(shell);
+    }
+
+    /// For tests: how many shells are open, whether a connection was tried and failed, and
+    /// when the idle ones were last used.
+    #[cfg(test)]
+    pub(super) fn looks(&self) -> (usize, bool, Vec<Instant>) {
+        let state = lock(&self.state);
+        let used = state.idle.iter().map(|s| s.used).collect();
+        (state.open, state.failed.is_some(), used)
     }
 
     /// One shell less (already closed by the caller, outside the lock).
