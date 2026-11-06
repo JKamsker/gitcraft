@@ -16,8 +16,9 @@ so your config, credentials and hooks apply as usual.
   shows every repository's branch, uncommitted files, ahead / behind and last fetch, looked at in
   the background a few at a time; _Fetch all_ and _Open all_ work on the whole group.
 - _Where's my work?_ (start page or palette): one panel over every repository gitcraft knows, on
-  every machine, listing commits not pushed, stashes, worktrees with uncommitted changes and
-  branches whose remote branch is gone, each with _Push_ and _Open_. One round trip per
+  every machine, listing commits not pushed, repositories with no remote, stashes, uncommitted
+  changes (in any worktree) and branches whose remote branch is gone. Each repository has
+  _Open_; a branch has _Push_ when it goes to a remote branch of its own name. One round trip per
   repository, a few at a time; it can also search a machine's home folder (here, WSL
   distributions, `~/.ssh/config` hosts) for repositories gitcraft doesn't know yet.
 - Browser-like tabs, one per repository (Ctrl+T, Ctrl+W, middle-click; Ctrl+Shift+T reopens a

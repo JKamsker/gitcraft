@@ -398,8 +398,12 @@ impl App {
         if settings && !modal_open {
             self.open_settings();
         }
-        // Not over a dialog that asks something (the clone, the remote one, ssh's question).
-        let asking = self.clone_form.is_some() || self.remote_form.is_some() || self.askpass_open();
+        // Not over a dialog that asks something (the clone, the remote one, ssh's question) or
+        // the Where's my work? panel.
+        let asking = self.clone_form.is_some()
+            || self.remote_form.is_some()
+            || self.askpass_open()
+            || self.my_work.open;
         if manual && !asking && self.palette.is_none() {
             self.manual_open = !self.manual_open;
         }
@@ -441,6 +445,7 @@ impl App {
                     || self.manual_open
                     || self.clone_form.is_some()
                     || self.remote_form.is_some()
+                    || self.my_work.open
                     || asking;
                 // Its widgets' state (scroll offsets, text fields' undo, open menus) is its own:
                 // every repository tab lays out the same widgets, which would otherwise share

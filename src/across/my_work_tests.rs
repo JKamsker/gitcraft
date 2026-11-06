@@ -76,29 +76,192 @@ fn a_repository_with_nothing_only_here_lists_nothing() -> Result<(), String> {
 }
 
 #[test]
-fn pushes_a_branch_to_its_upstream_even_under_another_name() -> Result<(), String> {
+fn pushes_a_branch_to_its_upstream_by_name() -> Result<(), String> {
     let (repo, origin) = pushed_repo("push-upstream")?;
     run(&repo, &["checkout", "-q", "-b", "mine"])?;
     commit(&repo, "two")?;
-    run(&repo, &["push", "-q", "origin", "mine:theirs-name"])?;
-    run(
-        &repo,
-        &["branch", "-q", "--set-upstream-to", "origin/theirs-name"],
-    )?;
+    run(&repo, &["push", "-q", "-u", "origin", "mine"])?;
     commit(&repo, "three")?;
     // Checked out elsewhere: the push is by name, not of HEAD.
     run(&repo, &["checkout", "-q", "main"])?;
-    let before = look(&repo)?;
-    assert!(work_of(&before).iter().any(|w| matches!(w,
-        Work::Unpushed { branch, upstream: Some(up), commits: 1 }
-            if branch == "mine" && up == "origin/theirs-name")));
+    let work = work_of(&look(&repo)?);
+    assert!(work.iter().any(|w| matches!(w,
+        Work::Unpushed { branch, upstream: Some(up), commits: 1, tracks: Tracks::SameName }
+            if branch == "mine" && up == "origin/mine")));
+    let pushes: Vec<_> = work.iter().filter_map(Work::push).collect();
+    assert_eq!(pushes, [("mine", true)]);
     push_branch(&repo, "mine", true)?;
-    let mine = run(&repo, &["rev-parse", "mine"])?;
-    let theirs = run(&origin, &["rev-parse", "refs/heads/theirs-name"])?;
-    assert_eq!(mine, theirs);
-    assert!(run(&origin, &["rev-parse", "--verify", "-q", "refs/heads/mine"]).is_err());
+    assert_eq!(
+        run(&repo, &["rev-parse", "mine"])?,
+        run(&origin, &["rev-parse", "refs/heads/mine"])?
+    );
     run(&repo, &["fetch", "-q"])?;
     assert!(work_of(&look(&repo)?).is_empty());
+    Ok(())
+}
+
+/// `git checkout -b feature origin/main` makes `feature` track `origin/main`: pushing it there
+/// would put its commits on main. There is no Push for it, and a push is refused.
+#[test]
+fn never_pushes_onto_a_branch_of_another_name() -> Result<(), String> {
+    let (repo, origin) = pushed_repo("push-other-name")?;
+    run(&repo, &["checkout", "-q", "-b", "feature", "origin/main"])?;
+    commit(&repo, "two")?;
+    let work = work_of(&look(&repo)?);
+    let row = work
+        .iter()
+        .find(|w| matches!(w, Work::Unpushed { branch, .. } if branch == "feature"))
+        .ok_or("feature isn't listed")?;
+    assert_eq!(
+        row.describe(),
+        "feature: 1 commit not pushed to origin/main"
+    );
+    assert_eq!(row.push(), None);
+    assert!(
+        row.why_no_push()
+            .is_some_and(|why| why.contains("another name")),
+        "{row:?}"
+    );
+    let before = run(&origin, &["rev-parse", "refs/heads/main"])?;
+    let err = push_branch(&repo, "feature", true)
+        .err()
+        .unwrap_or_default();
+    assert!(
+        err.contains("origin/main, a branch of another name"),
+        "{err}"
+    );
+    let err = push_branch(&repo, "feature", false)
+        .err()
+        .unwrap_or_default();
+    assert!(err.contains("another name"), "{err}");
+    assert_eq!(run(&origin, &["rev-parse", "refs/heads/main"])?, before);
+    assert!(
+        run(
+            &origin,
+            &["rev-parse", "--verify", "-q", "refs/heads/feature"]
+        )
+        .is_err()
+    );
+    Ok(())
+}
+
+/// A push remote set elsewhere (a fork workflow) means the push doesn't belong on the remote
+/// the branch tracks.
+#[test]
+fn refuses_a_push_set_to_go_elsewhere() -> Result<(), String> {
+    let (repo, origin) = pushed_repo("push-remote")?;
+    run(&repo, &["remote", "add", "fork", "../origin.git"])?;
+    commit(&repo, "two")?;
+    run(&repo, &["config", "branch.main.pushRemote", "fork"])?;
+    let err = push_branch(&repo, "main", true).err().unwrap_or_default();
+    assert!(err.contains("pushed to fork"), "{err}");
+    run(&repo, &["config", "--unset", "branch.main.pushRemote"])?;
+    run(&repo, &["config", "remote.pushDefault", "fork"])?;
+    let err = push_branch(&repo, "main", true).err().unwrap_or_default();
+    assert!(err.contains("pushed to fork"), "{err}");
+    assert_ne!(
+        run(&repo, &["rev-parse", "main"])?,
+        run(&origin, &["rev-parse", "refs/heads/main"])?
+    );
+    Ok(())
+}
+
+/// A branch tracking a branch of this repository has no Push, and a push leaves its tracking
+/// as it was.
+#[test]
+fn a_branch_tracking_a_local_one_isnt_pushed() -> Result<(), String> {
+    let (repo, origin) = pushed_repo("push-local")?;
+    run(
+        &repo,
+        &["checkout", "-q", "-b", "follower", "--track", "main"],
+    )?;
+    commit(&repo, "two")?;
+    let work = work_of(&look(&repo)?);
+    let row = work
+        .iter()
+        .find(|w| matches!(w, Work::Unpushed { branch, .. } if branch == "follower"))
+        .ok_or("follower isn't listed")?;
+    assert!(matches!(
+        row,
+        Work::Unpushed {
+            tracks: Tracks::Local,
+            ..
+        }
+    ));
+    assert_eq!(row.push(), None);
+    assert!(
+        row.describe()
+            .contains("tracks a branch of this repository")
+    );
+    let err = push_branch(&repo, "follower", false)
+        .err()
+        .unwrap_or_default();
+    assert!(err.contains("local branch"), "{err}");
+    assert_eq!(
+        run(&repo, &["config", "branch.follower.remote"])?.trim(),
+        "."
+    );
+    assert!(
+        run(
+            &origin,
+            &["rev-parse", "--verify", "-q", "refs/heads/follower"]
+        )
+        .is_err()
+    );
+    Ok(())
+}
+
+/// A repository with commits and no remote has nothing anywhere else.
+#[test]
+fn a_repository_with_no_remote_isnt_safe() -> Result<(), String> {
+    let root = scratch("no-remote")?;
+    for args in [
+        &["init", "-q", "-b", "main"][..],
+        &["config", "user.name", "T"],
+        &["config", "user.email", "t@t"],
+        &["config", "commit.gpgSign", "false"],
+    ] {
+        run(&root, args)?;
+    }
+    // Before the first commit there is nothing to lose.
+    assert!(work_of(&look(&root)?).is_empty());
+    commit(&root, "one")?;
+    let work = work_of(&look(&root)?);
+    assert_eq!(work, vec![Work::NoRemote]);
+    assert_eq!(work[0].describe(), "no remote: its commits are only here");
+    assert_eq!(work[0].push(), None);
+    Ok(())
+}
+
+/// A branch whose remote branch was deleted is one row with its count, and only while it has
+/// commits on no remote: one merged and deleted there has nothing only here.
+#[test]
+fn a_gone_branch_is_one_row_and_only_with_its_own_commits() -> Result<(), String> {
+    let (repo, origin) = pushed_repo("gone")?;
+    for b in ["merged", "kept"] {
+        run(&repo, &["checkout", "-q", "-b", b, "main"])?;
+        commit(&repo, b)?;
+        run(&repo, &["push", "-q", "-u", "origin", b])?;
+    }
+    commit(&repo, "kept two")?;
+    run(&repo, &["checkout", "-q", "main"])?;
+    run(&repo, &["merge", "-q", "--ff-only", "merged"])?;
+    run(&repo, &["push", "-q", "origin", "main"])?;
+    for b in ["merged", "kept"] {
+        run(&origin, &["branch", "-q", "-D", b])?;
+    }
+    run(&repo, &["fetch", "-q", "--prune"])?;
+    let work = work_of(&look(&repo)?);
+    let texts: Vec<String> = work.iter().map(Work::describe).collect();
+    assert_eq!(
+        texts,
+        ["kept: its remote branch is gone, 2 commits on no remote"]
+    );
+    assert_eq!(work[0].push(), None);
+    // And a push of it from elsewhere doesn't make it again.
+    let err = push_branch(&repo, "kept", true).err().unwrap_or_default();
+    assert!(err.contains("gone"), "{err}");
+    assert!(run(&origin, &["rev-parse", "--verify", "-q", "refs/heads/kept"]).is_err());
     Ok(())
 }
 
@@ -198,8 +361,12 @@ fn rows_read_in_words() {
         "worktree /w/side: 1 file with uncommitted changes"
     );
     assert_eq!(
-        Work::Gone("old".into()).describe(),
-        "old: its remote branch is gone"
+        Work::Gone {
+            branch: "old".into(),
+            commits: 1
+        }
+        .describe(),
+        "old: its remote branch is gone, 1 commit on no remote"
     );
     assert_eq!(Work::Uncommitted(3).icon(), "file-diff");
 }
