@@ -19,7 +19,7 @@ use std::sync::Arc;
 use egui::{PointerButton, Response, Ui};
 
 use super::actions::{BranchRef, interactive_rebase_action};
-use super::operations::{expect_ref, expect_symref};
+use super::operations::{expect_ref, expect_ref_at, expect_symref};
 use super::{
     Action, Refresh, RepoTab, Undo, fast_forward_action, merge_action, ops, rebase_action, short,
 };
@@ -304,20 +304,20 @@ fn head_move(label: String, args: &[&str]) -> Action {
 
 /// Moves the local branch `branch`, which isn't checked out, from `from_tip` forward to `to`
 /// (at `to_tip`, which the drop found it behind). Only while it is still at `from_tip`: a
-/// commit made on it since would not be a fast-forward of what was shown. Undo puts it back
-/// while it is still where this left it.
+/// commit made on it since would not be a fast-forward of what was shown. `git branch -f`
+/// refuses a branch checked out here or in another worktree, or being rebased or bisected
+/// there, which may have happened since the drop. Undo puts it back while it is still where
+/// this left it, under the same checks.
 fn fast_forward_branch(branch: &str, to: &Rev, to_tip: &str, from_tip: &str) -> Action {
     let full = format!("refs/heads/{branch}");
-    let label = format!("Fast-forward {branch} to {}", to.label());
-    let reflog = format!("gitcraft: {label}");
-    let update = |new: &str, old: &str| ops(&[&["update-ref", "-m", &reflog, &full, new, old]]);
+    let force = |at: &str| ops(&[&["branch", "-f", "--end-of-options", branch, at]]);
     Action::UndoableOps {
-        label: label.clone(),
-        ops: update(to_tip, from_tip),
+        label: format!("Fast-forward {branch} to {}", to.label()),
+        ops: [vec![expect_ref_at(&full, from_tip)], force(to_tip)].concat(),
         refresh: Refresh::All,
         undo: Undo::Custom {
-            undo: [vec![expect_ref(&full)], update(from_tip, to_tip)].concat(),
-            redo: update(to_tip, from_tip),
+            undo: [vec![expect_ref(&full)], force(from_tip)].concat(),
+            redo: [vec![expect_ref_at(&full, from_tip)], force(to_tip)].concat(),
         },
     }
 }

@@ -409,3 +409,61 @@ fn a_reorder_keeps_a_commit_made_since_the_drop() {
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(after, ["d", "b", "a", "c", "base"]);
 }
+
+/// A fast-forward of another branch refuses once that branch is checked out (in the
+/// terminal, while the menu was open): moving it under its checkout would leave the working
+/// tree at the old commit, its changes staged as their reverse.
+#[test]
+fn a_fast_forward_refuses_once_its_branch_is_checked_out() {
+    let dir = repo("ff-checked-out");
+    git_ok(&dir, &["branch", "topic"]);
+    commit(&dir, "m.txt", "ahead on main");
+    let (ctx, mut tab) = open(&dir);
+    let before = tip(&dir, "topic");
+    let target = DropTarget::Branch(branch(&dir, "topic"));
+    let offers = offered(&tab, DragItem::Branch(branch(&dir, "main")), &target);
+    git_ok(&dir, &["switch", "-q", "topic"]);
+    choose(&mut tab, &ctx, &offers, "Fast-forward topic to main");
+    let after = tip(&dir, "topic");
+    let staged = git_ok(&dir, &["diff", "--cached", "--name-only"]);
+    let failed = tab.status.as_ref().is_some_and(|(_, err)| *err);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(after, before);
+    assert!(staged.is_empty(), "{staged}");
+    assert!(failed);
+}
+
+/// Nor while it is being rebased in another worktree, where git lists it as detached: the
+/// rebase could not finish onto a branch moved under it.
+#[test]
+fn a_fast_forward_refuses_a_branch_being_rebased_elsewhere() {
+    let dir = repo("ff-rebasing");
+    git_ok(&dir, &["branch", "topic"]);
+    commit(&dir, "m.txt", "ahead on main");
+    let (ctx, mut tab) = open(&dir);
+    let before = tip(&dir, "topic");
+    let target = DropTarget::Branch(branch(&dir, "topic"));
+    let offers = offered(&tab, DragItem::Branch(branch(&dir, "main")), &target);
+    let wt = dir.with_extension("wt");
+    let _ = std::fs::remove_dir_all(&wt);
+    let wt_path = wt.to_string_lossy().into_owned();
+    git_ok(&dir, &["worktree", "add", "-q", &wt_path, "topic"]);
+    // A rebase stopped at its first step, the branch detached meanwhile.
+    git_ok(
+        &wt,
+        &[
+            "-c",
+            "sequence.editor=sed -i s/^pick/edit/",
+            "rebase",
+            "-q",
+            "-i",
+            "--root",
+        ],
+    );
+    choose(&mut tab, &ctx, &offers, "Fast-forward topic to main");
+    let after = tip(&dir, "topic");
+    let _ = git::run(Some(&wt), &["rebase", "--abort"]);
+    let _ = std::fs::remove_dir_all(&wt);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(after, before);
+}
