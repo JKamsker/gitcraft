@@ -5,6 +5,7 @@
 use std::io::{Read, Write};
 use std::path::Path;
 use std::process::{Child, Stdio};
+use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 
 use super::command::{Extra, git_cmd, remote_request, with_profile};
@@ -108,19 +109,30 @@ fn run_here(
             Err(e) => return Err(format!("could not wait for git: {e}")),
         }
     };
-    let collect = |h: std::thread::JoinHandle<Vec<u8>>| h.join().unwrap_or_default();
+    // Something git (a hook) left running in the background may hold the pipes open: what
+    // they said is waited for until the limit only (and a moment more), not until it ends.
+    let until = deadline.max(Instant::now() + GRACE);
+    let collect = |rx: Receiver<Vec<u8>>| {
+        rx.recv_timeout(until.saturating_duration_since(Instant::now()))
+            .unwrap_or_default()
+    };
     Ok((status.code(), collect(stdout), collect(stderr)))
 }
 
-/// Reads all of `pipe` on a thread of its own.
-fn drain(pipe: Option<impl Read + Send + 'static>) -> std::thread::JoinHandle<Vec<u8>> {
+/// How long the output of a call that ended is still waited for, past its limit.
+const GRACE: Duration = Duration::from_millis(500);
+
+/// Reads all of `pipe` on a thread of its own, and sends it once it is closed.
+fn drain(pipe: Option<impl Read + Send + 'static>) -> Receiver<Vec<u8>> {
+    let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         let mut out = Vec::new();
         if let Some(mut pipe) = pipe {
             let _ = pipe.read_to_end(&mut out);
         }
-        out
-    })
+        let _ = tx.send(out);
+    });
+    rx
 }
 
 /// Stops `child` and everything it started: its process group on Unix, its process tree on
@@ -208,6 +220,30 @@ mod tests {
             err.as_ref().is_err_and(|e| e.contains("didn't finish")),
             "{err:?}"
         );
+        Ok(())
+    }
+
+    /// What a call left running in the background, holding its output open, isn't waited for
+    /// past the limit.
+    #[cfg(unix)]
+    #[test]
+    fn what_is_left_running_is_not_waited_for() -> Result<(), String> {
+        let dir = scratch("background");
+        git_cmd()
+            .args(["init", "-q"])
+            .arg(&dir)
+            .status()
+            .map_err(|e| e.to_string())?;
+        let started = Instant::now();
+        let out = run_timed(
+            &dir,
+            &["-c", "alias.bg=!sleep 30 & echo started", "bg"],
+            None,
+            Duration::from_millis(500),
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(started.elapsed() < Duration::from_secs(10));
+        assert!(out.is_ok(), "{out:?}");
         Ok(())
     }
 }

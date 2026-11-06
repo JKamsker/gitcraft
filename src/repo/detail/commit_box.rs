@@ -32,8 +32,10 @@ impl RepoTab {
                     .on_hover_text(
                         "Rewrite the last commit with the staged changes and this message",
                     );
-                amend_started =
-                    amend.changed() && self.amend && self.commit_summary.trim().is_empty();
+                // Over an empty box, or what the template and hook put there.
+                amend_started = amend.changed()
+                    && self.amend
+                    && (self.commit_summary.trim().is_empty() || self.unedited_prefill());
             });
         });
         if amend_started {
@@ -45,10 +47,8 @@ impl RepoTab {
                 move || crate::git::head_message(&repo),
                 |tab, msg, _| {
                     let Ok(msg) = msg else { return };
-                    if tab.amend && tab.commit_summary.trim().is_empty() {
-                        let (summary, body) = msg.split_once('\n').unwrap_or((msg.as_str(), ""));
-                        tab.commit_summary = summary.trim().to_owned();
-                        tab.commit_body = body.trim().to_owned();
+                    if tab.amend {
+                        tab.take_message(&msg);
                     }
                 },
             );
@@ -102,8 +102,11 @@ impl RepoTab {
         } else {
             "Stage all and commit".to_owned()
         };
+        // An unchanged template is refused, as git refuses it.
+        let untouched = !rebasing && self.unedited_template();
         let can = idle
             && (rebasing || !self.commit_summary.trim().is_empty())
+            && !untouched
             && self.work.conflicted.is_empty();
         // Only from the message fields, so Ctrl+Enter in the terminal stays the shell's.
         let shortcut = (summary.has_focus() || body.has_focus())
@@ -112,7 +115,11 @@ impl RepoTab {
         if (resp.clicked() || (shortcut && can)) && can {
             acts.push(Action::Commit);
         }
-        resp.on_hover_text("Ctrl+Enter");
+        if untouched {
+            resp.on_hover_text("Edit the message first: it is still the template");
+        } else {
+            resp.on_hover_text("Ctrl+Enter");
+        }
 
         ui.add_space(4.0);
         self.identity_row(ui, acts);

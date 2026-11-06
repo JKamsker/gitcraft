@@ -12,6 +12,11 @@ use crate::remote;
 /// How long `prepare-commit-msg` may take before it is stopped.
 pub const HOOK_LIMIT: Duration = Duration::from_secs(10);
 
+/// The file the hook is given the message in, in the git folder: not git's own
+/// `COMMIT_EDITMSG`, which holds what a failed `git commit` was given (and may be open in an
+/// editor).
+const MESSAGE_FILE: &str = "GITCRAFT_EDITMSG";
+
 /// How long a message filter (`stripspace`, `interpret-trailers`) may take.
 const FILTER_LIMIT: Duration = Duration::from_secs(30);
 
@@ -35,8 +40,21 @@ pub fn commit_template(repo: &Path) -> Result<Option<String>, String> {
     let file = remote::resolve(repo, printed);
     let text = remote::read_to_string(&file)
         .map_err(|e| format!("commit.template is set to {printed}, which can't be read: {e}"))?;
+    let starts_blank = text
+        .lines()
+        .next()
+        .is_some_and(|first| first.trim().is_empty());
     let text = strip_comments(repo, &text)?;
-    Ok((!text.trim().is_empty()).then_some(text))
+    if text.trim().is_empty() {
+        return Ok(None);
+    }
+    // A template that starts with a blank line leaves the summary to write: what follows is
+    // the description (git's stripspace would make its first line the summary).
+    Ok(Some(if starts_blank {
+        format!("\n{text}")
+    } else {
+        text
+    }))
 }
 
 /// `text` as git cleans a message it opened an editor for: comment lines (`core.commentChar`)
@@ -60,6 +78,8 @@ pub enum MessageSource {
     Empty,
     /// The repository's `commit.template`.
     Template,
+    /// A message given to git (`-m`): what was typed in the box.
+    Message,
     /// A merge in progress, whose message git prepared.
     Merge,
     /// Amending: the commit whose message is reused.
@@ -72,6 +92,7 @@ impl MessageSource {
         match self {
             Self::Empty => Vec::new(),
             Self::Template => vec!["template"],
+            Self::Message => vec!["message"],
             Self::Merge => vec!["merge"],
             Self::Commit(rev) => vec!["commit", rev.as_str()],
         }
@@ -93,7 +114,7 @@ pub fn prepare_commit_msg(
             "--git-path",
             "hooks/prepare-commit-msg",
             "--git-path",
-            "COMMIT_EDITMSG",
+            MESSAGE_FILE,
         ],
     )?;
     let mut lines = paths.lines();
@@ -110,7 +131,7 @@ pub fn prepare_commit_msg(
         seed.push('\n');
     }
     remote::write(&msg_file, seed.as_bytes())
-        .map_err(|e| format!("could not write {msg} for prepare-commit-msg: {e}"))?;
+        .map_err(|e| format!("Couldn't write {msg} for prepare-commit-msg: {e}"))?;
     let mut args = vec![
         "hook",
         "run",
@@ -122,7 +143,7 @@ pub fn prepare_commit_msg(
     args.extend(source.args());
     run_timed(repo, &args, None, HOOK_LIMIT).map_err(hook_error)?;
     let left = remote::read_to_string(&msg_file)
-        .map_err(|e| format!("could not read what prepare-commit-msg left in {msg}: {e}"))?;
+        .map_err(|e| format!("Couldn't read what prepare-commit-msg left in {msg}: {e}"))?;
     strip_comments(repo, &left).map(Some)
 }
 
@@ -131,8 +152,16 @@ fn hook_error(err: String) -> String {
     if err.contains("is not a git command") || err.contains("unknown subcommand") {
         "Running prepare-commit-msg needs git 2.36 or newer".to_owned()
     } else {
-        format!("prepare-commit-msg failed: {err}")
+        format!("prepare-commit-msg failed: {}", first_lines(&err, 3))
     }
+}
+
+/// The first `n` lines of `text`, `…` after them when there are more.
+fn first_lines(text: &str, n: usize) -> String {
+    let mut lines = text.lines();
+    let head: Vec<&str> = lines.by_ref().take(n).collect();
+    let more = lines.next().is_some();
+    format!("{}{}", head.join("\n"), if more { "\n…" } else { "" })
 }
 
 /// Someone who made commits in the repository, as `.mailmap` names them.
@@ -206,10 +235,16 @@ pub fn add_trailer(repo: &Path, message: &str, key: &str, value: &str) -> Result
     let mut input = message.trim_end().to_owned();
     input.push('\n');
     let trailer = format!("{key}: {value}");
+    // The box commits with `-m`, which keeps `#` lines: they are text here, not comments
+    // (`#123 fixed` would otherwise end up after the trailer), and `---` is no divider.
+    let comment = format!("core.commentChar={}", unused_char(&input));
     run_timed(
         repo,
         &[
+            "-c",
+            &comment,
             "interpret-trailers",
+            "--no-divider",
             "--if-exists",
             "addIfDifferent",
             "--trailer",
@@ -219,7 +254,17 @@ pub fn add_trailer(repo: &Path, message: &str, key: &str, value: &str) -> Result
         FILTER_LIMIT,
     )
     .map(|out| out.trim_end().to_owned())
-    .map_err(|e| format!("could not add the {key} trailer: {e}"))
+    .map_err(|e| format!("Couldn't add the {key} trailer: {e}"))
+}
+
+/// A character `text` doesn't have, for git to take as its comment character.
+fn unused_char(text: &str) -> char {
+    [
+        '\u{1}', '\u{2}', '\u{3}', '\u{4}', '\u{5}', '\u{6}', '\u{7}', '`', '|', '~',
+    ]
+    .into_iter()
+    .find(|c| !text.contains(*c))
+    .unwrap_or('\u{1}')
 }
 
 /// The subjects of the latest commits on HEAD (none on a branch with no commit yet).
@@ -266,6 +311,7 @@ mod tests {
         assert!(MessageSource::Empty.args().is_empty());
         assert_eq!(MessageSource::Template.args(), ["template"]);
         assert_eq!(MessageSource::Merge.args(), ["merge"]);
+        assert_eq!(MessageSource::Message.args(), ["message"]);
         assert_eq!(
             MessageSource::Commit("HEAD".into()).args(),
             ["commit", "HEAD"]
@@ -277,5 +323,7 @@ mod tests {
         let err = hook_error("git: 'hook' is not a git command. See 'git --help'.".into());
         assert!(err.contains("2.36"), "{err}");
         assert!(hook_error("exit 3".into()).starts_with("prepare-commit-msg failed"));
+        let long = hook_error("a\nb\nc\nd\ne".into());
+        assert!(long.ends_with("a\nb\nc\n…"), "{long}");
     }
 }

@@ -27,10 +27,11 @@ enum Pick {
 
 impl RepoTab {
     pub(super) fn templates_button(&mut self, ui: &mut Ui) {
-        let b = icons::small_button(ui, "list", "Templates");
+        let b = icons::small_button(ui, "list", "Templates and prepare-commit-msg");
         let t = Tokens::get(ui.ctx());
         let ctx = ui.ctx().clone();
-        let mut store = Store::load(&ctx);
+        // Read only while the menu shows, not on every frame.
+        let mut store: Option<Store> = None;
         let mut pick = None;
         let repo = self.repo_key().to_path_buf();
         let template = self.compose.template.clone();
@@ -41,7 +42,7 @@ impl RepoTab {
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
             .show(|ui| {
                 ui.label(RichText::new("Start from").color(t.text_faint).small());
-                let tip = "Replaces the message with the file commit.template names";
+                let tip = "Replaces the message with the file commit.template names (Undo brings it back)";
                 if ui
                     .add_enabled(template.is_some(), egui::Button::new("commit.template"))
                     .on_hover_text(tip)
@@ -61,6 +62,7 @@ impl RepoTab {
                 {
                     pick = Some(Pick::Hook);
                 }
+                let store = store.insert(Store::load(&ctx));
                 for (scope, title) in [
                     (Scope::Repo, "This repository"),
                     (Scope::Global, "All repositories"),
@@ -81,6 +83,7 @@ impl RepoTab {
                     ui.close();
                 }
             });
+        let Some(mut store) = store else { return };
         match pick {
             Some(Pick::Text(text)) => {
                 self.set_message(&text);
@@ -112,21 +115,33 @@ impl RepoTab {
 }
 
 /// A saved template: click to use it, × to delete it.
+/// A saved template: click to use it, × (at the far end, away from the name) to delete it.
 fn template_row(ui: &mut Ui, scope: Scope, template: &Template, pick: &mut Option<Pick>) {
     ui.horizontal(|ui| {
-        if icons::small_button(ui, "x", "Delete this template").clicked() {
-            *pick = Some(Pick::Delete(scope, template.name.clone()));
-        }
-        let first = template.text.lines().next().unwrap_or_default();
         if ui
             .add(egui::Button::new(&template.name).truncate())
-            .on_hover_text(format!("Replaces the message with:\n\n{}", template.text))
+            .on_hover_text(format!(
+                "Replaces the message (Undo brings it back) with:\n\n{}",
+                template.text
+            ))
             .clicked()
         {
             *pick = Some(Pick::Text(template.text.clone()));
         }
-        let t = Tokens::get(ui.ctx());
-        ui.add(egui::Label::new(RichText::new(first).color(t.text_faint).small()).truncate());
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let delete = format!("Delete the template {}", template.name);
+            if icons::small_button(ui, "x", &delete).clicked() {
+                *pick = Some(Pick::Delete(scope, template.name.clone()));
+            }
+            let first = template
+                .text
+                .trim_start()
+                .lines()
+                .next()
+                .unwrap_or_default();
+            let t = Tokens::get(ui.ctx());
+            ui.add(egui::Label::new(RichText::new(first).color(t.text_faint).small()).truncate());
+        });
     });
 }
 

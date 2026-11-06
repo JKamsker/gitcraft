@@ -87,7 +87,7 @@ fn clean_scope(scope: &str) -> String {
 
 fn conventional_re() -> Option<&'static Regex> {
     static RE: OnceLock<Option<Regex>> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^([A-Za-z][\w-]*)(?:\(([^()\r\n]*)\))?(!)?: ?").ok())
+    RE.get_or_init(|| Regex::new(r"^([A-Za-z][\w-]*)(?:\(([^()\r\n]*)\))?(!)?:(?: |$)").ok())
         .as_ref()
 }
 
@@ -122,8 +122,24 @@ pub fn parse_gitmoji(summary: &str) -> Option<(&'static str, usize)> {
 
 /// `summary` with `prefix` (rendered) in place of the Conventional Commits prefix it had.
 pub fn with_conventional(summary: &str, prefix: &Conventional) -> String {
-    let rest = parse_conventional(summary).map_or(summary, |(_, end)| &summary[end..]);
+    let rest = parse_conventional(summary)
+        .map(|(_, end)| end)
+        .or_else(|| unfinished_prefix(summary))
+        .map_or(summary, |end| &summary[end..]);
     format!("{}{}", prefix.render(), rest.trim_start())
+}
+
+/// How long a prefix still being typed is, when the summary is only that: `fix(g` or
+/// `feat(ui)` (with a type that could be one, no colon yet).
+fn unfinished_prefix(summary: &str) -> Option<usize> {
+    let (kind, rest) = summary.split_once('(')?;
+    let kind_ok = kind.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
+        && kind
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_');
+    let scope = rest.strip_suffix(')').unwrap_or(rest);
+    let scope_ok = !scope.contains(['(', ')', ':', '\n', '\r']);
+    (kind_ok && scope_ok).then_some(summary.len())
 }
 
 /// `summary` with `emoji` in place of the Gitmoji it started with.
@@ -183,6 +199,10 @@ mod tests {
         assert!(read("").is_none());
         assert!(read("feat(a(b)): x").is_none());
         assert!(read(": x").is_none());
+        // Not a link nor a word with no space after its colon.
+        assert!(read("https://host is down").is_none());
+        assert!(read("fix:x").is_none());
+        assert!(read("fix:").is_some());
         let (c, _) = read("build(deps, ci): bump").unwrap_or_default();
         assert_eq!(c.scope, "deps, ci");
     }
@@ -209,6 +229,17 @@ mod tests {
             breaking: true,
         };
         assert_eq!(with_conventional("x", &bare), "docs(ab)!: x");
+        // A prefix still being typed is replaced whole.
+        assert_eq!(with_conventional("fix(g", &feat), "feat(app shell): ");
+        assert_eq!(with_conventional("fix(ui)", &feat), "feat(app shell): ");
+        assert_eq!(
+            with_conventional("fix(a) b", &feat),
+            "feat(app shell): fix(a) b"
+        );
+        assert_eq!(
+            with_conventional("https://x", &feat),
+            "feat(app shell): https://x"
+        );
         // No type: the prefix is taken out.
         assert_eq!(with_conventional("feat: x", &Conventional::default()), "x");
     }
