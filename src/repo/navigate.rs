@@ -236,7 +236,8 @@ impl RepoTab {
     /// Shows Markdown files rendered in diffs, or as text.
     pub(super) fn show_diff_rendered(&mut self, on: bool, ctx: &egui::Context) {
         self.diff_rendered = on;
-        if self.diff.as_ref().is_some_and(|d| d.rendered.is_none()) {
+        // Read again each time it's turned on: the file may have changed since.
+        if on {
             self.load_diff_rendered(ctx);
         }
     }

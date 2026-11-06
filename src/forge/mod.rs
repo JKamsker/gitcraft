@@ -8,6 +8,7 @@
 //!   credential helper) already has for the host. See [`gitea`].
 
 mod cli;
+pub(crate) use cli::tool_location;
 mod gitea;
 mod github;
 mod gitlab;
@@ -226,16 +227,24 @@ fn choose(host: &str, config: &HashMap<String, String>) -> Option<Forge> {
         })
 }
 
-/// gitcraft's own settings in git's config, keys lowercase.
+/// gitcraft's own settings in git's config, keys lowercase. For a repository on another
+/// machine, also this machine's global config, where the README says to set them: that
+/// machine's (and the repository's own) win.
 fn gitcraft_config(repo: &Path) -> HashMap<String, String> {
     // Exit code 1: nothing set, which is the usual.
-    let out = crate::git::run_ok_codes(
-        Some(repo),
-        &["config", "--get-regexp", r"^gitcraft\."],
-        &[0, 1],
-    )
-    .unwrap_or_default();
-    parse_config(&out)
+    let read = |dir: Option<&Path>, scope: &[&str]| {
+        let mut args = vec!["config"];
+        args.extend(scope);
+        args.extend(["--get-regexp", r"^gitcraft\."]);
+        parse_config(&crate::git::run_ok_codes(dir, &args, &[0, 1]).unwrap_or_default())
+    };
+    let mut config = if crate::remote::is_remote(repo) {
+        read(None, &["--global"])
+    } else {
+        HashMap::new()
+    };
+    config.extend(read(Some(repo), &[]));
+    config
 }
 
 fn parse_config(out: &str) -> HashMap<String, String> {

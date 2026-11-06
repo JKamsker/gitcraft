@@ -30,7 +30,8 @@ impl Project {
             .iter()
             .find(|r| r.name == "origin")
             .or_else(|| remotes.first())?;
-        let (host, path) = forge::location(&remote.url)?;
+        // GitLab's host with the port of an `http(s)` remote: its API is on it.
+        let (host, path) = forge::tool_location(forge, &remote.url)?;
         // Both go into the tools' arguments and the API's paths as they are.
         let plain = |text: &str, extra: char| {
             !text.is_empty()
@@ -362,6 +363,26 @@ mod tests {
         let project = Project::of(Forge::GitHub, &remotes);
         assert_eq!(project.map(|p| p.path), Some("o/r".to_owned()));
         assert_eq!(Project::of(Forge::GitHub, &[]), None);
+    }
+
+    /// A self-hosted GitLab on a port of its own has its API there; an SSH port isn't a web one.
+    #[test]
+    fn a_gitlab_project_keeps_the_port_of_its_web_pages() {
+        let host = |url: &str| {
+            let remotes = [Remote {
+                name: "origin".into(),
+                url: url.into(),
+            }];
+            Project::of(Forge::GitLab, &remotes).map(|p| p.host)
+        };
+        assert_eq!(
+            host("https://git.example.org:8443/team/app.git").as_deref(),
+            Some("git.example.org:8443")
+        );
+        assert_eq!(
+            host("ssh://git@git.example.org:2222/team/app.git").as_deref(),
+            Some("git.example.org")
+        );
     }
 
     #[test]

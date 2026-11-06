@@ -170,7 +170,7 @@ fn same_host(a: &str, b: &str) -> bool {
 
 /// The host and `owner/repo` the tool is given for remote `url`: GitLab's host with the port of
 /// an `http(s)` URL, an SSH port left out (it says nothing of the web pages).
-fn tool_location(forge: Forge, url: &str) -> Option<(String, String)> {
+pub(crate) fn tool_location(forge: Forge, url: &str) -> Option<(String, String)> {
     let (host, path) = super::location(url)?;
     let host = match (forge, http_port(url)) {
         (Forge::GitLab, Some(port)) => format!("{host}:{port}"),

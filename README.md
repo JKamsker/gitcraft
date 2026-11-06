@@ -357,8 +357,8 @@ was made this way, on a demo repository.
 | `src/update.rs`          | new-release check                                                                  |
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |
 | `src/shell_path.rs`      | on macOS, the login shell's PATH for the commands gitcraft starts                  |
-| `src/remote.rs` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
-| `src/settings.rs`        | user settings and their form                                                       |
+| `src/remote/` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
+| `src/settings/`          | user settings, profiles, and the settings pages                                    |
 | `src/manual.rs`          | the manual (F1): features and keyboard shortcuts                                   |
 | `src/theme.rs`           | colour tokens, fonts, egui style (PhotoCraft's Pro themes)                         |
 | `src/icons.rs`           | embedded Lucide SVG icons, tinted                                                  |
