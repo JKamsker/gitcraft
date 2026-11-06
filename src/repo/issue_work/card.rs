@@ -1,10 +1,11 @@
 //! The card above the graph while a branch made for an issue is checked out: the issue's number
-//! and title, and its acceptance criteria, folded away with a click.
+//! and title, and its acceptance criteria (or what stands in for them) as of the day the issue
+//! was read, read again or folded away with a click.
 
 use egui::{RichText, Ui, vec2};
 
 use super::IssueAct;
-use super::criteria::{self, Line};
+use super::criteria::{self, Line, Tick};
 use super::link::IssueLink;
 use crate::icons;
 use crate::repo::{Action, RepoTab};
@@ -15,17 +16,18 @@ const CRITERIA_H: f32 = 150.0;
 
 impl RepoTab {
     /// Draws the card of the checked-out branch's issue, when it has one, along the top of the
-    /// central area; reads the branches' issues again first when the repository was read since.
+    /// central area (the links are read with the rest of the repository).
     pub(in crate::repo) fn issue_card(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
-        let ctx = ui.ctx().clone();
-        self.refresh_issue_links(&ctx);
         let Some(branch) = self.refs.current.clone() else {
             return;
         };
         let Some(link) = self.issue_work.links.get(&branch) else {
             return;
         };
-        let t = Tokens::get(&ctx);
+        let t = Tokens::get(ui.ctx());
+        // Folded or not, per repository and branch, and kept across restarts.
+        let fold = egui::Id::new(("issue-card-folded", self.repo_key(), &branch));
+        let refreshing = self.issue_work.refreshing.as_deref() == Some(branch.as_str());
         egui::Panel::top("repo_issue_card")
             .frame(
                 egui::Frame::new()
@@ -33,15 +35,23 @@ impl RepoTab {
                     .inner_margin(egui::Margin::symmetric(10, 6))
                     .stroke(egui::Stroke::new(1.0, t.separator)),
             )
-            .show(ui, |ui| card(ui, &branch, link, acts));
+            .show(ui, |ui| {
+                card(ui, &branch, link, fold, refreshing, acts);
+            });
     }
 }
 
-fn card(ui: &mut Ui, branch: &str, link: &IssueLink, acts: &mut Vec<Action>) {
+fn card(
+    ui: &mut Ui,
+    branch: &str,
+    link: &IssueLink,
+    fold: egui::Id,
+    refreshing: bool,
+    acts: &mut Vec<Action>,
+) {
     let t = Tokens::get(ui.ctx());
-    // Folded or not, per branch, and kept across restarts.
-    let id = egui::Id::new(("issue-card-folded", branch));
-    let mut folded = ui.data_mut(|d| *d.get_persisted_mut_or(id, false));
+    let mut folded = ui.data_mut(|d| *d.get_persisted_mut_or(fold, false));
+    let what = link.kept.what();
     ui.horizontal(|ui| {
         let chevron = if folded {
             "chevron-right"
@@ -49,11 +59,11 @@ fn card(ui: &mut Ui, branch: &str, link: &IssueLink, acts: &mut Vec<Action>) {
             "chevron-down"
         };
         let tip = if folded {
-            "Show the acceptance criteria"
+            format!("Show {what}")
         } else {
-            "Hide the acceptance criteria"
+            format!("Hide {what}")
         };
-        if icons::small_button(ui, chevron, tip).clicked() {
+        if icons::small_button(ui, chevron, &tip).clicked() {
             folded = !folded;
         }
         ui.label(
@@ -61,7 +71,6 @@ fn card(ui: &mut Ui, branch: &str, link: &IssueLink, acts: &mut Vec<Action>) {
                 .font(theme::mono(12.0))
                 .color(t.accent),
         );
-        ui.add(egui::Label::new(RichText::new(&link.title).font(theme::semibold(12.5))).truncate());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if icons::small_button(ui, "x", "Forget which issue this branch is for").clicked() {
                 acts.push(Action::Issue(IssueAct::Unlink(branch.to_owned())));
@@ -72,9 +81,36 @@ fn card(ui: &mut Ui, branch: &str, link: &IssueLink, acts: &mut Vec<Action>) {
             {
                 acts.push(Action::OpenUrl(link.url.clone()));
             }
+            // What the card shows is the issue as it was read, not as it is.
+            let (read, when) = if link.read.is_empty() {
+                (
+                    "as first read".to_owned(),
+                    "when work on it started".to_owned(),
+                )
+            } else {
+                (format!("as of {}", link.read), format!("on {}", link.read))
+            };
+            if refreshing {
+                ui.add(crate::spinner::Spinner::new().size(12.0));
+            } else if icons::small_button(
+                ui,
+                "refresh-cw",
+                &format!("Read the issue again: the card shows it as it was {when}"),
+            )
+            .clicked()
+            {
+                acts.push(Action::Issue(IssueAct::Refresh(branch.to_owned())));
+            }
+            ui.label(RichText::new(read).size(11.0).color(t.text_faint));
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                ui.add(
+                    egui::Label::new(RichText::new(&link.title).font(theme::semibold(12.5)))
+                        .truncate(),
+                );
+            });
         });
     });
-    ui.data_mut(|d| d.insert_persisted(id, folded));
+    ui.data_mut(|d| d.insert_persisted(fold, folded));
     if folded {
         return;
     }
@@ -88,7 +124,7 @@ fn card(ui: &mut Ui, branch: &str, link: &IssueLink, acts: &mut Vec<Action>) {
         return;
     }
     egui::ScrollArea::vertical()
-        .id_salt(("issue-card-criteria", branch))
+        .id_salt(("issue-card-criteria", fold))
         .max_height(CRITERIA_H)
         .auto_shrink([false, true])
         .show(ui, |ui| {
@@ -105,21 +141,20 @@ fn criteria_line(ui: &mut Ui, line: &Line) {
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 6.0;
         match line {
-            Line::Task { done, text: what } => {
-                task_box(ui, *done);
-                let what = text(what);
-                ui.label(if *done {
-                    what.strikethrough().color(t.text_faint)
-                } else {
-                    what
+            Line::Task { tick, text: what } => {
+                task_box(ui, *tick);
+                let what = text(&criteria::plain(what));
+                ui.label(match tick {
+                    Tick::Open => what,
+                    Tick::Done | Tick::Dropped => what.strikethrough().color(t.text_faint),
                 });
             }
             Line::Bullet(what) => {
                 ui.label(RichText::new("•").color(t.text_faint));
-                ui.label(text(what));
+                ui.label(text(&criteria::plain(what)));
             }
             Line::Text(what) => {
-                ui.label(text(what));
+                ui.label(text(&criteria::plain(what)));
             }
             Line::Blank => {
                 ui.add_space(2.0);
@@ -128,12 +163,25 @@ fn criteria_line(ui: &mut Ui, line: &Line) {
     });
 }
 
-/// A task's box: a check in it when it's done.
-fn task_box(ui: &mut Ui, done: bool) {
+/// A task's box: a check in it when it's done, a dash when it no longer applies.
+fn task_box(ui: &mut Ui, tick: Tick) {
     let t = Tokens::get(ui.ctx());
     let (rect, _) = ui.allocate_exact_size(vec2(14.0, 14.0), egui::Sense::hover());
     let square = egui::Rect::from_center_size(rect.center(), vec2(12.0, 12.0));
-    if done {
+    if tick == Tick::Dropped {
+        ui.painter().rect_stroke(
+            square,
+            t.radius_sm,
+            egui::Stroke::new(1.0, t.field_border),
+            egui::StrokeKind::Inside,
+        );
+        let y = square.center().y;
+        ui.painter().hline(
+            square.left() + 3.0..=square.right() - 3.0,
+            y,
+            egui::Stroke::new(1.5, t.text_faint),
+        );
+    } else if tick == Tick::Done {
         ui.painter()
             .rect_filled(square, t.radius_sm, t.success.gamma_multiply(0.25));
         icons::paint(ui, square, "check", 11.0, t.success);

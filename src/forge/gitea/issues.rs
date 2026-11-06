@@ -1,9 +1,10 @@
-//! The issues assigned to the person whose login gitcraft found for the server, to start work from.
+//! The issues assigned to the person whose login gitcraft found for the server, to start work
+//! from, and one of them read again.
 
 use serde_json::Value;
 
 use super::super::http::Api;
-use crate::forge::{Hosting, Issue};
+use crate::forge::{Hosting, ISSUES_MAX, Issue};
 use crate::pull_request::{at, items};
 
 /// The open issues (not pull requests) of the repository assigned to the login's account. The
@@ -27,11 +28,23 @@ pub(super) fn assigned(api: &Api, hosting: &Hosting) -> Result<Vec<Issue>, Strin
         hosting.path,
         query_value(login)
     );
+    // Pull requests left out page by page: they don't take the place of issues in the cap.
     Ok(api
-        .get_all(&endpoint, 100)?
+        .get_all_kept(&endpoint, ISSUES_MAX, |item| !is_pull_request(item))?
         .iter()
         .filter_map(parse_issue)
         .collect())
+}
+
+/// Issue `number` as it is now.
+pub(super) fn one(api: &Api, hosting: &Hosting, number: u64) -> Result<Issue, String> {
+    let item = api.get(&format!("repos/{}/issues/{number}", hosting.path))?;
+    parse_issue(&item).ok_or_else(|| format!("#{number} is a pull request, not an issue"))
+}
+
+/// Older servers ignore `type=issues`: a pull request still says it is one.
+fn is_pull_request(item: &Value) -> bool {
+    item.get("pull_request").is_some_and(|pr| !pr.is_null())
 }
 
 /// `text` as it can go in a URL's query: anything but letters, digits and `-_.~` escaped.
@@ -46,9 +59,9 @@ fn query_value(text: &str) -> String {
         .collect()
 }
 
-/// One issue of the list. Older servers ignore `type=issues`: a pull request still says it is one.
+/// One issue of the list; `None` for a pull request.
 fn parse_issue(item: &Value) -> Option<Issue> {
-    if item.get("pull_request").is_some_and(|pr| !pr.is_null()) {
+    if is_pull_request(item) {
         return None;
     }
     Some(Issue {

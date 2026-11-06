@@ -41,7 +41,10 @@ impl RepoTab {
                 .frame(egui::Frame::new().fill(t.card))
                 .show(ui, |ui| self.terminal_panel(ui, &mut acts));
         }
-        self.issue_card(ui, &mut acts);
+        // Over the graph and the changes, not over the editors of a conflict or a rebase.
+        if self.conflict.is_none() && self.rebase.is_none() {
+            self.issue_card(ui, &mut acts);
+        }
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(t.dock))
             .show(ui, |ui| {

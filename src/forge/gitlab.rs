@@ -59,6 +59,7 @@ impl Provider for GitLab {
 
     /// `@me` is the account `glab` is signed in to for the host.
     fn assigned_issues(&self, repo: &Path, _: &Hosting) -> Result<Vec<Issue>, String> {
+        let max = super::ISSUES_MAX.to_string();
         let args = [
             "issue",
             "list",
@@ -66,9 +67,18 @@ impl Provider for GitLab {
             "--output",
             "json",
             "--per-page",
-            "100",
+            &max,
         ];
-        parse_issues(&self.run(repo, &args)?)
+        parse_issues(&cli::run(TOOL, "issue", repo, &args)?)
+    }
+
+    fn issue(&self, repo: &Path, _: &Hosting, number: u64) -> Result<Issue, String> {
+        let number = number.to_string();
+        let args = ["issue", "view", &number, "--output", "json"];
+        let out = cli::run(TOOL, "issue", repo, &args)?;
+        let value: Value =
+            serde_json::from_str(&out).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
+        parse_issue(&value).ok_or_else(|| format!("unexpected {TOOL} output: not an issue"))
     }
 
     /// The host's own avatar API, asked by email.
@@ -116,38 +126,38 @@ fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
         .collect())
 }
 
-/// glab's list of issues: `iid` is the number `#N` means in the project (`id` is the server's).
+/// glab's list of issues.
 fn parse_issues(json: &str) -> Result<Vec<Issue>, String> {
     let value: Value =
         serde_json::from_str(json).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
     let list = value
         .as_array()
         .ok_or_else(|| format!("unexpected {TOOL} output: not a list of issues"))?;
-    let text = |v: &Value, key: &str| {
-        v.get(key)
+    Ok(list.iter().filter_map(parse_issue).collect())
+}
+
+/// One issue: `iid` is the number `#N` means in the project (`id` is the server's).
+fn parse_issue(item: &Value) -> Option<Issue> {
+    let text = |key: &str| {
+        item.get(key)
             .and_then(Value::as_str)
             .unwrap_or_default()
             .to_owned()
     };
-    Ok(list
-        .iter()
-        .filter_map(|item| {
-            Some(Issue {
-                number: item.get("iid").and_then(Value::as_u64)?,
-                title: text(item, "title"),
-                body: text(item, "description"),
-                url: text(item, "web_url"),
-                labels: item
-                    .get("labels")
-                    .and_then(Value::as_array)
-                    .map_or(&[][..], Vec::as_slice)
-                    .iter()
-                    .filter_map(Value::as_str)
-                    .map(str::to_owned)
-                    .collect(),
-            })
-        })
-        .collect())
+    Some(Issue {
+        number: item.get("iid").and_then(Value::as_u64)?,
+        title: text("title"),
+        body: text("description"),
+        url: text("web_url"),
+        labels: item
+            .get("labels")
+            .and_then(Value::as_array)
+            .map_or(&[][..], Vec::as_slice)
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::to_owned)
+            .collect(),
+    })
 }
 
 #[cfg(test)]

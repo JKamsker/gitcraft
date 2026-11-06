@@ -431,7 +431,7 @@ impl RepoTab {
 
 /// Whether `name` (a pull request's branch, as the forge says it) is a branch name git takes
 /// as it is (`git check-ref-format --branch`), and never as an option.
-pub(in crate::repo) fn plain_branch_name(name: &str) -> bool {
+fn plain_branch_name(name: &str) -> bool {
     !name.is_empty()
         && !name.starts_with(['-', '/', '.'])
         && !name.ends_with(['/', '.'])

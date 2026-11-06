@@ -277,14 +277,15 @@ impl RepoTab {
                     .add_enabled(idle, egui::Button::new(format!("Create {}…", forge.noun())))
                     .clicked()
                 {
-                    let base = self.default_base();
-                    // A branch made for an issue: its title, and closing it once merged.
-                    let (title, body) =
-                        self.issue_pull_request_text(&b.name).unwrap_or_else(|| {
+                    // A branch made for an issue: its title, closing it once merged, and into the
+                    // branch it started from.
+                    let (title, body, base) =
+                        self.issue_pull_request(&b.name).unwrap_or_else(|| {
                             let summary = self.history.iter().find(|c| c.hash == b.target);
                             (
                                 summary.map(|c| c.summary.clone()).unwrap_or_default(),
                                 String::new(),
+                                self.default_base(),
                             )
                         });
                     acts.push(Action::Dialog(Dialog::create_pr(

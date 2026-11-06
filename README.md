@@ -140,14 +140,19 @@ so your config, credentials and hooks apply as usual.
 - Start work from an issue: _Start work from an issue…_ (the palette, or the button on the pull
   requests' header) lists the open issues of the repository assigned to you (`gh issue list
   --assignee @me`, `glab issue list --assignee=@me`, Forgejo's and Gitea's API with your login
-  for the host). Pick one, and gitcraft makes a branch named after it (`42-fix-login-crash`)
-  from the default branch as the remote has it, checked out here or in a new worktree beside the
-  repository. While that branch is checked out, a card above the graph keeps the issue in view:
-  its _Acceptance criteria_ section, else its task list, else its description, folded away with
-  a click. Which issue a branch is for is kept in the repository's git config
-  (`branch.<name>.gitcraft-issue`), so it works over WSL and SSH, every worktree sees it and git
-  renames or deletes it with the branch. _Create pull request…_ on that branch starts with the
-  issue's title and `Closes #42`.
+  for the host; the first 100). Pick one, and gitcraft makes a branch named after it
+  (`42-fix-login-crash`) from the remote's default branch (where its `HEAD` points, else main,
+  master or develop), fetched first so that it starts where the remote is now, checked out here
+  or in a new worktree beside the repository. A branch of that name already there is used as it
+  is, and one only the remote has is tracked. The picker says beforehand which of these it does,
+  and when changes in the working tree would go along. While that branch is checked out, a card
+  above the graph keeps the issue in view: its _Acceptance criteria_ section, else its task
+  list, else its description, as of the day it was read (read it again with a click), folded
+  away with another. Which issue a branch is for is kept in the repository's git config
+  (`branch.<name>.gitcraft-issue`): every worktree of the clone sees it, over WSL and SSH too,
+  and git renames or deletes it with the branch; it isn't pushed. _Create pull request…_ (merge
+  request, on GitLab) on that branch starts with the issue's title and `Closes #42`, into the
+  branch it started from.
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
 
 **Changes and commits** (right)

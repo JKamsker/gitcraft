@@ -15,6 +15,8 @@ mod details;
 mod issues;
 #[cfg(test)]
 mod live;
+#[cfg(test)]
+mod live_issues;
 mod post;
 
 use std::collections::HashMap;
@@ -84,6 +86,10 @@ impl Provider for GiteaFamily {
 
     fn assigned_issues(&self, _: &Path, hosting: &Hosting) -> Result<Vec<Issue>, String> {
         issues::assigned(&self.api(hosting), hosting)
+    }
+
+    fn issue(&self, _: &Path, hosting: &Hosting, number: u64) -> Result<Issue, String> {
+        issues::one(&self.api(hosting), hosting, number)
     }
 
     /// The accounts the latest commits belong to, as the API ties them to their emails.

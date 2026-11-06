@@ -3,9 +3,9 @@
 
 use egui::{Key, RichText, Ui};
 
-use super::IssueAct;
 use super::naming::branch_name;
-use crate::forge::Issue;
+use super::{IssueAct, Plan};
+use crate::forge::{ISSUES_MAX, Issue};
 use crate::repo::{Action, RepoTab, widgets};
 use crate::theme::{self, Tokens};
 
@@ -15,13 +15,20 @@ pub(super) struct Picker {
     forge: &'static str,
     /// `None` while the forge is asked.
     issues: Option<Result<Vec<Issue>, String>>,
-    filter: String,
+    pub(super) filter: String,
     /// The number of the issue picked.
     chosen: Option<u64>,
     /// The branch's name, suggested from the issue picked and editable.
     name: String,
     worktree: bool,
-    focus: bool,
+    /// The field to put the keyboard in on the next frame.
+    focus: Option<Field>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Field {
+    Filter,
+    Name,
 }
 
 /// What the picker leaves to do.
@@ -29,19 +36,28 @@ enum Outcome {
     Open,
     Close,
     Retry,
-    Start(Box<Issue>, String, bool),
+    /// Start work on the issue of that number, on the branch named so, in a worktree or not.
+    Start(u64, String, bool),
+}
+
+/// What the picker is told of the tab, each frame.
+struct View<'a> {
+    /// What starting would do, for an issue's number, a branch's name and whether in a worktree.
+    plan: &'a dyn Fn(u64, &str, bool) -> Plan,
+    /// The operation running, which Start waits for.
+    busy: Option<&'a str>,
 }
 
 impl Picker {
-    pub(super) fn new(forge: &'static str) -> Picker {
+    pub(super) fn new(forge: &'static str, filter: String) -> Picker {
         Picker {
             forge,
             issues: None,
-            filter: String::new(),
+            filter,
             chosen: None,
             name: String::new(),
             worktree: false,
-            focus: true,
+            focus: Some(Field::Filter),
         }
     }
 
@@ -50,14 +66,34 @@ impl Picker {
         self.issues = Some(result);
     }
 
-    fn chosen_issue(&self) -> Option<&Issue> {
-        let list = self.issues.as_ref()?.as_ref().ok()?;
-        list.iter().find(|i| Some(i.number) == self.chosen)
+    fn list(&self) -> &[Issue] {
+        match &self.issues {
+            Some(Ok(list)) => list,
+            _ => &[],
+        }
     }
 
-    fn choose(&mut self, issue: &Issue) {
-        self.chosen = Some(issue.number);
+    fn chosen_issue(&self) -> Option<&Issue> {
+        self.list().iter().find(|i| Some(i.number) == self.chosen)
+    }
+
+    /// Picks the issue numbered `number` of the list, suggesting its branch's name.
+    fn choose(&mut self, number: u64) {
+        let Some(issue) = self.list().iter().find(|i| i.number == number) else {
+            return;
+        };
         self.name = branch_name(issue.number, &issue.title);
+        self.chosen = Some(number);
+    }
+
+    /// The numbers of the issues the filter shows, in the list's order.
+    fn shown(&self) -> Vec<u64> {
+        let query = self.filter.trim().to_lowercase();
+        self.list()
+            .iter()
+            .filter(|i| matches(i, &query))
+            .map(|i| i.number)
+            .collect()
     }
 }
 
@@ -69,11 +105,8 @@ impl RepoTab {
 
     /// Draws the picker when it's open; what is picked goes to `acts`.
     pub(in crate::repo) fn issue_picker(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
-        if self.issue_work.picker.is_none() {
-            return;
-        }
-        let local: Vec<String> = self.refs.local.iter().map(|b| b.name.clone()).collect();
-        let Some(picker) = self.issue_work.picker.as_mut() else {
+        // Taken out while it's drawn, so that what starting would do can be read from the tab.
+        let Some(mut picker) = self.issue_work.picker.take() else {
             return;
         };
         let t = Tokens::get(ctx);
@@ -83,34 +116,45 @@ impl RepoTab {
             .corner_radius(t.radius_lg)
             .inner_margin(egui::Margin::same(18))
             .shadow(ctx.global_style().visuals.window_shadow);
+        let plan =
+            |number: u64, name: &str, worktree: bool| self.issue_plan(number, name, worktree);
+        let view = View {
+            plan: &plan,
+            busy: self.busy_op.as_deref(),
+        };
         let response = egui::Modal::new(egui::Id::new("gitcraft-issue-picker"))
             .frame(frame)
             .backdrop_color(egui::Color32::from_black_alpha(110))
             .show(ctx, |ui| {
                 ui.set_width(460.0);
-                show(ui, picker, &local)
+                show(ui, &mut picker, &view)
             });
         let outcome = match response.inner {
             Outcome::Open if response.should_close() => Outcome::Close,
             outcome => outcome,
         };
         match outcome {
-            Outcome::Open => {}
-            Outcome::Close => self.issue_work.picker = None,
-            Outcome::Retry => acts.push(Action::Issue(IssueAct::OpenPicker)),
-            Outcome::Start(issue, branch, worktree) => {
-                self.issue_work.picker = None;
-                acts.push(Action::Issue(IssueAct::Start {
-                    issue,
-                    branch,
-                    worktree,
-                }));
+            Outcome::Open => self.issue_work.picker = Some(picker),
+            Outcome::Close => {}
+            Outcome::Retry => {
+                self.issue_work.picker = Some(picker);
+                acts.push(Action::Issue(IssueAct::OpenPicker));
+            }
+            Outcome::Start(number, branch, worktree) => {
+                match picker.list().iter().find(|i| i.number == number) {
+                    Some(issue) => acts.push(Action::Issue(IssueAct::Start {
+                        issue: Box::new(issue.clone()),
+                        branch,
+                        worktree,
+                    })),
+                    None => self.issue_work.picker = Some(picker),
+                }
             }
         }
     }
 }
 
-fn show(ui: &mut Ui, picker: &mut Picker, local: &[String]) -> Outcome {
+fn show(ui: &mut Ui, picker: &mut Picker, view: &View) -> Outcome {
     let t = Tokens::get(ui.ctx());
     ui.label(RichText::new("Start work from an issue").font(theme::semibold(15.0)));
     ui.label(
@@ -122,6 +166,7 @@ fn show(ui: &mut Ui, picker: &mut Picker, local: &[String]) -> Outcome {
     );
     ui.add_space(10.0);
     let mut outcome = Outcome::Open;
+    let mut start_now = false;
     match &picker.issues {
         None => {
             ui.horizontal(|ui| {
@@ -142,22 +187,38 @@ fn show(ui: &mut Ui, picker: &mut Picker, local: &[String]) -> Outcome {
                     .color(t.text_dim),
             );
         }
-        Some(Ok(_)) => outcome = choose(ui, picker, local),
+        Some(Ok(_)) => start_now = choose(ui, picker),
     }
     ui.add_space(10.0);
-    let ready =
-        picker.chosen_issue().is_some() && super::super::sidebar::plain_branch_name(&picker.name);
+    // What starting would do, worked out as Start works it out.
+    let plan = picker
+        .chosen_issue()
+        .map(|issue| (view.plan)(issue.number, &picker.name, picker.worktree));
+    if let Some(plan) = &plan {
+        place_note(ui, plan);
+    }
+    let why_not = match (&plan, view.busy) {
+        (None, _) => None,
+        (
+            Some(Plan {
+                start: Err(why), ..
+            }),
+            _,
+        ) => Some(why.clone()),
+        (Some(_), Some(busy)) => Some(format!("Wait for {busy} to finish first")),
+        (Some(_), None) => None,
+    };
+    let ready = plan.is_some() && why_not.is_none();
     ui.horizontal(|ui| {
-        let enter = ui.input(|i| i.key_pressed(Key::Enter));
-        let clicked = widgets::primary_button(ui, "Start work", ready, 100.0).clicked();
-        if (clicked || (enter && ready))
+        let start = widgets::primary_button(ui, "Start work", ready, 100.0);
+        let start = match &why_not {
+            Some(why) => start.on_disabled_hover_text(why),
+            None => start,
+        };
+        if (start.clicked() || (start_now && ready))
             && let Some(issue) = picker.chosen_issue()
         {
-            outcome = Outcome::Start(
-                Box::new(issue.clone()),
-                picker.name.clone(),
-                picker.worktree,
-            );
+            outcome = Outcome::Start(issue.number, picker.name.clone(), picker.worktree);
         }
         if ui
             .add(egui::Button::new("Cancel").min_size(egui::vec2(80.0, 30.0)))
@@ -166,12 +227,27 @@ fn show(ui: &mut Ui, picker: &mut Picker, local: &[String]) -> Outcome {
             outcome = Outcome::Close;
         }
     });
+    if let Some(why) = why_not {
+        ui.label(RichText::new(why).size(11.5).color(t.danger));
+    }
     outcome
 }
 
+/// What starting does, and what to know before.
+fn place_note(ui: &mut Ui, plan: &Plan) {
+    let t = Tokens::get(ui.ctx());
+    if plan.start.is_ok() {
+        ui.add(egui::Label::new(RichText::new(&plan.note).size(11.5).color(t.text_faint)).wrap());
+    }
+    for warning in &plan.warnings {
+        ui.add(egui::Label::new(RichText::new(warning).size(11.5).color(t.warning)).wrap());
+    }
+    ui.add_space(8.0);
+}
+
 /// The filter, the issues that match it and, for the one picked, the branch's name and where it
-/// goes.
-fn choose(ui: &mut Ui, picker: &mut Picker, local: &[String]) -> Outcome {
+/// goes. Whether Enter in the branch's name asks to start.
+fn choose(ui: &mut Ui, picker: &mut Picker) -> bool {
     let t = Tokens::get(ui.ctx());
     let edit = ui.add(
         egui::TextEdit::singleline(&mut picker.filter)
@@ -179,17 +255,42 @@ fn choose(ui: &mut Ui, picker: &mut Picker, local: &[String]) -> Outcome {
             .desired_width(f32::INFINITY)
             .margin(egui::Margin::symmetric(8, 6)),
     );
-    if std::mem::take(&mut picker.focus) {
+    if picker.focus == Some(Field::Filter) {
+        picker.focus = None;
         edit.request_focus();
     }
     ui.add_space(6.0);
-    let query = picker.filter.trim().to_lowercase();
-    let list = match &picker.issues {
-        Some(Ok(list)) => list.clone(),
-        _ => Vec::new(),
-    };
-    let shown: Vec<&Issue> = list.iter().filter(|i| matches(i, &query)).collect();
-    let mut picked = None;
+    let shown = picker.shown();
+    // In the filter: ↑ and ↓ go through the list, Enter takes the one match there is.
+    if edit.has_focus() || edit.lost_focus() {
+        let (up, down, enter) = ui.input(|i| {
+            (
+                i.key_pressed(Key::ArrowUp),
+                i.key_pressed(Key::ArrowDown),
+                i.key_pressed(Key::Enter),
+            )
+        });
+        let at = shown.iter().position(|n| Some(*n) == picker.chosen);
+        let next = match (at, up, down) {
+            (None, _, true) | (None, true, _) => shown.first(),
+            (Some(i), true, _) => shown.get(i.saturating_sub(1)),
+            (Some(i), _, true) => shown.get(i + 1).or(shown.last()),
+            _ => None,
+        };
+        if let Some(&number) = next {
+            picker.choose(number);
+        }
+        if enter && edit.lost_focus() {
+            if let [only] = shown[..] {
+                picker.choose(only);
+                picker.focus = Some(Field::Name);
+            } else {
+                // Enter alone doesn't pick for you: the keys stay in the filter.
+                picker.focus = Some(Field::Filter);
+            }
+        }
+    }
+    let mut clicked = None;
     egui::ScrollArea::vertical()
         .max_height(260.0)
         .auto_shrink([false, true])
@@ -197,26 +298,42 @@ fn choose(ui: &mut Ui, picker: &mut Picker, local: &[String]) -> Outcome {
             if shown.is_empty() {
                 ui.label(RichText::new("No issue matches the filter.").color(t.text_faint));
             }
-            for issue in &shown {
+            for issue in picker.list().iter().filter(|i| shown.contains(&i.number)) {
                 if issue_row(ui, issue, picker.chosen == Some(issue.number)) {
-                    picked = Some(*issue);
+                    clicked = Some(issue.number);
                 }
             }
         });
-    if let Some(issue) = picked {
-        picker.choose(issue);
+    if picker.list().len() >= ISSUES_MAX {
+        ui.label(
+            RichText::new(format!(
+                "The first {ISSUES_MAX} came: an issue that isn't among them is found on the \
+                 forge's page."
+            ))
+            .size(11.5)
+            .color(t.text_faint),
+        );
+    }
+    if let Some(number) = clicked {
+        picker.choose(number);
     }
     if picker.chosen_issue().is_none() {
-        return Outcome::Open;
+        return false;
     }
     ui.add_space(8.0);
+    let mut start = false;
     ui.horizontal(|ui| {
         ui.label(RichText::new("Branch").color(t.text_dim));
-        ui.add(
+        let name = ui.add(
             egui::TextEdit::singleline(&mut picker.name)
                 .desired_width(f32::INFINITY)
                 .margin(egui::Margin::symmetric(8, 4)),
         );
+        if picker.focus == Some(Field::Name) {
+            picker.focus = None;
+            name.request_focus();
+        }
+        start = name.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
     });
     if picker.name.contains(' ') {
         picker.name = picker.name.replace(' ', "-");
@@ -229,18 +346,7 @@ fn choose(ui: &mut Ui, picker: &mut Picker, local: &[String]) -> Outcome {
             picker.worktree = i == 1;
         }
     });
-    let note = if local.contains(&picker.name) {
-        format!(
-            "{} exists already: work goes on on it as it is.",
-            picker.name
-        )
-    } else if picker.worktree {
-        "A new branch from the default branch, in a folder beside the repository.".to_owned()
-    } else {
-        "A new branch from the default branch, checked out here.".to_owned()
-    };
-    ui.label(RichText::new(note).size(11.5).color(t.text_faint));
-    Outcome::Open
+    start
 }
 
 /// Whether `issue` is one the filter `query` (lowercase) asks for.
@@ -280,6 +386,9 @@ fn issue_row(ui: &mut Ui, issue: &Issue, chosen: bool) -> bool {
                 }
             });
         });
+    if chosen {
+        inner.response.scroll_to_me(None);
+    }
     let response = ui.interact(
         inner.response.rect,
         ui.id().with(("issue-row", issue.number)),
@@ -319,15 +428,31 @@ mod tests {
 
     #[test]
     fn picking_an_issue_suggests_its_branch() {
-        let mut picker = Picker::new("GitHub");
+        let mut picker = Picker::new("GitHub", String::new());
         assert!(picker.chosen_issue().is_none());
         let list = vec![issue(42, "Fix login crash", &[]), issue(7, "Other", &[])];
         picker.listed(Ok(list.clone()));
-        picker.choose(&list[0]);
+        picker.choose(42);
         assert_eq!(picker.name, "42-fix-login-crash");
         assert_eq!(picker.chosen_issue().map(|i| i.number), Some(42));
+        // One that isn't in the list picks nothing.
+        picker.choose(99);
+        assert_eq!(picker.chosen, Some(42));
         // A list asked again without it: nothing is picked any more.
         picker.listed(Ok(vec![list[1].clone()]));
         assert!(picker.chosen_issue().is_none());
+    }
+
+    #[test]
+    fn the_filter_stays_when_asked_again() {
+        let mut picker = Picker::new("Forgejo", "crash".into());
+        picker.listed(Ok(vec![
+            issue(1, "Login crash", &[]),
+            issue(2, "Docs", &[]),
+            issue(3, "Crash on save", &["bug"]),
+        ]));
+        assert_eq!(picker.shown(), [1, 3]);
+        picker.filter = "#2".into();
+        assert_eq!(picker.shown(), [2]);
     }
 }
