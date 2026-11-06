@@ -117,8 +117,8 @@ pub(crate) struct DiffView {
     pub(super) at_change: Option<(usize, f32)>,
     /// A line (by its index in the diff) to scroll to on the next frame.
     pub(super) jump_line: Option<usize>,
-    /// The moved block whose two places are shown together (by its index in the diff's moves).
-    pub(super) moved: Option<usize>,
+    /// The moved block whose two places are shown together.
+    pub(super) moved: Option<diff::moved_view::Opened>,
     /// The latest read of this diff: only its answer is shown, so a slower answer to an older
     /// read (before the whitespace or whole-file setting changed…) can't replace it.
     pub(super) request: u64,
@@ -159,14 +159,25 @@ impl DiffView {
         if request != self.request {
             return;
         }
+        // The moved block shown stays open while the diff read again still has it.
+        let place = match (&self.data, &self.moved) {
+            (Some(Ok(data)), Some(open)) => diff::moved_view::Opened::place(data, open.block),
+            _ => None,
+        };
         self.data = Some(result);
         // The lines may have moved.
         self.chosen.clear();
         self.anchor = None;
         self.text_sel = None;
         self.at_change = None;
+        self.jump_line = None;
         // The blocks are found again, numbered anew.
-        self.moved = None;
+        self.moved = match (&self.data, place) {
+            (Some(Ok(data)), Some(place)) => (0..data.moves.blocks.len())
+                .find(|&b| diff::moved_view::Opened::place(data, b) == Some(place))
+                .and_then(|b| diff::moved_view::Opened::new(data, b)),
+            _ => None,
+        };
     }
 
     /// Shows the whole file read along with the read numbered `request`, unless a newer read

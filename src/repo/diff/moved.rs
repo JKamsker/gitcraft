@@ -50,7 +50,8 @@ impl Moves {
 
 /// The text a line is compared by: without the whitespace around it.
 fn norm(line: &DiffLine) -> &str {
-    line.text.trim()
+    // The line as git has it, not as shown (tabs expanded, a very long one cut).
+    line.raw.get(1..).unwrap_or_default().trim()
 }
 
 fn alnum(s: &str) -> usize {
@@ -255,6 +256,13 @@ pub fn compare(lines: &[DiffLine], block: &MovedBlock) -> Vec<CompareRow> {
     let old: Vec<usize> = block.del.clone().collect();
     let new: Vec<usize> = block.add.clone().collect();
     let (n, m) = (old.len(), new.len());
+    if block.exact && n == m {
+        return old
+            .into_iter()
+            .zip(new)
+            .map(|(i, j)| (Some(i), Some(j)))
+            .collect();
+    }
     if n.saturating_mul(m) > MAX_COMPARE_CELLS {
         let mut out: Vec<CompareRow> = old.iter().map(|&i| (Some(i), None)).collect();
         out.extend(new.iter().map(|&j| (None, Some(j))));

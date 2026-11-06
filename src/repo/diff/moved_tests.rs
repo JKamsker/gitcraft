@@ -268,23 +268,7 @@ fn the_moved_panel_names_both_places_and_goes_to_them() {
         marked("alpha", '-'),
         marked("alpha", '+')
     );
-    let lines = parse(&text);
-    let moves = detect(&lines);
-    let data = DiffData {
-        spans: vec![None; lines.len()],
-        changed: vec![None; lines.len()],
-        split: Vec::new(),
-        image: None,
-        lfs: None,
-        header: String::new(),
-        partial: false,
-        moves,
-        new_file: false,
-        longest: 0,
-        uncut: Default::default(),
-        map: Default::default(),
-        lines,
-    };
+    let data = data_of(&text);
     let block = data.moves.blocks[0].clone();
     let acts = std::cell::RefCell::new(Vec::new());
     let fonts = std::cell::Cell::new(false);
@@ -295,7 +279,9 @@ fn the_moved_panel_names_both_places_and_goes_to_them() {
             return;
         }
         let t = crate::theme::Tokens::get(ui.ctx());
-        super::moved_view::panel(ui, &t, &data, 0, &mut acts.borrow_mut());
+        if let Some(open) = super::moved_view::Opened::new(&data, 0) {
+            super::moved_view::panel(ui, &t, &data, &open, &mut acts.borrow_mut());
+        }
     });
     harness.run();
     assert!(
@@ -317,4 +303,94 @@ fn the_moved_panel_names_both_places_and_goes_to_them() {
         acts.iter()
             .any(|a| matches!(a, Action::DiffJumpLine(i) if *i == block.add.start))
     );
+}
+
+/// The diff `text` as the view gets it.
+fn data_of(text: &str) -> DiffData {
+    let lines = parse(text);
+    let moves = detect(&lines);
+    let (changed, split) = super::parse::pair_lines(&lines);
+    DiffData {
+        spans: vec![None; lines.len()],
+        changed,
+        split,
+        image: None,
+        lfs: None,
+        header: String::new(),
+        partial: false,
+        moves,
+        new_file: false,
+        longest: 0,
+        uncut: Default::default(),
+        map: Default::default(),
+        lines,
+    }
+}
+
+/// One line changed on the way counts once, not as a removal and an addition.
+#[test]
+fn a_line_edited_on_the_way_counts_once() {
+    let old = "-fn gamma(total: usize) -> usize {\n-    let doubled = total * 2;\n-    let tripled = total * 3;\n-    doubled + tripled\n-}\n";
+    let new: String = old
+        .lines()
+        .map(|l| format!("+{}\n", &l[1..]))
+        .collect::<String>()
+        .replace("total * 3;", "total * 30;");
+    let text = format!("@@ -1,6 +1,1 @@\n{old} a\n@@ -40,1 +35,6 @@\n b\n{new}");
+    let data = data_of(&text);
+    let open = super::moved_view::Opened::new(&data, 0);
+    assert_eq!(open.map(|o| o.edited_lines()), Some(1));
+}
+
+/// A long block moved unchanged is compared line by line, however big.
+#[test]
+fn a_big_exact_move_pairs_every_line() {
+    let block: String = (0..1500)
+        .map(|n| format!("    let value_number_{n} = compute({n});\n"))
+        .collect();
+    let mark = |m: char| -> String { block.lines().map(|l| format!("{m}{l}\n")).collect() };
+    let text = format!(
+        "@@ -1,1501 +1,1 @@\n{} a\n@@ -3000,1 +1500,1501 @@\n b\n{}",
+        mark('-'),
+        mark('+')
+    );
+    let data = data_of(&text);
+    assert_eq!(data.moves.blocks.len(), 1);
+    assert!(data.moves.blocks[0].exact);
+    let rows = compare(&data.lines, &data.moves.blocks[0]);
+    assert_eq!(rows.len(), 1500);
+    assert!(rows.iter().all(|(o, n)| o.is_some() && n.is_some()));
+    let open = super::moved_view::Opened::new(&data, 0);
+    assert_eq!(open.map(|o| o.edited_lines()), Some(0));
+}
+
+/// The panel stays open on the same block when the diff is read again, and a jump asked for
+/// before is dropped rather than landing on another line.
+#[test]
+fn the_open_block_survives_a_reload() {
+    let text = format!(
+        "@@ -1,8 +1,8 @@\n{}\n context one\n context two\n@@ -20,3 +20,7 @@\n tail\n{}",
+        marked("alpha", '-'),
+        marked("alpha", '+')
+    );
+    let mut view = crate::repo::DiffView::new(DiffKey::Commit {
+        hash: "x".to_owned(),
+        path: "a.rs".to_owned(),
+    });
+    let request = view.next_request();
+    view.arrived(request, Ok(data_of(&text)));
+    if let Some(Ok(data)) = &view.data {
+        view.moved = super::moved_view::Opened::new(data, 0);
+    }
+    view.jump_line = Some(3);
+    let request = view.next_request();
+    // Another change earlier in the file: the block keeps its place.
+    let again = format!("@@ -1,1 +1,1 @@\n-x = 1\n+x = 2\n{text}");
+    view.arrived(request, Ok(data_of(&again)));
+    assert!(view.moved.is_some());
+    assert_eq!(view.jump_line, None);
+    // Gone from the diff: closed.
+    let request = view.next_request();
+    view.arrived(request, Ok(data_of("@@ -1,1 +1,1 @@\n-x = 1\n+x = 2\n")));
+    assert!(view.moved.is_none());
 }

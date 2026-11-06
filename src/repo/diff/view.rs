@@ -77,8 +77,8 @@ impl RepoTab {
             let draft = self.pr_drafts.entry(pr.number).or_default();
             line_comment_panel(ui, &t, pr, draft, data, acts);
         }
-        if let Some(b) = view.moved {
-            super::moved_view::panel(ui, &t, data, b, acts);
+        if let Some(open) = &view.moved {
+            super::moved_view::panel(ui, &t, data, open, acts);
         }
 
         let split = data.shows_split(split);

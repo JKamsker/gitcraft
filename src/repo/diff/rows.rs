@@ -318,6 +318,15 @@ impl<'a> Rows<'a> {
         let right = rect.right().min(ui.clip_rect().right()) - 6.0;
         let id = ui.id().with(("moved_btn", i));
         let (resp, _) = text_button(ui, right, rect.center().y, &label, self.t.accent, id);
+        // The block whose places the panel below shows.
+        if self.view.moved.as_ref().is_some_and(|o| o.block == b) {
+            ui.painter().rect_stroke(
+                resp.rect,
+                self.t.radius_sm,
+                Stroke::new(1.5, self.t.accent),
+                egui::StrokeKind::Inside,
+            );
+        }
         if resp
             .on_hover_text("Show both places of the moved block, and what changed on the way")
             .clicked()

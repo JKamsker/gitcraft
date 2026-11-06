@@ -199,7 +199,10 @@ impl RepoTab {
             }
             Action::DiffMoved(block) => {
                 if let Some(view) = &mut self.diff {
-                    view.moved = block;
+                    view.moved = match (&view.data, block) {
+                        (Some(Ok(data)), Some(b)) => diff::moved_view::Opened::new(data, b),
+                        _ => None,
+                    };
                 }
             }
             Action::DiffJumpLine(i) => {
