@@ -118,10 +118,10 @@ impl RepoTab {
                     let r = widgets::file_row(ui, code, path, None, indent, shown(path), extra);
                     // Over the stats of a changed file, the padlock would hide them.
                     if change.is_none() {
-                        self.lock_badge(ui, &r.row, path, false);
+                        self.lock_badge(ui, &r.row, path, (false, shown(path)));
                     }
                     let locks = |ui: &mut Ui, acts: &mut Vec<Action>| {
-                        self.lock_menu_items(ui, path, acts);
+                        self.lock_menu_items(ui, path, Some(&detail.hash), acts);
                     };
                     widgets::file_menu_with(&r.row, path, Some(&detail.hash), false, locks, acts);
                     if r.row.clicked() {

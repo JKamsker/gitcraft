@@ -210,10 +210,10 @@ impl RepoTab {
             selected,
             RowExtra::Buttons(buttons),
         );
-        self.lock_badge(ui, &r.row, &f.path, !buttons.is_empty());
+        self.lock_badge(ui, &r.row, &f.path, (!buttons.is_empty(), selected));
         if f.code != 'D' {
             let locks =
-                |ui: &mut Ui, acts: &mut Vec<Action>| self.lock_menu_items(ui, &f.path, acts);
+                |ui: &mut Ui, acts: &mut Vec<Action>| self.lock_menu_items(ui, &f.path, None, acts);
             widgets::file_menu_with(&r.row, &f.path, None, true, locks, acts);
         }
         match r.button {

@@ -1,8 +1,11 @@
 //! The LFS locks panel: every lock on the server, filtered by path or owner, unlocked several at
 //! once (someone else's by force, for admins), and the patterns that make files lockable.
 
+use std::collections::BTreeSet;
+
 use egui::{RichText, Ui};
 
+use super::banner::lock_color;
 use super::{LockAct, LockState, Panel, lock_label};
 use crate::git::{self, LfsLock};
 use crate::icons;
@@ -32,7 +35,7 @@ impl RepoTab {
                 ui.add_space(8.0);
                 filters(ui, &mut panel);
                 ui.add_space(6.0);
-                let shown: Vec<LfsLock> = state.shown(&panel).into_iter().cloned().collect();
+                let shown: Vec<&LfsLock> = state.shown(&panel);
                 lock_list(ui, &t, state, &shown, &mut panel);
                 ui.add_space(8.0);
                 unlock_buttons(ui, &t, state, &shown, &mut panel, acts);
@@ -47,7 +50,7 @@ impl RepoTab {
     }
 }
 
-/// Title, refresh and close; true when closed.
+/// Title, refresh and close, and what went wrong; true when closed.
 fn header(ui: &mut Ui, t: &Tokens, state: &LockState, acts: &mut Vec<Action>) -> bool {
     let mut close = false;
     ui.horizontal(|ui| {
@@ -66,7 +69,7 @@ fn header(ui: &mut Ui, t: &Tokens, state: &LockState, acts: &mut Vec<Action>) ->
             }
         });
     });
-    if let Some(e) = &state.error {
+    for e in [&state.error, &state.job_error].into_iter().flatten() {
         ui.add(egui::Label::new(RichText::new(e).color(t.danger)).wrap());
     }
     if let Some(busy) = &state.busy {
@@ -77,16 +80,19 @@ fn header(ui: &mut Ui, t: &Tokens, state: &LockState, acts: &mut Vec<Action>) ->
 
 fn filters(ui: &mut Ui, panel: &mut Panel) {
     ui.horizontal(|ui| {
-        ui.add(
+        let typed = ui.add(
             egui::TextEdit::singleline(&mut panel.filter)
                 .hint_text("Filter by path or owner")
                 .desired_width(320.0),
         );
-        ui.checkbox(&mut panel.only_mine, "Only mine");
+        let mine = ui.checkbox(&mut panel.only_mine, "Only mine");
+        if typed.changed() || mine.changed() {
+            panel.confirm_force = None;
+        }
     });
 }
 
-fn lock_list(ui: &mut Ui, t: &Tokens, state: &LockState, shown: &[LfsLock], panel: &mut Panel) {
+fn lock_list(ui: &mut Ui, t: &Tokens, state: &LockState, shown: &[&LfsLock], panel: &mut Panel) {
     let now = git::now();
     egui::ScrollArea::vertical()
         .max_height(300.0)
@@ -95,36 +101,33 @@ fn lock_list(ui: &mut Ui, t: &Tokens, state: &LockState, shown: &[LfsLock], pane
             if shown.is_empty() {
                 let note = if state.locks.is_empty() {
                     if state.reading.is_some() {
-                        "Reading the locks…"
+                        Some("Reading the locks…")
+                    } else if state.error.is_some() {
+                        None
                     } else {
-                        "Nobody holds a lock."
+                        Some("Nobody holds a lock.")
                     }
+                } else if panel.only_mine && panel.filter.trim().is_empty() {
+                    Some("None of the locks is yours.")
                 } else {
-                    "No lock matches the filter."
+                    Some("No lock matches the filter.")
                 };
-                ui.label(RichText::new(note).color(t.text_dim));
+                if let Some(note) = note {
+                    ui.label(RichText::new(note).color(t.text_dim));
+                }
             }
             for lock in shown {
                 ui.horizontal(|ui| {
                     let mut on = panel.chosen.contains(&lock.id);
-                    if ui.checkbox(&mut on, "").changed() {
+                    let path = RichText::new(&lock.path).font(theme::medium(12.5));
+                    if ui.checkbox(&mut on, path).changed() {
                         if on {
                             panel.chosen.insert(lock.id.clone());
                         } else {
                             panel.chosen.remove(&lock.id);
                         }
-                        panel.confirm_force = false;
                     }
-                    let color = match lock.ours {
-                        Some(true) => t.accent,
-                        Some(false) => t.warning,
-                        None => t.text_dim,
-                    };
-                    icons::inline(ui, "lock", 13.0, color);
-                    ui.add(
-                        egui::Label::new(RichText::new(&lock.path).font(theme::medium(12.5)))
-                            .truncate(),
-                    );
+                    icons::inline(ui, "lock", 13.0, lock_color(t, lock));
                     ui.label(
                         RichText::new(lock_label(lock, now))
                             .color(t.text_dim)
@@ -135,34 +138,45 @@ fn lock_list(ui: &mut Ui, t: &Tokens, state: &LockState, shown: &[LfsLock], pane
         });
 }
 
-/// Unlock for the chosen locks that are ours (or not known to be someone else's), and Force
-/// unlock, asked twice, for those of someone else.
+/// Unlock for the chosen locks that are ours (or whose owner isn't known), and Force unlock,
+/// asked twice, for those not known to be ours; the confirmation holds for the locks it named.
 fn unlock_buttons(
     ui: &mut Ui,
     t: &Tokens,
     state: &LockState,
-    shown: &[LfsLock],
+    shown: &[&LfsLock],
     panel: &mut Panel,
     acts: &mut Vec<Action>,
 ) {
     let chosen: Vec<&LfsLock> = shown
         .iter()
+        .copied()
         .filter(|l| panel.chosen.contains(&l.id))
         .collect();
     let pair = |l: &&LfsLock| (l.id.clone(), l.path.clone());
     let mine: Vec<(String, String)> = chosen.iter().filter(|l| !l.theirs()).map(pair).collect();
-    let theirs: Vec<(String, String)> = chosen.iter().filter(|l| l.theirs()).map(pair).collect();
+    let forceable: Vec<(String, String)> = chosen
+        .iter()
+        .filter(|l| l.ours != Some(true))
+        .map(pair)
+        .collect();
+    let forceable_ids: BTreeSet<String> = forceable.iter().map(|(id, _)| id.clone()).collect();
+    if panel
+        .confirm_force
+        .as_ref()
+        .is_some_and(|c| *c != forceable_ids)
+    {
+        panel.confirm_force = None;
+    }
+    let any_forceable = shown.iter().any(|l| l.ours != Some(true));
     let idle = state.busy.is_none();
     ui.horizontal(|ui| {
         let all = !shown.is_empty() && chosen.len() == shown.len();
+        let pick = if all { "Pick none" } else { "Pick all" };
         if ui
-            .add_enabled(
-                !shown.is_empty(),
-                egui::Button::new(if all { "Pick none" } else { "Pick all" }),
-            )
+            .add_enabled(!shown.is_empty(), egui::Button::new(pick))
             .clicked()
         {
-            panel.confirm_force = false;
             if all {
                 panel.chosen.clear();
             } else {
@@ -170,32 +184,48 @@ fn unlock_buttons(
             }
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let force_label = if panel.confirm_force {
-                format!("Take {} locks from their owners", theirs.len())
-            } else {
-                format!("Force unlock {}…", theirs.len())
-            };
-            let force = ui
-                .add_enabled(idle && !theirs.is_empty(), egui::Button::new(force_label))
-                .on_hover_text(
-                    "Takes the lock from whoever holds it. The server allows this to admins \
-                     only, and their unpushed work on the file may then be refused.",
-                );
-            if force.clicked() {
-                if panel.confirm_force {
-                    acts.push(Action::LfsLocks(LockAct::Unlock {
-                        locks: theirs.clone(),
-                        force: true,
-                    }));
-                } else {
-                    panel.confirm_force = true;
+            if any_forceable {
+                let n = forceable.len();
+                let label = match (&panel.confirm_force, forceable.first()) {
+                    (Some(_), Some((id, _))) if n == 1 => {
+                        let owner = chosen
+                            .iter()
+                            .find(|l| &l.id == id)
+                            .map(|l| l.owner.as_str())
+                            .filter(|o| !o.is_empty())
+                            .unwrap_or("its owner");
+                        format!("Take the lock from {owner}")
+                    }
+                    (Some(_), _) => format!("Take {n} locks from their owners"),
+                    (None, _) if n == 0 => "Force unlock…".to_owned(),
+                    (None, _) => format!("Force unlock {n}…"),
+                };
+                let force = ui
+                    .add_enabled(idle && n > 0, egui::Button::new(label))
+                    .on_hover_text(
+                        "Takes the lock from whoever holds it. Only admins may do this; the \
+                         owner isn't told, and their unpushed changes to the file may clash \
+                         with someone else's.",
+                    );
+                if force.clicked() {
+                    if panel.confirm_force.is_some() {
+                        acts.push(Action::LfsLocks(LockAct::Unlock {
+                            locks: forceable.clone(),
+                            force: true,
+                        }));
+                    } else {
+                        panel.confirm_force = Some(forceable_ids.clone());
+                    }
                 }
             }
-            let unlock = ui.add_enabled(
-                idle && !mine.is_empty(),
-                egui::Button::new(format!("Unlock {}", mine.len())),
-            );
-            if unlock.clicked() {
+            let label = match mine.len() {
+                0 => "Unlock".to_owned(),
+                n => format!("Unlock {n}"),
+            };
+            if ui
+                .add_enabled(idle && !mine.is_empty(), egui::Button::new(label))
+                .clicked()
+            {
                 acts.push(Action::LfsLocks(LockAct::Unlock {
                     locks: mine.clone(),
                     force: false,
@@ -203,12 +233,23 @@ fn unlock_buttons(
             }
         });
     });
-    if panel.confirm_force {
-        ui.label(
-            RichText::new("Click again to force: the owners lose their locks.")
-                .color(t.warning)
-                .small(),
-        );
+    if panel.confirm_force.is_some() {
+        ui.horizontal(|ui| {
+            let who = if forceable.len() == 1 {
+                "its owner loses the lock"
+            } else {
+                "the owners lose their locks"
+            };
+            ui.label(
+                RichText::new(format!("Click again to force: {who}."))
+                    .color(t.warning)
+                    .small(),
+            );
+            if ui.small_button("Cancel").clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape))
+            {
+                panel.confirm_force = None;
+            }
+        });
     }
 }
 
@@ -217,13 +258,16 @@ fn patterns(ui: &mut Ui, t: &Tokens, state: &LockState, panel: &mut Panel, acts:
     ui.label(RichText::new("Lockable files").font(theme::semibold(13.0)));
     ui.label(
         RichText::new(
-            "Files matching these patterns are kept in LFS and read-only until you lock them.",
+            "Files matching these patterns can be locked; git-lfs keeps them read-only until \
+             you do. Commit .gitattributes to share a new pattern.",
         )
         .color(t.text_dim)
         .small(),
     );
     if state.patterns.is_empty() {
-        ui.label(RichText::new("No pattern in .gitattributes is lockable.").color(t.text_faint));
+        ui.label(
+            RichText::new("No pattern in the root .gitattributes is lockable.").color(t.text_faint),
+        );
     } else {
         ui.horizontal_wrapped(|ui| {
             for p in &state.patterns {
@@ -241,7 +285,9 @@ fn patterns(ui: &mut Ui, t: &Tokens, state: &LockState, panel: &mut Panel, acts:
         let ok = !panel.new_pattern.trim().is_empty() && state.busy.is_none();
         let add = ui
             .add_enabled(ok, egui::Button::new("Make lockable"))
-            .on_hover_text("git lfs track --lockable: writes the pattern to .gitattributes");
+            .on_hover_text(
+                "git lfs track --lockable: keeps them in LFS, written to .gitattributes",
+            );
         if ok && (add.clicked() || enter) {
             acts.push(Action::LfsLocks(LockAct::TrackLockable(
                 panel.new_pattern.trim().to_owned(),
