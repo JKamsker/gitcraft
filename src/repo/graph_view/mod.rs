@@ -57,8 +57,15 @@ impl RepoTab {
         let ghost = self
             .ghost
             .swap_in(&mut self.commits, &mut self.graph, &mut self.index);
-        // Rows are numbered differently in the ghost graph: nothing is selected in it.
-        let selected = if ghost { self.selected.take() } else { None };
+        // Rows are numbered differently in the ghost graph: the selected commit is found there
+        // by its hash (the open menu's entries, "Compare with" among them, stay as they were).
+        let selected = self.selected;
+        if ghost {
+            self.selected = self
+                .ghost
+                .real_hash(selected)
+                .and_then(|h| self.index.get(&h).copied());
+        }
         self.graph_rows_view(ui, acts);
         if ghost {
             self.ghost
@@ -142,7 +149,7 @@ impl RepoTab {
             }
             _ => {}
         }
-        if let Some(row) = self.scroll_to.take() {
+        if let Some(row) = self.scroll_to.take_if(|_| !ghost) {
             let view_h = ui.available_height();
             let top = row as f32 * ROW_PITCH;
             // Only scroll if the row is outside the visible part.
@@ -159,7 +166,9 @@ impl RepoTab {
         let total = self.commits.len() + usize::from(self.has_more);
         let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
             // Near the end: fetch the next page of history.
-            if range.end + 40 >= self.commits.len() && self.has_more && !self.loading_more {
+            // Not from the ghost graph, whose rows don't grow as pages come in.
+            if range.end + 40 >= self.commits.len() && self.has_more && !self.loading_more && !ghost
+            {
                 acts.push(Action::LoadMore);
             }
             let menu_row = ui.data(|d| d.get_temp::<String>(menu_row_id()));
@@ -511,9 +520,24 @@ mod tests {
         };
         let rows = tab.commits.clone();
         tab.ghost.show_for_test(outcome, &rows);
+        // Near the end of what is loaded, with more to load: the ghost graph asks for none.
+        tab.has_more = true;
+        tab.selected = Some(2);
+        let mut asked = Vec::new();
         for _ in 0..3 {
-            frame(&mut tab, Vec::new());
+            let input = egui::RawInput {
+                screen_rect: Some(screen),
+                ..Default::default()
+            };
+            ctx.run_ui(input, |ui| {
+                egui::CentralPanel::default()
+                    .frame(egui::Frame::NONE)
+                    .show(ui, |ui| tab.graph_view(ui, &mut asked));
+            })
+            .drop_without_applying_deltas();
         }
+        assert!(!asked.iter().any(|a| matches!(a, Action::LoadMore)));
+        assert_eq!(tab.selected, Some(2));
         assert!(opened, "the right-click opened no menu");
         assert!(egui::Popup::is_any_open(&ctx), "the menu closed");
         // The tab's own rows are back once the graph is drawn.

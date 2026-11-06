@@ -35,8 +35,6 @@ const HOVER_DELAY: Duration = Duration::from_millis(450);
 const ALT_DELAY: Duration = Duration::from_millis(80);
 /// How many outcomes are kept, by the commits involved.
 const CACHED: usize = 24;
-/// How long a pull's outcome is kept: it depends on the remote, which moves on its own.
-const PULL_FRESH: Duration = Duration::from_secs(60);
 
 /// Offers `op` for a ghost run while `resp` (an enabled menu entry or button) is under the
 /// pointer, for this frame.
@@ -104,6 +102,8 @@ pub(crate) struct Ghost {
     version: Arc<Mutex<Option<GitVersion>>>,
     jobs: u64,
     shift: Option<Shift>,
+    /// The refs' fingerprint, and the read of them it is of (see `RepoTab::history_gen`).
+    refs_fp: Option<(u64, u64)>,
     /// How far the graph was scrolled down for the ghost rows.
     pub(crate) shifted: f32,
 }
@@ -139,6 +139,13 @@ impl Ghost {
         let moved = refs.iter().any(|r| view.moved.contains(r));
         let gone = !refs.is_empty() && refs.iter().all(|r| view.gone.contains(r));
         (moved, gone)
+    }
+
+    /// The hash of the tab's row `row` (numbered as the tab's own rows, now swapped out into
+    /// the shown view).
+    pub(crate) fn real_hash(&self, row: Option<usize>) -> Option<String> {
+        let view = self.shown.as_ref().filter(|s| s.swapped)?.view.as_ref()?;
+        Some(view.commits.get(row?)?.hash.clone())
     }
 
     /// Puts the ghost graph in the place of the tab's rows (`commits`, `graph`, `index`) for
@@ -203,16 +210,19 @@ impl Ghost {
             job.cancel.store(true, Ordering::Relaxed);
         }
         self.hover = None;
+        // A shift not made yet (the graph wasn't drawn meanwhile) is no longer wanted.
+        if matches!(self.shift, Some(Shift::In(_))) {
+            self.shift = None;
+        }
         if self.shown.take().is_some() && self.shifted != 0.0 {
             self.shift = Some(Shift::Out(std::mem::take(&mut self.shifted)));
         }
     }
 
     fn cached(&self, key: &Key) -> Option<Arc<Result<Outcome, String>>> {
-        let fresh = |at: &Instant| !matches!(key.op, GhostOp::Pull(_)) || at.elapsed() < PULL_FRESH;
         self.cache
             .iter()
-            .find(|(k, at, _)| k == key && fresh(at))
+            .find(|(k, _, _)| k == key)
             .map(|(_, _, r)| Arc::clone(r))
     }
 
@@ -280,7 +290,28 @@ impl RepoTab {
     }
 
     /// The key `op`'s outcome is cached by.
-    fn ghost_key(&self, op: GhostOp) -> Key {
+    fn ghost_key(&mut self, op: GhostOp) -> Key {
+        let mut h = DefaultHasher::new();
+        self.refs_fingerprint().hash(&mut h);
+        // What a rebase checks the working tree for (untracked files don't count).
+        op::tracked_changes(&self.work).hash(&mut h);
+        if matches!(op, GhostOp::ResetHard { .. }) {
+            self.work_read.hash(&mut h);
+        }
+        Key {
+            op,
+            refs: h.finish(),
+        }
+    }
+
+    /// A hash of the commits every ref points at, worked out once per read of them (there may
+    /// be tens of thousands, and the key is asked for every frame of a hover).
+    fn refs_fingerprint(&mut self) -> u64 {
+        if let Some((read, fp)) = self.ghost.refs_fp
+            && read == self.history_gen
+        {
+            return fp;
+        }
         let mut h = DefaultHasher::new();
         let refs = &self.refs;
         (&refs.head, &refs.current).hash(&mut h);
@@ -292,14 +323,9 @@ impl RepoTab {
         {
             (&b.name, &b.target, &b.upstream).hash(&mut h);
         }
-        self.work.is_clean().hash(&mut h);
-        if matches!(op, GhostOp::ResetHard { .. }) {
-            self.work_read.hash(&mut h);
-        }
-        Key {
-            op,
-            refs: h.finish(),
-        }
+        let fp = h.finish();
+        self.ghost.refs_fp = Some((self.history_gen, fp));
+        fp
     }
 
     /// Works out the outcome of `key`'s operation (or takes it from the cache) and lays out
@@ -321,7 +347,6 @@ impl RepoTab {
             refs: self.refs.clone(),
             remotes: self.remotes.iter().map(|r| r.name.clone()).collect(),
             dirty: op::tracked_changes(&self.work),
-            credentials: self.credentials.clone(),
         };
         let rows = self.commits.clone();
         let repo = self.path.clone();
@@ -363,7 +388,8 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         let cancelled = matches!(&*result, Err(e) if e == CANCELLED);
-        if !cancelled {
+        // Only what was worked out: a failure may be passing (a machine not reachable).
+        if result.is_ok() {
             self.ghost.remember(key.clone(), &result);
         }
         if self.ghost.job.as_ref().map(|j| j.id) != Some(id) || cancelled {

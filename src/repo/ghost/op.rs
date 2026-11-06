@@ -46,8 +46,8 @@ pub(super) fn short(hash: &str) -> &str {
     hash.get(..8).unwrap_or(hash)
 }
 
-/// What the background work gets of the tab: the refs as read, where the checked-out
-/// branch's upstream is, and whether the working tree has changes.
+/// What the background work gets of the tab: the refs as read, the remotes, and whether the
+/// working tree has changes.
 #[derive(Clone, Default)]
 pub(crate) struct Facts {
     pub(crate) refs: Refs,
@@ -55,7 +55,6 @@ pub(crate) struct Facts {
     pub(crate) remotes: Vec<String>,
     /// Tracked files have uncommitted changes (untracked files stop no rebase).
     pub(crate) dirty: bool,
-    pub(crate) credentials: Option<crate::git::Credentials>,
 }
 
 /// A local branch's upstream: its remote, the branch's name there, and the remote-tracking

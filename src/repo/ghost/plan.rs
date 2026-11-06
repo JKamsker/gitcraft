@@ -12,8 +12,9 @@ use crate::repo::pull::PullMode;
 
 /// How many of the commits left on no ref are listed (and marked in the graph).
 const LOST_LIMIT: usize = 200;
-/// How many commits a pull brings in are drawn.
-const FETCHED_LIMIT: usize = 300;
+/// How many commits a rewrite may replay before the preview gives up: each is a git call or
+/// two (a round trip each on another machine).
+const PICKS_LIMIT: usize = 300;
 
 /// The commit a merge would make, which a ghost run never makes: its stand-in id.
 pub(crate) const GHOST_MERGE: &str = "\u{0}ghost-merge";
@@ -216,36 +217,17 @@ impl Ctx<'_> {
             )
         })?;
         let mut out = Outcome::default();
-        let new = self.remote_tip(&up, &mut out.warnings);
-        self.check()?;
+        // Never the network from a hover: asking the remote can hang, ask for a passphrase or
+        // a key's touch, or download a lot, for a pointer passing by. What the last fetch
+        // brought (the background fetch keeps it recent) stands for what the pull fetches.
+        out.notes.push(format!(
+            "As of the last fetch of {}: what was pushed there since isn't shown.",
+            up.remote
+        ));
         let head = branch.target.clone();
         let tracking = up.tracking.target.clone();
-        if new != tracking {
-            out.moves.push(RefMove {
-                full: format!("refs/remotes/{}", up.tracking.name),
-                from: Some(tracking.clone()),
-                to: Some(new.clone()),
-            });
-        }
-        let not = |h: &str| format!("^{h}");
-        let fetched = git::log(
-            self.repo,
-            Some(&[new.clone(), not(&head), not(&tracking)]),
-            0,
-            FETCHED_LIMIT,
-        )?;
-        out.created = fetched;
+        let new = tracking.clone();
         self.check()?;
-        // What only the old remote-tracking branch had goes when the fetch moves it (a force
-        // push there); the paths below that move the branch too count again with it.
-        if new != tracking {
-            self.lose(
-                &mut out,
-                std::slice::from_ref(&tracking),
-                &[new.clone(), head.clone()],
-                &[tracking_ref(&up)],
-            )?;
-        }
         if dry_run::is_ancestor(self.repo, &new, &head) {
             out.notes
                 .push("Already up to date: the branch has everything its remote has.".to_owned());
@@ -358,83 +340,6 @@ impl Ctx<'_> {
             out.files = Some(git::diff_files(self.repo, head, Some(&merged.tree))?);
         }
         Ok(out)
-    }
-
-    /// The commit the upstream's branch is at on the remote, asked without changing any ref:
-    /// `ls-remote`, then its objects fetched into nothing (no ref, no FETCH_HEAD, no tags). The
-    /// remote-tracking branch as last fetched when the remote can't be asked.
-    fn remote_tip(&self, up: &Upstream<'_>, warnings: &mut Vec<String>) -> String {
-        let known = up.tracking.target.clone();
-        let mut as_fetched = |why: String| {
-            warnings.push(format!(
-                "{why}. Shown as of the last fetch of {}.",
-                up.remote
-            ));
-            known.clone()
-        };
-        if !self.version.has_no_write_fetch_head() {
-            return as_fetched(format!(
-                "git {} can't fetch without writing FETCH_HEAD",
-                self.version
-            ));
-        }
-        if up.remote.starts_with('-') {
-            return as_fetched(format!("{} isn't a remote's name", up.remote));
-        }
-        let creds = self.facts.credentials.as_ref();
-        let branch_ref = format!("refs/heads/{}", up.name);
-        let listed = git::run_unattended(
-            Some(self.repo),
-            &["ls-remote", "--end-of-options", up.remote, &branch_ref],
-            creds,
-        );
-        let oid = match listed {
-            Ok(out) => out
-                .lines()
-                .find_map(|l| l.split_once('\t').filter(|(_, r)| *r == branch_ref))
-                .map(|(oid, _)| oid.trim().to_owned()),
-            Err(e) => {
-                return as_fetched(format!(
-                    "The pull would fail now: couldn't reach {} ({})",
-                    up.remote,
-                    first_line(&e)
-                ));
-            }
-        };
-        let Some(oid) = oid else {
-            return as_fetched(format!("{} has no branch {} any more", up.remote, up.name));
-        };
-        if oid == known || self.has_commit(&oid) {
-            return oid;
-        }
-        let fetched = git::run_unattended(
-            Some(self.repo),
-            &[
-                "-c",
-                "gc.auto=0",
-                "-c",
-                "maintenance.auto=false",
-                "fetch",
-                "--quiet",
-                "--no-tags",
-                "--no-prune",
-                "--no-recurse-submodules",
-                "--no-write-fetch-head",
-                "--refmap=",
-                up.remote,
-                &branch_ref,
-            ],
-            creds,
-        );
-        match fetched {
-            Ok(_) if self.has_commit(&oid) => oid,
-            Ok(_) => as_fetched(format!("{}'s new commits didn't come", up.remote)),
-            Err(e) => as_fetched(format!(
-                "The pull would fail now: couldn't fetch from {} ({})",
-                up.remote,
-                first_line(&e)
-            )),
-        }
     }
 
     fn has_commit(&self, oid: &str) -> bool {
@@ -628,6 +533,12 @@ impl Ctx<'_> {
     /// files that change.
     fn rewrite(&self, w: &Rewrite<'_>, out: &mut Outcome) -> Result<(), String> {
         let tip = local_ref(&w.branch.name);
+        if w.picks.len() > PICKS_LIMIT {
+            return Err(format!(
+                "{} commits to replay, too many to preview (at most {PICKS_LIMIT})",
+                w.picks.len()
+            ));
+        }
         if self.config_set("rebase.rebaseMerges") && self.has_merges(w.base, &tip)? {
             return Err(
                 "rebase.rebaseMerges is set and merges are among the commits: git keeps them, which the preview can't replay yet"
@@ -852,10 +763,6 @@ fn reversed(files: Vec<ChangedFile>) -> Vec<ChangedFile> {
 
 fn local_ref(name: &str) -> String {
     format!("refs/heads/{name}")
-}
-
-fn first_line(e: &str) -> &str {
-    e.lines().next().unwrap_or(e)
 }
 
 /// The commit `c` as the strip names it.

@@ -116,8 +116,8 @@ so your config, credentials and hooks apply as usual.
   of the graph lists those commits with their authors, the files of the working tree that would
   change, and the step that would conflict. It is worked out in the background without touching
   refs, index, working tree or reflog: `git replay` (git 2.44+) or `git merge-tree` (2.40+;
-  merges from 2.38) in memory, or a scratch clone in the temporary folder on an older git; a
-  pull asks the remote what it has without updating any ref. _Force push to origin/x (with
+  merges from 2.38) in memory, or a scratch clone in the temporary folder on an older git. A
+  hover never goes to the network: a pull is shown as of the last fetch. _Force push to origin/x (with
   lease)…_ is in a local branch's menu when its upstream has commits it hasn't.
 
 **Branches, remotes, worktrees, stashes, tags** (left)

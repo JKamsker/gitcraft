@@ -45,11 +45,6 @@ impl GitVersion {
     pub fn has_merge_base_option(self) -> bool {
         self >= Self(2, 40, 0)
     }
-
-    /// `git fetch --no-write-fetch-head` (2.29): a fetch that leaves even FETCH_HEAD alone.
-    pub fn has_no_write_fetch_head(self) -> bool {
-        self >= Self(2, 29, 0)
-    }
 }
 
 impl std::fmt::Display for GitVersion {
@@ -82,7 +77,6 @@ mod tests {
         assert!(!v(43, 9).has_replay() && v(44, 0).has_replay());
         assert!(!v(37, 4).has_merge_tree() && v(38, 0).has_merge_tree());
         assert!(!v(39, 5).has_merge_base_option() && v(40, 0).has_merge_base_option());
-        assert!(!v(28, 0).has_no_write_fetch_head() && v(29, 0).has_no_write_fetch_head());
         assert!(GitVersion(3, 0, 0).has_replay());
     }
 }
