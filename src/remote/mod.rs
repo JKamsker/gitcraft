@@ -15,6 +15,7 @@ mod pool;
 mod session;
 mod shell;
 mod ui_guard;
+mod vault;
 
 use std::path::{Path, PathBuf};
 

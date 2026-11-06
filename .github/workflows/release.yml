@@ -66,9 +66,10 @@ jobs:
           # The oldest supported runner, so the binary runs on older glibc too.
           - os: ubuntu-22.04
             name: linux-x86_64
-          # Builds for Apple silicon and Intel, joined into one universal app.
-          - os: macos-latest
-            name: macos-universal
+          # Builds for Apple silicon and Intel, joined into one universal app. Off for now: the
+          # macOS runners aren't picking the job up (a known issue); put it back once they do.
+          # - os: macos-latest
+          #   name: macos-universal
     runs-on: ${{ matrix.os }}
     env:
       VERSION: ${{ needs.version.outputs.version }}

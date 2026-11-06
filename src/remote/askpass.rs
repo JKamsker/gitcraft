@@ -7,7 +7,9 @@
 //! The running app shows the question (see [`pending`] and [`answer`]) and sends the answer
 //! back. A password or passphrase typed is remembered for the machine while the app runs, so
 //! the other shells kept open there don't ask again; one ssh asks again, and it was wrong: it
-//! is forgotten, and the question shown again.
+//! is forgotten, and the question shown again. Typed with "Remember connection", it is also
+//! kept in the system's credential store (see [`super::vault`]) and given from there after a
+//! restart, until it is wrong or forgotten.
 
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Write};
@@ -76,11 +78,16 @@ pub struct Question {
     pub host: String,
     pub prompt: String,
     pub kind: Kind,
+    /// A secret kept for it (see [`super::vault`]) was wrong, and is forgotten.
+    pub forgotten: bool,
 }
+
+/// An answer: what to give ssh, and whether to keep it for good.
+type Reply = Option<(String, bool)>;
 
 struct Waiting {
     question: Question,
-    reply: Sender<Option<String>>,
+    reply: Sender<Reply>,
 }
 
 #[derive(Default)]
@@ -94,6 +101,8 @@ struct State {
     answered_from_known: HashSet<(u64, String)>,
     /// When a question was last shown or answered.
     last_asked: Option<Instant>,
+    /// What the window is to say (a secret that couldn't be kept), the oldest first.
+    notices: Vec<String>,
     repaint: Option<egui::Context>,
 }
 
@@ -188,12 +197,55 @@ pub fn pending() -> Option<Question> {
 
 /// Answers question `id`: `None` declines it.
 pub fn answer(id: u64, answer: Option<String>) {
+    reply(id, answer.map(|a| (a, false)));
+}
+
+/// Answers question `id` with `secret`, and keeps it in the system's credential store.
+pub fn answer_and_remember(id: u64, secret: String) {
+    reply(id, Some((secret, true)));
+}
+
+fn reply(id: u64, reply: Reply) {
     let Some(server) = server() else { return };
     let mut state = lock(&server.state);
     state.last_asked = Some(Instant::now());
     if let Some(i) = state.waiting.iter().position(|w| w.question.id == id) {
         let waiting = state.waiting.remove(i);
-        let _ = waiting.reply.send(answer);
+        let _ = waiting.reply.send(reply);
+    }
+}
+
+/// What the window is to say since it last asked (a secret that couldn't be kept, the sign-ins
+/// forgotten).
+pub fn take_notices() -> Vec<String> {
+    server()
+        .map(|server| std::mem::take(&mut lock(&server.state).notices))
+        .unwrap_or_default()
+}
+
+/// Forgets every sign-in kept, here and in the system's store: blocking, so not on the
+/// window's thread. The window is told how many there were.
+pub fn forget_saved() {
+    let Some(server) = server() else { return };
+    lock(&server.state).known.clear();
+    let count = super::vault::forget_all();
+    let notice = match count {
+        0 => "No saved sign-ins to forget.".to_owned(),
+        1 => "Forgot 1 saved sign-in.".to_owned(),
+        n => format!("Forgot {n} saved sign-ins."),
+    };
+    tell(server, notice);
+}
+
+/// Has the window say `notice`.
+fn tell(server: &Server, notice: String) {
+    let repaint = {
+        let mut state = lock(&server.state);
+        state.notices.push(notice);
+        state.repaint.clone()
+    };
+    if let Some(ctx) = repaint {
+        ctx.request_repaint();
     }
 }
 
@@ -242,54 +294,99 @@ fn serve(stream: TcpStream) -> std::io::Result<()> {
     }
 }
 
-/// The answer to `prompt` of `session`'s ssh: a secret known for its machine, else the user's.
+/// What is known of a secret's answer before the user is asked.
+enum Known {
+    /// Give this.
+    Use(String),
+    /// What was given this ssh before was wrong (and is forgotten here).
+    Wrong,
+    /// Nothing here: maybe in the system's store.
+    Nothing,
+}
+
+/// The answer to `prompt` of `session`'s ssh: a secret known for its machine (typed since the
+/// app started, or kept in the system's store), else the user's.
 fn ask(server: &Server, session: u64, kind: Kind, prompt: String, id: u64) -> Option<String> {
-    let (rx, repaint, key) = {
-        let mut state = lock(&server.state);
-        let host = state
-            .sessions
-            .get(&session)
-            .cloned()
-            .unwrap_or_else(|| "SSH".to_owned());
-        let key = (host.clone(), prompt.clone());
-        let once = (session, prompt.clone());
-        if kind == Kind::Secret {
-            if state.answered_from_known.contains(&once) {
-                // Asked again by the same ssh: what was known didn't do.
-                state.known.remove(&key);
-                state.answered_from_known.remove(&once);
-            } else if let Some(known) = state.known.get(&key).cloned() {
-                state.answered_from_known.insert(once);
-                return Some(known);
+    let host = lock(&server.state)
+        .sessions
+        .get(&session)
+        .cloned()
+        .unwrap_or_else(|| "SSH".to_owned());
+    let mut forgotten = false;
+    if kind == Kind::Secret {
+        match known(server, session, &host, &prompt) {
+            Known::Use(secret) => return Some(secret),
+            // Kept too? Then that was wrong: forgotten there as well.
+            Known::Wrong => forgotten = super::vault::forget(&host, &prompt),
+            Known::Nothing => {
+                if let Some(saved) = super::vault::recall(&host, &prompt) {
+                    remember(server, session, &host, &prompt, &saved);
+                    return Some(saved);
+                }
             }
         }
-        let (tx, rx) = channel();
+    }
+    let (tx, rx) = channel();
+    let repaint = {
+        let mut state = lock(&server.state);
         state.waiting.push(Waiting {
             question: Question {
                 id,
-                host,
-                prompt,
+                host: host.clone(),
+                prompt: prompt.clone(),
                 kind,
+                forgotten,
             },
             reply: tx,
         });
         state.last_asked = Some(Instant::now());
-        (rx, state.repaint.clone(), key)
+        state.repaint.clone()
     };
     if let Some(ctx) = repaint {
         ctx.request_repaint();
     }
-    let answer = rx.recv().ok().flatten();
-    // Kept for the machine's other shells, and marked as given to this ssh: it asking again
-    // means it was wrong (see above).
-    if kind == Kind::Secret
-        && let Some(secret) = &answer
-    {
-        let mut state = lock(&server.state);
-        state.known.insert(key.clone(), secret.clone());
-        state.answered_from_known.insert((session, key.1));
+    let (answer, keep) = rx.recv().ok().flatten()?;
+    if kind == Kind::Secret {
+        remember(server, session, &host, &prompt, &answer);
+        if keep && let Err(e) = super::vault::keep(&host, &prompt, &answer) {
+            tell(
+                server,
+                format!("{host}: the password couldn't be saved ({e})."),
+            );
+        }
     }
-    answer
+    Some(answer)
+}
+
+/// What is known of `prompt`'s answer for `session`'s ssh to `host`. Asked again by the same
+/// ssh, what it was given was wrong: forgotten.
+fn known(server: &Server, session: u64, host: &str, prompt: &str) -> Known {
+    let mut state = lock(&server.state);
+    let key = (host.to_owned(), prompt.to_owned());
+    let once = (session, prompt.to_owned());
+    if state.answered_from_known.remove(&once) {
+        state.known.remove(&key);
+        return Known::Wrong;
+    }
+    match state.known.get(&key).cloned() {
+        Some(secret) => {
+            state.answered_from_known.insert(once);
+            Known::Use(secret)
+        }
+        None => Known::Nothing,
+    }
+}
+
+/// Keeps `secret` for the machine's other shells, and marks it given to this ssh: it asking
+/// again means it was wrong (see [`known`]).
+fn remember(server: &Server, session: u64, host: &str, prompt: &str, secret: &str) {
+    let mut state = lock(&server.state);
+    state
+        .known
+        .insert((host.to_owned(), prompt.to_owned()), secret.to_owned());
+    state
+        .answered_from_known
+        .insert((session, prompt.to_owned()));
 }
 
 /// Whether two tokens are the same, in a time that doesn't tell how much of one matched.
@@ -412,6 +509,60 @@ mod tests {
         let again = ask_in_background(other, prompt, Kind::Secret);
         assert!(answer_shown(prompt, Some("right")).is_some());
         assert_eq!(again.join().ok().flatten(), Some("right".to_owned()));
+    }
+
+    /// What this run of the app knows of `host`'s secrets, gone (as after a restart).
+    fn restart_for(host: &str) {
+        if let Some(server) = server() {
+            lock(&server.state).known.retain(|(h, _), _| h != host);
+        }
+    }
+
+    /// Kept with "Remember connection", a secret is given after a restart without asking;
+    /// wrong, it is forgotten there too, and the user told so when asked again.
+    #[test]
+    fn a_remembered_secret_outlives_the_app_until_it_is_wrong() {
+        let (host, prompt) = ("SSH · four", "me@four's password: (kept)");
+        let asked = ask_in_background(session_for(host), prompt, Kind::Secret);
+        let shown = loop_until_shown(prompt);
+        assert_eq!(shown.as_ref().map(|q| q.forgotten), Some(false));
+        if let Some(q) = shown {
+            answer_and_remember(q.id, "kept".to_owned());
+        }
+        assert_eq!(asked.join().ok().flatten(), Some("kept".to_owned()));
+        assert_eq!(
+            super::super::vault::recall(host, prompt),
+            Some("kept".to_owned())
+        );
+
+        restart_for(host);
+        let after = session_for(host);
+        assert_eq!(
+            ask_app(&after, prompt, Kind::Secret).ok().flatten(),
+            Some("kept".to_owned())
+        );
+        // That ssh asks again: the kept one was wrong.
+        let again = ask_in_background(after, prompt, Kind::Secret);
+        let shown = loop_until_shown(prompt);
+        assert_eq!(shown.as_ref().map(|q| q.forgotten), Some(true));
+        assert_eq!(super::super::vault::recall(host, prompt), None);
+        if let Some(q) = shown {
+            answer(q.id, Some("right".to_owned()));
+        }
+        assert_eq!(again.join().ok().flatten(), Some("right".to_owned()));
+        // Typed without remembering: not kept.
+        assert_eq!(super::super::vault::recall(host, prompt), None);
+    }
+
+    /// The next question shown whose prompt is `prompt`, unanswered.
+    fn loop_until_shown(prompt: &str) -> Option<Question> {
+        for _ in 0..500 {
+            if let Some(q) = pending().filter(|q| q.prompt == prompt) {
+                return Some(q);
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        None
     }
 
     /// Without the token, nothing is asked and nothing answered.

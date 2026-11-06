@@ -34,6 +34,7 @@ enum AppCommand {
     Create,
     Clone,
     OpenRemote,
+    ForgetSignIns,
     Settings,
     Manual,
     Theme(ThemeKind),
@@ -84,6 +85,11 @@ impl App {
                 Entry::App(AppCommand::OpenRemote),
             ),
             (
+                "Forget saved SSH sign-ins".to_owned(),
+                "app".to_owned(),
+                Entry::App(AppCommand::ForgetSignIns),
+            ),
+            (
                 "Settings".to_owned(),
                 "app".to_owned(),
                 Entry::App(AppCommand::Settings),
@@ -127,6 +133,10 @@ impl App {
             Entry::App(AppCommand::Create) => self.pick_new(ctx),
             Entry::App(AppCommand::Clone) => self.start_clone(),
             Entry::App(AppCommand::OpenRemote) => self.start_open_remote(ctx),
+            // The system's store can take a while (the Secret Service is another process).
+            Entry::App(AppCommand::ForgetSignIns) => {
+                std::thread::spawn(crate::remote::askpass::forget_saved);
+            }
             Entry::App(AppCommand::Settings) => self.open_settings(),
             Entry::App(AppCommand::Manual) => self.manual_open = true,
             Entry::App(AppCommand::Theme(kind)) => self.set_theme(ctx, kind),
