@@ -180,6 +180,8 @@ pub struct RepoTab {
 
     commit_summary: String,
     commit_body: String,
+    /// The commit box's helpers: templates, prefix picker, co-authors, completion.
+    compose: detail::compose::Compose,
     amend: bool,
     dialog: Option<Dialog>,
     search: Search,
@@ -326,6 +328,7 @@ impl RepoTab {
             conflict_generation: 0,
             commit_summary: String::new(),
             commit_body: String::new(),
+            compose: Default::default(),
             amend: false,
             dialog: None,
             search: Search::default(),

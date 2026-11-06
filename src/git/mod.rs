@@ -2,6 +2,7 @@
 //! gitcraft behaves exactly like the user's own git (config, credentials, hooks).
 
 mod command;
+mod commit_msg;
 mod commits;
 mod diff;
 mod files;
@@ -9,9 +10,11 @@ mod lfs;
 mod refs;
 mod status;
 mod submodule;
+mod timed;
 mod worktree;
 
 pub use self::command::*;
+pub use self::commit_msg::*;
 pub use self::commits::*;
 pub use self::diff::*;
 pub use self::files::*;
@@ -19,6 +22,7 @@ pub use self::lfs::*;
 pub use self::refs::*;
 pub use self::status::*;
 pub use self::submodule::*;
+pub use self::timed::*;
 pub use self::worktree::*;
 
 use std::path::{Path, PathBuf};
