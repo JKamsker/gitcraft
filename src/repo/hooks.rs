@@ -238,16 +238,16 @@ mod tests {
             let again = run(&mut tab, &ctx, Action::Commit);
             let _ = std::fs::remove_dir_all(&dir);
             assert!(
-                failed.contains("the pre-commit hook failed (exit code 3):\nlint: 2 problems ✗"),
+                failed.contains("the pre-commit hook stopped it (exit code 3)\nlint: 2 problems ✗"),
                 "{failed}"
             );
-            assert!(failed.contains("--no-verify"), "{failed}");
+            assert!(failed.contains("Tick Skip hooks"), "{failed}");
             assert_eq!(still, before);
             assert_eq!(skipped, "Commit: done");
             assert_ne!(committed, before);
             assert_eq!(message.trim(), "Add a file ✓");
             assert!(!ticked);
-            assert!(again.contains("pre-commit hook failed"), "{again}");
+            assert!(again.contains("pre-commit hook stopped it"), "{again}");
         }
 
         /// A `commit-msg` hook is told apart from `pre-commit` (both run on a commit).
@@ -270,12 +270,12 @@ mod tests {
             let _ = std::fs::remove_dir_all(&dir);
             let err = err.err().unwrap_or_default();
             assert!(
-                err.starts_with("the commit-msg hook failed (exit code 3) and said nothing"),
+                err.starts_with("the commit-msg hook stopped it (exit code 3)"),
                 "{err}"
             );
             // Nothing to commit is git's own failure: no hook is blamed.
             let plain = plain.err().unwrap_or_default();
-            assert!(!plain.contains("hook failed"), "{plain}");
+            assert!(!plain.contains(" hook "), "{plain}");
         }
 
         #[test]
@@ -301,7 +301,7 @@ mod tests {
             let _ = std::fs::remove_dir_all(&dir);
             let _ = std::fs::remove_dir_all(&remote);
             assert!(
-                failed.contains("the pre-push hook failed (exit code 3):\ntests failed"),
+                failed.contains("the pre-push hook stopped it (exit code 3)\ntests failed"),
                 "{failed}"
             );
             assert_ne!(not_pushed.as_deref(), Ok(head.as_str()));

@@ -26,8 +26,25 @@ const HOOKED: [&str; 10] = [
     "switch",
 ];
 
-/// The hooks `--no-verify` leaves out (of commit, merge and push).
-const SKIPPABLE: [&str; 4] = ["pre-commit", "commit-msg", "pre-merge-commit", "pre-push"];
+/// The hooks whose failure stops the command running them. git goes on whatever the others
+/// (`post-commit`, `post-merge`, `post-rewrite`…) exit with, so they never are why it failed.
+const STOPPING: [&str; 8] = [
+    "pre-commit",
+    "prepare-commit-msg",
+    "commit-msg",
+    "pre-merge-commit",
+    "pre-push",
+    "pre-rebase",
+    "applypatch-msg",
+    "pre-applypatch",
+];
+
+/// Whether the hook `name` failing makes the git command `args` fail: one of [`STOPPING`], or
+/// `post-checkout` of a checkout itself (git ignores it inside a rebase or a clone).
+fn can_fail(name: &str, args: &[&str]) -> bool {
+    STOPPING.contains(&name)
+        || (name == "post-checkout" && matches!(subcommand(args), Some("checkout" | "switch")))
+}
 
 /// A hook that exited with something other than 0.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -38,19 +55,34 @@ pub struct FailedHook {
 }
 
 impl FailedHook {
-    /// The error of the command it failed, naming it first: what it said (`said`, possibly
-    /// nothing) after.
-    pub fn explain(&self, said: &str) -> String {
-        let mut text = format!("the {} hook failed (exit code {})", self.name, self.code);
-        let said = said.trim();
-        if said.is_empty() {
-            text.push_str(" and said nothing");
+    /// The error of the git command `args` it failed: a first line naming the hook, then what
+    /// it printed (`said`, possibly nothing), then how to run it once without, where the app
+    /// can.
+    pub fn explain(&self, said: &str, args: &[&str]) -> String {
+        let (name, code) = (&self.name, self.code);
+        // A `post-` hook runs once the work is done: only its exit code fails the command.
+        let mut text = if name.starts_with("post-") {
+            format!("it was done, but the {name} hook failed afterwards (exit code {code})")
         } else {
-            text.push_str(":\n");
+            format!("the {name} hook stopped it (exit code {code})")
+        };
+        let said = said.trim();
+        if !said.is_empty() {
+            text.push('\n');
             text.push_str(said);
         }
-        if SKIPPABLE.contains(&self.name.as_str()) {
-            text.push_str("\nSkip hooks (--no-verify) runs it once without this hook.");
+        let hint = match (subcommand(args), name.as_str()) {
+            (Some("commit"), "pre-commit" | "commit-msg") => {
+                Some("Tick Skip hooks in the commit box to commit once without them.")
+            }
+            (Some("push"), "pre-push") => {
+                Some("Right-click Push for Push, skipping hooks, to push once without it.")
+            }
+            _ => None,
+        };
+        if let Some(hint) = hint {
+            text.push('\n');
+            text.push_str(hint);
         }
         text
     }
@@ -81,8 +113,9 @@ pub fn subcommand<'a>(args: &[&'a str]) -> Option<&'a str> {
 /// The last hook that failed, from trace2 events (one JSON object a line). A hook git starts
 /// is a `child_start` of the class `hook`; its `child_exit`, of the same process (`sid`) and
 /// child, has its exit code. Events of the git commands a hook runs itself are in the file
-/// too, under their own `sid`, and only count when they are a hook's.
-pub(super) fn failed_hook(events: &str) -> Option<FailedHook> {
+/// too, under their own `sid`, and only count when they are a hook's. Only a hook whose
+/// failure fails the git command `args` (see [`can_fail`]) counts.
+pub(super) fn failed_hook(events: &str, args: &[&str]) -> Option<FailedHook> {
     let mut started: Vec<(String, i64, String)> = Vec::new();
     let mut failed = None;
     for line in events.lines() {
@@ -99,7 +132,8 @@ pub(super) fn failed_hook(events: &str) -> Option<FailedHook> {
             "child_exit" => {
                 let code = event.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
                 let hook = started.iter().find(|(s, c, _)| s == sid && *c == child);
-                if let Some((_, _, name)) = hook.filter(|_| code != 0) {
+                if let Some((_, _, name)) = hook.filter(|(_, _, n)| code != 0 && can_fail(n, args))
+                {
                     failed = Some(FailedHook {
                         name: name.clone(),
                         code,
@@ -132,26 +166,42 @@ fn hook_name(event: &serde_json::Value) -> String {
 pub(super) struct TraceFile(PathBuf);
 
 impl TraceFile {
-    pub fn new() -> Self {
+    /// A new, empty file only this user can read (the events name the command run, a commit's
+    /// message with it), made here rather than by git: one someone else made first under the
+    /// name is never taken. `None` when none could be made: the command runs untraced.
+    pub fn new() -> Option<Self> {
         static SEQ: AtomicU64 = AtomicU64::new(0);
-        let name = format!(
-            "gitcraft-hooks-{}-{}.json",
-            std::process::id(),
-            SEQ.fetch_add(1, Ordering::Relaxed)
-        );
-        let path = std::env::temp_dir().join(name);
-        // One left by an earlier gitcraft of the same process id would be read as this one's.
-        let _ = std::fs::remove_file(&path);
-        TraceFile(path)
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.subsec_nanos());
+        for _ in 0..4 {
+            let name = format!(
+                "gitcraft-hooks-{}-{nanos:x}-{}.json",
+                std::process::id(),
+                SEQ.fetch_add(1, Ordering::Relaxed)
+            );
+            let path = std::env::temp_dir().join(name);
+            let mut options = std::fs::OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                options.mode(0o600);
+            }
+            if options.open(&path).is_ok() {
+                return Some(TraceFile(path));
+            }
+        }
+        None
     }
 
     pub fn path(&self) -> &Path {
         &self.0
     }
 
-    /// The hook that failed, as the events written say.
-    pub fn failed_hook(&self) -> Option<FailedHook> {
-        failed_hook(&std::fs::read_to_string(&self.0).ok()?)
+    /// The hook that failed the git command `args`, as the events written say.
+    pub fn failed_hook(&self, args: &[&str]) -> Option<FailedHook> {
+        failed_hook(&std::fs::read_to_string(&self.0).ok()?, args)
     }
 }
 
@@ -162,13 +212,17 @@ impl Drop for TraceFile {
 }
 
 /// The script that runs `git <words>` (each word already quoted for `sh`) on a machine
-/// elsewhere with its hook events written to a temporary file there, then passes them back
-/// after its error output, behind [`MARK`]. Without a temporary file, git just runs.
+/// elsewhere with its hook events written to a file in the shell's own temporary folder (`$T`,
+/// always absolute, removed with the shell however it ends), then passes them back after its
+/// error output, behind [`MARK`]. Without that folder, git just runs. Its first line names the
+/// command, for messages about it (`Request::what`).
 pub(super) fn traced_script(words: &str) -> String {
     format!(
         concat!(
-            "t=$(mktemp \"${{TMPDIR:-/tmp}}/gitcraft-hooks.XXXXXX\" 2>/dev/null) || t=\n",
-            "if [ -n \"$t\" ]; then {var}=\"$t\" git {words}; else git {words}; fi\n",
+            ": git {words}\n",
+            "t=\"${{T:+$T/hook-events}}\"\n",
+            "if [ -n \"$t\" ] && : >\"$t\" 2>/dev/null; then {var}=\"$t\" git {words}\n",
+            "else t=; git {words}; fi\n",
             "r=$?\n",
             "if [ -n \"$t\" ]; then\n",
             "  printf '\\n%s\\n' '{mark}' >&2; grep -F '\"child_' \"$t\" >&2; rm -f \"$t\"\n",
@@ -209,7 +263,7 @@ mod tests {
             r#"{"event":"child_exit","sid":"S1","child_id":0,"code":3}"#
         );
         assert_eq!(
-            failed_hook(&events),
+            failed_hook(&events, &["commit"]),
             Some(FailedHook {
                 name: "pre-commit".into(),
                 code: 3
@@ -231,7 +285,33 @@ mod tests {
             "",
         ]
         .join("\n");
-        assert_eq!(failed_hook(&events), None);
+        assert_eq!(failed_hook(&events, &["commit"]), None);
+    }
+
+    /// git goes on whatever `post-checkout` exits with inside a rebase, or `post-commit` in a
+    /// cherry-pick: a rebase stopped on a conflict is not that hook's doing.
+    #[test]
+    fn hooks_git_ignores_are_never_named() {
+        let events = |name: &str| {
+            format!(
+                "{}\n{}",
+                format_args!(
+                    r#"{{"event":"child_start","sid":"S","child_id":1,"child_class":"hook","hook_name":"{name}"}}"#
+                ),
+                r#"{"event":"child_exit","sid":"S","child_id":1,"code":2}"#
+            )
+        };
+        assert_eq!(
+            failed_hook(&events("post-checkout"), &["rebase", "main"]),
+            None
+        );
+        assert_eq!(
+            failed_hook(&events("post-commit"), &["cherry-pick", "a..b"]),
+            None
+        );
+        assert_eq!(failed_hook(&events("post-merge"), &["pull"]), None);
+        let checkout = failed_hook(&events("post-checkout"), &["checkout", "main", "--"]);
+        assert_eq!(checkout.map(|h| h.code), Some(2));
     }
 
     #[test]
@@ -242,7 +322,7 @@ mod tests {
             r#"{"event":"child_exit","sid":"S","child_id":4,"code":1}"#,
         );
         assert_eq!(
-            failed_hook(events).map(|h| h.name),
+            failed_hook(events, &["push"]).map(|h| h.name),
             Some("pre-push".to_owned())
         );
     }
@@ -253,17 +333,38 @@ mod tests {
             name: "pre-commit".into(),
             code: 1,
         };
-        let text = hook.explain("  lint: 2 problems ✗\n");
-        assert!(text.starts_with("the pre-commit hook failed (exit code 1):\nlint: 2 problems ✗"));
-        assert!(text.contains("--no-verify"));
-        let silent = FailedHook {
+        let text = hook.explain("  lint: 2 problems ✗\n", &["commit", "-m", "x"]);
+        assert_eq!(
+            text,
+            "the pre-commit hook stopped it (exit code 1)\nlint: 2 problems ✗\n\
+             Tick Skip hooks in the commit box to commit once without them."
+        );
+        let push = FailedHook {
+            name: "pre-push".into(),
+            code: 1,
+        };
+        let args = ["-c", "push.default=simple", "push", "-u", "o", "main"];
+        assert!(
+            push.explain("", &args)
+                .ends_with("to push once without it.")
+        );
+        // A merge's commit-msg can't be skipped from the app: no hint.
+        let merge = FailedHook {
+            name: "commit-msg".into(),
+            code: 2,
+        };
+        assert_eq!(
+            merge.explain("", &["merge", "x"]),
+            "the commit-msg hook stopped it (exit code 2)"
+        );
+        let after = FailedHook {
             name: "post-checkout".into(),
             code: 9,
         }
-        .explain("");
+        .explain("", &["checkout", "main", "--"]);
         assert_eq!(
-            silent,
-            "the post-checkout hook failed (exit code 9) and said nothing"
+            after,
+            "it was done, but the post-checkout hook failed afterwards (exit code 9)"
         );
     }
 
@@ -317,9 +418,20 @@ mod tests {
             .into_iter()
             .map(crate::remote::sh_quote)
             .collect();
+        let shell_temp = dir.join(".git").join("shell temp ✓");
+        let _ = std::fs::create_dir_all(&shell_temp);
         let out = std::process::Command::new("sh")
             .arg("-c")
             .arg(traced_script(&words.join(" ")))
+            .env("T", &shell_temp)
+            .current_dir(&dir)
+            .output();
+        let left = std::fs::read_dir(&shell_temp).map_or(0, |d| d.count());
+        // Without the shell's folder, git just runs: the command's error output alone.
+        let untraced = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(traced_script(&words.join(" ")))
+            .env_remove("T")
             .current_dir(&dir)
             .output();
         let _ = std::fs::remove_dir_all(&dir);
@@ -327,10 +439,15 @@ mod tests {
             return;
         };
         let (err, events) = split_trace(&out.stderr);
+        assert_eq!(left, 0, "the events file was left behind");
+        let untraced = untraced.map_or(String::new(), |o| {
+            String::from_utf8_lossy(&o.stderr).into_owned()
+        });
+        assert_eq!(untraced.trim(), "nope ✗");
         assert_eq!(out.status.code(), Some(1));
         assert_eq!(String::from_utf8_lossy(&err).trim(), "nope ✗");
         assert_eq!(
-            failed_hook(&events),
+            failed_hook(&events, &["commit", "--allow-empty"]),
             Some(FailedHook {
                 name: "pre-commit".into(),
                 code: 4

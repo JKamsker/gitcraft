@@ -55,8 +55,8 @@ pub(super) fn menu_items(ui: &mut Ui, current: LogOrder, acts: &mut Vec<Action>)
     ui.separator();
     ui.checkbox(&mut next.first_parent, "First parent only")
         .on_hover_text(
-            "Follows only the first parent of each merge: the commits a merge brought in are \
-             left out, so main shows one merge per pull request (git log --first-parent)",
+            "Each merge shows as one commit, without the commits it brought in; search \
+             finds only what is shown (git log --first-parent)",
         );
     if next != current {
         acts.push(Action::GraphOrder(next));

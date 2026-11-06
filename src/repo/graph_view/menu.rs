@@ -372,7 +372,8 @@ fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<Action>) {
             "--keep",
             "--keep",
             "Keep",
-            "Keeps uncommitted changes; stops if a changed file would be touched.",
+            "Drops the commits after this one, keeps uncommitted changes. It stops, changing \
+             nothing, if a file with changes is one those commits touched.",
         ),
         (
             "--hard",

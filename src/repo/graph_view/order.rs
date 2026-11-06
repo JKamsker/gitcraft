@@ -43,7 +43,7 @@ pub(super) fn order_button(
     );
     let resp = ui
         .interact(rect, ui.id().with("graph-order"), Sense::click())
-        .on_hover_text("How history is ordered, and First parent only");
+        .on_hover_text("Order history, or show first parents only");
     if resp.hovered() {
         ui.painter()
             .rect_filled(rect, t.radius_sm, t.text_faint.gamma_multiply(0.12));
@@ -57,6 +57,8 @@ pub(super) fn order_button(
     } else {
         t.accent
     };
+    // Over the end of a label too long for the column.
+    ui.painter().rect_filled(chevron.expand(2.0), 0.0, t.chrome);
     icons::paint(ui, chevron, "chevron-down", CHEVRON, tint);
     egui::Popup::menu(&resp)
         .style(theme::menu_style)
