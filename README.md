@@ -186,10 +186,11 @@ so your config, credentials and hooks apply as usual.
   program: it neither bundles nor links Mergiraf (GPL-3.0), so gitcraft's licence is unchanged.
 - External diff and merge tools: _Open in diff tool_ in a file's right-click menu (working tree,
   staged, a commit's file, a comparison) shows its diff in one; _Resolve in merge tool_ on a
-  conflicted file (or _Merge tool_ in the conflict editor) resolves it in one. Settings → Git →
+  conflicted file (or the same button in the conflict editor) resolves it in one. Settings → Git →
   External tools picks each: the tool git's `diff.tool` / `merge.tool` names
   (`git difftool --tool=… -y`, `git mergetool --tool=… -y`), or Beyond Compare, Araxis, VS
-  Code, Meld, KDiff3, P4Merge or WinMerge, with their program when it isn't found by itself.
+  Code, Meld, KDiff3, P4Merge or WinMerge, with their program when it isn't found by itself
+  (a program of this machine; over SSH git there finds its own).
   The view refreshes when the tool closes. The file counts as resolved only when the tool
   reports success, as git decides it: from its exit code with `mergetool.<tool>.trustExitCode`,
   otherwise from whether the file was saved; `mergetool.keepBackup` says whether the `.orig`
@@ -229,8 +230,8 @@ so your config, credentials and hooks apply as usual.
   use and what is its own, zoom, branch column width, graph columns, avatars, notifications,
   update check (with a Check for updates button), background fetch, keeping submodules up to
   date, editor command, external diff and merge tools, default shell and terminal font size,
-  saved identities, SSH sign-ins, and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
-  Alt+↓ go through the pages.
+  saved identities, SSH sign-ins, and every keyboard shortcut. Ctrl+F searches all pages at
+  once (Esc clears it); Alt+↑ / Alt+↓ go through the pages.
 - Commit signing in Settings → Commit signing: the format (OpenPGP, SSH or X.509), signing key
   and program, and whether commits and tags are signed by default. These are your global git
   config's `gpg.format`, `user.signingkey`, `gpg.program` (`gpg.ssh.program`, `gpg.x509.program`),

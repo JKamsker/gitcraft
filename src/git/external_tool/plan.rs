@@ -94,10 +94,14 @@ pub fn preset(
                 Kind::Diff => preset.diff_words(),
                 Kind::Merge => preset.merge_words(),
             };
-            let script = if *place == Place::Wsl {
+            let script = if *place == Place::Wsl && is_windows_path(program) {
                 wsl_script(program, words)
             } else {
-                format!("{} {}", sh_quote(program), shell_words(words, false))
+                format!(
+                    "{AS_FILE}; {} {}",
+                    sh_quote(program),
+                    shell_words(words, false)
+                )
             };
             let mut config = vec![(format!("{}.{name}.cmd", kind.command()), script)];
             if kind == Kind::Merge {
@@ -113,8 +117,15 @@ pub fn preset(
     }
 }
 
-/// `words` as `sh` reads them, each file git hands over in its variable; in WSL, turned into
-/// the `\\wsl.localhost` path a Windows program opens (through `gc_w`, see [`wsl_script`]).
+/// A `sh` function giving a file name git hands over (relative to the repository's top for the
+/// working tree's side) as one no program reads as an option: `-x.txt` becomes `./-x.txt`.
+pub(super) const AS_FILE: &str =
+    "gc_a() { case \"$1\" in -*) printf './%s' \"$1\";; *) printf '%s' \"$1\";; esac; }";
+
+/// `words` as `sh` reads them, each file git hands over in its variable: through `gc_a` (see
+/// [`AS_FILE`]) or, in WSL, turned into the `\\wsl.localhost` path a Windows program opens
+/// (through `gc_w`, see [`wsl_script`]). A file glued to an option (`--output=`) can't be read
+/// as one, and is left as it is but in WSL.
 fn shell_words(words: &[Word], wsl: bool) -> String {
     words
         .iter()
@@ -122,15 +133,10 @@ fn shell_words(words: &[Word], wsl: bool) -> String {
             Word::Text(text) => sh_quote(text),
             Word::File(prefix, slot) => {
                 let var = format!("\"${}\"", slot.var());
-                let value = if wsl {
-                    format!("\"$(gc_w {var})\"")
-                } else {
-                    var
-                };
-                if prefix.is_empty() {
-                    value
-                } else {
-                    format!("{}{value}", sh_quote(prefix))
+                match (wsl, prefix.is_empty()) {
+                    (true, _) => format!("{}\"$(gc_w {var})\"", sh_quote_or_empty(prefix)),
+                    (false, true) => format!("\"$(gc_a {var})\""),
+                    (false, false) => format!("{}{var}", sh_quote(prefix)),
                 }
             }
         })
@@ -138,16 +144,27 @@ fn shell_words(words: &[Word], wsl: bool) -> String {
         .join(" ")
 }
 
+/// `s` quoted for `sh`, or nothing for an empty `s`.
+fn sh_quote_or_empty(s: &str) -> String {
+    if s.is_empty() {
+        String::new()
+    } else {
+        sh_quote(s)
+    }
+}
+
+/// Whether `program` is a Windows path (`C:\\…`, `\\\\server\\…`): a program of this machine,
+/// not one inside WSL (`/usr/bin/meld`, `code`), which takes the files as they are there.
+fn is_windows_path(program: &str) -> bool {
+    program.contains('\\') || program.as_bytes().get(1) == Some(&b':')
+}
+
 /// The command a tool of this (Windows) machine runs with from git in WSL. `gc_w` gives the
 /// Windows path of each file: git's `/dev/null` (a file new or deleted on one side) and a base
 /// that isn't there become an empty file, as a Windows program can open neither. The program
-/// itself is a Windows path made a path there (`wslpath -u`), or a path there as it is.
+/// itself is a Windows path, made a path there (`wslpath -u`).
 fn wsl_script(program: &str, words: &[Word]) -> String {
-    let program = if program.starts_with('/') {
-        sh_quote(program)
-    } else {
-        format!("\"$(wslpath -u {})\"", sh_quote(program))
-    };
+    let program = format!("\"$(wslpath -u {})\"", sh_quote(program));
     let helper = "gc_w() { case \"$1\" in /dev/null) gc_p=\"${TMPDIR:-/tmp}/gitcraft-empty-file\"; \
                   : > \"$gc_p\";; /*) gc_p=\"$1\";; *) gc_p=\"$PWD/$1\";; esac; \
                   [ -e \"$gc_p\" ] || : > \"$gc_p\"; wslpath -w \"$gc_p\"; }";

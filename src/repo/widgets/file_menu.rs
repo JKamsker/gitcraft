@@ -86,8 +86,7 @@ fn tool_items(ui: &mut egui::Ui, key: &DiffKey, acts: &mut Vec<Action>) {
             if ui
                 .button("Open in diff tool")
                 .on_hover_text(
-                    "Shows this diff in the diff tool of Settings → Git → External tools. Over \
-                     SSH the tool runs on that machine.",
+                    "Shows this diff in the diff tool of Settings → Git → External tools",
                 )
                 .clicked()
             {
@@ -99,7 +98,7 @@ fn tool_items(ui: &mut egui::Ui, key: &DiffKey, acts: &mut Vec<Action>) {
                 .button("Resolve in merge tool")
                 .on_hover_text(
                     "Opens the conflict in the merge tool of Settings → Git → External tools; \
-                     the file is marked resolved when the tool reports success.",
+                     the file is marked resolved when the tool reports success",
                 )
                 .clicked()
             {
