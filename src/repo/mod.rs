@@ -25,6 +25,7 @@ mod navigate;
 mod operations;
 mod patches;
 mod pinned_sections;
+pub(crate) mod popout;
 mod pr_merge;
 mod pr_review;
 mod pr_view;
@@ -209,6 +210,8 @@ pub struct RepoTab {
     active_terminal: usize,
     terminal_open: bool,
     terminal_error: Option<String>,
+    /// The views shown in windows of their own.
+    popouts: popout::Popouts,
 
     watcher: Option<notify::RecommendedWatcher>,
     /// For a repository on another machine, which no watcher sees: what keeps its poller
@@ -346,6 +349,7 @@ impl RepoTab {
             active_terminal: 0,
             terminal_open: false,
             terminal_error: None,
+            popouts: Default::default(),
             watcher: None,
             poller: None,
             counting_worktrees: false,

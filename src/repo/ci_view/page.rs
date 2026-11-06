@@ -8,6 +8,7 @@ use crate::forge::Forge;
 use crate::git;
 use crate::icons;
 use crate::repo::ci_status::{state_color, state_word};
+use crate::repo::popout::{self, Panel};
 use crate::repo::{Action, RepoTab, short, widgets};
 use crate::theme::{self, Tokens};
 
@@ -24,7 +25,14 @@ impl RepoTab {
             Some(Forge::GitLab) => "Pipelines",
             _ => "Workflow runs",
         };
-        page_header(ui, view, &format!("{noun} of {}", short(&view.sha)), acts);
+        let popped = !self.docked(Panel::Ci);
+        page_header(
+            ui,
+            view,
+            &format!("{noun} of {}", short(&view.sha)),
+            popped,
+            acts,
+        );
         let runs = match &view.runs {
             None => {
                 ui.add_space(40.0);
@@ -60,12 +68,14 @@ impl RepoTab {
 }
 
 /// The title bar: back, open the run in the browser, load again.
-fn page_header(ui: &mut Ui, view: &CiView, title: &str, acts: &mut Vec<Action>) {
+/// `popped`: the view is in its own window (see [`popout::button`]).
+fn page_header(ui: &mut Ui, view: &CiView, title: &str, popped: bool, acts: &mut Vec<Action>) {
     let url = view.shown_run().map(|run| run.url.clone());
     widgets::panel_header(ui, title, |ui| {
         if icons::small_button(ui, "x", "Back (Esc)").clicked() {
             acts.push(Action::CloseCi);
         }
+        popout::button(ui, Panel::Ci, popped, acts);
         if let Some(url) = url
             && icons::small_button(ui, "external-link", "Open in the browser").clicked()
         {

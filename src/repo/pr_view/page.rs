@@ -5,6 +5,7 @@ use egui::{Align2, RichText, Sense, Ui, pos2, vec2};
 use crate::git;
 use crate::icons;
 use crate::pull_request::{self as pr, CheckState, PrDetails};
+use crate::repo::popout::{self, Panel};
 use crate::repo::pr_review::{self, Place, PrDraft};
 use crate::repo::{Action, DiffKey, RepoTab, short, widgets};
 use crate::theme::{self, Tokens};
@@ -19,10 +20,11 @@ impl RepoTab {
     /// The big area.
     pub(in crate::repo) fn pr_view_ui(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
+        let popped = !self.docked(Panel::Pr);
         let Some(view) = &mut self.pr_view else {
             return;
         };
-        page_header(ui, view, acts);
+        page_header(ui, view, popped, acts);
         match &view.details {
             None => {
                 ui.add_space(40.0);
@@ -138,7 +140,8 @@ impl RepoTab {
 }
 
 /// The title bar of the page: its number, and the buttons to leave, open or load it again.
-fn page_header(ui: &mut Ui, view: &PrView, acts: &mut Vec<Action>) {
+/// `popped`: the page is in its own window (see [`popout::button`]).
+fn page_header(ui: &mut Ui, view: &PrView, popped: bool, acts: &mut Vec<Action>) {
     let url = match &view.details {
         Some(Ok(details)) => Some(details.url.clone()),
         _ => None,
@@ -149,6 +152,7 @@ fn page_header(ui: &mut Ui, view: &PrView, acts: &mut Vec<Action>) {
         if icons::small_button(ui, "x", "Back to the graph (Esc)").clicked() {
             acts.push(Action::ClosePr);
         }
+        popout::button(ui, Panel::Pr, popped, acts);
         if let Some(url) = url
             && icons::small_button(ui, "external-link", "Open in the browser").clicked()
         {

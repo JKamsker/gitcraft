@@ -207,6 +207,10 @@ so your config, credentials and hooks apply as usual.
 - Terminal panel with tabs: PowerShell, cmd, Git Bash, WSL… on Windows, your shells elsewhere, in a
   real pseudo-terminal (ConPTY on Windows) with colours, scrollback, mouse selection and copy
   (Ctrl+C with a selection, Ctrl+Shift+C or right-click).
+- Pop out: the diff, the terminal, a pull request or the CI view moves into a window of its own
+  (the button in its header, or the command palette), for a second monitor. It keeps working
+  there (staging lines, comments, typing in the shell) and stays open across tab switches;
+  closing the window or _Bring back_ docks it again, and closing the view closes the window.
 - Command palette (Ctrl+P): every action and branch, fuzzy matched.
 - Manual (F1, or the book in the title bar): what each part does and every keyboard shortcut.
 - Avatars: on a GitHub repository, the authors' GitHub accounts (through `gh` when installed, else
