@@ -1,9 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use super::merge_tree::parse;
-use super::{Matrix, Pair, compute, landing_order, merges, simulate};
+use super::{Branch, Matrix, Pair, STOPPED, compute, landing_order, merges, simulate};
 
 /// A matrix of `n` branches where the pairs in `conflicts` conflict on one file each, and the
 /// branches in `bad` conflict with the target.
@@ -158,14 +158,20 @@ fn a_real_repository_with_agent_branches() -> Result<(), String> {
     assert_eq!(pair.files, vec!["shared file.txt"]);
     assert!(simulate(&dir, "agent/one", "agent/ünï")?.clean());
 
-    let branches: Vec<String> = ["agent/one", "agent/two", "agent/ünï", "agent/stale"]
+    let branch = |name: &str| Branch {
+        name: name.to_owned(),
+        git: format!("refs/heads/{name}"),
+    };
+    let branches: Vec<Branch> = ["agent/one", "agent/two", "agent/ünï", "agent/stale"]
         .iter()
-        .map(|s| (*s).to_owned())
+        .map(|s| branch(s))
         .collect();
+    let main = branch("main");
     let done = Arc::new(AtomicUsize::new(0));
-    let cancel = Arc::new(AtomicUsize::new(0));
-    let m = compute(&dir, &branches, "main", &done, &cancel)?;
+    let cancel = Arc::new(AtomicBool::new(false));
+    let m = compute(&dir, &branches, &main, &done, &cancel)?;
     assert_eq!(done.load(Ordering::Relaxed), merges(4));
+    assert_eq!(m.branches[0], "agent/one");
     assert!(m.conflict(0, 1) && m.conflict(1, 0));
     assert!(!m.conflict(0, 2));
     assert_eq!(m.target_count(3), 1);
@@ -187,11 +193,48 @@ fn a_real_repository_with_agent_branches() -> Result<(), String> {
     assert_eq!(git(&dir, &["rev-parse", "HEAD"])?, head_before);
     assert!(git(&dir, &["status", "--porcelain"])?.is_empty());
 
-    cancel.store(1, Ordering::Relaxed);
-    assert!(compute(&dir, &branches, "main", &done, &cancel).is_err());
+    // A branch gone meanwhile: its cells can't be told, named by its name, and it is never
+    // said to land cleanly.
+    let mut with_gone = branches.clone();
+    with_gone.push(branch("gone"));
+    let m = compute(&dir, &with_gone, &main, &done, &cancel)?;
+    let error = m.first_error().unwrap_or_default().to_owned();
+    assert!(
+        error.contains("gone") && !error.contains("refs/heads"),
+        "{error}"
+    );
+    let steps = landing_order(&m);
+    let gone = steps.iter().find(|s| s.branch == 4).ok_or("in the order")?;
+    assert!(!gone.clean());
+    assert!(gone.unknown.contains(&None));
+
+    cancel.store(true, Ordering::Relaxed);
+    let stopped = compute(&dir, &branches, &main, &done, &cancel);
+    assert_eq!(stopped.err().as_deref(), Some(STOPPED));
     let missing = simulate(&dir, "agent/one", "no-such-branch");
     assert!(missing.is_err_and(|e| e.starts_with("Could not merge agent/one with no-such-branch")));
     assert!(simulate(&dir, "--output=x", "main").is_err());
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())
+}
+
+#[test]
+fn a_pair_that_couldnt_be_told_is_never_clean() {
+    let mut m = matrix(3, &[], &[]);
+    m.cells[0][1] = Some(Err("share no history".into()));
+    m.cells[1][0] = Some(Err("share no history".into()));
+    m.with_target[2] = Err("connection lost".into());
+    let steps = landing_order(&m);
+    // 0 and 1 can't both be first; 2 isn't known against the target.
+    assert_eq!(steps.iter().filter(|s| s.clean()).count(), 1);
+    let two = steps.iter().find(|s| s.branch == 2);
+    assert!(two.is_some_and(|s| !s.clean() && s.unknown.contains(&None)));
+}
+
+#[test]
+fn old_git_is_told_once() {
+    let said = super::merge_tree::explain_for_test(
+        "usage: git merge-tree <base-tree> <branch1> <branch2>",
+    );
+    assert!(said.contains("needs git 2.38"), "{said}");
 }

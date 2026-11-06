@@ -6,7 +6,7 @@ mod grid;
 mod tests;
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use egui::{RichText, Ui};
 
@@ -18,23 +18,38 @@ use crate::theme::{self, Tokens};
 /// Most branches one matrix takes (105 merges past the target ones).
 pub(crate) const MOST: usize = 14;
 
+/// Numbers each computation: the latest one's answer is the one shown, whichever window
+/// (closed and opened again meanwhile) asked for it.
+static REQUESTS: AtomicU64 = AtomicU64::new(0);
+
 /// What the window holds.
 pub(crate) struct CollisionView {
-    /// Every local branch, and whether it is in the matrix.
+    /// Every local branch but the target, and whether it is in the matrix.
     picks: Vec<(String, bool)>,
-    /// The branch they land on.
+    /// The branch they land on (empty: none picked yet).
     target: String,
     run: Option<Running>,
     result: Option<Result<(Matrix, Vec<Step>), String>>,
+    /// Said under the buttons (a run stopped).
+    note: Option<String>,
     /// Which computation is the latest: an older one finishing late is dropped.
     request: u64,
+    /// Put away while a comparison it opened is looked at (Esc, a click beside it); the menu
+    /// brings it back as it was.
+    hidden: bool,
 }
 
-/// A computation going on.
+/// A computation going on; dropping it (the window closed, the tab closed) stops it.
 struct Running {
     done: Arc<AtomicUsize>,
-    cancel: Arc<AtomicUsize>,
+    cancel: Arc<AtomicBool>,
     total: usize,
+}
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        self.cancel.store(true, Ordering::Relaxed);
+    }
 }
 
 impl CollisionView {
@@ -50,7 +65,9 @@ impl CollisionView {
             target: target.to_owned(),
             run: None,
             result: None,
+            note: None,
             request: 0,
+            hidden: false,
         }
     }
 
@@ -61,12 +78,32 @@ impl CollisionView {
             .map(|(b, _)| b.clone())
             .collect()
     }
+
+    /// Why Check can't be clicked, if it can't.
+    fn cannot_check(&self) -> Option<String> {
+        let count = self.chosen().len();
+        if self.run.is_some() {
+            Some("A check is running".to_owned())
+        } else if self.target.is_empty() {
+            Some("Pick the branch they land on".to_owned())
+        } else if count == 0 {
+            Some("Tick the branches to check".to_owned())
+        } else if count > MOST {
+            Some(format!("At most {MOST} branches at a time"))
+        } else {
+            None
+        }
+    }
 }
 
 impl RepoTab {
-    /// Opens the window with the linked worktrees' branches ticked, landing on the main
-    /// worktree's branch (or the checked-out one).
+    /// Opens the window (or brings back the one put away) with the linked worktrees'
+    /// branches ticked, landing on the main worktree's branch (or the checked-out one).
     pub(crate) fn open_collisions(&mut self) {
+        if let Some(view) = &mut self.collisions {
+            view.hidden = false;
+            return;
+        }
         let branches: Vec<String> = self.refs.local.iter().map(|b| b.name.clone()).collect();
         let target = self
             .worktrees
@@ -74,6 +111,7 @@ impl RepoTab {
             .find(|w| w.main)
             .and_then(|w| w.branch.clone())
             .or_else(|| self.refs.current.clone())
+            .filter(|t| branches.contains(t))
             .unwrap_or_default();
         let ticked: Vec<String> = self
             .worktrees
@@ -91,51 +129,52 @@ impl RepoTab {
         let Some(view) = &mut self.collisions else {
             return;
         };
-        let names = view.chosen();
-        let full: Vec<String> = names
-            .iter()
-            .map(|b| branch_visibility::local_ref(b))
-            .collect();
-        let target = branch_visibility::local_ref(&view.target);
+        let branch = |name: &str| collision::Branch {
+            name: name.to_owned(),
+            git: branch_visibility::local_ref(name),
+        };
+        let branches: Vec<collision::Branch> = view.chosen().iter().map(|b| branch(b)).collect();
+        let target = branch(&view.target);
         let done = Arc::new(AtomicUsize::new(0));
-        let cancel = Arc::new(AtomicUsize::new(0));
-        if let Some(old) = view.run.take() {
-            old.cancel.store(1, Ordering::Relaxed);
-        }
+        let cancel = Arc::new(AtomicBool::new(false));
         view.run = Some(Running {
             done: done.clone(),
             cancel: cancel.clone(),
-            total: collision::merges(full.len()),
+            total: collision::merges(branches.len()),
         });
-        view.request += 1;
+        view.note = None;
+        view.request = REQUESTS.fetch_add(1, Ordering::Relaxed) + 1;
         let request = view.request;
-        let shown_target = view.target.clone();
         let repo = self.path.clone();
         self.then(
             ctx,
             move || {
-                collision::compute(&repo, &full, &target, &done, &cancel).map(|mut m| {
-                    // Shown by their names; given to git by their full refs.
-                    m.branches = names;
-                    m.target = shown_target;
+                collision::compute(&repo, &branches, &target, &done, &cancel).map(|m| {
                     let order = collision::landing_order(&m);
                     (m, order)
                 })
             },
             move |tab, found, _| {
-                if let Some(view) = &mut tab.collisions
-                    && view.request == request
-                {
-                    view.run = None;
-                    view.result = Some(found);
+                let Some(view) = &mut tab.collisions else {
+                    return;
+                };
+                if view.request != request {
+                    return;
+                }
+                view.run = None;
+                match found {
+                    Err(e) if e == collision::STOPPED => {
+                        view.note = Some("Stopped; nothing new to show".to_owned());
+                    }
+                    found => view.result = Some(found),
                 }
             },
         );
     }
 
-    /// The window, while it is open.
+    /// The window, while it is open and not put away.
     pub(crate) fn collision_window(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
-        if self.collisions.is_none() {
+        if self.collisions.as_ref().is_none_or(|v| v.hidden) {
             return;
         }
         let t = Tokens::get(ctx);
@@ -158,12 +197,15 @@ impl RepoTab {
                     (check, close) = body(ui, view, acts);
                 }
             });
-        if response.should_close() || close || acts.len() > before {
-            if let Some(run) = self.collisions.take().and_then(|v| v.run) {
-                run.cancel.store(1, Ordering::Relaxed);
+        if close {
+            // Dropping the run stops it.
+            self.collisions = None;
+        } else if let Some(view) = &mut self.collisions {
+            if response.should_close() || acts.len() > before {
+                view.hidden = true;
+            } else if check {
+                self.check_collisions(ctx);
             }
-        } else if check {
-            self.check_collisions(ctx);
         }
         if self.collisions.as_ref().is_some_and(|v| v.run.is_some()) {
             ctx.request_repaint_after(std::time::Duration::from_millis(100));
@@ -176,32 +218,37 @@ fn body(ui: &mut Ui, view: &mut CollisionView, acts: &mut Vec<Action>) -> (bool,
     let t = Tokens::get(ui.ctx());
     ui.label(RichText::new("Collision matrix").font(theme::semibold(15.0)));
     ui.add_space(4.0);
+    let onto = if view.target.is_empty() {
+        "the branch they land on".to_owned()
+    } else {
+        view.target.clone()
+    };
     ui.label(
         RichText::new(format!(
-            "Each pair of branches merged in memory (git merge-tree), and each with {}: nothing is \
-             checked out or changed. Branches of the linked worktrees are ticked.",
-            view.target
+            "Each pair of branches merged in memory (git merge-tree), and each with {onto}: \
+             nothing is checked out, no branch moves. Branches of the linked worktrees are \
+             ticked."
         ))
         .size(12.0)
         .color(t.text_dim),
     );
     ui.add_space(8.0);
     let running = view.run.is_some();
+    let ticks = view.chosen();
     ui.add_enabled_ui(!running, |ui| pick_branches(ui, view));
+    // What is shown no longer is what is ticked: check again.
+    if view.chosen() != ticks {
+        view.result = None;
+    }
     ui.add_space(10.0);
     let count = view.chosen().len();
     let mut check = false;
     let mut close = false;
     ui.horizontal(|ui| {
         let label = format!("Check {count} branch{}", if count == 1 { "" } else { "es" });
-        let can = !running && (1..=MOST).contains(&count) && !view.target.is_empty();
-        let reason = if count > MOST {
-            format!("At most {MOST} branches at a time")
-        } else {
-            "Tick the branches to check".to_owned()
-        };
-        if super::primary_button(ui, &label, can, 130.0)
-            .on_disabled_hover_text(reason)
+        let reason = view.cannot_check();
+        if super::primary_button(ui, &label, reason.is_none(), 130.0)
+            .on_disabled_hover_text(reason.unwrap_or_default())
             .clicked()
         {
             check = true;
@@ -211,8 +258,10 @@ fn body(ui: &mut Ui, view: &mut CollisionView, acts: &mut Vec<Action>) -> (bool,
             let done = run.done.load(Ordering::Relaxed);
             ui.label(format!("Merging in memory… {done} of {}", run.total));
             if ui.button("Stop").clicked() {
-                run.cancel.store(1, Ordering::Relaxed);
+                run.cancel.store(true, Ordering::Relaxed);
             }
+        } else if let Some(note) = &view.note {
+            ui.label(RichText::new(note).size(12.0).color(t.text_faint));
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             close = ui.button("Close").clicked();
@@ -237,10 +286,17 @@ fn pick_branches(ui: &mut Ui, view: &mut CollisionView) {
     ui.horizontal(|ui| {
         ui.label("Lands on");
         let mut target = view.target.clone();
+        let shown = if target.is_empty() {
+            "Pick one…"
+        } else {
+            target.as_str()
+        }
+        .to_owned();
         egui::ComboBox::from_id_salt("collision-target")
-            .selected_text(target.clone())
+            .selected_text(shown)
             .show_ui(ui, |ui| {
                 let names: Vec<String> = std::iter::once(view.target.clone())
+                    .filter(|t| !t.is_empty())
                     .chain(view.picks.iter().map(|(b, _)| b.clone()))
                     .collect();
                 for name in names {
@@ -250,7 +306,9 @@ fn pick_branches(ui: &mut Ui, view: &mut CollisionView) {
         if target != view.target {
             let old = std::mem::replace(&mut view.target, target.clone());
             view.picks.retain(|(b, _)| *b != target);
-            view.picks.push((old, false));
+            if !old.is_empty() {
+                view.picks.push((old, false));
+            }
             view.picks.sort_by(|a, b| a.0.cmp(&b.0));
             view.result = None;
         }

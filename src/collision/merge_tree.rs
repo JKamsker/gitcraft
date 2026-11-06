@@ -64,7 +64,10 @@ pub fn simulate(repo: &Path, a: &str, b: &str) -> Result<Pair, String> {
 
 /// What a failed `merge-tree` means, for the matrix's cell.
 fn explain(err: &str, a: &str, b: &str) -> String {
-    if err.contains("write-tree") && (err.contains("unknown option") || err.contains("usage")) {
+    // git 2.37 and older know only `merge-tree <base> <a> <b>`, and say how it is used.
+    let old_git = err.contains("usage: git merge-tree")
+        || (err.contains("write-tree") && err.contains("unknown option"));
+    if old_git {
         "The collision matrix needs git 2.38 or later (git merge-tree --write-tree)".to_owned()
     } else if err.contains("unrelated histories") {
         format!("{a} and {b} share no history")
@@ -73,4 +76,9 @@ fn explain(err: &str, a: &str, b: &str) -> String {
     } else {
         format!("Could not merge {a} with {b} in memory: {}", err.trim())
     }
+}
+
+#[cfg(test)]
+pub(super) fn explain_for_test(err: &str) -> String {
+    explain(err, "a", "b")
 }

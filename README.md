@@ -123,11 +123,13 @@ so your config, credentials and hooks apply as usual.
   prune.
 - Collision matrix (a worktree's menu → _Collision matrix…_): for branches worked on side by side,
   by agents in worktrees or otherwise, every pair is merged in memory (`git merge-tree`, git 2.38
-  or later; nothing is checked out or changed) and each with the branch they land on. The
+  or later: nothing is checked out, no branch moves) and each with the branch they land on. The
   branches of the linked worktrees are ticked; tick others, or pick another branch to land on.
   Each cell says how many files the pair conflicts on (hover for them, click to compare the
-  two), and below it is the order to land them in: as many as can land cleanly first, then the
-  rest, fewest files to resolve first.
+  two; `?` when a pair couldn't be merged in memory, and why). Below it is the order to land
+  them in with the fewest branches to rework: as many as merge cleanly with each other and the
+  target first, then the rest, fewest files to resolve first. It is a prediction pair by pair;
+  Esc puts the window away and the menu brings it back as it was.
 - Submodules (shown when the repository has any): each with its commit and whether it is
   modified, not initialised or out of date. Update one or all (`git submodule update --init
   --recursive`), open one in a new tab (or double-click it), show it in its folder. _Keep
