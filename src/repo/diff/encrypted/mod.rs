@@ -8,6 +8,7 @@ mod view;
 
 use super::structural::reader::read_sides;
 use crate::repo::{DiffKey, RepoTab};
+pub(crate) use model::JsonEncoding;
 use model::{inspect, recipients};
 use std::path::Path;
 use std::sync::{
@@ -34,6 +35,7 @@ pub(super) struct Comparison {
 #[derive(Default)]
 pub(in crate::repo) struct State {
     pub enabled: bool,
+    pub json_encoding: JsonEncoding,
     result: Option<Result<Comparison, String>>,
     receiver: Option<Receiver<Result<Comparison, String>>>,
     active: Option<Arc<AtomicBool>>,
@@ -97,7 +99,12 @@ pub(super) fn probe(repo: &Path, key: &DiffKey) -> bool {
     })
 }
 
-fn load(repo: &Path, key: &DiffKey, active: &dyn Fn() -> bool) -> Result<Comparison, String> {
+fn load(
+    repo: &Path,
+    key: &DiffKey,
+    encoding: JsonEncoding,
+    active: &dyn Fn() -> bool,
+) -> Result<Comparison, String> {
     if !active() {
         return Err("Decryption cancelled.".into());
     }
@@ -106,9 +113,10 @@ fn load(repo: &Path, key: &DiffKey, active: &dyn Fn() -> bool) -> Result<Compari
     let (old, new) = private_sides(repo, key, active).map_err(|_| {
         "Could not read both encrypted sides within 2 MiB. Refresh the encrypted patch.".to_owned()
     })?;
-    let result = compare(key.path(), &old, &new, active, |format, input| {
-        tool::decrypt(format, input, active)
-    })?;
+    let result =
+        compare_with_encoding(key.path(), &old, &new, encoding, active, |format, input| {
+            tool::decrypt(format, input, active)
+        })?;
     if !active() {
         return Err("Decryption cancelled.".into());
     }
@@ -160,10 +168,22 @@ fn await_ciphertext(
     }
 }
 
+#[cfg(test)]
 fn compare(
     path: &str,
     old: &str,
     new: &str,
+    active: &dyn Fn() -> bool,
+    decrypt: impl FnMut(model::Format, &str) -> Result<String, String>,
+) -> Result<Comparison, String> {
+    compare_with_encoding(path, old, new, JsonEncoding::Ask, active, decrypt)
+}
+
+fn compare_with_encoding(
+    path: &str,
+    old: &str,
+    new: &str,
+    encoding: JsonEncoding,
     active: &dyn Fn() -> bool,
     mut decrypt: impl FnMut(model::Format, &str) -> Result<String, String>,
 ) -> Result<Comparison, String> {
@@ -171,6 +191,14 @@ fn compare(
     let after = inspect(path, new)?;
     if before.is_none() && after.is_none() {
         return Err("No supported SOPS metadata was found. Use the encrypted patch.".into());
+    }
+    if encoding == JsonEncoding::Ask
+        && [before.as_ref(), after.as_ref()]
+            .into_iter()
+            .flatten()
+            .any(|e| e.ambiguous_json)
+    {
+        return Err("This data + sops envelope could be a JSON document or binary content. Choose JSON document or Binary envelope above, then retry. The filename cannot identify the format.".into());
     }
     let recipients_changed = recipients(before.as_ref()) != recipients(after.as_ref());
     let metadata_changed =
@@ -181,7 +209,25 @@ fn compare(
         }
         match envelope {
             Some(envelope) => {
-                decrypt(envelope.format, text).and_then(|text| tool::plaintext(text.into_bytes()))
+                let format = if envelope.ambiguous_json && encoding == JsonEncoding::Binary {
+                    model::Format::Binary
+                } else {
+                    envelope.format
+                };
+                let decrypted =
+                    decrypt(format, text).and_then(|text| tool::plaintext(text.into_bytes()))?;
+                // JSON encoding can escape binary NUL bytes. Validate the decoded data
+                // string too, rather than accepting those bytes as supported text.
+                if envelope.ambiguous_json && format == model::Format::Json {
+                    let value: serde_json::Value =
+                        serde_json::from_str(&decrypted).map_err(|_| {
+                            "SOPS did not return the chosen JSON document format.".to_owned()
+                        })?;
+                    if let Some(data) = value.get("data").and_then(serde_json::Value::as_str) {
+                        tool::plaintext(data.as_bytes().to_vec())?;
+                    }
+                }
+                Ok(decrypted)
             }
             None => tool::plaintext(text.as_bytes().to_vec()),
         }
@@ -237,6 +283,7 @@ impl RepoTab {
         view.anchor = None;
         view.text_sel = None;
         let (send, active) = view.encrypted.begin();
+        let encoding = view.encrypted.json_encoding;
         let (repo, key, ctx) = (self.path.clone(), view.key.clone(), ctx.clone());
         // Private receiver belongs to this view, not the tab's shared Msg queue. Closing
         // drops it immediately, so even a late completed plaintext cannot be retained there.
@@ -246,7 +293,7 @@ impl RepoTab {
             #[cfg(test)]
             tool::TEST_PROGRAM.with(|p| *p.borrow_mut() = test_program);
             let live = || active.load(Ordering::Acquire);
-            let result = load(&repo, &key, &live);
+            let result = load(&repo, &key, encoding, &live);
             if live() {
                 let _ = send.send(result);
             }

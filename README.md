@@ -257,7 +257,11 @@ Glossary tips stay out of the way while typing, scrolling or dragging.
   distinguishes plaintext content changes from recipient/wrapped-key and other encryption
   metadata changes, including re-encryption with unchanged content. JSON, YAML, dotenv and
   INI are recognized; binary envelopes can be compared only when their decrypted bytes are
-  UTF-8 text. YAML aliases/anchors and oversized or malformed documents fall back with a note.
+  UTF-8 text. A JSON envelope with only `data` and `sops` could encode either a JSON document
+  or binary content: choose **JSON document** or **Binary envelope** explicitly for both
+  compared sides, then retry. Filenames, including across renames, never decide this case.
+  Detection refuses the ambiguous envelope before running SOPS. YAML aliases/anchors and
+  oversized or malformed documents fall back with a note.
   - Decryption is explicit and read only. Return to **Encrypted patch / cancel** to stage;
     staging always uses the encrypted patch, with Git text conversion disabled.
   - Plaintext is kept in the active view and process pipes, never written to temporary files,

@@ -50,6 +50,18 @@ impl RepoTab {
         if matches!(&view.data, Some(Ok(data)) if data.sops) {
             ui.horizontal_wrapped(|ui| {
                 ui.label(egui::RichText::new("SOPS encrypted file").color(t.text_dim));
+                let mut encoding = view.encrypted.json_encoding;
+                egui::ComboBox::from_id_salt("sops_json_encoding")
+                    .selected_text(encoding.label())
+                    .show_ui(ui, |ui| {
+                        use super::encrypted::JsonEncoding;
+                        for choice in [JsonEncoding::Ask, JsonEncoding::Document, JsonEncoding::Binary] {
+                            ui.selectable_value(&mut encoding, choice, choice.label());
+                        }
+                    }).response.on_hover_text("For a data + sops JSON envelope, explicitly choose whether its content is a JSON document or binary bytes. The choice applies to both ambiguous sides, independent of filenames; other formats are detected normally. Changing the choice discards the decrypted view.");
+                if encoding != view.encrypted.json_encoding {
+                    acts.push(Action::DiffDecryptedEncoding(encoding));
+                }
                 if view.encrypted.enabled {
                     if ui.button("Encrypted patch / cancel").clicked() { acts.push(Action::DiffDecrypted(false)); }
                     if ui.button("Retry decryption").clicked() { acts.push(Action::DiffDecrypted(true)); }

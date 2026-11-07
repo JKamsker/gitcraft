@@ -42,6 +42,26 @@ impl Format {
 pub(super) struct Envelope {
     pub format: Format,
     pub metadata: Value,
+    // A binary store and a JSON document with one `data` field have identical
+    // ciphertext shapes. Neither the filename nor the encrypted value disambiguates.
+    pub ambiguous_json: bool,
+}
+
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) enum JsonEncoding {
+    #[default]
+    Ask,
+    Document,
+    Binary,
+}
+impl JsonEncoding {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Ask => "Ask when ambiguous",
+            Self::Document => "JSON document",
+            Self::Binary => "Binary envelope",
+        }
+    }
 }
 
 pub(super) fn inspect(path: &str, text: &str) -> Result<Option<Envelope>, String> {
@@ -57,15 +77,13 @@ pub(super) fn inspect(path: &str, text: &str) -> Result<Option<Envelope>, String
     } else {
         None
     };
+    let ambiguous_json = json.as_ref().is_some_and(|value| {
+        value.as_object().is_some_and(|object| {
+            object.len() == 2 && object.contains_key("data") && object.contains_key("sops")
+        })
+    });
     let (format, metadata) = if let Some(value) = json {
-        let binary = !lower.ends_with(".json")
-            && value.as_object().is_some_and(|object| {
-                object.len() == 2 && object.contains_key("data") && object.contains_key("sops")
-            });
-        (
-            if binary { Format::Binary } else { Format::Json },
-            value.get("sops").cloned(),
-        )
+        (Format::Json, value.get("sops").cloned())
     } else if lower.ends_with(".env") || text.lines().any(|line| line.starts_with("sops_mac=")) {
         let mut meta = Map::new();
         for line in text.lines() {
@@ -163,7 +181,11 @@ pub(super) fn inspect(path: &str, text: &str) -> Result<Option<Envelope>, String
     } {
         return Err(BAD.into());
     }
-    Ok(Some(Envelope { format, metadata }))
+    Ok(Some(Envelope {
+        format,
+        metadata,
+        ambiguous_json,
+    }))
 }
 
 fn yaml_value(yaml: &Yaml) -> Result<Value, String> {

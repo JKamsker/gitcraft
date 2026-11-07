@@ -228,6 +228,12 @@ impl RepoTab {
             Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
             Action::DiffStructural(on) => self.show_diff_structural(on, ctx),
             Action::DiffDecrypted(on) => self.show_diff_decrypted(on, ctx),
+            Action::DiffDecryptedEncoding(encoding) => {
+                if let Some(view) = &mut self.diff {
+                    view.encrypted.close();
+                    view.encrypted.json_encoding = encoding;
+                }
+            }
             Action::DiffStep(delta) => {
                 let rendered = self.diff_rendered
                     && self

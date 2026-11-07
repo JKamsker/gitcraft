@@ -69,7 +69,7 @@ fn formats_recognize_sops_metadata_without_invoking_a_tool() -> Result<(), Strin
             r#"{"data":"ENC[cipher]","sops":{"version":"3.10.0","mac":"ENC[mac]"}}"#
         )?
         .map(|e| e.format),
-        Some(Format::Binary)
+        Some(Format::Json)
     );
     assert!(inspect("ordinary.json", r#"{"secret":"ENC[looks similar]"}"#)?.is_none());
     assert!(inspect("ordinary.yaml", "normal: value\n")?.is_none());
@@ -80,6 +80,54 @@ fn formats_recognize_sops_metadata_without_invoking_a_tool() -> Result<(), Strin
         )?
         .is_none()
     );
+    Ok(())
+}
+
+#[test]
+fn data_envelopes_require_explicit_format_independent_of_filename() -> Result<(), String> {
+    let envelope = r#"{"data":"ENC[cipher]","sops":{"version":"3.10.0","mac":"ENC[mac]"}}"#;
+    for path in ["config", "config.yaml", "config.json", "config.bin"] {
+        assert!(inspect(path, envelope)?.is_some_and(|e| e.ambiguous_json));
+        let refused = compare(path, envelope, envelope, &|| true, |_, _| {
+            panic!("Ambiguous detection must not invoke SOPS")
+        });
+        assert!(refused.is_err_and(|e| e.contains("Choose JSON document or Binary envelope")));
+        for (encoding, format, plaintext) in [
+            (JsonEncoding::Document, Format::Json, r#"{"data":42}"#),
+            (JsonEncoding::Binary, Format::Binary, "actual text\n"),
+        ] {
+            let result = compare_with_encoding(
+                path,
+                envelope,
+                envelope,
+                encoding,
+                &|| true,
+                |selected, _| {
+                    assert_eq!(selected, format);
+                    Ok(plaintext.to_owned())
+                },
+            )?;
+            assert!(!result.content_changed);
+            assert!(result.rows.iter().any(|r| r.text.contains(
+                if encoding == JsonEncoding::Binary {
+                    "actual text"
+                } else {
+                    "42"
+                }
+            )));
+        }
+        assert!(
+            compare_with_encoding(
+                path,
+                envelope,
+                envelope,
+                JsonEncoding::Document,
+                &|| true,
+                |_, _| Ok(r#"{"data":"binary\u0000content"}"#.to_owned())
+            )
+            .is_err()
+        );
+    }
     Ok(())
 }
 #[test]
@@ -511,10 +559,23 @@ mod fixture {
             let first = encrypt(format, old.as_bytes(), &keys[0].1)?;
             let edited = encrypt(format, new.as_bytes(), &keys[0].1)?;
             let rotated = encrypt(format, old.as_bytes(), &keys[1].1)?;
-            assert_eq!(inspect(path, &first)?.map(|e| e.format), Some(format));
-            let changed = compare(path, &first, &edited, &|| true, |kind, bytes| {
-                decrypt(kind, bytes, &keys[0].0)
-            })?;
+            let encoding = if format == Format::Binary {
+                JsonEncoding::Binary
+            } else {
+                JsonEncoding::Ask
+            };
+            assert_eq!(
+                inspect(path, &first)?.map(|e| e.format),
+                Some(if format == Format::Binary {
+                    Format::Json
+                } else {
+                    format
+                })
+            );
+            let changed =
+                compare_with_encoding(path, &first, &edited, encoding, &|| true, |kind, bytes| {
+                    decrypt(kind, bytes, &keys[0].0)
+                })?;
             assert!(changed.content_changed);
             assert!(
                 changed
@@ -528,17 +589,24 @@ mod fixture {
                     .iter()
                     .any(|row| row.text.contains("fixture-new"))
             );
-            let rotation = compare(path, &first, &rotated, &|| true, |kind, bytes| {
-                decrypt(
-                    kind,
-                    bytes,
-                    if bytes == rotated {
-                        &keys[1].0
-                    } else {
-                        &keys[0].0
-                    },
-                )
-            })?;
+            let rotation = compare_with_encoding(
+                path,
+                &first,
+                &rotated,
+                encoding,
+                &|| true,
+                |kind, bytes| {
+                    decrypt(
+                        kind,
+                        bytes,
+                        if bytes == rotated {
+                            &keys[1].0
+                        } else {
+                            &keys[0].0
+                        },
+                    )
+                },
+            )?;
             assert!(
                 !rotation.content_changed
                     && rotation.recipients_changed
@@ -547,8 +615,82 @@ mod fixture {
         }
         let binary = encrypt(Format::Binary, b"fixture\0binary", &keys[0].1)?;
         assert!(decrypt(Format::Binary, &binary, &keys[0].0).is_err());
+        // JSON with just `data` is valid under every filename, including across a rename.
+        let data_old = encrypt(Format::Json, br#"{"data":42}"#, &keys[0].1)?;
+        let data_new = encrypt(Format::Json, br#"{"data":43}"#, &keys[0].1)?;
+        for path in ["encrypted-config", "fixture.yaml", "fixture.enc.json"] {
+            let result = compare_with_encoding(
+                path,
+                &data_old,
+                &data_new,
+                JsonEncoding::Document,
+                &|| true,
+                |kind, bytes| decrypt(kind, bytes, &keys[0].0),
+            )?;
+            assert!(result.content_changed && result.rows.iter().any(|r| r.text.contains("43")));
+        }
+        let renamed = Repo::new()?;
+        renamed.write("before.json", &data_old)?;
+        renamed.commit()?;
+        renamed.git(&["mv", "--", "before.json", "after.yaml"])?;
+        let key = DiffKey::Work(git::StatusFile {
+            path: "after.yaml".into(),
+            old_path: Some("before.json".into()),
+            area: Area::Staged,
+            code: 'R',
+        });
+        let (before, after) = read_sides(&renamed.0, &key)?;
+        let result = compare_with_encoding(
+            "after.yaml",
+            &before,
+            &after,
+            JsonEncoding::Document,
+            &|| true,
+            |kind, bytes| decrypt(kind, bytes, &keys[0].0),
+        )?;
+        assert!(!result.content_changed);
+        // Binary envelopes with .json names must use actual bytes, not JSON-escaped data.
+        let text_binary = encrypt(Format::Binary, b"actual binary text\n", &keys[0].1)?;
+        let result = compare_with_encoding(
+            "binary.enc.json",
+            "",
+            &text_binary,
+            JsonEncoding::Binary,
+            &|| true,
+            |kind, bytes| decrypt(kind, bytes, &keys[0].0),
+        )?;
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(result.rows[0].text, "actual binary text");
+        for bytes in [
+            b"fixture\0binary".as_slice(),
+            b"fixture\xffbinary".as_slice(),
+        ] {
+            let input = encrypt(Format::Binary, bytes, &keys[0].1)?;
+            assert!(
+                compare_with_encoding(
+                    "binary.enc.json",
+                    "",
+                    &input,
+                    JsonEncoding::Binary,
+                    &|| true,
+                    |kind, bytes| decrypt(kind, bytes, &keys[0].0)
+                )
+                .is_err()
+            );
+        }
+        assert!(
+            compare_with_encoding(
+                "binary.enc.json",
+                "",
+                &binary,
+                JsonEncoding::Document,
+                &|| true,
+                |kind, bytes| decrypt(kind, bytes, &keys[0].0)
+            )
+            .is_err()
+        );
         eprintln!(
-            "Real local SOPS generated-age fixture completed: JSON/YAML/dotenv/INI/binary UTF-8, recipient rotation, binary refusal; isolated HOME and explicit fixture keys only"
+            "Real local SOPS generated-age fixture completed: JSON/YAML/dotenv/INI/binary UTF-8, recipient rotation, explicit ambiguous formats, cross-extension rename, binary NUL/non-UTF8 refusal; isolated HOME and explicit fixture keys only"
         );
         Ok(())
     }
@@ -572,7 +714,7 @@ mod fixture {
         repo.commit()?;
         repo.write(path, &new)?;
         let key = work(path, Area::Unstaged, 'M');
-        let result = load(&repo.0, &key, &|| true)?;
+        let result = load(&repo.0, &key, JsonEncoding::Ask, &|| true)?;
         assert!(result.content_changed && !result.recipients_changed);
         assert_eq!(
             std::fs::read_to_string(repo.0.join(path)).map_err(|e| e.to_string())?,
@@ -680,7 +822,12 @@ mod fixture {
                 crate::remote::sh_quote(&repo.0.join(path).to_string_lossy())
             ),
         )?;
-        let result = load(&repo.0, &work(path, Area::Unstaged, 'M'), &|| true);
+        let result = load(
+            &repo.0,
+            &work(path, Area::Unstaged, 'M'),
+            JsonEncoding::Ask,
+            &|| true,
+        );
         assert!(result.is_err_and(
             |e| e.contains("changed while decrypting") && !e.contains("fixture-private")
         ));
@@ -829,6 +976,7 @@ mod fixture {
             crate::repo::Action::DiffAsFile(false),
             crate::repo::Action::DiffRendered(false),
             crate::repo::Action::DiffStructural(false),
+            crate::repo::Action::DiffDecryptedEncoding(JsonEncoding::Binary),
             crate::repo::Action::CloseDiff,
         ] {
             tab.diff = Some(make_view()?);
