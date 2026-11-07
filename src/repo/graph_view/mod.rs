@@ -77,7 +77,12 @@ impl RepoTab {
 
         // Keyboard navigation (only when no text field has focus, nor a window of the app's
         // is over the tab: the manual, the palette, the clone form).
-        if !ui.ctx().egui_wants_keyboard_input() && self.dialog.is_none() && !self.keys_blocked {
+        if !ui.ctx().egui_wants_keyboard_input()
+            && self.dialog.is_none()
+            && !self.keys_blocked
+            && self.keyboard_graph_active()
+            && !egui::Popup::is_any_open(ui.ctx())
+        {
             self.arrow_keys(ui, acts);
         }
 

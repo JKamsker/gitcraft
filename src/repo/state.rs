@@ -116,9 +116,13 @@ pub(crate) struct DiffView {
     pub(super) jump: Option<usize>,
     /// The change jumped to last, and the scroll offset that left.
     pub(super) at_change: Option<(usize, f32)>,
+    /// Header of the hunk currently addressed by S/U/D; reset with every diff read.
+    pub(super) keyboard_hunk: Option<usize>,
     /// The latest read of this diff: only its answer is shown, so a slower answer to an older
     /// read (before the whitespace or whole-file setting changed…) can't replace it.
     pub(super) request: u64,
+    /// The request that produced the retained data; it may remain visible during a newer read.
+    pub(super) data_request: u64,
 }
 
 /// Numbers the diff reads of every tab, so no two diffs ever wait for the same number.
@@ -140,7 +144,9 @@ impl DiffView {
             scroll: 0.0,
             jump: None,
             at_change: None,
+            keyboard_hunk: None,
             request: 0,
+            data_request: 0,
         }
     }
 
@@ -155,12 +161,14 @@ impl DiffView {
         if request != self.request {
             return;
         }
+        self.data_request = request;
         self.data = Some(result);
         // The lines may have moved.
         self.chosen.clear();
         self.anchor = None;
         self.text_sel = None;
         self.at_change = None;
+        self.keyboard_hunk = None;
     }
 
     /// Shows the whole file read along with the read numbered `request`, unless a newer read

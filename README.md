@@ -114,6 +114,13 @@ Glossary tips stay out of the way while typing, scrolling or dragging.
   are offscreen. Long summaries end in an ellipsis; hover the description to read its original
   message, loaded in the background. Messages over the 256 KiB tooltip limit open in the detail
   pane by selecting the commit.
+- Ctrl+Alt+1/2/3 (Cmd+Alt on macOS) focuses the sidebar, graph or diff, and detail pane;
+  an outline shows the active pane. In the detail pane, j/k selects files in display order,
+  opening their folders and scrolling them into view; Space stages or unstages, Enter opens
+  the diff. Conflicted files require the explicit Resolve/Mark resolved controls. In a text
+  diff, F7/Shift+F7 picks the next/previous change; S/U acts on the current hunk and D asks
+  before discarding it (Ctrl+Z restores it). These keys stay with text fields, terminals,
+  menus and dialogs while those have focus. Held action keys do not repeat operations.
 - Drag the column borders in the header to resize. Right-click the header to pick the columns,
   make the graph column compact (lanes closer together), or _Reset columns_ to their first
   widths.

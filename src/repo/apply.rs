@@ -13,10 +13,23 @@ use crate::settings::Settings;
 impl RepoTab {
     pub(crate) fn apply(&mut self, action: Action, ctx: &egui::Context) {
         let plain = OpKind::plain();
+        if matches!(
+            &action,
+            Action::Select(_)
+                | Action::SelectHash(_)
+                | Action::SelectStash(_)
+                | Action::OpenPr(_)
+                | Action::ClosePr
+                | Action::Compare { .. }
+                | Action::CloseCompare
+        ) {
+            self.keyboard_clear_cursor();
+        }
         if self.check_history_download(&action, ctx) {
             return;
         }
         match action {
+            Action::Keyboard(request) => self.apply_keyboard(request, ctx),
             Action::AllowHistoryDownload(action) => {
                 self.history_download_allowed = true;
                 self.apply(*action, ctx);
@@ -37,7 +50,10 @@ impl RepoTab {
                 self.ci_view = None;
                 self.select_stash(i, ctx);
             }
-            Action::OpenDiff(key) => self.open_diff(key, ctx),
+            Action::OpenDiff(key) => {
+                self.keyboard.borrow_mut().pane = Some(super::keyboard::Pane::Graph);
+                self.open_diff(key, ctx);
+            }
             Action::OpenPr(number) => {
                 // It refuses while an editor takes the big area: the builds shown stay then.
                 let requests = self.pr_requests;
@@ -61,6 +77,7 @@ impl RepoTab {
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),
             Action::CloseDiff => {
+                self.keyboard.borrow_mut().pane = Some(super::keyboard::Pane::Detail);
                 self.diff = None;
                 self.conflict = None;
             }
@@ -360,6 +377,13 @@ impl RepoTab {
         else {
             return;
         };
+        if self
+            .diff
+            .as_ref()
+            .is_some_and(|v| v.request != v.data_request)
+        {
+            return;
+        }
         let Some(patch) = diff::partial_patch(&data.header, &data.lines, lines, pick) else {
             return;
         };
@@ -371,11 +395,41 @@ impl RepoTab {
             file.path
         );
         // Written where git runs: on another machine, in the background.
-        let repo = self.path.clone();
+        if self.busy_op.is_some() {
+            return;
+        }
+        let (owner, read, key, request) = (
+            self.path.clone(),
+            self.work_read,
+            self.diff.as_ref().map(|v| v.key.clone()),
+            self.diff.as_ref().map(|v| v.request),
+        );
+        let repo = owner.clone();
+        let preparing = format!("Preparing {label}");
+        let started = Instant::now();
+        self.busy_op = Some(preparing.clone());
+        self.op_started = Some(started);
         self.here_or_later(
             ctx,
             move || git::save_patch_for(&repo, &patch),
-            move |tab, saved, ctx| tab.apply_picked(pick, &label, saved, ctx),
+            move |tab, saved, ctx| {
+                if tab.busy_op.as_ref() != Some(&preparing) || tab.op_started != Some(started) {
+                    return;
+                }
+                tab.busy_op = None;
+                let current = tab
+                    .diff
+                    .as_ref()
+                    .is_some_and(|v| Some(&v.key) == key.as_ref() && Some(v.request) == request);
+                if tab.path != owner || tab.work_read != read || tab.work_pending != 0 || !current {
+                    tab.status = Some((
+                        "Changes reloaded; pick the hunk again before applying it.".to_owned(),
+                        true,
+                    ));
+                    return;
+                }
+                tab.apply_picked(pick, &label, saved, ctx);
+            },
         );
     }
 
