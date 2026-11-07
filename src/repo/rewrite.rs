@@ -200,18 +200,26 @@ impl RepoTab {
         if self.busy_op.is_some() {
             return;
         }
-        let branch = self.refs.current.as_deref().unwrap_or("HEAD");
-        let ask =
-            git::PreviewAsk::rebase(branch, &self.refs.head, &onto, self.upstream_ref(branch));
-        let steps = vec![
-            self.same_branch(),
-            expect_ref_at("HEAD", &self.refs.head),
-            vec!["rebase".into(), "--end-of-options".into(), onto],
-        ];
-        self.open_dialog(super::Dialog::confirm(&label,
-            "Replay the branch's unique commits onto the target. Conflicts stop for resolution. Dirty tracked changes prevent this rebase from starting.".into(),
-            "Rebase", steps, None).undo(Undo::HeadMove { mode: "--keep" })
-            .preview(ask, format!("Commits rewritten on {branch}")), ctx);
+        self.plain_rebase_request = self.plain_rebase_request.wrapping_add(1);
+        let requested = self.plain_rebase_request;
+        let branch = self.refs.current.clone().unwrap_or_else(|| "HEAD".into());
+        let head = self.refs.head.clone();
+        let guard = self.same_branch();
+        let upstream = self.upstream_ref(&branch);
+        let repo = self.path.clone();
+        self.then(ctx,move|| -> Result<String,String> {
+            let pinned=git::forecast_run(&repo,&["--no-lazy-fetch","rev-parse","--verify","--end-of-options",&format!("{onto}^{{commit}}")],&[],&[0],&||true)?;
+            let pinned=pinned.trim().to_owned();if !git::investigations::oid(&pinned){return Err("Invalid rebase target".into());}Ok(pinned)
+        },move|tab,result,ctx|{
+            if tab.plain_rebase_request!=requested||tab.dialog.is_some(){return;}
+            let pinned=match result{Ok(p)=>p,Err(e)=>{tab.status=Some((format!("Rebase preview: {e}"),true));return;}};
+            if tab.busy_op.is_some()||tab.refs.head!=head||tab.same_branch()!=guard{tab.status=Some(("The branch changed while preparing the rebase preview; reopen it.".into(),true));return;}
+            let ask=git::PreviewAsk::rebase(&branch,&head,&pinned,upstream);
+            let steps=vec![guard,expect_ref_at("HEAD",&head),vec!["rebase".into(),"--end-of-options".into(),pinned]];
+            tab.open_dialog(super::Dialog::confirm(&label,
+                "Replay the branch's unique commits onto the pinned target. Conflicts stop for resolution. Dirty tracked changes prevent this rebase from starting.".into(),
+                "Rebase",steps,None).undo(Undo::HeadMove{mode:"--keep"}).preview(ask,format!("Commits rewritten on {branch}")),ctx);
+        });
     }
 
     pub(super) fn ask_run_rebase(&mut self, ctx: &egui::Context) {
@@ -400,6 +408,35 @@ mod tests {
                 Err(_) => return None,
             }
         }
+    }
+
+    #[test]
+    fn plain_rebase_preview_pins_target_before_a_later_branch_move() -> Result<(), String> {
+        let dir = repo("pin-plain-preview");
+        let head = git::resolve(&dir, "HEAD")?;
+        let target = git::resolve(&dir, "HEAD^")?;
+        git::run(Some(&dir), &["branch", "target", &target])?;
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+        tab.refs.head = head.clone();
+        tab.refs.current = Some("main".into());
+        tab.ask_plain_rebase("target".into(), "Rebase onto target".into(), &ctx);
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        while tab.dialog.is_none() && std::time::Instant::now() < deadline {
+            if let Ok(Msg::Then(next)) = tab.rx.recv_timeout(Duration::from_millis(100)) {
+                next(&mut tab, &ctx);
+            }
+        }
+        git::run(Some(&dir), &["update-ref", "refs/heads/target", &head])?;
+        let Some(super::super::Dialog::Confirm { ops, .. }) = &tab.dialog else {
+            return Err("Missing rebase confirmation".into());
+        };
+        assert_eq!(ops.last().and_then(|s| s.last()), Some(&target));
+        assert!(ops.iter().any(|s| s.iter().any(|word| word == &head)));
+        tab.dialog = None;
+        drop(tab);
+        let _ = std::fs::remove_dir_all(dir);
+        Ok(())
     }
 
     fn subject(dir: &Path) -> String {
