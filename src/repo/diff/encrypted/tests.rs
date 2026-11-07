@@ -977,6 +977,9 @@ mod fixture {
             crate::repo::Action::DiffRendered(false),
             crate::repo::Action::DiffStructural(false),
             crate::repo::Action::DiffDecryptedEncoding(JsonEncoding::Binary),
+            crate::repo::Action::OpenFileComparison(crate::repo::file_comparison::Page::Migration),
+            crate::repo::Action::OpenFileComparison(crate::repo::file_comparison::Page::Lens),
+            crate::repo::Action::OpenFileComparison(crate::repo::file_comparison::Page::Matrix),
             crate::repo::Action::CloseDiff,
         ] {
             tab.diff = Some(make_view()?);
