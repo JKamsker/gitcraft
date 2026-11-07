@@ -17,27 +17,16 @@ fn wait(h: &mut egui_kittest::Harness<'_, App>) -> Result<(), String> {
 // scrolling the target into view rather than clicking an off-screen AccessKit rectangle.
 fn click(h: &mut egui_kittest::Harness<'_, App>, label: &str) {
     h.get_by_label(label).scroll_to_me();
-    // Smooth scrolling/modal re-layout can move a control between pointer-down and
-    // pointer-up; let those requested animation frames finish before clicking.
-    h.run();
-    let pos = h.get_by_label(label).rect().center();
-    if std::env::var_os("GITCRAFT_SETUP_UI_SCREENSHOT").is_some()
-        && label.starts_with("Add profiles")
-    {
-        match h.render() {
-            Ok(image) => {
-                let _ = image.save("/workspace/work/setup-import-debug.png");
-            }
-            Err(e) => eprintln!("Screenshot unavailable: {e}"),
-        }
+    // The centered modal and its shrinking scroll viewport settle together. Force
+    // their layout frames, then sample the current pointer target for each event.
+    h.run_steps(30);
+    for _ in 0..4 {
+        let pos = h.get_by_label(label).rect().center();
+        h.event(egui::Event::PointerMoved(pos));
+        h.step();
     }
-    h.event(egui::Event::PointerMoved(pos));
-    h.step();
-    eprintln!(
-        "After hover: requested {pos:?}, current target={:?}",
-        h.get_by_label(label).rect()
-    );
     for pressed in [true, false] {
+        let pos = h.get_by_label(label).rect().center();
         h.event(egui::Event::PointerButton {
             pos,
             button: egui::PointerButton::Primary,
@@ -48,6 +37,7 @@ fn click(h: &mut egui_kittest::Harness<'_, App>, label: &str) {
     }
     h.run_steps(3);
 }
+
 #[test]
 fn export_import_ui_round_trip_preserves_active_profile_and_requires_local_setup()
 -> Result<(), String> {
