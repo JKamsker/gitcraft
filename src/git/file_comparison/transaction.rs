@@ -243,6 +243,9 @@ pub(super) fn index_stamp(repo: &Path, active: &dyn Fn() -> bool) -> Result<Stri
             active,
         )?;
         if out.code != 0 {
+            if String::from_utf8_lossy(&out.stderr).contains("Safe index reads require Perl") {
+                return Err("Safe remote index reads require Perl with Fcntl no-follow support on the repository machine".into());
+            }
             if String::from_utf8_lossy(&out.stderr).contains("File comparison requires md5sum") {
                 return Err("File comparison requires md5sum (Linux/WSL) or md5 (macOS) on the repository machine".into());
             }
@@ -262,11 +265,21 @@ pub(super) fn index_stamp(repo: &Path, active: &dyn Fn() -> bool) -> Result<Stri
         .unwrap_or_else(|| "missing".into()))
 }
 fn remote_stamp_read() -> String {
+    // Stock macOS has Perl/Fcntl and md5; Linux/WSL commonly supply Perl and md5sum.
+    // sysopen holds a no-follow regular descriptor across the entire bounded read.
+    let read = format!(
+        r#"use Fcntl qw(O_RDONLY O_NOFOLLOW O_NONBLOCK); use Errno qw(ENOENT);
+my $f; sysopen($f,$ARGV[0],O_RDONLY|O_NOFOLLOW|O_NONBLOCK) or exit($! == ENOENT ? 2 : 1);
+-f $f or exit 1; binmode $f; binmode STDOUT;
+my $total=0; while ($total < {limit}) {{ my $n=sysread($f,my $b,{limit}-$total); defined($n) or exit 1; last if $n==0; print STDOUT $b or exit 1; $total+=$n; }}
+exit($total > {max} ? 1 : 0);"#,
+        limit = INDEX_LIMIT + 1,
+        max = INDEX_LIMIT
+    );
     format!(
-        "{}\n[ -L \"$idx\" ] && exit 1\nif [ -e \"$idx\" ]; then\n[ -f \"$idx\" ] || exit 1\nhead -c {} \"$idx\" >\"$d/index-bytes\" || exit 1\n[ \"$(wc -c <\"$d/index-bytes\")\" -le {} ] || exit 1\nactual=$(gitcraft_md5 <\"$d/index-bytes\") || exit 1\nelse actual=missing; fi\n",
+        "{}\ncommand -v perl >/dev/null 2>&1 || {{ echo 'Safe index reads require Perl with Fcntl no-follow support on the repository machine' >&2; exit 1; }}\nperl -e {} -- \"$idx\" >\"$d/index-bytes\"; rc=$?\ncase \"$rc\" in 0) actual=$(gitcraft_md5 <\"$d/index-bytes\") || exit 1;; 2) actual=missing;; *) exit 1;; esac\n",
         portable_md5(),
-        INDEX_LIMIT + 1,
-        INDEX_LIMIT
+        crate::remote::sh_quote(&read)
     )
 }
 fn portable_md5() -> &'static str {
@@ -318,6 +331,7 @@ mod correction_tests {
             data["patch"],
             base64::engine::general_purpose::STANDARD.encode(b"fixture patch")
         );
+        assert!(remote_stamp_read().contains("O_NOFOLLOW"));
         let md5 = portable_md5();
         assert!(md5.contains("md5sum"));
         assert!(md5.contains("md5 -q"));
