@@ -25,31 +25,12 @@ pub struct Link {
     pub tooltip: String,
 }
 
+mod owned_child;
 #[cfg(windows)]
 mod process_job;
 #[cfg(windows)]
 mod windows_shell;
-#[cfg(windows)]
-pub use process_job::{ProcessJob, supervise_suspended_process};
-
-/// Stop a process group owned by the caller. A group already gone needs no cleanup.
-#[cfg(unix)]
-pub fn kill_process_group(pid: u32) -> std::io::Result<()> {
-    let pid = i32::try_from(pid).map_err(|_| std::io::Error::other("invalid process group"))?;
-    if pid <= 1 {
-        return Err(std::io::Error::other("invalid process group"));
-    }
-    // SAFETY: kill takes only integers, and a negative PID addresses this child's group.
-    if unsafe { libc::kill(-pid, libc::SIGKILL) } == 0 {
-        return Ok(());
-    }
-    let error = std::io::Error::last_os_error();
-    if error.raw_os_error() == Some(libc::ESRCH) {
-        Ok(())
-    } else {
-        Err(error)
-    }
-}
+pub use owned_child::OwnedChild;
 
 /// Sets the progress the taskbar button of the window `hwnd` (its `HWND`, as a number) shows.
 /// From the window's own thread.

@@ -28,6 +28,7 @@ pub(crate) struct Options {
     pub cancel: Cancellation,
     pub cancelled: Option<Box<dyn Fn() -> bool + Send + Sync>>,
     pub stderr: Option<Chunk>,
+    pub stdout: Option<Chunk>,
     pub ready: Option<Box<dyn FnOnce() + Send>>,
     /// Stream stdout directly to a file instead of capturing it in memory.
     pub stdout_file: Option<std::fs::File>,
@@ -50,6 +51,7 @@ impl Default for Options {
             cancel: crate::tasks::cancellation(),
             cancelled: None,
             stderr: None,
+            stdout: None,
             ready: None,
             stdout_file: None,
             stop_remote: None,
@@ -365,7 +367,7 @@ pub(crate) fn shutdown() {
 // The eighth argument only exists in opt-in libtest diagnostics.
 #[cfg_attr(test, allow(clippy::too_many_arguments))]
 async fn execute(
-    command: Command,
+    mut command: Command,
     mut options: Options,
     deadline: Option<Instant>,
     ticket: &Cancellation,
@@ -386,61 +388,50 @@ async fn execute(
     if deadline.is_some_and(|at| Instant::now() >= at) {
         return Err("process timed out and was stopped".into());
     }
-    let mut cmd = tokio::process::Command::from(command);
-    cmd.stdin(if options.input.is_some() {
-        Stdio::piped()
-    } else {
-        Stdio::null()
-    })
-    .stdout(
-        options
-            .stdout_file
-            .take()
-            .map_or_else(Stdio::piped, Stdio::from),
-    )
-    .stderr(Stdio::piped())
-    .kill_on_drop(true);
-    // Ordinary hooks/helpers inherit this group. Deliberate setsid escapes require stronger
-    // OS containment; see docs/process-orchestration.md.
-    #[cfg(unix)]
-    cmd.process_group(0);
-    #[cfg(windows)]
-    cmd.creation_flags(0x0800_0004); // CREATE_NO_WINDOW | CREATE_SUSPENDED
+    command
+        .stdin(if options.input.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
+        .stdout(
+            options
+                .stdout_file
+                .take()
+                .map_or_else(Stdio::piped, Stdio::from),
+        )
+        .stderr(Stdio::piped());
     #[cfg(test)]
     if let Some(trace) = trace {
         trace.stage(trace::Stage::Spawning);
     }
-    let mut child = cmd
-        .spawn()
+    let mut child = gitcraft_os::OwnedChild::spawn(command)
         .map_err(|e| format!("could not run process: {e}"))?;
     #[cfg(test)]
     if let Some(trace) = trace {
-        trace.spawned(child.id());
+        trace.spawned(Some(child.id()));
         trace.stage(trace::Stage::Supervising);
     }
-    #[cfg(windows)]
-    let mut process_job = match child
-        .id()
-        .ok_or_else(|| "child has no process ID".to_owned())
-        .and_then(gitcraft_os::supervise_suspended_process)
-    {
-        Ok(job) => Some(job),
-        Err(error) => {
-            let _ = child.kill().await;
-            let _ = child.wait().await;
-            return Err(format!("could not supervise process tree: {error}"));
-        }
-    };
     stats.spawned.fetch_add(1, Ordering::Relaxed);
     #[cfg(test)]
     if let Some(trace) = trace {
         trace.stage(trace::Stage::Running);
     }
-    #[cfg(unix)]
-    let pid = child.id();
-    let mut input = child.stdin.take();
-    let mut out = child.stdout.take();
-    let mut err = child.stderr.take();
+    let mut input = child
+        .stdin()
+        .map(tokio::process::ChildStdin::from_std)
+        .transpose()
+        .map_err(|e| e.to_string())?;
+    let mut out = child
+        .stdout()
+        .map(tokio::process::ChildStdout::from_std)
+        .transpose()
+        .map_err(|e| e.to_string())?;
+    let mut err = child
+        .stderr()
+        .map(tokio::process::ChildStderr::from_std)
+        .transpose()
+        .map_err(|e| e.to_string())?;
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let mut preamble = Vec::new();
@@ -474,7 +465,10 @@ async fn execute(
                 match result {
                     Ok(0) => out = None,
                     Ok(n) => {
-                        if ready { append(&mut stdout, &obuf[..n], options.output_limit, &mut stopped); }
+                        if ready {
+                            consume(&mut options.stdout, &obuf[..n], &mut stopped);
+                            append(&mut stdout, &obuf[..n], options.output_limit, &mut stopped);
+                        }
                         else {
                             for (i, &byte) in obuf[..n].iter().enumerate() {
                                 if byte == b'\n' {
@@ -526,14 +520,14 @@ async fn execute(
                     Err(e) => stopped = Some(format!("could not pass process its input: {e}")),
                 }
             }
-            result = child.wait(), if status.is_none() => {
-                match result {
-                    // Preserve early-reader semantics: an exited child need not consume all input.
-                    Ok(s) => { status = Some(s); input = None; drain_deadline = Some(Instant::now() + options.drain_for); }
-                    Err(e) => stopped = Some(format!("could not wait for process: {e}")),
-                }
-            }
             _ = tick.tick() => {
+                if status.is_none() {
+                    match child.observe() {
+                        Ok(Some(s)) => { status = Some(s); input = None; drain_deadline = Some(Instant::now() + options.drain_for); }
+                        Ok(None) => {},
+                        Err(e) => stopped = Some(format!("could not observe process: {e}")),
+                    }
+                }
                 if cancelled() && status.is_none() { stop_requested.get_or_insert_with(|| ("cancelled".into(), Instant::now())); }
                 else if status.is_none() && deadline.is_some_and(|at| Instant::now() >= at) {
                     stop_requested.get_or_insert_with(|| ("process timed out and was stopped".into(), Instant::now()));
@@ -564,46 +558,20 @@ async fn execute(
         {
             let _ = tokio::task::spawn_blocking(stop).await;
         }
-        // The remote stop can also end the local loopback/SSH child. Reap it before
-        // signaling its group: Darwin rejects SIGKILL on a group containing only zombies.
-        if status.is_none() {
-            #[cfg(test)]
-            if let Some(trace) = trace {
-                trace.stage(trace::Stage::Reaping);
+        // finish signals while the Unix leader is unreaped, then reaps exactly once;
+        // Windows holds its Job through the final signal. No delayed numeric kills.
+        #[cfg(test)]
+        if let Some(trace) = trace {
+            trace.stage(trace::Stage::Reaping);
+        }
+        match child.finish() {
+            Ok(s) => {
+                if status.is_none() {
+                    status = Some(s);
+                }
             }
-            status = child
-                .try_wait()
-                .map_err(|e| format!("could not reap process: {e}"))?;
+            Err(e) => return Err(format!("could not finish owned process: {e}")),
         }
-        #[cfg(unix)]
-        if let Some(pid) = pid
-            && let Err(error) = gitcraft_os::kill_process_group(pid)
-        {
-            stopped = Some(format!(
-                "{}; could not stop process group: {error}",
-                stopped.as_deref().unwrap_or_default()
-            ));
-        }
-        #[cfg(windows)]
-        if let Some(job) = &process_job
-            && let Err(error) = job.terminate()
-        {
-            stopped = Some(format!(
-                "{}; could not stop process job: {error}",
-                stopped.as_deref().unwrap_or_default()
-            ));
-        }
-        let _ = child.start_kill();
-        if status.is_none() {
-            status = Some(
-                child
-                    .wait()
-                    .await
-                    .map_err(|e| format!("could not reap process: {e}"))?,
-            );
-        }
-        #[cfg(windows)]
-        drop(process_job.take());
         // Killing/reaping does not consume bytes already buffered in the pipes. Retain
         // those diagnostics without waiting indefinitely for an inherited pipe to close.
         let until = tokio::time::Instant::now() + options.drain_for;
@@ -617,7 +585,10 @@ async fn execute(
                 result = async { match &mut out { Some(p) => p.read(&mut obuf).await, None => std::future::pending().await } } => {
                     match result {
                         Ok(0) | Err(_) => out = None,
-                        Ok(n) => if ready { append(&mut stdout, &obuf[..n], options.output_limit, &mut overflow); },
+                        Ok(n) => if ready {
+                            consume(&mut options.stdout, &obuf[..n], &mut overflow);
+                            append(&mut stdout, &obuf[..n], options.output_limit, &mut overflow);
+                        },
                     }
                 }
                 result = async { match &mut err { Some(p) => p.read(&mut ebuf).await, None => std::future::pending().await } } => {
@@ -635,6 +606,11 @@ async fn execute(
             }
         }
     }
+    // Also retire successful owners: descendants with closed output remain in the group.
+    // This is idempotent when cancellation already finished it above.
+    child
+        .finish()
+        .map_err(|e| format!("could not finish owned process: {e}"))?;
     if !ready && stopped.is_none() {
         let said = String::from_utf8_lossy(&stderr);
         stopped = Some(if said.trim().is_empty() {
@@ -670,6 +646,14 @@ async fn write_input<W: tokio::io::AsyncWrite + Unpin>(
     } else {
         pipe.flush().await?;
         Ok(true)
+    }
+}
+
+fn consume(callback: &mut Option<Chunk>, bytes: &[u8], stopped: &mut Option<String>) {
+    if let Some(callback) = callback
+        && std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| callback(bytes))).is_err()
+    {
+        *stopped = Some("process output callback panicked".into());
     }
 }
 
