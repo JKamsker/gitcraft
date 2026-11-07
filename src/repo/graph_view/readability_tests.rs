@@ -97,6 +97,17 @@ fn header_x(shapes: &[ClippedShape], label: &str) -> f32 {
     matching[0].pos.x
 }
 
+// Locate rows from painted content: the history filter strip can move the graph vertically.
+fn summary_y(shapes: &[ClippedShape], summary: &str) -> f32 {
+    texts(shapes)
+        .into_iter()
+        .find(|t| t.galley.job.text == summary)
+        .expect("painted commit summary")
+        .visual_bounding_rect()
+        .center()
+        .y
+}
+
 #[test]
 fn scrolling_reclaims_empty_refs_without_width_jitter_or_full_history_paint() {
     let (ctx, mut tab) = fixture(10_000);
@@ -107,7 +118,10 @@ fn scrolling_reclaims_empty_refs_without_width_jitter_or_full_history_paint() {
     tab.scroll_to = Some(5000);
     let (scrolled, _) = frame(&ctx, &mut tab, size, vec![], 0.2);
     assert!(header_x(&scrolled, "GRAPH") < with_pill);
-    assert_eq!(header_x(&scrolled, "GRAPH"), MIN_REFS_W + 10.0);
+    assert_eq!(
+        header_x(&scrolled, "GRAPH"),
+        MIN_REFS_W + crate::repo::columns::CELL_PAD
+    );
     assert!(texts(&scrolled).iter().any(|s| s.galley.job.text == "main"
         && s.galley.job.sections[0].format.color == Tokens::get(&ctx).text_faint));
     let painted_label = scrolled.iter().find(|clipped| {
@@ -174,7 +188,10 @@ fn manual_refs_optional_columns_and_compact_graph_survive_auto_sizing() {
     let (shapes, _) = frame(&ctx, &mut tab, size, vec![], 0.1);
     let shown = preferred_cols(&settings, lane_layout(&settings, 1))
         .squeezed(size.x, settings.last_resized);
-    assert_eq!(header_x(&shapes, "GRAPH"), shown.refs + 10.0);
+    assert_eq!(
+        header_x(&shapes, "GRAPH"),
+        shown.refs + crate::repo::columns::CELL_PAD
+    );
     for name in ["COMMIT", "AUTHOR", "WHEN", "DATE"] {
         header_x(&shapes, name);
     }
@@ -228,7 +245,7 @@ fn real_git_tooltip_retains_long_message_paragraphs_and_follows_hover_not_select
     frame(&ctx, &mut tab, size, vec![], 0.0);
     let (shapes, _) = frame(&ctx, &mut tab, size, vec![], 0.1);
     let x = header_x(&shapes, "DESCRIPTION") + 30.0;
-    let first_point = egui::pos2(x, 26.0 + ROW_PITCH / 2.0);
+    let first_point = egui::pos2(x, summary_y(&shapes, &tab.commits[0].summary));
     let second_point = first_point + vec2(0.0, ROW_PITCH);
     frame(
         &ctx,
@@ -429,8 +446,8 @@ fn auto_sized_pills_keep_double_click_and_branch_context_hitboxes() {
     Arc::make_mut(&mut tab.commits[0]).refs = vec!["feature".to_owned()];
     tab.rebuild_graph_labels();
     let size = vec2(900.0, 220.0);
-    let point = egui::pos2(25.0, 26.0 + ROW_PITCH / 2.0);
-    frame(&ctx, &mut tab, size, vec![], 0.0);
+    let (shapes, _) = frame(&ctx, &mut tab, size, vec![], 0.0);
+    let point = egui::pos2(25.0, summary_y(&shapes, &tab.commits[0].summary));
     frame(&ctx, &mut tab, size, vec![Event::PointerMoved(point)], 0.1);
     let mut actions = Vec::new();
     for (n, pressed) in [true, false, true, false].into_iter().enumerate() {
@@ -492,7 +509,7 @@ fn ghost_rows_do_not_offer_an_unresolvable_message_popup() {
     let (shapes, _) = frame(&ctx, &mut tab, size, vec![], 0.0);
     let point = egui::pos2(
         header_x(&shapes, "DESCRIPTION") + 35.0,
-        26.0 + ROW_PITCH / 2.0,
+        summary_y(&shapes, "Preview only"),
     );
     for time in [0.1, 1.0, 2.0] {
         let (shapes, _) = frame(&ctx, &mut tab, size, vec![Event::PointerMoved(point)], time);
@@ -535,4 +552,22 @@ fn cached_badges_refresh_when_refs_change_even_without_changing_the_graph() {
     assert_eq!(refreshed[0].label, "origin/topic");
     assert!(refreshed[0].local && refreshed[0].head && refreshed[0].remotes.is_empty());
     frame(&ctx, &mut tab, vec2(900.0, 220.0), vec![], 0.0);
+}
+
+#[test]
+fn hidden_remote_names_are_not_reintroduced_by_faint_lane_labels() {
+    let (ctx, mut tab) = fixture(3);
+    Arc::make_mut(&mut tab.commits[0]).refs = vec!["refs/remotes/origin/hidden".into()];
+    tab.visibility.toggle_remote_graph("origin");
+    tab.rebuild_graph_labels();
+    ctx.run_ui(Default::default(), |ui| {
+        let viewport = tab.readable_viewport(ui, 1..3, 24);
+        assert!(
+            viewport
+                .labels
+                .values()
+                .all(|name| !name.contains("hidden"))
+        );
+    })
+    .drop_without_applying_deltas();
 }

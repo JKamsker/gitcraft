@@ -32,7 +32,7 @@ use crate::menu_item::MenuItem;
 use crate::settings::Settings;
 use crate::theme::Tokens;
 pub(super) use badge::BadgeIndex;
-use badge::{Badge, BadgeKind, badges};
+use badge::{Badge, BadgeKind};
 /// For the settings' previews, which draw a graph of their own like this one.
 pub(crate) use lanes::edge;
 use row::Lanes;
@@ -67,7 +67,7 @@ impl RepoTab {
     /// A comparison opened from a pull request focuses that branch, including when several
     /// branches share its tip and the ordinary ordering would put it behind `+N`.
     fn graph_badges(&self, commit: &git::Commit) -> Vec<Badge> {
-        let mut badges = badges(&commit.refs, &self.refs);
+        let mut badges = self.graph_badge_index.badges(&commit.refs);
         for badge in &mut badges {
             if badge.kind != BadgeKind::Branch {
                 continue;
