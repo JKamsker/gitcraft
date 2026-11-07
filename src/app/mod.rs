@@ -378,7 +378,8 @@ impl App {
     fn poll_update(&mut self, ctx: &egui::Context) {
         let s = &self.settings;
         let want = (s.check_updates, s.update_channel, s.download_updates);
-        if self.update_looked != Some(want) {
+        // Offline or metered: looked for once that is over.
+        if self.update_looked != Some(want) && crate::network::background_may_run() {
             let pinned = self.pinned_version.clone();
             self.update_looked = Some(want);
             self.update = None;
@@ -571,6 +572,8 @@ impl eframe::App for App {
         // A theme file being edited, VS Code's theme switched: shown as they change.
         theme::poll(&ctx);
         crate::portable::set_credential_store(self.settings.portable_credential_store);
+        crate::network::set_choices(self.settings.offline, self.settings.pause_on_metered);
+        crate::network::start_watching(&ctx);
 
         // eframe shows the window after the first frame; maximize it on the next one.
         if MAXIMIZE_WHEN_SHOWN.load(Ordering::Relaxed) {

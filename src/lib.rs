@@ -24,6 +24,7 @@ pub mod mcp;
 mod mergiraf;
 mod portable;
 mod parallel_bisect;
+mod network;
 mod pr_post;
 mod pr_threads;
 mod pull_request;

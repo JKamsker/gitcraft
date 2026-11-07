@@ -120,6 +120,7 @@ impl RepoTab {
             Action::CancelOp => self.cancel_op(),
             Action::ToggleActivity => self.activity.open = !self.activity.open,
             Action::ShowActivity(id) => self.activity.reveal(id),
+            Action::SetOffline(offline) => super::offline::set_offline(ctx, offline),
             Action::LoadMore => self.load_more(ctx),
             Action::Undo => {
                 if !self.refuse_undo() {

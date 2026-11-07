@@ -226,6 +226,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Fetch, pull, push and clone show how far git is (“Receiving objects: 45%”) and a thin bar under the toolbar; Cancel stops git and what it started, and leaves undo as it was. A cancelled clone removes what it had cloned.",
             "Activity (the list button in the toolbar) lists each operation with its git commands, how long each took, how it ended and all it printed; copy any of it. Click a message in the toolbar to open its operation there.",
             "Fetch, Pull and Push can be clicked while another operation runs: they start once it is done (up to three wait, in order; Cancel or a failure drops them). The other buttons say what they wait for.",
+            "Offline mode (Settings → Git, or Go offline in the palette) stops gitcraft going on the network by itself: no background fetch, avatars, update checks or build and pull request polling, and Fetch, Pull, Push and the other commands that reach a remote say why they don't run. On a metered connection, or without one, only the background work pauses. The toolbar says so, with when the repository was last fetched.",
         ],
     ),
 ];

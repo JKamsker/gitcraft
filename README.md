@@ -663,6 +663,24 @@ so your config, credentials and hooks apply as usual.
   up to 64 KiB (its start and its end); a background fetch only when it fails, and the same
   failure again and again as one entry, counted.
 - Background fetch every few minutes (Settings; 0 turns it off).
+- Offline mode (Settings → Git, or _Go offline_ in the palette): nothing goes on the network by
+  itself (the background fetch, avatars, update checks and downloads, the polling of builds and
+  pull requests), and in a repository's tab Fetch, Pull, Push and the other git commands that
+  reach a remote (`ls-remote`, `remote update`, LFS transfers…) say why they don't run instead of
+  waiting for a network that isn't there. Commands that only change the config (`remote add`,
+  `set-url`…) still run. Cloning, the forge's pages (pull requests you open, reviews) and
+  _Check for updates_ are not refused: they are asked for by name. A repository in WSL or over
+  SSH is still looked at every few seconds, as it needs to be to work. The toolbar says
+  _Offline · last fetched 3 h ago_ (from `FETCH_HEAD`); a click on it goes online. Without the
+  switch, gitcraft asks the system every minute whether there is a connection and whether it is
+  metered (Windows: a metered or roaming network, or one at its data limit, through
+  `NetworkInformation`; Linux: NetworkManager), and the background work waits for its first
+  answer (a few seconds at most): without a connection, or on a metered one (unless Settings →
+  Git says otherwise), only that background work pauses, and the toolbar says so; what you ask
+  for still runs, and a repository over SSH still fetches in the background (on that machine's
+  network). Windows' "local access only" and "limited" don't count as no connection, as a
+  proxy or VPN can make it say so. Once the network is back, pull requests, builds and avatars
+  are asked for again; avatars already downloaded still show meanwhile.
 - HTTPS sign-in: when a remote wants a username and password (or token) and no credential helper
   provides them, a dialog asks and the operation runs again. They stay in memory for the tab;
   git's own credential helper, if there is one, stores them. Cloning asks the same way.

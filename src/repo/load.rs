@@ -453,13 +453,18 @@ impl RepoTab {
                 self.avatars_hinted = false;
             }
         }
-        if self
-            .prs_loaded
-            .is_none_or(|t| t.elapsed() > Duration::from_secs(120))
+        // The forge is asked by itself only while gitcraft may go on the network by itself.
+        let paused = !crate::network::background_may_run();
+        if !paused
+            && self
+                .prs_loaded
+                .is_none_or(|t| t.elapsed() > Duration::from_secs(120))
         {
             self.load_prs(ctx);
         }
-        self.refresh_ci(ctx);
+        if !paused {
+            self.refresh_ci(ctx);
+        }
         self.want_health(ctx);
         self.rebuild(ctx);
         // After the selection is settled: not for a commit that went (amended, rebased).
@@ -681,7 +686,11 @@ impl RepoTab {
     /// Once per tab, on a forge's repository: tells the avatar loader where its authors' account
     /// pictures are.
     pub(super) fn hint_avatars(&mut self, ctx: &egui::Context) {
-        if self.avatars_hinted || !Settings::get(ctx).avatars {
+        // Offline or metered: asked on the next read once that is over.
+        if self.avatars_hinted
+            || !Settings::get(ctx).avatars
+            || !crate::network::background_may_run()
+        {
             return;
         }
         // A local mirror has no host to ask.

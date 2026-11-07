@@ -79,6 +79,11 @@ pub struct Settings {
     pub diff_beside_graph: bool,
     /// Background fetch interval in minutes; 0 turns it off.
     pub auto_fetch_minutes: u32,
+    /// Offline mode: nothing goes on the network by itself, and fetch, pull, push and the like
+    /// are refused with why (see `network`).
+    pub offline: bool,
+    /// On a metered connection (as the system reports it), the background work pauses.
+    pub pause_on_metered: bool,
     /// What the toolbar's Pull does.
     pub pull_mode: crate::repo::pull::PullMode,
     /// Load avatars: GitHub / Forgejo / Gitea / GitLab accounts on repositories hosted there,
@@ -133,6 +138,17 @@ pub struct Settings {
     pub seen_hints: std::collections::BTreeSet<String>,
 }
 
+/// What offline mode does.
+const OFFLINE_TIP: &str = "Nothing goes on the network by itself (background fetch, avatars, \
+update checks, build and pull request polling), and Fetch, Pull, Push and the like say why \
+they don't run instead of waiting for a network that isn't there.";
+
+/// What pausing on a metered connection does.
+const METERED_TIP: &str = "When the system says the connection is metered (Windows: a metered \
+or roaming network; Linux: NetworkManager), the background fetch, avatars, update checks and \
+downloads and the polling of builds and pull requests wait (a repository over SSH still \
+fetches: on that machine's network). What you ask for still runs.";
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -160,6 +176,8 @@ impl Default for Settings {
             diff_whole_file: false,
             diff_beside_graph: false,
             auto_fetch_minutes: 10,
+            offline: false,
+            pause_on_metered: true,
             pull_mode: Default::default(),
             avatars: true,
             editor: "code".to_owned(),
@@ -688,6 +706,21 @@ impl Settings {
                         },
                     );
                     card.preview(Preview::Pull);
+                    card.row("Offline", "offline metered network data roaming", |ui| {
+                        ui.checkbox(&mut self.offline, "Offline mode")
+                            .on_hover_text(OFFLINE_TIP);
+                        ui.checkbox(
+                            &mut self.pause_on_metered,
+                            "Pause background work on a metered connection",
+                        )
+                        .on_hover_text(METERED_TIP);
+                        if let Some(pause) = crate::network::background_paused() {
+                            indented_note(
+                                ui,
+                                format!("{}: background work is paused.", pause.why()),
+                            );
+                        }
+                    });
                     card.row("Pull", "fast-forward rebase merge", |ui| {
                         egui::ComboBox::from_id_salt("settings-pull")
                             .width(layout::fit(ui, COMBO_WIDTH))

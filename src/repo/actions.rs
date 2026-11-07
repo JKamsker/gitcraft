@@ -23,6 +23,8 @@ pub(crate) enum Action {
     ToggleActivity,
     /// Open the Activity panel on an operation's entry (its message clicked in the toolbar).
     ShowActivity(u64),
+    /// Turn offline mode on or off.
+    SetOffline(bool),
     Select(usize),
     SelectHash(String),
     SelectStash(usize),
@@ -485,6 +487,19 @@ impl RepoTab {
                 label(Command::Terminal),
                 Action::ToggleTerminal,
             ),
+            if crate::network::refused().is_some() {
+                (
+                    "Go online".into(),
+                    "network offline".into(),
+                    Action::SetOffline(false),
+                )
+            } else {
+                (
+                    "Go offline".into(),
+                    "network offline metered".into(),
+                    Action::SetOffline(true),
+                )
+            },
             (
                 "Activity: operations and their output".into(),
                 "log".into(),

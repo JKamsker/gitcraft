@@ -58,6 +58,7 @@ mod messages;
 mod nav_history;
 mod navigate;
 mod navigation;
+mod offline;
 mod operations;
 mod palette;
 mod partial_stash;
@@ -328,6 +329,12 @@ pub struct RepoTab {
     /// summary written yet).
     focus_commit_summary: bool,
     last_fetch: Instant,
+    /// When the repository was last fetched, for the offline chip (see `offline`).
+    fetched_at: std::sync::Arc<std::sync::Mutex<Option<std::time::SystemTime>>>,
+    /// That was looked up once.
+    fetch_time_asked: bool,
+    /// Background network work was paused on the last frame (see `follow_network`).
+    network_paused: bool,
 
     terminals: Vec<Terminal>,
     active_terminal: usize,
@@ -519,6 +526,9 @@ impl RepoTab {
             focus_wip: false,
             focus_commit_summary: false,
             last_fetch: Instant::now(),
+            fetched_at: Default::default(),
+            fetch_time_asked: false,
+            network_paused: false,
             terminals: Vec::new(),
             active_terminal: 0,
             terminal_open: false,

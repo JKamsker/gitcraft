@@ -58,6 +58,7 @@ impl RepoTab {
             widgets::toolbar_separator(ui);
             self.head_label(ui, idle, acts);
             self.target_conflict_badge(ui);
+            self.network_chip(ui, acts);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 self.fresh_rewrite_button(ui, acts);
                 self.op_status(ui, acts);
@@ -106,7 +107,10 @@ impl RepoTab {
     /// Fetch, pull and push, with how far the current branch is behind and ahead.
     /// Fetch, pull and push stay available while another operation runs: they wait for it.
     fn remote_buttons(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
-        let has_remote = !self.remotes.is_empty();
+        // Offline mode: off, saying why, rather than left to wait for a network.
+        let offline = super::offline::refused_text();
+        let has_remote = !self.remotes.is_empty() && offline.is_none();
+        let off_why = offline.unwrap_or_else(|| "This repository has no remote".to_owned());
         let no_remote = "This repository has no remote";
         let waits = self
             .waits_text()
@@ -129,6 +133,7 @@ impl RepoTab {
             .on_hover_text(fetched)
             .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Fetch))
             .on_disabled_hover_text(no_remote)
+            .on_disabled_hover_text(&off_why)
             .clicked()
         {
             acts.push(Action::Fetch);
@@ -145,7 +150,7 @@ impl RepoTab {
             icons::tool_button_count(ui, "arrow-down-to-line", "Pull", behind, has_remote)
                 .named(|| behind_ahead("Pull", behind, "behind"))
                 .on_hover_text(format!("{}{waits}", mode.tip()))
-                .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Pull));
+                .on_disabled_hover_text(&off_why);
         crate::repo::ghost::offer(&pull, || crate::repo::ghost::GhostOp::Pull(mode));
         if pull.clicked() {
             acts.push(Action::Pull);
@@ -178,6 +183,7 @@ impl RepoTab {
         );
         if icons::tool_button(ui, "arrow-down-up", "Sync", has_remote)
             .on_hover_text(sync_tip)
+            .on_disabled_hover_text(&off_why)
             .clicked()
         {
             acts.push(Action::Sync);

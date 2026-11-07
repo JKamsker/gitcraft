@@ -47,6 +47,12 @@ impl RepoTab {
         }
         // A push asked to skip its hooks, this once (set only while that push starts).
         let ops = self.skip_hooks.push_steps(ops);
+        if let Some(why) = offline_refusal(&ops) {
+            if !quiet {
+                self.status = Some((format!("{label}: not started. {why}"), true));
+            }
+            return;
+        }
         self.busy_op = Some(label.to_owned());
         self.op_started = Some(Instant::now());
         let control = self.follow_op(&ops, ctx);
@@ -244,6 +250,7 @@ impl RepoTab {
                     self.status = Some((format!("{label}: done"), false));
                 }
                 if label.contains("etch") {
+                    self.note_fetched();
                     self.load_prs(ctx);
                 }
                 self.locks_after_push(&label, ctx);
@@ -447,6 +454,47 @@ fn cancelled_message(path: &Path, ops: &[Vec<String>], before: &[std::path::Path
         );
     }
     msg
+}
+
+/// Why `ops` don't run now: one of them goes on the network, and offline mode is on.
+pub(super) fn offline_refusal(ops: &[Vec<String>]) -> Option<String> {
+    let pause = crate::network::refused()?;
+    let network = ops.iter().any(|op| reaches_a_remote(op));
+    network.then(|| {
+        format!(
+            "{}: turn it off in the toolbar or Settings → Git.",
+            pause.why()
+        )
+    })
+}
+
+/// Whether the git command `op` reaches a remote: fetch, pull, push, clone, `ls-remote`, the
+/// `remote` subcommands that ask it (`update`, `prune`, `show` without `-n`) and LFS's
+/// transfers. Not `remote add` / `rename` / `set-url` / `remove`, which only write the config,
+/// nor `submodule update`, which reaches one only when a commit is missing (and then says so).
+pub(super) fn reaches_a_remote(op: &[String]) -> bool {
+    let mut words = op.iter().map(String::as_str);
+    // Past the options before the subcommand (`-c x=y`).
+    let sub = loop {
+        match words.next() {
+            Some("-c" | "-C") => {
+                words.next();
+            }
+            Some(w) if w.starts_with('-') => {}
+            other => break other,
+        }
+    };
+    let rest: Vec<&str> = words.collect();
+    match sub {
+        Some("fetch" | "pull" | "push" | "clone" | "ls-remote") => true,
+        Some("remote") => match rest.first().copied() {
+            Some("update" | "prune") => true,
+            Some("show") => !rest.contains(&"-n"),
+            _ => false,
+        },
+        Some("lfs") => matches!(rest.first().copied(), Some("fetch" | "pull" | "push")),
+        _ => false,
+    }
 }
 
 /// [`run_steps_counted`] without where it stopped.
