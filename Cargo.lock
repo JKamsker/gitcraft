@@ -1642,6 +1642,7 @@ dependencies = [
  "two-face",
  "ureq 2.12.1",
  "vt100",
+ "winapi-util",
  "windows-sys 0.61.2",
  "winresource",
  "yaml-rust",

@@ -768,7 +768,41 @@ mod native_windows_ownership {
         assert!(std::fs::rename(&borrower, f.0.join("replacement-root")).is_err());
         assert!(std::fs::remove_file(&alt).is_err());
         assert!(std::fs::OpenOptions::new().write(true).open(&alt).is_err());
+        assert!(std::fs::hard_link(&alt, f.0.join("new-alternate-alias")).is_err());
         drop(plan);
+        Ok(())
+    }
+    #[test]
+    fn native_hardlinked_alternates_refuse_without_changing_either_clone() -> Result<(), String> {
+        let f = Fixture::new()?;
+        let (donor, borrower) = f.borrowing()?;
+        let second = f.0.join("second borrower");
+        Fixture::git(
+            &f.0,
+            &[
+                "clone",
+                "--shared",
+                "--",
+                donor.to_str().ok_or("donor path")?,
+                second.to_str().ok_or("second clone path")?,
+            ],
+        )?;
+        let alt = borrower.join(".git/objects/info/alternates");
+        let other = second.join(".git/objects/info/alternates");
+        let expected = std::fs::read(&alt).map_err(|e| e.to_string())?;
+        std::fs::remove_file(&other).map_err(|e| e.to_string())?;
+        std::fs::hard_link(&alt, &other).map_err(|e| e.to_string())?;
+        let data = inspect(&borrower, "HEAD", &|| true)?;
+        assert!(data.independence.is_none());
+        assert!(data.notes.iter().any(|note| note.contains("multiple hard links")));
+        assert_eq!(std::fs::read(&alt).map_err(|e| e.to_string())?, expected);
+        assert_eq!(std::fs::read(&other).map_err(|e| e.to_string())?, expected);
+        for clone in [&borrower, &second] {
+            assert_eq!(
+                Fixture::git(clone, &["show", "HEAD:file ' $(touch ESCAPED).txt"] )?,
+                "borrowed bytes"
+            );
+        }
         Ok(())
     }
     #[test]

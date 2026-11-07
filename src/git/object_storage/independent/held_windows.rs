@@ -79,6 +79,20 @@ fn write(file: &File, bytes: &[u8]) -> Result<(), String> {
     file.set_len(bytes.len() as u64).map_err(err)?;
     file.sync_all().map_err(err)
 }
+fn unshared_alternate(file: &File) -> Result<(), String> {
+    // Query the actual exclusively held file. No DELETE sharing also prevents another
+    // handle acquiring the DELETE access needed to add/remove a hard link meanwhile.
+    if winapi_util::file::information(file)
+        .map_err(err)?
+        .number_of_links()
+        != 1
+    {
+        return Err(err(
+            "the alternate file has multiple hard links; clearing it could change another clone's borrowing. Replace this clone's alternate with a separate regular file using Git before preparing independence",
+        ));
+    }
+    Ok(())
+}
 #[derive(Debug)]
 struct Node {
     file: Arc<File>,
@@ -136,6 +150,7 @@ impl Ownership {
             Self::hold(&mut nodes, &directory)?;
         }
         let alternate = Arc::new(open(&objects.join("info/alternates"), false, true)?);
+        unshared_alternate(&alternate)?;
         if read(&alternate, 64 * 1024)? != expected {
             return Err(err("alternate bytes changed during capture"));
         }
@@ -172,6 +187,7 @@ impl Ownership {
                 return Err(err("a held ancestor is unavailable or changed"));
             }
         }
+        unshared_alternate(&self.alternate)?;
         let actual = read(&self.alternate, 64 * 1024)?;
         if (present && actual != self.expected) || (!present && !actual.is_empty()) {
             return Err(err("the exclusively held alternate changed"));

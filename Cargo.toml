@@ -44,6 +44,8 @@ rustix = { version = "1", features = ["fs", "process"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
+# Safe held-handle link-count queries; this version is already in the dependency graph.
+winapi-util = "0.1"
 
 [lints.rust]
 # Denied everywhere; the one exception, asking Windows where an open file really is
