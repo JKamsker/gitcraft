@@ -160,7 +160,11 @@ impl RepoTab {
             response.request_focus();
             state.focus_requested = false;
         }
-        if response.has_focus() {
+        if response.has_focus()
+            && !state.focus_requested
+            && !self.keys_blocked
+            && self.dialog.is_none()
+        {
             state.pane = Some(pane);
         }
         drop(state);
