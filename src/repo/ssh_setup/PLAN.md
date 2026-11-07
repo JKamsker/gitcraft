@@ -61,3 +61,8 @@ shell utilities, owned fake SSH/forge tools and owned loopback endpoints are exe
 new runtime tests. No actual ssh-keygen/ssh-add/ssh transport/forge action is executed.
 The direct diagnostic intentionally bypasses user aliases/proxies; use the actual server
 and port. A missing agent is explained rather than automatically launching a daemon.
+
+The interactive SSH transport sets -a explicitly: a Host ForwardAgent setting must
+not load a newly generated remote private key into this computer's forwarded agent.
+The agent step requires an agent available on the repository machine. WSL retains
+its configured agent (including an explicitly user-configured integration).

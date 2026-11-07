@@ -350,7 +350,7 @@ impl State {
         if ui.button("2. Add selected key to agent…").clicked() {
             self.prepare_command(ui.ctx(), Step::Agent);
         }
-        ui.label("An agent must already be available on that machine; gitcraft does not start a daemon or alter its global SSH configuration. Windows uses its OpenSSH agent, WSL its Linux agent. An SSH-forwarded agent remains the agent chosen by your session.");
+        ui.label("An agent must already be available on that machine; gitcraft does not start a daemon or alter its global SSH configuration. Windows uses its OpenSSH agent and WSL its configured agent. SSH setup connections disable forwarding of this computer's agent; have an agent available on the repository machine.");
         ui.separator();
         let old = (self.forge, self.host.clone(), self.account_name.clone());
         ui.horizontal(|ui| {

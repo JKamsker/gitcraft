@@ -93,6 +93,7 @@ impl Machine {
                     program: "ssh".into(),
                     args: vec![
                         "-t".into(),
+                        "-a".into(),
                         "--".into(),
                         crate::remote::ssh_destination(host),
                         launch,
@@ -333,8 +334,8 @@ mod tests {
         let invocation = agent(&machine, key)?;
         assert_eq!(invocation.shell.program, "ssh");
         assert_eq!(
-            &invocation.shell.args[..3],
-            &["-t", "--", "ssh://work@build:2222"]
+            &invocation.shell.args[..4],
+            &["-t", "-a", "--", "ssh://work@build:2222"]
         );
         let (_, payload) = invocation.shell.args[3]
             .rsplit_once(' ')

@@ -371,7 +371,9 @@ Glossary tips stay out of the way while typing, scrolling or dragging.
     through its installed `gh` or `tea` and its own named login. Local tokens/private keys are
     not copied there. Remote Forgejo/Gitea upload needs tea0.16+ and shows the login metadata
     for confirmation. Native Windows uses OpenSSH/ConPTY and its agent; WSL uses its Linux
-    tools/agent. An agent must already be available; no daemon/global SSH configuration is changed.
+    tools/agent. SSH setup disables local-agent forwarding so a remote key is not loaded into
+    this computer's forwarded agent. An agent must already be available on the indicated machine;
+    no daemon/global SSH configuration is changed.
   - The direct SSH test uses only the selected key, ignoring additive identities/agent keys
     and user SSH aliases/proxy settings. Enter the real destination and port. Host-key checks
     remain enabled; review any new-host fingerprint. Read the server greeting as well as the
