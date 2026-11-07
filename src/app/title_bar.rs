@@ -84,6 +84,59 @@ pub(super) fn apply(ctx: &egui::Context, settings: &Settings, decorated: &mut bo
     }
 }
 
+/// Windows 11 draws a light line one pixel wide around every window. Under the system's title
+/// bar it goes unnoticed; along the tab strip it reads as an edge of the first tab, so it is
+/// taken away while the tabs are in the title bar (the window's shadow still sets it apart).
+/// `shown` is what was last asked of Windows.
+pub(super) fn sync_border(
+    window: &impl raw_window_handle::HasWindowHandle,
+    settings: &Settings,
+    shown: &mut Option<bool>,
+) {
+    let want = !wanted(settings);
+    if *shown != Some(want) {
+        *shown = Some(want);
+        set_window_border(window, want);
+    }
+}
+
+/// Gives the window Windows' own border, or none (`DWMWA_BORDER_COLOR`). Windows before 11
+/// draw no such border and refuse the attribute, which leaves them as they are.
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn set_window_border(window: &impl raw_window_handle::HasWindowHandle, shown: bool) {
+    use raw_window_handle::RawWindowHandle;
+    use windows_sys::Win32::Graphics::Dwm::{
+        DWMWA_BORDER_COLOR, DWMWA_COLOR_DEFAULT, DWMWA_COLOR_NONE, DwmSetWindowAttribute,
+    };
+    let Ok(handle) = window.window_handle() else {
+        return;
+    };
+    let RawWindowHandle::Win32(win32) = handle.as_raw() else {
+        return;
+    };
+    let color: u32 = if shown {
+        DWMWA_COLOR_DEFAULT
+    } else {
+        DWMWA_COLOR_NONE
+    };
+    // SAFETY: `win32.hwnd` is this app's window, alive while `handle` borrows it for this
+    // call. `color` is a u32 on the stack that outlives the call, and its exact size is
+    // passed; Windows only reads it. A failure is an error code, left alone: the border just
+    // stays.
+    let _ = unsafe {
+        DwmSetWindowAttribute(
+            win32.hwnd.get() as _,
+            DWMWA_BORDER_COLOR as u32,
+            std::ptr::from_ref(&color).cast(),
+            size_of::<u32>() as u32,
+        )
+    };
+}
+
+#[cfg(not(windows))]
+fn set_window_border(_window: &impl raw_window_handle::HasWindowHandle, _shown: bool) {}
+
 /// Window state the title bar is drawn by.
 #[derive(Clone, Copy)]
 struct WindowState {

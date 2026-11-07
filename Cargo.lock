@@ -1633,6 +1633,7 @@ dependencies = [
  "open",
  "portable-pty",
  "pulldown-cmark",
+ "raw-window-handle",
  "rfd",
  "ron",
  "rustix 1.1.6",

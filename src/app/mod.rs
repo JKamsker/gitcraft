@@ -125,6 +125,8 @@ pub struct App {
     tab_drag: Option<TabDrag>,
     /// The window has the system's title bar (see `title_bar`).
     decorated: bool,
+    /// Windows' border was last asked shown (true) or hidden (see `title_bar::sync_border`).
+    window_border: Option<bool>,
 }
 
 impl App {
@@ -168,6 +170,7 @@ impl App {
             closed: Vec::new(),
             tab_drag: None,
             decorated: title_bar::decorated_now(),
+            window_border: None,
             error: None,
             was_focused: true,
             clone_form: None,
@@ -463,7 +466,7 @@ impl App {
 }
 
 impl eframe::App for App {
-    fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         let t = Tokens::get(&ctx);
         // Column widths dragged in a graph header live in the context; keep them for saving.
@@ -471,6 +474,7 @@ impl eframe::App for App {
         // A theme file being edited, VS Code's theme switched: shown as they change.
         theme::poll(&ctx);
         title_bar::apply(&ctx, &self.settings, &mut self.decorated);
+        title_bar::sync_border(frame, &self.settings, &mut self.window_border);
 
         // eframe shows the window after the first frame; maximize it on the next one.
         if MAXIMIZE_WHEN_SHOWN.load(Ordering::Relaxed) {
@@ -526,7 +530,9 @@ impl eframe::App for App {
                 egui::Frame::new()
                     .fill(t.tab_strip)
                     .inner_margin(egui::Margin {
-                        left: 6,
+                        // The first tab starts at the window's edge: a gap before it shows as a
+                        // dark band beside it when it is the active one.
+                        left: 0,
                         right: strip_right,
                         top: 0,
                         bottom: 0,
