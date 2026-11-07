@@ -237,7 +237,7 @@ fn search_inner(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<R
         report.notes.push(diagnostics.chars().take(1000).collect());
     }
     let mut commits = BTreeSet::new();
-    let mut unreachable = BTreeSet::new();
+    let mut unreachable = BTreeSet::<String>::new();
     let mut blobs: BTreeMap<String, Vec<Provenance>> = BTreeMap::new();
     for line in std::str::from_utf8(&fsck.stdout)
         .map_err(|_| "Invalid object scan output")?
