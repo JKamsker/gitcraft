@@ -449,7 +449,26 @@ impl Tokens {
             self.diff_del_bg
         };
         let [r, g, b, _] = fill.to_srgba_unmultiplied();
-        Color32::from_rgb(r, g, b).gamma_multiply(0.35)
+        let hue = Color32::from_rgb(r, g, b);
+        let backgrounds: Vec<_> = [self.field, self.card]
+            .into_iter()
+            .flat_map(|surface| {
+                let line = palette::over(fill, surface);
+                [line, palette::over(self.accent.gamma_multiply(0.22), line)]
+            })
+            .collect();
+        // A bright status foreground must never become a bright text background.
+        // Reduce the independent tint when an opaque fill would obscure plain text.
+        for alpha in (0..=89).rev() {
+            let tint = hue.gamma_multiply(alpha as f32 / 255.0);
+            if backgrounds
+                .iter()
+                .all(|bg| palette::contrast(self.text, palette::over(tint, *bg)) >= 4.5)
+            {
+                return tint;
+            }
+        }
+        Color32::TRANSPARENT
     }
 
     /// Tint behind small status text, capped so the composited row still meets AA.

@@ -48,11 +48,6 @@ impl Builtin {
         ] {
             text_surfaces.push(bg);
             text_surfaces.push(over(t.accent.gamma_multiply(0.22), bg));
-            for added in [true, false] {
-                let strong = t.diff_strong_bg(added);
-                text_surfaces.push(over(strong, bg));
-                text_surfaces.push(over(strong, over(t.accent.gamma_multiply(0.22), bg)));
-            }
         }
         p.text = aa_foreground(p.text, &text_surfaces);
         // Pressed controls use normal or dim labels. Faint metadata belongs to rows/panels;
