@@ -1,0 +1,8 @@
+{
+  "status": "DIAGNOSTIC FIXTURE ASSERTION FAILED",
+  "source": "8a2d30ad70503e0ff444decef6f86e231d5641aa",
+  "cause": "Actual native update HEAD emits only real refs/heads/main update to reference-transaction hook, no separate HEAD reflog-only line. Diagnostic incorrectly required two lines; its own hook vetoed transaction before mutation.",
+  "production_unchanged": true,
+  "state_unchanged": true,
+  "next": "Correct diagnostic-only hook expected stdin to exact real branch line, retaining before/after symbolic HEAD checks, then re-prove native lock behavior."
+}
