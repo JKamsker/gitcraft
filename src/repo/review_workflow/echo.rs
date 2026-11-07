@@ -144,17 +144,28 @@ fn check_patch(patch: &str, book: &Book) -> Result<Vec<Hit>, String> {
     let mut path = String::new();
     let mut line = 0;
     let mut hits = vec![];
+    let mut in_hunk = false;
     for text in patch.lines() {
-        if let Some(p) = text.strip_prefix("+++ b/") {
-            path = p.to_owned();
+        if text.starts_with("diff --git ") {
+            in_hunk = false;
+            path.clear();
+            continue;
+        }
+        if !in_hunk && let Some(p) = text.strip_prefix("+++ ") {
+            let decoded = git::unquote_path(p);
+            path = decoded.strip_prefix("b/").unwrap_or(&decoded).to_owned();
             continue;
         }
         if text.starts_with("@@ ") {
+            in_hunk = true;
             line = text
                 .split_whitespace()
                 .nth(2)
                 .and_then(|n| n.trim_start_matches('+').split(',').next()?.parse().ok())
                 .unwrap_or(0);
+            continue;
+        }
+        if !in_hunk {
             continue;
         }
         if let Some(added) = text.strip_prefix('+') {
@@ -177,7 +188,7 @@ fn check_patch(patch: &str, book: &Book) -> Result<Vec<Hit>, String> {
     Ok(hits)
 }
 fn outgoing(repo: &Path, book: &Book, steps: &[Vec<String>]) -> Result<Vec<Hit>, String> {
-    if !book.enabled {
+    if !book.enabled || !book.rules.iter().any(|r| r.enabled) {
         return Ok(vec![]);
     }
     let mut hits = vec![];
@@ -485,6 +496,18 @@ mod tests {
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].line, 1);
         assert_eq!(hits[0].path, "handler.rs");
+        let disguised = check_patch(
+            "diff --git a/real.rs b/real.rs\n--- a/real.rs\n+++ b/real.rs\n@@ -0,0 +1 @@\n+++ b/fake.unwrap()\ndiff --git a/next.rs b/next.rs\n--- a/next.rs\n+++ b/next.rs\n@@ -0,0 +1 @@\n+next.unwrap()",
+            &book,
+        )?;
+        assert_eq!(disguised.len(), 2);
+        assert_eq!(disguised[0].path, "real.rs");
+        assert_eq!(disguised[1].path, "next.rs");
+        let quoted = check_patch(
+            "+++ \"b/quoted\\tname.rs\"\n@@ -0,0 +1 @@\n+x.unwrap()",
+            &book,
+        )?;
+        assert_eq!(quoted[0].path, "quoted\tname.rs");
         let mut forged = book.clone();
         forged.rules[0].source = "https://invented".into();
         assert!(check_patch("", &forged).is_err());

@@ -517,6 +517,7 @@ impl RepoTab {
             let request = v.storyboard.request;
             v.storyboard.rows = None;
             let number = d.number;
+            let pr_request = self.pr_requests;
             self.then_or(
                 ctx,
                 true,
@@ -539,6 +540,9 @@ impl RepoTab {
                     }
                 },
                 move |tab, result, _| {
+                    if tab.pr_requests != pr_request {
+                        return;
+                    }
                     if let Some(v) = tab
                         .pr_view
                         .as_mut()
@@ -589,6 +593,7 @@ impl RepoTab {
         if mutation {
             v.storyboard.rows = None;
         }
+        let pr_request = self.pr_requests;
         self.then_or(
             ctx,
             mutation,
@@ -625,6 +630,9 @@ impl RepoTab {
                 read(&path, &d, &f)
             },
             move |tab, result, _| {
+                if tab.pr_requests != pr_request {
+                    return;
+                }
                 if let Some(v) = tab
                     .pr_view
                     .as_mut()

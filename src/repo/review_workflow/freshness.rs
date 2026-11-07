@@ -193,12 +193,16 @@ impl RepoTab {
         v.freshness.request = request;
         v.freshness.rows = None;
         let number = v.number;
+        let pr_request = self.pr_requests;
         self.then_or(
             ctx,
             false,
             Err,
             move || rows(&path, &d, &f),
             move |tab, result, _| {
+                if tab.pr_requests != pr_request {
+                    return;
+                }
                 if let Some(v) = tab
                     .pr_view
                     .as_mut()

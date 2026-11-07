@@ -160,7 +160,8 @@ pub(super) fn sources(repo: &Path, steps: &[Vec<String>]) -> Result<Vec<(String,
                     | "--dry-run"
                     | "-n"
                     | "--force-with-lease" => {}
-                    w if w.starts_with("--force-with-lease=") => {}
+                    w if w.starts_with("--force-with-lease=")
+                        || w.starts_with("--push-option=") => {}
                     _ => {
                         return Err(format!(
                             "Reviewer echo cannot infer push option {word}; review this operation explicitly"
@@ -288,6 +289,14 @@ pub(super) fn sources(repo: &Path, steps: &[Vec<String>]) -> Result<Vec<(String,
                 .ok_or_else(|| format!("Push source {src} has no inspectable commit tree"))?;
             let base = if src == "HEAD" && dst == "HEAD" {
                 commit(repo, "@{upstream}")
+            } else if let Some(review_branch) = dst.strip_prefix("refs/for/") {
+                commit(
+                    repo,
+                    &format!(
+                        "refs/remotes/{remote}/{}",
+                        review_branch.split('%').next().unwrap_or(review_branch)
+                    ),
+                )
             } else if !dst.starts_with("refs/") || dst.starts_with("refs/heads/") {
                 commit(
                     repo,
