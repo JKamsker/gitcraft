@@ -45,15 +45,23 @@ impl Preferences {
             .retain(|name, band| name.len() <= 1024 && *band < 4);
         prefs
     }
-    fn band(&self, full: &str) -> usize {
+    fn band(&self, full: &str, remotes: &[String]) -> usize {
         if let Some(band) = self.pins.get(full) {
             return *band;
         }
         let short = full
             .strip_prefix("refs/heads/")
             .or_else(|| {
-                full.strip_prefix("refs/remotes/")
-                    .and_then(|s| s.split_once('/').map(|(_, n)| n))
+                full.strip_prefix("refs/remotes/").and_then(|s| {
+                    remotes
+                        .iter()
+                        .filter_map(|remote| {
+                            s.strip_prefix(&format!("{remote}/"))
+                                .map(|short| (remote.len(), short))
+                        })
+                        .max_by_key(|(len, _)| *len)
+                        .map(|(_, short)| short)
+                })
             })
             .unwrap_or(full);
         if matches!(short, "main" | "master" | "trunk") {
@@ -87,19 +95,36 @@ impl Preferences {
                     .map(|b| (format!("refs/remotes/{}", b.name), b.target.as_str())),
             )
             .collect();
-        branches.sort_by_key(|(name, _)| (self.band(name), name.clone()));
-        let mut hints = HashMap::new();
-        for (name, mut at) in branches {
-            let band = self.band(&name);
-            // FNV-1a is explicitly stable across processes and Rust versions.
-            let colour = name.bytes().fold(2166136261u32, |h, b| {
+        let remotes: Vec<_> = refs.remotes.iter().map(|(name, _)| name.clone()).collect();
+        branches.sort_by_key(|(name, _)| (self.band(name, &remotes), name.clone()));
+        let colour = |name: &str| {
+            name.bytes().fold(2166136261u32, |h, b| {
                 (h ^ u32::from(b)).wrapping_mul(16777619)
-            }) as usize;
+            }) as usize
+        };
+        // Reserve every real ref tip first: a newly added descendant branch must not
+        // recolour an existing branch's unchanged tip or its first-parent ancestry.
+        let mut hints = HashMap::new();
+        for (name, tip) in &branches {
+            hints.entry((*tip).to_owned()).or_insert(LaneHint {
+                band: self.band(name, &remotes),
+                colour: colour(name),
+            });
+        }
+        for (name, mut at) in branches {
+            let hint = LaneHint {
+                band: self.band(&name, &remotes),
+                colour: colour(&name),
+            };
+            let mut first = true;
             while let Some(commit) = index.get(at) {
-                if hints.contains_key(at) {
-                    break;
+                if let Some(existing) = hints.get(at) {
+                    if !first || existing.band != hint.band || existing.colour != hint.colour {
+                        break;
+                    }
                 }
-                hints.insert(at.to_owned(), LaneHint { band, colour });
+                hints.insert(at.to_owned(), hint);
+                first = false;
                 let Some(parent) = commit.parents.first() else {
                     break;
                 };
@@ -116,6 +141,57 @@ impl Preferences {
     }
 }
 impl RepoTab {
+    pub(super) fn queue_branch_bands(&mut self, force: bool) {
+        self.band_dirty = false;
+        if !force && self.branch_bands.model == Model::Compact && self.branch_bands.pins.is_empty()
+        {
+            self.band_reader.cancel();
+            self.band_context=None;
+            return;
+        }
+        let prefs = self.branch_bands.clone();
+        let commits = self.commits.clone();
+        let refs = self.refs.clone();
+        self.band_context = Some(crate::connections::current());
+        self.band_reader.queue(move |active| {
+            if !active() {
+                return Err("Band layout cancelled".into());
+            }
+            let hints = prefs.hints(&commits, &refs);
+            if !active() {
+                return Err("Band layout cancelled".into());
+            }
+            let graph = crate::graph::layout_banded(&commits, &hints);
+            if !active() {
+                return Err("Band layout cancelled".into());
+            }
+            let labels = super::graph_view::readability::labels(&commits, &graph, &refs);
+            if !active() {
+                return Err("Band layout cancelled".into());
+            }
+            Ok((graph, labels))
+        });
+    }
+    pub(super) fn poll_branch_bands(&mut self, ctx: &egui::Context) {
+        if !self.shown {self.band_reader.cancel();self.band_dirty=true;return;}
+        if self.band_context.as_ref().is_some_and(|owner|owner!=&crate::connections::current()) {
+            self.band_reader.cancel();self.band_context=None;self.band_dirty=true;
+        }
+        if self.band_dirty {
+            self.queue_branch_bands(false);
+        }
+        if let Some(result) = self.band_reader.poll(ctx) {
+            match result {
+                Ok((graph, labels)) => {
+                    self.graph = graph;
+                    self.graph_labels = labels;
+                    self.saved_views.dirty = true;
+                    self.history_minimap.dirty = true;
+                }
+                Err(error) => self.status = Some((error, true)),
+            }
+        }
+    }
     pub(super) fn branch_bands_header(&mut self, ui: &mut egui::Ui) {
         let mut changed = false;
         ui.menu_button("Graph tools…", |ui| {
@@ -181,13 +257,7 @@ impl RepoTab {
         if changed {
             ui.ctx()
                 .data_mut(|d| d.insert_persisted(id(self.repo_key()), self.branch_bands.clone()));
-            self.graph = crate::graph::layout_banded(
-                &self.commits,
-                &self.branch_bands.hints(&self.commits, &self.refs),
-            );
-            self.rebuild_graph_labels();
-            self.history_minimap.dirty = true;
-            self.saved_views.dirty = true;
+            self.queue_branch_bands(true);
         }
     }
 }
@@ -196,6 +266,39 @@ impl RepoTab {
 mod tests {
     use super::*;
     use crate::git::Branch;
+    #[test]
+    fn real_tips_reserve_ancestry_colour_and_slash_remote_main_remains_trunk() {
+        let c = |hash: &str, parents: &[&str]| {
+            Arc::new(Commit {
+                hash: hash.into(),
+                parents: parents.iter().map(|p| (*p).into()).collect(),
+                ..Default::default()
+            })
+        };
+        let branch = |name: &str, target: &str| Branch {
+            name: name.into(),
+            target: target.into(),
+            is_head: false,
+            upstream: String::new(),
+            track: String::new(),
+        };
+        let commits = vec![c("a", &["z"]), c("z", &["base"]), c("base", &[])];
+        let mut refs = Refs {
+            local: vec![branch("feature/z", "z")],
+            ..Default::default()
+        };
+        let prefs = Preferences {
+            model: Model::Trunk,
+            ..Default::default()
+        };
+        let before = prefs.hints(&commits, &refs);
+        refs.local.push(branch("feature/a", "a"));
+        let after = prefs.hints(&commits, &refs);
+        assert_eq!(before["z"].colour, after["z"].colour);
+        assert_eq!(before["base"].colour, after["base"].colour);
+        refs.remotes = vec![("my/fork".into(), vec![branch("my/fork/main", "base")])];
+        assert_eq!(prefs.hints(&commits, &refs)["base"].band, 0);
+    }
     #[test]
     fn a_newer_feature_tip_joins_the_older_trunk_in_the_trunk_band() {
         let c = |hash: &str, parents: &[&str]| {

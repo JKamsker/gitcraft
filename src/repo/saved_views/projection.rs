@@ -13,7 +13,7 @@ pub(in crate::repo) enum Row {
 }
 #[derive(Default)]
 pub(super) struct Projection {
-    pub rows: Vec<Row>,
+    pub rows: std::sync::Arc<[Row]>,
 }
 impl Projection {
     pub fn build(
@@ -99,7 +99,7 @@ impl Projection {
                 gap += 1;
             }
         }
-        Self { rows }
+        Self { rows: rows.into() }
     }
     pub fn position(&self, raw: usize) -> Option<usize> {
         self.rows.iter().position(|r| match r {

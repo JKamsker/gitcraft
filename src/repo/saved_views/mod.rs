@@ -89,6 +89,9 @@ impl State {
     pub fn len(&self) -> usize {
         self.projection.rows.len()
     }
+    pub fn snapshot(&self) -> Option<std::sync::Arc<[Row]>> {
+        self.active().then(|| self.projection.rows.clone())
+    }
     pub fn row(&self, i: usize) -> Option<&Row> {
         self.projection.rows.get(i)
     }

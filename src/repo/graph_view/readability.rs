@@ -16,28 +16,37 @@ pub(super) struct Viewport {
     pub labels: HashMap<usize, String>,
 }
 
+pub(in crate::repo) fn labels(
+    commits: &[std::sync::Arc<crate::git::Commit>],
+    graph: &crate::graph::Graph,
+    refs: &crate::git::Refs,
+) -> HashMap<usize, String> {
+    let mut labels = HashMap::new();
+    for (i, commit) in commits.iter().enumerate() {
+        if commit.refs.is_empty() {
+            continue;
+        }
+        let Some(row) = graph.rows.get(i) else {
+            continue;
+        };
+        if let Some(badge) = badges(&commit.refs, refs)
+            .into_iter()
+            .find(|b| b.kind == BadgeKind::Branch || b.kind == BadgeKind::DetachedHead)
+        {
+            let name = if badge.kind == BadgeKind::DetachedHead {
+                "detached".to_owned()
+            } else {
+                badge.git_ref()
+            };
+            labels.entry(row.origin).or_insert(name);
+        }
+    }
+    labels
+}
+
 impl RepoTab {
     pub(in crate::repo) fn rebuild_graph_labels(&mut self) {
-        self.graph_labels.clear();
-        for (i, commit) in self.commits.iter().enumerate() {
-            if commit.refs.is_empty() {
-                continue;
-            }
-            let Some(row) = self.graph.rows.get(i) else {
-                continue;
-            };
-            if let Some(badge) = badges(&commit.refs, &self.refs)
-                .into_iter()
-                .find(|b| b.kind == BadgeKind::Branch || b.kind == BadgeKind::DetachedHead)
-            {
-                let name = if badge.kind == BadgeKind::DetachedHead {
-                    "detached".to_owned()
-                } else {
-                    badge.git_ref()
-                };
-                self.graph_labels.entry(row.origin).or_insert(name);
-            }
-        }
+        self.graph_labels = labels(&self.commits, &self.graph, &self.refs);
     }
 
     pub(super) fn readable_viewport(

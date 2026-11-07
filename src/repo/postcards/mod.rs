@@ -152,6 +152,8 @@ impl RepoTab {
         if !self.shown || !self.postcards.open || profile_changed {
             self.postcards.reader.cancel();
             self.postcards.context = None;
+            self.postcards.commits = None;
+            self.postcards.preview = None;
             if !self.shown {
                 self.postcards.open = false;
             }
@@ -305,6 +307,27 @@ impl RepoTab {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn closing_discards_owned_disclosures_before_a_later_profile_reopens() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/postcard-closed-owner".into(), &ctx);
+        tab.postcards.commits = Some(vec![Commit {
+            author: "Old private contributor".into(),
+            ..Default::default()
+        }]);
+        tab.postcards.context = Some(crate::connections::current());
+        tab.postcards.open = false;
+        tab.poll_postcards(&ctx);
+        assert!(tab.postcards.commits.is_none());
+        assert!(tab.postcards.preview.is_none());
+        tab.postcards.open = true;
+        crate::connections::Context {
+            error: Some("New profile".into()),
+            ..Default::default()
+        }
+        .run(|| tab.poll_postcards(&ctx));
+        assert!(tab.postcards.commits.is_none());
+    }
     #[test]
     fn profile_change_cancels_a_queued_read_and_discards_prior_disclosures() {
         let ctx = egui::Context::default();

@@ -224,6 +224,7 @@ impl RepoTab {
     fn poll_as(&mut self, ctx: &egui::Context, shown: bool) {
         self.shown = shown;
         if !shown {
+            self.cancel_minimap();
             self.discard_decrypted();
         }
         // Changes on disk, debounced. Taken in before the finished work, so that a reload
@@ -247,6 +248,7 @@ impl RepoTab {
         self.sync_draft_reader();
         self.poll_content_recovery(ctx);
         self.poll_saved_views(ctx);
+        self.poll_branch_bands(ctx);
         self.poll_postcards(ctx);
         if !shown {
             return;

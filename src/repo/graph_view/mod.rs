@@ -9,7 +9,7 @@ mod menu;
 pub(super) mod message_tooltip;
 pub(in crate::repo) mod minimap;
 mod pills;
-mod readability;
+pub(in crate::repo) mod readability;
 #[cfg(test)]
 mod readability_tests;
 mod row;

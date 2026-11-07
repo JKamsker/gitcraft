@@ -19,6 +19,7 @@ pub(in crate::repo) struct State {
     rows: usize,
     pub offset: Option<f32>,
     drag_anchor: f32,
+    reader: crate::repo::saved_views::reader::Reader<Model>,
 }
 impl Default for State {
     fn default() -> Self {
@@ -28,6 +29,7 @@ impl Default for State {
             rows: 0,
             offset: None,
             drag_anchor: 0.0,
+            reader: Default::default(),
         }
     }
 }
@@ -38,71 +40,87 @@ fn offset_at(fraction: f32, rows: usize, viewport: f32, anchor: f32) -> f32 {
     (fraction.clamp(0.0, 1.0) * rows as f32 * ROW_PITCH - anchor)
         .clamp(0.0, (rows as f32 * ROW_PITCH - viewport).max(0.0))
 }
-impl RepoTab {
-    fn prepare_minimap(&mut self) {
-        if !self.history_minimap.dirty {
-            return;
+struct Model {
+    bins: Vec<Bin>,
+    rows: usize,
+}
+fn build(
+    commits: &[std::sync::Arc<crate::git::Commit>],
+    graph: &crate::graph::Graph,
+    projection: Option<&[saved_views::Row]>,
+    head: &str,
+    matches: &std::collections::HashSet<String>,
+    active: &dyn Fn() -> bool,
+) -> Result<Model, String> {
+    let rows = projection.map_or(commits.len(), |rows| rows.len());
+    let mut bins = vec![Bin::default(); rows.min(BINS)];
+    for projected in 0..rows {
+        if !active() {
+            return Err("Minimap analysis cancelled".into());
         }
-        let filtered = self.saved_views.active();
-        let rows = if filtered {
-            self.saved_views.len()
-        } else {
-            self.commits.len()
+        let (raw, span) = match projection.and_then(|rows| rows.get(projected)) {
+            Some(saved_views::Row::Commit(raw)) => (*raw, None),
+            Some(saved_views::Row::Gap { range, .. }) => (range.start, Some(range.clone())),
+            None => (projected, None),
         };
-        let mut bins = vec![Bin::default(); rows.min(BINS)];
-        for projected in 0..rows {
-            let (raw, gap) = if filtered {
-                match self.saved_views.row(projected) {
-                    Some(saved_views::Row::Commit(raw)) => (*raw, false),
-                    Some(saved_views::Row::Gap { range, .. }) => (range.start, true),
-                    None => continue,
-                }
-            } else {
-                (projected, false)
-            };
-            let Some(c) = self.commits.get(raw) else {
-                continue;
-            };
-            let Some(g) = self.graph.rows.get(raw) else {
-                continue;
-            };
-            let bin = &mut bins[bin_for(projected, rows, rows.min(BINS))];
-            for col in std::iter::once(&g.col)
-                .chain(&g.through)
-                .chain(&g.incoming)
-                .chain(&g.outgoing)
-            {
-                if *col < LANES {
-                    bin.lanes |= 1 << col;
-                }
+        let Some(g) = graph.rows.get(raw) else {
+            continue;
+        };
+        let bin = &mut bins[bin_for(projected, rows, rows.min(BINS))];
+        for col in std::iter::once(&g.col)
+            .chain(&g.through)
+            .chain(&g.incoming)
+            .chain(&g.outgoing)
+        {
+            if *col < LANES {
+                bin.lanes |= 1 << col;
             }
-            bin.gap |= gap;
-            bin.head |= c.hash == self.refs.head;
+        }
+        bin.gap |= span.is_some();
+        for c in &commits[span.unwrap_or(raw..raw + 1)] {
+            bin.head |= c.hash == head;
             bin.tag |= c
                 .refs
                 .iter()
                 .any(|r| r.starts_with("tag: ") || r.starts_with("refs/tags/"));
-            bin.hit |= self.search.matches.contains(&c.hash);
-            if gap
-                && let Some(saved_views::Row::Gap { range, .. }) = self.saved_views.row(projected)
-            {
-                // A collapsed span can contain a tag, HEAD or a search hit; keep its marker at the connector.
-                for c in &self.commits[range.clone()] {
-                    bin.head |= c.hash == self.refs.head;
-                    bin.tag |= c
-                        .refs
-                        .iter()
-                        .any(|r| r.starts_with("tag: ") || r.starts_with("refs/tags/"));
-                    bin.hit |= self.search.matches.contains(&c.hash);
-                }
-            }
+            bin.hit |= matches.contains(&c.hash);
         }
-        self.history_minimap.bins = bins;
-        self.history_minimap.rows = rows;
-        self.history_minimap.dirty = false;
+    }
+    Ok(Model { bins, rows })
+}
+impl RepoTab {
+    fn prepare_minimap(&mut self, ctx: &egui::Context) {
+        if self.history_minimap.dirty {
+            let commits = self.commits.clone();
+            let graph = self.graph.clone();
+            let projection = self.saved_views.snapshot();
+            let head = self.refs.head.clone();
+            let matches = self.search.matches.clone();
+            self.history_minimap.bins.clear();
+            self.history_minimap.rows = 0;
+            self.history_minimap.reader.queue(move |active| {
+                build(
+                    &commits,
+                    &graph,
+                    projection.as_deref(),
+                    &head,
+                    &matches,
+                    active,
+                )
+            });
+            self.history_minimap.dirty = false;
+        }
+        if let Some(Ok(model)) = self.history_minimap.reader.poll(ctx) {
+            self.history_minimap.bins = model.bins;
+            self.history_minimap.rows = model.rows;
+        }
+    }
+    pub(in crate::repo) fn cancel_minimap(&mut self) {
+        self.history_minimap.reader.cancel();
+        self.history_minimap.dirty = true;
     }
     pub(super) fn history_minimap(&mut self, ui: &mut Ui, rect: Rect, offset: f32, viewport: f32) {
-        self.prepare_minimap();
+        self.prepare_minimap(ui.ctx());
         let t = Tokens::get(ui.ctx());
         let response = ui.interact(
             rect,
@@ -262,7 +280,21 @@ mod tests {
         tab.search.matches.insert(tab.commits[70].hash.clone());
         tab.selected = Some(0);
         tab.has_more = true;
-        tab.prepare_minimap();
+        let model = build(
+            &tab.commits,
+            &tab.graph,
+            None,
+            &tab.refs.head,
+            &tab.search.matches,
+            &|| true,
+        )
+        .unwrap_or_else(|_| Model {
+            bins: Vec::new(),
+            rows: 0,
+        });
+        tab.history_minimap.bins = model.bins;
+        tab.history_minimap.rows = model.rows;
+        tab.history_minimap.dirty = false;
         assert!(tab.history_minimap.bins[20].head);
         assert!(tab.history_minimap.bins[50].tag);
         assert!(tab.history_minimap.bins[70].hit);

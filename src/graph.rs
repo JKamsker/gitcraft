@@ -27,8 +27,9 @@ pub struct Row {
     pub outgoing: Vec<usize>,
 }
 
+#[derive(Clone)]
 pub struct Graph {
-    pub rows: Vec<Row>,
+    pub rows: std::sync::Arc<[Row]>,
     /// Widest the graph gets, in lanes.
     pub width: usize,
 }
@@ -158,7 +159,10 @@ pub fn layout_banded<C: Borrow<Commit>>(commits: &[C], hints: &HashMap<String, L
         }
         width = bands.len();
     }
-    Graph { rows, width }
+    Graph {
+        rows: rows.into(),
+        width,
+    }
 }
 
 fn band_lane(lanes: &mut Vec<Option<&str>>, bands: &mut Vec<usize>, band: usize) -> usize {
