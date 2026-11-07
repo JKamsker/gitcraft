@@ -1,0 +1,14 @@
+{
+  "candidate": "60cb5790cd478a0b1811ee4a705fd758a0b61a14",
+  "tree": "d3d84bab0be9c730b9290cea40bf81e2f5135efb",
+  "base": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+  "status": "STATIC CORRECTION INSPECTED; FOCUSED LOCAL CHECK PLANNED",
+  "scope": "Re-review SOPS-CORRECTNESS-1, explicit format choice lifetime, ciphertext staging and three file-comparison pane transitions. No CI access; no security scan or new Cargo compilation.",
+  "source_and_log_binding": {"source_files": 28, "source_hash_mismatches": 0, "author_logs": 6, "log_hash_mismatches": 0, "author_full": "839 passed, 3 ignored, 0 filtered; 842 registered", "author_targeted": "21 passed; actual generated-key offline SOPS fixture ran", "author_inert": "11 passed", "author_fmt_and_strict_clippy": "PASS"},
+  "binary": "/workspace/work/encrypted-diffs/target/debug/deps/gitcraft-98b7c97eceab1e2d",
+  "binary_sha256": "c9a1433e889c7bc037adc00f5f204e1c31225db510dfe9654e8882392ff999c7",
+  "binding_limit": "Checked private author compile log/source hashes and frozen binary are reused read-only. No independent compile claim.",
+  "fixture_inspection": "Read changed tests before execution: only existing owned local children, disposable Git repos, env_clear/private HOME+XDG generated age keys, explicit official SOPS3.10.0/age1.2.1 executables, no user keys or live hosts. Added real cases cover data42 arbitrary names, staged cross-extension rename, binary UTF8 .json, NUL/nonUTF8 refusal and escaped-NUL JSON refusal.",
+  "plan": ["Independently list frozen binary and confirm 842 registered/21 SOPS tests", "Run only repo::diff::encrypted::tests with one thread and explicit fixture tool paths; unset optional SSH/WSL variables", "Retain logs/hash and final correction verdict; commit/push/verify before switching to static Preflight review"],
+  "limits": ["No new Cargo", "No CI", "No live SSH/WSL or Windows", "Final combined candidate review remains separate"]
+}
