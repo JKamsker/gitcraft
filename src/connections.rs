@@ -65,6 +65,61 @@ impl Account {
     }
 }
 
+/// Public provider selection plus local authentication location; never a token container.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(default)]
+pub(crate) struct CloudAccount {
+    /// Azure organization URL, or https://bitbucket.org.
+    pub server: String,
+    /// Expected Azure unique name/ID or Bitbucket account ID/UUID/nickname.
+    pub user: String,
+    /// Optional public credential-store username (for example an Atlassian email).
+    pub credential_user: String,
+    /// Verified public subject ID, never an access token.
+    pub subject: String,
+    /// Optional local Azure CLI directory. Bitbucket uses the local Git credential store.
+    pub config_dir: String,
+}
+impl CloudAccount {
+    pub fn selected(&self) -> bool {
+        !self.user.trim().is_empty()
+    }
+    pub fn validate(&self, service: crate::forge::CloudService) -> Result<(), String> {
+        if !self.selected() {
+            if !self.config_dir.is_empty() || !self.credential_user.is_empty() {
+                return Err(
+                    "Choose the expected provider account before its local authentication settings"
+                        .into(),
+                );
+            }
+            return Ok(());
+        }
+        service.server(&self.server)?;
+        for text in [&self.user, &self.credential_user, &self.subject] {
+            if text.len() > 256 || text.chars().any(|c| c.is_control() || c.is_whitespace()) {
+                return Err(
+                    "Choose a public account name or ID without spaces or control characters"
+                        .into(),
+                );
+            }
+        }
+        if self.user.starts_with('-') || self.credential_user.starts_with('-') {
+            return Err("An account name cannot be an option".into());
+        }
+        if !self.config_dir.is_empty()
+            && (!Path::new(&self.config_dir).is_absolute()
+                || self.config_dir.chars().any(char::is_control))
+        {
+            return Err("The Azure CLI configuration folder must be a local absolute path".into());
+        }
+        match service {
+            crate::forge::CloudService::Azure if !self.credential_user.is_empty() => Err("Azure uses its CLI account; no credential-store username is needed".into()),
+            crate::forge::CloudService::Bitbucket if !self.config_dir.is_empty() => Err("Bitbucket uses Git's local credential store; an Azure CLI folder cannot be applied".into()),
+            _ => Ok(()),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(default)]
 pub(crate) struct Choices {
@@ -74,6 +129,8 @@ pub(crate) struct Choices {
     pub tea_login: String,
     /// HTTPS host for the selected tea alias; metadata only, never its token.
     pub tea_host: String,
+    pub azure: CloudAccount,
+    pub bitbucket: CloudAccount,
 }
 
 impl Default for Choices {
@@ -84,6 +141,8 @@ impl Default for Choices {
             gitlab: Account::on("gitlab.com"),
             tea_login: String::new(),
             tea_host: String::new(),
+            azure: CloudAccount::default(),
+            bitbucket: CloudAccount::default(),
         }
     }
 }
@@ -92,6 +151,9 @@ impl Choices {
     pub fn validate(&self) -> Result<(), String> {
         self.github.validate()?;
         self.gitlab.validate()?;
+        self.azure.validate(crate::forge::CloudService::Azure)?;
+        self.bitbucket
+            .validate(crate::forge::CloudService::Bitbucket)?;
         if !self.tea_login.is_empty() {
             Account {
                 host: self.tea_host.clone(),

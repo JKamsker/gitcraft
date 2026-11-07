@@ -8,7 +8,9 @@
 //!   credential helper) already has for the host. See [`gitea`].
 
 mod cli;
+mod cloud;
 pub(crate) use cli::tool_location;
+pub(crate) use cloud::{Service as CloudService, check_connection as check_cloud_connection};
 mod gitea;
 pub(crate) use gitea::{selected_tea_metadata, selected_tea_secret};
 mod github;

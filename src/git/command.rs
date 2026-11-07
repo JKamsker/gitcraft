@@ -592,6 +592,31 @@ pub fn stored_credentials(url: &str) -> Option<Credentials> {
     parse_credentials(&String::from_utf8_lossy(&out.stdout))
 }
 
+/// Bounded, noninteractive provider credential lookup. Secrets and helper diagnostics
+/// never become UI errors; the provider still verifies the returned account owner.
+pub(crate) fn provider_credentials(url: &str) -> Result<super::Credentials, String> {
+    if url.contains(['\n', '\r', '\0']) {
+        return Err("Invalid provider credential URL".into());
+    }
+    let mut cmd = git_cmd();
+    with_profile(&mut cmd, &["credential", "fill"])?;
+    unattended(&mut cmd);
+    cmd.args(["credential", "fill"]).env("GCM_INTERACTIVE", "never");
+    let out = crate::bounded_process::run_input(
+        cmd,
+        Some(format!("url={url}\n\n").into_bytes()),
+        &|| true,
+        std::time::Duration::from_secs(30),
+        65536,
+        65536,
+    ).map_err(|_| "Could not read the selected provider credential store")?;
+    if !out.status.success() {
+        return Err("No credential for the selected provider was available without prompting".into());
+    }
+    let text = std::str::from_utf8(&out.stdout).map_err(|_| "The credential store returned invalid data")?;
+    parse_credentials(text).ok_or("The credential store did not return a username and password".into())
+}
+
 /// The name and password in what `git credential fill` prints.
 fn parse_credentials(out: &str) -> Option<Credentials> {
     let field = |name: &str| {

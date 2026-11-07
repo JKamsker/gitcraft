@@ -13,14 +13,17 @@ use serde_json::Value;
 pub(super) enum Login {
     /// An access token (`tea`'s, or one in the environment).
     Token(String),
+    /// An Azure DevOps access token; never serialized into profiles or setup exports.
+    Bearer(String),
     /// A name and a password or token, from git's credential helper.
     Basic { user: String, password: String },
 }
 
 impl Login {
-    fn header(&self) -> String {
+    pub(super) fn header(&self) -> String {
         match self {
             Login::Token(token) => format!("token {token}"),
+            Login::Bearer(token) => format!("Bearer {token}"),
             Login::Basic { user, password } => {
                 format!("Basic {}", BASE64.encode(format!("{user}:{password}")))
             }
@@ -236,7 +239,7 @@ impl Api {
 }
 
 /// `builder` going through the proxy the environment sets for `web`, as git and curl pick it.
-fn with_proxy(builder: ureq::AgentBuilder, web: &str) -> ureq::AgentBuilder {
+pub(super) fn with_proxy(builder: ureq::AgentBuilder, web: &str) -> ureq::AgentBuilder {
     let proxy = proxy_for(web, |name| {
         std::env::var(name).ok().filter(|v| !v.is_empty())
     });
