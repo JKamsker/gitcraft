@@ -1,0 +1,173 @@
+{
+  "candidate": "87e5ae9f93f3a852691a2a65915b8c6f34dc58c7",
+  "tree": "eead53b58de102be5bd6550c798c33cc2ab450ac",
+  "previous_pr_head": "a51f9f9a590a5a6f046303b183728dcdac07a7cb",
+  "created_utc": "2026-11-07T19:34:13.597301+00:00",
+  "failure": {
+    "run": "https://github.com/JKamsker/gitcraft/actions/runs/42404282740",
+    "head": "a51f9f9a590a5a6f046303b183728dcdac07a7cb",
+    "shard_job": "https://github.com/JKamsker/gitcraft/actions/runs/42404282740/job/128499784626",
+    "aggregate_job": "https://github.com/JKamsker/gitcraft/actions/runs/42404282740/job/128504816380",
+    "observed": "repo-a-c timed out after20minutes with263tests passed,1ignored and opening_on_a_finished_bisect_keeps_the_selection still running. No assertion failure. Aggregate failed because shard failed; build succeeded.",
+    "limits": "Captured logs do not identify which call blocked and do not establish the exact Windows root cause."
+  },
+  "change": {
+    "path": "src/repo/bisect/tests.rs",
+    "response": "Use existing bisect_run_args builtin eval instead of launching external sh from PATH, matching the application. Apply existing60second command deadline to both fixture setup calls, with command-specific error context. Preserve real Git execution, culprit and selection assertions. No skips, retries, workflow or production changes.",
+    "reason": "External sh need not be Git for Windows own shell; unlike production this fixture depended on PATH shell resolution. Deadline prevents the two fixture commands waiting unbounded."
+  },
+  "review": {
+    "candidate": "87e5ae9f93f3a852691a2a65915b8c6f34dc58c7",
+    "result": "PASS",
+    "reviewer": "independent adversarial review agent /root/review_codex_integration",
+    "verbatim": "PASS \u2014 87e5ae9f93f3a852691a2a65915b8c6f34dc58c7. The test retains its culprit and selection assertions, uses the application\u2019s existing bisect command helper, and adds bounded setup calls with useful diagnostics. No production or process-control code changed. The Windows hang\u2019s root cause and fix remain unproven pending Windows execution. Read-only review; no tests or CI executed."
+  },
+  "validation": {
+    "build": "cargo +1.95.0 test --locked --all-targets --no-run: PASS",
+    "parallel_shard": {
+      "command": "target/debug/deps/gitcraft-a471af9e9f6bcb96 --test-threads=4 repo::a repo::b repo::c --skip git::",
+      "passed": 273,
+      "failed": 0,
+      "ignored": 1,
+      "filtered": 2853,
+      "seconds": 39.33,
+      "platform": "macOS arm64; this is the same substring partition, not a native Windows execution claim."
+    },
+    "shell_probe": {
+      "result": "PASS",
+      "positive_control": "Temporary PATH sh wrapper writes a marker and exits126; direct sh invocation confirms interception.",
+      "experiment": "Exact completed-bisect fixture passes in0.43s with the same PATH and never invokes that external sh.",
+      "scope": "POSIX portability experiment; does not prove native Windows runtime behavior."
+    },
+    "fmt": "cargo +1.95.0 fmt --all -- --check: PASS",
+    "clippy": "cargo +1.95.0 clippy --locked --all-targets -- -D warnings -A dead_code: PASS; documented six existing macOS dead-code warnings allowed.",
+    "environment": {
+      "TMPDIR": "/private/tmp",
+      "SHELL": "/tmp/gitcraft-integration-tools/validation-shell",
+      "PATH_prefix": "/tmp/gitcraft-integration-tools",
+      "rust": "1.95.0"
+    },
+    "full_suite_binding": {
+      "executed_on_this_candidate": false,
+      "production_full_candidate": "f65685c3683e0cbf145b25f7df231d402d7309cd",
+      "passed": 3127,
+      "failed": 0,
+      "ignored": 9,
+      "record": "docs/validation/pr164-polish-2026-11-07.json",
+      "scope": "Prior full production suite retained; only ignored benchmark setup and the completed-bisect test fixture differ in application/test sources. No full run relabeled as this candidate."
+    },
+    "binary_sha256": "3282a16be3a97a3b8440a5ef00fa403861e3b3e8a3f28a643becb1777bfa424a"
+  },
+  "limits": [
+    "Fresh native Windows CI must confirm whether the hang is fixed; no local Windows claim.",
+    "No GitHub CI rerun dispatched; final PR push triggers fresh CI."
+  ],
+  "documentation_binding": {
+    "application_candidate": "87e5ae9f93f3a852691a2a65915b8c6f34dc58c7",
+    "scope": "Delivery adds only report and immutable logs/record; application/crates/manifests/lockfile/tests/workflows checked unchanged from candidate."
+  },
+  "logs": {
+    "windows-shard": {
+      "sha256": "1f876b802a5b33099be3f44e724cfc8018859e7fef8b3bc68f96198f8e3bf257",
+      "bytes": 67973,
+      "tail": [
+        "Windows tests (repo-a-c)\tPost Run actions/checkout@v4\t2026-11-07T19:28:14.3027638Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader",
+        "Windows tests (repo-a-c)\tPost Run actions/checkout@v4\t2026-11-07T19:28:14.3266742Z http.https://github.com/.extraheader",
+        "Windows tests (repo-a-c)\tPost Run actions/checkout@v4\t2026-11-07T19:28:14.3303607Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" config --local --unset-all http.https://github.com/.extraheader",
+        "Windows tests (repo-a-c)\tPost Run actions/checkout@v4\t2026-11-07T19:28:14.3586772Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" submodule foreach --recursive \"sh -c \\\"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\\\"\"",
+        "Windows tests (repo-a-c)\tPost Run actions/checkout@v4\t2026-11-07T19:28:14.8087914Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" config --local --name-only --get-regexp ^includeIf\\.gitdir:",
+        "Windows tests (repo-a-c)\tPost Run actions/checkout@v4\t2026-11-07T19:28:14.8366407Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" submodule foreach --recursive \"git config --local --show-origin --name-only --get-regexp remote.origin.url\"",
+        "Windows tests (repo-a-c)\tComplete job\t\ufeff2026-11-07T19:28:15.3025932Z Cleaning up orphan processes",
+        "Windows tests (repo-a-c)\tComplete job\t2026-11-07T19:28:15.3164656Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/download-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+      ]
+    },
+    "windows-aggregate": {
+      "sha256": "4d83449fbb7555dcfa226622a449967f45ce25794e181f74057a56603c6b9bd1",
+      "bytes": 4122,
+      "tail": [
+        "test (windows-latest)\tRequire the Windows build and every shard to pass\t2026-11-07T19:28:20.7131142Z shell: /usr/bin/bash -e {0}",
+        "test (windows-latest)\tRequire the Windows build and every shard to pass\t2026-11-07T19:28:20.7132741Z env:",
+        "test (windows-latest)\tRequire the Windows build and every shard to pass\t2026-11-07T19:28:20.7133584Z   CARGO_TERM_COLOR: always",
+        "test (windows-latest)\tRequire the Windows build and every shard to pass\t2026-11-07T19:28:20.7134575Z   BUILD_RESULT: success",
+        "test (windows-latest)\tRequire the Windows build and every shard to pass\t2026-11-07T19:28:20.7135713Z   TESTS_RESULT: failure",
+        "test (windows-latest)\tRequire the Windows build and every shard to pass\t2026-11-07T19:28:20.7136580Z ##[endgroup]",
+        "test (windows-latest)\tRequire the Windows build and every shard to pass\t2026-11-07T19:28:20.7398014Z ##[error]Process completed with exit code 1.",
+        "test (windows-latest)\tComplete job\t\ufeff2026-11-07T19:28:20.7574494Z Cleaning up orphan processes"
+      ]
+    },
+    "build": {
+      "sha256": "8ad7af15e55138323254fb8a9253a110986ff6cbec1b657e219a32fa272fa72c",
+      "bytes": 2251,
+      "tail": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.75s",
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft-a471af9e9f6bcb96)",
+        "  Executable unittests src/main.rs (target/debug/deps/gitcraft-9f329e5678eb4039)",
+        "  Executable tests/checkpoint_cli.rs (target/debug/deps/checkpoint_cli-e41eeca633127291)",
+        "  Executable tests/mcp_stdio.rs (target/debug/deps/mcp_stdio-ba2fc8f743f21693)",
+        "  Executable unittests examples/image_memory.rs (target/debug/examples/image_memory-7172267f85bc6305)",
+        "  Executable unittests examples/ui_shot.rs (target/debug/examples/ui_shot-32635cd1a722a925)",
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft_os-f792e6e5c14eb1c3)"
+      ]
+    },
+    "parallel-shard": {
+      "sha256": "2c08977780c5e306cfb2261a375e327d15a8333db34b68f78c772657ae555be8",
+      "bytes": 22993,
+      "tail": [
+        "test repo::custom_commands::tests::a_repositorys_commands_wait_for_trust_and_are_asked_again_once_changed ... ok",
+        "test repo::custom_commands::tests::a_terminal_command_opens_a_terminal_of_its_own ... ok",
+        "test repo::custom_commands::tests::a_toast_command_runs_in_the_background_and_shows_its_output ... ok",
+        "test repo::custom_commands::tests::an_older_read_of_the_file_does_not_replace_a_newer_one ... ok",
+        "test repo::custom_commands::tests::global_commands_go_to_the_menu_they_name ... ok",
+        "",
+        "test result: ok. 273 passed; 0 failed; 1 ignored; 0 measured; 2853 filtered out; finished in 39.33s",
+        ""
+      ]
+    },
+    "shell-probe": {
+      "sha256": "7c337badc70326871261f3d227a428232adfaabc8a2240dd359553f87f2e6639",
+      "bytes": 325,
+      "tail": [
+        "Positive control: external PATH sh is intercepted and exits 126",
+        "",
+        "running 1 test",
+        "test repo::bisect::tests::opening_on_a_finished_bisect_keeps_the_selection ... ok",
+        "",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3126 filtered out; finished in 0.43s",
+        "",
+        "PASS: finished-bisect fixture succeeds without external PATH sh"
+      ]
+    },
+    "shell-probe-script": {
+      "sha256": "5ffb0fe178b84a83fa7a14d7a2c33be1b00e3b10217c8a5c0e5618d178cac5b1",
+      "bytes": 1174,
+      "tail": [
+        " env=os.environ.copy();env.update(TMPDIR=\"/private/tmp\",SHELL=\"/tmp/gitcraft-integration-tools/validation-shell\",PATH=str(root)+\":/tmp/gitcraft-integration-tools:\"+env[\"PATH\"],GITCRAFT_BISECT_SH_PROBE=str(marker))",
+        " control=subprocess.run([\"sh\",\"-c\",\"exit 0\"],env=env,capture_output=True)",
+        " assert control.returncode==126 and marker.read_text()==\"external sh\\n\"",
+        " marker.unlink();print(\"Positive control: external PATH sh is intercepted and exits 126\",flush=True)",
+        " result=subprocess.run([str(binary),\"repo::bisect::tests::opening_on_a_finished_bisect_keeps_the_selection\",\"--exact\",\"--nocapture\"],env=env)",
+        " assert result.returncode==0",
+        " assert not marker.exists(),\"fixture launched the external PATH sh\"",
+        " print(\"PASS: finished-bisect fixture succeeds without external PATH sh\",flush=True)"
+      ]
+    },
+    "fmt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "tail": []
+    },
+    "clippy": {
+      "sha256": "61283f6b00de0d45eea40edddad1456d48e27d865dc0b593c897f9f782c3a32e",
+      "bytes": 151,
+      "tail": [
+        "    Checking gitcraft v0.3.4 (/Users/jonas/.t3/worktrees/gitcraft/t3-bde8f5ba)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.68s"
+      ]
+    }
+  },
+  "durable_logs": {
+    "path": "docs/validation/pr164-bisect-2026-11-07-tests.log.gz",
+    "sha256": "b772f2c89057369e8fba95de5d074c44dd93e7e7dde2d968874eaf0d6af44a40",
+    "uncompressed_sha256": "a3f8a006de238ef5819505117904eb7cc7a8ce6f177b9d467a917963321626bf"
+  }
+}
