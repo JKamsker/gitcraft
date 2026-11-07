@@ -597,7 +597,13 @@ fi
     if case == "native-prelock-switch" {
         run(
             &f.repo,
-            &["symbolic-ref", "HEAD", "refs/heads/other"],
+            &[
+                "-c",
+                "core.hooksPath=",
+                "symbolic-ref",
+                "HEAD",
+                "refs/heads/other",
+            ],
             b"",
             None,
         )?;
