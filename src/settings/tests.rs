@@ -266,6 +266,7 @@ fn every_preview_and_page_draws() {
                         update: UpdateCheck::NotYet,
                         check_updates_now: false,
                         previous: None,
+                        previous_is_newer: false,
                         pinned: String::new(),
                         go_back: false,
                         unpin: false,
@@ -276,6 +277,8 @@ fn every_preview_and_page_draws() {
             }
         }
     }
+}
+
 #[test]
 fn going_back_and_unpinning_show_only_when_they_can_be_done() {
     assert!(found("go back").is_empty());
