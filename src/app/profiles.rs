@@ -147,6 +147,10 @@ impl App {
         else {
             return false;
         };
+        if next.pending_setup() {
+            self.error=Some("This imported profile is pending. Open Import setup → Finish profile setup to select local keys and verify its expected accounts.".into());
+            return false;
+        }
         if id == self.settings.active_profile {
             return true;
         }
@@ -364,4 +368,46 @@ fn author_line(p: &settings::UserProfile) -> String {
         (true, false) => format!(" · <{email}>"),
         (false, false) => format!(" · {name} <{email}>"),
     }
+}
+
+/// Keep a saved pending profile parked, including its tabs. Never reopen it under a
+/// default personal identity merely because its old credentials are absent here.
+pub(super) fn resume_ready_profile(saved: &mut super::Saved) {
+    saved.settings.ensure_profile();
+    if !saved.settings.profile().pending_setup() {
+        return;
+    }
+    let old = saved.settings.active_profile;
+    saved.profile_states.insert(
+        old,
+        ProfileState {
+            open: std::mem::take(&mut saved.open),
+            active: saved.active,
+            recent: std::mem::take(&mut saved.recent),
+            theme: saved.theme.clone(),
+        },
+    );
+    let next = saved
+        .settings
+        .user_profiles
+        .iter()
+        .find(|p| !p.pending_setup())
+        .map(|p| p.id)
+        .unwrap_or_else(|| {
+            let id = (0..=saved.settings.user_profiles.len() as u64)
+                .find(|id| saved.settings.user_profiles.iter().all(|p| p.id != *id))
+                .unwrap_or(0);
+            saved.settings.user_profiles.push(settings::UserProfile {
+                id,
+                name: "Local setup".into(),
+                ..Default::default()
+            });
+            id
+        });
+    saved.settings.active_profile = next;
+    let state = saved.profile_states.remove(&next).unwrap_or_default();
+    saved.open = state.open;
+    saved.active = state.active;
+    saved.recent = state.recent;
+    saved.theme = state.theme;
 }

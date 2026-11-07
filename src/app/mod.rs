@@ -134,10 +134,11 @@ impl App {
         crate::remote::mark_ui_thread();
         // ssh's questions (passwords, new host keys) come to this window.
         crate::remote::askpass::set_repaint(cc.egui_ctx.clone());
-        let saved: Saved = cc
+        let mut saved: Saved = cc
             .storage
             .and_then(|s| eframe::get_value(s, eframe::APP_KEY))
             .unwrap_or_default();
+        profiles::resume_ready_profile(&mut saved);
         let ctx = &cc.egui_ctx;
         egui_extras::install_image_loaders(ctx);
         crate::image_fit::install(ctx);

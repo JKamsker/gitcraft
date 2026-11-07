@@ -135,6 +135,12 @@ impl Api {
         endpoint: &str,
         payload: Option<&Value>,
     ) -> Result<Value, Failure> {
+        if let Some(message) = crate::connections::current().error {
+            return Err(Failure {
+                status: None,
+                message,
+            });
+        }
         let url = format!("{}/{}", self.base, endpoint.trim_start_matches('/'));
         let mut request = self
             .agent

@@ -224,6 +224,9 @@ fn login_key(web: &str) -> String {
 }
 
 fn find_login(web: &str) -> Option<Login> {
+    if crate::connections::current().error.is_some() {
+        return None;
+    }
     let Ok(mut found) = found_logins().lock() else {
         return None;
     };

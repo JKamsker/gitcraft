@@ -55,6 +55,10 @@ impl Default for UserProfile {
 
 impl UserProfile {
     /// Whether it sets anything in git's config.
+    pub fn pending_setup(&self) -> bool {
+        self.pending_setup.as_ref().is_some_and(|p| p.pending())
+    }
+
     pub fn sets_git(&self) -> bool {
         !self.author_name.trim().is_empty()
             || !self.author_email.trim().is_empty()
@@ -275,6 +279,15 @@ pub fn apply(profile: &UserProfile) {
         choices: profile.connections.clone(),
         ..Default::default()
     };
+    if profile.pending_setup() {
+        let message =
+            "This imported profile needs fresh local account/key setup before use".to_owned();
+        context.choices = Default::default();
+        context.error = Some(message.clone());
+        *lock(&ERROR) = Some(message);
+        crate::connections::set(context);
+        return;
+    }
     let result = profile.connections.validate().and_then(|_| {
         if profile.sets_git() && std::env::current_exe().is_err() {
             return Err("Could not locate gitcraft's connection helpers".to_owned());

@@ -122,7 +122,10 @@ impl PublicProfile {
         p.signing.format = self.signing_format.clone();
         p.signing.sign_commits = self.sign_commits;
         p.signing.sign_tags = self.sign_tags;
-        p.pending_setup = self.setup.pending().then(|| self.setup.clone());
+        let mut setup = self.setup.clone();
+        setup.signing_key_reselection_required |=
+            self.own_signing && (self.sign_commits || self.sign_tags);
+        p.pending_setup = setup.pending().then_some(setup);
         p
     }
 }
@@ -262,7 +265,11 @@ impl Setup {
             if p.setup.accounts.len() > 3 {
                 return Err("Too many account expectations".into());
             }
+            let mut providers = std::collections::BTreeSet::new();
             for a in &p.setup.accounts {
+                if !providers.insert(format!("{:?}", a.provider)) {
+                    return Err("Duplicate provider expectation".into());
+                }
                 text(&a.user_or_alias, 256)?;
                 host(&a.host)?;
                 if a.user_or_alias.is_empty() {
