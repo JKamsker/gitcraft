@@ -400,6 +400,7 @@ impl RepoTab {
             Action::Fork(act) => self.fork_act(act, ctx),
             Action::Release(act) => self.release_act(act, ctx),
             Action::Hotfix(act) => self.hotfix_act(act, ctx),
+            Action::Package(act) => self.package_act(act, ctx),
         }
     }
 

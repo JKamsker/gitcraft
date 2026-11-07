@@ -670,6 +670,15 @@ so your config, credentials and hooks apply as usual.
   a new branch; the branch itself doesn't move. If a later commit no longer applies, it stops
   there and names the conflicted files: resolve them in that worktree, or discard the attempt.
   Undo deletes the new branch.
+- _What a package will publish_ (from the palette, Ctrl+P) lists the files
+  `cargo package --list` or `npm pack --dry-run --ignore-scripts` would ship for each crate of
+  the repository's Cargo workspace and its top `package.json`, run where the repository is
+  (here, in WSL or over SSH). It flags what looks shipped by accident (`.env`, keys, logs, build
+  output, editor folders, a crate's files git doesn't track, big files), what is left out that a package
+  usually wants (the README and licence, a crate's `src/` files, the files the manifest names:
+  `readme`, `main`, `bin`…), and, asked of the registry once the files are listed, the files new
+  or gone since the version on crates.io or npm (not compared for a package published to
+  another registry). Refresh reads it again after a change.
 
 **Diffs and conflicts** (centre)
 
@@ -1399,6 +1408,8 @@ was made this way, on a demo repository.
 | `src/update.rs`          | new-release check                                                                  |
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |
 | `src/shell_path.rs`      | on macOS, the login shell's PATH for the commands gitcraft starts                  |
+| `src/package/` | what a crate or npm package will publish: the tool's listing, what looks wrong, the registry's version |
+| `src/repo/package/` | the panel that shows it |
 | `src/remote/` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
 | `src/agent/` | coding agents: the worktree setup recipe, the agent tasks, the terminal script that runs them |
 | `src/repo/agents/` | the AGENTS section and the agent task and setup recipe dialogs |

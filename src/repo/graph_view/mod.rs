@@ -131,7 +131,7 @@ impl RepoTab {
         let rows_id = ui.id().with("graph-rows");
         let keys_free =
             !ui.ctx().egui_wants_keyboard_input() || crate::a11y::list_has_focus(ui.ctx(), rows_id);
-        if !ghost && keys_free && self.dialog.is_none() && !self.stacks.modal_open() && !self.keys_blocked {
+        if !ghost && keys_free && self.dialog.is_none() && self.package.is_none() && !self.stacks.modal_open() && !self.keys_blocked {
             let ringed = ui.data(|d| d.get_temp::<usize>(rows_id));
             self.arrow_keys(ui, ringed, acts);
         }

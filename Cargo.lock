@@ -1690,6 +1690,7 @@ dependencies = [
  "egui_extras",
  "egui_kittest",
  "gitcraft-os",
+ "flate2",
  "image",
  "keyring",
  "md5",

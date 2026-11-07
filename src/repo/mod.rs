@@ -74,6 +74,7 @@ mod palette;
 mod partial_stash;
 mod parallel_bisect;
 mod owners;
+mod package;
 mod patches;
 mod pinned_sections;
 pub(crate) mod popout;
@@ -288,6 +289,8 @@ pub struct RepoTab {
     release: Option<release::ReleaseView>,
     /// The hotfix flow: the dialog that finishes one, and the push after it.
     hotfix: hotfix::Hotfix,
+    /// The panel of what a package will publish, while open.
+    package: Option<package::PackageView>,
     /// The selected commit's message, being edited in the right pane.
     reword: Option<Reword>,
     /// Push and Sync: the push running, Sync's push waiting for its pull, the banner after a
@@ -559,6 +562,7 @@ impl RepoTab {
             stacks: Default::default(),
             release: None,
             hotfix: hotfix::Hotfix::default(),
+            package: None,
             reword: None,
             push_flow: Default::default(),
             credentials: None,

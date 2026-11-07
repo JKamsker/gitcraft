@@ -36,6 +36,7 @@ mod parallel_bisect;
 mod network;
 mod os_shell;
 mod nautilus_scripts;
+mod package;
 mod pr_post;
 mod pr_threads;
 mod pull_request;

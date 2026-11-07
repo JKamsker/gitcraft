@@ -15,7 +15,7 @@ pub(crate) use cli::{ToolReport, tool_report};
 mod gitea;
 mod github;
 mod gitlab;
-mod http;
+pub(crate) mod http;
 pub mod links;
 pub mod inbox;
 pub mod stack;

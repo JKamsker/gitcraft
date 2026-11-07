@@ -171,6 +171,7 @@ impl RepoTab {
         self.bakeoff_dialog(&ctx, &mut acts);
         self.release_dialog(&ctx, &mut acts);
         self.hotfix_dialog(&ctx, &mut acts);
+        self.package_panel(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
         }
@@ -221,7 +222,7 @@ impl RepoTab {
     /// None of them while a dialog, a text field or the terminal has the keyboard.
     pub(super) fn shortcuts(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         let free_keys =
-            self.dialog.is_none() && self.release.is_none() && self.hotfix.finish.is_none() && self.agents.dialog.is_none() && self.bakeoff.picker.is_none() && !self.stacks.modal_open() && !self.issue_picker_open() && !self.keys_blocked && !crate::a11y::keyboard_taken(ctx);
+            self.dialog.is_none() && self.package.is_none() && self.release.is_none() && self.hotfix.finish.is_none() && self.agents.dialog.is_none() && self.bakeoff.picker.is_none() && !self.stacks.modal_open() && !self.issue_picker_open() && !self.keys_blocked && !crate::a11y::keyboard_taken(ctx);
         // Ctrl+F, Esc and the steps of the find bar, when a diff, file or blame is shown.
         self.find_keys(ctx, free_keys);
         if free_keys {

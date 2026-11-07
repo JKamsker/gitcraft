@@ -366,6 +366,8 @@ pub(crate) enum Action {
     Release(super::release::ReleaseAct),
     /// Starting or finishing a hotfix.
     Hotfix(super::hotfix::HotfixAct),
+    /// The panel of what a package will publish.
+    Package(super::package::PackageAct),
 }
 
 /// Compares two branches, given to git by their full refs (a tag of the same name is not
@@ -629,6 +631,11 @@ impl RepoTab {
                 "Worktree setup…".into(),
                 "agent".into(),
                 Action::Agent(super::agents::AgentAct::OpenRecipe),
+            ),
+            (
+                "What a package will publish".into(),
+                "cargo / npm".into(),
+                Action::Package(super::package::PackageAct::Open),
             ),
             (
                 reveal_label().into(),

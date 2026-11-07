@@ -332,6 +332,12 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Worktree setup… (palette) is a recipe that runs in every worktree gitcraft makes for the repository, for an agent or not: it copies or links files from the main worktree (.env.local, node_modules), sets variables (PORT=$((3000 + GITCRAFT_WORKTREE_INDEX)): the main worktree is 0, each other keeps the number it was given) and runs a setup command, in a terminal where its output shows. It runs with sh on the repository's machine, WSL and SSH included. A step that fails says so, and then neither the setup command nor the agent runs.",
         ],
     ),
+    (
+        "Packages",
+        &[
+            "What a package will publish (from the palette, Ctrl+P) lists the files cargo package --list or npm pack --dry-run --ignore-scripts would ship for each crate of the workspace and the top package.json, what looks shipped by accident (.env, keys, logs, build output), what a package usually wants and leaves out (its README, LICENSE, main file), and the files new or gone since the version on crates.io or npm.",
+        ],
+    ),
 ];
 
 /// The "Did you know" tips under the graph: features above, each said in one short line of its
