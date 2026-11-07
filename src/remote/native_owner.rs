@@ -422,11 +422,7 @@ fn helper() -> Result<i32, String> {
     };
     // A Service error is not acknowledged. A completed cancellation confirms the actual
     // anchored group/Job was stopped/reaped before a durable receipt is published.
-    if result
-        .stopped
-        .as_ref()
-        .is_some_and(|s| s.contains("unconfirmed"))
-    {
+    if result.stop_kind == Some(crate::processes::StopKind::Uncertain) {
         return Err("native cleanup unconfirmed".into());
     }
     let code = result.status.code().unwrap_or(125);

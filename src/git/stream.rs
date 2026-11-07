@@ -90,19 +90,25 @@ pub fn stream(
             Ok((which, bytes)) => {
                 if let Err(error) = feed(&mut pending[which], &bytes, &mut line) {
                     ticket.cancel();
-                    let _ = ticket.wait();
-                    return Err(error);
+                    return stream_completion(
+                        crate::processes::checked(ticket.wait()),
+                        stopper.stopped(),
+                        Some(error),
+                    );
                 }
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => {}
         }
         if let Some(result) = ticket.try_result() {
-            break result?;
+            break crate::processes::checked(result);
         }
     };
+    let mut content_error = None;
     while let Ok((which, bytes)) = received.try_recv() {
-        feed(&mut pending[which], &bytes, &mut line)?;
+        if content_error.is_none() {
+            content_error = feed(&mut pending[which], &bytes, &mut line).err();
+        }
     }
     for bytes in pending {
         if !bytes.is_empty() {
@@ -114,18 +120,47 @@ pub fn stream(
         }
     }
     if overflow.load(Ordering::Acquire) {
-        return Err("stream consumer exceeded the bounded output queue".into());
+        content_error
+            .get_or_insert_with(|| "stream consumer exceeded the bounded output queue".into());
     }
+    stream_completion(result, stopper.stopped(), content_error)
+}
+fn stream_completion(
+    result: Result<crate::processes::Output, crate::processes::Failure>,
+    stopped: bool,
+    content_error: Option<String>,
+) -> Result<Ended, String> {
+    let error = |message: String| match &content_error {
+        Some(content) => format!("{content}; {message}"),
+        None => message,
+    };
+    let result = match result {
+        Ok(result) => result,
+        Err(crate::processes::Failure::CancelledBeforeStart) if stopped => {
+            return match content_error {
+                Some(content) => Err(content),
+                None => Ok(Ended {
+                    code: None,
+                    stopped: true,
+                }),
+            };
+        }
+        Err(failure) => return Err(error(failure.message())),
+    };
     if let Some(reason) = result.stopped
-        && (!stopper.stopped() || reason.contains("unconfirmed"))
+        && !(stopped && result.stop_kind == Some(crate::processes::StopKind::Cancelled))
     {
-        return Err(reason);
+        return Err(error(reason));
+    }
+    if let Some(content) = content_error {
+        return Err(content);
     }
     Ok(Ended {
         code: result.status.code(),
-        stopped: stopper.stopped(),
+        stopped,
     })
 }
+
 fn feed(pending: &mut Vec<u8>, bytes: &[u8], line: &mut impl FnMut(String)) -> Result<(), String> {
     pending.extend_from_slice(bytes);
     while let Some(end) = pending.iter().position(|&b| b == b'\n') {
@@ -145,6 +180,39 @@ fn feed(pending: &mut Vec<u8>, bytes: &[u8], line: &mut impl FnMut(String)) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn recording_content_errors_preserve_terminal_uncertainty() {
+        use crate::processes::{Failure, StopKind, recording_output};
+        for content in [
+            "stream line exceeds 1 MiB",
+            "stream consumer exceeded the bounded output queue",
+        ] {
+            let error = stream_completion(
+                Ok(recording_output(Some(StopKind::Uncertain))),
+                true,
+                Some(content.into()),
+            )
+            .err()
+            .unwrap_or_default();
+            assert!(error.contains(content) && error.contains("cleanup proof missing"));
+            let error = stream_completion(
+                Err(Failure::Failed("could not finish owned process".into())),
+                true,
+                Some(content.into()),
+            )
+            .err()
+            .unwrap_or_default();
+            assert!(error.contains(content) && error.contains("could not finish owned process"));
+        }
+        assert!(
+            stream_completion(Ok(recording_output(Some(StopKind::Cancelled))), true, None)
+                .is_ok_and(|ended| ended.stopped)
+        );
+        assert!(
+            stream_completion(Err(Failure::CancelledBeforeStart), true, None)
+                .is_ok_and(|ended| ended.stopped)
+        );
+    }
 
     fn repo(name: &str) -> Result<std::path::PathBuf, String> {
         let dir =

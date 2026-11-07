@@ -141,12 +141,20 @@ fn unreachable_commits(repo: &Path, cancel: &Cancel) -> Result<Vec<String>, Stri
             said.push('\n');
         }
     });
-    cancel.check()?;
-    match result {
-        Ok(ended) if ended.code == Some(0) || !hashes.is_empty() => Ok(hashes),
-        Ok(ended) => Err(failed(&said, &format!("exit status: {:?}", ended.code))),
-        Err(e) => Err(e),
+    let ended = scan_completion(result, cancel)?;
+    if ended.code == Some(0) || !hashes.is_empty() {
+        Ok(hashes)
+    } else {
+        Err(failed(&said, &format!("exit status: {:?}", ended.code)))
     }
+}
+fn scan_completion(
+    result: Result<crate::git::stream::Ended, String>,
+    cancel: &Cancel,
+) -> Result<crate::git::stream::Ended, String> {
+    let ended = result?;
+    cancel.check()?;
+    Ok(ended)
 }
 
 /// What a failed fsck said, or how it ended when it said nothing.
@@ -211,6 +219,25 @@ fn parse_commit(record: &[&str; FIELDS]) -> Option<LostCommit> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn recording_cancel_does_not_replace_failed_cleanup() {
+        let cancel = Cancel::default();
+        cancel.cancel();
+        assert_eq!(
+            scan_completion(Err("native finish failed".into()), &cancel),
+            Err("native finish failed".into())
+        );
+        assert_eq!(
+            scan_completion(
+                Ok(crate::git::stream::Ended {
+                    code: None,
+                    stopped: true
+                }),
+                &cancel
+            ),
+            Err(CANCELLED.into())
+        );
+    }
 
     #[test]
     fn only_unreachable_commits_are_taken() {

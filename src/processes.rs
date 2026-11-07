@@ -85,6 +85,110 @@ pub(crate) struct Output {
     pub stderr: Vec<u8>,
     /// Partial output is retained on cancellation, timeout, I/O failure or overflow.
     pub stopped: Option<String>,
+    pub stop_kind: Option<StopKind>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum StopKind {
+    Cancelled,
+    TimedOut,
+    Failed,
+    Uncertain,
+}
+fn stop_kind(reason: Option<&str>, confirmed: bool) -> Option<StopKind> {
+    reason.map(|reason| {
+        if !confirmed {
+            StopKind::Uncertain
+        } else {
+            match reason {
+                "cancelled" => StopKind::Cancelled,
+                "process timed out and was stopped" => StopKind::TimedOut,
+                _ => StopKind::Failed,
+            }
+        }
+    })
+}
+#[cfg(test)]
+mod recording_outcomes {
+    use super::*;
+    #[test]
+    fn cancellation_requires_no_dispatch_or_confirmed_cleanup() {
+        assert!(matches!(
+            checked(Err("cancelled".into())),
+            Err(Failure::CancelledBeforeStart)
+        ));
+        assert!(matches!(
+            checked(Err("could not finish owned process".into())),
+            Err(Failure::Failed(_))
+        ));
+        assert!(matches!(
+            checked(Err(
+                "Process service stopped before returning a result".into()
+            )),
+            Err(Failure::Failed(_))
+        ));
+        assert_eq!(
+            stop_kind(Some("cancelled"), false),
+            Some(StopKind::Uncertain)
+        );
+        assert_eq!(
+            stop_kind(Some("cancelled"), true),
+            Some(StopKind::Cancelled)
+        );
+        assert_eq!(
+            stop_kind(Some("output delivery incomplete"), false),
+            Some(StopKind::Uncertain)
+        );
+    }
+}
+#[derive(Debug)]
+pub(crate) enum Failure {
+    CancelledBeforeStart,
+    Failed(String),
+}
+impl Failure {
+    pub(crate) fn message(self) -> String {
+        match self {
+            Self::CancelledBeforeStart => "cancelled before execution".into(),
+            Self::Failed(message) => message,
+        }
+    }
+}
+pub(crate) fn checked(result: ResultOutput) -> Result<Output, Failure> {
+    result.map_err(|message| {
+        if message == "cancelled" {
+            Failure::CancelledBeforeStart
+        } else {
+            Failure::Failed(message)
+        }
+    })
+}
+#[cfg(test)]
+pub(crate) fn recording_output(kind: Option<StopKind>) -> Output {
+    #[cfg(unix)]
+    let status = {
+        use std::os::unix::process::ExitStatusExt;
+        ExitStatus::from_raw(0)
+    };
+    #[cfg(windows)]
+    let status = {
+        use std::os::windows::process::ExitStatusExt;
+        ExitStatus::from_raw(0)
+    };
+    Output {
+        status,
+        stdout: Vec::new(),
+        stderr: Vec::new(),
+        stop_kind: kind,
+        stopped: kind.map(|kind| {
+            match kind {
+                StopKind::Cancelled => "cancelled",
+                StopKind::TimedOut => "process timed out and was stopped",
+                StopKind::Failed => "content failure",
+                StopKind::Uncertain => "cleanup proof missing",
+            }
+            .to_owned()
+        }),
+    }
 }
 impl Output {
     pub(crate) fn complete(self) -> Result<std::process::Output, String> {
@@ -376,6 +480,9 @@ pub(crate) fn service() -> Result<&'static Service, String> {
 pub(crate) fn run(command: Command, options: Options) -> ResultOutput {
     service()?.submit(command, options)?.wait()
 }
+pub(crate) fn run_checked(command: Command, options: Options) -> Result<Output, Failure> {
+    checked(run(command, options))
+}
 /// Dedicated bounded cleanup capacity cannot deadlock behind the transports whose
 /// owners are waiting for this acknowledgement. It never inherits caller cancellation.
 pub(crate) fn run_cleanup(command: Command, mut options: Options) -> ResultOutput {
@@ -639,7 +746,12 @@ async fn execute(
                     status = Some(s);
                 }
             }
-            Err(e) => return Err(format!("could not finish owned process: {e}")),
+            Err(e) => {
+                return Err(format!(
+                    "{}; could not finish owned process: {e}",
+                    stopped.as_deref().unwrap_or("cleanup failed")
+                ));
+            }
         }
         // Killing/reaping does not consume bytes already buffered in the pipes. Retain
         // those diagnostics without waiting indefinitely for an inherited pipe to close.
@@ -723,6 +835,7 @@ async fn execute(
         status: status.ok_or("process ended without an exit status")?,
         stdout,
         stderr,
+        stop_kind: stop_kind(stopped.as_deref(), remote_confirmed),
         stopped,
     })
 }

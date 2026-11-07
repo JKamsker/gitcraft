@@ -7,7 +7,7 @@ use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use super::settings::{AiSettings, AiTool};
 use crate::remote::{self, Target};
@@ -259,20 +259,21 @@ fn run_owned(command: ToolCommand, job: &Job<'_>) -> Result<Ran, RunError> {
         ToolCommand::Here(command) => command,
         ToolCommand::There(streaming) => streaming.configure(&mut options),
     };
-    let started = Instant::now();
-    match crate::processes::run(command, options) {
-        Err(e) if e.contains("unconfirmed") => Err(RunError::Failed(e)),
-        Err(_) if job.cancel.is_cancelled() => Err(RunError::Cancelled),
-        Err(e) => Err(RunError::Failed(e)),
+    owned_completion(crate::processes::run_checked(command, options), job)
+}
+fn owned_completion(
+    result: Result<crate::processes::Output, crate::processes::Failure>,
+    job: &Job<'_>,
+) -> Result<Ran, RunError> {
+    match result {
+        Err(crate::processes::Failure::CancelledBeforeStart) => Err(RunError::Cancelled),
+        Err(e) => Err(RunError::Failed(e.message())),
         Ok(out) => {
             if let Some(reason) = out.stopped {
-                if reason.contains("unconfirmed") {
-                    return Err(RunError::Failed(reason));
-                }
-                if job.cancel.is_cancelled() {
+                if out.stop_kind == Some(crate::processes::StopKind::Cancelled) {
                     return Err(RunError::Cancelled);
                 }
-                if started.elapsed() >= job.timeout {
+                if out.stop_kind == Some(crate::processes::StopKind::TimedOut) {
                     return Err(timed_out(&job.command.program(), job.timeout));
                 }
                 return Err(RunError::Failed(reason));
@@ -329,6 +330,43 @@ fn run_there(target: &Target, job: &Job<'_>) -> Result<Ran, RunError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn recording_cancel_keeps_native_failures_and_typed_uncertainty() {
+        use crate::processes::{Failure, StopKind, recording_output};
+        let cancel = Cancel::default();
+        cancel.cancel();
+        let command = CommandLine::Line("never executed".into());
+        let job = Job {
+            repo: Path::new("/recording-only"),
+            command: &command,
+            input: b"",
+            timeout: Duration::from_secs(1),
+            cancel: &cancel,
+        };
+        for failure in [
+            "could not finish owned process",
+            "Process service stopped before returning a result",
+        ] {
+            let error = owned_completion(Err(Failure::Failed(failure.into())), &job)
+                .err()
+                .map(|e| e.message())
+                .unwrap_or_default();
+            assert!(error.contains(failure));
+        }
+        let error = owned_completion(Ok(recording_output(Some(StopKind::Uncertain))), &job)
+            .err()
+            .map(|e| e.message())
+            .unwrap_or_default();
+        assert!(error.contains("cleanup proof missing"));
+        assert!(matches!(
+            owned_completion(Ok(recording_output(Some(StopKind::Cancelled))), &job),
+            Err(RunError::Cancelled)
+        ));
+        assert!(matches!(
+            owned_completion(Err(Failure::CancelledBeforeStart), &job),
+            Err(RunError::Cancelled)
+        ));
+    }
 
     #[test]
     fn each_tool_has_its_command() -> Result<(), String> {
