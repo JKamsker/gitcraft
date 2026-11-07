@@ -228,7 +228,7 @@ pub(in crate::repo) fn show(
         ui.label("Exact blob and patch receipts. Unnamed dependencies are unchecked; no language analysis has run.");
         ui.horizontal(|ui|{ui.label("Dependency paths for the next receipt (one per line):");if ui.button("Refresh receipts").clicked(){acts.push(Action::Freshness(FreshnessAct::Refresh));}});
         ui.text_edit_multiline(&mut state.dependencies);
-        let Some(rows)=&state.rows else{ui.spinner();return};
+        let Some(rows)=&state.rows else{ui.add(crate::spinner::Spinner::new());return};
         match rows {Err(e)=>{ui.label(e);},Ok(rows)=>for row in rows{
             ui.horizontal_wrapped(|ui|{
                 ui.monospace(&row.path);

@@ -132,7 +132,7 @@ fn sandbox(
         image.into(),
         "sh".into(),
         "-c".into(),
-        inside.into(),
+        inside,
     ];
     let run = format!(
         "printf %s {} | {}",
@@ -369,7 +369,8 @@ impl RepoTab {
         Act::Run(case)=>run(&repo,case,&stop).map(|report|(None,Some(report))),
         Act::Load=>Ok((store::load::<Case>(&repo,"reproducer-cases","latest")?,store::load::<Report>(&repo,"reproducer-evidence","latest")?)),_=>Ok((None,None))
       }
-   },|tab,result,_|{let s=&mut tab.review_tools.reproducer;s.busy=false;match result{Ok((case,report))=>{if let Some(case)=case{s.case=case;}if report.is_some(){s.report=report;}},Err(e)=>s.error=Some(e)}});
+   },|tab,result,_|{let s=&mut tab.review_tools.reproducer;s.busy=false;match result{Ok((case,report))=>{if let Some(case)=case{s.case=case;}
+if report.is_some(){s.report=report;}},Err(e)=>s.error=Some(e)}});
     }
     pub(in crate::repo) fn reproducer_badge(&self, ui: &mut egui::Ui, key: &DiffKey) {
         if let Some(report) = &self.review_tools.reproducer.report
@@ -469,7 +470,7 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
         ))));
     }
     if s.busy {
-        ui.spinner();
+        ui.add(crate::spinner::Spinner::new());
         if ui.button("Stop generation / sandbox run").clicked() {
             acts.push(Action::ReviewTools(ToolsAct::Reproducer(Act::Stop)));
         }

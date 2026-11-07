@@ -161,7 +161,7 @@ impl RepoTab {
         }
         let state = &self.review_document;
         let Some(data) = &state.data else {
-            ui.spinner();
+            ui.add(crate::spinner::Spinner::new());
             return;
         };
         let data = match data {
@@ -187,10 +187,10 @@ impl RepoTab {
                     .id_salt(file)
                     .default_open(true)
                     .show(ui, |ui| {
-                        if data.binary.is_some() || data.image.is_some() || data.lfs.is_some() {
-                            if ui.button("Open binary / image comparison").clicked() {
-                                acts.push(Action::OpenDiff(key.clone()));
-                            }
+                        if (data.binary.is_some() || data.image.is_some() || data.lfs.is_some())
+                            && ui.button("Open binary / image comparison").clicked()
+                        {
+                            acts.push(Action::OpenDiff(key.clone()));
                         }
                         let review = self.diff_review(key);
                         for (hunk, line) in data.lines.iter().enumerate() {
@@ -210,7 +210,7 @@ impl RepoTab {
                                             }));
                                         }
                                     }
-                                    if ui.small_button("Open hunk").clicked() {
+                                    if ui.small_button("Open file diff").clicked() {
                                         acts.push(Action::OpenDiff(key.clone()));
                                     }
                                 });

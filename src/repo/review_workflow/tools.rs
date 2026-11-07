@@ -89,6 +89,7 @@ impl RepoTab {
                     });
                 });
             });
+        crate::repo::pr_view::only_web_links(ctx);
         self.review_tools.open = open;
     }
 }

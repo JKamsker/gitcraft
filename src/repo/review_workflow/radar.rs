@@ -109,7 +109,8 @@ fn patch_id(repo: &Path, rev: &str, reverse: bool) -> Result<String, String> {
         .map(str::to_owned)
         .ok_or("Pin a nonempty, nonmerge fix patch".into())
 }
-fn history(repo: &Path, tip: &str) -> Result<(Vec<(String, String)>, usize, bool), String> {
+type HistoryEvidence = (Vec<(String, String)>, usize, bool);
+fn history(repo: &Path, tip: &str) -> Result<HistoryEvidence, String> {
     let limit = format!("--max-count={}", HISTORY + 1);
     let count = git::run(Some(repo), &["rev-list", "--no-merges", &limit, tip, "--"])?
         .lines()

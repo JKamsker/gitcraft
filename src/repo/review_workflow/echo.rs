@@ -111,7 +111,9 @@ fn own_comments(d: &PrDetails) -> Result<Vec<Comment>, String> {
         .collect())
 }
 fn validate_rule(rule: &Rule, comments: &[Comment]) -> Result<(), String> {
-    if !comments.iter().any(|c| c.url == rule.source) {
+    if !(rule.source.starts_with("https://") || rule.source.starts_with("http://"))
+        || !comments.iter().any(|c| c.url == rule.source)
+    {
         return Err("Rule has no imported comment citation".into());
     }
     if rule.pattern.is_empty() || rule.pattern.len() > 4000 {
@@ -241,7 +243,7 @@ impl RepoTab {
             {
                 Ok(c) => Some(c),
                 Err(e) => {
-                    self.review_tools.echo.error = Some(e.into());
+                    self.review_tools.echo.error = Some(e);
                     return;
                 }
             }
@@ -368,7 +370,7 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
     });
     ui.weak(format!("{} cited comments · {} rules. AI suggestions start disabled; inspect and enable them below.",s.book.comments.len(),s.book.rules.len()));
     if s.busy {
-        ui.spinner();
+        ui.add(crate::spinner::Spinner::new());
         if ui.button("Stop AI / collection job").clicked() {
             acts.push(Action::ReviewTools(ToolsAct::Echo(Act::Stop)));
         }
