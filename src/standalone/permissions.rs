@@ -98,7 +98,9 @@ fn copy_xattrs(from: &File, to: &File) -> Result<(), String> {
     const LIMIT: usize = 1024 * 1024;
     let size = match flistxattr_query(from) {
         Ok(size) => size,
-        Err(rustix::io::Errno::OPNOTSUPP) => return Ok(()),
+        Err(rustix::io::Errno::OPNOTSUPP) => {
+            return Err("This filesystem cannot expose the output's access metadata safely; the original was not changed".into());
+        }
         Err(e) => return Err(e.to_string()),
     };
     if size > LIMIT {
