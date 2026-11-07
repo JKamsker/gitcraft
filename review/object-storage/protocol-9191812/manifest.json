@@ -1,0 +1,55 @@
+{
+  "source_head": "9191812c849ae39403aea6b420d50a636349d86d",
+  "source_tree": "8847248089cb8270f7e3c114b500fd65d1c9a6f1",
+  "source_branch": "codex/object-storage",
+  "remote_head_verified": "9191812c849ae39403aea6b420d50a636349d86d",
+  "base": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
+  "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "phase": "Independent STATIC protocol review requested; new protocol runtime NOT executed",
+  "format": "PASS",
+  "strict_all_target_clippy": "PASS",
+  "full_tests_on_this_candidate": "DEFERRED until independent protocol static PASS",
+  "prior_fixed_local_full_head": "a3b4d7dd67a7a5394f35042654ee3a672b9c1366",
+  "prior_fixed_local_full": "886 passed, 3 ignored, 0 failed, 0 filtered; 889 names; all 869 baseline names retained",
+  "windows_check": "Actual Windows held module metadata-only cross-target typecheck PASS; no native runtime claimed",
+  "prior_failed_review": "c805f6e static ownership FAIL preserved at notes4f7f397b; old blocked harness never retried",
+  "source_files": {
+    "Cargo.toml": "5bbde0a5a39f0ae1e8144b6dc4f05442d3e5e9d624ebcce2111dcb32362e744a",
+    "README.md": "e27d5befe1f5fe8f6f83267e71a0aa928ae678901cf33253919878f6fd70c8c6",
+    "src/app/mod.rs": "8368833cd252a5bfe5381a8eb3e7a83b06cb4d220d9b0843e69a22b8e832a248",
+    "src/bin/gitcraft-object-storage-helper.rs": "d244eb5c46909a3606d4f9cce728f6f816f6075c24121afaa41458a1e81d8b6b",
+    "src/git/command.rs": "9a02df9c85c02ef2335f69af5aae322d959a36e518c1ca311b0b0f7494b7c0ae",
+    "src/git/mod.rs": "ab750d7356a8d9d41b93ce1a3312489063e99201173be221197ef2f1c6726d3a",
+    "src/git/object_storage/files.rs": "aee31e9d68265731368ed36fb5fd538ba076a47db47a6bc68258c2df798039ee",
+    "src/git/object_storage/helper.rs": "c65127d05f673e95ef150cdd733c91edc2a38e72b36a8cbcb0b22984cfc22764",
+    "src/git/object_storage/independent.rs": "d4a46dcc85a734f9493eea9ed21bbb18429a159df549b23b708a7c864928bf83",
+    "src/git/object_storage/independent/held.rs": "f9910741a8920cf828f0db560a890aae155973b1334dc5ed555cffe70596a15b",
+    "src/git/object_storage/independent/held_windows.rs": "607f0440acd2298dca8c1c3201e01041e017388a4a4e95a0c1bc225bee7c079e",
+    "src/git/object_storage/independent/local.rs": "3111dc8366a2cc86d741531536f5a45608330c7dd808325d5fac720c910bb9aa",
+    "src/git/object_storage/mod.rs": "009d96f5bdfadc20b567b4c50492b0813721d499005e4ea23ec8ebd25af9be59",
+    "src/git/object_storage/tests.rs": "b5ef9f4f7afb7b434dbcd4f42717484f2d9bab2e3f170a94f66bea1ee7c65cb5",
+    "src/git/object_storage/topology.rs": "864d5e8612977a85818bbba2955a4f12377dbefd0d395dfa34fddc783f281cd1",
+    "src/repo/actions.rs": "10ddc9820b41b157d329a71d5cf39e5ea562e0f968c538f234915da316f1c3cb",
+    "src/repo/apply.rs": "a43b2c8bff933c695ee4f829a0638c4301ce6a449e005fbd1bff944dcdd46f18",
+    "src/repo/dialogs/mod.rs": "5ac0f8ad0c696ab6bc6cc8e10e40de0008c3578849239371e1f29eed72688166",
+    "src/repo/mod.rs": "887e6d59925e1ffe27758cf42015dbab0b7dee2cd99ee931b135edeb52076ab8",
+    "src/repo/object_storage/mod.rs": "cd2634dd3986259a42518b9b56d72dc58f3a0ed60bcb9c4efd7ef4419dbff5e3",
+    "src/repo/toolbar.rs": "27779e08548f018c91885164caf233a8966b3bc421aa78ab01686fd1d0068add",
+    "src/safe_read.rs": "015855df550574af5b39483f9598c6011eb9331e498ecc46405eb4cd50370def"
+  },
+  "logs": {
+    "fmt": {
+      "file": "object-storage-protocol-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "clippy": {
+      "file": "object-storage-protocol-clippy.log",
+      "sha256": "8b1fd2394f7b6f177ede882431154a419bd9f404f00add314c912e91a7fc0ec0"
+    },
+    "windows-typecheck": {
+      "file": "object-storage-windows-typecheck.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "runtime_authorization": "Do not execute new helper protocol fixture or full suite until independent static PASS; no CI/live hosts/accounts/user repositories/new process controllers"
+}

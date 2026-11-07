@@ -1,0 +1,43 @@
+{
+  "head": "a3b4d7dd67a7a5394f35042654ee3a672b9c1366",
+  "remote": "a3b4d7dd67a7a5394f35042654ee3a672b9c1366",
+  "base": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
+  "tree": "19ba32483fb6e28ad990b05cfcca017d0e3c6176",
+  "fmt": "PASS",
+  "strict_all_target_clippy": "PASS",
+  "full": {
+    "passed": 886,
+    "ignored": 3,
+    "failed": 0,
+    "filtered": 0
+  },
+  "names": 889,
+  "baseline_names": 869,
+  "missing_baseline": [],
+  "logs": {
+    "fmt": {
+      "path": "/workspace/work/object-storage-evidence/a3b4d7dd67a7a5394f35042654ee3a672b9c1366/object-storage-fixed-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "clippy": {
+      "path": "/workspace/work/object-storage-evidence/a3b4d7dd67a7a5394f35042654ee3a672b9c1366/object-storage-fixed-clippy.log",
+      "sha256": "604aa841a1afc6010bd229fada9047520d8db7a2f9ac201eae956f3d7105a7bd"
+    },
+    "full": {
+      "path": "/workspace/work/object-storage-evidence/a3b4d7dd67a7a5394f35042654ee3a672b9c1366/object-storage-fixed-full.log",
+      "sha256": "8eebe6358451d732944dd40ff103461a40ac0361b166ebf76e0f20c1dc14089e"
+    },
+    "test-list": {
+      "path": "/workspace/work/object-storage-evidence/a3b4d7dd67a7a5394f35042654ee3a672b9c1366/object-storage-fixed-test-list.log",
+      "sha256": "6ee3837054cbf51d9ad3245d68bf9a214269e486bd906b473162f02a7d6271ff"
+    },
+    "targeted": {
+      "path": "/workspace/work/object-storage-evidence/a3b4d7dd67a7a5394f35042654ee3a672b9c1366/object-storage-fixed-targeted.log",
+      "sha256": "101892d4905fee275d2950ec82085b9e27f86be2ee41ed3d736c853bfc76218d"
+    }
+  },
+  "targeted_note": "20/20 fixed-candidate targeted run at f8d73dd; final exact a3b4d7d full gates include all20 tests.",
+  "status": "Linux-local ownership correction complete; Windows/cross-machine independence is INTERIM refusal pending continued implementation and proof. Read-only inspector remains cross-machine.",
+  "review": "c805f6e FAIL/incomplete static ownership finding preserved; no blocked old harness retried; ordinary fixed-candidate review requested.",
+  "ci": "Deferred; no live hosts/accounts/user repository mutation."
+}
