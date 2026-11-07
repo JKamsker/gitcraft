@@ -23,6 +23,20 @@ git config gitcraft.forge gitea                               # just this reposi
 
 The value is one of `github`, `gitlab`, `forgejo` or `gitea`.
 
+## Primary forge remote
+
+In **Remotes**, right-click a remote (or use its actions button) and choose
+_Set as primary forge_. The starred remote supplies pull requests, issue lookups,
+CI and default commit/file web links. This preference is kept per repository,
+including across worktrees. Selecting it does not change Git's push/fetch settings
+or branch upstreams. Explicit branch web links still follow that branch's remote.
+
+_Use automatic forge selection_ restores the default: a recognised `origin`, else the
+first recognised remote. Recognition uses local URL/config information, so choosing
+works offline too. A unique rename with the same URL preserves the choice; removing
+the selected remote restores automatic selection. Changing its URL follows the new
+repository and clears old forge views so identical PR/issue numbers cannot mix.
+
 ## Pull requests
 
 - Pull / merge requests of GitHub (through `gh`), GitLab (through `glab`), Forgejo and Gitea

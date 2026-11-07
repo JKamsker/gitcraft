@@ -403,6 +403,9 @@ pub(crate) fn run_step(
     creds: Option<&git::Credentials>,
     hosting: Option<&Hosting>,
 ) -> Result<(), String> {
+    if matches!(step, Step::Bump | Step::Tag | Step::Push) {
+        preflight(repo, plan, hosting)?;
+    }
     match step {
         Step::Bump => {
             let bump = plan.bump.as_ref().ok_or("nothing to move")?;
@@ -464,6 +467,7 @@ pub(crate) fn run_step(
         }
         Step::Publish => {
             let hosting = hosting.ok_or("The repository isn't on a forge gitcraft knows")?;
+            check_publication_destination(repo, plan, hosting)?;
             let url = hosting.forge.provider().create_release(
                 repo,
                 hosting,
@@ -478,6 +482,7 @@ pub(crate) fn run_step(
         }
         Step::Upload => {
             let hosting = hosting.ok_or("The repository isn't on a forge gitcraft knows")?;
+            check_publication_destination(repo, plan, hosting)?;
             hosting
                 .forge
                 .provider()
@@ -485,6 +490,87 @@ pub(crate) fn run_step(
         }
     }
     Ok(())
+}
+
+/// Validate a publishing plan before executing it, and again immediately before each
+/// local mutation and push. Resuming preserves the completed steps even when this refuses.
+pub(crate) fn preflight(repo: &Path, plan: &Plan, hosting: Option<&Hosting>) -> Result<(), String> {
+    if !plan.publish {
+        return Ok(());
+    }
+    let hosting = hosting.ok_or("The repository isn't on a forge gitcraft knows")?;
+    check_publication_destination(repo, plan, hosting)
+}
+
+/// A push URL, URL rewrite, or a remote edited during the release must not receive a tag
+/// intended for a different publishing repository. Also checked before forge mutations,
+/// including resumed uploads; Git's configured transport routing itself is never rewritten.
+fn check_publication_destination(
+    repo: &Path,
+    plan: &Plan,
+    hosting: &Hosting,
+) -> Result<(), String> {
+    let remote = plan
+        .push
+        .as_deref()
+        .ok_or("Publication needs the release's push destination")?;
+    let urls = git::run(
+        Some(repo),
+        &["remote", "get-url", "--push", "--all", "--", remote],
+    )?;
+    let expected = format!("{}/{}", hosting.web.trim_end_matches('/'), hosting.path);
+    let urls = urls
+        .lines()
+        .filter(|url| !url.trim().is_empty())
+        .collect::<Vec<_>>();
+    if urls.is_empty()
+        || !urls
+            .iter()
+            .all(|url| same_publication_repository(url, hosting))
+    {
+        return Err(format!(
+            "Release publication stopped: the push destination of {remote} does not match the selected forge repository {expected}. Local release changes remain undoable."
+        ));
+    }
+    Ok(())
+}
+
+/// Compare the web authority separately from the repository path. DNS names are case
+/// insensitive; GitLab's captured subgroup/project spelling must remain exact. GitHub,
+/// Forgejo and Gitea identify owner/repository names without regard to ASCII case.
+fn same_publication_repository(url: &str, hosting: &Hosting) -> bool {
+    let Some((host, path)) = crate::forge::location(url) else {
+        return false;
+    };
+    if !host.eq_ignore_ascii_case(&hosting.host) {
+        return false;
+    }
+    // SSH identifies the Git repository independently of the forge's configured
+    // web port or reverse-proxy prefix. HTTP transports must also match the web
+    // authority and scheme; a different port can serve another repository.
+    let web_transport = url.split_once("://").is_some_and(|(scheme, _)| {
+        scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https")
+    });
+    if web_transport {
+        let Some(web) = crate::forge::web_url(url) else {
+            return false;
+        };
+        let authority = |web: &str| {
+            web.split_once("://").map(|(scheme, rest)| {
+                format!("{scheme}://{}", rest.split('/').next().unwrap_or_default())
+            })
+        };
+        let (Some(actual), Some(expected)) = (authority(&web), authority(&hosting.web)) else {
+            return false;
+        };
+        if !actual.eq_ignore_ascii_case(&expected) {
+            return false;
+        }
+    }
+    match hosting.forge {
+        Forge::GitLab => path == hosting.path,
+        Forge::GitHub | Forge::Forgejo | Forge::Gitea => path.eq_ignore_ascii_case(&hosting.path),
+    }
 }
 
 /// Writes the new version (and the notes in the changelog) and commits those files only.

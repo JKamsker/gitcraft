@@ -518,3 +518,33 @@ fn what_the_picker_says_is_what_happens() {
     );
     assert!(fresh.open.is_some());
 }
+
+#[test]
+fn a_saved_upstream_issue_is_not_refreshed_or_closed_by_number_on_the_fork() {
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred("/nonexistent/issue-forge-isolation".into(), &ctx);
+    let mut link = IssueLink::of(&issue(7, "Upstream issue"));
+    link.url = "https://github.com/Vancete/gitcraft/issues/7".into();
+    tab.issue_work.links.insert("topic".into(), link);
+    tab.hosting = Some(crate::forge::Hosting {
+        forge: crate::forge::Forge::GitHub,
+        host: "github.com".into(),
+        path: "JKamsker/gitcraft".into(),
+        web: "https://github.com".into(),
+    });
+    assert!(
+        tab.issue_pull_request("topic").is_none(),
+        "must not generate Closes #7 on the other repository"
+    );
+    tab.refresh_issue("topic".into(), &ctx);
+    assert!(tab.issue_work.refreshing.is_none());
+    assert!(
+        tab.status
+            .as_ref()
+            .is_some_and(|(s, _)| s.contains("another forge repository"))
+    );
+    if let Some(hosting) = &mut tab.hosting {
+        hosting.path = "Vancete/gitcraft".into();
+    }
+    assert!(tab.issue_pull_request("topic").is_some());
+}

@@ -482,7 +482,7 @@ fn a_fast_forward_refuses_a_branch_being_rebased_elsewhere() {
         &wt,
         &[
             "-c",
-            "sequence.editor=sed -i s/^pick/edit/",
+            "sequence.editor=sed -i.bak s/^pick/edit/",
             "rebase",
             "-q",
             "-i",
@@ -495,4 +495,52 @@ fn a_fast_forward_refuses_a_branch_being_rebased_elsewhere() {
     let _ = std::fs::remove_dir_all(&wt);
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(after, before);
+}
+
+#[test]
+fn filtered_ancestor_keeps_rewrite_offers_and_drop_replays_hidden_commit_then_undoes()
+-> Result<(), String> {
+    let dir = repo("filtered-ancestor");
+    let older = commit(&dir, "older.txt", "older");
+    git_ok(&dir, &["config", "user.name", "T3 Code"]);
+    git_ok(
+        &dir,
+        &["config", "user.email", "t3code@users.noreply.github.com"],
+    );
+    let hidden = commit(&dir, "hidden.txt", "hidden checkpoint");
+    git_ok(&dir, &["config", "user.name", "Human"]);
+    git_ok(&dir, &["config", "user.email", "human@example.com"]);
+    let head = commit(&dir, "head.txt", "head");
+    let (ctx, mut tab) = open(&dir);
+    assert!(!tab.index.contains_key(&hidden));
+    assert!(tab.history_index.contains_key(&hidden));
+    let offers = offered(
+        &tab,
+        DragItem::Commit(commit_item(&tab, &older)),
+        &DropTarget::Commit(commit_item(&tab, &head)),
+    );
+    assert!(!offers.iter().any(|o| matches!(o, Offer::CherryPick { .. })));
+    assert!(offers.iter().any(|o| matches!(o, Offer::Rewrite(_))));
+    assert_eq!(tab.surgery_refusal(&older), None);
+    run(
+        &mut tab,
+        &ctx,
+        Action::QuickEdit {
+            edit: crate::repo::quick_edit::Edit::Drop,
+            hash: older,
+        },
+    );
+    assert_eq!(subjects(&dir), ["head", "hidden checkpoint", "base"]);
+    assert_eq!(
+        std::fs::read_to_string(dir.join("hidden.txt")).map_err(|e| e.to_string())?,
+        "hidden checkpoint\n"
+    );
+    run(&mut tab, &ctx, Action::Undo);
+    assert_eq!(git::head(&dir), head);
+    assert_eq!(
+        subjects(&dir),
+        ["head", "hidden checkpoint", "older", "base"]
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
 }

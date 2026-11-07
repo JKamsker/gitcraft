@@ -55,7 +55,7 @@ impl RepoTab {
 
     /// _Fold staged changes into this commit_ in a commit's menu, disabled with the reason.
     pub(super) fn fold_item(&self, ui: &mut Ui, hash: &str, idle: bool, acts: &mut Vec<Action>) {
-        let line = first_parents(&self.commits, &self.index, &self.refs.head);
+        let line = first_parents(&self.history, &self.history_index, &self.refs.head);
         let refused = self.fold_refusal(&line, hash);
         let button = ui
             .add_enabled(
@@ -83,17 +83,23 @@ impl RepoTab {
             amending.then(|| "Untick Amend last commit to fold into an older commit".to_owned())
         });
         let button = ui
-            .add_enabled(idle && blocked.is_none(), egui::Button::new("Fold…"))
+            .add_enabled(idle && blocked.is_none(), |ui: &mut Ui| {
+                crate::icons::small_button(
+                    ui,
+                    "git-merge",
+                    "Fold staged changes into an older commit",
+                )
+            })
             .on_hover_text("Fold the staged changes into an older commit of this branch");
         let button = match &blocked {
             Some(why) => button.on_disabled_hover_text(why),
-            None => button,
+            None => button.on_disabled_hover_text("Wait for the operation running to end"),
         };
         egui::Popup::menu(&button)
             .style(crate::theme::menu_style)
             .show(|ui| {
                 // Walked only while the picker is open.
-                let line = first_parents(&self.commits, &self.index, &self.refs.head);
+                let line = first_parents(&self.history, &self.history_index, &self.refs.head);
                 ui.set_max_width(360.0);
                 ui.label(
                     RichText::new("Fold the staged changes into:")
@@ -386,9 +392,9 @@ impl RepoTab {
         let stopped = self.fold.stopped.as_ref()?;
         let tip = self.refs.local.iter().find(|b| b.name == stopped.branch)?;
         let parent = self
-            .index
+            .history_index
             .get(&tip.target)
-            .and_then(|&i| self.commits.get(i))
+            .and_then(|&i| self.history.get(i))
             .and_then(|c| Borrow::<Commit>::borrow(c).parents.first().cloned());
         (state == InProgress::Rebase && parent.as_deref() == Some(stopped.before.as_str()))
             .then_some(stopped)

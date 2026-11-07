@@ -382,3 +382,17 @@ fn nothing_is_offered_on_a_detached_head_line() {
     };
     assert!(places(&w, "c", &DropTarget::Commit(commit("m"))).is_empty());
 }
+
+#[test]
+fn unknown_ancestry_is_not_proof_that_a_commit_needs_cherry_picking() {
+    let mut known = Known::default();
+    known.unknown.insert("c".to_owned());
+    let w = World::on_main(known);
+    assert!(
+        w.offers(
+            &DragItem::Commit(commit("c")),
+            &DropTarget::Commit(commit("m"))
+        )
+        .is_empty()
+    );
+}

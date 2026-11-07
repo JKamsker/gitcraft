@@ -3,6 +3,7 @@
 mod agents;
 mod ai_page;
 mod branch_names;
+mod context_menus;
 mod custom_commands;
 mod diffs;
 mod external_tools;
@@ -22,6 +23,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::theme::Tokens;
 pub(crate) use branch_names::fit as fit_branch_name;
+pub use context_menus::ContextMenus;
 use file_menus::file_menu_rows;
 use layout::{Card, Filter, section};
 pub(crate) use page::show as show_page;
@@ -49,6 +51,7 @@ pub struct Settings {
     pub shell: String,
     /// Width of the branch/tag column of the graph.
     pub refs_width: f32,
+    pub history_filter: crate::repo::history_filter::Rules,
     /// Fit Branch / Tag to visible pills; dragging its border switches to a fixed width.
     pub auto_refs_width: bool,
     /// Shortened branch and tag pills keep their end rather than their beginning.
@@ -62,10 +65,12 @@ pub struct Settings {
     pub when_width: f32,
     pub date_width: f32,
     pub hash_width: f32,
-    /// The column bar dragged last: that column keeps its width while the others make room.
+    /// Legacy drag metadata, retained for saved-settings compatibility; sizing ignores it.
     pub last_resized: Option<crate::repo::columns::Bar>,
-    /// How far that bar was pulled past its column's minimum, shrinking the columns right of it.
+    /// Legacy cascading-resize offset; new divider drags clear it.
     pub column_push: f32,
+    /// Description space exchanged by the most recent manual column gesture.
+    pub description_space: crate::repo::columns::DescriptionSpace,
     pub show_author: bool,
     /// How long ago each commit was made ("3 hours ago").
     pub show_when: bool,
@@ -154,6 +159,10 @@ pub struct Settings {
     /// Agents connected over `gitcraft mcp` may change repositories (through the window, as
     /// steps of the undo list); otherwise they only read.
     pub agent_writes: bool,
+    /// Show the optional task section; independent of MCP write permission.
+    pub show_agents: bool,
+    /// Optional commands in branch and commit context menus.
+    pub context_menus: ContextMenus,
     /// The "Did you know" line and the first-time hints of a repository tab.
     pub tips: bool,
     /// The first-time hints shown already (by their ids), each shown only once.
@@ -178,6 +187,7 @@ impl Default for Settings {
             terminal_font: 12.5,
             shell: String::new(),
             refs_width: DEFAULT_REFS_WIDTH,
+            history_filter: Default::default(),
             auto_refs_width: true,
             branch_names_keep_end: true,
             graph_width: 0.0,
@@ -188,6 +198,7 @@ impl Default for Settings {
             hash_width: 70.0,
             last_resized: None,
             column_push: 0.0,
+            description_space: Default::default(),
             show_author: true,
             show_when: true,
             show_date: false,
@@ -230,6 +241,8 @@ impl Default for Settings {
             custom_commands: Vec::new(),
             trusted_command_files: Vec::new(),
             agent_writes: true,
+            show_agents: false,
+            context_menus: Default::default(),
             tips: true,
             seen_hints: Default::default(),
         }
@@ -276,6 +289,7 @@ impl Settings {
         self.hash_width = fresh.hash_width;
         self.last_resized = fresh.last_resized;
         self.column_push = fresh.column_push;
+        self.description_space = fresh.description_space;
     }
 
     /// Puts the graph's lanes closer together or back apart. The graph column then fits them
@@ -709,6 +723,15 @@ impl Settings {
                 });
             }
             Page::Graph => {
+                section(ui, f, "History filters", None, |card| {
+                    card.row(
+                        "Global history filters",
+                        "authors names emails namespaces T3 Code hide exclude",
+                        |ui| {
+                            crate::repo::history_filter::edit(ui, &mut self.history_filter);
+                        },
+                    );
+                });
                 section(ui, f, "Commit graph", None, |card| {
                     card.preview(Preview::GraphRefs);
                     card.row("Branch column width", "refs tags pills", |ui| {
@@ -1040,6 +1063,7 @@ impl Settings {
             }
             Page::CustomCommands => custom_commands::page(self, ui, f),
             Page::Agents => self.agents_ui(ui, f),
+            Page::ContextMenus => self.context_menus_ui(ui, f),
             Page::Shortcuts => {
                 for (group, keys) in crate::manual::shortcut_groups() {
                     section(ui, f, group, None, |card| {
@@ -1142,12 +1166,13 @@ pub(crate) enum Page {
     Identities,
     Ai,
     CustomCommands,
+    ContextMenus,
     Agents,
     Shortcuts,
 }
 
 impl Page {
-    pub const ALL: [Page; 12] = [
+    pub const ALL: [Page; 13] = [
         Page::Profile,
         Page::General,
         Page::Appearance,
@@ -1158,6 +1183,7 @@ impl Page {
         Page::Identities,
         Page::Ai,
         Page::CustomCommands,
+        Page::ContextMenus,
         Page::Agents,
         Page::Shortcuts,
     ];
@@ -1175,6 +1201,7 @@ impl Page {
             Page::Ai => "AI",
             Page::CustomCommands => "Custom commands",
             Page::Agents => "Agents",
+            Page::ContextMenus => "Context menus",
             Page::Shortcuts => "Keyboard shortcuts",
         }
     }
@@ -1192,6 +1219,7 @@ impl Page {
             Page::Ai => "sparkles",
             Page::CustomCommands => "command",
             Page::Agents => "bot",
+            Page::ContextMenus => "list",
             Page::Shortcuts => "keyboard",
         }
     }

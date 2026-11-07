@@ -104,8 +104,7 @@ fn operations_are_kept_across_a_restart_and_undo_still_works() {
     let base = git::head(&dir);
     let mut tab = open(&dir, &ctx);
     let made = commit(&mut tab, &ctx, "dir with space ü.txt", "Add the ü file");
-    let entry = tab.timeline.current_entry().cloned();
-    let id = entry.as_ref().map_or(0, |e| e.id);
+    let id = tab.timeline.current_entry().map_or(0, |e| e.id);
     // Its files and kept commits come in the background, then it is written.
     let found = wait(&mut tab, &ctx, |t| {
         t.timeline.get(id).is_some_and(|e| !e.files.is_empty())
@@ -114,6 +113,9 @@ fn operations_are_kept_across_a_restart_and_undo_still_works() {
     let on_disk = wait(&mut tab, &ctx, |t| {
         store::load(&t.path).is_ok_and(|s| s.entries.first().is_some_and(|e| !e.files.is_empty()))
     });
+    // Snapshot after enrichment: the worker may already finish during commit's
+    // reload, so observing its temporary "Commit" label is not deterministic.
+    let entry = tab.timeline.get(id).cloned();
     drop(tab);
 
     let mut again = open(&dir, &ctx);
@@ -130,7 +132,7 @@ fn operations_are_kept_across_a_restart_and_undo_still_works() {
     let _ = std::fs::remove_dir_all(&dir);
 
     let entry = entry.unwrap_or_else(|| unreachable!("no entry"));
-    assert_eq!(entry.label, "Commit");
+    assert_eq!(entry.label, "Commit “Add the ü file”");
     assert_eq!(entry.origin, Origin::Gitcraft);
     assert_eq!(entry.before.head, base);
     assert_eq!(entry.after.head, made);

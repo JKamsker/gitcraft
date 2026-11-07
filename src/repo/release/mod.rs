@@ -56,6 +56,9 @@ pub(crate) struct Run {
     done: Done,
     /// The undo entry recorded for what was done here, by its label.
     recorded: bool,
+    /// Captured when this run starts; resuming never retargets publication.
+    hosting: Option<crate::forge::Hosting>,
+    forge_repository_generation: u64,
 }
 
 impl Run {
@@ -142,6 +145,14 @@ impl RepoTab {
         }
     }
 
+    pub(super) fn clear_forge_release(&mut self) {
+        // A started run owns mutations and their pending completions, including the
+        // initial validation before a step is marked Running. Keep its Done/undo state.
+        if self.release.as_ref().is_some_and(|view| view.run.is_none()) {
+            self.release = None;
+        }
+    }
+
     fn open_release(&mut self, commit: String, ctx: &Context) {
         if self
             .release
@@ -158,9 +169,14 @@ impl RepoTab {
             run: None,
         });
         let repo = self.path.clone();
-        let remote = self.default_remote();
+        // This explicit release pushes the tag to the forge where it will be published.
+        // Ordinary push/fetch defaults and the branch's upstream remain independent.
+        let remote = self
+            .primary_forge_remote()
+            .map(str::to_owned)
+            .or_else(|| self.default_remote());
         let hosting = self.hosting.clone();
-        self.then(
+        self.forge_then(
             ctx,
             {
                 let commit = commit.clone();
@@ -192,6 +208,8 @@ impl RepoTab {
 
     /// Starts the steps, or goes on from the first one not done.
     fn run_release(&mut self, ctx: &Context) {
+        let hosting = self.hosting.clone();
+        let forge_repository_generation = self.forge_repository_generation;
         let Some(view) = &mut self.release else {
             return;
         };
@@ -212,6 +230,8 @@ impl RepoTab {
                 steps,
                 done: Done::default(),
                 recorded: false,
+                hosting,
+                forge_repository_generation,
             });
         }
         let label = view
@@ -226,10 +246,14 @@ impl RepoTab {
             return;
         };
         let (plan, done) = (run.plan.clone(), run.done.clone());
+        let hosting = run.hosting.clone();
         let repo = self.path.clone();
         self.then(
             ctx,
-            move || still_there(&repo, &plan, &done),
+            move || {
+                still_there(&repo, &plan, &done)
+                    .or_else(|| release::preflight(&repo, &plan, hosting.as_ref()).err())
+            },
             |tab, gone, ctx| match gone {
                 None => tab.next_release_step(ctx),
                 Some(why) => {
@@ -251,13 +275,23 @@ impl RepoTab {
             self.release_stopped(ctx);
             return;
         };
-        run.steps[i].1 = Status::Running;
         let step = run.steps[i].0;
+        if matches!(step, Step::Publish | Step::Upload)
+            && (run.forge_repository_generation != self.forge_repository_generation
+                || run.hosting != self.hosting)
+        {
+            run.steps[i].1 = Status::Failed(
+                "The primary forge changed during this release; publication stopped. Local changes remain undoable. Close this release before starting one on the new forge.".into(),
+            );
+            self.release_stopped(ctx);
+            return;
+        }
+        run.steps[i].1 = Status::Running;
         let plan = run.plan.clone();
         let mut done = run.done.clone();
         let repo = self.path.clone();
         let creds = self.credentials.clone();
-        let hosting = self.hosting.clone();
+        let hosting = run.hosting.clone();
         self.then(
             ctx,
             move || {
@@ -292,8 +326,11 @@ impl RepoTab {
                         // Signing in, then Resume, pushes with what was typed.
                         if auth {
                             let url = tab
-                                .default_remote()
-                                .and_then(|r| tab.remotes.iter().find(|x| x.name == r))
+                                .release
+                                .as_ref()
+                                .and_then(|v| v.run.as_ref())
+                                .and_then(|r| r.plan.push.as_ref())
+                                .and_then(|r| tab.remotes.iter().find(|x| &x.name == r))
                                 .map(|r| r.url.clone())
                                 .unwrap_or_default();
                             tab.last_op = None;

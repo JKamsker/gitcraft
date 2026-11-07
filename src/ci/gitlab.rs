@@ -7,7 +7,7 @@ use std::path::Path;
 use serde_json::Value;
 
 use super::{Check, Job, Project, Run, Status, time};
-use crate::forge::{self, Forge};
+use crate::forge;
 use crate::pull_request::{CheckState, at};
 
 /// The state of a pipeline or a job from its `status`.
@@ -35,7 +35,7 @@ fn endpoint(project: &Project, rest: &str) -> String {
 fn api(repo: &Path, project: &Project, rest: &str) -> Result<String, String> {
     let endpoint = endpoint(project, rest);
     forge::tool(
-        Forge::GitLab,
+        &project.hosting(),
         repo,
         &["api", "--hostname", &project.host, &endpoint],
     )
@@ -147,7 +147,7 @@ fn parse_jobs(json: &str) -> Result<Vec<Job>, String> {
 fn post(repo: &Path, project: &Project, rest: &str) -> Result<(), String> {
     let endpoint = endpoint(project, rest);
     let args = ["api", "--hostname", &project.host, "-X", "POST", &endpoint];
-    forge::tool(Forge::GitLab, repo, &args).map(|_| ())
+    forge::tool(&project.hosting(), repo, &args).map(|_| ())
 }
 
 /// Runs the failed jobs of pipeline `run` again.
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn projects_go_by_their_path() {
         let project = Project {
-            forge: Forge::GitLab,
+            forge: crate::forge::Forge::GitLab,
             host: "gitlab.com".to_owned(),
             path: "group/sub/project".to_owned(),
         };

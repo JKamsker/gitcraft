@@ -210,30 +210,19 @@ pub fn write(worktree: &Path, task: &str) -> Result<(), String> {
         .map_err(|e| format!("Could not save the worktree's task: {e}"))
 }
 
-/// The linked issue's title and text, through the forge's tool (`gh`, `glab`).
-pub fn issue_text(forge: crate::forge::Forge, repo: &Path, number: u64) -> Result<String, String> {
-    let n = number.to_string();
-    let out = match forge {
-        crate::forge::Forge::GitHub => {
-            crate::forge::tool(forge, repo, &["issue", "view", &n, "--json", "title,body"])?
-        }
-        crate::forge::Forge::GitLab => {
-            crate::forge::tool(forge, repo, &["issue", "view", &n, "--output", "json"])?
-        }
-        other => return Err(format!("Issues of {} aren't read yet", other.name())),
-    };
-    let v: serde_json::Value =
-        serde_json::from_str(&out).map_err(|e| format!("Could not read issue #{n}: {e}"))?;
-    let field = |k: &str| {
-        v.get(k)
-            .and_then(|x| x.as_str())
-            .unwrap_or_default()
-            .to_owned()
-    };
-    let body = if v.get("body").is_some() {
-        field("body")
-    } else {
-        field("description")
-    };
-    Ok(format!("{}\n\n{}", field("title"), body).trim().to_owned())
+/// The linked issue's title and text, explicitly in the selected forge repository.
+pub fn issue_text(
+    hosting: &crate::forge::Hosting,
+    repo: &Path,
+    number: u64,
+) -> Result<String, String> {
+    hosting
+        .forge
+        .provider()
+        .issue(repo, hosting, number)
+        .map(|issue| {
+            format!("{}\n\n{}", issue.title, issue.body)
+                .trim()
+                .to_owned()
+        })
 }

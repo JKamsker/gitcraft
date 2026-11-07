@@ -4,7 +4,7 @@
 //! from. Builds run where a branch is pushed, so the tips of `fork/*` are asked of the fork,
 //! those of `origin/*` of upstream, and local branches of their push and tracking remotes.
 //! HEAD follows the checked-out branch; recent commits are also asked of the main project
-//! (that of `origin`). Pull requests are asked of the main project, which lists them.
+//! (the selected forge in the UI). Pull requests are asked of that project, which lists them.
 
 use std::collections::{HashMap, HashSet};
 
@@ -27,7 +27,7 @@ pub(crate) type Cached = Vec<(Project, HashMap<String, Status>)>;
 
 /// What a plan is made from.
 pub(crate) struct Sources<'a> {
-    /// The project of `origin` (or the first remote).
+    /// The caller's main project: the selected forge in the UI.
     pub main: &'a Project,
     pub remotes: &'a [Remote],
     pub refs: &'a Refs,

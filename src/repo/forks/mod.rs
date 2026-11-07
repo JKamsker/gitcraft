@@ -120,7 +120,7 @@ impl RepoTab {
         };
         self.forks.read_for = Some(loaded);
         let repo = self.path.clone();
-        self.then(
+        self.forge_then(
             ctx,
             move || {
                 let provider = hosting.forge.provider();
@@ -379,7 +379,7 @@ impl RepoTab {
         let repo = self.path.clone();
         self.forks.approving = true;
         self.status = Some((format!("Approving #{number}'s workflow runs…"), false));
-        self.then(
+        self.forge_then(
             ctx,
             move || {
                 runs.iter()

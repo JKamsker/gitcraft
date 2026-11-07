@@ -345,7 +345,7 @@ impl RepoTab {
             self.scroll_to = Some(row);
         } else if hash == WIP_HASH {
             // The changes row goes once everything is committed: nothing to say.
-        } else if self.has_more {
+        } else if self.history_index.contains_key(hash) || self.has_more {
             self.goto(hash, ctx);
         } else {
             self.status = Some((

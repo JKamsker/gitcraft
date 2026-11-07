@@ -244,7 +244,7 @@ impl RepoTab {
         }
         let pr = self.pr_head_of_details(details);
         let (path, creds) = (self.path.clone(), self.credentials.clone());
-        self.then(
+        self.forge_then(
             ctx,
             move || look(&path, &key, &pr, creds.as_ref()),
             |tab, found, _| tab.pr_looked(found),
@@ -288,7 +288,7 @@ impl RepoTab {
         // It may fetch from the forge first: say so meanwhile.
         self.status = Some((format!("Reading #{number}…"), false));
         let (path, creds) = (self.path.clone(), self.credentials.clone());
-        self.then(
+        self.forge_then(
             ctx,
             move || look(&path, &key, &pr, creds.as_ref()),
             move |tab, found, ctx| match found {
@@ -343,7 +343,7 @@ impl RepoTab {
         }
         self.versions.seen_heads.insert(number, seen.tip.clone());
         let path = self.path.clone();
-        self.then(
+        self.forge_then(
             ctx,
             move || git::mark_reviewed(&path, &key, number, &seen),
             move |tab, marked, _| tab.seen_marked(number, marked),
@@ -382,7 +382,7 @@ impl RepoTab {
         };
         self.versions.seen_heads.insert(number, pr.head.clone());
         let (path, creds) = (self.path.clone(), self.credentials.clone());
-        self.then(
+        self.forge_then(
             ctx,
             move || mark_seen(&path, &key, &pr, creds.as_ref()).map(|_| ()),
             move |tab, marked, _| tab.seen_marked(number, marked),
@@ -399,7 +399,7 @@ impl RepoTab {
         // The list holds at most 100: only a shorter one names every open pull request.
         let open: Option<Vec<u64>> =
             (self.prs.len() < 100).then(|| self.prs.iter().map(|p| p.number).collect());
-        self.then(
+        self.forge_then(
             ctx,
             move || {
                 if let Some(open) = open {

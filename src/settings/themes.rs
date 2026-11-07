@@ -129,7 +129,7 @@ fn gallery(ui: &mut Ui, f: &Filter, view: &mut SettingsView, tweaks: &theme::Twe
     let t = Tokens::get(ui.ctx());
     let shown_id = egui::Id::new("settings-theme-filter");
     let mut shown: Shown = ui.data(|d| d.get_temp(shown_id)).unwrap_or_default();
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         for (option, label) in [
             (Shown::All, "All"),
             (Shown::Dark, "Dark"),
@@ -147,7 +147,45 @@ fn gallery(ui: &mut Ui, f: &Filter, view: &mut SettingsView, tweaks: &theme::Twe
     // A search for a theme's name shows only the themes it finds.
     let named: Vec<bool> = themes.iter().map(|th| f.names(&th.name)).collect();
     let any_named = named.iter().any(|&n| n);
+    let more_id = egui::Id::new("settings-themes-more");
+    let active = theme::find(&view.theme);
+    let external_active = active.as_ref().filter(|th| th.group != Group::Gitcraft);
+    let external_count = themes
+        .iter()
+        .filter(|th| th.group != Group::Gitcraft)
+        .count();
+    // Search can reveal named external themes until the user explicitly collapses them.
+    let search_external = any_named
+        && themes
+            .iter()
+            .zip(&named)
+            .any(|(th, named)| *named && th.group != Group::Gitcraft);
+    // Reveal search matches automatically until the user chooses the disclosure state.
+    // An explicit collapse wins over search, and the label always describes what is drawn.
+    let mut more = ui
+        .data(|d| d.get_temp::<bool>(more_id))
+        .unwrap_or(search_external);
     for group in Group::ALL {
+        if group == Group::Dark {
+            ui.add_space(4.0);
+            if ui
+                .button(if more { "Show less" } else { "Show more" })
+                .clicked()
+            {
+                more = !more;
+                ui.data_mut(|d| d.insert_temp(more_id, more));
+            }
+            layout::note(ui, format!("{external_count} other themes"));
+            if let Some(active) = external_active {
+                layout::note(ui, format!("Active theme: {}", active.name));
+            }
+            if search_external && more {
+                layout::note(ui, "Showing themes matching your search");
+            }
+        }
+        if group != Group::Gitcraft && !more {
+            continue;
+        }
         let members: Vec<_> = themes
             .iter()
             .zip(&named)
@@ -179,9 +217,10 @@ fn gallery(ui: &mut Ui, f: &Filter, view: &mut SettingsView, tweaks: &theme::Twe
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = CARD_GAP;
                 for info in chunk {
+                    let card_w = CARD.x.min(ui.available_width().max(1.0));
                     let (rect, resp) =
-                        ui.allocate_exact_size(vec2(CARD.x, CARD.y + NAME_H), Sense::click());
-                    let thumb = Rect::from_min_size(rect.min, CARD);
+                        ui.allocate_exact_size(vec2(card_w, CARD.y + NAME_H), Sense::click());
+                    let thumb = Rect::from_min_size(rect.min, vec2(card_w, CARD.y));
                     let tokens = info.tokens(tweaks);
                     preview::thumbnail(ui.painter(), thumb, &tokens);
                     let chosen = info.id == view.theme;
@@ -205,7 +244,7 @@ fn gallery(ui: &mut Ui, f: &Filter, view: &mut SettingsView, tweaks: &theme::Twe
                     } else {
                         FontId::proportional(11.5)
                     };
-                    let name = fit(ui, &info.name, &name_font, CARD.x - 4.0);
+                    let name = fit(ui, &info.name, &name_font, card_w - 4.0);
                     ui.painter().text(
                         pos2(thumb.center().x, thumb.bottom() + NAME_H / 2.0 + 2.0),
                         Align2::CENTER_CENTER,
@@ -219,7 +258,19 @@ fn gallery(ui: &mut Ui, f: &Filter, view: &mut SettingsView, tweaks: &theme::Twe
                     let resp = resp
                         .on_hover_cursor(egui::CursorIcon::PointingHand)
                         .on_hover_text(format!("{}\n{}", info.name, info.credit));
-                    if resp.clicked() && !chosen {
+                    resp.widget_info(|| {
+                        egui::WidgetInfo::selected(
+                            egui::WidgetType::SelectableLabel,
+                            true,
+                            chosen,
+                            &info.name,
+                        )
+                    });
+                    let keyboard = resp.has_focus()
+                        && ui.input(|i| {
+                            i.key_pressed(egui::Key::Enter) || i.key_pressed(egui::Key::Space)
+                        });
+                    if (resp.clicked() || keyboard) && !chosen {
                         view.request = Some(ProfileRequest::Theme(info.id.clone()));
                     }
                 }
@@ -461,4 +512,210 @@ fn message(ctx: &egui::Context) -> Option<Result<String, String>> {
     ctx.data(|d| d.get_temp::<(f64, Result<String, String>)>(message_id()))
         .filter(|(at, _)| now - at < 8.0)
         .map(|(_, m)| m)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui_kittest::kittest::Queryable;
+
+    fn harness(
+        width: f32,
+        scale: f32,
+    ) -> egui_kittest::Harness<'static, (Settings, ThemeId, bool)> {
+        egui_kittest::Harness::builder()
+            .with_size([width / scale, 900.0 / scale])
+            .with_pixels_per_point(scale)
+            .build_ui_state(
+                |ui, (settings, selected, fonts): &mut (Settings, ThemeId, bool)| {
+                    if !*fonts {
+                        crate::theme::install_fonts(ui.ctx());
+                        egui_extras::install_image_loaders(ui.ctx());
+                        *fonts = true;
+                        super::super::page::show(ui.ctx(), crate::settings::Page::Appearance);
+                        return;
+                    }
+                    crate::theme::apply(ui.ctx(), selected, &settings.theme_tweaks);
+                    let mut view = SettingsView {
+                        theme: selected.clone(),
+                        git_version: "2.45.0",
+                        dialog_open: false,
+                        update: crate::settings::UpdateCheck::NotYet,
+                        check_updates_now: false,
+                        previous: None,
+                        previous_is_newer: false,
+                        pinned: String::new(),
+                        go_back: false,
+                        unpin: false,
+                        request: None,
+                    };
+                    settings.page(ui, &mut view);
+                    if let Some(ProfileRequest::Theme(id)) = view.request {
+                        *selected = id;
+                    }
+                },
+                (Settings::default(), ThemeId::default(), false),
+            )
+    }
+
+    #[test]
+    fn area_d_followup_expanded_preview_keeps_controls_reachable_at_small_heights()
+    -> Result<(), String> {
+        for (width, height) in [(640.0, 900.0), (800.0, 500.0), (1100.0, 500.0)] {
+            for scale in [1.0, 1.25, 1.5] {
+                let mut h = harness(width, scale);
+                h.set_size(egui::vec2(width / scale, height / scale));
+                h.run();
+                h.get_by_label("Preview").click();
+                h.run();
+                h.get_by_label("Show more").scroll_to_me();
+                h.run();
+                let rect = h.get_by_label("Show more").rect();
+                assert!(
+                    h.ctx.content_rect().contains_rect(rect),
+                    "expanded preview makes disclosure unreachable at {width}x{height}/{scale}: {rect:?}"
+                );
+                if let Ok(dir) = std::env::var("GITCRAFT_AREA_D_SCREENSHOTS") {
+                    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+                    h.render()?
+                        .save(format!(
+                            "{dir}/followup-preview-{width:.0}-{height:.0}-{scale:.2}.png"
+                        ))
+                        .map_err(|e| e.to_string())?;
+                }
+                h.get_by_label("Show more").click();
+                h.run();
+                h.get_by_label("Show less");
+                let external =
+                    theme::find(&ThemeId::new("catppuccin-latte")).ok_or("missing theme")?;
+                h.get_by_role_and_label(egui::accesskit::Role::Button, &external.name)
+                    .scroll_to_me();
+                h.run();
+                let card = h
+                    .get_by_role_and_label(egui::accesskit::Role::Button, &external.name)
+                    .rect();
+                assert!(h.ctx.content_rect().contains_rect(card));
+                h.get_by_role_and_label(egui::accesskit::Role::Button, &external.name)
+                    .click();
+                h.run();
+                assert_eq!(h.state().1, external.id);
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn area_d_followup_search_disclosure_honors_explicit_collapse() -> Result<(), String> {
+        let mut h = harness(1100.0, 1.0);
+        h.get_by_role(egui::accesskit::Role::TextInput).focus();
+        h.run();
+        h.get_by_role(egui::accesskit::Role::TextInput)
+            .type_text("Catppuccin");
+        h.run();
+        h.get_by_role_and_label(egui::accesskit::Role::Button, "Catppuccin Latte");
+        // Exercise the original Show more -> Show less reproduction as well as a
+        // correctly auto-expanded search, whose disclosure already reads Show less.
+        if h.query_by_label("Show more").is_some() {
+            h.get_by_label("Show more").click();
+            h.run();
+        }
+        h.get_by_label("Show less").click();
+        h.run();
+        assert!(
+            h.query_all_by_role_and_label(egui::accesskit::Role::Button, "Catppuccin Latte")
+                .next()
+                .is_none(),
+            "explicit collapse was overridden by automatic search reveal"
+        );
+        h.get_by_label("Show more");
+        if let Ok(dir) = std::env::var("GITCRAFT_AREA_D_SCREENSHOTS") {
+            std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+            h.render()?
+                .save(format!("{dir}/followup-search-collapsed.png"))
+                .map_err(|e| e.to_string())?;
+        }
+        h.get_by_label("Show more").click();
+        h.run();
+        h.get_by_label("Show less");
+        h.get_by_role_and_label(egui::accesskit::Role::Button, "Catppuccin Latte");
+        assert_eq!(h.state().1, ThemeId::default());
+        Ok(())
+    }
+
+    #[test]
+    fn area_d_appearance_matrix_discloses_filters_and_preserves_active_theme() -> Result<(), String>
+    {
+        for width in [640.0, 1100.0, 1600.0] {
+            for scale in [1.0, 1.25, 1.5] {
+                let mut h = harness(width, scale);
+                h.run();
+                let builtin_names: Vec<_> = theme::themes()
+                    .iter()
+                    .filter(|t| t.group == Group::Gitcraft)
+                    .map(|t| t.name.clone())
+                    .collect();
+                assert_eq!(builtin_names.len(), 5);
+                for name in &builtin_names {
+                    h.get_by_role_and_label(egui::accesskit::Role::Button, name);
+                }
+                assert!(h.query_all_by_label("Catppuccin Latte").next().is_none());
+                if let Ok(dir) = std::env::var("GITCRAFT_AREA_D_SCREENSHOTS") {
+                    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+                    h.render()?
+                        .save(format!("{dir}/appearance-{width:.0}-{scale:.2}.png"))
+                        .map_err(|e| e.to_string())?;
+                }
+                h.get_by_label("Show more").scroll_to_me();
+                h.run();
+                h.get_by_label("Show more").focus();
+                h.key_press(egui::Key::Enter);
+                h.run();
+                h.get_by_label("Show less");
+                let external = theme::find(&ThemeId::new("catppuccin-latte"))
+                    .ok_or("missing fixture theme")?;
+                h.get_by_role_and_label(egui::accesskit::Role::Button, &external.name)
+                    .scroll_to_me();
+                h.run();
+                h.get_by_role_and_label(egui::accesskit::Role::Button, &external.name)
+                    .click();
+                h.run();
+                assert_eq!(h.state().1, external.id);
+                h.get_by_label("Show less").scroll_to_me();
+                h.run();
+                h.get_by_label("Show less").click();
+                h.run();
+                h.get_by_label_contains("Active theme: Catppuccin Latte");
+                assert_eq!(h.state().1, external.id);
+                h.get_by_label("Show more").click();
+                h.run();
+                h.get_by_label("Dark").scroll_to_me();
+                h.run();
+                h.get_by_label("Dark").click();
+                h.run();
+                assert!(
+                    h.query_all_by_role_and_label(egui::accesskit::Role::Button, &external.name)
+                        .next()
+                        .is_none()
+                );
+                h.get_by_label("Light").click();
+                h.run();
+                h.get_by_role_and_label(egui::accesskit::Role::Button, &external.name);
+                assert_eq!(h.state().1, external.id);
+                h.get_by_label("All").click();
+                h.run();
+                // A custom-painted theme card is keyboard focusable and activates with Enter.
+                let dark = theme::themes()
+                    .iter()
+                    .find(|t| t.group == Group::Gitcraft && t.dark())
+                    .map(|t| t.name.clone())
+                    .ok_or("missing dark theme")?;
+                h.get_by_role_and_label(egui::accesskit::Role::Button, &dark)
+                    .focus();
+                h.key_press(egui::Key::Enter);
+                h.run();
+                assert_eq!(h.state().1.label(), dark);
+            }
+        }
+        Ok(())
+    }
 }

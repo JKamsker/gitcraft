@@ -294,3 +294,106 @@ fn going_back_and_unpinning_show_only_when_they_can_be_done() {
     );
     assert_eq!(found_with("unpin", None, "0.3.3"), [(Page::General, 1)]);
 }
+
+#[test]
+fn area_d_optional_settings_persist_without_changing_permissions() {
+    let old: Settings = ron::from_str("(agent_writes: true)").unwrap_or_default();
+    assert!(!old.show_agents);
+    assert!(old.agent_writes);
+    assert_eq!(old.context_menus, ContextMenus::default());
+    for agent_writes in [false, true] {
+        let settings = Settings {
+            show_agents: true,
+            agent_writes,
+            context_menus: ContextMenus {
+                diagnostics: true,
+                surgery: true,
+                rehearsal: true,
+                release: true,
+            },
+            ..Settings::default()
+        };
+        let mut storage = Memory::default();
+        eframe::set_value(&mut storage, "settings", &settings);
+        let loaded: Option<Settings> = eframe::get_value(&storage, "settings");
+        assert_eq!(loaded, Some(settings));
+    }
+    assert_eq!(found("Show Agents section"), vec![(Page::Agents, 1)]);
+    assert_eq!(found("commit surgery"), vec![(Page::ContextMenus, 1)]);
+}
+
+#[test]
+fn area_d_optional_settings_pages_fit_and_toggle_at_each_scale() -> Result<(), String> {
+    use egui_kittest::kittest::Queryable;
+    for width in [640.0, 1100.0, 1600.0] {
+        for scale in [1.0, 1.25, 1.5] {
+            for page in [Page::ContextMenus, Page::Agents] {
+                let mut h = egui_kittest::Harness::builder()
+                    .with_size([width / scale, 900.0 / scale])
+                    .with_pixels_per_point(scale)
+                    .build_ui_state(
+                        move |ui, (settings, fonts): &mut (Settings, bool)| {
+                            if !*fonts {
+                                crate::theme::install_fonts(ui.ctx());
+                                egui_extras::install_image_loaders(ui.ctx());
+                                *fonts = true;
+                                super::page::show(ui.ctx(), page);
+                                return;
+                            }
+                            let theme = crate::theme::ThemeId::default();
+                            crate::theme::apply(ui.ctx(), &theme, &settings.theme_tweaks);
+                            let mut view = SettingsView {
+                                theme,
+                                git_version: "2.45.0",
+                                dialog_open: false,
+                                update: UpdateCheck::NotYet,
+                                check_updates_now: false,
+                                previous: None,
+                                previous_is_newer: false,
+                                pinned: String::new(),
+                                go_back: false,
+                                unpin: false,
+                                request: None,
+                            };
+                            settings.page(ui, &mut view);
+                        },
+                        (Settings::default(), false),
+                    );
+                h.run();
+                let label = if page == Page::Agents {
+                    "Show Agents section"
+                } else {
+                    "Show split and move changes"
+                };
+                h.get_by_role_and_label(egui::accesskit::Role::CheckBox, label)
+                    .click();
+                h.run();
+                assert!(h.state().0.agent_writes);
+                assert_eq!(h.state().0.show_agents, page == Page::Agents);
+                assert_eq!(
+                    h.state().0.context_menus.surgery,
+                    page == Page::ContextMenus
+                );
+                let checkbox = h
+                    .get_by_role_and_label(egui::accesskit::Role::CheckBox, label)
+                    .rect();
+                assert!(
+                    h.ctx.content_rect().contains_rect(checkbox),
+                    "setting clipped at {width}/{scale}: {checkbox:?}"
+                );
+                if let Ok(dir) = std::env::var("GITCRAFT_AREA_D_SCREENSHOTS") {
+                    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+                    let name = if page == Page::Agents {
+                        "agents-settings"
+                    } else {
+                        "context-settings"
+                    };
+                    h.render()?
+                        .save(format!("{dir}/{name}-{width:.0}-{scale:.2}.png"))
+                        .map_err(|e| e.to_string())?;
+                }
+            }
+        }
+    }
+    Ok(())
+}

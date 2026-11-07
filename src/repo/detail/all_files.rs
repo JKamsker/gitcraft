@@ -49,17 +49,16 @@ impl RepoTab {
 
     /// The "View all files" box.
     pub(super) fn all_files_toggle(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
-        egui::Frame::new()
-            .inner_margin(egui::Margin::symmetric(10, 4))
-            .show(ui, |ui| {
-                let mut on = self.all_files.on;
-                let resp = ui
-                    .checkbox(&mut on, "View all files")
-                    .on_hover_text("List every file of the commit, not only those it changed");
-                if resp.changed() {
-                    acts.push(Action::ViewAllFiles(on));
-                }
-            });
+        if crate::icons::toggle_button(ui, "folder-tree", "View all files", self.all_files.on)
+            .on_hover_text(if self.all_files.on {
+                "All files in this commit · click to show only changed files"
+            } else {
+                "Changed files only · click to view all files in this commit"
+            })
+            .clicked()
+        {
+            acts.push(Action::ViewAllFiles(!self.all_files.on));
+        }
     }
 
     /// Every file of `detail`'s commit, those it changed with their status; each opens as it is
@@ -101,53 +100,56 @@ impl RepoTab {
         };
         let id = egui::Id::new(("file-folder", self.repo_key(), "all"));
         // Rows are known by their path within this commit's files.
-        ui.push_id(("all-files", &detail.hash), |ui| {
-            branch_tree::files(
-                ui,
-                (id, false),
-                files,
-                |p| p.as_str(),
-                &|p: &&String| shown(p),
-                &mut |ui, indent, path| {
-                    let change = changed.get(path.as_str());
-                    let extra = match change {
-                        Some(f) => RowExtra::Stats(f.added, f.removed),
-                        None => RowExtra::Buttons(&[]),
-                    };
-                    let code = change.map_or(' ', |f| f.status);
-                    let r = widgets::file_row(ui, code, path, None, indent, shown(path), extra);
-                    // The checkout's files only, and not over a changed file's stats.
-                    if change.is_none() && self.is_checkout(Some(&detail.hash)) {
-                        self.pointer_mark(ui, &r.row, path, shown(path));
-                    }
-                    // Over the stats of a changed file, the padlock would hide them.
-                    if change.is_none() {
-                        self.lock_badge(ui, &r.row, path, (false, shown(path)));
-                    }
-                    let locks = |ui: &mut Ui, acts: &mut Vec<Action>| {
-                        self.lock_menu_items(ui, path, Some(&detail.hash), acts);
-                        self.storage_menu_items(ui, path, Some(&detail.hash), acts);
-                    };
-                    let links = || self.link_menu(None);
-                    widgets::file_menu_with(
-                        &r.row,
-                        path,
-                        Some(&detail.hash),
-                        false,
-                        None,
-                        &links,
-                        acts,
-                        locks,
-                    );
-                    if r.row.clicked() {
-                        acts.push(Action::FileView {
-                            path: path.clone(),
-                            rev: Some(detail.hash.clone()),
-                            tab: FileTab::File,
-                        });
-                    }
-                },
-            );
+        let paths: Vec<&str> = files.iter().map(String::as_str).collect();
+        super::horizontal_files(ui, ("all-files-scroll", &detail.hash), &paths, |ui| {
+            ui.push_id(("all-files", &detail.hash), |ui| {
+                branch_tree::files(
+                    ui,
+                    (id, false),
+                    files,
+                    |p| p.as_str(),
+                    &|p: &&String| shown(p),
+                    &mut |ui, indent, path| {
+                        let change = changed.get(path.as_str());
+                        let extra = match change {
+                            Some(f) => RowExtra::Stats(f.added, f.removed),
+                            None => RowExtra::Buttons(&[]),
+                        };
+                        let code = change.map_or(' ', |f| f.status);
+                        let r = widgets::file_row(ui, code, path, None, indent, shown(path), extra);
+                        // The checkout's files only, and not over a changed file's stats.
+                        if change.is_none() && self.is_checkout(Some(&detail.hash)) {
+                            self.pointer_mark(ui, &r.row, path, shown(path));
+                        }
+                        // Over the stats of a changed file, the padlock would hide them.
+                        if change.is_none() {
+                            self.lock_badge(ui, &r.row, path, (false, shown(path)));
+                        }
+                        let locks = |ui: &mut Ui, acts: &mut Vec<Action>| {
+                            self.lock_menu_items(ui, path, Some(&detail.hash), acts);
+                            self.storage_menu_items(ui, path, Some(&detail.hash), acts);
+                        };
+                        let links = || self.link_menu(None);
+                        widgets::file_menu_with(
+                            &r.row,
+                            path,
+                            Some(&detail.hash),
+                            false,
+                            None,
+                            &links,
+                            acts,
+                            locks,
+                        );
+                        if r.row.clicked() {
+                            acts.push(Action::FileView {
+                                path: path.clone(),
+                                rev: Some(detail.hash.clone()),
+                                tab: FileTab::File,
+                            });
+                        }
+                    },
+                );
+            });
         });
     }
 }
