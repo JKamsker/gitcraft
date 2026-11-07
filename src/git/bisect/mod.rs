@@ -121,8 +121,8 @@ pub fn bisect_state(repo: &Path) -> Result<Option<Bisect>, String> {
     };
     // Side by side: for a repository elsewhere, each is a round trip or more.
     let (files, refs, current) = std::thread::scope(|scope| {
-        let files = scope.spawn(|| Files::read(repo));
-        let refs = scope.spawn(|| bisect_refs(repo));
+        let files = scope.spawn(crate::connections::inherit(|| Files::read(repo)));
+        let refs = scope.spawn(crate::connections::inherit(|| bisect_refs(repo)));
         let current = current_commit(repo);
         let join = |_| "could not read the bisect".to_owned();
         Ok::<_, String>((
@@ -193,9 +193,9 @@ impl Files {
         };
         // Side by side: for a repository elsewhere, each is a round trip.
         std::thread::scope(|scope| {
-            let terms = scope.spawn(|| optional_file(repo, terms));
-            let start = scope.spawn(|| optional_file(repo, start));
-            let names = scope.spawn(|| optional_file(repo, names));
+            let terms = scope.spawn(crate::connections::inherit(|| optional_file(repo, terms)));
+            let start = scope.spawn(crate::connections::inherit(|| optional_file(repo, start)));
+            let names = scope.spawn(crate::connections::inherit(|| optional_file(repo, names)));
             let first_parent = optional_file(repo, first_parent)?.is_some();
             let join = |_| "could not read the bisect's files".to_owned();
             Ok(Self {

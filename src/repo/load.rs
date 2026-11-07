@@ -286,6 +286,46 @@ impl RepoTab {
         newer
     }
 
+    /// Editing transport identity invalidates credentials and account-dependent read results.
+    /// Already submitted operations keep their immutable original context.
+    pub(crate) fn notice_connections(&mut self, ctx: &egui::Context) {
+        let now = crate::connections::current();
+        if self.connection_context == now {
+            return;
+        }
+        self.connection_context = now;
+        self.credentials = None;
+        if matches!(self.dialog, Some(super::Dialog::Credentials { .. })) {
+            self.dialog = None;
+        }
+        self.prs.clear();
+        self.pr_error = None;
+        self.prs_loaded = Some(Instant::now());
+        self.forget_merged_prs();
+        self.ci.account_changed();
+        self.ci_view = None;
+        self.avatars_hinted = false;
+        self.pr_requests += 1;
+        if let Some(view) = &mut self.pr_view {
+            view.account_changed(self.pr_requests);
+        }
+        for parked in &mut self.parked {
+            parked.notice_connections(ctx);
+        }
+        if self.sleeping() {
+            return;
+        }
+        self.reload_identity(ctx);
+        if crate::network::background_may_run() {
+            self.load_prs(ctx);
+            self.refresh_ci(ctx);
+            if self.pr_view.is_some() {
+                self.load_pr(ctx);
+            }
+            self.hint_avatars(ctx);
+        }
+    }
+
     /// Re-reads the submodules: the commits they should be at are in the index, which can
     /// change without any ref moving (`git add` of a submodule, `git submodule add`).
     /// Reads again who commits are made as: the profile's author changed.
@@ -799,5 +839,37 @@ mod tests {
         }
         tab.poll(&ctx);
         assert!(tab.prs.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod connection_identity_tests {
+    use super::*;
+    #[test]
+    fn connection_edits_clear_tab_and_parked_credentials_before_another_action() {
+        let a = crate::connections::Context {
+            error: Some("profile a".into()),
+            ..Default::default()
+        };
+        let b = crate::connections::Context {
+            error: Some("profile b".into()),
+            ..Default::default()
+        };
+        let ctx = egui::Context::default();
+        let mut tab =
+            a.run(|| RepoTab::new_deferred("/nonexistent/context-edit-main".into(), &ctx));
+        let mut parked =
+            a.run(|| RepoTab::new_deferred("/nonexistent/context-edit-worktree".into(), &ctx));
+        let creds = git::Credentials {
+            username: "alice".into(),
+            password: "never-send-as-bob".into(),
+        };
+        tab.set_credentials(creds.clone());
+        parked.set_credentials(creds);
+        tab.parked.push(Box::new(parked));
+        b.run(|| tab.notice_connections(&ctx));
+        assert!(tab.credentials.is_none());
+        assert!(tab.parked[0].credentials.is_none());
+        assert_eq!(tab.connection_context, b);
     }
 }

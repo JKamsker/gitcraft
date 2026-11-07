@@ -201,11 +201,16 @@ impl Context {
     }
 }
 
+/// Capture both the profile and task lifetime before entering any nested thread.
+pub(crate) fn inherit<F: FnOnce() -> T, T>(job: F) -> impl FnOnce() -> T {
+    let context = current();
+    let cancel = crate::tasks::cancellation();
+    move || crate::tasks::with_cancellation(cancel, || context.run(job))
+}
 pub(crate) fn spawn<T: Send + 'static>(
     job: impl FnOnce() -> T + Send + 'static,
 ) -> std::thread::JoinHandle<T> {
-    let context = current();
-    std::thread::spawn(move || context.run(job))
+    std::thread::spawn(inherit(job))
 }
 
 /// Git executes core.sshCommand with its shell, including on Git for Windows.

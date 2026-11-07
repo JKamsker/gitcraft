@@ -44,6 +44,18 @@ pub(crate) fn cancellation() -> Cancellation {
     CURRENT.with(|slot| slot.borrow().clone().unwrap_or_default())
 }
 
+/// Bind an inherited lifetime in a nested worker, restoring the previous token on unwind.
+pub(crate) fn with_cancellation<T>(cancel: Cancellation, work: impl FnOnce() -> T) -> T {
+    struct Restore(Option<Cancellation>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            CURRENT.with(|slot| *slot.borrow_mut() = self.0.take());
+        }
+    }
+    let _restore = Restore(CURRENT.with(|slot| slot.replace(Some(cancel))));
+    work()
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Priority {
     Interactive,

@@ -223,7 +223,7 @@ impl RepoTab {
                 w
             })
             .collect();
-        if from.credentials.is_some() {
+        if from.credentials.is_some() && from.connection_context == crate::connections::current() {
             self.credentials = from.credentials.clone();
         }
     }

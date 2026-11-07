@@ -1112,3 +1112,34 @@ fn profile_openssh_checks_options_after_the_hostname_until_the_command_boundary(
         );
     }
 }
+
+#[test]
+fn scoped_workers_keep_the_captured_profile_and_cancellation_even_after_context_changes() {
+    let parent = crate::tasks::Cancellation::default();
+    let a = Context {
+        error: Some("captured profile".into()),
+        ..Default::default()
+    };
+    let b = Context {
+        error: Some("later profile".into()),
+        ..Default::default()
+    };
+    crate::tasks::with_cancellation(parent.clone(), || {
+        a.run(|| {
+            let work = inherit(|| (current(), crate::tasks::cancellation().is_cancelled()));
+            parent.cancel();
+            b.run(|| {
+                std::thread::scope(|scope| {
+                    let (context, cancelled) = scope.spawn(work).join().expect("synthetic worker");
+                    assert_eq!(context, a);
+                    assert!(cancelled);
+                    assert_eq!(current(), b);
+                })
+            });
+        })
+    });
+    assert!(
+        !crate::tasks::cancellation().is_cancelled(),
+        "the caller's prior lifetime is restored"
+    );
+}

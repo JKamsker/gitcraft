@@ -13,6 +13,7 @@ use crate::settings::Settings;
 
 impl RepoTab {
     pub(crate) fn apply(&mut self, action: Action, ctx: &egui::Context) {
+        self.notice_connections(ctx);
         let Some(action) = self.popout_intercept(action, ctx) else {
             return;
         };

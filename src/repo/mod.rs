@@ -325,6 +325,7 @@ pub struct RepoTab {
     push_flow: push::PushFlow,
     /// HTTPS credentials typed in this session, used for every later git command of the tab.
     credentials: Option<git::Credentials>,
+    connection_context: crate::connections::Context,
     /// The last operation started, to run again after signing in.
     last_op: Option<PendingOp>,
     /// A known git failure explained, with its fix (see [`crate::error_card`]).
@@ -619,6 +620,7 @@ impl RepoTab {
             reword: None,
             push_flow: Default::default(),
             credentials: None,
+            connection_context: crate::connections::current(),
             last_op: None,
             error_card: None,
             avatars_hinted: false,

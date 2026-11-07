@@ -34,6 +34,13 @@ pub(crate) struct PrView {
 }
 
 impl PrView {
+    pub(super) fn account_changed(&mut self, request: u64) {
+        self.request = request;
+        self.loading = false;
+        self.details = None;
+        self.files = None;
+    }
+
     /// The pull request's latest commit as last read.
     pub(super) fn head(&self) -> Option<&str> {
         self.seen_head.as_deref()
