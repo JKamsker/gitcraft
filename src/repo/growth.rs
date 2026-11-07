@@ -44,7 +44,7 @@ impl Default for State {
         }
     }
 }
-fn tree_rows(data: &Growth, cursor: usize) -> Vec<TreeRow> {
+fn tree_rows(data: &Growth, cursor: usize) -> Result<Vec<TreeRow>, String> {
     let files = data.files_at(cursor);
     let mut all = files.clone();
     let changes = data
@@ -59,13 +59,20 @@ fn tree_rows(data: &Growth, cursor: usize) -> Vec<TreeRow> {
         .unwrap_or_default();
     for path in files.iter().chain(&changes) {
         all.insert(path.clone());
+        if all.len() > 200_000 {
+            return Err("Replay tree exceeds the 200,000 folder/file entry budget".into());
+        }
         for (i, b) in path.iter().enumerate() {
             if *b == b'/' {
                 all.insert(path[..i].to_vec());
+                if all.len() > 200_000 {
+                    return Err("Replay tree exceeds the 200,000 folder/file entry budget".into());
+                }
             }
         }
     }
-    all.into_iter()
+    Ok(all
+        .into_iter()
         .map(|path| {
             let changed = changes.contains(&path);
             let removed = changed && !files.contains(&path);
@@ -77,7 +84,7 @@ fn tree_rows(data: &Growth, cursor: usize) -> Vec<TreeRow> {
                 removed,
             }
         })
-        .collect()
+        .collect())
 }
 impl RepoTab {
     pub(super) fn open_growth(&mut self) {
@@ -148,7 +155,7 @@ impl RepoTab {
             if view.playing {ctx.request_repaint_after(Duration::from_millis(30));}
             if view.requested!=Some(view.cursor) {
                 let at=view.cursor;let snapshot=data.clone();view.requested=Some(at);
-                view.frames.queue(move |active| {if !active(){return Err("Frame cancelled".into());} let rows=tree_rows(&snapshot,at);if !active(){return Err("Frame cancelled".into());}Ok((at,rows))});
+                view.frames.queue(move |active| {if !active(){return Err("Frame cancelled".into());} let rows=tree_rows(&snapshot,at)?;if !active(){return Err("Frame cancelled".into());}Ok((at,rows))});
             }
             if view.frames.busy() {ui.label(format!("Preparing frame {}…",view.cursor+1));}
             let frame=&data.frames[view.shown.min(data.frames.len()-1)];
@@ -206,7 +213,7 @@ mod tests {
             more: false,
             shallow: false,
         };
-        let rows = tree_rows(&data, 1);
+        let rows = tree_rows(&data, 1).unwrap_or_default();
         assert!(rows.iter().any(|r| r.path == b"src" && r.directory));
         assert!(
             rows.iter()
@@ -243,7 +250,7 @@ mod tests {
             more: false,
             shallow: false,
         });
-        let rows = tree_rows(&data, 0);
+        let rows = tree_rows(&data, 0)?;
         tab.growth = Some(State {
             data: Some(data),
             rows,

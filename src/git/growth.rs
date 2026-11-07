@@ -64,9 +64,26 @@ pub(crate) fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<Growth, Str
     if let Some(first) = frames.first() {
         let tree = run(&["ls-tree", "-r", "-z", "--name-only", &first.hash])?;
         for path in tree.split(|b| *b == 0).filter(|p| !p.is_empty()) {
+            validate_path(path)?;
             baseline.insert(path.to_vec());
             if baseline.len() > 100_000 {
                 return Err("Growth replay is limited to 100,000 files".into());
+            }
+        }
+    }
+    let mut state = baseline.clone();
+    for frame in frames.iter().skip(1) {
+        for (path, present) in &frame.changes {
+            if !active() {
+                return Err("Replay cancelled".into());
+            }
+            if *present {
+                state.insert(path.clone());
+            } else {
+                state.remove(path);
+            }
+            if state.len() > 100_000 {
+                return Err("Growth replay is limited to 100,000 files per tree".into());
             }
         }
     }
@@ -76,6 +93,12 @@ pub(crate) fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<Growth, Str
         more,
         shallow,
     })
+}
+fn validate_path(path: &[u8]) -> Result<(), String> {
+    if path.is_empty() || path.len() > 32768 || path.split(|b| *b == b'/').count() > 128 {
+        return Err("Growth path/depth budget exceeded".into());
+    }
+    Ok(())
 }
 fn parse(raw: &[u8]) -> Result<Vec<Frame>, String> {
     let mut fields = raw.split(|b| *b == 0).peekable();
@@ -114,6 +137,7 @@ fn parse(raw: &[u8]) -> Result<Vec<Frame>, String> {
             if path.is_empty() {
                 return Err("Empty replay path".into());
             }
+            validate_path(path)?;
             changes.push((path.to_vec(), parts[4] != b"D"));
         }
         frames.push(Frame {

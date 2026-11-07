@@ -265,16 +265,20 @@ impl RepoTab {
             let repo = self.path.clone();
             let base = self.postcards.base.clone();
             let target = self.postcards.target.clone();
-            self.postcards.context = Some(crate::git::profile_config());
-            self.postcards.reader.queue(move |active| {
-                git::postcards::range(&repo, &base, &target, active).map(Answer::Range)
+            let profile = crate::git::profile_config();
+            self.postcards.context = Some(profile.clone());
+            self.postcards.reader.queue(move |owned| {
+                let active = || owned() && crate::git::profile_config() == profile;
+                git::postcards::range(&repo, &base, &target, &active).map(Answer::Range)
             });
         }
         if compose && let Some(commits) = &self.postcards.commits {
             let snapshot = Snapshot::new(&self.postcards, commits);
-            self.postcards.context = Some(crate::git::profile_config());
-            self.postcards.reader.queue(move |active| {
-                let (image, png) = render::render(&snapshot, active)?;
+            let profile = crate::git::profile_config();
+            self.postcards.context = Some(profile.clone());
+            self.postcards.reader.queue(move |owned| {
+                let active = || owned() && crate::git::profile_config() == profile;
+                let (image, png) = render::render(&snapshot, &active)?;
                 Ok(Answer::Preview(snapshot, image, png))
             });
         }
@@ -288,9 +292,11 @@ impl RepoTab {
             {
                 match export::Destination::capture(&path) {
                     Ok(destination) => {
-                        self.postcards.context = Some(crate::git::profile_config());
-                        self.postcards.reader.queue(move |active| {
-                            destination.publish(&png, active)?;
+                        let profile = crate::git::profile_config();
+                        self.postcards.context = Some(profile.clone());
+                        self.postcards.reader.queue(move |owned| {
+                            let active = || owned() && crate::git::profile_config() == profile;
+                            destination.publish(&png, &active)?;
                             Ok(Answer::Saved)
                         });
                     }
