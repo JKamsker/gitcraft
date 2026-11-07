@@ -24,6 +24,7 @@ pub(super) struct State {
     enter: bool,
     focus_requested: bool,
     focus_row: bool,
+    parked_focus: Option<Id>,
     step: i32,
 }
 
@@ -114,6 +115,18 @@ impl RepoTab {
 
     pub(super) fn keyboard_panes(&mut self, ctx: &egui::Context) {
         self.keyboard_scope();
+        if self.keys_blocked && !crate::a11y::keyboard_taken(ctx) {
+            if let Some(focused) = ctx.memory(|m| m.focused()) {
+                self.keyboard.borrow_mut().parked_focus = Some(focused);
+                ctx.memory_mut(|m| m.surrender_focus(focused));
+            }
+        } else if !self.keys_blocked
+            && let Some(focused) = self.keyboard.borrow_mut().parked_focus.take()
+        {
+            if ctx.memory(|m| m.focused().is_none()) {
+                ctx.memory_mut(|m| m.request_focus(focused));
+            }
+        }
         keymap::active(ctx, self.key_scopes(ctx));
         if !available(self, ctx) {
             return;
@@ -222,7 +235,9 @@ impl RepoTab {
             &self.work.staged,
         ];
         let navigating = self.keyboard.borrow().enter
-            || ui.input(|i| i.key_pressed(Key::J) || i.key_pressed(Key::K));
+            || (keymap::queued(ui.ctx(), Command::FileNext)
+                || keymap::queued(ui.ctx(), Command::FilePrevious)
+                || self.keyboard.borrow().step != 0);
         let files: Vec<_> = if navigating && Settings::get(ui.ctx()).files_as_tree {
             groups
                 .into_iter()

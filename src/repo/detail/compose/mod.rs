@@ -29,6 +29,7 @@ pub(in crate::repo) struct Compose {
     /// The box is to be started from the template and the hook: the tab was opened, or a
     /// commit was just made.
     prefill_due: bool,
+    editor_ids: Vec<egui::Id>,
     prefilling: bool,
     /// What went wrong reading the template or running the hook (never in the way of
     /// committing).
@@ -64,6 +65,7 @@ impl Default for Compose {
     fn default() -> Self {
         Self {
             prefill_due: true,
+            editor_ids: Vec::new(),
             prefilling: false,
             notice: None,
             template: None,
@@ -339,6 +341,13 @@ impl RepoTab {
 
     /// The summary and description fields, with completion. `enabled`: whether they can be
     /// typed in.
+    pub(crate) fn composer_has_focus(&self, ctx: &egui::Context) -> bool {
+        ctx.memory(|m| {
+            m.focused()
+                .is_some_and(|id| self.compose.editor_ids.contains(&id))
+        })
+    }
+
     pub(in crate::repo) fn message_fields(
         &mut self,
         ui: &mut Ui,
@@ -378,6 +387,7 @@ impl RepoTab {
                 (summary, body)
             })
             .inner;
+        self.compose.editor_ids = vec![summary.id, body.id];
         self.compose.completion = open;
         self.compose.candidates = Some((self.work_read, cands.types, cands));
         (summary, body)

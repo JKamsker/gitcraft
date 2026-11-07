@@ -583,7 +583,27 @@ impl App {
             || (crate::a11y::keyboard_taken(ctx) && !home_filter::search_has_focus(ctx));
         let focused =
             ctx.input(|i| i.focused || i.raw.viewports.values().any(|v| v.focused == Some(true)));
-        let commands = if keymap::editor::capturing(ctx) {
+        let capturing = keymap::editor::capturing(ctx);
+        let allowed = if capturing {
+            Some(Vec::new())
+        } else if modal_open {
+            let mut allowed = vec![keymap::Command::Manual, keymap::Command::Palette];
+            if self.palette.is_none()
+                && !self.manual_open
+                && self.clone_form.is_none()
+                && self.remote_form.is_none()
+                && !self.askpass_open()
+                && let Some(Tab::Repo(r)) = self.tabs.get(self.active)
+                && r.composer_has_focus(ctx)
+            {
+                allowed.push(keymap::Command::Commit);
+            }
+            Some(allowed)
+        } else {
+            None
+        };
+        keymap::restrict(ctx, allowed);
+        let commands = if capturing {
             keymap::cancel(ctx, keymap::Scope::Window);
             Vec::new()
         } else if modal_open {

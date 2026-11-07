@@ -14,6 +14,7 @@ struct Resolver {
     pass: Option<u64>,
     commands: Vec<Command>,
     active: Vec<Scope>,
+    allowed: Option<Vec<Command>>,
 }
 
 fn id(ctx: &Context, _scope: Scope) -> Id {
@@ -66,10 +67,17 @@ impl Resolver {
         });
         let mut found = None;
         let mut candidates = Vec::new();
-        for c in config::commands().filter(|c| {
-            self.active.is_empty() && matches!(c.scope(), Scope::Window | Scope::Repository)
-                || self.active.contains(&c.scope())
-        }) {
+        for c in config::commands()
+            .filter(|c| {
+                self.allowed
+                    .as_ref()
+                    .is_none_or(|allowed| allowed.contains(c))
+            })
+            .filter(|c| {
+                self.active.is_empty() && matches!(c.scope(), Scope::Window | Scope::Repository)
+                    || self.active.contains(&c.scope())
+            })
+        {
             let seq = config::effective(&self.config, c);
             if seq.len() <= self.prefix.len() || seq[..self.prefix.len()] != self.prefix {
                 continue;
@@ -105,6 +113,19 @@ impl Resolver {
     }
 }
 
+/// Modal/text owners only expose their deliberate command exceptions. Other bindings must
+/// neither dispatch nor consume the editor/terminal's keys.
+pub(crate) fn restrict(ctx: &Context, allowed: Option<Vec<Command>>) {
+    let key = id(ctx, Scope::Window).with("allowed");
+    let old = ctx
+        .data(|d| d.get_temp::<Option<Vec<Command>>>(key))
+        .flatten();
+    if old != allowed {
+        cancel(ctx, Scope::Window);
+    }
+    ctx.data_mut(|d| d.insert_temp(key, allowed));
+}
+
 pub(crate) fn active(ctx: &Context, scopes: Vec<Scope>) {
     let key = id(ctx, Scope::Window).with("active");
     let old: Option<Vec<Scope>> = ctx.data(|d| d.get_temp(key));
@@ -112,6 +133,12 @@ pub(crate) fn active(ctx: &Context, scopes: Vec<Scope>) {
         cancel(ctx, Scope::Window);
     }
     ctx.data_mut(|d| d.insert_temp(key, scopes));
+}
+
+pub(crate) fn queued(ctx: &Context, command: Command) -> bool {
+    let key = id(ctx, command.scope());
+    ctx.data(|d| d.get_temp::<Resolver>(key))
+        .is_some_and(|r| r.commands.contains(&command))
 }
 
 /// Consume one contextual command without draining unrelated keys for the same list.
@@ -149,6 +176,9 @@ pub(crate) fn pressed(ctx: &Context, scope: Scope) -> Vec<Command> {
         return commands;
     }
     r.pass = Some(pass);
+    r.allowed = ctx
+        .data(|d| d.get_temp::<Option<Vec<Command>>>(key_id.with("allowed")))
+        .flatten();
     r.active = ctx
         .data(|d| d.get_temp::<Vec<Scope>>(key_id.with("active")))
         .unwrap_or_default();
@@ -398,5 +428,38 @@ mod integration_tests {
             frame(&ctx, 0.7, vec![key(Key::F, egui::Modifiers::NONE)]),
             (vec![], vec![])
         );
+    }
+}
+
+#[cfg(test)]
+mod owner_tests {
+    use super::*;
+    #[test]
+    fn modal_restriction_leaves_unrelated_editor_keys_unconsumed() {
+        let ctx = Context::default();
+        restrict(&ctx, Some(vec![Command::Palette, Command::Manual]));
+        let key = Event::Key {
+            key: Key::Enter,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::COMMAND,
+        };
+        ctx.run_ui(
+            egui::RawInput {
+                events: vec![key.clone()],
+                ..Default::default()
+            },
+            |_| {
+                assert!(pressed(&ctx, Scope::Window).is_empty());
+                assert!(pressed(&ctx, Scope::Repository).is_empty());
+                assert!(
+                    ctx.input(|i| i.events.contains(&key)),
+                    "terminal/editor Ctrl+Enter stays available"
+                );
+            },
+        )
+        .textures_delta
+        .clear();
     }
 }
