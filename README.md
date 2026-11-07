@@ -173,6 +173,21 @@ so your config, credentials and hooks apply as usual.
   (warns when the commit is already pushed), the identity you commit as (and whether it is the
   repository's own, the profile's or the global one), and saved identities or profile authors
   to switch a repository to; _Use the profile's author_ takes the repository's own out again.
+- The commit box starts from the repository's `commit.template` (`~` and relative paths as git
+  reads them; its comment lines are left out, because git keeps a message it is given as it
+  is) and then runs its `prepare-commit-msg` hook with the arguments git passes, as git's own
+  editor would (stopped after 10 seconds; an error shows under the message and never stops a
+  commit; the options can leave the hook out, since git runs it again when committing). An
+  unchanged template isn't committed, as git refuses it; amending, or a merge's message, takes
+  its place. Above the message: templates (`commit.template`, _Run prepare-commit-msg_, saved
+  ones for this repository or all), a type / scope picker (Conventional Commits, Gitmoji or
+  none), _Add co-author_ (the repository's authors as `.mailmap` names them, written as a
+  `Co-authored-by:` trailer by `git interpret-trailers`) and the options. A template that
+  replaces what was typed can be undone. Typing completes the names of changed files and the
+  types and scopes used before: while the list shows, Tab takes the suggestion instead of
+  moving to the next field.
+- Issue references in a commit's message link to their page: `#12` to the forge's issue, and
+  patterns of your own (`JIRA-\d+` → `https://jira.example.com/browse/$0`).
 - _Fold staged changes into this commit_ (a commit's menu in the graph, or _Fold…_ beside
   _Amend last commit_): the staged changes go into an older commit of the checked-out branch. The dialog
   first shows that commit and the commits after it that get rewritten, and warns when any of

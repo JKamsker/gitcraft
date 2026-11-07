@@ -67,6 +67,10 @@ impl RepoTab {
         let view_h = ui.available_height();
         let rest_id = ui.id().with("message_rest");
         let rest: f32 = ui.data(|d| d.get_temp(rest_id)).unwrap_or(0.0);
+        let issue_rules = super::compose::issue_links::rules_for(
+            &super::compose::store::Store::issue_rules(ui.ctx()),
+            self.hosting.as_ref(),
+        );
         egui::ScrollArea::vertical()
             .id_salt("detail_scroll")
             .auto_shrink(false)
@@ -79,6 +83,7 @@ impl RepoTab {
                         let room = view_h - (ui.cursor().top() - top) - rest;
                         message_section(ui, acts, detail, &mut reword, editable, room);
                         message_end = ui.cursor().top();
+                        super::compose::issue_links::links_row(ui, &detail.message, &issue_rules);
                         ui.add_space(12.0);
                         author_line(ui, detail);
                         ui.add_space(10.0);

@@ -41,7 +41,7 @@ fn after_options<'a>(args: &'a [&'a str]) -> &'a [&'a str] {
 }
 
 /// Points `cmd` at the active profile's config, unless `args` is about the user's own.
-fn with_profile(cmd: &mut Command, args: &[&str]) {
+pub(super) fn with_profile(cmd: &mut Command, args: &[&str]) {
     if user_global_config(args) {
         return;
     }
@@ -71,7 +71,7 @@ const GIT_ENV: [(&str, &str); 4] = [
 /// Interactive rebases set `sequence.editor` themselves; an inherited one would win.
 const GIT_ENV_REMOVED: [&str; 1] = ["GIT_SEQUENCE_EDITOR"];
 
-fn git_cmd() -> Command {
+pub(super) fn git_cmd() -> Command {
     let mut cmd = Command::new("git");
     for (name, value) in GIT_ENV {
         cmd.env(name, value);
@@ -100,7 +100,7 @@ struct Ran {
 
 /// Options before the subcommand, and variables, a call is run with on top of [`GIT_ENV`].
 #[derive(Default)]
-struct Extra {
+pub(super) struct Extra {
     pre: Vec<&'static str>,
     env: Vec<(&'static str, String)>,
 }
@@ -132,7 +132,7 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
 }
 
 /// The request that runs git with `args` in `target`'s folder, on its machine.
-fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Request {
+pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Request {
     let words: Vec<String> = extra
         .pre
         .iter()

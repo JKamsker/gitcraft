@@ -573,13 +573,9 @@ impl RepoTab {
 
     /// A merge or cherry-pick leaves a message to commit with.
     fn take_prepared_message(&mut self) {
-        if let Some(msg) = &self.work.prepared_message
-            && self.commit_summary.is_empty()
-            && self.commit_body.is_empty()
-        {
-            let (summary, body) = msg.split_once('\n').unwrap_or((msg.as_str(), ""));
-            self.commit_summary = summary.trim().to_owned();
-            self.commit_body = body.trim().to_owned();
+        // Over an empty box, or one that holds only what the template and hook put there.
+        if let Some(msg) = self.work.prepared_message.clone() {
+            self.take_message(&msg);
         }
     }
 

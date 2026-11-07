@@ -34,8 +34,10 @@ impl RepoTab {
                     .on_hover_text(
                         "Rewrite the last commit with the staged changes and this message",
                     );
-                amend_started =
-                    amend.changed() && amending && self.commit_summary.trim().is_empty();
+                // Over an empty box, or what the template and hook put there.
+                amend_started = amend.changed()
+                    && amending
+                    && (self.commit_summary.trim().is_empty() || self.unedited_prefill());
                 if !rebasing {
                     self.fold_picker(ui, amending, acts);
                 }
@@ -51,10 +53,8 @@ impl RepoTab {
                 move || crate::git::head_message(&repo),
                 |tab, msg, _| {
                     let Ok(msg) = msg else { return };
-                    if tab.amend && tab.commit_summary.trim().is_empty() {
-                        let (summary, body) = msg.split_once('\n').unwrap_or((msg.as_str(), ""));
-                        tab.commit_summary = summary.trim().to_owned();
-                        tab.commit_body = body.trim().to_owned();
+                    if tab.amend {
+                        tab.take_message(&msg);
                     }
                 },
             );
@@ -76,23 +76,12 @@ impl RepoTab {
                 );
             }
         }
+        self.compose_prefill(ui.ctx());
+        self.compose_toolbar(ui, !rebasing);
         ui.add_space(2.0);
         // `--continue` commits with the message git kept: edits here would be lost.
-        let summary = ui.add_enabled(
-            !rebasing,
-            egui::TextEdit::singleline(&mut self.commit_summary)
-                .hint_text("Summary")
-                .desired_width(f32::INFINITY)
-                .margin(egui::Margin::symmetric(8, 6)),
-        );
-        let body = ui.add_enabled(
-            !rebasing,
-            egui::TextEdit::multiline(&mut self.commit_body)
-                .hint_text("Description (optional)")
-                .desired_width(f32::INFINITY)
-                .desired_rows(3)
-                .margin(egui::Margin::symmetric(8, 6)),
-        );
+        let (summary, body) = self.message_fields(ui, !rebasing);
+        self.compose_notice(ui);
         if rebasing {
             ui.label(
                 RichText::new("The commit keeps its message: reword it once this is done.")
@@ -119,8 +108,11 @@ impl RepoTab {
         } else {
             "Stage all and commit".to_owned()
         };
+        // An unchanged template is refused, as git refuses it.
+        let untouched = !rebasing && self.unedited_template();
         let can = idle
             && (rebasing || !self.commit_summary.trim().is_empty())
+            && !untouched
             && self.work.conflicted.is_empty();
         // Only from the message fields, so Ctrl+Enter in the terminal stays the shell's.
         let shortcut = (summary.has_focus() || body.has_focus())
@@ -129,7 +121,11 @@ impl RepoTab {
         if (resp.clicked() || (shortcut && can)) && can {
             acts.push(Action::Commit);
         }
-        resp.on_hover_text("Ctrl+Enter");
+        if untouched {
+            resp.on_hover_text("Edit the message first: it is still the template");
+        } else {
+            resp.on_hover_text("Ctrl+Enter");
+        }
 
         ui.add_space(4.0);
         self.identity_row(ui, acts);
