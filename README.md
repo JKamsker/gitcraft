@@ -591,6 +591,12 @@ so your config, credentials and hooks apply as usual.
   changed, signatures replaced_. _Follow each commit_ pairs each old commit with its
   replacement, as `git range-diff` does, with whether its files, message, author and signature
   changed. The receipt is kept with the entry.
+- **Remove this, keep later work** (in the timeline): pick an older operation that only made
+  commits on a branch (yesterday's merge, a commit, cherry-picks) and gitcraft plays the
+  commits made on that branch since again without it, in a worktree beside the repository, as
+  a new branch; the branch itself doesn't move. If a later commit no longer applies, it stops
+  there and names the conflicted files: resolve them in that worktree, or discard the attempt.
+  Undo deletes the new branch.
 
 **Diffs and conflicts** (centre)
 

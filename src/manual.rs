@@ -216,6 +216,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "An entry's old branch tips come back with Put … back, or as a new branch with New branch there, even after git gc: they are kept under refs/gitcraft/undo/.",
             "Forget… drops older entries, after asking; past the newest 300 they go by themselves.",
             "After a rebase, squash, reorder or amend, a receipt says whether the final files are identical, the authors kept, how many messages changed and what became of the signatures; in the timeline, Follow each commit pairs each old commit with its replacement (as git range-diff does).",
+            "Remove this, keep later work: on an entry that only made commits on a branch (commits, a merge, cherry-picks), plays the commits made on it since again without it, on a new branch in a worktree beside the repository; the branch itself stays. A commit that no longer applies stops it there, its conflicted files listed: resolve them in that worktree, or discard the attempt.",
         ],
     ),
     (

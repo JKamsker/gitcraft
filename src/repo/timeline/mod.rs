@@ -12,6 +12,11 @@ pub(super) mod receipt;
 #[cfg(test)]
 mod receipt_tests;
 mod receipt_view;
+pub(super) mod remove;
+mod remove_tab;
+#[cfg(test)]
+mod remove_tests;
+mod remove_view;
 pub(super) mod snapshot;
 pub(super) mod store;
 mod tab;
