@@ -2,9 +2,9 @@
 //!
 //! A clone often has more than one remote, such as a fork and the repository it was forked
 //! from. Builds run where a branch is pushed, so the tips of `fork/*` are asked of the fork,
-//! those of `origin/*` of upstream, a local branch of the remote it tracks, and HEAD and the
-//! latest commits of the checked-out branch's remote. Pull requests are asked of the main
-//! project (that of `origin`), which lists them.
+//! those of `origin/*` of upstream, and local branches of their push and tracking remotes.
+//! HEAD follows the checked-out branch; recent commits are also asked of the main project
+//! (that of `origin`). Pull requests are asked of the main project, which lists them.
 
 use std::collections::{HashMap, HashSet};
 
@@ -21,6 +21,9 @@ pub(crate) type Plan = Vec<(Project, Vec<String>)>;
 
 /// What each project answered.
 pub(crate) type Answers = Vec<(Project, Result<HashMap<String, Status>, String>)>;
+
+/// Last successful contribution from each project, in lookup order.
+pub(crate) type Cached = Vec<(Project, HashMap<String, Status>)>;
 
 /// What a plan is made from.
 pub(crate) struct Sources<'a> {
@@ -46,18 +49,26 @@ pub(crate) fn plan(sources: &Sources, max: usize) -> Plan {
         .current
         .as_deref()
         .and_then(|name| refs.local.iter().find(|b| b.name == name))
-        .and_then(|b| router.of_upstream(&b.upstream))
-        .unwrap_or_else(|| sources.main.clone());
+        .map(|b| router.of_branch(b, refs))
+        .unwrap_or_else(|| vec![sources.main.clone()]);
 
-    let mut wanted: Vec<(Project, &str)> = vec![(home.clone(), refs.head.as_str())];
+    let mut wanted: Vec<(Project, &str)> = home
+        .iter()
+        .map(|p| (p.clone(), refs.head.as_str()))
+        .collect();
     for branch in &refs.local {
-        let project = router
-            .of_upstream(&branch.upstream)
-            .unwrap_or_else(|| home.clone());
-        wanted.push((project, &branch.target));
+        let projects =
+            if refs.push_remotes.contains_key(&branch.name) || !branch.upstream.is_empty() {
+                router.of_branch(branch, refs)
+            } else {
+                home.clone()
+            };
+        wanted.extend(projects.into_iter().map(|p| (p, branch.target.as_str())));
     }
     wanted.extend(sources.prs.iter().map(|sha| (sources.main.clone(), *sha)));
-    wanted.extend(sources.recent.iter().map(|sha| (home.clone(), *sha)));
+    for sha in &sources.recent {
+        wanted.extend(home.iter().chain([sources.main]).map(|p| (p.clone(), *sha)));
+    }
     for (remote, branches) in &refs.remotes {
         let project = router.of_remote(remote);
         wanted.extend(
@@ -96,6 +107,9 @@ pub(crate) fn projects_for(
         .chain([main.clone()])
         .chain(known(main, remotes));
     for project in rest {
+        if projects.len() == MAX_PROJECTS {
+            break;
+        }
         if !projects.contains(&project) {
             projects.push(project);
         }
@@ -105,15 +119,16 @@ pub(crate) fn projects_for(
 
 /// Every project the repository's remotes point at that the main project's tool can ask.
 pub(crate) fn known(main: &Project, remotes: &[Remote]) -> Vec<Project> {
-    let mut router = Router {
-        main,
-        remotes,
-        chosen: vec![main.clone()],
-    };
+    let mut projects = vec![main.clone()];
     for remote in remotes {
-        router.of_remote(&remote.name);
+        if let Some(project) =
+            Project::of_remote(main.forge, remote).filter(|p| p.host == main.host)
+            && !projects.contains(&project)
+        {
+            projects.push(project);
+        }
     }
-    router.chosen
+    projects
 }
 
 /// The asked pairs, deduplicated and cut to `max`, grouped by project in order.
@@ -149,6 +164,23 @@ struct Router<'a> {
 }
 
 impl Router<'_> {
+    /// A branch's push destination first, followed by its tracking upstream if different.
+    fn of_branch(&mut self, branch: &crate::git::Branch, refs: &Refs) -> Vec<Project> {
+        let mut projects = Vec::new();
+        if let Some(remote) = refs.push_remotes.get(&branch.name) {
+            projects.push(self.of_remote(remote));
+        }
+        if let Some(project) = self.of_upstream(&branch.upstream)
+            && !projects.contains(&project)
+        {
+            projects.push(project);
+        }
+        if projects.is_empty() {
+            projects.push(self.main.clone());
+        }
+        projects
+    }
+
     /// The project of remote `name`. A remote on another host than the main project (another
     /// forge, which the main project's tool can't ask), one gitcraft can't read, or one past
     /// [`MAX_PROJECTS`] is asked as the main project.
@@ -194,6 +226,7 @@ fn remote_of<'a>(upstream: &str, remotes: &'a [Remote]) -> Option<&'a str> {
 #[derive(Debug, Default)]
 pub(crate) struct Merged {
     pub by_sha: HashMap<String, Status>,
+    pub cached: Cached,
     pub source: HashMap<String, Project>,
     /// Why a project couldn't be read, when another could.
     pub error: Option<String>,
@@ -201,47 +234,44 @@ pub(crate) struct Merged {
 
 /// Puts the projects' answers together. A commit two projects build is shown as both did
 /// (the worse state, every check), and opens in the first one's builds. A project that
-/// couldn't be read keeps what it said before; when none could, the first error is returned.
+/// couldn't be read keeps its own cached contribution; when none could, the errors are returned.
 pub(crate) fn merge(
     answers: Answers,
-    before: &HashMap<String, Status>,
-    before_source: &HashMap<String, Project>,
+    before: &[(Project, HashMap<String, Status>)],
 ) -> Result<Merged, String> {
     let mut merged = Merged::default();
-    let mut failed = Vec::new();
+    let mut errors = Vec::new();
     let mut answered = false;
     for (project, answer) in answers {
-        match answer {
+        let statuses = match answer {
             Ok(statuses) => {
                 answered = true;
-                for (sha, status) in statuses {
-                    match merged.by_sha.get_mut(&sha) {
-                        Some(known) => *known = combine(known, status),
-                        None => {
-                            merged.source.insert(sha.clone(), project.clone());
-                            merged.by_sha.insert(sha, status);
-                        }
-                    }
+                statuses
+            }
+            Err(e) => {
+                errors.push(format!("{}: {e}", project.path));
+                before
+                    .iter()
+                    .find(|(p, _)| *p == project)
+                    .map(|(_, statuses)| statuses.clone())
+                    .unwrap_or_default()
+            }
+        };
+        for (sha, status) in &statuses {
+            match merged.by_sha.get_mut(sha) {
+                Some(known) => *known = combine(known, status.clone()),
+                None => {
+                    merged.source.insert(sha.clone(), project.clone());
+                    merged.by_sha.insert(sha.clone(), status.clone());
                 }
             }
-            Err(e) => failed.push((project, e)),
         }
+        merged.cached.push((project, statuses));
     }
-    if !answered && !failed.is_empty() {
-        return Err(failed.swap_remove(0).1);
+    if !answered && !errors.is_empty() {
+        return Err(errors.join("; "));
     }
-    for (project, _) in &failed {
-        for (sha, status) in before {
-            if before_source.get(sha) == Some(project) && !merged.by_sha.contains_key(sha) {
-                merged.by_sha.insert(sha.clone(), status.clone());
-                merged.source.insert(sha.clone(), project.clone());
-            }
-        }
-    }
-    merged.error = failed
-        .into_iter()
-        .next()
-        .map(|(project, e)| format!("{}: {e}", project.path));
+    merged.error = (!errors.is_empty()).then(|| errors.join("; "));
     Ok(merged)
 }
 
@@ -341,7 +371,7 @@ mod tests {
         };
         let plan = plan_of(&remotes, &refs, vec!["pr1"], vec!["local1", "old1"]);
         assert_eq!(shas_of(&plan, "me/repo"), ["local1", "old1", "fork1"]);
-        assert_eq!(shas_of(&plan, "up/repo"), ["pr1", "up1"]);
+        assert_eq!(shas_of(&plan, "up/repo"), ["pr1", "local1", "old1", "up1"]);
         assert_eq!(
             plan[0].0.path, "me/repo",
             "the checked-out branch's project first"
@@ -461,6 +491,76 @@ mod tests {
         let refs = Refs::default();
         let plan = plan_of(&remotes, &refs, vec![], vec!["c1"]);
         assert_eq!(shas_of(&plan, "up/repo"), ["c1"]);
+    }
+
+    /// A triangular workflow keeps looking at the push fork after its tracking tip moves.
+    #[test]
+    fn push_remote_and_tracking_upstream_are_both_asked() {
+        let remotes = fork_and_upstream();
+        let refs = Refs {
+            local: vec![branch("dev", "local", "origin/main")],
+            push_remotes: HashMap::from([("dev".to_owned(), "fork".to_owned())]),
+            head: "local".to_owned(),
+            current: Some("dev".to_owned()),
+            remotes: vec![("fork".to_owned(), vec![branch("fork/dev", "newer", "")])],
+            ..Refs::default()
+        };
+        let plan = plan_of(&remotes, &refs, vec![], vec!["old"]);
+        assert_eq!(shas_of(&plan, "me/repo"), ["local", "old", "newer"]);
+        assert_eq!(shas_of(&plan, "up/repo"), ["local", "old"]);
+        assert_eq!(
+            paths(&projects_for("local", &project("up/repo"), &remotes, &refs)),
+            ["me/repo", "up/repo"]
+        );
+    }
+
+    /// Recent shared history still shows checks that only upstream ran.
+    #[test]
+    fn recent_commits_are_asked_of_the_fork_and_upstream_within_the_pair_budget() {
+        let remotes = fork_and_upstream();
+        let refs = Refs {
+            local: vec![branch("dev", "head", "fork/dev")],
+            head: "head".to_owned(),
+            current: Some("dev".to_owned()),
+            ..Refs::default()
+        };
+        let main = project("up/repo");
+        let sources = Sources {
+            main: &main,
+            remotes: &remotes,
+            refs: &refs,
+            prs: vec![],
+            recent: vec!["old", "older"],
+        };
+        let plan = plan(&sources, 3);
+        assert_eq!(pairs(&plan).len(), 3);
+        assert_eq!(shas_of(&plan, "me/repo"), ["head", "old"]);
+        assert_eq!(shas_of(&plan, "up/repo"), ["old"]);
+    }
+
+    /// The query budget applies after combining branch-specific and other remotes.
+    #[test]
+    fn projects_for_has_one_budget_but_known_includes_all_eligible_remotes() {
+        let remotes: Vec<_> = (0..8)
+            .map(|i| {
+                remote(
+                    &format!("r{i}"),
+                    &format!("https://github.com/o{i}/repo.git"),
+                )
+            })
+            .collect();
+        let refs = Refs {
+            local: vec![branch("dev", "head", "r7/dev")],
+            current: Some("dev".to_owned()),
+            head: "head".to_owned(),
+            ..Refs::default()
+        };
+        let main = project("up/repo");
+        assert_eq!(
+            paths(&projects_for("old", &main, &remotes, &refs)),
+            ["o7/repo", "up/repo", "o0/repo", "o1/repo"]
+        );
+        assert_eq!(known(&main, &remotes).len(), 9);
     }
 
     fn paths(projects: &[Project]) -> Vec<&str> {
@@ -583,7 +683,7 @@ mod tests {
                 )])),
             ),
         ];
-        let merged = merge(answers, &HashMap::new(), &HashMap::new());
+        let merged = merge(answers, &[]);
         assert!(merged.is_ok(), "{merged:?}");
         let Ok(merged) = merged else { return };
         let c = &merged.by_sha["c"];
@@ -595,14 +695,16 @@ mod tests {
 
     #[test]
     fn a_project_that_fails_keeps_what_it_said_before() {
-        let before = HashMap::from([
-            ("f".to_owned(), status(CheckState::Passed, "fork ci")),
-            ("u".to_owned(), status(CheckState::Failed, "up ci")),
-        ]);
-        let before_source = HashMap::from([
-            ("f".to_owned(), project("me/repo")),
-            ("u".to_owned(), project("up/repo")),
-        ]);
+        let before = vec![
+            (
+                project("me/repo"),
+                HashMap::from([("f".to_owned(), status(CheckState::Passed, "fork ci"))]),
+            ),
+            (
+                project("up/repo"),
+                HashMap::from([("u".to_owned(), status(CheckState::Failed, "up ci"))]),
+            ),
+        ];
         let answers: Answers = vec![
             (project("me/repo"), Err("rate limited".to_owned())),
             (
@@ -613,7 +715,7 @@ mod tests {
                 )])),
             ),
         ];
-        let merged = merge(answers, &before, &before_source);
+        let merged = merge(answers, &before);
         assert!(merged.is_ok(), "{merged:?}");
         let Ok(merged) = merged else { return };
         assert_eq!(
@@ -625,20 +727,79 @@ mod tests {
         assert_eq!(merged.error.as_deref(), Some("me/repo: rate limited"));
     }
 
+    /// An upstream outage must not turn a shared commit's cached failure green.
     #[test]
-    fn when_every_project_fails_the_first_error_is_returned() {
+    fn a_failed_projects_contribution_is_merged_with_fresh_checks_without_duplication() {
+        let initial = vec![
+            (
+                project("me/repo"),
+                Ok(HashMap::from([(
+                    "c".to_owned(),
+                    status(CheckState::Passed, "fork"),
+                )])),
+            ),
+            (
+                project("up/repo"),
+                Ok(HashMap::from([(
+                    "c".to_owned(),
+                    status(CheckState::Failed, "upstream"),
+                )])),
+            ),
+        ];
+        let first = merge(initial, &[]).unwrap_or_default();
+        let refresh = || {
+            vec![
+                (
+                    project("me/repo"),
+                    Ok(HashMap::from([(
+                        "c".to_owned(),
+                        status(CheckState::Passed, "fork new"),
+                    )])),
+                ),
+                (project("up/repo"), Err("offline".to_owned())),
+            ]
+        };
+        let second = merge(refresh(), &first.cached).unwrap_or_default();
+        let third = merge(refresh(), &second.cached).unwrap_or_default();
+        assert_eq!(third.by_sha["c"].state, CheckState::Failed);
+        let names: Vec<_> = third.by_sha["c"]
+            .checks
+            .iter()
+            .map(|c| c.name.as_str())
+            .collect();
+        assert_eq!(names, ["fork new", "upstream"]);
+        assert_eq!(third.error.as_deref(), Some("up/repo: offline"));
+        let cleared = merge(
+            vec![
+                (project("me/repo"), Ok(HashMap::new())),
+                (project("up/repo"), Ok(HashMap::new())),
+            ],
+            &third.cached,
+        )
+        .unwrap_or_default();
+        assert!(
+            cleared.by_sha.is_empty(),
+            "successful empty responses replace cached checks"
+        );
+    }
+
+    #[test]
+    fn when_every_project_fails_the_errors_name_each_project() {
         let answers: Answers = vec![
             (project("me/repo"), Err("gh isn't signed in".to_owned())),
             (project("up/repo"), Err("network".to_owned())),
         ];
-        let result = merge(answers, &HashMap::new(), &HashMap::new());
-        assert_eq!(result.err().as_deref(), Some("gh isn't signed in"));
+        let result = merge(answers, &[]);
+        assert_eq!(
+            result.err().as_deref(),
+            Some("me/repo: gh isn't signed in; up/repo: network")
+        );
     }
 
     #[test]
     fn projects_with_nothing_to_say_are_not_a_failure() {
         let answers: Answers = vec![(project("up/repo"), Ok(HashMap::new()))];
-        let merged = merge(answers, &HashMap::new(), &HashMap::new());
+        let merged = merge(answers, &[]);
         assert!(merged.is_ok(), "{merged:?}");
         let Ok(merged) = merged else { return };
         assert!(merged.by_sha.is_empty());
@@ -651,7 +812,7 @@ mod tests {
             (project("up/repo"), Ok(HashMap::new())),
             (project("me/repo"), Err("network".to_owned())),
         ];
-        let merged = merge(answers, &HashMap::new(), &HashMap::new());
+        let merged = merge(answers, &[]);
         assert!(merged.is_ok(), "{merged:?}");
         let Ok(merged) = merged else { return };
         assert_eq!(merged.error.as_deref(), Some("me/repo: network"));

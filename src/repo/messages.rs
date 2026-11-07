@@ -109,7 +109,7 @@ pub(super) enum Msg {
     /// asked about.
     CiStatuses(bool, crate::ci::route::Answers),
     /// The runs of the commit the pipeline view shows, for the read numbered so.
-    CiRuns(u64, Result<Vec<crate::ci::Run>, String>),
+    CiRuns(u64, Result<super::ci_view::Builds, String>),
     /// The jobs of a run (by id), for the read numbered so.
     CiJobs(u64, u64, Result<Vec<crate::ci::Job>, String>),
     CiLog(u64, Result<String, String>),

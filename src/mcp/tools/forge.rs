@@ -20,6 +20,7 @@ const MAX_BODY: usize = 8_000;
 const LOG_PAGE: u64 = 30_000;
 const MAX_LOG_PAGE: u64 = 200_000;
 
+/// Detects the repository's forge and its configured remotes.
 fn hosting(ctx: &Ctx) -> Result<(Hosting, Vec<git::Remote>), String> {
     let remotes = git::remotes(&ctx.repo)?;
     let hosting = forge::detect(&ctx.repo, &remotes).ok_or(
@@ -65,6 +66,7 @@ static CI: ToolDef = ToolDef {
     run: ci_status,
 };
 
+/// Lists routed runs or reads jobs from a validated repository project.
 fn ci_status(ctx: &Ctx, a: &Args) -> Result<Value, String> {
     a.only(&[
         "commit",
@@ -100,14 +102,13 @@ fn ci_status(ctx: &Ctx, a: &Args) -> Result<Value, String> {
         let project = named_project(path, &route::known(&main, &remotes))?;
         return run_jobs(ctx, &project, run, failed_log, offset, max);
     }
+    if let Some(run) = run {
+        let project = default_run_project(ctx, rev, &main, &remotes)?;
+        return run_jobs(ctx, &project, run, failed_log, offset, max);
+    }
     let sha = super::history::resolve_commit(ctx, rev)?;
     let refs = git::refs(&ctx.repo)?;
     let projects = route::projects_for(&sha, &main, &remotes, &refs);
-    if let Some(run) = run {
-        // The likeliest project; `projects_for` always names the main one at least.
-        let project = projects.first().unwrap_or(&main);
-        return run_jobs(ctx, project, run, failed_log, offset, max);
-    }
     let answers = projects
         .iter()
         .map(|project| (project, ci::runs(&ctx.repo, project, &sha)))
@@ -136,6 +137,24 @@ fn ci_status(ctx: &Ctx, a: &Args) -> Result<Value, String> {
         out["errors"] = json!(errors);
     }
     Ok(out)
+}
+
+/// Uses the commit's first candidate, or the main project for an unborn default HEAD.
+fn default_run_project(
+    ctx: &Ctx,
+    rev: &str,
+    main: &Project,
+    remotes: &[git::Remote],
+) -> Result<Project, String> {
+    let refs = git::refs(&ctx.repo)?;
+    if rev == "HEAD" && refs.head.is_empty() {
+        return Ok(main.clone());
+    }
+    let sha = super::history::resolve_commit(ctx, rev)?;
+    Ok(route::projects_for(&sha, main, remotes, &refs)
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| main.clone()))
 }
 
 /// The project `path` names, if it is one of the repository's remotes.
@@ -181,6 +200,7 @@ fn runs_of_all(answers: Vec<(&Project, Result<Vec<Run>, String>)>) -> Result<All
     Ok(all)
 }
 
+/// Reads a run's jobs and optionally a bounded page of its failed log.
 fn run_jobs(
     ctx: &Ctx,
     project: &Project,
@@ -227,6 +247,7 @@ static PULL_REQUESTS: ToolDef = ToolDef {
     run: pull_requests,
 };
 
+/// Lists pull requests or returns the requested pull request's details.
 fn pull_requests(ctx: &Ctx, a: &Args) -> Result<Value, String> {
     a.only(&["number"])?;
     let number = a.uint("number", 0, 0, u64::MAX)?;
@@ -340,11 +361,54 @@ mod tests {
         );
     }
 
+    /// Run details remain usable in an empty repository, while explicit bad revisions fail.
+    #[test]
+    fn run_details_default_to_main_only_when_head_is_unborn() -> Result<(), String> {
+        let repo = git::fixture::Repo::new("ci-unborn-head")?;
+        repo.git(&["remote", "add", "origin", "https://github.com/up/repo.git"])?;
+        repo.git(&["remote", "add", "fork", "https://github.com/me/repo.git"])?;
+        let ctx = Ctx {
+            repo: repo.dir.clone(),
+            agent: "t".into(),
+            link_dir: None,
+            wait: std::time::Duration::from_secs(1),
+            cancelled: std::sync::Arc::new(|| false),
+        };
+        let remotes = git::remotes(repo.path())?;
+        let main = project("up/repo");
+        assert_eq!(default_run_project(&ctx, "HEAD", &main, &remotes)?, main);
+        assert!(default_run_project(&ctx, "missing", &main, &remotes).is_err());
+        repo.commit("one", &[])?;
+        repo.git(&["config", "branch.main.pushRemote", "fork"])?;
+        assert_eq!(
+            default_run_project(&ctx, "HEAD", &main, &remotes)?,
+            project("me/repo")
+        );
+        Ok(())
+    }
+
+    /// A remote outside the listing budget is still a valid named run-details target.
+    #[test]
+    fn named_run_projects_are_validated_independently_of_the_query_budget() {
+        let main = project("up/repo");
+        let remotes: Vec<_> = (0..8)
+            .map(|i| git::Remote {
+                name: format!("r{i}"),
+                url: format!("https://github.com/o{i}/repo.git"),
+            })
+            .collect();
+        let known = route::known(&main, &remotes);
+        assert_eq!(named_project("o7/repo", &known), Ok(project("o7/repo")));
+        assert!(named_project("unknown/repo", &known).is_err());
+    }
+
     #[test]
     fn the_runs_of_every_project_are_listed_with_what_failed() {
         let (fork, upstream) = (project("me/repo"), project("up/repo"));
+        let mirror = project("other/repo");
         let answers = vec![
             (&fork, Ok(vec![run(1), run(2)])),
+            (&mirror, Ok(vec![run(3)])),
             (&upstream, Err("not signed in".to_owned())),
         ];
         let read = runs_of_all(answers);
@@ -353,7 +417,7 @@ mod tests {
             return;
         };
         let ids: Vec<(&str, u64)> = runs.iter().map(|(p, r)| (p.path.as_str(), r.id)).collect();
-        assert_eq!(ids, [("me/repo", 1), ("me/repo", 2)]);
+        assert_eq!(ids, [("me/repo", 1), ("me/repo", 2), ("other/repo", 3)]);
         assert_eq!(errors, ["up/repo: not signed in"]);
     }
 

@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use super::{Msg, RepoTab, spawn};
-use crate::ci::{self, CheckState, Job, Run};
+use crate::ci::{self, CheckState, Job, Project, Run};
 
 /// How often a run that's still going is read again.
 const POLL: Duration = Duration::from_secs(10);
@@ -26,7 +26,7 @@ fn next_request() -> u64 {
 
 /// What the pipeline view asks for.
 pub(crate) enum CiAct {
-    SelectRun(u64),
+    SelectRun(Project, u64),
     SelectJob(u64),
     Reload,
     RerunFailed,
@@ -39,7 +39,9 @@ pub(crate) struct CiView {
     pub(super) sha: String,
     request: u64,
     loading: bool,
-    runs: Option<Result<Vec<Run>, String>>,
+    runs: Option<Result<Builds, String>>,
+    /// Project of the selected run, retained independently of status refreshes.
+    project: Option<Project>,
     /// The run shown, by id.
     run: Option<u64>,
     /// The jobs of a run (by id), the one shown once they're here.
@@ -57,10 +59,46 @@ pub(crate) struct CiView {
     acting: bool,
 }
 
+/// Runs retain their owning project; IDs can overlap between GitLab projects.
+#[derive(Debug, Default)]
+pub(super) struct Builds {
+    runs: Vec<(Project, Run)>,
+    errors: Vec<String>,
+}
+
+/// Searches every candidate, retaining readable runs and reporting partial failures.
+fn read_builds(
+    projects: Vec<Project>,
+    mut read: impl FnMut(&Project) -> Result<Vec<Run>, String>,
+) -> Result<Builds, String> {
+    let mut builds = Builds::default();
+    let mut answered = false;
+    for project in projects {
+        match read(&project) {
+            Ok(runs) => {
+                answered = true;
+                builds
+                    .runs
+                    .extend(runs.into_iter().map(|run| (project.clone(), run)));
+            }
+            Err(e) => builds.errors.push(format!("{}: {e}", project.path)),
+        }
+    }
+    if !answered {
+        return Err(builds.errors.join("; "));
+    }
+    Ok(builds)
+}
+
 impl CiView {
+    /// Selected run in its original project, even if the commit's status source changes.
     fn shown_run(&self) -> Option<&Run> {
-        let runs = self.runs.as_ref()?.as_ref().ok()?;
-        runs.iter().find(|run| Some(run.id) == self.run)
+        let builds = self.runs.as_ref()?.as_ref().ok()?;
+        builds
+            .runs
+            .iter()
+            .find(|(p, run)| Some(p) == self.project.as_ref() && Some(run.id) == self.run)
+            .map(|(_, run)| run)
     }
 
     /// The jobs of the run shown, once they're here.
@@ -71,6 +109,7 @@ impl CiView {
             .map(|(_, jobs)| jobs)
     }
 
+    /// Whether either the selected run or one of its jobs is still active.
     fn running(&self) -> bool {
         let jobs = self.shown_jobs().and_then(|jobs| jobs.as_ref().ok());
         self.shown_run()
@@ -98,6 +137,7 @@ impl RepoTab {
             request: 0,
             loading: true,
             runs: None,
+            project: None,
             run,
             jobs: None,
             job: None,
@@ -112,12 +152,16 @@ impl RepoTab {
 
     /// Reads the runs of the commit shown (again), then the jobs of the one shown.
     fn load_ci_view(&mut self, ctx: &egui::Context) {
-        let project = self.ci_view_project();
+        let projects = self
+            .ci_view
+            .as_ref()
+            .map(|v| self.ci_projects_for(&v.sha))
+            .unwrap_or_default();
         let Some(view) = &mut self.ci_view else {
             return;
         };
         view.next = None;
-        let Some(project) = project else {
+        if projects.is_empty() {
             view.loading = false;
             view.runs = Some(Err("This repository isn't on GitHub or GitLab.".to_owned()));
             return;
@@ -126,15 +170,21 @@ impl RepoTab {
         view.loading = true;
         let (request, path, sha) = (view.request, self.path.clone(), view.sha.clone());
         spawn(&self.tx, ctx, move || {
-            Msg::CiRuns(request, ci::runs(&path, &project, &sha))
+            Msg::CiRuns(
+                request,
+                read_builds(projects, |project| ci::runs(&path, project, &sha)),
+            )
         });
     }
 
-    /// The project whose builds the view shows: the one its commit's status came from.
+    /// The selected run's project, captured when the runs were loaded.
     fn ci_view_project(&self) -> Option<crate::ci::Project> {
-        self.ci_project_for(&self.ci_view.as_ref()?.sha)
+        let view = self.ci_view.as_ref()?;
+        view.shown_run()?;
+        view.project.clone()
     }
 
+    /// Reads jobs from the selected run's original project.
     fn load_ci_jobs(&mut self, ctx: &egui::Context) {
         let project = self.ci_view_project();
         let Some(view) = &mut self.ci_view else {
@@ -150,22 +200,35 @@ impl RepoTab {
         });
     }
 
+    /// Accepts only the current run-list request and preserves selection by project and ID.
     pub(super) fn ci_runs_arrived(
         &mut self,
         request: u64,
-        result: Result<Vec<Run>, String>,
+        result: Result<Builds, String>,
         ctx: &egui::Context,
     ) {
         let Some(view) = self.ci_view.as_mut().filter(|v| v.request == request) else {
             return;
         };
         view.loading = false;
-        if let Ok(runs) = &result {
-            // The run shown stays; else the one asked for, or the newest.
-            let keep = view.run.filter(|id| runs.iter().any(|run| run.id == *id));
-            view.run = keep.or_else(|| runs.first().map(|run| run.id));
+        if let Ok(builds) = &result {
+            // Preserve the project together with the ID: pipeline IDs may overlap.
+            let keep = builds.runs.iter().find(|(project, run)| {
+                Some(run.id) == view.run && view.project.as_ref().is_none_or(|p| p == project)
+            });
+            let selected = keep.or_else(|| builds.runs.first());
+            let project = selected.map(|(project, _)| project.clone());
+            let run = selected.map(|(_, run)| run.id);
+            if project != view.project || run != view.run {
+                view.jobs = None;
+                view.job = None;
+                view.log = None;
+                view.log_request = next_request();
+            }
+            view.project = project;
+            view.run = run;
         }
-        let load_jobs = result.as_ref().is_ok_and(|runs| !runs.is_empty());
+        let load_jobs = result.as_ref().is_ok_and(|builds| !builds.runs.is_empty());
         // A read that failed while the run was going (the network blinked) is tried again,
         // rather than the view never being read again.
         if result.is_err() && view.was_running {
@@ -177,6 +240,7 @@ impl RepoTab {
         }
     }
 
+    /// Accepts jobs only for the current request and selected run.
     pub(super) fn ci_jobs_arrived(
         &mut self,
         request: u64,
@@ -242,17 +306,22 @@ impl RepoTab {
         }
     }
 
+    /// Applies a view action using the selected run's retained project.
     pub(super) fn ci_act(&mut self, act: CiAct, ctx: &egui::Context) {
         let project = self.ci_view_project();
         let Some(view) = &mut self.ci_view else {
             return;
         };
         match act {
-            CiAct::SelectRun(id) => {
-                if view.run != Some(id) {
+            CiAct::SelectRun(project, id) => {
+                if view.run != Some(id) || view.project.as_ref() != Some(&project) {
+                    view.request = next_request();
+                    view.project = Some(project);
                     view.run = Some(id);
+                    view.jobs = None;
                     view.job = None;
                     view.log = None;
+                    view.log_request = next_request();
                     self.load_ci_jobs(ctx);
                 }
             }
@@ -308,6 +377,117 @@ impl RepoTab {
 mod tests {
     use super::*;
 
+    fn project(path: &str) -> Project {
+        Project {
+            forge: crate::forge::Forge::GitLab,
+            host: "gitlab.com".to_owned(),
+            path: path.to_owned(),
+        }
+    }
+
+    /// Empty upstream results do not conceal an older fork build; run IDs may overlap.
+    #[test]
+    fn builds_search_all_candidates_and_retain_each_runs_project() -> Result<(), String> {
+        let projects = vec![
+            project("up/repo"),
+            project("me/repo"),
+            project("other/repo"),
+        ];
+        let builds = read_builds(projects, |p| {
+            Ok(if p.path == "up/repo" {
+                vec![]
+            } else {
+                vec![Run {
+                    id: 7,
+                    ..Run::default()
+                }]
+            })
+        })?;
+        let owners: Vec<_> = builds
+            .runs
+            .iter()
+            .map(|(p, run)| (p.path.as_str(), run.id))
+            .collect();
+        assert_eq!(owners, [("me/repo", 7), ("other/repo", 7)]);
+        assert!(builds.errors.is_empty());
+        Ok(())
+    }
+
+    /// A partial read shows its error alongside readable builds rather than claiming no CI.
+    #[test]
+    fn builds_report_partial_project_failures() -> Result<(), String> {
+        let builds = read_builds(vec![project("up/repo"), project("me/repo")], |p| {
+            if p.path == "up/repo" {
+                Err("offline".to_owned())
+            } else {
+                Ok(vec![Run {
+                    id: 7,
+                    ..Run::default()
+                }])
+            }
+        })?;
+        assert_eq!(builds.runs.len(), 1);
+        assert_eq!(builds.errors, ["up/repo: offline"]);
+        assert!(read_builds(vec![project("up/repo")], |_| Err("offline".to_owned())).is_err());
+        Ok(())
+    }
+
+    /// Refreshing commit status cannot redirect a loaded pipeline's job/action requests.
+    #[test]
+    fn loaded_runs_keep_their_project_when_the_commit_source_changes() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/ci-project-test".into(), &ctx);
+        tab.open_ci("abc".to_owned(), None, &ctx);
+        if let Some(view) = &mut tab.ci_view {
+            view.project = Some(project("me/repo"));
+            view.run = Some(7);
+            view.runs = Some(Ok(Builds {
+                runs: vec![
+                    (
+                        project("up/repo"),
+                        Run {
+                            id: 7,
+                            name: "up".to_owned(),
+                            ..Run::default()
+                        },
+                    ),
+                    (
+                        project("me/repo"),
+                        Run {
+                            id: 7,
+                            name: "fork".to_owned(),
+                            ..Run::default()
+                        },
+                    ),
+                ],
+                errors: vec![],
+            }));
+        }
+        assert_eq!(tab.ci_view_project(), Some(project("me/repo")));
+        assert_eq!(
+            tab.ci_view
+                .as_ref()
+                .and_then(|v| v.shown_run())
+                .map(|r| r.name.as_str()),
+            Some("fork")
+        );
+        // Refreshing status from another project does not change the loaded run's identity.
+        tab.ci_arrived(
+            false,
+            vec![(
+                project("up/repo"),
+                Ok(std::collections::HashMap::from([(
+                    "abc".to_owned(),
+                    ci::Status {
+                        state: CheckState::Passed,
+                        checks: vec![],
+                    },
+                )])),
+            )],
+        );
+        assert_eq!(tab.ci_view_project(), Some(project("me/repo")));
+    }
+
     /// A poll of a running build that fails (the network blinked) is tried again: the view
     /// does not stop following the build.
     #[test]
@@ -319,6 +499,7 @@ mod tests {
             request: 7,
             loading: true,
             runs: None,
+            project: None,
             run: Some(1),
             jobs: None,
             job: None,
