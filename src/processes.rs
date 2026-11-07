@@ -229,15 +229,20 @@ impl Service {
         }
         let (reply, receive) = mpsc::channel();
         let ticket = Cancellation::default();
-        if self
-            .counters
-            .queued
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
-                (n < self.capacity).then_some(n + 1)
-            })
-            .is_err()
-        {
-            return Err("Process queue is full; try again when current work finishes".into());
+        let mut queued = self.counters.queued.load(Ordering::Relaxed);
+        loop {
+            if queued >= self.capacity {
+                return Err("Process queue is full; try again when current work finishes".into());
+            }
+            match self.counters.queued.compare_exchange_weak(
+                queued,
+                queued + 1,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => break,
+                Err(actual) => queued = actual,
+            }
         }
         if self
             .sender

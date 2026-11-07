@@ -159,10 +159,13 @@ fixture is the Rust test executable, so these process tests run on Windows witho
 
 Validated on the macOS host:
 
-- 3,011 library tests passed, 9 opt-in tests ignored, 5 known baseline failures excluded.
+- On the benchmark base, 3,011 library tests passed, 9 opt-in tests ignored, 5 known baseline failures excluded.
   The excluded tests were also run against the saved unmodified baseline and failed there:
   the two checkpoint shell-parser cases, WSL tool path canonicalization, content-regex
   search, and the drag/drop rebase case using GNU `sed -i` syntax.
+- After separating the PR onto `dev`, the library suite passed 2,992 tests with 8 ignored
+  and the same 5 exclusions. Six timeline/version tests failed under the full-suite load;
+  all passed on focused reruns (43 timeline tests together and the version test separately).
 - All 25 focused process/job/timed-command/tab-lifecycle tests passed, including the real
   loopback remote-stream progress/cancel path. The inherited-pipe timed-command regression
   found during development was fixed and passes in the full run.
