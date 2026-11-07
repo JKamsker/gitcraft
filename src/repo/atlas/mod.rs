@@ -1,9 +1,11 @@
 //! Folder treemap; all Git reads and aggregation run on the shared task pool.
+mod byte_history;
 use super::{RepoTab, history_reader::Reader};
 use crate::git::{
     activity::{Clock, Day, Query},
     atlas::{self, Atlas},
 };
+use byte_history::ByteHistory;
 use egui::{Rect, pos2, vec2};
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Size {
@@ -28,6 +30,7 @@ pub(super) struct State {
     page: usize,
     limit: usize,
     profile: Option<std::path::PathBuf>,
+    byte_history: Option<ByteHistory>,
 }
 impl Default for State {
     fn default() -> Self {
@@ -44,6 +47,7 @@ impl Default for State {
             page: 0,
             limit: 5000,
             profile: crate::git::profile_config(),
+            byte_history: None,
         }
     }
 }
@@ -135,7 +139,7 @@ impl RepoTab {
             });
             let node = &data.nodes[view.zoom];
             if node.children.is_empty() { ui.label("No files in this snapshot."); return; }
-            ui.small("Files and historical folders at the same path are separate hotspots. File history uses HEAD for current files or an observed change revision for historical files. Long contributor labels are shortened; numbered identities remain separate.");
+            ui.small("Files and historical folders at the same path are separate hotspots. File history uses HEAD for current files or an observed change revision for historical files. Right-click a file for history across analyzed refs; non-UTF-8 paths open that history directly. Long contributor labels are shortened; numbered identities remain separate.");
             // Bound painter and AccessKit work even for a flat tree with 100,000 files.
             let pages = node.children.len().div_ceil(300);
             view.page = view.page.min(pages.saturating_sub(1));
@@ -148,17 +152,32 @@ impl RepoTab {
             let t = crate::theme::Tokens::get(ctx);
             for (at, rect) in boxes {
                 let id = ids[at]; let n = &data.nodes[id]; let rect = rect.shrink(1.5);
-                let label = String::from_utf8_lossy(&n.path);
+                let label = std::str::from_utf8(&n.path).map(std::borrow::Cow::Borrowed).unwrap_or_else(|_| std::borrow::Cow::Owned(n.path.escape_ascii().to_string()));
                 let response = ui.interact(rect, ui.id().with(("atlas-node", id)), egui::Sense::click());
                 let fill = if view.colour == Colour::Churn { t.accent.gamma_multiply(0.15 + 0.85 * n.changes as f32 / max) } else { t.lane(n.contributor_key).gamma_multiply(0.7) };
                 ui.painter().rect_filled(rect,3.0,fill);
-                crate::a11y::a11y(&response, egui::WidgetType::Button, format!("{label} ({}), {} bytes, {} changes, most frequent contributor: {}. {}", if n.directory {"folder"} else {"file"}, n.bytes,n.changes,n.contributor,if !n.directory {"Open file history at the pinned revision"} else {"Zoom into folder"}));
+                crate::a11y::a11y(&response, egui::WidgetType::Button, format!("{label} ({}), {} bytes, {} changes, most frequent contributor: {}. {}", if n.directory {"folder"} else {"file"}, n.bytes,n.changes,n.contributor,if n.directory {"Zoom into folder"} else if std::str::from_utf8(&n.path).is_ok() {"Open file history at the pinned revision"} else {"Open scanned history for this exact byte path"}));
                 if rect.width() > 42.0 && rect.height() > 22.0 { ui.painter().with_clip_rect(rect.shrink(3.0)).text(rect.left_top()+vec2(4.0,4.0),egui::Align2::LEFT_TOP,n.path.rsplit(|b| *b==b'/').next().map(String::from_utf8_lossy).unwrap_or_default(),egui::FontId::proportional(12.0),t.text); }
+                let mut scanned = false;
+                response.context_menu(|ui| {if !n.directory && ui.button("Scanned file history across analyzed refs").clicked() {scanned = true; ui.close();}});
                 let clicked = response.clicked(); response.on_hover_text(format!("{label}\n{} bytes · {} changes\nMost frequent contributor: {}",n.bytes,n.changes,if n.contributor.is_empty() {"No changes in selected period"} else {n.contributor.as_ref()}));
-                if clicked { if !n.directory { match String::from_utf8(n.path.clone()) { Ok(path) => file = n.revision.as_ref().map(|rev| (path,rev.to_string())), Err(_) => view.error = Some("This filename is not UTF-8; file-history navigation cannot represent it. Its bytes remain distinct in the atlas.".into()) } } else { view.zoom = id; view.page=0; } }
+                if scanned || (clicked && !n.directory && std::str::from_utf8(&n.path).is_err()) {
+                    view.byte_history = Some(ByteHistory::new(data.history.clone(),n.path.clone(),view.profile.clone(),view.clock));
+                } else if clicked { if !n.directory { if let Ok(path) = String::from_utf8(n.path.clone()) {file = n.revision.as_ref().map(|rev| (path,rev.to_string()));} } else { view.zoom = id; view.page=0; } }
             }
         });
-        if let Some((path, head)) = file {
+        let mut chosen = None;
+        if let Some(history) = &mut view.byte_history {
+            let (history_open, commit) = history.show(&self.tx, ctx);
+            chosen = commit;
+            if !history_open {
+                view.byte_history = None;
+            }
+        }
+        if let Some(hash) = chosen {
+            self.activity_commit(hash, ctx);
+            self.atlas = None;
+        } else if let Some((path, head)) = file {
             self.open_file_view(path, Some(head), super::file_view::FileTab::History, ctx);
             self.atlas = None;
         } else if !open {
@@ -204,6 +223,90 @@ fn partition(rect: Rect, weights: &[f64], start: usize, out: &mut Vec<(usize, Re
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn non_utf8_hotspot_opens_exact_byte_history_and_immutable_commit() -> Result<(), String> {
+        use crate::git::activity::{History, Record};
+        use egui_kittest::{Harness, kittest::Queryable};
+        use std::sync::Arc;
+        let day = Day::parse("2026-11-08").ok_or("day")?;
+        let history = Arc::new(History {
+            commits: [
+                (b"f\xff".to_vec(), "touch-ff", "a".repeat(40)),
+                (b"f\xfe".to_vec(), "touch-fe", "b".repeat(40)),
+            ]
+            .into_iter()
+            .map(|(path, subject, hash)| Record {
+                hash,
+                name: "Author".into(),
+                email: String::new(),
+                author: day,
+                committer: day,
+                subject: subject.into(),
+                paths: [path].into_iter().collect(),
+            })
+            .collect(),
+            tips: 2,
+            ..Default::default()
+        });
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/byte-atlas".into(), &ctx);
+        tab.atlas = Some(State {
+            data: Some(Atlas {
+                head: "head".into(),
+                history,
+                nodes: vec![
+                    atlas::Node {
+                        children: vec![1],
+                        directory: true,
+                        ..Default::default()
+                    },
+                    atlas::Node {
+                        path: b"f\xff".to_vec(),
+                        revision: Some("side".into()),
+                        changes: 1,
+                        ..Default::default()
+                    },
+                ],
+                selected: 2,
+                query: Query::default(),
+            }),
+            ..Default::default()
+        });
+        let mut harness = Harness::builder()
+            .with_size([1200.0, 1000.0])
+            .build_ui_state(|ui, tab: &mut RepoTab| tab.atlas_window(ui.ctx()), tab);
+        harness.run();
+        harness.get_by_label_contains(r"f\xff (file)").click();
+        harness.run_steps(2);
+        let start = std::time::Instant::now();
+        while harness
+            .state()
+            .atlas
+            .as_ref()
+            .and_then(|v| v.byte_history.as_ref())
+            .is_none_or(|h| h.rows.is_empty())
+        {
+            if start.elapsed() > std::time::Duration::from_secs(5) {
+                return Err("Byte path history did not finish".into());
+            }
+            std::thread::yield_now();
+            harness.run_steps(1);
+        }
+        assert_eq!(
+            harness
+                .state()
+                .atlas
+                .as_ref()
+                .and_then(|v| v.byte_history.as_ref())
+                .map(|h| h.rows.as_slice()),
+            Some([0].as_slice())
+        );
+        harness.get_by_label_contains("touch-ff").click();
+        harness.run_steps(2);
+        assert!(harness.state().atlas.is_none());
+        assert_eq!(harness.state().detail_hash, Some("a".repeat(40)));
+        Ok(())
+    }
     #[test]
     fn overlapping_file_and_historical_folder_both_remain_reachable() -> Result<(), String> {
         use egui_kittest::{Harness, kittest::Queryable};
