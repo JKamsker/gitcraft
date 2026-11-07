@@ -147,12 +147,25 @@ fn replay(
     mergiraf: bool,
     requested: impl Fn() -> bool,
 ) -> Vec<Forecast> {
+    let began = Instant::now();
+    replay_with_budget(repo, onto, plan, cache, mergiraf, requested, || {
+        began.elapsed() < Duration::from_secs(90)
+    })
+}
+
+fn replay_with_budget(
+    repo: &Path,
+    onto: &str,
+    plan: &[(String, Step)],
+    cache: &mut Cache,
+    mergiraf: bool,
+    requested: impl Fn() -> bool,
+    within_budget: impl Fn() -> bool,
+) -> Vec<Forecast> {
     if !requested() {
         return Vec::new();
     }
-    let began = Instant::now();
-    let active = || requested() && began.elapsed() < Duration::from_secs(90);
-    let mut rows = Vec::with_capacity(plan.len());
+    let active = || requested() && within_budget();
     let setup = || -> Result<(String, ForecastGit), String> {
         let context = ForecastGit::new(repo, &active)?;
         let tree = context.run(
@@ -167,14 +180,68 @@ fn replay(
         )?;
         Ok((tree.trim().to_owned(), context))
     };
-    let (mut tree, context) = match setup() {
+    let (tree, context) = match setup() {
         Ok(value) => value,
-        Err(e) => return plan.iter().map(|_| Forecast::Unknown(e.clone())).collect(),
+        Err(e) => {
+            if !requested() {
+                return Vec::new();
+            }
+            if !within_budget() {
+                return finish_budget(plan, Vec::new(), &requested, &within_budget);
+            }
+            return unfinished(plan, &e);
+        }
     };
+    replay_rows(
+        plan,
+        cache,
+        tree,
+        &requested,
+        &within_budget,
+        |tree, commit, active| apply(&context, tree, commit, mergiraf, active),
+    )
+}
+
+/// Keep completed rows, but never publish a short current-generation answer when the
+/// overall budget runs out. Cancellation belongs to a stale editor/generation instead.
+fn finish_budget(
+    plan: &[(String, Step)],
+    mut rows: Vec<Forecast>,
+    requested: &dyn Fn() -> bool,
+    within_budget: &dyn Fn() -> bool,
+) -> Vec<Forecast> {
+    if requested() && !within_budget() {
+        rows.extend(unfinished(&plan[rows.len()..], "Forecast time budget exceeded; this position was not checked. Recheck rebase weather to try again."));
+    }
+    rows
+}
+
+fn unfinished(plan: &[(String, Step)], reason: &str) -> Vec<Forecast> {
+    plan.iter()
+        .map(|(_, step)| {
+            if *step == Step::Drop {
+                Forecast::Dropped
+            } else {
+                Forecast::Unknown(reason.to_owned())
+            }
+        })
+        .collect()
+}
+
+fn replay_rows(
+    plan: &[(String, Step)],
+    cache: &mut Cache,
+    mut tree: String,
+    requested: &dyn Fn() -> bool,
+    within_budget: &dyn Fn() -> bool,
+    mut apply_step: impl FnMut(&str, &str, &dyn Fn() -> bool) -> Result<Applied, String>,
+) -> Vec<Forecast> {
+    let active = || requested() && within_budget();
+    let mut rows = Vec::with_capacity(plan.len());
     let mut blocked: Option<String> = None;
     for (commit, step) in plan {
         if !active() {
-            return rows;
+            break;
         }
         if *step == Step::Drop {
             rows.push(Forecast::Dropped);
@@ -187,7 +254,7 @@ fn replay(
         let key = (tree.clone(), commit.clone());
         let applied = match cache.get(&key) {
             Some(value) => Ok(value.clone()),
-            None => apply(&context, &tree, commit, mergiraf, &active).inspect(|value| {
+            None => apply_step(&tree, commit, &active).inspect(|value| {
                 // Bound a long editing session without affecting correctness.
                 if cache.len() >= 2048 {
                     cache.clear();
@@ -195,6 +262,9 @@ fn replay(
                 cache.insert(key, value.clone());
             }),
         };
+        if !active() {
+            break;
+        }
         match applied {
             Ok(applied) => {
                 if matches!(
@@ -215,7 +285,7 @@ fn replay(
             }
         }
     }
-    rows
+    finish_budget(plan, rows, requested, within_budget)
 }
 
 fn apply(
@@ -380,7 +450,116 @@ pub(super) fn badge(ui: &mut egui::Ui, forecast: Option<&Forecast>, dropped: boo
 mod tests {
     use super::*;
     use crate::git;
+    use std::cell::Cell;
     use std::path::PathBuf;
+
+    fn budget_plan() -> Plan {
+        vec![
+            ("first".into(), Step::Pick),
+            ("second".into(), Step::Reword),
+            ("dropped".into(), Step::Drop),
+            ("last".into(), Step::Fixup),
+        ]
+    }
+
+    fn assert_budget_exhausted(rows: &[Forecast], plan: &Plan, from: usize) {
+        assert_eq!(rows.len(), plan.len());
+        for (row, (_, step)) in rows[from..].iter().zip(&plan[from..]) {
+            if *step == Step::Drop {
+                assert_eq!(*row, Forecast::Dropped);
+            } else {
+                assert!(
+                    matches!(row, Forecast::Unknown(reason) if reason.contains("time budget exceeded"))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn budget_expiring_between_rows_publishes_a_complete_terminal_answer() {
+        let plan = budget_plan();
+        let applied = Cell::new(false);
+        let checked_after_apply = Cell::new(false);
+        let budget = || !applied.get() || !checked_after_apply.replace(true);
+        let rows = replay_rows(
+            &plan,
+            &mut Cache::new(),
+            "base".into(),
+            &|| true,
+            &budget,
+            |_, _, _| {
+                applied.set(true);
+                Ok(Applied {
+                    tree: "next".into(),
+                    forecast: Forecast::Clean,
+                })
+            },
+        );
+        assert_eq!(rows[0], Forecast::Clean);
+        assert_budget_exhausted(&rows, &plan, 1);
+
+        let mut weather = Weather {
+            plan,
+            running: true,
+            ..Default::default()
+        };
+        weather.arrived(0, rows, Cache::new());
+        assert!(!weather.running);
+        assert!(weather.edited.is_none());
+        // Every UI row lookup now finds a terminal status rather than badge(None)'s Checking.
+        for i in 0..weather.plan.len() {
+            assert!(weather.rows.get(i).is_some());
+        }
+    }
+
+    #[test]
+    fn budget_expiring_inside_a_step_finalizes_that_position_and_every_later_row() {
+        let plan = budget_plan();
+        let budget = Cell::new(true);
+        let rows = replay_rows(
+            &plan,
+            &mut Cache::new(),
+            "base".into(),
+            &|| true,
+            &|| budget.get(),
+            |_, _, active| {
+                assert!(active());
+                budget.set(false);
+                assert!(!active());
+                Err("Forecast cancelled or timed out".into())
+            },
+        );
+        assert_budget_exhausted(&rows, &plan, 0);
+    }
+
+    #[test]
+    fn expired_setup_budget_is_terminal_but_generation_cancellation_can_abandon_rows() {
+        let plan = budget_plan();
+        let rows = replay_with_budget(
+            Path::new("/nonexistent/budget-test"),
+            "base",
+            &plan,
+            &mut Cache::new(),
+            false,
+            || true,
+            || false,
+        );
+        assert_budget_exhausted(&rows, &plan, 0);
+
+        let requested = Cell::new(true);
+        let rows = replay_rows(
+            &plan,
+            &mut Cache::new(),
+            "base".into(),
+            &|| requested.get(),
+            &|| true,
+            |_, _, _| {
+                requested.set(false);
+                Err("Forecast cancelled".into())
+            },
+        );
+        assert!(rows.is_empty());
+    }
 
     struct Repository(PathBuf);
 
