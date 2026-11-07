@@ -122,6 +122,10 @@ impl Default for State {
     }
 }
 impl RepoTab {
+    pub(super) fn has_postcard_draft(&self) -> bool {
+        self.postcards.open
+    }
+
     pub(super) fn postcard_button(&mut self, ui: &mut egui::Ui) {
         if ui.button("History postcard…").clicked() {
             ui.close();

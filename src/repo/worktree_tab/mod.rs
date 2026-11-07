@@ -172,7 +172,7 @@ impl RepoTab {
                 || !self.commit_body.trim().is_empty()
                 || self.reword.is_some()
                 || self.note_being_written(),
-            editor: self.rebase.is_some() || self.conflict.is_some(),
+            editor: self.rebase.is_some() || self.conflict.is_some() || self.has_postcard_draft(),
             review: self.has_pr_draft(),
         }
     }
