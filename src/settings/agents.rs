@@ -10,6 +10,21 @@ use crate::theme::{self, Tokens};
 impl Settings {
     pub(super) fn agents_ui(&mut self, ui: &mut Ui, f: &Filter) {
         let t = Tokens::get(ui.ctx());
+        section(
+            ui,
+            f,
+            "Sidebar",
+            Some("Task visibility does not change agent permissions or stop running tasks."),
+            |card| {
+                card.row(
+                    "Show Agents section",
+                    "sidebar feature flag tasks visibility robot",
+                    |ui| {
+                        ui.checkbox(&mut self.show_agents, "Show Agents section");
+                    },
+                );
+            },
+        );
         let program = crate::mcp::program();
         section(
             ui,

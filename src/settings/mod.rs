@@ -3,6 +3,7 @@
 mod agents;
 mod ai_page;
 mod branch_names;
+mod context_menus;
 mod custom_commands;
 mod diffs;
 mod external_tools;
@@ -22,6 +23,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::theme::Tokens;
 pub(crate) use branch_names::fit as fit_branch_name;
+pub use context_menus::ContextMenus;
 use file_menus::file_menu_rows;
 use layout::{Card, Filter, section};
 pub(crate) use page::show as show_page;
@@ -152,6 +154,10 @@ pub struct Settings {
     /// Agents connected over `gitcraft mcp` may change repositories (through the window, as
     /// steps of the undo list); otherwise they only read.
     pub agent_writes: bool,
+    /// Show the optional task section; independent of MCP write permission.
+    pub show_agents: bool,
+    /// Optional commands in branch and commit context menus.
+    pub context_menus: ContextMenus,
     /// The "Did you know" line and the first-time hints of a repository tab.
     pub tips: bool,
     /// The first-time hints shown already (by their ids), each shown only once.
@@ -227,6 +233,8 @@ impl Default for Settings {
             custom_commands: Vec::new(),
             trusted_command_files: Vec::new(),
             agent_writes: true,
+            show_agents: false,
+            context_menus: Default::default(),
             tips: true,
             seen_hints: Default::default(),
         }
@@ -1017,6 +1025,7 @@ impl Settings {
             }
             Page::CustomCommands => custom_commands::page(self, ui, f),
             Page::Agents => self.agents_ui(ui, f),
+            Page::ContextMenus => self.context_menus_ui(ui, f),
             Page::Shortcuts => {
                 for (group, keys) in crate::manual::shortcut_groups() {
                     section(ui, f, group, None, |card| {
@@ -1119,12 +1128,13 @@ pub(crate) enum Page {
     Identities,
     Ai,
     CustomCommands,
+    ContextMenus,
     Agents,
     Shortcuts,
 }
 
 impl Page {
-    pub const ALL: [Page; 12] = [
+    pub const ALL: [Page; 13] = [
         Page::Profile,
         Page::General,
         Page::Appearance,
@@ -1135,6 +1145,7 @@ impl Page {
         Page::Identities,
         Page::Ai,
         Page::CustomCommands,
+        Page::ContextMenus,
         Page::Agents,
         Page::Shortcuts,
     ];
@@ -1152,6 +1163,7 @@ impl Page {
             Page::Ai => "AI",
             Page::CustomCommands => "Custom commands",
             Page::Agents => "Agents",
+            Page::ContextMenus => "Context menus",
             Page::Shortcuts => "Keyboard shortcuts",
         }
     }
@@ -1169,6 +1181,7 @@ impl Page {
             Page::Ai => "sparkles",
             Page::CustomCommands => "command",
             Page::Agents => "bot",
+            Page::ContextMenus => "list",
             Page::Shortcuts => "keyboard",
         }
     }

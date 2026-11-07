@@ -32,7 +32,7 @@ impl RepoTab {
 
     /// The dialog for a parallel bisect from `hash`: with the bisect's marks when it has both
     /// ends, else from that commit.
-    fn parallel_dialog_for(&self, hash: &str) -> Action {
+    pub(in crate::repo) fn parallel_dialog_for(&self, hash: &str) -> Action {
         self.parallel_from_bisect()
             .unwrap_or_else(|| self.parallel_from(hash))
     }
