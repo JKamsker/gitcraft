@@ -16,6 +16,7 @@ mod gitea;
 mod github;
 mod gitlab;
 pub(crate) mod http;
+mod identity;
 pub mod inbox;
 pub mod links;
 #[cfg(test)]

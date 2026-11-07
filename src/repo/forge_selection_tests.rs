@@ -379,3 +379,133 @@ fn primary_forge_is_ci_fallback_while_pushed_commits_retain_their_source() {
     assert!(projects.iter().any(|p| p.path == "JKamsker/gitcraft"));
     assert_eq!(tab.primary_forge_remote(), Some("fork"));
 }
+
+fn review12_tab(ctx: &egui::Context, before: Hosting, after: Hosting) -> RepoTab {
+    let mut tab = RepoTab::new_deferred("/nonexistent/forge-identity-tests".into(), ctx);
+    tab.remotes = [(&before, "origin"), (&after, "other")]
+        .map(|(h, name)| Remote {
+            name: name.into(),
+            url: format!("{}/{}", h.web.trim_end_matches('/'), h.path),
+        })
+        .into();
+    tab.forge_remotes = vec![("origin".into(), before), ("other".into(), after)];
+    tab.take_forge_selection(false, ctx);
+    tab
+}
+
+fn review12_hosting(web: &str) -> Hosting {
+    Hosting {
+        forge: Forge::Forgejo,
+        host: "forgejo.example".into(),
+        path: "team/repo".into(),
+        web: web.into(),
+    }
+}
+
+#[test]
+fn review12_different_web_instances_do_not_share_pr_drafts() {
+    let _pause = crate::network::test_pause::set(Some(crate::network::Pause::Switch));
+    for web in [
+        "https://forgejo.example:4000",
+        "http://forgejo.example:3000",
+        "https://forgejo.example:3000/reviews",
+    ] {
+        let ctx = egui::Context::default();
+        let mut tab = review12_tab(
+            &ctx,
+            review12_hosting("https://forgejo.example:3000"),
+            review12_hosting(web),
+        );
+        tab.pr_drafts.entry(7).or_default().comment = "first instance's unsent comment".into();
+        let previous = tab.forge_repository_generation;
+        tab.set_primary_forge(Some("other".into()), &ctx);
+        assert!(tab.pr_drafts.is_empty(), "draft leaked to {web}");
+        assert!(tab.forge_repository_generation > previous);
+        assert!(tab.pr_drafts.entry(7).or_default().comment.is_empty());
+    }
+}
+
+#[test]
+fn review12_gitlab_case_distinct_paths_do_not_share_pr_drafts() {
+    let _pause = crate::network::test_pause::set(Some(crate::network::Pause::Switch));
+    let mut before = review12_hosting("https://forgejo.example:3000");
+    before.forge = Forge::GitLab;
+    before.path = "Group/Subgroup/Project".into();
+    for path in [
+        "group/Subgroup/Project",
+        "Group/subgroup/Project",
+        "Group/Subgroup/project",
+    ] {
+        let ctx = egui::Context::default();
+        let mut after = before.clone();
+        after.path = path.into();
+        let mut tab = review12_tab(&ctx, before.clone(), after);
+        tab.pr_drafts.entry(7).or_default().review = "case-sensitive repository's draft".into();
+        tab.set_primary_forge(Some("other".into()), &ctx);
+        assert!(tab.pr_drafts.is_empty(), "draft leaked to {path}");
+    }
+}
+
+#[test]
+fn review12_stale_review_completion_from_another_port_is_rejected() {
+    let _pause = crate::network::test_pause::set(Some(crate::network::Pause::Switch));
+    let ctx = egui::Context::default();
+    let before = review12_hosting("https://forgejo.example:3000");
+    let mut tab = review12_tab(
+        &ctx,
+        before.clone(),
+        review12_hosting("https://forgejo.example:4000"),
+    );
+    let old = tab.forge_sender();
+    tab.set_primary_forge(Some("other".into()), &ctx);
+    tab.pr_drafts.entry(7).or_default().comment = "second instance's draft".into();
+    let completion = || Msg::PrPosted {
+        hosting: Box::new(before.clone()),
+        number: 7,
+        what: crate::repo::pr_review::Posted::Comment,
+        result: Ok(()),
+    };
+    let _ = old.send(completion());
+    tab.poll(&ctx);
+    assert_eq!(tab.pr_drafts[&7].comment, "second instance's draft");
+    assert!(tab.finished.is_empty());
+    // The captured-hosting guard must also reject an unwrapped completion.
+    tab.handle(completion(), &ctx);
+    assert_eq!(tab.pr_drafts[&7].comment, "second instance's draft");
+    assert!(tab.finished.is_empty());
+}
+
+#[test]
+fn review12_canonical_repository_rename_preserves_pending_review_completion() {
+    let _pause = crate::network::test_pause::set(Some(crate::network::Pause::Switch));
+    for forge in Forge::ALL {
+        let ctx = egui::Context::default();
+        let mut before = review12_hosting("https://forgejo.example/reviews");
+        before.forge = forge;
+        let mut after = before.clone();
+        after.host = "FORGEJO.example".into();
+        after.web = "HTTPS://FORGEJO.example:443/reviews/".into();
+        if forge != Forge::GitLab {
+            after.path = "TEAM/REPO".into();
+        }
+        let mut tab = review12_tab(&ctx, before.clone(), after);
+        let sender = tab.forge_sender();
+        let previous = tab.forge_repository_generation;
+        tab.pr_drafts.entry(7).or_default().posting = true;
+        // A remote rename/URL normalization is allowed while its review is posting.
+        tab.remotes.remove(0);
+        tab.forge_remotes.remove(0);
+        tab.take_forge_selection(true, &ctx);
+        assert_eq!(tab.forge_repository_generation, previous);
+        assert!(tab.pr_drafts[&7].posting);
+        let _ = sender.send(Msg::PrPosted {
+            hosting: Box::new(before),
+            number: 7,
+            what: crate::repo::pr_review::Posted::Comment,
+            result: Ok(()),
+        });
+        tab.poll(&ctx);
+        assert!(!tab.pr_drafts[&7].posting);
+        assert_eq!(tab.finished.len(), 1);
+    }
+}

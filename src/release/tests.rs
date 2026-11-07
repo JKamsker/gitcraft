@@ -481,3 +481,79 @@ fn ssh_publication_identity_preserves_custom_web_ports_and_proxy_prefixes() {
         ));
     }
 }
+
+#[test]
+fn review12_matching_http_single_label_publication_preflight() {
+    let (dir, bare) = project("single-label-preflight");
+    let read = draft(&dir, "HEAD", Some("origin".into())).unwrap();
+    let mut plan = plan_of(&read, "notes");
+    plan.publish = true;
+    let hosting = Hosting {
+        forge: Forge::Forgejo,
+        host: "forgejo".into(),
+        path: "team/repo".into(),
+        web: "http://forgejo:3000".into(),
+    };
+    run(
+        &dir,
+        &[
+            "remote",
+            "set-url",
+            "--push",
+            "origin",
+            "http://forgejo:3000/team/repo.git",
+        ],
+    );
+    // Reads only Git's resolved URL; no HTTP request, push or forge process runs.
+    let result = check_publication_destination(&dir, &plan, &hosting);
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(&bare);
+    assert!(result.is_ok(), "{result:?}");
+}
+
+#[test]
+fn review12_http_publication_identity_keeps_authority_and_proxy_prefix() {
+    for forge in Forge::ALL {
+        let hosting = Hosting {
+            forge,
+            host: "forgejo".into(),
+            path: "Team/Repo".into(),
+            web: "http://forgejo:3000/reviews".into(),
+        };
+        for matching in [
+            "http://forgejo:3000/reviews/Team/Repo.git",
+            "HTTP://FORGEJO:3000/reviews/Team/Repo.git",
+            "http://user@forgejo:3000/reviews/Team/Repo.git",
+        ] {
+            assert!(
+                same_publication_repository(matching, &hosting),
+                "{forge:?} {matching}"
+            );
+        }
+        for mismatch in [
+            "http://forgejo:4000/reviews/Team/Repo.git",
+            "http://forgejo/reviews/Team/Repo.git",
+            "https://forgejo:3000/reviews/Team/Repo.git",
+            "http://another:3000/reviews/Team/Repo.git",
+            "http://forgejo:3000/Team/Repo.git",
+            "http://forgejo:3000/other/Team/Repo.git",
+            "http://forgejo:3000/REVIEWS/Team/Repo.git",
+            "http://forgejo:3000/reviews/Other/Repo.git",
+        ] {
+            assert!(
+                !same_publication_repository(mismatch, &hosting),
+                "{forge:?} {mismatch}"
+            );
+        }
+        assert_eq!(
+            same_publication_repository("http://forgejo:3000/reviews/team/repo.git", &hosting),
+            forge != Forge::GitLab
+        );
+        let mut default_port = hosting.clone();
+        default_port.web = "http://forgejo".into();
+        assert!(same_publication_repository(
+            "http://FORGEJO:80/Team/Repo.git",
+            &default_port
+        ));
+    }
+}

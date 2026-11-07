@@ -46,14 +46,12 @@ pub(super) struct Loaded {
     pub(super) issues: super::issue_work::Read,
 }
 
-/// Whether two hostings are the same repository on the same forge, however it's reached (HTTPS
-/// or SSH): the first load, with nothing before it, moves nothing anywhere.
+/// Whether two hostings name the same web instance and repository, however Git reaches it
+/// (HTTPS or SSH): the first load, with nothing before it, moves nothing anywhere.
 pub(super) fn same_repository(before: Option<&Hosting>, now: Option<&Hosting>) -> bool {
     match (before, now) {
         (None, _) => true,
-        (Some(a), Some(b)) => {
-            a.forge == b.forge && a.host == b.host && a.path.eq_ignore_ascii_case(&b.path)
-        }
+        (Some(a), Some(b)) => a.same_repository(b),
         (Some(_), None) => false,
     }
 }
