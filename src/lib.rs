@@ -2,6 +2,7 @@
 
 pub mod app;
 mod avatars;
+mod bounded_process;
 mod ci;
 mod desktop_entry;
 mod folder_browser;

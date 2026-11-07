@@ -257,6 +257,111 @@ pub fn run_ok_codes(dir: Option<&Path>, args: &[&str], ok: &[i32]) -> Result<Str
     run_inner(dir, args, ok, None, false)
 }
 
+/// Only automatic rebase forecasts use this bounded, cancellable command path. Remote work
+/// is detached immediately on cancellation and stopped by the remote session's own deadline.
+pub(crate) fn forecast_bytes(
+    dir: &Path,
+    args: &[&str],
+    env: &[(&'static str, String)],
+    ok: &[i32],
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    use std::time::Duration;
+    const LIMIT: Duration = Duration::from_secs(15);
+    const REMOVE: &[&str] = &[
+        "GIT_DIR",
+        "GIT_COMMON_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_ATTR_SOURCE",
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    ];
+    if !active() {
+        return Err("Forecast cancelled".into());
+    }
+    let out = if let Some(target) = remote::parse(dir) {
+        let extra = Extra {
+            pre: Vec::new(),
+            env: env.to_vec(),
+        };
+        let mut request = remote_request(&target, &extra, args);
+        request.unset.extend(REMOVE.iter().map(|s| (*s).to_owned()));
+        forecast_remote(&target.host, request, active)?
+    } else {
+        let mut command = git_cmd();
+        with_profile(&mut command, args);
+        command.arg("-C").arg(dir).args(args);
+        for name in REMOVE {
+            command.env_remove(name);
+        }
+        for (name, value) in env {
+            command.env(name, value);
+        }
+        let out = crate::bounded_process::run(command, active, LIMIT)?;
+        remote::Output {
+            code: out.status.code().unwrap_or(-1),
+            stdout: out.stdout,
+            stderr: out.stderr,
+        }
+    };
+    if ok.contains(&out.code) {
+        Ok(out.stdout)
+    } else {
+        Err(format!(
+            "Forecast git command failed ({}): {}",
+            out.code,
+            String::from_utf8_lossy(&out.stderr).trim()
+        ))
+    }
+}
+
+pub(crate) fn forecast_remote(
+    host: &remote::Host,
+    mut request: remote::Request,
+    active: &dyn Fn() -> bool,
+) -> Result<remote::Output, String> {
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+    const LIMIT: Duration = Duration::from_secs(15);
+    if !active() {
+        return Err("Forecast cancelled".into());
+    }
+    request.timeout = Some(LIMIT);
+    request.long = true;
+    let host = host.clone();
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(remote::exec(&host, &request));
+    });
+    let deadline = Instant::now() + LIMIT;
+    loop {
+        if !active() {
+            return Err("Forecast cancelled".into());
+        }
+        if Instant::now() >= deadline {
+            return Err("Forecast command timed out".into());
+        }
+        match rx.recv_timeout(Duration::from_millis(20)) {
+            Ok(out) => return out,
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(_) => return Err("Forecast command stopped".into()),
+        }
+    }
+}
+
+pub(crate) fn forecast_run(
+    dir: &Path,
+    args: &[&str],
+    env: &[(&'static str, String)],
+    ok: &[i32],
+    active: &dyn Fn() -> bool,
+) -> Result<String, String> {
+    forecast_bytes(dir, args, env, ok, active).map(|out| String::from_utf8_lossy(&out).into_owned())
+}
+
 /// A username and password (or token) for an HTTPS remote, typed into gitcraft.
 #[derive(Clone)]
 pub struct Credentials {
