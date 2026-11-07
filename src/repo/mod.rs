@@ -18,6 +18,7 @@ mod branch_order;
 mod branch_tree;
 mod branch_visibility;
 mod bundles;
+mod celebration;
 mod ci_status;
 mod ci_view;
 mod collision_view;
@@ -410,6 +411,7 @@ pub struct RepoTab {
     waiting: running::Waiting,
     /// The operations run, with their commands and output (the Activity panel).
     activity: activity::ActivityLog,
+    celebration: celebration::State,
     topology: std::sync::Arc<graph_walk::Topology>,
     topology_reader: history_reader::Reader<std::sync::Arc<graph_walk::Topology>>,
     graph_narration: graph_walk::Narration,
@@ -670,6 +672,7 @@ impl RepoTab {
             running: None,
             waiting: Default::default(),
             activity: Default::default(),
+            celebration: Default::default(),
             topology: Default::default(),
             topology_reader: Default::default(),
             graph_narration: Default::default(),

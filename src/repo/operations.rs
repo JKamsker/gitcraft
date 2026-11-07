@@ -53,6 +53,7 @@ impl RepoTab {
             }
             return;
         }
+        self.celebration_begin(label, &ops, ctx);
         self.busy_op = Some(label.to_owned());
         self.op_started = Some(Instant::now());
         let control = self.follow_op(&ops, quiet, ctx);
@@ -185,6 +186,7 @@ impl RepoTab {
         quiet: bool,
         ctx: &egui::Context,
     ) {
+        self.celebration_done(result.is_ok());
         self.busy_op = None;
         self.detached_op_done(&label, result.is_ok());
 

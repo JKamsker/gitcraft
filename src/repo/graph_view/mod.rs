@@ -123,6 +123,7 @@ impl RepoTab {
     }
 
     fn graph_rows_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        self.celebration_ui(ui);
         self.graph_walk_header(ui);
         let map_area = ui.available_rect_before_wrap();
         let map_rect = egui::Rect::from_min_max(

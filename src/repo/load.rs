@@ -429,6 +429,7 @@ impl RepoTab {
             self.tx.repo = self.repo_key().to_owned();
         }
         self.timeline_read(loaded.read, ctx);
+        self.celebration_loaded(loaded.read, ctx);
         self.fold_loaded(loaded.read, state, ctx);
         let remote = crate::remote::is_remote(&self.path);
         for wt in self

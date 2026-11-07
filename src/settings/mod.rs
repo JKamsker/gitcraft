@@ -59,6 +59,8 @@ pub struct Settings {
     pub compact_graph: bool,
     pub graph_lane_walk: bool,
     pub graph_sounds: bool,
+    pub celebration_motion: bool,
+    pub celebration_sound: bool,
     /// Widths of the author, when, date and hash columns (dragged in the graph header).
     pub author_width: f32,
     pub when_width: f32,
@@ -186,6 +188,8 @@ impl Default for Settings {
             compact_graph: false,
             graph_lane_walk: false,
             graph_sounds: false,
+            celebration_motion: false,
+            celebration_sound: false,
             author_width: 150.0,
             when_width: 100.0,
             date_width: 118.0,
@@ -460,6 +464,9 @@ impl Settings {
         match page {
             Page::Profile => self.profile_ui(ui, f, view),
             Page::General => {
+                section(ui, f, "Quiet celebrations", None, |card| {
+                    card.row("After success", "first commit release tag merge sound motion", |ui| { ui.checkbox(&mut self.celebration_motion,"Short visual flourish"); ui.checkbox(&mut self.celebration_sound,"Soft celebration sound"); ui.small("Opt-in acknowledgements for a first repository commit, a tag marked as a release, or a completed merge. Motion follows the system preference."); if crate::audio::unavailable() { ui.label("Audio unavailable"); if ui.button("Retry audio").clicked() { crate::audio::retry(); } } });
+                });
                 section(ui, f, "Behaviour", None, |card| {
                     card.row("Worktrees", "open same tab switch", |ui| {
                         ui.checkbox(&mut self.worktrees_in_same_tab, "Open in the same tab")
