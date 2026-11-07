@@ -1,6 +1,7 @@
 //! Native Windows ownership uses kernel sharing restrictions, not pathname rechecks.
 //! Every ancestor is held without FILE_SHARE_DELETE; the alternate is additionally
-//! held with exclusive write/delete ownership. No new unsafe/Win32 calls are needed.
+//! held with exclusive write/delete ownership. Detach renames the actual held file;
+//! it never edits its contents, including when other clones hard-link that inode.
 use std::fs::File;
 use std::io::Write;
 use std::os::windows::fs::{FileExt, MetadataExt, OpenOptionsExt};
@@ -9,8 +10,11 @@ use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
 };
+#[path = "windows_rename.rs"]
+mod rename;
 const SHARE_READ: u32 = 1;
 const SHARE_READ_WRITE: u32 = 3;
+const SHARE_ALL: u32 = 7;
 const DIRECTORY: u32 = 0x0200_0000;
 const NOFOLLOW: u32 = 0x0020_0000;
 const REPARSE: u32 = 0x400;
@@ -49,6 +53,43 @@ fn locked_read(path: &Path) -> Result<File, String> {
     }
     Ok(file)
 }
+fn alternate(path: &Path, create: bool) -> Result<File, String> {
+    use windows_sys::Win32::{
+        Foundation::{GENERIC_READ, GENERIC_WRITE},
+        Storage::FileSystem::DELETE,
+    };
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(create)
+        .access_mode(GENERIC_READ | DELETE | if create { GENERIC_WRITE } else { 0 })
+        .share_mode(SHARE_READ)
+        .create_new(create)
+        .custom_flags(NOFOLLOW)
+        .open(path)
+        .map_err(err)?;
+    let meta = file.metadata().map_err(err)?;
+    if !meta.is_file() || meta.file_attributes() & REPARSE != 0 {
+        return Err(err("alternate metadata must be a plain file"));
+    }
+    Ok(file)
+}
+fn same_file(path: &Path, held: &File) -> Result<bool, String> {
+    // This read must share DELETE with our retained source handle. Its requested
+    // access is READ only; the held source still excludes every other writer/deleter.
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(SHARE_ALL)
+        .custom_flags(NOFOLLOW)
+        .open(path)
+        .map_err(err)?;
+    let meta = file.metadata().map_err(err)?;
+    if !meta.is_file() || meta.file_attributes() & REPARSE != 0 {
+        return Err(err("replaced alternate metadata is not a plain file"));
+    }
+    let a = winapi_util::file::information(&file).map_err(err)?;
+    let b = winapi_util::file::information(held).map_err(err)?;
+    Ok(a.volume_serial_number() == b.volume_serial_number() && a.file_index() == b.file_index())
+}
 fn read(file: &File, max: usize) -> Result<Vec<u8>, String> {
     let mut data = Vec::new();
     let mut buffer = [0u8; 8192];
@@ -65,38 +106,11 @@ fn read(file: &File, max: usize) -> Result<Vec<u8>, String> {
         data.extend_from_slice(&buffer[..count]);
     }
 }
-fn write(file: &File, bytes: &[u8]) -> Result<(), String> {
-    let mut offset = 0;
-    while offset < bytes.len() {
-        let count = file
-            .seek_write(&bytes[offset..], offset as u64)
-            .map_err(err)?;
-        if count == 0 {
-            return Err(err("could not restore captured alternate bytes"));
-        }
-        offset += count;
-    }
-    file.set_len(bytes.len() as u64).map_err(err)?;
-    file.sync_all().map_err(err)
-}
-fn unshared_alternate(file: &File) -> Result<(), String> {
-    // Query the actual exclusively held file. No DELETE sharing also prevents another
-    // handle acquiring the DELETE access needed to add/remove a hard link meanwhile.
-    if winapi_util::file::information(file)
-        .map_err(err)?
-        .number_of_links()
-        != 1
-    {
-        return Err(err(
-            "the alternate file has multiple hard links; clearing it could change another clone's borrowing. Replace this clone's alternate with a separate regular file using Git before preparing independence",
-        ));
-    }
-    Ok(())
-}
 #[derive(Debug)]
 struct Node {
     file: Arc<File>,
     at: PathBuf,
+    path: PathBuf,
 }
 #[derive(Debug)]
 pub(super) struct Ownership {
@@ -105,11 +119,12 @@ pub(super) struct Ownership {
     git: PathBuf,
     objects: PathBuf,
     info: PathBuf,
+    info_file: Arc<File>,
     pack: PathBuf,
     alternate: Arc<File>,
     expected: Vec<u8>,
     locked: AtomicBool,
-    backup: Mutex<Option<(String, Arc<File>)>>,
+    backup: Mutex<Option<String>>,
     installed: Mutex<Vec<Arc<File>>>,
 }
 impl Ownership {
@@ -149,8 +164,12 @@ impl Ownership {
         ] {
             Self::hold(&mut nodes, &directory)?;
         }
-        let alternate = Arc::new(open(&objects.join("info/alternates"), false, true)?);
-        unshared_alternate(&alternate)?;
+        let info_file = nodes
+            .iter()
+            .find(|node| node.path == objects.join("info"))
+            .map(|node| node.file.clone())
+            .ok_or_else(|| err("no retained info directory"))?;
+        let alternate = Arc::new(alternate(&objects.join("info/alternates"), false)?);
         if read(&alternate, 64 * 1024)? != expected {
             return Err(err("alternate bytes changed during capture"));
         }
@@ -160,6 +179,7 @@ impl Ownership {
             git: git.into(),
             objects: objects.into(),
             info: objects.join("info"),
+            info_file,
             pack: objects.join("pack"),
             alternate,
             expected: expected.into(),
@@ -176,7 +196,11 @@ impl Ownership {
             .ok_or_else(|| err("the system could not report the held directory location"))?;
         // All parent handles remain open without delete sharing before a child is opened.
         // Thus an already captured ancestor cannot be renamed/replaced between these opens.
-        nodes.push(Node { file, at });
+        nodes.push(Node {
+            file,
+            at,
+            path: path.into(),
+        });
         Ok(())
     }
     pub fn current(&self, present: bool) -> Result<(), String> {
@@ -187,10 +211,20 @@ impl Ownership {
                 return Err(err("a held ancestor is unavailable or changed"));
             }
         }
-        unshared_alternate(&self.alternate)?;
         let actual = read(&self.alternate, 64 * 1024)?;
-        if (present && actual != self.expected) || (!present && !actual.is_empty()) {
-            return Err(err("the exclusively held alternate changed"));
+        if actual != self.expected {
+            return Err(err("the actual held alternate content changed"));
+        }
+        let path = self.info.join("alternates");
+        if present {
+            if !same_file(&path, &self.alternate)? {
+                return Err(err("the alternate name no longer belongs to the held file"));
+            }
+        } else {
+            match std::fs::symlink_metadata(&path) {
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+                _ => return Err(err("an alternate name exists after guarded removal")),
+            }
         }
         Ok(())
     }
@@ -252,43 +286,58 @@ impl Ownership {
     }
     pub fn detach(&self, name: &str) -> Result<(), String> {
         self.current(true)?;
-        let mut file = std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create_new(true)
-            .share_mode(SHARE_READ)
-            .custom_flags(NOFOLLOW)
-            .open(self.info.join(name))
-            .map_err(err)?;
-        file.write_all(&self.expected).map_err(err)?;
-        file.sync_all().map_err(err)?;
+        // Source and destination directory are actual retained handles. A hard-link
+        // alias keeps exactly its original contents; only this directory entry moves.
+        rename::no_replace(&self.alternate, &self.info_file, name).map_err(err)?;
         *self
             .backup
             .lock()
-            .map_err(|_| err("backup ownership lock failed"))? =
-            Some((name.into(), Arc::new(file)));
-        // The actual alternate cannot be deleted, renamed, or opened by another writer
-        // while its exclusive-write handle is retained. Emptying it removes all borrowing.
-        self.alternate.set_len(0).map_err(err)?;
-        self.alternate.sync_all().map_err(err)
+            .map_err(|_| err("backup ownership lock failed"))? = Some(name.into());
+        self.verify_backup(name)
     }
     pub fn verify_backup(&self, name: &str) -> Result<(), String> {
         let backup = self
             .backup
             .lock()
             .map_err(|_| err("backup ownership lock failed"))?;
-        let Some((held_name, file)) = backup.as_ref() else {
+        let Some(held_name) = backup.as_ref() else {
             return Err(err("no held backup"));
         };
-        if held_name != name || read(file, 64 * 1024)? != self.expected {
-            return Err(err("held backup does not match captured bytes"));
+        if held_name != name
+            || !same_file(&self.info.join(name), &self.alternate)?
+            || read(&self.alternate, 64 * 1024)? != self.expected
+        {
+            return Err(err("held backup identity or captured bytes changed"));
         }
         Ok(())
     }
-    pub fn restore(&self, _name: &str) -> Result<(), String> {
-        // This writes only the actual exclusively held original file. Sharing rules have
-        // prevented any replacement/new writer since capture; no newer file is overwritten.
-        write(&self.alternate, &self.expected)
+    pub fn restore(&self, name: &str) -> Result<(), String> {
+        let destination = self.info.join("alternates");
+        match std::fs::symlink_metadata(&destination) {
+            Ok(_) => {
+                if same_file(&destination, &self.alternate)?
+                    && read(&self.alternate, 64 * 1024)? == self.expected
+                {
+                    return Ok(());
+                }
+                return Err(err("a newer alternate file exists; it was not overwritten"));
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+            Err(error) => return Err(err(error)),
+        }
+        // Publish captured bytes from a fresh actual inode, never by writing the old
+        // alternate/backup. The held directory and no-replace rename guard both names.
+        let private = format!("{name}.restore");
+        let mut file = alternate(&self.info.join(&private), true)?;
+        file.write_all(&self.expected).map_err(err)?;
+        file.sync_all().map_err(err)?;
+        rename::no_replace(&file, &self.info_file, "alternates").map_err(|error| {
+            err(format!("create-only restore refused: {error}; retained {private}"))
+        })?;
+        if !same_file(&destination, &file)? || read(&file, 64 * 1024)? != self.expected {
+            return Err(err("restored alternate identity/content could not be proven"));
+        }
+        Ok(())
     }
     pub fn recovery_path(&self, name: &str) -> PathBuf {
         self.info.join(name)

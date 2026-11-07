@@ -768,12 +768,11 @@ mod native_windows_ownership {
         assert!(std::fs::rename(&borrower, f.0.join("replacement-root")).is_err());
         assert!(std::fs::remove_file(&alt).is_err());
         assert!(std::fs::OpenOptions::new().write(true).open(&alt).is_err());
-        assert!(std::fs::hard_link(&alt, f.0.join("new-alternate-alias")).is_err());
         drop(plan);
         Ok(())
     }
     #[test]
-    fn native_hardlinked_alternates_refuse_without_changing_either_clone() -> Result<(), String> {
+    fn native_handle_rename_preserves_another_clones_hardlinked_alternate() -> Result<(), String> {
         let f = Fixture::new()?;
         let (donor, borrower) = f.borrowing()?;
         let second = f.0.join("second borrower");
@@ -792,14 +791,11 @@ mod native_windows_ownership {
         let expected = std::fs::read(&alt).map_err(|e| e.to_string())?;
         std::fs::remove_file(&other).map_err(|e| e.to_string())?;
         std::fs::hard_link(&alt, &other).map_err(|e| e.to_string())?;
-        let data = inspect(&borrower, "HEAD", &|| true)?;
-        assert!(data.independence.is_none());
-        assert!(
-            data.notes
-                .iter()
-                .any(|note| note.contains("multiple hard links"))
-        );
-        assert_eq!(std::fs::read(&alt).map_err(|e| e.to_string())?, expected);
+        let plan = inspect(&borrower, "HEAD", &|| true)?
+            .independence
+            .ok_or("no native plan")?;
+        independent::make_independent(&plan, &|| true)?;
+        assert!(!alt.exists());
         assert_eq!(std::fs::read(&other).map_err(|e| e.to_string())?, expected);
         for clone in [&borrower, &second] {
             assert_eq!(
@@ -807,21 +803,18 @@ mod native_windows_ownership {
                 "borrowed bytes"
             );
         }
+        drop(plan);
         Ok(())
     }
     #[test]
-    fn native_independence_clears_only_the_exclusively_held_alternate() -> Result<(), String> {
+    fn native_independence_renames_only_the_actual_held_alternate() -> Result<(), String> {
         let f = Fixture::new()?;
         let (donor, borrower) = f.borrowing()?;
         let plan = inspect(&borrower, "HEAD", &|| true)?
             .independence
             .ok_or("no native plan")?;
         independent::make_independent(&plan, &|| true)?;
-        assert!(
-            std::fs::read(borrower.join(".git/objects/info/alternates"))
-                .map_err(|e| e.to_string())?
-                .is_empty()
-        );
+        assert!(!borrower.join(".git/objects/info/alternates").exists());
         std::fs::rename(&donor, f.0.join("removed donor")).map_err(|e| e.to_string())?;
         assert_eq!(
             Fixture::git(&borrower, &["show", "HEAD:file ' $(touch ESCAPED).txt"])?,
@@ -832,7 +825,7 @@ mod native_windows_ownership {
         Ok(())
     }
     #[test]
-    fn native_failed_proof_recovers_the_same_exclusively_owned_file() -> Result<(), String> {
+    fn native_failed_proof_recovers_captured_bytes_without_editing_backup() -> Result<(), String> {
         let f = Fixture::new()?;
         let (_, borrower) = f.borrowing()?;
         let plan = inspect(&borrower, "HEAD", &|| true)?
@@ -842,14 +835,88 @@ mod native_windows_ownership {
         let before = std::fs::read(&alt).map_err(|e| e.to_string())?;
         let result = independent::make_with_checkpoints(&plan, &|| true, &mut |phase| {
             if phase == "detached" {
-                assert!(std::fs::read(&alt).map_err(|e| e.to_string())?.is_empty());
-                assert!(std::fs::remove_file(&alt).is_err());
+                assert!(!alt.exists());
                 return Err("owned native fixture stops final proof".into());
             }
             Ok(())
         });
         assert!(result.is_err_and(|e| e.contains("Borrowing was restored")));
         assert_eq!(std::fs::read(&alt).map_err(|e| e.to_string())?, before);
+        let backup = std::fs::read_dir(alt.parent().ok_or("no info")?)
+            .map_err(|e| e.to_string())?
+            .filter_map(Result::ok)
+            .find(|entry| {
+                let name = entry.file_name();
+                let name = name.to_string_lossy();
+                name.starts_with("alternates.gitcraft-backup-") && !name.ends_with(".restore")
+            })
+            .ok_or("no retained backup")?;
+        assert_eq!(std::fs::read(backup.path()).map_err(|e| e.to_string())?, before);
+        drop(plan);
+        Ok(())
+    }
+    #[test]
+    fn native_restore_does_not_replace_new_alternate_metadata() -> Result<(), String> {
+        let f = Fixture::new()?;
+        let (_, borrower) = f.borrowing()?;
+        let plan = inspect(&borrower, "HEAD", &|| true)?
+            .independence
+            .ok_or("no native plan")?;
+        let alt = borrower.join(".git/objects/info/alternates");
+        let replacement = b"newer alternate metadata\n";
+        let result = independent::make_with_checkpoints(&plan, &|| true, &mut |phase| {
+            if phase == "detached" {
+                std::fs::write(&alt, replacement).map_err(|e| e.to_string())?;
+                return Err("owned fixture stops proof after newer metadata".into());
+            }
+            Ok(())
+        });
+        assert!(result.is_err_and(|error| error.contains("newer alternate file")));
+        assert_eq!(std::fs::read(&alt).map_err(|e| e.to_string())?, replacement);
+        drop(plan);
+        Ok(())
+    }
+    #[test]
+    fn native_backup_destination_collision_never_replaces_metadata() -> Result<(), String> {
+        let f = Fixture::new()?;
+        let (_, borrower) = f.borrowing()?;
+        let plan = inspect(&borrower, "HEAD", &|| true)?
+            .independence
+            .ok_or("no native plan")?;
+        let objects = borrower.join(".git/objects");
+        let alt = objects.join("info/alternates");
+        let before = std::fs::read(&alt).map_err(|e| e.to_string())?;
+        let mut collision = None;
+        let result = independent::make_with_checkpoints(&plan, &|| true, &mut |phase| {
+            if phase == "verified" {
+                let stage = std::fs::read_dir(&objects)
+                    .map_err(|e| e.to_string())?
+                    .filter_map(Result::ok)
+                    .find(|entry| {
+                        entry
+                            .file_name()
+                            .to_string_lossy()
+                            .starts_with("gitcraft-independent-stage-")
+                    })
+                    .ok_or("no private stage")?;
+                let name = stage.file_name().to_string_lossy().into_owned();
+                let transaction = name
+                    .strip_prefix("gitcraft-independent-stage-")
+                    .ok_or("no transaction")?;
+                let path = objects
+                    .join("info")
+                    .join(format!("alternates.gitcraft-backup-{transaction}"));
+                std::fs::write(&path, b"existing backup metadata\n").map_err(|e| e.to_string())?;
+                collision = Some(path);
+            }
+            Ok(())
+        });
+        assert!(result.is_err_and(|error| error.contains("Guarded alternate removal failed")));
+        assert_eq!(std::fs::read(&alt).map_err(|e| e.to_string())?, before);
+        assert_eq!(
+            std::fs::read(collision.ok_or("no collision")?).map_err(|e| e.to_string())?,
+            b"existing backup metadata\n"
+        );
         drop(plan);
         Ok(())
     }

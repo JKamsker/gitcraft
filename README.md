@@ -644,10 +644,11 @@ through `.git/objects/info` and `pack`; it stages and verifies the copy before
 installing through those handles. Alternate removal is a create-only guarded rename,
 and recovery publishes captured bytes through the held info directory without
 overwriting newer metadata.
-Windows holds every ancestor without delete sharing and exclusively owns the actual
-alternate file while clearing its contents; its held-file recovery cannot overwrite
-replacement metadata. Multiply hard-linked alternate files are refused so another
-clone's borrowing cannot be changed through a shared file. Unsupported platforms retain read-only inspection and explain
+Windows holds every ancestor without delete sharing and retains DELETE access on the
+actual alternate. It moves that file through its handle with a no-replace rename;
+it never changes the original file's contents, including when another clone has a
+hard-link alias. Recovery publishes captured bytes from a fresh file through another
+no-replace handle rename. Unsupported platforms retain read-only inspection and explain
 which independence capability is missing. Private `objects/gitcraft-independent-stage-*` directories are kept
 as recovery evidence; Linux installs share pack data with the stage; Windows retains protected copies.
 
