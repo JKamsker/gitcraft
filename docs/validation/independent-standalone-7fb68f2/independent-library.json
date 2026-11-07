@@ -1,0 +1,11 @@
+{
+  "application_candidate": "7fb68f226a1056970d5f722751a1bd2f0b937cbf",
+  "command": [
+    "/workspace/work/standalone-file-tools/target/debug/deps/gitcraft-cdb92a3e5c63a8e6",
+    "standalone::",
+    "--test-threads=2"
+  ],
+  "exit_code": 0,
+  "log_sha256": "7e8b6b625bfc96ee432b39e5c19191eca07ccad732a5df393463a455196664d4",
+  "scope": "Independent focused Linux existing-bound-binary reuse; temp config/files and recording-only metadata protocol; no native Windows/helper invocation, actual globalconfig/provider write, Cargo/freshcompile/fullsuite rerun/CI."
+}

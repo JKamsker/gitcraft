@@ -1,0 +1,8 @@
+
+running 3 tests
+test malformed_native_helper_fields_fail_closed_instead_of_opening_a_repository ... ok
+test native_non_utf8_file_arguments_never_panic_in_utf8_helper_dispatch ... ok
+test help_and_usage_exit_without_repository_profile_or_display_fallback ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

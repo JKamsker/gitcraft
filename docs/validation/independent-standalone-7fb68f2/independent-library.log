@@ -1,0 +1,27 @@
+
+running 22 tests
+test standalone::cli::tests::non_utf8_arguments_are_not_reconstructed_from_display_strings ... ok
+test standalone::cli::tests::file_modes_have_exact_arity_and_option_looking_names_stay_native ... ok
+test standalone::files::tests::native_byte_paths_and_explicit_input_links_are_read_only ... ok
+test standalone::files::tests::native_snapshots_keep_binary_bytes_detect_edits_and_bound_reads ... ok
+test standalone::model::tests::binary_whole_side_choices_preserve_bytes_and_stale_inputs_refuse_save ... ok
+test standalone::model::tests::existing_result_is_kept_and_computed_conflicts_require_a_choice ... ok
+test standalone::model::tests::file_modes_work_under_a_profile_error_without_repository_fallback ... ok
+test standalone::model::tests::nonoverlapping_three_way_merge_preserves_the_missing_final_newline ... ok
+test standalone::permissions::tests::edited_results_keep_bounded_user_metadata_and_executable_mode_without_privileged_bits ... ok
+test standalone::registration::tests::isolated_global_registration_preserves_relative_override_meaning ... ok
+test standalone::registration::tests::registered_shell_commands_pass_literal_native_file_paths_and_propagate_status ... ok
+test standalone::registration::tests::registration_settings_do_not_write_until_the_user_clicks_the_concrete_action ... ok
+test standalone::save::tests::destination_drift_and_concurrent_creators_are_preserved_without_success ... ok
+test standalone::save::tests::explicit_save_retains_the_old_inode_and_never_writes_inputs ... ok
+test standalone::save::tests::missing_outputs_install_create_only_aliases_and_read_only_outputs_are_refused ... ok
+test standalone::save::tests::swapped_parents_and_output_links_never_redirect_writes ... ok
+test standalone::registration::tests::explicit_temp_config_registration_keeps_unrelated_defaults_and_supports_opt_in ... ok
+test standalone::ui::tests::actual_diff_close_succeeds_but_unsaved_merge_close_cancels_and_load_error_is_distinct ... ok
+test standalone::ui::tests::actual_result_editor_and_conflict_choice_save_exact_bytes_with_success ... ok
+test standalone::ui::tests::actual_save_refuses_changed_destination_and_reports_nonzero_without_overwrite ... ok
+test standalone::windows_metadata::tests::metadata_protocol_records_only_constant_script_and_literal_native_path_data ... ok
+test standalone::ui::tests::hostile_profile_cannot_redirect_the_standalone_background_ui ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 820 filtered out; finished in 0.35s
+
