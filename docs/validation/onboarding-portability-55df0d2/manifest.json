@@ -1,0 +1,223 @@
+{
+  "features": [
+    "#45 A tour of this repository",
+    "#45 New machine, same setup"
+  ],
+  "application_candidate": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+  "application_tree": "3a4a060041ef998d68773be5252e6bc3c934fd17",
+  "review_base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "prior_failed_application": "b05e51c529c12cc66bb907772e66450cd4ad9cc8",
+  "prior_review": "/workspace/work/review-portable-setup/docs/validation/independent-portable-setup-b05/review.md",
+  "branch": "codex/onboarding-portability",
+  "remote_sha_before_evidence": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+  "status": "locally validated correction; independent re-review pending",
+  "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "worktree": "/workspace/work/onboarding-portability",
+  "private_target": "/workspace/work/onboarding-portability/target",
+  "cargo_incremental": "0",
+  "cargo_build_jobs": "2",
+  "optional_ssh_wsl_environment": "unset",
+  "safety_exclusions": 0,
+  "gates": {
+    "fmt": "PASS",
+    "strict_all_target_clippy_Dwarnings": "PASS",
+    "focused": "25 passed;0 failed",
+    "full_default": "814 passed;0 failed;3 ignored;0 filtered;817 registered",
+    "test_list": "817 names; all25 named feature cases actually pass"
+  },
+  "commands": {
+    "fmt": "cargo fmt --all --check",
+    "clippy": "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo clippy --all-targets -- -D warnings",
+    "full": "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo test",
+    "test_list": "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo test -- --list",
+    "focused_filters": [
+      "git::command::setup::tests::",
+      "portability::",
+      "app::setup::",
+      "tour::",
+      "a_pending_startup_profile_stays_parked"
+    ]
+  },
+  "source_changed_files": {
+    "docs/portable-setup.md": "351de93c61842fc1d7143286d14e43fe38106e2c462c2942c801551e3b3c116c",
+    "src/app/home.rs": "342e488b650bac50a5c3759d7c8944c65fafae1d18fff6e11eab2ccc7cde60de",
+    "src/app/mod.rs": "78ff1a5330af85045df617c3da64c7eac6ca8731717bb1349750e71ecf92551e",
+    "src/app/palette.rs": "23bb222fbbbcd4b929178d9ffea2ee8063b01f33268cc4deb608779ac3255e0d",
+    "src/app/profiles.rs": "dd2e95ac6cc645af56747aa9e9e0a3d5de46b45ce9a837718061497c1f11daed",
+    "src/app/setup/files.rs": "41ef50952932f21c0d61fd394cd45d7d0b5dbc7a8d97667354fa2e64be626f3f",
+    "src/app/setup/mod.rs": "e3b7517df4b7e9ed47d2f292095c8886ccad04dfddb8b7bf7c18f11efaea1f43",
+    "src/app/setup/pending.rs": "7bc2ac8f6a6a3854f660c93e91676d88509ff53d4527f57286d6abed9820eed2",
+    "src/app/setup/tests.rs": "bf677fdb6663e78b29a5b9ee09209681dcd1d1ec560d1ade06232a20e8a2c6df",
+    "src/app/tests.rs": "15415cfb39b828777209f30660f99ecf68b8855eb688610be78bbf044edc040e",
+    "src/connections.rs": "976fd90f203ac502d67614aa254406b0dca5e49cd678635b6b6595048c594f6e",
+    "src/forge/gitea/mod.rs": "3921c6eb7d3ed2fc74936306c24b96849a1bfca9cfca737872c3a63cf98e2cc2",
+    "src/forge/http.rs": "b6970de947876198a71ba996f836876697d07f8136d26f262ebd4531e606b607",
+    "src/git/activity.rs": "c484d2b8c714b732cf7b318d9026feaa1c9f9cd90006c85c6412f588093927f7",
+    "src/git/activity/date.rs": "84721549b14eab3ebee805fc63ea469a4469e1ebec353f67a8d004792e79e96a",
+    "src/git/activity/process.rs": "fbff2b4758533714fd8ba2b5b5c5b394eba636a9a5a8d1dd7b3b86a151923cc6",
+    "src/git/command.rs": "7c5901d0a6002ffdb8d6eee3ea8815dfabab5f027686eb76f31ee7c169d31305",
+    "src/git/command/setup.rs": "276a3dae546abd17225ebda0d0cbf2c81dc335d532b57bc24c5b7e770f15f290",
+    "src/git/command/setup/tests.rs": "dd94c855905eac8be8b96ce3c3417b97e14c6912ba046d429e60f499cf57d179",
+    "src/lib.rs": "42fada5079c8db9db31cc476b100b674bfe36e33258cf5448ee2e26004c87f92",
+    "src/portability.rs": "217532a587d3b51ea8f90b70c5e5eb3b9592963b55015eabf8587074e5292c1e",
+    "src/portability/repository.rs": "71a0e78336440ab4fd3acb9174321f06977b1c64364323b313be161d56a399cb",
+    "src/portability/restore.rs": "36cad7a88ae02886e1810c5b4a269f700ad77b8dc04e99fab5dcd41fc2e72107",
+    "src/portability/tests.rs": "c8e1d4def0b6d110ffc957b390e33108a3016c7874e7e0a50e6a4e35420856f8",
+    "src/portability/url.rs": "9cda6b984784fb3adda55803f28e68c6e5c306c9ae1fd562009bfff1f6a4e5c8",
+    "src/repo/actions.rs": "0d9c30c55d972f08f3d2e85d5b5474afa394940a9c44c041d1b89edec9241e15",
+    "src/repo/activity/mod.rs": "9bb4f73111710fbd74bccf2730cb04c5b1b899a3248c33c2f002f205a4ee7555",
+    "src/repo/apply.rs": "23edc8d6ecb424ffe9e8876c1cb50ef71d9849f7aacaf514ed58934586acfea3",
+    "src/repo/branch_visibility.rs": "c5a2734235455ab01ff2b7421f4a74aff1313fc9d78be20c820e0895693aa659",
+    "src/repo/layout.rs": "630aca3cb80e1a2277c56558dd209ec0047d9bc1673e7785673a6cb8cf7fac39",
+    "src/repo/mod.rs": "5d7975497933bdadc93ca15ad701201d610c2395efacf5f26d7314ba7f3d77cf",
+    "src/repo/tour/mod.rs": "db9de59a63d173e9f3a4efa8de46c0298194f163a90cf5561523e696d2d5c91f",
+    "src/settings/profiles.rs": "36f7691409fef7a340275c32f96cfaf2de679e3992fc083f0638b97632f30e93",
+    "src/theme/mod.rs": "19202af3aed0cb95470f87e1ed40e3570f0a9fe49d40fdacc61dc4d493903f14",
+    "src/tour.rs": "e773aef16045914d7a36fc1ef02c915c8fcabf6030856d7d5780f0e46e32b13c",
+    "src/tour/tests.rs": "c2943598f30188506478743fe6aa433986e0e57cb808f32d52617bc0be385b12"
+  },
+  "fix_source_changed_files": {
+    "docs/portable-setup.md": "351de93c61842fc1d7143286d14e43fe38106e2c462c2942c801551e3b3c116c",
+    "src/app/setup/mod.rs": "e3b7517df4b7e9ed47d2f292095c8886ccad04dfddb8b7bf7c18f11efaea1f43",
+    "src/app/setup/pending.rs": "7bc2ac8f6a6a3854f660c93e91676d88509ff53d4527f57286d6abed9820eed2",
+    "src/app/setup/tests.rs": "bf677fdb6663e78b29a5b9ee09209681dcd1d1ec560d1ade06232a20e8a2c6df",
+    "src/git/command.rs": "7c5901d0a6002ffdb8d6eee3ea8815dfabab5f027686eb76f31ee7c169d31305",
+    "src/git/command/setup.rs": "276a3dae546abd17225ebda0d0cbf2c81dc335d532b57bc24c5b7e770f15f290",
+    "src/git/command/setup/tests.rs": "dd94c855905eac8be8b96ce3c3417b97e14c6912ba046d429e60f499cf57d179",
+    "src/portability.rs": "217532a587d3b51ea8f90b70c5e5eb3b9592963b55015eabf8587074e5292c1e",
+    "src/portability/restore.rs": "36cad7a88ae02886e1810c5b4a269f700ad77b8dc04e99fab5dcd41fc2e72107",
+    "src/portability/tests.rs": "c8e1d4def0b6d110ffc957b390e33108a3016c7874e7e0a50e6a4e35420856f8"
+  },
+  "logs": {
+    "fmt": {
+      "path": "/workspace/work/onboarding-fixed-fmt.log",
+      "bundled_path": "docs/validation/onboarding-portability-55df0d2/onboarding-fixed-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "network": {
+      "path": "/workspace/work/onboarding-fixed-network.log",
+      "bundled_path": "docs/validation/onboarding-portability-55df0d2/onboarding-fixed-network.log",
+      "sha256": "3dcf2ee88510f89d72418146356bb0c835066b3a0488e74e1a6cabcfb9efeb1c",
+      "bytes": 785
+    },
+    "restore": {
+      "path": "/workspace/work/onboarding-fixed-restore.log",
+      "bundled_path": "docs/validation/onboarding-portability-55df0d2/onboarding-fixed-restore.log",
+      "sha256": "a3609cfbbfaee8f21f37188ff4296c9dcc2e2e439d925a76215ddabddccbf8c5",
+      "bytes": 1665
+    },
+    "ui": {
+      "path": "/workspace/work/onboarding-fixed-ui.log",
+      "bundled_path": "docs/validation/onboarding-portability-55df0d2/onboarding-fixed-ui.log",
+      "sha256": "9783a7bab2db9049ca93e65564e46c0868eda5a402f8a51b1f2aa8c9ba375d2f",
+      "bytes": 1083
+    },
+    "tour": {
+      "path": "/workspace/work/onboarding-fixed-tour.log",
+      "bundled_path": "docs/validation/onboarding-portability-55df0d2/onboarding-fixed-tour.log",
+      "sha256": "c77abdaadea432ac9ac290e12ada5ef15044aebc7bc694b5fc8313bde1dc910f",
+      "bytes": 920
+    },
+    "startup": {
+      "path": "/workspace/work/onboarding-fixed-startup.log",
+      "bundled_path": "docs/validation/onboarding-portability-55df0d2/onboarding-fixed-startup.log",
+      "sha256": "b317119c01b94efe2db310f011075bb320c3fb21e47fc234ee89c5cc8b2180d7",
+      "bytes": 714
+    },
+    "clippy": {
+      "path": "/workspace/work/onboarding-fixed-clippy.log",
+      "bundled_path": "docs/validation/onboarding-portability-55df0d2/onboarding-fixed-clippy.log",
+      "sha256": "ec9fef5a95720f57719cab21122297162499de2979b3efe18a014a5a1678df9a",
+      "bytes": 143
+    },
+    "test": {
+      "path": "/workspace/work/onboarding-fixed-test.log",
+      "bundled_path": "docs/validation/onboarding-portability-55df0d2/onboarding-fixed-test.log",
+      "sha256": "5e1ebce28330b7c6bc351c004ad5c67edc299074a6e26e1b11c950ad64c1df31",
+      "bytes": 66622
+    },
+    "test-list": {
+      "path": "/workspace/work/onboarding-fixed-test-list.log",
+      "bundled_path": "docs/validation/onboarding-portability-55df0d2/onboarding-fixed-test-list.log",
+      "sha256": "b8a7f4d77b22657fbda511c81fce9a8dbe355873635fedefccb3b92d41ba3c60",
+      "bytes": 61244
+    }
+  },
+  "feature_tests": [
+    "app::setup::pending::tests::tea_round_trip_pins_public_owner_and_host_without_exporting_token_or_auth_folder",
+    "app::setup::tests::cancelled_profile_answers_cannot_activate_stale_setup",
+    "app::setup::tests::changed_profile_answers_do_not_clear_the_current_pending_requirements",
+    "app::setup::tests::deleted_imported_profile_mappings_are_not_reused_for_another_profiles_id",
+    "app::setup::tests::export_import_ui_round_trip_preserves_active_profile_and_requires_local_setup",
+    "app::setup::tests::malicious_setup_file_cannot_restore_commands_paths_or_credential_urls",
+    "app::tests::a_pending_startup_profile_stays_parked_instead_of_using_ambient_accounts",
+    "git::command::setup::tests::network_setup_clone_pins_https_and_explicit_profile_authentication_under_hostile_configuration",
+    "git::command::setup::tests::setup_network_context_refuses_pending_profiles_and_unselected_ssh_identities",
+    "portability::tests::cancelled_restore_never_creates_a_destination",
+    "portability::tests::locked_worktree_retry_completes_after_a_later_missing_branch_without_relocking",
+    "portability::tests::malicious_setup_fields_and_command_urls_are_data_errors",
+    "portability::tests::partial_worktree_restore_can_retry_but_changed_config_cannot",
+    "portability::tests::portable_profiles_keep_public_policy_but_never_export_auth_paths_or_commands",
+    "portability::tests::practice_export_and_local_restore_isolate_hostile_git_environment_and_profile",
+    "portability::tests::repository_snapshot_and_restore_round_trip_remotes_author_hidden_refs_and_linked_worktrees",
+    "portability::tests::restoration_refuses_overwrite_traversal_and_missing_branch_without_substitution",
+    "portability::tests::signing_safety_cannot_be_disabled_by_a_missing_pending_flag",
+    "portability::tests::ssh_alias_repository_forces_fresh_key_setup_even_when_the_old_profile_used_an_ambient_agent",
+    "portability::tests::worktree_lock_detection_uses_directory_identity_for_native_and_git_spellings",
+    "repo::tour::tests::closed_or_replaced_tours_reject_stale_answers",
+    "repo::tour::tests::tour_ui_checklist_and_close_button_are_connected",
+    "tour::tests::encoded_remote_tour_and_portable_snapshot_use_only_the_recording_local_launcher",
+    "tour::tests::real_repository_tour_reads_documents_needs_and_one_cached_history_without_hooks",
+    "tour::tests::workflow_observations_do_not_verify_signatures_or_assert_a_policy"
+  ],
+  "new_fix_test_names": [
+    "git::command::setup::tests::network_setup_clone_pins_https_and_explicit_profile_authentication_under_hostile_configuration",
+    "git::command::setup::tests::setup_network_context_refuses_pending_profiles_and_unselected_ssh_identities",
+    "portability::tests::locked_worktree_retry_completes_after_a_later_missing_branch_without_relocking",
+    "portability::tests::ssh_alias_repository_forces_fresh_key_setup_even_when_the_old_profile_used_an_ambient_agent",
+    "portability::tests::worktree_lock_detection_uses_directory_identity_for_native_and_git_spellings"
+  ],
+  "binary": {
+    "path": "/workspace/work/onboarding-portability/target/debug/deps/gitcraft-31822f5b138c0fe8",
+    "sha256": "e39934cbb2a95b44d8b986458f6d3abdda93dbacda4d24a9290ec160ad7065b8",
+    "source_binding": "Fresh Compiling gitcraft (/workspace/work/onboarding-portability) in network gate; all25 named cases executed, current source frozen during pipeline."
+  },
+  "corrections": {
+    "ambient_network_rewrite": {
+      "status": "implemented; locally validated",
+      "scope": [
+        "Clone command runs in an owned private Git working directory/HOME with no global/system/profile-included/parent repository config, caller Git routing, personal .netrc or inherited askpass/SSH command.",
+        "The previewed credential-free URL is validated; the exact HTTPS/SSH/file protocol is allowed, HTTPS redirects are disabled, and key/client-certificate/credential fallbacks are excluded.",
+        "Only captured explicit Profile account/key helpers are reconstructed. Selected fixed helpers alone regain their original local auth-folder environment; no tokens or raw config enter the setup file. Same-host selected providers retain normal Profile last-helper precedence.",
+        "SSH uses the explicit key, fixed OpenSSH dialect, no unexported SSH config and BatchMode; a matching selected-key agent context is retained. Agent-only/no-key/missing-key choices fail closed.",
+        "Recording-only real Git helper fixture proves previewed HTTPS routing under hostile inherited/global/profile/parent URL rewrites, explicit selected GitHub/GitLab metadata/auth-folder capture, anonymous no-helper behavior, no ambient helper/SSH execution, selected SSH host:port/key/agent forwarding, and unchanged parent config. No network connection is opened."
+      ]
+    },
+    "windows_locked_worktree_retry": {
+      "status": "implemented; locally validated with native-platform case pending",
+      "scope": [
+        "Git porcelain path spellings are matched through the existing canonical filesystem identity helper rather than byte-comparing C:/... with Windows verbatim backslash paths.",
+        "A real restore creates/locks the first worktree, fails a later missing branch, fixes that branch and retries all remaining steps without re-locking the completed worktree.",
+        "Directory-alias identity parsing test uses real Git-style C:/... versus native canonical path on Windows and an equivalent real directory alias on other platforms. No native Windows execution is claimed."
+      ]
+    }
+  },
+  "supported_setup_contract": [
+    "Existing public account/Tea alias+host+actual-owner metadata remains unchanged and verified; no new SSH alias/agent selector or imported config execution was introduced.",
+    "Any imported SSH address requires fresh explicit key setup even when the original profile used ambient agent defaults. Decoding older/untrusted files cannot omit that requirement.",
+    "Import preview allows editing credential-free restoration addresses to replace unexported SSH-config aliases with literal server endpoints. SSH restoration remains disabled until a supported explicit key and endpoint confirmation exist; edits reset confirmation.",
+    "The real isolated App pointer round-trip covers work-alias export, pending profile refusal, fresh key/signing setup, explicit activation, edited literal endpoint confirmation and actual local clone/config restoration. Existing Tea, Practice, stale/cancel, no-overwrite/missing-branch and Tour coverage all pass."
+  ],
+  "limits": [
+    "Native Windows/live SSH/WSL/providers/user credentials were not exercised. All transport/auth tests use recording-only owned local helpers; selected agent socket forwarding is recorded without an actual agent or connection.",
+    "Only supported explicit Profile GitHub/GitLab/Tea choices and a selected SSH key are used. Unselected HTTPS clones are anonymous; ambient credential helpers/.netrc/SSH config/agent-only policies are not restored.",
+    "SSH setup confirms a selected local key-file binding, not remote access or passphrase availability. Unexported SSH aliases/proxy configuration require literal endpoint edits or other local setup; no configuration or selectors are imported.",
+    "Original bounds remain:8MiB setup,64 profiles/repositories/worktrees,256 saved identities,32 remotes,16 push URLs/remote,2000 hidden refs,UTF-8 metadata/conservative ASCII names. Tour observations remain bounded and not policy/signature verification.",
+    "Named branches use current source tips with mismatch notices; local-only objects/working files/stashes need separate backup. Retry receipts remain in-memory for an unchanged owned clone/config; failed/partial destinations are retained.",
+    "Application b05 and its evidence remain immutable. Integration handback b5df680 is separately validated866pass+3ignored with869 exact names; this correction is not yet merged there."
+  ],
+  "prior_evidence": "docs/validation/onboarding-portability-b05e51c/manifest.json",
+  "ci": "No CI used, dispatched, polled or awaited. User defers CI until all implementation, final history assembly, local gates and independent reviews are complete.",
+  "review_state": "Independent exact-candidate re-review required before integration/publication."
+}

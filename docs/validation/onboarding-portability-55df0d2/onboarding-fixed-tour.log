@@ -1,0 +1,18 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.44s
+     Running unittests src/lib.rs (target/debug/deps/gitcraft-31822f5b138c0fe8)
+
+running 5 tests
+test repo::tour::tests::closed_or_replaced_tours_reject_stale_answers ... ok
+test tour::tests::workflow_observations_do_not_verify_signatures_or_assert_a_policy ... ok
+test repo::tour::tests::tour_ui_checklist_and_close_button_are_connected ... ok
+test tour::tests::real_repository_tour_reads_documents_needs_and_one_cached_history_without_hooks ... ok
+test tour::tests::encoded_remote_tour_and_portable_snapshot_use_only_the_recording_local_launcher ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 812 filtered out; finished in 1.97s
+
+     Running unittests src/main.rs (target/debug/deps/gitcraft-7e93e9ffb9045fe8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
