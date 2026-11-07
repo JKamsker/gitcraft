@@ -18,6 +18,7 @@ const RECOUNT_EVERY: Duration = Duration::from_secs(30);
 
 pub(super) struct Loaded {
     pub(super) refs: Refs,
+    pub(super) partial_clone: bool,
     pub(super) history: Vec<Arc<Commit>>,
     pub(super) work: WorkStatus,
     pub(super) worktrees: Vec<Worktree>,
@@ -121,6 +122,7 @@ impl RepoTab {
                     })?;
                 let hosting = forge::detect(path, &remotes);
                 Ok(Box::new(Loaded {
+                    partial_clone: git::is_partial_clone(path),
                     refs,
                     history,
                     work,
@@ -351,6 +353,7 @@ impl RepoTab {
         self.log_stream = Default::default();
         self.loading_more = false;
         self.refs = loaded.refs;
+        self.partial_clone = loaded.partial_clone;
         self.has_more = loaded.history.len() >= loaded.requested;
         self.history = loaded.history;
         // A status read since this reload started is newer.

@@ -13,7 +13,15 @@ use crate::settings::Settings;
 impl RepoTab {
     pub(crate) fn apply(&mut self, action: Action, ctx: &egui::Context) {
         let plain = OpKind::plain();
+        if self.check_history_download(&action, ctx) {
+            return;
+        }
         match action {
+            Action::AllowHistoryDownload(action) => {
+                self.history_download_allowed = true;
+                self.apply(*action, ctx);
+                self.history_download_allowed = false;
+            }
             Action::Select(row) => {
                 self.close_pr();
                 self.ci_view = None;
@@ -87,6 +95,8 @@ impl RepoTab {
             Action::PullWith(mode) => self.pull(mode, ctx),
             Action::Push => self.push(ctx),
             Action::Reload => self.reload(ctx),
+            Action::OpenSparse => self.open_sparse(ctx),
+            Action::SetSparse { before, folders } => self.set_sparse(*before, folders, ctx),
             Action::LoadMore => self.load_more(ctx),
             Action::Undo => self.undo(ctx),
             Action::Redo => self.redo(ctx),

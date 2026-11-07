@@ -35,6 +35,7 @@ mod rewrite;
 #[cfg(test)]
 mod samples;
 mod sidebar;
+mod sparse;
 mod state;
 mod terminals;
 #[cfg(test)]
@@ -106,6 +107,10 @@ pub struct RepoTab {
     reload_again: bool,
     load_error: Option<String>,
     refs: Refs,
+    partial_clone: bool,
+    sparse_requests: u64,
+    history_requests: u64,
+    history_download_allowed: bool,
     /// Commits as git listed them.
     history: Vec<Arc<Commit>>,
     has_more: bool,
@@ -274,6 +279,10 @@ impl RepoTab {
             reload_again: false,
             load_error: None,
             refs: Refs::default(),
+            partial_clone: false,
+            sparse_requests: 0,
+            history_requests: 0,
+            history_download_allowed: false,
             history: Vec::new(),
             has_more: false,
             loading_more: false,

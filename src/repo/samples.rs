@@ -12,6 +12,7 @@ impl RepoTab {
         match phase {
             1 => {
                 acts.push(Action::Reload);
+                acts.push(Action::OpenSparse);
                 acts.push(Action::Select(1));
                 acts.push(Action::Select(0));
                 acts.push(Action::LoadMore);
