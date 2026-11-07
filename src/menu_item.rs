@@ -154,8 +154,15 @@ pub(crate) fn bounded_menu<R>(
 
 /// Keep the toolkit's submenu hover, keyboard and close behavior, with reachable scrolling.
 pub(crate) fn group(ui: &mut Ui, label: &str, content: impl FnOnce(&mut Ui)) {
-    ui.menu_button(label, |ui| {
-        bounded_menu(ui, label, content);
+    // A salted child UI still mixes its position into the automatic button ID. Use an
+    // explicit scope ID so inserting a sibling cannot hand its open submenu to another
+    // branch (and silently change the action target). Include the parent's persistent ID
+    // to distinguish identical group labels in different commit/branch menus.
+    let id = ui.make_persistent_id(("menu-group", label));
+    ui.scope_builder(egui::UiBuilder::new().id(id), |ui| {
+        ui.menu_button(label, |ui| {
+            bounded_menu(ui, label, content);
+        });
     });
 }
 

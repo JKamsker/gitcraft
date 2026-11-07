@@ -148,19 +148,23 @@ fn gallery(ui: &mut Ui, f: &Filter, view: &mut SettingsView, tweaks: &theme::Twe
     let named: Vec<bool> = themes.iter().map(|th| f.names(&th.name)).collect();
     let any_named = named.iter().any(|&n| n);
     let more_id = egui::Id::new("settings-themes-more");
-    let mut more = ui.data(|d| d.get_temp::<bool>(more_id)).unwrap_or(false);
     let active = theme::find(&view.theme);
     let external_active = active.as_ref().filter(|th| th.group != Group::Gitcraft);
     let external_count = themes
         .iter()
         .filter(|th| th.group != Group::Gitcraft)
         .count();
-    // Search is an explicit request to discover a named theme, even with the gallery closed.
+    // Search can reveal named external themes until the user explicitly collapses them.
     let search_external = any_named
         && themes
             .iter()
             .zip(&named)
             .any(|(th, named)| *named && th.group != Group::Gitcraft);
+    // Reveal search matches automatically until the user chooses the disclosure state.
+    // An explicit collapse wins over search, and the label always describes what is drawn.
+    let mut more = ui
+        .data(|d| d.get_temp::<bool>(more_id))
+        .unwrap_or(search_external);
     for group in Group::ALL {
         if group == Group::Dark {
             ui.add_space(4.0);
@@ -169,17 +173,17 @@ fn gallery(ui: &mut Ui, f: &Filter, view: &mut SettingsView, tweaks: &theme::Twe
                 .clicked()
             {
                 more = !more;
+                ui.data_mut(|d| d.insert_temp(more_id, more));
             }
             layout::note(ui, format!("{external_count} other themes"));
             if let Some(active) = external_active {
                 layout::note(ui, format!("Active theme: {}", active.name));
             }
-            if search_external && !more {
+            if search_external && more {
                 layout::note(ui, "Showing themes matching your search");
             }
-            ui.data_mut(|d| d.insert_temp(more_id, more));
         }
-        if group != Group::Gitcraft && !more && !search_external {
+        if group != Group::Gitcraft && !more {
             continue;
         }
         let members: Vec<_> = themes
@@ -552,6 +556,90 @@ mod tests {
                 },
                 (Settings::default(), ThemeId::default(), false),
             )
+    }
+
+    #[test]
+    fn area_d_followup_expanded_preview_keeps_controls_reachable_at_small_heights()
+    -> Result<(), String> {
+        for (width, height) in [(640.0, 900.0), (800.0, 500.0), (1100.0, 500.0)] {
+            for scale in [1.0, 1.25, 1.5] {
+                let mut h = harness(width, scale);
+                h.set_size(egui::vec2(width / scale, height / scale));
+                h.run();
+                h.get_by_label("Preview").click();
+                h.run();
+                h.get_by_label("Show more").scroll_to_me();
+                h.run();
+                let rect = h.get_by_label("Show more").rect();
+                assert!(
+                    h.ctx.content_rect().contains_rect(rect),
+                    "expanded preview makes disclosure unreachable at {width}x{height}/{scale}: {rect:?}"
+                );
+                if let Ok(dir) = std::env::var("GITCRAFT_AREA_D_SCREENSHOTS") {
+                    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+                    h.render()?
+                        .save(format!(
+                            "{dir}/followup-preview-{width:.0}-{height:.0}-{scale:.2}.png"
+                        ))
+                        .map_err(|e| e.to_string())?;
+                }
+                h.get_by_label("Show more").click();
+                h.run();
+                h.get_by_label("Show less");
+                let external =
+                    theme::find(&ThemeId::new("catppuccin-latte")).ok_or("missing theme")?;
+                h.get_by_role_and_label(egui::accesskit::Role::Button, &external.name)
+                    .scroll_to_me();
+                h.run();
+                let card = h
+                    .get_by_role_and_label(egui::accesskit::Role::Button, &external.name)
+                    .rect();
+                assert!(h.ctx.content_rect().contains_rect(card));
+                h.get_by_role_and_label(egui::accesskit::Role::Button, &external.name)
+                    .click();
+                h.run();
+                assert_eq!(h.state().1, external.id);
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn area_d_followup_search_disclosure_honors_explicit_collapse() -> Result<(), String> {
+        let mut h = harness(1100.0, 1.0);
+        h.get_by_role(egui::accesskit::Role::TextInput).focus();
+        h.run();
+        h.get_by_role(egui::accesskit::Role::TextInput)
+            .type_text("Catppuccin");
+        h.run();
+        h.get_by_role_and_label(egui::accesskit::Role::Button, "Catppuccin Latte");
+        // Exercise the original Show more -> Show less reproduction as well as a
+        // correctly auto-expanded search, whose disclosure already reads Show less.
+        if h.query_by_label("Show more").is_some() {
+            h.get_by_label("Show more").click();
+            h.run();
+        }
+        h.get_by_label("Show less").click();
+        h.run();
+        assert!(
+            h.query_all_by_role_and_label(egui::accesskit::Role::Button, "Catppuccin Latte")
+                .next()
+                .is_none(),
+            "explicit collapse was overridden by automatic search reveal"
+        );
+        h.get_by_label("Show more");
+        if let Ok(dir) = std::env::var("GITCRAFT_AREA_D_SCREENSHOTS") {
+            std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+            h.render()?
+                .save(format!("{dir}/followup-search-collapsed.png"))
+                .map_err(|e| e.to_string())?;
+        }
+        h.get_by_label("Show more").click();
+        h.run();
+        h.get_by_label("Show less");
+        h.get_by_role_and_label(egui::accesskit::Role::Button, "Catppuccin Latte");
+        assert_eq!(h.state().1, ThemeId::default());
+        Ok(())
     }
 
     #[test]
