@@ -8,7 +8,7 @@ use super::{gh, login, threads};
 use crate::forge::Forge;
 use crate::pr_threads::PrExtras;
 use crate::pull_request::{
-    Entry, EntryKind, PrCommit, PrDetails, at, check, items, line_entries, parse_time, repo_of_url,
+    Entry, EntryKind, PrCommit, PrDetails, at, check, items, line_entries, parse_time,
 };
 
 const FIELDS: &str = "number,title,body,state,isDraft,author,url,baseRefName,baseRefOid,\
@@ -47,20 +47,16 @@ fn read_details(repo: &Path, hosting: &super::Hosting, number: u64) -> Result<Pr
         &["pr", "view", &number.to_string(), "--json", FIELDS],
     )?;
     let mut details = parse_details(&view)?;
-    match repo_of_url(&details.url) {
-        Some((host, path))
-            if host.eq_ignore_ascii_case(&hosting.host)
-                && path.eq_ignore_ascii_case(&hosting.path) =>
-        {
-            match threads::fetch(repo, hosting, number) {
-                Ok(extras) => {
-                    details.timeline.extend(line_entries(&extras));
-                    details.extras = extras;
-                }
-                Err(e) => details.inline_error = Some(e),
+    if hosting.matches_pull_request(&details.url) {
+        match threads::fetch(repo, hosting, number) {
+            Ok(extras) => {
+                details.timeline.extend(line_entries(&extras));
+                details.extras = extras;
             }
+            Err(e) => details.inline_error = Some(e),
         }
-        _ => details.inline_error = Some("unexpected pull request URL".to_owned()),
+    } else {
+        details.inline_error = Some("unexpected pull request URL".to_owned());
     }
     details.timeline.sort_by_key(|entry| entry.at);
     Ok(details)

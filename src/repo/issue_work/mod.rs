@@ -135,10 +135,8 @@ impl RepoTab {
             .url
             .rsplit_once("/-/issues/")
             .or_else(|| link.url.rsplit_once("/issues/"))
-            .and_then(|(repo, _)| crate::forge::location(repo));
-        place.is_some_and(|(host, path)| {
-            host == hosting.host && path.eq_ignore_ascii_case(&hosting.path)
-        })
+            .map(|(repo, _)| repo);
+        place.is_some_and(|repo| hosting.matches_http_repository(repo))
     }
 
     pub(super) fn issue_act(&mut self, act: IssueAct, ctx: &egui::Context) {
@@ -464,9 +462,17 @@ impl RepoTab {
         }
         self.issue_work.refreshing = Some(branch.clone());
         let path = self.path.clone();
+        #[cfg(test)]
+        let recorded = tests::record_refresh(&hosting, number);
         self.forge_then(
             ctx,
-            move || hosting.forge.provider().issue(&path, &hosting, number),
+            move || {
+                #[cfg(test)]
+                if let Some(issue) = recorded {
+                    return Ok(issue);
+                }
+                hosting.forge.provider().issue(&path, &hosting, number)
+            },
             move |tab, result, ctx| {
                 tab.issue_work.refreshing = None;
                 let label = format!("Read #{number} again");

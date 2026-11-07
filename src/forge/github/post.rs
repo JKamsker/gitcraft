@@ -13,7 +13,7 @@ use crate::pr_post::{
     LineComment, MergeMethod, Suggestion, Target, Verdict, apply_lines, check_path, decode_file,
     encode_path, may_delete_branch,
 };
-use crate::pull_request::{DiffSide, PrDetails, repo_of_url};
+use crate::pull_request::{DiffSide, PrDetails};
 
 /// What `POST …/pulls/N/reviews` is sent.
 fn review_payload(head_oid: &str, verdict: Verdict, body: &str, pending: &[LineComment]) -> Value {
@@ -90,17 +90,13 @@ impl GitHubTarget {
         hosting: &super::Hosting,
         details: &PrDetails,
     ) -> Option<GitHubTarget> {
-        let (host, path) = repo_of_url(&details.url)?;
-        if !host.eq_ignore_ascii_case(&hosting.host)
-            || !path.eq_ignore_ascii_case(&hosting.path)
-            || details.number == 0
-        {
+        if !hosting.matches_pull_request(&details.url) || details.number == 0 {
             return None;
         }
         Some(GitHubTarget {
             repo: repo.to_owned(),
             hosting: hosting.clone(),
-            path,
+            path: hosting.path.clone(),
             number: details.number,
             head_oid: details.head_oid.clone(),
             head_branch: details.head_branch.clone(),

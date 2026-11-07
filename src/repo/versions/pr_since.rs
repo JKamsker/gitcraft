@@ -181,11 +181,11 @@ fn mark_seen(
 }
 
 impl RepoTab {
-    /// The repository's key among the pull requests looked at: `host/owner/repo`.
+    /// The canonical web instance and repository among the pull requests looked at.
     fn pr_repo_key(&self) -> Option<String> {
         self.hosting
             .as_ref()
-            .map(|h| format!("{}/{}", h.host, h.path))
+            .and_then(|h| h.review_repository_key())
     }
 
     /// The pull request numbered so: from its page when it is shown (which names its base),
@@ -205,7 +205,11 @@ impl RepoTab {
             head: pr.sha.clone(),
             fetch_ref: pull_ref(self.forge(), number),
             base: None,
-            remote: crate::pull_request::remote_for(&self.remotes, &pr.url).map(str::to_owned),
+            remote: self
+                .hosting
+                .as_ref()
+                .and_then(|h| crate::pull_request::remote_for(&self.remotes, &pr.url, h))
+                .map(str::to_owned),
         })
     }
 
@@ -215,7 +219,11 @@ impl RepoTab {
             head: d.head_oid.clone(),
             fetch_ref: d.head_ref.clone(),
             base: Some(d.base_oid.clone()),
-            remote: crate::pull_request::remote_for(&self.remotes, &d.url).map(str::to_owned),
+            remote: self
+                .hosting
+                .as_ref()
+                .and_then(|h| crate::pull_request::remote_for(&self.remotes, &d.url, h))
+                .map(str::to_owned),
         }
     }
 

@@ -161,13 +161,17 @@ impl RepoTab {
         if let Ok(details) = &result {
             view.prepare_texts(details);
             let details = details.clone();
-            let (path, remotes, credentials) = (
+            let (path, remotes, credentials, hosting) = (
                 self.path.clone(),
                 self.remotes.clone(),
                 self.credentials.clone(),
+                self.hosting.clone(),
             );
             spawn(&sender, ctx, move || {
-                let files = pr::files(&path, &details, &remotes, credentials.as_ref());
+                let files = hosting
+                    .as_ref()
+                    .ok_or_else(|| "No primary forge is selected".to_owned())
+                    .and_then(|h| pr::files(&path, h, &details, &remotes, credentials.as_ref()));
                 Msg::PrFiles(request, files)
             });
         }

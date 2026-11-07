@@ -182,7 +182,14 @@ impl RepoTab {
             .current
             .clone()
             .unwrap_or_else(|| self.refs.head.clone());
-        match plan::checkout(&info, &self.remotes, &self.forks.setup, &locals, &previous) {
+        match plan::checkout(
+            &info,
+            &self.remotes,
+            &self.forks.setup,
+            &locals,
+            &previous,
+            self.hosting.as_ref(),
+        ) {
             Ok(plan) => {
                 let label = format!("Check out #{number} to push to {}", info.owner);
                 self.run_undoable(
@@ -213,13 +220,21 @@ impl RepoTab {
         };
         let repo = self.path.clone();
         let setup = self.forks.setup.clone();
+        let hosting = self.hosting.clone();
         let creds = self.credentials.clone();
         self.status = Some((format!("Fetching #{number}'s branch and its base…"), false));
         self.then(
             ctx,
             move || {
-                plan::plan_rebase(&repo, &info, &upstream, &setup, creds.as_ref())
-                    .map(|p| (info, p))
+                plan::plan_rebase(
+                    &repo,
+                    &info,
+                    &upstream,
+                    &setup,
+                    creds.as_ref(),
+                    hosting.as_ref(),
+                )
+                .map(|p| (info, p))
             },
             |tab, plan, _| match plan {
                 Ok((info, plan)) => {

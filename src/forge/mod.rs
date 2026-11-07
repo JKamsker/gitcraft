@@ -594,9 +594,7 @@ pub(crate) fn tool(hosting: &Hosting, repo: &Path, args: &[&str]) -> Result<Stri
 
 /// Never let a CLI answer's URL override the repository captured for follow-up mutations.
 fn created_pr_number(hosting: &Hosting, url: &str) -> Result<String, String> {
-    let expected = crate::pull_request::repo_of_url(url).is_some_and(|(host, path)| {
-        host.eq_ignore_ascii_case(&hosting.host) && path.eq_ignore_ascii_case(&hosting.path)
-    });
+    let expected = hosting.matches_pull_request(url);
     let number = url
         .rsplit('/')
         .next()
