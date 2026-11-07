@@ -76,6 +76,7 @@ mod lifecycle;
 #[cfg(test)]
 mod line_history_tests;
 mod load;
+mod local_ci;
 mod messages;
 mod nav_history;
 mod navigate;
@@ -296,6 +297,7 @@ pub struct RepoTab {
     pr_view: Option<pr_view::PrView>,
     /// The builds of a commit the big area shows.
     ci_view: Option<ci_view::CiView>,
+    local_ci: local_ci::State,
     /// The reflog (or the lost commits) shown above the graph.
     reflog: Option<reflog::ReflogView>,
     /// Two versions of a series of commits compared, the rewrites kept and the pull requests'
@@ -624,6 +626,7 @@ impl RepoTab {
             compare: None,
             pr_view: None,
             ci_view: None,
+            local_ci: Default::default(),
             reflog: None,
             versions: Default::default(),
             doctor: None,

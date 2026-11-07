@@ -137,7 +137,8 @@ impl super::RepoTab {
 
     /// Nothing goes on that suspending would end or lose.
     fn idle(&mut self) -> bool {
-        !self.is_busy()
+        !self.local_ci.busy()
+            && !self.is_busy()
             && !self.loading_more
             && !self.counting_worktrees
             && self.queued.is_empty()

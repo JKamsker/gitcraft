@@ -18,6 +18,7 @@ impl RepoTab {
     /// The big area.
     pub(in crate::repo) fn ci_view_ui(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
+        self.local_ci_ui(ui, acts);
         let Some(view) = &self.ci_view else {
             return;
         };
