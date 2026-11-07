@@ -152,6 +152,26 @@ impl RepoTab {
         }
         let paths: Vec<&str> = staged.iter().map(|f| f.path.as_str()).collect();
         self.owners_summary(ui, &paths);
+        if !staged.is_empty() && self.work.in_progress.is_none() {
+            let attached = self.refs.current.is_some();
+            let clicked = ui
+                .horizontal(|ui| {
+                    ui.add_space(8.0);
+                    ui.add_enabled(
+                        idle && attached,
+                        egui::Button::new("Distribute staged fixes…").small(),
+                    )
+                    .on_hover_text(
+                        "Put each staged change into the earlier commit of the branch that last changed those lines",
+                    )
+                    .on_disabled_hover_text("HEAD is detached: check out a branch first")
+                    .clicked()
+                })
+                .inner;
+            if clicked {
+                acts.push(Action::OpenAbsorb);
+            }
+        }
         let buttons = [("minus", "Unstage")];
         self.work_list(
             ui,

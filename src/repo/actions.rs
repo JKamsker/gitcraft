@@ -278,6 +278,13 @@ pub(crate) enum Action {
     CheckSplit,
     RunSplit,
     CloseSplit,
+    /// Open the editor distributing the staged changes into the commits they belong to.
+    OpenAbsorb,
+    CheckAbsorb,
+    RunAbsorb,
+    /// Run the installed `git-absorb` instead.
+    RunGitAbsorb,
+    CloseAbsorb,
     /// Remember these HTTPS credentials and run the operation that needed them again.
     SignIn(git::Credentials),
     /// Ask before deleting the local tag `name` (at the commit `target`), once what it points
@@ -494,6 +501,11 @@ impl RepoTab {
             ("Stash only what is staged…".into(), "stash".into(), Action::Dialog(Dialog::stash_as(StashChoice::Staged))),
             ("Save snapshot (stash, keep the changes)…".into(), "stash".into(), Action::Dialog(Dialog::stash_as(StashChoice::Snapshot))),
             ("Apply patch…".into(), "patch".into(), Action::ApplyPatch),
+            (
+                "Distribute staged fixes…".into(),
+                "absorb".into(),
+                Action::OpenAbsorb,
+            ),
             ("Undo".into(), written("Cmd+Z"), Action::Undo),
             ("Redo".into(), written("Cmd+Y"), Action::Redo),
             (

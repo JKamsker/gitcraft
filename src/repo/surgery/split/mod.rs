@@ -16,7 +16,7 @@ use crate::git;
 use crate::repo::diff::Kind;
 use crate::repo::{RepoTab, Undo, short};
 
-pub(crate) use preview::Preview;
+pub(crate) use preview::{Look, Preview};
 
 use super::moving::Move;
 
@@ -410,6 +410,13 @@ impl RepoTab {
     pub(in crate::repo) fn open_split(&mut self, hash: String, ctx: &egui::Context) {
         if let Some(why) = self.surgery_refusal(&hash) {
             self.status = Some((format!("Split commit: {why}"), true));
+            return;
+        }
+        if self.absorb.is_some() {
+            self.status = Some((
+                "Split commit: close the staged fixes editor first".to_owned(),
+                true,
+            ));
             return;
         }
         self.status = Some((format!("Split commit: reading {}…", short(&hash)), false));

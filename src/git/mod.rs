@@ -7,6 +7,7 @@ mod bisect;
 #[cfg(test)]
 mod clone_tests;
 mod attributes;
+mod absorb;
 mod command;
 mod commit_msg;
 mod commits;
@@ -63,6 +64,7 @@ pub use self::backlinks::*;
 pub use self::branch_health::*;
 pub use self::bisect::*;
 pub use self::attributes::*;
+pub use self::absorb::*;
 pub use self::command::*;
 pub use self::commit_msg::*;
 pub use self::commits::*;

@@ -7,12 +7,16 @@
 #[cfg(test)]
 mod move_tests;
 mod moving;
+mod absorb;
+#[cfg(test)]
+mod absorb_tests;
 mod patchset;
 mod replay;
 mod split;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use absorb::AbsorbEditor;
 pub(crate) use split::SplitEditor;
 
 use egui::Ui;

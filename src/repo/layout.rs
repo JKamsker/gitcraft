@@ -115,6 +115,8 @@ impl RepoTab {
                     self.rebase_view(ui, &mut acts);
                 } else if self.split.is_some() {
                     self.split_view(ui, &mut acts);
+                } else if self.absorb.is_some() {
+                    self.absorb_view(ui, &mut acts);
                 } else if self.diff_beside_graph(&ctx) {
                     self.split_view(ui, &mut acts);
                 } else if self.diff.is_some()
@@ -240,6 +242,8 @@ impl RepoTab {
                 acts.push(Action::CloseRebase);
             } else if esc && self.conflict.is_none() && self.split.is_some() {
                 acts.push(Action::CloseSplit);
+            } else if esc && self.conflict.is_none() && self.absorb.is_some() {
+                acts.push(Action::CloseAbsorb);
             } else if esc && diff_keys {
                 acts.push(Action::CloseDiff);
             } else if esc && let Some(rebase) = &self.rebase {
@@ -273,7 +277,7 @@ impl RepoTab {
             } else if esc && self.reflog.is_some() {
                 acts.push(Action::CloseReflog);
             }
-            let diff_shown = diff_keys && self.conflict.is_none() && self.rebase.is_none() && self.split.is_none();
+            let diff_shown = diff_keys && self.conflict.is_none() && self.rebase.is_none() && self.split.is_none() && self.absorb.is_none();
             if let Some(delta) = ctx.input(change_step).filter(|_| diff_shown) {
                 acts.push(Action::DiffStep(delta));
             }

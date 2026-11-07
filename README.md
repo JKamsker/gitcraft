@@ -282,6 +282,16 @@ so your config, credentials and hooks apply as usual.
   conflict_), which files conflict and whether the test command passes on the result. The
   merge and the rebase can be rehearsed side by side; _Rebase now_ / _Merge now_ checks that
   neither branch moved meanwhile, then does it as usual, undoable with Ctrl+Z.
+- _Distribute staged fixes…_ (above the staged files, or the palette): each staged change goes
+  into the earlier commit of the branch that last changed those lines, as git-absorb does. A
+  change whose lines one commit last changed is matched; one several commits changed is only
+  suggested (the newest); one no commit of the branch changed (a new file, an older line) stays
+  staged. Change any of them, _Check_ the fixups and what stays staged (a fix a later commit
+  would conflict with is refused there), then absorb: the commits are made again with their
+  fixes (signed when your config signs), and the index and working tree stay exactly as they
+  are. Ctrl+Z undoes it. With
+  `git-absorb` installed (on the repository's machine for WSL / SSH), _Run git-absorb instead_
+  hands it over.
 - Quick edits from a commit's menu, for commits of the checked-out branch: _Edit commit
   message_, _Drop commit_ (which asks first), _Move commit up_ / _down_, each a rebase without
   the editor and undone with Ctrl+Z. What can't be done (a merge, merges after the commit) is greyed out with why.
@@ -1168,7 +1178,7 @@ was made this way, on a demo repository.
 | `src/repo/conflict_check.rs` | conflict warnings in the menus and the toolbar, checked in the background and kept |
 | `src/git/external_tool/` | external diff and merge tools: presets, how git starts them (here, in WSL, over SSH), how a merge ended |
 | `src/mergiraf.rs` | Mergiraf, run as the user's own command when it is installed |
-| `src/repo/surgery/`      | history surgery: splitting a commit (`split/`), moving changes (`moving.rs`), patches of some lines (`patchset.rs`) |
+| `src/repo/surgery/`      | history surgery: splitting a commit (`split/`), moving changes (`moving.rs`), absorbing staged fixes (`absorb/`), patches of some lines (`patchset.rs`) |
 | `src/git/trees.rs`       | commits made in a scratch index (`tree_after`, `commit_tree`) for rewrites         |
 | `src/repo/rebase.rs`     | interactive rebase editor and its todo list (`rebase/rows.rs`: its rows, drag, keys) |
 | `src/repo/reflog/` | the reflog view and the scan for lost commits (`src/git/reflog/`: reading and parsing them) |

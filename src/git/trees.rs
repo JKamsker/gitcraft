@@ -97,6 +97,28 @@ pub fn patch_bytes_between(repo: &Path, from: &str, to: &str) -> Result<Vec<u8>,
     super::run_bytes(Some(repo), &args)
 }
 
+/// What is staged, as [`patch_bytes_between`] writes it, and its paths as
+/// [`paths_between`] lists them.
+pub fn staged_patch(repo: &Path) -> Result<(Vec<u8>, Vec<String>), String> {
+    let mut args = vec!["diff", "--cached"];
+    args.extend(PATCH);
+    args.push("--");
+    let patch = super::run_bytes(Some(repo), &args)?;
+    let raw = run(
+        Some(repo),
+        &[
+            "diff",
+            "--cached",
+            "--raw",
+            "-z",
+            "--no-renames",
+            "--ignore-submodules=none",
+            "--",
+        ],
+    )?;
+    Ok((patch, parse_raw(&raw)))
+}
+
 /// The paths [`patch_between`] has, in its order: one whose type changes (a file becoming a
 /// link…) twice, as it has a removal and an addition.
 pub fn paths_between(repo: &Path, from: &str, to: &str) -> Result<Vec<String>, String> {
@@ -188,15 +210,25 @@ pub fn commit_tree(
     message: &str,
     author: Option<&Author>,
 ) -> Result<String, String> {
+    commit_tree_signed(repo, tree, parent, message, author, false)
+}
+
+/// [`commit_tree`], signed (with the user's `user.signingKey` and `gpg.format`) when `sign`.
+pub fn commit_tree_signed(
+    repo: &Path,
+    tree: &str,
+    parent: &str,
+    message: &str,
+    author: Option<&Author>,
+    sign: bool,
+) -> Result<String, String> {
     let file = super::save_patch_for(repo, message)?;
     let env = author.map(Author::env).unwrap_or_default();
-    Ok(run_env(
-        repo,
-        &env,
-        &["commit-tree", tree, "-p", parent, "-F", &file],
-    )?
-    .trim()
-    .to_owned())
+    let mut args = vec!["commit-tree", tree, "-p", parent, "-F", &file];
+    if sign {
+        args.push("-S");
+    }
+    Ok(run_env(repo, &env, &args)?.trim().to_owned())
 }
 
 #[cfg(test)]

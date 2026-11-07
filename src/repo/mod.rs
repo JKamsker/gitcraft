@@ -261,6 +261,8 @@ pub struct RepoTab {
     drop_menu: Option<drag_drop::DropMenu>,
     /// A commit being split (`surgery`).
     split: Option<Box<surgery::SplitEditor>>,
+    /// Staged fixes being distributed into the commits they belong to (`surgery`).
+    absorb: Option<Box<surgery::AbsorbEditor>>,
     /// The selected commit's message, being edited in the right pane.
     reword: Option<Reword>,
     /// Push and Sync: the push running, Sync's push waiting for its pull, the banner after a
@@ -517,6 +519,7 @@ impl RepoTab {
             rebase: None,
             drop_menu: None,
             split: None,
+            absorb: None,
             reword: None,
             push_flow: Default::default(),
             credentials: None,
