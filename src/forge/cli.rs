@@ -280,7 +280,8 @@ fn plain_path(path: &str) -> bool {
     path.contains('/')
         && path.split('/').all(|part| {
             !part.is_empty()
-                && !part.starts_with(['-', '.'])
+                && !part.starts_with('-')
+                && !matches!(part, "." | "..")
                 && part
                     .chars()
                     .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
@@ -495,6 +496,7 @@ mod tests {
     fn only_plain_paths_reach_the_tools() {
         assert!(plain_path("team/app"));
         assert!(plain_path("group/sub/my.app"));
+        assert!(plain_path("owner/.github"));
         for bad in [
             "https://evil.example/x/y",
             "git@evil.example:x/y",
@@ -502,6 +504,7 @@ mod tests {
             "-x/y",
             "app",
             "a//b",
+            "owner/../project",
         ] {
             assert!(!plain_path(bad), "{bad}");
         }

@@ -591,6 +591,23 @@ pub(crate) fn tool(hosting: &Hosting, repo: &Path, args: &[&str]) -> Result<Stri
     cli::run(tool, forge.noun(), repo, hosting, args)
 }
 
+/// Never let a CLI answer's URL override the repository captured for follow-up mutations.
+fn created_pr_number(hosting: &Hosting, url: &str) -> Result<String, String> {
+    let expected = crate::pull_request::repo_of_url(url).is_some_and(|(host, path)| {
+        host.eq_ignore_ascii_case(&hosting.host) && path.eq_ignore_ascii_case(&hosting.path)
+    });
+    let number = url
+        .rsplit('/')
+        .next()
+        .filter(|n| n.parse::<u64>().is_ok_and(|n| n > 0));
+    if expected && let Some(number) = number {
+        return Ok(number.to_owned());
+    }
+    Err(format!(
+        "The forge returned a pull request outside the selected repository; reviewers were not requested. Check the created pull request: {url}"
+    ))
+}
+
 /// Asks each of `reviewers` for a review of the pull request just opened at `url`, one at a
 /// time with `ask`: one the forge refuses (the author, an account or team that is gone) doesn't
 /// keep the others from being asked, and doesn't undo the opening. The URL, or what went wrong.

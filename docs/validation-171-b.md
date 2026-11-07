@@ -183,3 +183,27 @@ other areas; shared load.rs, messages.rs, mod.rs and graph files need merge revi
   these tests; mutation coverage performs no live forge writes.
 - This follow-up changes routing/state only. Existing area-B screenshots remain
   under `/tmp/gitcraft-167-171/area-b/`; no layout change needs new screenshots.
+
+### Review 9 release and follow-up mutation safeguards
+
+- [x] The explicit release draft selects the primary forge remote for its Git push
+  and captures that same repository for publication. Other push/fetch defaults
+  and upstreams are unchanged. The before-fix test failed with `origin` instead
+  of `fork`; afterward a real local bare fork receives the tag and origin does
+  not. All six release-dialog regressions pass, including release completion,
+  resume, changed-primary cancellation and undo from Review 8.
+- [x] Publication and resumed asset uploads re-read Git's resolved push URLs. If
+  they differ from the captured hosting repository (including a separate
+  `pushurl` or a changed remote), the forge mutation stops with an explanation;
+  local changes remain recorded and undoable. A recording-only regression
+  confirms zero forge calls for incompatible destinations and an explicitly
+  selected release target for a matching destination.
+- [x] PR/MR creation validates the returned URL before requesting reviewers;
+  GitHub edits by numeric ID, since a URL argument would override `--repo`.
+  Unexpected upstream URLs cannot redirect the follow-up mutation. Valid
+  `.github` repository names remain supported while traversal paths are refused.
+- Current focused boundary count is **12 passed**, with all command preparation
+  covered without starting gh/glab. Release evidence:
+  `/tmp/gitcraft-review9/area-b/{release-before.log,release-after.log,release-focused.log}`.
+  `clippy.log` passes `--all-targets -- -D clippy::all` (only existing dead_code
+  warnings); formatting and diff checks pass. Rust 1.95.0, jobs 3, private target.

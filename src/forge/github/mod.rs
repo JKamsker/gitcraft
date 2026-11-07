@@ -110,9 +110,16 @@ impl Provider for GitHub {
             args.push("--draft");
         }
         let url = gh(repo, hosting, &args)?.trim().to_owned();
-        // Asked after opening it: gh refuses the whole of `--reviewer` for one name it can't ask.
+        // A URL argument to `gh pr edit` overrides --repo. Validate the answer and edit by
+        // number so reviewer requests remain bound to the selected repository as well.
+        let number = super::created_pr_number(hosting, &url)?;
         super::ask_reviewers(url.clone(), new.reviewers, |who| {
-            gh(repo, hosting, &["pr", "edit", &url, "--add-reviewer", who]).map(|_| ())
+            gh(
+                repo,
+                hosting,
+                &["pr", "edit", &number, "--add-reviewer", who],
+            )
+            .map(|_| ())
         })
     }
 
