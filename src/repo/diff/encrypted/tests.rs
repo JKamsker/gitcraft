@@ -389,6 +389,170 @@ mod fixture {
         );
     }
 
+    /// Opt-in real-tool validation. All keys, HOME/config and plaintext are generated
+    /// fixtures; no user credential environment or default keyring is inherited.
+    #[test]
+    fn real_sops_and_generated_age_compare_formats_and_key_rotation_offline() -> Result<(), String>
+    {
+        use std::process::Command;
+        let Some(sops) = std::env::var_os("GITCRAFT_TEST_SOPS").map(PathBuf::from) else {
+            eprintln!(
+                "Real SOPS fixture not run: set explicit GITCRAFT_TEST_SOPS and GITCRAFT_TEST_AGE_KEYGEN paths"
+            );
+            return Ok(());
+        };
+        let age = std::env::var_os("GITCRAFT_TEST_AGE_KEYGEN")
+            .map(PathBuf::from)
+            .ok_or("Set the explicit fixture age-keygen path")?;
+        if !sops.is_absolute() || !age.is_absolute() || !sops.is_file() || !age.is_file() {
+            return Err("Real-tool fixture paths must be absolute installed executables".into());
+        }
+        let repo = Repo::new()?;
+        let home = repo.0.join("isolated-home");
+        std::fs::create_dir_all(&home).map_err(|e| e.to_string())?;
+        let isolate = |command: &mut Command| {
+            command
+                .env_clear()
+                .env("PATH", "/usr/bin:/bin")
+                .env("HOME", &home)
+                .env("XDG_CONFIG_HOME", home.join("config"))
+                .env("XDG_CACHE_HOME", home.join("cache"))
+                .env("SOPS_DECRYPTION_ORDER", "age")
+                .current_dir(&home);
+        };
+        let execute = |command: Command, input: Option<Vec<u8>>| -> Result<Vec<u8>, String> {
+            let output = crate::bounded_process::run_input(
+                command,
+                input,
+                &|| true,
+                Duration::from_secs(5),
+                model::MAX_BYTES as u64,
+                32768,
+            )?;
+            if !output.status.success() {
+                return Err("Offline generated-key SOPS/age fixture command failed (private diagnostics suppressed)".into());
+            }
+            Ok(output.stdout)
+        };
+        let mut keys = Vec::new();
+        for label in ["first", "second"] {
+            let key = home.join(format!("fixture-{label}-age-key.txt"));
+            let mut create = Command::new(&age);
+            isolate(&mut create);
+            create.arg("-o").arg(&key);
+            execute(create, None)?;
+            let mut public = Command::new(&age);
+            isolate(&mut public);
+            public.arg("-y").arg(&key);
+            let recipient = String::from_utf8(execute(public, None)?)
+                .map_err(|_| "Invalid fixture recipient")?;
+            if !recipient.trim().starts_with("age1") {
+                return Err("Expected a generated age fixture recipient".into());
+            }
+            keys.push((key, recipient.trim().to_owned()));
+        }
+        tool::TEST_PROGRAM.with(|p| *p.borrow_mut() = Some(sops.clone()));
+        let encrypt = |format: Format, input: &[u8], recipient: &str| -> Result<String, String> {
+            let mut command = Command::new(&sops);
+            isolate(&mut command);
+            command.args([
+                "encrypt",
+                "--input-type",
+                format.name(),
+                "--output-type",
+                format.name(),
+                "--age",
+                recipient,
+                "--filename-override",
+                format.hint(),
+            ]);
+            String::from_utf8(execute(command, Some(input.to_vec()))?)
+                .map_err(|_| "Encrypted fixture must be UTF-8".into())
+        };
+        let decrypt =
+            |format: Format, input: &str, key: &std::path::Path| -> Result<String, String> {
+                let mut command = tool::command(format);
+                isolate(&mut command);
+                command.env("SOPS_AGE_KEY_FILE", key);
+                tool::plaintext(execute(command, Some(input.as_bytes().to_vec()))?)
+            };
+        for (format, path, old, new) in [
+            (
+                Format::Json,
+                "fixture.json",
+                "{\"secret\":\"fixture-old\"}\n",
+                "{\"secret\":\"fixture-new\"}\n",
+            ),
+            (
+                Format::Yaml,
+                "fixture.yaml",
+                "secret: fixture-old\n",
+                "secret: fixture-new\n",
+            ),
+            (
+                Format::Dotenv,
+                "fixture.env",
+                "SECRET=fixture-old\n",
+                "SECRET=fixture-new\n",
+            ),
+            (
+                Format::Ini,
+                "fixture.ini",
+                "[app]\nsecret=fixture-old\n",
+                "[app]\nsecret=fixture-new\n",
+            ),
+            (
+                Format::Binary,
+                "fixture.bin",
+                "fixture-old\n",
+                "fixture-new\n",
+            ),
+        ] {
+            let first = encrypt(format, old.as_bytes(), &keys[0].1)?;
+            let edited = encrypt(format, new.as_bytes(), &keys[0].1)?;
+            let rotated = encrypt(format, old.as_bytes(), &keys[1].1)?;
+            assert_eq!(inspect(path, &first)?.map(|e| e.format), Some(format));
+            let changed = compare(path, &first, &edited, &|| true, |kind, bytes| {
+                decrypt(kind, bytes, &keys[0].0)
+            })?;
+            assert!(changed.content_changed);
+            assert!(
+                changed
+                    .rows
+                    .iter()
+                    .any(|row| row.text.contains("fixture-old"))
+            );
+            assert!(
+                changed
+                    .rows
+                    .iter()
+                    .any(|row| row.text.contains("fixture-new"))
+            );
+            let rotation = compare(path, &first, &rotated, &|| true, |kind, bytes| {
+                decrypt(
+                    kind,
+                    bytes,
+                    if bytes == rotated {
+                        &keys[1].0
+                    } else {
+                        &keys[0].0
+                    },
+                )
+            })?;
+            assert!(
+                !rotation.content_changed
+                    && rotation.recipients_changed
+                    && rotation.metadata_changed
+            );
+        }
+        let binary = encrypt(Format::Binary, b"fixture\0binary", &keys[0].1)?;
+        assert!(decrypt(Format::Binary, &binary, &keys[0].0).is_err());
+        eprintln!(
+            "Real local SOPS generated-age fixture completed: JSON/YAML/dotenv/INI/binary UTF-8, recipient rotation, binary refusal; isolated HOME and explicit fixture keys only"
+        );
+        Ok(())
+    }
+
     #[test]
     fn local_cli_uses_only_ciphertext_stdin_and_fixed_safe_format_argv() -> Result<(), String> {
         let repo = Repo::new()?;
