@@ -1,6 +1,38 @@
 //! One production ordering for a suspended Windows launch and its recording backend.
 use std::io;
 
+pub(super) fn validate_thread_owner(
+    expected: u32,
+    actual: u32,
+    child_active: bool,
+) -> io::Result<()> {
+    if expected > 1 && actual == expected && child_active {
+        Ok(())
+    } else {
+        Err(io::Error::other(
+            "suspended thread no longer belongs to the live owned child",
+        ))
+    }
+}
+
+pub(super) fn wait_empty(
+    mut active: impl FnMut() -> io::Result<u32>,
+    mut expired: impl FnMut() -> bool,
+    mut pause: impl FnMut(),
+) -> io::Result<()> {
+    loop {
+        if active()? == 0 {
+            return Ok(());
+        }
+        if expired() {
+            return Err(io::Error::other(
+                "owned Job still has active processes; cleanup unknown",
+            ));
+        }
+        pause();
+    }
+}
+
 pub(super) trait Backend {
     type Child;
     type Job;
@@ -34,6 +66,26 @@ mod recording_tests {
     use std::cell::RefCell;
     use std::rc::Rc;
     type Events = Rc<RefCell<Vec<&'static str>>>;
+    #[test]
+    fn receipts_require_empty_job_and_resumed_thread_requires_live_owner_identity() {
+        let mut active = [3, 2, 0].into_iter();
+        let mut pauses = 0;
+        assert!(wait_empty(|| Ok(active.next().unwrap_or(0)), || false, || pauses += 1).is_ok());
+        assert_eq!(pauses, 2);
+        assert!(wait_empty(|| Ok(1), || true, || panic!("no pause after deadline")).is_err());
+        assert!(
+            wait_empty(
+                || Err(io::Error::other("query failed")),
+                || false,
+                || panic!("no pause after failure")
+            )
+            .is_err()
+        );
+        assert!(validate_thread_owner(42, 42, true).is_ok());
+        assert!(validate_thread_owner(42, 43, true).is_err());
+        assert!(validate_thread_owner(42, 42, false).is_err());
+        assert!(validate_thread_owner(0, 0, true).is_err());
+    }
     struct Job(Events);
     impl Drop for Job {
         fn drop(&mut self) {

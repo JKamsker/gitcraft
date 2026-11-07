@@ -8,10 +8,14 @@ use windows::Win32::System::Diagnostics::ToolHelp::{
 };
 use windows::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-    JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
-    SetInformationJobObject, TerminateJobObject,
+    JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+    JobObjectBasicAccountingInformation, JobObjectExtendedLimitInformation,
+    QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
 };
-use windows::Win32::System::Threading::{OpenThread, ResumeThread, THREAD_SUSPEND_RESUME};
+use windows::Win32::System::Threading::{
+    GetExitCodeProcess, GetProcessIdOfThread, OpenThread, ResumeThread,
+    THREAD_QUERY_LIMITED_INFORMATION, THREAD_SUSPEND_RESUME,
+};
 
 fn owned(handle: HANDLE) -> OwnedHandle {
     // SAFETY: only freshly created, successful Win32 owned-handle results reach here.
@@ -32,7 +36,28 @@ impl ProcessJob {
     /// a fallback; kill-on-close alone can report a successful child exit on Windows.
     pub fn terminate(&self) -> Result<(), String> {
         // SAFETY: this owner holds a valid job handle created with termination access.
-        unsafe { TerminateJobObject(raw(&self.handle), 1) }.map_err(|e| e.to_string())
+        unsafe { TerminateJobObject(raw(&self.handle), 1) }.map_err(|e| e.to_string())?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        super::suspended::wait_empty(
+            || {
+                let mut info = JOBOBJECT_BASIC_ACCOUNTING_INFORMATION::default();
+                // SAFETY: this exact retained Job HANDLE, initialized matching structure.
+                unsafe {
+                    QueryInformationJobObject(
+                        Some(raw(&self.handle)),
+                        JobObjectBasicAccountingInformation,
+                        (&mut info as *mut JOBOBJECT_BASIC_ACCOUNTING_INFORMATION).cast(),
+                        std::mem::size_of_val(&info) as u32,
+                        None,
+                    )
+                }
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+                Ok(info.ActiveProcesses)
+            },
+            || std::time::Instant::now() >= deadline,
+            || std::thread::sleep(std::time::Duration::from_millis(10)),
+        )
+        .map_err(|e| e.to_string())
     }
 }
 
@@ -78,9 +103,22 @@ pub(super) fn resume(child: &std::process::Child) -> Result<(), String> {
         if entry.th32OwnerProcessID == pid {
             // SAFETY: a thread ID from the snapshot, with only resume access requested.
             let thread = owned(
-                unsafe { OpenThread(THREAD_SUSPEND_RESUME, false, entry.th32ThreadID) }
-                    .map_err(|e| e.to_string())?,
+                unsafe {
+                    OpenThread(
+                        THREAD_SUSPEND_RESUME | THREAD_QUERY_LIMITED_INFORMATION,
+                        false,
+                        entry.th32ThreadID,
+                    )
+                }
+                .map_err(|e| e.to_string())?,
             );
+            let mut exit_code = 0;
+            // SAFETY: both retained handles remain open across validation and resume.
+            unsafe { GetExitCodeProcess(HANDLE(child.as_raw_handle()), &mut exit_code) }
+                .map_err(|e| e.to_string())?;
+            let actual = unsafe { GetProcessIdOfThread(raw(&thread)) };
+            super::suspended::validate_thread_owner(pid, actual, exit_code == 259)
+                .map_err(|e| e.to_string())?;
             // SAFETY: the handle remains valid for this call; failure leaves the job owner
             // responsible for terminating the child rather than returning it suspended.
             if unsafe { ResumeThread(raw(&thread)) } == u32::MAX {

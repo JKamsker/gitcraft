@@ -85,13 +85,20 @@ impl std::fmt::Debug for Endpoint {
 struct Receipt {
     endpoint: Endpoint,
     state: String,
-    code: i32,
+    code: i64,
 }
 fn hex(value: &str, length: usize) -> bool {
     value.len() == length
         && value
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+fn native_exit_code(code: i64, windows: bool) -> bool {
+    if windows {
+        i32::try_from(code).is_ok()
+    } else {
+        (0..=255).contains(&code)
+    }
 }
 fn random_hex(length: usize) -> Result<String, String> {
     let mut bytes = vec![0u8; length];
@@ -127,7 +134,7 @@ impl Endpoint {
             return false;
         }
         serde_json::from_slice::<Receipt>(bytes).is_ok_and(|r| {
-            r.endpoint == *self && r.state == "stopped" && (0..=255).contains(&r.code)
+            r.endpoint == *self && r.state == "stopped" && native_exit_code(r.code, cfg!(windows))
         })
     }
     fn terminal(&self) -> Result<Vec<u8>, String> {
@@ -410,7 +417,7 @@ fn helper() -> Result<i32, String> {
     let receipt = Receipt {
         endpoint,
         state: "stopped".into(),
-        code,
+        code: i64::from(code),
     };
     let mut bytes = serde_json::to_vec(&receipt).map_err(|e| e.to_string())?;
     bytes.push(b'\n');
@@ -443,6 +450,23 @@ pub(crate) fn entrypoint() -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn recording_native_exit_codes_preserve_windows_status_range() {
+        for code in [0, 7, 255] {
+            assert!(native_exit_code(code, false) && native_exit_code(code, true));
+        }
+        for code in [
+            256,
+            65536,
+            -1073741819,
+            i64::from(i32::MIN),
+            i64::from(i32::MAX),
+        ] {
+            assert!(native_exit_code(code, true));
+            assert!(!native_exit_code(code, false));
+        }
+        assert!(!native_exit_code(i64::MAX, true));
+    }
     #[test]
     fn helper_entrypoint() {
         if std::env::var_os("GITCRAFT_NATIVE_HELPER").is_some() {
