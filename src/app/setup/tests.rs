@@ -61,7 +61,7 @@ fn export_import_ui_round_trip_preserves_active_profile_and_requires_local_setup
         .setup
         .mappings
         .get(&active)
-        .ok_or("No profile mapping")?;
+        .ok_or_else(||format!("No profile mapping: applied={}, active={}, mappings={:?}, profiles={:?}, messages={:?}",h.state().setup.applied,active,h.state().setup.mappings,h.state().setup.file.as_ref().map(|f|f.profiles.iter().map(|p|p.source_id).collect::<Vec<_>>()),h.state().setup.messages))?;
     assert!(
         h.state()
             .settings
