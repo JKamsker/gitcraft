@@ -65,6 +65,8 @@ pub struct Settings {
     pub worktrees_in_same_tab: bool,
     /// Windows: the tab strip stands in for the system's title bar.
     pub tabs_in_title_bar: bool,
+    /// Where the settings, command palette, theme and manual buttons sit, and in what order.
+    pub button_layout: crate::app_buttons::ButtonLayout,
     /// Changed files in a tree of their folders rather than a flat list.
     pub files_as_tree: bool,
     /// Diffs side by side rather than unified.
@@ -128,6 +130,7 @@ impl Default for Settings {
             show_detail: true,
             worktrees_in_same_tab: true,
             tabs_in_title_bar: false,
+            button_layout: Default::default(),
             files_as_tree: true,
             diff_split: false,
             diff_whole_file: false,
@@ -489,6 +492,31 @@ impl Settings {
                         card.row("Title bar", "window frame caption native tabs", |ui| {
                             ui.checkbox(&mut self.tabs_in_title_bar, "Tabs in the title bar")
                                 .on_hover_text("The tabs take the place of Windows' title bar, as in a browser: drag the space next to them to move the window, double-click it to maximize, and the buttons to minimize, maximize and close are at the end of the strip.");
+                        });
+                    }
+                    for button in crate::app_buttons::AppButton::ALL {
+                        let keywords = "button place move title bar bottom footer panel";
+                        card.row(button.label(), keywords, |ui| {
+                            let layout = self.button_layout.normalized();
+                            let was = layout.place_of(button);
+                            let mut place = was;
+                            egui::ComboBox::from_id_salt(("settings-button-place", button.label()))
+                                .width(layout::fit(ui, COMBO_WIDTH))
+                                .selected_text(place.label())
+                                .show_ui(ui, |ui| {
+                                    for p in crate::app_buttons::Place::ALL {
+                                        ui.selectable_value(&mut place, p, p.label());
+                                    }
+                                })
+                                .response
+                                .on_hover_text(
+                                    "Where its button sits: in the title bar, or in the footer \
+                                     of a repository's left or right panel. Drag the button \
+                                     itself to put it anywhere along them.",
+                                );
+                            if place != was {
+                                self.button_layout = layout.moved(button, place, usize::MAX);
+                            }
                         });
                     }
                     card.preview(Preview::CodeColors);

@@ -4,6 +4,7 @@
 use egui::{Key, Ui};
 
 use super::{Action, RepoTab, pr_review, widgets};
+use crate::app_buttons::{self, Place};
 use crate::icons;
 use crate::settings::Settings;
 use crate::theme::Tokens;
@@ -183,11 +184,16 @@ impl RepoTab {
                     if panel_toggle(ui, "panel-left", "branches", open) {
                         acts.push(Action::ToggleBranches);
                     }
+                    if open {
+                        app_buttons::footer_row(ui, Place::BottomLeft);
+                    }
                 });
                 if open {
                     self.sidebar(ui, acts);
                 } else {
-                    self.folded_sidebar(ui, area.left(), acts);
+                    let slid = widgets::slide_offset(ui, area.left(), false);
+                    let below = app_buttons::folded_column(ui, Place::BottomLeft, slid);
+                    self.folded_sidebar(ui, area.left(), below, acts);
                 }
             },
         );
@@ -210,6 +216,7 @@ impl RepoTab {
                     }
                     // This build's version, at the other end.
                     if open {
+                        app_buttons::footer_row(ui, Place::BottomRight);
                         ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                             ui.add_space(6.0);
                             ui.label(
@@ -222,6 +229,9 @@ impl RepoTab {
                 });
                 if open {
                     self.detail_panel(ui, acts);
+                } else {
+                    let slid = widgets::slide_offset(ui, area.right(), true);
+                    app_buttons::folded_column(ui, Place::BottomRight, slid);
                 }
             },
         );

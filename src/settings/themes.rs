@@ -9,6 +9,7 @@ use super::{ProfileRequest, Settings, SettingsView};
 use crate::theme::{self, Group, ThemeId, Tokens};
 
 /// What the title bar's theme menu picked.
+#[derive(Clone, Debug)]
 pub enum ThemePick {
     Theme(ThemeId),
     /// The settings' themes, to see them all and more.

@@ -17,9 +17,9 @@ use crate::theme::Tokens;
 const CAPTION_W: f32 = 46.0;
 /// The three caption buttons together.
 const CAPTIONS_W: f32 = 3.0 * CAPTION_W;
-/// Space before the caption buttons kept free to move the window by, however many tabs there
-/// are.
-const DRAG_GUTTER: f32 = 40.0;
+/// Space between the tabs and the strip's buttons kept free to move the window by, however many
+/// tabs there are.
+pub(super) const DRAG_GUTTER: f32 = 40.0;
 /// Half the size of a caption button's glyph.
 const GLYPH_HALF: f32 = 5.0;
 /// How far in from the window's edge a press resizes it: thin, as it lies over the caption
@@ -156,30 +156,24 @@ fn window_state(ctx: &egui::Context) -> WindowState {
     })
 }
 
-/// The width at the strip's end kept for moving the window and the caption buttons; none in
-/// fullscreen, where the window neither moves nor has them.
-pub(super) fn reserved_width(ctx: &egui::Context) -> f32 {
+/// The width of the caption buttons at the strip's end; none in fullscreen, which has none.
+pub(super) fn captions_width(ctx: &egui::Context) -> f32 {
     if window_state(ctx).fullscreen {
         0.0
     } else {
-        DRAG_GUTTER + CAPTIONS_W
+        CAPTIONS_W
     }
 }
 
-/// The space kept at the strip's end, `rect`: room to move the window, then minimize, maximize
-/// (or restore) and close.
-pub(super) fn strip_end(ui: &mut Ui, t: &Tokens, rect: Rect) {
+/// Minimize, maximize (or restore) and close in `rect`, at the strip's end.
+pub(super) fn captions(ui: &mut Ui, t: &Tokens, rect: Rect) {
     if rect.width() <= 0.0 {
         return;
     }
-    let gutter = rect.with_max_x(rect.right() - CAPTIONS_W);
-    drag_area(ui, gutter, "gutter");
-    let captions = rect.with_min_x(gutter.right());
     let layout = egui::Layout::right_to_left(egui::Align::Center);
-    ui.scope_builder(
-        egui::UiBuilder::new().max_rect(captions).layout(layout),
-        |ui| caption_buttons(ui, t),
-    );
+    ui.scope_builder(egui::UiBuilder::new().max_rect(rect).layout(layout), |ui| {
+        caption_buttons(ui, t)
+    });
 }
 
 /// Minimize, maximize (or restore) and close, right to left from the strip's end.

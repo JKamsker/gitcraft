@@ -218,18 +218,6 @@ pub fn small_button(ui: &mut Ui, icon: &str, tooltip: &str) -> Response {
     resp.on_hover_text(tooltip)
 }
 
-/// An icon-only button of the window's title bar, a size up from [`small_button`].
-pub fn bar_button(ui: &mut Ui, icon: &str, tooltip: &str) -> Response {
-    let t = Tokens::get(ui.ctx());
-    let (rect, resp) = ui.allocate_exact_size(Vec2::splat(28.0), Sense::click());
-    if resp.hovered() {
-        ui.painter().rect_filled(rect, t.radius, t.pressed);
-    }
-    let tint = if resp.hovered() { t.text } else { t.icon };
-    paint(ui, rect, icon, 17.0, tint);
-    resp.on_hover_text(tooltip)
-}
-
 /// An icon laid out inline, like a label.
 pub fn inline(ui: &mut Ui, name: &str, size: f32, tint: Color32) {
     let (rect, _) = ui.allocate_exact_size(Vec2::splat(size), Sense::hover());

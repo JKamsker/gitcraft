@@ -4,7 +4,7 @@
 //! `cargo run --example ui_shot -- <repo> <out-prefix> [step]...`
 //!
 //! Steps (coordinates in points, window is 1400×860):
-//! `click:x,y`, `dclick:x,y`, `rclick:x,y`, `hover:x,y`, `drag:x1,y1,x2,y2`, `press:x,y` / `move:x,y` / `release:x,y` (a drag in parts), `leave` (pointer off the window), `open:path` (a repository in a new tab), `key:Escape`, `ckey:P` (Ctrl/Cmd+key), `type:text`, `wait:ms`, `shot`.
+//! `click:x,y`, `dclick:x,y`, `rclick:x,y`, `hover:x,y`, `drag:x1,y1,x2,y2`, `press:x,y` / `move:x,y` / `release:x,y` (a drag in parts), `leave` (pointer off the window), `open:path` (a repository in a new tab), `key:Escape`, `ckey:P` (Ctrl/Cmd+key), `size:w,h` (the window's size), `type:text`, `wait:ms`, `shot`.
 //! Each `shot` writes `<out-prefix>-<n>.png`.
 
 use std::time::{Duration, Instant};
@@ -192,6 +192,11 @@ fn main() {
                 settle(&mut harness, 200);
             }
             "wait" => settle(&mut harness, arg.parse().unwrap_or(500)),
+            "size" => {
+                let size = point(arg);
+                harness.set_size(egui::vec2(size.x, size.y));
+                settle(&mut harness, 300);
+            }
             "shot" => {
                 shots += 1;
                 let path = format!("{out}-{shots}.png");

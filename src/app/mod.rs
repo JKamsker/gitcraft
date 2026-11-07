@@ -287,6 +287,31 @@ impl App {
         self.recent.truncate(MAX_RECENT);
     }
 
+    /// Carries out what was done with the app's buttons this frame, wherever they are.
+    fn app_button_events(&mut self, ctx: &egui::Context) {
+        use crate::app_buttons::{AppButton, Event};
+        use crate::settings::ThemePick;
+        for event in crate::app_buttons::take_events(ctx) {
+            match event {
+                Event::Clicked(AppButton::Settings) => self.open_settings(),
+                Event::Clicked(AppButton::Palette) => self.open_palette(),
+                Event::Clicked(AppButton::Manual) => self.manual_open = true,
+                // The theme button opens its menu rather than being clicked.
+                Event::Clicked(AppButton::Theme) => {}
+                Event::Theme(ThemePick::Theme(id)) => self.set_theme(ctx, id),
+                Event::Theme(ThemePick::Browse) => {
+                    crate::settings::show_page(ctx, crate::settings::Page::Appearance);
+                    self.open_settings();
+                }
+                Event::Move(button, place) => {
+                    let layout = self.settings.button_layout.normalized();
+                    self.settings.button_layout = layout.moved(button, place, usize::MAX);
+                    self.settings.set(ctx);
+                }
+            }
+        }
+    }
+
     fn set_theme(&mut self, ctx: &egui::Context, id: ThemeId) {
         self.theme = id;
         self.apply_theme(ctx);
@@ -469,12 +494,15 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         let t = Tokens::get(&ctx);
+        // A button dropped moves in the settings, read just below.
+        crate::app_buttons::begin_frame(&ctx);
         // Column widths dragged in a graph header live in the context; keep them for saving.
         self.settings = Settings::get(&ctx);
         // A theme file being edited, VS Code's theme switched: shown as they change.
         theme::poll(&ctx);
         title_bar::apply(&ctx, &self.settings, &mut self.decorated);
         title_bar::sync_border(frame, &self.settings, &mut self.window_border);
+        crate::app_buttons::set_current_theme(&ctx, &self.theme);
 
         // eframe shows the window after the first frame; maximize it on the next one.
         if MAXIMIZE_WHEN_SHOWN.load(Ordering::Relaxed) {
@@ -555,6 +583,8 @@ impl eframe::App for App {
         self.manual_ui(&ctx);
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
+        self.app_button_events(&ctx);
+        crate::app_buttons::end_frame(&ctx);
         if title_bar::wanted(&self.settings) {
             title_bar::resize_edges(&ctx);
         }

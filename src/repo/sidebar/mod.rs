@@ -101,12 +101,19 @@ impl RepoTab {
     }
 
     /// The folded sidebar: a button for the filter and one for each section, about where they
-    /// are when it is open. Each opens it there. Its outer edge belongs at `outer_edge`.
-    pub(super) fn folded_sidebar(&self, ui: &mut Ui, outer_edge: f32, acts: &mut Vec<Action>) {
+    /// are when it is open. Each opens it there. Its outer edge belongs at `outer_edge`; the
+    /// bottom `below` points of the strip are the app's buttons' (see `app_buttons`).
+    pub(super) fn folded_sidebar(
+        &self,
+        ui: &mut Ui,
+        outer_edge: f32,
+        below: f32,
+        acts: &mut Vec<Action>,
+    ) {
         let t = Tokens::get(ui.ctx());
         let slid = widgets::slide_offset(ui, outer_edge, false);
-        // Above the footer, which `max_rect` still includes.
-        let bottom = ui.available_rect_before_wrap().bottom();
+        // Above the footer, which `max_rect` still includes, and the app's buttons.
+        let bottom = ui.available_rect_before_wrap().bottom() - below;
         let mut col = ui.new_child(
             egui::UiBuilder::new()
                 .max_rect(ui.max_rect().translate(vec2(slid, 0.0)))

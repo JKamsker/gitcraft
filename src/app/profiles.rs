@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use super::panels::Toast;
 use super::{App, MAX_RECENT, Tab, active_among_kept};
+use crate::app_buttons::{self, AppButton};
 use crate::repo::RepoTab;
 use crate::settings::{self, ProfileRequest};
 use crate::theme::{self, ThemeId, Tokens};
@@ -254,7 +255,9 @@ impl App {
     }
 
     /// The profile in use on the tab strip, a menu to switch to another.
-    pub(super) fn profile_button(&mut self, ui: &mut Ui, t: &Tokens) {
+    /// The profile in use, and its menu: the profiles, and `extras`, the title bar's buttons
+    /// when it has no room for them.
+    pub(super) fn profile_button(&mut self, ui: &mut Ui, t: &Tokens, extras: &[AppButton]) {
         let profile = self.settings.profile();
         let font = theme::medium(12.0);
         let name = ui
@@ -310,6 +313,10 @@ impl App {
                 if ui.button("Manage profiles…").clicked() {
                     settings::show_page(ui.ctx(), settings::Page::Profile);
                     self.open_settings();
+                }
+                if !extras.is_empty() {
+                    ui.separator();
+                    app_buttons::menu_entries(ui, extras);
                 }
             });
         if let Some(request) = request {
