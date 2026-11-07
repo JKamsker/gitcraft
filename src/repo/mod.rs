@@ -10,6 +10,7 @@ mod ci_view;
 pub(crate) mod columns;
 mod commands;
 mod conflict;
+mod conflict_check;
 mod detail;
 mod dialogs;
 mod diff;
@@ -185,6 +186,10 @@ pub struct RepoTab {
     /// How many times a conflict editor was opened in the tab: the one open is the latest, and
     /// what is read in the background for an earlier one is not taken for it.
     conflict_generation: u64,
+    /// Whether merges, rebases and cherry-picks would conflict, by the commits involved.
+    conflict_checks: conflict_check::ConflictChecks,
+    /// What the toolbar's conflict badge compares the checked-out branch with.
+    target_watch: conflict_check::TargetWatch,
 
     commit_summary: String,
     commit_body: String,
@@ -336,6 +341,8 @@ impl RepoTab {
             all_files: Default::default(),
             conflict: None,
             conflict_generation: 0,
+            conflict_checks: Default::default(),
+            target_watch: Default::default(),
             commit_summary: String::new(),
             commit_body: String::new(),
             amend: false,

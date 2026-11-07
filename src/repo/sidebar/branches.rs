@@ -9,6 +9,7 @@ use crate::icons;
 use crate::repo::actions::{BranchRef, compare_branches_action, interactive_rebase_action};
 use crate::repo::branch_tree::{self, LeafRow, TreeView};
 use crate::repo::branch_visibility::local_ref;
+use crate::repo::conflict_check::Op;
 use crate::repo::graph_view;
 use crate::repo::pinned_sections::{Button, Header, Sections};
 use crate::repo::reflog::{ReflogAct, Source};
@@ -143,7 +144,7 @@ impl RepoTab {
             && !b.is_head
         {
             ui.separator();
-            integrate_items(ui, acts, b, current, idle);
+            self.integrate_items(ui, acts, b, current, idle);
         }
         // The checked-out branch against the one pull requests usually go to.
         if b.is_head
@@ -306,7 +307,7 @@ impl RepoTab {
     }
 
     /// The branch to compare the current one with: the local default base, or its remote one.
-    fn base_ref(&self) -> Option<OwnedBranch> {
+    pub(in crate::repo) fn base_ref(&self) -> Option<OwnedBranch> {
         let base = self.default_base();
         if self.refs.local.iter().any(|b| b.name == base) {
             return Some(OwnedBranch {
@@ -344,9 +345,9 @@ impl RepoTab {
 }
 
 /// A local or remote-tracking branch found by name.
-struct OwnedBranch {
-    name: String,
-    remote: bool,
+pub(in crate::repo) struct OwnedBranch {
+    pub(in crate::repo) name: String,
+    pub(in crate::repo) remote: bool,
 }
 
 impl OwnedBranch {
@@ -358,46 +359,51 @@ impl OwnedBranch {
     }
 }
 
-/// Fast-forward, merge, rebase and compare `current` with `b`.
-fn integrate_items(ui: &mut Ui, acts: &mut Vec<Action>, b: &Branch, current: &str, idle: bool) {
-    if ui
-        .add_enabled(
-            idle,
-            egui::Button::new(format!("Fast-forward {current} to {}", b.name)),
-        )
-        .clicked()
-    {
-        acts.push(fast_forward_action(BranchRef::local(&b.name), current));
+impl RepoTab {
+    /// Fast-forward, merge, rebase and compare `current` with `b`.
+    fn integrate_items(
+        &self,
+        ui: &mut Ui,
+        acts: &mut Vec<Action>,
+        b: &Branch,
+        current: &str,
+        idle: bool,
+    ) {
+        if ui
+            .add_enabled(
+                idle,
+                egui::Button::new(format!("Fast-forward {current} to {}", b.name)),
+            )
+            .clicked()
+        {
+            acts.push(fast_forward_action(BranchRef::local(&b.name), current));
+        }
+        let merge = format!("Merge {} into {current}", b.name);
+        if self
+            .conflict_button(ui, merge, idle, Op::Merge, &b.target)
+            .clicked()
+        {
+            acts.push(merge_action(BranchRef::local(&b.name), current));
+        }
+        let rebase = format!("Rebase {current} onto {}", b.name);
+        if self
+            .conflict_button(ui, rebase, idle, Op::Rebase, &b.target)
+            .clicked()
+        {
+            acts.push(rebase_action(BranchRef::local(&b.name), current));
+        }
+        if ui
+            .add_enabled(
+                idle,
+                egui::Button::new(format!("Interactive rebase {current} onto {}…", b.name)),
+            )
+            .clicked()
+        {
+            acts.push(interactive_rebase_action(BranchRef::local(&b.name)));
+        }
+        ui.separator();
+        graph_view::compare_items(ui, acts, BranchRef::local(&b.name), current);
     }
-    if ui
-        .add_enabled(
-            idle,
-            egui::Button::new(format!("Merge {} into {current}", b.name)),
-        )
-        .clicked()
-    {
-        acts.push(merge_action(BranchRef::local(&b.name), current));
-    }
-    if ui
-        .add_enabled(
-            idle,
-            egui::Button::new(format!("Rebase {current} onto {}", b.name)),
-        )
-        .clicked()
-    {
-        acts.push(rebase_action(BranchRef::local(&b.name), current));
-    }
-    if ui
-        .add_enabled(
-            idle,
-            egui::Button::new(format!("Interactive rebase {current} onto {}…", b.name)),
-        )
-        .clicked()
-    {
-        acts.push(interactive_rebase_action(BranchRef::local(&b.name)));
-    }
-    ui.separator();
-    graph_view::compare_items(ui, acts, BranchRef::local(&b.name), current);
 }
 
 /// What a branch's row shows besides its name and how far ahead and behind it is.

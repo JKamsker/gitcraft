@@ -10,6 +10,7 @@ mod lfs;
 mod reflog;
 mod preview;
 mod refs;
+pub mod simulate;
 mod status;
 mod submodule;
 mod worktree;

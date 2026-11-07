@@ -90,7 +90,7 @@ impl RepoTab {
             Action::Push => self.push(ctx),
             Action::Sync => self.sync(ctx),
             Action::PushFlow(act) => self.push_act(act, ctx),
-            Action::Reload => self.reload(ctx),
+            Action::Reload => self.refresh(ctx),
             Action::LoadMore => self.load_more(ctx),
             Action::Undo => self.undo(ctx),
             Action::Redo => self.redo(ctx),

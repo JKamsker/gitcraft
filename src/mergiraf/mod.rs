@@ -169,6 +169,12 @@ pub fn found(ctx: &egui::Context) -> Option<Found> {
     state(ctx).found
 }
 
+/// Counts the changes gitcraft made to Mergiraf's set-up (installed, git set up to merge with
+/// it or set back): what git merges cleanly may differ after one.
+pub fn changes() -> u32 {
+    FORGOTTEN.load(Ordering::Acquire)
+}
+
 fn forget() {
     if let Ok(mut cache) = STATE.lock() {
         FORGOTTEN.fetch_add(1, Ordering::AcqRel);
@@ -212,6 +218,82 @@ pub fn use_in_merges(ctx: &egui::Context, on: bool) {
     } else {
         start(ctx, "Setting git back…", setup::disable);
     }
+}
+
+/// The file name patterns Mergiraf has a language for (`*.rs`, `*.json`…), as `mergiraf
+/// languages --gitattributes` lists them, read once for each Mergiraf (and version). Runs it: not
+/// from the UI thread.
+pub fn patterns(found: &Found) -> Result<Vec<String>, String> {
+    if let Ok(cache) = PATTERNS.lock()
+        && let Some((program, version, patterns)) = cache.as_ref()
+        && *program == found.program
+        && *version == found.version
+    {
+        return Ok(patterns.clone());
+    }
+    let out = quiet(Command::new(&found.program))
+        .args(["languages", "--gitattributes"])
+        .output()
+        .map_err(|e| format!("Could not run mergiraf: {e}"))?;
+    if !out.status.success() {
+        return Err(error_message(
+            &String::from_utf8_lossy(&out.stderr),
+            "languages",
+        ));
+    }
+    let patterns = parse_patterns(&String::from_utf8_lossy(&out.stdout));
+    if let Ok(mut cache) = PATTERNS.lock() {
+        *cache = Some((
+            found.program.clone(),
+            found.version.clone(),
+            patterns.clone(),
+        ));
+    }
+    Ok(patterns)
+}
+
+/// The patterns of [`patterns`], by the Mergiraf (program and version) they were read from:
+/// one upgraded in place may know more languages.
+type Patterns = (PathBuf, String, Vec<String>);
+static PATTERNS: Mutex<Option<Patterns>> = Mutex::new(None);
+
+/// The patterns in gitattributes lines such as `*.rs merge=mergiraf` (or several patterns on
+/// one line).
+fn parse_patterns(out: &str) -> Vec<String> {
+    out.lines()
+        .filter(|line| line.contains("merge=mergiraf"))
+        .flat_map(str::split_whitespace)
+        .filter(|word| !word.contains('='))
+        .map(str::to_owned)
+        .collect()
+}
+
+/// Whether `path` matches one of `patterns`, as a gitattributes pattern without a slash
+/// matches a file's name in any folder. Only `*` is a wildcard here (Mergiraf lists no other).
+pub fn knows(patterns: &[String], path: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    patterns.iter().any(|p| wildcard_match(p, name))
+}
+
+/// `text` against `pattern`, in which `*` stands for any run of characters.
+fn wildcard_match(pattern: &str, text: &str) -> bool {
+    let mut parts = pattern.split('*');
+    let first = parts.next().unwrap_or_default();
+    let Some(mut rest) = text.strip_prefix(first) else {
+        return false;
+    };
+    let parts: Vec<&str> = parts.collect();
+    let Some((last, middle)) = parts.split_last() else {
+        // No `*` at all: the whole name.
+        return rest.is_empty();
+    };
+    for part in middle {
+        match rest.find(part) {
+            Some(at) => rest = &rest[at + part.len()..],
+            None => return false,
+        }
+    }
+    rest.len() >= last.len() && rest.ends_with(last)
 }
 
 /// What Mergiraf makes of the conflicts in `path`, a file of the repository at `repo`: the file
@@ -342,6 +424,31 @@ mod tests {
             "{solved}"
         );
         Ok(())
+    }
+
+    #[test]
+    fn language_patterns_are_read_and_matched() {
+        let out = "*.java merge=mergiraf\n*.rs merge=mergiraf\n*.js *.jsx merge=mergiraf\n\
+                   go.mod merge=mergiraf\n# a comment\n";
+        let patterns = parse_patterns(out);
+        assert_eq!(patterns, ["*.java", "*.rs", "*.js", "*.jsx", "go.mod"]);
+        for (path, known) in [
+            ("src/main.rs", true),
+            ("a b/ü.jsx", true),
+            ("go.mod", true),
+            ("sub/go.mod", true),
+            ("go.mod.bak", false),
+            ("main.rs.orig", false),
+            ("rs", false),
+            ("image.png", false),
+            ("Makefile", false),
+        ] {
+            assert_eq!(knows(&patterns, path), known, "{path}");
+        }
+        assert!(wildcard_match("a*b*c", "a-x-b-y-c"));
+        assert!(!wildcard_match("a*b*c", "a-x-c"));
+        assert!(wildcard_match("*", "anything"));
+        assert!(!wildcard_match("*.rs", ".r"));
     }
 
     #[test]
