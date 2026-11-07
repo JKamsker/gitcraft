@@ -61,9 +61,6 @@ jobs:
   # Compile once and fan out the Windows tests, alongside the release builds.
   windows-tests:
     uses: ./.github/workflows/windows-tests.yml
-    with:
-      # The existing release cache contains both debug and release dependencies.
-      cache-key: build
 
   build:
     needs: version

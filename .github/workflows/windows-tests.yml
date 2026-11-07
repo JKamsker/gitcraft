@@ -3,11 +3,6 @@ name: Windows tests
 
 on:
   workflow_call:
-    inputs:
-      cache-key:
-        description: Dependency cache shared key (release reuses its existing build cache).
-        type: string
-        default: test
 
 permissions:
   contents: read
@@ -25,7 +20,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ${{ inputs.cache-key }}
+          # Dev releases populate this cache, so new PRs can restore it too.
+          shared-key: build
           cache-on-failure: true
       - name: Build test binaries
         run: python ci/windows-test-build.py
