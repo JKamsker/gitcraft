@@ -85,13 +85,30 @@ pub fn features(repo: &Path) -> Result<Features, String> {
 /// Whether `repo` is a partial clone (`git clone --filter`): merging there downloads the
 /// files it lacks from the remote, which a check must not do behind the user's back.
 pub fn partial_clone(repo: &Path) -> Result<bool, String> {
-    // 1: the key isn't set. Any other failure (a machine out of reach) is not a "no".
+    // 1: no such key. Any other failure (a machine out of reach) is not a "no".
     let (code, out) = run_code(
         Some(repo),
         &["config", "--get", "extensions.partialClone"],
         &[0, 1],
     )?;
-    Ok(code == 0 && !String::from_utf8_lossy(&out).trim().is_empty())
+    if code == 0 && !String::from_utf8_lossy(&out).trim().is_empty() {
+        return Ok(true);
+    }
+    // A remote marked as a promisor lets git fetch what is missing too.
+    let (code, out) = run_code(
+        Some(repo),
+        &[
+            "config",
+            "--type=bool",
+            "--get-regexp",
+            r"^remote\..*\.promisor$",
+        ],
+        &[0, 1],
+    )?;
+    Ok(code == 0
+        && String::from_utf8_lossy(&out)
+            .lines()
+            .any(|line| line.ends_with(" true")))
 }
 
 /// A file a merge would leave conflicted.
