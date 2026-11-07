@@ -6,6 +6,10 @@ use crate::keymap::Command;
 use crate::settings::Settings;
 
 impl RepoTab {
+    pub(crate) fn command_refusal(&self, command: Command) -> Option<String> {
+        self.key_action(command).err()
+    }
+
     /// The action the key of `command` stands for here, or why it can't be done now, as the
     /// toolbar would say it. `None` for the window's keys, which aren't the tab's.
     pub(super) fn key_action(&self, command: Command) -> Result<Option<Action>, String> {

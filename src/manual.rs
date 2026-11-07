@@ -502,10 +502,12 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
 /// Every group of shortcuts, as the manual and Settings → Keyboard shortcuts list them: the
 /// window's and a repository tab's keys from [`crate::keymap`], then the views' own. Each row:
 /// the keys as [`key_combo`] draws them (Ctrl or Cmd already written), what they do.
-pub(crate) fn shortcut_groups() -> Vec<(&'static str, Vec<(String, &'static str)>)> {
+pub(crate) fn shortcut_groups(
+    ctx: &egui::Context,
+) -> Vec<(&'static str, Vec<(String, &'static str)>)> {
     let from_keymap = |rows: &[keymap::Row]| {
         rows.iter()
-            .map(|r| (keymap::row_keys(r), r.what))
+            .map(|r| (keymap::row_keys(ctx, r), r.what))
             .collect::<Vec<_>>()
     };
     let mut groups = vec![
@@ -554,7 +556,7 @@ pub fn ui(ui: &mut Ui) {
 
     ui.add_space(8.0);
     ui.separator();
-    for (title, keys) in shortcut_groups() {
+    for (title, keys) in shortcut_groups(ui.ctx()) {
         heading(ui, &format!("{title} shortcuts"));
         egui::Grid::new(("manual_keys", title))
             .num_columns(2)

@@ -235,7 +235,7 @@ impl RepoTab {
         // Ctrl+F, Esc and the steps of the find bar, when a diff, file or blame is shown.
         self.find_keys(ctx, free_keys);
         if free_keys {
-            let commands = ctx.input(|i| keymap::pressed(i, keymap::Scope::Repository));
+            let commands = keymap::pressed(ctx, keymap::Scope::Repository);
             // While a commit's message is being edited, Ctrl+Enter saves it (the editor takes
             // the key also when nothing has the focus): it doesn't commit the changes too.
             let rewording = self.reword.is_some();
@@ -335,7 +335,11 @@ impl RepoTab {
                 self.search.open = true;
                 self.search.focus = true;
             }
-        } else if self.search.open
+        } else {
+            keymap::cancel(ctx, keymap::Scope::Repository);
+        }
+        if !free_keys
+            && self.search.open
             && ctx.input(|i| i.modifiers.command && !i.modifiers.shift && i.key_pressed(Key::F))
         {
             self.search.focus = true;

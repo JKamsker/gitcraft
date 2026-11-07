@@ -284,7 +284,7 @@ fn close_button(
     );
     let clicked = c.clicked();
     if dragging.is_none() {
-        c.on_hover_text(keymap::tip("Close tab", Command::CloseTab));
+        c.on_hover_text(keymap::tip(ui.ctx(), "Close tab", Command::CloseTab));
     }
     clicked
 }

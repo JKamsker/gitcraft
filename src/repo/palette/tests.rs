@@ -52,11 +52,15 @@ fn labels(items: &[PaletteItem]) -> Vec<&str> {
 
 #[test]
 fn branches_do_not_flood_the_first_step() {
-    let few = tab_with_branches(1).palette_items().len();
-    let many = tab_with_branches(3000).palette_items().len();
+    let few = tab_with_branches(1)
+        .palette_items(&egui::Context::default())
+        .len();
+    let many = tab_with_branches(3000)
+        .palette_items(&egui::Context::default())
+        .len();
     assert_eq!(few, many);
     let tab = tab_with_branches(3000);
-    let items = tab.palette_items();
+    let items = tab.palette_items(&egui::Context::default());
     let got = labels(&items);
     for verb in [
         "Check out a branch…",
@@ -98,7 +102,7 @@ fn the_second_step_lists_every_other_branch() {
 fn with_only_one_branch_there_is_nothing_to_pick() {
     let mut tab = tab_with_branches(0);
     tab.refs.remotes.clear();
-    let items = tab.palette_items();
+    let items = tab.palette_items(&egui::Context::default());
     assert!(!items.iter().any(|i| matches!(i.run, PaletteRun::Pick(_))));
     assert!(tab.palette_choices(&Pick::Merge).is_empty());
 }
@@ -108,7 +112,7 @@ fn detached_head_offers_checkout_but_nothing_into_the_branch() {
     let mut tab = tab_with_branches(2);
     tab.refs.current = None;
     tab.refs.local[0].is_head = false;
-    let items = tab.palette_items();
+    let items = tab.palette_items(&egui::Context::default());
     let got = labels(&items);
     assert!(got.contains(&"Check out a branch…"));
     assert!(!got.iter().any(|l| l.starts_with("Merge into")));
@@ -128,7 +132,7 @@ fn a_selected_commit_puts_its_actions_first() {
         .map(|(i, c)| (c.hash.clone(), i))
         .collect();
     tab.selected = Some(1);
-    let items = tab.palette_items();
+    let items = tab.palette_items(&egui::Context::default());
     let got = labels(&items);
     assert_eq!(
         got[..4],
@@ -152,7 +156,7 @@ fn a_selected_commit_puts_its_actions_first() {
 
     // HEAD itself: nothing to cherry-pick or reset to; reverting it is still possible.
     tab.selected = Some(0);
-    let items = tab.palette_items();
+    let items = tab.palette_items(&egui::Context::default());
     let got = labels(&items);
     assert!(!got.iter().any(|l| l.starts_with("Cherry-pick")));
     assert!(!got.iter().any(|l| l.starts_with("Reset")));
@@ -161,7 +165,7 @@ fn a_selected_commit_puts_its_actions_first() {
     // While an operation runs, nothing rewrites the branch.
     tab.selected = Some(1);
     tab.busy_op = Some("Fetch".to_owned());
-    let items = tab.palette_items();
+    let items = tab.palette_items(&egui::Context::default());
     let got = labels(&items);
     assert!(
         !got.iter()
@@ -175,13 +179,21 @@ fn the_uncommitted_changes_row_and_merges_offer_less() {
     let mut tab = tab_with_branches(1);
     tab.commits = vec![commit(WIP_HASH, 1), commit(&"b".repeat(40), 2)];
     tab.selected = Some(0);
-    assert!(!tab.palette_items().iter().any(|i| i.selection));
+    assert!(
+        !tab.palette_items(&egui::Context::default())
+            .iter()
+            .any(|i| i.selection)
+    );
     tab.selected = Some(1);
-    let items = tab.palette_items();
+    let items = tab.palette_items(&egui::Context::default());
     assert!(!labels(&items).iter().any(|l| l.starts_with("Create patch")));
     // A selection past the end (the history shrank) is no selection.
     tab.selected = Some(7);
-    assert!(!tab.palette_items().iter().any(|i| i.selection));
+    assert!(
+        !tab.palette_items(&egui::Context::default())
+            .iter()
+            .any(|i| i.selection)
+    );
 }
 
 fn work(path: &str, code: char, area: Area) -> DiffKey {
@@ -195,7 +207,7 @@ fn work(path: &str, code: char, area: Area) -> DiffKey {
 
 fn file_labels(tab: &mut RepoTab, key: DiffKey) -> Vec<String> {
     tab.diff = Some(DiffView::new(key));
-    tab.palette_items()
+    tab.palette_items(&egui::Context::default())
         .into_iter()
         .filter(|i| i.selection)
         .map(|i| i.label)
@@ -230,7 +242,7 @@ fn the_open_file_has_its_actions() {
         path: path.to_owned(),
     };
     tab.diff = Some(DiffView::new(key));
-    let items = tab.palette_items();
+    let items = tab.palette_items(&egui::Context::default());
     let history = items
         .iter()
         .find(|i| i.label == format!("File history of {path}"));

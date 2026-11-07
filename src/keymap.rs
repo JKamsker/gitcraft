@@ -2,7 +2,13 @@
 //! handlers, the manual, Settings → Keyboard shortcuts, the toolbar's tooltips, the palette and
 //! the menus all read, so none of them can say another key than the one that works.
 
-use egui::{InputState, Key, Modifiers};
+mod config;
+pub(crate) mod editor;
+mod resolver;
+
+pub(crate) use config::{Overrides, Stroke};
+use egui::{Key, Modifiers};
+pub(crate) use resolver::{cancel, owner, pressed, which_key};
 
 /// What a key does.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -30,10 +36,16 @@ pub(crate) enum Command {
 }
 
 /// Where a key works: anywhere in the window, or in a repository tab.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Scope {
     Window,
     Repository,
+}
+
+impl Scope {
+    fn overlaps(self, _other: Self) -> bool {
+        true
+    }
 }
 
 impl Command {
@@ -59,6 +71,47 @@ impl Command {
             | Command::StageAll
             | Command::Commit => Scope::Repository,
         }
+    }
+
+    /// Stable IDs are persisted independently of translated labels.
+    pub(crate) fn id(self) -> &'static str {
+        match self {
+            Self::NewTab => "new_tab",
+            Self::CloseTab => "close_tab",
+            Self::ReopenTab => "reopen_tab",
+            Self::NextTab => "next_tab",
+            Self::PreviousTab => "previous_tab",
+            Self::LastTab => "last_tab",
+            Self::Palette => "palette",
+            Self::Settings => "settings",
+            Self::Reload => "reload",
+            Self::Manual => "manual",
+            Self::Fetch => "fetch",
+            Self::Pull => "pull",
+            Self::Push => "push",
+            Self::Stash => "stash",
+            Self::NewBranch => "new_branch",
+            Self::Terminal => "terminal",
+            Self::StageAll => "stage_all",
+            Self::Commit => "commit",
+            Self::GoToTab(1) => "tab_1",
+            Self::GoToTab(2) => "tab_2",
+            Self::GoToTab(3) => "tab_3",
+            Self::GoToTab(4) => "tab_4",
+            Self::GoToTab(5) => "tab_5",
+            Self::GoToTab(6) => "tab_6",
+            Self::GoToTab(7) => "tab_7",
+            Self::GoToTab(8) => "tab_8",
+            Self::GoToTab(_) => "invalid_tab",
+        }
+    }
+
+    pub(crate) fn title(self) -> &'static str {
+        WINDOW_ROWS
+            .iter()
+            .chain(REPOSITORY_ROWS)
+            .find(|r| r.commands.contains(&self))
+            .map_or("Action", |r| r.what)
     }
 
     /// Whether holding the key down does it again: going through the tabs does, an operation
@@ -123,6 +176,7 @@ pub(crate) const BINDINGS: &[Binding] = &[
 ];
 
 /// The command `key` with `modifiers` held does, if any.
+#[cfg(test)]
 pub(crate) fn find(key: Key, modifiers: Modifiers) -> Option<Command> {
     BINDINGS
         .iter()
@@ -133,6 +187,7 @@ pub(crate) fn find(key: Key, modifiers: Modifiers) -> Option<Command> {
 /// The command of a key press: by the character the key types, else, for the tab keys, by
 /// where the digit is on the keyboard (on AZERTY the digits are typed with Shift, and the key
 /// under 4 reads as `'` without it).
+#[cfg(test)]
 fn find_pressed(key: Key, physical: Option<Key>, modifiers: Modifiers) -> Option<Command> {
     find(key, modifiers).or_else(|| {
         physical
@@ -141,38 +196,29 @@ fn find_pressed(key: Key, physical: Option<Key>, modifiers: Modifiers) -> Option
     })
 }
 
-/// The commands of `scope` whose key was pressed this frame, in the order pressed.
-pub(crate) fn pressed(input: &InputState, scope: Scope) -> Vec<Command> {
-    input
-        .events
-        .iter()
-        .filter_map(|e| match e {
-            egui::Event::Key {
-                key,
-                physical_key,
-                pressed: true,
-                repeat,
-                modifiers,
-            } => find_pressed(*key, *physical_key, *modifiers).filter(|c| !*repeat || c.repeats()),
-            _ => None,
-        })
-        .filter(|c| c.scope() == scope)
-        .collect()
-}
-
 /// The key of `command`, as the manual, the tooltips and the menus write it ("Ctrl+Shift+F", or
 /// "Cmd+Shift+F" on macOS). Empty for a command with no key.
-pub(crate) fn label(command: Command) -> String {
-    BINDINGS
-        .iter()
-        .find(|b| b.command == command)
-        .map(|b| combo(b.modifiers, b.key))
-        .unwrap_or_default()
+pub(crate) fn label(ctx: &egui::Context, command: Command) -> String {
+    config::effective(
+        &config::usable(&crate::settings::Settings::get(ctx).key_bindings),
+        command,
+    )
+    .iter()
+    .map(Stroke::label)
+    .collect::<Vec<_>>()
+    .join(" → ")
 }
 
 /// `text` followed by the key of `command` in brackets, for a tooltip.
-pub(crate) fn tip(text: &str, command: Command) -> String {
-    format!("{text} ({})", label(command))
+pub(crate) fn tip(ctx: &egui::Context, text: &str, command: Command) -> String {
+    {
+        let keys = label(ctx, command);
+        if keys.is_empty() {
+            text.to_owned()
+        } else {
+            format!("{text} ({keys})")
+        }
+    }
 }
 
 /// Keys written as the manual writes them ("Cmd+Z / Cmd+Y"), with Ctrl outside macOS.
@@ -279,20 +325,26 @@ pub(crate) const REPOSITORY_ROWS: &[Row] = &[
 ];
 
 /// The keys of a manual row, as `manual::key_combo` draws them ("Ctrl+Tab / Ctrl+Shift+Tab").
-pub(crate) fn row_keys(row: &Row) -> String {
+pub(crate) fn row_keys(ctx: &egui::Context, row: &Row) -> String {
     match (row.range, row.commands.first(), row.commands.last()) {
-        (true, Some(&first), Some(&last)) => {
+        (true, Some(&first), Some(&last))
+            if row.commands.iter().all(|c| {
+                !crate::settings::Settings::get(ctx)
+                    .key_bindings
+                    .contains_key(c.id())
+            }) =>
+        {
             let last_key = BINDINGS
                 .iter()
                 .find(|b| b.command == last)
                 .map(|b| b.key.symbol_or_name())
                 .unwrap_or_default();
-            format!("{}…{last_key}", label(first))
+            format!("{}…{last_key}", label(ctx, first))
         }
         _ => row
             .commands
             .iter()
-            .map(|&c| label(c))
+            .map(|&c| label(ctx, c))
             .collect::<Vec<_>>()
             .join(" / "),
     }

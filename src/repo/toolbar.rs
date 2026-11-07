@@ -50,7 +50,7 @@ impl RepoTab {
             widgets::toolbar_separator(ui);
             if icons::tool_button(ui, "refresh-cw", "", !self.loading)
                 .named("Reload (F5)")
-                .on_hover_text(keymap::tip("Reload", Command::Reload))
+                .on_hover_text(keymap::tip(ui.ctx(), "Reload", Command::Reload))
                 .clicked()
             {
                 acts.push(Action::Reload);
@@ -151,6 +151,7 @@ impl RepoTab {
         let fetched = format!(
             "{}\nLast fetched {} ago{waits}",
             keymap::tip(
+                ui.ctx(),
                 "Fetch all remotes (git fetch --all --prune)",
                 Command::Fetch
             ),
@@ -175,7 +176,7 @@ impl RepoTab {
         let mode = Settings::get(ui.ctx()).pull_mode;
         let pull = icons::tool_button_count(ui, "arrow-down-to-line", "Pull", behind, has_remote)
             .named(|| behind_ahead("Pull", behind, "behind"))
-            .on_hover_text(format!("{}{waits}", mode.tip()))
+            .on_hover_text(format!("{}{waits}", mode.tip(ui.ctx())))
             .on_disabled_hover_text(&off_why);
         crate::repo::ghost::offer(&pull, || crate::repo::ghost::GhostOp::Pull(mode));
         if pull.clicked() {
@@ -211,6 +212,7 @@ impl RepoTab {
         let push = icons::tool_button_count(ui, "arrow-up-from-line", "Push", ahead, has_remote)
             .named(|| behind_ahead("Push", ahead, "ahead"))
             .on_hover_text(keymap::tip(
+                ui.ctx(),
                 "Push the current branch (publishes it if it has no upstream yet)",
                 Command::Push,
             ))
@@ -246,7 +248,11 @@ impl RepoTab {
         let head = self.refs.head.clone();
         let waits = self.waits_text();
         if icons::tool_button(ui, "git-branch-plus", "Branch", idle && !head.is_empty())
-            .on_hover_text(keymap::tip("Create a branch at HEAD", Command::NewBranch))
+            .on_hover_text(keymap::tip(
+                ui.ctx(),
+                "Create a branch at HEAD",
+                Command::NewBranch,
+            ))
             .on_disabled_hover_ui(|ui| self.why_not(ui, Command::NewBranch))
             .on_disabled_hover_text(match &waits {
                 _ if head.is_empty() => "No commit to branch from yet".to_owned(),
@@ -259,6 +265,7 @@ impl RepoTab {
         }
         if icons::tool_button(ui, "archive", "Stash", idle && !self.work.is_clean())
             .on_hover_text(keymap::tip(
+                ui.ctx(),
                 "Stash everything, staged changes, a snapshot, or picked files",
                 Command::Stash,
             ))
@@ -271,9 +278,12 @@ impl RepoTab {
         {
             acts.push(Action::Dialog(Dialog::stash()));
         }
-        let terminal = icons::tool_button(ui, "square-terminal", "Terminal", true).on_hover_text(
-            keymap::tip("Terminal in the repository folder", Command::Terminal),
-        );
+        let terminal =
+            icons::tool_button(ui, "square-terminal", "Terminal", true).on_hover_text(keymap::tip(
+                ui.ctx(),
+                "Terminal in the repository folder",
+                Command::Terminal,
+            ));
         if self.terminal_open {
             widgets::active_underline(ui, terminal.rect, t.accent);
         }

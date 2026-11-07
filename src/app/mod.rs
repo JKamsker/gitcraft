@@ -551,6 +551,19 @@ impl App {
     /// Keyboard shortcuts, and the reload on coming back to the window. Returns whether the
     /// window has the focus.
     fn shortcuts(&mut self, ctx: &egui::Context) -> bool {
+        keymap::owner(
+            ctx,
+            egui::Id::new((
+                self.active,
+                self.tabs.get(self.active).and_then(|t| {
+                    if let Tab::Repo(r) = t {
+                        Some(&r.path)
+                    } else {
+                        None
+                    }
+                }),
+            )),
+        );
         // A focused text field or the terminal keeps these keys for itself.
         let modal_open = self.clone_form.is_some()
             || self.remote_form.is_some()
@@ -561,12 +574,17 @@ impl App {
             || self.manual_open
             || self.repo_scan.is_some()
             || (crate::a11y::keyboard_taken(ctx) && !home_filter::search_has_focus(ctx));
-        let (commands, focused) = ctx.input(|i| {
-            (
-                keymap::pressed(i, keymap::Scope::Window),
-                i.focused || i.raw.viewports.values().any(|v| v.focused == Some(true)),
-            )
-        });
+        let focused =
+            ctx.input(|i| i.focused || i.raw.viewports.values().any(|v| v.focused == Some(true)));
+        let commands = if modal_open {
+            keymap::cancel(ctx, keymap::Scope::Window);
+            keymap::pressed(ctx, keymap::Scope::Window)
+                .into_iter()
+                .filter(|c| matches!(c, keymap::Command::Manual | keymap::Command::Palette))
+                .collect()
+        } else {
+            keymap::pressed(ctx, keymap::Scope::Window)
+        };
         let mut refresh = false;
         for command in commands {
             refresh |= self.window_command(command, modal_open, ctx);
@@ -792,6 +810,13 @@ impl eframe::App for App {
         if title_bar::wanted(&self.settings) {
             title_bar::resize_edges(&ctx);
         }
+        keymap::which_key(&ctx, |command| match self.tabs.get(self.active) {
+            Some(Tab::Repo(r)) => r.command_refusal(command),
+            _ if command.scope() == keymap::Scope::Repository => {
+                Some("Open a repository first".into())
+            }
+            _ => None,
+        });
         crate::a11y::end_frame(&ctx);
     }
 

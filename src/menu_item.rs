@@ -58,7 +58,7 @@ impl<'a> MenuItem<'a> {
     pub(crate) fn show(self, ui: &mut Ui) -> Response {
         let mut button = egui::Button::new(self.label);
         if let Some(command) = self.keys {
-            button = button.shortcut_text(keymap::label(command));
+            button = button.shortcut_text(keymap::label(ui.ctx(), command));
         }
         let response = ui.add_enabled(self.enabled && self.refused.is_none(), button);
         if let Some(why) = self.refused.filter(|why| self.explained && !why.is_empty()) {

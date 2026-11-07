@@ -43,7 +43,7 @@ pub(super) fn run(bench: &mut Bench, inputs: &Inputs) -> Result<(), String> {
         assert!(black_box(ron::ser::to_string(&settings)).is_ok());
     });
     bench.measure("ui/palette-items", || {
-        black_box(tab.palette_items());
+        black_box(tab.palette_items(&ctx));
     });
     for _ in 0..20 {
         frame(&ctx, &mut time, |ui| tab.sidebar(ui, &mut Vec::new()));

@@ -86,7 +86,7 @@ fn every_command_has_one_key_and_finds_its_way_back() {
         assert_eq!(bindings.len(), 1, "{command:?}");
         let b = bindings[0];
         assert_eq!(find(b.key, b.modifiers), Some(command));
-        assert!(!label(command).is_empty());
+        assert!(!label(&egui::Context::default(), command).is_empty());
     }
     assert_eq!(BINDINGS.len(), EVERY_COMMAND.len());
 }
@@ -110,16 +110,34 @@ fn every_command_is_in_the_manual_once() {
 #[test]
 fn keys_are_written_for_this_platform() {
     let cmd = crate::manual::command();
-    assert_eq!(label(Command::Fetch), format!("{cmd}+Shift+F"));
-    assert_eq!(label(Command::Commit), format!("{cmd}+Enter"));
-    assert_eq!(label(Command::Settings), format!("{cmd}+,"));
+    assert_eq!(
+        label(&egui::Context::default(), Command::Fetch),
+        format!("{cmd}+Shift+F")
+    );
+    assert_eq!(
+        label(&egui::Context::default(), Command::Commit),
+        format!("{cmd}+Enter")
+    );
+    assert_eq!(
+        label(&egui::Context::default(), Command::Settings),
+        format!("{cmd}+,")
+    );
     // Ctrl, also on macOS.
-    assert_eq!(label(Command::PreviousTab), "Ctrl+Shift+Tab");
-    assert_eq!(label(Command::Reload), "F5");
-    assert_eq!(tip("Push", Command::Push), format!("Push ({cmd}+Shift+K)"));
-    let tabs = row_keys(&WINDOW_ROWS[4]);
+    assert_eq!(
+        label(&egui::Context::default(), Command::PreviousTab),
+        "Ctrl+Shift+Tab"
+    );
+    assert_eq!(label(&egui::Context::default(), Command::Reload), "F5");
+    assert_eq!(
+        tip(&egui::Context::default(), "Push", Command::Push),
+        format!("Push ({cmd}+Shift+K)")
+    );
+    let tabs = row_keys(&egui::Context::default(), &WINDOW_ROWS[4]);
     assert_eq!(tabs, format!("{cmd}+1…8"));
-    assert_eq!(row_keys(&WINDOW_ROWS[3]), "Ctrl+Tab / Ctrl+Shift+Tab");
+    assert_eq!(
+        row_keys(&egui::Context::default(), &WINDOW_ROWS[3]),
+        "Ctrl+Tab / Ctrl+Shift+Tab"
+    );
 }
 
 #[test]
@@ -152,7 +170,7 @@ fn pressed_with(events: Vec<Event>, scope: Scope) -> Vec<Command> {
         events,
         ..Default::default()
     };
-    ctx.run_ui(input, |ui| got = ui.input(|i| pressed(i, scope)))
+    ctx.run_ui(input, |ui| got = pressed(ui.ctx(), scope))
         .textures_delta
         .clear();
     got

@@ -44,6 +44,8 @@ pub struct SavedIdentity {
 pub struct Settings {
     /// Interface zoom (1.0 = 100 %).
     pub ui_scale: f32,
+    /// Stable action IDs mapped to zero (unbound) or up to four key strokes.
+    pub(crate) key_bindings: crate::keymap::Overrides,
     pub terminal_font: f32,
     /// Program of the default shell; empty = the platform's default.
     pub shell: String,
@@ -180,6 +182,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             ui_scale: 1.0,
+            key_bindings: Default::default(),
             terminal_font: 12.5,
             shell: String::new(),
             refs_width: DEFAULT_REFS_WIDTH,
@@ -1071,23 +1074,7 @@ impl Settings {
             Page::CustomCommands => custom_commands::page(self, ui, f),
             Page::Agents => self.agents_ui(ui, f),
             Page::Shortcuts => {
-                for (group, keys) in crate::manual::shortcut_groups() {
-                    section(ui, f, group, None, |card| {
-                        card.compact();
-                        for (combo, what) in &keys {
-                            card.full(&format!("{combo} {what} keys keyboard"), |ui| {
-                                ui.horizontal(|ui| {
-                                    let width = layout::label_width(ui);
-                                    let start = ui.cursor().left();
-                                    crate::manual::key_combo(ui, combo);
-                                    let used = ui.cursor().left() - start;
-                                    ui.add_space((width + 8.0 - used).max(8.0));
-                                    ui.label(RichText::new(*what).color(t.text_dim));
-                                });
-                            });
-                        }
-                    });
-                }
+                crate::keymap::editor::page(&mut self.key_bindings, ui);
             }
         }
     }

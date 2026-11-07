@@ -53,7 +53,7 @@ struct Step {
 
 /// What the palette's entries were made from: the active tab, and its repository (a tab's
 /// view can change to another worktree) and what that repository's entries are made from.
-type EntriesKey = (usize, Option<(PathBuf, PaletteGeneration)>);
+type EntriesKey = (usize, Option<(PathBuf, PaletteGeneration)>, String);
 
 /// What the list shown was ranked for: the query, the step, and the entries' key.
 type RankedFor = (String, bool, EntriesKey);
@@ -87,12 +87,13 @@ impl App {
                 Some(Tab::Repo(repo)) => Some((repo.path.clone(), repo.palette_generation())),
                 _ => None,
             },
+            serde_json::to_string(&self.settings.key_bindings).unwrap_or_default(),
         )
     }
 
     /// Makes the entries again when what they are made from changed, and the second step's
     /// choices with them (a branch deleted meanwhile is gone from them).
-    fn refresh_palette(&mut self, key: &EntriesKey) {
+    fn refresh_palette(&mut self, key: &EntriesKey, ctx: &egui::Context) {
         let Some(palette) = &self.palette else {
             return;
         };
@@ -103,7 +104,7 @@ impl App {
         {
             return;
         }
-        let entries = self.palette_entries();
+        let entries = self.palette_entries(ctx);
         let choices = palette.step.as_ref().map(|s| self.palette_choices(&s.pick));
         if let Some(palette) = &mut self.palette {
             palette.entries = Some((key.clone(), entries));
@@ -124,7 +125,7 @@ impl App {
             return;
         }
         let key = self.entries_key();
-        self.refresh_palette(&key);
+        self.refresh_palette(&key, ctx);
         let outcome = match &mut self.palette {
             Some(palette) => palette.show(ctx, &key, &self.palette_recent),
             None => return,
