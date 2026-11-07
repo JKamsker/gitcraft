@@ -63,6 +63,7 @@ impl RepoTab {
         self.activity = None;
         self.tour = None;
         self.cancel_draft_reads();
+        self.content_recovery.dismiss();
         self.reload_identity(ctx);
         self.load_prs(ctx);
         if self.pr_view.is_some() {

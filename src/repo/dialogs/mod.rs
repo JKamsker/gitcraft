@@ -29,6 +29,7 @@ pub enum Dialog {
         preview: Box<crate::git::drafts::RestorePreview>,
         selected: std::collections::BTreeSet<usize>,
     },
+    ContentRecovery,
     GerritReview {
         remote: String,
         head: String,
@@ -305,6 +306,10 @@ impl RepoTab {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         self.sync_draft_reader();
         let draft_reader_waiting = self.draft_reader_waiting();
+        if !matches!(self.dialog, Some(Dialog::ContentRecovery)) {
+            self.content_recovery.dismiss();
+        }
+        let content_recovery = &mut self.content_recovery;
         let Some(dialog) = &mut self.dialog else {
             return;
         };
@@ -342,6 +347,7 @@ impl RepoTab {
                 }
                 Dialog::DraftHistory { on, versions, error, index } => drafts::history(ui,on,versions,error.as_deref(),index,idle,draft_undo),
                 Dialog::DraftRecovery { preview, selected } => drafts::recovery(ui,preview,selected,idle),
+                Dialog::ContentRecovery => content_recovery.show(ui, idle),
                 Dialog::GerritReview {
                     remote,
                     head,

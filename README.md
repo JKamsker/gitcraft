@@ -644,3 +644,9 @@ Assets and their licences: [ATTRIBUTION.md](ATTRIBUTION.md).
 ## License
 
 MIT OR Apache-2.0, at your option ([LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE)).
+
+**Lost and found by content**
+
+Open **Lost and found by content…** in the palette and enter literal text you remember. It searches local reflog history, unreachable commits, dropped stash layers and unattached staged blobs, with timeline/provenance and a saved-content preview. Binary/non-UTF-8 and oversized blobs are skipped; the view explains budgets, missing data and incomplete results. No objects are downloaded.
+
+Preview recovery before deliberately creating a new branch, creating a new regular file, or returning a validated dropped stash to the stash list. Existing files/branches are refused; index and other working contents stay unchanged. A restored stash is not applied. Unattached blobs have no known original filename or staging time and recover as new files. File recovery pins the selected working root’s filesystem identity and refuses root/ancestor replacement. Remote new-file recovery needs GNU `stat`/`ln` and Git metadata on the working tree's filesystem; unsupported layouts refuse safely. Local disk-write errors can leave a clearly reported incomplete new file. Closing/replacing the view cancels further work; the newest queued reader waits until its predecessor actually returns.

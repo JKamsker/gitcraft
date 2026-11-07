@@ -234,6 +234,7 @@ impl RepoTab {
     }
     pub(super) fn dismiss_dialog(&mut self) {
         self.cancel_draft_reads();
+        self.content_recovery.dismiss();
         self.dialog = None;
     }
     pub(super) fn sync_draft_reader(&mut self) {

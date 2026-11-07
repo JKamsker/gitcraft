@@ -141,6 +141,7 @@ impl RepoTab {
             Action::CheckoutRemote(name) => self.checkout_remote(&name, ctx),
             Action::Dialog(dialog) => {
                 self.cancel_draft_reads();
+                self.content_recovery.dismiss();
                 self.dialog = Some(dialog);
             }
             Action::DeleteTag { name, target } => self.delete_tag(name, target, ctx),
@@ -292,6 +293,11 @@ impl RepoTab {
             Action::EditMessage(hash) => self.edit_message(hash, ctx),
             Action::SavePatch { hash, summary } => self.save_patch(hash, &summary, ctx),
             Action::ApplyPatch => self.apply_patch(ctx),
+            Action::OpenContentRecovery => self.open_content_recovery(),
+            Action::ContentSearch(query) => self.content_search(query, ctx),
+            Action::ContentInspect(hit, source) => self.content_inspect(hit, source, ctx),
+            Action::ContentPrepare(target) => self.content_prepare(target, ctx),
+            Action::ContentPerform(prepared) => self.content_perform(prepared, ctx),
             Action::OpenBundleExport => self.open_bundle_export(ctx),
             Action::OpenBundleImport => self.open_bundle_import(ctx),
             Action::ExportBundle { refs, base } => self.export_bundle(refs, base, ctx),

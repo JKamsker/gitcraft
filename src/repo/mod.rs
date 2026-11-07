@@ -12,6 +12,7 @@ mod ci_view;
 pub(crate) mod columns;
 mod commands;
 mod conflict;
+mod content_recovery;
 mod detail;
 mod dialogs;
 mod diff;
@@ -94,6 +95,7 @@ pub struct RepoTab {
     pub name: String,
     tx: Sender<Msg>,
     rx: Receiver<Msg>,
+    content_recovery: content_recovery::State,
 
     /// When the tab was made: its opening screen shows only if the first read takes a while.
     opened: Instant,
@@ -293,6 +295,7 @@ impl RepoTab {
             name,
             tx,
             rx,
+            content_recovery: Default::default(),
             opened: Instant::now(),
             deferred: true,
             reads: 0,

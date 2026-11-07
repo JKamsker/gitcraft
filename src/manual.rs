@@ -99,6 +99,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Settings → Commit signing sets the format, key and program git signs with, and whether it signs commits and tags by default, in your global git config; Settings → Profile can sign just for the profile instead.",
             "Double-click a commit's message in the right pane to edit it (any commit of the checked-out branch with no merges after it).",
             "Undo and redo commits, merges, rebases, resets, checkouts, branches, tags and stashes.",
+            "Lost and found by content… in the palette searches literal remembered text across local reflog history, unreachable commits, dropped stashes and unattached staged blobs. Preview provenance and raw content, then deliberately create a new branch/file or return a validated stash to its list. Existing data and the index are preserved; missing/binary/oversized data and search limits are reported, with no automatic downloads.",
         ],
     ),
     (

@@ -194,6 +194,11 @@ pub(crate) enum Action {
     },
     /// Apply a patch file, asking which.
     ApplyPatch,
+    OpenContentRecovery,
+    ContentSearch(String),
+    ContentInspect(usize, Option<usize>),
+    ContentPrepare(git::recovery::Target),
+    ContentPerform(std::sync::Arc<git::recovery::Prepared>),
     OpenBundleExport,
     OpenBundleImport,
     ExportBundle {
@@ -438,6 +443,11 @@ impl RepoTab {
                 "Earlier versions of working changes…".into(),
                 "working drafts".into(),
                 Action::EarlierVersions,
+            ),
+            (
+                "Lost and found by content…".into(),
+                "recovery search staged blobs".into(),
+                Action::OpenContentRecovery,
             ),
             (
                 "Export Git bundle…".into(),
