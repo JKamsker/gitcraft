@@ -264,7 +264,7 @@ pub(super) fn remote_registration(
         // tea0.16+ exposes this explicit-login command. Its preview contains metadata
         // only; the user confirms that this alias's URL/account is the intended server.
         format!(
-            "set +x\nset -eu\n{}tea login -- {} 2>/dev/null\nprintf '%s' 'Check the login URL/account above. Type UPLOAD to register this public key: '\nIFS= read -r answer\n[ \"$answer\" = UPLOAD ] || exit 1\npublic_file=$(mktemp \"${{TMPDIR:-/tmp}}/gitcraft-public-key.XXXXXXXX\")\ntrap 'rm -f -- \"$public_file\"' EXIT\nprintf '%s\\n' \"$public\" > \"$public_file\"\nif tea ssh-keys add --login {} --title {} -- \"$public_file\" >/dev/null 2>&1; then printf '%s\\n' 'Public key registered for the chosen tea login.'; else printf '%s\\n' 'Registration failed; check tea0.16+ and key-management permission.' >&2; exit 1; fi\n",
+            "set +x\nset -eu\nunset GITEA_SERVER_URL GITEA_SERVER_TOKEN GITEA_SERVER_USER GITEA_SERVER_PASSWORD GITEA_SERVER_OTP\n{}tea login -- {} 2>/dev/null\nprintf '%s' 'Check the login URL/account above. Type UPLOAD to register this public key: '\nIFS= read -r answer\n[ \"$answer\" = UPLOAD ] || exit 1\npublic_file=$(mktemp \"${{TMPDIR:-/tmp}}/gitcraft-public-key.XXXXXXXX\")\ntrap 'rm -f -- \"$public_file\"' EXIT\nprintf '%s\\n' \"$public\" > \"$public_file\"\nif tea ssh-keys add --login {} --title {} -- \"$public_file\" >/dev/null 2>&1; then printf '%s\\n' 'Public key registered for the chosen tea login.'; else printf '%s\\n' 'Registration failed; check tea0.16+ and key-management permission.' >&2; exit 1; fi\n",
             public_input(key),
             sh_quote(login),
             sh_quote(login),
