@@ -20,8 +20,10 @@ impl RepoTab {
     pub(super) fn open_bundle_export(&mut self, ctx: &egui::Context) {
         let id = loading(self);
         let repo = self.path.clone();
-        self.then(
+        self.then_or(
             ctx,
+            false,
+            Err,
             move || git::bundle_refs(&repo),
             move |tab, result, _| tab.bundle_export_loaded(id, result),
         );
@@ -37,8 +39,10 @@ impl RepoTab {
         let label = file.display().to_string();
         let repo = self.path.clone();
         let id = loading(self);
-        self.then(
+        self.then_or(
             ctx,
+            false,
+            Err,
             move || git::read_bundle_file(&file).and_then(|b| git::inspect_bundle(&repo, b)),
             move |tab, result, _| tab.bundle_inspect_loaded(id, label, result),
         );
@@ -166,6 +170,25 @@ impl RepoTab {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn rejected_bundle_read_releases_loading_dialog() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("unread-bundle-repository".into(), &ctx);
+        tab.tx.cancel.cancel();
+        tab.open_bundle_export(&ctx);
+        let start = Instant::now();
+        while tab.dialog.is_some() && start.elapsed() < std::time::Duration::from_secs(5) {
+            tab.poll(&ctx);
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(tab.dialog.is_none());
+        assert!(
+            tab.status
+                .as_ref()
+                .is_some_and(|(s, bad)| *bad && s.contains("cancelled"))
+        );
+    }
+
     #[test]
     fn cancelled_and_replaced_bundle_readings_are_not_current() {
         let ctx = egui::Context::default();

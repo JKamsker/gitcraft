@@ -34,6 +34,8 @@ pub(crate) struct Options {
     pub stop_ready: Option<Box<dyn Fn() -> bool + Send + Sync>>,
     pub stdout_ready: Option<&'static str>,
     pub output_limit: usize,
+    /// A smaller independent stderr cap; otherwise use the stdout capture limit.
+    pub stderr_limit: Option<usize>,
     pub drain_for: Duration,
 }
 impl Default for Options {
@@ -51,6 +53,7 @@ impl Default for Options {
             stop_ready: None,
             stdout_ready: None,
             output_limit: OUTPUT_LIMIT,
+            stderr_limit: None,
             drain_for: Duration::from_secs(1),
         }
     }
@@ -450,7 +453,7 @@ async fn execute(
                             && std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| consume(&ebuf[..n]))).is_err() {
                             stopped = Some("process progress callback panicked".into());
                         }
-                        append(&mut stderr, &ebuf[..n], options.output_limit, &mut stopped);
+                        append(&mut stderr, &ebuf[..n], options.stderr_limit.unwrap_or(options.output_limit), &mut stopped);
                     }
                     Err(e) => stopped = Some(format!("could not read process errors: {e}")),
                 }
@@ -837,6 +840,29 @@ mod tests {
                 .is_some_and(|s| s.contains("capture limit"))
         );
         assert!(out.stdout.len() <= 32768 && out.stderr.len() <= 32768);
+        Ok(())
+    }
+
+    #[test]
+    fn smaller_stderr_limit_stops_a_process_with_large_stdout_budget() -> Result<(), String> {
+        let service = Service::new(1, 2).map_err(|e| e.to_string())?;
+        let out = service
+            .submit(
+                command("flood")?,
+                Options {
+                    output_limit: 2 << 20,
+                    stderr_limit: Some(1024),
+                    ..Default::default()
+                },
+            )?
+            .wait()?;
+        assert!(
+            out.stopped
+                .as_deref()
+                .is_some_and(|s| s.contains("capture limit"))
+        );
+        assert!(out.stderr.len() <= 1024);
+        assert!(out.stdout.len() < 2 << 20);
         Ok(())
     }
 

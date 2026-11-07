@@ -102,8 +102,10 @@ impl RepoTab {
         if let Some(request) = request {
             let path = request.path.clone();
             let hash = request.hash.clone();
-            self.then(
+            self.then_or(
                 ctx,
+                false,
+                Err,
                 move || crate::git::commit_message(&path, &hash),
                 move |tab, result, _| {
                     tab.graph_messages.arrived(&tab.path, request, result);
@@ -176,6 +178,41 @@ pub(super) fn show(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn rejected_message_read_releases_pending_and_can_retry() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("unread-message-repository".into(), &ctx);
+        tab.tx.cancel.cancel();
+        for time in [0.0, 1.0] {
+            let _ = ctx.run_ui(
+                egui::RawInput {
+                    time: Some(time),
+                    ..Default::default()
+                },
+                |ui| {
+                    tab.graph_message_hover(Some("hash"), ui.ctx());
+                },
+            );
+        }
+        let start = std::time::Instant::now();
+        while tab.graph_messages.pending.is_some()
+            && start.elapsed() < std::time::Duration::from_secs(5)
+        {
+            tab.poll(&ctx);
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(tab.graph_messages.pending.is_none());
+        assert!(
+            matches!(tab.graph_messages.message(&tab.path, "hash"), Some(Err(e)) if e.contains("cancelled"))
+        );
+        tab.graph_messages.hovered(&tab.path, None, 2.0);
+        tab.graph_messages.hovered(&tab.path, Some("hash"), 3.0);
+        assert!(
+            tab.graph_messages
+                .hovered(&tab.path, Some("hash"), 4.0)
+                .is_some()
+        );
+    }
 
     #[test]
     fn hover_requests_are_debounced_serialized_hash_owned_and_bounded() {

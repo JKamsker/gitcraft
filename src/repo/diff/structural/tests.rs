@@ -807,3 +807,71 @@ fn remote_preparation_falls_back_before_starting_a_tool_or_transport() {
     let result = reader::read_sides(std::path::Path::new("ssh://example.invalid/repo"), &key);
     assert!(matches!(result, Err(e) if e.contains("local repositories")));
 }
+
+/// No process is launched: this records how both runners pass untrusted display metadata.
+#[test]
+fn syntax_supervision_protocol_is_data_only() {
+    let before = PathBuf::from("private-before");
+    let after = PathBuf::from("private-after");
+    let display = "../../user; touch unexpected";
+    let args = tool::protocol_args(display, &before, &after);
+    assert_eq!(args[0], display);
+    assert_eq!(args[1], before.as_os_str());
+    assert_eq!(args[4], after.as_os_str());
+    assert_eq!(args.len(), 7);
+}
+
+#[cfg(unix)]
+#[test]
+fn closing_tab_cancels_preparation_and_tool_and_prevents_later_effects() -> Result<(), String> {
+    for preparation in [true, false] {
+        let repo = Repo::new()?;
+        let ready = repo.0.join("ready");
+        let effect = repo.0.join("survived");
+        let script = format!(
+            "printf ready > {}; sleep 1; printf survived > {}",
+            crate::remote::sh_quote(&ready.to_string_lossy()),
+            crate::remote::sh_quote(&effect.to_string_lossy())
+        );
+        let ctx = egui::Context::default();
+        let tab = RepoTab::new_deferred(repo.0.clone(), &ctx);
+        let path = repo.0.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tab.then_or(
+            &ctx,
+            false,
+            Err,
+            move || {
+                let result = if preparation {
+                    git::syntax_read(
+                        &path,
+                        &["-c", &format!("alias.block=!{script}"), "block"],
+                        4096,
+                        Duration::from_secs(30),
+                    )
+                    .map(|_| ())
+                } else {
+                    let mut command = Command::new("sh");
+                    command.args(["-c", &script]);
+                    tool::run(command, Duration::from_secs(30)).map(|_| ())
+                };
+                let _ = tx.send(result.clone());
+                result
+            },
+            |_, _, _| {},
+        );
+        let start = Instant::now();
+        while !ready.exists() && start.elapsed() < Duration::from_secs(5) {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert!(ready.exists(), "owned child did not start");
+        drop(tab);
+        let result = rx
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?;
+        assert!(result.is_err_and(|e| e.contains("cancelled")));
+        std::thread::sleep(Duration::from_millis(1100));
+        assert!(!effect.exists(), "child survived tab cancellation");
+    }
+    Ok(())
+}

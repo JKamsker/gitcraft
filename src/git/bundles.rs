@@ -151,6 +151,9 @@ pub fn read_bundle_file(file: &Path) -> Result<Vec<u8>, String> {
 
 /// Never overwrite an existing file, even if it appeared after the save dialog.
 pub fn save_bundle_file(file: &Path, bytes: &[u8]) -> Result<(), String> {
+    if crate::tasks::cancellation().is_cancelled() {
+        return Err("cancelled".into());
+    }
     if bytes.len() > BUNDLE_LIMIT {
         return Err("Bundle exceeds 128 MiB".into());
     }

@@ -1,12 +1,10 @@
 //! Bounded, noninteractive tool execution on the repository's machine.
 
 use std::ffi::OsString;
-use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::mpsc::{Receiver, channel};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[cfg(test)]
 use base64::Engine;
@@ -210,106 +208,25 @@ impl Drop for Temp {
     }
 }
 
-/// Drain both pipes while the process runs, with a deadline even if a child holds a pipe.
-pub(super) fn run(mut command: Command, timeout: Duration) -> Result<remote::Output, String> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        command.process_group(0);
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
-    let mut child = command
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                "Install Difftastic (difft) on the repository's machine to compare syntax."
-                    .to_owned()
-            } else {
-                format!("Couldn't start Difftastic: {e}")
-            }
-        })?;
-    let stdout = capture(
-        child
-            .stdout
-            .take()
-            .ok_or("Couldn't read Difftastic's output")?,
-        MAX_OUTPUT,
-    );
-    let stderr = capture(
-        child
-            .stderr
-            .take()
-            .ok_or("Couldn't read Difftastic's error output")?,
-        MAX_ERROR,
-    );
-    let deadline = Instant::now() + timeout;
-    let result = (|| {
-        let status = loop {
-            if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
-                break status;
-            }
-            if Instant::now() >= deadline {
-                return Err("Syntax comparison took too long and was stopped.".to_owned());
-            }
-            std::thread::sleep(Duration::from_millis(10));
-        };
-        let receive = |rx: Receiver<Result<Vec<u8>, String>>| {
-            rx.recv_timeout(deadline.saturating_duration_since(Instant::now()))
-                .map_err(|_| "Syntax comparison took too long and was stopped.".to_owned())?
-        };
-        Ok(remote::Output {
-            code: status.code().unwrap_or(-1),
-            stdout: receive(stdout)?,
-            stderr: receive(stderr)?,
-        })
-    })();
-    if result.is_err() {
-        stop(&mut child);
-    }
-    result
-}
-
-fn capture(mut pipe: impl Read + Send + 'static, max: usize) -> Receiver<Result<Vec<u8>, String>> {
-    let (tx, rx) = channel();
-    std::thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let result = pipe
-            .by_ref()
-            .take(max as u64 + 1)
-            .read_to_end(&mut bytes)
-            .map_err(|e| e.to_string())
-            .and_then(|_| {
-                if bytes.len() > max {
-                    Err("Difftastic's output was too large to show.".to_owned())
-                } else {
-                    Ok(bytes)
-                }
-            });
-        let _ = tx.send(result);
-    });
-    rx
-}
-
-fn stop(child: &mut Child) {
-    #[cfg(unix)]
-    {
-        let _ = Command::new("kill")
-            .args(["-KILL", "--", &format!("-{}", child.id())])
-            .output();
-    }
-    #[cfg(windows)]
-    {
-        let _ = Command::new("taskkill")
-            .args(["/F", "/T", "/PID", &child.id().to_string()])
-            .output();
-    }
-    let _ = child.kill();
-    let _ = child.wait();
+/// Use the shared subprocess supervisor and inherit the tab's cancellation token.
+pub(super) fn run(command: Command, timeout: Duration) -> Result<remote::Output, String> {
+    let out = crate::processes::run(
+        command,
+        crate::processes::Options {
+            background: true,
+            timeout: Some(timeout),
+            output_limit: MAX_OUTPUT,
+            stderr_limit: Some(MAX_ERROR),
+            ..Default::default()
+        },
+    )
+    .map_err(|e| {
+        format!("Couldn't start Difftastic. Install Difftastic (difft) to compare syntax: {e}")
+    })?
+    .complete()?;
+    Ok(remote::Output {
+        code: out.status.code().unwrap_or(-1),
+        stdout: out.stdout,
+        stderr: out.stderr,
+    })
 }
