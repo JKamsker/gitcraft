@@ -150,7 +150,7 @@ fn panel(ui: &mut egui::Ui, executable: &Path, scope: Scope) {
         )
         .clicked();
     if state.pending {
-        ui.spinner();
+        ui.add(crate::spinner::Spinner::new());
         ui.label("Writing the listed Git settings…");
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_millis(50));

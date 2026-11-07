@@ -166,11 +166,11 @@ impl ToolApp {
         });
         ui.label("Read-only input snapshots · 2 MiB per file · no repository actions");
         if self.loading.is_some() {
-            ui.spinner();
+            ui.add(crate::spinner::Spinner::new());
             ui.label("Reading file snapshots…");
         }
         if self.saving.is_some() {
-            ui.spinner();
+            ui.add(crate::spinner::Spinner::new());
             ui.label("Finishing the guarded save. Closing waits for its result.");
         }
         if let Some(error) = &self.error {

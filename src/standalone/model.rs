@@ -6,7 +6,7 @@ use super::{
 use crate::repo::{conflict::ConflictEditor, file_comparison::ReadOnlyComparison};
 
 pub(super) enum Loaded {
-    Diff(ReadOnlyComparison),
+    Diff(Box<ReadOnlyComparison>),
     Merge(Box<Merge>),
 }
 pub(super) struct Merge {
@@ -29,7 +29,7 @@ pub(super) fn load(invocation: &Invocation, active: &dyn Fn() -> bool) -> Result
                 [a.stamp.is_some(), b.stamp.is_some()],
                 active,
             )
-            .map(Loaded::Diff)
+            .map(|comparison| Loaded::Diff(Box::new(comparison)))
         }
         Invocation::Merge(paths) => {
             let inputs = paths[..3]
