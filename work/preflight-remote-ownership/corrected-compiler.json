@@ -1,0 +1,29 @@
+{
+  "status": "COMPILED ONLY; ninepure recordingtests next; no protocol/runtimeyet",
+  "compiled_source_commit": "e5d1c100f6f20918f3f7c3564d28234cc64a3133",
+  "application_source_tree": "b8a1acb618c8bf3b02c67f1c9b0d541ce4c0f0cc",
+  "static_pass": "e5d1c100f6f20918f3f7c3564d28234cc64a3133 reviewba19e714",
+  "binary": "/workspace/work/push-preflight/target/debug/deps/gitcraft-98b7c97eceab1e2d",
+  "binary_sha256": "3fb0dc166388d1f0504bb18861a0df7ba44405a45ff9847882b0203b0286e67c",
+  "private_target": "/workspace/work/push-preflight/target",
+  "incremental": "0",
+  "jobs": 2,
+  "checks": "fmt/strictClippyalltargets/no-runPASS",
+  "log_sha256": {
+    "corrected-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "corrected-clippy.log": "17ca0eef0ed728d6809ce6099ed143de06572e6b2981cda58e8e543868a704d8",
+    "corrected-compiler.log": "b572e38edc2481075f969a998f1e4117d9a0b044e84cd2c8720254765e63697e"
+  },
+  "tests": [
+    "remote::ownership::tests::recording_cancelled_queued_work_cannot_dispatch",
+    "remote::ownership::tests::recording_cancellation_after_dispatch_never_claims_stopped",
+    "remote::ownership::tests::recording_only_pre_dispatch_refusal_can_retire_ownership",
+    "remote::ownership::tests::recording_owned_failures_never_select_the_legacy_stop_controller",
+    "remote::ownership::tests::recording_partial_and_flush_write_failures_are_unknown_without_retry",
+    "remote::ownership::tests::recording_scope_retains_context_and_ticket_for_the_whole_owned_wait",
+    "remote::ownership::tests::recording_terminal_receipt_is_distinct_from_transport_uncertainty",
+    "push_preflight::fix::remote_repair::tests::recording_receipts_require_complete_schema_nonce_code_kind_and_oid",
+    "push_preflight::fix::remote_repair::tests::recording_registry_retirement_cannot_erase_a_replacement_owner"
+  ],
+  "authorization": "Root standingsequencerelease9recordings thenreviewcoveredownedtransportfixtures; publishminimalcut; nofurtherapprovalneededbetweenpassinggates; noCI"
+}
