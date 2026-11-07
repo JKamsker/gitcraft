@@ -69,7 +69,7 @@ pub struct Settings {
     pub last_resized: Option<crate::repo::columns::Bar>,
     /// Legacy cascading-resize offset; new divider drags clear it.
     pub column_push: f32,
-    /// Description space exchanged by the most recent manual column gesture.
+    /// Description space and sibling compression retained by the most recent column gesture.
     pub description_space: crate::repo::columns::DescriptionSpace,
     pub show_author: bool,
     /// How long ago each commit was made ("3 hours ago").
