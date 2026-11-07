@@ -387,13 +387,18 @@ pub trait Pages: Sync {
     ) -> Option<Box<dyn Target>>;
 }
 
-/// The forge hosting `origin` (or the first remote). git's config can say which it is, for a
+/// The forge hosting usable `origin` (or the first usable remote). git's config can say which it is, for a
 /// server whose name doesn't tell: `gitcraft.forge` for one repository, `gitcraft.<host>.forge`
 /// for every repository on that host (`git config --global gitcraft.git.example.org.forge
 /// forgejo`). Otherwise the host's name decides, then the servers `tea` is logged in to, then
 /// the remote's whole URL.
 pub fn detect(repo: &Path, remotes: &[Remote]) -> Option<Hosting> {
-    detect_with(remotes, &gitcraft_config(repo), &gitea::tea_servers())
+    let hosts = detect_remotes(repo, remotes);
+    hosts
+        .iter()
+        .find(|(name, _)| name == "origin")
+        .or_else(|| hosts.first())
+        .map(|(_, hosting)| hosting.clone())
 }
 
 /// [`detect`], given git's config and the servers `tea` knows as `(host, web address)`.
@@ -402,10 +407,29 @@ fn detect_with(
     config: &HashMap<String, String>,
     tea: &[(String, String)],
 ) -> Option<Hosting> {
-    let remote = remotes
+    remotes
         .iter()
         .find(|r| r.name == "origin")
-        .or_else(|| remotes.first())?;
+        .and_then(|r| detect_remote(r, config, tea))
+        .or_else(|| remotes.iter().find_map(|r| detect_remote(r, config, tea)))
+}
+
+/// All usable forge remotes, detected locally even while offline. A local/unrecognized
+/// `origin` must not prevent another usable remote from being selected.
+pub(crate) fn detect_remotes(repo: &Path, remotes: &[Remote]) -> Vec<(String, Hosting)> {
+    let config = gitcraft_config(repo);
+    let tea = gitea::tea_servers();
+    remotes
+        .iter()
+        .filter_map(|remote| Some((remote.name.clone(), detect_remote(remote, &config, &tea)?)))
+        .collect()
+}
+
+fn detect_remote(
+    remote: &Remote,
+    config: &HashMap<String, String>,
+    tea: &[(String, String)],
+) -> Option<Hosting> {
     let tea_web = |host: &str| {
         tea.iter()
             .find(|(h, _)| h == host)
@@ -772,6 +796,26 @@ mod tests {
             forge(&[r("origin", "https://github.example.com/a/b")]),
             Some(Forge::GitHub)
         );
+    }
+
+    #[test]
+    fn unusable_origin_falls_back_to_first_usable_forge_remote() {
+        let remotes = [
+            Remote {
+                name: "disk".into(),
+                url: "/srv/repo".into(),
+            },
+            Remote {
+                name: "origin".into(),
+                url: "https://unknown.example/owner/repo".into(),
+            },
+            Remote {
+                name: "fork".into(),
+                url: "https://github.com/JKamsker/gitcraft".into(),
+            },
+        ];
+        let hosting = detect_with(&remotes, &HashMap::new(), &[]);
+        assert_eq!(hosting.map(|h| h.path), Some("JKamsker/gitcraft".into()));
     }
 
     #[test]

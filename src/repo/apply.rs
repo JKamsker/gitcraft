@@ -173,6 +173,7 @@ impl RepoTab {
                     self.offer_hint(hint, ctx);
                 }
             }
+            Action::PrimaryForge(remote) => self.set_primary_forge(remote, ctx),
             Action::GraphOrder(order) => self.set_log_order(order, ctx),
             Action::OpenBranches(section) => {
                 let mut settings = Settings::get(ctx);

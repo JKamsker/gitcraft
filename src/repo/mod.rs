@@ -47,6 +47,7 @@ mod find;
 mod fold;
 mod folding;
 mod forge_link;
+mod forge_selection;
 pub(crate) mod forks;
 mod ghost;
 mod graph_order;
@@ -226,8 +227,13 @@ pub struct RepoTab {
     /// Its Unity project, if it has one.
     unity: unity::UnityState,
     identity: Identity,
-    /// Where `origin` is hosted, when it's on a forge gitcraft knows.
+    /// Where the selected primary forge remote is hosted.
     hosting: Option<Hosting>,
+    forge_selection: forge_selection::Selection,
+    forge_remotes: Vec<(String, Hosting)>,
+    forge_generation: u64,
+    /// The selection lifetime when the actual hosting repository last changed.
+    forge_repository_generation: u64,
     prs: Vec<PullRequest>,
     pr_error: Option<String>,
     prs_loaded: Option<Instant>,
@@ -497,6 +503,8 @@ impl RepoTab {
         let jobs = crate::tasks::Scope::default();
         let tx = messages::JobSender {
             sender,
+            forge_generation: None,
+            forge_operation: false,
             cancel: jobs.0.clone(),
             repo: messages::mutation_key(&path),
         };
@@ -547,6 +555,10 @@ impl RepoTab {
             unity: Default::default(),
             identity: Identity::default(),
             hosting: None,
+            forge_selection: Default::default(),
+            forge_remotes: Vec::new(),
+            forge_generation: 0,
+            forge_repository_generation: 0,
             prs: Vec::new(),
             pr_error: None,
             prs_loaded: None,
@@ -726,7 +738,7 @@ impl RepoTab {
         self.queued.push(action);
     }
 
-    /// The forge `origin` is on.
+    /// The selected primary remote's forge.
     pub(super) fn forge(&self) -> Option<Forge> {
         self.hosting.as_ref().map(|h| h.forge)
     }

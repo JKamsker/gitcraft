@@ -63,6 +63,23 @@ impl RepoTab {
     /// branches share its tip and the ordinary ordering would put it behind `+N`.
     fn graph_badges(&self, commit: &git::Commit) -> Vec<Badge> {
         let mut badges = badges(&commit.refs, &self.refs);
+        for badge in &mut badges {
+            if badge.kind != BadgeKind::Branch {
+                continue;
+            }
+            badge.remotes.retain(|remote| {
+                self.visibility
+                    .shows(&super::branch_visibility::remote_ref(&format!(
+                        "{remote}/{}",
+                        badge.label
+                    )))
+            });
+            badge.local &= badge.head
+                || self
+                    .visibility
+                    .shows(&super::branch_visibility::local_ref(&badge.label));
+        }
+        badges.retain(|b| b.kind != BadgeKind::Branch || b.local || !b.remotes.is_empty());
         if let Some(compare) = &self.compare
             && compare.target.as_deref() == Some(commit.hash.as_str())
         {
@@ -389,7 +406,8 @@ impl RepoTab {
         let (old, new) = (a.max(b), a.min(b));
         let end = |row: usize| {
             let c = self.commits.get(row)?;
-            let label = badges(&c.refs, &self.refs)
+            let label = self
+                .graph_badges(c)
                 .into_iter()
                 .find(|b| b.kind != BadgeKind::DetachedHead)
                 .map(|b| b.label)
@@ -742,5 +760,35 @@ mod tests {
         frame(&mut tab, Vec::new());
         assert!(opened, "the right-click opened no menu");
         assert!(!egui::Popup::is_any_open(&ctx));
+    }
+}
+
+#[cfg(test)]
+mod remote_visibility_tests {
+    use super::*;
+    #[test]
+    fn hidden_remote_pills_disappear_but_local_head_is_kept() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/remote-pills".into(), &ctx);
+        tab.refs.current = Some("main".into());
+        tab.visibility.toggle_remote_graph("origin");
+        tab.visibility.toggle_remote_graph("fork");
+        let commit = git::Commit {
+            refs: [
+                "HEAD -> main",
+                "refs/remotes/origin/main",
+                "refs/remotes/fork/topic",
+            ]
+            .map(String::from)
+            .to_vec(),
+            ..Default::default()
+        };
+        let badges = tab.graph_badges(&commit);
+        assert_eq!(badges.len(), 1);
+        assert_eq!(badges[0].label, "main");
+        assert!(badges[0].head && badges[0].local);
+        assert!(badges[0].remotes.is_empty());
+        tab.visibility.toggle_solo("refs/remotes/fork/topic");
+        assert_eq!(tab.graph_badges(&commit).len(), 2);
     }
 }

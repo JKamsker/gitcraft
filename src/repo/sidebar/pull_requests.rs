@@ -199,7 +199,11 @@ impl RepoTab {
                     } else if let Some(b) = self.pr_remote_branch(pr) {
                         acts.push(Action::CheckoutRemote(b.name.clone()));
                     } else {
-                        let remote = self.default_remote().unwrap_or_else(|| "origin".to_owned());
+                        let remote = self
+                            .primary_forge_remote()
+                            .map(str::to_owned)
+                            .or_else(|| self.default_remote())
+                            .unwrap_or_else(|| "origin".to_owned());
                         acts.push(Action::CheckoutRemote(format!("{remote}/{}", pr.branch)));
                     }
                 }
@@ -231,7 +235,10 @@ impl RepoTab {
 
     /// The remote-tracking branch named `branch` on any remote, at `sha` if one is.
     fn remote_branch_of(&self, branch: &str, sha: &str) -> Option<&Branch> {
-        let default = self.default_remote();
+        let default = self
+            .primary_forge_remote()
+            .map(str::to_owned)
+            .or_else(|| self.default_remote());
         let found: Vec<(&str, &Branch)> = self
             .remotes
             .iter()
@@ -418,7 +425,11 @@ impl RepoTab {
                     Some(Forge::GitLab) => format!("refs/merge-requests/{number}/head"),
                     _ => format!("refs/pull/{number}/head"),
                 };
-                let from = self.default_remote().unwrap_or_else(|| "origin".to_owned());
+                let from = self
+                    .primary_forge_remote()
+                    .map(str::to_owned)
+                    .or_else(|| self.default_remote())
+                    .unwrap_or_else(|| "origin".to_owned());
                 // Not forced: a `pr-N` of the user's own that went elsewhere is refused by git
                 // rather than overwritten.
                 ops.push(strings(&[

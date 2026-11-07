@@ -2,7 +2,7 @@
 
 use egui::{Response, Ui};
 
-use super::badge::{BadgeKind, badges};
+use super::badge::BadgeKind;
 use super::compare_items;
 use crate::forge::links::Target;
 use crate::git;
@@ -78,7 +78,7 @@ impl RepoTab {
         let is_head = hash == self.refs.head;
         // The right-clicked branch, else the commit's first branch, for copying.
         let branch_name = pill.clone().or_else(|| {
-            badges(&commit.refs, &self.refs)
+            self.graph_badges(commit)
                 .into_iter()
                 .find(|b| b.kind == BadgeKind::Branch)
                 .map(|b| b.git_ref())

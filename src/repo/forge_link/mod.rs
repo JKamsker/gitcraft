@@ -95,7 +95,8 @@ impl LinkMenu {
 
 impl RepoTab {
     /// The menu of links for what is on `branch` (the checked-out one when `None`): to the
-    /// remote it tracks, else `origin`, else a choice. `None` when no remote is on a forge.
+    /// primary forge remote, else the remote it tracks, `origin`, or a choice.
+    /// Explicit branch links still point to their branch's own remote.
     pub(in crate::repo) fn link_menu(&self, branch: Option<&str>) -> Option<LinkMenu> {
         // A stash is never pushed: what it holds has no page on any forge.
         if self.stash_view.is_some() {
@@ -103,7 +104,10 @@ impl RepoTab {
         }
         let branch = branch.or(self.refs.current.as_deref());
         let tracked = branch.and_then(|name| self.tracked_remote(name));
-        self.link_menu_of(links::candidates(&self.remotes, tracked.as_deref()))
+        self.link_menu_of(links::candidates(
+            &self.remotes,
+            self.primary_forge_remote().or(tracked.as_deref()),
+        ))
     }
 
     /// The menu of links to the branch `name` (local, or `remote/branch`), and what the remote
@@ -112,8 +116,13 @@ impl RepoTab {
         let (remotes, on_remote) = match self.refs.local.iter().find(|b| b.name == name) {
             Some(b) => {
                 let tracked = links::upstream_remote(&b.upstream, &self.remotes);
-                let remotes =
-                    links::candidates(&self.remotes, tracked.as_ref().map(|(r, _)| r.as_str()));
+                let remotes = links::candidates(
+                    &self.remotes,
+                    tracked
+                        .as_ref()
+                        .map(|(r, _)| r.as_str())
+                        .or(self.primary_forge_remote()),
+                );
                 // The upstream's name is only the branch's name on the remote it is on.
                 let on_remote = match (&tracked, remotes.as_slice()) {
                     (Some((remote, branch)), [one]) if one == remote => branch.clone(),
@@ -167,7 +176,7 @@ impl RepoTab {
             remote,
             open,
         } = request;
-        self.then(
+        self.forge_then(
             ctx,
             move || links::resolve(&path, &remotes, &remote, &target),
             move |tab, result, ctx| tab.status = Some(deliver(result, open, ctx)),

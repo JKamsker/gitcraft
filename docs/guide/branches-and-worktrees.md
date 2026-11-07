@@ -49,6 +49,12 @@ The left panel: local and remote branches, stacked branches, worktrees, submodul
 ## Remotes
 
 - Remotes: add, edit (name and URL), fetch one, remove; their branches below each.
+  Right-click a remote, or use its actions button, to select the primary forge (marked
+  with a star), or hide its branches in the sidebar or graph. Sidebar hiding keeps the
+  remote header and a _Show remote branches in sidebar_ action. Graph hiding removes
+  history reachable only from that remote; local HEAD and its ancestry stay visible.
+  Individual _Show_ and _Solo_ still work within hidden graph groups. These independent
+  preferences are kept per repository; _Show all_ restores graph visibility.
 
 ## Worktrees
 

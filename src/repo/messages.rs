@@ -17,8 +17,20 @@ use crate::settings::Settings;
 #[derive(Clone)]
 pub(super) struct JobSender {
     pub(super) sender: Sender<Msg>,
+    pub(super) forge_generation: Option<u64>,
+    pub(super) forge_operation: bool,
     pub(super) cancel: crate::tasks::Cancellation,
     pub(super) repo: std::path::PathBuf,
+}
+
+impl JobSender {
+    pub(super) fn send(&self, msg: Msg) -> Result<(), Box<std::sync::mpsc::SendError<Msg>>> {
+        let msg = match self.forge_generation {
+            Some(generation) => Msg::ForgeResult(generation, self.forge_operation, Box::new(msg)),
+            None => msg,
+        };
+        self.sender.send(msg).map_err(Box::new)
+    }
 }
 
 impl std::ops::Deref for JobSender {
@@ -45,6 +57,8 @@ pub(super) type Continuation = Box<dyn FnOnce(&mut RepoTab, &egui::Context) + Se
 
 /// Results coming back from background git calls.
 pub(super) enum Msg {
+    /// A hosting job belongs to one selection lifetime, including switching away and back.
+    ForgeResult(u64, bool, Box<Msg>),
     Loaded(Result<Box<Loaded>, String>),
     /// The submodules, from the read numbered so (see `RepoTab::reads`).
     Submodules(u64, Vec<git::Submodule>),
@@ -365,6 +379,7 @@ impl RepoTab {
 
     fn poll_as(&mut self, ctx: &egui::Context, shown: bool) {
         self.shown = shown;
+        self.sync_forge_selection(ctx);
         if let Some(poller) = &mut self.poller {
             poller.tick(ctx);
         }
@@ -443,6 +458,24 @@ impl RepoTab {
 
     pub(super) fn handle(&mut self, msg: Msg, ctx: &egui::Context) {
         match msg {
+            Msg::ForgeResult(generation, operation, msg) => {
+                // A review sent before a same-repository rename still has to settle its
+                // posting editor. It is safe only if no repository move occurred since it
+                // was sent; A→B→A cannot revive that old review. All reads stay invalidated.
+                let same_review = matches!(msg.as_ref(), Msg::PrPosted { hosting, .. }
+                    if generation >= self.forge_repository_generation
+                        && super::load::same_repository(Some(hosting.as_ref()), self.hosting.as_ref()));
+                if generation == self.forge_generation || same_review {
+                    self.handle(*msg, ctx);
+                } else if operation {
+                    // The mutation used its captured old target. Let the busy slot go, but
+                    // never run old continuations (or retries) against the new hosting.
+                    self.busy_op = None;
+                    self.op_started = None;
+                    self.status = Some(("The operation on the previous primary forge finished; refresh that repository to check its result".into(), true));
+                    self.reload(ctx);
+                }
+            }
             Msg::Loaded(result) => self.loaded(result, ctx),
             Msg::Submodules(read, list) => {
                 if Self::newer(read, &mut self.submodules_read) {

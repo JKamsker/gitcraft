@@ -435,7 +435,7 @@ impl RepoTab {
                             (
                                 summary.map(|c| c.summary.clone()).unwrap_or_default(),
                                 String::new(),
-                                self.default_base(),
+                                self.issue_base().name,
                             )
                         });
                     acts.push(Action::Dialog(Dialog::create_pr(

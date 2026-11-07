@@ -42,7 +42,7 @@ impl RepoTab {
 
         // The remote's base is what the pull request goes into; a local main can have
         // unpublished commits. Pages below replace both endpoints with the forge's OIDs.
-        let remote = self.default_remote();
+        let remote = self.primary_forge_remote().map(str::to_owned);
         let base = remote
             .as_ref()
             .and_then(|remote| {
@@ -80,7 +80,7 @@ impl RepoTab {
             self.remotes.clone(),
             self.credentials.clone(),
         );
-        self.then(
+        self.forge_then(
             ctx,
             move || match hosting.forge.provider().pages() {
                 Some(pages) => {
