@@ -197,7 +197,12 @@ impl RepoTab {
                 resp.clone().on_hover_ui(|ui| {
                     match self.graph_messages.message(&self.path, &commit.hash) {
                         Some(Ok(message)) => {
-                            ui.label(message.as_str());
+                            egui::ScrollArea::vertical()
+                                .id_salt(("full-commit-message", &commit.hash))
+                                .max_height((ui.ctx().content_rect().height() * 0.6).max(60.0))
+                                .show(ui, |ui| {
+                                    ui.label(message.as_str());
+                                });
                         }
                         Some(Err(error)) => {
                             ui.label(error);

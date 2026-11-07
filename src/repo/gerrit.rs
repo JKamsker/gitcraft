@@ -316,6 +316,7 @@ mod integration_tests {
             tab.gerrit.is_some(),
             "status={:?}, error={:?}, loading={}, head={}, remotes={:?}",
             tab.status,
+            tab.load_error,
             tab.loading,
             tab.refs.head,
             tab.remotes

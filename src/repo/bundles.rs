@@ -23,29 +23,7 @@ impl RepoTab {
         self.then(
             ctx,
             move || git::bundle_refs(&repo),
-            move |tab, result, _| {
-                if !waiting(tab, id) {
-                    return;
-                }
-                match result {
-                    Ok(refs) => {
-                        let selected = refs
-                            .iter()
-                            .filter(|r| r.name == "HEAD")
-                            .map(|r| r.name.clone())
-                            .collect::<BTreeSet<_>>();
-                        tab.dialog = Some(Dialog::BundleExport {
-                            refs,
-                            selected,
-                            base: String::new(),
-                        });
-                    }
-                    Err(e) => {
-                        tab.dialog = None;
-                        tab.status = Some((format!("Read bundle refs: {e}"), true));
-                    }
-                }
-            },
+            move |tab, result, _| tab.bundle_export_loaded(id, result),
         );
     }
     pub(super) fn open_bundle_inspect(&mut self, ctx: &egui::Context) {
@@ -62,24 +40,53 @@ impl RepoTab {
         self.then(
             ctx,
             move || git::read_bundle_file(&file).and_then(|b| git::inspect_bundle(&repo, b)),
-            move |tab, result, _| {
-                if !waiting(tab, id) {
-                    return;
-                }
-                match result {
-                    Ok(preview) => {
-                        tab.dialog = Some(Dialog::BundleIncoming {
-                            label,
-                            preview: Box::new(preview),
-                        });
-                    }
-                    Err(e) => {
-                        tab.dialog = None;
-                        tab.status = Some((format!("Inspect bundle: {e}"), true));
-                    }
-                }
-            },
+            move |tab, result, _| tab.bundle_inspect_loaded(id, label, result),
         );
+    }
+    fn bundle_export_loaded(&mut self, id: u64, result: Result<Vec<git::BundleRef>, String>) {
+        if !waiting(self, id) {
+            return;
+        }
+        match result {
+            Ok(refs) => {
+                let selected = refs
+                    .iter()
+                    .filter(|r| r.name == "HEAD")
+                    .map(|r| r.name.clone())
+                    .collect::<BTreeSet<_>>();
+                self.dialog = Some(Dialog::BundleExport {
+                    refs,
+                    selected,
+                    base: String::new(),
+                });
+            }
+            Err(e) => {
+                self.dialog = None;
+                self.status = Some((format!("Read bundle refs: {e}"), true));
+            }
+        }
+    }
+    fn bundle_inspect_loaded(
+        &mut self,
+        id: u64,
+        label: String,
+        result: Result<git::BundlePreview, String>,
+    ) {
+        if !waiting(self, id) {
+            return;
+        }
+        match result {
+            Ok(preview) => {
+                self.dialog = Some(Dialog::BundleIncoming {
+                    label,
+                    preview: Box::new(preview),
+                });
+            }
+            Err(e) => {
+                self.dialog = None;
+                self.status = Some((format!("Inspect bundle: {e}"), true));
+            }
+        }
     }
     pub(super) fn export_bundle(
         &mut self,
@@ -162,5 +169,29 @@ mod tests {
         let second = loading(&mut tab);
         assert!(waiting(&tab, second));
         assert!(!waiting(&tab, first));
+        for replaced in [false, true] {
+            tab.dialog = if replaced {
+                Some(Dialog::BundleLoading(second))
+            } else {
+                None
+            };
+            tab.bundle_export_loaded(first, Ok(Vec::new()));
+            tab.bundle_inspect_loaded(
+                first,
+                "stale.bundle".into(),
+                Ok(git::BundlePreview {
+                    refs: Vec::new(),
+                    prerequisites: Vec::new(),
+                    verification_error: None,
+                }),
+            );
+            tab.bundle_export_loaded(first, Err("obsolete export".into()));
+            tab.bundle_inspect_loaded(first, "stale.bundle".into(), Err("obsolete inspect".into()));
+            assert_eq!(waiting(&tab, second), replaced);
+            assert!(tab.status.is_none());
+            if !replaced {
+                assert!(tab.dialog.is_none());
+            }
+        }
     }
 }
