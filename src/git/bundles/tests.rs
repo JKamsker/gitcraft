@@ -619,3 +619,64 @@ fn unicode_whitespace_refs_and_legacy_prerequisite_subjects_are_preserved() -> R
     assert!(header(&bad_ref).is_err());
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn partial_clone_export_never_fetches_promised_blobs() -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new()?;
+    let source = f.repo("offline-export-source")?;
+    run(Some(&source), &["config", "uploadpack.allowFilter", "true"])?;
+    f.commit(&source, "promised blob")?;
+    let dest = f.0.join("offline-export-dest");
+    run(
+        None,
+        &[
+            "-c",
+            "protocol.file.allow=always",
+            "clone",
+            "--no-local",
+            "--no-checkout",
+            "--filter=blob:none",
+            "--",
+            source.to_str().ok_or("source")?,
+            dest.to_str().ok_or("destination")?,
+        ],
+    )?;
+    run(Some(&dest), &["config", "protocol.file.allow", "always"])?;
+    let marker = f.0.join("export-fetch-ran");
+    let helper = f.0.join("export-upload-pack");
+    std::fs::write(
+        &helper,
+        format!(
+            "#!/bin/sh\nprintf fetch >> {}\nexec git-upload-pack \"$@\"\n",
+            remote::sh_quote(marker.to_str().ok_or("marker")?)
+        ),
+    )
+    .map_err(|e| e.to_string())?;
+    std::fs::set_permissions(&helper, std::fs::Permissions::from_mode(0o700))
+        .map_err(|e| e.to_string())?;
+    run(
+        Some(&dest),
+        &[
+            "config",
+            "remote.origin.uploadpack",
+            helper.to_str().ok_or("helper")?,
+        ],
+    )?;
+    let before = run(Some(&dest), &["count-objects", "-v"])?;
+    let selected = head(&dest)?;
+    assert!(export_bundle(&dest, std::slice::from_ref(&selected), None).is_err());
+    assert!(!marker.exists());
+    assert_eq!(run(Some(&dest), &["count-objects", "-v"])?, before);
+    let output = f.0.join("positive-control.bundle");
+    run(
+        Some(&dest),
+        &["bundle", "create", output.to_str().ok_or("output")?, "HEAD"],
+    )?;
+    assert!(
+        marker.exists(),
+        "ordinary Git must fetch this same promised blob"
+    );
+    Ok(())
+}

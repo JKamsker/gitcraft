@@ -374,7 +374,7 @@ fn header(bytes: &[u8]) -> Result<(Vec<BundleRef>, Vec<BundleRef>), String> {
         }
         let (prerequisite, line) = match line.strip_prefix('-') {
             Some(rest) => (true, rest),
-            None => (false, line),
+            None => (false, line.as_ref()),
         };
         let (oid, name) = match line.split_once(' ') {
             Some(parts) => parts,

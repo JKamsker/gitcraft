@@ -202,4 +202,47 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn bundle_completion_records_outcomes_and_resumes_or_drops_queued_operations() {
+        use crate::repo::activity::Outcome;
+        use crate::repo::running::Waiter;
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/bundle-queue".into(), &ctx);
+        tab.gerrit = Some(crate::gerrit::Server {
+            remote: "origin".into(),
+            web: "https://gerrit.example.invalid".into(),
+            project: "app".into(),
+            web_warning: None,
+        });
+        tab.refs.head = "a".repeat(40);
+        tab.waiting.push_back(Waiter::Push);
+        tab.busy_op = Some("Export bundle".into());
+        tab.op_started = Some(Instant::now());
+        tab.bundle_done("Export bundle".into(), Ok(()), Refresh::Status, &ctx);
+        assert!(tab.waiting.is_empty());
+        assert!(matches!(tab.dialog, Some(Dialog::GerritReview { .. })));
+        assert!(
+            tab.activity
+                .last()
+                .is_some_and(|e| e.label == "Export bundle" && e.outcome == Outcome::Done)
+        );
+        tab.dialog = None;
+        tab.waiting.push_back(Waiter::Push);
+        tab.bundle_done(
+            "Export bundle".into(),
+            Err("missing object".into()),
+            Refresh::Status,
+            &ctx,
+        );
+        assert!(tab.waiting.is_empty());
+        assert!(tab.dialog.is_none());
+        assert!(tab.activity.last().is_some_and(
+            |e| matches!(&e.outcome, Outcome::Failed(message) if message == "missing object")
+        ));
+        assert!(
+            tab.status
+                .as_ref()
+                .is_some_and(|(message, failed)| *failed && message.contains("Push"))
+        );
+    }
 }
