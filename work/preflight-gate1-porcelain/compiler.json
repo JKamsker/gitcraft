@@ -1,0 +1,19 @@
+{
+  "compiled_source_commit": "069cbccae4dc9a0f04e7e47fa6360fc9c56dbcbd",
+  "application_source_tree": "d7e71fc9ff630b17ea4ed54f9552fafc84dd3853",
+  "production_static_pass": "ffc2851a9e5077443d0ec9a4f32654886e3435de",
+  "transaction_rs_sha256": "198e08476c1091d1a452926936d02b5ea4ac5346a7237bd1467ea08aa8df2f65",
+  "production_prefix_sha256": "5cc97a803f8f86afb71c1097d14c5f80f76cb13b14cafdb80b3b1e2989c0704f",
+  "binary": "/workspace/work/push-preflight/target/debug/deps/gitcraft-31822f5b138c0fe8",
+  "binary_sha256": "69fff01579bbc05c83e9417fd442c4e8a7da969502ed8dc25c4147b77e98d973",
+  "private_target": "/workspace/work/push-preflight/target",
+  "incremental": "0",
+  "jobs": 2,
+  "checks": "fmtcheck/strictClippyalltargets/no-runPASS; compilerworktree /workspace/work/push-preflight",
+  "log_sha256": {
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy.log": "4dfea041658c7197f759fc4bed6c2807eb1529837d77d4c05d1b4337c4a63d9e",
+    "compiler.log": "20872376edef5aacbfd6425f552a690cf8d9908e0a3878a41a24bd994870f4ac"
+  },
+  "runtime": "NOT EXECUTED; only6recordingsauthorizednow"
+}
