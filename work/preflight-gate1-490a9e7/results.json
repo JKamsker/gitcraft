@@ -1,0 +1,50 @@
+{
+  "gate": "Gate1 ONLY recording/synthetic checks",
+  "execution_plan_commit": "8a4ce5a4087bc3ed8dd3d03c4535407c330b4d3c",
+  "compiled_source_commit": "490a9e7c3b579e24718ffdcb446b86c6f1b2c66f",
+  "application_source_tree": "8526dee9183d9709ff1c0e7e50ef13e9aaaf8b53",
+  "binary_sha256": "aec397e715249612815e45011f11fa56427ce059a56a07bce9877d0d1e34e36c",
+  "tests": [
+    {
+      "test": "push_preflight::fix::transaction::tests::rotated_split_index_dependency_is_resolved_from_the_saved_index",
+      "exit_code": 0,
+      "passed_exactly_one": true,
+      "log": "01-rotated_split_index_dependency_is_resolved_from_the_saved_index.log",
+      "sha256": "c6f0418869f2d3ab7bd7a33a45b15f6f036f19a2148756287d045a4b48715fb2"
+    },
+    {
+      "test": "push_preflight::fix::transaction::tests::synthetic_capability_versions_refuse_before_user_dispatch",
+      "exit_code": 0,
+      "passed_exactly_one": true,
+      "log": "02-synthetic_capability_versions_refuse_before_user_dispatch.log",
+      "sha256": "59d1d17ec569760525b57e2974890b1ca00e4fed7f4b9faad7a91e5684f1634f"
+    },
+    {
+      "test": "push_preflight::fix::transaction::tests::missing_backend_acknowledgement_cannot_qualify_user_dispatch",
+      "exit_code": 0,
+      "passed_exactly_one": true,
+      "log": "03-missing_backend_acknowledgement_cannot_qualify_user_dispatch.log",
+      "sha256": "dc1c7ad0828fb78bb7fab09b11c9a49ceddd0d70bcbd4ab59ce88652e8dfb201"
+    },
+    {
+      "test": "push_preflight::fix::transaction::tests::synthetic_uncertain_lifecycle_always_retains_owned_evidence",
+      "exit_code": 0,
+      "passed_exactly_one": true,
+      "log": "04-synthetic_uncertain_lifecycle_always_retains_owned_evidence.log",
+      "sha256": "6cf3c0e61faa85e96ebf991dca6616cc6eca628348f0bfe9bcca28b59eb2d4cc"
+    },
+    {
+      "test": "push_preflight::fix::transaction::tests::recording_hook_changes_are_refused_before_checkout_and_keep_external_bytes",
+      "exit_code": 0,
+      "passed_exactly_one": true,
+      "log": "05-recording_hook_changes_are_refused_before_checkout_and_keep_external_bytes.log",
+      "sha256": "74c0b9cffe2dca814be12a00b14d3f163861eac4ea8700be96bdfc045f7906cf"
+    }
+  ],
+  "passed": 5,
+  "failed": 0,
+  "real_protocol_executed": false,
+  "ci_used": false,
+  "verdict": "PASS_RECORDING_ONLY",
+  "next_gate": "Await root acceptance before any owned real Git protocol or broader tests."
+}
