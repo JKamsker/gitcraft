@@ -3,6 +3,7 @@
 mod agents;
 mod ai_page;
 mod branch_names;
+mod connection_page;
 mod custom_commands;
 mod diffs;
 mod external_tools;

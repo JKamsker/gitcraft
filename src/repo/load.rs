@@ -618,7 +618,7 @@ impl RepoTab {
         // Freeing tens of thousands of commits (those a reload replaced), rows and index entries
         // takes a while: not on the UI thread.
         if old_rows.len() > 5000 {
-            std::thread::spawn(move || drop((old_rows, old_graph, old_index)));
+            crate::connections::spawn(move || drop((old_rows, old_graph, old_index)));
         }
     }
 
@@ -755,7 +755,7 @@ impl RepoTab {
         emails.sort();
         emails.dedup();
         let ctx = ctx.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             for (email, hint) in hosting.forge.provider().avatars(&repo, &hosting, &emails) {
                 crate::avatars::hint(&email, hint);
             }

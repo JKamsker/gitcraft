@@ -11,6 +11,7 @@ mod avatars;
 mod ci;
 mod codeowners;
 mod collision;
+pub mod connections;
 mod custom_commands;
 mod desktop_entry;
 mod diagnostics;

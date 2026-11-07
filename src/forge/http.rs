@@ -53,6 +53,7 @@ pub(super) struct Api {
     login: Option<Login>,
     /// Told the server's `web` when it refused the login, so that it isn't sent again.
     on_refused: Option<fn(&str)>,
+    refused_key: Option<String>,
     agent: ureq::Agent,
 }
 
@@ -69,6 +70,7 @@ impl Api {
             web: web.trim_end_matches('/').to_owned(),
             login,
             on_refused: None,
+            refused_key: None,
             agent: with_proxy(ureq::AgentBuilder::new(), web)
                 // A large repository on a busy server can take its time over a page of the list.
                 .timeout(Duration::from_secs(30))
@@ -80,13 +82,11 @@ impl Api {
         }
     }
 
-    /// Calls `forget` with the server's address when it refuses the login.
-    pub fn on_refused(mut self, forget: fn(&str)) -> Api {
+    pub fn on_refused_key(mut self, forget: fn(&str), key: &str) -> Api {
         self.on_refused = Some(forget);
+        self.refused_key = Some(key.to_owned());
         self
     }
-
-    /// "Forgejo" or "Gitea".
     pub fn name(&self) -> &'static str {
         self.name
     }
@@ -239,7 +239,7 @@ impl Api {
                     && self.login.is_some()
                     && let Some(forget) = self.on_refused
                 {
-                    forget(&self.web);
+                    forget(self.refused_key.as_deref().unwrap_or(&self.web));
                 }
                 let text = response.into_string().unwrap_or_default();
                 Err(Failure {

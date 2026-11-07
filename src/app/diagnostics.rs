@@ -49,7 +49,7 @@ impl App {
         };
         let (tx, rx) = channel();
         let ctx = ctx.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let _ = tx.send(diagnostics::collect(&facts));
             ctx.request_repaint();
         });

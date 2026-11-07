@@ -6,25 +6,9 @@ pub(super) mod bounded;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::RwLock;
-
-/// The config file the active gitcraft profile has git read as its global config (see
-/// `settings::profiles`), if it sets anything.
-static PROFILE_CONFIG: RwLock<Option<PathBuf>> = RwLock::new(None);
-
-/// Has every git command from now on read `path` as its global config, or the user's own again
-/// with `None`. It is still the global scope, so what a repository sets itself (`--local`,
-/// `--worktree`) wins over it.
-pub fn set_profile_config(path: Option<PathBuf>) {
-    if let Ok(mut current) = PROFILE_CONFIG.write() {
-        *current = path;
-    }
-}
-
-/// The active profile's config file, when git reads it as the global config (see
-/// [`set_profile_config`]).
+/// The initiating task's immutable profile config (including queued and nested reads).
 pub fn profile_config() -> Option<PathBuf> {
-    PROFILE_CONFIG.read().ok().and_then(|p| p.clone())
+    crate::connections::current().git_config
 }
 
 /// Whether `args` reads or writes the user's own global config: `git config --global …`
@@ -56,7 +40,17 @@ pub(super) fn with_profile(cmd: &mut Command, args: &[&str]) {
     if user_global_config(args) {
         return;
     }
-    let path = PROFILE_CONFIG.read().ok().and_then(|p| p.clone());
+    let context = crate::connections::current();
+    if context.error.is_some() {
+        cmd.arg("-c").arg("=invalid-profile");
+        return;
+    }
+    if !context.choices.ssh_key.is_empty() {
+        cmd.env_remove("GIT_SSH_COMMAND")
+            .env_remove("GIT_SSH")
+            .env_remove("GIT_SSH_VARIANT");
+    }
+    let path = context.git_config;
     if let Some(path) = path {
         cmd.env("GIT_CONFIG_GLOBAL", path);
     }

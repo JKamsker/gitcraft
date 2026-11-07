@@ -144,6 +144,9 @@ fn capability(repo: &Path) -> Result<(), &'static str> {
     if crate::remote::is_remote(repo) {
         return Err("remote-context");
     }
+    if crate::connections::current().error.is_some() {
+        return Err("invalid-profile");
+    }
     if super::profile_config().is_some() {
         return Err("profile-config");
     }

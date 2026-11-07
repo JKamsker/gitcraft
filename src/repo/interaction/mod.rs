@@ -149,7 +149,7 @@ impl RepoTab {
         let path = self.path.clone();
         let tx = self.tx.clone();
         let wake = ctx.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let tell = |p: SearchProgress| {
                 let _ = tx.send(Msg::Then(Box::new(move |tab, _| {
                     tab.search_progress(id, p)
