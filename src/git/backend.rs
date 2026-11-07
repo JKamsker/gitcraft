@@ -207,6 +207,7 @@ pub(super) fn dispatch<T>(
                 "symbolic reference requires Git" => "symbolic-reference",
                 "non-commit branch requires Git" => "non-commit-branch",
                 "unsupported upstream namespace" => "upstream-namespace",
+                "local upstream requires Git" => "local-upstream",
                 _ => "native-read-error",
             },
         },
@@ -316,6 +317,7 @@ mod native {
     fn reachable(
         repo: &gix::Repository,
         id: gix::ObjectId,
+        remaining_visits: &mut usize,
     ) -> Result<HashSet<gix::ObjectId>, String> {
         let mut ids = HashSet::new();
         for info in repo
@@ -326,14 +328,21 @@ mod native {
             .all()
             .map_err(err)?
         {
-            ids.insert(info.map_err(err)?.id);
-            if ids.len() > 100_000 {
+            if *remaining_visits == 0 {
                 return Err("tracking graph exceeds native bound".into());
             }
+            *remaining_visits -= 1;
+            ids.insert(info.map_err(err)?.id);
         }
         Ok(ids)
     }
     pub(super) fn refs(path: &Path) -> Result<super::super::Refs, String> {
+        refs_bounded(path, 100_000)
+    }
+    pub(super) fn refs_bounded(
+        path: &Path,
+        visit_budget: usize,
+    ) -> Result<super::super::Refs, String> {
         let repo = open(path)?;
         if repo.common_dir().join("info/grafts").exists()
             || repo.common_dir().join("shallow").exists()
@@ -373,6 +382,9 @@ mod native {
             return Err("history-overlays".into());
         }
         list.sort_by(|a, b| a.name().as_bstr().cmp(b.name().as_bstr()));
+        // Bound total traversal work for the whole refresh, including repeated visits
+        // to shared history across many diverged branches.
+        let mut remaining_visits = visit_budget;
         for mut reference in list {
             let full = text(reference.name().as_bstr())?;
             let prefix = ["refs/heads/", "refs/remotes/", "refs/tags/"]
@@ -398,6 +410,15 @@ mod native {
                 raw.to_string()
             };
             let upstream = if prefix == "refs/heads/" {
+                // Gitoxide's remote-tracking resolver returns None for the special
+                // local repository remote. Git still displays and tracks that upstream.
+                if repo
+                    .config_snapshot()
+                    .string(&format!("branch.{short}.remote"))
+                    .is_some_and(|remote| remote.as_bstr() == b".")
+                {
+                    return Err("local upstream requires Git".into());
+                }
                 reference
                     .remote_tracking_ref_name(gix::remote::Direction::Fetch)
                     .transpose()
@@ -451,8 +472,8 @@ mod native {
                         let local_id = reference.peel_to_id().map_err(err)?.detach();
                         let remote_id = remote.peel_to_id().map_err(err)?.detach();
                         if local_id != remote_id {
-                            let ours = reachable(&repo, local_id)?;
-                            let theirs = reachable(&repo, remote_id)?;
+                            let ours = reachable(&repo, local_id, &mut remaining_visits)?;
+                            let theirs = reachable(&repo, remote_id, &mut remaining_visits)?;
                             let ahead = ours.difference(&theirs).count();
                             let behind = theirs.difference(&ours).count();
                             track = match (ahead, behind) {
@@ -555,7 +576,7 @@ mod tests {
         repo.git(&["config", "branch.main.merge", "refs/heads/origin/main"])?;
         assert_eq!(
             native::refs(repo.path()),
-            Err("ambiguous upstream short name".to_owned())
+            Err("local upstream requires Git".to_owned())
         );
         let expected = super::super::refs::refs_cli(repo.path())?;
         assert_eq!(
@@ -592,6 +613,30 @@ mod tests {
             );
             repo.git(&["update-ref", "-d", candidate])?;
         }
+        Ok(())
+    }
+
+    #[test]
+    fn tracking_walk_budget_is_shared_across_branches() -> Result<(), String> {
+        let repo = Repo::new("native-tracking-budget")?;
+        let base = repo.commit("base", &[])?;
+        repo.commit("one", &[])?;
+        repo.commit("two", &[])?;
+        repo.git(&["remote", "add", "origin", "/a remote"])?;
+        repo.git(&["update-ref", "refs/remotes/origin/main", &base])?;
+        repo.git(&["config", "branch.main.remote", "origin"])?;
+        repo.git(&["config", "branch.main.merge", "refs/heads/main"])?;
+        // Three local ancestors and one upstream ancestor fit once.
+        assert!(native::refs_bounded(repo.path(), 4).is_ok());
+        repo.git(&["branch", "other"])?;
+        repo.git(&["config", "branch.other.remote", "origin"])?;
+        repo.git(&["config", "branch.other.merge", "refs/heads/main"])?;
+        assert_eq!(
+            native::refs_bounded(repo.path(), 4),
+            Err("tracking graph exceeds native bound".to_owned())
+        );
+        assert!(native::refs_bounded(repo.path(), 8).is_ok());
+        parity(repo.path())?;
         Ok(())
     }
 

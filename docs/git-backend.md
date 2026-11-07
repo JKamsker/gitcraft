@@ -39,9 +39,10 @@ Native reads require a local, trusted repository, parsed with strict config vali
 `safe.directory` ownership checks. Git installation, system, user, include/includeIf and
 repository configuration are loaded. An active GitCraft profile or inherited `GIT_*`
 repository/config overrides uses the installed Git, so its exact effective context wins.
-Non-UTF8 reference/config values, ambiguous upstream abbreviations, symbolic refs requiring
-Git's resolution rules, shallow/replacement/graft histories, and very large upstream graph
-comparisons (over 100,000 reachable commits) also fall back. Each operation reopens the
+Non-UTF8 reference/config values, local (`remote = .`) upstreams, ambiguous upstream
+abbreviations, symbolic refs requiring Git's resolution rules, shallow/replacement/graft
+histories, and upstream graph comparisons exceeding 100,000 aggregate commit visits per
+refs read also fall back. Repeated visits to shared history count toward that total budget. Each operation reopens the
 repository/config: branch changes and edited configuration are visible on the next read.
 No global mutable repository object or credential session is shared between repositories.
 
