@@ -240,12 +240,13 @@ pub(crate) fn read(
 
 type Identity = (String, String);
 type FolderCounts = BTreeMap<Vec<u8>, BTreeMap<Identity, usize>>;
+type Recent = (Vec<Folder>, Vec<(Vec<u8>, usize)>, usize);
 fn recent(
     history: &History,
     since: Day,
     through: Day,
     active: &dyn Fn() -> bool,
-) -> Result<(Vec<Folder>, Vec<(Vec<u8>, usize)>, usize), String> {
+) -> Result<Recent, String> {
     let mut folders: FolderCounts = BTreeMap::new();
     let mut files: BTreeMap<Vec<u8>, usize> = BTreeMap::new();
     let mut count = 0;

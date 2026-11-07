@@ -158,7 +158,7 @@ impl RepoTab {
                 if ui.add_enabled(self.busy_op.is_none(),egui::Button::new("Install LFS hooks locally")).clicked(){acts.push(Action::Ops{label:"Install local Git LFS hooks".into(),ops:ops(&[&["lfs","install","--local"]]),refresh:Refresh::All});}
             }
             if report.needs.contains("Submodules")&&ui.button("Review submodule initialization…").clicked(){acts.push(Action::Dialog(super::Dialog::confirm("Initialize submodules","Download and check out the submodules named by this repository? Review .gitmodules before continuing.".into(),"Initialize submodules",ops(&[&["submodule","update","--init","--recursive"]]),None)));}
-            if ui.button("Review hook, EditorConfig and signing setup").clicked(){view.show_help=!view.show_help;}
+            if ui.button("Review hook, EditorConfig and signing setup").clicked(){view.show_help = !view.show_help;}
             if view.show_help{ui.label("Review the contribution documents above before installing Husky, Lefthook or pre-commit. This tour never runs project scripts. Enable EditorConfig support in your editor. For signing, use Settings → Git → Commit signing and choose a local key; a signature header does not prove trust or validity.");}
             if valid&&ui.button("Copy a Signed-off-by line").clicked(){ui.ctx().copy_text(format!("Signed-off-by: {} <{}>",view.name,view.email));}
         });
@@ -190,8 +190,11 @@ mod tests {
         let mut tab = RepoTab::new_deferred("/nonexistent/tour-test".into(), &ctx);
         tab.tour = Some(pending(2));
         tab.tour_arrived(1, Err("stale".into()));
-        assert!(tab.tour.as_ref().unwrap().loading);
-        assert!(tab.tour.as_ref().unwrap().error.is_none());
+        assert!(
+            tab.tour
+                .as_ref()
+                .is_some_and(|v| v.loading && v.error.is_none())
+        );
         tab.tour = None;
         tab.tour_arrived(2, Err("closed".into()));
         assert!(tab.tour.is_none());
@@ -222,7 +225,7 @@ mod tests {
         h.get_by_label("Review hook, EditorConfig and signing setup")
             .click();
         h.run_steps(3);
-        assert!(h.state().tour.as_ref().unwrap().show_help);
+        assert!(h.state().tour.as_ref().is_some_and(|v| v.show_help));
         h.get_by_label("Close tour").click();
         h.run_steps(3);
         assert!(h.state().tour.is_none());

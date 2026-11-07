@@ -18,10 +18,10 @@ pub(crate) fn sanitize_url(input: &str) -> Result<(String, bool), String> {
         host(server)?;
         let mut host_parts = server.split(':');
         let _ = host_parts.next();
-        if let Some(port) = host_parts.next() {
-            if host_parts.next().is_some() || port.parse::<u16>().ok().is_none_or(|p| p == 0) {
-                return Err("Invalid remote port".into());
-            }
+        if let Some(port) = host_parts.next()
+            && (host_parts.next().is_some() || port.parse::<u16>().ok().is_none_or(|p| p == 0))
+        {
+            return Err("Invalid remote port".into());
         }
         let path = path.split(['?', '#']).next().unwrap_or_default();
         if path.is_empty()
@@ -54,26 +54,27 @@ pub(crate) fn sanitize_url(input: &str) -> Result<(String, bool), String> {
         let safe = format!("{scheme}{user}{server}/{path}");
         return Ok((safe.clone(), safe != input));
     }
-    if !input.contains("://") && !input.starts_with(['-', '/', '\\']) {
-        if let Some((server, path)) = input.split_once(':') {
-            let (user, server) = server
-                .split_once('@')
-                .ok_or("Use an explicit SSH username in scp-style URLs")?;
-            host(server)?;
-            if user.is_empty()
-                || user.starts_with('-')
-                || !user
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
-                || path.is_empty()
-                || path.starts_with(['-', '/', '\\'])
-                || path.contains(['?', '#', '\\'])
-                || path.split('/').any(|p| p == "." || p == "..")
-            {
-                return Err("Invalid scp-style repository URL".into());
-            }
-            return Ok((input.into(), false));
+    if !input.contains("://")
+        && !input.starts_with(['-', '/', '\\'])
+        && let Some((server, path)) = input.split_once(':')
+    {
+        let (user, server) = server
+            .split_once('@')
+            .ok_or("Use an explicit SSH username in scp-style URLs")?;
+        host(server)?;
+        if user.is_empty()
+            || user.starts_with('-')
+            || !user
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+            || path.is_empty()
+            || path.starts_with(['-', '/', '\\'])
+            || path.contains(['?', '#', '\\'])
+            || path.split('/').any(|p| p == "." || p == "..")
+        {
+            return Err("Invalid scp-style repository URL".into());
         }
+        return Ok((input.into(), false));
     }
     Err("Only credential-free HTTPS and SSH remote URLs can be imported; local sources must be selected separately on this machine".into())
 }

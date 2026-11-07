@@ -15,10 +15,10 @@ pub(super) fn fields(ui: &mut egui::Ui, profile: &UserProfile, fresh: &mut Fresh
     };
     if requirements.ssh_key_reselection_required {
         ui.label("Select this machine's SSH private key (no key is read into the setup file)");
-        if ui.button("Choose local SSH key…").clicked() {
-            if let Some(path) = rfd::FileDialog::new().pick_file() {
-                fresh.ssh = path.to_string_lossy().into_owned();
-            }
+        if ui.button("Choose local SSH key…").clicked()
+            && let Some(path) = rfd::FileDialog::new().pick_file()
+        {
+            fresh.ssh = path.to_string_lossy().into_owned();
         }
         ui.label(&fresh.ssh);
     }

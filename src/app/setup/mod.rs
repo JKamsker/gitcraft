@@ -186,14 +186,14 @@ impl App {
                     plan.receipt = outcome.receipt;
                     plan.messages = outcome.messages;
                     plan.complete = outcome.complete;
-                    if let (Some(receipt), Some(file)) = (&plan.receipt, &self.setup.file) {
-                        if let Some(r) = file.repositories.get(index) {
-                            crate::repo::RepoTab::restore_portable_visibility(
-                                ctx,
-                                &receipt.root,
-                                &r.hidden,
-                            );
-                        }
+                    if let (Some(receipt), Some(file)) = (&plan.receipt, &self.setup.file)
+                        && let Some(r) = file.repositories.get(index)
+                    {
+                        crate::repo::RepoTab::restore_portable_visibility(
+                            ctx,
+                            &receipt.root,
+                            &r.hidden,
+                        );
                     }
                 }
                 if complete
@@ -342,14 +342,14 @@ impl App {
                                     ui.checkbox(&mut plan.selected,"Select this repository");
                                     ui.add_enabled_ui(plan.receipt.is_none(),|ui|{
                                         ui.horizontal(|ui|{ui.label("New folder name");ui.text_edit_singleline(&mut plan.name);});
-                                        if ui.button("Choose destination parent…").clicked(){if let Some(path)=rfd::FileDialog::new().pick_folder(){plan.parent=path;}}
-                                        if ui.button("Use local source folder on this machine…").clicked(){if let Some(path)=rfd::FileDialog::new().pick_folder(){plan.source=Some(path);}}
+                                        if ui.button("Choose destination parent…").clicked() && let Some(path)=rfd::FileDialog::new().pick_folder(){plan.parent=path;}
+                                        if ui.button("Use local source folder on this machine…").clicked() && let Some(path)=rfd::FileDialog::new().pick_folder(){plan.source=Some(path);}
                                         if plan.source.is_some() && ui.button("Use portable remote instead").clicked(){plan.source=None;}
                                     });
                                     ui.label(format!("New destination: {}",plan.parent.join(&plan.name).display()));
                                     if let Some(source)=&plan.source{ui.label(format!("Current-machine source: {}",source.display()));}
                                     if !r.worktrees.is_empty(){ui.label(format!("New worktree root: {}",plan.parent.join(format!("{}-worktrees",plan.name)).display()));}
-                                    if !permitted {ui.label("Add the public profiles, finish their required setup, then explicitly activate a corresponding profile before cloning.");for id in &matching {if let Some(p)=self.settings.user_profiles.iter().find(|p|p.id==*id && !p.pending_setup()){if ui.button(format!("Activate {}",p.title())).clicked(){activate=Some(*id);}}}}
+                                    if !permitted {ui.label("Add the public profiles, finish their required setup, then explicitly activate a corresponding profile before cloning.");for id in &matching {if let Some(p)=self.settings.user_profiles.iter().find(|p|p.id==*id && !p.pending_setup()) && ui.button(format!("Activate {}",p.title())).clicked(){activate=Some(*id);}}}
                                     if ui.add_enabled(plan.selected && permitted && !plan.parent.as_os_str().is_empty() && !plan.complete,egui::Button::new(if plan.receipt.is_some(){"Retry remaining steps"}else{"Clone and restore selected setup"})).clicked(){restore=Some(index);}
                                     if plan.receipt.is_some() && ui.button("Choose a new destination instead").clicked(){plan.receipt=None;plan.complete=false;plan.parent=PathBuf::new();plan.name=format!("{}-retry",r.name);plan.messages.push("Previous clone/worktrees were retained. Choose a new unused destination.".into());}
                                     if plan.complete && ui.button("Open restored repository").clicked(){open=plan.receipt.as_ref().map(|r|r.root.clone());}
@@ -364,21 +364,20 @@ impl App {
                 for profile in self.settings.user_profiles.iter().filter(|p|p.pending_setup()) {ui.push_id(profile.id,|ui|{ui.group(|ui|{ui.label(profile.title());let fresh=self.setup.fresh.entry(profile.id).or_default();ui.add_enabled_ui(!busy,|ui|{if pending::fields(ui,profile,fresh){verify=Some((profile.clone(),fresh.clone()));}});});});}
                 for message in &self.setup.messages{ui.label(message);}
             });
-            if busy {ui.horizontal(|ui|{ui.spinner();ui.label("Working in the background…");if ui.button("Cancel setup operation").clicked(){if let Some(job)=&self.setup.job{job.active.store(false,Ordering::Release);}}});}
+            if busy {ui.horizontal(|ui|{ui.add(crate::spinner::Spinner::new());ui.label("Working in the background…");if ui.button("Cancel setup operation").clicked() && let Some(job)=&self.setup.job{job.active.store(false,Ordering::Release);}});}
             close=ui.add_enabled(!busy,egui::Button::new("Close")).clicked();
         });
         if close || (!busy && modal.should_close()) {
             self.setup.open = false;
         }
-        if load {
-            if let Some(path) = rfd::FileDialog::new()
+        if load
+            && let Some(path) = rfd::FileDialog::new()
                 .add_filter("Gitcraft setup", &["json"])
                 .pick_file()
-            {
-                self.setup.launch(ctx, move |active| {
-                    files::load(&path, active).map(Answer::Loaded)
-                });
-            }
+        {
+            self.setup.launch(ctx, move |active| {
+                files::load(&path, active).map(Answer::Loaded)
+            });
         }
         if export {
             let mut themes = self
@@ -419,23 +418,21 @@ impl App {
                 Ok(Answer::Snapshot(file, errors))
             });
         }
-        if save {
-            if let (Some(file), Some(path)) = (
+        if save
+            && let (Some(file), Some(path)) = (
                 self.setup.file.clone(),
                 rfd::FileDialog::new()
                     .set_file_name("gitcraft-setup.json")
                     .save_file(),
-            ) {
-                self.setup.launch(ctx, move |active| {
-                    files::save(&path, &file, active)?;
-                    Ok(Answer::Saved(path))
-                });
-            }
+            )
+        {
+            self.setup.launch(ctx, move |active| {
+                files::save(&path, &file, active)?;
+                Ok(Answer::Saved(path))
+            });
         }
-        if apply {
-            if let Err(e) = self.apply_setup_public(ctx) {
-                self.setup.messages.push(e);
-            }
+        if apply && let Err(e) = self.apply_setup_public(ctx) {
+            self.setup.messages.push(e);
         }
         if let Some(id) = activate {
             self.switch_profile(id, ctx);
@@ -444,21 +441,21 @@ impl App {
             self.open_root(path, ctx);
             self.setup.open = false;
         }
-        if let Some(index) = restore {
-            if let Some(file) = &self.setup.file {
-                let plan = &self.setup.plans[index];
-                let mut repo = file.repositories[index].clone();
-                repo.name = plan.name.clone();
-                let parent = plan.parent.clone();
-                let source = plan.source.clone();
-                let previous = plan.receipt.clone();
-                self.setup.launch(ctx, move |active| {
-                    Ok(Answer::Restored(
-                        index,
-                        portability::restore(&repo, &parent, source.as_deref(), previous, active),
-                    ))
-                });
-            }
+        if let Some(index) = restore
+            && let Some(file) = &self.setup.file
+        {
+            let plan = &self.setup.plans[index];
+            let mut repo = file.repositories[index].clone();
+            repo.name = plan.name.clone();
+            let parent = plan.parent.clone();
+            let source = plan.source.clone();
+            let previous = plan.receipt.clone();
+            self.setup.launch(ctx, move |active| {
+                Ok(Answer::Restored(
+                    index,
+                    portability::restore(&repo, &parent, source.as_deref(), previous, active),
+                ))
+            });
         }
         if let Some((profile, fresh)) = verify {
             self.setup.launch(ctx, move |active| {

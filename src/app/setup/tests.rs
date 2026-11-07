@@ -144,9 +144,11 @@ fn cancelled_profile_answers_cannot_activate_stale_setup() {
     let active = Arc::new(AtomicBool::new(false));
     window.job = Some(Job { rx, active });
     let p = UserProfile::default();
-    tx.send(Ok(Answer::Verified(Box::new((p.clone(), p)))))
-        .unwrap();
-    assert!(window.take_answer().unwrap().is_err());
+    assert!(
+        tx.send(Ok(Answer::Verified(Box::new((p.clone(), p)))))
+            .is_ok()
+    );
+    assert!(window.take_answer().is_some_and(|r| r.is_err()));
 }
 #[test]
 fn malicious_setup_file_cannot_restore_commands_paths_or_credential_urls() -> Result<(), String> {
@@ -182,8 +184,10 @@ fn changed_profile_answers_do_not_clear_the_current_pending_requirements() {
     let mut ready = before.clone();
     ready.pending_setup = None;
     let (tx, rx) = channel();
-    tx.send(Ok(Answer::Verified(Box::new((before, ready)))))
-        .unwrap();
+    assert!(
+        tx.send(Ok(Answer::Verified(Box::new((before, ready)))))
+            .is_ok()
+    );
     h.state_mut().setup.job = Some(Job {
         rx,
         active: Arc::new(AtomicBool::new(true)),
