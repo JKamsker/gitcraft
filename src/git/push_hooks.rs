@@ -34,6 +34,14 @@ impl Hooks {
         let original_dir = original.rsplit_once('/').map(|v| v.0).unwrap_or(original);
         let mut payload =
             String::from("refs_file=\"$(dirname \"$0\")/refs\"\ncat >\"$refs_file\" || exit 1\n");
+        // Let the original hook veto the update before our wrapper can upload LFS
+        // objects. Keep its remote name/address and the exact advertised ref input.
+        payload.push_str(&format!(
+            "if [ -x {} ]; then {} {} \"$2\" <\"$refs_file\" || exit $?; fi\n",
+            remote::sh_quote(original),
+            remote::sh_quote(original),
+            remote::sh_quote(name)
+        ));
         if !upload.objects.is_empty() {
             let remote = upload.remote_tip.map(|tip| {
                 if tip.is_empty() {
@@ -47,12 +55,6 @@ impl Hooks {
                 .unwrap_or_default();
             payload.push_str(&format!("valid=0\nwhile read -r local_ref local_oid remote_ref remote_oid; do\nif [ \"$local_oid\" = {} ] && [ \"$remote_ref\" = {} ]{test}; then valid=1; fi\ndone <\"$refs_file\"\n[ \"$valid\" = 1 ] || exit 0\ngit lfs push --object-id {} {} </dev/null || exit 1\n",remote::sh_quote(upload.source),remote::sh_quote(upload.destination),remote::sh_quote(upload.alias),upload.objects.iter().map(|o|remote::sh_quote(o)).collect::<Vec<_>>().join(" ")));
         }
-        payload.push_str(&format!(
-            "if [ -x {} ]; then exec {} {} \"$2\" <\"$refs_file\"; fi\n",
-            remote::sh_quote(original),
-            remote::sh_quote(original),
-            remote::sh_quote(name)
-        ));
         let wrapper = format!(
             "#!/bin/sh\nn=${{GIT_CONFIG_COUNT:-0}}\nexec env \"GIT_CONFIG_KEY_${{n}}=core.hooksPath\" \"GIT_CONFIG_VALUE_${{n}}=\"{} \"GIT_CONFIG_COUNT=$((n+1))\" sh -c {} \"$0\" \"$@\"\n",
             remote::sh_quote(original_dir),

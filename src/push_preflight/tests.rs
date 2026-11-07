@@ -626,3 +626,37 @@ fn lfs_upload_works_with_the_existing_local_lfs_hook_too() -> Result<(), String>
     assert_eq!(f.receiver_head()?, plan.head);
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn rejecting_pre_push_hook_preserves_receiver_refs_and_lfs_objects() -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new()?;
+    std::fs::write(f.repo.join("asset.bin"), vec![b'x'; 6 * 1024 * 1024])
+        .map_err(|e| e.to_string())?;
+    f.git(&["add", "asset.bin"])?;
+    f.git(&["commit", "-qm", "Asset"])?;
+    fix(&f.repo, &f.plan(f.profile())?, "lfs")?;
+    let marker = f.root.join("hook-ran");
+    let hook = f.repo.join(".git/hooks/pre-push");
+    std::fs::write(
+        &hook,
+        format!(
+            "#!/bin/sh\nprintf 'rejected\n' > {}\nexit 1\n",
+            crate::remote::sh_quote(&marker.to_string_lossy())
+        ),
+    )
+    .map_err(|e| e.to_string())?;
+    std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o700))
+        .map_err(|e| e.to_string())?;
+    let plan = f.plan(f.profile())?;
+    let before = f.receiver_head()?;
+    let oid = plan.lfs_objects.iter().next().ok_or("No LFS object")?;
+    let stored = f.receiver.join("lfs/objects").join(&oid[..2]).join(&oid[2..4]).join(oid);
+    assert!(!stored.exists(), "The receiver starts without this LFS object");
+    assert!(execute(&f.repo, &plan, None).is_err());
+    assert!(marker.exists(), "The original hook must run");
+    assert_eq!(f.receiver_head()?, before);
+    assert!(!stored.exists(), "A hook veto must precede explicit LFS upload");
+    Ok(())
+}
