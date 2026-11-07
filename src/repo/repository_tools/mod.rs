@@ -1,6 +1,9 @@
-//! Reachable repository internals dialogs; stale background answers never replace a new view.
+mod remotes;
+// Reachable repository internals dialogs; stale background answers never replace a new view.
 use super::{Action, Dialog, RepoTab};
-use crate::git::repository_tools::{all_refs, guard, object, reftable, replacements};
+use crate::git::repository_tools::{
+    all_refs, guard, object, reftable, remote_config, replacements,
+};
 use std::sync::atomic::{AtomicU64, Ordering};
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Tool {
@@ -8,6 +11,7 @@ enum Tool {
     Object,
     Reftable,
     Replacements,
+    Remote,
 }
 static REQUESTS: AtomicU64 = AtomicU64::new(1);
 
@@ -20,12 +24,16 @@ pub(crate) enum Act {
     Graft(Box<replacements::Histories>, String, String),
     RemoveReplacement(Box<replacements::Histories>, String, String),
     ConvertGrafts(Box<replacements::Histories>),
+    Remote(String),
+    RemotePreview(Box<remote_config::Editor>),
+    SaveRemote(Box<remote_config::Editor>),
 }
 enum Data {
     Refs(all_refs::Browser),
     Object(object::Inspection),
     Reftable(reftable::Storage),
     Replacements(replacements::Histories),
+    Remote(remote_config::Editor),
 }
 pub(crate) struct State {
     id: u64,
@@ -41,6 +49,19 @@ pub(crate) struct State {
 impl RepoTab {
     pub(super) fn repository_tools_act(&mut self, act: Act, ctx: &egui::Context) {
         let act = match act {
+            Act::SaveRemote(editor) => {
+                self.repository_tool_mutation(
+                    "Save remote configuration",
+                    false,
+                    ctx,
+                    move |runner| remote_config::save(runner, &editor),
+                );
+                return;
+            }
+            Act::RemotePreview(editor) => {
+                self.remote_config_preview(*editor, ctx);
+                return;
+            }
             Act::Migrate(snapshot, target) => {
                 self.repository_tool_mutation("Migrate ref storage", false, ctx, move |runner| {
                     reftable::migrate(runner, &snapshot, &target)
@@ -78,6 +99,8 @@ impl RepoTab {
             Act::Object(q) => (q, Tool::Object),
             Act::Reftable => (String::new(), Tool::Reftable),
             Act::Replacements => (String::new(), Tool::Replacements),
+            Act::Remote(name) => (name, Tool::Remote),
+            Act::SaveRemote(..) | Act::RemotePreview(..) => return,
             Act::Migrate(..)
             | Act::Graft(..)
             | Act::RemoveReplacement(..)
@@ -110,6 +133,7 @@ impl RepoTab {
                 Tool::Refs => all_refs::read(&path, &query).map(Data::Refs),
                 Tool::Reftable => reftable::inspect(&path).map(Data::Reftable),
                 Tool::Replacements => replacements::read(&path).map(Data::Replacements),
+                Tool::Remote => remote_config::inspect(&path, &query).map(Data::Remote),
             },
             move |tab, result, _| {
                 if tab.path != expected_path || crate::git::profile_config() != profile {
@@ -181,6 +205,10 @@ impl RepoTab {
 
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.set_width(850.0);
+    if state.tool == Tool::Remote {
+        remotes::show(ui, state, acts);
+        return;
+    }
     if state.tool == Tool::Replacements {
         replacements_view(ui, state, acts);
         return;
@@ -448,5 +476,36 @@ fn replacements_view(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action
             state.query.trim().into(),
             state.parent.trim().into(),
         )));
+    }
+}
+
+impl RepoTab {
+    fn remote_config_preview(&mut self, editor: remote_config::Editor, ctx: &egui::Context) {
+        let Some(Dialog::RepositoryTools(state)) = &mut self.dialog else {
+            return;
+        };
+        let id = REQUESTS.fetch_add(1, Ordering::Relaxed);
+        state.id = id;
+        let repo = self.path.clone();
+        let path = repo.clone();
+        self.then_or(
+            ctx,
+            false,
+            Err,
+            move || remote_config::preview(&repo, editor),
+            move |tab, result, _| {
+                if tab.path != path {
+                    return;
+                }
+                if let Some(Dialog::RepositoryTools(state)) = &mut tab.dialog
+                    && state.id == id
+                {
+                    match result {
+                        Ok(editor) => state.result = Some(Ok(Data::Remote(editor))),
+                        Err(e) => tab.status = Some((format!("Remote preview: {e}"), true)),
+                    }
+                }
+            },
+        );
     }
 }

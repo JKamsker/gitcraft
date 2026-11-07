@@ -58,4 +58,5 @@ pub(super) fn read(
 }
 pub(crate) mod guard;
 pub(crate) mod reftable;
+pub(crate) mod remote_config;
 pub(crate) mod replacements;

@@ -66,6 +66,9 @@ impl Runner<'_> {
             "alias.gitcraft-repository-write=!f() { unset GIT_DIR GIT_COMMON_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_NAMESPACE GIT_REPLACE_REF_BASE GIT_SHALLOW_FILE GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS; git \"$@\"; }; f",
             "gitcraft-repository-write",
         ];
+        if self.credentials.is_some() {
+            guarded.extend(["-c", "credential.helper=!f() { test \"$1\" = get && printf 'username=%s\\npassword=%s\\n' \"$GITCRAFT_GIT_USERNAME\" \"$GITCRAFT_GIT_PASSWORD\"; }; f"]);
+        }
         guarded.extend(args);
         git::run_watched(Some(repo), &guarded, self.credentials, false, self.control)
     }

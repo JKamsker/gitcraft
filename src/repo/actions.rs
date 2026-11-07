@@ -666,6 +666,11 @@ impl RepoTab {
                 Action::SelectStaleBranches,
             ),
             (
+                "Remote URLs, refspecs and mirror policy…".into(),
+                "fetch push mapping prune".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Remote(String::new())),
+            ),
+            (
                 "Replace refs and temporary history joins…".into(),
                 "grafts original effective history".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Replacements),
