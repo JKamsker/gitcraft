@@ -17,11 +17,18 @@ pub(crate) struct Browser {
 }
 
 pub(crate) fn read(repo: &Path, namespace: &str) -> Result<Browser, String> {
+    let root = !namespace.is_empty()
+        && namespace
+            .bytes()
+            .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'_');
     if !namespace.is_empty()
+        && !root
         && (!namespace.starts_with("refs/")
             || namespace.contains(['\n', '\r', '\0', '*', '?', '[']))
     {
-        return Err("Choose a literal ref or prefix beginning with refs/".into());
+        return Err(
+            "Choose a literal root ref (such as HEAD) or a ref/prefix beginning with refs/".into(),
+        );
     }
     let format = "--format=%(refname)%00%(objectname)%00%(objecttype)%00%(symref)";
     let (code, out) = git::run_code(
@@ -47,6 +54,16 @@ pub(crate) fn read(repo: &Path, namespace: &str) -> Result<Browser, String> {
             })
         })
         .collect();
+    // %(symref) resolves a whole chain. Keep the immediate target so Follow can visit
+    // intermediate symbolic/root refs instead of silently jumping over them.
+    for reference in refs.iter_mut().filter(|r| !r.symbolic.is_empty()) {
+        reference.symbolic = git::run(
+            Some(repo),
+            &["symbolic-ref", "--no-recurse", "-q", &reference.name],
+        )?
+        .trim()
+        .to_owned();
+    }
     // Older Git cannot enumerate arbitrary root refs. Explicitly inspect its established
     // pseudorefs without treating a failed resolve as a nonexistent normal ref.
     for name in [
@@ -73,9 +90,13 @@ pub(crate) fn read(repo: &Path, namespace: &str) -> Result<Browser, String> {
         let kind = git::run(Some(repo), &["cat-file", "-t", &oid])?
             .trim()
             .to_owned();
-        let symbolic = git::run_ok_codes(Some(repo), &["symbolic-ref", "-q", name], &[0, 1])?
-            .trim()
-            .to_owned();
+        let symbolic = git::run_ok_codes(
+            Some(repo),
+            &["symbolic-ref", "--no-recurse", "-q", name],
+            &[0, 1],
+        )?
+        .trim()
+        .to_owned();
         refs.push(Reference {
             name: name.into(),
             oid,
@@ -151,6 +172,7 @@ mod tests {
             r.git(&["update-ref", name, "HEAD"])?;
         }
         r.git(&["symbolic-ref", "refs/gitcraft/current", "refs/heads/main"])?;
+        r.git(&["symbolic-ref", "refs/gitcraft/root", "HEAD"])?;
         let b = read(r.path(), "refs/namespaces/team")?;
         assert!(
             b.refs
@@ -164,6 +186,13 @@ mod tests {
         );
         assert!(b.refs.iter().any(|x| x.name.starts_with("refs/original/")));
         assert!(b.history.contains("base"));
+        let root = b
+            .refs
+            .iter()
+            .find(|v| v.name == "refs/gitcraft/root")
+            .ok_or("missing symbolic root ref")?;
+        assert_eq!(root.symbolic, "HEAD");
+        assert!(read(r.path(), &root.symbolic)?.history.contains("base"));
         assert!(read(r.path(), "--all").is_err());
         Ok(())
     }
