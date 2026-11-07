@@ -1,0 +1,30 @@
+
+running 25 tests
+test app::setup::tests::cancelled_profile_answers_cannot_activate_stale_setup ... ok
+test app::setup::tests::changed_profile_answers_do_not_clear_the_current_pending_requirements ... ok
+test app::setup::tests::deleted_imported_profile_mappings_are_not_reused_for_another_profiles_id ... ok
+test app::setup::pending::tests::tea_round_trip_pins_public_owner_and_host_without_exporting_token_or_auth_folder ... ok
+test app::setup::tests::malicious_setup_file_cannot_restore_commands_paths_or_credential_urls ... ok
+test app::tests::a_pending_startup_profile_stays_parked_instead_of_using_ambient_accounts ... ok
+test git::command::setup::tests::network_setup_clone_pins_https_and_explicit_profile_authentication_under_hostile_configuration ... ok
+test git::command::setup::tests::setup_network_context_refuses_pending_profiles_and_unselected_ssh_identities ... ok
+test portability::tests::cancelled_restore_never_creates_a_destination ... ok
+test app::setup::tests::export_import_ui_round_trip_preserves_active_profile_and_requires_local_setup ... ok
+test portability::tests::malicious_setup_fields_and_command_urls_are_data_errors ... ok
+test portability::tests::locked_worktree_retry_completes_after_a_later_missing_branch_without_relocking ... ok
+test portability::tests::portable_profiles_keep_public_policy_but_never_export_auth_paths_or_commands ... ok
+test portability::tests::partial_worktree_restore_can_retry_but_changed_config_cannot ... ok
+test portability::tests::practice_export_and_local_restore_isolate_hostile_git_environment_and_profile ... ok
+test portability::tests::repository_snapshot_and_restore_round_trip_remotes_author_hidden_refs_and_linked_worktrees ... ok
+test portability::tests::signing_safety_cannot_be_disabled_by_a_missing_pending_flag ... ok
+test portability::tests::ssh_alias_repository_forces_fresh_key_setup_even_when_the_old_profile_used_an_ambient_agent ... ok
+test portability::tests::worktree_lock_detection_uses_directory_identity_for_native_and_git_spellings ... ok
+test repo::tour::tests::closed_or_replaced_tours_reject_stale_answers ... ok
+test portability::tests::restoration_refuses_overwrite_traversal_and_missing_branch_without_substitution ... ok
+test repo::tour::tests::tour_ui_checklist_and_close_button_are_connected ... ok
+test tour::tests::encoded_remote_tour_and_portable_snapshot_use_only_the_recording_local_launcher ... ok
+test tour::tests::workflow_observations_do_not_verify_signatures_or_assert_a_policy ... ok
+test tour::tests::real_repository_tour_reads_documents_needs_and_one_cached_history_without_hooks ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 792 filtered out; finished in 2.88s
+

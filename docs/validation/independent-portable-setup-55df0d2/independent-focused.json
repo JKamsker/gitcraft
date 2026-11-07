@@ -1,0 +1,15 @@
+{
+  "application_candidate": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+  "command": [
+    "/workspace/work/onboarding-portability/target/debug/deps/gitcraft-31822f5b138c0fe8",
+    "git::command::setup::tests::",
+    "portability::",
+    "app::setup::",
+    "tour::",
+    "a_pending_startup_profile_stays_parked",
+    "--test-threads=2"
+  ],
+  "exit_code": 0,
+  "log_sha256": "437ebe19fc549bcab675e57bacbeb01b83b3bb70df64e50c0a3bf01150f89740",
+  "scope": "Independent Linux focused run using existing bound frozen author binary; no Cargo/fresh compilation/full independent rerun/native Windows/live credentials/real remote host/CI."
+}
