@@ -9,6 +9,23 @@ class Recording:
     def kill(self,p,s): self.events.append(('direct',p,s))
     def waitpid(self,p,f): self.events.append(('reap',p,f)); return p,0
 class Pure(unittest.TestCase):
+    def test_forwarding_backpressure_never_blocks_control_and_is_bounded(self):
+        def blocked(fd, data): raise BlockingIOError()
+        forward = m.Forwarder(blocked)
+        self.assertTrue(forward.add(0, b'abcdef'))
+        self.assertTrue(forward.flush())
+        self.assertEqual(forward.pending[0], b'abcdef')
+        calls=[]
+        forward.write=lambda fd,data: calls.append((fd,bytes(data))) or 2
+        self.assertTrue(forward.flush())
+        self.assertEqual(forward.pending[0], b'cdef')
+        self.assertEqual(calls, [(1,b'abcdef')])
+        old=m.MAX
+        try:
+            m.MAX=8
+            self.assertFalse(forward.add(0,b'x'*16))
+            self.assertEqual(len(forward.pending[0]),8)
+        finally: m.MAX=old
     def test_live_anchor_signal_order(self):
         r=Recording(); m.finish_owned(424242,True,r,lambda _:None)
         self.assertEqual([e[0] for e in r.events],['group','group','reap'])

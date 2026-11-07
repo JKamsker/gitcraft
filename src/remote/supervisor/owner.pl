@@ -88,6 +88,24 @@ sub finish_owned {
     $ops->{reap}->($anchor);
     die $error if $error;
 }
+sub forward_add {
+    my ($pending,$index,$bytes) = @_;
+    my $room = $MAX-length($pending->[$index]);
+    $pending->[$index] .= substr($bytes,0,$room);
+    return length($bytes) <= $room;
+}
+sub forward_flush {
+    my ($pending,$writer) = @_;
+    $writer //= sub { my ($index,$data)=@_; my $fd=$index==0 ? \*STDOUT : \*STDERR; return syswrite($fd,$data); };
+    for my $index (0,1) {
+        next unless length($pending->[$index]);
+        my $n = $writer->($index,$pending->[$index]);
+        if (defined($n) && $n > 0) { substr($pending->[$index],0,$n,''); }
+        elsif (!defined($n) && ($! == EAGAIN || $! == EWOULDBLOCK)) { next; }
+        else { return 0; }
+    }
+    return 1;
+}
 sub run {
     my ($req, $controller, $stream) = @_;
     die 'invalid request nonce' unless $req->{nonce} =~ /\A[0-9a-f]{1,96}\z/;
@@ -98,6 +116,7 @@ sub run {
     my $server = IO::Socket::UNIX->new(Type=>SOCK_STREAM, Local=>"$o->{path}/control", Listen=>4) or die 'private control socket failed';
     $server->blocking(0); cloexec($server);
     sysopen(my $input, "$o->{path}/input", O_RDWR|O_CREAT|O_EXCL|O_NOFOLLOW, 0600) or die 'input file failed';
+    die 'invalid encoded input' unless $req->{input} =~ /\A(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?\z/;
     binmode($input); print $input decode_base64($req->{input}) or die 'input write failed';
     seek($input, 0, 0) or die 'input seek failed';
     pipe(my $out_r, my $out_w) or die 'pipe failed';
@@ -131,6 +150,7 @@ sub run {
         _exit(125);
     }
     close($out_w); close($err_w); close($status_w); close($gate_r); close($input);
+    my @pending = ('','');
     my $code = 125; my @output = ('',''); my %clients; my $established = 0;
     local $SIG{HUP} = 'IGNORE';
     my $error;
@@ -143,11 +163,13 @@ sub run {
         my $hello = "O1 $o->{nonce} $o->{path} $o->{token}\n";
         if ($stream) { print STDERR "__GITCRAFT_OWNER__ $hello"; STDERR->flush; }
         else { print STDOUT $hello; STDOUT->flush; }
+        if ($stream) { STDOUT->blocking(0); STDERR->blocking(0); }
         syswrite($gate_w, 'G') == 1 or die 'anchor release failed'; close($gate_w); undef($gate_w);
         my $select = IO::Select->new($controller,$server,$status_r,$out_r,$err_r);
         my %kind = (fileno($controller)=>'controller',fileno($server)=>'socket',fileno($status_r)=>'status',fileno($out_r)=>0,fileno($err_r)=>1);
         my $deadline = time()+$duration; my $status = ''; my $stopped = 0;
         while (!$stopped && time() < $deadline) {
+            last if $stream && !forward_flush(\@pending);
             for my $key (keys %clients) { if (time() > $clients{$key}{until}) { $select->remove($clients{$key}{handle}); close($clients{$key}{handle}); delete $clients{$key}; } }
             for my $fd ($select->can_read(.05)) {
                 my $which = $kind{fileno($fd)} // 'client';
@@ -179,7 +201,7 @@ sub run {
                     if (!$n) { $select->remove($fd); next; }
                     my $room = $MAX-length($output[$which]); $stopped = 1 if length($bytes) > $room;
                     $output[$which] .= substr($bytes,0,$room);
-                    if ($stream) { my $dest = $which == 0 ? \*STDOUT : \*STDERR; print $dest $bytes or die 'stream disconnected'; $dest->flush; }
+                    $stopped = 1 if $stream && !forward_add(\@pending,$which,$bytes);
                 }
             }
         }
@@ -194,10 +216,11 @@ sub run {
         while (time() < $end && $select->can_read(0)) {
             my $n = sysread($fd,my $bytes,8192); last unless $n;
             $output[$index] .= substr($bytes,0,$MAX-length($output[$index]));
-            if ($stream) { my $dest = $index == 0 ? \*STDOUT : \*STDERR; print $dest $bytes; $dest->flush; }
+            forward_add(\@pending,$index,$bytes) if $stream;
         }
         close($fd);
     }
+    while ($stream && time() < $end && (length($pending[0]) || length($pending[1]))) { last unless forward_flush(\@pending); sleep(.005); }
     close($status_r); close($server);
     my $final = {%$o,state=>'stopped',code=>$code}; atomic("$o->{path}/terminal",encode($final),0);
     for my $client (values %clients) { syswrite($client->{handle},encode($final)); close($client->{handle}); }
@@ -236,6 +259,14 @@ elsif ($mode eq 'stream') {
     my ($code,$out) = run($req,$controller,1); exit($code);
 }
 elsif ($mode eq 'recording') {
+    my @queued=('abcdef','');
+    die 'blocked forward lost bytes' unless forward_flush(\@queued,sub {$!=EAGAIN; return undef;}) && $queued[0] eq 'abcdef';
+    die 'partial forward lost bytes' unless forward_flush(\@queued,sub {return 2;}) && $queued[0] eq 'cdef';
+    {
+        my $previous=$MAX; $MAX=8;
+        die 'unbounded forward queue' if forward_add(\@queued,0,'x'x16) || length($queued[0]) != 8;
+        $MAX=$previous;
+    }
     for my $established (0,1) {
         my @events;
         my $ops = {signal=>sub {push @events, join(':',@_);}, pause=>sub {}, reap=>sub {push @events, "reap:$_[0]";}};
@@ -247,6 +278,6 @@ elsif ($mode eq 'recording') {
     my $ops = {signal=>sub {push @events, $_[0] ? 'group' : 'direct'; die 'refused' if $_[0];},pause=>sub {},reap=>sub {push @events,'reap';}};
     my $ok = eval {finish_owned(424242,1,$ops);1;};
     die 'refusal acknowledged' if $ok || join(',',@events) ne 'group,direct,reap';
-    print "3 recording-only owner gates passed\n";
+    print "6 recording-only owner gates passed\n";
 }
 else { die 'unknown owner operation'; }

@@ -192,7 +192,7 @@ impl Workspace {
         // Every record is authenticated before CLEAR may mutate worktrees or refs. Keep
         // the exact bytes as a final barrier against replaced/new records during recovery.
         let listing = runner::shell(&self.repo, RECORDS, &[&self.base_there])?;
-        let proof = clear_proof(&self.base_there, &listing, |name| {
+        let proof = clear_proof(&listing, |name| {
             let path = remote::join(&self.base, name);
             remote::recover_owner(&path).map_err(|e| {
                 format!(
@@ -202,9 +202,11 @@ impl Workspace {
             })
         })?;
         let pid = std::process::id().to_string();
-        let mut args = vec![self.base_there.as_str(), pid.as_str()];
-        args.extend(proof.iter().map(String::as_str));
-        runner::shell(&self.repo, CLEAR, &args)
+        let input = format!("{}\n", proof.join("\n")).into_bytes();
+        if input.len() > 64 << 20 {
+            return Err("recovery proof exceeds 64 MiB; workspace preserved".into());
+        }
+        runner::shell_input(&self.repo, CLEAR, &[&self.base_there, &pid], Some(input))
             .map(|_| ())
             .map_err(|e| {
                 format!(
@@ -342,7 +344,6 @@ fn record_names(listing: &str) -> Result<Vec<String>, String> {
 }
 
 fn clear_proof(
-    base: &str,
     listing: &str,
     mut recover: impl FnMut(&str) -> Result<Vec<u8>, String>,
 ) -> Result<Vec<String>, String> {
@@ -350,10 +351,9 @@ fn clear_proof(
     let names = record_names(listing)?;
     let mut proof = Vec::new();
     for name in names {
-        let bytes =
-            String::from_utf8(recover(&name)?).map_err(|_| "invalid owner record encoding")?;
-        proof.push(format!("{base}/{name}"));
-        proof.push(bytes.trim_end_matches('\n').to_owned());
+        let bytes = recover(&name)?;
+        proof.push(name);
+        proof.push(bytes.iter().map(|b| format!("{b:02x}")).collect());
     }
     Ok(proof)
 }
@@ -369,12 +369,13 @@ for f in "$b"/*.pid; do
 done
 for f in "$b"/*.owner; do
   [ -e "$f" ] || [ -L "$f" ] || continue
-  if [ "$#" -lt 2 ] || [ "$f" != "$1" ] || [ -L "$f" ]; then echo 'gitcraft: owner records changed; workspace preserved' >&2; exit 1; fi
-  value=$(cat "$f") || exit 1
-  if [ "$value" != "$2" ]; then echo 'gitcraft: owner record replaced; workspace preserved' >&2; exit 1; fi
-  shift 2
+  IFS= read -r expected && IFS= read -r receipt || { echo 'gitcraft: owner records changed; workspace preserved' >&2; exit 1; }
+  if [ "${f##*/}" != "$expected" ] || [ -L "$f" ]; then echo 'gitcraft: owner records changed; workspace preserved' >&2; exit 1; fi
+  value=$(head -c 2049 "$f" | od -An -v -tx1) || exit 1
+  value=$(printf '%s' "$value" | tr -d ' \n')
+  if [ "$value" != "$receipt" ]; then echo 'gitcraft: owner record replaced; workspace preserved' >&2; exit 1; fi
 done
-[ "$#" -eq 0 ] || { echo 'gitcraft: owner record missing; workspace preserved' >&2; exit 1; }
+if IFS= read -r extra && [ -n "$extra" ]; then echo 'gitcraft: owner record missing; workspace preserved' >&2; exit 1; fi
 git worktree list --porcelain | sed -n 's/^worktree //p' | while IFS= read -r w; do
   case $w in "$b"/*) git worktree remove --force --force "$w" >/dev/null 2>&1;; esac
 done
@@ -532,7 +533,7 @@ mod tests {
         let mut controlled = Vec::new();
         let invalid = format!("{name}\0old.pid\0");
         assert!(
-            clear_proof("/private/base", &invalid, |n| {
+            clear_proof(&invalid, |n| {
                 controlled.push(n.to_owned());
                 Ok(b"not used".to_vec())
             })
@@ -543,15 +544,12 @@ mod tests {
             "legacy files must not grant control authority"
         );
         let valid = format!("{name}\0");
-        assert!(clear_proof("/private/base", &valid, |_| Err("missing receipt".into())).is_err());
+        assert!(clear_proof(&valid, |_| Err("missing receipt".into())).is_err());
         assert_eq!(
-            clear_proof("/private/base", &valid, |_| Ok(
-                b"verified endpoint\n".to_vec()
-            ))
-            .unwrap_or_default(),
+            clear_proof(&valid, |_| Ok(b"verified endpoint\n".to_vec())).unwrap_or_default(),
             [
-                format!("/private/base/{name}"),
-                "verified endpoint".to_owned()
+                name.clone(),
+                "766572696669656420656e64706f696e740a".to_owned()
             ]
         );
         for invalid in [

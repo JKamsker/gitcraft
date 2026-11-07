@@ -56,9 +56,18 @@ const SHELL_FOR: Duration = Duration::from_secs(30 * 60);
 /// Runs `script` with `sh` in `dir` (on its machine) and waits for it; its output, or why it
 /// failed. Elsewhere in a test's shell, so that it never waits behind the tab's reads.
 pub fn shell(dir: &Path, script: &str, args: &[&str]) -> Result<String, String> {
+    shell_input(dir, script, args, None)
+}
+
+pub(super) fn shell_input(
+    dir: &Path,
+    script: &str,
+    args: &[&str],
+    input: Option<Vec<u8>>,
+) -> Result<String, String> {
     let words = sh_alias("gitcraft-bisect-sh", script, args);
     let words: Vec<&str> = words.iter().map(String::as_str).collect();
-    let exit = git::run_for_test(dir, &words, SHELL_FOR)?;
+    let exit = git::run_for_test_input(dir, &words, SHELL_FOR, input)?;
     if exit.code == Some(0) {
         Ok(String::from_utf8_lossy(&exit.stdout).into_owned())
     } else {

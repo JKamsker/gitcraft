@@ -617,8 +617,18 @@ pub struct Exit {
 /// once) and is stopped there after `limit`; here it runs as long as it takes, and the caller
 /// stops it (see `parallel_bisect::runner`).
 pub fn run_for_test(dir: &Path, args: &[&str], limit: std::time::Duration) -> Result<Exit, String> {
+    run_for_test_input(dir, args, limit, None)
+}
+
+pub(crate) fn run_for_test_input(
+    dir: &Path,
+    args: &[&str],
+    limit: std::time::Duration,
+    stdin: Option<Vec<u8>>,
+) -> Result<Exit, String> {
     let extra = Extra {
         test: Some(limit),
+        stdin,
         ..Extra::default()
     };
     let out = execute(Some(dir), &extra, args)?;

@@ -87,6 +87,29 @@ def finish_owned(anchor, established, ops=os, pause=time.sleep):
         ops.waitpid(anchor, 0)
     if failure: raise failure
 
+class Forwarder:
+    # Streaming backpressure must never block EOF, deadline or authenticated cancellation.
+    # Captured output and these queues are independently bounded by MAX per stream.
+    def __init__(self, write=os.write):
+        self.pending = [bytearray(), bytearray()]
+        self.write = write
+    def add(self, index, data):
+        room = MAX - len(self.pending[index])
+        self.pending[index].extend(data[:max(0, room)])
+        return len(data) <= room
+    def flush(self):
+        connected = True
+        for index in (0, 1):
+            data = self.pending[index]
+            if not data: continue
+            try:
+                n = self.write(index + 1, data)
+                if n <= 0: connected = False
+                else: del data[:n]
+            except BlockingIOError: pass
+            except OSError: connected = False
+        return connected
+
 def run(req, controller, stream=False):
     nonce = req['nonce']
     if not NONCE.fullmatch(nonce): raise ValueError('invalid request nonce')
@@ -145,6 +168,7 @@ def run(req, controller, stream=False):
         expiries = {}
         selector = selectors.DefaultSelector()
         output = [bytearray(), bytearray()]
+        forward = Forwarder() if stream else None
         deadline = time.monotonic() + duration
         # Ignore hangup in the supervisor; EOF/deadline uses the same owned stop/reap path.
         signal.signal(signal.SIGHUP, signal.SIG_IGN)
@@ -169,10 +193,13 @@ def run(req, controller, stream=False):
                 sys.stderr.buffer.flush()
             else:
                 sys.stdout.buffer.write(hello); sys.stdout.buffer.flush()
+            if stream:
+                os.set_blocking(1, False); os.set_blocking(2, False)
             os.write(gate_w, b'G'); os.close(gate_w); gate_w = None
             status_bytes = bytearray()
             while not stopped:
                 if time.monotonic() >= deadline: break
+                if forward and not forward.flush(): break
                 for client in list(clients):
                     if expiries.get(client, 0) < time.monotonic():
                         try: selector.unregister(client)
@@ -214,9 +241,7 @@ def run(req, controller, stream=False):
                         if not chunk: selector.unregister(key.fd); continue
                         if len(output[which]) + len(chunk) > MAX: stopped = True
                         output[which].extend(chunk[:max(0, MAX - len(output[which]))])
-                        if stream:
-                            dest = sys.stdout.buffer if which == 0 else sys.stderr.buffer
-                            dest.write(chunk); dest.flush()
+                        if forward and not forward.add(which, chunk): stopped = True
         finally:
             # The owned anchor has never been waited on. Even premature anchor death
             # retains its identity as our unreaped direct child until these signals finish.
@@ -232,12 +257,14 @@ def run(req, controller, stream=False):
                     except BlockingIOError: break
                     if not chunk: break
                     output[index].extend(chunk[:max(0, MAX - len(output[index]))])
-                    if stream:
-                        dest = sys.stdout.buffer if index == 0 else sys.stderr.buffer
-                        try: dest.write(chunk); dest.flush()
-                        except BrokenPipeError: pass
+                    if forward: forward.add(index, chunk)
                 os.close(fd)
             os.close(status_r)
+            # Final forwarding has a finite drain; an unread controller cannot hold ownership.
+            if forward:
+                while time.monotonic() < end and any(forward.pending):
+                    if not forward.flush(): break
+                    time.sleep(.005)
             final = receipt(owner, 'stopped', code)
             atomic(owner['path'] + '/terminal', encode(final))
             for client in clients:
