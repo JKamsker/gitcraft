@@ -3,7 +3,7 @@ mod api;
 mod details;
 mod post;
 #[cfg(test)]
-mod tests;
+mod native_tests;
 
 use std::path::Path;
 
