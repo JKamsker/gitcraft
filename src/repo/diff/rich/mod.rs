@@ -21,6 +21,7 @@ mod dvc_view;
 mod json;
 pub(super) mod prose;
 pub(super) mod prose_view;
+mod search;
 mod tab;
 pub(super) mod table;
 #[cfg(test)]
@@ -320,3 +321,5 @@ pub fn fallback_note(ui: &mut Ui, kind: RichKind, note: &str) {
             });
         });
 }
+
+pub(in crate::repo) use search::document as search_document;

@@ -87,6 +87,9 @@ impl RepoTab {
             acts,
         );
 
+        if let Some(what) = self.find_in() {
+            self.find.bar(ui, what.name());
+        }
         if markdown == Some(true) {
             let Some(view) = &mut self.diff else { return };
             match &view.rendered {
@@ -100,12 +103,34 @@ impl RepoTab {
                         ui.colored_label(t.danger, e);
                     });
                 }
-                Some(Ok(md)) => rendered::show(ui, &path, md, &mut view.markdown, !as_file),
+                Some(Ok(md)) => {
+                    if self.find.open {
+                        self.find.rendered(
+                            ui,
+                            format!("markdown:{:?}:{}:{as_file}", view.key, view.request),
+                            |t| {
+                                let mut doc = find::rendered::Document::default();
+                                if as_file {
+                                    doc.markdown(&md.file, t.text);
+                                } else {
+                                    for (change, text) in &md.blocks {
+                                        let color = match change {
+                                            rendered::Change::Kept => t.text,
+                                            rendered::Change::Removed => t.danger,
+                                            rendered::Change::Added => t.success,
+                                        };
+                                        doc.markdown(text, color);
+                                    }
+                                }
+                                doc
+                            },
+                        );
+                    } else {
+                        rendered::show(ui, &path, md, &mut view.markdown, !as_file);
+                    }
+                }
             }
             return;
-        }
-        if let Some(what) = self.find_in() {
-            self.find.bar(ui, what.name());
         }
         if as_file {
             let before = matches!(&view.file, Some(Ok(f)) if f.before);
@@ -170,7 +195,15 @@ impl RepoTab {
                     return;
                 }
                 Some((_, Ok(rich::Rich::Ready(diff)))) => {
-                    rich::show(ui, diff, &mut view.rich_state, acts);
+                    if self.find.open {
+                        self.find.rendered(
+                            ui,
+                            format!("rich:{:?}:{}:{}", view.key, view.request, view.rich_load),
+                            |t| rich::search_document(diff, t),
+                        );
+                    } else {
+                        rich::show(ui, diff, &mut view.rich_state, acts);
+                    }
                     return;
                 }
                 Some((_, Ok(rich::Rich::Plain(note)))) => rich::fallback_note(ui, kind, note),
@@ -194,7 +227,20 @@ impl RepoTab {
                     return;
                 }
                 Some(Ok(data)) => {
-                    structural::show(ui, data);
+                    if self.find.open {
+                        self.find.rendered(
+                            ui,
+                            format!(
+                                "syntax:{:?}:{}:{}",
+                                view.key,
+                                view.request,
+                                view.structural.generation()
+                            ),
+                            |t| structural::search_document(data, t),
+                        );
+                    } else {
+                        structural::show(ui, data);
+                    }
                     return;
                 }
                 Some(Err(reason)) => {
@@ -204,7 +250,7 @@ impl RepoTab {
                 }
             }
         }
-        let Some(data) = ready_data(ui, view, ignore_ws, &t, acts) else {
+        let Some(data) = ready_data(ui, view, ignore_ws, &t, &mut self.find, acts) else {
             return;
         };
 
@@ -768,6 +814,7 @@ fn ready_data<'a>(
     view: &'a DiffView,
     ignore_ws: bool,
     t: &Tokens,
+    find: &mut find::Find,
     acts: &mut Vec<Action>,
 ) -> Option<&'a DiffData> {
     let data = match &view.data {
@@ -785,6 +832,43 @@ fn ready_data<'a>(
         }
         Some(Ok(data)) => data,
     };
+    if find.open {
+        let identity = format!("rich-data:{:?}:{}", view.key, view.request);
+        if let Some(binary) = &data.binary {
+            find.rendered(ui, identity, |t| super::binary::search_document(binary, t));
+            return None;
+        }
+        if let Some(notebook) = &data.notebook {
+            find.rendered(ui, identity, |t| {
+                super::notebook::search_document(notebook, t)
+            });
+            return None;
+        }
+        if let Some(lfs) = &data.lfs {
+            find.rendered(ui, identity, |t| {
+                let mut doc = find::rendered::Document::default();
+                for (side, pointer) in [("Before", &lfs.old), ("After", &lfs.new)] {
+                    if let Some(pointer) = pointer {
+                        doc.text(
+                            &format!(
+                                "{side} · Git LFS · {} · {}",
+                                crate::git::human_size(pointer.size),
+                                pointer.oid
+                            ),
+                            t.text,
+                        );
+                    }
+                }
+                doc
+            });
+            return None;
+        }
+        if data.compare.is_some() || data.image.is_some() {
+            ui.label(
+                "Image pixels have no searchable text. Close Find to continue image comparison.",
+            );
+        }
+    }
     if let Some(lfs) = &data.lfs {
         lfs_view(ui, lfs);
         return None;

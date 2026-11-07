@@ -22,6 +22,9 @@ pub(in crate::repo) struct State {
 }
 
 impl State {
+    pub(in crate::repo) fn generation(&self) -> u64 {
+        self.load
+    }
     pub(in crate::repo) fn shows_patch(&self) -> bool {
         !self.enabled || matches!(self.result, Some(Err(_)))
     }
@@ -121,4 +124,25 @@ pub(super) fn toggle(ui: &mut egui::Ui, on: bool, acts: &mut Vec<Action>) {
     {
         acts.push(Action::DiffStructural(!on));
     }
+}
+
+pub(in crate::repo) fn search_document(
+    data: &Structural,
+    t: &crate::theme::Tokens,
+) -> crate::repo::find::rendered::Document {
+    let mut doc = crate::repo::find::rendered::Document::default();
+    for row in &data.rows {
+        match row {
+            model::Row::Heading(n) => doc.text(&format!("Syntax change {n}"), t.accent),
+            model::Row::Pair(old, new) => {
+                if let Some(old) = old {
+                    doc.text(&format!("Before {} · {}", old.number, old.text), t.danger);
+                }
+                if let Some(new) = new {
+                    doc.text(&format!("After {} · {}", new.number, new.text), t.success);
+                }
+            }
+        }
+    }
+    doc
 }

@@ -612,3 +612,41 @@ fn keys_typed_into_another_field_are_left_to_it() {
     let ctrl_f = frame(&mut tab, key(Key::F, Modifiers::COMMAND).to_vec(), false);
     assert!(!kept(&ctrl_f, Key::F) && tab.find.focus);
 }
+
+#[test]
+fn actual_markdown_diff_opens_find_and_marks_rendered_content() {
+    let ctx = egui::Context::default();
+    crate::theme::install_fonts(&ctx);
+    let mut tab = RepoTab::new_deferred("/nonexistent/find-rendered-test".into(), &ctx);
+    let mut view = crate::repo::DiffView::new(DiffKey::Commit {
+        hash: "abc".into(),
+        path: "README.md".into(),
+    });
+    view.rendered = Some(Ok(crate::repo::diff::rendered::RenderedMd {
+        file: "# **Visible** words [label](https://hidden.example/secret)".into(),
+        blocks: vec![(
+            crate::repo::diff::rendered::Change::Added,
+            "# **Visible** words [label](https://hidden.example/secret)".into(),
+        )],
+        before: false,
+        images: Vec::new(),
+    }));
+    tab.diff = Some(view);
+    tab.diff_rendered = true;
+    assert!(tab.find_in().is_some());
+    tab.find.show();
+    tab.find.query.text = "Visible words".into();
+    for _ in 0..2 {
+        let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            tab.diff_view(ui, &mut Vec::new())
+        });
+        output.drop_without_applying_deltas();
+    }
+    assert_eq!(tab.find.count(), 1);
+    tab.find.query.text = "hidden.example".into();
+    let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+        tab.diff_view(ui, &mut Vec::new())
+    });
+    output.drop_without_applying_deltas();
+    assert_eq!(tab.find.count(), 0);
+}

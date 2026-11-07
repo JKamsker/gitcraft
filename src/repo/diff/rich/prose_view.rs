@@ -205,7 +205,7 @@ fn caption(part: &Part, captions: bool) -> Option<&'static str> {
 }
 
 /// The text of a part, laid out to wrap within `width`.
-fn part_job(part: &Part, t: &Tokens, width: f32) -> LayoutJob {
+pub(super) fn part_job(part: &Part, t: &Tokens, width: f32) -> LayoutJob {
     let font = egui::FontId::proportional(14.0);
     let mut job = match part {
         Part::Kept { text, .. } => plain(text, &font, t.text_dim, false),

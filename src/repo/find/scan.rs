@@ -29,6 +29,7 @@ pub(crate) struct SourceKey {
 pub(crate) enum Source {
     /// A diff's lines (by its file).
     Diff(String),
+    Rendered(String),
     /// The file of a diff switched to File.
     DiffFile(String),
     Blame {

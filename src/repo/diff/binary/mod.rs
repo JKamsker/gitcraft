@@ -4,8 +4,10 @@
 //! added, removed and changed, and the first bytes of each side in hex.
 
 mod extract;
+mod search;
 mod sniff;
 mod view;
+pub(super) use search::document as search_document;
 mod zip;
 
 #[cfg(test)]
