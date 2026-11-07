@@ -1,0 +1,43 @@
+{
+  "status": "CHECKPOINT_BEFORE_INDEPENDENT_TEST_EXECUTION",
+  "candidate": "cdd45af340b433b125f29e2347705cf2335053c3",
+  "tree": "dc3255b5b76703f295591890242ce516895b451d",
+  "source_clean": true,
+  "author_manifest_sha256": "99c1331d0ce478df0ae570b980da6ba8569cd20b628d0fb6e0b71630541b429d",
+  "author_logs_verified": {
+    "fmt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "path": "/workspace/work/file-comparison-fix-fmt.log"
+    },
+    "clippy": {
+      "sha256": "fc4c8e5e15db3ff2fd337c06012372506af2992d6b5d6a861ec00a54a54b6404",
+      "bytes": 142,
+      "path": "/workspace/work/file-comparison-fix-clippy.log"
+    },
+    "targeted": {
+      "sha256": "55027bbc067c3ac6e138b164ca39f1316e10b92c0779f2a37e512850338b154f",
+      "bytes": 3463,
+      "path": "/workspace/work/file-comparison-fix-targeted.log"
+    },
+    "test": {
+      "sha256": "76ec791d72223596927ef126393998607f4f845dae3f0db4eb34a456946eb7e1",
+      "bytes": 66973,
+      "path": "/workspace/work/file-comparison-fix-test.log"
+    }
+  },
+  "binary": "/workspace/work/file-comparison-views/target/debug/deps/gitcraft-31822f5b138c0fe8",
+  "binary_sha256": "88c9b178edc6ba36d66a1b4df926167331c614fb5632dff6156875034702eb47",
+  "binary_bytes": 788310608,
+  "fresh_compile_evidence": "Author full/targeted logs compile gitcraft from frozen worktree and name this binary; current clean tracked source matches exact candidate. Reviewer reuses executable read-only and does not claim a new compile.",
+  "binary_feature_test_count": 26,
+  "all_manifest_test_names_present": true,
+  "author_feature_test_names_passed": true,
+  "optional_live_transports": "GITCRAFT_TEST_SSH and GITCRAFT_TEST_WSL will be explicitly unset",
+  "independent_selection": [
+    "file_comparison::",
+    "app::practice::isolation::normal_practice_tab_operations_and_shells_are_isolated",
+    "connections::tests::workers_inherit_the_initiating_profile_and_nested_contexts_restore",
+    "git::command::profile_connection_tests::local_git_gets_the_pinned_profile_but_remote_git_does_not_get_local_paths_or_accounts"
+  ]
+}
