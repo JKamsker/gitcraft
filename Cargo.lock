@@ -1693,6 +1693,7 @@ dependencies = [
  "image",
  "keyring",
  "md5",
+ "miniz_oxide 0.8.9",
  "notify",
  "notify-rust",
  "open",

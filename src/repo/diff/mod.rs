@@ -6,12 +6,14 @@
 mod algorithm;
 #[cfg(test)]
 mod algorithm_tests;
+mod binary;
 mod images;
 mod interdiff;
 mod jump;
 mod lfs;
 pub(in crate::repo) mod link;
 mod lines;
+pub(super) mod line_diff;
 mod map;
 mod paint;
 mod parse;
@@ -86,6 +88,11 @@ pub struct DiffData {
     pub image: Option<ImagePair>,
     /// The file is kept in Git LFS: the objects before and after, shown instead of the lines.
     pub lfs: Option<LfsPair>,
+    /// A binary file (not an image, not in LFS): both versions, shown instead of git's
+    /// "Binary files differ".
+    pub binary: Option<binary::BinaryPair>,
+    /// The program git turned the file into text with (`textconv`), when it did.
+    pub textconv: Option<String>,
     /// The patch's file header (`diff --git`, `index`, `---`, `+++`), for partial patches.
     pub header: String,
     /// Hunks and lines can be staged, unstaged or discarded on their own.
@@ -188,13 +195,28 @@ pub fn load_lines(
 
 /// Reads and prepares the diff for `key`.
 pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result<DiffData, String> {
-    let (text, path) = match key {
-        DiffKey::Commit { hash, path } => (git::file_diff(repo, hash, path, opts)?, path.clone()),
-        DiffKey::Work(file) => (git::work_diff(repo, file, opts)?, file.path.clone()),
-        DiffKey::Range { from, to, path } => (
-            git::range_file_diff(repo, from, to.as_deref(), path, opts)?,
-            path.clone(),
-        ),
+    let patch = |opts: DiffOptions| -> Result<(String, String), String> {
+        Ok(match key {
+            DiffKey::Commit { hash, path } => {
+                (git::file_diff(repo, hash, path, opts)?, path.clone())
+            }
+            DiffKey::Work(file) => (git::work_diff(repo, file, opts)?, file.path.clone()),
+            DiffKey::Range { from, to, path } => (
+                git::range_file_diff(repo, from, to.as_deref(), path, opts)?,
+                path.clone(),
+            ),
+        })
+    };
+    // A textconv driver that fails (Git for Windows maps `*.docx` and `*.pdf` to its own
+    // `astextplain`, which refuses some files) fails the whole diff: the file's own bytes
+    // are diffed instead, so it is shown as a binary rather than not at all.
+    let (text, path) = match patch(opts) {
+        Err(e) if !opts.no_textconv => patch(DiffOptions {
+            no_textconv: true,
+            ..opts
+        })
+        .map_err(|_| e)?,
+        done => done?,
         DiffKey::Remerge {
             hash,
             path,
@@ -240,6 +262,14 @@ fn prepare(
     } else {
         None
     };
+    let binary = (image.is_none() && lfs.is_none() && binary::is_binary_patch(&text))
+        .then(|| binary::load_pair(repo, key, &path, renamed_from(&text)));
+    // A diff of what the file's textconv made of it: its lines aren't the file's. Not for a
+    // symbolic link: git diffs those with its default driver, whatever the attribute says.
+    let textconv = (binary.is_none() && !lines.is_empty() && !is_symlink_patch(&text))
+        .then(|| binary::textconv_for(repo, &path))
+        .flatten();
+    let partial = partial && textconv.is_none();
     let mut spans = highlight_sides(&path, &lines, dark);
     let (mut changed, split) = pair_lines(&lines);
     let mut uncut = std::collections::HashMap::new();
@@ -266,6 +296,8 @@ fn prepare(
         split,
         image,
         lfs,
+        binary,
+        textconv,
         header,
         partial,
         revertable,
@@ -275,6 +307,18 @@ fn prepare(
         weakened,
         map: Default::default(),
     }
+}
+
+/// Whether the patch is of a symbolic link (mode 120000 before its first hunk, no file mode).
+pub(super) fn is_symlink_patch(text: &str) -> bool {
+    let modes: Vec<&str> = text
+        .split_terminator('\n')
+        .take_while(|l| !l.starts_with("@@"))
+        .filter(|l| l.starts_with("index ") || l.contains(" mode "))
+        .filter_map(|l| l.rsplit(' ').next())
+        .filter(|m| m.len() == 6 && m.bytes().all(|c| c.is_ascii_digit()))
+        .collect();
+    modes.contains(&"120000") && modes.iter().all(|m| *m == "120000")
 }
 
 /// The lines `lines` adds and removes; `None` when it has none to count (a binary file, one

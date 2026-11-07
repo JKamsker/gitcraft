@@ -250,6 +250,7 @@ impl RepoTab {
             ignore_ws: self.diff_ignore_ws,
             whole_file: settings.diff_whole_file,
             algorithm: diff::algorithm_for(&settings, key.path()),
+            no_textconv: false,
         };
         view.algorithm = opts.algorithm;
         let dark = Tokens::get(ctx).dark();

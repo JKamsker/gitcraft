@@ -126,6 +126,8 @@ pub struct DiffOptions {
     pub whole_file: bool,
     /// How lines are paired; `None`: as the user's git config says (`diff.algorithm`).
     pub algorithm: Option<super::DiffAlgorithm>,
+    /// `--no-textconv`: the file's own bytes, not what a textconv driver makes of them.
+    pub no_textconv: bool,
 }
 
 impl DiffOptions {
@@ -135,6 +137,9 @@ impl DiffOptions {
         args.extend(PATCH_ARGS);
         if self.ignore_ws {
             args.push("-w");
+        }
+        if self.no_textconv {
+            args.push("--no-textconv");
         }
         if self.whole_file {
             // More context than any file has lines: git shows each file as one hunk.
