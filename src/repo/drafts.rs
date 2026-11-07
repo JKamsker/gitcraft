@@ -401,6 +401,11 @@ mod tests {
         std::fs::write(path.join("notes"), b"a pause saves this").map_err(|e| e.to_string())?;
         store::set_enabled(&path, true)?;
         let mut tab = RepoTab::new_deferred(path.clone(), &ctx);
+        // A deferred tab also starts its independent filesystem-watcher worker.
+        // Isolate this test's draft channel from that unrelated initial result.
+        let (tx, rx) = std::sync::mpsc::channel();
+        tab.tx = tx;
+        tab.rx = rx;
         tab.deferred = false;
         tab.drafts.loaded = true;
         tab.drafts.enabled = true;
