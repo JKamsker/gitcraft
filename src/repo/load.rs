@@ -429,6 +429,7 @@ impl RepoTab {
             self.tx.repo = self.repo_key().to_owned();
         }
         self.timeline_read(loaded.read, ctx);
+        self.celebration_loaded(loaded.read, ctx);
         self.fold_loaded(loaded.read, state, ctx);
         let remote = crate::remote::is_remote(&self.path);
         for wt in self
@@ -499,6 +500,7 @@ impl RepoTab {
         }
         self.want_health(ctx);
         self.rebuild(ctx);
+        self.graph_motion_loaded(loaded.read, ctx);
         // After the selection is settled: not for a commit that went (amended, rebased).
         self.extras_after_reload(refs_moved, ctx);
         self.hint_avatars(ctx);
@@ -611,6 +613,9 @@ impl RepoTab {
         let old_graph = std::mem::replace(&mut self.graph, graph);
         let old_index = std::mem::replace(&mut self.index, index);
         self.rebuild_graph_labels();
+        self.queue_branch_bands();
+        self.queue_graph_topology();
+        self.cancel_minimap();
         // Freeing tens of thousands of commits (those a reload replaced), rows and index entries
         // takes a while: not on the UI thread.
         if old_rows.len() > 5000 {

@@ -34,6 +34,7 @@ impl RepoTab {
                 self.select(row, ctx);
                 self.hint_after_select(row, ctx);
             }
+            Action::ActivityCommit(hash) => self.activity_commit(hash, ctx),
             Action::SelectHash(hash) => {
                 self.leave_pages();
                 // Following a link is a step of its own, back and forward.

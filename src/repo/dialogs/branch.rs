@@ -90,6 +90,7 @@ pub(super) fn tag(
     message: &mut String,
     remote: &Option<String>,
     push: &mut bool,
+    release: &mut bool,
     focus: &mut bool,
 ) -> Outcome {
     let t = Tokens::get(ui.ctx());
@@ -109,6 +110,7 @@ pub(super) fn tag(
         ui.checkbox(push, format!("Push it to {remote}"));
     }
     ui.add_space(8.0);
+    ui.checkbox(release, "This is a release tag");
     let valid = usable(name);
     buttons(
         ui,
@@ -131,7 +133,11 @@ pub(super) fn tag(
                 ]);
             }
             Action::UndoableOps {
-                label: format!("Create tag {name}"),
+                label: if *release {
+                    format!("Create release tag {name}")
+                } else {
+                    format!("Create tag {name}")
+                },
                 ops: steps,
                 refresh: Refresh::All,
                 undo: Undo::Custom {

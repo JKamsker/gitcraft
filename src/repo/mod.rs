@@ -7,15 +7,18 @@ pub(crate) mod agent;
 mod agents;
 mod ai;
 mod apply;
+mod atlas;
 mod authorship_view;
 mod bakeoff;
 mod bisect;
+mod branch_bands;
 mod branch_cleanup;
 mod branch_health;
 mod branch_order;
 mod branch_tree;
 mod branch_visibility;
 mod bundles;
+mod celebration;
 mod ci_status;
 mod ci_view;
 mod collision_view;
@@ -51,10 +54,15 @@ mod forge_link;
 pub(crate) mod forks;
 mod gerrit;
 mod ghost;
+mod graph_motion;
 mod graph_order;
 pub(crate) mod graph_view;
+mod graph_walk;
+mod growth;
 mod guide;
 pub(crate) mod highlight;
+mod history_activity;
+mod history_reader;
 mod hooks;
 mod hotfix;
 mod interaction;
@@ -82,6 +90,7 @@ mod partial_stash;
 mod patches;
 mod pinned_sections;
 pub(crate) mod popout;
+mod postcards;
 mod pr_merge;
 mod pr_review;
 mod pr_view;
@@ -403,6 +412,18 @@ pub struct RepoTab {
     waiting: running::Waiting,
     /// The operations run, with their commands and output (the Activity panel).
     activity: activity::ActivityLog,
+    graph_motion: graph_motion::State,
+    celebration: celebration::State,
+    topology: std::sync::Arc<graph_walk::Topology>,
+    topology_reader: history_reader::Reader<std::sync::Arc<graph_walk::Topology>>,
+    graph_narration: graph_walk::Narration,
+    postcards: postcards::State,
+    growth: Option<growth::State>,
+    atlas: Option<atlas::State>,
+    history_activity: Option<history_activity::Activity>,
+    history_minimap: graph_view::minimap::State,
+    branch_bands: branch_bands::Preferences,
+    band_reader: history_reader::Reader<crate::graph::Graph>,
     /// A network operation failed (taken by `App`, for the taskbar button).
     network_failed: bool,
     /// The running operation moves the checkout: update the submodules after it, if asked to.
@@ -508,6 +529,7 @@ impl RepoTab {
             cancel: jobs.0.clone(),
             repo: messages::mutation_key(&path),
         };
+        let branch_bands = branch_bands::Preferences::load(_ctx, &path);
         Self {
             path,
             name,
@@ -652,6 +674,18 @@ impl RepoTab {
             running: None,
             waiting: Default::default(),
             activity: Default::default(),
+            graph_motion: Default::default(),
+            celebration: Default::default(),
+            topology: Default::default(),
+            topology_reader: Default::default(),
+            graph_narration: Default::default(),
+            postcards: Default::default(),
+            growth: None,
+            atlas: None,
+            history_activity: None,
+            history_minimap: Default::default(),
+            branch_bands,
+            band_reader: Default::default(),
             network_failed: false,
             update_submodules: false,
             status: None,

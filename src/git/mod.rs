@@ -2,6 +2,8 @@
 //! Git as the compatibility backend (config, credentials, hooks and remote machines).
 
 mod absorb;
+pub(crate) mod activity;
+pub(crate) mod atlas;
 mod attributes;
 pub mod backend;
 mod backlinks;
@@ -24,6 +26,7 @@ pub mod errors;
 pub mod external_tool;
 mod files;
 mod fold;
+pub(crate) mod growth;
 mod hooks;
 mod interaction;
 mod lfs;
@@ -39,6 +42,7 @@ mod log_order;
 mod notebook_filter;
 mod notes;
 mod overview;
+pub(crate) mod postcards;
 mod preview;
 pub mod progress;
 mod range_diff;
@@ -61,6 +65,8 @@ mod submodule;
 mod timed;
 mod trees;
 mod unity;
+#[cfg(test)]
+mod visualization_tests;
 #[cfg(test)]
 pub(crate) use self::unity::tests as unity_tests;
 mod testlane;

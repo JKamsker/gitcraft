@@ -59,3 +59,5 @@ mod theme;
 mod update;
 mod vscode_theme;
 mod weakened;
+
+mod audio;

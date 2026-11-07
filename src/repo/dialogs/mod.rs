@@ -106,6 +106,7 @@ pub enum Dialog {
         /// Remote to push the tag to, if any.
         remote: Option<String>,
         push: bool,
+        release: bool,
         focus: bool,
     },
     RenameBranch {
@@ -316,6 +317,7 @@ impl Dialog {
             message: String::new(),
             remote,
             push: false,
+            release: false,
             focus: true,
         }
     }
@@ -430,6 +432,10 @@ enum Outcome {
 
 impl RepoTab {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
+        self.history_activity_window(ctx, acts);
+        self.atlas_window(ctx);
+        self.growth_window(ctx);
+        self.postcard_window(ctx);
         if let Some(Dialog::Stash(d)) = &mut self.dialog {
             d.seed(self.stash_picks.picked.iter().cloned());
             d.keep_changed(&self.work);
@@ -542,8 +548,9 @@ impl RepoTab {
                     message,
                     remote,
                     push,
+                    release,
                     focus,
-                } => branch::tag(ui, enter, at, at_label, name, message, remote, push, focus),
+                } => branch::tag(ui, enter, at, at_label, name, message, remote, push, release, focus),
                 Dialog::RenameBranch { old, new, focus } => {
                     let children = crate::git::stack::children(stack_parents, old);
                     branch::rename_branch(ui, enter, old, new, focus, &children)

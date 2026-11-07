@@ -65,8 +65,28 @@ impl RepoTab {
             return (resp, None);
         };
         let (rect, mid, gx, cols) = (row.rect, row.mid(), row.gx, row.cols);
-        let refs_clip = Rect::from_min_max(rect.min, pos2(gx - 4.0, rect.bottom()));
-        let mut rp = painter.with_clip_rect(refs_clip);
+        let identity = first.full_refs().into_iter().next().unwrap_or_default();
+        let offset = if self.ghost.drawing() {
+            0.0
+        } else {
+            self.graph_motion
+                .pill_offset(ui.ctx(), &identity, &row.commit.hash, row.i)
+        };
+        let mid = mid + offset;
+        let refs_clip = Rect::from_min_max(
+            pos2(rect.left(), ui.clip_rect().top()),
+            pos2(gx - 4.0, ui.clip_rect().bottom()),
+        );
+        let mut rp = if offset.abs() > 0.1 {
+            ui.ctx()
+                .layer_painter(egui::LayerId::new(
+                    egui::Order::Middle,
+                    ui.id().with("moving-ref-pills"),
+                ))
+                .with_clip_rect(refs_clip)
+        } else {
+            painter.with_clip_rect(refs_clip)
+        };
         // In a ghost run: a pill where the operation would put it, or one it would delete.
         let (moved, gone) = self.ghost.pill(&first.full_refs());
         if moved || gone {
@@ -86,8 +106,14 @@ impl RepoTab {
             self.marks(first, &row.commit.hash),
         );
         ghost_pill_marks(&rp, &t, pill, moved, gone);
-        self.pill_clicks(ui, &resp, pill, first, &row.commit.hash, acts);
-        let hit = PillHit::of(first, pill, &row.commit.hash);
+        if offset.abs() <= 0.1 {
+            self.pill_clicks(ui, &resp, pill, first, &row.commit.hash, acts);
+        }
+        let hit = if offset.abs() <= 0.1 {
+            Some(PillHit::of(first, pill, &row.commit.hash))
+        } else {
+            None
+        };
         let mut end = pill.right();
         let mut more_rect = None;
         if more > 0 {
@@ -131,9 +157,9 @@ impl RepoTab {
                 row.commit.author,
                 row.commit.date
             ));
-            return (resp, Some(hit));
+            return (resp, hit);
         }
-        (resp, Some(hit))
+        (resp, hit)
     }
 
     /// What a pill of `badge` on commit `hash` carries besides its name: whether the branch has

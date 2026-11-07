@@ -241,7 +241,7 @@ impl RepoTab {
     }
 
     /// Branch, stash, terminal, search and the folder menu.
-    fn repo_buttons(&self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
+    fn repo_buttons(&mut self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         let head = self.refs.head.clone();
         let waits = self.waits_text();
@@ -280,6 +280,7 @@ impl RepoTab {
         if terminal.clicked() {
             acts.push(Action::ToggleTerminal);
         }
+        self.branch_bands_header(ui);
         let activity = icons::tool_button(ui, "list", "", true)
             .on_hover_text("Activity: each operation's git commands and all they printed");
         if self.activity.open {
