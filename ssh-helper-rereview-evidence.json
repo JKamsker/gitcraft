@@ -1,0 +1,22 @@
+{
+  "candidate": "bcb0e78ba1fca0622126a2e72885554ee3fc9e0e",
+  "tree": "9946698fef1a2b66b6f50ef4ab0d0172b98cc362",
+  "original_candidate": "32f72244ca8b0386915173eacbbb9f87e39d25ad",
+  "base": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+  "verdict": "PASS: original P2 malformed Windows WSL UNC fallback finding resolved; no remaining actionable finding identified",
+  "binary": {
+    "path": "/workspace/work/ssh-key-helper/target/debug/deps/gitcraft-31822f5b138c0fe8",
+    "sha256": "317b9450f7142030a3d1245bcf74f0e0479e9dbf235bfa11e4b69a7f9bde9c83"
+  },
+  "command": "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL /workspace/work/ssh-key-helper/target/debug/deps/gitcraft-31822f5b138c0fe8 ssh_ --nocapture",
+  "exit": 0,
+  "result": "41 passed; 0 failed; 0 ignored; 799 filtered out",
+  "log_sha256": "e1f08da2cad0740416b96d1f0c80239f5093016801b582f1dedfba8eaef24581",
+  "source_binding": "20 corrected source manifest paths and20 original Git-object hashes verified;18 manifest paths unchanged;only plan.rs/tests.rs differ;5 corrected logs verified;16 exact authors verified",
+  "independent_compile": false,
+  "ci_used": false,
+  "native_windows_runtime": false,
+  "native_windows_test_scope": "Actual correction fallback function executed on Linux with windows=true pure fixtures; native actual parse/palette tests inspected source only",
+  "prior_report": "SSH_HELPER_REVIEW.md verdict remains specific to original32f7224",
+  "combined_review": "Separate final combined-candidate review remains required"
+}
