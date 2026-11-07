@@ -6,7 +6,7 @@
 //! Steps (coordinates in points, window is 1400×860):
 //! `click:x,y`, `dclick:x,y`, `rclick:x,y`, `hover:x,y`, `drag:x1,y1,x2,y2`, `press:x,y` / `move:x,y` / `release:x,y` (a drag in parts), `leave` (pointer off the window), `open:path` (a repository in a new tab), `key:Escape`, `ckey:P` (Ctrl/Cmd+key), `size:w,h` (the window's size), `type:text`, `wait:ms`, `shot`.
 //! Each `shot` writes `<out-prefix>-<n>.png`.
-//! `scale:1.25` applies the application's UI scale, preserving the physical window size.
+//! `scale:1.25` sets the egui zoom factor for a capture. Reapply after changing app settings.
 
 use std::time::{Duration, Instant};
 
@@ -204,9 +204,7 @@ fn main() {
                 if let Ok(scale) = arg.parse::<f32>()
                     && scale.is_finite()
                 {
-                    let mut settings = gitcraft::settings::Settings::get(&harness.ctx);
-                    settings.ui_scale = scale.clamp(0.7, 2.0);
-                    settings.set(&harness.ctx);
+                    harness.ctx.set_zoom_factor(scale.clamp(0.7, 2.0));
                     settle(&mut harness, 300);
                 }
             }
