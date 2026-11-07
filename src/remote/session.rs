@@ -132,6 +132,10 @@ pub struct Output {
 
 /// Runs `req` on `host`, in one of the shells kept open there.
 pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
+    exec_inner(host, req, false)
+}
+
+fn exec_inner(host: &Host, req: &Request, cleanup: bool) -> Result<Output, String> {
     super::ui_guard::off_ui_thread(&req.what())?;
     let lane = req.lane();
     let pool = pool(host, lane);
@@ -155,7 +159,7 @@ pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
             // Hung: its shell is closed (`taken`, dropped), and the command stopped there.
             Err(Failure::TimedOut(pid)) => {
                 drop(taken);
-                if let Some(pid) = pid {
+                if !cleanup && let Some(pid) = pid {
                     stop(host.clone(), pid);
                 }
                 return Err(format!(
@@ -174,6 +178,14 @@ pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
 /// connecting, when there is none. For reads nobody asked for (the start page's look at a
 /// recent repository), which must never ask for a password nor start WSL.
 pub fn exec_if_connected(host: &Host, req: &Request) -> Option<Result<Output, String>> {
+    exec_if_connected_inner(host, req, false)
+}
+
+fn exec_if_connected_inner(
+    host: &Host,
+    req: &Request,
+    cleanup: bool,
+) -> Option<Result<Output, String>> {
     if let Err(e) = super::ui_guard::off_ui_thread(&req.what()) {
         return Some(Err(e));
     }
@@ -191,16 +203,19 @@ pub fn exec_if_connected(host: &Host, req: &Request) -> Option<Result<Output, St
         Err(Failure::TimedOut(pid)) => {
             drop(taken);
             // Stopped only through another shell open there: never a new connection.
-            if let Some(pid) = pid {
+            if !cleanup && let Some(pid) = pid {
                 let host = host.clone();
+                let cleanup = Cleanup::new();
                 std::thread::spawn(move || {
-                    let _ = exec_if_connected(
+                    let _cleanup = cleanup;
+                    let _ = exec_if_connected_inner(
                         &host,
                         &Request {
                             script: stop_script(pid),
                             timeout: Some(Duration::from_secs(30)),
                             ..Request::default()
                         },
+                        true,
                     );
                 });
             }
@@ -219,16 +234,54 @@ const UNASKED_FRESH: Duration = Duration::from_secs(240);
 /// processes are listed first, as one stopped leaves what it started to another parent. The
 /// thread doing it is given back, for a caller that has to wait for it.
 pub fn stop(host: Host, pid: u32) -> std::thread::JoinHandle<()> {
+    let cleanup = Cleanup::new();
     std::thread::spawn(move || {
-        let _ = exec(
+        let _cleanup = cleanup;
+        let _ = exec_inner(
             &host,
             &Request {
                 script: stop_script(pid),
                 timeout: Some(Duration::from_secs(30)),
                 ..Request::default()
             },
+            true,
         );
     })
+}
+
+static CLEANUPS: (std::sync::Mutex<usize>, std::sync::Condvar) =
+    (std::sync::Mutex::new(0), std::sync::Condvar::new());
+
+struct Cleanup;
+impl Cleanup {
+    fn new() -> Self {
+        *CLEANUPS
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
+        Self
+    }
+}
+impl Drop for Cleanup {
+    fn drop(&mut self) {
+        *CLEANUPS
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) -= 1;
+        CLEANUPS.1.notify_all();
+    }
+}
+pub(super) fn wait_for_cleanup() {
+    let mut active = CLEANUPS
+        .0
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    while *active != 0 {
+        active = CLEANUPS
+            .1
+            .wait(active)
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+    }
 }
 
 /// Stops the process `pid` on `host` and everything it started (see [`stop`]): a command the
@@ -239,13 +292,14 @@ pub fn stop_process(host: &Host, pid: u32) {
 
 /// [`stop`], waiting until it is done (from a thread that may wait).
 pub fn stop_now(host: &Host, pid: u32) {
-    let _ = exec(
+    let _ = exec_inner(
         host,
         &Request {
             script: stop_script(pid),
             timeout: Some(Duration::from_secs(30)),
             ..Request::default()
         },
+        true,
     );
 }
 
@@ -266,6 +320,31 @@ pub fn stop_script(pid: u32) -> String {
         ),
         pid = pid
     )
+}
+
+/// Prepared standalone stream for the shared asynchronous process service. Persistent
+/// shells and their protocol are deliberately unchanged.
+pub(crate) struct Streaming {
+    pub command: Command,
+    pub input: Vec<u8>,
+    pub ready: &'static str,
+    pub connected: Option<Box<dyn FnOnce() + Send>>,
+}
+
+pub(crate) fn streaming_command(host: &Host, req: &Request) -> Result<Streaming, String> {
+    super::ui_guard::off_ui_thread(&req.what())?;
+    let (command, attempt) = shell_command(host);
+    let input = format!(
+        "{MORE_PATH}\nprintf '\\n%s\\n' {READY}\n{}\n",
+        inline(req, "</dev/null")
+    )
+    .into_bytes();
+    Ok(Streaming {
+        command,
+        input,
+        ready: READY,
+        connected: attempt.map(|a| Box::new(move || a.connected()) as Box<dyn FnOnce() + Send>),
+    })
 }
 
 /// Starts `req` on `host` in a process of its own, whose output the caller reads as it comes

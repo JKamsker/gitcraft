@@ -7,25 +7,33 @@
 //! kept-open shell, whose answer only comes once the command has ended; that process says the
 //! command's process number there first, for stopping it.
 
+#[cfg(all(test, unix))]
 use std::io::Read;
 use std::path::Path;
-use std::process::{Child, Stdio};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{Arc, Mutex, mpsc};
-use std::time::{Duration, Instant};
+#[cfg(all(test, unix))]
+use std::process::Stdio;
+use std::sync::atomic::{AtomicU32, Ordering};
+#[cfg(all(test, unix))]
+use std::sync::mpsc;
+use std::sync::{Arc, Mutex};
+#[cfg(all(test, unix))]
+use std::time::Duration;
+use std::time::Instant;
 
 use super::{
     Credentials, Extra, Recorded, after_options, extra_for, failure_message, local_command,
 };
 use crate::git::progress::{Progress, ProgressReader, without_progress};
-use crate::remote::{self, Host, Target};
+#[cfg(all(test, unix))]
+use crate::remote::Host;
+use crate::remote::{self, Target};
 
 /// What a cancelled command fails with.
 pub const CANCELLED: &str = "cancelled";
 
 /// How the UI follows a running operation and stops it: shared with the thread that runs it.
 pub struct OpControl {
-    cancel: AtomicBool,
+    cancel: crate::tasks::Cancellation,
     progress: Mutex<Option<Progress>>,
     /// What each git call of the operation did so far, for the activity log.
     steps: Mutex<Vec<Recorded>>,
@@ -36,8 +44,15 @@ pub struct OpControl {
 impl OpControl {
     /// A control that calls `notify` when the progress moves.
     pub fn new(notify: impl Fn() + Send + Sync + 'static) -> Arc<Self> {
+        Self::scoped(notify, crate::tasks::Cancellation::default())
+    }
+
+    pub(crate) fn scoped(
+        notify: impl Fn() + Send + Sync + 'static,
+        cancel: crate::tasks::Cancellation,
+    ) -> Arc<Self> {
         Arc::new(Self {
-            cancel: AtomicBool::new(false),
+            cancel,
             progress: Mutex::new(None),
             steps: Mutex::new(Vec::new()),
             notify: Box::new(notify),
@@ -46,12 +61,17 @@ impl OpControl {
 
     /// Asks the operation to stop: the command running is stopped, and no step after it runs.
     pub fn cancel(&self) {
-        self.cancel.store(true, Ordering::SeqCst);
+        self.cancel.cancel();
+        crate::tasks::purge_cancelled();
         (self.notify)();
     }
 
     pub fn is_cancelled(&self) -> bool {
-        self.cancel.load(Ordering::SeqCst)
+        self.cancel.is_cancelled()
+    }
+
+    pub(crate) fn cancellation(&self) -> crate::tasks::Cancellation {
+        self.cancel.clone()
     }
 
     /// The latest progress the running command reported.
@@ -127,20 +147,12 @@ fn watched_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Req
 
 /// How a followed command ended.
 struct Ended {
+    stopped: Option<String>,
     code: Option<i32>,
     status: String,
     stdout: String,
     stderr: String,
 }
-
-/// How often the command is looked at (cancelled? ended?).
-const POLL: Duration = Duration::from_millis(40);
-
-/// How long the output of a command that ended is waited for.
-const DRAIN_FOR: Duration = Duration::from_secs(10);
-
-/// How long a cancelled command on another machine is given to say its process number.
-const PID_WAIT: Duration = Duration::from_secs(5);
 
 /// Runs the git command `args` in `dir` (on whichever machine it is), as [`super::run_with`]
 /// does (or [`super::run_unattended`] when `quiet`), following it through `control`: its
@@ -191,23 +203,8 @@ pub fn run_watched_recorded(
         ));
     }
     let target = dir.and_then(remote::parse);
-    let spawned = match &target {
-        Some(t) => remote::spawn(&t.host, &watched_request(t, &extra, &words))
-            .map(|c| (c, Some(t.host.clone()))),
-        None => spawn_here(dir, &extra, &words).map(|c| (c, None)),
-    };
-    let (child, host) = match spawned {
-        Ok(spawned) => spawned,
-        Err(e) => return failed(e),
-    };
-    let mut ended = match follow(child, host.as_ref(), control) {
+    let mut ended = match follow_command(dir, &extra, &words, target.as_ref(), control) {
         Ok(ended) => ended,
-        Err(e) if e == CANCELLED => {
-            return (
-                Err(e),
-                Recorded::new(&words, None, "Stopped: cancelled", creds, started),
-            );
-        }
         Err(e) => return failed(e),
     };
     let failed_hook = if target.is_some() && extra.trace_hooks {
@@ -225,6 +222,9 @@ pub fn run_watched_recorded(
         creds,
         started,
     );
+    if let Some(reason) = ended.stopped {
+        return (Err(reason), recorded);
+    }
     if ended.code == Some(0) {
         return (Ok(ended.stdout), recorded);
     }
@@ -249,163 +249,76 @@ pub fn run_watched_recorded(
     (Err(e), recorded)
 }
 
-fn spawn_here(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Child, String> {
-    local_command(dir, extra, args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("could not run git: {e}"))
-}
-
-/// Waits for `child` (git here, or the process that runs it on `host`), reading its output and
-/// reporting its progress, and stops it when `control` is cancelled (or, elsewhere, when it
-/// runs past the time a network operation may take there).
-fn follow(
-    mut child: Child,
-    host: Option<&Host>,
+/// Drains both pipes and writes input on the process service's single event loop. Only
+/// the existing synchronous caller waits, on a bounded background worker.
+fn follow_command(
+    dir: Option<&Path>,
+    extra: &Extra,
+    args: &[&str],
+    target: Option<&Target>,
     control: &Arc<OpControl>,
 ) -> Result<Ended, String> {
-    let (out_tx, out_rx) = mpsc::channel();
-    if let Some(mut stdout) = child.stdout.take() {
-        std::thread::spawn(move || {
-            let mut bytes = Vec::new();
-            let _ = stdout.read_to_end(&mut bytes);
-            let _ = out_tx.send(String::from_utf8_lossy(&bytes).into_owned());
-        });
-    }
     let remote_pid = Arc::new(AtomicU32::new(0));
-    let (err_tx, err_rx) = mpsc::channel();
-    if let Some(stderr) = child.stderr.take() {
-        let reader = if host.is_some() {
-            ProgressReader::with_marker(PID_MARKER)
-        } else {
-            ProgressReader::default()
-        };
-        read_errors(
-            stderr,
-            reader,
-            Arc::clone(control),
-            Arc::clone(&remote_pid),
-            err_tx,
-        );
-    }
-    let deadline = host.map(|_| Instant::now() + remote::NETWORK_LIMIT);
-    let status = loop {
-        // Ended first: what it did stands, even when Cancel came meanwhile.
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) => {}
-            Err(e) => return Err(format!("could not follow git: {e}")),
-        }
-        if control.is_cancelled() {
-            stop(&mut child, host, &remote_pid);
-            return Err(CANCELLED.to_owned());
-        }
-        if deadline.is_some_and(|d| Instant::now() > d) {
-            stop(&mut child, host, &remote_pid);
-            let minutes = remote::NETWORK_LIMIT.as_secs().div_ceil(60);
-            let place = host.map(Host::label).unwrap_or_default();
-            return Err(format!(
-                "git didn't finish within {minutes} minutes on {place} and was stopped"
-            ));
-        }
-        std::thread::sleep(POLL);
+    let reader = Arc::new(Mutex::new(if target.is_some() {
+        ProgressReader::with_marker(PID_MARKER)
+    } else {
+        ProgressReader::default()
+    }));
+    let mut options = crate::processes::Options {
+        background: true,
+        ..Default::default()
     };
-    let code = status.code();
-    Ok(Ended {
-        code,
-        status: match host {
-            Some(_) => format!("exit status: {}", code.unwrap_or(-1)),
-            None => status.to_string(),
-        },
-        // Something git left running (a hook's background job) may hold the pipes open.
-        stdout: out_rx.recv_timeout(DRAIN_FOR).unwrap_or_default(),
-        stderr: err_rx.recv_timeout(DRAIN_FOR).unwrap_or_else(|_| {
-            "(git ended, but something it started kept its output open)".to_owned()
-        }),
-    })
-}
-
-/// Reads `stderr` in the background into `reader`, telling `control` each new progress line,
-/// and `pid` the process number the marker line gives; sends the text read when it ends.
-fn read_errors(
-    mut stderr: std::process::ChildStderr,
-    mut reader: ProgressReader,
-    control: Arc<OpControl>,
-    pid: Arc<AtomicU32>,
-    done: mpsc::Sender<String>,
-) {
-    std::thread::spawn(move || {
-        let mut buf = [0u8; 8192];
-        loop {
-            match stderr.read(&mut buf) {
-                Ok(0) | Err(_) => break,
-                Ok(n) => {
-                    if reader.feed(&buf[..n]) {
-                        control.set_progress(reader.latest().cloned());
-                    }
-                    if pid.load(Ordering::SeqCst) == 0
-                        && let Some(n) = reader.marked().and_then(|m| m.parse().ok())
-                    {
-                        pid.store(n, Ordering::SeqCst);
-                    }
+    let command = match target {
+        Some(target) => {
+            let streaming =
+                remote::streaming_command(&target.host, &watched_request(target, extra, args))?;
+            options.input = Some(streaming.input);
+            options.stdout_ready = Some(streaming.ready);
+            options.timeout = Some(remote::NETWORK_LIMIT);
+            options.ready = streaming.connected;
+            let (host, pid) = (target.host.clone(), Arc::clone(&remote_pid));
+            options.stop_remote = Some(Box::new(move || {
+                let pid = pid.load(Ordering::SeqCst);
+                if pid != 0 {
+                    remote::stop_now(&host, pid);
                 }
-            }
+            }));
+            let pid = Arc::clone(&remote_pid);
+            options.stop_ready = Some(Box::new(move || pid.load(Ordering::SeqCst) != 0));
+            streaming.command
         }
-        let _ = done.send(reader.finish());
-    });
-}
-
-/// Stops `child` and what it started: on another machine (`host`) the command there by its
-/// process number, here the whole tree of processes; then the process itself.
-///
-/// Elsewhere, the process number may not have come yet: it is waited for a moment (the local
-/// ssh alone, killed, would leave git running there). The command there is stopped before this
-/// returns, so that what follows (removing a cancelled clone, the next operation) doesn't race
-/// it.
-fn stop(child: &mut Child, host: Option<&Host>, remote_pid: &AtomicU32) {
-    match host {
-        Some(host) => {
-            let start = Instant::now();
-            let mut pid = remote_pid.load(Ordering::SeqCst);
-            while pid == 0 && start.elapsed() < PID_WAIT && matches!(child.try_wait(), Ok(None)) {
-                std::thread::sleep(POLL);
-                pid = remote_pid.load(Ordering::SeqCst);
-            }
-            if pid != 0 {
-                remote::stop_now(host, pid);
-            }
+        None => local_command(dir, extra, args),
+    };
+    let followed = Arc::clone(control);
+    options.cancelled = Some(Box::new(move || followed.is_cancelled()));
+    let followed = Arc::clone(control);
+    let reading = Arc::clone(&reader);
+    let pid = Arc::clone(&remote_pid);
+    options.stderr = Some(Box::new(move |chunk| {
+        let mut reader = reading
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if reader.feed(chunk) {
+            followed.set_progress(reader.latest().cloned());
         }
-        None => stop_here(child.id()),
-    }
-    let _ = child.kill();
-    let _ = child.wait();
-}
-
-/// Stops the process `pid` of this machine and everything it started (git runs helpers:
-/// `git-remote-https`, `ssh`), as one that hung on another machine is.
-fn stop_here(pid: u32) {
-    #[cfg(unix)]
-    let mut cmd = {
-        let mut cmd = std::process::Command::new("sh");
-        cmd.arg("-c").arg(remote::stop_script(pid));
-        cmd
-    };
-    #[cfg(windows)]
-    let mut cmd = {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        let mut cmd = std::process::Command::new("taskkill");
-        cmd.args(["/PID", &pid.to_string(), "/T", "/F"]);
-        cmd.creation_flags(CREATE_NO_WINDOW);
-        cmd
-    };
-    let _ = cmd
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
+        if let Some(n) = reader.marked().and_then(|n| n.parse().ok()) {
+            pid.store(n, Ordering::SeqCst);
+        }
+    }));
+    let out = crate::processes::run(command, options)?;
+    let stderr = std::mem::take(
+        &mut *reader
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+    )
+    .finish();
+    Ok(Ended {
+        stopped: out.stopped,
+        code: out.status.code(),
+        status: out.status.to_string(),
+        stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
+        stderr,
+    })
 }
 
 #[cfg(test)]
@@ -650,6 +563,44 @@ mod tests {
         assert!(stopped.1.is_some());
         assert_ne!(stopped.0, Some(0));
         assert!(took < Duration::from_secs(15), "took {took:?}");
+        Ok(())
+    }
+    #[cfg(unix)]
+    #[test]
+    fn remote_stream_progress_cancel_and_partial_output_use_the_event_loop() -> Result<(), String> {
+        let dir = scratch("async-remote")?;
+        let repo = std::path::PathBuf::from(format!("ssh://{}{}", remote::LOOPBACK, dir.display()));
+        let control = OpControl::new(|| {});
+        let cancel = Arc::clone(&control);
+        let canceller = std::thread::spawn(move || {
+            let start = Instant::now();
+            while cancel.progress().is_none() && start.elapsed() < Duration::from_secs(10) {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            let progress = cancel.progress();
+            cancel.cancel();
+            progress
+        });
+        let (result, recorded) = run_watched_recorded(
+            Some(&repo),
+            &[
+                "-c",
+                "alias.stream=!printf partial-output; printf 'Receiving objects: 42%% (42/100)\\r' >&2; sleep 60",
+                "stream",
+            ],
+            None,
+            false,
+            &control,
+        );
+        let progress = canceller.join().map_err(|_| "canceller panicked")?;
+        let _ = std::fs::remove_dir_all(dir);
+        assert_eq!(result, Err(CANCELLED.into()));
+        assert_eq!(progress.and_then(|p| p.percent), Some(42));
+        assert!(
+            recorded.output.contains("partial-output"),
+            "{}",
+            recorded.output
+        );
         Ok(())
     }
 }

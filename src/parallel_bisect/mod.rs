@@ -21,6 +21,7 @@ mod tests;
 
 pub use cache::TreeCache;
 pub use machine::Machine;
+pub(crate) use session::shutdown;
 pub use session::{Event, Handle, Outcome, Setup, start};
 pub use verdict::Verdict;
 

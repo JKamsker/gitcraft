@@ -87,53 +87,57 @@ impl RepoTab {
                 let refs = git::refs(&path)?;
                 visibility.prune(&refs);
                 let log_from = visibility.revisions(&refs);
-                // Independent reads, side by side: a reload waits for the slowest of them
-                // rather than for all of them in turn.
+                // Leaf reads share one fixed pool across every tab. The parent waits in
+                // the job pool; no reload creates its own scoped OS threads.
+                let history = {
+                    let (path, from) = (path.clone(), log_from.clone());
+                    crate::tasks::read(move || git::log(&path, from.as_deref(), order, 0, count))?
+                };
+                let work_trees = {
+                    let path = path.clone();
+                    crate::tasks::read(move || {
+                        let work = git::status(&path)?;
+                        let changes = Some(work.changed_files());
+                        let worktrees = if crate::remote::is_remote(&path) {
+                            git::worktree_list(&path, changes)
+                        } else {
+                            git::worktrees(&path, changes)
+                        }
+                        .unwrap_or_default();
+                        Ok::<_, String>((work, worktrees))
+                    })?
+                };
+                let stashes = {
+                    let path = path.clone();
+                    crate::tasks::read(move || git::stashes(&path).unwrap_or_default())?
+                };
+                let remotes = {
+                    let path = path.clone();
+                    crate::tasks::read(move || git::remotes(&path).unwrap_or_default())?
+                };
+                let submodules = {
+                    let path = path.clone();
+                    crate::tasks::read(move || git::submodules(&path).unwrap_or_default())?
+                };
+                let lfs = {
+                    let path = path.clone();
+                    crate::tasks::read(move || git::uses_lfs(&path) && git::lfs_installed(&path))?
+                };
+                let issues = {
+                    let path = path.clone();
+                    crate::tasks::read(move || super::issue_work::read(&path))?
+                };
+                let identity = git::identity(&path);
+                let history = history.join()??.into_iter().map(Arc::new).collect();
+                let (work, worktrees) = work_trees.join()??;
+                let (stashes, remotes, submodules, lfs, issues) = (
+                    stashes.join()?,
+                    remotes.join()?,
+                    submodules.join()?,
+                    lfs.join()?,
+                    issues.join()?,
+                );
                 let path = path.as_path();
-                let (history, work, worktrees, stashes, remotes, submodules, lfs, identity, issues) =
-                    std::thread::scope(|scope| {
-                        let history =
-                            scope.spawn(|| git::log(path, log_from.as_deref(), order, 0, count));
-                        let work_trees = scope.spawn(|| {
-                            let work = git::status(path)?;
-                            let changes = Some(work.changed_files());
-                            // Very old gits have no `worktree list`; the section just stays
-                            // empty.
-                            // Elsewhere, the others are counted after the tab shows.
-                            let worktrees = if crate::remote::is_remote(path) {
-                                git::worktree_list(path, changes)
-                            } else {
-                                git::worktrees(path, changes)
-                            };
-                            let worktrees = worktrees.unwrap_or_default();
-                            Ok::<_, String>((work, worktrees))
-                        });
-                        let stashes = scope.spawn(|| git::stashes(path).unwrap_or_default());
-                        let remotes = scope.spawn(|| git::remotes(path).unwrap_or_default());
-                        let submodules = scope.spawn(|| git::submodules(path).unwrap_or_default());
-                        let lfs = scope.spawn(|| git::uses_lfs(path) && git::lfs_installed(path));
-                        let issues = scope.spawn(|| super::issue_work::read(path));
-                        let identity = git::identity(path);
-                        let join = |e| format!("Reading the repository failed: {e:?}");
-                        let history: Vec<Arc<Commit>> = history
-                            .join()
-                            .map_err(join)??
-                            .into_iter()
-                            .map(Arc::new)
-                            .collect();
-                        let (work, worktrees) = work_trees.join().map_err(join)??;
-                        Ok::<_, String>((
-                            history,
-                            work,
-                            worktrees,
-                            stashes.join().map_err(join)?,
-                            remotes.join().map_err(join)?,
-                            submodules.join().map_err(join)?,
-                            lfs.join().map_err(join)?,
-                            identity,
-                            issues.join().map_err(join)?,
-                        ))
-                    })?;
                 let hosting = forge::detect(path, &remotes);
                 Ok(Box::new(Loaded {
                     refs,
@@ -413,6 +417,9 @@ impl RepoTab {
             .map(|w| (w.path.clone(), w.changes))
             .collect();
         self.worktrees = loaded.worktrees;
+        if crate::remote::is_remote(&self.path) {
+            self.tx.repo = self.repo_key().to_owned();
+        }
         self.timeline_read(loaded.read, ctx);
         self.fold_loaded(loaded.read, state, ctx);
         let remote = crate::remote::is_remote(&self.path);

@@ -836,3 +836,127 @@ fn the_command_line_opens_a_file_s_blame_at_a_line() -> Result<(), String> {
     assert_eq!(goto, Some(2));
     Ok(())
 }
+
+/// Closing a tab cancels its in-flight local command, including its descendants.
+#[test]
+fn closing_a_tab_stops_its_background_child() -> Result<(), String> {
+    let dir = repo("close-process");
+    let ctx = egui::Context::default();
+    let tab = super::RepoTab::new_deferred(dir.clone(), &ctx);
+    let marker = dir.join("started");
+    let effect = dir.join("survived");
+    let descendant = format!(
+        "printf started > {}; sleep 1; printf survived > {}",
+        crate::remote::sh_quote(&marker.to_string_lossy()),
+        crate::remote::sh_quote(&effect.to_string_lossy())
+    );
+    let script = format!("sh -c {} & wait", crate::remote::sh_quote(&descendant));
+    let (done, result) = std::sync::mpsc::channel();
+    let path = dir.clone();
+    super::spawn(&tab.tx, &ctx, move || {
+        let ran = git::run_shell(&path, &script).map(|_| ());
+        let _ = done.send(ran);
+        super::Msg::Then(Box::new(|_, _| {}))
+    });
+    let start = std::time::Instant::now();
+    while !marker.exists() {
+        if start.elapsed() > std::time::Duration::from_secs(10) {
+            return Err("child did not start".into());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    drop(tab);
+    let ran = result
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .map_err(|e| e.to_string())?;
+    assert_eq!(ran, Err("cancelled".into()));
+    std::thread::sleep(std::time::Duration::from_millis(1200));
+    let survived = effect.exists();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        !survived,
+        "the cancelled descendant performed its delayed write"
+    );
+    Ok(())
+}
+
+/// Shared refs and stashes are serialized even before either worktree starts loading.
+#[test]
+fn linked_worktrees_share_a_mutation_key_before_the_first_load() -> Result<(), String> {
+    let dir = repo("shared-mutation-key");
+    let linked = dir.join("linked");
+    git::run(
+        Some(&dir),
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "-b",
+            "linked",
+            &linked.to_string_lossy(),
+        ],
+    )?;
+    assert_eq!(
+        super::messages::mutation_key(&dir),
+        super::messages::mutation_key(&linked)
+    );
+    let _ = std::fs::remove_dir_all(dir);
+    Ok(())
+}
+
+#[test]
+fn feature_failure_continuation_runs_when_a_queued_job_is_cancelled() -> Result<(), String> {
+    let ctx = egui::Context::default();
+    let mut tab = super::RepoTab::new_deferred("gitcraft-cancelled-completion".into(), &ctx);
+    tab.tx.cancel.cancel();
+    tab.then_or(
+        &ctx,
+        false,
+        Err,
+        || Ok::<_, String>(()),
+        |tab, found, _| {
+            tab.status = Some((
+                found.err().unwrap_or_else(|| "cancelled work ran".into()),
+                true,
+            ));
+        },
+    );
+    let start = std::time::Instant::now();
+    while tab.status.is_none() && start.elapsed() < std::time::Duration::from_secs(5) {
+        tab.poll(&ctx);
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    assert_eq!(tab.status, Some(("cancelled".into(), true)));
+    Ok(())
+}
+
+/// Repeated reload requests coalesce while the first read runs; no thread per request.
+#[test]
+fn rapid_reloads_finish_and_coalesce() {
+    let dir = repo("rapid-reloads");
+    let ctx = egui::Context::default();
+    let mut tab = super::RepoTab::new(dir.clone(), &ctx);
+    let settle = |tab: &mut super::RepoTab| {
+        let start = std::time::Instant::now();
+        while tab.loading || tab.reload_again {
+            tab.poll(&ctx);
+            assert!(start.elapsed() < std::time::Duration::from_secs(20));
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    };
+    settle(&mut tab);
+    let before = tab.reads;
+    for _ in 0..100 {
+        tab.reload(&ctx);
+    }
+    assert_eq!(tab.reads, before + 1);
+    assert!(tab.reload_again);
+    settle(&mut tab);
+    assert!(!tab.loading);
+    assert!(!tab.reload_again);
+    assert!(tab.load_error.is_none());
+    assert!(tab.history.iter().any(|commit| commit.summary == "base"));
+    assert!(tab.reads <= before + 3); // a watcher arriving may also request a recheck
+    drop(tab);
+    let _ = std::fs::remove_dir_all(dir);
+}

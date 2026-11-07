@@ -108,8 +108,10 @@ fn assert_clean(dir: &Path) -> Result<(), String> {
 fn command(log: &Path) -> String {
     format!(
         "git rev-parse HEAD^{{tree}} >> '{}'; [ -e skip ] && exit 125; \
-         [ -e slow ] && sleep 6789; test ! -e bug",
-        sh_path(log)
+         if [ -e slow ]; then sleep 6789 & sleeper=$!; echo \"$sleeper\" >> '{}'; \
+         wait \"$sleeper\"; fi; test ! -e bug",
+        sh_path(log),
+        sh_path(&log.with_extension("pids"))
     )
 }
 
@@ -161,11 +163,42 @@ fn assert_each_tree_once(log: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Whether a process running `sleep 6789` is left (Unix: `ps`).
+/// Check only this fixture's sleepers: other bisect tests can run at the same time.
+/// SIGKILL delivery is asynchronous, and an orphaned zombie has already stopped.
 #[cfg(unix)]
-fn sleepers_left() -> bool {
-    let out = git::run(None, &["-c", "alias.x=!ps -A -o args= || true", "x"]).unwrap_or_default();
-    out.lines().any(|l| l.trim() == "sleep 6789")
+fn sleepers_stopped(log: &Path) -> Result<bool, String> {
+    let pids = std::fs::read_to_string(log.with_extension("pids")).map_err(|e| e.to_string())?;
+    let pids = pids
+        .lines()
+        .map(|pid| pid.parse::<u32>().map_err(|e| e.to_string()))
+        .collect::<Result<Vec<_>, _>>()?;
+    assert!(!pids.is_empty(), "no slow test started");
+    let pids = pids
+        .iter()
+        .map(u32::to_string)
+        .collect::<Vec<_>>()
+        .join(",");
+    let until = Instant::now() + Duration::from_secs(3);
+    loop {
+        let out = std::process::Command::new("ps")
+            .args(["-o", "stat=", "-p", &pids])
+            .output()
+            .map_err(|e| e.to_string())?;
+        // ps exits 1 when none of the selected processes exist.
+        if !matches!(out.status.code(), Some(0 | 1)) {
+            return Err(String::from_utf8_lossy(&out.stderr).into_owned());
+        }
+        if String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .all(|state| state.trim().starts_with('Z'))
+        {
+            return Ok(true);
+        }
+        if Instant::now() >= until {
+            return Ok(false);
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
 }
 
 #[test]
@@ -328,7 +361,10 @@ fn a_test_past_its_limit_is_stopped_and_skipped() -> Result<(), String> {
     )));
     assert!(started.elapsed() < Duration::from_secs(120));
     #[cfg(unix)]
-    assert!(!sleepers_left(), "the test that timed out still runs");
+    assert!(
+        sleepers_stopped(&dir.join("trees"))?,
+        "the test that timed out still runs"
+    );
     repo.assert_clean()?;
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())
@@ -418,7 +454,10 @@ fn cancelling_stops_the_tests_and_removes_the_worktrees() -> Result<(), String> 
         started.elapsed()
     );
     #[cfg(unix)]
-    assert!(!sleepers_left(), "a cancelled test still runs");
+    assert!(
+        sleepers_stopped(&dir.join("trees"))?,
+        "a cancelled test still runs"
+    );
     repo.assert_clean()?;
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())

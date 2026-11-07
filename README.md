@@ -1404,6 +1404,9 @@ The default syntax highlighter compiles bundled Oniguruma with the platform's C 
 For reproducible CPU benchmarks, stack profiles and source-line coverage, see
 [CPU performance](docs/cpu-performance.md) and the [workflow suite](docs/cpu-workflows.md).
 
+For subprocess limits, lifecycle handling and before/after stress measurements, see
+[Process orchestration](docs/process-orchestration.md).
+
 Linux needs the usual eframe system packages (e.g. `libxkbcommon-dev`, `libgtk-3-dev` for the
 file dialogs, `libdbus-1-dev` for notifications). Pull requests need the GitHub CLI (`gh`) or
 GitLab CLI (`glab`), logged in.

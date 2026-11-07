@@ -122,6 +122,8 @@ struct Ran {
 /// Options before the subcommand, and variables, a call is run with on top of [`GIT_ENV`].
 #[derive(Clone, Default)]
 pub(super) struct Extra {
+    output_limit: Option<usize>,
+    stdout_file: Option<PathBuf>,
     pre: Vec<&'static str>,
     env: Vec<(&'static str, String)>,
     /// What git reads on its input; nothing when `None`.
@@ -161,12 +163,24 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
             trace.path().to_string_lossy().into_owned(),
         ));
     }
-    let mut cmd = local_command(dir, &extra, args);
-    let out = match &extra.stdin {
-        Some(input) => output_with_input(cmd, input),
-        None => cmd.output(),
-    }
-    .map_err(|e| format!("could not run git: {e}"))?;
+    let cmd = local_command(dir, &extra, args);
+    let out = crate::processes::run(
+        cmd,
+        crate::processes::Options {
+            input: extra.stdin.clone(),
+            stdout_file: extra
+                .stdout_file
+                .as_ref()
+                .map(std::fs::File::create)
+                .transpose()
+                .map_err(|e| format!("could not save output: {e}"))?,
+            output_limit: extra.output_limit.unwrap_or(64 << 20),
+            background: extra.long || extra.tool || extra.test.is_some() || goes_over_network(args),
+            timeout: extra.timeout,
+            ..Default::default()
+        },
+    )?
+    .complete()?;
     super::doctor::hook_log::record(dir, args, out.status.success(), &out.stderr);
     let failed = !out.status.success();
     Ok(Ran {
@@ -179,7 +193,7 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
 }
 
 /// git with `args` in `dir` on this machine, `extra` before them.
-fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Command {
+pub(super) fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Command {
     let mut cmd = git_cmd();
     with_profile(&mut cmd, args);
     if let Some(dir) = dir {
@@ -191,28 +205,6 @@ fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Command {
     }
     cmd.args(args);
     cmd
-}
-
-/// Runs `cmd` with `input` on its input, written from a thread of its own: git may answer
-/// before it has read all of it, and a full pipe both ways would wait for good.
-fn output_with_input(mut cmd: Command, input: &[u8]) -> std::io::Result<std::process::Output> {
-    use std::io::Write;
-    use std::process::Stdio;
-    cmd.stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = cmd.spawn()?;
-    let stdin = child.stdin.take();
-    let input = input.to_vec();
-    let writer = std::thread::spawn(move || {
-        if let Some(mut stdin) = stdin {
-            // Git that stopped reading (it failed) says why on its error output.
-            let _ = stdin.write_all(&input);
-        }
-    });
-    let out = child.wait_with_output();
-    let _ = writer.join();
-    out
 }
 
 /// The request that runs git with `args` in `target`'s folder, on its machine.
@@ -444,36 +436,14 @@ pub fn run_captured(dir: &Path, args: &[&str], input: Option<&[u8]>) -> Result<C
 
 /// Runs git here in `dir` with `input` on its standard input.
 fn run_here_with_input(dir: &Path, args: &[&str], input: &[u8]) -> Result<Ran, String> {
-    use std::io::Write;
-    use std::process::Stdio;
-    let mut cmd = git_cmd();
-    with_profile(&mut cmd, args);
-    cmd.arg("-C").arg(dir).args(args);
-    cmd.stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = cmd.spawn().map_err(|e| format!("could not run git: {e}"))?;
-    // Written from a thread of its own: git may fill its output before it has read it all.
-    let writer = child.stdin.take().map(|mut stdin| {
-        let input = input.to_vec();
-        std::thread::spawn(move || stdin.write_all(&input))
-    });
-    let out = child
-        .wait_with_output()
-        .map_err(|e| format!("could not run git: {e}"))?;
-    // Git stopping before it read it all (a broken pipe) says what it has to say itself.
-    if let Some(Ok(Err(e))) = writer.map(std::thread::JoinHandle::join)
-        && e.kind() != std::io::ErrorKind::BrokenPipe
-    {
-        return Err(format!("could not pass git its input: {e}"));
-    }
-    Ok(Ran {
-        code: out.status.code(),
-        status: out.status.to_string(),
-        stdout: out.stdout,
-        stderr: out.stderr,
-        failed_hook: None,
-    })
+    execute(
+        Some(dir),
+        &Extra {
+            stdin: Some(input.to_vec()),
+            ..Extra::default()
+        },
+        args,
+    )
 }
 
 /// [`run`] with variables of its own on top of what every call gets (`GIT_INDEX_FILE` for a
@@ -503,9 +473,41 @@ pub fn run_env(
 
 /// Runs git and returns stdout as raw bytes (file contents: images…).
 pub fn run_bytes(dir: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
-    let out = execute(dir, &Extra::default(), args)?;
+    // Blob callers already return a Vec, but need more headroom than command diagnostics.
+    // Keep a finite per-read bound rather than allowing arbitrary process output in memory.
+    let out = execute(
+        dir,
+        &Extra {
+            output_limit: Some(512 << 20),
+            ..Default::default()
+        },
+        args,
+    )?;
     if out.code == Some(0) {
         Ok(out.stdout)
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
+    }
+}
+
+/// Save a command's stdout without capturing a local export in memory. Remote exports
+/// retain the existing persistent-shell transport and its binary-output behavior.
+pub fn run_to_file(dir: &Path, args: &[&str], file: &Path) -> Result<(), String> {
+    if remote::is_remote(dir) {
+        return run_bytes(Some(dir), args).and_then(|bytes| {
+            std::fs::write(file, bytes).map_err(|e| format!("could not save it: {e}"))
+        });
+    }
+    let out = execute(
+        Some(dir),
+        &Extra {
+            stdout_file: Some(file.to_owned()),
+            ..Default::default()
+        },
+        args,
+    )?;
+    if out.code == Some(0) {
+        Ok(())
     } else {
         Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
     }
@@ -1005,6 +1007,32 @@ mod tests {
     use std::process::Stdio;
 
     use super::*;
+
+    #[test]
+    fn large_binary_reads_and_file_exports_exceed_the_diagnostic_capture_bound()
+    -> Result<(), String> {
+        let dir =
+            std::env::temp_dir().join(format!("gitcraft-large-output-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        run(Some(&dir), &["init", "-q"])?;
+        let blob = dir.join("large.bin");
+        let mut file = std::fs::File::create(&blob).map_err(|e| e.to_string())?;
+        let chunk = vec![0; 1 << 20];
+        for _ in 0..65 {
+            file.write_all(&chunk).map_err(|e| e.to_string())?;
+        }
+        drop(file);
+        let hash = run(Some(&dir), &["hash-object", "-w", "large.bin"])?;
+        let args = ["cat-file", "blob", hash.trim()];
+        let captured = run_bytes(Some(&dir), &args)?.len();
+        let export = dir.join("export.bin");
+        run_to_file(&dir, &args, &export)?;
+        let saved = std::fs::metadata(&export).map_err(|e| e.to_string())?.len();
+        let _ = std::fs::remove_dir_all(dir);
+        assert_eq!(captured, 65 << 20);
+        assert_eq!(saved, captured as u64);
+        Ok(())
+    }
 
     /// Network operations go to shells of their own on another machine; reads don't.
     #[test]
