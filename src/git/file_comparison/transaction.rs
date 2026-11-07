@@ -311,6 +311,9 @@ mod correction_tests {
         let script = remote_apply_script(&lens, "fixture patch", false)?;
         assert!(script.contains("requires Python 3"));
         assert!(script.contains("O_NOFOLLOW"));
+        assert!(script.contains("resource.setrlimit(resource.RLIMIT_FSIZE"));
+        assert!(script.contains("stdout=stdout, stderr=stderr"));
+        assert!(!script.contains("subprocess.PIPE"));
         assert!(script.contains("O_EXCL"));
         assert!(script.contains("src_dir_fd=recovery,dst_dir_fd=parent,follow_symlinks=False"));
         assert!(script.contains("os.fchown"));

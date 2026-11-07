@@ -1,21 +1,27 @@
 # Fixed remote transaction program; stdin is data, never executable repository input.
 # Python 3 + its standard library supply no-follow dir-fd I/O and native ACL snapshots.
-import base64, ctypes, errno, hashlib, json, os, stat, subprocess, sys, tempfile, time
+import base64, ctypes, errno, hashlib, json, os, resource, stat, subprocess, sys, tempfile, time
 LIMIT = 16 * 1024 * 1024
+# Limit spool/index writes for this owned helper and its Git children. Output is
+# spooled rather than accumulated by communicate(); oversized producers fail under
+# the OS file-size limit without PID discovery or manual signal selection.
+resource.setrlimit(resource.RLIMIT_FSIZE, (LIMIT + 1, LIMIT + 1))
 DEADLINE = time.monotonic() + 40
 payload = json.load(sys.stdin)
 def decode(key): return base64.b64decode(payload[key], validate=True)
 def git(args, index=None, absent=False):
     env = os.environ.copy()
     if index is not None: env['GIT_INDEX_FILE'] = index
-    out = subprocess.run(['git', '--no-lazy-fetch', '--literal-pathspecs'] + args,
-                         env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                         timeout=max(0.1, DEADLINE-time.monotonic()))
-    if out.returncode != 0 and not (absent and out.returncode == 1):
-        raise RuntimeError('Git index transaction command failed')
-    if len(out.stdout) > LIMIT or out.stderr:
-        raise RuntimeError('Git transaction output is unsupported or exceeds limit')
-    return out.stdout
+    with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
+        out = subprocess.run(['git', '--no-lazy-fetch', '--literal-pathspecs'] + args,
+                             env=env, stdout=stdout, stderr=stderr,
+                             timeout=max(0.1, DEADLINE-time.monotonic()))
+        if out.returncode != 0 and not (absent and out.returncode == 1):
+            raise RuntimeError('Git index transaction command failed')
+        if stdout.tell() > LIMIT or stderr.tell() != 0:
+            raise RuntimeError('Git transaction output is unsupported or exceeds limit')
+        stdout.seek(0)
+        return stdout.read(LIMIT + 1)
 
 def config(name): return git(['config','--get',name], absent=True)
 def native_acl(fd):
