@@ -567,7 +567,7 @@ pub(super) fn script(args: HookScript<'_>) -> String {
         })
         .unwrap_or_default();
     let payload = format!(
-        r#"case "$1" in prepared|committed|aborted) ;; *) exit 1 ;; esac
+        r#"case "$1" in preparing|prepared|committed|aborted) ;; *) exit 1 ;; esac
 directory=$(dirname "$0")
 command -v cmp >/dev/null && command -v cp >/dev/null || exit 1
 if [ "$(cat "$directory/mode")" = probe ]; then

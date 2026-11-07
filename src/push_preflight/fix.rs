@@ -201,15 +201,18 @@ pub(crate) fn fix(repo: &Path, plan: &Plan, kind: &str) -> Result<String, String
                     &env,
                 )?;
             }
-            let attributes = git::forecast_run(
-                repo,
-                &["show", &format!("{tree}:.gitattributes")],
-                &[("GIT_NO_LAZY_FETCH", "1".into())],
-                &[0, 128],
-                &|| true,
-            )
-            .map_err(|_| "Could not read attributes")?;
-            let mut attributes = attributes;
+            // Missing attributes are ordinary, not a failed `show` whose diagnostic
+            // would be rejected by the strict read transport. Read only a pinned blob.
+            let attr_oid = entries
+                .split('\0')
+                .filter_map(|entry| entry.split_once('\t'))
+                .find(|(_, path)| *path == ".gitattributes")
+                .and_then(|(meta, _)| meta.split_whitespace().nth(2));
+            let mut attributes = if let Some(oid) = attr_oid {
+                run(&["cat-file", "blob", oid], &[])?
+            } else {
+                String::new()
+            };
             if !attributes.ends_with('\n') && !attributes.is_empty() {
                 attributes.push('\n');
             }
