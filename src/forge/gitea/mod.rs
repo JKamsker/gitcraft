@@ -60,6 +60,11 @@ pub(super) fn ssh_key_api(hosting: &Hosting) -> Api {
     }
 }
 
+/// History reads use the same captured tea/account selection as ordinary forge pages.
+pub(super) fn history_api(hosting: &Hosting) -> Api {
+    ssh_key_api(hosting)
+}
+
 impl GiteaFamily {
     fn api(&self, hosting: &Hosting) -> Api {
         Api::new(

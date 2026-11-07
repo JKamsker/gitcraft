@@ -96,6 +96,80 @@ pub(super) fn run_with_input(
     }
 }
 
+/// Narrow bounded read API for history cards. It uses the ordinary captured account
+/// routing, outside repository-local CLI config, and never exposes raw diagnostics.
+pub(super) fn history_api(
+    hosting: &super::Hosting,
+    endpoint: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<serde_json::Value, String> {
+    let (tool, forge) = match hosting.forge {
+        Forge::GitHub => ("gh", Forge::GitHub),
+        Forge::GitLab => ("glab", Forge::GitLab),
+        _ => return Err("This forge uses its HTTP API".into()),
+    };
+    let authority = hosting
+        .web
+        .split_once("://")
+        .map(|(_, rest)| rest.trim_end_matches('/'))
+        .ok_or("Invalid forge address")?;
+    if authority.contains(['/', '@', '\n', '\r'])
+        || authority.starts_with('-')
+        || endpoint.starts_with(['/', '-'])
+        || endpoint.contains("://")
+        || endpoint.chars().any(char::is_control)
+    {
+        return Err("Invalid history API address".into());
+    }
+    let actual = super::location(&format!("{}/_history_guard_", hosting.web))
+        .map(|(host, _)| host)
+        .ok_or("Invalid forge authority")?;
+    if !actual.eq_ignore_ascii_case(&hosting.host) {
+        return Err("Forge account and API authority do not match".into());
+    }
+    if !active() {
+        return Err("History lookup cancelled".into());
+    }
+    if !trusted_host(forge, tool, authority)? {
+        return Err("Sign in to the selected forge host before looking up history".into());
+    }
+    let mut command = tool_command(tool);
+    crate::connections::configure_cli(&mut command, tool, &hosting.host)
+        .map_err(|_| "The selected forge account is unavailable")?;
+    command
+        .current_dir(std::env::temp_dir())
+        .env_remove("GH_DEBUG")
+        .env_remove("GLAB_DEBUG")
+        .env_remove("GH_FORCE_TTY")
+        .env("GH_PROMPT_DISABLED", "1");
+    match forge {
+        Forge::GitHub => {
+            command.env("GH_REPO", format!("{}/{}", hosting.host, hosting.path));
+        }
+        Forge::GitLab => {
+            command.env("GITLAB_HOST", authority);
+        }
+        _ => {}
+    }
+    command.args(["api", "--hostname", authority, endpoint]);
+    let output = crate::bounded_process::run_input(
+        command,
+        None,
+        active,
+        Duration::from_secs(15),
+        2 * 1024 * 1024,
+        16 * 1024,
+    )
+    .map_err(|_| "Bounded forge history lookup failed or was cancelled")?;
+    if !output.status.success() {
+        return Err(
+            "Forge history lookup failed; check the selected account and server API support".into(),
+        );
+    }
+    serde_json::from_slice(&output.stdout)
+        .map_err(|_| "Forge history lookup returned malformed JSON".into())
+}
+
 /// The forge whose tool `tool` is.
 fn forge_of(tool: &str) -> Result<Forge, String> {
     match tool {
@@ -436,5 +510,23 @@ mod tests {
             }
             assert_eq!(envs.get("NO_COLOR"), Some(&Some("1".to_owned())));
         }
+    }
+}
+
+#[cfg(test)]
+mod history_api_tests {
+    use super::*;
+    #[test]
+    fn mismatched_authorities_absolute_endpoints_and_cancel_never_dispatch() {
+        let mut hosting = crate::forge::Hosting {
+            forge: Forge::GitHub,
+            host: "github.com".into(),
+            path: "o/r".into(),
+            web: "https://other.invalid".into(),
+        };
+        assert!(history_api(&hosting, "repos/o/r/commits/a/pulls", &|| true).is_err());
+        hosting.web = "https://github.com".into();
+        assert!(history_api(&hosting, "https://other.invalid/user", &|| true).is_err());
+        assert!(history_api(&hosting, "repos/o/r/commits/a/pulls", &|| false).is_err());
     }
 }
