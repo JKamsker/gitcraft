@@ -30,6 +30,8 @@ pub use private::{create_private_directory, detach_controller, random_bytes};
 mod owned_child;
 #[cfg(windows)]
 mod process_job;
+#[cfg(any(windows, test))]
+mod suspended;
 #[cfg(unix)]
 mod unix_anchor;
 #[cfg(windows)]

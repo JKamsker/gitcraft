@@ -18,6 +18,27 @@ struct Process {
     job: Option<super::process_job::ProcessJob>,
 }
 
+#[cfg(windows)]
+struct WindowsLaunch(Command);
+#[cfg(windows)]
+impl super::suspended::Backend for WindowsLaunch {
+    type Child = Child;
+    type Job = super::process_job::ProcessJob;
+    fn spawn_suspended(&mut self) -> io::Result<Child> {
+        self.0.spawn()
+    }
+    fn assign(&mut self, child: &Child) -> io::Result<Self::Job> {
+        super::process_job::assign(child).map_err(io::Error::other)
+    }
+    fn resume(&mut self, child: &Child) -> io::Result<()> {
+        super::process_job::resume(child).map_err(io::Error::other)
+    }
+    fn abort_and_reap(&mut self, child: &mut Child) {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+}
+
 impl OwnedChild {
     pub fn spawn(command: Command) -> io::Result<Self> {
         Self::start(command, false)
@@ -46,22 +67,14 @@ impl OwnedChild {
         } else {
             Some(super::unix_anchor::prepare(&mut command)?)
         };
-        #[allow(unused_mut)]
-        let mut child = command.spawn()?;
+        #[cfg(unix)]
+        let child = command.spawn()?;
         #[cfg(windows)]
-        let job = if controller {
-            None
+        let (child, job) = if controller {
+            (command.spawn()?, None)
         } else {
-            Some(
-                match super::process_job::supervise_suspended_process(child.id()) {
-                    Ok(job) => job,
-                    Err(error) => {
-                        let _ = child.kill();
-                        let _ = child.wait();
-                        return Err(io::Error::other(error));
-                    }
-                },
-            )
+            let (child, job) = super::suspended::launch(&mut WindowsLaunch(command))?;
+            (child, Some(job))
         };
         Ok(Self {
             process: Process {
