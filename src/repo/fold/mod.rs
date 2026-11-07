@@ -321,7 +321,7 @@ impl RepoTab {
     /// aborted in the terminal, or never started) is forgotten. When it left its fixup commit
     /// on top (the rebase failed before it began, or was aborted elsewhere), that commit gets
     /// an undo of its own, which stages the changes again.
-    pub(super) fn fold_loaded(&mut self, read: u64, state: Option<InProgress>) {
+    pub(super) fn fold_loaded(&mut self, read: u64, state: Option<InProgress>, ctx: &egui::Context) {
         if !self
             .fold
             .stopped
@@ -342,8 +342,7 @@ impl RepoTab {
         if !on_top || self.refs.current.as_deref() != Some(stopped.branch.as_str()) {
             return;
         }
-        self.undo_stack.push(stopped.leftover_undo(&head));
-        self.redo_stack.clear();
+        self.remember_undo(&stopped.label, stopped.leftover_undo(&head), ctx);
         self.status = Some((
             format!(
                 "{}: the rebase didn't run, so the changes are in a commit on top. Ctrl+Z \

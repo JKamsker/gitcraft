@@ -92,6 +92,7 @@ mod surgery;
 mod terminals;
 #[cfg(test)]
 mod tests;
+mod timeline;
 mod toolbar;
 mod versions;
 mod unity;
@@ -320,11 +321,13 @@ pub struct RepoTab {
     /// A commit to select once enough history is loaded (search results, links).
     pending_goto: Option<String>,
 
-    undo_stack: Vec<UndoEntry>,
-    /// A fold of staged changes into an older commit running, or stopped on a conflict.
+    /// Every operation and change seen, kept across restarts; undo and redo walk it.
+    timeline: timeline::Timeline,
+    /// The timeline (undo tree) shown in the big area.
+    timeline_view: Option<timeline::view::TimelineView>,
+    /// Why the timeline isn't kept on disk, or what it couldn't do.
+    timeline_error: Option<String>,
     fold: fold::FoldState,
-    redo_stack: Vec<UndoEntry>,
-    /// What agents asked for over `gitcraft mcp`, waiting, on its card or running.
     agents: agent::Agents,
 
     busy_op: Option<String>,
@@ -540,9 +543,10 @@ impl RepoTab {
             search: Search::default(),
             find: find::Find::default(),
             pending_goto: None,
-            undo_stack: Vec::new(),
-            fold: fold::FoldState::default(),
-            redo_stack: Vec::new(),
+            timeline: Default::default(),
+            timeline_view: None,
+            timeline_error: None,
+            fold: Default::default(),
             agents: Default::default(),
             busy_op: None,
             op_started: None,

@@ -133,6 +133,8 @@ impl RepoTab {
                 }
             }
             Action::Redo => self.redo(ctx),
+            Action::ToggleTimeline => self.toggle_timeline(),
+            Action::Timeline(act) => self.timeline_act(act, ctx),
             Action::Stash(request) => self.stash(request, ctx),
             Action::PickToStash(path) => self.stash_picks.toggle(&path),
             Action::ClearStashPicks => self.stash_picks.picked.clear(),

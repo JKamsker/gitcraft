@@ -120,6 +120,8 @@ impl RepoTab {
                     self.versions_ui(ui, &mut acts);
                 } else if self.pr_view.is_some() && self.docked(Panel::Pr) {
                     self.pr_view_ui(ui, &mut acts);
+                } else if self.timeline_view.is_some() {
+                    self.timeline_view_ui(ui, &mut acts);
                 } else {
                     if self.reflog.is_some() {
                         self.reflog_panel(ui, &mut acts);
@@ -184,7 +186,8 @@ impl RepoTab {
         });
     }
 
-    /// Escape closes the innermost view; Ctrl+Z / Ctrl+Y undo and redo, Ctrl+F searches, F7 and
+    /// Escape closes the innermost view; Ctrl+Z / Ctrl+Y undo and redo, Ctrl+Shift+Z shows the
+    /// undo tree, Ctrl+F searches, F7 and
     /// Shift+F7 (or Alt+↓ / Alt+↑) go to the next and previous change of a diff; the keys of
     /// [`crate::keymap`] fetch, pull, push, stash, branch, stage, commit and open the terminal.
     /// None of them while a dialog, a text field or the terminal has the keyboard.
@@ -204,12 +207,12 @@ impl RepoTab {
                     .filter(|&c| !(rewording && c == keymap::Command::Commit))
                     .map(Action::Key),
             );
-            let (esc, undo, redo, find) = ctx.input(|i| {
+            let (esc, undo, redo, tree, find) = ctx.input(|i| {
                 (
                     i.key_pressed(Key::Escape),
                     i.modifiers.command && !i.modifiers.shift && i.key_pressed(Key::Z),
-                    i.modifiers.command
-                        && (i.key_pressed(Key::Y) || (i.modifiers.shift && i.key_pressed(Key::Z))),
+                    i.modifiers.command && i.key_pressed(Key::Y),
+                    i.modifiers.command && i.modifiers.shift && i.key_pressed(Key::Z),
                     // Not with Shift: Ctrl+Shift+F fetches.
                     i.modifiers.command && !i.modifiers.shift && i.key_pressed(Key::F),
                 )
@@ -249,6 +252,8 @@ impl RepoTab {
                 }));
             } else if esc && self.pr_view.is_some() && self.main_keys(ctx, Panel::Pr) {
                 acts.push(Action::ClosePr);
+            } else if esc && self.timeline_view.is_some() {
+                acts.push(Action::ToggleTimeline);
             } else if esc && self.compare.is_some() {
                 acts.push(Action::CloseCompare);
             } else if esc && self.search.open {
@@ -265,6 +270,9 @@ impl RepoTab {
             }
             if redo {
                 acts.push(Action::Redo);
+            }
+            if tree {
+                acts.push(Action::ToggleTimeline);
             }
             if find {
                 self.search.open = true;

@@ -359,9 +359,6 @@ impl RepoTab {
         };
         let reply = match result {
             Ok(_) => {
-                if undoable && let Some(entry) = self.undo_stack.last_mut() {
-                    entry.agent = Some(running.agent.clone());
-                }
                 self.status = Some((format!("{}: {label}: done", running.agent), false));
                 let how = if undoable {
                     "It is the latest step of gitcraft's undo list: the user can undo it with \

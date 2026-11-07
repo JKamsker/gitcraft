@@ -4,6 +4,7 @@ use super::bisect::BisectAct;
 use super::file_view::FileTab;
 use super::reflog::{ReflogAct, Source};
 use super::partial_stash::StashRequest;
+use super::timeline::view::TimelineAct;
 use super::{Action, Dialog, DiffKey, DiffView, RepoTab, diff};
 
 impl RepoTab {
@@ -100,6 +101,10 @@ impl RepoTab {
                     rev: None,
                 }));
                 acts.push(Action::Bisect(BisectAct::Reset));
+                // The timeline, an entry picked and a jump asked about (not made).
+                acts.push(Action::ToggleTimeline);
+                acts.push(Action::Timeline(TimelineAct::Select(self.timeline.current)));
+                acts.push(Action::Timeline(TimelineAct::AskJump(None)));
             }
         }
         acts

@@ -131,7 +131,7 @@ impl RepoTab {
                     undo: ops(&[&["apply", "--whitespace=nowarn", &file]]),
                     redo: ops(&[&["apply", "--reverse", "--whitespace=nowarn", &file]]),
                 };
-                self.record_undo(label, OpKind::Normal(undo, self.refs.head.clone()));
+                self.record_undo(label, OpKind::Normal(undo, self.refs.head.clone()), ctx);
                 (
                     format!(
                         "{label}: done. The change is in the working tree, to look over before \

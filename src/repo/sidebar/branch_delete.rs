@@ -413,6 +413,7 @@ mod tests {
         }
         let at = git::head(&dir);
         let entry = UndoEntry {
+            id: 0,
             label: "Delete branch".to_owned(),
             undo: ops(&[&["branch", "--", "feat", &at]]),
             redo: redo_delete("feat", ops(&[&["branch", "-D", "--", "feat"]])),

@@ -131,7 +131,8 @@ fn script(mark: &str) -> String {
     ));
     s.push_str(&echo("git"));
     s.push_str(concat!(
-        "git for-each-ref --format='%(objectname) %(refname)' | cksum\n",
+        // Not what gitcraft keeps from gc under refs/gitcraft/ (see `timeline::snapshot`).
+        "git for-each-ref --format='%(objectname) %(refname)' | grep -v ' refs/gitcraft/' | cksum\n",
         "cat \"$g/HEAD\"\n",
         "for f in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD rebase-merge rebase-apply BISECT_START; do\n",
         "  [ -e \"$g/$f\" ] && echo \"$f\"\n",

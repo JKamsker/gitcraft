@@ -16,8 +16,8 @@ use crate::settings::Settings;
 use crate::theme::Tokens;
 
 /// "Undo Commit (Ctrl+Z)", or "Undo Claude Code's Commit (Ctrl+Z)" for an agent's step.
-fn step_tip(what: &str, entry: &super::UndoEntry, keys: &str) -> String {
-    match &entry.agent {
+fn step_tip(what: &str, entry: &super::timeline::Entry, keys: &str) -> String {
+    match entry.undo.as_ref().and_then(|u| u.agent.as_ref()) {
         Some(agent) => format!("{what} {agent}'s {} ({keys})", entry.label),
         None => format!("{what} {} ({keys})", entry.label),
     }
@@ -67,9 +67,10 @@ impl RepoTab {
         });
     }
 
-    /// Undo and redo, with what they'd undo or redo as tooltips.
+    /// Undo and redo, with what they'd undo or redo as tooltips, and the undo tree.
     fn history_buttons(&self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
-        let undo_tip = match self.undo_stack.last() {
+        let undo = self.timeline.current_entry();
+        let undo_tip = match undo {
             Some(e) => step_tip("Undo", e, &keymap::written("Cmd+Z")),
             None => "Nothing to undo".to_owned(),
         };
@@ -79,28 +80,35 @@ impl RepoTab {
             Some(w) => w.clone(),
             None => none.to_owned(),
         };
-        let undo = icons::tool_button(ui, "undo-2", "", idle && !self.undo_stack.is_empty())
+        let undo = icons::tool_button(ui, "undo-2", "", idle && self.timeline.current_entry().is_some())
             .named(&undo_tip)
             .on_hover_text(&undo_tip)
-            .on_disabled_hover_text(why(self.undo_stack.is_empty(), "Nothing to undo"));
+            .on_disabled_hover_text(why(self.timeline.current_entry().is_none(), "Nothing to undo"));
         if undo.clicked() {
             acts.push(Action::Undo);
         }
         // What Ctrl+Z takes back next is an agent's.
-        if self.undo_stack.last().is_some_and(|e| e.agent.is_some()) {
+        if self.timeline.current_entry().and_then(|e| e.undo.as_ref()).is_some_and(|e| e.agent.is_some()) {
             agent_badge(ui, &undo);
         }
-        let redo_tip = match self.redo_stack.last() {
+        let redo = self.timeline.redo_target();
+        let redo_tip = match redo {
             Some(e) => step_tip("Redo", e, &keymap::written("Cmd+Y")),
             None => "Nothing to redo".to_owned(),
         };
-        if icons::tool_button(ui, "redo-2", "", idle && !self.redo_stack.is_empty())
+        if icons::tool_button(ui, "redo-2", "", idle && redo.is_some())
             .named(&redo_tip)
             .on_hover_text(redo_tip)
-            .on_disabled_hover_text(why(self.redo_stack.is_empty(), "Nothing to redo"))
+            .on_disabled_hover_text(why(self.timeline.redo_target().is_none(), "Nothing to redo"))
             .clicked()
         {
             acts.push(Action::Redo);
+        }
+        if icons::tool_button(ui, "history", "", true)
+            .on_hover_text("Timeline and undo tree (Ctrl+Shift+Z)")
+            .clicked()
+        {
+            acts.push(Action::ToggleTimeline);
         }
     }
 

@@ -88,7 +88,7 @@ impl super::RepoTab {
                 // The opening screen's delay counts from now, not from when the tab was made.
                 self.opened = Instant::now();
                 self.resuming = step == Step::Resume;
-                if step == Step::Start { self.restore_drafts(); }
+                if step == Step::Start { self.restore_drafts(); self.load_timeline(ctx); }
                 self.watch(ctx);
                 self.reload(ctx);
             }

@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use super::dialogs::StashChoice;
 use super::pull::PullMode;
 use super::{
-    Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view, ops, pr_review, quick_edit, reflog, drag_drop, partial_stash, issue_work, versions,
+    Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view, ops, pr_review, quick_edit, reflog, drag_drop, partial_stash, issue_work, versions, timeline,
 };
 use crate::git::{self, InProgress};
 use crate::keymap::{Command, label, written};
@@ -90,6 +90,10 @@ pub(crate) enum Action {
     LoadMore,
     Undo,
     Redo,
+    /// Show the timeline (undo tree) in the big area, or close it.
+    ToggleTimeline,
+    /// Something done in the timeline.
+    Timeline(timeline::view::TimelineAct),
     /// Stash everything, some files or what is staged, or save a snapshot.
     Stash(partial_stash::StashRequest),
     /// Pick a working-tree file to stash, or unpick it.
@@ -488,6 +492,11 @@ impl RepoTab {
             ("Apply patch…".into(), "patch".into(), Action::ApplyPatch),
             ("Undo".into(), written("Cmd+Z"), Action::Undo),
             ("Redo".into(), written("Cmd+Y"), Action::Redo),
+            (
+                "Timeline and undo tree".into(),
+                "Ctrl+Shift+Z".into(),
+                Action::ToggleTimeline,
+            ),
             (
                 "Stash changes…".into(),
                 label(Command::Stash),

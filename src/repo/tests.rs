@@ -82,6 +82,7 @@ fn undoing_a_head_move_refuses_once_head_moved_elsewhere() {
     assert!(git::run(Some(&dir), &["commit", "-q", "--allow-empty", "-m", "two"]).is_ok());
     let after = git::head(&dir);
     let entry = UndoEntry {
+        id: 0,
         label: "Commit".to_owned(),
         undo: ops(&[&["reset", "--soft", &before]]),
         redo: ops(&[&["reset", "--soft", &after]]),
@@ -572,44 +573,69 @@ fn aborting_asks_first() {
 }
 
 /// An undo that needed signing in stays undoable when the sign-in is cancelled, and signing in
-/// runs it again without leaving a second copy of it behind.
+/// runs it again without moving the timeline until it goes through.
 #[test]
 fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
+    use super::timeline::{Entry, Origin, RefState};
     use super::{RepoTab, UndoEntry};
     let dir = repo("sign-in-undo");
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    // The timeline is read (there is none yet) before undo goes ahead.
+    for _ in 0..2000 {
+        tab.poll(&ctx);
+        if tab.timeline.loaded {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
     // An undo git answers like one that needs signing in.
     let entry = UndoEntry {
+        id: 0,
         label: "Push".to_owned(),
         undo: ops(&[&["push", "terminal prompts disabled", "refs/tags/v1"]]),
         redo: Vec::new(),
         heads: None,
         agent: None,
     };
-    tab.undo_stack.push(entry.clone());
+    let id = tab.timeline.push(Entry {
+        id: 0,
+        parent: None,
+        time: 0,
+        label: "Push".to_owned(),
+        origin: Origin::Gitcraft,
+        before: RefState::default(),
+        after: RefState::default(),
+        files: Vec::new(),
+        files_total: 0,
+        undo: Some(entry),
+        redo_child: None,
+        receipt: None,
+    });
     tab.undo(&ctx);
-    let running = tab.undo_stack.len();
+    let running = tab.busy_op.is_some();
     finish(&mut tab, &ctx);
     let asked = matches!(tab.dialog, Some(super::Dialog::Credentials { .. }));
     // Cancelled.
     tab.dialog = None;
-    let after_cancel = tab.undo_stack.clone();
+    let after_cancel = tab.timeline.current;
     let creds = git::Credentials {
         username: "u".to_owned(),
         password: "p".to_owned(),
     };
     tab.sign_in(creds, &ctx);
-    let retrying = tab.undo_stack.len();
+    let retrying = tab.busy_op.is_some();
     finish(&mut tab, &ctx);
-    let after_retry = tab.undo_stack.clone();
+    let after_retry = tab.timeline.current;
+    let entries = tab.timeline.entries.len();
     let _ = std::fs::remove_dir_all(&dir);
-    assert_eq!(running, 0);
+    assert!(running);
     assert!(asked);
-    assert_eq!(after_cancel, vec![entry.clone()]);
-    assert_eq!(retrying, 0);
-    // Refused again: back once more, still only once.
-    assert_eq!(after_retry, vec![entry]);
+    assert_eq!(after_cancel, Some(id));
+    assert!(retrying);
+    // Refused again: still there, still only once.
+    assert_eq!(after_retry, Some(id));
+    assert_eq!(entries, 1);
 }
 
 /// Work that panics (a bug in a dependency) still ends: the tab isn't left busy for good.

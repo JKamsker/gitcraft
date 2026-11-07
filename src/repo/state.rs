@@ -31,8 +31,11 @@ pub(crate) enum Undo {
     },
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct UndoEntry {
+    /// The timeline entry this undoes (see `timeline::Entry::id`); 0 until it has one.
+    #[serde(default)]
+    pub(super) id: u64,
     pub(super) label: String,
     pub(super) undo: Vec<Vec<String>>,
     pub(super) redo: Vec<Vec<String>>,

@@ -110,7 +110,7 @@ impl RepoTab {
 
     /// Why the undo on top must not run now, said in the status line; `true` when refused.
     pub(super) fn refuse_undo(&mut self) -> bool {
-        let refusal = (self.undo_stack.last())
+        let refusal = (self.timeline.current_entry().and_then(|e| e.undo.as_ref()))
             .and_then(|entry| empty_commit::undo_refusal(entry, &self.refs));
         let refused = refusal.is_some();
         if let Some(why) = refusal {

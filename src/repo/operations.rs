@@ -57,6 +57,7 @@ impl RepoTab {
         self.op_started = Some(Instant::now());
         let control = self.follow_op(&ops, quiet, ctx);
         let cancellable = self.can_cancel();
+        self.timeline_op_started(quiet, refresh);
         self.note_checkout_move(&ops, ctx);
         if !quiet {
             self.status = None;
@@ -165,43 +166,7 @@ impl RepoTab {
     /// Runs the last operation started again (what of it didn't run, after a failure).
     pub(super) fn run_last_op_again(&mut self, ctx: &egui::Context) {
         if let Some(op) = self.last_op.take() {
-            self.take_back(&op.kind);
             self.run_ops_ex(&op.label, op.ops, op.refresh, op.kind, op.quiet, ctx);
-        }
-    }
-
-    /// Takes the undo or redo of `kind` off its stack again, to run it: it went back there when
-    /// it needed signing in, so that cancelling the sign-in keeps it (see `op_done`).
-    fn take_back(&mut self, kind: &OpKind) {
-        let (stack, entry) = match kind {
-            OpKind::Undo(entry) => (&mut self.undo_stack, entry),
-            OpKind::Redo(entry) => (&mut self.redo_stack, entry),
-            OpKind::Normal(..) => return,
-        };
-        if let Some(i) = stack.iter().rposition(|e| e == entry) {
-            stack.remove(i);
-        }
-    }
-
-    pub(super) fn undo(&mut self, ctx: &egui::Context) {
-        if self.busy_op.is_some() {
-            return;
-        }
-        if let Some(entry) = self.undo_stack.pop() {
-            let label = format!("Undo {}", entry.label);
-            let steps = entry.undo.clone();
-            self.run_ops(&label, steps, Refresh::All, OpKind::Undo(entry), ctx);
-        }
-    }
-
-    pub(super) fn redo(&mut self, ctx: &egui::Context) {
-        if self.busy_op.is_some() {
-            return;
-        }
-        if let Some(entry) = self.redo_stack.pop() {
-            let label = format!("Redo {}", entry.label);
-            let steps = entry.redo.clone();
-            self.run_ops(&label, steps, Refresh::All, OpKind::Redo(entry), ctx);
         }
     }
 
@@ -219,7 +184,7 @@ impl RepoTab {
     ) {
         self.busy_op = None;
         self.detached_op_done(&label, result.is_ok());
-        let mut undoable = false;
+
         self.dropped_patch_done(&label, &result);
         // Done with it before anything starts after it (updating the submodules).
         let running = self.running.take();
@@ -263,19 +228,11 @@ impl RepoTab {
                     self.open_request = Some(super::OpenRequest::Worktree(path));
                 }
                 self.note_rewrite(&label, &kind, ctx);
-                undoable = self.record_undo(&label, kind);
             }
             Err(e) if cancelled => {
                 self.open_when_done.take_if(|(l, _)| *l == label);
-                // Red only when it left something to clear up.
                 let left_locks = e.starts_with(&format!("{}, but", git::CANCELLED));
                 self.status = Some((format!("{label}: {e}"), left_locks));
-                // Not done: what would undo it stays where it was.
-                match kind {
-                    OpKind::Undo(entry) => self.undo_stack.push(entry),
-                    OpKind::Redo(entry) => self.redo_stack.push(entry),
-                    OpKind::Normal(..) => {}
-                }
             }
             Err(e) if git::is_auth_error(e) && !quiet => {
                 self.agent_needs_sign_in(&label);
@@ -287,33 +244,31 @@ impl RepoTab {
                     .and_then(|r| self.remotes.iter().find(|x| x.name == r))
                     .map(|r| r.url.clone())
                     .unwrap_or_default();
+                // An undo or redo stays where it is in the timeline until signing in runs it
+                // again, so that cancelling the sign-in keeps it.
                 self.dialog = Some(Dialog::credentials(&url, refused));
-                // Back on its stack until signing in runs it again: the sign-in can be
-                // cancelled, and the undo must not be lost then.
-                match kind {
-                    OpKind::Undo(entry) => self.undo_stack.push(entry),
-                    OpKind::Redo(entry) => self.redo_stack.push(entry),
-                    OpKind::Normal(..) => {}
-                }
             }
             Err(e) => {
                 self.note_reused(Some(e));
                 self.open_when_done.take_if(|(l, _)| *l == label);
                 self.focus_wip = e.contains("CONFLICT") || e.contains("could not apply");
+                // A failed undo stays undoable: the timeline stays where it was.
                 self.status = Some((format!("{label} failed: {e}"), true));
                 if !quiet {
                     self.explain_failure(e, &label, ctx);
                 }
                 self.note_stopped_rewrite(&label, &kind, e);
-                // A failed undo stays undoable.
-                match kind {
-                    OpKind::Undo(entry) => self.undo_stack.push(entry),
-                    OpKind::Redo(entry) => self.redo_stack.push(entry),
-                    OpKind::Normal(..) => {}
-                }
             }
         }
-        self.agent_op_done(&label, &result, undoable);
+        if !quiet {
+            let ok = result.is_ok();
+            let mut undo = if ok { undo_entry(&label, &kind) } else { None };
+            if let Some(undo) = &mut undo {
+                undo.agent = self.agents.running.as_ref().filter(|r| r.label == label).map(|r| r.agent.clone());
+            }
+            self.agent_op_done(&label, &result, undo.is_some());
+            self.timeline_op_ended(&label, &kind, undo, ok, refresh, ctx);
+        }
         if long && !quiet {
             self.finished.push(match &result {
                 Ok(_) => (format!("{} · {label}: done", self.name), false),
@@ -335,65 +290,55 @@ impl RepoTab {
         self.after_op(result.is_ok(), quiet, ctx);
         self.link_status();
     }
+}
 
-    /// Puts what `kind` did on the undo (or redo) stack. Returns whether a new step went on
-    /// the undo list.
-    pub(super) fn record_undo(&mut self, label: &str, kind: OpKind) -> bool {
-        let mut added = false;
-        match kind {
-            OpKind::Normal(Undo::None, _) => {}
-            OpKind::Normal(Undo::HeadMove { mode }, heads) => {
-                let mut parts = heads.split('\u{0}');
-                let (before, after) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""));
-                if before.is_empty() || after.is_empty() || before == after {
-                    // Nothing to undo (a first commit), but HEAD moved: what was undone
-                    // before is not redone on top of it.
-                    if before != after {
-                        self.redo_stack.clear();
-                    }
-                    return false;
-                }
-                // Resetting moves whatever branch is checked out: another one at the same
-                // commit passes the check of HEAD's commit, so the branch is checked too.
-                let guard: Vec<Vec<String>> = parts
-                    .next()
-                    .map(|branch| vec![expect_symref("HEAD", branch)])
-                    .unwrap_or_default();
-                let reset = |to: &str| [guard.clone(), ops(&[&["reset", mode, to]])].concat();
-                self.undo_stack.push(UndoEntry {
-                    label: label.to_owned(),
-                    undo: reset(before),
-                    redo: reset(after),
-                    heads: Some((before.to_owned(), after.to_owned())),
-                    agent: None,
-                });
-                self.redo_stack.clear();
-                added = true;
-            }
-            OpKind::Normal(Undo::Custom { undo, redo }, _) => {
-                self.undo_stack.push(UndoEntry {
-                    label: label.to_owned(),
-                    undo,
-                    redo,
-                    heads: None,
-                    agent: None,
-                });
-                self.redo_stack.clear();
-                added = true;
-            }
-            OpKind::Undo(entry) => self.redo_stack.push(entry),
-            OpKind::Redo(entry) => self.undo_stack.push(entry),
-        }
-        // Plenty for a session.
-        if self.undo_stack.len() > 50 {
-            self.undo_stack.remove(0);
-        }
-        added
+impl RepoTab {
+    pub(super) fn record_undo(&mut self, label: &str, kind: OpKind, ctx: &egui::Context) -> bool {
+        let Some(undo) = undo_entry(label, &kind) else { return false; };
+        self.remember_undo(label, undo, ctx);
+        true
     }
 }
 
-/// Runs one step of an operation: one that goes over the network followed through `control`
-/// (its progress shown, and stopped on a cancel), any other as it is; none once cancelled.
+/// How to undo and redo what an operation of `kind` did, when it can be: a HEAD move is reset
+/// back (and forward), only while HEAD is on the branch it moved.
+fn undo_entry(label: &str, kind: &OpKind) -> Option<UndoEntry> {
+    match kind {
+        OpKind::Normal(Undo::None, _) | OpKind::Undo(_) | OpKind::Redo(_) => None,
+        OpKind::Normal(Undo::HeadMove { mode }, heads) => {
+            let mut parts = heads.split('\u{0}');
+            let (before, after) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""));
+            if before.is_empty() || after.is_empty() || before == after {
+                return None;
+            }
+            // Resetting moves whatever branch is checked out: another one at the same
+            // commit passes the check of HEAD's commit, so the branch is checked too.
+            let guard: Vec<Vec<String>> = parts
+                .next()
+                .map(|branch| vec![expect_symref("HEAD", branch)])
+                .unwrap_or_default();
+            let reset = |to: &str| [guard.clone(), ops(&[&["reset", mode, to]])].concat();
+            Some(UndoEntry {
+                id: 0,
+            agent: None,
+                agent: None,
+                label: label.to_owned(),
+                undo: reset(before),
+                redo: reset(after),
+                heads: Some((before.to_owned(), after.to_owned())),
+            })
+        }
+        OpKind::Normal(Undo::Custom { undo, redo }, _) => Some(UndoEntry {
+            id: 0,
+            agent: None,
+            label: label.to_owned(),
+            undo: undo.clone(),
+            redo: redo.clone(),
+            heads: None,
+        }),
+    }
+}
+
 /// What each did is kept in `control`, for the activity log.
 fn run_step(
     path: &Path,
@@ -500,6 +445,14 @@ pub(super) fn reaches_a_remote(op: &[String]) -> bool {
         },
         Some("lfs") => matches!(rest.first().copied(), Some("fetch" | "pull" | "push")),
         _ => false,
+        OpKind::Normal(Undo::Custom { undo, redo }, _) => Some(UndoEntry {
+            id: 0,
+            agent: None,
+            label: label.to_owned(),
+            undo: undo.clone(),
+            redo: redo.clone(),
+            heads: None,
+        }),
     }
 }
 
@@ -832,6 +785,9 @@ mod tests {
     fn entry(kind: OpKind) -> Option<UndoEntry> {
         match kind {
             OpKind::Normal(Undo::Custom { undo, redo }, _) => Some(UndoEntry {
+                id: 0,
+            agent: None,
+                agent: None,
                 label: "op".to_owned(),
                 undo,
                 redo,

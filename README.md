@@ -534,6 +534,19 @@ so your config, credentials and hooks apply as usual.
   _Apply stash_ (`git fsck --unreachable --no-reflogs`, in the background: it reads every
   object, so it can be cancelled). Its tab only says what it does: the scan waits to be asked.
   A commit taken back (a branch made there) drops off the list.
+- **Timeline and undo tree** (Ctrl+Shift+Z, or the clock in the toolbar; redo is Ctrl+Y):
+  gitcraft's operations, with the branches before and after each and the files it changed,
+  kept across restarts (open yesterday's rebase and get the old branch tip back as a branch, or
+  put the branch back). Branch moves made elsewhere (the terminal, another client, while
+  gitcraft was closed) show up too, named from the reflog. Undo three steps and do something
+  new: the undone steps stay as a side path of the tree, and _Go here_ jumps to any entry,
+  changes in files kept. The commits it needs stay under `refs/gitcraft/undo/*`, so `git gc`
+  doesn't prune them. Entries past the newest 300 are dropped; _Forget…_ drops them sooner.
+- **Rewrite receipt**: after a rebase, squash, reorder or amend (in gitcraft or elsewhere), the
+  status line and the timeline entry say _final files identical, authors kept, 2 messages
+  changed, signatures replaced_. _Follow each commit_ pairs each old commit with its
+  replacement, as `git range-diff` does, with whether its files, message, author and signature
+  changed. The receipt is kept with the entry.
 
 **Diffs and conflicts** (centre)
 
@@ -763,7 +776,7 @@ so your config, credentials and hooks apply as usual.
 
 **Toolbar, terminal, app**
 
-- Undo, redo, Fetch, Pull, Push (with incoming / outgoing counts) and Sync, new branch, stash, terminal,
+- Undo, redo, the timeline, Fetch, Pull, Push (with incoming / outgoing counts) and Sync, new branch, stash, terminal,
   search, open the folder (Explorer / Finder, your editor), refresh (F5).
 - Back and forward (the arrows at the start of the toolbar, Alt+← / Alt+→, or the mouse's back
   and forward buttons) go through the tab's recent views: the graph with its selected commit,
@@ -1116,6 +1129,7 @@ was made this way, on a demo repository.
 | `src/repo/mod.rs`        | one repository tab: state, background git work, undo / redo, toolbar               |
 | `src/mcp/`               | `gitcraft mcp`: the MCP server (`rmcp`), its tools, and the token-checked channel to the window |
 | `src/repo/agent/`        | agents' requests in a tab: planned as undoable steps, queued, the approval card's state |
+| `src/repo/timeline/`     | the timeline and undo tree: entries kept on disk, changes seen made elsewhere, jumps, the refs that keep old tips |
 | `src/repo/sidebar.rs`    | branches, remotes, worktrees, stashes, pull requests, tags                         |
 | `src/repo/pr_view.rs` | a pull request in the big area, its changed files on the right |
 | `src/repo/pr_review.rs` | comments and reviews being written, and the threads on lines of a diff |
