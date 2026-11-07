@@ -1,0 +1,44 @@
+{
+  "review": "Independent static prepared repair protocol re-review",
+  "verdict": "FAIL",
+  "candidate": "12cee4d405fffe3a3dd4a4f260f521c5eecf87d5",
+  "tree": "9266468710db3d429a3bb208ab983284d5edd9d7",
+  "scope": "Static correctness/protocol review against previous three blockers, including changed helper, wrapper, recording fixtures and recovery evidence. No Cargo, recording fixture, real protocol, process experiment or CI executed.",
+  "findings": [
+    {
+      "id": "REPAIR-PROTOCOL-4",
+      "priority": "P2",
+      "title": "Concurrent split-index rotation can produce a saved index with the wrong dependency backup",
+      "paths": ["src/push_preflight/fix/transaction.rs:149", "src/push_preflight/fix/transaction.rs:232", "src/push_preflight/fix/transaction.rs:236", "src/push_preflight/fix/transaction.rs:524"],
+      "static_trace": "Hook::new first resolves the live --shared-index-path, performs further reads, then copies the live index to before.index and the previously resolved dependency to before.shared-index. Another ordinary Git writer can rotate the split index between resolving the dependency and copying the main index, while preserving its semantic tree/work content. The saved main index then references the newer shared-index hash, but the owned backup and recovery.txt describe the older dependency. The prepared hook can accept this pair: cmp(actual index,before.index) matches the newer bytes, and cmp(old shared path,before.shared-index) independently matches older bytes; neither verifies the dependency named by before.index. A later failure therefore retains incomplete/misidentified recovery evidence.",
+      "required_fix": "Make the saved index/dependency pair self-consistent before permitting user dispatch. Derive/validate the shared-index dependency from the saved before.index itself (with the correct repository context), or use a consistent snapshot/stability protocol that refuses on rotation. Record and compare the dependency actually referenced by that saved main index. Keep existing conservative retention on any uncertain launched operation.",
+      "required_evidence": "First add a recording/static snapshot-rotation case that supplies old shared path, newer main-index snapshot and distinct newer dependency; assert either coherent captured pair or refusal before user update-ref. Later root-authorized owned split-index fixture should rotate its dependency at this boundary and demonstrate complete recovery evidence after a refused/later-failed transaction."
+    }
+  ],
+  "previous_findings": [
+    {"id": "REPAIR-PROTOCOL-1", "status": "STRUCTURALLY RESOLVED; runtime proof pending", "evidence": "Conservative Git>=2.50 parser; exact files/reftable and sha1/sha256 allowlists; same-backend/object-format scratch repository proves git hook run/stdin/private selection and the exact native current-HEAD/branch transaction. User dispatch requires capability acknowledgement; completion requires exact prepared/checkout/committed proofs."},
+    {"id": "REPAIR-PROTOCOL-2", "status": "STRUCTURALLY RESOLVED by interim scope restriction; runtime proof pending", "evidence": "Remote mutating repairs refuse at UI/fix entry/Hook constructor/local transport, before repair work is dispatched. No remote hook lifecycle remains. All launched local scratch and user requests set keep=true before launch; any error/missing acknowledgement retains the directory, without treating absent markers as completion proof."},
+    {"id": "REPAIR-PROTOCOL-3", "status": "STRUCTURALLY RESOLVED; runtime/backend proof pending", "evidence": "Native symref-verify HEAD and direct branch update share one transaction; scratch proof uses the current branch case. Original prepared hook runs first, then exact HEAD target/OID, raw index/dependency, stat-cold work-content and affected-path checks precede checkout. HEAD/index/work checks repeat after checkout and after original committed hook; later failures retain evidence without rollback."}
+  ],
+  "other_static_observations": [
+    "Quoted shell interpolation covers branch/object/proof/path arguments; original stdin is copied and replayed with quoted --to-stdin and argv. Original hooksPath is restored for nested calls; the outer sole -c is removed before relay.",
+    "Metadata-only rewrites use the same guarded HEAD/ref path. Git version refusal occurs before any user-ref transaction, although prior rewrite object preparation can create unreachable objects.",
+    "All scratch/local commands route through Practice-first repository_command and captured profile with absolute second -C. Ambient Git directory/index/namespace overrides are removed; lazy fetch is disabled on the guarded transport.",
+    "No new PID discovery, signal controller, FIFO or manual HEAD.lock is introduced. Existing approved owned bounded runner is reused.",
+    "Recording tests remain unexecuted; manually calling a fake-Git wrapper cannot establish real backend locking or Windows support."
+  ],
+  "verified_source_sha256": {
+    "src/push_preflight/fix.rs": "b09d7c2df5b9b60b8400749ec5e70b5c6776ac34797d7cdf6bf3404e42cfd14e",
+    "src/push_preflight/fix/transaction.rs": "0d72ba166da9da466a0fde20bdceb81713c10285c4e10874a4371ea26172aae7",
+    "src/git/command.rs": "590e9b53410debb0ea6328de4e131a72420daacaeea12fed9791c24480a955eb",
+    "src/repo/push_preflight.rs": "f841248b452f36e9206db306eab1c12d12e8a93c33aedf8b1f12e074a1490d77"
+  },
+  "limits_and_next_gates": [
+    "Remote automatic repair is explicitly INTERIM unavailable, not a completed feature acceptance claim.",
+    "Supported Git files/reftable current-HEAD protocol may safely refuse if backend rejects conflicting locks; no successful backend proof has yet run.",
+    "After snapshot-pair fix and static acceptance: root schedules recording-only rejection/ownership/uncertainty cases first, assesses results, then may separately authorize actual owned held-lock/concurrent edit/hook-veto/later-failure/old-Git fixtures.",
+    "UTF8 metadata paths, non-sparse/no-assume-unchanged restrictions, 64MiB snapshots and normal Git normalization/filter semantics are explicit limits. No native Windows claim.",
+    "Full feature/auth/journal/default-port tests, combined gates and final independent review remain separate. No CI or PR."
+  ],
+  "release_decision": "Resolve REPAIR-PROTOCOL-4 before accepting the static protocol gate. No runtime protocol authorized by this review."
+}
