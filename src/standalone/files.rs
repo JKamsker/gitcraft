@@ -2,6 +2,7 @@
 use std::fs::{File, Metadata};
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::SystemTime;
 
 pub(super) const FILE_LIMIT: u64 = 2 * 1024 * 1024;
@@ -43,6 +44,7 @@ pub(super) struct Snapshot {
     pub path: PathBuf,
     pub bytes: Vec<u8>,
     pub stamp: Option<Stamp>,
+    pub handle: Option<Arc<same_file::Handle>>,
 }
 impl Snapshot {
     pub fn read(path: &Path, active: &dyn Fn() -> bool) -> Result<Self, String> {
@@ -54,6 +56,7 @@ impl Snapshot {
                 path: path.into(),
                 bytes: Vec::new(),
                 stamp: None,
+                handle: None,
             });
         }
         let file = open_input(path).map_err(|e| format!("Could not open {}: {e}", label(path)))?;
@@ -99,11 +102,14 @@ impl Snapshot {
             path: path.into(),
             bytes,
             stamp: Some(stamp),
+            handle: Some(Arc::new(
+                same_file::Handle::from_file(file).map_err(|e| e.to_string())?,
+            )),
         })
     }
     pub fn unchanged(&self) -> Result<bool, String> {
         let now = Self::read(&self.path, &|| true)?;
-        Ok(now.stamp == self.stamp && now.bytes == self.bytes)
+        Ok(now.handle == self.handle && now.stamp == self.stamp && now.bytes == self.bytes)
     }
 }
 
