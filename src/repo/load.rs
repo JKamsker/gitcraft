@@ -19,6 +19,8 @@ const RECOUNT_EVERY: Duration = Duration::from_secs(30);
 pub(super) struct Loaded {
     pub(super) refs: Refs,
     pub(super) history: Vec<Arc<Commit>>,
+    pub(super) history_namespaces: Vec<String>,
+    pub(super) excluded_namespace_count: Option<usize>,
     pub(super) work: WorkStatus,
     pub(super) worktrees: Vec<Worktree>,
     pub(super) stashes: Vec<Stash>,
@@ -80,6 +82,7 @@ impl RepoTab {
         let count = self.history.len().clamp(git::LOG_PAGE, MAX_HISTORY);
         let mut visibility = Visibility::load(ctx, self.repo_key());
         let order = super::graph_order::load(ctx, self.repo_key());
+        let excluded = super::history_filter::rules(ctx, self.repo_key()).excludes();
         // Answered all the same if it panics: the tab reloads only once it is.
         let failed = |e| Msg::Loaded(Err(e));
         super::messages::spawn_or(&self.tx, ctx, failed, move || {
@@ -90,8 +93,10 @@ impl RepoTab {
                 // Leaf reads share one fixed pool across every tab. The parent waits in
                 // the job pool; no reload creates its own scoped OS threads.
                 let history = {
-                    let (path, from) = (path.clone(), log_from.clone());
-                    crate::tasks::read(move || git::log(&path, from.as_deref(), order, 0, count))?
+                    let (path, from, excluded) = (path.clone(), log_from.clone(), excluded.clone());
+                    crate::tasks::read(move || {
+                        git::log_scoped(&path, from.as_deref(), order, 0, count, &excluded)
+                    })?
                 };
                 let work_trees = {
                     let path = path.clone();
@@ -127,6 +132,12 @@ impl RepoTab {
                     let path = path.clone();
                     crate::tasks::read(move || super::issue_work::read(&path))?
                 };
+                let excluded_namespace_count = git::history_scope::excluded_namespace_count(
+                    &path,
+                    log_from.as_deref(),
+                    &excluded,
+                )
+                .ok();
                 let identity = git::identity(&path);
                 let history = history.join()??.into_iter().map(Arc::new).collect();
                 let (work, worktrees) = work_trees.join()??;
@@ -142,6 +153,8 @@ impl RepoTab {
                 Ok(Box::new(Loaded {
                     refs,
                     history,
+                    history_namespaces: excluded,
+                    excluded_namespace_count,
                     work,
                     worktrees,
                     stashes,
@@ -303,6 +316,11 @@ impl RepoTab {
         let generation = self.history_gen;
         let from = self.log_from.clone();
         let order = self.log_order;
+        let excluded = self
+            .history_filter
+            .read_namespaces
+            .clone()
+            .unwrap_or_else(git::history_scope::default_hidden_namespaces);
         let stream = Arc::clone(&self.log_stream);
         // Answered all the same if it panics: no more is read until it is.
         let failed = move |e| Msg::More(generation, Err(e));
@@ -320,7 +338,13 @@ impl RepoTab {
                     *slot = None;
                     *slot = Some((
                         generation,
-                        git::LogStream::start(&path, from.as_deref(), order, skip)?,
+                        git::LogStream::start_scoped(
+                            &path,
+                            from.as_deref(),
+                            order,
+                            skip,
+                            &excluded,
+                        )?,
                     ));
                 }
                 let page = match slot.as_mut() {
@@ -399,7 +423,42 @@ impl RepoTab {
         let refs_moved = loaded.refs != self.refs;
         self.refs = loaded.refs;
         self.has_more = loaded.history.len() >= loaded.requested;
+        let namespace_changed = self
+            .history_filter
+            .read_namespaces
+            .as_ref()
+            .is_some_and(|old| *old != loaded.history_namespaces);
+        let selected = self.selected.and_then(|i| self.commits.get(i));
+        let pinned = selected
+            .filter(|c| {
+                c.hash != WIP_HASH
+                    && (namespace_changed
+                        || self
+                            .history_filter
+                            .pinned
+                            .as_ref()
+                            .is_some_and(|p| p.hash == c.hash))
+                    && !loaded.history.iter().any(|h| h.hash == c.hash)
+            })
+            .cloned();
+        self.history_filter.pinned_layout = pinned.as_ref().map(|commit| {
+            let source = self
+                .history_filter
+                .pinned_layout
+                .as_ref()
+                .filter(|p| p.hash == commit.hash)
+                .unwrap_or(commit);
+            super::history_filter::pinned_projection(source, &self.history, &loaded.history)
+        });
+        self.history_filter.pinned = pinned;
         self.history = loaded.history;
+        self.history_filter.read_namespaces = Some(loaded.history_namespaces);
+        self.history_filter.excluded_total = loaded.excluded_namespace_count;
+        let filters = super::history_filter::rules(ctx, self.repo_key());
+        if self.history_filter.read_namespaces.as_ref() != Some(&filters.excludes()) {
+            self.reload_again = true;
+        }
+        self.history_filter.applied = Some(filters);
         // A status read since this reload started is newer.
         let state = loaded.work.in_progress;
         if Self::newer(loaded.read, &mut self.work_read) {
@@ -552,6 +611,18 @@ impl RepoTab {
     /// The WIP pseudo-commit (when the tree is dirty), then `history` with its stashes, laid out
     /// as the graph.
     pub(super) fn rebuild_rows(&mut self) {
+        let selected_hash = self.selected_hash();
+        let mut protected = self.history_filter.revealed.clone();
+        protected.extend(self.selected_hash());
+        protected.extend(self.pending_goto.clone());
+        protected.extend(self.search.matches.iter().cloned());
+        protected.insert(self.refs.head.clone());
+        protected.extend(self.stashes.iter().map(|s| s.base.clone()));
+        let rules = self.history_filter.applied.clone().unwrap_or_default();
+        let (visible, graph_history, hidden, kept) =
+            super::history_filter::compact(&self.history, &rules, &protected);
+        self.history_filter.hidden_loaded = hidden;
+        self.history_filter.kept_loaded = kept;
         let old_rows = std::mem::take(&mut self.commits);
         if !self.work.is_clean() {
             self.commits.push(Arc::new(Commit {
@@ -575,7 +646,7 @@ impl RepoTab {
         }
         self.commits
             .reserve(self.history.len() + self.stashes.len());
-        for commit in &self.history {
+        for commit in &visible {
             for stash in stashes_on.get(commit.hash.as_str()).into_iter().flatten() {
                 self.commits.push(Arc::new(Commit {
                     hash: stash.hash.clone(),
@@ -591,8 +662,34 @@ impl RepoTab {
             // Shared with `history`, not copied: tens of thousands of commits may be loaded.
             self.commits.push(Arc::clone(commit));
         }
+        if let Some(pinned) = &self.history_filter.pinned
+            && selected_hash.as_ref() == Some(&pinned.hash)
+            && !self.commits.iter().any(|c| c.hash == pinned.hash)
+        {
+            let at = usize::from(self.commits.first().is_some_and(|c| c.hash == WIP_HASH));
+            self.commits.insert(at, Arc::clone(pinned));
+        }
         self.insert_pr_graph_head();
-        let graph = graph::layout_with(&self.commits, self.log_order.first_parent);
+        let pinned_layout = self
+            .history_filter
+            .pinned_layout
+            .as_ref()
+            .map(|p| super::history_filter::pinned_projection(p, &self.history, &visible));
+        let layout_by_hash: HashMap<&str, &Arc<Commit>> =
+            graph_history.iter().map(|c| (c.hash.as_str(), c)).collect();
+        let layout_rows: Vec<Arc<Commit>> = self
+            .commits
+            .iter()
+            .map(|c| {
+                if let Some(pinned) = pinned_layout.as_ref().filter(|p| p.hash == c.hash) {
+                    return Arc::clone(pinned);
+                }
+                layout_by_hash
+                    .get(c.hash.as_str())
+                    .map_or_else(|| Arc::clone(c), |c| Arc::clone(c))
+            })
+            .collect();
+        let graph = graph::layout_with(&layout_rows, self.log_order.first_parent);
         let index = self
             .commits
             .iter()

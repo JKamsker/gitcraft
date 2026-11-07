@@ -55,30 +55,41 @@ pub struct Backlink {
 
 /// The commits mentioning `hash`, the most recent first, at most [`BACKLINK_CAP`]: explicit
 /// links and bare mentions, and whether there were more than that.
+#[cfg(test)]
 pub fn backlinks(repo: &Path, hash: &str) -> Result<(Vec<Backlink>, bool), String> {
+    backlinks_scoped(
+        repo,
+        hash,
+        &super::history_scope::default_hidden_namespaces(),
+    )
+}
+
+pub fn backlinks_scoped(
+    repo: &Path,
+    hash: &str,
+    excluded: &[String],
+) -> Result<(Vec<Backlink>, bool), String> {
     let Some(probe) = hash.get(..MIN_MENTION) else {
         return Err(format!("{hash} is not a commit hash"));
     };
     // git finds the messages with the hash's start; which of them really mention it (and how)
     // is read here. Every branch, remote branch and tag; not notes or stashes, whose
     // messages name the commit they were made on.
-    let out = run(
-        Some(repo),
-        &[
-            "log",
-            NO_SIGNATURE,
-            UTF8,
-            "--exclude=refs/notes/*",
-            "--exclude=refs/stash",
-            "--all",
-            "--fixed-strings",
-            "--regexp-ignore-case",
-            &format!("--grep={probe}"),
-            "--date=format-local:%Y-%m-%d %H:%M",
-            "--format=%H%x00%an%x00%ad%x00%B%x00%x1e",
-        ],
-    )
-    .map_err(|e| format!("Could not search the history for mentions: {e}"))?;
+    let grep = format!("--grep={probe}");
+    let revisions = super::history_scope::revision_args(None, excluded);
+    let mut args = vec![
+        "log",
+        NO_SIGNATURE,
+        UTF8,
+        "--fixed-strings",
+        "--regexp-ignore-case",
+        &grep,
+        "--date=format-local:%Y-%m-%d %H:%M",
+        "--format=%H%x00%an%x00%ad%x00%B%x00%x1e",
+    ];
+    args.extend(revisions.iter().map(String::as_str));
+    let out = run(Some(repo), &args)
+        .map_err(|e| format!("Could not search the history for mentions: {e}"))?;
     let mut links: Vec<Backlink> = out
         .split('\x1e')
         .filter_map(|record| parse_record(record.trim_start_matches('\n'), hash))

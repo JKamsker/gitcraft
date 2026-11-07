@@ -2,34 +2,48 @@
 
 use egui::{Rect, Sense, Stroke, Ui, pos2, vec2};
 
-use super::{HANDLE_COLOR, HANDLE_GAP, HANDLE_WIDTH};
+use super::{HANDLE_COLOR, HANDLE_WIDTH};
 use crate::repo::RepoTab;
 use crate::repo::columns::{Bar, Cols};
 use crate::settings::Settings;
 use crate::theme::Tokens;
 
-/// Keeps the widths after a drag of `bar` from the preferred `prefs` in the settings.
-/// Only what changed: hidden columns keep their width. The graph keeps its fit to the lanes
-/// unless its own bar is dragged: dragging another bar in a narrow view would otherwise save
-/// the squeezed graph width, and the graph would stay that narrow once the view widens.
-fn save_drag(next: &mut Settings, bar: Bar, prefs: &Cols, widths: &Cols) {
+/// One pointer gesture, including its original grab offset and saved preference.
+#[derive(Clone, Copy)]
+struct DragStart {
+    prefs: Cols,
+    available: f32,
+    pointer: f32,
+    preference: f32,
+}
+
+/// Persist only the intended column; temporary viewport compression is never saved.
+fn save_drag(next: &mut Settings, bar: Bar, _prefs: &Cols, widths: &Cols) {
     next.last_resized = Some(bar);
-    for (col, setting) in [
-        (Bar::Refs, &mut next.refs_width),
-        (Bar::Graph, &mut next.graph_width),
-        (Bar::Hash, &mut next.hash_width),
-        (Bar::Author, &mut next.author_width),
-        (Bar::When, &mut next.when_width),
-        (Bar::Date, &mut next.date_width),
-    ] {
-        if col == Bar::Graph && bar != Bar::Graph {
-            continue;
-        }
-        if widths.width(col) != prefs.width(col) {
-            *setting = widths.width(col);
-        }
-    }
+    *preference_mut(next, bar) = widths.width(bar);
+
     next.column_push = widths.push;
+}
+
+fn preference_mut(settings: &mut Settings, bar: Bar) -> &mut f32 {
+    match bar {
+        Bar::Refs => &mut settings.refs_width,
+        Bar::Graph => &mut settings.graph_width,
+        Bar::Hash => &mut settings.hash_width,
+        Bar::Author => &mut settings.author_width,
+        Bar::When => &mut settings.when_width,
+        Bar::Date => &mut settings.date_width,
+    }
+}
+fn preference(settings: &Settings, bar: Bar) -> f32 {
+    match bar {
+        Bar::Refs => settings.refs_width,
+        Bar::Graph => settings.graph_width,
+        Bar::Hash => settings.hash_width,
+        Bar::Author => settings.author_width,
+        Bar::When => settings.when_width,
+        Bar::Date => settings.date_width,
+    }
 }
 
 impl RepoTab {
@@ -48,21 +62,7 @@ impl RepoTab {
     ) {
         let t = Tokens::get(ui.ctx());
         let mut next = settings.clone();
-        // The right-hand columns start their text exactly on the border: keep the line off it.
-        let right = header.right() - HANDLE_GAP;
-        // (bar, x of the border, shown)
-        let borders = [
-            (Bar::Refs, header.left() + cols.refs, true),
-            (Bar::Graph, header.left() + cols.refs + cols.graph, true),
-            (Bar::Hash, right - cols.trailing(), cols.hash > 0.0),
-            (
-                Bar::Author,
-                right - cols.author - cols.when - cols.date,
-                cols.author > 0.0,
-            ),
-            (Bar::When, right - cols.when - cols.date, cols.when > 0.0),
-            (Bar::Date, right - cols.date, cols.date > 0.0),
-        ];
+        let borders = Bar::ALL.map(|bar| (bar, cols.border(header, bar), cols.width(bar) > 0.0));
         for (bar, x, shown) in borders {
             if !shown {
                 continue;
@@ -90,16 +90,39 @@ impl RepoTab {
                 next.graph_width = 0.0;
                 continue;
             }
-            // Measured from the pointer, not its movement: past a column's limit the bar waits
-            // there and only moves again once the pointer comes back to it.
-            let dx = resp
-                .interact_pointer_pos()
-                .map_or(0.0, |pointer| pointer.x - x);
-            if !resp.dragged() || dx == 0.0 {
+            let drag_id = ui.id().with(("column-drag-start", bar));
+            // egui's press origin preserves the offset anywhere within the ten-point hit area.
+            if resp.drag_started() {
+                let origin = ui.input(|i| i.pointer.press_origin()).map_or(x, |p| p.x);
+                ui.data_mut(|d| {
+                    d.insert_temp(
+                        drag_id,
+                        DragStart {
+                            prefs: *prefs,
+                            available: header.width(),
+                            pointer: origin,
+                            preference: preference(settings, bar),
+                        },
+                    )
+                });
+            }
+            if resp.drag_stopped() {
+                ui.data_mut(|d| d.remove::<DragStart>(drag_id));
+            }
+            if !resp.dragged() {
                 continue;
             }
-            let widths = bar.drag(prefs, settings.last_resized, dx, header.width());
+            let Some(start) = ui.data(|d| d.get_temp::<DragStart>(drag_id)) else {
+                continue;
+            };
+            let dx = resp
+                .interact_pointer_pos()
+                .map_or(0.0, |p| p.x - start.pointer);
+            let widths = bar.drag(&start.prefs, None, dx, start.available);
             save_drag(&mut next, bar, prefs, &widths);
+            if widths.width(bar) == start.prefs.width(bar) {
+                *preference_mut(&mut next, bar) = start.preference;
+            }
         }
         if next != *settings {
             next.set(ui.ctx());
@@ -138,7 +161,7 @@ mod tests {
         };
         // A narrow view: the graph is squeezed on screen.
         let widths = Bar::Author.drag(&prefs, None, -10.0, 550.0);
-        assert_ne!(widths.graph, prefs.graph);
+        assert_eq!(widths.graph, prefs.graph);
         let mut next = Settings::default();
         save_drag(&mut next, Bar::Author, &prefs, &widths);
         assert_eq!(next.graph_width, 0.0);
@@ -148,5 +171,90 @@ mod tests {
         let widths = Bar::Graph.drag(&prefs, None, 10.0, 700.0);
         save_drag(&mut next, Bar::Graph, &prefs, &widths);
         assert_eq!(next.graph_width, 110.0);
+    }
+}
+
+#[cfg(test)]
+mod interaction_tests {
+    use super::*;
+    use crate::repo::graph_view::{lane_layout, preferred_cols};
+
+    #[test]
+    fn snapshot_drags_preserve_the_initial_hit_offset_and_other_preferences() {
+        for bar in Bar::ALL {
+            for offset in [-4.0, 4.0] {
+                let ctx = egui::Context::default();
+                let tab = RepoTab::new_deferred("/nonexistent/column-drag".into(), &ctx);
+                let initial = Settings {
+                    graph_width: 100.0,
+                    show_hash: true,
+                    show_date: true,
+                    ..Default::default()
+                };
+                initial.set(&ctx);
+                let frame = |events| {
+                    ctx.run_ui(
+                        egui::RawInput {
+                            screen_rect: Some(Rect::from_min_size(
+                                egui::Pos2::ZERO,
+                                vec2(1600.0, 200.0),
+                            )),
+                            events,
+                            ..Default::default()
+                        },
+                        |ui| {
+                            let settings = Settings::get(&ctx);
+                            let prefs = preferred_cols(&settings, lane_layout(&settings, 3));
+                            let header = Rect::from_min_size(egui::Pos2::ZERO, vec2(1600.0, 26.0));
+                            let shown = prefs.squeezed(header.width(), None);
+                            tab.column_handles(ui, header, &prefs, &shown, &settings);
+                        },
+                    )
+                    .drop_without_applying_deltas();
+                };
+                let prefs = preferred_cols(&initial, lane_layout(&initial, 3));
+                let header = Rect::from_min_size(egui::Pos2::ZERO, vec2(1600.0, 26.0));
+                let press = pos2(prefs.border(header, bar) + offset, 13.0);
+                let button = |pos, pressed| egui::Event::PointerButton {
+                    pos,
+                    button: egui::PointerButton::Primary,
+                    pressed,
+                    modifiers: egui::Modifiers::NONE,
+                };
+                frame(vec![egui::Event::PointerMoved(press)]);
+                frame(vec![button(press, true)]);
+                for delta in [10.0, 20.0, 5000.0, 20.0] {
+                    frame(vec![egui::Event::PointerMoved(press + vec2(delta, 0.0))]);
+                    let saved = Settings::get(&ctx);
+                    for other in Bar::ALL {
+                        if other != bar {
+                            assert_eq!(
+                                preference(&saved, other),
+                                preference(&initial, other),
+                                "{bar:?} touched {other:?}"
+                            );
+                        }
+                    }
+                    if delta == 20.0 {
+                        let sign = if matches!(bar, Bar::Refs | Bar::Graph) {
+                            1.0
+                        } else {
+                            -1.0
+                        };
+                        assert_eq!(
+                            preference(&saved, bar),
+                            preference(&initial, bar) + sign * delta,
+                            "{bar:?} offset {offset}"
+                        );
+                    }
+                }
+                frame(vec![egui::Event::PointerMoved(press)]);
+                assert_eq!(
+                    preference(&Settings::get(&ctx), bar),
+                    preference(&initial, bar)
+                );
+                frame(vec![button(press, false)]);
+            }
+        }
     }
 }

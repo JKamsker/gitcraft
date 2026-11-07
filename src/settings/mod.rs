@@ -51,6 +51,7 @@ pub struct Settings {
     pub shell: String,
     /// Width of the branch/tag column of the graph.
     pub refs_width: f32,
+    pub history_filter: crate::repo::history_filter::Rules,
     /// Shortened branch and tag pills keep their end rather than their beginning.
     pub branch_names_keep_end: bool,
     /// Width of the graph column; 0 = fit the lanes of the repository.
@@ -62,9 +63,9 @@ pub struct Settings {
     pub when_width: f32,
     pub date_width: f32,
     pub hash_width: f32,
-    /// The column bar dragged last: that column keeps its width while the others make room.
+    /// Legacy drag metadata, retained for saved-settings compatibility; sizing ignores it.
     pub last_resized: Option<crate::repo::columns::Bar>,
-    /// How far that bar was pulled past its column's minimum, shrinking the columns right of it.
+    /// Legacy cascading-resize offset; new divider drags clear it.
     pub column_push: f32,
     pub show_author: bool,
     /// How long ago each commit was made ("3 hours ago").
@@ -182,6 +183,7 @@ impl Default for Settings {
             terminal_font: 12.5,
             shell: String::new(),
             refs_width: 280.0,
+            history_filter: Default::default(),
             branch_names_keep_end: true,
             graph_width: 0.0,
             compact_graph: false,
@@ -706,6 +708,15 @@ impl Settings {
                 });
             }
             Page::Graph => {
+                section(ui, f, "History filters", None, |card| {
+                    card.row(
+                        "Global history filters",
+                        "authors names emails namespaces T3 Code hide exclude",
+                        |ui| {
+                            crate::repo::history_filter::edit(ui, &mut self.history_filter);
+                        },
+                    );
+                });
                 section(ui, f, "Commit graph", None, |card| {
                     card.preview(Preview::GraphRefs);
                     card.row("Branch column width", "refs tags pills", |ui| {
