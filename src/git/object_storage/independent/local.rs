@@ -270,6 +270,29 @@ pub(crate) fn make_transaction(
     checkpoint: &mut dyn FnMut(&str) -> Result<(), String>,
     transaction: &str,
 ) -> Result<String, String> {
+    run_transaction(snapshot, active, checkpoint, transaction, None)
+}
+#[cfg(target_os = "linux")]
+pub(crate) fn make_receipted_transaction(
+    snapshot: &Snapshot,
+    active: &dyn Fn() -> bool,
+    ticket: &super::super::helper::Ticket,
+) -> Result<String, String> {
+    run_transaction(
+        snapshot,
+        active,
+        &mut |_| Ok(()),
+        &ticket.transaction,
+        Some(ticket),
+    )
+}
+fn run_transaction(
+    snapshot: &Snapshot,
+    active: &dyn Fn() -> bool,
+    checkpoint: &mut dyn FnMut(&str) -> Result<(), String>,
+    transaction: &str,
+    receipt: Option<&super::super::helper::Ticket>,
+) -> Result<String, String> {
     if transaction.is_empty()
         || transaction.len() > 64
         || !transaction.bytes().all(|b| b.is_ascii_hexdigit())
@@ -282,79 +305,86 @@ pub(crate) fn make_transaction(
     let before = required(&snapshot.repo, owner, active)?;
     let stage_name = format!("gitcraft-independent-stage-{transaction}");
     let stage = owner.stage(&stage_name)?;
-    let imported = copy_pack(&snapshot.repo, owner, &stage, active)?;
-    let index = stage.index(&imported);
-    let output = owner.run(
-        &snapshot.repo,
-        &[
-            "verify-pack",
-            "-v",
-            "--",
-            index.to_str().ok_or("Invalid stage path")?,
-        ],
-        Vec::new(),
-        16 * 1024 * 1024,
-        None,
-        active,
-    )?;
-    let rows = pack_rows(std::str::from_utf8(&output).map_err(|_| "Invalid pack metadata")?)?;
-    if !before.iter().all(|oid| rows.contains_key(oid)) {
-        return Err("Copied pack does not contain every required object; borrowing is preserved and the private stage remains available.".into());
-    }
-    checkpoint("copied")?;
-    current(snapshot, active)?;
-    if required(&snapshot.repo, owner, active)? != before {
-        return Err("Required objects changed during copying; borrowing is preserved.".into());
-    }
-    owner.install(&stage, &imported)?;
-    current(snapshot, active)?;
-    // Fixed-candidate tests can exercise ownership changes after final verification.
-    checkpoint("verified")?;
-    let backup_name = format!("alternates.gitcraft-backup-{transaction}");
-    if let Err(error) = owner.detach(&backup_name) {
-        let restored = owner.restore(&backup_name);
-        return Err(format!(
-            "Guarded alternate removal failed: {error}. Create-only recovery: {restored:?}. Recovery backup location (if created): {}",
-            owner.recovery_path(&backup_name).display()
-        ));
-    }
-    let proof = (|| {
-        checkpoint("detached")?;
-        owner.current(false)?;
-        owner.verify_backup(&backup_name)?;
-        if required(&snapshot.repo, owner, active)? != before
-            || references(&snapshot.repo, owner, active)? != snapshot.refs
-        {
-            return Err("Refs/index/reflogs changed during final proof".into());
-        }
-        owner.run(
+    let result = (|| {
+        let imported = copy_pack(&snapshot.repo, owner, &stage, active)?;
+        let index = stage.index(&imported);
+        let output = owner.run(
             &snapshot.repo,
-            &["fsck", "--connectivity-only", "--no-dangling"],
+            &[
+                "verify-pack",
+                "-v",
+                "--",
+                index.to_str().ok_or("Invalid stage path")?,
+            ],
             Vec::new(),
             16 * 1024 * 1024,
             None,
             active,
         )?;
-        owner.current(false)?;
-        owner.verify_backup(&backup_name)?;
-        Ok::<(), String>(())
+        let rows = pack_rows(std::str::from_utf8(&output).map_err(|_| "Invalid pack metadata")?)?;
+        if !before.iter().all(|oid| rows.contains_key(oid)) {
+            return Err("Copied pack does not contain every required object; borrowing is preserved and the private stage remains available.".into());
+        }
+        checkpoint("copied")?;
+        current(snapshot, active)?;
+        if required(&snapshot.repo, owner, active)? != before {
+            return Err("Required objects changed during copying; borrowing is preserved.".into());
+        }
+        owner.install(&stage, &imported)?;
+        current(snapshot, active)?;
+        // Fixed-candidate tests can exercise ownership changes after final verification.
+        checkpoint("verified")?;
+        let backup_name = format!("alternates.gitcraft-backup-{transaction}");
+        if let Err(error) = owner.detach(&backup_name) {
+            let restored = owner.restore(&backup_name);
+            return Err(format!(
+                "Guarded alternate removal failed: {error}. Create-only recovery: {restored:?}. Recovery backup location (if created): {}",
+                owner.recovery_path(&backup_name).display()
+            ));
+        }
+        let proof = (|| {
+            checkpoint("detached")?;
+            owner.current(false)?;
+            owner.verify_backup(&backup_name)?;
+            if required(&snapshot.repo, owner, active)? != before
+                || references(&snapshot.repo, owner, active)? != snapshot.refs
+            {
+                return Err("Refs/index/reflogs changed during final proof".into());
+            }
+            owner.run(
+                &snapshot.repo,
+                &["fsck", "--connectivity-only", "--no-dangling"],
+                Vec::new(),
+                16 * 1024 * 1024,
+                None,
+                active,
+            )?;
+            owner.current(false)?;
+            owner.verify_backup(&backup_name)?;
+            Ok::<(), String>(())
+        })();
+        if let Err(error) = proof {
+            let recovery = match owner.restore(&backup_name) {
+                Ok(()) => "Borrowing was restored.".into(),
+                Err(e) => format!("Create-only restoration did not overwrite a newer file: {e}"),
+            };
+            return Err(format!(
+                "Independence proof failed: {error}. {recovery} Retained backup: {}",
+                owner.recovery_path(&backup_name).display()
+            ));
+        }
+        Ok(format!(
+            "Clone is independent: {} required objects copied and verified. Donors were not modified. Recovery backup: {}. Private recovery stage: {}",
+            before.len(),
+            owner.recovery_path(&backup_name).display(),
+            stage_name
+        ))
     })();
-    if let Err(error) = proof {
-        let recovery = match owner.restore(&backup_name) {
-            Ok(()) => "Borrowing was restored.".into(),
-            Err(e) => format!("Create-only restoration did not overwrite a newer file: {e}"),
-        };
-        return Err(format!(
-            "Independence proof failed: {error}. {recovery} Retained backup: {}",
-            owner.recovery_path(&backup_name).display()
-        ));
+    if let Some(ticket) = receipt {
+        let bytes = super::super::helper::receipt_bytes(ticket, &result)?;
+        stage.record_outcome(&bytes).map_err(|error| format!("The operation finished ({result:?}) but its terminal receipt could not be retained: {error}. Inspect the recovery stage before another action."))?;
     }
-    Ok(format!(
-        "Clone is independent: {} required objects copied and verified. Donors were not modified. Recovery backup: {}. Private recovery stage: {}",
-        before.len(),
-        owner.recovery_path(&backup_name).display(),
-        stage_name
-    ))
+    result
 }
 
 #[cfg(target_os = "linux")]

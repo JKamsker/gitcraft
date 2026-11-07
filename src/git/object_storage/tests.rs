@@ -927,6 +927,44 @@ mod native_windows_ownership {
 
 #[cfg(target_os = "linux")]
 #[test]
+fn fixed_helper_terminal_receipt_pins_the_ticket_and_actual_object_directory() -> Result<(), String>
+{
+    crate::connections::Context::default().run(|| {
+        let f = Fixture::new()?;
+        let (donor, borrower) = f.borrowing()?;
+        let ticket = helper::fixture_server_prepare(&borrower)?;
+        assert!(
+            helper::fixture_server_status(&borrower, ticket.clone()).is_err(),
+            "No receipt is never a terminal outcome"
+        );
+        helper::fixture_server_execute(&borrower, ticket.clone())?;
+        assert!(
+            helper::fixture_server_status(&borrower, ticket.clone())??
+                .contains("Clone is independent")
+        );
+        let mut stale = ticket.clone();
+        let last_directory = stale
+            .identities
+            .len()
+            .checked_sub(2)
+            .ok_or("no directory identity")?;
+        stale.identities[last_directory].inode =
+            stale.identities[last_directory].inode.wrapping_add(1);
+        assert!(helper::fixture_server_status(&borrower, stale).is_err());
+        let mut wrong = ticket;
+        wrong.transaction.push('a');
+        assert!(helper::fixture_server_status(&borrower, wrong).is_err());
+        std::fs::rename(&donor, f.0.join("removed donor")).map_err(|e| e.to_string())?;
+        assert_eq!(
+            Fixture::git(&borrower, &["show", "HEAD:file ' $(touch ESCAPED).txt"])?,
+            "borrowed bytes"
+        );
+        Ok(())
+    })
+}
+
+#[cfg(target_os = "linux")]
+#[test]
 fn fixed_helper_server_rejects_changed_refs_alternate_identity_and_missing_donor()
 -> Result<(), String> {
     crate::connections::Context::default().run(|| {

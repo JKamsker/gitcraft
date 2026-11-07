@@ -186,6 +186,7 @@ pub(super) fn dialog(ui: &mut egui::Ui, state: &mut State) -> super::dialogs::Ou
                 ui.label("Objects shown in a donor's loose file or pack are borrowed: deleting or pruning that donor may make this repository unreadable. A linked worktree shares objects rather than owning a separate clone.");
                 if let Some(snapshot) = &data.independence {
                     ui.label("Make independent copies every object needed by refs, reflogs and the index into a self-contained local pack. Only after coverage and connectivity proofs succeed is the primary alternate link removed. Donors stay untouched; an alternate backup is retained. Copies are limited to 128 MiB per pack.");
+                    if crate::remote::is_remote(&state.path) { ui.label("If the connection is interrupted, use Inspect to check the retained terminal receipt before another action. An unconfirmed attempt blocks replacement; its recovery files are kept."); }
                     ui.checkbox(&mut state.independence_ack, "I have stopped other Git writers for this clone and want to remove its borrowing link.");
                     if ui.add_enabled(state.independence_ack && !state.loading, egui::Button::new("Make this clone independent")).clicked() { outcome = Outcome::Done(Action::MakeObjectStorageIndependent(Box::new(snapshot.clone()))); }
                 }

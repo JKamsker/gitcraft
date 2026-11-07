@@ -411,6 +411,15 @@ pub(super) struct Stage {
     _pack_file: Arc<File>,
 }
 impl Stage {
+    pub fn record_outcome(&self, bytes: &[u8]) -> Result<(), String> {
+        if bytes.len() > 4 * 1024 * 1024 {
+            return Err(err("terminal receipt exceeds 4 MiB"));
+        }
+        let mut file = alternate(&self.root.join("gitcraft-outcome.pending"), true)?;
+        file.write_all(bytes).map_err(err)?;
+        file.sync_all().map_err(err)?;
+        rename::no_replace(&file, &self._root_file, "gitcraft-outcome.json").map_err(err)
+    }
     pub fn index(&self, hash: &str) -> PathBuf {
         self.pack.join(format!("pack-{hash}.idx"))
     }

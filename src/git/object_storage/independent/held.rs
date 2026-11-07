@@ -388,6 +388,24 @@ pub(super) struct Stage {
     pack: Arc<File>,
 }
 impl Stage {
+    pub fn record_outcome(&self, bytes: &[u8]) -> Result<(), String> {
+        if bytes.len() > 4 * 1024 * 1024 {
+            return Err(err("terminal receipt exceeds 4 MiB"));
+        }
+        let mut file = File::from(
+            fs::openat(
+                self.root.as_ref(),
+                "gitcraft-outcome.pending",
+                OFlags::WRONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::CREATE | OFlags::EXCL,
+                Mode::RUSR | Mode::WUSR,
+            )
+            .map_err(err)?,
+        );
+        file.write_all(bytes).map_err(err)?;
+        file.sync_all().map_err(err)?;
+        link_file(&file, &self.root, "gitcraft-outcome.json").map_err(err)?;
+        self.root.sync_all().map_err(err)
+    }
     pub fn index(&self, hash: &str) -> PathBuf {
         proc_path(&self.pack).join(format!("pack-{hash}.idx"))
     }

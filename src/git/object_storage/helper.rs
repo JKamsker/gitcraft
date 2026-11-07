@@ -11,6 +11,8 @@ use std::sync::{
 use std::time::Duration;
 const PROTOCOL: &str = "gitcraft-owned-objects/1";
 const LIMIT: usize = 4 * 1024 * 1024;
+#[cfg(target_os = "linux")]
+mod receipt;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Identity {
@@ -35,6 +37,8 @@ struct Request {
     protocol: String,
     repo: String,
     ticket: Option<Ticket>,
+    #[serde(default)]
+    status: Option<Ticket>,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -50,6 +54,34 @@ enum Payload {
         transaction: String,
         message: String,
     },
+    Terminal {
+        transaction: String,
+        result: Result<String, String>,
+    },
+}
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg(any(target_os = "linux", windows))]
+struct Receipt {
+    protocol: String,
+    ticket: Ticket,
+    result: Result<String, String>,
+}
+#[cfg(any(target_os = "linux", windows))]
+pub(super) fn receipt_bytes(
+    ticket: &Ticket,
+    result: &Result<String, String>,
+) -> Result<Vec<u8>, String> {
+    let bytes = serde_json::to_vec(&Receipt {
+        protocol: PROTOCOL.into(),
+        ticket: ticket.clone(),
+        result: result.clone(),
+    })
+    .map_err(|e| e.to_string())?;
+    if bytes.len() > LIMIT {
+        return Err("Terminal ownership receipt exceeds 4 MiB".into());
+    }
+    Ok(bytes)
 }
 #[derive(Clone, Debug)]
 pub(super) struct RemotePlan {
@@ -58,41 +90,74 @@ pub(super) struct RemotePlan {
     ticket: Ticket,
     attempted: Arc<AtomicBool>,
 }
-fn request(
-    repo: &Path,
-    ticket: Option<Ticket>,
-    active: &dyn Fn() -> bool,
-) -> Result<Payload, String> {
-    if !active() {
-        return Err(
-            "Object independence was cancelled before dispatch; no helper request was sent.".into(),
-        );
-    }
-    let target = remote::parse(repo).ok_or("Owned helper requires an SSH/WSL repository")?;
-    request_target(&target, ticket, active)
+#[derive(Clone)]
+struct Pending {
+    owner: remote::OwnedDispatch,
+    ticket: Ticket,
 }
-fn request_target(
+fn pending() -> &'static std::sync::Mutex<std::collections::HashMap<PathBuf, Pending>> {
+    static VALUE: std::sync::OnceLock<
+        std::sync::Mutex<std::collections::HashMap<PathBuf, Pending>>,
+    > = std::sync::OnceLock::new();
+    VALUE.get_or_init(Default::default)
+}
+fn retire(repo: &Path, transaction: &str) {
+    let mut values = pending()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if values
+        .get(repo)
+        .is_some_and(|value| value.ticket.transaction == transaction)
+    {
+        values.remove(repo);
+    }
+}
+#[derive(Debug)]
+enum ExchangeError {
+    NotDispatched(String),
+    Unknown(String),
+}
+impl std::fmt::Display for ExchangeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotDispatched(s) | Self::Unknown(s) => f.write_str(s),
+        }
+    }
+}
+fn exchange(
     target: &remote::Target,
-    ticket: Option<Ticket>,
+    body: Request,
+    owner: &remote::OwnedDispatch,
     active: &dyn Fn() -> bool,
-) -> Result<Payload, String> {
+) -> Result<Result<Payload, String>, ExchangeError> {
+    exchange_with(target, body, owner, active, remote::exec_owned)
+}
+fn exchange_with(
+    target: &remote::Target,
+    body: Request,
+    owner: &remote::OwnedDispatch,
+    active: &dyn Fn() -> bool,
+    send: impl FnOnce(
+        &remote::Host,
+        &remote::Request,
+        &remote::OwnedDispatch,
+        &dyn Fn() -> bool,
+    ) -> Result<remote::Output, remote::OwnedFailure>,
+) -> Result<Result<Payload, String>, ExchangeError> {
     if !active() {
-        return Err(
+        owner.cancel();
+        return Err(ExchangeError::NotDispatched(
             "Object independence was cancelled before dispatch; no helper request was sent.".into(),
-        );
+        ));
     }
-    let payload = serde_json::to_vec(&Request {
-        protocol: PROTOCOL.into(),
-        repo: target.path.clone(),
-        ticket,
-    })
-    .map_err(|e| e.to_string())?;
+    let payload =
+        serde_json::to_vec(&body).map_err(|e| ExchangeError::NotDispatched(e.to_string()))?;
     if payload.len() > LIMIT {
-        return Err(
+        return Err(ExchangeError::NotDispatched(
             "Owned-helper snapshot exceeds 4 MiB; use Git on the repository machine.".into(),
-        );
+        ));
     }
-    // All shell text is constant; the path and snapshot travel only as bounded JSON stdin.
+    // Constant shell text only. Paths and ownership metadata travel as bounded JSON stdin.
     let mut req = super::super::command::object_storage_request(
         target,
         &[
@@ -104,10 +169,22 @@ fn request_target(
         LIMIT,
     );
     req.timeout = Some(Duration::from_secs(20));
-    let out = super::super::command::comparison_remote(&target.host, req, active)?;
-    parse_reply(out)
+    owner.run(|| {
+        // Keep the Context/completion scope across actual queue/connect/send/result.
+        // exec_owned checks active again at its actual pre-send boundary; it never
+        // invokes the legacy timeout controller or retries a possibly partial send.
+        if !active() {
+            owner.cancel();
+            return Err(ExchangeError::NotDispatched("Object independence was cancelled before dispatch; no helper request was sent.".into()));
+        }
+        let out = send(&target.host, &req, owner, active).map_err(|e| match e {
+            remote::OwnedFailure::NotDispatched(message) => ExchangeError::NotDispatched(message),
+            remote::OwnedFailure::Unknown => ExchangeError::Unknown("The actual helper transport ended without a known outcome; no stop or retry was dispatched.".into()),
+        })?;
+        parse_protocol(out).map_err(ExchangeError::Unknown)
+    })
 }
-fn parse_reply(out: remote::Output) -> Result<Payload, String> {
+fn parse_protocol(out: remote::Output) -> Result<Result<Payload, String>, String> {
     if out.stdout.len() > LIMIT || out.stderr.len() > 64 * 1024 {
         return Err("Owned-helper reply exceeds its byte limit".into());
     }
@@ -123,13 +200,78 @@ fn parse_reply(out: remote::Output) -> Result<Payload, String> {
     if reply.protocol != PROTOCOL {
         return Err("The installed GitCraft helper uses an incompatible ownership protocol; update it before retrying.".into());
     }
-    reply.result
+    Ok(reply.result)
+}
+#[cfg(test)]
+fn parse_reply(out: remote::Output) -> Result<Payload, String> {
+    parse_protocol(out)?
+}
+fn request_target(
+    target: &remote::Target,
+    ticket: Option<Ticket>,
+    active: &dyn Fn() -> bool,
+) -> Result<Payload, String> {
+    let owner = remote::OwnedDispatch::default();
+    exchange(
+        target,
+        Request {
+            protocol: PROTOCOL.into(),
+            repo: target.path.clone(),
+            ticket,
+            status: None,
+        },
+        &owner,
+        active,
+    )
+    .map_err(|e| e.to_string())?
+}
+fn resolve_pending(repo: &Path, active: &dyn Fn() -> bool) -> Result<(), String> {
+    let held = pending()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .get(repo)
+        .cloned();
+    let Some(held) = held else {
+        return Ok(());
+    };
+    let target = remote::parse(repo).ok_or("Pending helper target is unavailable")?;
+    let result = held.owner.run(|| {
+        let reader = remote::OwnedDispatch::default();
+        exchange(
+            &target,
+            Request {
+                protocol: PROTOCOL.into(),
+                repo: target.path.clone(),
+                ticket: None,
+                status: Some(held.ticket.clone()),
+            },
+            &reader,
+            active,
+        )
+    });
+    if let Ok(Ok(Payload::Terminal {
+        transaction,
+        result,
+    })) = result
+        && transaction == held.ticket.transaction
+        && !held.owner.pending()
+    {
+        retire(repo, &transaction);
+        return Err(format!(
+            "The previous independence attempt has a verified terminal receipt: {result:?}. Inspect this repository again before another action."
+        ));
+    }
+    Err(format!(
+        "A previous independence attempt still has no verified terminal outcome. No replacement was dispatched. Reinspect after the helper finishes. Recovery: {}/info/alternates.gitcraft-backup-{}; private stage: {}/gitcraft-independent-stage-{}. A missing receipt does not prove it stopped. If no receipt can be recovered, finish deliberate recovery on that machine, ensure the helper has ended, then reopen GitCraft.",
+        held.ticket.primary, held.ticket.transaction, held.ticket.primary, held.ticket.transaction
+    ))
 }
 pub(super) fn prepare(repo: &Path, active: &dyn Fn() -> bool) -> Result<RemotePlan, String> {
-    let Payload::Prepared(ticket) = request(repo, None, active)? else {
+    resolve_pending(repo, active)?;
+    let target = remote::parse(repo).ok_or("Owned helper requires an SSH/WSL repository")?;
+    let Payload::Prepared(ticket) = request_target(&target, None, active)? else {
         return Err("The owned helper did not prepare an identity snapshot".into());
     };
-    let target = remote::parse(repo).ok_or("Missing remote target")?;
     if ticket.repo != target.path
         || ticket.identities.is_empty()
         || ticket.identities.len() > 4096
@@ -155,25 +297,110 @@ fn claim(plan: &RemotePlan, active: &dyn Fn() -> bool) -> Result<(), String> {
     if plan.profile != connections::current() {
         return Err("Profile changed; prepare remote independence again.".into());
     }
-    // A prepared mutation is one deliberate attempt, shared by every Snapshot clone.
-    // Unknown/lost/malformed outcomes never turn the same ticket into a retry action.
-    plan.attempted.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+    plan.attempted.compare_exchange(false,true,Ordering::AcqRel,Ordering::Acquire)
         .map_err(|_| "This prepared independence attempt was already used. Inspect borrowing and recovery evidence again before another deliberate action.".to_owned())?;
     Ok(())
 }
 pub(super) fn execute(plan: &RemotePlan, active: &dyn Fn() -> bool) -> Result<String, String> {
     claim(plan, active)?;
+    let target = remote::parse(&plan.repo).ok_or("Owned helper requires an SSH/WSL repository")?;
+    let owner = remote::OwnedDispatch::default();
+    reserve(plan, &owner)?;
     let recovery = format!(
         "{}/info/alternates.gitcraft-backup-{}",
         plan.ticket.primary, plan.ticket.transaction
     );
-    let result=request(&plan.repo,Some(plan.ticket.clone()),active).map_err(|e|format!("{e}. No completion proof was received; do not assume independence or retry automatically. Inspect borrowing and the recovery backup (if created) on that machine: {recovery}"))?;
-    completed(result, &plan.ticket.transaction, &recovery)
+    let result = exchange(
+        &target,
+        Request {
+            protocol: PROTOCOL.into(),
+            repo: target.path.clone(),
+            ticket: Some(plan.ticket.clone()),
+            status: None,
+        },
+        &owner,
+        active,
+    );
+    finish_attempt(plan, result, &recovery)
+}
+fn reserve(plan: &RemotePlan, owner: &remote::OwnedDispatch) -> Result<(), String> {
+    {
+        let mut values = pending()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if values.contains_key(&plan.repo) || values.len() >= 64 {
+            return Err("Resolve the previous unknown helper outcome before another independence action. Inspect borrowing and retained recovery evidence.".into());
+        }
+        values.insert(
+            plan.repo.clone(),
+            Pending {
+                owner: owner.clone(),
+                ticket: plan.ticket.clone(),
+            },
+        );
+    }
+    Ok(())
+}
+fn finish_attempt(
+    plan: &RemotePlan,
+    result: Result<Result<Payload, String>, ExchangeError>,
+    recovery: &str,
+) -> Result<String, String> {
+    match result {
+        Err(ExchangeError::NotDispatched(message)) => {
+            retire(&plan.repo, &plan.ticket.transaction);
+            Err(format!("The helper mutation was not dispatched: {message}"))
+        }
+        Ok(Err(message)) => {
+            retire(&plan.repo, &plan.ticket.transaction);
+            Err(format!(
+                "The helper finished with an error: {message}. Inspect retained recovery: {recovery}"
+            ))
+        }
+        Ok(Ok(payload)) => match completed(payload, &plan.ticket.transaction, &recovery) {
+            Ok(message) => {
+                retire(&plan.repo, &plan.ticket.transaction);
+                Ok(message)
+            }
+            Err(error) => Err(format!(
+                "{error} The captured operation barrier remains retained; inspect borrowing again to query its terminal receipt."
+            )),
+        },
+        Err(error @ ExchangeError::Unknown(_)) => Err(format!(
+            "No exact completion proof was received ({detail}); no automatic retry or cleanup was performed. The captured connection and operation barrier remain retained. Inspect borrowing again to query its terminal receipt, or recover deliberately on that machine. Backup (if created): {recovery}",
+            detail = error.to_string()
+        )),
+    }
+}
+fn completed(result: Payload, expected: &str, recovery: &str) -> Result<String, String> {
+    match result {
+        Payload::Completed {
+            transaction,
+            message,
+        } if transaction == expected => Ok(message),
+        _ => Err(format!(
+            "Missing/mismatched helper completion proof. Inspect borrowing and {recovery}; no automatic retry was performed."
+        )),
+    }
 }
 
 #[cfg(test)]
 mod protocol_tests {
     use super::*;
+    fn target() -> remote::Target {
+        remote::Target {
+            host: remote::Host::Ssh("recording-only.invalid".into()),
+            path: "/recording-only/repo ' $(touch ESCAPED)".into(),
+        }
+    }
+    fn body(target: &remote::Target) -> Request {
+        Request {
+            protocol: PROTOCOL.into(),
+            repo: target.path.clone(),
+            ticket: None,
+            status: None,
+        }
+    }
     fn plan() -> RemotePlan {
         RemotePlan {
             repo: PathBuf::from("ssh://owned-helper-fixture.invalid/recording-only/repo"),
@@ -217,6 +444,93 @@ mod protocol_tests {
             assert!(claim(&plan, &|| true).is_err_and(|e| e.contains("Profile changed")));
             assert!(!plan.attempted.load(Ordering::Acquire));
         });
+    }
+    #[test]
+    fn recording_owned_adapter_checks_cancel_before_send_and_holds_actual_completion_scope()
+    -> Result<(), String> {
+        connections::Context::default().run(|| {
+            use std::sync::atomic::AtomicUsize;
+            let target = target();
+            let owner = remote::OwnedDispatch::default();
+            let calls = AtomicUsize::new(0);
+            let cancelled = exchange_with(&target,body(&target),&owner,&|| false,|_,_,_,_| {
+                calls.fetch_add(1,Ordering::Relaxed); Err(remote::OwnedFailure::Unknown)
+            });
+            assert!(matches!(cancelled,Err(ExchangeError::NotDispatched(_))));
+            assert_eq!(calls.load(Ordering::Relaxed),0);
+            assert!(!owner.pending());
+            let owner = remote::OwnedDispatch::default();
+            let good = serde_json::json!({"protocol":PROTOCOL,"result":{"Ok":{"kind":"Completed","data":{"transaction":"abc123","message":"verified"}}}});
+            let result = exchange_with(&target,body(&target),&owner,&|| true,|_,request,actual,active| {
+                assert!(actual.pending());
+                assert!(active());
+                assert_eq!(connections::current(),connections::Context::default());
+                assert_eq!(request.cwd.as_deref(),Some(target.path.as_str()));
+                assert!(!request.script.contains(&target.path));
+                let payload: Request = serde_json::from_slice(request.stdin.as_deref().ok_or_else(||remote::OwnedFailure::NotDispatched("no payload".into()))?)
+                    .map_err(|_|remote::OwnedFailure::NotDispatched("invalid payload".into()))?;
+                assert_eq!(payload.repo,target.path);
+                calls.fetch_add(1,Ordering::Relaxed);
+                Ok(output(good))
+            }).map_err(|e|e.to_string())??;
+            assert_eq!(completed(result,"abc123","backup")?,"verified");
+            assert_eq!(calls.load(Ordering::Relaxed),1);
+            assert!(!owner.pending());
+            Ok(())
+        })
+    }
+    #[test]
+    fn recording_unknown_or_mismatched_outcome_keeps_owner_and_blocks_replacement()
+    -> Result<(), String> {
+        connections::Context::default().run(|| {
+            let mut plan = plan();
+            plan.repo = PathBuf::from("ssh://recording-only.invalid/unique-unknown-object-attempt");
+            let owner = remote::OwnedDispatch::default();
+            reserve(&plan, &owner)?;
+            let result = finish_attempt(
+                &plan,
+                Err(ExchangeError::Unknown("recording lost response".into())),
+                "backup",
+            );
+            assert!(result.is_err_and(|e| e.contains("barrier remain retained")));
+            assert!(reserve(&plan, &remote::OwnedDispatch::default()).is_err());
+            retire(&plan.repo, "wrong-transaction");
+            assert!(
+                pending()
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .contains_key(&plan.repo)
+            );
+            let wrong = Payload::Completed {
+                transaction: "different".into(),
+                message: "not this attempt".into(),
+            };
+            assert!(finish_attempt(&plan, Ok(Ok(wrong)), "backup").is_err());
+            assert!(
+                pending()
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .contains_key(&plan.repo)
+            );
+            assert_eq!(
+                finish_attempt(
+                    &plan,
+                    Ok(Ok(Payload::Completed {
+                        transaction: plan.ticket.transaction.clone(),
+                        message: "verified".into()
+                    })),
+                    "backup"
+                )?,
+                "verified"
+            );
+            assert!(
+                !pending()
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .contains_key(&plan.repo)
+            );
+            Ok(())
+        })
     }
     #[test]
     fn recording_only_exact_complete_protocol_and_transaction_prove_success() -> Result<(), String>
@@ -263,18 +577,6 @@ mod protocol_tests {
         Ok(())
     }
 }
-fn completed(result: Payload, expected: &str, recovery: &str) -> Result<String, String> {
-    match result {
-        Payload::Completed {
-            transaction,
-            message,
-        } if transaction == expected => Ok(message),
-        _ => Err(format!(
-            "Missing/mismatched helper completion proof. Inspect borrowing and {recovery}; no automatic retry was performed."
-        )),
-    }
-}
-
 #[cfg(target_os = "linux")]
 fn process(request: Request) -> Result<Payload, String> {
     use super::independent::local;
@@ -284,6 +586,16 @@ fn process(request: Request) -> Result<Payload, String> {
     let repo = PathBuf::from(&request.repo);
     if !repo.is_absolute() || remote::is_remote(&repo) {
         return Err("The helper accepts only absolute local repository paths".into());
+    }
+    if let Some(ticket) = request.status {
+        if request.ticket.is_some() || ticket.repo != request.repo {
+            return Err("Status request does not match the prepared repository/ticket".into());
+        }
+        let result = receipt::read(&ticket)?;
+        return Ok(Payload::Terminal {
+            transaction: ticket.transaction,
+            result,
+        });
     }
     let primary = PathBuf::from(super::line(
         &repo,
@@ -311,12 +623,7 @@ fn process(request: Request) -> Result<Payload, String> {
             if actual != expected {
                 return Err("Actual ancestor/store/file identities, refs or borrowing changed. Prepare independence again.".into());
             }
-            let message = local::make_transaction(
-                &snapshot,
-                &|| true,
-                &mut |_| Ok(()),
-                &expected.transaction,
-            )?;
+            let message = local::make_receipted_transaction(&snapshot, &|| true, &expected)?;
             Ok(Payload::Completed {
                 transaction: expected.transaction,
                 message,
@@ -330,7 +637,7 @@ fn process(_request: Request) -> Result<Payload, String> {
 }
 pub(crate) fn entrypoint() -> i32 {
     if std::env::args().nth(1).as_deref() == Some("--capabilities") {
-        let capabilities = serde_json::json!({"protocol":PROTOCOL,"package_version":env!("CARGO_PKG_VERSION"),"linux_owned_identity":cfg!(target_os="linux"),"requires_filesystem_birth_time":true,"max_protocol_bytes":LIMIT});
+        let capabilities = serde_json::json!({"protocol":PROTOCOL,"package_version":env!("CARGO_PKG_VERSION"),"linux_owned_identity":cfg!(target_os="linux"),"requires_filesystem_birth_time":true,"terminal_status":true,"max_protocol_bytes":LIMIT});
         return if writeln!(std::io::stdout(), "{capabilities}").is_ok() {
             0
         } else {
@@ -401,6 +708,7 @@ pub(super) fn fixture_server_prepare(repo: &Path) -> Result<Ticket, String> {
         protocol: PROTOCOL.into(),
         repo: repo.to_string_lossy().into_owned(),
         ticket: None,
+        status: None,
     })? {
         Payload::Prepared(ticket) => Ok(ticket),
         _ => Err("Server fixture did not prepare ownership".into()),
@@ -413,6 +721,26 @@ pub(super) fn fixture_server_execute(repo: &Path, ticket: Ticket) -> Result<Stri
         protocol: PROTOCOL.into(),
         repo: repo.to_string_lossy().into_owned(),
         ticket: Some(ticket),
+        status: None,
     })?;
     completed(result, &transaction, "owned fixture recovery")
+}
+#[cfg(all(test, target_os = "linux"))]
+pub(super) fn fixture_server_status(
+    repo: &Path,
+    ticket: Ticket,
+) -> Result<Result<String, String>, String> {
+    let transaction = ticket.transaction.clone();
+    match process(Request {
+        protocol: PROTOCOL.into(),
+        repo: repo.to_string_lossy().into_owned(),
+        ticket: None,
+        status: Some(ticket),
+    })? {
+        Payload::Terminal {
+            transaction: actual,
+            result,
+        } if actual == transaction => Ok(result),
+        _ => Err("No exact terminal fixture receipt".into()),
+    }
 }

@@ -659,10 +659,20 @@ never installs a helper automatically. The Linux helper binds preparation to act
 ancestor/store/file device, inode and filesystem birth-time identities plus refs and
 borrowing metadata, then retains handles throughout copying, installation and recovery.
 Filesystems without birth-time identity support refuse the action. Requests/replies
-are capped at 4 MiB and the existing remote deadline applies. Only an exact transaction
+are capped at 4 MiB. The owned remote transport waits through the actual queue,
+connection and command result, checks cancellation before sending, and never selects
+the legacy timeout stop controller or replays a possibly partial send. Only an exact transaction
 completion reply proves success; an interrupted connection reports the known recovery
 backup path and never retries automatically. Each prepared action permits one attempt;
 inspect borrowing again before another deliberate attempt after an uncertain result.
+An uncertain attempt retains its captured connection and blocks replacement actions.
+**Inspect** asks for its terminal receipt using that same connection. The receipt is
+published create-only in the private stage after copying/proof/recovery has finished;
+the helper accepts it only through the prepared actual ancestor/object-store identities
+and exact ticket. A missing or changed receipt never means the helper stopped. Early
+failures may have no receipt: finish deliberate recovery on that machine, ensure the
+helper has ended, then reopen GitCraft. No donor, receipt or recovery directory is
+automatically deleted on an uncertain outcome.
 
 For a source installation on the repository machine, build the helper from the same
 GitCraft checkout and put it on that account's PATH:
