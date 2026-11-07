@@ -235,36 +235,20 @@ impl NativeCommand {
         options.stdout_ready = Some(READY);
         let endpoint = self.endpoint.clone();
         let nonce = self.nonce;
-        let mut pending = Vec::new();
-        let mut known = false;
+        let mut filter = super::private_marker::Filter::new(MARKER);
         options.stderr_filter = Some(Box::new(move |bytes| {
-            if known {
-                return bytes.to_vec();
-            }
-            pending.extend_from_slice(bytes);
-            let mut output = Vec::new();
-            while let Some(end) = pending.iter().position(|&b| b == b'\n') {
-                let line: Vec<_> = pending.drain(..=end).collect();
-                if let Some(json) = line.strip_prefix(MARKER) {
-                    if let Ok(ep) = Endpoint::from_record(json)
-                        && ep.nonce == nonce
-                    {
-                        *endpoint
-                            .lock()
-                            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(ep);
-                        known = true;
-                        output.append(&mut pending);
-                        break;
-                    }
-                    output.extend_from_slice(b"gitcraft: invalid native ownership handshake\n");
+            filter.feed(bytes, |json| {
+                if let Ok(ep) = Endpoint::from_record(json)
+                    && ep.nonce == nonce
+                {
+                    *endpoint
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(ep);
+                    true
                 } else {
-                    output.extend_from_slice(&line);
+                    false
                 }
-            }
-            if pending.len() > 4096 {
-                output.append(&mut pending);
-            }
-            output
+            })
         }));
         let endpoint = self.endpoint.clone();
         options.stop_ready = Some(Box::new(move || {

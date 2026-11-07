@@ -14,6 +14,7 @@ mod discover;
 mod fs;
 pub(crate) mod native_owner;
 mod pool;
+mod private_marker;
 mod session;
 mod shell;
 mod supervisor;

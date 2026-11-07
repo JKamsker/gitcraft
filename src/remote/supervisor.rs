@@ -142,42 +142,24 @@ impl Lease {
 pub(super) struct Marker {
     nonce: String,
     lease: Lease,
-    pending: Vec<u8>,
-    established: bool,
+    filter: super::private_marker::Filter,
 }
 impl Marker {
     pub(super) fn new(nonce: String, lease: Lease) -> Self {
         Self {
             nonce,
             lease,
-            pending: Vec::new(),
-            established: false,
+            filter: super::private_marker::Filter::new(b"__GITCRAFT_OWNER__ "),
         }
     }
     pub(super) fn feed(&mut self, bytes: &[u8]) -> Vec<u8> {
-        if self.established {
-            return bytes.to_vec();
-        }
-        self.pending.extend_from_slice(bytes);
-        let mut output = Vec::new();
-        while let Some(end) = self.pending.iter().position(|&b| b == b'\n') {
-            let line: Vec<_> = self.pending.drain(..=end).collect();
-            if let Some(hello) = line.strip_prefix(b"__GITCRAFT_OWNER__ ") {
-                if let Some(endpoint) = Endpoint::parse(hello, &self.nonce) {
-                    self.lease.accept(endpoint);
-                    self.established = true;
-                    output.append(&mut self.pending);
-                    break;
-                }
-                output.extend_from_slice(b"gitcraft: invalid ownership handshake\n");
+        self.filter.feed(bytes, |hello| {
+            if let Some(endpoint) = Endpoint::parse(hello, &self.nonce) {
+                self.lease.accept(endpoint)
             } else {
-                output.extend_from_slice(&line);
+                false
             }
-        }
-        if self.pending.len() > 4096 {
-            output.append(&mut self.pending);
-        }
-        output
+        })
     }
 }
 
