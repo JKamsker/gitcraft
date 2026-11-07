@@ -102,6 +102,7 @@ mod rewrite;
 mod running;
 #[cfg(test)]
 mod samples;
+mod saved_views;
 mod sidebar;
 mod stack;
 mod state;
@@ -191,6 +192,7 @@ pub struct RepoTab {
     refs: Refs,
     graph_badge_index: graph_view::BadgeIndex,
     /// Commits as git listed them.
+    saved_views: saved_views::State,
     history: Vec<Arc<Commit>>,
     /// A selected pull request's tip, including one with no local or tracking ref.
     pr_graph_head: Option<Arc<Commit>>,
@@ -528,6 +530,7 @@ impl RepoTab {
             load_error: None,
             refs: Refs::default(),
             graph_badge_index: graph_view::BadgeIndex::default(),
+            saved_views: Default::default(),
             history: Vec::new(),
             pr_graph_head: None,
             has_more: false,

@@ -387,6 +387,7 @@ impl RepoTab {
         }
         self.agent_step(ctx);
         // A tab not read yet, or suspended, neither fetches nor follows builds.
+        self.poll_saved_views(ctx);
         if !shown || self.sleeping() {
             return;
         }
@@ -469,7 +470,10 @@ impl RepoTab {
                 }
                 self.conflict_saved(path, saved, ctx)
             }
-            Msg::Identity(identity) => self.identity = identity,
+            Msg::Identity(identity) => {
+                self.identity = identity;
+                self.saved_views.dirty = true;
+            }
             // One asked for before the tab was suspended (or watched again) sends to a channel
             // no longer read: dropped, not kept.
             Msg::Watcher(watch, watcher) => {

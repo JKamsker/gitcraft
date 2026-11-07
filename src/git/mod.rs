@@ -26,6 +26,7 @@ mod files;
 mod fold;
 mod hooks;
 mod interaction;
+pub(crate) mod investigations;
 mod lfs;
 #[cfg(test)]
 pub(crate) mod lfs_fixtures;
