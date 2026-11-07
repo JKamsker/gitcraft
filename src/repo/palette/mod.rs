@@ -1,0 +1,235 @@
+//! What the command palette offers for a repository: its commands, what can be done with the
+//! selected commit or file, and verbs (merge, rebase, check out…) whose branch is picked in a
+//! second step, so that a repository with thousands of branches doesn't get an entry for each
+//! combination.
+
+mod picks;
+mod selection;
+#[cfg(test)]
+mod tests;
+
+use std::path::PathBuf;
+
+use super::pull::PullMode;
+use super::toolbar::reveal_label;
+use super::{Action, Dialog, DiffKey, Refresh, RepoTab, ops};
+
+/// One palette entry.
+pub(crate) struct PaletteItem {
+    pub label: String,
+    /// What kind of entry it is (`remote`, `branch`…), on the right.
+    pub hint: String,
+    /// The keys that do the same, drawn on the right as a keycap; `Ctrl` stands for Cmd on
+    /// macOS.
+    pub shortcut: Option<String>,
+    /// What the palette remembers it by when it is run: the same entry across reloads even
+    /// when its label names something that changes (the checked-out branch).
+    pub key: String,
+    /// It is about the selected commit or file: it comes first.
+    pub selection: bool,
+    pub run: PaletteRun,
+}
+
+/// What choosing an entry does.
+pub(crate) enum PaletteRun {
+    Action(Action),
+    /// Lists what to do it with, to pick from.
+    Pick(Pick),
+}
+
+/// A verb whose object is picked in a second step.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum Pick {
+    Checkout,
+    Merge,
+    Rebase,
+    InteractiveRebase,
+    /// What a branch changed since it left the checked-out one.
+    ChangesAdded,
+    Compare,
+    /// Push a branch other than the checked-out one.
+    Push,
+    /// Reset the checked-out branch to this commit, picking how.
+    Reset(String),
+}
+
+impl Pick {
+    /// The prompt of the second step's field.
+    pub(crate) fn placeholder(&self) -> &'static str {
+        match self {
+            Pick::Reset(_) => "How to reset…",
+            Pick::Push => "Branch to push…",
+            _ => "Branch…",
+        }
+    }
+
+    /// What its choices are remembered under.
+    fn key(&self) -> &'static str {
+        match self {
+            Pick::Checkout => "checkout",
+            Pick::Merge => "merge",
+            Pick::Rebase => "rebase",
+            Pick::InteractiveRebase => "interactive-rebase",
+            Pick::ChangesAdded => "changes-added",
+            Pick::Compare => "compare",
+            Pick::Push => "push",
+            Pick::Reset(_) => "reset",
+        }
+    }
+}
+
+impl PaletteItem {
+    /// An entry remembered by its label.
+    pub(crate) fn new(label: impl Into<String>, hint: &str, run: PaletteRun) -> Self {
+        let label = label.into();
+        Self {
+            key: label.clone(),
+            label,
+            hint: hint.to_owned(),
+            shortcut: None,
+            selection: false,
+            run,
+        }
+    }
+
+    pub(crate) fn action(label: impl Into<String>, hint: &str, action: Action) -> Self {
+        Self::new(label, hint, PaletteRun::Action(action))
+    }
+
+    pub(crate) fn key(mut self, key: impl Into<String>) -> Self {
+        self.key = key.into();
+        self
+    }
+
+    pub(crate) fn shortcut(mut self, keys: &str) -> Self {
+        self.shortcut = Some(keys.to_owned());
+        self
+    }
+
+    fn selection(mut self) -> Self {
+        self.selection = true;
+        self
+    }
+}
+
+/// What the palette's entries for a repository were made from: when it changes, they are
+/// made again.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct PaletteGeneration {
+    history: u64,
+    submodules: u64,
+    selected: Option<usize>,
+    file: Option<DiffKey>,
+    busy: bool,
+}
+
+impl RepoTab {
+    /// Changes whenever what [`Self::palette_items`] is made from (refs, remotes, submodules,
+    /// the selected commit and the open file) is read again or changes, and whether an operation is running.
+    pub(crate) fn palette_generation(&self) -> PaletteGeneration {
+        PaletteGeneration {
+            history: self.history_gen,
+            submodules: self.submodules_read,
+            selected: self.selected,
+            file: self.diff.as_ref().map(|d| d.key.clone()),
+            busy: self.busy_op.is_some(),
+        }
+    }
+
+    /// What the command palette offers for this repository: what can be done with the
+    /// selection first, then the commands, then the verbs that pick a branch next.
+    pub(crate) fn palette_items(&self) -> Vec<PaletteItem> {
+        let mut items = self.selection_items();
+        items.extend(self.command_items());
+        items.extend(self.pick_items());
+        items
+    }
+
+    /// The repository's commands, whatever is selected.
+    fn command_items(&self) -> Vec<PaletteItem> {
+        let mut items = vec![
+            PaletteItem::action("Fetch", "remote", Action::Fetch),
+            PaletteItem::action("Pull", "remote", Action::Pull),
+            PaletteItem::action("Push", "remote", Action::Push),
+        ];
+        items.extend(
+            PullMode::ALL.map(|m| PaletteItem::action(m.label(), "remote", Action::PullWith(m))),
+        );
+        items.extend([
+            PaletteItem::action("Apply patch…", "patch", Action::ApplyPatch),
+            PaletteItem::action("Undo", "history", Action::Undo).shortcut("Ctrl+Z"),
+            PaletteItem::action("Redo", "history", Action::Redo).shortcut("Ctrl+Y"),
+            PaletteItem::action("Stash changes", "stash", Action::Dialog(Dialog::stash())),
+            PaletteItem::action("Search commits", "graph", Action::ToggleSearch).shortcut("Ctrl+F"),
+            PaletteItem::action("Toggle terminal", "terminal", Action::ToggleTerminal),
+            PaletteItem::action(
+                "New terminal",
+                "terminal",
+                Action::NewTerminal {
+                    shell: None,
+                    cwd: None,
+                },
+            ),
+            PaletteItem::action("Reload", "repository", Action::Reload).shortcut("F5"),
+            PaletteItem::action(reveal_label(), "folder", Action::OpenPath(PathBuf::new())),
+            PaletteItem::action(
+                "Open in editor",
+                "folder",
+                Action::OpenInEditor(PathBuf::new()),
+            ),
+        ]);
+        if let Some(url) = self.web_page() {
+            items.push(PaletteItem::action(
+                "Open in browser",
+                "remote",
+                Action::OpenUrl(url),
+            ));
+        }
+        if !self.submodules.is_empty() {
+            items.push(PaletteItem::action(
+                "Update submodules",
+                "submodule",
+                super::keep_submodules::update_all(),
+            ));
+        }
+        if self.lfs {
+            for (label, args) in [
+                ("LFS: Fetch", ["lfs", "fetch"]),
+                ("LFS: Pull", ["lfs", "pull"]),
+            ] {
+                items.push(PaletteItem::action(
+                    label,
+                    "remote",
+                    Action::Ops {
+                        label: label.into(),
+                        ops: ops(&[&args]),
+                        refresh: Refresh::All,
+                    },
+                ));
+            }
+        }
+        if !self.refs.head.is_empty() && self.ci_project().is_some() {
+            items.push(PaletteItem::action(
+                "Show CI for HEAD",
+                "builds",
+                Action::OpenCi {
+                    sha: self.refs.head.clone(),
+                    run: None,
+                },
+            ));
+        }
+        if !self.refs.head.is_empty() {
+            items.push(PaletteItem::action(
+                "Create branch…",
+                "branch",
+                Action::Dialog(Dialog::create_branch(&self.refs.head, "HEAD")),
+            ));
+            items.push(PaletteItem::action(
+                "Create tag…",
+                "tag",
+                Action::Dialog(Dialog::tag(&self.refs.head, "HEAD", self.default_remote())),
+            ));
+        }
+        items
+    }
+}

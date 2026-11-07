@@ -1,8 +1,7 @@
-//! Saved state, the active tab on start, the window icon and palette matching.
+//! Saved state, the active tab on start and the window icon.
 
 use eframe::Storage as _;
 
-use super::palette::fuzzy;
 use super::{Saved, active_among_kept, window_icon};
 use crate::tab_look::{TabColor, TabLook};
 
@@ -60,14 +59,6 @@ fn window_icon_decodes() {
         icon.rgba.chunks(4).any(|p| p[3] > 0),
         "the icon isn't blank"
     );
-}
-
-#[test]
-fn fuzzy_matching() {
-    assert!(fuzzy("check out main", "cmain"));
-    assert!(fuzzy("check out main", "co main"));
-    assert!(!fuzzy("fetch", "push"));
-    assert!(fuzzy("anything", ""));
 }
 
 /// A repository in WSL (`GITCRAFT_TEST_WSL=<distro>`; skipped without): the window is driven

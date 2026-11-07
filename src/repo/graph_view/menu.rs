@@ -9,10 +9,11 @@ use crate::git;
 use crate::menu_item::MenuItem;
 use crate::repo::actions::{BranchRef, cherry_pick_action, interactive_rebase_action};
 use crate::repo::conflict_check::Op;
-use crate::repo::operations::{expect_ref_at, expect_symref};
+use crate::repo::commit_actions::{
+    revert_action,
+};
 use crate::repo::{
-    Action, Dialog, Refresh, RepoTab, Undo, WIP_HASH, fast_forward_action, merge_action, ops,
-    rebase_action,
+    Action, Dialog, RepoTab, Refresh, Undo, WIP_HASH, ops, fast_forward_action, merge_action, rebase_action,
 };
 
 /// Where a row remembers which branch pill was right-clicked, for its menu.
@@ -339,9 +340,9 @@ impl RepoTab {
 /// The commit a menu rewrites the checked-out branch from.
 pub(in crate::repo) struct Rewrite<'a> {
     /// The tab, which marks the cherry-pick with whether it would conflict.
-    tab: &'a RepoTab,
+    pub(in crate::repo) tab: &'a RepoTab,
     /// The commit is a merge (cherry-picking it needs a parent, and isn't checked).
-    merge: bool,
+    pub(in crate::repo) merge: bool,
     pub(in crate::repo) hash: &'a str,
     pub(in crate::repo) short: &'a str,
     pub(in crate::repo) summary: &'a str,
@@ -350,7 +351,7 @@ pub(in crate::repo) struct Rewrite<'a> {
     /// HEAD's commit, as the menu saw it.
     pub(in crate::repo) head: &'a str,
     /// The remote-tracking branch `target` is pushed to (`refs/remotes/origin/main`).
-    upstream: Option<&'a str>,
+    pub(in crate::repo) upstream: Option<&'a str>,
 }
 
 /// Entries that rewrite `target` (the checked-out branch) from the commit: interactive rebase,
@@ -389,12 +390,7 @@ fn rewrite_items(ui: &mut Ui, r: &Rewrite<'_>, idle: bool, is_head: bool, acts: 
         .add_enabled(idle, egui::Button::new("Revert commit"))
         .clicked()
     {
-        acts.push(Action::UndoableOps {
-            label: format!("Revert {short}"),
-            ops: ops(&[&["revert", "--no-edit", hash]]),
-            refresh: Refresh::All,
-            undo: Undo::HeadMove { mode: "--keep" },
-        });
+        acts.push(revert_action(hash, short));
     }
     ui.add_enabled_ui(idle && !is_head, |ui| {
         ui.menu_button(format!("Reset {target} to here"), |ui| {
@@ -497,9 +493,9 @@ fn copy_items(ui: &mut Ui, hash: &str, summary: &str, branch: Option<&str>) {
 
 #[cfg(test)]
 mod tests {
-    use super::reset_steps;
     use crate::git;
     use crate::repo::OpKind;
+    use crate::repo::commit_actions::reset_steps;
     use crate::repo::operations::run_steps;
 
     /// A hard reset asked for on `main` does nothing once another branch is checked out (in the

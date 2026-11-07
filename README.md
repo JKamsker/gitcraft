@@ -388,7 +388,16 @@ so your config, credentials and hooks apply as usual.
 - Terminal panel with tabs: PowerShell, cmd, Git Bash, WSL… on Windows, your shells elsewhere, in a
   real pseudo-terminal (ConPTY on Windows) with colours, scrollback, mouse selection and copy
   (Ctrl+C with a selection, Ctrl+Shift+C or right-click).
-- Command palette (Ctrl+P): every action and branch, fuzzy matched.
+- Command palette (Ctrl+P): every action, ranked by how well it matches what you type (word
+  starts, letters in a row, the start of the entry: `reb` finds _Rebase main onto…_ first, `cp`
+  _Cherry-pick_), the letters you typed highlighted. With nothing typed, what can be done with
+  the selected commit (_Cherry-pick a301da9c_, _Revert_, _Reset main to here…_) or the
+  open file (_Stage_, _Blame_, _File history_) comes first, then what you ran lately (remembered
+  across restarts). Verbs that need a branch (_Merge into main…_, _Rebase main onto…_, _Check out
+  a branch…_, _Compare main with…_, _Push another branch…_) list the branches in a second step
+  with their own search, so thousands of branches don't flood the list; Esc goes back, and so
+  does Backspace in its empty field. Typing a branch's name in the first step also offers to
+  check out the few that match best.
 - Custom commands (Settings → Custom commands): your own command lines in a commit's, a branch's
   or a file's menu, or the palette. Each runs with `sh` on the repository's machine (here, in
   WSL or over SSH) in its folder, with `$SHA`, `$SHORT_SHA`, `$BRANCH`, `$REMOTE`, `$FILE` and
@@ -647,7 +656,10 @@ was made this way, on a demo repository.
 | `src/repo/dialogs.rs`    | branch, tag, stash, remote, worktree, pull request and confirm dialogs             |
 | `src/git/preview.rs`     | what a destructive operation would change, read before it runs                     |
 | `src/repo/widgets.rs`    | shared painted widgets (panel headers, file rows, avatars, tabs)                   |
+| `src/repo/palette/`      | what the palette offers a repository: commands, the selection's, branch verbs      |
+| `src/repo/commit_actions.rs` | cherry-pick, revert and reset of a commit, for its menu and the palette        |
 | `src/app.rs`             | window shell: tabs, start page, cloning, palette, settings, toasts                 |
+| `src/app/palette/`       | the command palette: scored matching, recently used entries, the second step       |
 
 Assets and their licences: [ATTRIBUTION.md](ATTRIBUTION.md).
 
