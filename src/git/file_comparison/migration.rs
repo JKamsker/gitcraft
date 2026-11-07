@@ -79,12 +79,12 @@ pub(crate) fn read_migration(
         return Err(String::from_utf8_lossy(&out.stderr).trim().into());
     }
     let (moves, other_changes) = parse_moves(&out.stdout)?;
-    if let Some((before_head, before_index)) = snapshot {
-        if head(repo, active)? != before_head || index(repo, active)?.0 != before_index {
-            return Err(
-                "HEAD or index changed while detecting moves. Refresh the migration map.".into(),
-            );
-        }
+    if let Some((before_head, before_index)) = snapshot
+        && (head(repo, active)? != before_head || index(repo, active)?.0 != before_index)
+    {
+        return Err(
+            "HEAD or index changed while detecting moves. Refresh the migration map.".into(),
+        );
     }
     Ok(Migration {
         label,

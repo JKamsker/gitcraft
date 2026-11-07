@@ -440,9 +440,9 @@ fn lens(
                 let row = &lens.rows[i];
                 ui.horizontal(|ui| {
                     line_cell(ui, &row.text[0], width, row.undoes, t);
-                    boundary_button(ui, state, row, i, 0, allowed, &lens.boundaries[0], acts);
+                    boundary_button(ui, state, row, (i, 0), allowed, &lens.boundaries[0], acts);
                     line_cell(ui, &row.text[1], width, row.undoes, t);
-                    boundary_button(ui, state, row, i, 1, allowed, &lens.boundaries[1], acts);
+                    boundary_button(ui, state, row, (i, 1), allowed, &lens.boundaries[1], acts);
                     line_cell(ui, &row.text[2], width, row.undoes, t);
                     if row.undoes {
                         ui.colored_label(t.warning, "undoes staged");
@@ -455,12 +455,12 @@ fn boundary_button(
     ui: &mut egui::Ui,
     state: &State,
     row: &model::Row,
-    index: usize,
-    side: usize,
+    position: (usize, usize),
     allowed: bool,
     part: &model::Boundary,
     acts: &mut Vec<Action>,
 ) {
+    let (index, side) = position;
     let text = if side == 0 { "Unstage" } else { "Stage" };
     let label = format!("{text} lens row {}", index + 1);
     let enabled = allowed

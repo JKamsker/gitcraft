@@ -167,10 +167,8 @@ pub(crate) fn display_path(path: &[u8]) -> String {
     }
 }
 
-pub(super) fn index(
-    repo: &Path,
-    active: &dyn Fn() -> bool,
-) -> Result<(Vec<u8>, BTreeMap<Vec<u8>, Entry>), String> {
+type IndexEntries = (Vec<u8>, BTreeMap<Vec<u8>, Entry>);
+pub(super) fn index(repo: &Path, active: &dyn Fn() -> bool) -> Result<IndexEntries, String> {
     let bytes = run(repo, &["ls-files", "--stage", "-z"], active)?;
     let mut entries = BTreeMap::new();
     for row in bytes.split(|b| *b == 0).filter(|s| !s.is_empty()) {

@@ -229,10 +229,10 @@ fn slots(boundary: &Boundary, source: &Version, index: &Version, left: bool) -> 
                     *at = text.map(|s| (s, changed));
                 }
             }
-        } else if let Some(s) = text {
-            if let Some(slot) = result.before.get_mut(cursor) {
-                slot.push((s, changed));
-            }
+        } else if let Some(s) = text
+            && let Some(slot) = result.before.get_mut(cursor)
+        {
+            slot.push((s, changed));
         }
     }
     result
