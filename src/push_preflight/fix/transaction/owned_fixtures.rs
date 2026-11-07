@@ -939,8 +939,8 @@ fn default_owned_suite() -> Result<(), String> {
     Ok(())
 }
 fn owned_child(root: &Path, case: &str, git: &Path) -> Result<(), String> {
-    fs::create_dir(&root).map_err(|e| e.to_string())?;
-    fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).map_err(|e| e.to_string())?;
+    fs::create_dir(root).map_err(|e| e.to_string())?;
+    fs::set_permissions(root, fs::Permissions::from_mode(0o700)).map_err(|e| e.to_string())?;
     for name in ["home", "xdg", "tmp", "template"] {
         fs::create_dir(root.join(name)).map_err(|e| e.to_string())?;
     }
@@ -948,7 +948,7 @@ fn owned_child(root: &Path, case: &str, git: &Path) -> Result<(), String> {
     let mut command = Command::new(std::env::current_exe().map_err(|e| e.to_string())?);
     command
         .env_clear()
-        .current_dir(&root)
+        .current_dir(root)
         .args(["--exact", TEST, "--nocapture", "--test-threads=1"])
         .env(
             "PATH",
@@ -975,7 +975,7 @@ fn owned_child(root: &Path, case: &str, git: &Path) -> Result<(), String> {
         .env("LC_ALL", "C")
         .env("GIT_CONFIG_COUNT", "0")
         .env("GITCRAFT_GATE2_CASE", case)
-        .env("GITCRAFT_GATE2_ROOT", &root)
+        .env("GITCRAFT_GATE2_ROOT", root)
         .env("GITCRAFT_GATE2_CHILD", "1");
     let output = crate::bounded_process::run_input(
         command,

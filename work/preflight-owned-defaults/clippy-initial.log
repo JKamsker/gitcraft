@@ -1,0 +1,37 @@
+   Compiling gitcraft v0.3.4 (/workspace/work/push-preflight)
+    Checking similar v2.7.0
+error: the borrowed expression implements the required traits
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:942:20
+    |
+942 |     fs::create_dir(&root).map_err(|e| e.to_string())?;
+    |                    ^^^^^ help: change this to: `root`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_borrows_for_generic_args
+    = note: `-D clippy::needless-borrows-for-generic-args` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrows_for_generic_args)]`
+
+error: the borrowed expression implements the required traits
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:943:25
+    |
+943 |     fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).map_err(|e| e.to_string())?;
+    |                         ^^^^^ help: change this to: `root`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_borrows_for_generic_args
+
+error: the borrowed expression implements the required traits
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:951:22
+    |
+951 |         .current_dir(&root)
+    |                      ^^^^^ help: change this to: `root`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_borrows_for_generic_args
+
+error: the borrowed expression implements the required traits
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:978:37
+    |
+978 |         .env("GITCRAFT_GATE2_ROOT", &root)
+    |                                     ^^^^^ help: change this to: `root`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_borrows_for_generic_args
+
+error: could not compile `gitcraft` (lib test) due to 4 previous errors
