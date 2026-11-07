@@ -6,6 +6,7 @@ pub(crate) struct Tools {
     pub echo: echo::State,
     pub intents: super::intents::State,
     pub contracts: super::contracts::State,
+    pub radar: super::radar::State,
 }
 #[derive(Clone)]
 pub(crate) enum ToolsAct {
@@ -13,6 +14,7 @@ pub(crate) enum ToolsAct {
     Echo(echo::Act),
     Intent(super::intents::Act),
     Contract(super::contracts::Act),
+    Radar(super::radar::Act),
 }
 impl RepoTab {
     pub(in crate::repo) fn review_tools_act(&mut self, act: ToolsAct, ctx: &egui::Context) {
@@ -21,6 +23,7 @@ impl RepoTab {
                 self.review_tools.open = true;
                 self.echo_act(echo::Act::Load, ctx);
             }
+            ToolsAct::Radar(act) => self.radar_act(act, ctx),
             ToolsAct::Contract(act) => self.contract_act(act, ctx),
             ToolsAct::Intent(act) => self.intent_act(act, ctx),
             ToolsAct::Echo(act) => self.echo_act(act, ctx),
@@ -39,6 +42,9 @@ impl RepoTab {
                 egui::ScrollArea::both().show(ui, |ui| {
                     egui::CollapsingHeader::new("Personal reviewer echo")
                         .show(ui, |ui| echo::show(ui, &mut self.review_tools.echo, acts));
+                    egui::CollapsingHeader::new("Fix survival radar").show(ui, |ui| {
+                        super::radar::show(ui, &mut self.review_tools.radar, acts)
+                    });
                     egui::CollapsingHeader::new("Backport by contract").show(ui, |ui| {
                         super::contracts::show(
                             ui,
