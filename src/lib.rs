@@ -8,6 +8,7 @@ mod ci;
 mod custom_commands;
 mod desktop_entry;
 mod drafts;
+mod error_card;
 mod folder_browser;
 mod forge;
 mod git;

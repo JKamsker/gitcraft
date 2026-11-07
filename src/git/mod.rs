@@ -12,6 +12,7 @@ mod contained;
 mod detached;
 mod diff;
 pub mod external_tool;
+pub mod errors;
 mod files;
 mod fold;
 mod hooks;
@@ -160,7 +161,10 @@ pub fn version() -> Result<String, String> {
 pub fn toplevel(path: &Path) -> Result<PathBuf, String> {
     let out = run(Some(path), &["rev-parse", "--show-toplevel"]).map_err(|e| {
         // Elsewhere, not reaching the machine (or the folder there) says more.
-        if crate::remote::is_remote(path) && !e.contains("not a git repository") {
+        // Nor is a repository git refuses (owned by another user): that is explained.
+        if (crate::remote::is_remote(path) && !e.contains("not a git repository"))
+            || errors::is_dubious_ownership(&e)
+        {
             e
         } else {
             format!("{} is not inside a git repository", path.display())

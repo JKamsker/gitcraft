@@ -344,7 +344,10 @@ impl RepoTab {
                 self.take_loaded(*loaded, ctx);
                 self.read_custom_commands(ctx);
             }
-            Err(e) => self.load_error = Some(e),
+            Err(e) => {
+                self.explain_failure(&e, super::error_help::RELOAD, ctx);
+                self.load_error = Some(e);
+            }
         }
         if std::mem::take(&mut self.reload_again) {
             self.reload(ctx);

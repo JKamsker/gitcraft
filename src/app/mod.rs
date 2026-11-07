@@ -92,6 +92,9 @@ pub struct App {
     theme: ThemeId,
     clone_parent: Option<PathBuf>,
     error: Option<String>,
+    /// What the start page's error is, when it is a git failure gitcraft can explain (see
+    /// [`crate::error_card`]).
+    error_card: Option<crate::error_card::ErrorCard>,
     was_focused: bool,
     clone_form: Option<CloneForm>,
     /// A clone running in the background: (destination, result).
@@ -192,6 +195,7 @@ impl App {
             keeper: Default::default(),
             session: crate::drafts::Session::start(),
             error: None,
+            error_card: None,
             was_focused: true,
             clone_form: None,
             cloning: None,
@@ -263,7 +267,22 @@ impl App {
         }
         match repo_root(path) {
             Ok(root) => self.open_root(root, ctx),
-            Err(e) => self.report(e),
+            Err(e) => {
+                let old = self.error_card.take();
+                self.error_card = match old {
+                    // The same again: the card stays as it is.
+                    Some(mut card) if card.is_about(&e) && card.dir() == path => {
+                        card.failed_again();
+                        Some(card)
+                    }
+                    old => match crate::error_card::ErrorCard::for_error(&e, path, "Open", ctx) {
+                        Some(card) => Some(card.replacing(old)),
+                        // A fix made stays undoable.
+                        None => old.filter(|card| card.fixed()),
+                    },
+                };
+                self.report(e);
+            }
         }
     }
 
@@ -280,6 +299,7 @@ impl App {
     fn open_root(&mut self, root: PathBuf, ctx: &egui::Context) {
         self.remember(&root);
         self.error = None;
+        self.error_card.take_if(|card| !card.fixed());
 
         if let Some(i) = self
             .tabs

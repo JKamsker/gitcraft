@@ -1,0 +1,4 @@
+fatal: unsafe repository ('/home/me/work/repo' is owned by someone else)
+To add an exception for this directory, call:
+
+	git config --global --add safe.directory /home/me/work/repo

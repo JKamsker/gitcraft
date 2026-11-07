@@ -28,6 +28,7 @@ mod drafts;
 mod drafts_tests;
 mod drag_drop;
 mod external_tools;
+mod error_help;
 mod file_text;
 mod file_view;
 mod forge_link;
@@ -215,6 +216,8 @@ pub struct RepoTab {
     credentials: Option<git::Credentials>,
     /// The last operation started, to run again after signing in.
     last_op: Option<PendingOp>,
+    /// A known git failure explained, with its fix (see [`crate::error_card`]).
+    error_card: Option<crate::error_card::ErrorCard>,
     /// The forge has been asked for avatars.
     avatars_hinted: bool,
     diff_ignore_ws: bool,
@@ -410,6 +413,7 @@ impl RepoTab {
             push_flow: Default::default(),
             credentials: None,
             last_op: None,
+            error_card: None,
             avatars_hinted: false,
             diff_ignore_ws: false,
             diff_as_file: false,

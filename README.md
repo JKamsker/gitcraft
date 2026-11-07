@@ -634,6 +634,27 @@ so your config, credentials and hooks apply as usual.
   `enable-animations`, KDE's animation speed, macOS' Reduce motion, Windows' "Animate windows
   when minimizing and maximizing"); with animations off, tabs and panels move into place without
   sliding. `GITCRAFT_REDUCE_MOTION=1` (or `0`) decides instead.
+- When git fails in a way gitcraft knows, a card under the toolbar (or on the start page, for a
+  repository that won't open) says what happened, with git's own words below. Where there is a
+  fix, a button makes it, after saying exactly what it changes and in which config file; a
+  config change can be undone from the card (until it is closed), and _Try again_ runs what
+  failed again once, when it is the tab's last operation:
+  - a repository owned by another user (_dubious ownership_): **Trust this folder** adds that
+    folder, and only it (never `*`), to `safe.directory` in your global config;
+  - a `.lock` file left behind (_index.lock exists_): how old it is and which git processes are
+    running on that machine (on Windows and on another machine, gitcraft's own included), then
+    **Remove stale lock** (only a `….lock` file in the
+    repository's git folder, and only if nothing wrote it since);
+  - _Filename too long_ in an open repository (a checkout, a pull): **Enable long paths** sets
+    `core.longpaths` for the repository (Git for Windows; a failed clone isn't explained yet);
+  - _SSL certificate problem_: **Use Windows' certificates** sets `http.sslBackend=schannel` in
+    your global config (Git for Windows);
+  - explained only: line-ending warnings (what `core.autocrlf` does, as it is set here, against
+    `.gitattributes`, as it is for the file), _RPC failed_ / _early EOF_ / HTTP 413,
+    _unrelated histories_, _shallow update not allowed_ and _Permission denied (publickey)_.
+  A refused push is the push banner's. Everything it reads or changes runs in the background, on
+  the repository's machine (WSL and SSH included).
+- Themes: Dark, Medium Gray and Light, from PhotoCraft's Pro palettes.
 
 ## Download
 
@@ -749,6 +770,8 @@ was made this way, on a demo repository.
 | ------------------------ | ---------------------------------------------------------------------------------- |
 | `src/git.rs`             | `git` CLI wrapper and output parsing (refs, log, status, stashes, remotes, search) |
 | `src/git/simulate` | a merge, rebase or cherry-pick worked out with `git merge-tree`, without doing it |
+| `src/git/errors.rs` | known git failures told apart by git's words; their fixes (`errors/fix.rs`, `errors/lock.rs`) and git's real output for tests (`errors/samples/`) |
+| `src/error_card/` | the card that explains a git failure and offers its fix (confirmed, undoable) |
 | `src/graph.rs`           | lane layout for the commit graph                                                   |
 | `src/forge/mod.rs`       | the forges behind one `Provider` trait: which one hosts a remote, list, create, avatars, the page of one |
 | `src/forge/github/`      | GitHub through `gh`: list, `gh pr view`, GraphQL threads, comments, reviews, merges |
