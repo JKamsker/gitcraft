@@ -9,6 +9,7 @@ mod commits;
 mod diff;
 mod files;
 mod lfs;
+pub(crate) mod recovery;
 mod refs;
 mod status;
 mod submodule;

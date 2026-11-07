@@ -2,7 +2,7 @@
 
 Base: accepted integration `ff901aad4346ee409509b60f9c6e7b12689fde44`.
 Branch: `codex/content-recovery`; independent of unreviewed working drafts.
-Status: plan only, unvalidated. No application implementation or runtime test yet.
+Status: read-only search engine and source-level regressions implemented, unvalidated. No Cargo/runtime test has run; UI and recovery actions remain to implement.
 
 The eligible named idea searches remembered text through reflog-reachable commits, dropped stashes, unreachable commits and dangling blobs, then shows content hits with timeline/provenance and guarded recovery. The audit explicitly requires bounded background `fsck --unreachable --no-reflogs`, `cat-file` batching, cancellation, binary/large-object limits and non-destructive recovery previews.
 
