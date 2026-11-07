@@ -315,6 +315,7 @@ fn prepare_with(
         "push".into(),
         "--porcelain".into(),
         "--no-follow-tags".into(),
+        "--recurse-submodules=check".into(),
         "--".into(),
         e.remote.clone(),
         format!("{}:{}", e.commit, e.destination),
@@ -518,6 +519,105 @@ mod tests {
         save(r.path(), &view, None)?;
         assert!(prepare(r.path(), &id, UserProfile::default()).is_err());
         assert!(remove(r.path(), &read(r.path())?, &id).is_err());
+        Ok(())
+    }
+    #[test]
+    fn opted_in_clean_send_and_reviewed_destination_change_keep_the_exact_pin() -> Result<(), String>
+    {
+        let (r, _host, bare) = fixture("outbox-renewed")?;
+        let queued = r.rev("HEAD")?;
+        enqueue(r.path(), &read(r.path())?, true)?;
+        let id = read(r.path())?.queue.entries[0].id.clone();
+        let p = prepare(r.path(), &id, UserProfile::default())?;
+        assert!(
+            p.plan.findings.is_empty(),
+            "fixture should have a clean plain preflight"
+        );
+        assert!(preflight::push_args(&p.plan)?.contains(&"--recurse-submodules=check".into()));
+        let control = git::OpControl::new(|| {});
+        let runner = Runner {
+            repo: r.path(),
+            control: &control,
+            credentials: None,
+        };
+        send(&runner, &p, true)?;
+        assert_eq!(read(r.path())?.queue.entries[0].status, Status::Sent);
+        r.commit("second", &[])?;
+        let queued2 = r.rev("HEAD")?;
+        enqueue(r.path(), &read(r.path())?, true)?;
+        let id = read(r.path())?.queue.entries[1].id.clone();
+        r.commit("later excluded", &[])?;
+        let url = format!("{}/.", bare.display());
+        r.git(&["remote", "set-url", "--push", "origin", &url])?;
+        assert!(prepare(r.path(), &id, UserProfile::default()).is_err());
+        let p = review_prepare(r.path(), &id, UserProfile::default())?;
+        assert_eq!(p.view.queue.entries[1].commit, queued2);
+        assert!(!p.view.queue.entries[1].autosend);
+        assert!(send(&runner, &p, true).is_err());
+        send(&runner, &p, false)?;
+        assert_eq!(
+            git::run(Some(&bare), &["rev-parse", &p.plan.destination])?.trim(),
+            queued2
+        );
+        assert_ne!(queued, queued2);
+        Ok(())
+    }
+    #[test]
+    fn automatic_findings_pause_before_transport_and_remote_rejections_stay_paused()
+    -> Result<(), String> {
+        let (r, _host, bare) = fixture("outbox-reject")?;
+        enqueue(r.path(), &read(r.path())?, true)?;
+        let id = read(r.path())?.queue.entries[0].id.clone();
+        let mut p = prepare(r.path(), &id, UserProfile::default())?;
+        p.plan.findings.push(preflight::Finding {
+            kind: preflight::Kind::Message,
+            commit: p.plan.head.clone(),
+            path: String::new(),
+            detail: "Review required".into(),
+        });
+        let control = git::OpControl::new(|| {});
+        let runner = Runner {
+            repo: r.path(),
+            control: &control,
+            credentials: None,
+        };
+        assert!(send(&runner, &p, true).is_err());
+        assert!(matches!(
+            read(r.path())?.queue.entries[0].status,
+            Status::Paused(_)
+        ));
+        assert!(git::resolve(&bare, &p.plan.destination).is_err());
+        let p = review_prepare(r.path(), &id, UserProfile::default())?;
+        // A receiver changes after inspection. Its new ref violates the absent-ref lease.
+        let tree = git::run(Some(&bare), &["mktree"])?;
+        let remote = git::run(
+            Some(&bare),
+            &[
+                "-c",
+                "user.name=Receiver",
+                "-c",
+                "user.email=receiver@example.com",
+                "-c",
+                "commit.gpgSign=false",
+                "commit-tree",
+                tree.trim(),
+                "-m",
+                "Other work",
+            ],
+        )?;
+        git::run(
+            Some(&bare),
+            &["update-ref", &p.plan.destination, remote.trim()],
+        )?;
+        assert!(send(&runner, &p, false).is_err());
+        let e = read(r.path())?.queue.entries.remove(0);
+        assert!(matches!(e.status, Status::Paused(_)));
+        assert!(!e.receipt.is_empty());
+        assert_eq!(
+            git::run(Some(&bare), &["rev-parse", &p.plan.destination])?.trim(),
+            remote.trim()
+        );
+        assert!(prepare(r.path(), &id, UserProfile::default()).is_err());
         Ok(())
     }
 }

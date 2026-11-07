@@ -177,6 +177,7 @@ fn parse(words: &[String]) -> Result<ParsedPush, String> {
                 "-u" | "--set-upstream" => tracking = true,
                 "-f" | "--force" | "--force-with-lease" => force = true,
                 "--no-follow-tags" | "--porcelain" | "--no-verify" => {},
+                "--recurse-submodules=check" => extras.push(word.clone()),
                 "--delete" | "-d" => deleting = true,
                 _ if word.starts_with("--force-with-lease=") => force = true,
                 _ if word.starts_with("--push-option=") => extras.push(word.clone()),
@@ -1199,7 +1200,15 @@ pub(crate) fn push_args(plan: &Plan) -> Result<Vec<String>, String> {
         "push".into(),
         "--porcelain".into(),
         "--no-follow-tags".into(),
-        "--recurse-submodules=no".into(),
+        if plan
+            .extras
+            .iter()
+            .any(|s| s == "--recurse-submodules=check")
+        {
+            "--recurse-submodules=check".into()
+        } else {
+            "--recurse-submodules=no".into()
+        },
     ];
     if !plan.destination.starts_with("refs/for/") {
         if !plan.deleting
@@ -1216,7 +1225,12 @@ pub(crate) fn push_args(plan: &Plan) -> Result<Vec<String>, String> {
             plan.base.as_deref().unwrap_or_default()
         ));
     }
-    args.extend(plan.extras.clone());
+    args.extend(
+        plan.extras
+            .iter()
+            .filter(|s| s.as_str() != "--recurse-submodules=check")
+            .cloned(),
+    );
     args.extend([
         "--".into(),
         plan.remote.clone(),
