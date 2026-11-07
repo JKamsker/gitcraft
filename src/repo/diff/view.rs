@@ -238,7 +238,7 @@ impl RepoTab {
                         if !as_file && !rendered && !folded {
                             view_options(ui, &t, (split, ignore_ws, whole_file), acts);
                             ui.add_space(4.0);
-                            super::algorithm::algorithm_menu(ui, path, acts);
+                            super::algorithm::algorithm_menu(ui, path, view.repairing, acts);
                             ui.add_space(8.0);
                             change_steps(ui, acts);
                             ui.add_space(8.0);
