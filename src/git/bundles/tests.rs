@@ -136,7 +136,7 @@ fn native_long_bundle_paths_verify_exact_bytes_and_cleanup_without_changing_conf
     assert!(native.as_os_str().len() > 260);
     assert_eq!(std::fs::read(&native).map_err(|e| e.to_string())?, bytes);
     assert!(!temp.path.starts_with("//?/"));
-    verify(&dest, &temp.path, &selected)?;
+    verify(&dest, &temp.path, &selected, &bytes)?;
     assert!(refs(&dest)?.is_empty());
     assert_eq!(
         std::fs::read(dest.join(".git/config")).map_err(|e| e.to_string())?,
@@ -753,5 +753,34 @@ fn old_git_verification_is_fail_closed_for_promisor_or_unreadable_configuration(
     }
     assert!(no_lazy_compatibility(unsupported(), || Err("cannot read config".into())).is_err());
     assert!(no_lazy_compatibility(Err("SSH failed".into()), || Ok(String::new())).is_err());
+    Ok(())
+}
+
+#[test]
+fn verification_streams_only_the_validated_header_and_keeps_the_old_git_fallback()
+-> Result<(), String> {
+    let oid = "a".repeat(40);
+    let header = format!("# v2 git bundle\n{oid} refs/heads/main\n\n");
+    let mut bytes = header.as_bytes().to_vec();
+    bytes.extend_from_slice(b"PACK");
+    bytes.extend(vec![0; 1024 * 1024]);
+    let long_path = format!("C:/{}exchange.bundle", "deep ü/".repeat(80));
+    let (args, input) = verification_command(&["--no-lazy-fetch"], &long_path, &bytes)?;
+    assert_eq!(
+        args,
+        [
+            "--no-lazy-fetch",
+            "-c",
+            "core.longpaths=true",
+            "bundle",
+            "verify",
+            "-"
+        ]
+    );
+    assert_eq!(input, header.as_bytes());
+    let (args, input) = verification_command(&[], &long_path, &bytes)?;
+    assert_eq!(args.last().copied(), Some(long_path.as_str()));
+    assert!(input.is_empty());
+    assert!(verification_command(&["--no-lazy-fetch"], &long_path, b"not a bundle").is_err());
     Ok(())
 }

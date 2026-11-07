@@ -173,7 +173,7 @@ pub fn inspect_bundle(repo: &Path, bytes: Vec<u8>) -> Result<BundlePreview, Stri
         valid_ref(repo, &r.name)?;
     }
     let temp = BundleFile::new(repo, &bytes)?;
-    let verification_error = verify(repo, &temp.path, &refs).err();
+    let verification_error = verify(repo, &temp.path, &refs, &bytes).err();
     let existing = bounded::run(
         repo,
         &["for-each-ref", "--format=%(refname)"],
@@ -233,7 +233,7 @@ pub fn import_bundle(
     }
     transaction.push_str("prepare\ncommit\n");
     let temp = BundleFile::new(repo, &preview.bytes)?;
-    let no_lazy = verify(repo, &temp.path, &refs)?;
+    let no_lazy = verify(repo, &temp.path, &refs, &preview.bytes)?;
     // `bundle unbundle` does not honor fetch/transfer.fsckObjects. Feed only the pack
     // to strict index-pack so malformed objects, not only bad checksums, stop the import.
     let pack_at = preview
@@ -287,7 +287,12 @@ fn checked_out_refs(repo: &Path) -> Result<BTreeSet<String>, String> {
         .collect())
 }
 
-fn verify(repo: &Path, file: &str, refs: &[BundleRef]) -> Result<Vec<&'static str>, String> {
+fn verify(
+    repo: &Path,
+    file: &str,
+    refs: &[BundleRef],
+    bytes: &[u8],
+) -> Result<Vec<&'static str>, String> {
     let format = run(Some(repo), &["rev-parse", "--show-object-format"])?;
     let expected_len = match format.trim() {
         "sha1" => 40,
@@ -303,16 +308,38 @@ fn verify(repo: &Path, file: &str, refs: &[BundleRef]) -> Result<Vec<&'static st
     // Verification resolves prerequisite commits, which otherwise triggers a promisor
     // fetch and modifies the object store before the user chooses Import.
     let no_lazy = no_lazy_fetch(repo)?;
-    let args: Vec<_> = no_lazy
+    let (args, input) = verification_command(&no_lazy, file, bytes)?;
+    bounded::run(repo, &args, input, HEADER_LIMIT)?;
+    Ok(no_lazy)
+}
+
+/// Git 2.45 added --no-lazy-fetch, after bundle verification gained stdin support.
+/// Use that existing capability probe to retain the older ordinary-repository fallback.
+fn verification_command<'a>(
+    no_lazy: &[&'a str],
+    file: &'a str,
+    bytes: &[u8],
+) -> Result<(Vec<&'a str>, Vec<u8>), String> {
+    let (file, input) = if no_lazy.is_empty() {
+        (file, Vec::new())
+    } else {
+        // Native Git for Windows opens bundle files before initializing long-path config.
+        // Streaming the exact validated header avoids that pathname limit. Do not send the
+        // pack: verify closes stdin after the header, leaving a large writer with EPIPE.
+        header(bytes)?;
+        let end = bytes
+            .windows(2)
+            .position(|b| b == b"\n\n")
+            .ok_or("No bundle header")?
+            + 2;
+        ("-", bytes[..end].to_vec())
+    };
+    let args = no_lazy
         .iter()
         .copied()
-        // Git for Windows accepts ordinary drive/UNC arguments, but not the
-        // verbatim prefix returned by Rust canonicalize. Its own long-path
-        // handling must remain enabled after that argument conversion.
         .chain(["-c", "core.longpaths=true", "bundle", "verify", file])
         .collect();
-    bounded::run(repo, &args, vec![], HEADER_LIMIT)?;
-    Ok(no_lazy)
+    Ok((args, input))
 }
 
 fn no_lazy_fetch(repo: &Path) -> Result<Vec<&'static str>, String> {
