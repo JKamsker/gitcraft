@@ -405,9 +405,8 @@ mod tests {
         ] {
             assert!(reserved_wsl_unc(path), "{path}");
             let mut operation = false;
-            let result = Machine::unparsed(Path::new(path), true).map(|machine| {
+            let result = Machine::unparsed(Path::new(path), true).inspect(|_| {
                 operation = true;
-                machine
             });
             assert!(result.is_err(), "{path}");
             assert!(
