@@ -65,6 +65,7 @@ mod unity;
 pub(crate) use self::unity::tests as unity_tests;
 mod testlane;
 mod worktree;
+mod worktree_location;
 
 pub use self::absorb::*;
 pub use self::attributes::*;
@@ -115,6 +116,7 @@ pub use self::timed::*;
 pub use self::trees::*;
 pub use self::unity::*;
 pub use self::worktree::*;
+pub use self::worktree_location::*;
 
 // Explicit names for types and helpers independently added by feature stacks.
 pub use self::commit_msg::Author;

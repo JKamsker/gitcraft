@@ -119,6 +119,8 @@ mod watch_remote;
 mod weakened_marks;
 pub(crate) mod widgets;
 pub(crate) mod worktree_tab;
+#[cfg(test)]
+mod worktree_tests;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -217,6 +219,8 @@ pub struct RepoTab {
     graph_messages: graph_view::message_tooltip::MessageTooltips,
     index: HashMap<String, usize>,
     worktrees: Vec<Worktree>,
+    /// Default root shared by every worktree of this repository (empty: sibling `.wt`).
+    worktree_root: String,
     stashes: Vec<Stash>,
     /// The files picked to stash, and whether git here can stash only what is staged.
     stash_picks: partial_stash::StashPicks,
@@ -548,6 +552,7 @@ impl RepoTab {
             graph_messages: Default::default(),
             index: HashMap::new(),
             worktrees: Vec::new(),
+            worktree_root: String::new(),
             stashes: Vec::new(),
             stash_picks: Default::default(),
             remotes: Vec::new(),
