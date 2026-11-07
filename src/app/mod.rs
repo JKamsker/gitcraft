@@ -404,7 +404,7 @@ impl App {
             || self.manual_open
             || crate::a11y::keyboard_taken(ctx);
         let (commands, focused) =
-            ctx.input(|i| (keymap::pressed(i, keymap::Scope::Window), i.focused));
+            ctx.input(|i| (keymap::pressed(i, keymap::Scope::Window), i.focused || i.raw.viewports.values().any(|v| v.focused == Some(true))));
         let mut refresh = false;
         for command in commands {
             refresh |= self.window_command(command, modal_open, ctx);
@@ -579,6 +579,13 @@ impl eframe::App for App {
         }
 
         self.active_tab_ui(ui, &t);
+        // Views popped out of any tab keep their windows, the tab shown or not; after it, so
+        // they show what it just took in.
+        for (i, tab) in self.tabs.iter_mut().enumerate() {
+            if let Tab::Repo(r) = tab {
+                r.popouts_ui(&ctx, i == self.active);
+            }
+        }
         self.clone_dialog(&ctx);
         self.remote_dialog(&ctx);
         self.teleport_dialog(&ctx);

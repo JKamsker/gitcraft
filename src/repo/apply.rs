@@ -13,6 +13,9 @@ use crate::settings::Settings;
 
 impl RepoTab {
     pub(crate) fn apply(&mut self, action: Action, ctx: &egui::Context) {
+        let Some(action) = self.popout_intercept(action, ctx) else {
+            return;
+        };
         let plain = OpKind::plain();
         match action {
             Action::Select(row) => {
@@ -129,6 +132,7 @@ impl RepoTab {
                 settings.set(ctx);
             }
             Action::ToggleTerminal => self.toggle_terminal(ctx),
+            Action::Popout(request) => self.popout_request(request, ctx),
             Action::NewTerminal { shell, cwd } => self.start_terminal(shell, cwd, ctx),
             Action::CloseTerminal(i) => self.close_terminal(i),
             Action::SelectTerminal(i) => self.active_terminal = i,

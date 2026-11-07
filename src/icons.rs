@@ -65,6 +65,8 @@ const SOURCES: &[(&str, &str)] = icons![
     "palette",
     "panel-left",
     "panel-right",
+    "picture-in-picture",
+    "picture-in-picture-2",
     "pilcrow",
     "pin",
     "plus",

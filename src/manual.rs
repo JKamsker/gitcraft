@@ -156,6 +156,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Review this branch in a branch's menu has the AI tool review what the branch adds to the branch pull requests go to (main, master or develop; the checked-out branch, for that one itself); its answer shows in a window, with Copy and Review again.",
             "Right-click a pull request and choose Open in worktree to work on its branch in a worktree of its own, made for it when there is none.",
             "A terminal panel with tabs, in the repository's folder.",
+            "The pop-out button in the header of a diff, the terminal, a pull request or the CI view (or Pop out the view shown / Pop out the terminal in the command palette) moves it into a window of its own, say on another monitor; the main window shows what was underneath, with a reminder at the bottom that raises the window or brings the view back. It works there as before and stays open while you switch tabs; a commit selected in the main window leaves it open, and the next diff, pull request or CI view opens there. Closing that window, or its bring-back button, puts the view back in the main window; closing the view itself (its ×, or Esc outside the terminal) closes the window.",
         ],
     ),
     (

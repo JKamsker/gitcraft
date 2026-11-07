@@ -9,7 +9,14 @@ use crate::terminal::Terminal;
 use crate::theme::{self, Tokens};
 
 /// The terminal panel's strip: one tab per shell, `+` with a shell menu, and close.
-pub fn terminal_tabs(ui: &mut Ui, terminals: &[Terminal], active: usize, acts: &mut Vec<Action>) {
+/// `popped`: the panel is in its own window, and offers to come back rather than pop out.
+pub fn terminal_tabs(
+    ui: &mut Ui,
+    terminals: &[Terminal],
+    active: usize,
+    popped: bool,
+    acts: &mut Vec<Action>,
+) {
     let t = Tokens::get(ui.ctx());
     let (strip, _) = ui.allocate_exact_size(vec2(ui.available_width(), 30.0), Sense::hover());
     ui.painter().rect_filled(strip, 0.0, t.tab_strip);
@@ -40,9 +47,15 @@ pub fn terminal_tabs(ui: &mut Ui, terminals: &[Terminal], active: usize, acts: &
         .show(|ui| shell_items(ui, acts));
     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         ui.add_space(4.0);
-        if icons::small_button(ui, "x", "Hide the panel (shells keep running)").clicked() {
+        use crate::repo::popout::{Panel, Request};
+        if popped {
+            if icons::small_button(ui, "x", "Close the window (shells keep running)").clicked() {
+                acts.push(Action::Popout(Request::Close(Panel::Terminal)));
+            }
+        } else if icons::small_button(ui, "x", "Hide the panel (shells keep running)").clicked() {
             acts.push(Action::ToggleTerminal);
         }
+        crate::repo::popout::button(ui, crate::repo::popout::Panel::Terminal, popped, acts);
     });
 }
 

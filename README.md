@@ -469,6 +469,12 @@ so your config, credentials and hooks apply as usual.
 - Terminal panel with tabs: PowerShell, cmd, Git Bash, WSL… on Windows, your shells elsewhere, in a
   real pseudo-terminal (ConPTY on Windows) with colours, scrollback, mouse selection and copy
   (Ctrl+C with a selection, Ctrl+Shift+C or right-click).
+- Pop out: the diff, the terminal, a pull request or the CI view moves into a window of its own
+  (the button in its header, or the command palette), for a second monitor. It keeps working
+  there (staging lines, comments, typing in the shell, undo) and stays open across tab switches
+  and commits selected in the main window, which shows what was underneath and a reminder that
+  raises the window. Closing the window or its bring-back button docks the view again; closing
+  the view itself (its ×, or Esc outside the terminal) closes the window.
 - Command palette (Ctrl+P): every action, ranked by how well it matches what you type (word
   starts, letters in a row, the start of the entry: `reb` finds _Rebase main onto…_ first, `cp`
   _Cherry-pick_), the letters you typed highlighted. With nothing typed, what can be done with

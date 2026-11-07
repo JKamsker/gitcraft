@@ -14,6 +14,10 @@ impl RepoTab {
     /// Whether the open diff is of a commit in the file history shown, which then lists the
     /// commits beside it.
     pub(in crate::repo) fn history_beside_diff(&self) -> bool {
+        // A diff in its own window isn't drawn beside them as well.
+        if !self.docked(crate::repo::popout::Panel::Diff) {
+            return false;
+        }
         let Some(view) = &self.file_view else {
             return false;
         };

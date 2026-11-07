@@ -14,6 +14,7 @@ use crate::git::{Area, StatusFile};
 use crate::icons;
 use crate::pull_request::DiffSide;
 use crate::repo::find;
+use crate::repo::popout::{self, Panel};
 use crate::repo::pr_review::{self, PrDraft};
 use crate::repo::pr_view::{self, PrView};
 use crate::repo::{Action, DiffKey, DiffView, Refresh, RepoTab, file_text, ops, short, widgets};
@@ -218,6 +219,7 @@ impl RepoTab {
                         if icons::small_button(ui, "x", "Close (Esc)").clicked() {
                             acts.push(Action::CloseDiff);
                         }
+                        popout::button(ui, Panel::Diff, !self.docked(Panel::Diff), acts);
                         if let DiffKey::Work(file) = &view.key {
                             let partial = partial && !as_file && !rendered;
                             clear = self.file_actions(ui, view, file, partial, acts);
