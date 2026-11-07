@@ -1,0 +1,61 @@
+{
+  "commit": "aab2a257b8598f6718431b40cd1058d9a273bd2c",
+  "remote_sha": "aab2a257b8598f6718431b40cd1058d9a273bd2c",
+  "tree": "9de1aa92b9181fa358e85601a7318481403035c6",
+  "base": "82189c4fcdb2d77fbb2746cb25d6390072266e9e",
+  "branch": "codex/process-test-containment",
+  "clean": true,
+  "independent_static_pass": "/workspace/work/review-process-test-containment-aab2a25.json",
+  "root_authorized_recording_fixture": true,
+  "unit_status": "AUTHOR RUNTIME GATES PASS; INDEPENDENT FINAL REVIEW PENDING",
+  "source_sha256": "f212529ec23eb6e5b22c15cf33500d91ddfcdd3a356f40d9370d7b1a3e5c215a",
+  "gates": {
+    "exact": {
+      "status": "PASS",
+      "path": "/workspace/work/process-test-containment-exact.log",
+      "sha256": "388822d3e573397fcd933a8878e89d668da725a06d9ce77a87cd62fc366bbbb7"
+    },
+    "fmt": {
+      "status": "PASS",
+      "path": "/workspace/work/process-test-containment-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "clippy": {
+      "status": "PASS",
+      "path": "/workspace/work/process-test-containment-clippy.log",
+      "sha256": "28e57c25a28ebed31cd607e9a11e041dcf8b8b4bfbdebb7051b675b4a629b176"
+    },
+    "test": {
+      "status": "PASS",
+      "path": "/workspace/work/process-test-containment-test.log",
+      "sha256": "6ad286952f1158bc6630d464f1e4698aae34a926c5f674c431c82323975d1f31"
+    }
+  },
+  "test_results": {
+    "exact_recording_fixture_passed": 1,
+    "full_passed": 789,
+    "failed": 0,
+    "ignored": 3,
+    "total": 792,
+    "filtered_out": 0,
+    "skip_arguments": [],
+    "test_list": "/workspace/work/process-test-containment-test-list.log",
+    "test_list_sha256": "c0b1b1c4b59a484ee0c4923320ade3521444a1059e8746383344ac6649f7958d"
+  },
+  "runtime_conditions": {
+    "private_target": "/workspace/work/process-test-containment/target",
+    "cargo_incremental": "0",
+    "optional_ssh_wsl_env": "unset",
+    "fresh_compile_at_exact_worktree": true,
+    "private_cargo_lock_links": 1,
+    "private_incremental_removed_after_own_cargo_exit": true,
+    "sops_cargo_concurrent": false
+  },
+  "scope": "Contains baseline stop-script test with synthetic snapshots/recording-only ps/kill/sleep; actual fixture signal calls and process-table lookup are replaced by printf functions. Production only adds pid0/1 no-op; production host-PID ownership is not certified.",
+  "limitations": [
+    "No live SSH/WSL timeout or remote process-control validation.",
+    "No native Windows/macOS validation.",
+    "Independent final immutable-head review is required before integration.",
+    "No new commits while root resolves newly requested author identity."
+  ]
+}
