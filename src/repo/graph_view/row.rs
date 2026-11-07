@@ -66,15 +66,15 @@ impl RepoTab {
         i: usize,
         cols: Cols,
         lanes: Lanes,
-        now: i64,
+        viewport: &super::readability::Viewport,
         tab_stop: bool,
         acts: &mut Vec<Action>,
-    ) -> Response {
+    ) -> (Response, Option<String>) {
         let t = Tokens::get(ui.ctx());
         let (auto_id, rect) = ui.allocate_space(vec2(ui.available_width(), ROW_PITCH));
         let sense = crate::a11y::list_row_sense(tab_stop);
         let Some(commit) = self.commits.get(i) else {
-            return ui.interact(rect, auto_id, sense);
+            return (ui.interact(rect, auto_id, sense), None);
         };
         let is_wip = commit.hash == WIP_HASH;
         // Commits are dragged (the changes row and stashes aren't): egui tells a drag from a
@@ -88,9 +88,10 @@ impl RepoTab {
         // Known by its commit, not its place: rows shift when a reload adds commits or the
         // changes row above them, and a menu opened on one must stay that commit's.
         let resp = ui.interact(rect, row_id(ui, &commit.hash), sense);
-        let label = || self.row_label(commit, now);
+        let label = || self.row_label(commit, viewport.now);
         widgets::a11y_selected(&resp, label, self.selected == Some(i));
         let painter = ui.painter_at(rect);
+        let mut hovered_message = None;
         let is_match = self.search.matches.contains(&commit.hash);
         let background = row_background(
             &painter,
@@ -124,6 +125,11 @@ impl RepoTab {
         };
 
         let (resp, pill) = self.refs_cell(ui, &painter, &row, resp, acts);
+        if !self.ghost.drawing()
+            && let Some(label) = viewport.labels.get(&i)
+        {
+            faint_lane_label(ui, &painter, &t, &row, label);
+        }
         self.graph_cell(ui, &painter, &row, lanes.shown);
         if is_wip {
             self.wip_description(&painter, &t, &row, background);
@@ -179,7 +185,30 @@ impl RepoTab {
                     acts.push(Action::OpenUrl(server.change_url(id)));
                 }
             }
-            trailing_columns(ui, &painter, &t, &row, now);
+            let description_rect = Rect::from_min_max(
+                pos2((gx + cols.graph).min(rect.right()), rect.top()),
+                pos2(
+                    (rect.right() - cols.trailing()).max(gx + cols.graph),
+                    rect.bottom(),
+                ),
+            );
+            if resp.hovered() && ui.rect_contains_pointer(description_rect.intersect(rect)) {
+                hovered_message = Some(commit.hash.clone());
+                resp.clone().on_hover_ui(|ui| {
+                    match self.graph_messages.message(&self.path, &commit.hash) {
+                        Some(Ok(message)) => {
+                            ui.label(message.as_str());
+                        }
+                        Some(Err(error)) => {
+                            ui.label(error);
+                        }
+                        None => {
+                            ui.label("Loading full commit message…");
+                        }
+                    }
+                });
+            }
+            trailing_columns(ui, &painter, &t, &row, viewport.now);
             if let Some(status) = ci {
                 let center = pos2(rect.right() - cols.trailing() - 9.0, row.mid());
                 let id = ui.id().with(("ci-dot", &commit.hash));
@@ -205,7 +234,7 @@ impl RepoTab {
         if draggable {
             self.row_drag_drop(ui, &resp, &row, pill.as_ref(), acts);
         }
-        resp
+        (resp, hovered_message)
     }
 
     /// What a screen reader says for the row of `commit`: the changes row's counts, a stash's
@@ -373,17 +402,18 @@ fn description(
     };
     let text_clip = painter.with_clip_rect(Rect::from_min_max(
         pos2(x, rect.top()),
-        pos2(text_right, rect.bottom()),
+        pos2(text_right.max(x), rect.bottom()),
     ));
-    let summary = text_clip.text(
-        pos2(x + 2.0, mid),
-        Align2::LEFT_CENTER,
-        &row.commit.summary,
-        font.clone(),
-        t.text,
+    let mut job = egui::text::LayoutJob::single_section(
+        row.commit.summary.clone(),
+        egui::TextFormat::simple(font, t.text),
     );
-    let room = text_right - summary.right() - 12.0;
-    let end = summary.right().min(text_right);
+    job.wrap = egui::text::TextWrapping::truncate_at_width((text_right - x - 2.0).max(0.0));
+    let galley = ui.fonts_mut(|f| f.layout_job(job));
+    let summary_right = x + 2.0 + galley.size().x;
+    text_clip.galley(pos2(x + 2.0, mid - galley.size().y / 2.0), galley, t.text);
+    let room = text_right - summary_right - 12.0;
+    let end = summary_right.min(text_right);
     if !row.commit.body.is_empty() && room > 24.0 {
         let mut job = egui::text::LayoutJob::single_section(
             row.commit.body.clone(),
@@ -392,7 +422,7 @@ fn description(
         job.wrap = egui::text::TextWrapping::truncate_at_width(room);
         let galley = ui.fonts_mut(|f| f.layout_job(job));
         text_clip.galley(
-            pos2(summary.right() + 10.0, mid - galley.size().y / 2.0),
+            pos2(summary_right + 10.0, mid - galley.size().y / 2.0),
             galley,
             t.text,
         );
@@ -569,5 +599,31 @@ mod tests {
                 }
             }
         }
+    }
+}
+
+fn faint_lane_label(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, label: &str) {
+    let x = row.rect.left() + 8.0;
+    let mut job = egui::text::LayoutJob::single_section(
+        label.to_owned(),
+        egui::TextFormat::simple(FontId::proportional(11.0), t.text_faint),
+    );
+    job.wrap = egui::text::TextWrapping::truncate_at_width((row.cols.refs - 24.0).max(0.0));
+    let galley = ui.fonts_mut(|f| f.layout_job(job));
+    let right = x + galley.size().x;
+    let clip = Rect::from_min_max(row.rect.min, pos2(row.gx - 4.0, row.rect.bottom()));
+    painter.with_clip_rect(clip).galley(
+        pos2(x, row.mid() - galley.size().y / 2.0),
+        galley,
+        t.text_faint,
+    );
+    if let Some(node_x) = row.node_x {
+        painter.line_segment(
+            [
+                pos2(right + 6.0, row.mid()),
+                pos2(node_x.min(row.gx + row.cols.graph), row.mid()),
+            ],
+            Stroke::new(1.0, t.text_faint.gamma_multiply(0.35)),
+        );
     }
 }

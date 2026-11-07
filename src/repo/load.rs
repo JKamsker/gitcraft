@@ -604,6 +604,7 @@ impl RepoTab {
             .collect();
         let old_graph = std::mem::replace(&mut self.graph, graph);
         let old_index = std::mem::replace(&mut self.index, index);
+        self.rebuild_graph_labels();
         // Freeing tens of thousands of commits (those a reload replaced), rows and index entries
         // takes a while: not on the UI thread.
         if old_rows.len() > 5000 {
