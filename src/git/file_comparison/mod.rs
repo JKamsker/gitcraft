@@ -305,6 +305,7 @@ pub(crate) fn matrix(
     if !(2..=8).contains(&branches.len()) {
         return Err("Choose between two and eight branches".into());
     }
+    let folder = folder.trim_end_matches('/');
     let mut columns = Vec::new();
     let mut paths = BTreeSet::new();
     for branch in branches {

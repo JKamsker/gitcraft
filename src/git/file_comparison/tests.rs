@@ -84,6 +84,74 @@ impl Drop for Repo {
     }
 }
 
+/// The SSH process is a fixture-owned shell; no network or account configuration is used.
+#[cfg(unix)]
+#[test]
+fn encoded_remote_readers_and_locked_staging_preserve_raw_files_and_existing_locks()
+-> Result<(), String> {
+    const CHILD: &str = "GITCRAFT_FILE_COMPARISON_SSH_FIXTURE";
+    const NAME: &str = "git::file_comparison::tests::encoded_remote_readers_and_locked_staging_preserve_raw_files_and_existing_locks";
+    if let Ok(path) = std::env::var(CHILD) {
+        let encoded = crate::remote::encode(
+            &crate::remote::Host::Ssh("file-comparison-fixture.invalid".into()), &path,
+        );
+        let spec = LensSpec { path: "new folder/quoted ' $(touch ESCAPED).txt".into(), previous: Some("old/a".into()) };
+        let snapshot = read_lens(&encoded, &spec, &|| true)?;
+        assert_eq!(snapshot.versions[0].bytes, b"base\n");
+        assert_eq!(snapshot.versions[1].bytes, b"base\n");
+        assert_eq!(snapshot.versions[2].bytes, b"working\n");
+        let migration = read_migration(&encoded, &MigrationSource::Staged, &|| true)?;
+        assert_eq!(migration.moves.len(), 1);
+        assert_eq!(migration.moves[0].similarity, Some(100));
+        let matrix = matrix(&encoded, &["HEAD".into(), "refs/heads/main".into()], "old", &|| true)?;
+        assert_eq!(matrix.paths, [b"old/a".to_vec()]);
+        let patch = patch_header(&spec.path, Some("100644"), Some("100644")) + "@@ -1 +1 @@\n-base\n+working\n";
+        let lock = PathBuf::from(&path).join(".git/index.lock");
+        std::fs::write(&lock, b"another writer").map_err(|e| e.to_string())?;
+        assert!(apply_lens_patch(&encoded, &snapshot, &patch, false).is_err());
+        assert_eq!(std::fs::read(&lock).map_err(|e| e.to_string())?, b"another writer");
+        std::fs::remove_file(&lock).map_err(|e| e.to_string())?;
+        apply_lens_patch(&encoded, &snapshot, &patch, false)?;
+        let current = read_lens(&encoded, &spec, &|| true)?;
+        assert_eq!(current.versions[1].bytes, b"working\n");
+        assert_eq!(current.versions[2].bytes, b"working\n");
+        apply_lens_patch(&encoded, &current, &patch, true)?;
+        let stale = read_lens(&encoded, &spec, &|| true)?;
+        std::fs::write(PathBuf::from(&path).join(&spec.path), b"newer\n").map_err(|e| e.to_string())?;
+        assert!(apply_lens_patch(&encoded, &stale, &patch, false).is_err_and(|e| e.contains("stale")));
+        assert!(!PathBuf::from(&path).join("ESCAPED").exists());
+        assert!(!lock.exists());
+        return Ok(());
+    }
+    let mut r = Repo::new()?;
+    let renamed = r.0.with_file_name(format!("{} remote's repo", r.0.file_name().unwrap_or_default().to_string_lossy()));
+    std::fs::rename(&r.0, &renamed).map_err(|e| e.to_string())?;
+    r.0 = renamed;
+    r.write("old/a", b"base\n")?;
+    r.commit()?;
+    r.git(&["mv", "old/a", "new-name"])?;
+    std::fs::create_dir(r.0.join("new folder")).map_err(|e| e.to_string())?;
+    r.git(&["mv", "new-name", "new folder/quoted ' $(touch ESCAPED).txt"])?;
+    r.write("new folder/quoted ' $(touch ESCAPED).txt", b"working\n")?;
+    let bin = r.0.join("fixture-bin");
+    std::fs::create_dir(&bin).map_err(|e| e.to_string())?;
+    let ssh = bin.join("ssh");
+    std::fs::write(&ssh, "#!/bin/sh\nexec /bin/sh\n").map_err(|e| e.to_string())?;
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&ssh, std::fs::Permissions::from_mode(0o700)).map_err(|e| e.to_string())?;
+    let mut paths = vec![bin];
+    paths.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()));
+    let out = Command::new(std::env::current_exe().map_err(|e| e.to_string())?)
+        .args(["--exact", NAME, "--nocapture"])
+        .env(CHILD, &r.0)
+        .env("PATH", std::env::join_paths(paths).map_err(|e| e.to_string())?)
+        .output().map_err(|e| e.to_string())?;
+    assert!(out.status.success(), "{} {}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+    assert_eq!(r.git(&["show", ":0:new folder/quoted ' $(touch ESCAPED).txt"])?, "base");
+    assert_eq!(std::fs::read(r.0.join("new folder/quoted ' $(touch ESCAPED).txt")).map_err(|e| e.to_string())?, b"newer\n");
+    Ok(())
+}
+
 #[test]
 fn migration_reads_renames_copies_scores_and_immutable_blob_sides() -> Result<(), String> {
     let r = Repo::new()?;

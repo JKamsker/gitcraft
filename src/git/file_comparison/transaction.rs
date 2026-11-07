@@ -122,6 +122,9 @@ pub(crate) fn apply_lens_patch(
             alternate(repo, &staged, &["read-tree", "--empty"])?;
         }
     }
+    if lens.intent_to_add {
+        alternate(repo, &staged, &["update-index", "--force-remove", "--", &lens.spec.path])?;
+    }
     let file = temp.0.join("patch");
     std::fs::write(&file, patch).map_err(|e| e.to_string())?;
     let file = file.to_str().ok_or("Non-UTF8 temporary patch path")?;
@@ -257,6 +260,7 @@ fn remote_apply(
          check_snapshot || {{ echo 'The staging lens is stale; refresh it' >&2; exit 1; }}\n\
          [ -L \"$idx\" ] && {{ echo 'Symbolic-link index files are not modified' >&2; exit 1; }}\n\
          if [ -f \"$idx\" ]; then [ \"$(wc -c <\"$idx\")\" -le {index_limit} ] && cp -- \"$idx\" \"$d/index\" || exit 1; else GIT_INDEX_FILE=\"$d/index\" git read-tree --empty || exit 1; fi\n\
+         {remove_intent}\n\
          GIT_INDEX_FILE=\"$d/index\" git apply --cached --whitespace=nowarn {reverse} -- \"$d/patch\" || exit 1\n\
          check_snapshot || {{ echo 'The staging lens changed before the patch was installed; refresh it' >&2; exit 1; }}\n\
          [ \"$(wc -c <\"$d/index\")\" -le {index_limit} ] || exit 1\n\
@@ -266,6 +270,11 @@ fn remote_apply(
         work_b64 = b64(&work),
         patch_b64 = b64(patch.as_bytes()),
         index_limit = INDEX_LIMIT,
+        remove_intent = if lens.intent_to_add {
+            format!("GIT_INDEX_FILE=\"$d/index\" git update-index --force-remove -- {} || exit 1", crate::remote::sh_quote(&lens.spec.path))
+        } else {
+            String::new()
+        },
         reverse = if reverse { "--reverse" } else { "" }
     );
     let out = super::super::command::comparison_remote(

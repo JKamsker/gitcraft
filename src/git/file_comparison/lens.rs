@@ -14,6 +14,7 @@ pub(crate) struct Lens {
     pub index_stamp: String,
     pub work_raw: Version,
     pub filemode: String,
+    pub intent_to_add: bool,
     pub versions: [Version; 3],
     pub staging_warning: Option<String>,
 }
@@ -40,7 +41,11 @@ pub(crate) fn read_lens(
         Some(h) => tree(repo, h, old_path, active)?.remove(old_path.as_bytes()),
         None => None,
     };
-    let staged = entries.get(spec.path.as_bytes());
+    // Intent-to-add entries contain the empty-blob OID but are absent from the
+    // next commit. Ask Git to interpret its index flags instead of displaying a
+    // staged empty file or decoding a platform/version-specific index format.
+    let intent_to_add = intent_to_add(repo, &spec.path, active)?;
+    let staged = entries.get(spec.path.as_bytes()).filter(|_| !intent_to_add);
     let first = blob(repo, head_entry.as_ref(), active)?;
     let second = blob(repo, staged, active)?;
     let work_raw = working(repo, &spec.path, active)?;
@@ -66,9 +71,22 @@ pub(crate) fn read_lens(
         index_stamp,
         work_raw,
         filemode,
+        intent_to_add,
         versions: [first, second, third],
         staging_warning,
     })
+}
+
+fn intent_to_add(repo: &Path, path: &str, active: &dyn Fn() -> bool) -> Result<bool, String> {
+    let names = |visibility| {
+        run(repo, &[
+            "--no-lazy-fetch", "--literal-pathspecs", "diff", "--cached", "--name-only", "-z",
+            "--no-ext-diff", "--no-textconv", "--no-renames", visibility, "--", path,
+        ], active)
+    };
+    let visible = names("--ita-visible-in-index")?;
+    let invisible = names("--ita-invisible-in-index")?;
+    Ok(!visible.is_empty() && invisible.is_empty())
 }
 
 /// Partial patches use raw bytes; a filter/encoding conversion belongs to normal Git staging.
