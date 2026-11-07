@@ -1,0 +1,12 @@
+{
+  "status": "STATIC SOURCE ONLY; NO CHANGED PROTOCOL EXECUTION",
+  "basis": "Actualproduction firstfiles/sha1 failedaftercapability+originalrelay/beforecheckout; userstateunchanged preserved86e5a1c. Actualclean freshprivateindex diff-files quiet1; porcelain diff quiet0 clean /1 realchange provedapprovedboundedstandalone controls ce82218.",
+  "change": [
+    "Onlythree statcoldprivateindex comparisons nowuse porcelain git diff --quiet instead of plumbingdiff-files --quiet",
+    "Eachprivatecomparison explicitlyGIT_OPTIONAL_LOCKS0 toavoidwritingindexstatcache; distinctcoldprivatebefore/after/committed indexes retained",
+    "No reftransaction/target/HEAD/relay/rawindex/shared/affectedpath/checkout/ACK/cleanup/profilerouting/remote behavior change",
+    "Recording fakeGit recognizes diff subcommand; allrealGate2fullmatrixfixtures unchanged"
+  ],
+  "required_next": "Independent staticPASS then recordingrepeat/rootrelease beforeactualnewproductionGate2; no featurePASS/defaultsuiteyet; remotecompletionOPEN",
+  "transaction_rs_sha256": "198e08476c1091d1a452926936d02b5ea4ac5346a7237bd1467ea08aa8df2f65"
+}
