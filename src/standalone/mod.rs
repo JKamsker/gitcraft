@@ -1,7 +1,7 @@
 //! Explicit native-file tools, independent of repository tabs and connection profiles.
-mod access;
+pub(crate) mod access;
 mod cli;
-mod directory;
+pub(crate) mod directory;
 mod files;
 mod model;
 mod permissions;

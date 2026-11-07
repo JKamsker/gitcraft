@@ -7,7 +7,7 @@ use std::io::{self, Write};
 use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug)]
-pub(super) struct Directory {
+pub(crate) struct Directory {
     pub path: PathBuf,
     handle: same_file::Handle,
     // Windows opens every canonical ancestor without FILE_SHARE_DELETE, pinning the path.
@@ -35,7 +35,7 @@ impl Directory {
         Ok(file)
     }
     #[cfg(any(windows, target_os = "macos"))]
-    pub fn rewrite_owned(
+    pub(super) fn rewrite_owned(
         &self,
         name: &OsStr,
         bytes: &[u8],
@@ -196,7 +196,11 @@ impl Directory {
             Ok(file)
         }
     }
-    pub fn snapshot(&self, name: &OsStr, path: &Path) -> Result<super::files::Snapshot, String> {
+    pub(super) fn snapshot(
+        &self,
+        name: &OsStr,
+        path: &Path,
+    ) -> Result<super::files::Snapshot, String> {
         #[cfg(windows)]
         let _pin = self.stable_source(name).map_err(|e| e.to_string())?;
         // The temporary Windows pin excludes path replacement during descriptor

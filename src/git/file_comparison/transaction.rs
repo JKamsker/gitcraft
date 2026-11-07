@@ -1,7 +1,7 @@
 //! Compare-and-apply against a locked index. Only the user's frozen raw patch is written.
 use super::*;
 use base64::Engine;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::path::PathBuf;
 
 const INDEX_LIMIT: u64 = 16 * 1024 * 1024;
@@ -69,7 +69,7 @@ fn verify_patch(path: &str, patch: &str) -> Result<(), String> {
     }
     Ok(())
 }
-fn verify(repo: &Path, lens: &Lens) -> Result<(), String> {
+pub(super) fn verify(repo: &Path, lens: &Lens) -> Result<(), String> {
     if lens.versions.iter().any(|v| {
         v.warning.is_some()
             || !matches!(
@@ -108,55 +108,10 @@ pub(crate) fn apply_lens_patch(
     if let Some(target) = crate::remote::parse(repo) {
         return remote_apply(&target, lens, patch, reverse);
     }
-    let index = lens::index_path(repo, &|| true)?;
-    let lock = PathBuf::from(format!("{}.lock", index.to_string_lossy()));
-    let mut reserved = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&lock)
-        .map_err(|e| format!("Could not lock the Git index: {e}"))?;
-    let mut guard = IndexLock {
-        path: lock.clone(),
-        committed: false,
-    };
-    verify(repo, lens)?;
-    let temp = Scratch::new()?;
-    let staged = temp.0.join("index");
-    match read_index(&index)? {
-        Some(bytes) => std::fs::write(&staged, bytes).map_err(|e| e.to_string())?,
-        None => {
-            alternate(repo, &staged, &["read-tree", "--empty"])?;
-        }
-    }
-    if lens.intent_to_add {
-        alternate(
-            repo,
-            &staged,
-            &["update-index", "--force-remove", "--", &lens.spec.path],
-        )?;
-    }
-    let file = temp.0.join("patch");
-    std::fs::write(&file, patch).map_err(|e| e.to_string())?;
-    let file = file.to_str().ok_or("Non-UTF8 temporary patch path")?;
-    let mut args = vec!["apply", "--cached", "--whitespace=nowarn"];
-    if reverse {
-        args.push("--reverse");
-    }
-    args.extend(["--", file]);
-    alternate(repo, &staged, &args)?;
-    // Git writers are excluded by index.lock. A changed HEAD/file/attribute is refused too.
-    verify(repo, lens)?;
-    let bytes = read_index(&staged)?.ok_or("Git did not produce an index")?;
-    reserved
-        .write_all(&bytes)
-        .and_then(|_| reserved.sync_all())
-        .map_err(|e| e.to_string())?;
-    drop(reserved);
-    std::fs::rename(&lock, &index).map_err(|e| e.to_string())?;
-    guard.committed = true;
-    Ok(String::new())
+    super::index_transaction::apply(repo, lens, patch, reverse, &mut |_| {})
 }
-fn alternate(repo: &Path, index: &Path, args: &[&str]) -> Result<(), String> {
+
+pub(super) fn alternate(repo: &Path, index: &Path, args: &[&str]) -> Result<(), String> {
     let out = super::super::command::comparison_output(
         repo,
         args,
@@ -170,13 +125,14 @@ fn alternate(repo: &Path, index: &Path, args: &[&str]) -> Result<(), String> {
     }
 }
 fn read_index(path: &Path) -> Result<Option<Vec<u8>>, String> {
-    if std::fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()) {
-        return Err("Symbolic-link index files are not modified".into());
-    }
-    let file = match std::fs::File::open(path) {
+    let parent = path.parent().ok_or("Index has no parent")?;
+    let directory =
+        crate::standalone::directory::Directory::open(parent).map_err(|e| e.to_string())?;
+    let name = path.file_name().ok_or("Index has no name")?;
+    let file = match directory.read(name) {
         Ok(f) => f,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(e.to_string()),
+        Err(e) => return Err(format!("Cannot read a no-follow regular Git index: {e}")),
     };
     if !file.metadata().map_err(|e| e.to_string())?.is_file() {
         return Err("Git index is not a regular file".into());
@@ -190,18 +146,6 @@ fn read_index(path: &Path) -> Result<Option<Vec<u8>>, String> {
     }
     Ok(Some(bytes))
 }
-struct IndexLock {
-    path: PathBuf,
-    committed: bool,
-}
-impl Drop for IndexLock {
-    fn drop(&mut self) {
-        if !self.committed {
-            let _ = std::fs::remove_file(&self.path);
-        }
-    }
-}
-
 pub(crate) struct Scratch(pub PathBuf);
 impl Scratch {
     pub fn new() -> Result<Self, String> {

@@ -1,4 +1,5 @@
 //! Immutable raw file versions shared by migration, staging and branch-matrix views.
+mod index_transaction;
 mod lens;
 mod migration;
 #[cfg(test)]

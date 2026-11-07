@@ -2,7 +2,7 @@
 use std::{fs::File, path::Path};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct AccessMetadata {
+pub(crate) struct AccessMetadata {
     #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
     entries: Vec<(Vec<u8>, Vec<u8>)>,
     #[cfg(target_os = "macos")]
@@ -47,7 +47,7 @@ impl AccessMetadata {
     }
 }
 
-pub(super) fn read(file: &File, path: &Path) -> Result<AccessMetadata, String> {
+pub(crate) fn read(file: &File, path: &Path) -> Result<AccessMetadata, String> {
     #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
     {
         #[cfg(not(target_os = "macos"))]
@@ -147,6 +147,53 @@ fn mac_acl(file: &File, path: &Path) -> Result<Vec<exacl::AclEntry>, String> {
     }
     check()?;
     Ok(acl)
+}
+
+/// Restore a captured index policy only on an owned candidate, then verify the complete
+/// metadata. Failure leaves the original index in place.
+pub(crate) fn copy_index_policy(
+    file: &File,
+    path: &Path,
+    original: &AccessMetadata,
+    source: &Path,
+) -> Result<(), String> {
+    let _ = source;
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
+    {
+        for (name, bytes) in &original.entries {
+            rustix::fs::fsetxattr(
+                file,
+                name.as_slice(),
+                bytes,
+                rustix::fs::XattrFlags::empty(),
+            )
+            .map_err(|e| e.to_string())?;
+        }
+        #[cfg(target_os = "macos")]
+        restore_mac_acl(file, path, original)?;
+        if read(file, path)? != *original {
+            return Err("Index access metadata could not be preserved".into());
+        }
+        Ok(())
+    }
+    #[cfg(windows)]
+    {
+        super::windows_metadata::prepare(source, path)?;
+        if read(file, path)? != *original {
+            return Err("Full index access policy could not be preserved".into());
+        }
+        Ok(())
+    }
+    #[cfg(not(any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "macos",
+        windows
+    )))]
+    {
+        let _ = (file, path, original);
+        Err("Index access policy is unsupported on this platform".into())
+    }
 }
 
 /// APFS clonefile inherits destination ACLs by default. Install the captured source ACL
