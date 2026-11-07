@@ -60,7 +60,7 @@
   "source_checks": [
     "No unmerged paths or conflict markers",
     "No staged changes beyond the27accepted feature paths",
-    "All15standalone source files and executable fixture byte-identical to accepted9bb",
+    "All12standalone source files and executable fixture byte-identical to accepted9bb",
     "All AGENTS/workflow files byte-identical to acceptedab68",
     "No later evidence commit/transient docs-validation logs imported"
   ],
