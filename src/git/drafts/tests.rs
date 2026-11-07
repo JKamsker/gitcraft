@@ -581,3 +581,118 @@ fn limits_invalid_paths_and_cancellation_leave_all_real_state_untouched() -> Res
     );
     Ok(())
 }
+
+#[test]
+fn private_index_cache_handles_split_and_sparse_indexes_without_rewriting_the_real_index()
+-> Result<(), String> {
+    let f = Fixture::new()?;
+    f.write("keep/file", b"base\n")?;
+    f.write("omit/file", b"outside sparse checkout\n")?;
+    f.commit()?;
+    git::run(Some(&f.0), &["update-index", "--split-index"])?;
+    git::run(
+        Some(&f.0),
+        &["update-index", "--assume-unchanged", "keep/file"],
+    )?;
+    f.write("keep/file", b"hidden working edit\n")?;
+    let index = std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?;
+    let saved = capture(&f.0, "Split index", &|| true)?.ok_or("No split-index draft")?;
+    assert_eq!(
+        git::run_bytes(
+            Some(&f.0),
+            &[
+                "cat-file",
+                "blob",
+                &format!("{}:keep/file", saved.metadata.work_tree)
+            ]
+        )?,
+        b"hidden working edit\n"
+    );
+    assert_eq!(
+        std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?,
+        index
+    );
+    git::run(
+        Some(&f.0),
+        &["update-index", "--no-assume-unchanged", "keep/file"],
+    )?;
+    git::run(Some(&f.0), &["restore", "keep/file"])?;
+    git::run(Some(&f.0), &["update-index", "--no-split-index"])?;
+    git::run(
+        Some(&f.0),
+        &["sparse-checkout", "set", "--cone", "--sparse-index", "keep"],
+    )?;
+    f.write("keep/file", b"sparse edit\n")?;
+    let index = std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?;
+    let saved = capture(&f.0, "Sparse index", &|| true)?.ok_or("No sparse-index draft")?;
+    assert_eq!(
+        git::run_bytes(
+            Some(&f.0),
+            &[
+                "cat-file",
+                "blob",
+                &format!("{}:keep/file", saved.metadata.work_tree)
+            ]
+        )?,
+        b"sparse edit\n"
+    );
+    assert!(
+        !saved
+            .metadata
+            .files
+            .iter()
+            .any(|file| file.path == "omit/file")
+    );
+    assert!(!f.0.join("omit/file").exists());
+    assert_eq!(
+        std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?,
+        index
+    );
+    Ok(())
+}
+
+#[test]
+fn recovery_detects_intent_to_add_changes_even_when_index_object_records_match()
+-> Result<(), String> {
+    let f = Fixture::new()?;
+    f.write("file", b"base\n")?;
+    f.commit()?;
+    f.write("empty", b"")?;
+    git::run(Some(&f.0), &["add", "-N", "empty"])?;
+    f.write("file", b"saved\n")?;
+    let saved = capture(&f.0, "Intent to add", &|| true)?.ok_or("No draft")?;
+    f.write("file", b"newer\n")?;
+    let view = preview(&f.0, &saved.id, "file", false, &|| true)?;
+    let records = git::run(Some(&f.0), &["ls-files", "-v", "--stage", "-z"])?;
+    git::run(Some(&f.0), &["add", "empty"])?;
+    assert_eq!(
+        git::run(Some(&f.0), &["ls-files", "-v", "--stage", "-z"])?,
+        records
+    );
+    assert!(restore(&f.0, &view, &[0], &|| true).is_err());
+    assert_eq!(
+        std::fs::read(f.0.join("file")).map_err(|e| e.to_string())?,
+        b"newer\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn unchanged_large_tracked_files_are_not_copied_as_working_changes() -> Result<(), String> {
+    let f = Fixture::new()?;
+    std::fs::File::create(f.0.join("large"))
+        .and_then(|file| file.set_len(FILE_LIMIT as u64 + 1))
+        .map_err(|e| e.to_string())?;
+    f.write("file", b"base\n")?;
+    f.commit()?;
+    f.write("file", b"small working edit\n")?;
+    let index = std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?;
+    let saved = capture(&f.0, "Small change", &|| true)?.ok_or("No draft")?;
+    assert_eq!(saved.metadata.files.len(), 1);
+    assert_eq!(saved.metadata.files[0].path, "file");
+    assert_eq!(
+        std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?,
+        index
+    );
+    Ok(())
+}

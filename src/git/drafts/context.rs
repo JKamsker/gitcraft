@@ -10,6 +10,8 @@ pub(super) struct Context {
     env: Vec<(&'static str, String)>,
     pub worktree: String,
     pub id: String,
+    pub index_file: String,
+    pub shared_file: String,
 }
 
 fn prefix(repo: &Path, hooks: Option<&Path>, lazy: bool) -> Vec<String> {
@@ -110,6 +112,8 @@ impl Context {
             "--git-path",
             "objects",
         ])?;
+        let index_file = initial(&["rev-parse", "--path-format=absolute", "--git-path", "index"])?;
+        let shared_file = initial(&["rev-parse", "--path-format=absolute", "--shared-index-path"])?;
         let format = initial(&["rev-parse", "--show-object-format"])?;
         if !matches!(format.as_str(), "sha1" | "sha256") {
             return Err("Unknown Git object format".into());
@@ -132,6 +136,8 @@ impl Context {
             env: Vec::new(),
             worktree,
             id,
+            index_file,
+            shared_file,
         };
         let empty = remote::git_path(&context.path.join("empty"));
         context.env = vec![

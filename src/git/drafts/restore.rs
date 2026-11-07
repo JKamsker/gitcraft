@@ -8,7 +8,7 @@ use std::sync::Arc;
 pub struct RestoreHunk {
     pub label: String,
     range: Range<usize>,
-    replacement: Vec<u8>,
+    replacement: Arc<Vec<u8>>,
 }
 #[derive(Clone)]
 pub struct RestorePreview {
@@ -17,12 +17,13 @@ pub struct RestorePreview {
     pub index_layer: bool,
     pub binary: bool,
     pub hunks: Vec<RestoreHunk>,
-    pub lines: Vec<String>,
+    pub lines: Arc<Vec<String>>,
     pub before_len: usize,
     pub saved_len: usize,
     before: Option<(String, Arc<Vec<u8>>)>,
     saved: Option<(String, Arc<Vec<u8>>)>,
-    index: Vec<u8>,
+    index: Arc<Vec<u8>>,
+    shared: Option<(String, Arc<Vec<u8>>)>,
     head: Option<String>,
     branch: Option<String>,
 }
@@ -123,7 +124,7 @@ pub fn preview(
                 "Restore saved deletion".into()
             },
             range: 0..before.as_ref().map_or(0, |(_, b)| b.len()),
-            replacement: saved.as_ref().map_or_else(Vec::new, |(_, b)| b.clone()),
+            replacement: Arc::new(saved.as_ref().map_or_else(Vec::new, |(_, b)| b.clone())),
         }]
     } else {
         parse_hunks(
@@ -156,12 +157,13 @@ pub fn preview(
         index_layer,
         binary,
         hunks,
-        lines,
+        lines: Arc::new(lines),
         before_len: before.as_ref().map_or(0, |(_, b)| b.len()),
         saved_len: saved.as_ref().map_or(0, |(_, b)| b.len()),
         before: before.map(|(m, b)| (m, Arc::new(b))),
         saved: saved.map(|(m, b)| (m, Arc::new(b))),
-        index: now.raw,
+        index: Arc::new(now.cache),
+        shared: now.shared.map(|(name, bytes)| (name, Arc::new(bytes))),
         head: now.head,
         branch: now.branch,
     })
@@ -184,7 +186,18 @@ pub fn restore(
     let check = || -> Result<Source, String> {
         current(&ctx, &view.id, active)?;
         let now = source(&ctx, active)?;
-        if now.raw != view.index || now.head != view.head || now.branch != view.branch {
+        if now.cache.as_slice() != view.index.as_slice()
+            || now
+                .shared
+                .as_ref()
+                .map(|(name, bytes)| (name, bytes.as_slice()))
+                != view
+                    .shared
+                    .as_ref()
+                    .map(|(name, bytes)| (name, bytes.as_slice()))
+            || now.head != view.head
+            || now.branch != view.branch
+        {
             return Err(
                 "HEAD or staged contents changed since preview; reopen the recovery preview".into(),
             );
@@ -481,7 +494,7 @@ fn parse_hunks(text: &str, before: &[u8], saved: &[u8]) -> Result<Vec<RestoreHun
         hunks.push(RestoreHunk {
             label: line.into(),
             range: old,
-            replacement: saved[new].to_vec(),
+            replacement: Arc::new(saved[new].to_vec()),
         });
         if hunks.len() > 200 {
             return Err("This file has over 200 recovery hunks; use Git in the terminal".into());

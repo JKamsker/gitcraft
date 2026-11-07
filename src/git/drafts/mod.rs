@@ -71,6 +71,8 @@ impl Default for Retention {
 #[derive(PartialEq, Eq)]
 struct Source {
     raw: Vec<u8>,
+    cache: Vec<u8>,
+    shared: Option<(String, Vec<u8>)>,
     index: BTreeMap<String, Entry>,
     skip: BTreeSet<String>,
     head: Option<String>,
@@ -112,19 +114,7 @@ fn capture_preserving(
     let ctx = Context::new(repo, &active)?;
     let before = source(&ctx, &active)?;
     let index_tree = tree(&ctx, &before.index, &active)?;
-    if !before.skip.is_empty() {
-        let input = before
-            .skip
-            .iter()
-            .flat_map(|p| p.bytes().chain([0]))
-            .collect();
-        ctx.run(
-            &["update-index", "--skip-worktree", "-z", "--stdin"],
-            input,
-            &[0],
-            &active,
-        )?;
-    }
+    cached_index(&ctx, &before, &active)?;
     let initial_changes = changed(&ctx, &before, &index_tree, &active)?;
     let mut candidates = initial_changes.clone();
     let untracked = paths(ctx.source(
@@ -215,19 +205,7 @@ fn capture_preserving(
         );
     }
     tree(&ctx, &before.index, &active)?;
-    if !before.skip.is_empty() {
-        let input = before
-            .skip
-            .iter()
-            .flat_map(|p| p.bytes().chain([0]))
-            .collect();
-        ctx.run(
-            &["update-index", "--skip-worktree", "-z", "--stdin"],
-            input,
-            &[0],
-            &active,
-        )?;
-    }
+    cached_index(&ctx, &before, &active)?;
     if changed(&ctx, &before, &index_tree, &active)? != initial_changes
         || paths(ctx.source(
             &["ls-files", "--others", "--exclude-standard", "-z"],
@@ -372,12 +350,154 @@ fn source(ctx: &Context, active: &dyn Fn() -> bool) -> Result<Source, String> {
         Ok((!s.trim().is_empty()).then(|| s.trim().to_owned()))
     };
     Ok(Source {
+        cache: internal_file(ctx, &ctx.index_file, active)?.unwrap_or_default(),
+        shared: if ctx.shared_file.is_empty() {
+            None
+        } else {
+            let name = ctx
+                .shared_file
+                .rsplit(['/', '\\'])
+                .next()
+                .ok_or("Invalid shared index path")?;
+            if !name.strip_prefix("sharedindex.").is_some_and(oid_valid) {
+                return Err("Invalid shared index path".into());
+            }
+            Some((
+                name.into(),
+                internal_file(ctx, &ctx.shared_file, active)?.ok_or("Shared index disappeared")?,
+            ))
+        },
         raw,
         index,
         skip,
         head: text(&["rev-parse", "--verify", "-q", "HEAD"])?,
         branch: text(&["symbolic-ref", "-q", "HEAD"])?,
     })
+}
+
+/// Copy metadata only, without following an index/cache link or persisting its contents
+/// in the draft's object graph. The copied stat cache avoids hashing clean large files.
+fn internal_file(
+    ctx: &Context,
+    path: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<Option<Vec<u8>>, String> {
+    const LIMIT: u64 = 32 * 1024 * 1024;
+    if let Some(target) = remote::parse(&ctx.repo) {
+        let (parent, name) = path.rsplit_once('/').ok_or("Invalid Git metadata path")?;
+        let file = remote::sh_quote(path);
+        let read =
+            remote::read_within_script(parent, name, LIMIT).ok_or("Invalid Git metadata path")?;
+        let script = format!(
+            "if [ ! -e {file} ] && [ ! -L {file} ]; then printf M; exit 0; fi\nprintf F\n{read}"
+        );
+        let out = git::forecast_remote(
+            &target.host,
+            remote::Request {
+                script,
+                ..Default::default()
+            },
+            active,
+        )?;
+        if out.code == 0 && out.stdout == b"M" {
+            return Ok(None);
+        }
+        if out.code == 0
+            && out.stdout.first() == Some(&b'F')
+            && out.stdout.len() as u64 <= LIMIT + 1
+        {
+            return Ok(Some(out.stdout[1..].to_vec()));
+        }
+        return Err("Cannot read a regular index/cache file within 32 MiB".into());
+    }
+    let path = Path::new(path);
+    match std::fs::symlink_metadata(path) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e.to_string()),
+        Ok(meta) if !meta.is_file() || meta.file_type().is_symlink() => {
+            return Err("Index/cache links and special files are not supported".into());
+        }
+        _ => {}
+    }
+    let parent = path.parent().ok_or("Invalid index path")?;
+    let name = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .ok_or("Index path is not UTF-8")?;
+    crate::safe_read::read_inside(parent, name, LIMIT)
+        .map(Some)
+        .ok_or_else(|| "Index/cache file is unreadable or exceeds 32 MiB".into())
+}
+
+fn private_index_file(
+    ctx: &Context,
+    name: &str,
+    bytes: &[u8],
+    active: &dyn Fn() -> bool,
+) -> Result<(), String> {
+    let path = ctx.path.join(name);
+    if let Some(target) = remote::parse(&path) {
+        let out = git::forecast_remote(
+            &target.host,
+            remote::Request {
+                script: format!("umask 077; cat > {}", remote::sh_path(&target.path)),
+                stdin: Some(bytes.to_vec()),
+                ..Default::default()
+            },
+            active,
+        )?;
+        if out.code != 0 {
+            return Err("Cannot copy the private index cache".into());
+        }
+    } else {
+        std::fs::write(path, bytes).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+fn cached_index(ctx: &Context, state: &Source, active: &dyn Fn() -> bool) -> Result<(), String> {
+    if !state.cache.is_empty() {
+        private_index_file(ctx, "index", &state.cache, active)?;
+    } else if !state.raw.is_empty() {
+        return Err("Index disappeared while preparing the draft".into());
+    }
+    if let Some((name, bytes)) = &state.shared {
+        private_index_file(ctx, name, bytes, active)?;
+    }
+    if ctx.run(&["ls-files", "-v", "--stage", "-z"], vec![], &[0], active)? != state.raw {
+        return Err("Index moved while copying its private stat cache".into());
+    }
+    // The source cache is immutable. Drop daemon/UC state and materialize any split
+    // index only in the private copy before asking about working changes.
+    ctx.run(
+        &[
+            "update-index",
+            "--no-fsmonitor",
+            "--no-untracked-cache",
+            "--no-split-index",
+        ],
+        vec![],
+        &[0],
+        active,
+    )?;
+    let mut assume = Vec::new();
+    for record in state.raw.split(|b| *b == 0).filter(|r| !r.is_empty()) {
+        if record.first().is_some_and(u8::is_ascii_lowercase) {
+            let record = std::str::from_utf8(record).map_err(|_| "Invalid index")?;
+            let (_, path) = record.split_once('\t').ok_or("Invalid index")?;
+            assume.extend_from_slice(path.as_bytes());
+            assume.push(0);
+        }
+    }
+    if !assume.is_empty() {
+        ctx.run(
+            &["update-index", "--no-assume-unchanged", "-z", "--stdin"],
+            assume,
+            &[0],
+            active,
+        )?;
+    }
+    Ok(())
 }
 
 fn tree(
