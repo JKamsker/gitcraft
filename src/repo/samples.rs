@@ -1,6 +1,7 @@
 //! For the tests that drive the window: actions a user takes, made from what a tab shows.
 
 use super::file_view::FileTab;
+use super::reflog::{ReflogAct, Source};
 use super::{Action, Dialog, DiffKey, DiffView, RepoTab, diff};
 
 impl RepoTab {
@@ -17,6 +18,12 @@ impl RepoTab {
                 acts.push(Action::LoadMore);
                 acts.push(Action::ToggleSearch);
                 acts.push(Action::ToggleSearch);
+                // The reflog view: HEAD's, an entry shown, a branch's, the scan.
+                acts.push(Action::Reflog(ReflogAct::Show(Source::head())));
+                acts.push(Action::Reflog(ReflogAct::Select(0)));
+                acts.push(Action::Reflog(ReflogAct::Show(Source::branch("main"))));
+                acts.push(Action::Reflog(ReflogAct::FindLost));
+                acts.push(Action::CloseReflog);
                 if let Some(file) = self.work.unstaged.first() {
                     acts.push(Action::OpenDiff(DiffKey::Work(file.clone())));
                 }

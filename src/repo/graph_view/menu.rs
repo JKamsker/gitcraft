@@ -288,14 +288,14 @@ impl RepoTab {
 }
 
 /// The commit a menu rewrites the checked-out branch from.
-struct Rewrite<'a> {
-    hash: &'a str,
-    short: &'a str,
-    summary: &'a str,
+pub(in crate::repo) struct Rewrite<'a> {
+    pub(in crate::repo) hash: &'a str,
+    pub(in crate::repo) short: &'a str,
+    pub(in crate::repo) summary: &'a str,
     /// The checked-out branch, or `HEAD` when detached.
-    target: &'a str,
+    pub(in crate::repo) target: &'a str,
     /// HEAD's commit, as the menu saw it.
-    head: &'a str,
+    pub(in crate::repo) head: &'a str,
 }
 
 /// Entries that rewrite `target` (the checked-out branch) from the commit: interactive rebase,
@@ -353,7 +353,7 @@ fn rewrite_items(ui: &mut Ui, r: &Rewrite<'_>, idle: bool, is_head: bool, acts: 
 }
 
 /// The reset modes, each asking before it moves `target` to the commit.
-fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<Action>) {
+pub(in crate::repo) fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<Action>) {
     let Rewrite {
         hash,
         short,

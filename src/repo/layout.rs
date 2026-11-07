@@ -57,6 +57,9 @@ impl RepoTab {
                 } else if self.pr_view.is_some() {
                     self.pr_view_ui(ui, &mut acts);
                 } else {
+                    if self.reflog.is_some() {
+                        self.reflog_panel(ui, &mut acts);
+                    }
                     self.graph_view(ui, &mut acts);
                 }
             });
@@ -135,6 +138,8 @@ impl RepoTab {
                 acts.push(Action::CloseCompare);
             } else if esc && self.search.open {
                 acts.push(Action::ToggleSearch);
+            } else if esc && self.reflog.is_some() {
+                acts.push(Action::CloseReflog);
             }
             let diff_shown =
                 self.diff.is_some() && self.conflict.is_none() && self.rebase.is_none();

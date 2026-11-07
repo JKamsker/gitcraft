@@ -4,6 +4,7 @@
 mod branch_delete;
 mod branches;
 mod pull_requests;
+mod recovery;
 mod remotes;
 mod stashes;
 mod submodules;
@@ -79,6 +80,7 @@ impl RepoTab {
             self.worktree_section(ui, acts, idle, &mut sections);
             self.submodule_section(ui, acts, idle, &mut sections);
             self.stash_section(ui, acts, idle, &mut sections);
+            self.recovery_section(ui, acts, &mut sections);
             self.pr_section(ui, acts, idle, &mut sections);
             self.tags_section(ui, acts, idle, &filter, &mut sections);
         });
@@ -141,6 +143,11 @@ impl RepoTab {
             ("worktrees", "folder-tree", Some("Worktrees")),
             ("submodules", "package", submodules),
             ("stashes", "archive", Some("Stashes")),
+            (
+                "recovery",
+                "history",
+                Some("Recovery: reflog and lost commits"),
+            ),
             ("prs", "git-pull-request", prs),
             ("tags", "tag", tags),
         ];

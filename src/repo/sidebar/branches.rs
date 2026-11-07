@@ -11,6 +11,7 @@ use crate::repo::branch_tree::{self, LeafRow, TreeView};
 use crate::repo::branch_visibility::local_ref;
 use crate::repo::graph_view;
 use crate::repo::pinned_sections::{Button, Header, Sections};
+use crate::repo::reflog::{ReflogAct, Source};
 use crate::repo::{
     Action, Dialog, RepoTab, ci_status, fast_forward_action, merge_action, ops, rebase_action,
     widgets,
@@ -180,6 +181,15 @@ impl RepoTab {
         }
         if ui.button("Copy name").clicked() {
             ui.ctx().copy_text(b.name.clone());
+        }
+        if ui
+            .button("Show reflog")
+            .on_hover_text(
+                "Where the branch has been: each commit it pointed at, and what moved it",
+            )
+            .clicked()
+        {
+            acts.push(Action::Reflog(ReflogAct::Show(Source::branch(&b.name))));
         }
         ui.separator();
         self.visibility_items(ui, acts, &local_ref(&b.name), b.is_head);

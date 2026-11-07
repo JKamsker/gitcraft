@@ -23,6 +23,9 @@ use badge::{BadgeKind, badges};
 pub(crate) use lanes::edge;
 use row::Lanes;
 
+// The reset modes, for the reflog view's entries too.
+pub(super) use menu::{Rewrite, reset_items};
+
 pub(crate) const ROW_H: f32 = 28.0;
 /// Space between rows, which the graph's lines cross.
 pub(crate) const ROW_GAP: f32 = 2.0;
