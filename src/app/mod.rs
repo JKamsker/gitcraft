@@ -22,6 +22,7 @@ mod profiles;
 mod recent_status;
 mod remote_open;
 mod repo_scan;
+mod setup;
 mod tab_strip;
 mod tabs;
 mod teleport;
@@ -120,6 +121,7 @@ pub struct App {
     was_focused: bool,
     clone_form: Option<CloneForm>,
     practice_open: bool,
+    setup: setup::SetupWindow,
     practice_jobs: crate::tasks::Scope,
     practicing: Option<Receiver<Result<PathBuf, String>>>,
     /// A clone running in the background: (destination, result).
@@ -286,6 +288,7 @@ impl App {
             was_focused: true,
             clone_form: None,
             practice_open: false,
+            setup: Default::default(),
             practice_jobs: crate::tasks::Scope::default(),
             practicing: None,
             cloning: None,
@@ -566,6 +569,7 @@ impl App {
             || self.askpass_open()
             || self.palette.is_some()
             || self.practice_open
+            || self.setup.open
             || self.manual_open
             || self.repo_scan.is_some()
             || (crate::a11y::keyboard_taken(ctx) && !home_filter::search_has_focus(ctx));
@@ -649,6 +653,7 @@ impl App {
             Some(Tab::Repo(repo)) => {
                 repo.keys_blocked = self.palette.is_some()
                     || self.practice_open
+                    || self.setup.open
                     || self.manual_open
                     || self.clone_form.is_some()
                     || self.remote_form.is_some()
@@ -718,6 +723,7 @@ impl eframe::App for App {
         }
         self.poll_clone(&ctx);
         self.poll_practice(&ctx);
+        self.poll_setup(&ctx);
         self.os_shell(&ctx, frame);
         self.poll_connecting(&ctx);
         self.poll_launch(&ctx);
@@ -790,6 +796,7 @@ impl eframe::App for App {
         self.palette_ui(&ctx);
         self.manual_ui(&ctx);
         self.practice_dialog(&ctx);
+        self.setup_ui(&ctx);
         crate::glossary::hover(&ctx);
         // After the tabs are drawn, so what was typed in this frame is in.
         self.keep_drafts(&ctx, focused);

@@ -55,6 +55,7 @@ impl App {
                 || self.askpass_open()
                 || self.palette.is_some()
                 || self.practice_open
+                || self.setup.open
                 || self.manual_open
                 || self.my_work.open,
             update: self.update_check(),

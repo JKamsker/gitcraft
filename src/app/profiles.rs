@@ -110,7 +110,11 @@ impl App {
     /// lose, nor while a repository is being cloned or connected to (it would open in the other
     /// profile): a toast says why.
     fn can_switch_profile(&mut self) -> bool {
-        if self.practicing.is_some() || self.cloning.is_some() || !self.connecting.is_empty() {
+        if self.setup.busy()
+            || self.practicing.is_some()
+            || self.cloning.is_some()
+            || !self.connecting.is_empty()
+        {
             self.toasts.push(Toast::new(
                 "A repository is still being cloned or connected to: wait for it before switching \
                  profiles"
@@ -218,6 +222,7 @@ impl App {
                 return;
             }
         }
+        self.setup.forget_profile(id);
         self.settings.user_profiles.retain(|p| p.id != id);
         self.profile_states.remove(&id);
         settings::profiles::forget(id);

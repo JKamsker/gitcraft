@@ -59,7 +59,9 @@ pub(super) fn with_profile(cmd: &mut Command, args: &[&str]) {
 use crate::remote::{self, Target};
 
 mod connection;
+mod setup;
 pub(crate) use connection::*;
+pub(crate) use setup::{setup_clone, setup_run};
 mod watched;
 pub use watched::{CANCELLED, OpControl, run_watched, run_watched_recorded};
 
@@ -1424,4 +1426,39 @@ mod practice_environment_tests {
         }
         assert!(cmd.get_args().any(|a| a == "--no-replace-objects"));
     }
+}
+
+pub(crate) fn onboarding_local_config(
+    repo: &Path,
+    key: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<Option<String>, String> {
+    if !["user.name", "user.email"].contains(&key) {
+        return Err("Unsupported setup configuration key".into());
+    }
+    if !active() {
+        return Err("Export cancelled".into());
+    }
+    let bytes = execute(
+        Some(repo),
+        &Extra {
+            timeout: Some(std::time::Duration::from_secs(20)),
+            output_limit: Some(65536),
+            ..Default::default()
+        },
+        &["config", "--local", "--null", "--get", key],
+    )?;
+    if bytes.code == Some(1) {
+        return Ok(None);
+    }
+    if bytes.code != Some(0) {
+        return Err("Could not inspect local setup configuration".into());
+    }
+    let value = bytes
+        .stdout
+        .strip_suffix(&[0])
+        .ok_or("Invalid configuration response")?;
+    String::from_utf8(value.to_vec())
+        .map(Some)
+        .map_err(|_| "Local configuration is not UTF-8".into())
 }

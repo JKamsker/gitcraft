@@ -101,6 +101,14 @@ impl App {
                     {
                         self.practice_open = true;
                     }
+                    ui.horizontal(|ui| {
+                        if ui.button("Export setup…").clicked() {
+                            self.show_setup(false, ui.ctx());
+                        }
+                        if ui.button("Import setup…").clicked() {
+                            self.show_setup(true, ui.ctx());
+                        }
+                    });
                     self.home_link_field(ui, &t);
 
                     // The card has git's words itself.
