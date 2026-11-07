@@ -6,6 +6,27 @@ so your config, credentials and hooks apply as usual.
 
 ![gitcraft: branches, remotes and worktrees on the left, the graph with branch pills and relative dates, uncommitted changes on the right and the integrated terminal below](docs/screenshot.png)
 
+## Practice git
+
+Choose **Practice git…** on the start page or in the command palette. Each attempt opens a
+new, clearly marked local throwaway repository: resolve a merge conflict, merge diverged
+branches, rescue a detached HEAD, or undo an already published commit. The last scenario uses
+a local bare `origin`, so pushing it contacts no server. The goal banner explains the task,
+offers a hint and checks the real repository when you click **Check goal**. Reopening the tab
+keeps its scenario. Setup and checks run in the background and never alter an existing repo.
+
+Practice folders live in the system temporary directory. They are kept when you close the
+tab; your system may delete them, so copy a folder elsewhere if you want to keep it. Starting
+another attempt makes a fresh repository. The scenarios are local even when you also work in
+WSL or over SSH. Git operations and terminals opened from a practice tab ignore inherited Git
+repository overrides, profiles and global Git configuration. This keeps your caller's working
+tree and Git settings out of the exercise. A practice terminal is still an ordinary shell:
+commands you explicitly run can access other folders.
+
+Pause the pointer over git words such as **HEAD**, **upstream**, **fast-forward** or **rebase**
+to see a short glossary explanation. This also works in menus, the manual and graph labels.
+Glossary tips stay out of the way while typing, scrolling or dragging.
+
 ## Features
 
 **Repositories and tabs**

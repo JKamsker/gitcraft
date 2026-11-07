@@ -30,6 +30,7 @@ pub(super) struct Loaded {
     pub(super) submodules: Vec<Submodule>,
     /// It keeps files in Git LFS, and git-lfs is installed.
     pub(super) lfs: bool,
+    pub(super) practice: Option<crate::practice::Session>,
     pub(super) identity: Identity,
     /// How many commits were asked for (more exist when that many came back).
     pub(super) requested: usize,
@@ -140,6 +141,7 @@ impl RepoTab {
                     submodules,
                     lfs,
                     identity,
+                    practice: crate::practice::load(path),
                     requested: count,
                     log_from,
                     read,
@@ -404,6 +406,8 @@ impl RepoTab {
             self.submodules = loaded.submodules;
         }
         self.lfs = loaded.lfs;
+        self.practice = loaded.practice;
+        self.practice_result = None;
         // Another project (origin pointed elsewhere): its pull requests are other ones, under
         // the same numbers, and a list asked of the old one is not to be taken in.
         let remotes_changed = loaded.remotes != self.remotes;
