@@ -2,6 +2,7 @@
 //! (branches on the left, commit graph or diff in the middle, commit detail / changes on the right).
 
 mod actions;
+mod activity;
 mod apply;
 mod branch_tree;
 mod branch_visibility;
@@ -161,6 +162,7 @@ pub struct RepoTab {
     compare: Option<Compare>,
     /// The pull request the big area shows.
     pr_view: Option<pr_view::PrView>,
+    activity: Option<activity::Activity>,
     /// The builds of a commit the big area shows.
     ci_view: Option<ci_view::CiView>,
     pr_requests: u64,
@@ -327,6 +329,7 @@ impl RepoTab {
             diff: None,
             compare: None,
             pr_view: None,
+            activity: None,
             ci_view: None,
             pr_requests: 0,
             pr_drafts: HashMap::new(),

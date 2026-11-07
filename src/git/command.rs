@@ -518,6 +518,114 @@ fn parse_credentials(out: &str) -> Option<Credentials> {
     (!password.is_empty()).then_some(Credentials { username, password })
 }
 
+/// Read-only, bounded background analysis transport. Cancellation never holds a newer view.
+pub(super) fn activity_bytes_with_limit(
+    dir: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+    active: &dyn Fn() -> bool,
+    limit: std::time::Duration,
+) -> Result<Vec<u8>, String> {
+    use std::{
+        sync::mpsc,
+        time::{Duration, Instant},
+    };
+    const MAX: usize = 16 * 1024 * 1024;
+    if !active() {
+        return Err("Analysis cancelled".into());
+    }
+    let out = if let Some(target) = remote::parse(dir) {
+        let mut request = remote_request(&target, &Extra::default(), args);
+        // The shared remote runner captures whole outputs. Bound both streams *there*,
+        // before they cross the connection or allocate a large local buffer. FIFO readers
+        // cap scratch files and give Git SIGPIPE on overflow; preserve Git's exit status.
+        let git = request
+            .script
+            .strip_prefix("exec ")
+            .unwrap_or(&request.script)
+            .to_owned();
+        request.script = format!(
+            concat!(
+                "umask 077\n",
+                "history_tmp=$(mktemp -d \"${{TMPDIR:-/tmp}}/gitcraft-activity.XXXXXXXX\") || exit 1\n",
+                "trap 'rm -rf -- \"$history_tmp\"' 0\n",
+                "mkfifo \"$history_tmp/out\" \"$history_tmp/err\" || exit 1\n",
+                "head -c {cap} <\"$history_tmp/out\" >\"$history_tmp/out-cap\" & history_out=$!\n",
+                "head -c {cap} <\"$history_tmp/err\" >\"$history_tmp/err-cap\" & history_err=$!\n",
+                "{git} >\"$history_tmp/out\" 2>\"$history_tmp/err\"; history_code=$?\n",
+                "wait \"$history_out\"; wait \"$history_err\"\n",
+                "cat \"$history_tmp/out-cap\"; cat \"$history_tmp/err-cap\" >&2\n",
+                "exit \"$history_code\""
+            ),
+            cap = MAX + 1,
+            git = git
+        );
+        request.stdin = input.map(<[u8]>::to_vec);
+        request.timeout = Some(limit);
+        request.long = true;
+        let (tx, rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(remote::exec(&target.host, &request));
+        });
+        let deadline = Instant::now() + limit;
+        loop {
+            if !active() {
+                return Err("Analysis cancelled".into());
+            }
+            if Instant::now() >= deadline {
+                return Err("History analysis timed out".into());
+            }
+            match rx.recv_timeout(Duration::from_millis(20)) {
+                Ok(out) => break out?,
+                Err(mpsc::RecvTimeoutError::Timeout) => (),
+                Err(_) => return Err("History worker stopped".into()),
+            }
+        }
+    } else {
+        let mut command = repository_command(Some(dir), args);
+        command.args(args);
+        let output = crate::bounded_process::run_with_input(
+            command,
+            input.map(<[u8]>::to_vec),
+            active,
+            limit,
+        )
+        .map_err(|e| {
+            if e.contains("output exceeded") {
+                "A history page exceeded 16 MiB".to_owned()
+            } else {
+                e.replace("Forecast", "History analysis")
+                    .replace("forecast", "history analysis")
+            }
+        })?;
+        remote::Output {
+            code: output.status.code().unwrap_or(-1),
+            stdout: output.stdout,
+            stderr: output.stderr,
+        }
+    };
+    if out.stdout.len() > MAX || out.stderr.len() > MAX {
+        return Err("A history page exceeded 16 MiB".into());
+    }
+    if out.code == 0 {
+        Ok(out.stdout)
+    } else {
+        Err(format!(
+            "Could not analyze history: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ))
+    }
+}
+
+pub(crate) fn activity_bytes(
+    dir: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    activity_bytes_with_limit(dir, args, input, active, std::time::Duration::from_secs(20))
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Write;

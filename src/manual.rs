@@ -56,6 +56,14 @@ const FEATURES: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "History activity",
+        &[
+            "Activity in the toolbar opens the activity calendar and contributor statistics; both are also in Ctrl+P. Click a day, drag across dates, pick a month or apply a date range. Select a commit to open its detail.",
+            "Choose author or committer dates. Days use each timestamp’s recorded timezone, and date ranges include both ends. Authors follow Git’s .mailmap. Counts show distinct paths, active days and first/last activity within the selected period; renames touch both paths and merge changes compare with their first parent.",
+            "Each reachable commit counts once across local/remote branches, tags and HEAD. Stash and app-only refs are excluded. Coverage says when the snapshot is partial or shallow. Scan more history expands the initial 5,000 commits up to 100,000, within a 64 MiB snapshot and 16 MiB page limit. Cancel stops waiting; Refresh takes a new snapshot without fetching. Analysis needs Git with --no-lazy-fetch support and reads tree changes without file contents; missing trees or metadata are reported as errors.",
+        ],
+    ),
+    (
         "Compare",
         &[
             "Ctrl+click a second commit to list the files that differ between the two (the changes row is the working tree).",
