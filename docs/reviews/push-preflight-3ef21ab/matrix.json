@@ -1,0 +1,86 @@
+[
+  {
+    "case": "remote_delete",
+    "preview": false,
+    "preview_error": "This push option needs an explicit single-ref preview; multi-ref, matching, mirror, delete, atomic and recursive pushes are not sent by this checklist.",
+    "production_dispatch_or_raw_git_error": ""
+  },
+  {
+    "case": "both_delete_d",
+    "preview": false,
+    "preview_error": "Create the tag or complete the local operation first, then preview its push separately.",
+    "production_dispatch_or_raw_git_error": ""
+  },
+  {
+    "case": "both_delete_D",
+    "preview": false,
+    "preview_error": "Create the tag or complete the local operation first, then preview its push separately.",
+    "production_dispatch_or_raw_git_error": ""
+  },
+  {
+    "case": "undo_both",
+    "preview": false,
+    "preview_error": "Create the tag or complete the local operation first, then preview its push separately.",
+    "production_dispatch_or_raw_git_error": ""
+  },
+  {
+    "case": "redo_both",
+    "preview": false,
+    "preview_error": "Create the tag or complete the local operation first, then preview its push separately.",
+    "production_dispatch_or_raw_git_error": ""
+  },
+  {
+    "case": "remote_tag_delete",
+    "preview": false,
+    "preview_error": "This push option needs an explicit single-ref preview; multi-ref, matching, mirror, delete, atomic and recursive pushes are not sent by this checklist.",
+    "production_dispatch_or_raw_git_error": ""
+  },
+  {
+    "case": "normal_ff",
+    "preview": true,
+    "preview_error": "",
+    "production_dispatch_or_raw_git_error": ""
+  },
+  {
+    "case": "publish",
+    "preview": true,
+    "preview_error": "",
+    "production_dispatch_or_raw_git_error": ""
+  },
+  {
+    "case": "force_lease",
+    "preview": true,
+    "preview_error": "",
+    "production_dispatch_or_raw_git_error": ""
+  },
+  {
+    "case": "branch_context",
+    "preview": true,
+    "preview_error": "",
+    "production_dispatch_or_raw_git_error": ""
+  },
+  {
+    "case": "annotated_tag",
+    "preview": true,
+    "preview_error": "",
+    "production_dispatch_or_raw_git_error": ""
+  },
+  {
+    "case": "detached_tag",
+    "preview": false,
+    "preview_error": "Push preflight needs a checked-out branch.",
+    "production_dispatch_or_raw_git_error": ""
+  },
+  {
+    "case": "gerrit",
+    "preview": true,
+    "preview_error": "",
+    "production_dispatch_or_raw_git_error": ""
+  },
+  {
+    "case": "create_then_push_tag",
+    "preview": true,
+    "preview_error": "",
+    "production_dispatch_or_raw_git_error": ""
+  }
+]

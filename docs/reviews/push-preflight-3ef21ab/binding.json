@@ -1,0 +1,16 @@
+{
+  "fmt": {
+    "matches": true,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "clippy": {
+    "matches": true,
+    "sha256": "e839000dacb75654c9d537d35b4ae60a10f88df25d270b436e74c79cf340c653"
+  },
+  "test": {
+    "matches": true,
+    "sha256": "2dde4b95465b4104c4acf35de51498b4d1bc32ff118212fb4123ecd73db357be"
+  },
+  "patch_sha256": "04854c50259040a7417702134628eb85a98d03bbcbe3af3edf17b0d2c72fe1ec",
+  "tree": "e19bc362813509a9c81d2b045a1a16dcc1eace8c"
+}

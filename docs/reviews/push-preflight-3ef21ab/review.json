@@ -1,0 +1,208 @@
+{
+  "review": "Independent adversarial review: Push preflight with identity guard (#32)",
+  "verdict": "FAIL",
+  "candidate": "3ef21abfb112cc0105b437737427291ce44c4842",
+  "base": "4f4fb565c3ade34d3b974f0545af21c51bb34b93",
+  "tree": "e19bc362813509a9c81d2b045a1a16dcc1eace8c",
+  "patch_sha256": "04854c50259040a7417702134628eb85a98d03bbcbe3af3edf17b0d2c72fe1ec",
+  "canonical_source_changed": false,
+  "scope": "Confirmed production parser/RepoTab dispatch regressions and original pre-push hook semantics; interrupted before completion of remaining review. No merge approval.",
+  "findings": [
+    {
+      "id": "PREFLIGHT-1",
+      "priority": "P1",
+      "title": "Central interception disables existing remote deletion and combined-operation undo/redo",
+      "paths": [
+        "src/repo/operations.rs:39",
+        "src/push_preflight.rs:153",
+        "src/push_preflight.rs:194",
+        "src/repo/sidebar/branch_delete.rs",
+        "src/repo/sidebar/remotes.rs",
+        "src/repo/sidebar/tags.rs"
+      ],
+      "reproduction": "reviewer_production_dispatch_push_matrix constructs existing UI operations, sends them through RepoTab::run_ops or actual undo/redo entry points, and receives PushError; executing the same original operation via production run_steps against a fixture bare remote succeeds.",
+      "affected_cases": [
+        "remote_delete",
+        "both_delete_d",
+        "both_delete_D",
+        "undo_both",
+        "redo_both",
+        "remote_tag_delete"
+      ],
+      "impact": "Previously available branch/tag deletion and remote restoration are unusable. Unsupported-delete documentation does not preserve existing UI behavior.",
+      "required_fix": "Support deliberate pinned deletion and ordered local/remote operation sequences with their original lease, failure and journal semantics. Add actual dispatch regressions for all affected paths.",
+      "evidence": "review-push-preflight-3ef21ab/matrix.json"
+    },
+    {
+      "id": "PREFLIGHT-2",
+      "priority": "P2",
+      "title": "Tag pushes fail solely because HEAD is detached",
+      "paths": [
+        "src/push_preflight.rs:225",
+        "src/repo/sidebar/tags.rs:72"
+      ],
+      "reproduction": "Create annotated release tag, detach HEAD, dispatch existing push origin refs/tags/release. Preview refuses with checked-out-branch error; original run_steps push succeeds against bare fixture.",
+      "impact": "Existing explicit tag push is unnecessarily disabled while inspecting detached history.",
+      "required_fix": "Inspect explicit source refs independently of checked-out branch, while preserving stale source/checkout ownership checks.",
+      "evidence": "review-push-preflight-3ef21ab/matrix.json"
+    },
+    {
+      "id": "PREFLIGHT-3",
+      "priority": "P1",
+      "title": "LFS payload is uploaded before an original rejecting pre-push hook",
+      "paths": [
+        "src/git/push_hooks.rs:48"
+      ],
+      "reproduction": "Create 6 MiB fixture asset, use production LFS repair and rescan, install executable pre-push hook that records invocation and exits 1, then execute approved production plan. Push fails and remote ref stays unchanged, but receiver.git/lfs/objects contains the payload.",
+      "impact": "An existing policy hook cannot prevent transfer of LFS content; rejected pushes can disclose/upload data.",
+      "required_fix": "Preserve original hook rejection semantics before any synthetic LFS upload; continue preserving exact stdin/remote/config behavior and stale-server-lease refusal.",
+      "evidence": "review-push-preflight-3ef21ab/hook.json"
+    }
+  ],
+  "validated_controls": [
+    "normal_ff",
+    "publish",
+    "force_lease",
+    "branch_context",
+    "annotated_tag",
+    "gerrit",
+    "create_then_push_tag"
+  ],
+  "matrix": [
+    {
+      "case": "remote_delete",
+      "preview": false,
+      "preview_error": "This push option needs an explicit single-ref preview; multi-ref, matching, mirror, delete, atomic and recursive pushes are not sent by this checklist.",
+      "production_dispatch_or_raw_git_error": ""
+    },
+    {
+      "case": "both_delete_d",
+      "preview": false,
+      "preview_error": "Create the tag or complete the local operation first, then preview its push separately.",
+      "production_dispatch_or_raw_git_error": ""
+    },
+    {
+      "case": "both_delete_D",
+      "preview": false,
+      "preview_error": "Create the tag or complete the local operation first, then preview its push separately.",
+      "production_dispatch_or_raw_git_error": ""
+    },
+    {
+      "case": "undo_both",
+      "preview": false,
+      "preview_error": "Create the tag or complete the local operation first, then preview its push separately.",
+      "production_dispatch_or_raw_git_error": ""
+    },
+    {
+      "case": "redo_both",
+      "preview": false,
+      "preview_error": "Create the tag or complete the local operation first, then preview its push separately.",
+      "production_dispatch_or_raw_git_error": ""
+    },
+    {
+      "case": "remote_tag_delete",
+      "preview": false,
+      "preview_error": "This push option needs an explicit single-ref preview; multi-ref, matching, mirror, delete, atomic and recursive pushes are not sent by this checklist.",
+      "production_dispatch_or_raw_git_error": ""
+    },
+    {
+      "case": "normal_ff",
+      "preview": true,
+      "preview_error": "",
+      "production_dispatch_or_raw_git_error": ""
+    },
+    {
+      "case": "publish",
+      "preview": true,
+      "preview_error": "",
+      "production_dispatch_or_raw_git_error": ""
+    },
+    {
+      "case": "force_lease",
+      "preview": true,
+      "preview_error": "",
+      "production_dispatch_or_raw_git_error": ""
+    },
+    {
+      "case": "branch_context",
+      "preview": true,
+      "preview_error": "",
+      "production_dispatch_or_raw_git_error": ""
+    },
+    {
+      "case": "annotated_tag",
+      "preview": true,
+      "preview_error": "",
+      "production_dispatch_or_raw_git_error": ""
+    },
+    {
+      "case": "detached_tag",
+      "preview": false,
+      "preview_error": "Push preflight needs a checked-out branch.",
+      "production_dispatch_or_raw_git_error": ""
+    },
+    {
+      "case": "gerrit",
+      "preview": true,
+      "preview_error": "",
+      "production_dispatch_or_raw_git_error": ""
+    },
+    {
+      "case": "create_then_push_tag",
+      "preview": true,
+      "preview_error": "",
+      "production_dispatch_or_raw_git_error": ""
+    }
+  ],
+  "hook_result": {
+    "hook_ran": true,
+    "lfs_uploaded_despite_reject": true,
+    "push_failed": true,
+    "remote_ref_unchanged": true
+  },
+  "test_evidence": {
+    "supplied_full_gates": {
+      "fmt": "PASS",
+      "clippy": "PASS",
+      "tests_passed": 711,
+      "ignored": 3,
+      "total": 714,
+      "hashes_verified": true,
+      "manifest": "/workspace/work/push-preflight-validation.json"
+    },
+    "independent_targeted": {
+      "passed": 2,
+      "failed": 0,
+      "filtered": 714,
+      "log": "/workspace/work/review-push-preflight-3ef21ab/repros.log",
+      "harness": "git archive exact head plus reviewer-only tests in disposable source/; production source not edited"
+    },
+    "interrupted_batch": {
+      "state": "UNVALIDATED: execution environment disconnected during compilation; no result files produced",
+      "log": "/workspace/work/review-push-preflight-3ef21ab/repros-final.log"
+    }
+  },
+  "unvalidated_hypotheses": [
+    {
+      "topic": "Ref-lock repair journal failure",
+      "status": "UNVALIDATED",
+      "basis": "Static sequence writes actual index/worktree with read-tree before update-ref; pending fixture held refs/heads/main.lock. Runtime result unread/absent."
+    },
+    {
+      "topic": "Explicit HTTPS default-port identity normalization",
+      "status": "UNVALIDATED",
+      "basis": "location preserves github.com:443 and source test expects fallback identity; pending full scan fixture result absent."
+    }
+  ],
+  "remaining_validation": [
+    "Read or rerun interrupted targeted fixtures only after process safety guard permits runtime.",
+    "Finish auth-retry/cancellation, repair/journal failure and stale UI/profile/account ownership checks.",
+    "Re-review all fixes on exact immutable pushed head; retain full local bare-remote regression matrix.",
+    "At integration adapt fallible leased profile context and combine UserProfile author_hosts with connections/account metadata; no SSH transport-username-to-forge-account comparison."
+  ],
+  "limits": [
+    "No actual external credentials/accounts, SSH/WSL/Windows operations or external remote writes.",
+    "No new runtime execution after process quarantine.",
+    "Review incomplete beyond the explicitly evidenced paths; FAIL is definitive, PASS is not asserted."
+  ]
+}
