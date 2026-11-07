@@ -224,6 +224,9 @@ impl RepoTab {
                                     .size(11.0)
                                     .color(t.text_faint),
                             );
+                            // Between the version and the buttons, the window can be moved.
+                            let rest = ui.available_rect_before_wrap();
+                            crate::app::title_bar::window_drag(ui, rest, "detail-footer");
                         });
                     }
                 });

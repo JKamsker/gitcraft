@@ -11,7 +11,7 @@ mod tab_strip;
 mod tabs;
 #[cfg(test)]
 mod tests;
-mod title_bar;
+pub(crate) mod title_bar;
 mod update_banner;
 mod worktrees;
 

@@ -197,6 +197,19 @@ fn caption_buttons(ui: &mut Ui, t: &Tokens) {
     }
 }
 
+/// Whether the empty middle of the folded branches strip moves the window too. Off for now: a
+/// grab just beside one of its buttons would move the window.
+pub(crate) const FOLDED_STRIP_MOVES_WINDOW: bool = false;
+
+/// Empty space `rect` elsewhere along the window's edges (the toolbar's end, a panel footer)
+/// that moves the window like the strip's, while the tabs are in the title bar; `name` tells
+/// the pieces apart.
+pub(crate) fn window_drag(ui: &mut Ui, rect: Rect, name: &str) {
+    if wanted(&Settings::get(ui.ctx())) {
+        drag_area(ui, rect, name);
+    }
+}
+
 /// The strip's empty space `rect` (`name` tells its pieces apart): dragged, it moves the window;
 /// double-clicked, it maximizes or restores it.
 pub(super) fn drag_area(ui: &mut Ui, rect: Rect, name: &str) {

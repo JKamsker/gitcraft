@@ -161,6 +161,13 @@ impl RepoTab {
                 .layout(egui::Layout::bottom_up(egui::Align::Center)),
         );
         section_buttons(&mut col, lower.into_iter().rev(), acts);
+        if crate::app::title_bar::FOLDED_STRIP_MOVES_WINDOW {
+            // The gap between the upper and lower sections' buttons.
+            let gap = col
+                .available_rect_before_wrap()
+                .shrink2(egui::vec2(0.0, 6.0));
+            crate::app::title_bar::window_drag(&mut col, gap, "folded-strip");
+        }
     }
 }
 

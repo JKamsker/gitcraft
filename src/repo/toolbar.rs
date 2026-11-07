@@ -33,6 +33,9 @@ impl RepoTab {
             self.head_label(ui, idle, acts);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 self.op_status(ui);
+                // What is left between the branch and the status moves the window.
+                let rest = ui.available_rect_before_wrap();
+                crate::app::title_bar::window_drag(ui, rest, "toolbar");
             });
         });
     }
