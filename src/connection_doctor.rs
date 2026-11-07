@@ -239,41 +239,98 @@ pub(crate) fn test(repo: &Path, name: &str) -> Result<Report, String> {
     Ok(report)
 }
 fn classify(success: bool, trace: &str, tls: bool, elapsed: std::time::Duration) -> Report {
-    let t = trace.to_lowercase();
-    let failure = if t.contains("407") {
-        Some((1, "407: the proxy wants a password"))
-    } else if t.contains("could not resolve")
-        || t.contains("name or service not known")
-        || t.contains("could not resolve hostname")
-    {
-        Some((0, "DNS: the host or proxy could not be resolved"))
-    } else if t.contains("host key verification failed") {
-        Some((
-            2,
-            "SSH host verification failed; verify the server's host key on the repository machine",
-        ))
-    } else if t.contains("certificate")
-        || t.contains("ssl connect")
-        || t.contains("tls") && t.contains("failed")
-    {
-        Some((
-            2,
-            "TLS: certificate chain or handshake failed; check the configured CA and hostname",
-        ))
-    } else if git::is_auth_error(trace) || t.contains("publickey") || t.contains("access denied") {
-        Some((
-            3,
-            "Authentication: the server refused this account or no unattended sign-in is available",
-        ))
-    } else if t.contains("failed to connect")
-        || t.contains("connection refused")
-        || t.contains("timed out")
-        || t.contains("no route")
-    {
-        Some((1, "TCP: could not connect to the server or proxy"))
-    } else {
-        None
-    };
+    let mut failure = None;
+    let mut completed = [false; 4];
+    // curl writes successful certificate details too. Read explicit events in order;
+    // an earlier successful TLS exchange must not mask a later auth/connection error.
+    for text in trace.lines() {
+        let t = text.to_ascii_lowercase();
+        if t.contains("was resolved") {
+            completed[0] = true;
+        }
+        if t.contains("connected to ") {
+            completed[0] = true;
+            completed[1] = true;
+        }
+        if t.contains("ssl certificate verify ok")
+            || t.contains("ssl connection using")
+            || t.contains("ssl certificate verification ok")
+        {
+            completed[0] = true;
+            completed[1] = true;
+            completed[2] = true;
+        }
+        let event = if t.contains("407")
+            && (t.contains("http") || t.contains("proxy") || t.contains("connect"))
+        {
+            Some((1, "407: the proxy wants a password"))
+        } else if t.contains("could not resolve") || t.contains("name or service not known") {
+            Some((0, "DNS: the host or proxy could not be resolved"))
+        } else if t.contains("host key verification failed") {
+            Some((
+                2,
+                "SSH host verification failed; verify the server's host key on the repository machine",
+            ))
+        } else if [
+            "ssl certificate problem",
+            "certificate verify failed",
+            "certificate verification failed",
+            "server certificate verification failed",
+            "ssl connect error",
+            "ssl_error_",
+            "tls handshake failed",
+            "tls connect error",
+            "ssl peer certificate",
+        ]
+        .iter()
+        .any(|pattern| t.contains(pattern))
+        {
+            Some((
+                2,
+                "TLS: certificate chain or handshake failed; check the configured CA and hostname",
+            ))
+        } else if git::is_auth_error(text)
+            || t.contains("publickey")
+            || t.contains("access denied")
+            || [
+                "http/2 401",
+                "http/2 403",
+                "http/1.1 401",
+                "http/1.1 403",
+                "http/1.0 401",
+                "http/1.0 403",
+            ]
+            .iter()
+            .any(|status| t.contains(status))
+        {
+            Some((
+                3,
+                "Authentication: the server refused this account or no unattended sign-in is available",
+            ))
+        } else if [
+            "failed to connect",
+            "connection refused",
+            "timed out",
+            "no route",
+            "connection reset",
+            "recv failure",
+            "send failure",
+            "empty reply from server",
+        ]
+        .iter()
+        .any(|pattern| t.contains(pattern))
+        {
+            Some((
+                1,
+                "TCP: could not connect to the server or proxy, or the connection failed",
+            ))
+        } else {
+            None
+        };
+        if event.is_some() {
+            failure = event;
+        }
+    }
     let mut lines = Vec::new();
     let names = [
         "DNS",
@@ -292,6 +349,8 @@ fn classify(success: bool, trace: &str, tls: bool, elapsed: std::time::Duration)
             } else {
                 "completed through the configured transport"
             }
+        } else if completed[i] && !failure.is_some_and(|(step, _)| i == step) {
+            "completed earlier in this trace"
         } else if failure.is_some_and(|(step, _)| i < step) {
             "completed before the failure"
         } else if failure.is_some_and(|(step, _)| i == step) {
@@ -430,5 +489,50 @@ mod tests {
         );
         assert_eq!(ssh_host("ssh://-oProxyCommand=bad/r"), None);
         assert_eq!(ssh_host("file:///tmp/r"), None);
+    }
+}
+
+#[cfg(test)]
+mod trace_regressions {
+    use super::*;
+    #[test]
+    fn successful_tls_followed_by_auth_failure_is_not_a_certificate_failure() {
+        for code in [401, 403] {
+            let report = classify(
+                false,
+                &format!(
+                    "Connected to fixture.invalid\nServer certificate: CN fixture.invalid\nSSL certificate verify ok\n<= Recv header: HTTP/2 {code}\nfatal: the requested URL returned error: {code}"
+                ),
+                true,
+                std::time::Duration::ZERO,
+            );
+            assert!(report.lines[2].contains("completed"), "{:?}", report.lines);
+            assert!(report.lines[3].ends_with("failed"), "{:?}", report.lines);
+            assert!(
+                report
+                    .lines
+                    .iter()
+                    .any(|line| line.starts_with("Authentication: the server"))
+            );
+        }
+    }
+    #[test]
+    fn later_connection_failure_preserves_earlier_tls_evidence() {
+        let report = classify(
+            false,
+            "SSL certificate verify ok\nRecv failure: Connection reset by peer",
+            true,
+            std::time::Duration::ZERO,
+        );
+        assert!(report.lines[1].ends_with("failed"));
+        assert!(report.lines[2].contains("completed earlier"));
+        let report = classify(
+            false,
+            "Connected to fixture.invalid\nSSL certificate problem: self-signed certificate",
+            true,
+            std::time::Duration::ZERO,
+        );
+        assert!(report.lines[2].ends_with("failed"));
+        assert!(!report.lines[3].ends_with("failed"));
     }
 }
