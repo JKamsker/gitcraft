@@ -180,6 +180,7 @@ pub(crate) enum Action {
     CloseFileView,
     OpenLineDossier(Option<git::investigations::dossier::Seed>),
     CloseLineDossier,
+    OpenPinnedFileLine(git::investigations::dossier::Seed),
     /// Open the interactive rebase editor for the commits after `onto`.
     /// Gives a commit of the checked-out branch a new message: amending the latest, rebasing
     /// for an older one.

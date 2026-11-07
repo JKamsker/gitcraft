@@ -302,6 +302,21 @@ impl RepoTab {
             Action::CloseFileView => self.file_view = None,
             Action::OpenLineDossier(seed) => self.open_line_dossier(seed, ctx),
             Action::CloseLineDossier => self.dossier.close(),
+            Action::OpenPinnedFileLine(seed) => {
+                if !git::investigations::oid(&seed.commit) || seed.line == 0 {
+                    return;
+                }
+                let id = ("file_view", &seed.path, Some(&seed.commit));
+                super::file_text::focus(ctx, id, seed.line);
+                self.apply(
+                    Action::FileView {
+                        path: seed.path,
+                        rev: Some(seed.commit),
+                        tab: super::file_view::FileTab::File,
+                    },
+                    ctx,
+                );
+            }
             Action::InteractiveRebase { onto, label } => self.interactive_rebase(onto, label, ctx),
             Action::Reword { hash, message } => self.reword_commit(hash, message, ctx),
             Action::EditMessage(hash) => self.edit_message(hash, ctx),

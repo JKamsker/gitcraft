@@ -114,9 +114,45 @@ impl RepoTab {
         match view.tab {
             FileTab::History => self.file_history(ui, acts),
             FileTab::Blame => self.blame_lines(ui, acts),
-            FileTab::File => {
-                file_text::show(ui, ("file_view", &view.path, &view.rev), view.text.as_ref())
-            }
+            FileTab::File => file_text::show_menu(
+                ui,
+                ("file_view", &view.path, &view.rev),
+                view.text.as_ref(),
+                |ui, line| {
+                    if let Some(commit) = view
+                        .rev
+                        .as_ref()
+                        .filter(|rev| crate::git::investigations::oid(rev))
+                    {
+                        if ui.button("Explain history").clicked() {
+                            acts.push(Action::OpenLineDossier(Some(
+                                crate::git::investigations::dossier::Seed {
+                                    commit: commit.clone(),
+                                    path: view.path.clone(),
+                                    line,
+                                },
+                            )));
+                            ui.close();
+                        }
+                    } else {
+                        ui.small("Working/index line positions can differ from committed history.");
+                        if ui
+                            .add_enabled(
+                                crate::git::investigations::oid(&self.refs.head),
+                                egui::Button::new("Open pinned committed version"),
+                            )
+                            .clicked()
+                        {
+                            acts.push(Action::FileView {
+                                path: view.path.clone(),
+                                rev: Some(self.refs.head.clone()),
+                                tab: FileTab::File,
+                            });
+                            ui.close();
+                        }
+                    }
+                },
+            ),
         }
     }
 }

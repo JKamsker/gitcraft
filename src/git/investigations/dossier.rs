@@ -68,7 +68,7 @@ fn one_line(text: &str, line: usize) -> Result<&str, String> {
 fn normal(text: &str) -> String {
     text.chars().filter(|c| !c.is_whitespace()).collect()
 }
-fn quoted_path(value: &str) -> Result<String, String> {
+pub(crate) fn quoted_path(value: &str) -> Result<String, String> {
     if !value.starts_with('"') {
         return if path_ok(value) {
             Ok(value.into())

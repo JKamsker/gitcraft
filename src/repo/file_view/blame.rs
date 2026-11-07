@@ -165,6 +165,13 @@ impl RepoTab {
                         t.text_faint,
                     );
                     let x = gutter.right() + NUM_W + 8.0;
+                    let text_rect=Rect::from_min_max(pos2(x,rect.top()),rect.right_bottom());
+                    let response=ui.interact(text_rect,ui.id().with(("blame-line-history",&line.hash,&line.source_path,line.original_line)),Sense::click());
+                    egui::Popup::context_menu(&response).style(crate::theme::menu_style).show(|ui|{
+                        let committed=!line.uncommitted()&&line.original_line>0&&!line.source_path.is_empty();
+                        if ui.add_enabled(committed,egui::Button::new("Explain history")).clicked(){acts.push(Action::OpenLineDossier(Some(crate::git::investigations::dossier::Seed{commit:line.hash.clone(),path:line.source_path.clone(),line:line.original_line})));ui.close();}
+                        if !committed{ui.small("No verified committed source position for this line; inspect a committed file version.");}
+                    });
                     match data.spans.as_ref().and_then(|s| s.get(i)) {
                         Some(spans) => {
                             let mut job = egui::text::LayoutJob::default();

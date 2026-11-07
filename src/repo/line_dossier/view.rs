@@ -96,7 +96,7 @@ impl RepoTab {
      egui::ScrollArea::both().id_salt("dossier_line").max_height(180.0).show(ui,|ui|{ui.monospace(clip(&card.text,4000));});
      ui.small(clip(&card.note,1000));ui.small(format!("Whitespace/copy/move-aware blame: {} at {}:{}",super::super::short(&card.attribution.commit),clip(&card.attribution.path,200),card.attribution.line));
      if card.whitespace_only{ui.label("Whitespace-only file changes detected; review the full commit before choosing any ignore revision.");}
-     ui.horizontal_wrapped(|ui|{if ui.button("Show commit").clicked(){acts.push(Action::SelectHash(card.at.commit.clone()));}if ui.button("Open file at this version").clicked(){acts.push(Action::CloseLineDossier);acts.push(Action::FileView{path:card.at.path.clone(),rev:Some(card.at.commit.clone()),tab:super::super::file_view::FileTab::File});}});
+     ui.horizontal_wrapped(|ui|{if ui.button("Show commit").clicked(){acts.push(Action::CloseLineDossier);acts.push(Action::SelectHash(card.at.commit.clone()));}if ui.button("Open file at this version").clicked(){acts.push(Action::CloseLineDossier);acts.push(Action::OpenPinnedFileLine(card.at.clone()));}});
     }
    });
         } else if !self.dossier.reader.busy() {

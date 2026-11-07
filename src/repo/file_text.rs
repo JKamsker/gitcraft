@@ -105,6 +105,28 @@ pub(crate) fn show(
     id: impl std::hash::Hash + std::fmt::Debug,
     text: Option<&Result<FileText, String>>,
 ) {
+    show_inner(ui, id, text, None);
+}
+
+/// A committed file's line context menu. Ordinary raw file views retain their old behavior.
+pub(crate) fn show_menu(
+    ui: &mut Ui,
+    id: impl std::hash::Hash + std::fmt::Debug,
+    text: Option<&Result<FileText, String>>,
+    mut menu: impl FnMut(&mut Ui, usize),
+) {
+    show_inner(ui, id, text, Some(&mut menu));
+}
+/// The focus is consumed only once the pinned content has arrived, after any download prompt.
+pub(crate) fn focus(ctx: &egui::Context, id: impl std::hash::Hash, line: usize) {
+    ctx.data_mut(|d| d.insert_temp(egui::Id::new(("file-line-focus", id)), line));
+}
+fn show_inner(
+    ui: &mut Ui,
+    id: impl std::hash::Hash + std::fmt::Debug,
+    text: Option<&Result<FileText, String>>,
+    mut menu: Option<&mut dyn FnMut(&mut Ui, usize)>,
+) {
     let t = Tokens::get(ui.ctx());
     let data = match text {
         None => {
@@ -140,56 +162,76 @@ pub(crate) fn show(
         .x;
     let width = (NUM_W + 16.0 + data.longest as f32 * char_w + 24.0).max(ui.available_width());
     ui.spacing_mut().item_spacing.y = 0.0;
-    egui::ScrollArea::both()
-        .id_salt(("file_text", id))
-        .auto_shrink(false)
-        .show_rows(ui, LINE_H, data.lines.len(), |ui, range| {
-            for i in range {
-                let Some(line) = data.lines.get(i) else {
-                    continue;
-                };
-                let (rect, _) = ui.allocate_exact_size(vec2(width, LINE_H), Sense::hover());
-                let p = ui.painter().with_clip_rect(rect.intersect(ui.clip_rect()));
-                let gutter = Rect::from_min_size(rect.min, vec2(NUM_W, LINE_H));
-                p.rect_filled(gutter, 0.0, t.card.gamma_multiply(0.6));
-                let mid = rect.center().y;
-                p.text(
-                    pos2(gutter.right() - 8.0, mid),
-                    Align2::RIGHT_CENTER,
-                    (i + 1).to_string(),
-                    theme::mono(11.0),
-                    t.text_faint,
+    let focus = ui
+        .ctx()
+        .data_mut(|d| d.remove_temp::<usize>(egui::Id::new(("file-line-focus", &id))));
+    let mut scroll = egui::ScrollArea::both()
+        .id_salt(("file_text", &id))
+        .auto_shrink(false);
+    if let Some(line) = focus {
+        scroll = scroll.vertical_scroll_offset(
+            line.saturating_sub(1)
+                .min(data.lines.len().saturating_sub(1)) as f32
+                * LINE_H,
+        );
+    }
+    scroll.show_rows(ui, LINE_H, data.lines.len(), |ui, range| {
+        for i in range {
+            let Some(line) = data.lines.get(i) else {
+                continue;
+            };
+            let (rect, _) = ui.allocate_exact_size(vec2(width, LINE_H), Sense::hover());
+            if let Some(menu) = menu.as_mut() {
+                let response = ui.interact(
+                    rect,
+                    ui.id().with(("file-line-menu", &id, i)),
+                    Sense::click(),
                 );
-                let x = gutter.right() + 10.0;
-                match data.spans.as_ref().and_then(|s| s.get(i)) {
-                    Some(spans) => {
-                        let mut job = egui::text::LayoutJob::default();
-                        for (color, text) in spans {
-                            job.append(
-                                text,
-                                0.0,
-                                egui::TextFormat {
-                                    font_id: font.clone(),
-                                    color: *color,
-                                    ..Default::default()
-                                },
-                            );
-                        }
-                        let galley = ui.painter().layout_job(job);
-                        p.galley(pos2(x, mid - galley.size().y / 2.0), galley, t.text);
-                    }
-                    None => {
-                        p.text(
-                            pos2(x, mid),
-                            Align2::LEFT_CENTER,
-                            line,
-                            font.clone(),
-                            t.text,
+                egui::Popup::context_menu(&response)
+                    .style(crate::theme::menu_style)
+                    .show(|ui| menu(ui, i + 1));
+            }
+            let p = ui.painter().with_clip_rect(rect.intersect(ui.clip_rect()));
+            let gutter = Rect::from_min_size(rect.min, vec2(NUM_W, LINE_H));
+            p.rect_filled(gutter, 0.0, t.card.gamma_multiply(0.6));
+            let mid = rect.center().y;
+            p.text(
+                pos2(gutter.right() - 8.0, mid),
+                Align2::RIGHT_CENTER,
+                (i + 1).to_string(),
+                theme::mono(11.0),
+                t.text_faint,
+            );
+            let x = gutter.right() + 10.0;
+            match data.spans.as_ref().and_then(|s| s.get(i)) {
+                Some(spans) => {
+                    let mut job = egui::text::LayoutJob::default();
+                    for (color, text) in spans {
+                        job.append(
+                            text,
+                            0.0,
+                            egui::TextFormat {
+                                font_id: font.clone(),
+                                color: *color,
+                                ..Default::default()
+                            },
                         );
                     }
+                    let galley = ui.painter().layout_job(job);
+                    p.galley(pos2(x, mid - galley.size().y / 2.0), galley, t.text);
+                }
+                None => {
+                    p.text(
+                        pos2(x, mid),
+                        Align2::LEFT_CENTER,
+                        line,
+                        font.clone(),
+                        t.text,
+                    );
                 }
             }
-        });
+        }
+    });
 }
 
 #[cfg(test)]
@@ -250,6 +292,49 @@ mod tests {
         assert_eq!(
             (deleted.lines, deleted.before),
             (vec!["two".to_owned()], true)
+        );
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod focus_tests {
+    use super::*;
+    #[test]
+    fn revision_line_focus_survives_loading_and_scrolls_to_the_actual_pinned_line()
+    -> Result<(), String> {
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let id = ("file_view", "f.rs", Some("a".repeat(40)));
+        focus(&ctx, &id, 400);
+        ctx.run_ui(Default::default(), |ui| show(ui, &id, None))
+            .drop_without_applying_deltas();
+        assert_eq!(
+            ctx.data(|d| d.get_temp::<usize>(egui::Id::new(("file-line-focus", &id)))),
+            Some(400)
+        );
+        let bytes = (1..=500)
+            .map(|i| format!("distinct line {i}\n"))
+            .collect::<String>();
+        let text = Ok(FileText::new(bytes.as_bytes(), "f.rs", false));
+        let output = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(egui::Pos2::ZERO, vec2(500.0, 220.0))),
+                ..Default::default()
+            },
+            |ui| show(ui, &id, Some(&text)),
+        );
+        fn contains(shape: &egui::Shape) -> bool {
+            match shape {
+                egui::Shape::Text(t) => t.galley.job.text == "distinct line 400",
+                egui::Shape::Vec(v) => v.iter().any(contains),
+                _ => false,
+            }
+        }
+        assert!(output.shapes.iter().any(|s| contains(&s.shape)));
+        assert!(
+            ctx.data(|d| d.get_temp::<usize>(egui::Id::new(("file-line-focus", &id))))
+                .is_none()
         );
         Ok(())
     }

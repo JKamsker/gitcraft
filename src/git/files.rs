@@ -178,6 +178,9 @@ pub struct BlameLine {
     pub time: i64,
     pub summary: String,
     pub text: String,
+    /// Exact committed source position, even when working-tree insertions shift this row.
+    pub original_line: usize,
+    pub source_path: String,
 }
 
 impl BlameLine {
@@ -231,6 +234,13 @@ fn parse_blame(out: &str) -> Vec<BlameLine> {
                     hash: hash.to_owned(),
                     ..BlameLine::default()
                 }));
+                if let Some(current) = current.as_mut() {
+                    current.original_line = line
+                        .split_whitespace()
+                        .nth(1)
+                        .and_then(|n| n.parse().ok())
+                        .unwrap_or(0);
+                }
             }
             continue;
         };
@@ -240,6 +250,10 @@ fn parse_blame(out: &str) -> Vec<BlameLine> {
             "author-mail" => c.email = value.trim_matches(['<', '>']).to_owned(),
             "author-time" => c.time = value.parse().unwrap_or(0),
             "summary" => c.summary = value.to_owned(),
+            "filename" => {
+                c.source_path =
+                    super::investigations::dossier::quoted_path(value).unwrap_or_default()
+            }
             _ => {}
         }
     }
@@ -383,6 +397,11 @@ mod tests {
             ("First", 100, "two")
         );
         assert!(!b[1].uncommitted() && b[2].uncommitted());
+        assert_eq!(
+            (b[0].original_line, b[1].original_line, b[2].original_line),
+            (1, 2, 3)
+        );
+        assert!(b.iter().all(|line| line.source_path == "f"));
     }
 
     #[test]
