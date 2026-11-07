@@ -205,7 +205,7 @@ mod tests {
             false,
         );
         h.run();
-        let label = "Open commit aaaaaaa, s, a, d, t";
+        let label = "Open commit aaaaaaaa, s, a, d, t";
         h.get_by_role_and_label(egui::accesskit::Role::Button, label);
         h.key_press(egui::Key::Tab);
         h.run();
