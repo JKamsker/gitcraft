@@ -45,8 +45,9 @@ requested cue. Queue length is bounded, sound failure leaves navigation usable a
 audio. Test builds record dispatches without opening a sound device.
 
 Native dependency note: Linux playback requires the ALSA development package when building.
-Cargo.lock must be resolved in the working execution handoff; no dependency installation,
-compilation, protocol fixture or real audio playback has run for this source cut.
+Cargo.lock pins the native playback dependency graph, resolved with a one-CPU Cargo metadata
+update and fetched without a build. No compilation, protocol fixture or real audio playback
+has run for this source cut.
 
 ## Quiet celebrations
 
