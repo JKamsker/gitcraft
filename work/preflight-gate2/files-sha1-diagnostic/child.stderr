@@ -1,0 +1,1 @@
+Error: "supported files/sha1 capability refused: This Git/backend did not prove private hook selection and an atomic current-HEAD/branch update. No user reference update was launched."

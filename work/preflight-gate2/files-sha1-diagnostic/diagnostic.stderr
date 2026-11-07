@@ -1,0 +1,1 @@
+fatal: prepare: multiple updates for 'HEAD' (including one via its referent 'refs/heads/gitcraft-capability') are not allowed

@@ -1,0 +1,29 @@
+
+running 1 test
+test push_preflight::fix::transaction::owned_fixtures::gate2_owned_local_fixture ... owned case files-sha1-diagnostic, evidence /workspace/work/push-preflight-gate2-files-sha1-diagnostic
+
+thread 'push_preflight::fix::transaction::owned_fixtures::gate2_owned_local_fixture' (942486) panicked at src/push_preflight/fix/transaction/owned_fixtures.rs:581:5:
+
+running 1 test
+test push_preflight::fix::transaction::owned_fixtures::gate2_owned_local_fixture ... FAILED
+
+failures:
+
+failures:
+    push_preflight::fix::transaction::owned_fixtures::gate2_owned_local_fixture
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 825 filtered out; finished in 0.93s
+
+
+Error: "supported files/sha1 capability refused: This Git/backend did not prove private hook selection and an atomic current-HEAD/branch update. No user reference update was launched."
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    push_preflight::fix::transaction::owned_fixtures::gate2_owned_local_fixture
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 825 filtered out; finished in 0.95s
+

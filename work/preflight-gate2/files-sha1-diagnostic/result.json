@@ -1,0 +1,18 @@
+{
+  "status": "FAIL_RUNTIME confirmed native duplicate HEAD update",
+  "source": "50b39e828db3997c22161737b01b3ef9e4535dcd",
+  "compiler_binding_commit": "ec2bb3bbbd51ee7e4aefa9a717d800711c82a115",
+  "exact_stderr": "fatal: prepare: multiple updates for 'HEAD' (including one via its referent 'refs/heads/gitcraft-capability') are not allowed\n",
+  "scope": "Only owned bare scratch capability transaction; no user mutation; production unchanged",
+  "next": "Test parent-proposed native update HEAD dereference only in preserved owned scratch diagnostic; production changes still need independent static review",
+  "hashes": {
+    "outer.log": "1a7573e3404fedc9fbfa267056f5a67c7a6162f7cda92636843ae96a59da6b37",
+    "diagnostic-status": "bb7354f5eaa75ed1955dc7866d53b9fa750929f3ea45ebb77e96254d5055114b",
+    "diagnostic.stderr": "7fbf719b71fa8268e337f1e4863ff81d9ee0d2195b6947806fccdcdd1d454221",
+    "case.json": "97e4af0df83ea9ce0c6f7670b84af931461b91c42bb7b6e9f54f1692e89add4b",
+    "child.stdout": "55c69bf56385aed45096c47fbcc3ee05c36df9d7bd7c667e2da78fa6e0097e85",
+    "diagnostic.stdout": "b8c47225f6122fb05d09b8cda3890b910a5953658dc7f76bfb40aa897da0b14f",
+    "diagnostic-input": "053b0cb0128924dbc8acbb1f641eb9dc12736af5666fb9f3b0c8d96cccbff038",
+    "child.stderr": "c605a6d98eff038944ecfbbe5485e2294ef4fe30c7a942717782d81591e9f5c0"
+  }
+}

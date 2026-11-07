@@ -1,0 +1,6 @@
+start
+option no-deref
+symref-verify HEAD refs/heads/gitcraft-capability
+update refs/heads/gitcraft-capability b9c1f69c51f30025983f4f94efbac5bae93e9e59 edd90739dbf18e271fd53c1139a236a9ca413b93
+prepare
+commit
