@@ -165,3 +165,17 @@ fn a_symlink_in_place_of_the_marker_is_not_followed() -> Result<(), String> {
     assert!(load(repo).is_none());
     Ok(())
 }
+
+#[test]
+fn an_opened_practice_path_keeps_its_safe_environment_if_the_marker_is_removed()
+-> Result<(), String> {
+    let sandbox = Sandbox::new(Scenario::Detached)?;
+    assert!(is_repository(&sandbox.0));
+    std::fs::remove_file(sandbox.0.join(MARKER)).map_err(|e| e.to_string())?;
+    assert!(load(&sandbox.0).is_none());
+    assert!(
+        is_repository(&sandbox.0),
+        "A missing marker must not reactivate caller Git routing mid-session"
+    );
+    Ok(())
+}

@@ -20,6 +20,7 @@ const FEATURES: &[(&str, &[&str])] = &[
         &[
             "Practice git… on the start page or in the palette opens a new local throwaway repository: a merge conflict, diverged branches, a detached HEAD or undoing a published commit. The goal banner has a hint and Check goal reads the repository in the background.",
             "The published-commit scenario pushes only to a local bare origin. Your own repositories are untouched. Practice folders stay in the system temporary directory when closed; the system may remove them. Copy a folder elsewhere to keep it.",
+            "Git commands and terminals opened from practice tabs ignore inherited Git repository overrides, profiles and global Git configuration. Practice terminals are ordinary shells; commands you choose to run can access other folders.",
             "Pause over words such as HEAD, upstream, fast-forward and rebase anywhere in the window for their meaning. Glossary tips do not appear while typing, scrolling or dragging.",
         ],
     ),

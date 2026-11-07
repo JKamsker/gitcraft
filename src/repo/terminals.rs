@@ -41,7 +41,12 @@ impl RepoTab {
                 cwd,
             ),
         };
-        match Terminal::spawn(&cwd, &shell, ctx) {
+        let result = if self.practice.is_some() {
+            Terminal::spawn_practice(&cwd, &shell, ctx)
+        } else {
+            Terminal::spawn(&cwd, &shell, ctx)
+        };
+        match result {
             Ok(term) => {
                 self.terminals.push(term);
                 self.active_terminal = self.terminals.len() - 1;

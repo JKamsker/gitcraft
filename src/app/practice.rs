@@ -130,3 +130,6 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(all(test, unix))]
+mod isolation;

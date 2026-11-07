@@ -74,6 +74,28 @@ pub struct Terminal {
 impl Terminal {
     /// Starts `shell` in `cwd`.
     pub fn spawn(cwd: &Path, shell: &ShellSpec, ctx: &egui::Context) -> Result<Self, String> {
+        Self::spawn_inner(cwd, shell, ctx, false)
+    }
+
+    /// A practice shell starts without caller Git routing, global configuration or hooks.
+    /// This is environment isolation, not a restriction on commands the user chooses to run.
+    pub(crate) fn spawn_practice(
+        cwd: &Path,
+        shell: &ShellSpec,
+        ctx: &egui::Context,
+    ) -> Result<Self, String> {
+        Self::spawn_inner(cwd, shell, ctx, true)
+    }
+
+    fn spawn_inner(
+        cwd: &Path,
+        shell: &ShellSpec,
+        ctx: &egui::Context,
+        practice: bool,
+    ) -> Result<Self, String> {
+        // Also recognize the cwd directly: a palette action may start a terminal before
+        // the tab's first background read has delivered its scenario metadata.
+        let practice = practice || crate::practice::is_repository(cwd);
         let (rows, cols) = (24, 100);
         let pair = native_pty_system()
             .openpty(PtySize {
@@ -97,6 +119,14 @@ impl Terminal {
         // The user's own PATH, relative folders and all: not the one for gitcraft's own tools.
         if let Some(path) = crate::shell_path::terminal_path() {
             cmd.env("PATH", path);
+        }
+        if practice {
+            for name in crate::practice::ISOLATED_ENV_REMOVE {
+                cmd.env_remove(name);
+            }
+            for (name, value) in crate::practice::ISOLATED_ENV_SET {
+                cmd.env(name, value);
+            }
         }
         let child = pair
             .slave

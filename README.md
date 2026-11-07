@@ -18,7 +18,10 @@ keeps its scenario. Setup and checks run in the background and never alter an ex
 Practice folders live in the system temporary directory. They are kept when you close the
 tab; your system may delete them, so copy a folder elsewhere if you want to keep it. Starting
 another attempt makes a fresh repository. The scenarios are local even when you also work in
-WSL or over SSH.
+WSL or over SSH. Git operations and terminals opened from a practice tab ignore inherited Git
+repository overrides, profiles and global Git configuration. This keeps your caller's working
+tree and Git settings out of the exercise. A practice terminal is still an ordinary shell:
+commands you explicitly run can access other folders.
 
 Pause the pointer over git words such as **HEAD**, **upstream**, **fast-forward** or **rebase**
 to see a short glossary explanation. This also works in menus, the manual and graph labels.

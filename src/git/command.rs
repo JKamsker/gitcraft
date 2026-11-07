@@ -105,16 +105,26 @@ struct Extra {
     env: Vec<(&'static str, String)>,
 }
 
-/// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
-fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
-    if let Some(target) = dir.and_then(remote::parse) {
-        return execute_there(&target, extra, args);
+/// Construct every local repository process through one route, including piped logs.
+/// Practice detection reads bounded marker metadata, never Git or inherited configuration.
+fn repository_command(dir: Option<&Path>, args: &[&str]) -> Command {
+    if let Some(dir) = dir.filter(|dir| crate::practice::is_repository(dir)) {
+        return practice_command(dir);
     }
     let mut cmd = git_cmd();
     with_profile(&mut cmd, args);
     if let Some(dir) = dir {
         cmd.arg("-C").arg(dir);
     }
+    cmd
+}
+
+/// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
+fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
+    if let Some(target) = dir.and_then(remote::parse) {
+        return execute_there(&target, extra, args);
+    }
+    let mut cmd = repository_command(dir, args);
     cmd.args(&extra.pre);
     for (name, value) in &extra.env {
         cmd.env(name, value);
@@ -206,34 +216,13 @@ pub(crate) fn practice_run(dir: &Path, args: &[&str]) -> Result<String, String> 
 
 fn practice_command(dir: &Path) -> Command {
     let mut cmd = git_cmd();
-    for name in [
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_COMMON_DIR",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_NAMESPACE",
-        "GIT_CONFIG",
-        "GIT_CONFIG_PARAMETERS",
-        "GIT_TEMPLATE_DIR",
-        "GIT_SHALLOW_FILE",
-        "GIT_AUTHOR_NAME",
-        "GIT_AUTHOR_EMAIL",
-        "GIT_COMMITTER_NAME",
-        "GIT_COMMITTER_EMAIL",
-        "GIT_AUTHOR_DATE",
-        "GIT_COMMITTER_DATE",
-    ] {
+    for name in crate::practice::ISOLATED_ENV_REMOVE {
         cmd.env_remove(name);
     }
-    cmd.env("GIT_CONFIG_GLOBAL", "")
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_CONFIG_COUNT", "0")
-        .env("GIT_ATTR_NOSYSTEM", "1")
-        .arg("--no-replace-objects")
-        .arg("-C")
-        .arg(dir);
+    for (name, value) in crate::practice::ISOLATED_ENV_SET {
+        cmd.env(name, value);
+    }
+    cmd.arg("--no-replace-objects").arg("-C").arg(dir);
     cmd
 }
 
@@ -255,9 +244,8 @@ pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Chi
             &remote_request(&target, &Extra::default(), args),
         );
     }
-    let mut cmd = git_cmd();
-    with_profile(&mut cmd, args);
-    cmd.arg("-C").arg(dir).args(args);
+    let mut cmd = repository_command(Some(dir), args);
+    cmd.args(args);
     cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());

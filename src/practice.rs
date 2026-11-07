@@ -87,6 +87,89 @@ fn run(repo: &Path, args: &[&str]) -> Result<String, String> {
     git::practice_run(repo, args)
 }
 
+/// Used both by git processes and practice shells. Never change the process environment:
+/// normal repository tabs still use the user's inherited settings and active profile.
+pub(crate) const ISOLATED_ENV_REMOVE: &[&str] = &[
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_COMMON_DIR",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_NAMESPACE",
+    "GIT_CONFIG",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_TEMPLATE_DIR",
+    "GIT_SHALLOW_FILE",
+    "GIT_AUTHOR_NAME",
+    "GIT_AUTHOR_EMAIL",
+    "GIT_COMMITTER_NAME",
+    "GIT_COMMITTER_EMAIL",
+    "GIT_AUTHOR_DATE",
+    "GIT_COMMITTER_DATE",
+    "GIT_SEQUENCE_EDITOR",
+    "GIT_SSH",
+    "GIT_SSH_COMMAND",
+    "GIT_ASKPASS",
+    "SSH_ASKPASS",
+    "GIT_EXTERNAL_DIFF",
+    "GIT_DIFF_OPTS",
+    "BASH_ENV",
+    "ENV",
+];
+pub(crate) const ISOLATED_ENV_SET: &[(&str, &str)] = &[
+    ("GIT_CONFIG_GLOBAL", ""),
+    ("GIT_CONFIG_NOSYSTEM", "1"),
+    ("GIT_CONFIG_COUNT", "0"),
+    ("GIT_ATTR_NOSYSTEM", "1"),
+];
+
+/// Filesystem-only identity, established before any Git command can inherit routing.
+/// Descendant folders, aliases and linked worktrees of a practice repo retain isolation.
+/// A marker selects a safer environment; it never grants a write outside the chosen cwd.
+pub(crate) fn is_repository(dir: &Path) -> bool {
+    use std::sync::Mutex;
+    static KNOWN: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+    if crate::remote::is_remote(dir) {
+        return false;
+    }
+    let Ok(path) = dir.canonicalize() else {
+        return false;
+    };
+    let known = KNOWN.lock().map(|roots| roots.clone()).unwrap_or_default();
+    if known.iter().any(|root| path.starts_with(root)) {
+        return true;
+    }
+    let remember = |root: &Path| {
+        if let Ok(mut roots) = KNOWN.lock()
+            && !roots.iter().any(|r| r == root)
+        {
+            roots.push(root.to_owned());
+        }
+    };
+    for root in path.ancestors() {
+        if load(root).is_some() {
+            remember(root);
+            return true;
+        }
+        // A linked worktree's .git is a plain file. Resolve it without invoking Git,
+        // and accept it only when its metadata lives inside a marked practice repo.
+        if let Some(bytes) = crate::safe_read::read_inside(root, ".git", 8192)
+            && let Ok(text) = std::str::from_utf8(&bytes)
+            && let Some(gitdir) = text.trim().strip_prefix("gitdir: ")
+            && let Ok(gitdir) = root.join(gitdir).canonicalize()
+            && (known.iter().any(|root| gitdir.starts_with(root))
+                || gitdir
+                    .ancestors()
+                    .any(|candidate| load(candidate).is_some()))
+        {
+            remember(root);
+            return true;
+        }
+    }
+    false
+}
+
 pub(crate) fn create(scenario: Scenario) -> Result<PathBuf, String> {
     create_in(&std::env::temp_dir(), scenario)
 }
