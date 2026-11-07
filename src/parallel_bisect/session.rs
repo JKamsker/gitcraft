@@ -399,13 +399,16 @@ impl Slot {
                 output: String::new(),
             });
         }
-        let pid_file = format!("{}/{}.pid", ws.base_there, self.n);
+        let mut random = [0u8; 16];
+        gitcraft_os::random_bytes(&mut random).map_err(|e| e.to_string())?;
+        let unique: String = random.iter().map(|b| format!("{b:02x}")).collect();
+        let owner_record = crate::remote::join(&ws.base, &format!("{}-{unique}.owner", self.n));
         let log = format!("{}/{}.log", ws.base_there, self.n);
         runner::run(
             &runner::Test {
                 dir: &self.path,
                 control: &ws.repo,
-                pid_file: &pid_file,
+                owner_record: &owner_record,
                 log: &log,
                 command: &setup.command,
                 limit: setup.timeout,

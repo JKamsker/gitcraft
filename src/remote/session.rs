@@ -269,12 +269,20 @@ impl Streaming {
 }
 
 pub(crate) fn streaming_command(host: &Host, req: &Request) -> Result<Streaming, String> {
+    streaming_command_record(host, req, None)
+}
+
+pub(crate) fn streaming_command_record(
+    host: &Host,
+    req: &Request,
+    record: Option<&str>,
+) -> Result<Streaming, String> {
     super::ui_guard::off_ui_thread(&req.what())?;
     let (command, attempt) = shell_command(host, false);
     let nonce = nonce();
     let input = format!(
         "{MORE_PATH}\n{}",
-        super::supervisor::streaming(req, &nonce, None)?
+        super::supervisor::streaming(req, &nonce, record)?
     )
     .into_bytes();
     Ok(Streaming {

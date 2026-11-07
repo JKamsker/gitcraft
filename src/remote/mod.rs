@@ -33,7 +33,34 @@ pub use session::LONG_FOR as NETWORK_LIMIT;
 #[cfg(all(test, unix))]
 pub use session::LOOPBACK;
 pub use session::{Output, Request, exec, exec_if_connected, is_missing_folder};
-pub(crate) use session::{Streaming, streaming_command};
+pub(crate) use session::{Streaming, streaming_command, streaming_command_record};
+
+/// Authenticate a persisted owner without accepting a process number as authority.
+/// Missing receipt and unavailable owner remain unknown and must preserve the workspace.
+pub(crate) fn recover_owner(record: &Path) -> Result<Vec<u8>, String> {
+    let parent = record.parent().ok_or("owner record has no parent")?;
+    let name = record
+        .file_name()
+        .and_then(|s| s.to_str())
+        .ok_or("invalid owner name")?;
+    let read_record = || -> Result<Vec<u8>, String> {
+        let bytes = match read_within(parent, name, 2048) {
+            Some(result) => result.map_err(|e| e.to_string())?,
+            None => crate::safe_read::read_inside(parent, name, 2048),
+        };
+        bytes.ok_or_else(|| "missing, replaced or invalid owner record; cleanup unknown".into())
+    };
+    let bytes = read_record()?;
+    if let Some(target) = parse(record) {
+        session::stop_endpoint(&target.host, &supervisor::Endpoint::from_record(&bytes)?)?;
+    } else {
+        native_owner::Endpoint::from_record(&bytes)?.stop()?;
+    }
+    if read_record()? != bytes {
+        return Err("owner record changed during recovery; workspace preserved".into());
+    }
+    Ok(bytes)
+}
 pub use ui_guard::{mark_ui_thread, refused_on_ui_thread};
 
 /// Whether gitcraft has a connection open to `host` now: asking it something won't connect

@@ -85,7 +85,7 @@ impl Workspace {
             closed: false,
         };
         ws.clear()?;
-        remote::create_dir_all(&ws.base).map_err(|e| {
+        ws.make_private().map_err(|e| {
             format!(
                 "could not make {} on {}: {e}",
                 ws.base_there,
@@ -189,20 +189,45 @@ impl Workspace {
     /// Takes away everything a bisect made there: stops its tests that still run, removes its
     /// worktrees and its folder, and its refs.
     fn clear(&self) -> Result<(), String> {
+        // Every record is authenticated before CLEAR may mutate worktrees or refs. Keep
+        // the exact bytes as a final barrier against replaced/new records during recovery.
+        let listing = runner::shell(&self.repo, RECORDS, &[&self.base_there])?;
+        let proof = clear_proof(&self.base_there, &listing, |name| {
+            let path = remote::join(&self.base, name);
+            remote::recover_owner(&path).map_err(|e| {
+                format!(
+                    "unresolved test owner {name}; {} preserved: {e}",
+                    self.base_there
+                )
+            })
+        })?;
         let pid = std::process::id().to_string();
-        runner::shell(
-            &self.repo,
-            CLEAR,
-            &[&self.base_there, runner::STOP_SCRIPT, &pid],
-        )
-        .map(|_| ())
-        .map_err(|e| {
-            format!(
-                "could not clear {} on {}: {e}",
-                self.base_there,
-                self.machine.label()
+        let mut args = vec![self.base_there.as_str(), pid.as_str()];
+        args.extend(proof.iter().map(String::as_str));
+        runner::shell(&self.repo, CLEAR, &args)
+            .map(|_| ())
+            .map_err(|e| {
+                format!(
+                    "could not clear {} on {}: {e}",
+                    self.base_there,
+                    self.machine.label()
+                )
+            })
+    }
+
+    fn make_private(&self) -> Result<(), String> {
+        let parent = self.base.parent().ok_or("bisect folder has no parent")?;
+        remote::create_dir_all(parent).map_err(|e| e.to_string())?;
+        if remote::parse(&self.base).is_some() {
+            runner::shell(
+                &self.repo,
+                "umask 077; mkdir -- \"$1\"",
+                &[&self.base_there],
             )
-        })
+            .map(|_| ())
+        } else {
+            gitcraft_os::create_private_directory(&self.base).map_err(|e| e.to_string())
+        }
     }
 
     /// Clears what the bisect made (once; dropping it does the same).
@@ -285,19 +310,71 @@ pub fn base_for(repo: &Path, machine: &Machine) -> Result<(PathBuf, String), Str
     Ok((machine.path(&there), there))
 }
 
-/// What [`Workspace::clear`] runs in the repository there, `$1` the folder, `$2` the script
-/// that stops a test by its process file, `$3` this process's number. Only a folder named so is
-/// ever removed, and only the worktrees in it: never `git worktree prune`, which would also
-/// forget the user's own worktrees whose folder is away (an unmounted drive). The refs it takes
-/// away are the commits sent there, and those a crashed gitcraft made to send some (not this
-/// one's, which another bisect of it may be sending right now).
+/// List names only. Legacy PID files are recovery uncertainty, never kill authority.
+const RECORDS: &str = r#"for f in "$1"/*.owner "$1"/*.pid; do
+  [ -e "$f" ] || [ -L "$f" ] || continue
+  printf '%s\000' "${f##*/}"
+done
+true"#;
+
+fn record_names(listing: &str) -> Result<Vec<String>, String> {
+    let mut names = Vec::new();
+    for name in listing.split('\0').filter(|n| !n.is_empty()) {
+        let valid = name
+            .strip_suffix(".owner")
+            .and_then(|n| n.split_once('-'))
+            .is_some_and(|(slot, nonce)| {
+                !slot.is_empty()
+                    && slot.bytes().all(|b| b.is_ascii_digit())
+                    && nonce.len() == 32
+                    && nonce
+                        .bytes()
+                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            });
+        if !valid {
+            return Err(format!(
+                "unresolved legacy or invalid owner record {name}; workspace preserved; no signals sent"
+            ));
+        }
+        names.push(name.to_owned());
+    }
+    Ok(names)
+}
+
+fn clear_proof(
+    base: &str,
+    listing: &str,
+    mut recover: impl FnMut(&str) -> Result<Vec<u8>, String>,
+) -> Result<Vec<String>, String> {
+    // Validate the entire set first: a legacy/unknown record grants no signal authority.
+    let names = record_names(listing)?;
+    let mut proof = Vec::new();
+    for name in names {
+        let bytes =
+            String::from_utf8(recover(&name)?).map_err(|_| "invalid owner record encoding")?;
+        proof.push(format!("{base}/{name}"));
+        proof.push(bytes.trim_end_matches('\n').to_owned());
+    }
+    Ok(proof)
+}
+
+/// Verify exact acknowledged records again before any mutation. Never prune unrelated
+/// worktrees. Coordination heartbeat PID is used only to retain this app's send refs.
 const CLEAR: &str = r#"b=$1
+ours=$2
+shift 2
 case $b in */.cache/gitcraft/bisect/run-*) ;; *) echo "gitcraft: $b is no bisect folder" >&2; exit 1;; esac
-if [ -d "$b" ]; then
-  for f in "$b"/*.pid; do
-    [ -f "$f" ] && sh -c "$2" gitcraft-bisect-stop "$f"
-  done
-fi
+for f in "$b"/*.pid; do
+  if [ -e "$f" ] || [ -L "$f" ]; then echo 'gitcraft: unresolved legacy owner; workspace preserved' >&2; exit 1; fi
+done
+for f in "$b"/*.owner; do
+  [ -e "$f" ] || [ -L "$f" ] || continue
+  if [ "$#" -lt 2 ] || [ "$f" != "$1" ] || [ -L "$f" ]; then echo 'gitcraft: owner records changed; workspace preserved' >&2; exit 1; fi
+  value=$(cat "$f") || exit 1
+  if [ "$value" != "$2" ]; then echo 'gitcraft: owner record replaced; workspace preserved' >&2; exit 1; fi
+  shift 2
+done
+[ "$#" -eq 0 ] || { echo 'gitcraft: owner record missing; workspace preserved' >&2; exit 1; }
 git worktree list --porcelain | sed -n 's/^worktree //p' | while IFS= read -r w; do
   case $w in "$b"/*) git worktree remove --force --force "$w" >/dev/null 2>&1;; esac
 done
@@ -307,7 +384,7 @@ c=$(git rev-parse --git-common-dir) && for g in "$c"/worktrees/*/gitdir; do
   case $(cat "$g") in "$b"/*) rm -rf "${g%/gitdir}";; esac
 done
 git for-each-ref --format='%(refname)' refs/gitcraft-bisect/ | while IFS= read -r r; do
-  case $r in refs/gitcraft-bisect/send-"$3"-*) ;; *) git update-ref -d "$r";; esac
+  case $r in refs/gitcraft-bisect/send-"$ours"-*) ;; *) git update-ref -d "$r";; esac
 done
 true"#;
 
@@ -448,6 +525,44 @@ fn bundle(source: &Path, with: &[String], without: &[String]) -> Result<Vec<u8>,
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recording_recovery_requires_every_receipt_and_rejects_legacy_before_control() {
+        let name = format!("0-{}.owner", "a".repeat(32));
+        let mut controlled = Vec::new();
+        let invalid = format!("{name}\0old.pid\0");
+        assert!(
+            clear_proof("/private/base", &invalid, |n| {
+                controlled.push(n.to_owned());
+                Ok(b"not used".to_vec())
+            })
+            .is_err()
+        );
+        assert!(
+            controlled.is_empty(),
+            "legacy files must not grant control authority"
+        );
+        let valid = format!("{name}\0");
+        assert!(clear_proof("/private/base", &valid, |_| Err("missing receipt".into())).is_err());
+        assert_eq!(
+            clear_proof("/private/base", &valid, |_| Ok(
+                b"verified endpoint\n".to_vec()
+            ))
+            .unwrap_or_default(),
+            [
+                format!("/private/base/{name}"),
+                "verified endpoint".to_owned()
+            ]
+        );
+        for invalid in [
+            "../../escape.owner\0",
+            "0-abcd.owner\0",
+            "owner\0",
+            "0-a.pid\0",
+        ] {
+            assert!(record_names(invalid).is_err());
+        }
+    }
 
     /// Two bisects never share a folder in one process; the second one is told why.
     #[test]

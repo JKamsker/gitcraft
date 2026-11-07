@@ -629,6 +629,43 @@ pub fn run_for_test(dir: &Path, args: &[&str], limit: std::time::Duration) -> Re
     })
 }
 
+/// A bisect test with durable, authenticated crash recovery on its actual machine.
+pub(crate) fn run_owned_test(
+    dir: &Path,
+    args: &[&str],
+    record: &Path,
+    limit: std::time::Duration,
+    cancel: crate::tasks::Cancellation,
+) -> Result<crate::processes::Output, String> {
+    let extra = Extra {
+        test: Some(limit),
+        ..Default::default()
+    };
+    let mut options = crate::processes::Options {
+        cancel,
+        background: true,
+        timeout: Some(limit),
+        ..Default::default()
+    };
+    let command = if let Some(target) = remote::parse(dir) {
+        let record =
+            remote::parse(record).ok_or("remote owner record is on a different machine")?;
+        if record.host != target.host {
+            return Err("remote owner record is on a different machine".into());
+        }
+        let request = remote_request(&target, &extra, args);
+        remote::streaming_command_record(&target.host, &request, Some(&record.path))?
+            .configure(&mut options)
+    } else {
+        if remote::parse(record).is_some() {
+            return Err("native owner record is on a different machine".into());
+        }
+        remote::native_owner::command(local_command(Some(dir), &extra, args), record, limit)?
+            .configure(&mut options)
+    };
+    crate::processes::run(command, options)
+}
+
 /// Like [`run`], but exit codes in `ok` count as success (`diff --no-index` exits 1 on changes).
 pub fn run_ok_codes(dir: Option<&Path>, args: &[&str], ok: &[i32]) -> Result<String, String> {
     run_inner(dir, args, ok, None, false)
