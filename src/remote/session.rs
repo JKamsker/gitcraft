@@ -104,40 +104,116 @@ pub struct Output {
 
 /// Runs `req` on `host`, in one of the shells kept open there.
 pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
+    exec_mode(host, req, None, &|| true)
+}
+
+/// Explicit mutation transport: its caller waits for this actual worker result. A
+/// connection loss/deadline remains unknown; it never invokes the legacy stop selector.
+/// The caller must retain its owned host receipt/recovery on Unknown and must not retry.
+pub(crate) fn exec_owned(
+    host: &Host,
+    req: &Request,
+    owner: &super::OwnedDispatch,
+    active: &dyn Fn() -> bool,
+) -> Result<Output, super::OwnedFailure> {
+    let result = owner.run(|| exec_mode(host, req, Some(owner), active));
+    result.map_err(|error| {
+        if owner.phase() == super::OwnedPhase::Unknown {
+            super::OwnedFailure::Unknown
+        } else {
+            super::OwnedFailure::NotDispatched(error)
+        }
+    })
+}
+fn exec_mode(
+    host: &Host,
+    req: &Request,
+    owned: Option<&super::OwnedDispatch>,
+    active: &dyn Fn() -> bool,
+) -> Result<Output, String> {
+    use super::ownership::{FailureAction, failure_action};
     super::ui_guard::off_ui_thread(&req.what())?;
+    if let Some(owner) = owned
+        && let Some(error) = owner.context_error()
+    {
+        owner.not_sent(false);
+        return Err(error);
+    }
     let lane = if req.long { Lane::Long } else { Lane::Quick };
     let pool = pool(host, lane);
     loop {
-        let mut taken = pool.take(host, lane)?;
+        if let Some(owner) = owned
+            && (!active() || owner.phase() != super::OwnedPhase::Queued)
+        {
+            owner.cancel();
+            return Err("Owned remote work was cancelled before dispatch".into());
+        }
+        let mut taken = match pool.take(host, lane) {
+            Ok(taken) => taken,
+            Err(error) => {
+                if let Some(owner) = owned {
+                    owner.not_sent(false);
+                }
+                return Err(error);
+            }
+        };
         let reused = taken.reused;
         let nonce = nonce();
         let script = framed(req, &nonce);
         let Some(shell) = taken.shell() else {
             continue;
         };
+        // This is the dispatch boundary: queue and connection waits have completed,
+        // and no byte of this request has yet been sent to the selected shell.
+        if let Some(owner) = owned {
+            if !active() {
+                owner.cancel();
+            }
+            if !owner.begin() {
+                return Err("Owned remote work was cancelled before dispatch".into());
+            }
+        }
         let limit = req.time_limit();
         match shell.run(&script, &nonce, Instant::now() + limit) {
             Ok(out) => {
+                if let Some(owner) = owned {
+                    owner.completed();
+                }
                 taken.give_back();
                 return Ok(out);
             }
-            // A shell left open went away meanwhile: the script never reached it, so another
-            // shell can run it. (`taken`, dropped, closes it.)
-            Err(Failure::NotSent(_)) if reused => {}
-            // Hung: its shell is closed (`taken`, dropped), and the command stopped there.
-            Err(Failure::TimedOut(pid)) => {
-                drop(taken);
-                if let Some(pid) = pid {
-                    stop(host.clone(), pid);
+            Err(failure) => match failure_action(&failure, reused, owned.is_some()) {
+                FailureAction::Retry => {
+                    if let Some(owner) = owned {
+                        owner.not_sent(true);
+                    }
                 }
-                return Err(format!(
-                    "{} didn't finish within {} minutes on {} and was stopped",
-                    req.what(),
-                    limit.as_secs().div_ceil(60),
-                    host.label()
-                ));
-            }
-            Err(failure) => return Err(failure.message()),
+                FailureAction::OwnedNotSent => {
+                    if let Some(owner) = owned {
+                        owner.not_sent(false);
+                    }
+                    return Err(failure.message());
+                }
+                FailureAction::OwnedUnknown => {
+                    if let Some(owner) = owned {
+                        owner.unknown();
+                    }
+                    return Err("Remote mutation outcome is unknown; retain its owned receipt and recovery evidence. No automatic stop, retry or cleanup was dispatched.".into());
+                }
+                FailureAction::LegacyTimeout(pid) => {
+                    drop(taken);
+                    if let Some(pid) = pid {
+                        stop(host.clone(), pid);
+                    }
+                    return Err(format!(
+                        "{} didn't finish within {} minutes on {} and was stopped",
+                        req.what(),
+                        limit.as_secs().div_ceil(60),
+                        host.label()
+                    ));
+                }
+                FailureAction::LegacyError => return Err(failure.message()),
+            },
         }
     }
 }

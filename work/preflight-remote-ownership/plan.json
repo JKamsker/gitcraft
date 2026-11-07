@@ -1,0 +1,21 @@
+{
+  "status": "WIP STATIC FOUNDATION ONLY; remoteautomaticrepairstilldisabled; NO COMPILE/RECORDING/RUNTIME/CI onnewsource",
+  "base_local_green": "1c6d1611ead6f39b0ab60947a08af504cfa4aa19 local926pass3ignore929names",
+  "unit": [
+    "OwnedDispatch lifecycle queued/running/cancelled/not-dispatched/completed/unknown, immutable initiatingContext and acceptedForecastCompletion scope",
+    "Synchronousscope.track takes ticketBEFOREqueue/connect, inheritednestedforecasts retainownership untilactualreturn",
+    "exec_owned checks cancellationatactualpresendboundary; queuedcancelcanneverstartlater; runningcancelnotreportedstopped; onlyNotSent mayretry",
+    "Ownedtransportlost/deadline becomesUnknown and NEVER selects baselineasyncps/stopcontroller; ordinaryexecNone path preservesexistingbehavior",
+    "No hostcontroller/PIDselector/signal added; onlypurestate/recordingthreadtests added; no remoteautomaticentryenabled orcleanupyet"
+  ],
+  "recording_tests": [
+    "recording_cancelled_queued_work_cannot_dispatch",
+    "recording_cancellation_after_dispatch_never_claims_stopped",
+    "recording_not_sent_retry_obeys_cancellation_and_only_retries_unsent",
+    "recording_owned_failures_never_select_the_legacy_stop_controller",
+    "recording_scope_retains_context_and_ticket_for_the_whole_owned_wait",
+    "recording_terminal_receipt_is_distinct_from_transport_uncertainty"
+  ],
+  "next": "Independentstaticreview oflifecycle/dispatch/legacycompatibility before recording. Thenwire remotehost receipt+exclusiveperworktreeguard/nativeGitprotocol+mandatoryACK/outcome, keepUnknownowner/evidenceblockingautomaticretry. Do notclaimthisfoundationcompletesremoteacceptance. PublicAPItemporarilyunwireduntilhostunit; compilerclaimnone.",
+  "local_transaction_sha256": "198e08476c1091d1a452926936d02b5ea4ac5346a7237bd1467ea08aa8df2f65"
+}
