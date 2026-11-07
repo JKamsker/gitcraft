@@ -1,5 +1,5 @@
 //! An execution owner, never constructible from a persisted PID. On Unix the direct
-//! child remains unreaped until the final group signal; its identity cannot be recycled.
+//! child is a packaged live anchor until final signaling, then reaped exactly once.
 use std::io;
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, ExitStatus};
 
@@ -10,6 +10,8 @@ pub struct OwnedChild {
 
 struct Process {
     child: Child,
+    #[cfg(unix)]
+    status: super::unix_anchor::Status,
     #[cfg(windows)]
     job: super::process_job::ProcessJob,
 }
@@ -26,6 +28,8 @@ impl OwnedChild {
             use std::os::windows::process::CommandExt;
             command.creation_flags(0x0800_0004);
         }
+        #[cfg(unix)]
+        let status = super::unix_anchor::prepare(&mut command)?;
         #[allow(unused_mut)]
         let mut child = command.spawn()?;
         #[cfg(windows)]
@@ -40,6 +44,8 @@ impl OwnedChild {
         Ok(Self {
             process: Process {
                 child,
+                #[cfg(unix)]
+                status,
                 #[cfg(windows)]
                 job,
             },
@@ -66,33 +72,7 @@ impl OwnedChild {
     pub fn observe(&mut self) -> io::Result<Option<ExitStatus>> {
         #[cfg(unix)]
         {
-            use std::os::unix::process::ExitStatusExt;
-            // SAFETY: initialized output, exact owned direct child, and WNOWAIT prevents
-            // reaping. All group signals occur before the single private wait below.
-            let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
-            let result = unsafe {
-                libc::waitid(
-                    libc::P_PID,
-                    self.process.child.id(),
-                    &mut info,
-                    libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
-                )
-            };
-            if result != 0 {
-                return Err(io::Error::last_os_error());
-            }
-            // SAFETY: waitid initializes the SIGCHLD variant, including si_pid/status.
-            if unsafe { info.si_pid() } == 0 {
-                return Ok(None);
-            }
-            let code = unsafe { info.si_status() };
-            let raw = match info.si_code {
-                libc::CLD_EXITED => code << 8,
-                libc::CLD_KILLED => code,
-                libc::CLD_DUMPED => code | 0x80,
-                _ => return Err(io::Error::other("unexpected child wait state")),
-            };
-            Ok(Some(ExitStatus::from_raw(raw)))
+            self.process.status.observe()
         }
         #[cfg(windows)]
         {

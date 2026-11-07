@@ -28,6 +28,8 @@ pub struct Link {
 mod owned_child;
 #[cfg(windows)]
 mod process_job;
+#[cfg(unix)]
+mod unix_anchor;
 #[cfg(windows)]
 mod windows_shell;
 pub use owned_child::OwnedChild;
