@@ -307,7 +307,7 @@ impl App {
                 let (tx, rx) = channel();
                 let ctx = ctx.clone();
                 let skipped = self.skipped_version.clone();
-                std::thread::spawn(move || {
+                crate::connections::spawn(move || {
                     let _ = tx.send(update::look(releases, download, &skipped));
                     ctx.request_repaint();
                 });
@@ -338,7 +338,7 @@ impl App {
         let (releases, download) = (s.update_channel, s.download_updates);
         let (tx, rx) = channel();
         let ctx = ctx.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let _ = tx.send(update::look(releases, download, ""));
             ctx.request_repaint();
         });
@@ -599,7 +599,9 @@ fn repo_root(path: &Path) -> Result<PathBuf, String> {
 /// question and returns the exit code to end with, before any window is made. `None` for an
 /// ordinary start.
 pub fn askpass_helper() -> Option<i32> {
-    crate::remote::askpass::run_helper()
+    crate::connections::ssh_helper()
+        .or_else(crate::connections::credential_helper)
+        .or_else(crate::remote::askpass::run_helper)
 }
 
 /// How many commands for a repository on another machine were asked from the window's thread
@@ -612,7 +614,7 @@ pub fn refused_on_ui_thread() -> usize {
 /// that: on macOS, asking the login shell for its PATH, which every git call waits for (its
 /// profile scripts can take seconds).
 pub fn warm_up() {
-    std::thread::spawn(|| {
+    crate::connections::spawn(|| {
         let _ = crate::shell_path::path();
     });
 }

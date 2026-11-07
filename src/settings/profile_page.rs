@@ -108,7 +108,7 @@ impl Settings {
             f,
             "Profile",
             Some(
-                "Each profile has its own tabs, recent repositories, theme, git author and \
+                "Each profile has its own tabs, recent repositories, theme, git author, SSH key, forge accounts and \
                  commit signing; the other pages are shared. Switching closes this profile's \
                  tabs and opens the other one's.",
             ),
@@ -264,6 +264,7 @@ impl Settings {
                 });
             },
         );
+        self.profile_connections_ui(ui, f);
 
         section(ui, f, "Profile's commit signing", None, |card| {
             let profile = self.profile_mut();

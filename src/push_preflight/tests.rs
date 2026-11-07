@@ -700,3 +700,41 @@ fn explicit_annotated_tag_push_works_with_detached_head() -> Result<(), String> 
     assert_eq!(f.git(&["rev-parse", "HEAD"])?, checkout);
     Ok(())
 }
+
+#[test]
+fn selected_account_metadata_and_reviewed_connection_context_stay_bound() -> Result<(), String> {
+    let f = Fixture::new()?;
+    f.commit("next", "next", "Next")?;
+    f.git(&[
+        "remote",
+        "set-url",
+        "origin",
+        "ssh://git@fixture.invalid/team/repo",
+    ])?;
+    let context = crate::connections::Context {
+        choices: crate::connections::Choices {
+            github: crate::connections::Account {
+                host: "fixture.invalid".into(),
+                user: "selected-forge-user".into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    context.run(|| -> Result<(), String> {
+        let plan = f.plan(f.profile())?;
+        assert_eq!(
+            plan.expected_accounts
+                .get("fixture.invalid")
+                .map(String::as_str),
+            Some("selected-forge-user")
+        );
+        assert!(check(&f.repo, &plan).is_ok());
+        crate::connections::Context::default().run(|| {
+            assert!(check(&f.repo, &plan).is_err_and(|error| error.contains("connection context")));
+        });
+        assert!(check(&f.repo, &plan).is_ok());
+        Ok(())
+    })
+}

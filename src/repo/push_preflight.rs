@@ -259,6 +259,9 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
         plan.expected_name,
         plan.expected_email
     ));
+    for (host, account) in &plan.expected_accounts {
+        ui.label(format!("Selected account for {host}: {account} (profile metadata; server identity not queried)."));
+    }
     ui.label("Checks use local/fetched history only. Secret detection is heuristic; it does not download or inspect external LFS contents, verify signature trust, or replace a dedicated secret scanner.");
     if !plan.lfs_objects.is_empty() {
         ui.label(format!("{} LFS objects will be uploaded as part of the confirmed push to {}; their external content was not scanned. Endpoint settings use committed .lfsconfig plus inspected Git configuration, ignoring later working-tree edits.",plan.lfs_objects.len(),plan.lfs_targets().join(", ")));

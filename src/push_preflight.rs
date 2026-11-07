@@ -60,6 +60,7 @@ pub(crate) struct Plan {
     pub targets: Vec<String>,
     pub expected_name: String,
     pub expected_email: String,
+    pub expected_accounts: BTreeMap<String, String>,
     pub profile: UserProfile,
     pub force: bool,
     pub deleting: bool,
@@ -70,6 +71,7 @@ pub(crate) struct Plan {
     urls: Vec<String>,
     checkout: String,
     checkout_oid: String,
+    connection: crate::connections::Context,
     config: String,
     config_before_push: String,
     local_refs: BTreeMap<String, String>,
@@ -230,6 +232,7 @@ pub(crate) fn scan(
     profile: UserProfile,
     active: &dyn Fn() -> bool,
 ) -> Result<Plan, String> {
+    let connection = crate::connections::current();
     let initial_config = config_stamp(repo, active)?;
     for op in &original {
         if push_words(op).is_some() {
@@ -852,6 +855,15 @@ pub(crate) fn scan(
     if config != initial_config {
         return Err("The push configuration changed while checking. Reopen preflight.".into());
     }
+    // This is selected profile metadata, never a guessed identity from SSH's `git`
+    // transport username. Reading it does not resolve credentials or contact a service.
+    let expected_accounts = urls
+        .iter()
+        .filter_map(|url| {
+            let (host, _) = location(url)?;
+            crate::connections::expected_account(&host).map(|user| (host, user))
+        })
+        .collect();
     let targets = urls.iter().map(|u| target_label(u)).collect();
     let plan = Plan {
         branch: source,
@@ -864,6 +876,7 @@ pub(crate) fn scan(
         targets,
         expected_name,
         expected_email,
+        expected_accounts,
         profile,
         force,
         deleting,
@@ -874,6 +887,7 @@ pub(crate) fn scan(
         urls,
         checkout,
         checkout_oid,
+        connection,
         config,
         config_before_push,
         local_refs,
@@ -1138,6 +1152,9 @@ pub(crate) fn check(repo: &Path, plan: &Plan) -> Result<(), String> {
 }
 
 fn check_active(repo: &Path, plan: &Plan, active: &dyn Fn() -> bool) -> Result<(), String> {
+    if crate::connections::current() != plan.connection {
+        return Err("The selected connection context changed. Reopen push preflight.".into());
+    }
     clean_lfs_config(repo, &plan.checkout_oid, active)?;
     if read(repo, &["rev-parse", "--verify", "HEAD"], active)?.trim() != plan.checkout_oid {
         return Err("The checked-out branch moved. Reopen push preflight.".into());

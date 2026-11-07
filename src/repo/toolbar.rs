@@ -30,6 +30,13 @@ impl RepoTab {
                 acts.push(Action::Reload);
             }
             widgets::toolbar_separator(ui);
+            if ui
+                .button("Activity")
+                .on_hover_text("Activity calendar and contributor statistics")
+                .clicked()
+            {
+                acts.push(Action::OpenActivity(super::activity::Page::Calendar));
+            }
             self.head_label(ui, idle, acts);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 self.op_status(ui);

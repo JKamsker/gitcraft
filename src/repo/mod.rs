@@ -2,9 +2,11 @@
 //! (branches on the left, commit graph or diff in the middle, commit detail / changes on the right).
 
 mod actions;
+mod activity;
 mod apply;
 mod branch_tree;
 mod branch_visibility;
+mod bundles;
 mod ci_status;
 mod ci_view;
 pub(crate) mod columns;
@@ -19,6 +21,7 @@ mod gerrit;
 pub(crate) mod graph_view;
 pub(crate) mod highlight;
 mod keep_submodules;
+pub(crate) mod keyboard;
 mod layout;
 mod load;
 mod messages;
@@ -98,6 +101,10 @@ pub struct RepoTab {
     reads: u64,
     /// The read the working tree shown comes from.
     work_read: u64,
+    work_pending: u64,
+    /// Invalidates mutation preparations as soon as a full/status read starts, even if it fails.
+    work_epoch: u64,
+    keyboard: std::cell::RefCell<keyboard::State>,
     /// The read the submodules shown come from.
     submodules_read: u64,
     /// The watcher came while the first read ran, which may have missed changes made before
@@ -130,6 +137,9 @@ pub struct RepoTab {
     /// Rows of the graph: the WIP pseudo-commit (when the tree is dirty) followed by `history`.
     commits: Vec<Arc<Commit>>,
     graph: Graph,
+    /// Ref names for continuous lane runs, rebuilt with the graph, never while scrolling.
+    graph_labels: HashMap<usize, String>,
+    graph_messages: graph_view::message_tooltip::MessageTooltips,
     index: HashMap<String, usize>,
     worktrees: Vec<Worktree>,
     stashes: Vec<Stash>,
@@ -162,6 +172,7 @@ pub struct RepoTab {
     compare: Option<Compare>,
     /// The pull request the big area shows.
     pr_view: Option<pr_view::PrView>,
+    activity: Option<activity::Activity>,
     /// The builds of a commit the big area shows.
     ci_view: Option<ci_view::CiView>,
     pr_requests: u64,
@@ -281,6 +292,9 @@ impl RepoTab {
             deferred: true,
             reads: 0,
             work_read: 0,
+            work_pending: 0,
+            work_epoch: 0,
+            keyboard: Default::default(),
             submodules_read: 0,
             recheck_after_load: false,
             shown: true,
@@ -305,6 +319,8 @@ impl RepoTab {
                 rows: Vec::new(),
                 width: 0,
             },
+            graph_labels: HashMap::new(),
+            graph_messages: Default::default(),
             index: HashMap::new(),
             worktrees: Vec::new(),
             stashes: Vec::new(),
@@ -330,6 +346,7 @@ impl RepoTab {
             diff: None,
             compare: None,
             pr_view: None,
+            activity: None,
             ci_view: None,
             pr_requests: 0,
             pr_drafts: HashMap::new(),

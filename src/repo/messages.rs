@@ -104,6 +104,7 @@ pub(super) enum Msg {
     },
     /// A commit's patch was written to the file, or wasn't.
     PatchSaved(std::path::PathBuf, Result<(), String>),
+    BundleDone(String, Result<(), String>, Refresh),
     /// The commits to replay for a drop or move from a commit's menu.
     QuickEditCommits {
         edit: quick_edit::Edit,
@@ -178,7 +179,7 @@ pub(super) fn spawn_or(
 ) {
     let tx = tx.clone();
     let ctx = ctx.clone();
-    std::thread::spawn(move || {
+    crate::connections::spawn(move || {
         // What the job owned goes with it; a lock it held is left poisoned, which those
         // taking it handle.
         let msg = std::panic::catch_unwind(std::panic::AssertUnwindSafe(job))
@@ -318,6 +319,9 @@ impl RepoTab {
             Msg::Status(read, _) if read <= self.work_read => {}
             Msg::Status(read, result) => match result {
                 Ok(work) => {
+                    if read >= self.work_pending {
+                        self.work_pending = 0;
+                    }
                     self.work_read = read;
                     // This worktree's count of changes, as the worktree list shows it.
                     let changes = work.changed_files();
@@ -361,6 +365,9 @@ impl RepoTab {
                 result,
             } => self.reword_older(hash, message, result, ctx),
             Msg::PatchSaved(file, result) => self.patch_saved(file, result),
+            Msg::BundleDone(label, result, refresh) => {
+                self.bundle_done(label, result, refresh, ctx)
+            }
             Msg::QuickEditCommits { edit, hash, result } => {
                 self.run_quick_edit(edit, hash, result, ctx)
             }
