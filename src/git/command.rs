@@ -330,7 +330,7 @@ pub(crate) fn forecast_remote(
     request.long = true;
     let host = host.clone();
     let (tx, rx) = mpsc::channel();
-    std::thread::spawn(move || {
+    crate::connections::spawn(move || {
         let _ = tx.send(remote::exec(&host, &request));
     });
     let deadline = Instant::now() + LIMIT;
@@ -937,6 +937,84 @@ mod practice_tests {
                 Some(std::ffi::OsStr::new(value)),
                 "{name}"
             );
+        }
+    }
+}
+
+/// Snapshot readers share the practice-aware builder and the reviewed bounded process guard.
+pub(super) fn comparison_output(
+    repo: &Path,
+    args: &[&str],
+    env: &[(&'static str, String)],
+    active: &dyn Fn() -> bool,
+) -> Result<remote::Output, String> {
+    const MAX: usize = 8 * 1024 * 1024;
+    if !active() {
+        return Err("Comparison cancelled".into());
+    }
+    // Attributes may themselves live in promised blobs. Enforce this on every
+    // raw-view command, including metadata/config reads and alternate-index writes,
+    // rather than relying on individual callers to remember the global option.
+    let guarded_args: Vec<_> = std::iter::once("--no-lazy-fetch")
+        .chain(args.iter().copied())
+        .collect();
+    let args = guarded_args.as_slice();
+    let out = if let Some(target) = remote::parse(repo) {
+        let mut request = bounded::request(&target, args, Vec::new(), MAX);
+        request
+            .env
+            .extend(env.iter().map(|(k, v)| ((*k).into(), v.clone())));
+        comparison_remote(&target.host, request, active)?
+    } else {
+        let mut cmd = repository_command(Some(repo), args)?;
+        cmd.args(args);
+        for (key, value) in env {
+            cmd.env(key, value);
+        }
+        let out = crate::bounded_process::run(cmd, active, std::time::Duration::from_secs(20))
+            .map_err(|e| {
+                e.replace("Forecast", "Comparison")
+                    .replace("forecast", "comparison")
+            })?;
+        remote::Output {
+            code: out.status.code().unwrap_or(-1),
+            stdout: out.stdout,
+            stderr: out.stderr,
+        }
+    };
+    if out.stdout.len() > MAX || out.stderr.len() > 64 * 1024 {
+        return Err(
+            "Comparison output exceeds 8 MiB (64 KiB for errors); choose fewer files".into(),
+        );
+    }
+    Ok(out)
+}
+
+pub(super) fn comparison_remote(
+    host: &remote::Host,
+    mut request: remote::Request,
+    active: &dyn Fn() -> bool,
+) -> Result<remote::Output, String> {
+    use std::time::{Duration, Instant};
+    request.timeout = Some(Duration::from_secs(20));
+    request.long = true;
+    let host = host.clone();
+    let (tx, rx) = std::sync::mpsc::channel();
+    crate::connections::spawn(move || {
+        let _ = tx.send(remote::exec(&host, &request));
+    });
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        if !active() {
+            return Err("Comparison cancelled".into());
+        }
+        if Instant::now() >= deadline {
+            return Err("Comparison timed out".into());
+        }
+        match rx.recv_timeout(Duration::from_millis(20)) {
+            Ok(result) => return result,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => (),
+            Err(_) => return Err("Comparison worker stopped".into()),
         }
     }
 }

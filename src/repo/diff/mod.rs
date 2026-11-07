@@ -297,3 +297,8 @@ pub(super) fn unstage_args(head: &str, path: &str) -> Vec<String> {
 pub(in crate::repo) fn literal_path(path: &str) -> String {
     format!(":(literal){path}")
 }
+
+/// Pair raw patch lines for the snapshot-only file comparison panes.
+pub(in crate::repo) fn comparison_pairs(lines: &[DiffLine]) -> Vec<(Option<usize>, Option<usize>)> {
+    pair_lines(lines).1
+}

@@ -30,6 +30,27 @@ impl RepoTab {
                 acts.push(Action::Reload);
             }
             widgets::toolbar_separator(ui);
+            ui.menu_button("File views", |ui| {
+                for (label, page) in [
+                    (
+                        "File migration map",
+                        super::file_comparison::Page::Migration,
+                    ),
+                    (
+                        "Three-state staging lens",
+                        super::file_comparison::Page::Lens,
+                    ),
+                    (
+                        "File versions across branches",
+                        super::file_comparison::Page::Matrix,
+                    ),
+                ] {
+                    if ui.button(label).clicked() {
+                        acts.push(Action::OpenFileComparison(page));
+                        ui.close();
+                    }
+                }
+            });
             if ui
                 .button("Activity")
                 .on_hover_text("Activity calendar and contributor statistics")

@@ -65,6 +65,16 @@ const FEATURES: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "File comparison views",
+        &[
+            "File views in the toolbar and the palette open File migration map, Three-state staging lens, and File versions across branches. They read raw repository bytes in the background; alternate diff renderers and their selections are closed when entering these views.",
+            "The migration map shows staged, committed or between-commit renames and copies as old-folder to new-folder ribbons, with Git's similarity score. Click a ribbon for content edits alone. Git's 50% similarity threshold and 2,000 rename/copy candidates can leave changes unmatched; warnings and unmatched changes are shown. Stage a working reorganization first to inspect it.",
+            "The staging lens aligns HEAD, staged and working versions. Boundary buttons stage or unstage a row or the whole boundary; working edits that undo a staged edit are marked. A changed HEAD, index or working file requires Refresh before applying. Working files are never overwritten. For a staged rename, content-only unstaging preserves the staged move; use the normal patch to change the move itself.",
+            "Choose two to eight branches and a folder for the versions matrix. Equal blob contents share a V marker; missing files and file modes are separate. Select two cells for a read-only diff of their pinned versions, even if a branch later moves.",
+            "Limits: 2 MiB per version, 20,000 text lines, 2,000 files and eight branches; long displayed lines are abbreviated. Binary/non-UTF8 content and submodules are read-only. Clean filters, text/EOL and encoding conversions use normal Git staging instead. Symlinks compare their targets without following them; unsupported working paths are reported. These views require Git with --no-lazy-fetch support and never download missing objects. SSH/WSL use the remote repository; Linux shell/coreutils are required there.",
+        ],
+    ),
+    (
         "Compare",
         &[
             "Ctrl+click a second commit to list the files that differ between the two (the changes row is the working tree).",
