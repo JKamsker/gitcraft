@@ -99,13 +99,16 @@ pub(super) fn show(ui: &mut egui::Ui, part: &Boundary, t: &Tokens) {
                 _ => (t.text, t.card),
             };
             let galley = galley(ui, &line.raw, color, width);
-            let (rect, _) = ui.allocate_exact_size(
+            let (rect, response) = ui.allocate_exact_size(
                 egui::vec2(
                     ui.available_width().max(galley.size().x + 12.),
                     geometry.offsets[i + 1] - geometry.offsets[i],
                 ),
                 egui::Sense::hover(),
             );
+            response.widget_info(|| {
+                egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &line.raw)
+            });
             ui.painter().rect_filled(rect, 0., fill);
             ui.painter()
                 .galley(rect.min + egui::vec2(6., 2.), galley, color);
