@@ -95,14 +95,11 @@ impl Settings {
                     });
                 search_field(ui, &mut view.query);
             });
-            if counts.is_empty()
-                && let Some(shown) = preview::shown(ui.ctx(), Some(view.page))
-            {
-                egui::CollapsingHeader::new("Preview").show(ui, |ui| {
-                    preview::panel(ui, shown, self, &app.theme);
-                });
-            }
-            self.page_column(ui, &mut view, &counts, app);
+            let above = counts
+                .is_empty()
+                .then(|| preview::shown(ui.ctx(), Some(view.page)))
+                .flatten();
+            self.page_column(ui, &mut view, &counts, app, above);
             ui.data_mut(|d| d.insert_temp(view_id(), view));
             return *self != before;
         }
@@ -127,7 +124,7 @@ impl Settings {
                     ui.allocate_ui_with_layout(
                         vec2(page_w, height),
                         egui::Layout::top_down(egui::Align::Min),
-                        |ui| self.page_column(ui, &mut view, &counts, app),
+                        |ui| self.page_column(ui, &mut view, &counts, app, None),
                     );
                     ui.add_space(preview::SIDE_GAP - ui.spacing().item_spacing.x);
                     ui.allocate_ui_with_layout(
@@ -145,21 +142,8 @@ impl Settings {
                         },
                     );
                 }
-                (Some(shown), None) => {
-                    ui.vertical(|ui| {
-                        ui.add_space(TOP);
-                        let width = CONTENT_WIDTH.min(ui.available_width() - 16.0);
-                        ui.set_max_width(width);
-                        egui::CollapsingHeader::new("Preview").show(ui, |ui| {
-                            egui::ScrollArea::vertical()
-                                .id_salt("settings-preview-above")
-                                .max_height(preview::ABOVE_MAX_H)
-                                .show(ui, |ui| preview::panel(ui, shown, self, &app.theme));
-                        });
-                        self.page_column(ui, &mut view, &counts, app);
-                    });
-                }
-                _ => self.page_column(ui, &mut view, &counts, app),
+                (Some(shown), None) => self.page_column(ui, &mut view, &counts, app, Some(shown)),
+                _ => self.page_column(ui, &mut view, &counts, app, None),
             }
         });
         ui.data_mut(|d| d.insert_temp(view_id(), view));
@@ -173,6 +157,7 @@ impl Settings {
         view: &mut View,
         counts: &[usize],
         app: &mut SettingsView,
+        above_preview: Option<preview::Preview>,
     ) {
         let salt = if counts.is_empty() {
             Id::new(("settings-page", view.page as u8))
@@ -187,6 +172,18 @@ impl Settings {
                 ui.vertical(|ui| {
                     ui.set_width(width);
                     ui.add_space(TOP);
+                    // An expanded preview shares the page's scroll range. Keeping it above
+                    // this ScrollArea could consume all height at high zoom, leaving even
+                    // scroll_to_me unable to bring the settings into the viewport.
+                    if let Some(shown) = above_preview {
+                        egui::CollapsingHeader::new("Preview").show(ui, |ui| {
+                            egui::ScrollArea::vertical()
+                                .id_salt("settings-preview-above")
+                                .max_height(preview::ABOVE_MAX_H)
+                                .show(ui, |ui| preview::panel(ui, shown, self, &app.theme));
+                        });
+                        ui.add_space(12.0);
+                    }
                     if counts.is_empty() {
                         title(ui, view.page.title());
                         self.page_ui(

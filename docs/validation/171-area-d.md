@@ -20,8 +20,8 @@ integration reviewer under `/tmp/gitcraft-167-171/reference-{14,15,17}.png`.
   for fold/surgery and guards/confirmations for rewriting/resetting.
 - [x] Root and nested menus have viewport-derived height limits and scrolling. egui's
   Popup best-alignment and constrained Area flip/reposition at edges. Long forced-line
-  conflict annotations can scroll horizontally too. Stable salts use commit hash/branch
-  name/group, not row index or scroll offset.
+  conflict annotations can scroll horizontally too. Explicit submenu button scope IDs use the parent identity and branch/group label;
+  scroll salts use commit hash/branch name/group, not row index or scroll offset.
 - [x] Native/separate-viewport popup evaluated; unsupported fallback implemented (below).
 - [x] WIP selection skips the redundant selected-row comparison. One working-tree
   comparison remains, with the clicked commit as base.
@@ -151,3 +151,61 @@ Logs: `/tmp/gitcraft-area-d-{check,tests,final-focused,fmt,clippy}.log` and
   Context menus page; `sidebar/branches.rs` changes only branch-menu grouping and the
   optional advanced entries. Other agents' settings additions must be retained when
   combining these changes. No `graph_view/mod.rs` changes were necessary.
+
+
+## Adversarial review follow-up
+
+The three reported defects were reproduced by new interaction regressions before the
+fixes: **0 passed, 3 failed** (`/tmp/gitcraft-area-d-followup-before.log`). No review was
+delegated and no unrelated implementation areas were changed.
+
+- [x] **P1 submenu action target after refs reload.** `menu_item::group` now gives the
+  submenu **button** an explicit scope ID derived from its parent identity and label.
+  A salted child UI alone still mixes sibling position into egui's automatic button ID.
+  The regression opens Branches / Checkout → Branch bravo → Check out, holds the pointer
+  over the action, inserts alpha before bravo, and clicks. It requires exactly
+  `Checkout("bravo")`. Separate cases reorder and remove other refs. The pre-fix run
+  dispatched `Checkout("alpha")`; all three cases pass with the fix.
+- [x] **P2 expanded Preview at short/high-scale sizes.** The above-page preview is inside
+  the same page scroll area as its controls, with a bounded preview scroller. This applies
+  to both compact navigation and intermediate widths. At physical sizes 640×900, 800×500
+  and 1100×500, each at 100/125/150%, the regression expands Preview, scrolls Show more
+  into the viewport, asserts its full rectangle is inside the viewport, opens the other
+  themes, scrolls to Catppuccin Latte, asserts its card is fully inside, and selects it.
+  The pre-fix run failed at 800×500/125%; the nine cases now pass, including 800×500/150%.
+- [x] **P2 explicit collapse during theme search.** Named external search matches reveal
+  automatically only until the user chooses the disclosure state. An explicit collapse
+  hides the cards even while the query still matches, and the button reads Show more.
+  The regression searches Catppuccin, collapses, asserts the card is absent, reopens,
+  verifies Show less and the card, and confirms the active theme was not changed.
+
+### Follow-up validation and evidence
+
+The test build compiled this worktree's source. Its executable was immediately copied to
+`/tmp/gitcraft-area-d-followup-tests`; the captured inventory
+`/tmp/gitcraft-area-d-followup-inventory.log` contains **all 12 area_d test names**, including
+all three follow-up regressions. Related test runs use this isolated executable rather
+than trusting shared-target freshness. The complete inventory is 3091 tests.
+
+- Focused `area_d` run: **12 passed**, all names recorded in
+  `/tmp/gitcraft-area-d-followup-tests.log`; copied-executable `area_d_followup` rerun:
+  **3 passed**, `/tmp/gitcraft-area-d-followup-final.log`.
+- Related copied-executable runs: settings **15 passed**, palette **9 passed**, graph
+  **40 passed**; `/tmp/gitcraft-area-d-followup-{settings,palette,graph}.log`.
+  Counts overlap the focused run and are not additive.
+- `cargo +1.95.0 fmt --all -- --check` and `git diff --check`: passed.
+- `cargo +1.95.0 clippy --lib --tests --offline -- -D clippy::all`: passed; the log
+  confirms `Checking gitcraft` at this worktree. Existing platform-dependent dead-code
+  warnings remain. Logs: `/tmp/gitcraft-area-d-followup-{fmt,clippy}.log`.
+- The original six screenshot matrices were regenerated at widths 640/1100/1600 and
+  100/125/150%, retaining all original area-D interaction coverage. No original acceptance
+  checkbox above is deferred by this follow-up.
+- New evidence directory: `/tmp/gitcraft-167-171/area-d-followup/`, **64 PNGs**: the original
+  54 matrix frames, nine `followup-preview-{width}-{height}-{scale}.png` frames for the
+  short-height matrix, and `followup-search-collapsed.png`. The screenshot is taken after
+  scrolling Show more into view while Preview remains expanded above the visible range.
+- Particularly relevant: `followup-preview-800-500-1.50.png`,
+  `followup-search-collapsed.png`, and `contact-followup-preview.jpg`. Inspected the preview
+  contact sheet, the minimum-window frame, the collapsed search, and regenerated menu and
+  comparison contact sheets, plus the Appearance, Open In, Agents and Context menus
+  contact sheets. Headless macOS/platform limitations above remain unchanged.

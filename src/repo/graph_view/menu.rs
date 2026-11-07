@@ -722,6 +722,63 @@ mod tests {
         Ok(())
     }
 
+    /// Ref reloads may insert/reorder siblings while the pointer rests on an action in
+    /// an open submenu. Its button identity must belong to the branch, not its row index.
+    #[test]
+    fn area_d_followup_branch_submenu_keeps_its_target_across_ref_reordering() {
+        let branch = |name: &str| git::Branch {
+            name: name.to_owned(),
+            target: "a".repeat(40),
+            is_head: false,
+            upstream: String::new(),
+            track: String::new(),
+        };
+        for updated in [
+            vec!["alpha", "bravo", "charlie"],
+            vec!["charlie", "bravo"],
+            vec!["bravo"],
+        ] {
+            let mut tab = area_d_tab();
+            tab.refs.local = vec![branch("bravo"), branch("charlie")];
+            let mut h = egui_kittest::Harness::builder()
+                .with_size([1000.0, 800.0])
+                .build_ui_state(
+                    |ui, (tab, acts): &mut (crate::repo::RepoTab, Vec<crate::repo::Action>)| {
+                        let r = ui.button("Commit row");
+                        tab.commit_menu(&r, 1, true, acts);
+                    },
+                    (tab, Vec::new()),
+                );
+            h.run();
+            h.get_by_label("Commit row").click_secondary();
+            h.run();
+            h.get_by_label("Branches / Checkout ⏵").hover();
+            h.run_steps(12);
+            h.get_by_label("Branch bravo ⏵").hover();
+            h.run_steps(12);
+            h.get_by_label("Check out").hover();
+            h.run_steps(12);
+            h.state_mut().0.refs.local = updated.iter().map(|name| branch(name)).collect();
+            h.run_steps(12);
+            h.get_by_label("Check out").click();
+            h.run();
+            let targets: Vec<_> = h
+                .state()
+                .1
+                .iter()
+                .filter_map(|action| match action {
+                    crate::repo::Action::Checkout(name) => Some(name.as_str()),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(
+                targets,
+                ["bravo"],
+                "open submenu changed scope after refs became {updated:?}"
+            );
+        }
+    }
+
     /// A hard reset asked for on `main` does nothing once another branch is checked out (in the
     /// terminal, while the dialog was open): it would throw away that one's uncommitted work.
     #[test]
