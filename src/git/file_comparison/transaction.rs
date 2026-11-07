@@ -529,20 +529,53 @@ mod owned_remote_correction_tests {
         let r = Repo::new()?;
         let tools = r.0.join("tools");
         std::fs::create_dir(&tools).map_err(|e| e.to_string())?;
-        std::os::unix::fs::symlink("/sbin/md5", tools.join("md5")).map_err(|e| e.to_string())?;
-        let mut cmd = std::process::Command::new("/bin/sh");
-        cmd.args([
-            "-c",
-            &format!("{}\nprintf abc | gitcraft_md5", portable_md5()),
-        ])
-        .env("PATH", &tools);
-        let out = crate::processes::run(cmd, crate::processes::Options::default())?.complete()?;
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
+        for (program, path) in [("md5", "/sbin/md5"), ("perl", "/usr/bin/perl")] {
+            std::os::unix::fs::symlink(path, tools.join(program)).map_err(|e| e.to_string())?;
+        }
+        let idx = r.0.join("index-source");
+        let sentinel = r.0.join("outside");
+        r.write("outside", "outside bytes must not be read")?;
+        for case in ["regular", "missing", "symlink", "oversize"] {
+            if std::fs::symlink_metadata(&idx).is_ok() {
+                std::fs::remove_file(&idx).map_err(|e| e.to_string())?;
+            }
+            match case {
+                "regular" => std::fs::write(&idx, b"abc").map_err(|e| e.to_string())?,
+                "symlink" => {
+                    std::os::unix::fs::symlink(&sentinel, &idx).map_err(|e| e.to_string())?
+                }
+                "oversize" => std::fs::write(&idx, vec![0; INDEX_LIMIT as usize + 1])
+                    .map_err(|e| e.to_string())?,
+                _ => (),
+            }
+            let script = format!(
+                "idx={}\nd={}\n{}\nprintf '%s' \"$actual\"",
+                crate::remote::sh_quote(&idx.to_string_lossy()),
+                crate::remote::sh_quote(&r.0.to_string_lossy()),
+                remote_stamp_read()
+            );
+            let mut cmd = std::process::Command::new("/bin/sh");
+            cmd.args(["-c", &script]).env("PATH", &tools);
+            let out =
+                crate::processes::run(cmd, crate::processes::Options::default())?.complete()?;
+            if case == "regular" {
+                assert!(
+                    out.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&out.stderr)
+                );
+                assert_eq!(out.stdout, b"900150983cd24fb0d6963f7d28e17f72");
+            } else if case == "missing" {
+                assert!(out.status.success());
+                assert_eq!(out.stdout, b"missing");
+            } else {
+                assert!(!out.status.success());
+            }
+        }
+        assert_eq!(
+            std::fs::read(&sentinel).map_err(|e| e.to_string())?,
+            b"outside bytes must not be read"
         );
-        assert_eq!(out.stdout, b"900150983cd24fb0d6963f7d28e17f72");
         Ok(())
     }
 }
