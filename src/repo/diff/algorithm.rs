@@ -35,8 +35,14 @@ fn shown_label(algorithm: Option<DiffAlgorithm>) -> &'static str {
     algorithm.map_or("Algorithm", DiffAlgorithm::label)
 }
 
-/// The algorithm drop-down of the diff header for the file at `path`.
-pub(in crate::repo) fn algorithm_menu(ui: &mut Ui, path: &str, acts: &mut Vec<Action>) {
+/// The algorithm drop-down of the diff header for the file at `path`, with a spinner beside it
+/// while the diff is being read again with it (`repairing`: the lines are still the old ones).
+pub(in crate::repo) fn algorithm_menu(
+    ui: &mut Ui,
+    path: &str,
+    repairing: bool,
+    acts: &mut Vec<Action>,
+) {
     let current = algorithm_for(&Settings::get(ui.ctx()), path);
     let kind = file_type(path);
     let name = path
@@ -65,6 +71,14 @@ pub(in crate::repo) fn algorithm_menu(ui: &mut Ui, path: &str, acts: &mut Vec<Ac
             "Diff algorithm: how the lines of both sides are paired. Kept for {kept_for}; \
              the repository's config is left as it is."
         ));
+    if repairing {
+        // Laid out right to left: beside the drop-down, on its left.
+        ui.add(crate::spinner::Spinner::new().size(12.0))
+            .on_hover_text(format!(
+                "Reading the diff again with {}; the lines shown are paired the old way",
+                current.map_or("git's default", DiffAlgorithm::label)
+            ));
+    }
     if picked != current {
         acts.push(Action::SetDiffAlgorithm(picked));
     }
@@ -93,6 +107,7 @@ impl RepoTab {
         if let Some(Ok(data)) = &view.data {
             view.keep_place = place_at(data, data.shows_split(settings.diff_split), view.scroll);
         }
+        view.repairing = true;
         self.refresh_diff(ctx);
     }
 }

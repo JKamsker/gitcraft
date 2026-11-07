@@ -127,6 +127,9 @@ pub(crate) struct DiffView {
     pub(super) restore: Option<diff::Place>,
     /// The algorithm the diff was last asked for with (`None`: git's default).
     pub(super) algorithm: Option<crate::git::DiffAlgorithm>,
+    /// The diff is being read again with another algorithm: the lines shown are still the
+    /// old pairing.
+    pub(super) repairing: bool,
     /// A scroll offset to go to on the next frame.
     pub(super) scroll_to: Option<f32>,
 }
@@ -154,6 +157,7 @@ impl DiffView {
             keep_place: None,
             restore: None,
             algorithm: None,
+            repairing: false,
             scroll_to: None,
         }
     }
@@ -169,6 +173,7 @@ impl DiffView {
         if request != self.request {
             return;
         }
+        self.repairing = false;
         if result.is_ok() {
             self.restore = self.keep_place.take();
         }
