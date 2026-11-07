@@ -181,6 +181,12 @@ so your config, credentials and hooks apply as usual.
   it at that commit (`x` and `origin/x` make one pill), a pull-request icon when one is open,
   `+N` when more refs share the commit, the author's avatar and how long ago it was ("2 hours
   ago"). Author, date and hash columns are optional (Settings).
+- Description takes the flexible width. Branch / Tag fits visible pills and shrinks when none
+  are in view; dragging its border keeps a fixed width. Restore _Fit visible branch / tag
+  pills_ from the header's menu. Faint branch names (or _detached_) identify lanes whose tips
+  are offscreen. Long summaries end in an ellipsis; hover the description to read its original
+  message, loaded in the background. Messages over the 256 KiB tooltip limit open in the detail
+  pane by selecting the commit.
 - Drag the column borders in the header to resize. Right-click the header to pick the columns,
   make the graph column compact (lanes closer together), or _Reset columns_ to their first
   widths.

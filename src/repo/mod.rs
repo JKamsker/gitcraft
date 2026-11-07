@@ -203,6 +203,9 @@ pub struct RepoTab {
     /// Rows of the graph: the WIP pseudo-commit (when the tree is dirty) followed by `history`.
     commits: Vec<Arc<Commit>>,
     graph: Graph,
+    /// Ref names for continuous lane runs, rebuilt with the graph, never while scrolling.
+    graph_labels: HashMap<usize, String>,
+    graph_messages: graph_view::message_tooltip::MessageTooltips,
     index: HashMap<String, usize>,
     worktrees: Vec<Worktree>,
     stashes: Vec<Stash>,
@@ -519,6 +522,8 @@ impl RepoTab {
                 rows: Vec::new(),
                 width: 0,
             },
+            graph_labels: HashMap::new(),
+            graph_messages: Default::default(),
             index: HashMap::new(),
             worktrees: Vec::new(),
             stashes: Vec::new(),

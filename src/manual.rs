@@ -102,6 +102,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "After a rebase, an amend or any other rewrite gitcraft makes, Compare before / after (beside the message saying it's done, or Compare before / after the last rewrite in the branch's menu) shows the old commits and the new ones paired up: unchanged ones faded, changed, added, dropped and moved ones marked. Click a pair to see how its patch changed. The old commits are kept for 30 days.",
             "Start hotfix from v2.3.1… in a version tag's menu makes hotfix/2.3.2 there; Finish hotfix… (its menu, or the palette) merges it into develop (if used) and main, tags main's merge, deletes it and pushes it all, shown first and undone with Ctrl+Z (also when it stops part-way).",
             "Cut release… in a commit's menu (or the palette) suggests the next version from the Conventional Commits since the last tag and drafts the notes; it can move the version in Cargo.toml / package.json and CHANGELOG.md, tag (annotated or signed), push and make the release on the forge with files, showing each step first. A step that fails can be resumed; Ctrl+Z undoes what was done here.",
+            "Description takes the flexible width; Branch / Tag fits visible pills until you drag its border. Right-click the header to restore Fit visible branch / tag pills, pick columns, make the graph compact or reset widths. Faint lane labels identify offscreen tips; hover a description for the full message.",
         ],
     ),
     (
