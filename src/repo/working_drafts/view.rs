@@ -55,7 +55,7 @@ pub(in crate::repo) fn history(
         index,
         "Preview the saved staged/index contents (otherwise the working version)",
     );
-    ui.label("Staged versions contain raw Git blobs (including LFS pointers). Recovery does not run filters or line-ending conversions; working versions contain the saved on-disk bytes.");
+    ui.label("Remote recovery preserves file permissions using Python 3 on that machine. Staged versions contain raw Git blobs (including LFS pointers). Recovery does not run filters or line-ending conversions; working versions contain the saved on-disk bytes.");
     egui::ScrollArea::vertical()
         .max_height(420.0)
         .show(ui, |ui| {

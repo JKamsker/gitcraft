@@ -262,7 +262,7 @@ mod tests {
         run_steps_counted(&path, &ops, OpKind::plain(), None, true, None).0?;
         let saved = store::list(&path, &|| true)?;
         assert_eq!(saved.len(), 1);
-        assert_eq!(saved[0].metadata.branch.as_deref(), Some("main"));
+        assert_eq!(saved[0].metadata.branch.as_deref(), Some("refs/heads/main"));
         assert_ne!(saved[0].metadata.index_tree, saved[0].metadata.work_tree);
         std::fs::write(path.join("too-large"), vec![b'x'; store::FILE_LIMIT + 1])
             .map_err(|e| e.to_string())?;

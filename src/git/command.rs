@@ -1435,7 +1435,7 @@ pub(crate) fn draft_bytes(
     if stdout.len() > 64 << 20 || stderr.len() > 64 << 10 {
         return Err("Read output exceeds limit".into());
     }
-    if ok.contains(&code) {
+    if ok.contains(&code) && stderr.is_empty() {
         Ok(stdout)
     } else {
         Err(format!(

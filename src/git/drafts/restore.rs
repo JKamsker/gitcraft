@@ -262,6 +262,11 @@ pub fn restore(
     if patch.is_empty() {
         return Err("No content changes to recover".into());
     }
+    let permissions = if view.before.is_some() && target.is_some() {
+        Some(super::permissions::Pin::capture(repo, &view.path, active)?)
+    } else {
+        None
+    };
     let backup = capture_preserving(
         repo,
         "Before recovering earlier contents",
@@ -298,6 +303,9 @@ pub fn restore(
     let mut args = base.to_vec();
     args.push("-");
     ctx.work(&args, patch, &[0], active)?;
+    if let (Some(pin), Some((_, bytes))) = (permissions, target.as_ref()) {
+        pin.restore(&view.path,bytes,active).map_err(|error|format!("Contents recovered and safety draft saved, but permission restoration needs attention: {error}"))?;
+    }
     Ok(backup.id)
 }
 
