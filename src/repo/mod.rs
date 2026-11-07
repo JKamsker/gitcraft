@@ -341,6 +341,8 @@ pub struct RepoTab {
     ghost: ghost::Ghost,
     /// Actions queued from outside (the command palette).
     queued: Vec<Action>,
+    /// Where a patch dropped on the window is (see `patches`).
+    dropped_patch: patches::DroppedPatch,
     /// A folder the app should open (taken by `App`).
     pub open_request: Option<OpenRequest>,
     /// A worktree to open once the operation so labelled (which makes it) is done.
@@ -506,6 +508,7 @@ impl RepoTab {
             fs_pending: None,
             ghost: ghost::Ghost::default(),
             queued: Vec::new(),
+            dropped_patch: Default::default(),
             open_request: None,
             open_when_done: None,
             parked: Vec::new(),

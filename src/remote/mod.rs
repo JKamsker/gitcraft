@@ -25,7 +25,7 @@ pub use fs::{
 };
 #[cfg(all(test, unix))]
 pub use session::LOOPBACK;
-pub use session::{Output, Request, exec, is_missing_folder, spawn, stop_process, stop};
+pub use session::{Output, Request, exec, exec_if_connected, is_missing_folder, spawn, stop_process, stop};
 pub use ui_guard::{mark_ui_thread, refused_on_ui_thread};
 
 /// The machine a repository is on, when it isn't this one.

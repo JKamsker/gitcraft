@@ -191,6 +191,7 @@ impl RepoTab {
         self.busy_op = None;
         self.detached_op_done(&label, result.is_ok());
         let mut undoable = false;
+        self.dropped_patch_done(&label, &result);
         let long = self
             .op_started
             .take()

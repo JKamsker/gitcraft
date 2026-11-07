@@ -348,6 +348,32 @@ pub fn run_input(dir: Option<&Path>, args: &[&str], input: &str) -> Result<Strin
     finish(execute(dir, &extra, args)?, args, &[0])
 }
 
+/// [`run`] for a read nobody asked for and nobody waits on (the start page's look at a recent
+/// repository): for one on another machine, only in a shell already open there, so it never
+/// connects (no password asked, no WSL started); `None` when there is none.
+pub fn run_if_connected(dir: &Path, args: &[&str]) -> Option<Result<String, String>> {
+    let Some(target) = remote::parse(dir) else {
+        return Some(run(Some(dir), args));
+    };
+    let mut req = remote_request(&target, &Extra::default(), args);
+    req.timeout = Some(std::time::Duration::from_secs(30));
+    let out = match remote::exec_if_connected(&target.host, &req)? {
+        Ok(out) => out,
+        Err(e) => return Some(Err(e)),
+    };
+    Some(if out.code == 0 {
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    } else if out.code == 1 && remote::is_missing_folder(&out.stderr) {
+        Err(format!(
+            "{} isn't a folder on {}",
+            target.path,
+            target.host.label()
+        ))
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
+    })
+}
+
 /// Runs git and returns stdout as raw bytes (file contents: images…).
 pub fn run_bytes(dir: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
     let out = execute(dir, &Extra::default(), args)?;

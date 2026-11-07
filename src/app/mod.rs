@@ -5,11 +5,16 @@ mod askpass_dialog;
 mod clone;
 mod draft_saving;
 mod handoff;
+mod dropped;
 mod home;
+mod home_filter;
+mod home_recent;
 mod palette;
 mod panels;
 mod profiles;
+mod recent_status;
 mod remote_open;
+mod repo_scan;
 mod tab_strip;
 mod tabs;
 mod teleport;
@@ -67,6 +72,8 @@ struct Saved {
     profile_states: profiles::ProfileStates,
     /// The command palette's entries run lately.
     palette_recent: palette::recent::Recent,
+    /// When each recent repository was last opened, in seconds since 1970 (of every profile).
+    last_opened: BTreeMap<PathBuf, i64>,
 }
 
 enum Tab {
@@ -145,6 +152,16 @@ pub struct App {
     keeper: crate::drafts::Keeper,
     /// This run's marker, and whether the last run ended without closing.
     session: crate::drafts::Session,
+    /// The start page's search of the recent repositories.
+    recent_filter: home_filter::RecentFilter,
+    /// The recent repositories' branches and changes, read in the background.
+    recent_status: recent_status::RecentStatuses,
+    /// See [`Saved::last_opened`].
+    last_opened: BTreeMap<PathBuf, i64>,
+    /// Patches dropped on repository tabs, still to be applied.
+    patches: dropped::PatchQueue,
+    /// _Scan a folder for repositories_, while its dialog is open.
+    repo_scan: Option<repo_scan::RepoScan>,
 }
 
 impl App {
@@ -194,6 +211,11 @@ impl App {
             tab_drag: None,
             keeper: Default::default(),
             session: crate::drafts::Session::start(),
+            recent_filter: Default::default(),
+            recent_status: Default::default(),
+            last_opened: saved.last_opened,
+            patches: Default::default(),
+            repo_scan: None,
             error: None,
             error_card: None,
             was_focused: true,
@@ -259,6 +281,7 @@ impl App {
                 .iter()
                 .position(|t| matches!(t, Tab::Repo(r) if r.path == path))
             {
+                self.remember(path);
                 self.active = i;
                 return;
             }
@@ -329,6 +352,15 @@ impl App {
         self.recent.retain(|p| p != path);
         self.recent.insert(0, path.to_owned());
         self.recent.truncate(MAX_RECENT);
+        self.last_opened
+            .insert(path.to_owned(), home_recent::now_secs());
+        // Only what some profile's recent list still has.
+        let kept: Vec<&PathBuf> = self
+            .recent
+            .iter()
+            .chain(self.profile_states.values().flat_map(|s| &s.recent))
+            .collect();
+        self.last_opened.retain(|p, _| kept.contains(&p));
     }
 
     fn set_theme(&mut self, ctx: &egui::Context, id: ThemeId) {
@@ -426,7 +458,8 @@ impl App {
             || self.askpass_open()
             || self.palette.is_some()
             || self.manual_open
-            || crate::a11y::keyboard_taken(ctx);
+            || self.repo_scan.is_some()
+            || (crate::a11y::keyboard_taken(ctx) && !home_filter::search_has_focus(ctx));
         let (commands, focused) =
             ctx.input(|i| (keymap::pressed(i, keymap::Scope::Window), i.focused || i.raw.viewports.values().any(|v| v.focused == Some(true))));
         let mut refresh = false;
@@ -619,6 +652,7 @@ impl eframe::App for App {
         self.manual_ui(&ctx);
         // After the tabs are drawn, so what was typed in this frame is in.
         self.keep_drafts(&ctx, focused);
+        self.repo_scan_dialog(&ctx);
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
         crate::a11y::end_frame(&ctx);
@@ -626,6 +660,7 @@ impl eframe::App for App {
 
     fn on_exit(&mut self) {
         self.stop_teleport();
+        self.dropped_files(&ctx);
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
@@ -643,6 +678,7 @@ impl eframe::App for App {
             tab_looks: self.tab_looks.clone(),
             profile_states: self.profile_states.clone(),
             palette_recent: self.palette_recent.clone(),
+            last_opened: self.last_opened.clone(),
         };
         eframe::set_value(storage, eframe::APP_KEY, &saved);
     }

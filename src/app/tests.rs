@@ -261,3 +261,32 @@ fn a_folder_handed_over_opens_its_repositorys_tab_once() -> Result<(), String> {
     let _ = std::fs::remove_dir_all(&root);
     Ok(())
 }
+
+/// When each recent repository was last opened survives a restart; a save from before it
+/// knew of them still loads, with none.
+#[test]
+fn last_opened_times_survive_a_restart() {
+    let mut saved = Saved {
+        recent: vec!["/home/me/Größe repo".into()],
+        ..Saved::default()
+    };
+    saved
+        .last_opened
+        .insert("/home/me/Größe repo".into(), 1_700_000_000);
+    let mut storage = Memory::default();
+    eframe::set_value(&mut storage, eframe::APP_KEY, &saved);
+    let back: Option<Saved> = eframe::get_value(&storage, eframe::APP_KEY);
+    assert_eq!(
+        back.and_then(|b| b
+            .last_opened
+            .get(std::path::Path::new("/home/me/Größe repo"))
+            .copied()),
+        Some(1_700_000_000)
+    );
+    let mut old = Memory::default();
+    old.set_string(eframe::APP_KEY, "(recent: [\"C:/a\"])".to_owned());
+    let back: Option<Saved> = eframe::get_value(&old, eframe::APP_KEY);
+    let back = back.unwrap_or_default();
+    assert_eq!(back.recent, [std::path::PathBuf::from("C:/a")]);
+    assert!(back.last_opened.is_empty());
+}

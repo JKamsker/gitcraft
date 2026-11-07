@@ -170,6 +170,50 @@ pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
     }
 }
 
+/// Runs `req` on `host` only in a shell already open and idle there: `None`, without
+/// connecting, when there is none. For reads nobody asked for (the start page's look at a
+/// recent repository), which must never ask for a password nor start WSL.
+pub fn exec_if_connected(host: &Host, req: &Request) -> Option<Result<Output, String>> {
+    if let Err(e) = super::ui_guard::off_ui_thread(&req.what()) {
+        return Some(Err(e));
+    }
+    let pool = pool(host, Lane::Quick);
+    let mut taken = pool.take_idle(UNASKED_FRESH)?;
+    let nonce = nonce();
+    let script = framed(req, &nonce);
+    let limit = req.time_limit();
+    let ran = taken.shell()?.run(&script, &nonce, Instant::now() + limit);
+    Some(match ran {
+        Ok(out) => {
+            taken.give_back();
+            Ok(out)
+        }
+        Err(Failure::TimedOut(pid)) => {
+            drop(taken);
+            // Stopped only through another shell open there: never a new connection.
+            if let Some(pid) = pid {
+                let host = host.clone();
+                std::thread::spawn(move || {
+                    let _ = exec_if_connected(
+                        &host,
+                        &Request {
+                            script: stop_script(pid),
+                            timeout: Some(Duration::from_secs(30)),
+                            ..Request::default()
+                        },
+                    );
+                });
+            }
+            Err(format!("{} didn't answer in time", req.what()))
+        }
+        Err(failure) => Err(failure.message()),
+    })
+}
+
+/// How recently a shell must have been used by something asked for, for
+/// [`exec_if_connected`] to use it: a connection only those reads would use is left to close.
+const UNASKED_FRESH: Duration = Duration::from_secs(240);
+
 /// Stops the process `pid` on `host` (a command that hung, or the shell it hung in) and
 /// everything it started, however deep, in the background: politely, then for good. The
 /// processes are listed first, as one stopped leaves what it started to another parent. The
@@ -518,6 +562,51 @@ mod tests {
             busy,
             "4 diff or merge tools are already open on SSH · build: close one of them first"
         );
+    }
+
+    #[test]
+    fn nothing_runs_without_an_open_connection() {
+        let host = Host::Ssh("gitcraft-never-connected.invalid".to_owned());
+        let req = Request {
+            script: "true".to_owned(),
+            ..Request::default()
+        };
+        assert!(exec_if_connected(&host, &req).is_none());
+    }
+
+    /// Reads nobody asked for run in a shell already open, don't count as its use (so the
+    /// connection still closes when idle), and one that times out never opens another
+    /// connection, not even to stop what hung.
+    #[cfg(unix)]
+    #[test]
+    fn unasked_reads_never_connect_nor_keep_a_connection_alive() -> Result<(), String> {
+        let host = Host::Ssh("gitcraft-unasked-test.invalid".to_owned());
+        let pool = pool(&host, Lane::Quick);
+        pool.add_idle(Shell::start(Command::new("sh"), "test")?);
+        let (_, _, before) = pool.looks();
+        std::thread::sleep(Duration::from_millis(20));
+        let quick = Request {
+            script: "printf ok".to_owned(),
+            ..Request::default()
+        };
+        let out = exec_if_connected(&host, &quick).ok_or("no shell taken")??;
+        assert_eq!(out.stdout, b"ok");
+        let (open, failed, after) = pool.looks();
+        assert_eq!((open, failed), (1, false));
+        assert_eq!(after, before, "the read counted as use");
+        // Hangs past its limit: the shell is closed, and nothing connects.
+        let slow = Request {
+            script: "sleep 5".to_owned(),
+            timeout: Some(Duration::from_millis(300)),
+            ..Request::default()
+        };
+        let timed_out = exec_if_connected(&host, &slow).ok_or("no shell taken")?;
+        assert!(timed_out.is_err_and(|e| e.contains("didn't answer in time")));
+        std::thread::sleep(Duration::from_millis(300));
+        let (open, failed, _) = pool.looks();
+        assert_eq!((open, failed), (0, false), "a connection was tried");
+        assert!(exec_if_connected(&host, &quick).is_none());
+        Ok(())
     }
 
     #[test]
