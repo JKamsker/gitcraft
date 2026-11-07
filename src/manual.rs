@@ -75,6 +75,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Settings → Commit signing sets the format, key and program git signs with, and whether it signs commits and tags by default, in your global git config; Settings → Profile can sign just for the profile instead.",
             "The sparkles button in the commit box has an AI tool you already have (claude -p, codex exec, gh copilot, or a command of your own) write the message from the staged changes (when amending, from the last commit with them), on the repository's machine (here, in WSL or over SSH); gitcraft keeps no API key. It is off until you pick a tool (from the button, or Settings → AI, which also has the prompts and how much of the diff is sent). A message you typed is never replaced without asking; Cancel stops the tool.",
             "Double-click a commit's message in the right pane to edit it (any commit of the checked-out branch with no merges after it).",
+            "Below a commit's hash, click a section to fold it out: Signature (whether it is valid, and if not why, with the signer and git's output; Check again after importing a key), Contained in (its branches and tags, and the first tag after it), Notes (add, edit or delete a note in the namespace picked; Fetch notes and Push notes share that namespace with a remote, and stop rather than overwrite when both sides have notes the other lacks) and Backlinks (later commits that revert it, cherry-pick it, name it in a trailer such as Fixes: or just mention its hash; click one to open it).",
             "Fold staged changes into an older commit: right-click it in the graph and pick “Fold staged changes into this commit”, or use “Fold…” beside “Amend last commit”. First it shows the commit and the ones after it that get rewritten, and warns when they are already pushed. “Keep as fixup! commit for later” only commits them as “fixup! <summary>” on top. A conflict is resolved as in any rebase, and Abort goes back to before the fold; Ctrl+Z undoes it, the changes staged again.",
             "Undo and redo commits, merges, rebases, folds, resets, checkouts, branches, tags and stashes.",
             "Reflog (left pane, a branch's menu, or Ctrl+P): where HEAD and each branch have been, what moved them (commit, checkout, reset, rebase…) and from which commit to which, also for what was done in the terminal or before gitcraft was opened. Select an entry to see its commit; Create branch here (or a double-click) gets it back, or cherry-pick it, check it out or copy its hash.",
@@ -166,7 +167,10 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
     (
         "Changes",
         &[
-            ("Cmd+Enter", "Commit (from the message fields)"),
+            (
+                "Cmd+Enter",
+                "Commit (from the message fields), or save a note",
+            ),
             (
                 "Click / Shift+click",
                 "Pick lines in a diff, or a range of them",

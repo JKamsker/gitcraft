@@ -160,6 +160,8 @@ pub struct RepoTab {
     detail_hash: Option<String>,
     detail: Option<CommitDetail>,
     detail_error: Option<String>,
+    /// The selected commit's signature, containment, notes and backlinks.
+    extras: detail::Extras,
     diff: Option<DiffView>,
     compare: Option<Compare>,
     /// The pull request the big area shows.
@@ -342,6 +344,7 @@ impl RepoTab {
             detail_hash: None,
             detail: None,
             detail_error: None,
+            extras: Default::default(),
             diff: None,
             compare: None,
             pr_view: None,

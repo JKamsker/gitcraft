@@ -1,10 +1,12 @@
 //! Thin wrapper over the `git` command line. Every call shells out to the installed git, so
 //! gitcraft behaves exactly like the user's own git (config, credentials, hooks).
 
+mod backlinks;
 mod command;
 mod commit_msg;
 mod commits;
 mod conflict;
+mod contained;
 mod diff;
 pub mod external_tool;
 mod files;
@@ -12,25 +14,31 @@ mod fold;
 mod lfs;
 mod reflog;
 mod preview;
+mod notes;
 mod refs;
 pub mod simulate;
 pub mod search_query;
+mod signature;
 mod status;
 mod submodule;
 mod timed;
 mod worktree;
 
+pub use self::backlinks::*;
 pub use self::command::*;
 pub use self::commit_msg::*;
 pub use self::commits::*;
 pub use self::conflict::*;
+pub use self::contained::*;
 pub use self::diff::*;
 pub use self::files::*;
 pub use self::fold::*;
 pub use self::lfs::*;
 pub use self::reflog::*;
 pub use self::preview::*;
+pub use self::notes::*;
 pub use self::refs::*;
+pub use self::signature::*;
 pub use self::status::*;
 pub use self::submodule::*;
 pub use self::timed::*;
@@ -196,6 +204,8 @@ pub fn now() -> i64 {
         .unwrap_or(0)
 }
 
+#[cfg(test)]
+mod extras_tests;
 #[cfg(test)]
 mod tests;
 

@@ -53,6 +53,7 @@ impl RepoTab {
         if hash == WIP_HASH {
             self.detail = None;
             self.detail_hash = None;
+            self.drop_extras();
             return;
         }
         self.load_detail(hash, ctx);
@@ -63,6 +64,7 @@ impl RepoTab {
         self.reword = None;
         self.detail_error = None;
         self.detail_hash = Some(hash.clone());
+        self.load_extras(&hash, ctx);
         let path = self.path.clone();
         spawn(&self.tx, ctx, move || {
             let detail = git::commit_detail(&path, &hash);
