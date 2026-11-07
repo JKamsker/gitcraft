@@ -70,7 +70,22 @@ fn install(scope: &Scope, plan: &Plan) -> Result<String, String> {
             Scope::Global(override_path) => {
                 cmd.arg("--global");
                 if let Some(path) = override_path {
-                    cmd.env("GIT_CONFIG_GLOBAL", path);
+                    // The isolated command cwd must not change the meaning of
+                    // a caller's relative global-config override.
+                    cmd.env(
+                        "GIT_CONFIG_GLOBAL",
+                        std::path::absolute(Path::new(path)).map_err(|e| e.to_string())?,
+                    );
+                }
+                for variable in ["HOME", "XDG_CONFIG_HOME"] {
+                    if let Some(path) = std::env::var_os(variable)
+                        && Path::new(&path).is_relative()
+                    {
+                        cmd.env(
+                            variable,
+                            std::path::absolute(Path::new(&path)).map_err(|e| e.to_string())?,
+                        );
+                    }
                 }
             }
             #[cfg(test)]
@@ -235,6 +250,50 @@ mod tests {
         install(&Scope::File(config.clone()), &Plan::new(&executable, true)?)?;
         assert_eq!(get(&config, "diff.tool")?, "gitcraft");
         assert_eq!(get(&config, "merge.tool")?, "gitcraft");
+        Ok(())
+    }
+    #[test]
+    fn isolated_global_registration_preserves_relative_override_meaning() -> Result<(), String> {
+        const CHILD: &str = "GITCRAFT_RELATIVE_REGISTRATION_FIXTURE";
+        const NAME: &str = "standalone::registration::tests::isolated_global_registration_preserves_relative_override_meaning";
+        if std::env::var_os(CHILD).is_some() {
+            let plan = Plan::new(&std::env::current_exe().map_err(|e| e.to_string())?, false)?;
+            install(&Scope::Global(Some("relative config".into())), &plan)?;
+            assert_eq!(
+                get(Path::new("relative config"), "fixture.untouched")?,
+                "keep"
+            );
+            assert_eq!(
+                get(
+                    Path::new("relative config"),
+                    "mergetool.gitcraft.trustExitCode"
+                )?,
+                "true"
+            );
+            return Ok(());
+        }
+        let temp = crate::git::file_comparison::Scratch::new()?;
+        std::fs::write(
+            temp.0.join("relative config"),
+            "[fixture]\nuntouched = keep\n",
+        )
+        .map_err(|e| e.to_string())?;
+        let out = std::process::Command::new(std::env::current_exe().map_err(|e| e.to_string())?)
+            .args(["--exact", NAME, "--nocapture"])
+            .current_dir(&temp.0)
+            .env(CHILD, "1")
+            .output()
+            .map_err(|e| e.to_string())?;
+        assert!(
+            out.status.success(),
+            "{} {}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert_eq!(
+            get(&temp.0.join("relative config"), "fixture.untouched")?,
+            "keep"
+        );
         Ok(())
     }
     #[test]
