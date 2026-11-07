@@ -1,0 +1,113 @@
+{
+  "feature": "#32 Drafts of the working tree (L, opt-in)",
+  "candidate": "51ea04904419b850805a8fc627f71af8b9255fb9",
+  "branch": "codex/working-drafts",
+  "remote_branch": "51ea04904419b850805a8fc627f71af8b9255fb9",
+  "status": "validated; independent review pending",
+  "review_base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "original_base": "48f2b234c4b9535c820138442295caeada1410fc",
+  "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "tree": "a88cca3e923691adfb98877c3ad79051c2ba79ca",
+  "source_changed_files": {
+    "README.md": "7ea36b4a35487e728cd49d114a49d74954b808e14aafaba20ed12665cffe1e1d",
+    "src/git/command.rs": "96b0caa75ea2cdafb60e25e0bed3cd4ef7504206c6134badc403371e2f45c783",
+    "src/git/drafts/context.rs": "3f17f396b76de5a6290522e3483c8a85f005b4790bbc540783af3102461a98ed",
+    "src/git/drafts/mod.rs": "f45bd4220007dfc329455183c6c61220e6ca4112989be472eeac1b8b6f78f232",
+    "src/git/drafts/restore.rs": "3dd10e4b40f08ce4ede47f7b81ff7fb28cfe5915b7410784977ed881c3a298de",
+    "src/git/drafts/tests.rs": "9bc4cb13b5a9b8ecd42b88f317620eceb59e63b6557e89c085099b8302ae50a5",
+    "src/git/mod.rs": "c8c4a528504f84da16673443dc63dfd466cd5839371a363a75b4bc77b7efcbb7",
+    "src/manual.rs": "4e634f0244bae53054f2dc9d4a4cfb97b97214679ea38d48c64a7249313b89a2",
+    "src/remote/fs.rs": "508df7b036533dd2b943d439b8ab1916795ea2c2ee97281a3faa2fe11712c2e6",
+    "src/remote/mod.rs": "2acf80269bb32af3c2f8f4550a08b828a7f3cc71edab9f360879ee09f0dab264",
+    "src/repo/actions.rs": "f1bec62f3fdf9ca9f1577fbe421e75dba8ba50a90070897c91ba244a53049c4a",
+    "src/repo/apply.rs": "6c7b627502742f00dff2afb78d70cbb40110ce4dee6b0c863af0845b0a2b8416",
+    "src/repo/detail/changes.rs": "c765ab983864d4046cb7701fcf5638fb714f3372be515d7e108ec9848e10cf27",
+    "src/repo/dialogs/drafts.rs": "1c8dac30eeeb6187ec58645a312aef289f215271776702a5d51ce4de5be06c95",
+    "src/repo/dialogs/mod.rs": "85c530b78d8c7e52ed6f0f5fa097d2ffe3aaea1f48c068446654553a219cdf38",
+    "src/repo/drafts.rs": "fb3fa1ac371cc44201f0f78f6dfad2608fcccc9c6115d3877cc4eab368fed230",
+    "src/repo/graph_view/mod.rs": "9b113aabad93ceff53e378e27e3d42def08d3f403f74755348a8b9799235a763",
+    "src/repo/messages.rs": "ec97f8c12badc008084df131d5fc8b3d98e14158c8b7b194559e3627cfee27bf",
+    "src/repo/mod.rs": "8066c6435f5f6aaad42e555f00ac5a8a05764cea877c8fca5be4f49d8ec56f85",
+    "src/repo/operations.rs": "c624b0fb900d4b931730ca4a825394e4ae490ea9e3c281cfb5d6d8055c3d83e3"
+  },
+  "private_target": "/workspace/work/working-drafts/target",
+  "cargo_incremental": "0",
+  "cargo_build_jobs": "2",
+  "gates": {
+    "fmt": "PASS",
+    "clippy_all_targets_Dwarnings": "PASS",
+    "targeted": "25 passed (22 new +3 existing),0 failures",
+    "full_test": "811 passed,0 failures,3 ignored,0 filtered,814 total"
+  },
+  "commands": {
+    "targeted": "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo test draft -- --nocapture",
+    "fmt": "cargo fmt -- --check",
+    "clippy": "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo clippy --all-targets -- -D warnings",
+    "full_test": "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo test"
+  },
+  "logs": {
+    "targeted": {
+      "path": "/workspace/work/working-drafts-targeted-51ea049.log",
+      "sha256": "67d28ca23d84d7305151f8c7ddb2dee0d431441b19009e5a0c5b6fb184ead8a4"
+    },
+    "fmt": {
+      "path": "/workspace/work/working-drafts-fmt-51ea049.log",
+      "sha256": "899bef27170811a2bd2d35aecb224c80e738cb492a08df07e95cad05a78c3d3c"
+    },
+    "clippy": {
+      "path": "/workspace/work/working-drafts-clippy-51ea049.log",
+      "sha256": "39adf7b7c4264c9a1b2bb89ef23f06ce191e47862649ecab893638f2f586b210"
+    },
+    "test": {
+      "path": "/workspace/work/working-drafts-test-51ea049.log",
+      "sha256": "2fbe03559405c0b858433887fd99a816a13172e5eab968fa65c9feb91526453a"
+    }
+  },
+  "new_tests": [
+    "git::drafts::tests::ignored_rule_read_warnings_fail_closed_before_any_version_is_published",
+    "git::drafts::tests::changed_symlinks_and_conflicted_indexes_fail_without_following_targets_or_touching_index",
+    "git::drafts::tests::missing_paths_below_symlinks_fail_closed_and_do_not_publish_deletions",
+    "git::drafts::tests::limits_invalid_paths_and_cancellation_leave_all_real_state_untouched",
+    "git::drafts::tests::nested_untracked_repositories_are_excluded_without_hiding_outer_changes",
+    "git::drafts::tests::configured_filters_hooks_fsmonitor_and_signing_never_run_for_drafts_or_recovery",
+    "git::drafts::tests::mixed_index_work_and_untracked_are_independent_and_ignored_files_stay_out",
+    "git::drafts::tests::partial_shallow_drafts_and_missing_index_preview_never_call_network_helpers",
+    "git::drafts::tests::private_index_cache_handles_split_and_sparse_indexes_without_rewriting_the_real_index",
+    "git::drafts::tests::recovery_detects_intent_to_add_changes_even_when_index_object_records_match",
+    "git::drafts::tests::rename_unicode_no_newline_and_hardlinks_recover_only_the_selected_path",
+    "git::drafts::tests::recovery_refuses_stale_files_indexes_refs_and_new_ignore_rules",
+    "git::drafts::tests::retention_expires_owned_refs_with_cas_and_preserves_unknown_versions",
+    "git::drafts::tests::typed_remote_reader_quotes_paths_and_never_confuses_links_with_missing_files",
+    "git::drafts::tests::tree_roots_survive_gc_restart_and_do_not_change_history_branches_reflog_or_normal_push",
+    "git::drafts::tests::unchanged_large_tracked_files_are_not_copied_as_working_changes",
+    "git::drafts::tests::binary_empty_files_deletions_and_index_layer_recovery_preserve_the_real_index",
+    "git::drafts::tests::selected_hunks_recover_without_changing_staged_state_and_have_a_safety_version",
+    "git::drafts::tests::unborn_sha256_and_linked_worktree_versions_keep_separate_identities",
+    "repo::drafts::tests::pauses_coalesce_and_stale_or_disabled_jobs_cannot_publish_ui_results",
+    "repo::drafts::tests::a_due_pause_dispatches_a_background_snapshot_and_disabled_repos_stay_empty",
+    "repo::operations::tests::working_drafts_protect_checkout_and_rebase_before_any_operation_step"
+  ],
+  "ignored_tests": [
+    "test forge::gitea::live::live_forgejo ... ignored, needs a Forgejo: see ci/forge-server.sh",
+    "test forge::gitea::live::live_gitea ... ignored, needs a Gitea: see ci/forge-server.sh",
+    "test remote::vault::tests::the_system_store_keeps_and_forgets ... ignored, uses the system's credential store"
+  ],
+  "invariants": [
+    "Hidden tree refs refs/gitcraft/drafts/<worktree-id> protect separate raw index and working trees; no WIP commits or normal-push exposure.",
+    "Real index and shared split cache are read-only; private copied cache detects working edits and all recovery index bytes are pinned.",
+    "Ignored untracked, nested repositories and submodule contents excluded; changed links/special files/conflicts fail closed.",
+    "Empty private Git config, templates, hooks, raw attributes and --no-lazy-fetch block filters/signing/hooks/fsmonitor and implicit downloads.",
+    "Selected text hunks and whole binary files recover via guarded native patches; pre-recovery safety draft/Undo preview; index, mode, hardlink peers and unselected edits preserved.",
+    "Source generation/cancellation, HEAD/branch/index/raw-file/ref checks and compare-and-swap publication/deletion guard stale state; 50-version/14-day retention."
+  ],
+  "limitations": [
+    "Live SSH/WSL not exercised (optional env unset); typed remote read shell/quoting executed locally.",
+    "Snapshots require Git with --no-lazy-fetch; older Git fails closed before checkout/rebase when enabled.",
+    "Changed symlinks, special files, conflicted indexes and changed gitlinks require manual backup; regular file content recovery only, no mode-only restoration.",
+    "UTF-8 portable safe paths required;8MiB/file,32MiB captured content,2000 changed and20000 index paths; snapshot metadata1MiB and index/cache32MiB.",
+    "Mirror pushes/manual all-ref exports can include hidden drafts; normal push defaults skip them.",
+    "Raw index-layer recovery includes LFS pointers and no line-ending/filter conversion.",
+    "Native Git2.52 --attr-source apply segfault avoided using private highest-precedence info/attributes; no-index preview keeps explicit empty attribute source."
+  ],
+  "review_pending": true
+}
