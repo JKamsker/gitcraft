@@ -1,0 +1,40 @@
+{
+  "application_candidate": "8011a392fafe8a7e4d5964c809b83c1ff88b9769",
+  "review_base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "status": "WIP static review; author final local gates/manifest pending; no approval",
+  "reviewed_files_sha256": {
+    "README.md": "d6b03f64a310552abd130644d9b168564d99cc7595c622d420c7edbfed4f9b77",
+    "docs/plans/content-recovery.md": "e25b6d2b3d069cfc3f53cfc54e559cf3736ef32a577821e943694c62dc73e5ee",
+    "src/git/command.rs": "d304120608fd84e9c4c6d942a2a8b42e5df6c79f504f813355df09ec976c96d8",
+    "src/git/mod.rs": "858978850feb79947a66d3f6c2a2b466f64ae8042ab14824f6af40730f0d9b14",
+    "src/git/recovery/batch.rs": "ec6198f5dd133fcf4170f024a93ddcc03cc0ede4898286eabb649e430b2cea00",
+    "src/git/recovery/file.rs": "b79dfc2a671b502ceefe50f92d4e097e2e3abf827ecdb1d46899286682318ca8",
+    "src/git/recovery/mod.rs": "afe1f504e5841d6004a4d54d9d34e93b32d1c6f08e18ca60cce7d1ed9f5a0bde",
+    "src/git/recovery/recover.rs": "d0da24957b3f9f064c8e2438b42ee169f24b36e24e25f9fedd7b9920813a6f3d",
+    "src/git/recovery/tests.rs": "c55d18be956a89b2a8748b96357112d863e4d8cbd19996643c8c319edde8cd6e",
+    "src/manual.rs": "44b70236c7c9df723ee96f3a9da2cc5e0b72c8730ecaec2532340fec2c5a47cc",
+    "src/repo/actions.rs": "754dbb688f17f02ba4b310858cde86f1f156dafda9f1c6e35dcc7933c03ee7e0",
+    "src/repo/apply.rs": "a6e1562ccef7bdbe5876c551e855a16e09d9e59bdf95874827fa493f00196bd4",
+    "src/repo/content_recovery/mod.rs": "369f38d7517cb8e51d594ce81ded4f1301bbbda1c7f5edf61ca8513427d80a4e",
+    "src/repo/content_recovery/tests.rs": "a429d92ab548aa0666d5ba21a04aebe19f5a39de465cfda449cac3d20a997768",
+    "src/repo/content_recovery/view.rs": "ccf8c5087edadbe5d99f7ed725d6ff954396166a0e3b42af1d6f4e9b60b67779",
+    "src/repo/dialogs/mod.rs": "28ed82ae74602f85b6619776a6902b716bb82bf47705cda05c6684902ba6d268",
+    "src/repo/load.rs": "17eab5c0e6f458797afe8e12dcd893185a88bde1f83056f8d568ccf04e9a469e",
+    "src/repo/messages.rs": "5d64e35e459137d0cfa429ec4ccdc6f98a00458596a582d57c8eb4513b01718e",
+    "src/repo/mod.rs": "f0987957a1fb969b2847d20e9bdd739c9cca7fc9081162b0f89990527b729e83",
+    "src/repo/worktree_tab/mod.rs": "5e0e72f0abcd60ced8d48f8f24f931ba71350d852ae644da26906a4082147719"
+  },
+  "scope": "Ordinary software correctness review of eligible literal content recovery addition; standalone PR54 reflog/lost-commit UI excluded. No app edits, Cargo, runtime claims or CI.",
+  "static_review_completed": [
+    "bounded object discovery and literal content provenance/timeline",
+    "strict raw cat-file identity/type/size framing and budgets",
+    "prepare/confirm revalidation and source/tree/blob checks",
+    "create-only branch/file guards, stash-list membership and CAS",
+    "UI latest-only reader ownership until actual remote exec return",
+    "Practice/profile command routing and source test evidence"
+  ],
+  "open_questions": [
+    "Unix initial root open intentionally removes NOFOLLOW; assess rename/symlink replacement between final identity verification and file creation. Sent to author before source freeze."
+  ],
+  "author_evidence": "No final manifest yet; author reports17targeted on8aa310f and19targeted8011 upcoming. Not independently executed."
+}
