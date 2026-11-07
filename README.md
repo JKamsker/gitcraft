@@ -669,3 +669,7 @@ Preview recovery before deliberately creating a new branch, creating a new regul
 ### Branch-model graph lanes
 
 The graph offers compact, trunk/release/feature, and Git-flow lane models. Bands stay contiguous from left to right; continuous first-parent runs retain branch-derived colours when history reloads. Use **Pin branch to band…** to override a local branch, or **Use preset** to remove its override. Choices are kept per repository. Shared ancestry follows the first branch in band/name order; detached and unnamed runs occupy the last band. Lanes beyond the visible graph width remain clipped like compact lanes.
+
+### History minimap
+
+Wide graph panes show an overview of the loaded history and its current viewport. Drag its rectangle or click the map to scroll; once focused, use arrows and Page Up/Down. HEAD is blue, tags green and search hits yellow. Saved graph views use their projected rows, including collapsed spans; markers inside a collapsed span remain visible. The older-unloaded boundary is explicit, and reaching it follows normal bounded history loading. Narrow panes hide the minimap to preserve readable commit rows. The overview caches 512 bins and never starts Git work while painting.

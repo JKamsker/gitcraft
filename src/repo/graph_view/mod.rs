@@ -6,6 +6,7 @@ mod handles;
 mod header;
 mod lanes;
 mod menu;
+pub(in crate::repo) mod minimap;
 pub(super) mod message_tooltip;
 mod pills;
 mod readability;
@@ -88,6 +89,9 @@ impl RepoTab {
             self.arrow_keys(ui, acts);
         }
 
+        let available = ui.available_rect_before_wrap();
+        let minimap = (available.width() >= 480.0 && available.height() >= 120.0).then(|| egui::Rect::from_min_max(egui::pos2(available.right()-78.0,available.top()+27.0),available.right_bottom()));
+        if minimap.is_some() { ui.set_max_width((available.width()-84.0).max(1.0)); }
         let settings = Settings::get(ui.ctx());
         let lanes = lane_layout(&settings, self.graph.width);
         let mut prefs = preferred_cols(&settings, lanes);
@@ -112,6 +116,8 @@ impl RepoTab {
                 scroll = scroll.vertical_scroll_offset((top - view_h / 2.0).max(0.0));
             }
         }
+
+        if let Some(offset) = self.history_minimap.offset.take() { scroll = scroll.vertical_scroll_offset(offset); }
 
         // `show_rows` sizes rows as ROW_PITCH + item spacing, so the spacing must be zero here.
         ui.spacing_mut().item_spacing.y = 0.0;
@@ -197,6 +203,7 @@ impl RepoTab {
             }
         });
         ui.data_mut(|d| d.insert_temp(offset_id, out.state.offset.y));
+        if let Some(rect) = minimap { self.history_minimap(ui,rect,out.state.offset.y,out.inner_rect.height()); }
         header::column_headers(ui, &t, header, &cols);
         self.column_handles(ui, header, &prefs, &cols, &settings);
         header::header_menu(&header_resp, &settings);

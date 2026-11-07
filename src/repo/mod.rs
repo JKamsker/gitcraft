@@ -146,6 +146,7 @@ pub struct RepoTab {
     /// Rows of the graph: the WIP pseudo-commit (when the tree is dirty) followed by `history`.
     commits: Vec<Arc<Commit>>,
     graph: Graph,
+    history_minimap: graph_view::minimap::State,
     branch_bands: branch_bands::Preferences,
     /// Ref names for continuous lane runs, rebuilt with the graph, never while scrolling.
     graph_labels: HashMap<usize, String>,
@@ -334,6 +335,7 @@ impl RepoTab {
                 width: 0,
             },
             branch_bands: Default::default(),
+            history_minimap: Default::default(),
             graph_labels: HashMap::new(),
             graph_messages: Default::default(),
             index: HashMap::new(),

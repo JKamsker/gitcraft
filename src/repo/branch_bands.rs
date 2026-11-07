@@ -107,6 +107,7 @@ impl RepoTab {
             ui.ctx().data_mut(|d| d.insert_persisted(id(self.repo_key()), self.branch_bands.clone()));
             self.graph = crate::graph::layout_banded(&self.commits, &self.branch_bands.hints(&self.commits, &self.refs));
             self.rebuild_graph_labels();
+        self.history_minimap.dirty = true;
             self.saved_views.dirty = true;
         }
     }

@@ -424,6 +424,7 @@ impl RepoTab {
             self.search.running = false;
             self.search.results.clear();
             self.search.matches.clear();
+            self.history_minimap.dirty = true;
             self.search.searched.clear();
             return;
         }
@@ -465,6 +466,7 @@ impl RepoTab {
         match result {
             Ok(hashes) => {
                 self.search.matches = hashes.iter().cloned().collect();
+                self.history_minimap.dirty = true;
                 self.search.results = hashes;
                 self.search.current = 0;
                 if let Some(first) = self.search.results.first().cloned() {
@@ -495,6 +497,7 @@ impl RepoTab {
             // Nor does a query typed just before closing start a search once it's closed.
             self.search.edited = None;
             self.search.matches.clear();
+            self.history_minimap.dirty = true;
             self.search.results.clear();
             self.search.searched.clear();
         }

@@ -118,6 +118,7 @@ impl RepoTab {
     fn set_graph_view(&mut self, preset: Option<Preset>, ctx: &egui::Context) {
         self.saved_views.cancel();
         self.saved_views.prefs.active = preset;
+        self.history_minimap.dirty = true;
         self.saved_views.expanded.clear();
         self.saved_views.error = None;
         self.save_graph_preferences(ctx);
@@ -237,6 +238,7 @@ impl RepoTab {
             );
             self.saved_views.selected = self.selected;
             self.saved_views.dirty = false;
+        self.history_minimap.dirty = true;
         }
     }
     pub(super) fn expand_graph_span(&mut self, range: std::ops::Range<usize>) {

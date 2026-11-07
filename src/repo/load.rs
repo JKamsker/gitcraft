@@ -512,6 +512,7 @@ impl RepoTab {
         let previous = self.selected_hash();
         self.branch_bands = super::branch_bands::Preferences::load(ctx, self.repo_key());
         self.rebuild_rows();
+        self.history_minimap.dirty = true;
         self.restore_selection(previous, ctx);
         self.saved_views.dirty = true;
         self.take_prepared_message();

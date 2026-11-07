@@ -74,7 +74,11 @@ pub fn layout_banded<C: Borrow<Commit>>(
             next_origin += 1;
         }
         let origin = origins[col];
-        let mut colours: HashMap<usize, usize> = (0..lanes.len()).map(|i| (i, if hints.is_empty() { i } else { keys[i] })).collect();
+        let mut colours: HashMap<usize, usize> = if hints.is_empty() {
+            HashMap::new()
+        } else {
+            (0..lanes.len()).filter(|&i| lanes[i].is_some() || i == col).map(|i| (i,keys[i])).collect()
+        };
         let through: Vec<usize> = (0..lanes.len())
             .filter(|&i| lanes[i].is_some() && lanes[i] != Some(hash))
             .collect();
@@ -97,7 +101,7 @@ pub fn layout_banded<C: Borrow<Commit>>(
                 let lane = band_lane(&mut lanes, &mut bands, parent_hint.band);
                 keys.resize(lanes.len(), 0);
                 keys[lane] = parent_hint.colour;
-                colours.insert(lane, if hints.is_empty() { lane } else { keys[lane] });
+                if !hints.is_empty() { colours.insert(lane, keys[lane]); }
                 lanes[lane] = Some(parent);
                 origins.resize(lanes.len(), row_index);
                 origins[lane] = next_origin;
