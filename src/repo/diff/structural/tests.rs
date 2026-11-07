@@ -425,7 +425,7 @@ fn syntax_view_draws_read_only_and_patch_fallback_cannot_stage_lines() -> Result
     assert!(!text.contains("Stage hunk"), "{text}");
     assert!(!text.contains("Stage 1 line"), "{text}");
     assert!(tab.find_in().is_some(), "patch fallback retains Find");
-    tab.apply(Action::DiffStep(1), &ctx);
+    tab.apply(Action::DiffStep(-1), &ctx);
     assert!(
         tab.diff.as_ref().is_some_and(|v| v.jump.is_some()),
         "patch fallback retains change navigation"
@@ -446,7 +446,7 @@ fn syntax_view_draws_read_only_and_patch_fallback_cannot_stage_lines() -> Result
         tab.find_in().is_none(),
         "successful Syntax has no patch Find"
     );
-    tab.apply(Action::DiffStep(1), &ctx);
+    tab.apply(Action::DiffStep(-1), &ctx);
     assert!(tab.diff.as_ref().is_some_and(|v| v.jump.is_none()));
     let mut syntax = ctx.run_ui(egui::RawInput::default(), |ui| {
         egui::CentralPanel::default().show(ui, |ui| tab.diff_view(ui, &mut actions));
