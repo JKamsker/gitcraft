@@ -23,11 +23,18 @@ pub(super) fn run_with_input(
 ) -> Result<String, String> {
     let mut cmd = tool_command(tool);
     let remote = crate::remote::parse(repo).is_some();
-    if remote {
+    let context = crate::connections::current();
+    let selected = if tool == "gh" {
+        context.choices.github.selected()
+    } else {
+        context.choices.gitlab.selected()
+    };
+    if remote || selected {
         // The tool runs here, where the user signed in to it, about the repository there:
         // named rather than found from the folder, which it can't read.
         let forge = forge_of(tool)?;
         let (host, path) = remote_location(repo, forge)?;
+        crate::connections::configure_cli(&mut cmd, tool, &host)?;
         // The hosts the arguments name (`--hostname`, `-R host/owner/repo`) were read when the
         // tab loaded: only the one just checked, so a changed `origin` can't send the tool, and
         // a token, to the one before.
@@ -40,6 +47,8 @@ pub(super) fn run_with_input(
                  refresh the tab"
             ));
         }
+        // Explicit repository routing also isolates selected credentials from repository-
+        // local CLI configuration (notably .glab-cli/config.yml).
         cmd.current_dir(std::env::temp_dir()).args(args);
         match forge {
             Forge::GitLab => {
@@ -203,7 +212,7 @@ const NOT_SIGNED_IN_FOR: Duration = Duration::from_secs(60);
 /// An error when the tool can't be run at all (not installed).
 fn trusted_host(forge: Forge, tool: &str, host: &str) -> Result<bool, String> {
     use std::sync::{Mutex, OnceLock};
-    type Known = Mutex<HashMap<(Forge, String), (bool, Instant)>>;
+    type Known = Mutex<HashMap<(Forge, String, String), (bool, Instant)>>;
     static KNOWN: OnceLock<Known> = OnceLock::new();
     let plain = !host.is_empty()
         && host
@@ -220,13 +229,23 @@ fn trusted_host(forge: Forge, tool: &str, host: &str) -> Result<bool, String> {
     if host.eq_ignore_ascii_case(own) {
         return Ok(true);
     }
+    let context = crate::connections::current();
+    let account = if tool == "gh" {
+        &context.choices.github
+    } else {
+        &context.choices.gitlab
+    };
+    if account.selected() {
+        account.validate()?;
+        return Ok(account.host.eq_ignore_ascii_case(host));
+    }
     let known = KNOWN.get_or_init(Known::default);
     let lock = || {
         known
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     };
-    let key = (forge, host.to_lowercase());
+    let key = (forge, host.to_lowercase(), format!("{:?}", context));
     if let Some(&(signed_in, at)) = lock().get(&key)
         && (signed_in || at.elapsed() < NOT_SIGNED_IN_FOR)
     {
@@ -268,7 +287,7 @@ fn signed_in_to(tool: &str, host: &str) -> Result<bool, String> {
 
 /// The forge's tool, set to answer this repository in plain JSON.
 fn tool_command(tool: &str) -> Command {
-    let mut cmd = Command::new(tool);
+    let mut cmd = Command::new(crate::connections::program(tool));
     cmd.env("GH_PROMPT_DISABLED", "1").env("NO_PROMPT", "1");
     // What it prints is read as JSON: `CLICOLOR_FORCE` or `GH_FORCE_TTY` in the user's
     // environment would colour it even into a pipe, escape codes no JSON reader takes.

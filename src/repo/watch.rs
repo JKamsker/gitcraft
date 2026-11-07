@@ -24,7 +24,7 @@ impl RepoTab {
             let weak = std::sync::Arc::downgrade(&alive);
             self.poller = Some(alive);
             let arrived = self.tx.clone();
-            std::thread::spawn(move || {
+            crate::connections::spawn(move || {
                 super::watch_remote::poll(&path, &tx, &arrived, &events_ctx, &weak);
             });
             return;

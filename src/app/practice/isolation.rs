@@ -57,7 +57,25 @@ fn exercise_app(root: &Path) -> Result<(), String> {
             app
         });
     // This is the real active-profile override; normal tabs must keep it, practice must not.
-    git::set_profile_config(Some(root.join("hostile.gitconfig")));
+    // A selected SSH/account profile with a configuration error must never obstruct or
+    // redirect a practice command, including captured worker contexts and binary reads.
+    let hostile_context = crate::connections::Context {
+        git_config: Some(root.join("hostile.gitconfig")),
+        choices: crate::connections::Choices {
+            ssh_key: root.join("missing-selected-key").to_string_lossy().into_owned(),
+            github: crate::connections::Account {
+                host: "fixture.invalid".into(),
+                user: "selected-hostile-account".into(),
+                config_dir: root.join("missing-account-config").to_string_lossy().into_owned(),
+            },
+            ..Default::default()
+        },
+        error: Some("Fixture profile must not govern Practice".into()),
+        ..Default::default()
+    };
+    crate::connections::set(hostile_context.clone());
+    assert!(git::run(Some(&root.join("caller")), &["rev-parse", "HEAD"])
+        .is_err_and(|error| error.contains("Fixture profile")));
     let ctx = harness.ctx.clone();
     harness
         .state_mut()
@@ -264,6 +282,10 @@ fn exercise_app(root: &Path) -> Result<(), String> {
 
     // The same active profile still applies to a non-practice repository. This fix must
     // not globally sanitize the user's environment or change normal tab behavior.
+    crate::connections::set(crate::connections::Context {
+        error: None,
+        ..hostile_context
+    });
     assert_eq!(
         git::run(
             Some(&root.join("caller")),
@@ -273,7 +295,7 @@ fn exercise_app(root: &Path) -> Result<(), String> {
         "normal-tabs-keep-this"
     );
     drop(harness);
-    git::set_profile_config(None);
+    crate::connections::set(Default::default());
     std::fs::remove_dir_all(path.parent().ok_or("No sandbox root")?).map_err(|e| e.to_string())?;
     Ok(())
 }
