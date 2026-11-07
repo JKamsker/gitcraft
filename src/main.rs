@@ -5,14 +5,47 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use eframe::egui_wgpu::{WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew, wgpu};
-use gitcraft::app;
+use gitcraft::{
+    app,
+    standalone::{self, Invocation},
+};
 
-fn main() -> eframe::Result {
+fn main() -> std::process::ExitCode {
+    let args: Vec<_> = std::env::args_os().skip(1).collect();
+    let explicit = args.first().and_then(|a| a.to_str()).is_some_and(|s| {
+        matches!(
+            s,
+            "--diff" | "--merge" | "--mergetool" | "--help" | "-h" | "--version" | "-V"
+        )
+    });
     // Started by ssh to ask the running app something (see `remote::askpass`): no window.
-    if let Some(code) = app::askpass_helper() {
-        std::process::exit(code);
+    // Helpers expect UTF-8 protocol fields. Native file arguments never pass through
+    // their std::env::args conversion, repository discovery or profile fallback.
+    if !explicit
+        && args.iter().all(|a| a.to_str().is_some())
+        && let Some(code) = app::askpass_helper()
+    {
+        return std::process::ExitCode::from(u8::try_from(code).unwrap_or(1));
     }
-    app::warm_up();
+    let invocation = match standalone::parse(args) {
+        Ok(mode) => mode,
+        Err(e) => {
+            eprintln!("{e}");
+            return std::process::ExitCode::from(2);
+        }
+    };
+    match &invocation {
+        Invocation::Help => {
+            print!("{}", standalone::USAGE);
+            return std::process::ExitCode::SUCCESS;
+        }
+        Invocation::Version => {
+            println!("gitcraft {}", env!("CARGO_PKG_VERSION"));
+            return std::process::ExitCode::SUCCESS;
+        }
+        Invocation::Repository(_) => app::warm_up(),
+        _ => {}
+    }
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("GitCraft")
@@ -33,16 +66,31 @@ fn main() -> eframe::Result {
         wgpu_options: wgpu_options(),
         ..Default::default()
     };
+    if matches!(&invocation, Invocation::Diff(_) | Invocation::Merge(_)) {
+        return match standalone::run(invocation, options) {
+            Ok(code) => std::process::ExitCode::from(code),
+            Err(e) => {
+                eprintln!("File tool failed: {e}");
+                std::process::ExitCode::from(2)
+            }
+        };
+    }
+    let Invocation::Repository(open_arg) = invocation else {
+        return std::process::ExitCode::from(2);
+    };
     let result = eframe::run_native(
         "gitcraft",
         options,
-        Box::new(|cc| {
-            let open_arg = std::env::args_os().nth(1).map(std::path::PathBuf::from);
-            Ok(Box::new(app::App::new(cc, open_arg)))
-        }),
+        Box::new(move |cc| Ok(Box::new(app::App::new(cc, open_arg)))),
     );
     app::after_exit();
-    result
+    match result {
+        Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::ExitCode::FAILURE
+        }
+    }
 }
 
 /// egui-wgpu's defaults, made lighter on memory. The `WGPU_*` environment variables still win.
