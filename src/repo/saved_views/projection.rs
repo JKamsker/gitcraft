@@ -69,9 +69,7 @@ impl Projection {
             {
                 **top = active;
             }
-            if row.incoming.is_empty() {
-                next_origin = next_origin.max(row.origin + 1);
-            }
+            next_origin = next_origin.max(row.origin + 1);
             for &col in &row.incoming {
                 if col < LANES {
                     active[col] = None;

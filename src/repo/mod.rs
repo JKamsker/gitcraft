@@ -4,8 +4,8 @@
 mod actions;
 mod activity;
 mod apply;
-mod branch_tree;
 mod branch_bands;
+mod branch_tree;
 mod branch_visibility;
 mod bundles;
 mod ci_status;
@@ -33,6 +33,7 @@ mod navigate;
 mod operations;
 mod patches;
 mod pinned_sections;
+mod postcards;
 mod pr_merge;
 mod pr_review;
 mod pr_view;
@@ -146,6 +147,7 @@ pub struct RepoTab {
     /// Rows of the graph: the WIP pseudo-commit (when the tree is dirty) followed by `history`.
     commits: Vec<Arc<Commit>>,
     graph: Graph,
+    postcards: postcards::State,
     history_minimap: graph_view::minimap::State,
     branch_bands: branch_bands::Preferences,
     /// Ref names for continuous lane runs, rebuilt with the graph, never while scrolling.
@@ -336,6 +338,7 @@ impl RepoTab {
             },
             branch_bands: Default::default(),
             history_minimap: Default::default(),
+            postcards: Default::default(),
             graph_labels: HashMap::new(),
             graph_messages: Default::default(),
             index: HashMap::new(),

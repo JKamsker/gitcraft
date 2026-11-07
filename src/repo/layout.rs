@@ -82,6 +82,7 @@ impl RepoTab {
             });
 
         self.ssh_setup_window(&ctx);
+        self.postcard_window(&ctx);
         self.dialogs(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);

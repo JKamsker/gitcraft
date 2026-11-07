@@ -1,6 +1,6 @@
 //! Repository-scoped saved graph relations and their display-only projection.
 mod projection;
-mod reader;
+pub(in crate::repo) mod reader;
 #[cfg(test)]
 mod tests;
 mod view;
@@ -238,7 +238,7 @@ impl RepoTab {
             );
             self.saved_views.selected = self.selected;
             self.saved_views.dirty = false;
-        self.history_minimap.dirty = true;
+            self.history_minimap.dirty = true;
         }
     }
     pub(super) fn expand_graph_span(&mut self, range: std::ops::Range<usize>) {

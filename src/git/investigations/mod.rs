@@ -1,4 +1,5 @@
 //! Pinned, bounded history investigations. Every request uses the accepted raw transport.
+pub(crate) mod postcards;
 #[cfg(test)]
 pub(crate) mod tests;
 pub(crate) mod views;

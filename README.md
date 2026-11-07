@@ -673,3 +673,9 @@ The graph offers compact, trunk/release/feature, and Git-flow lane models. Bands
 ### History minimap
 
 Wide graph panes show an overview of the loaded history and its current viewport. Drag its rectangle or click the map to scroll; once focused, use arrows and Page Up/Down. HEAD is blue, tags green and search hits yellow. Saved graph views use their projected rows, including collapsed spans; markers inside a collapsed span remain visible. The older-unloaded boundary is explicit, and reaching it follows normal bounded history loading. Narrow panes hide the minimap to preserve readable commit rows. The overview caches 512 bins and never starts Git work while painting.
+
+### Release history postcards
+
+Use **History postcard…** above the graph to choose an excluded base and included release tip from immutable commit IDs, tags or branches. Read the release range, enter its title and date, and review exactly which subjects and optional contributor names will appear. Names follow `.mailmap`. Subjects include at most 96 characters and no message bodies. Anonymization replaces names and subjects with numbered labels; the title, date and immutable range IDs remain visible. Compose the actual PNG preview before saving. The card includes the range graph, release name, date and optional contributors.
+
+Postcards support at most 200 commits per range and refuse larger ranges explicitly. Reads and CPU rendering run in cancellable background jobs without fetching missing objects; close the window or use Cancel to stop pending work. Export saves exactly the preview bytes to a new local PNG through a held physical destination directory. Existing files are preserved, linked parents are refused, and cancellation before publication creates no output. A disk-write failure may leave the newly created PNG incomplete; existing files remain intact. No PNG metadata embeds the original names or commit messages.

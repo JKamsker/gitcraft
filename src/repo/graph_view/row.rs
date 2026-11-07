@@ -97,7 +97,9 @@ impl RepoTab {
             gx,
             lane_w: lanes.width,
             node_x: graph_row.map(|r| lane_x(gx, r.col, lanes.width)),
-            color: graph_row.map(|r| t.lane(r.colours.get(&r.col).copied().unwrap_or(r.col))).unwrap_or(t.text_faint),
+            color: graph_row
+                .map(|r| t.lane(r.colours.get(&r.col).copied().unwrap_or(r.col)))
+                .unwrap_or(t.text_faint),
         };
 
         let resp = self.refs_cell(ui, &painter, &row, resp, acts);

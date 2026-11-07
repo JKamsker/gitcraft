@@ -576,7 +576,10 @@ impl RepoTab {
             // Shared with `history`, not copied: tens of thousands of commits may be loaded.
             self.commits.push(Arc::clone(commit));
         }
-        let graph = graph::layout_banded(&self.commits, &self.branch_bands.hints(&self.commits, &self.refs));
+        let graph = graph::layout_banded(
+            &self.commits,
+            &self.branch_bands.hints(&self.commits, &self.refs),
+        );
         let index = self
             .commits
             .iter()

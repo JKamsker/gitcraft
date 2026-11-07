@@ -6,8 +6,8 @@ mod handles;
 mod header;
 mod lanes;
 mod menu;
-pub(in crate::repo) mod minimap;
 pub(super) mod message_tooltip;
+pub(in crate::repo) mod minimap;
 mod pills;
 mod readability;
 #[cfg(test)]
@@ -84,14 +84,23 @@ impl RepoTab {
             && self.dialog.is_none()
             && !self.keys_blocked
             && self.keyboard_graph_active()
+            && !self.postcard_is_open()
+            && !ui.memory(|m| m.has_focus(ui.id().with("history-minimap")))
             && !egui::Popup::is_any_open(ui.ctx())
         {
             self.arrow_keys(ui, acts);
         }
 
         let available = ui.available_rect_before_wrap();
-        let minimap = (available.width() >= 480.0 && available.height() >= 120.0).then(|| egui::Rect::from_min_max(egui::pos2(available.right()-78.0,available.top()+27.0),available.right_bottom()));
-        if minimap.is_some() { ui.set_max_width((available.width()-84.0).max(1.0)); }
+        let minimap = (available.width() >= 480.0 && available.height() >= 120.0).then(|| {
+            egui::Rect::from_min_max(
+                egui::pos2(available.right() - 78.0, available.top() + 27.0),
+                available.right_bottom(),
+            )
+        });
+        if minimap.is_some() {
+            ui.set_max_width((available.width() - 84.0).max(1.0));
+        }
         let settings = Settings::get(ui.ctx());
         let lanes = lane_layout(&settings, self.graph.width);
         let mut prefs = preferred_cols(&settings, lanes);
@@ -117,7 +126,9 @@ impl RepoTab {
             }
         }
 
-        if let Some(offset) = self.history_minimap.offset.take() { scroll = scroll.vertical_scroll_offset(offset); }
+        if let Some(offset) = self.history_minimap.offset.take() {
+            scroll = scroll.vertical_scroll_offset(offset);
+        }
 
         // `show_rows` sizes rows as ROW_PITCH + item spacing, so the spacing must be zero here.
         ui.spacing_mut().item_spacing.y = 0.0;
@@ -171,8 +182,19 @@ impl RepoTab {
                     match self.saved_views.row(projected) {
                         Some(super::saved_views::Row::Commit(raw)) => *raw,
                         Some(super::saved_views::Row::Gap { range, top, bottom }) => {
-                            if connector_row(ui, &t, cols, lanes, range.len(), top, bottom)
-                                .clicked()
+                            if connector_row(
+                                ui,
+                                &t,
+                                cols,
+                                lanes,
+                                range.len(),
+                                (top, bottom),
+                                (
+                                    self.graph.rows.get(range.start),
+                                    self.graph.rows.get(range.end.saturating_sub(1)),
+                                ),
+                            )
+                            .clicked()
                             {
                                 self.expand_graph_span(range.clone());
                             }
@@ -203,7 +225,9 @@ impl RepoTab {
             }
         });
         ui.data_mut(|d| d.insert_temp(offset_id, out.state.offset.y));
-        if let Some(rect) = minimap { self.history_minimap(ui,rect,out.state.offset.y,out.inner_rect.height()); }
+        if let Some(rect) = minimap {
+            self.history_minimap(ui, rect, out.state.offset.y, out.inner_rect.height());
+        }
         header::column_headers(ui, &t, header, &cols);
         self.column_handles(ui, header, &prefs, &cols, &settings);
         header::header_menu(&header_resp, &settings);
@@ -397,16 +421,29 @@ fn connector_row(
     cols: Cols,
     lanes: Lanes,
     count: usize,
-    top: &[Option<usize>; 24],
-    bottom: &[Option<usize>; 24],
+    boundaries: (&[Option<usize>; 24], &[Option<usize>; 24]),
+    colours: (Option<&crate::graph::Row>, Option<&crate::graph::Row>),
 ) -> Response {
+    let (top, bottom) = boundaries;
     let (rect, response) =
         ui.allocate_exact_size(vec2(ui.available_width(), ROW_PITCH), Sense::click());
     let painter = ui.painter_at(rect);
     let mid = rect.center().y;
     for col in 0..lanes.shown.min(24) {
         let x = rect.left() + cols.refs + 6.0 + col as f32 * lanes.width + lanes.width / 2.0;
-        let stroke = egui::Stroke::new(1.3, t.lane(col).gamma_multiply(0.65));
+        let colour = |upper: bool| {
+            let boundary = if upper { colours.0 } else { colours.1 };
+            egui::Stroke::new(
+                1.3,
+                t.lane(
+                    boundary
+                        .and_then(|r| r.colours.get(&col))
+                        .copied()
+                        .unwrap_or(col),
+                )
+                .gamma_multiply(0.65),
+            )
+        };
         let continuous = top[col].is_some() && top[col] == bottom[col];
         for step in 0..6 {
             let y = rect.top() + step as f32 * 5.0;
@@ -418,7 +455,7 @@ fn connector_row(
                         egui::pos2(x, y),
                         egui::pos2(x, (y + 3.0).min(rect.bottom())),
                     ],
-                    stroke,
+                    colour(upper),
                 );
             }
         }
@@ -429,7 +466,7 @@ fn connector_row(
                         egui::pos2(x - 2.0, mid - 3.0),
                         egui::pos2(x + 2.0, mid - 3.0),
                     ],
-                    stroke,
+                    colour(true),
                 );
             }
             if bottom[col].is_some() {
@@ -438,7 +475,7 @@ fn connector_row(
                         egui::pos2(x - 2.0, mid + 3.0),
                         egui::pos2(x + 2.0, mid + 3.0),
                     ],
-                    stroke,
+                    colour(false),
                 );
             }
         }
