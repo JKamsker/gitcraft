@@ -137,7 +137,7 @@ mod tests {
         let mut acts = Vec::new();
         let mut frame = |tab: &mut RepoTab, events: Vec<egui::Event>, acts: &mut Vec<Action>| {
             time += 0.05;
-            ctx.run_ui(
+            let mut output = ctx.run_ui(
                 egui::RawInput {
                     screen_rect: Some(egui::Rect::from_min_size(
                         egui::Pos2::ZERO,
@@ -150,8 +150,9 @@ mod tests {
                 |ui| {
                     egui::CentralPanel::default().show(ui, |ui| tab.cochange_hints(ui, acts));
                 },
-            )
-            .shapes
+            );
+            output.textures_delta.clear();
+            output.shapes
         };
         let mut click =
             |tab: &mut RepoTab, label: &str, acts: &mut Vec<Action>| -> Result<(), String> {
