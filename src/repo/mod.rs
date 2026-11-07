@@ -46,6 +46,7 @@ mod fold;
 mod folding;
 mod forge_link;
 pub(crate) mod forks;
+mod gerrit;
 mod ghost;
 mod graph_order;
 pub(crate) mod graph_view;
@@ -220,6 +221,7 @@ pub struct RepoTab {
     identity: Identity,
     /// Where `origin` is hosted, when it's on a forge gitcraft knows.
     hosting: Option<Hosting>,
+    gerrit: Option<crate::gerrit::Server>,
     prs: Vec<PullRequest>,
     pr_error: Option<String>,
     prs_loaded: Option<Instant>,
@@ -529,6 +531,7 @@ impl RepoTab {
             unity: Default::default(),
             identity: Identity::default(),
             hosting: None,
+            gerrit: None,
             prs: Vec::new(),
             pr_error: None,
             prs_loaded: None,

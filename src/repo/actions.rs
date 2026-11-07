@@ -522,7 +522,16 @@ impl RepoTab {
         let mut items: Vec<(String, String, Action)> = vec![
             ("Fetch".into(), label(Command::Fetch), Action::Fetch),
             ("Pull".into(), label(Command::Pull), Action::Pull),
-            ("Push".into(), label(Command::Push), Action::Push),
+            (
+                if self.gerrit.is_some() {
+                    "Push for review"
+                } else {
+                    "Push"
+                }
+                .into(),
+                label(Command::Push),
+                Action::Push,
+            ),
             (
                 "Sync (pull, then push)".into(),
                 "remote".into(),

@@ -119,6 +119,10 @@ pub(crate) struct PushFlow {
 impl RepoTab {
     /// The toolbar's Push: the checked-out branch, to where it goes.
     pub(super) fn push(&mut self, ctx: &egui::Context) {
+        if let Some(dialog) = self.review_dialog() {
+            self.dialog = Some(dialog);
+            return;
+        }
         self.push_labelled("Push", None, ctx);
     }
 

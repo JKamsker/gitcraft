@@ -69,6 +69,15 @@ const FEATURES: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "Gerrit",
+        &[
+            "For Gerrit, set git config gitcraft.forge gerrit, then reload and fetch. Hosts named gerrit.… and *.googlesource.com are recognised automatically.",
+            "Push for review picks the target branch and optional topic, checks every commit above the fetched target for a unique Change-Id, then pushes the exact previewed commit to refs/for/<branch>. Install your server’s commit-msg hook and amend commits with missing IDs. Fetch and rebase divergent or merged series first.",
+            "The arrow on a graph row, or Open Gerrit change in its menu, opens the change. Amend last commit keeps its original Change-Id, even with a new description; push for review again to upload another patch set.",
+            "For another web address or a reverse-proxy prefix, set git config gitcraft.gerritUrl https://review.example.org/gerrit. Git handles transport and sign-in.",
+        ],
+    ),
+    (
         "Graph",
         &[
             "Every branch with its pill on its latest commit: solid for the checked-out one, a laptop when it is local, a cloud when a remote has it.",

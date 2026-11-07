@@ -499,6 +499,9 @@ so your config, credentials and hooks apply as usual.
   their fork and here. _Remove unused fork remotes_ (in the palette when there are some) takes
   out the marked remotes no branch uses any more, keeping those whose branches hold commits no
   branch here has (Ctrl+Z adds them back).
+- Gerrit: _Push for review_ picks a fetched target branch and optional topic, validates every
+  commit's `Change-Id`, and submits to `refs/for/<branch>`. Graph rows link to the change.
+  Amending preserves its `Change-Id`; submit again for a new patch set.
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
 - CODEOWNERS: the file at HEAD, found where the forge of `origin` looks for it (GitHub:
   `.github/`, the root, `docs/`; GitLab: the root, `docs/`, `.gitlab/`; Gitea: the root, `docs/`,
@@ -1416,6 +1419,29 @@ git config gitcraft.forge gitea                               # just this reposi
 ```
 
 The value is one of `github`, `gitlab`, `forgejo` or `gitea`.
+
+### Gerrit
+
+Hosts named `gerrit.…` and `*.googlesource.com` are recognised. For another host, set
+`git config gitcraft.forge gerrit` (or `git config --global gitcraft.review.example.org.forge gerrit`).
+The workflow uses `origin`, or the first remote when there is no origin, and git's existing
+transport and credentials. Fetch first, then choose _Push for review_ in the toolbar, command
+palette, or a branch's Push action. The dialog previews the exact commit and review ref.
+The optional topic travels as a Git push option, so punctuation cannot become Gerrit options.
+
+Install your server's `commit-msg` hook using its own instructions, and amend existing commits
+that lack a `Change-Id`. gitcraft validates the complete series above the fetched target,
+including commits outside the visible graph. Missing, malformed or duplicate IDs stop the push.
+This flow submits linear series based on the target; fetch and rebase first when the target has
+diverged. Merge commits are refused. It never changes the branch's upstream or force pushes.
+
+Use _Amend last commit_ to update a reviewed change. Its original `Change-Id` is preserved even
+when replacing the description; changing it to another ID is refused. _Push for review_ again
+uploads the new patch set. The arrow on a graph row and _Open Gerrit change_ in its menu open
+a project-qualified change search, which also works without knowing the change number.
+Googlesource links use its corresponding `-review` host.
+For SSH, the default web URL uses HTTPS without the SSH port. Override the review web address
+(including a reverse-proxy prefix) with `git config gitcraft.gerritUrl https://review.example.org/gerrit`.
 
 ### Testing against a real Forgejo and Gitea
 

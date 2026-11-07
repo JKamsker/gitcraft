@@ -345,6 +345,7 @@ fn an_older_read_of_the_working_tree_does_not_replace_a_newer_one() {
         stashes: Vec::new(),
         remotes: Vec::new(),
         hosting: None,
+        gerrit: None,
         submodules: Vec::new(),
         lfs: false,
         identity: Default::default(),

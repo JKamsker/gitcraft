@@ -141,7 +141,8 @@ impl RepoTab {
             } else {
                 0.0
             } + lane;
-            let dot_w = dots;
+            let change = self.gerrit.as_ref().zip(commit.change_id.as_ref());
+            let dot_w = dots + if change.is_some() { 16.0 } else { 0.0 };
             // Only where the description has room for it beside some of the summary.
             let room = rect.right() - cols.trailing() - dot_w - (gx + cols.graph);
             let resolved = self
@@ -156,6 +157,27 @@ impl RepoTab {
                     [pos2(x, row.mid()), pos2(end, row.mid())],
                     Stroke::new(1.2, t.text),
                 );
+            }
+            if let Some((server, id)) = change {
+                let center = pos2(rect.right() - cols.trailing() - 9.0 - dots, row.mid());
+                let link = ui.interact(
+                    Rect::from_center_size(center, vec2(14.0, 18.0)),
+                    ui.id().with(("gerrit-change", &commit.hash)),
+                    Sense::click(),
+                );
+                painter.text(
+                    center,
+                    Align2::CENTER_CENTER,
+                    "↗",
+                    FontId::proportional(14.0),
+                    t.accent,
+                );
+                if link
+                    .on_hover_text(format!("Open Gerrit change {id}"))
+                    .clicked()
+                {
+                    acts.push(Action::OpenUrl(server.change_url(id)));
+                }
             }
             trailing_columns(ui, &painter, &t, &row, now);
             if let Some(status) = ci {
