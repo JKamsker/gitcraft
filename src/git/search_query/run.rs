@@ -12,9 +12,13 @@ use crate::git::{NO_SIGNATURE, UTF8, run as git, search, search_code};
 /// The commits `plan` finds, newest first; among those of the revisions `from` when given
 /// (as the graph shows them), else of every branch.
 pub fn run(repo: &Path, from: Option<&[String]>, plan: &Plan) -> Result<Vec<String>, String> {
+    run_with_order(repo, from, crate::git::LogOrder::default(), plan)
+}
+
+pub fn run_with_order(repo: &Path, from: Option<&[String]>, order: crate::git::LogOrder, plan: &Plan) -> Result<Vec<String>, String> {
     let (passes, paths, hash) = match plan {
-        Plan::Plain { query, code: true } => return search_code(repo, from, query),
-        Plan::Plain { query, code: false } => return search(repo, from, query),
+        Plan::Plain { query, code: true } => return search_code(repo, from, order, query),
+        Plan::Plain { query, code: false } => return search(repo, from, order, query),
         Plan::Operators {
             passes,
             paths,
@@ -27,7 +31,7 @@ pub fn run(repo: &Path, from: Option<&[String]>, plan: &Plan) -> Result<Vec<Stri
     let mut seen: HashSet<String> = HashSet::new();
     let mut hashes = Vec::new();
     for pass in passes {
-        let out = git(Some(repo), &log_args(pass, from, paths)).map_err(failed)?;
+        let out = git(Some(repo), &log_args(pass, from, paths, order)).map_err(failed)?;
         for hash in out.lines() {
             if seen.insert(hash.to_owned()) {
                 hashes.push(hash.to_owned());
@@ -60,8 +64,10 @@ fn log_args<'a>(
     pass: &'a [String],
     from: Option<&'a [String]>,
     paths: &'a [String],
+    order: crate::git::LogOrder,
 ) -> Vec<&'a str> {
-    let mut args = vec!["log", NO_SIGNATURE, UTF8, "--date-order", "--format=%H"];
+    let mut args = vec!["log", NO_SIGNATURE, UTF8, "--format=%H"];
+    args.extend(order.args());
     args.extend(pass.iter().map(String::as_str));
     push_revisions(&mut args, from);
     // `push_revisions` ends revisions it was given with `--`, and none with every branch.

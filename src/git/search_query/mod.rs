@@ -15,7 +15,7 @@ mod tests;
 pub use self::args::{Plan, prepare};
 pub use self::dates::{DATE_FORMATS, date_suggestions};
 pub use self::operator::Operator;
-pub use self::run::{Person, people, run};
+pub use self::run::{Person, people, run, run_with_order};
 pub use self::token::{quote_value, token_at};
 
 /// The longest query with operators searched: past it, the command line itself could get

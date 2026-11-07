@@ -23,29 +23,19 @@ pub fn file_menu(
     links: &dyn Fn() -> Option<LinkMenu>,
     acts: &mut Vec<Action>,
 ) {
-    file_menu_with(resp, path, rev, ignorable, acts, |_, _| {});
+    file_menu_with(resp, path, rev, ignorable, diff, links, acts, |_, _| {});
 }
 
-/// [`file_menu`] with `more` entries at its end (a working-tree file's stash entries).
+/// File menu with additional actions such as LFS locks and stashing.
 pub fn file_menu_with(
     resp: &Response,
     path: &str,
     rev: Option<&str>,
     ignorable: bool,
+    diff: Option<&DiffKey>,
+    links: &dyn Fn() -> Option<LinkMenu>,
     acts: &mut Vec<Action>,
     more: impl FnOnce(&mut Ui, &mut Vec<Action>),
-) {
-    file_menu_with(resp, path, rev, ignorable, |_, _| {}, acts);
-}
-
-/// [`file_menu`] with `extra` items of the caller's (Git LFS locks…) before Copy path.
-pub fn file_menu_with(
-    resp: &Response,
-    path: &str,
-    rev: Option<&str>,
-    ignorable: bool,
-    extra: impl FnOnce(&mut egui::Ui, &mut Vec<Action>),
-    acts: &mut Vec<Action>,
 ) {
     egui::Popup::context_menu(resp)
         .style(crate::theme::menu_style)
@@ -99,7 +89,6 @@ pub fn file_menu_with(
                     }
                 });
             }
-            extra(ui, acts);
             ui.separator();
             if ui.button("Copy path").clicked() {
                 ui.ctx().copy_text(path.to_owned());

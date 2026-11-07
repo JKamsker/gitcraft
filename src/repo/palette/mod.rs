@@ -142,6 +142,7 @@ impl RepoTab {
         let mut items = self.selection_items();
         items.extend(self.command_items());
         items.extend(self.pick_items());
+        items.extend(self.custom_palette_items().into_iter().map(|(label, hint, action)| PaletteItem::action(label, &hint, action)));
         items
     }
 
@@ -156,6 +157,11 @@ impl RepoTab {
             PullMode::ALL.map(|m| PaletteItem::action(m.label(), "remote", Action::PullWith(m))),
         );
         items.extend([
+            PaletteItem::action("Sync (pull, then push)", "remote", Action::Sync),
+            PaletteItem::action("Reflog", "recovery", Action::Reflog(super::reflog::ReflogAct::Show(super::reflog::Source::head()))),
+            PaletteItem::action("Find lost commits", "recovery", Action::Reflog(super::reflog::ReflogAct::FindLost)),
+            PaletteItem::action("Stage all changes", "changes", Action::Key(crate::keymap::Command::StageAll)),
+            PaletteItem::action("Commit", "changes", Action::Key(crate::keymap::Command::Commit)),
             PaletteItem::action("Apply patch…", "patch", Action::ApplyPatch),
             PaletteItem::action("Undo", "history", Action::Undo).shortcut("Ctrl+Z"),
             PaletteItem::action("Redo", "history", Action::Redo).shortcut("Ctrl+Y"),
@@ -229,6 +235,21 @@ impl RepoTab {
                 "tag",
                 Action::Dialog(Dialog::tag(&self.refs.head, "HEAD", self.default_remote())),
             ));
+        }
+        for item in &mut items {
+            let command = match item.label.as_str() {
+                "Fetch" => Some(crate::keymap::Command::Fetch),
+                "Pull" => Some(crate::keymap::Command::Pull),
+                "Push" => Some(crate::keymap::Command::Push),
+                "Stash changes" => Some(crate::keymap::Command::Stash),
+                "Toggle terminal" => Some(crate::keymap::Command::Terminal),
+                "Stage all changes" => Some(crate::keymap::Command::StageAll),
+                "Commit" => Some(crate::keymap::Command::Commit),
+                "Create branch…" => Some(crate::keymap::Command::NewBranch),
+                "Reload" => Some(crate::keymap::Command::Reload),
+                _ => None,
+            };
+            if let Some(command) = command { item.shortcut = Some(crate::keymap::label(command)); }
         }
         items
     }

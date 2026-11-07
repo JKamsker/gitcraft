@@ -31,6 +31,7 @@ pub(crate) enum AppCommand {
     Create,
     Clone,
     OpenRemote,
+    Teleport,
     ForgetSignIns,
     Settings,
     Manual,
@@ -91,11 +92,11 @@ impl Item {
 impl App {
     /// Every entry of the palette's first step.
     pub(super) fn palette_entries(&self) -> Vec<Item> {
-        let mut list = vec![Item::app("New tab", "app", AppCommand::NewTab).shortcut("Ctrl+T")];
+        let mut list = vec![Item::app("New tab", "app", AppCommand::NewTab).shortcut(&crate::keymap::label(crate::keymap::Command::NewTab))];
         if !self.closed.is_empty() {
             list.push(
                 Item::app("Reopen closed tab", "app", AppCommand::ReopenTab)
-                    .shortcut("Ctrl+Shift+T"),
+                    .shortcut(&crate::keymap::label(crate::keymap::Command::ReopenTab)),
             );
         }
         list.extend([
@@ -112,8 +113,8 @@ impl App {
                 "app",
                 AppCommand::ForgetSignIns,
             ),
-            Item::app("Settings", "app", AppCommand::Settings).shortcut("Ctrl+,"),
-            Item::app("Manual and keyboard shortcuts", "app", AppCommand::Manual).shortcut("F1"),
+            Item::app("Settings", "app", AppCommand::Settings).shortcut(&crate::keymap::label(crate::keymap::Command::Settings)),
+            Item::app("Manual and keyboard shortcuts", "app", AppCommand::Manual).shortcut(&crate::keymap::label(crate::keymap::Command::Manual)),
         ]);
         for t in theme::themes().iter() {
             let hint = if t.dark() {
@@ -139,6 +140,7 @@ impl App {
         }
         list.push(Item::app("New profile", "profile", AppCommand::NewProfile));
         if let Some(Tab::Repo(repo)) = self.tabs.get(self.active) {
+            list.push(Item::app("Teleport to another machine…", "tab", AppCommand::Teleport));
             let mut repo_items: Vec<Item> = repo
                 .palette_items()
                 .into_iter()
@@ -193,6 +195,11 @@ impl App {
             AppCommand::Create => self.pick_new(ctx),
             AppCommand::Clone => self.start_clone(),
             AppCommand::OpenRemote => self.start_open_remote(ctx),
+            AppCommand::Teleport => {
+                if let Some(Tab::Repo(repo)) = self.tabs.get(self.active) {
+                    self.start_teleport(repo.path.clone(), ctx);
+                }
+            }
             // The system's store can take a while (the Secret Service is another process).
             AppCommand::ForgetSignIns => {
                 std::thread::spawn(crate::remote::askpass::forget_saved);

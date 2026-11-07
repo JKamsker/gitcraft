@@ -229,6 +229,7 @@ fn elided(
 fn recent_row(ui: &mut Ui, path: &Path, info: &RowInfo) -> (Option<RowClick>, bool) {
     let t = Tokens::get(ui.ctx());
     let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 40.0), Sense::click());
+    crate::repo::widgets::a11y(&resp, egui::WidgetType::Button, || crate::remote::display(path));
     let hovered = resp.hovered();
     if hovered || info.highlighted {
         ui.painter().rect_filled(rect, t.radius, t.hover);
@@ -287,11 +288,14 @@ fn recent_row(ui: &mut Ui, path: &Path, info: &RowInfo) -> (Option<RowClick>, bo
         t.text_faint,
     );
     let mut forget = false;
-    if hovered || ui.rect_contains_pointer(rect) {
+    let forget_id = resp.id.with("forget");
+    let keyboard = crate::a11y::keyboard_on(&resp) || ui.memory(|m| m.has_focus(forget_id));
+    if hovered || keyboard || ui.rect_contains_pointer(rect) {
         let x_rect = Rect::from_center_size(pos2(rect.right() - 18.0, y), vec2(20.0, 20.0));
         let x = ui
-            .interact(x_rect, resp.id.with("forget"), Sense::click())
+            .interact(x_rect, forget_id, Sense::click())
             .on_hover_text("Remove from list");
+        crate::repo::widgets::a11y(&x, egui::WidgetType::Button, "Remove from list");
         if x.hovered() {
             ui.painter().rect_filled(x_rect, t.radius_sm, t.pressed);
         }
