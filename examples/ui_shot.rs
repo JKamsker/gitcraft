@@ -6,6 +6,7 @@
 //! Steps (coordinates in points, window is 1400×860):
 //! `click:x,y`, `dclick:x,y`, `rclick:x,y`, `hover:x,y`, `drag:x1,y1,x2,y2`, `press:x,y` / `move:x,y` / `release:x,y` (a drag in parts), `leave` (pointer off the window), `open:path` (a repository in a new tab), `key:Escape`, `ckey:P` (Ctrl/Cmd+key), `size:w,h` (the window's size), `type:text`, `wait:ms`, `shot`.
 //! Each `shot` writes `<out-prefix>-<n>.png`.
+//! `scale:1.25` applies the application's UI scale, preserving the physical window size.
 
 use std::time::{Duration, Instant};
 
@@ -198,6 +199,16 @@ fn main() {
                 let size = point(arg);
                 harness.set_size(egui::vec2(size.x, size.y));
                 settle(&mut harness, 300);
+            }
+            "scale" => {
+                if let Ok(scale) = arg.parse::<f32>()
+                    && scale.is_finite()
+                {
+                    let mut settings = gitcraft::settings::Settings::get(&harness.ctx);
+                    settings.ui_scale = scale.clamp(0.7, 2.0);
+                    settings.set(&harness.ctx);
+                    settle(&mut harness, 300);
+                }
             }
             "shot" => {
                 shots += 1;
