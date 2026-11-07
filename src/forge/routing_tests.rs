@@ -602,3 +602,122 @@ fn provider_boundary_same_numbers_in_fork_and_upstream_do_not_change_git_transpo
 
     Ok(())
 }
+
+#[test]
+fn provider_boundary_release_blocks_incompatible_pushurl_before_any_cli_call()
+-> Result<(), Box<dyn std::error::Error>> {
+    let dir = std::env::temp_dir().join(format!(
+        "gitcraft-release-publication-target-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir)?;
+    struct Cleanup(std::path::PathBuf);
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    let _cleanup = Cleanup(dir.clone());
+    crate::git::run(Some(&dir), &["init", "-q"])?;
+    crate::git::run(
+        Some(&dir),
+        &["remote", "add", "fork", "https://github.com/fork/project"],
+    )?;
+    crate::git::run(
+        Some(&dir),
+        &[
+            "remote",
+            "set-url",
+            "--push",
+            "fork",
+            "https://github.com/upstream/project",
+        ],
+    )?;
+    let h = hosting(Forge::GitHub, "github.com");
+    let plan = crate::release::Plan {
+        commit: "a".repeat(40),
+        tag: "v1".into(),
+        notes: "notes".into(),
+        bump: None,
+        sign: false,
+        push: Some("fork".into()),
+        publish: true,
+        prerelease: false,
+        assets: vec!["asset.zip".into()],
+    };
+    for step in [crate::release::Step::Publish, crate::release::Step::Upload] {
+        let calls = recording::run(vec![], || {
+            let mut done = crate::release::Done::default();
+            let result = crate::release::run_step(&dir, &plan, step, &mut done, None, Some(&h));
+            assert!(
+                result.is_err_and(|e| e.contains("does not match the selected forge repository"))
+            );
+            Ok(())
+        })?;
+        assert!(calls.is_empty());
+    }
+    crate::git::run(
+        Some(&dir),
+        &[
+            "remote",
+            "set-url",
+            "--push",
+            "fork",
+            "https://github.com/fork/project",
+        ],
+    )?;
+    capture(
+        &h,
+        vec![ok("https://github.com/fork/project/releases/tag/v1")],
+        || {
+            let mut done = crate::release::Done::default();
+            crate::release::run_step(
+                &dir,
+                &plan,
+                crate::release::Step::Publish,
+                &mut done,
+                None,
+                Some(&h),
+            )?;
+            assert!(done.url.is_some());
+            Ok(())
+        },
+    )?;
+    Ok(())
+}
+
+#[test]
+fn provider_boundary_creation_url_cannot_override_selected_repository_for_reviewers()
+-> Result<(), Box<dyn std::error::Error>> {
+    for forge in [Forge::GitHub, Forge::GitLab] {
+        let host = if forge == Forge::GitHub {
+            "github.com"
+        } else {
+            "gitlab.com"
+        };
+        let marker = if forge == Forge::GitHub {
+            "pull"
+        } else {
+            "-/merge_requests"
+        };
+        let h = hosting(forge, host);
+        let dir = std::env::temp_dir();
+        let unexpected = format!("https://{host}/upstream/project/{marker}/7");
+        let calls = capture(&h, vec![ok(&unexpected)], || {
+            assert!(
+                forge
+                    .provider()
+                    .create(&dir, &h, &new_pr(&["reviewer".into()]))
+                    .is_err_and(|e| e.contains("reviewers were not requested"))
+            );
+            Ok(())
+        })?;
+        assert_eq!(
+            calls.len(),
+            1,
+            "no follow-up may use the unexpected URL's number"
+        );
+    }
+    Ok(())
+}

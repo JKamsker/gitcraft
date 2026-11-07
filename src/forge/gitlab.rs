@@ -83,10 +83,7 @@ impl Provider for GitLab {
             .find(|w| w.starts_with("http"))
             .unwrap_or(out.trim())
             .to_owned();
-        let Some(iid) = url.rsplit('/').next().filter(|n| n.parse::<u64>().is_ok()) else {
-            return Ok(url);
-        };
-        let iid = iid.to_owned();
+        let iid = super::created_pr_number(hosting, &url)?;
         // Asked after opening it, one at a time (accounts only: glab asks no group).
         let accounts = gitlab_reviewers(new.reviewers);
         super::ask_reviewers(url, &accounts, |who| {

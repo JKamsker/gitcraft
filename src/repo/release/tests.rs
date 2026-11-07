@@ -308,3 +308,75 @@ fn adversarial_changed_primary_stops_later_publication_but_keeps_local_undo() {
     let _ = std::fs::remove_dir_all(dir);
     let _ = std::fs::remove_dir_all(bare);
 }
+
+#[test]
+fn review9_release_push_uses_selected_forge_remote_and_preserves_normal_upstream() {
+    let _pause = crate::network::test_pause::set(Some(crate::network::Pause::Switch));
+    let (dir, origin) = project("selected-forge");
+    let fork = folder("selected-forge-fork.git");
+    run(&fork, &["init", "-q", "--bare"]);
+    run(
+        &dir,
+        &["remote", "add", "fork", "https://github.com/fork/project"],
+    );
+    // Redirect only this fixture's Git writes to a local bare repository; no forge process
+    // executes, and publication is disabled before running the release.
+    run(
+        &dir,
+        &[
+            "remote",
+            "set-url",
+            "--push",
+            "fork",
+            &fork.to_string_lossy(),
+        ],
+    );
+    let config = std::fs::read(dir.join(".git/config")).unwrap_or_default();
+    let ctx = egui::Context::default();
+    let mut tab = open(&dir, &ctx);
+    assert_eq!(tab.primary_forge_remote(), Some("fork"));
+    assert_eq!(tab.default_remote().as_deref(), Some("origin"));
+    let draft = tab
+        .release
+        .as_ref()
+        .and_then(|r| r.draft.as_ref())
+        .and_then(|d| d.as_ref().ok());
+    assert_eq!(
+        draft.and_then(|d| d.remote.as_deref()),
+        Some("fork"),
+        "release preview must push to the same repository it publishes on"
+    );
+    if let Some(view) = &mut tab.release {
+        view.form.publish = false;
+    }
+    tab.release_act(ReleaseAct::Run, &ctx);
+    wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
+    assert_eq!(statuses(&tab), [Status::Done, Status::Done, Status::Done]);
+    assert!(
+        git::resolve(&fork, "refs/tags/v2.3.2").is_ok(),
+        "selected fork must receive the tag"
+    );
+    assert!(
+        git::resolve(&origin, "refs/tags/v2.3.2").is_err(),
+        "ordinary origin must not receive the release tag"
+    );
+    assert_eq!(
+        git::run(Some(&dir), &["config", "branch.main.remote"]).map(|s| s.trim().to_owned()),
+        Ok("origin".into())
+    );
+    assert_eq!(
+        std::fs::read(dir.join(".git/config")).unwrap_or_default(),
+        config
+    );
+    assert_eq!(
+        tab.release
+            .as_ref()
+            .and_then(|v| v.run.as_ref())
+            .and_then(|r| r.hosting.as_ref())
+            .map(|h| h.path.as_str()),
+        Some("fork/project")
+    );
+    let _ = std::fs::remove_dir_all(dir);
+    let _ = std::fs::remove_dir_all(origin);
+    let _ = std::fs::remove_dir_all(fork);
+}

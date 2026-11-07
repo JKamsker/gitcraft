@@ -464,6 +464,7 @@ pub(crate) fn run_step(
         }
         Step::Publish => {
             let hosting = hosting.ok_or("The repository isn't on a forge gitcraft knows")?;
+            check_publication_destination(repo, plan, hosting)?;
             let url = hosting.forge.provider().create_release(
                 repo,
                 hosting,
@@ -478,11 +479,45 @@ pub(crate) fn run_step(
         }
         Step::Upload => {
             let hosting = hosting.ok_or("The repository isn't on a forge gitcraft knows")?;
+            check_publication_destination(repo, plan, hosting)?;
             hosting
                 .forge
                 .provider()
                 .upload_assets(repo, hosting, &plan.tag, &plan.assets)?;
         }
+    }
+    Ok(())
+}
+
+/// A push URL, URL rewrite, or a remote edited during the release must not publish on a
+/// repository that did not receive its tag. Read this before each forge mutation, including
+/// resumed uploads; Git's configured transport routing itself is never rewritten.
+fn check_publication_destination(
+    repo: &Path,
+    plan: &Plan,
+    hosting: &Hosting,
+) -> Result<(), String> {
+    let remote = plan
+        .push
+        .as_deref()
+        .ok_or("Publication needs the release's push destination")?;
+    let urls = git::run(
+        Some(repo),
+        &["remote", "get-url", "--push", "--all", "--", remote],
+    )?;
+    let expected = format!("{}/{}", hosting.web.trim_end_matches('/'), hosting.path);
+    let urls = urls
+        .lines()
+        .filter(|url| !url.trim().is_empty())
+        .collect::<Vec<_>>();
+    if urls.is_empty()
+        || !urls.iter().all(|url| {
+            crate::forge::web_url(url).is_some_and(|url| url.eq_ignore_ascii_case(&expected))
+        })
+    {
+        return Err(format!(
+            "Release publication stopped: the push destination of {remote} does not match the selected forge repository {expected}. Local release changes remain undoable."
+        ));
     }
     Ok(())
 }

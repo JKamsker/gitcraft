@@ -169,7 +169,12 @@ impl RepoTab {
             run: None,
         });
         let repo = self.path.clone();
-        let remote = self.default_remote();
+        // This explicit release pushes the tag to the forge where it will be published.
+        // Ordinary push/fetch defaults and the branch's upstream remain independent.
+        let remote = self
+            .primary_forge_remote()
+            .map(str::to_owned)
+            .or_else(|| self.default_remote());
         let hosting = self.hosting.clone();
         self.forge_then(
             ctx,
@@ -317,8 +322,11 @@ impl RepoTab {
                         // Signing in, then Resume, pushes with what was typed.
                         if auth {
                             let url = tab
-                                .default_remote()
-                                .and_then(|r| tab.remotes.iter().find(|x| x.name == r))
+                                .release
+                                .as_ref()
+                                .and_then(|v| v.run.as_ref())
+                                .and_then(|r| r.plan.push.as_ref())
+                                .and_then(|r| tab.remotes.iter().find(|x| &x.name == r))
                                 .map(|r| r.url.clone())
                                 .unwrap_or_default();
                             tab.last_op = None;
