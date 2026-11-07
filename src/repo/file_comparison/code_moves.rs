@@ -159,7 +159,8 @@ pub(super) fn read(
     }
     assemble(label, patches, notes, source, &pins)
 }
-fn paths(bytes: &[u8]) -> Result<(Vec<(String, char)>, Vec<String>), String> {
+type ChangedPaths = (Vec<(String, char)>, Vec<String>);
+fn paths(bytes: &[u8]) -> Result<ChangedPaths, String> {
     let mut fields = bytes.split(|b| *b == 0).filter(|f| !f.is_empty());
     let mut paths = Vec::new();
     let mut notes = Vec::new();
@@ -362,7 +363,7 @@ mod tests {
         }
     }
     #[test]
-    fn finds_an_edited_reindented_cross_file_block_with_shared_markers() {
+    fn finds_an_edited_reindented_cross_file_block_with_shared_markers() -> Result<(), String> {
         let a = patch(
             "old/module.rs",
             "-fn important_validation_function(value: i32) {\n-    validate_input(value);\n-    let amount = 1;\n-    record_the_validation_result(value);\n-}\n",
@@ -377,8 +378,7 @@ mod tests {
             vec![],
             2,
             &["a".repeat(40), "b".repeat(40)],
-        )
-        .unwrap();
+        )?;
         assert_eq!(data.locations.len(), 1);
         let b = &data.data.moves.blocks[0];
         assert!(!b.exact);
@@ -388,56 +388,50 @@ mod tests {
         assert_eq!(data.data.moves.at(b.add.start), Some((0, true)));
         assert_eq!(
             moved_view::Opened::new(&data.data, 0)
-                .unwrap()
+                .ok_or("Missing moved block")?
                 .edited_lines(),
             1
         );
+        Ok(())
     }
     #[test]
-    fn same_file_moves_are_left_to_the_existing_diff() {
+    fn same_file_moves_are_left_to_the_existing_diff() -> Result<(), String> {
         let a = patch(
             "one.rs",
             "-fn important_validation_function() {}\n context\n+fn important_validation_function() {}\n",
         );
         assert!(
-            assemble("".into(), vec![a], vec![], 0, &[])
-                .unwrap()
+            assemble("".into(), vec![a], vec![], 0, &[])?
                 .locations
                 .is_empty()
         );
+        Ok(())
     }
     #[test]
-    fn paths_preserve_literal_metacharacters_and_refuse_conflicts() {
-        assert_eq!(paths(b"M\0a\n:(glob)*\0").unwrap().0[0].0, "a\n:(glob)*");
+    fn paths_preserve_literal_metacharacters_and_refuse_conflicts() -> Result<(), String> {
+        assert_eq!(paths(b"M\0a\n:(glob)*\0")?.0[0].0, "a\n:(glob)*");
         assert!(paths(b"U\0a\0").is_err());
+        Ok(())
     }
     #[test]
-    fn reads_staged_commit_range_and_working_snapshots() {
+    fn reads_staged_commit_range_and_working_snapshots() -> Result<(), String> {
         use crate::git::file_comparison::tests::Repo;
-        let temp = Repo::new().unwrap();
+        let temp = Repo::new()?;
         let p = &temp.0;
-        let git = |_: &Path, args: &[&str]| temp.git(args).unwrap();
         let content = "fn important_validation_function(value: i32) {\n    validate_input(value);\n    record_the_validation_result(value);\n}\n";
-        std::fs::write(p.join("a.rs"), content).unwrap();
-        git(p, &["add", "."]);
-        git(p, &["commit", "-qm", "base"]);
-        std::fs::write(p.join("a.rs"), "").unwrap();
-        std::fs::write(p.join("b.rs"), content).unwrap();
-        git(p, &["add", "."]);
-        let data = read(p, 0, "", "", &|| true).unwrap();
-        assert_eq!(data.locations.len(), 1);
-        git(p, &["commit", "-qm", "move"]);
-        assert_eq!(read(p, 1, "", "HEAD", &|| true).unwrap().locations.len(), 1);
-        assert_eq!(
-            read(p, 2, "HEAD~1", "HEAD", &|| true)
-                .unwrap()
-                .locations
-                .len(),
-            1
-        );
-        std::fs::write(p.join("a.rs"), content).unwrap();
-        std::fs::write(p.join("b.rs"), "").unwrap();
-        assert_eq!(read(p, 3, "", "", &|| true).unwrap().locations.len(), 1);
+        temp.write("a.rs", content)?;
+        temp.commit()?;
+        temp.write("a.rs", "")?;
+        temp.write("b.rs", content)?;
+        temp.git(&["add", "."])?;
+        assert_eq!(read(p, 0, "", "", &|| true)?.locations.len(), 1);
+        temp.commit()?;
+        assert_eq!(read(p, 1, "", "HEAD", &|| true)?.locations.len(), 1);
+        assert_eq!(read(p, 2, "HEAD~1", "HEAD", &|| true)?.locations.len(), 1);
+        temp.write("a.rs", content)?;
+        temp.write("b.rs", "")?;
+        assert_eq!(read(p, 3, "", "", &|| true)?.locations.len(), 1);
         assert!(read(p, 3, "", "", &|| false).is_err());
+        Ok(())
     }
 }

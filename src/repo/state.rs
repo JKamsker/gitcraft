@@ -257,16 +257,16 @@ impl DiffView {
         // The blocks are found again, numbered anew.
         self.moved = None;
         self.reopen();
-        if let Some((old, new)) = self.pending_line_target.take() {
-            if let Some(Ok(data)) = &self.data {
-                self.jump_line = data.lines.iter().position(|l| {
-                    if let Some(n) = new {
-                        l.kind != diff::Kind::Del && l.new == Some(n)
-                    } else {
-                        old.is_some() && l.old == old
-                    }
-                });
-            }
+        if let Some((old, new)) = self.pending_line_target.take()
+            && let Some(Ok(data)) = &self.data
+        {
+            self.jump_line = data.lines.iter().position(|l| {
+                if let Some(n) = new {
+                    l.kind != diff::Kind::Del && l.new == Some(n)
+                } else {
+                    old.is_some() && l.old == old
+                }
+            });
         }
         self.moved = match (&self.data, place) {
             (Some(Ok(data)), Some(place)) => (0..data.moves.blocks.len())

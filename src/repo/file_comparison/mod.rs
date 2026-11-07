@@ -61,7 +61,7 @@ pub(crate) enum Page {
 }
 enum Data {
     Migration(files::Migration),
-    CodeMoves(code_moves::CodeMoves),
+    CodeMoves(Box<code_moves::CodeMoves>),
     Lens(Box<model::LensData>),
     Matrix(files::Matrix),
 }
@@ -246,9 +246,8 @@ impl RepoTab {
                         .is_some_and(|g| g.load(Ordering::Relaxed) == request)
                 };
                 let result = match page {
-                    Page::CodeMoves => {
-                        code_moves::read(&repo, source, &from, &to, &active).map(Data::CodeMoves)
-                    }
+                    Page::CodeMoves => code_moves::read(&repo, source, &from, &to, &active)
+                        .map(|data| Data::CodeMoves(Box::new(data))),
                     Page::Migration => files::read_migration(
                         &repo,
                         &match source {

@@ -227,7 +227,7 @@ impl<'a> Rows<'a> {
                     for row in start..end {
                         let h = g.height(row);
                         if split {
-                            self.split_row(ui, row, view, (width / 2.0).floor(), 0.0, h, acts);
+                            self.split_row(ui, row, view, ((width / 2.0).floor(), 0.0, h), acts);
                         } else {
                             let (rect, _) = ui.allocate_exact_size(vec2(width, h), Sense::hover());
                             self.line(ui, rect, row, Side::Unified, 0.0, acts);
@@ -241,7 +241,7 @@ impl<'a> Rows<'a> {
                         let half = (view.width() / 2.0).floor();
                         let overflow = (NUM_W + 24.0 + longest * char_w + 16.0 - half).max(0.0);
                         for row in range {
-                            self.split_row(ui, row, view, half, overflow, LINE_H, acts);
+                            self.split_row(ui, row, view, (half, overflow, LINE_H), acts);
                         }
                     } else {
                         let width = (NUM_W * 2.0 + 24.0 + longest * char_w + 24.0)
@@ -350,11 +350,10 @@ impl<'a> Rows<'a> {
         ui: &mut Ui,
         row: usize,
         view: Rect,
-        half: f32,
-        overflow: f32,
-        height: f32,
+        dimensions: (f32, f32, f32),
         acts: &mut Vec<Action>,
     ) {
+        let (half, overflow, height) = dimensions;
         let Some(&(l, r)) = self.data.split.get(row) else {
             return;
         };
