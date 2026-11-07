@@ -682,7 +682,7 @@ fn analysis_output(
     if out.stdout.len() > MAX || out.stderr.len() > MAX {
         return Err("A history page exceeded 16 MiB".into());
     }
-    if isolated && !active() {
+    if isolated && !active() && after_options(args).first() != Some(&"update-ref") {
         return Err("Content recovery cancelled".into());
     }
     Ok(out)

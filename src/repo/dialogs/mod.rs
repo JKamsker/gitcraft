@@ -293,7 +293,7 @@ pub(super) enum Outcome {
 impl RepoTab {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         if !matches!(self.dialog, Some(Dialog::ContentRecovery)) {
-            self.content_recovery.cancel();
+            self.content_recovery.dismiss();
         }
         let content_recovery = &mut self.content_recovery;
         let Some(dialog) = &mut self.dialog else {
@@ -499,11 +499,11 @@ impl RepoTab {
                 self.dialog = None;
             }
             Outcome::Cancel => {
-                self.content_recovery.cancel();
+                self.content_recovery.dismiss();
                 self.dialog = None;
             }
             Outcome::Open if response.should_close() => {
-                self.content_recovery.cancel();
+                self.content_recovery.dismiss();
                 self.dialog = None;
             }
             Outcome::Open => {}

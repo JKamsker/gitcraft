@@ -55,6 +55,7 @@ pub(crate) struct Identity {
     pub host: Option<remote::Host>,
     pub common: String,
     pub root: Option<String>,
+    pub root_pin: Option<file::RootPin>,
     pub format: String,
 }
 #[derive(Clone, Debug, Default)]
@@ -135,7 +136,11 @@ impl<'a> Reader<'a> {
         )
     }
     pub fn run(&self, args: &[&str], input: Option<&[u8]>) -> Result<Vec<u8>, String> {
-        let out = self.output(args, input)?;
+        let out = self.output(args, input).map_err(|error| {
+            if args.first() == Some(&"update-ref") && (error.to_ascii_lowercase().contains("cancel") || error.contains("timed out")) {
+                format!("Ref recovery was interrupted and may have completed. Inspect the branch/stash list before retrying: {error}")
+            } else { error }
+        })?;
         if out.code == 0 && out.stderr.is_empty() {
             Ok(out.stdout)
         } else {
@@ -170,8 +175,9 @@ impl<'a> Reader<'a> {
             Ok(value.to_owned())
         };
         let bare = text(&["rev-parse", "--is-bare-repository"])? == "true";
-        let identity = Identity {
+        let mut identity = Identity {
             host: remote::parse(self.repo).map(|target| target.host),
+            root_pin: None,
             common: text(&["rev-parse", "--path-format=absolute", "--git-common-dir"])?,
             root: if bare {
                 None
@@ -180,6 +186,10 @@ impl<'a> Reader<'a> {
             },
             format: text(&["rev-parse", "--show-object-format"])?,
         };
+        identity.root_pin = identity
+            .root
+            .as_deref()
+            .and_then(|root| file::capture(self, root).ok());
         if !matches!(identity.format.as_str(), "sha1" | "sha256") {
             return Err("Unsupported object format".into());
         }
@@ -206,6 +216,9 @@ fn search_inner(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<R
         shallow: reader.run(&["rev-parse", "--is-shallow-repository"], None)? == b"true\n",
         ..Default::default()
     };
+    if identity.root.is_some() && identity.root_pin.is_none() {
+        report.notes.push("Safe file recovery is unavailable because this machine could not verify the working-root filesystem identity. Branch/stash recovery remains available.".into());
+    }
     let fsck = reader.output(
         &[
             "fsck",

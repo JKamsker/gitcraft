@@ -124,7 +124,10 @@ impl State {
                     self.prepared = None;
                 }
                 if ui
-                    .add_enabled(enabled, egui::Button::new("Preview file recovery…"))
+                    .add_enabled(
+                        enabled && preview.identity.root_pin.is_some(),
+                        egui::Button::new("Preview file recovery…"),
+                    )
                     .clicked()
                 {
                     outcome =
@@ -157,7 +160,7 @@ impl State {
             }
             if let Some(prepared) = self.prepared.clone() {
                 ui.group(|ui|{
-                    match &prepared.target {Target::File(path)=>{ui.label(format!("Create {path} with {} raw bytes. Nothing existing will be replaced.",prepared.preview.bytes.len()));},Target::Branch(name)=>{ui.label(format!("Create branch {name} at the saved commit. HEAD and working files stay unchanged."));},Target::Stash=>{ui.label("Return this dropped stash to the stash list, preserving the current stash. Do not apply it or change staged/working files.");}}
+                    match &prepared.target {Target::File(path)=>{ui.label(format!("Create {}/{path} with {} raw bytes. Nothing existing will be replaced.",prepared.preview.identity.root_pin.as_ref().map(|pin|pin.physical.as_str()).or(prepared.preview.identity.root.as_deref()).unwrap_or("(unavailable root)"),prepared.preview.bytes.len()));},Target::Branch(name)=>{ui.label(format!("Create branch {name} at the saved commit. The complete saved commit is included; HEAD and working files stay unchanged."));},Target::Stash=>{ui.label("Return this dropped stash to the stash list, preserving the current stash. Do not apply it or change staged/working files.");}}
                     if ui.add_enabled(enabled,egui::Button::new("Recover now")).clicked(){outcome=Outcome::Done(Action::ContentPerform(prepared));}
                 });
             }

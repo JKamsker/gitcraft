@@ -51,6 +51,13 @@ impl State {
         self.pending = None;
         self.began = None;
     }
+    pub(super) fn dismiss(&mut self) {
+        self.cancel();
+        self.results = None;
+        self.preview = None;
+        self.prepared = None;
+        self.selected = None;
+    }
     pub(super) fn loading(&self) -> bool {
         self.began.is_some()
     }
@@ -105,7 +112,7 @@ impl RepoTab {
     }
     pub(super) fn poll_content_recovery(&mut self, ctx: &egui::Context) {
         if !matches!(self.dialog, Some(Dialog::ContentRecovery)) {
-            self.content_recovery.cancel();
+            self.content_recovery.dismiss();
             return;
         }
         if self.content_recovery.running.is_some() {

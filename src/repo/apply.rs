@@ -112,7 +112,7 @@ impl RepoTab {
             Action::CheckoutPull(name) => self.checkout_pull(&name, ctx),
             Action::CheckoutRemote(name) => self.checkout_remote(&name, ctx),
             Action::Dialog(dialog) => {
-                self.content_recovery.cancel();
+                self.content_recovery.dismiss();
                 self.dialog = Some(dialog);
             }
             Action::DeleteTag { name, target } => self.delete_tag(name, target, ctx),
