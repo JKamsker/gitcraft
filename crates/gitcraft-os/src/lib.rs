@@ -27,6 +27,7 @@ pub struct Link {
 
 mod private;
 pub use private::{create_private_directory, detach_controller, random_bytes};
+mod controller_reaper;
 mod owned_child;
 #[cfg(windows)]
 mod process_job;

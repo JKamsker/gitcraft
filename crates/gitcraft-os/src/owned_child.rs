@@ -4,7 +4,7 @@ use std::io;
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, ExitStatus};
 
 pub struct OwnedChild {
-    process: Process,
+    process: Option<Process>,
     terminal: Option<Result<ExitStatus, String>>,
 }
 
@@ -12,6 +12,7 @@ struct Process {
     child: Child,
     controller: bool,
     controller_status: Option<ExitStatus>,
+    controller_permit: Option<super::controller_reaper::Permit>,
     #[cfg(unix)]
     status: Option<super::unix_anchor::Status>,
     #[cfg(windows)]
@@ -49,6 +50,11 @@ impl OwnedChild {
         Self::start(command, true)
     }
     fn start(mut command: Command, controller: bool) -> io::Result<Self> {
+        let controller_permit = if controller {
+            Some(super::controller_reaper::reserve()?)
+        } else {
+            None
+        };
         #[cfg(unix)]
         {
             use std::os::unix::process::CommandExt;
@@ -77,45 +83,50 @@ impl OwnedChild {
             (child, Some(job))
         };
         Ok(Self {
-            process: Process {
+            process: Some(Process {
                 child,
                 controller,
                 controller_status: None,
+                controller_permit,
                 #[cfg(unix)]
                 status,
                 #[cfg(windows)]
                 job,
-            },
+            }),
             terminal: None,
         })
     }
 
     /// Diagnostic only; no public operation accepts a process/group number.
     pub fn id(&self) -> u32 {
-        self.process.child.id()
+        self.process.as_ref().map_or(0, |p| p.child.id())
     }
     pub fn stdin(&mut self) -> Option<ChildStdin> {
-        self.process.child.stdin.take()
+        self.process.as_mut()?.child.stdin.take()
     }
     pub fn stdout(&mut self) -> Option<ChildStdout> {
-        self.process.child.stdout.take()
+        self.process.as_mut()?.child.stdout.take()
     }
     pub fn stderr(&mut self) -> Option<ChildStderr> {
-        self.process.child.stderr.take()
+        self.process.as_mut()?.child.stderr.take()
     }
 
     /// Observe exit without releasing the Unix identity anchor. No SIGCHLD handler or
     /// other waiter may reap this private child. Windows retains the Job HANDLE instead.
     pub fn observe(&mut self) -> io::Result<Option<ExitStatus>> {
-        if self.process.controller {
-            if self.process.controller_status.is_none() {
-                self.process.controller_status = self.process.child.try_wait()?;
+        let process = self
+            .process
+            .as_mut()
+            .ok_or_else(|| io::Error::other("owner retired"))?;
+        if process.controller {
+            if process.controller_status.is_none() {
+                process.controller_status = process.child.try_wait()?;
             }
-            return Ok(self.process.controller_status);
+            return Ok(process.controller_status);
         }
         #[cfg(unix)]
         {
-            self.process
+            process
                 .status
                 .as_mut()
                 .ok_or_else(|| io::Error::other("missing group anchor"))?
@@ -123,13 +134,18 @@ impl OwnedChild {
         }
         #[cfg(windows)]
         {
-            self.process.child.try_wait()
+            process.child.try_wait()
         }
     }
 
     /// Finish is idempotent. All group/Job signals precede reaping, including failures.
     pub fn finish(&mut self) -> io::Result<ExitStatus> {
-        finish(&mut self.terminal, &mut self.process)
+        finish(
+            &mut self.terminal,
+            self.process
+                .as_mut()
+                .ok_or_else(|| io::Error::other("owner retired"))?,
+        )
     }
 }
 
@@ -161,9 +177,9 @@ impl Control for Process {
     fn stop(&mut self) -> io::Result<()> {
         if self.controller {
             if self.controller_status.is_none() {
-                self.child.kill()?;
+                self.controller_status = self.child.try_wait()?;
             }
-            return Ok(());
+            return controller_retirement(self.controller_status).map(|_| ());
         }
         #[cfg(unix)]
         {
@@ -191,21 +207,63 @@ impl Control for Process {
         if let Some(status) = self.controller_status {
             return Ok(status);
         }
+        if self.controller {
+            return Err(io::Error::other(
+                "native owner preserved for receipt recovery",
+            ));
+        }
         // Handle-based/direct-child fallback also bounds a refused group signal.
         let _ = self.child.kill();
         self.child.wait()
     }
 }
 
+// Deliberately has no signal operation: a live native helper is recovery authority.
+fn controller_retirement(status: Option<ExitStatus>) -> io::Result<ExitStatus> {
+    status.ok_or_else(|| {
+        io::Error::other("native owner still running; cleanup unknown, helper preserved")
+    })
+}
+
 impl Drop for OwnedChild {
     fn drop(&mut self) {
-        let _ = self.finish();
+        if self.finish().is_err()
+            && self.process.as_ref().is_some_and(|p| p.controller)
+            && let Some(mut process) = self.process.take()
+            && let Some(permit) = process.controller_permit.take()
+        {
+            super::controller_reaper::retain(process.child, permit);
+        }
     }
 }
 
 #[cfg(test)]
 mod recording_tests {
     use super::*;
+    #[test]
+    fn live_controller_retirement_has_no_signal_authority() {
+        assert!(controller_retirement(None).is_err());
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            assert_eq!(
+                controller_retirement(Some(ExitStatus::from_raw(0)))
+                    .ok()
+                    .and_then(|s| s.code()),
+                Some(0)
+            );
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::ExitStatusExt;
+            assert_eq!(
+                controller_retirement(Some(ExitStatus::from_raw(0)))
+                    .ok()
+                    .and_then(|s| s.code()),
+                Some(0)
+            );
+        }
+    }
     #[derive(Default)]
     struct Recording {
         events: Vec<&'static str>,

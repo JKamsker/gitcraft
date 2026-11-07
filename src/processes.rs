@@ -595,6 +595,11 @@ async fn execute(
     }
     let mut remote_confirmed = stopped.is_none() || options.stop_remote.is_none();
     if stopped.is_some() {
+        // A native helper owns another group/Job. Deliver controller EOF before control
+        // recovery; an unconfirmed helper is retained for reaping, never killed here.
+        if options.native_controller {
+            input = None;
+        }
         #[cfg(test)]
         if let Some(trace) = trace {
             trace.stage(trace::Stage::Stopping);
