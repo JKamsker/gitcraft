@@ -271,7 +271,10 @@ fn pointer_ui_roundtrip_searches_inspects_prepares_and_recovers_a_new_file() -> 
         }
     }
     let mut time = 0.0;
-    let shapes = frame(&mut tab, &ctx, &mut time, vec![]);
+    let shapes = (0..3)
+        .map(|_| frame(&mut tab, &ctx, &mut time, vec![]))
+        .last()
+        .unwrap_or_default();
     click(
         &mut tab,
         &ctx,
@@ -285,7 +288,10 @@ fn pointer_ui_roundtrip_searches_inspects_prepares_and_recovers_a_new_file() -> 
         vec![egui::Event::Text("parse_header".into())],
     );
     assert_eq!(tab.content_recovery.query, "parse_header");
-    let shapes = frame(&mut tab, &ctx, &mut time, vec![]);
+    let shapes = (0..3)
+        .map(|_| frame(&mut tab, &ctx, &mut time, vec![]))
+        .last()
+        .unwrap_or_default();
     click(
         &mut tab,
         &ctx,
@@ -299,12 +305,18 @@ fn pointer_ui_roundtrip_searches_inspects_prepares_and_recovers_a_new_file() -> 
             .as_ref()
             .is_some_and(|results| !results.report.hits.is_empty())
     );
-    let shapes = frame(&mut tab, &ctx, &mut time, vec![]);
+    let shapes = (0..3)
+        .map(|_| frame(&mut tab, &ctx, &mut time, vec![]))
+        .last()
+        .unwrap_or_default();
     click(&mut tab, &ctx, &mut time, point(&shapes, " · file · ")?);
     finish(&mut tab, &ctx)?;
     assert!(tab.content_recovery.preview.is_some());
     let destination = tab.content_recovery.file.clone();
-    let shapes = frame(&mut tab, &ctx, &mut time, vec![]);
+    let shapes = (0..3)
+        .map(|_| frame(&mut tab, &ctx, &mut time, vec![]))
+        .last()
+        .unwrap_or_default();
     click(
         &mut tab,
         &ctx,
@@ -314,7 +326,10 @@ fn pointer_ui_roundtrip_searches_inspects_prepares_and_recovers_a_new_file() -> 
     finish(&mut tab, &ctx)?;
     assert!(tab.content_recovery.prepared.is_some());
     assert!(!path.join(&destination).exists());
-    let shapes = frame(&mut tab, &ctx, &mut time, vec![]);
+    let shapes = (0..3)
+        .map(|_| frame(&mut tab, &ctx, &mut time, vec![]))
+        .last()
+        .unwrap_or_default();
     click(&mut tab, &ctx, &mut time, point(&shapes, "Recover now")?);
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
