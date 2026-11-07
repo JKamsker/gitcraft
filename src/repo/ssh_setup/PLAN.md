@@ -1,12 +1,12 @@
-# SSH key helper implementation checkpoint (unvalidated WIP)
+# SSH key helper implementation checkpoints
 
 Exact queue: issue43 SSH key helper; no overlapping open PR, and PR95 explicitly
 leaves this SSH-key case for this helper. Base is reviewed consolidated c56d050.
 
-The first static unit builds inert command plans and recording-oriented assertions.
-It is not connected to the app and has not run a process, generated/read a key,
-contacted an agent/account/host, or run Cargo. Complete UI/runner wiring and fixture
-gates are still required before claiming the feature implemented.
+The first static unit (1269c54) built inert command plans and recording-oriented
+assertions before any execution. Later units below wire the app and add fixture-only
+validation. No user keys, accounts or hosts are used during development. Final gates
+and independent review remain recorded separately against an immutable commit.
 
 - All steps are explicit. New ed25519 keys live inside an exclusively created new
   user-selected folder; local runner must use create_dir (never create_dir_all),
@@ -47,3 +47,17 @@ probe and eventual one-use upload, preventing a later login change from retarget
 Only fixture/recording tests are added; no actual key/account action has run. Local compile
 and targeted gates are the next step after preserving this unit. CI remains disabled until
 the final consolidated work and reviews are complete.
+
+Initial all-target cargo check passed at3c51d18, with an unused import removed in5d2bfaf.
+The initial targeted run passed31 tests and exposed one invalid WSL name in a fixture;
+1ba6633 corrects that fixture to the accepted distribution-name grammar and adds owned
+recording shell/CLI tests. d7f616c adds scoped Forgejo/Gitea loopback request validation,
+while remote tea shows actual account API information before explicit upload confirmation.
+The opening-UI fixture proves that displaying all four steps creates no key folder,
+worker, account request or terminal and does not mutate profile metadata.
+
+Every source unit is committed and pushed before checks/retries. Only installed basic
+shell utilities, owned fake SSH/forge tools and owned loopback endpoints are executed by
+new runtime tests. No actual ssh-keygen/ssh-add/ssh transport/forge action is executed.
+The direct diagnostic intentionally bypasses user aliases/proxies; use the actual server
+and port. A missing agent is explained rather than automatically launching a daemon.

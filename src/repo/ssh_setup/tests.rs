@@ -442,3 +442,36 @@ esac"#,
         Ok(())
     }
 }
+
+#[test]
+fn opening_setup_ui_exposes_each_step_without_running_tools_or_changing_profiles()
+-> Result<(), String> {
+    use egui_kittest::{Harness, kittest::Queryable};
+    Context::default().run(|| {
+        let fixture = Fixture::new()?;
+        let ctx = egui::Context::default();
+        let mut state = fixture.state(&ctx);
+        state.folder = fixture.0.join("new key").to_string_lossy().into_owned();
+        state.key = fixture.0.join("selected").to_string_lossy().into_owned();
+        let profile = Settings::get(&ctx).profile();
+        let harness = Harness::builder()
+            .with_size(egui::vec2(1200., 1400.))
+            .build_ui_state(|ui, state: &mut State| state.fields(ui), state);
+        for label in [
+            "1. Create ed25519 key",
+            "2. Add selected key",
+            "3. Upload public key",
+            "4. Test with ssh -T",
+        ] {
+            assert!(harness.query_by_label_contains(label).is_some());
+        }
+        assert!(
+            harness.state().receiver.is_none()
+                && harness.state().command.is_none()
+                && harness.state().account.is_none()
+        );
+        assert!(!fixture.0.join("new key").exists());
+        assert_eq!(Settings::get(&ctx).profile(), profile);
+        Ok(())
+    })
+}
