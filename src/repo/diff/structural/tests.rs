@@ -424,6 +424,47 @@ fn syntax_view_draws_read_only_and_patch_fallback_cannot_stage_lines() -> Result
     assert!(!text.contains("Stage file"), "{text}");
     assert!(!text.contains("Stage hunk"), "{text}");
     assert!(!text.contains("Stage 1 line"), "{text}");
+    assert!(tab.find_in().is_some(), "patch fallback retains Find");
+    tab.apply(Action::DiffStep(1), &ctx);
+    assert!(
+        tab.diff.as_ref().is_some_and(|v| v.jump.is_some()),
+        "patch fallback retains change navigation"
+    );
+    if let Some(view) = &mut tab.diff {
+        view.structural.result = Some(model::parse(
+            br#"{"language":"Rust","status":"created"}"#,
+            "",
+            "fn f() {}",
+        ));
+        view.jump = None;
+        view.key = DiffKey::Commit {
+            hash: git::head(&repo.0),
+            path: "a.rs".to_owned(),
+        };
+    }
+    assert!(
+        tab.find_in().is_none(),
+        "successful Syntax has no patch Find"
+    );
+    tab.apply(Action::DiffStep(1), &ctx);
+    assert!(tab.diff.as_ref().is_some_and(|v| v.jump.is_none()));
+    let mut syntax = ctx.run_ui(egui::RawInput::default(), |ui| {
+        egui::CentralPanel::default().show(ui, |ui| tab.diff_view(ui, &mut actions));
+    });
+    let labels = syntax
+        .shapes
+        .iter()
+        .filter_map(|s| match &s.shape {
+            egui::Shape::Text(t) => Some(t.galley.text()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    syntax.textures_delta.clear();
+    assert!(
+        !labels.contains("Revert file") && !labels.contains("Revert 1 line"),
+        "{labels}"
+    );
     tab.apply(Action::DiffStructural(false), &ctx);
     assert!(tab.diff.as_ref().is_some_and(|v| v.chosen.is_empty()));
     Ok(())
