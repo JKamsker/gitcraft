@@ -327,7 +327,7 @@ pub(super) fn assemble(
 pub(super) fn oid(v: &str) -> bool {
     matches!(v.len(), 40 | 64) && v.bytes().all(|b| b.is_ascii_hexdigit())
 }
-fn thread(d: &Value, head: &str, viewer: &str, can_resolve: bool, open: bool) -> Option<Thread> {
+fn thread(d: &Value, mr: &Value, viewer: &str, can_resolve: bool, open: bool) -> Option<Thread> {
     let notes = items(d, "/notes");
     let first = notes.first()?;
     let p = first.get("position")?;
