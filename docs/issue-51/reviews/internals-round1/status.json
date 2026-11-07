@@ -1,0 +1,37 @@
+{
+  "candidate": "3e5b685a17d9351ae59dd89cd4c148358c9644bd",
+  "content_verdict": "FAIL",
+  "other_reviewers": "in progress",
+  "artifacts": [
+    {
+      "source": "/tmp/gitcraft-internals-content-r1.rs",
+      "archive": "00-gitcraft-internals-content-r1.rs.gz",
+      "sha256": "6e9a520bc67850e5ce9094b1e40db0ac51f85b525dd7f567e0586ead2fb5bec8"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-content-r1-fixture.json",
+      "archive": "01-gitcraft-internals-content-r1-fixture.json.gz",
+      "sha256": "a09acce3ec7e7df95216f08c8361abe2a510b29dea5addd6ecd603c7d07ccfec"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-content-r1-reftable-fixture.json",
+      "archive": "02-gitcraft-internals-content-r1-reftable-fixture.json.gz",
+      "sha256": "a0c275f69509332a0c50ad01602629483b19649920c25a2d9452a3a12c6e4324"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-content-r1-reftable.log",
+      "archive": "03-gitcraft-internals-content-r1-reftable.log.gz",
+      "sha256": "ea44988af2fe73960b78cffae0645ee8ca517f978522b38cf8523dd7e7308be0"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-content-r1.log",
+      "archive": "04-gitcraft-internals-content-r1.log.gz",
+      "sha256": "a19a2d5d91fe5c3fe9b0ed0c95c9820b870adbb75efe7043fad5526df5f7dfda"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-content-r1-env-fixture.json",
+      "archive": "05-gitcraft-internals-content-r1-env-fixture.json.gz",
+      "sha256": "db3530643d4cba4054a0f92283ab5ecef5f5b40bca48d751bf43271a89b9359d"
+    }
+  ]
+}

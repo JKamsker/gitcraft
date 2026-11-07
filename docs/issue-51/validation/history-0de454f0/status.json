@@ -1,0 +1,204 @@
+{
+  "candidate": "0de454f05f8fbdf932fc841b5d696bfc7d9b0cca",
+  "remote_sha_verified": true,
+  "writer_test_executions": 158,
+  "writer_distinct_tests": 156,
+  "independent_review": "in progress",
+  "artifacts": [
+    {
+      "source": "/private/tmp/gitcraft-history-gate-0de454f05f8f/14-plain-rebase-preview.log",
+      "archive": "00-14-plain-rebase-preview.log.gz",
+      "sha256": "4ec558f6008effcf0920ea5df50aee297695771feb4faf5717b77c4f20db3332"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-0de454f05f8f/13-repo-push-.log",
+      "archive": "01-13-repo-push-.log.gz",
+      "sha256": "062f2a2546197d207444fd958cb95c1e9aa9b78a0b5acda7ef72d7c43829a8dd"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-0de454f05f8f/1-rebase-preview-names-rewritten-commits.log",
+      "archive": "02-1-rebase-preview-names-rewritten-commits.log.gz",
+      "sha256": "f13dc0faebda5ce375660cde04e37cc14028063a2ed2124fbb91a1cfb4766d53"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-0de454f05f8f/8-forge-history.log",
+      "archive": "03-8-forge-history.log.gz",
+      "sha256": "9b2073f21f15f87d6470630ed5462eb26cbb3bbc013dd1982e5ee7a1293edf65"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-0de454f05f8f/5-git-drafts.log",
+      "archive": "04-5-git-drafts.log.gz",
+      "sha256": "302d8a680e4c98f05800ac502a97b36a0696576f6cee72b40c184c9724e86953"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-0de454f05f8f/10-cochange.log",
+      "archive": "05-10-cochange.log.gz",
+      "sha256": "82f237424c5aaf4be229d157f3b038e9815855ec12999619b7ec5cf4385a2feb"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-0de454f05f8f/9-line-dossier.log",
+      "archive": "06-9-line-dossier.log.gz",
+      "sha256": "4ccf949e8eb363f393c28d26bcc777a571aca67d2e6bde76cea53220d4fda9cf"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-0de454f05f8f/3-timeline-hover-restores.log",
+      "archive": "07-3-timeline-hover-restores.log.gz",
+      "sha256": "79b3ef6eb4adfa5986203b984c2febce34644710fc0580b8a06bd2852e0857d3"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-0de454f05f8f/4-git-recovery.log",
+      "archive": "08-4-git-recovery.log.gz",
+      "sha256": "7baa43c372085e39f5f4973a46cf84ad7599dba5f80bdeb40bb961ebdabd2e63"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-0de454f05f8f/2-saved-views.log",
+      "archive": "09-2-saved-views.log.gz",
+      "sha256": "73b5c5b26695c6341d0a3323c2c2e092a70073f40fb2a2aca4e9c8ffb590741b"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-0de454f05f8f/0-repo-rebase-weather-tests.log",
+      "archive": "10-0-repo-rebase-weather-tests.log.gz",
+      "sha256": "444943728362db57d06371415d0e6f618132cf518c16aaaa4f1acd7d20036dcb"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-0de454f05f8f/11-symbol-biography.log",
+      "archive": "11-11-symbol-biography.log.gz",
+      "sha256": "64ecd7bf9a39fc9a65bb8e6e2d23127c80399d08dad20f66f225ddd60baee515"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-0de454f05f8f/7-git-investigations.log",
+      "archive": "12-7-git-investigations.log.gz",
+      "sha256": "836b180d5b8fea1be55a35c7209d1733ac80ee476e0ff2b98cc4cc5ac894fcf2"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-0de454f05f8f/12-push-preflight.log",
+      "archive": "13-12-push-preflight.log.gz",
+      "sha256": "fcc74ed18ae2e1617719438f7f3e63e3c1f8bcfff5f46cddea13682c60144c9a"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-0de454f05f8f/6-working-drafts.log",
+      "archive": "14-6-working-drafts.log.gz",
+      "sha256": "979728f2db20b42a258a27a62bd98455e1256f24aee3dbb4ec14591b2a32b565"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-no-default-0de454f0.log",
+      "archive": "15-gitcraft-history-gate-no-default-0de454f0.log.gz",
+      "sha256": "0c29f88466bc2d9629ef7572af3accb8a60acf1c1c4dd293a8af025f89f460b2"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-check-tests-0de454f0.log",
+      "archive": "16-gitcraft-history-gate-check-tests-0de454f0.log.gz",
+      "sha256": "3257a4720231433294c75e3df6cba711120a7db70206e529f98cbfcff9da9e4e"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-build-0de454f0.log",
+      "archive": "17-gitcraft-history-gate-build-0de454f0.log.gz",
+      "sha256": "a59ad3d91c838699a5daa9f938ffad75bab17ec97e3b7ff3b6b70eb081915d9e"
+    },
+    {
+      "source": "/private/tmp/gitcraft-history-gate-clippy-0de454f0.log",
+      "archive": "18-gitcraft-history-gate-clippy-0de454f0.log.gz",
+      "sha256": "882f7b4ba3e57f42d125e43d25b568d46a3d630bd172697801b2f388cc698050"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-1.log",
+      "archive": "19-gitcraft-draft-fixed-repeat-1.log.gz",
+      "sha256": "8d35dbea0d335dc388e4ba3355bb69dfe9f57f09576249e62393775356169f36"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-11.log",
+      "archive": "20-gitcraft-draft-fixed-repeat-11.log.gz",
+      "sha256": "2297a6915ac5c459b957721c786e70805b5af9a06104f3ce85d689490b9ffd07"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-10.log",
+      "archive": "21-gitcraft-draft-fixed-repeat-10.log.gz",
+      "sha256": "1e1313593358362836610929410ccec39d065cd204c0aa036df5496c0819aea1"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-0.log",
+      "archive": "22-gitcraft-draft-fixed-repeat-0.log.gz",
+      "sha256": "724f4781dfe467e8a7c0973b83e8da4cd2f343b2f2db50e3b3c67a09ce4a04ae"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-2.log",
+      "archive": "23-gitcraft-draft-fixed-repeat-2.log.gz",
+      "sha256": "ecc297c6c2e66898d1807d42a236af0c3b56ce34a3686bb4f989e52e306eece7"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-12.log",
+      "archive": "24-gitcraft-draft-fixed-repeat-12.log.gz",
+      "sha256": "93ca161a76b3eb8ef095089cfb5c35f4d768349627e015b5d94b3e9896243c3e"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-13.log",
+      "archive": "25-gitcraft-draft-fixed-repeat-13.log.gz",
+      "sha256": "e0bc9cf5742e42b990b83426efb26d01bf4ec949020a9aab81a2e0ff93a1bfec"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-3.log",
+      "archive": "26-gitcraft-draft-fixed-repeat-3.log.gz",
+      "sha256": "6eca38a8941e4f893941ca2e47458a503406f7990ccbf1e2b9d36ff76359846d"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-17.log",
+      "archive": "27-gitcraft-draft-fixed-repeat-17.log.gz",
+      "sha256": "215e4bdb9f40909637fdb95df51a6c8702a03c364bddfb64aa0bffee6a836775"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-7.log",
+      "archive": "28-gitcraft-draft-fixed-repeat-7.log.gz",
+      "sha256": "215e4bdb9f40909637fdb95df51a6c8702a03c364bddfb64aa0bffee6a836775"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-6.log",
+      "archive": "29-gitcraft-draft-fixed-repeat-6.log.gz",
+      "sha256": "38298b1a8156b642d6948a48cd771ea06720e809d84165b80d1c7a284e82f178"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-16.log",
+      "archive": "30-gitcraft-draft-fixed-repeat-16.log.gz",
+      "sha256": "e81578fb845773e5d82fd57e9f7002af15af5ced851ee999b3ba1d2c0f3137e2"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-14.log",
+      "archive": "31-gitcraft-draft-fixed-repeat-14.log.gz",
+      "sha256": "d44ac2d13de1ff9932c6e7f6a699eee68157e3d9c1a391e6d740d2686fd68dfa"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-4.log",
+      "archive": "32-gitcraft-draft-fixed-repeat-4.log.gz",
+      "sha256": "f6cedae2b917c9f81c51a1a68c5fc682f9bcf6d1e208de98379c82d257e2db05"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-5.log",
+      "archive": "33-gitcraft-draft-fixed-repeat-5.log.gz",
+      "sha256": "93ca161a76b3eb8ef095089cfb5c35f4d768349627e015b5d94b3e9896243c3e"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-15.log",
+      "archive": "34-gitcraft-draft-fixed-repeat-15.log.gz",
+      "sha256": "6eca38a8941e4f893941ca2e47458a503406f7990ccbf1e2b9d36ff76359846d"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-18.log",
+      "archive": "35-gitcraft-draft-fixed-repeat-18.log.gz",
+      "sha256": "ecc297c6c2e66898d1807d42a236af0c3b56ce34a3686bb4f989e52e306eece7"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-8.log",
+      "archive": "36-gitcraft-draft-fixed-repeat-8.log.gz",
+      "sha256": "6eca38a8941e4f893941ca2e47458a503406f7990ccbf1e2b9d36ff76359846d"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-9.log",
+      "archive": "37-gitcraft-draft-fixed-repeat-9.log.gz",
+      "sha256": "1e1313593358362836610929410ccec39d065cd204c0aa036df5496c0819aea1"
+    },
+    {
+      "source": "/private/tmp/gitcraft-draft-fixed-repeat-19.log",
+      "archive": "38-gitcraft-draft-fixed-repeat-19.log.gz",
+      "sha256": "93ca161a76b3eb8ef095089cfb5c35f4d768349627e015b5d94b3e9896243c3e"
+    }
+  ]
+}
