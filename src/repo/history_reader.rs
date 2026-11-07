@@ -86,3 +86,62 @@ impl<T: Send + 'static> Reader<T> {
         answer
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::{Duration, Instant},
+    };
+    #[test]
+    fn replacement_keeps_one_owned_worker_until_completion_and_only_latest_answer()
+    -> Result<(), String> {
+        let ctx = egui::Context::default();
+        let tab = crate::repo::RepoTab::new_deferred("/nonexistent/reader-fixture".into(), &ctx);
+        let mut reader = Reader::default();
+        let started = Arc::new(AtomicUsize::new(0));
+        let (entered, entry) = mpsc::channel();
+        let (release, released) = mpsc::channel();
+        let count = started.clone();
+        reader.queue(move |active| {
+            count.fetch_add(1, Ordering::SeqCst);
+            entered.send(()).map_err(|e| e.to_string())?;
+            released
+                .recv_timeout(Duration::from_secs(3))
+                .map_err(|e| e.to_string())?;
+            assert!(!active());
+            Ok(1)
+        });
+        reader.poll(&tab.tx, &ctx);
+        entry
+            .recv_timeout(Duration::from_secs(3))
+            .map_err(|e| e.to_string())?;
+        for id in 2..102 {
+            let count = started.clone();
+            reader.queue(move |_| {
+                count.fetch_add(1, Ordering::SeqCst);
+                Ok(id)
+            });
+            assert!(reader.poll(&tab.tx, &ctx).is_none());
+        }
+        assert_eq!(started.load(Ordering::SeqCst), 1);
+        release.send(()).map_err(|e| e.to_string())?;
+        let begin = Instant::now();
+        loop {
+            if let Some(answer) = reader.poll(&tab.tx, &ctx) {
+                assert_eq!(answer?, 101);
+                break;
+            }
+            if begin.elapsed() > Duration::from_secs(3) {
+                return Err("Latest read did not finish".into());
+            }
+            std::thread::yield_now();
+        }
+        assert_eq!(started.load(Ordering::SeqCst), 2);
+        Ok(())
+    }
+}

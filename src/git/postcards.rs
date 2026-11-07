@@ -72,3 +72,15 @@ fn parse(output: &[u8]) -> Result<Vec<Commit>, String> {
     }
     Ok(commits)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn metadata_parser_bounds_release_size_and_rejects_incomplete_records() {
+        let item = format!("{}\0\0Canonical\02026-11-07\0Release\0\n", "a".repeat(40));
+        assert_eq!(parse(item.as_bytes()).map(|c| c.len()), Ok(1));
+        assert!(parse(item.repeat(LIMIT + 1).as_bytes()).is_err());
+        assert!(parse(b"abc\0truncated").is_err());
+    }
+}
