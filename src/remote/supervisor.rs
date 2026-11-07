@@ -131,6 +131,50 @@ impl Lease {
     }
 }
 
+/// Remove the out-of-band ownership handshake before output capture or callbacks. Only
+/// the first valid exact-nonce endpoint is accepted. Command stderr starts after its gate.
+pub(super) struct Marker {
+    nonce: String,
+    lease: Lease,
+    pending: Vec<u8>,
+    established: bool,
+}
+impl Marker {
+    pub(super) fn new(nonce: String, lease: Lease) -> Self {
+        Self {
+            nonce,
+            lease,
+            pending: Vec::new(),
+            established: false,
+        }
+    }
+    pub(super) fn feed(&mut self, bytes: &[u8]) -> Vec<u8> {
+        if self.established {
+            return bytes.to_vec();
+        }
+        self.pending.extend_from_slice(bytes);
+        let mut output = Vec::new();
+        while let Some(end) = self.pending.iter().position(|&b| b == b'\n') {
+            let line: Vec<_> = self.pending.drain(..=end).collect();
+            if let Some(hello) = line.strip_prefix(b"__GITCRAFT_OWNER__ ") {
+                if let Some(endpoint) = Endpoint::parse(hello, &self.nonce) {
+                    self.lease.accept(endpoint);
+                    self.established = true;
+                    output.append(&mut self.pending);
+                    break;
+                }
+                output.extend_from_slice(b"gitcraft: invalid ownership handshake\n");
+            } else {
+                output.extend_from_slice(&line);
+            }
+        }
+        if self.pending.len() > 4096 {
+            output.append(&mut self.pending);
+        }
+        output
+    }
+}
+
 /// Probe a backend before dispatching repository code. Core Perl is a fallback on macOS
 /// and minimal SSH/WSL hosts without Python; hosts with neither get an actionable preflight
 /// failure. Never fall back to sh job control, process discovery, or raw PID termination.
@@ -236,6 +280,29 @@ mod recording_tests {
         assert!(!format!("{ep:?}").contains(&ep.token));
         Ok(())
     }
+    #[test]
+    fn split_streaming_handshake_is_private_and_cannot_replace_the_owner() -> Result<(), String> {
+        let ep = endpoint()?;
+        let handshake = format!("__GITCRAFT_OWNER__ O1 ab {} {}\n", ep.path, ep.token);
+        for cut in 0..=handshake.len() {
+            let lease = Lease::default();
+            let mut marker = Marker::new("ab".into(), lease.clone());
+            let mut output = marker.feed(&handshake.as_bytes()[..cut]);
+            output.extend(marker.feed(&handshake.as_bytes()[cut..]));
+            output.extend(marker.feed(b"Receiving objects: 42%\r"));
+            assert_eq!(output, b"Receiving objects: 42%\r");
+            assert_eq!(lease.endpoint(), Some(ep.clone()));
+        }
+        let lease = Lease::default();
+        let mut marker = Marker::new("ac".into(), lease.clone());
+        assert_eq!(
+            marker.feed(handshake.as_bytes()),
+            b"gitcraft: invalid ownership handshake\n"
+        );
+        assert!(lease.endpoint().is_none());
+        Ok(())
+    }
+
     #[test]
     fn actual_writer_never_reports_partial_or_flush_failure_as_success() {
         struct Recording {

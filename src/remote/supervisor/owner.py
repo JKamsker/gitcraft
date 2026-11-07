@@ -252,8 +252,15 @@ def serve():
     controller = os.fdopen(os.dup(0), 'rb', buffering=0)
     print('__GITCRAFT_READY__', flush=True)
     while True:
-        line = controller.readline((96 << 20) + 1)
-        if not line: return
+        line = bytearray()
+        while len(line) <= 96 << 20:
+            chunk = os.read(controller.fileno(), 65536)
+            if not chunk: return
+            line.extend(chunk)
+            if b'\n' in chunk: break
+        if len(line) > 96 << 20 or line.count(b'\n') != 1 or not line.endswith(b'\n'):
+            raise ValueError('oversized or pipelined request')
+        line = bytes(line)
         if line.startswith(b'P '):
             sys.stdout.buffer.write(line); sys.stdout.buffer.flush(); continue
         req = json.loads(line)
@@ -271,6 +278,7 @@ def main():
     elif mode == 'control':
         print(json.dumps(control(json.loads(sys.stdin.buffer.readline(2049)))), flush=True)
     elif mode == 'stream':
+        print('\n__GITCRAFT_READY__', flush=True)
         fd = os.open(sys.argv[2], os.O_RDONLY | os.O_NOFOLLOW)
         with os.fdopen(fd, 'rb') as f: req = json.load(f)
         os.unlink(sys.argv[2])

@@ -571,23 +571,6 @@ pub(super) fn run_coded(dir: &Path, args: &[&str]) -> Result<(i32, Vec<u8>), Str
     }
 }
 
-/// Starts git in `dir` with its output piped, for a caller that reads it bit by bit.
-pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Child, String> {
-    if let Some(target) = remote::parse(dir) {
-        return remote::spawn(
-            &target.host,
-            &remote_request(&target, &Extra::default(), args),
-        );
-    }
-    let mut cmd = git_cmd();
-    with_profile(&mut cmd, args);
-    cmd.arg("-C").arg(dir).args(args);
-    cmd.stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
-    cmd.spawn().map_err(|e| format!("could not run git: {e}"))
-}
-
 /// What a [`run_call`] is run with besides its arguments.
 #[derive(Default)]
 pub struct Call {

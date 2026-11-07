@@ -9,8 +9,7 @@
 //! deadlines and cancellation stop and reap through the same owner without opening a second
 //! connection. Ambiguous delivery is never retried.
 
-use std::io::{Read, Write};
-use std::process::{Child, Command, Stdio};
+use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
@@ -201,26 +200,6 @@ fn exec_if_connected_inner(
 /// [`exec_if_connected`] to use it: a connection only those reads would use is left to close.
 const UNASKED_FRESH: Duration = Duration::from_secs(240);
 
-/// Stops the process `pid` on `host` (a command that hung, or the shell it hung in) and
-/// everything it started, however deep, in the background: politely, then for good. The
-/// processes are listed first, as one stopped leaves what it started to another parent. The
-/// thread doing it is given back, for a caller that has to wait for it.
-pub fn stop(host: Host, pid: u32) -> std::thread::JoinHandle<()> {
-    let cleanup = Cleanup::new();
-    std::thread::spawn(move || {
-        let _cleanup = cleanup;
-        let _ = exec_inner(
-            &host,
-            &Request {
-                script: stop_script(pid),
-                timeout: Some(Duration::from_secs(30)),
-                ..Request::default()
-            },
-            true,
-        );
-    })
-}
-
 static CLEANUPS: (std::sync::Mutex<usize>, std::sync::Condvar) =
     (std::sync::Mutex::new(0), std::sync::Condvar::new());
 
@@ -256,44 +235,6 @@ pub(super) fn wait_for_cleanup() {
     }
 }
 
-/// Stops the process `pid` on `host` and everything it started (see [`stop`]): a command the
-/// user asked to stop.
-pub fn stop_process(host: &Host, pid: u32) {
-    stop(host.clone(), pid);
-}
-
-/// [`stop`], waiting until it is done (from a thread that may wait).
-pub fn stop_now(host: &Host, pid: u32) {
-    let _ = exec_inner(
-        host,
-        &Request {
-            script: stop_script(pid),
-            timeout: Some(Duration::from_secs(30)),
-            ..Request::default()
-        },
-        true,
-    );
-}
-
-/// The script [`stop`] runs (and a command stopped here, on Unix): `pid` and its descendants (from `ps`, which every system has with
-/// these options), else `pid` alone.
-pub fn stop_script(pid: u32) -> String {
-    format!(
-        concat!(
-            "all=$(ps -A -o pid= -o ppid= 2>/dev/null | awk -v root={pid} '",
-            "{{ up[$1] = $2 }} END {{ print root; seen[root] = 1; more = 1; ",
-            "while (more) {{ more = 0; for (p in up) if (!(p in seen) && (up[p] in seen)) ",
-            "{{ seen[p] = 1; print p; more = 1 }} }} }}')\n",
-            "[ -n \"$all\" ] || all={pid}\n",
-            "kill -TERM $all 2>/dev/null\n",
-            "sleep 2\n",
-            "kill -KILL $all 2>/dev/null\n",
-            "true\n",
-        ),
-        pid = pid
-    )
-}
-
 /// Prepared standalone stream for the shared asynchronous process service. Persistent
 /// shells and their protocol are deliberately unchanged.
 pub(crate) struct Streaming {
@@ -301,14 +242,39 @@ pub(crate) struct Streaming {
     pub input: Vec<u8>,
     pub ready: &'static str,
     pub connected: Option<Box<dyn FnOnce() + Send>>,
+    pub lease: super::supervisor::Lease,
+    nonce: String,
+    host: Host,
+}
+impl Streaming {
+    pub(crate) fn configure(self, options: &mut crate::processes::Options) -> Command {
+        options.input = Some(self.input);
+        options.hold_input = true;
+        options.stdout_ready = Some(self.ready);
+        options.ready = self.connected;
+        let mut marker = super::supervisor::Marker::new(self.nonce, self.lease.clone());
+        options.stderr_filter = Some(Box::new(move |bytes| marker.feed(bytes)));
+        let ready = self.lease.clone();
+        options.stop_ready = Some(Box::new(move || ready.endpoint().is_some()));
+        let lease = self.lease;
+        let host = self.host;
+        options.stop_remote = Some(Box::new(move || {
+            let endpoint = lease
+                .endpoint()
+                .ok_or("no ownership handshake; cleanup remains unknown")?;
+            stop_endpoint(&host, &endpoint)
+        }));
+        self.command
+    }
 }
 
 pub(crate) fn streaming_command(host: &Host, req: &Request) -> Result<Streaming, String> {
     super::ui_guard::off_ui_thread(&req.what())?;
     let (command, attempt) = shell_command(host, false);
+    let nonce = nonce();
     let input = format!(
-        "{MORE_PATH}\nprintf '\\n%s\\n' {READY}\n{}\n",
-        inline(req, "</dev/null")
+        "{MORE_PATH}\n{}",
+        super::supervisor::streaming(req, &nonce, None)?
     )
     .into_bytes();
     Ok(Streaming {
@@ -316,63 +282,33 @@ pub(crate) fn streaming_command(host: &Host, req: &Request) -> Result<Streaming,
         input,
         ready: READY,
         connected: attempt.map(|a| Box::new(move || a.connected()) as Box<dyn FnOnce() + Send>),
+        lease: Default::default(),
+        nonce,
+        host: host.clone(),
     })
 }
 
-/// Starts `req` on `host` in a process of its own, whose output the caller reads as it comes
-/// (a long `git log`): from the command's first byte on, what a login printed skipped.
-pub fn spawn(host: &Host, req: &Request) -> Result<Child, String> {
-    super::ui_guard::off_ui_thread(&req.what())?;
-    let (mut cmd, attempt) = shell_command(host, false);
-    cmd.stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = cmd.spawn().map_err(|e| start_error(host, &e))?;
-    let script = format!(
-        "{MORE_PATH}\nprintf '\\n%s\\n' {READY}\n{}\n",
-        inline(req, "</dev/null")
-    );
-    let written = child
-        .stdin
-        .take()
-        .map(|mut stdin| stdin.write_all(script.as_bytes()));
-    let ready = match (written, child.stdout.as_mut()) {
-        (Some(Ok(())), Some(stdout)) => skip_to_ready(stdout),
-        _ => false,
-    };
-    if !ready {
-        let _ = child.kill();
-        let _ = child.wait();
-        // What ssh said, as far as it comes in a moment (a proxy can hold the pipe open).
-        let said = child
-            .stderr
-            .take()
-            .map(|stderr| super::shell::said_on_ending(stderr, super::shell::SAID_WITHIN))
-            .unwrap_or_default();
-        return Err(format!("could not reach {}: {said}", host.label()));
-    }
-    if let Some(attempt) = attempt {
-        attempt.connected();
-    }
-    Ok(child)
-}
-
-/// Reads `stdout` up to and with the line [`READY`], a byte at a time (so nothing after it is
-/// taken from the caller); `false` when it ended first.
-fn skip_to_ready(stdout: &mut std::process::ChildStdout) -> bool {
-    let mut line = Vec::new();
-    let mut byte = [0u8; 1];
-    loop {
-        match stdout.read(&mut byte) {
-            Ok(1) if byte[0] == b'\n' => {
-                if line == READY.as_bytes() {
-                    return true;
-                }
-                line.clear();
-            }
-            Ok(1) => line.push(byte[0]),
-            _ => return false,
-        }
+pub(crate) fn stop_endpoint(
+    host: &Host,
+    endpoint: &super::supervisor::Endpoint,
+) -> Result<(), String> {
+    let _cleanup = Cleanup::new();
+    let (command, _connection) = shell_command(host, false);
+    let out = crate::processes::run_cleanup(
+        command,
+        crate::processes::Options {
+            input: Some(endpoint.control_script()?.into_bytes()),
+            timeout: Some(Duration::from_secs(10)),
+            output_limit: 4096,
+            stderr_limit: Some(4096),
+            ..Default::default()
+        },
+    )?
+    .complete()?;
+    if out.status.success() && endpoint.confirms(&out.stdout) {
+        Ok(())
+    } else {
+        Err("the supervisor did not confirm its atomic stop/reap receipt".into())
     }
 }
 
@@ -478,14 +414,6 @@ fn shell_command(host: &Host, serialize: bool) -> (Command, Option<Connection>) 
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
     (cmd, connection)
-}
-
-fn start_error(host: &Host, e: &std::io::Error) -> String {
-    let program = match host {
-        Host::Ssh(_) => "ssh",
-        Host::Wsl(_) => "wsl.exe",
-    };
-    format!("could not run {program} to reach {}: {e}", host.label())
 }
 
 /// A word that names a shell variable (`GIT_EDITOR`), and nothing else.
@@ -693,30 +621,26 @@ mod tests {
         assert!(!parse_ready(b"login banner\n"));
     }
 
-    /// The stop script ends a process and what it started, however deep.
+    /// This production timeout must acknowledge the owner; no process-list assertion.
     #[cfg(unix)]
     #[test]
     fn stopping_ends_a_whole_tree() -> Result<(), String> {
-        let marker = format!("{}.5", std::process::id() % 1000 + 200);
-        let mut tree = Command::new("sh")
-            .args(["-c", &format!("sh -c 'sleep {marker}; true'; true")])
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        std::thread::sleep(Duration::from_millis(300));
-        let stopped = Command::new("sh")
-            .args(["-c", &stop_script(tree.id())])
-            .status()
-            .map_err(|e| e.to_string())?;
-        assert!(stopped.success());
-        let _ = tree.wait();
-        let left = Command::new("sh")
-            .args([
-                "-c",
-                &format!("ps -A -o args | grep -c '^sleep {marker}$' || true"),
-            ])
-            .output()
-            .map_err(|e| e.to_string())?;
-        assert_eq!(String::from_utf8_lossy(&left.stdout).trim(), "0");
+        let effect = std::env::temp_dir().join(format!("gitcraft-owned-stop-{}", nonce()));
+        let request = Request {
+            script: format!(
+                "sh -c {}",
+                sh_quote(&format!(
+                    "sleep 1; printf survived >{}",
+                    sh_quote(&effect.to_string_lossy())
+                ))
+            ),
+            timeout: Some(Duration::from_millis(200)),
+            ..Default::default()
+        };
+        let result = exec(&Host::Ssh(LOOPBACK.into()), &request);
+        assert!(result.is_err_and(|e| e.contains("confirmed stop and reap")));
+        std::thread::sleep(Duration::from_secs(1));
+        assert!(!effect.exists(), "a child survived cancellation");
         Ok(())
     }
 

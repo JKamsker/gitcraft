@@ -20,21 +20,25 @@ const QUEUED: usize = 256;
 const OUTPUT_LIMIT: usize = 64 << 20;
 const POLL: Duration = Duration::from_millis(20);
 
+pub(crate) type Filter = Box<dyn FnMut(&[u8]) -> Vec<u8> + Send>;
 pub(crate) type Chunk = Box<dyn FnMut(&[u8]) + Send>;
 pub(crate) struct Options {
     pub input: Option<Vec<u8>>,
+    /// Keep the control channel open after flushing a remote request.
+    pub hold_input: bool,
     pub background: bool,
     pub timeout: Option<Duration>,
     pub cancel: Cancellation,
     pub cancelled: Option<Box<dyn Fn() -> bool + Send + Sync>>,
     pub stderr: Option<Chunk>,
+    pub stderr_filter: Option<Filter>,
     pub stdout: Option<Chunk>,
     pub ready: Option<Box<dyn FnOnce() + Send>>,
     /// Stream stdout directly to a file instead of capturing it in memory.
     pub stdout_file: Option<std::fs::File>,
     /// Cleanup on the other machine, before returning a cancelled/timed-out operation.
     /// This is a blocking protocol API, isolated from the I/O loop on bounded workers.
-    pub stop_remote: Option<Box<dyn FnOnce() + Send>>,
+    pub stop_remote: Option<Box<dyn FnOnce() -> Result<(), String> + Send>>,
     pub stop_ready: Option<Box<dyn Fn() -> bool + Send + Sync>>,
     pub stdout_ready: Option<&'static str>,
     pub output_limit: usize,
@@ -46,11 +50,13 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             input: None,
+            hold_input: false,
             background: false,
             timeout: None,
             cancel: crate::tasks::cancellation(),
             cancelled: None,
             stderr: None,
+            stderr_filter: None,
             stdout: None,
             ready: None,
             stdout_file: None,
@@ -119,7 +125,15 @@ impl Ticket {
             .recv()
             .map_err(|_| "Process service stopped before returning a result".to_owned())?
     }
-    #[cfg(test)]
+    pub(crate) fn try_result(&self) -> Option<ResultOutput> {
+        match self.reply.try_recv() {
+            Ok(result) => Some(result),
+            Err(mpsc::TryRecvError::Empty) => None,
+            Err(mpsc::TryRecvError::Disconnected) => Some(Err(
+                "Process service stopped before returning a result".into(),
+            )),
+        }
+    }
     pub(crate) fn cancel(&self) {
         self.cancel.cancel();
     }
@@ -352,6 +366,19 @@ pub(crate) fn service() -> Result<&'static Service, String> {
 pub(crate) fn run(command: Command, options: Options) -> ResultOutput {
     service()?.submit(command, options)?.wait()
 }
+/// Dedicated bounded cleanup capacity cannot deadlock behind the transports whose
+/// owners are waiting for this acknowledgement. It never inherits caller cancellation.
+pub(crate) fn run_cleanup(command: Command, mut options: Options) -> ResultOutput {
+    static CLEANUP: OnceLock<Result<Service, String>> = OnceLock::new();
+    options.cancel = Cancellation::default();
+    let service = CLEANUP.get_or_init(|| Service::new(2, 32).map_err(|e| e.to_string()));
+    service
+        .as_ref()
+        .map_err(Clone::clone)?
+        .submit(command, options)?
+        .wait()
+}
+
 pub(crate) fn counts() -> Option<Counts> {
     SERVICE
         .get()
@@ -483,6 +510,7 @@ async fn execute(
                                                 }
                                             });
                                         }
+                                        consume(&mut options.stdout, &obuf[i+1..n], &mut stopped);
                                         append(&mut stdout, &obuf[i+1..n], options.output_limit, &mut stopped);
                                         break;
                                     }
@@ -498,23 +526,26 @@ async fn execute(
                 match result {
                     Ok(0) => err = None,
                     Ok(n) => {
+                        let filtered = options.stderr_filter.as_mut().map(|filter| filter(&ebuf[..n]));
+                        let bytes = filtered.as_deref().unwrap_or(&ebuf[..n]);
                         if let Some(consume) = &mut options.stderr
-                            && std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| consume(&ebuf[..n]))).is_err() {
+                            && std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| consume(bytes))).is_err() {
                             stopped = Some("process progress callback panicked".into());
                         }
-                        append(&mut stderr, &ebuf[..n], options.stderr_limit.unwrap_or(options.output_limit), &mut stopped);
+                        append(&mut stderr, bytes, options.stderr_limit.unwrap_or(options.output_limit), &mut stopped);
                     }
                     Err(e) => stopped = Some(format!("could not read process errors: {e}")),
                 }
             }
             result = async {
                 match &mut input {
+                    Some(_) if options.hold_input && written == usize::MAX => std::future::pending().await,
                     Some(pipe) => write_input(pipe, options.input.as_deref().unwrap_or_default(), &mut written).await,
                     None => std::future::pending().await,
                 }
             } => {
                 match result {
-                    Ok(true) => input = None,
+                    Ok(true) => { if options.hold_input { written = usize::MAX; } else { input = None; } },
                     Ok(false) => {},
                     Err(e) if e.kind() == io::ErrorKind::BrokenPipe => input = None,
                     Err(e) => stopped = Some(format!("could not pass process its input: {e}")),
@@ -556,7 +587,20 @@ async fn execute(
         if let Some(stop) = options.stop_remote.take()
             && let Ok(_permit) = Arc::clone(blocking).acquire_owned().await
         {
-            let _ = tokio::task::spawn_blocking(stop).await;
+            match tokio::task::spawn_blocking(stop).await {
+                Ok(Ok(())) => {}
+                result => {
+                    let why = match result {
+                        Ok(Err(why)) => why,
+                        Err(e) => e.to_string(),
+                        _ => String::new(),
+                    };
+                    stopped = Some(format!(
+                        "{}; remote cleanup unconfirmed: {why}",
+                        stopped.as_deref().unwrap_or_default()
+                    ));
+                }
+            }
         }
         // finish signals while the Unix leader is unreaped, then reaps exactly once;
         // Windows holds its Job through the final signal. No delayed numeric kills.
@@ -595,10 +639,12 @@ async fn execute(
                     match result {
                         Ok(0) | Err(_) => err = None,
                         Ok(n) => {
+                            let filtered = options.stderr_filter.as_mut().map(|filter| filter(&ebuf[..n]));
+                            let bytes = filtered.as_deref().unwrap_or(&ebuf[..n]);
                             if let Some(consume) = &mut options.stderr {
-                                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| consume(&ebuf[..n])));
+                                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| consume(bytes)));
                             }
-                            append(&mut stderr, &ebuf[..n], options.stderr_limit.unwrap_or(options.output_limit), &mut overflow);
+                            append(&mut stderr, bytes, options.stderr_limit.unwrap_or(options.output_limit), &mut overflow);
                         }
                     }
                 }

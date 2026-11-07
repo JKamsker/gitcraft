@@ -119,7 +119,7 @@ sub run {
                 $SIG{TERM} = 'DEFAULT'; $SIG{HUP} = 'DEFAULT'; $SIG{PIPE} = 'DEFAULT';
                 open(STDIN, '<&', $input) or _exit(125); open(STDOUT, '>&', $out_w) or _exit(125); open(STDERR, '>&', $err_w) or _exit(125);
                 close($input); close($status_w); close($out_w); close($err_w);
-                exec('/bin/sh', '-c', $req->{script}); _exit(125);
+                exec('/bin/sh', '-c', $req->{script}) or _exit(125);
             }
             close($out_w); close($err_w); close($input);
             my $waited; do { $waited = waitpid($child, 0); } while $waited < 0 && $!{EINTR};
@@ -210,7 +210,8 @@ sub serve {
     print "__GITCRAFT_READY__\n";
     while (1) {
         my $line = '';
-        while (length($line) <= (96 << 20)) { my $n = sysread($controller,my $byte,1); return unless $n; $line .= $byte; last if $byte eq "\n"; }
+        while (length($line) <= (96 << 20)) { my $n = sysread($controller,my $part,65536); return unless $n; $line .= $part; last if index($part,"\n") >= 0; }
+        die 'pipelined request rejected' unless $line =~ /\A[^\n]*\n\z/s;
         die 'oversized request' if length($line) > (96 << 20);
         if ($line =~ /\AP ([0-9a-f]{1,96})\n\z/) { print $line; next; }
         my $req = $JSON->decode($line); print "S $req->{nonce}\n";
@@ -229,6 +230,7 @@ if ($mode eq 'probe') { exit(0); }
 elsif ($mode eq 'serve') { serve(); }
 elsif ($mode eq 'control') { my $line = <STDIN>; print encode(control($JSON->decode($line))); }
 elsif ($mode eq 'stream') {
+    print STDOUT "\n__GITCRAFT_READY__\n"; STDOUT->flush;
     my $path = shift(@ARGV); sysopen(my $f,$path,O_RDONLY|O_NOFOLLOW) or die 'request missing'; local $/; my $req = $JSON->decode(<$f>); close($f); unlink($path); (my $dir = $path) =~ s{/[^/]+$}{}; rmdir($dir);
     open(my $controller,'<&',\*STDIN) or die 'controller missing'; cloexec($controller);
     my ($code,$out) = run($req,$controller,1); exit($code);

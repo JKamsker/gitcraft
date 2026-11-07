@@ -441,15 +441,6 @@ fn drain_errors(
     })
 }
 
-/// What a process that has ended said on `stderr`: read to its end, but waited for `within` at
-/// most, as a proxy it started can keep the pipe open after it.
-pub(super) fn said_on_ending(stderr: std::process::ChildStderr, within: Duration) -> String {
-    let said = Arc::new(Mutex::new(String::new()));
-    let drain = drain_errors(stderr, Arc::clone(&said));
-    wait_for(&drain, within);
-    lock(&said).trim().to_owned()
-}
-
 /// Waits for `drain` to end, `within` at most.
 fn wait_for(drain: &std::thread::JoinHandle<()>, within: Duration) {
     let until = Instant::now() + within;

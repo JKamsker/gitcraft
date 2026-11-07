@@ -28,15 +28,11 @@ pub use fs::{
     is_same_dir_as, read, read_to_string, read_within, remove_file, remove_host_scratch_dir,
     same_dir, try_is_dir, try_is_file, try_is_link, worktree_file, write,
 };
+pub use session::LONG_FOR as NETWORK_LIMIT;
 #[cfg(all(test, unix))]
 pub use session::LOOPBACK;
-#[cfg(test)]
-pub use session::stop_script;
-pub(crate) use session::streaming_command;
-pub use session::{LONG_FOR as NETWORK_LIMIT, stop_now};
-pub use session::{
-    Output, Request, exec, exec_if_connected, is_missing_folder, spawn, stop, stop_process,
-};
+pub use session::{Output, Request, exec, exec_if_connected, is_missing_folder};
+pub(crate) use session::{Streaming, streaming_command};
 pub use ui_guard::{mark_ui_thread, refused_on_ui_thread};
 
 /// Whether gitcraft has a connection open to `host` now: asking it something won't connect
