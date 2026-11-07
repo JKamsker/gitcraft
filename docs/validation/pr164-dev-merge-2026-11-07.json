@@ -1,0 +1,239 @@
+{
+  "candidate": "978fb9bb97e69193caa0121664ff39a93165f133",
+  "tree": "6cd690921a652cb9ebbbaae294297454f89a5ff2",
+  "new_base": "d7b3757ac4ed1e6a955c5845a898cb1bfca7ff11",
+  "previous_base": "d82b2586aa073d23bc031717576d883d02bd187c",
+  "previous_pr_head": "f6840306add95e4fcbfbd77a229bd61d409363d6",
+  "merge_commit": "80d96e7d45532865fc52d07c6347a8755177ed87",
+  "created_utc": "2026-11-07T18:38:54.022371+00:00",
+  "trigger": {
+    "comments": "The 17-comment wake was the older CodeRabbit batch: all 20 total inline IDs already triaged in pr164-review-2026-11-07.json. The second review was only the publication continuation; no new finding.",
+    "mergeability": "Read-only host snapshot reported CONFLICTING on f6840306 after dev advanced through PR161, PR162, PR165; no check rollup was attached to the conflicting head."
+  },
+  "conflict_resolutions": {
+    "src/graph.rs": "Combine Arc bypass-lane sharing and boxed edges with continuous lane-origin identity; retain both regression tests.",
+    "src/manual.rs": "Retain local Syntax limits and upstream single-click PR comparison documentation.",
+    "src/repo/columns.rs": "Keep upstream70px minimum and width-formula regression assertions.",
+    "src/repo/graph_view/badge.rs": "Integrate current/default branch priority, stable deterministic ties and remote dedup with reusable indexes. Cache head/current metadata too.",
+    "src/repo/graph_view/pills.rs": "Retain upstream focused PR pills and narrow-column priorities, shortening preference; retain AA fills, clipping, adaptive sizing.",
+    "src/repo/load.rs": "Retain upstream fixed shared read pools; detect Gerrit after joining reads.",
+    "src/settings/mod.rs": "Retain both auto-fit and keep-end/start preferences; use shared70px minimum."
+  },
+  "integration_fixes": [
+    "Route bounded Git and Difftastic through shared subprocess service with inherited task cancellation, timeouts and background priority; delete private polling/read-thread/kill paths.",
+    "Add optional independent stderr limit to the shared service; other callers retain prior behavior.",
+    "Check cancellation before creating bundle output.",
+    "Complete bundle and full-message loading through then_or on rejection/cancellation/panic, retaining request ownership checks."
+  ],
+  "rejected_review": {
+    "candidate": "bd123f249cbbdf61c2d4052992234539f629aaff",
+    "result": "FAIL",
+    "findings": [
+      "Private Git/Syntax runners bypass tab cancellation/shared subprocess service.",
+      "Generic then strands bundle loading/message pending after bounded queue rejection."
+    ],
+    "resolved_in": "70c439dd0c370e6581d4d0240ea06853b36916df"
+  },
+  "review": {
+    "result": "PASS",
+    "candidate": "978fb9bb97e69193caa0121664ff39a93165f133",
+    "verbatim_result": "PASS \u2014 978fb9bb97e69193caa0121664ff39a93165f133. The sole change preserves the 70px minimum while retaining existing width buckets above it. The full integration review PASS carries forward. No tests or CI executed.",
+    "application_review": "PASS \u2014 pinned f60b241a35bc91ef43eb907a924b84a596ff8425 versus dev d7b3757ac4ed1e6a955c5845a898cb1bfca7ff11. Both prior blockers are fixed: Git/Syntax runners inherit cancellation through the shared process service, and rejected bundle/message reads complete their owner-checked state. Independent stderr limits remain intact. No additional blocking semantic or lifecycle regressions found. Read-only review; build, tests, and native Windows validation remain parent-side gates.",
+    "reviewer": "independent adversarial review agent /root/review_codex_integration",
+    "execution": "Read-only source review; no additional tests or CI claimed."
+  },
+  "validation": {
+    "platform": "macOS arm64, Rust1.95.0",
+    "environment": {
+      "TMPDIR": "/private/tmp",
+      "SHELL": "/tmp/gitcraft-integration-tools/validation-shell",
+      "PATH_prefix": "/tmp/gitcraft-integration-tools",
+      "tools": "Official Difftastic0.72.0 and GNU sed4.10; same normalized environment as preceding full suite."
+    },
+    "focused_command": "target/debug/deps/gitcraft-a471af9e9f6bcb96 --test-threads=1 git::bundles repo::bundles repo::dialogs::bundles repo::diff::structural repo::graph_view repo::columns repo::pr_view::select settings::branch_names settings::tests gerrit theme::catalog processes::tests tasks::tests graph::tests palette",
+    "focused_result": "224 passed;0 failed;0 ignored;2900 filtered;19.30seconds",
+    "build_command": "cargo +1.95.0 test --locked --all-targets --no-run",
+    "clippy_command": "cargo +1.95.0 clippy --locked --all-targets -- -D warnings -A dead_code",
+    "format_command": "cargo +1.95.0 fmt --all -- --check",
+    "full_command": "cargo +1.95.0 test --locked -- --test-threads=1",
+    "full_result": {
+      "passed": 3124,
+      "failed": 0,
+      "ignored": 9,
+      "filtered": 0,
+      "result_lines": [
+        "test result: ok. 3115 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 551.99s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.32s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.66s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "synthetic_gate": "Four protocol/path and precancelled production-loader checks passed before owned-child tests. No host-wide signal/PID selectors used.",
+    "owned_gate": "Drop a tab during local Git preparation or a tool process, require cancellation completion and no later side-effect marker. Existing deadline/inherited-pipe tests also run.",
+    "rejected_attempts": [
+      "Merge build first lost crate::git import; restored.",
+      "A new fixture called the message loader under the wrong name; corrected to the existing production method.",
+      "The new egui frame fixture initially dropped unapplied textures; first gate3pass1fail. Corrected to clear texture deltas, then repeated the complete preliminary gate before process tests.",
+      "The smaller stderr-cap test exposed a post-stop drain using the stdout cap. Corrected that drain and repeated validation; tab-close cancellation experiments passed on the earlier attempt too.",
+      "Focused integration initially223passed1failed: empty adaptive ref column rounded new70px minimum to96px. Production now preserves exact minimum for empty refs; existing assertion unchanged."
+    ],
+    "binary_sha256": "c27a51d5e64da317c3e31c9dce6bc3ef29ac4576550b81d4cddb8426fc451a0e"
+  },
+  "limitations": [
+    "Native Windows runtime remains pending for this candidate; Unix-only cancellation side-effect experiment does not establish Windows runtime behavior. Shared Windows supervision uses upstream owned Jobs.",
+    "Live SSH/WSL bundle execution not exercised locally. Remote Syntax and bundle import remain deferred.",
+    "Shared process supervisor retains upstream documented limits against deliberate process escapes; no new absolute containment claim."
+  ],
+  "documentation_binding": {
+    "application_candidate": "978fb9bb97e69193caa0121664ff39a93165f133",
+    "rule": "Documentation-only delivery binds these gates after verifying source/crates/manifests/lockfile/tests unchanged."
+  },
+  "logs": {
+    "build-final-4": {
+      "sha256": "56f5e7d08c4552e0c26d2c9c0bbb0e659bcdfbe49f3b13f782f7549a3c826a07",
+      "bytes": 2250,
+      "tail": [
+        "warning: `gitcraft` (lib) generated 6 warnings",
+        "warning: `gitcraft` (lib test) generated 3 warnings (2 duplicates)",
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.85s",
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft-a471af9e9f6bcb96)",
+        "  Executable unittests src/main.rs (target/debug/deps/gitcraft-9f329e5678eb4039)",
+        "  Executable tests/checkpoint_cli.rs (target/debug/deps/checkpoint_cli-e41eeca633127291)",
+        "  Executable tests/mcp_stdio.rs (target/debug/deps/mcp_stdio-ba2fc8f743f21693)",
+        "  Executable unittests examples/image_memory.rs (target/debug/examples/image_memory-7172267f85bc6305)",
+        "  Executable unittests examples/ui_shot.rs (target/debug/examples/ui_shot-32635cd1a722a925)",
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft_os-f792e6e5c14eb1c3)"
+      ]
+    },
+    "clippy-final-4": {
+      "sha256": "0ddb849352fe22aa4306932f53ab9c3635cac8c38de1bae8ca66ec2229808916",
+      "bytes": 151,
+      "tail": [
+        "    Checking gitcraft v0.3.4 (/Users/jonas/.t3/worktrees/gitcraft/t3-bde8f5ba)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.81s"
+      ]
+    },
+    "fmt-final-4": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "tail": []
+    },
+    "synthetic-final": {
+      "sha256": "d5c2ca4b90f2ff0b7c2ce8d91fec2283e76813cf06c1bac247aff32b024c2d13",
+      "bytes": 486,
+      "tail": [
+        "",
+        "running 4 tests",
+        "test git::bundles::tests::windows_bundle_arguments_preserve_drive_unc_unicode_and_long_paths ... ok",
+        "test repo::bundles::tests::rejected_bundle_read_releases_loading_dialog ... ok",
+        "test repo::diff::structural::tests::syntax_supervision_protocol_is_data_only ... ok",
+        "test repo::graph_view::message_tooltip::tests::rejected_message_read_releases_pending_and_can_retry ... ok",
+        "",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 3120 filtered out; finished in 0.04s",
+        ""
+      ]
+    },
+    "owned-final": {
+      "sha256": "5f66ae83d44e2823cf5e3c2156c5a0b33d08c193a3c506aa9667773d8a94836b",
+      "bytes": 430,
+      "tail": [
+        "",
+        "running 3 tests",
+        "test processes::tests::smaller_stderr_limit_stops_a_process_with_large_stdout_budget ... ok",
+        "test repo::diff::structural::tests::a_hung_tool_or_inherited_pipe_times_out_and_large_output_is_bounded ... ok",
+        "test repo::diff::structural::tests::closing_tab_cancels_preparation_and_tool_and_prevents_later_effects ... ok",
+        "",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3121 filtered out; finished in 3.50s",
+        ""
+      ]
+    },
+    "focused-final": {
+      "sha256": "bb790754df16696ae87ff72994fc4673b72d6eac0cad1eedb823386bad308239",
+      "bytes": 20046,
+      "tail": [
+        "test theme::catalog::tests::contrast_changes_preserve_surfaces_terminal_and_graph_colours ... ok",
+        "test theme::catalog::tests::every_builtin_small_text_token_meets_wcag_aa_on_its_surfaces ... ok",
+        "test theme::catalog::tests::ids_are_unique ... ok",
+        "test theme::catalog::tests::the_pro_themes_keep_their_colours ... ok",
+        "test theme::palette::tests::accent_text_is_whichever_reads_better ... ok",
+        "test theme::palette::tests::hex_colours_read_in_every_length ... ok",
+        "test theme::palette::tests::translucent_colours_are_laid_over_their_background ... ok",
+        "",
+        "test result: ok. 224 passed; 0 failed; 0 ignored; 0 measured; 2900 filtered out; finished in 19.30s",
+        ""
+      ]
+    },
+    "full-final": {
+      "sha256": "3afb2689f494cb28f257a76d4425c85091d465fa6eb19baf4618aa0e5ee5cf94",
+      "bytes": 247617,
+      "tail": [
+        "running 0 tests",
+        "",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "",
+        "   Doc-tests gitcraft_os",
+        "",
+        "running 0 tests",
+        "",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        ""
+      ]
+    },
+    "synthetic-rejected": {
+      "sha256": "fcf69b9e93688aa7eb64c1252d679a877501d1fc315aa486124696729c50bca3",
+      "bytes": 1180,
+      "tail": [
+        "thread 'repo::graph_view::message_tooltip::tests::rejected_message_read_releases_pending_and_can_retry' (6350849) panicked at /Users/jonas/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/epaint-0.36.2/src/textures.rs:337:9:",
+        "Dropped TexturesDelta with 1 unapplied deltas. Deltas need to be handled. If you want to drop this intentionally call `clear` before dropping.",
+        "note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
+        "",
+        "",
+        "failures:",
+        "    repo::graph_view::message_tooltip::tests::rejected_message_read_releases_pending_and_can_retry",
+        "",
+        "test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 3120 filtered out; finished in 0.02s",
+        ""
+      ]
+    },
+    "owned-rejected": {
+      "sha256": "09fdb02675959b554b8a6b4c60767432adec8cf553e356dd31d6e6176c846081",
+      "bytes": 900,
+      "tail": [
+        "thread 'processes::tests::smaller_stderr_limit_stops_a_process_with_large_stdout_budget' (6376405) panicked at src/processes.rs:864:9:",
+        "assertion failed: out.stderr.len() <= 1024",
+        "note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
+        "",
+        "",
+        "failures:",
+        "    processes::tests::smaller_stderr_limit_stops_a_process_with_large_stdout_budget",
+        "",
+        "test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 3121 filtered out; finished in 3.53s",
+        ""
+      ]
+    },
+    "focused-rejected": {
+      "sha256": "aa4e1e99b3720f00a8e6943366d7659223cb628a02b34a27a59398c729d73612",
+      "bytes": 20647,
+      "tail": [
+        "  left: 106.0",
+        " right: 80.0",
+        "note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
+        "",
+        "",
+        "failures:",
+        "    repo::graph_view::readability_tests::scrolling_reclaims_empty_refs_without_width_jitter_or_full_history_paint",
+        "",
+        "test result: FAILED. 223 passed; 1 failed; 0 ignored; 0 measured; 2900 filtered out; finished in 19.27s",
+        ""
+      ]
+    }
+  },
+  "durable_log": {
+    "path": "docs/validation/pr164-dev-merge-2026-11-07-tests.log.gz",
+    "sha256": "4c6c2f415672bd45669e3df7dc47e481555c896809f9692b88981357c152f2e0",
+    "uncompressed_sha256": "da3fbfe148130a4fdb209ca2e2b6dcb509d08376ebc22516ce4d5476e19e3e9f"
+  }
+}
