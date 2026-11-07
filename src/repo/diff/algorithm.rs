@@ -72,7 +72,8 @@ pub(in crate::repo) fn algorithm_menu(ui: &mut Ui, path: &str, acts: &mut Vec<Ac
 
 impl RepoTab {
     /// Uses `algorithm` for the open diff's file type from now on, and reads the diff again
-    /// with it, keeping the line at the top of the view at the top.
+    /// with it (also when that was already the choice but the diff was read another way),
+    /// keeping the line at the top of the view at the top.
     pub(in crate::repo) fn set_diff_algorithm(
         &mut self,
         algorithm: Option<DiffAlgorithm>,
@@ -80,14 +81,17 @@ impl RepoTab {
     ) {
         let mut settings = Settings::get(ctx);
         let Some(view) = &mut self.diff else { return };
-        if !keep_algorithm(&mut settings, view.key.path(), algorithm) {
+        let changed = keep_algorithm(&mut settings, view.key.path(), algorithm);
+        // Unchanged, but this diff was read another way (changed in another tab, or forgotten
+        // in the settings): read again all the same.
+        if !changed && view.algorithm == algorithm {
             return;
         }
-        settings.set(ctx);
+        if changed {
+            settings.set(ctx);
+        }
         if let Some(Ok(data)) = &view.data {
-            let split = settings.diff_split;
-            view.keep_place =
-                place_at(data, data.shows_split(split), view.scroll).map(|p| (p, split));
+            view.keep_place = place_at(data, data.shows_split(settings.diff_split), view.scroll);
         }
         self.refresh_diff(ctx);
     }

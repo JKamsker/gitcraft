@@ -421,3 +421,75 @@ fn a_list_changed_in_place_is_worked_out_again() {
         list_fingerprint(&many, String::as_str)
     );
 }
+
+/// A read that failed is tried again once the interval is over, keeping its last answer
+/// meanwhile, and not asked again before.
+#[test]
+fn a_failed_read_is_tried_again_later() {
+    let start = Instant::now();
+    let mut folding = Folding::default();
+    read(&mut folding, &["Cargo.lock"], FoldAttr::NotGenerated);
+    // Forgotten (another commit), and the read again fails.
+    folding.saw_status(&work_with(&[]), "other", start);
+    let unknown = folding.unknown(["Cargo.lock"]);
+    let (epoch, _) = folding.asking(&unknown);
+    folding.arrived(epoch, unknown, HashMap::new(), Some("busy".to_owned()));
+    assert_eq!(
+        folding.reason(&rules(), "Cargo.lock"),
+        None,
+        "last answer kept"
+    );
+    assert!(
+        folding.unknown(["Cargo.lock"]).is_empty(),
+        "not asked again at once"
+    );
+    let wait = folding.tick(Instant::now()).unwrap_or_default();
+    assert!(wait > Duration::from_secs(20));
+    assert!(folding.tick(Instant::now() + REREAD_EVERY).is_some());
+    assert_eq!(
+        folding.unknown(["Cargo.lock"]),
+        vec!["Cargo.lock".to_owned()]
+    );
+    assert_eq!(folding.tick(Instant::now() + REREAD_EVERY * 2), None);
+}
+
+/// An edit of a `.gitattributes` seen too soon after the last read is read once the interval
+/// is over, though nothing else happens by then.
+#[test]
+fn an_edit_seen_too_soon_is_read_when_the_interval_is_over() {
+    let start = Instant::now();
+    let edited = work_with(&[(".gitattributes", 'M')]);
+    let mut folding = Folding::default();
+    folding.saw_status(&edited, "h", start);
+    read(&mut folding, &["gen.rs"], FoldAttr::Generated);
+    folding.saw_status(&edited, "h", start + Duration::from_secs(5));
+    assert!(folding.unknown(["gen.rs"]).is_empty());
+    assert!(
+        folding
+            .tick(start + Duration::from_secs(10))
+            .is_some_and(|w| w > Duration::ZERO)
+    );
+    assert_eq!(
+        folding.tick(start + Duration::from_secs(31)),
+        Some(Duration::ZERO)
+    );
+    assert_eq!(folding.unknown(["gen.rs"]), vec!["gen.rs".to_owned()]);
+}
+
+/// A `.gitattributes` renamed away forgets what it said.
+#[test]
+fn a_gitattributes_renamed_away_forgets_what_was_read() {
+    let start = Instant::now();
+    let mut folding = Folding::default();
+    folding.saw_status(&work_with(&[]), "h", start);
+    read(&mut folding, &["gen.rs"], FoldAttr::Generated);
+    let mut renamed = git::WorkStatus::default();
+    renamed.staged.push(StatusFile {
+        path: "attributes.backup".to_owned(),
+        old_path: Some(".gitattributes".to_owned()),
+        code: 'R',
+        area: Area::Staged,
+    });
+    folding.saw_status(&renamed, "h", start);
+    assert_eq!(folding.unknown(["gen.rs"]), vec!["gen.rs".to_owned()]);
+}

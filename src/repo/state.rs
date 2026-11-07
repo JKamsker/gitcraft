@@ -121,8 +121,12 @@ pub(crate) struct DiffView {
     /// A folded file's lines (a lockfile…) were opened.
     pub(super) unfolded: bool,
     /// Where the view was when the diff was asked for again another way (another algorithm):
-    /// put back at the top once the new reading arrives; with whether diffs show side by side.
-    pub(super) keep_place: Option<(diff::Place, bool)>,
+    /// put back at the top once the new reading arrives.
+    pub(super) keep_place: Option<diff::Place>,
+    /// That place, once the new reading is in: put back at the top in the layout shown then.
+    pub(super) restore: Option<diff::Place>,
+    /// The algorithm the diff was last asked for with (`None`: git's default).
+    pub(super) algorithm: Option<crate::git::DiffAlgorithm>,
     /// A scroll offset to go to on the next frame.
     pub(super) scroll_to: Option<f32>,
 }
@@ -148,6 +152,8 @@ impl DiffView {
             request: 0,
             unfolded: false,
             keep_place: None,
+            restore: None,
+            algorithm: None,
             scroll_to: None,
         }
     }
@@ -163,8 +169,8 @@ impl DiffView {
         if request != self.request {
             return;
         }
-        if let (Some((place, split)), Ok(data)) = (self.keep_place.take(), &result) {
-            self.scroll_to = Some(diff::offset_of_place(data, data.shows_split(split), place));
+        if result.is_ok() {
+            self.restore = self.keep_place.take();
         }
         self.data = Some(result);
         // The lines may have moved.

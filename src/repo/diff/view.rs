@@ -22,12 +22,25 @@ use crate::theme::{self, Tokens};
 impl RepoTab {
     pub(in crate::repo) fn diff_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
+        let settings = Settings::get(ui.ctx());
+        if let Some(view) = &mut self.diff {
+            // Back where it was, read another way: in the layout shown now.
+            if let (Some(Ok(data)), Some(place)) = (&view.data, view.restore) {
+                let split = data.shows_split(settings.diff_split);
+                view.scroll_to = Some(super::offset_of_place(data, split, place));
+                view.restore = None;
+            }
+            // The choice for its file type changed elsewhere (another tab, the settings).
+            let algorithm = super::algorithm_for(&settings, view.key.path());
+            if view.algorithm != algorithm {
+                acts.push(Action::SetDiffAlgorithm(algorithm));
+            }
+        }
         let Some(view) = &self.diff else { return };
         let idle = self.busy_op.is_none();
 
         let (path, origin) = self.diff_origin(&view.key);
         let partial = matches!(&view.data, Some(Ok(d)) if d.partial) && idle;
-        let settings = Settings::get(ui.ctx());
         let (split, ignore_ws, whole_file) = (
             settings.diff_split,
             self.diff_ignore_ws,
@@ -129,7 +142,9 @@ impl RepoTab {
     ) -> Option<fold::FoldReason> {
         let conflicted = matches!(&view.key, DiffKey::Work(f) if f.area == Area::Conflicted);
         let rules = fold::Rules::from_settings(settings);
-        if view.unfolded || conflicted || !rules.on {
+        // A diff that failed to read shows why, folded or not.
+        let failed = matches!(view.data, Some(Err(_)));
+        if view.unfolded || conflicted || failed || !rules.on {
             return None;
         }
         let path = view.key.path();
@@ -138,9 +153,9 @@ impl RepoTab {
             acts.push(Action::FoldAttributes(unknown));
         }
         let reason = self.folding.reason(&rules, path);
-        if reason.is_none() && !self.folding.knows(path) && matches!(view.data, Some(Ok(_))) {
-            // Its lines show before its attributes are known: they stay, rather than fold
-            // away under the reader when the answer comes.
+        if reason.is_none() && matches!(view.data, Some(Ok(_))) {
+            // Its lines show: they stay, rather than fold away under the reader when an
+            // answer about its attributes comes (the first one, or one read again).
             acts.push(Action::UnfoldDiff);
         }
         reason

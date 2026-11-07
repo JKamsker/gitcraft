@@ -224,6 +224,9 @@ impl RepoTab {
         if !shown {
             return;
         }
+        if let Some(wait) = self.folding.tick(Instant::now()) {
+            ctx.request_repaint_after(wait);
+        }
         if let Some((change, at)) = self.fs_pending
             && at.elapsed() > Duration::from_millis(400)
             && !self.loading

@@ -43,6 +43,9 @@ pub(crate) struct Folding {
     seen: (Vec<(String, char)>, String),
     /// When they were last forgotten.
     forgot: Option<Instant>,
+    /// When to forget them next: a read that failed is tried again, an edit seen too soon
+    /// after the last read is read once the interval is over.
+    reread_at: Option<Instant>,
 }
 
 impl Folding {
@@ -53,6 +56,7 @@ impl Folding {
     }
 
     /// Whether anything is known of the attributes of `path` yet.
+    #[cfg(test)]
     pub(super) fn knows(&self, path: &str) -> bool {
         self.attrs.contains_key(path)
     }
@@ -85,9 +89,9 @@ impl Folding {
     }
 
     /// The answer about `paths`, asked at `epoch`: what was `found`, and the error that left
-    /// the others unread. Those count as saying nothing (their names decide) and aren't asked
-    /// again until the attributes are forgotten. An answer asked before they were forgotten
-    /// only fills in paths not read since, and leaves them to be asked again.
+    /// the others unread. Those keep their last answer (or their names decide) and are asked
+    /// again after [`REREAD_EVERY`]. An answer asked before the attributes were forgotten only
+    /// fills in paths not read since, and leaves them to be asked again.
     pub(super) fn arrived(
         &mut self,
         epoch: u64,
@@ -96,6 +100,9 @@ impl Folding {
         error: Option<String>,
     ) {
         let current = epoch == self.epoch();
+        if current && error.is_some() {
+            self.reread_at = Some(Instant::now() + REREAD_EVERY);
+        }
         for path in paths {
             if self.asked.get(&path) == Some(&epoch) {
                 self.asked.remove(&path);
@@ -109,6 +116,14 @@ impl Folding {
                 }
                 None if current && error.is_none() => {
                     self.attrs.insert(path.clone(), FoldAttr::Unspecified);
+                }
+                None if current => {
+                    // Unread: not asked again until it is retried.
+                    self.attrs
+                        .entry(path.clone())
+                        .or_insert(FoldAttr::Unspecified);
+                    self.asked.insert(path, epoch);
+                    continue;
                 }
                 None => {
                     self.attrs
@@ -131,8 +146,13 @@ impl Folding {
             .iter()
             .chain(&work.unstaged)
             .chain(&work.conflicted)
-            .filter(|f| is_attributes_file(&f.path))
-            .map(|f| (f.path.clone(), f.code))
+            // A `.gitattributes` renamed away counts too.
+            .flat_map(|f| {
+                let paths = [Some(&f.path), f.old_path.as_ref()];
+                paths.into_iter().flatten().map(move |p| (p, f.code))
+            })
+            .filter(|(path, _)| is_attributes_file(path))
+            .map(|(path, code)| (path.clone(), code))
             .collect();
         let seen = (changed, head.to_owned());
         let due = self
@@ -141,13 +161,30 @@ impl Folding {
         if seen != self.seen || (!seen.0.is_empty() && due) {
             self.seen = seen;
             self.forget(now);
+        } else if !seen.0.is_empty() {
+            // Edited again, perhaps, too soon after the last read: read once the interval is
+            // over, whether or not anything else happens by then.
+            let at = self.forgot.map_or(now, |at| at + REREAD_EVERY);
+            self.reread_at = Some(self.reread_at.map_or(at, |due| due.min(at)));
         }
+    }
+
+    /// Each frame (at `now`): forgets the attributes when reading them again is due. Returns
+    /// how long until then, to wake the window for it.
+    pub(super) fn tick(&mut self, now: Instant) -> Option<Duration> {
+        let at = self.reread_at?;
+        if now < at {
+            return Some(at - now);
+        }
+        self.forget(now);
+        Some(Duration::ZERO)
     }
 
     /// Forgets what was read: the files of the lists shown are asked about again (their last
     /// answers apply meanwhile), and reads under way stop.
     fn forget(&mut self, now: Instant) {
         self.forgot = Some(now);
+        self.reread_at = None;
         if self.fresh.is_empty() && self.asked.is_empty() {
             return;
         }
