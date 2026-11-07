@@ -373,6 +373,10 @@ fn an_internal_teleport_worktree_is_ignored() -> Result<(), String> {
     let _one = serial();
     let root = scratch("internal-worktree")?;
     let (src, target) = source_with_work(&root)?;
+    // The target can already have changes, including CRLF from Windows' clone defaults.
+    // Verify those stay visible while the new nested checkout is ignored.
+    write(&target.join("existing-note.txt"), b"keep this visible\n")?;
+    let target_before = state_of(&target)?;
     let mut plan = plan_to(&src, &target, &Machine::Here);
     plan.folder = target.join(".worktrees/feature/x");
     let landed = run(&plan, &job())?;
@@ -381,7 +385,7 @@ fn an_internal_teleport_worktree_is_ignored() -> Result<(), String> {
         git(&target, &["check-ignore", "--", ".worktrees/feature/x/"])?
             .contains(".worktrees/feature/x/")
     );
-    assert!(git(&target, &["status", "--porcelain", "--untracked-files=all"])?.is_empty());
+    assert_eq!(state_of(&target)?, target_before);
     let _ = std::fs::remove_dir_all(&root);
     Ok(())
 }
