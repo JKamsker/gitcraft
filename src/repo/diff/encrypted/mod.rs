@@ -17,8 +17,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     mpsc::{self, Receiver},
 };
-#[cfg(test)]
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub(super) struct Row {
     kind: super::line_diff::Edit,
@@ -117,8 +116,8 @@ fn load(
     if !active() {
         return Err("Decryption cancelled.".into());
     }
-    // Practice Git reads retain its reviewed isolation. Failures are generalized so no
-    // custom CLI error or decrypted source can enter app activity/output.
+    // Failures are generalized so no custom CLI diagnostic or decrypted source can
+    // enter app activity/output.
     let (old, new) = private_sides(repo, key, active).map_err(|_| {
         "Could not read both encrypted sides within 2 MiB. Refresh the encrypted patch.".to_owned()
     })?;
@@ -138,29 +137,43 @@ fn load(
     Ok(result)
 }
 
-/// Slow host/Git reads own only ciphertext. Cancellation never leaves decrypted rows
-/// retained in a worker blocked on a remote read or filesystem. The normal Practice-aware
-/// reader runs independently; this owner stops waiting within 20 ms (15 s overall limit).
+/// Slow host/Git reads own only ciphertext. The plaintext owner can drop its rows promptly
+/// on cancellation even while an SSH request is finishing bounded cleanup.
 fn private_sides(
     repo: &Path,
     key: &DiffKey,
     active: &dyn Fn() -> bool,
 ) -> Result<(String, String), String> {
-    reader::read_sides_active(repo, key, active)
+    struct ReadOwner(Arc<AtomicBool>);
+    impl Drop for ReadOwner {
+        fn drop(&mut self) {
+            self.0.store(false, Ordering::Release);
+        }
+    }
+    let flag = Arc::new(AtomicBool::new(true));
+    let _owner = ReadOwner(flag.clone());
+    let (repo, key) = (repo.to_owned(), key.clone());
+    await_ciphertext(
+        move || reader::read_sides_active(&repo, &key, &|| flag.load(Ordering::Acquire)),
+        active,
+    )
 }
 
-#[cfg(test)]
 fn await_ciphertext(
     read: impl FnOnce() -> Result<(String, String), String> + Send + 'static,
     active: &dyn Fn() -> bool,
 ) -> Result<(String, String), String> {
     let (send, receive) = mpsc::channel();
-    submit(move || {
+    submit_with(crate::tasks::cancellation().child(), move || {
         let _ = send.send(read());
     });
+    let start = Instant::now();
     loop {
         if !active() {
             return Err("Decryption cancelled.".into());
+        }
+        if start.elapsed() > Duration::from_secs(15) {
+            return Err("Encrypted source reading exceeded 15 seconds. Retry when the connection and background workers are available.".into());
         }
         match receive.recv_timeout(Duration::from_millis(20)) {
             Ok(result) => return result,
