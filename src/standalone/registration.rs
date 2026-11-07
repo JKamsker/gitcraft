@@ -1,6 +1,8 @@
 //! Explicit named-tool registration. No normal file-tool invocation writes Git configuration.
+#[cfg(test)]
+use std::path::PathBuf;
 use std::{
-    path::{Path, PathBuf},
+    path::Path,
     sync::{Arc, Mutex},
 };
 
@@ -166,13 +168,19 @@ fn panel(ui: &mut egui::Ui, executable: &Path, scope: Scope) {
             },
         );
     }
-    if start {
-        state.pending = true;
-        state.result = None;
-    }
-    *shared
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner) = state;
+    let start = {
+        let mut current = shared
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        current.defaults = state.defaults;
+        if start && !current.pending {
+            current.pending = true;
+            current.result = None;
+            true
+        } else {
+            false
+        }
+    };
     if start {
         let repaint = ui.ctx().clone();
         std::thread::spawn(move || {
