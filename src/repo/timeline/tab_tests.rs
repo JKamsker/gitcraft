@@ -396,6 +396,7 @@ fn back_to_back_operations_are_both_kept() {
     let ctx = egui::Context::default();
     let mut tab = open(&dir, &ctx);
     let _ = std::fs::write(dir.join("a.txt"), "a");
+    git_ok(&dir, &["add", "a.txt"]);
     tab.commit_summary = "first".to_owned();
     tab.apply(Action::Commit, &ctx);
     assert!(wait(&mut tab, &ctx, |t| t.busy_op.is_none()));
@@ -407,6 +408,9 @@ fn back_to_back_operations_are_both_kept() {
         Some(tab.status.clone().map(|(s, _)| s).unwrap_or_default())
     };
     let _ = std::fs::write(dir.join("b.txt"), "b");
+    // The cached status may still show the first commit's staged file. Give
+    // this operation its input without waiting for that status refresh.
+    git_ok(&dir, &["add", "b.txt"]);
     tab.commit_summary = "second".to_owned();
     tab.apply(Action::Commit, &ctx);
     let second_ran = tab.busy_op.is_some();
@@ -422,11 +426,16 @@ fn back_to_back_operations_are_both_kept() {
         t.timeline.entries.iter().all(|e| e.label.contains('“'))
     });
     let path = tab.timeline.path_to(tab.timeline.current);
+    let subjects = git_ok(&dir, &["log", "--format=%s"]);
     let _ = std::fs::remove_dir_all(&dir);
     assert!(second_ran, "{status:?}");
     assert_eq!(labels.len(), 2, "{labels:?} {status:?} {refused:?}");
     assert!(named);
     assert_eq!(path.len(), 2);
+    assert_eq!(
+        subjects.lines().collect::<Vec<_>>(),
+        ["second", "first", "base"]
+    );
     if let Some(status) = refused {
         assert!(status.contains("waiting for the repository"), "{status}");
     }
