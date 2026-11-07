@@ -1,0 +1,28 @@
+{
+  "candidate": "a30f1f178099f5a38f4ae470434972ddbd2e1973",
+  "scope": "Ordinary correctness/end-to-end feature review; no security scan, live remote, user keys, host PID probe, or new Cargo invocation.",
+  "status": "STATIC SOURCE AND AUTHOR EVIDENCE INSPECTED; DIRECT-BINARY CHECKS PLANNED",
+  "verified": {
+    "changed_source_files": 28,
+    "source_hash_mismatches": 0,
+    "author_logs": 7,
+    "log_hash_mismatches": 0,
+    "author_compiler_worktree": "/workspace/work/encrypted-diffs",
+    "author_full_result": "810 passed, 3 ignored, 0 filtered; 813 registered",
+    "author_targeted_result": "20 passed, 793 filtered; generated offline keys fixture executed",
+    "author_inert_result": "11 passed",
+    "frozen_library_binary": "/workspace/work/encrypted-diffs/target/debug/deps/gitcraft-98b7c97eceab1e2d",
+    "frozen_library_binary_sha256": "249eacee81cb9ac5649aad784e7c0b5e64f54897d681e23cd0c35bd4ced6b423",
+    "binary_binding": "Reuse author binary read-only; supplied clean/compile/full logs and 28 checked source hashes bind it to candidate. No independent compilation claimed.",
+    "sops_sha256": "0aec146367f4a4cc825ae32f2db344cd41c162e96a47bfeae7fca4ca5d2e0712",
+    "age_keygen_sha256": "50f849de5f05dc136de3dba623dd2b7e166e7badb9d4e3d83da88f2dbdb2d439"
+  },
+  "fixture_inspection": "Read complete encrypted test fixture first. Real-tool case uses explicit installed executables, env_clear, private HOME/XDG, two newly generated offline age keys, dummy values, fixed input/output format argv, bounded existing owned-child helper, and cleanup of fixture directory. No user keys/config inherited. Other selected tests use only owned local fake SOPS and local disposable Git repositories; no new process controller is exercised.",
+  "plan": [
+    "Run frozen library binary --list to independently confirm 813 registered and 20 SOPS cases.",
+    "Run only repo::diff::encrypted::tests, one thread, with explicit official SOPS3.10.0/age-keygen1.2.1 paths; unset optional SSH/WSL; retain output log and hash.",
+    "Inspect recognition edge cases statically; if useful, use a separate private env-cleared generated-age tool fixture for fixed-format behavior, with dummy plaintext and no repository/user keys.",
+    "Review all staging and view lifecycle entry points; preserve exact PASS/FAIL and limitations. Commit/push the completed evidence unit before any next test."
+  ],
+  "limitations": ["No fresh compile", "No live SSH/WSL or Windows", "Final combined candidate review remains separate"]
+}
