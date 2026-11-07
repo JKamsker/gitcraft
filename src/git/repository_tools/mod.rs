@@ -62,3 +62,4 @@ pub(crate) mod reftable;
 pub(crate) mod remote_config;
 pub(crate) mod replacements;
 pub(crate) mod routes;
+pub(crate) mod submodule_conflict;
