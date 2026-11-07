@@ -109,10 +109,22 @@ impl RepoTab {
             .chain(self.refs.remotes.iter().flat_map(|(_, refs)| refs))
             .filter_map(|branch| self.index.get(&branch.target).copied())
             .collect();
-        let next = self
-            .topology
-            .walk(start, direction, &tips)
-            .filter(|row| !self.is_wip(*row) && self.stash_at(*row).is_none());
+        let real = |row: usize| {
+            row < self.commits.len() && !self.is_wip(row) && self.stash_at(row).is_none()
+        };
+        // Worktree and stash rows deliberately have no topology edges. Enter the
+        // actual history on the first arrow instead of trapping their keyboard focus.
+        let next = if self.selected.is_none() || !real(start) {
+            self.index
+                .get(&self.refs.head)
+                .copied()
+                .filter(|row| real(*row))
+                .or_else(|| (0..self.commits.len()).find(|row| real(*row)))
+        } else {
+            self.topology
+                .walk(start, direction, &tips)
+                .filter(|row| real(*row))
+        };
         if let Some(next) = next {
             if crate::settings::Settings::get(ctx).graph_sounds {
                 let merge = self.commits.get(next).is_some_and(|c| c.parents.len() > 1);
