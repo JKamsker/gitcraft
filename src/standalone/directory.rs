@@ -15,6 +15,73 @@ pub(super) struct Directory {
     _ancestors: Vec<File>,
 }
 impl Directory {
+    #[cfg(target_vendor = "apple")]
+    pub fn file(&self) -> &File {
+        self.handle.as_file()
+    }
+    #[cfg(windows)]
+    pub fn stable_source(&self, name: &OsStr) -> io::Result<File> {
+        use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
+        check_name(name)?;
+        let file = OpenOptions::new()
+            .read(true)
+            .share_mode(0x1)
+            .custom_flags(0x0020_0000)
+            .open(self.path.join(name))?;
+        let meta = file.metadata()?;
+        if !meta.is_file() || meta.file_attributes() & 0x400 != 0 {
+            return Err(io::Error::other("The output changed type"));
+        }
+        Ok(file)
+    }
+    #[cfg(any(windows, target_vendor = "apple"))]
+    pub fn rewrite_owned(
+        &self,
+        name: &OsStr,
+        bytes: &[u8],
+        original: &super::files::Snapshot,
+    ) -> io::Result<File> {
+        check_name(name)?;
+        #[cfg(unix)]
+        let mut file = {
+            use rustix::fs::{Mode, OFlags, openat};
+            File::from(openat(
+                self.handle.as_file(),
+                name,
+                OFlags::WRONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+                Mode::empty(),
+            )?)
+        };
+        #[cfg(windows)]
+        let mut file = {
+            use std::os::windows::fs::OpenOptionsExt;
+            OpenOptions::new()
+                .read(true)
+                .write(true)
+                .custom_flags(0x0020_0000)
+                .open(self.path.join(name))?
+        };
+        let handle = same_file::Handle::from_file(file.try_clone()?)?;
+        if !file.metadata()?.is_file()
+            || original
+                .handle
+                .as_ref()
+                .is_some_and(|h| h.as_ref() == &handle)
+        {
+            return Err(io::Error::other("Unsafe replacement file identity"));
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::MetadataExt;
+            if file.metadata()?.file_attributes() & 0x400 != 0 {
+                return Err(io::Error::other("Replacement is a reparse point"));
+            }
+        }
+        file.set_len(0)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        Ok(file)
+    }
     pub fn open(path: &Path) -> io::Result<Self> {
         #[cfg(unix)]
         let file = {

@@ -3,6 +3,7 @@ mod cli;
 mod directory;
 mod files;
 mod model;
+mod permissions;
 mod save;
 mod ui;
 

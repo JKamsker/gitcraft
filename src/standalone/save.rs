@@ -125,22 +125,13 @@ impl Output {
         let mut recovery = Recovery::new(Arc::clone(&self.parent))?;
         let candidate = OsStr::new("replacement");
         let previous = OsStr::new("previous");
-        let file = recovery
-            .dir()?
-            .create(candidate, bytes)
-            .map_err(|e| e.to_string())?;
-        if let Some(original) = &self.original {
-            let permissions = original
-                .handle
-                .as_ref()
-                .ok_or("No output identity")?
-                .as_file()
-                .metadata()
-                .map_err(|e| e.to_string())?
-                .permissions();
-            file.set_permissions(permissions)
-                .map_err(|e| e.to_string())?;
-        }
+        let file = super::permissions::candidate(
+            recovery.dir()?,
+            &self.parent,
+            &self.name,
+            self.original.as_ref(),
+            bytes,
+        )?;
         drop(file);
         let prepared = Snapshot::from_file(
             &recovery.dir()?.path.join(candidate),
