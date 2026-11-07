@@ -1699,6 +1699,7 @@ name = "gitcraft"
 version = "0.3.4"
 dependencies = [
  "base64 0.22.1",
+ "bytemuck",
  "eframe",
  "egui",
  "egui_commonmark",

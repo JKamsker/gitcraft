@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use egui::{Color32, ColorImage};
+use image::{GenericImageView as _, ImageDecoder as _};
 
 /// The longest side shown at full detail; a larger picture is scaled down to it.
 pub const MAX_SIDE: u32 = 4096;
@@ -19,20 +20,106 @@ pub struct Decoded {
 }
 
 /// `bytes` decoded (PNG, JPEG, GIF, BMP, WebP), at full size, or why not.
-pub fn decode(bytes: &[u8]) -> Result<image::DynamicImage, String> {
-    image::load_from_memory(bytes).map_err(|e| format!("Could not read the picture: {e}"))
+pub fn decode(bytes: &[u8]) -> Result<Picture, String> {
+    decode_picture(bytes).map_err(|e| format!("Could not read the picture: {e}"))
+}
+
+/// RGBA8 images can decode into the final, correctly aligned pixel allocation. Other colour
+/// types retain their native representation until resized, as they may use less memory.
+pub struct Picture(Source);
+
+enum Source {
+    Rgba(Pixels),
+    Other(image::DynamicImage),
+}
+
+struct Pixels {
+    size: (u32, u32),
+    // Unmultiplied until `into_display`, so resampling has exactly the old colour behaviour.
+    rgba: Vec<Color32>,
+}
+
+fn decode_picture(bytes: &[u8]) -> image::ImageResult<Picture> {
+    let reader = image::ImageReader::new(std::io::Cursor::new(bytes)).with_guessed_format()?;
+    let mut decoder = reader.into_decoder()?;
+    // Keep ImageReader::decode's allocation accounting, including its output buffer.
+    let mut limits = image::Limits::default();
+    limits.reserve(decoder.total_bytes())?;
+    decoder.set_limits(limits)?;
+    let source = if decoder.color_type() == image::ColorType::Rgba8 {
+        let size = decoder.dimensions();
+        let mut rgba = vec![Color32::TRANSPARENT; (decoder.total_bytes() / 4) as usize];
+        decoder.read_image(bytemuck::cast_slice_mut(&mut rgba))?;
+        Source::Rgba(Pixels { size, rgba })
+    } else {
+        Source::Other(image::DynamicImage::from_decoder(decoder)?)
+    };
+    Ok(Picture(source))
+}
+
+impl Picture {
+    fn dimensions(&self) -> (u32, u32) {
+        match &self.0 {
+            Source::Rgba(pixels) => pixels.size,
+            Source::Other(img) => img.dimensions(),
+        }
+    }
+
+    fn into_display(self, factor: f64) -> ColorImage {
+        let (width, height) = self.dimensions();
+        let scaled = factor < 1.0;
+        let w = ((f64::from(width) * factor).round() as u32).max(1);
+        let h = ((f64::from(height) * factor).round() as u32).max(1);
+        let rgba = match self.0 {
+            Source::Rgba(mut pixels) if !scaled => {
+                // Premultiply in place; no second full-sized buffer beside the decode.
+                for pixel in &mut pixels.rgba {
+                    let [r, g, b, a] = pixel.to_array();
+                    *pixel = Color32::from_rgba_unmultiplied(r, g, b, a);
+                }
+                return ColorImage::new([width as usize, height as usize], pixels.rgba);
+            }
+            Source::Rgba(pixels) => {
+                image::imageops::resize(&pixels, w, h, image::imageops::FilterType::Triangle)
+            }
+            Source::Other(img) => {
+                let img = if scaled {
+                    let resized = img.resize_exact(w, h, image::imageops::FilterType::Triangle);
+                    drop(img);
+                    resized
+                } else {
+                    img
+                };
+                img.into_rgba8()
+            }
+        };
+        let size = [rgba.width() as usize, rgba.height() as usize];
+        ColorImage::from_rgba_unmultiplied(size, rgba.as_raw())
+    }
+}
+
+impl image::GenericImageView for Pixels {
+    type Pixel = image::Rgba<u8>;
+
+    fn dimensions(&self) -> (u32, u32) {
+        self.size
+    }
+
+    fn get_pixel(&self, x: u32, y: u32) -> Self::Pixel {
+        image::Rgba(self.rgba[y as usize * self.size.0 as usize + x as usize].to_array())
+    }
 }
 
 /// The two pictures ready to compare: scaled down by one factor when the larger is past
 /// [`MAX_SIDE`], so they still line up pixel for pixel.
-pub fn ready(
-    old: Option<image::DynamicImage>,
-    new: Option<image::DynamicImage>,
-) -> (Option<Decoded>, Option<Decoded>) {
+pub fn ready(old: Option<Picture>, new: Option<Picture>) -> (Option<Decoded>, Option<Decoded>) {
     let largest = [&old, &new]
         .into_iter()
         .flatten()
-        .map(|i| i.width().max(i.height()))
+        .map(|i| {
+            let (w, h) = i.dimensions();
+            w.max(h)
+        })
         .max()
         .unwrap_or(0);
     let factor = if largest > MAX_SIDE {
@@ -40,23 +127,11 @@ pub fn ready(
     } else {
         1.0
     };
-    let make = |img: image::DynamicImage| {
-        let (width, height) = (img.width(), img.height());
+    let make = |img: Picture| {
+        let (width, height) = img.dimensions();
         let scaled = factor < 1.0;
-        let img = if scaled {
-            let w = ((f64::from(width) * factor).round() as u32).max(1);
-            let h = ((f64::from(height) * factor).round() as u32).max(1);
-            let resized = img.resize_exact(w, h, image::imageops::FilterType::Triangle);
-            // Release the large decoded original before allocating the display pixels.
-            drop(img);
-            resized
-        } else {
-            img
-        };
-        let rgba = img.into_rgba8();
-        let size = [rgba.width() as usize, rgba.height() as usize];
         Decoded {
-            image: Arc::new(ColorImage::from_rgba_unmultiplied(size, rgba.as_raw())),
+            image: Arc::new(img.into_display(factor)),
             width,
             height,
             scaled,
@@ -126,6 +201,113 @@ pub(crate) mod tests {
         let mut out = std::io::Cursor::new(Vec::new());
         let _ = img.write_to(&mut out, image::ImageFormat::Png);
         out.into_inner()
+    }
+
+    fn encode(img: &image::DynamicImage, format: image::ImageFormat) -> Result<Vec<u8>, String> {
+        let mut bytes = std::io::Cursor::new(Vec::new());
+        img.write_to(&mut bytes, format)
+            .map_err(|e| e.to_string())?;
+        Ok(bytes.into_inner())
+    }
+
+    fn expected(bytes: &[u8], factor: f64) -> Result<ColorImage, String> {
+        let img = image::load_from_memory(bytes).map_err(|e| e.to_string())?;
+        let img = if factor < 1.0 {
+            let w = ((f64::from(img.width()) * factor).round() as u32).max(1);
+            let h = ((f64::from(img.height()) * factor).round() as u32).max(1);
+            img.resize_exact(w, h, image::imageops::FilterType::Triangle)
+        } else {
+            img
+        }
+        .into_rgba8();
+        Ok(ColorImage::from_rgba_unmultiplied(
+            [img.width() as usize, img.height() as usize],
+            img.as_raw(),
+        ))
+    }
+
+    #[test]
+    fn rgba_decode_reuses_its_allocation_and_preserves_every_alpha() -> Result<(), String> {
+        let img = image::RgbaImage::from_fn(8, 256, |x, y| {
+            image::Rgba([(x * 31) as u8, y as u8, 210, y as u8])
+        });
+        let bytes = encode(&img.into(), image::ImageFormat::Png)?;
+        let picture = decode(&bytes)?;
+        let Source::Rgba(pixels) = &picture.0 else {
+            return Err("RGBA8 didn't use the direct decode".to_owned());
+        };
+        let allocation = pixels.rgba.as_ptr();
+        let actual = picture.into_display(1.0);
+        assert_eq!(actual.pixels.as_ptr(), allocation);
+        let expected = expected(&bytes, 1.0)?;
+        assert_eq!(actual, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn resampling_preserves_the_original_unmultiplied_colours() -> Result<(), String> {
+        let img = image::RgbaImage::from_fn(137, 83, |x, y| {
+            image::Rgba([(x * 17) as u8, (y * 31) as u8, 90, (x * y) as u8])
+        });
+        let bytes = encode(&img.into(), image::ImageFormat::Png)?;
+        for factor in [0.5, 0.031] {
+            assert_eq!(
+                decode(&bytes)?.into_display(factor),
+                expected(&bytes, factor)?
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn other_formats_and_colour_depths_keep_the_same_pixels() -> Result<(), String> {
+        let rgba = image::DynamicImage::ImageRgba8(image::RgbaImage::from_fn(19, 11, |x, y| {
+            image::Rgba([(x * 31) as u8, (y * 17) as u8, 90, (x * y) as u8])
+        }));
+        let rgba16 = image::ImageBuffer::from_fn(19, 11, |x, y| {
+            image::Rgba([
+                (x * 3171) as u16,
+                (y * 1729) as u16,
+                913,
+                (x * y * 71) as u16,
+            ])
+        });
+        let variants = [
+            rgba.clone(),
+            rgba.to_rgb8().into(),
+            rgba.to_luma8().into(),
+            rgba.to_luma_alpha8().into(),
+            image::DynamicImage::ImageRgba16(rgba16),
+        ];
+        for img in variants {
+            let bytes = encode(&img, image::ImageFormat::Png)?;
+            for factor in [1.0, 0.5] {
+                assert_eq!(
+                    decode(&bytes)?.into_display(factor),
+                    expected(&bytes, factor)?
+                );
+            }
+        }
+        for format in [
+            image::ImageFormat::Bmp,
+            image::ImageFormat::WebP,
+            image::ImageFormat::Gif,
+            image::ImageFormat::Jpeg,
+        ] {
+            let img = if format == image::ImageFormat::Jpeg {
+                rgba.to_rgb8().into()
+            } else {
+                rgba.clone()
+            };
+            let bytes = encode(&img, format)?;
+            for factor in [1.0, 0.5] {
+                assert_eq!(
+                    decode(&bytes)?.into_display(factor),
+                    expected(&bytes, factor)?
+                );
+            }
+        }
+        Ok(())
     }
 
     #[test]
