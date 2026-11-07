@@ -1,0 +1,66 @@
+{
+  "review": "Independent static review of baseline process-test containment",
+  "verdict": "PASS",
+  "scope": "STATIC PASS permits root to authorize only the new contained recording fixture phase. Runtime/full-suite verdict pending; production host-PID ownership is not certified.",
+  "candidate": "aab2a257b8598f6718431b40cd1058d9a273bd2c",
+  "remote_sha_verified": "aab2a257b8598f6718431b40cd1058d9a273bd2c",
+  "remote_ref": "refs/heads/codex/process-test-containment",
+  "base": "82189c4fcdb2d77fbb2746cb25d6390072266e9e",
+  "tree": "9de1aa92b9181fa358e85601a7318481403035c6",
+  "patch_sha256": "72dddf262c19b0fc2ae3f7e9a7b64297829c6e0368ae4df8e6f5a4e4e55e1832",
+  "source": "src/remote/session.rs",
+  "source_sha256": "f212529ec23eb6e5b22c15cf33500d91ddfcdd3a356f40d9370d7b1a3e5c215a",
+  "canonical_source_changed": false,
+  "blocking_findings": [],
+  "static_findings": [
+    {
+      "topic": "Command containment",
+      "result": "PASS",
+      "details": "Exact production script compared to complete allowlist BEFORE /bin/sh output() launch. Allowlist admits only bare ps/kill/sleep calls, awk with fixed no-system/no-pipe program, builtin [, printf-derived recorder data and true. No command/builtin/absolute-executable escape to host signal/process-list commands. ps/kill/sleep functions are defined in the same shell before the script, remain visible in its pipeline/substitution, and contain only printf to FD3/synthetic stdout. No live PID is used as a fixture target."
+    },
+    {
+      "topic": "Launch environment",
+      "result": "PASS",
+      "details": "Absolute /bin/sh, env_clear, PATH=/usr/bin:/bin, neutral temp cwd, null stdin. No inherited ENV/BASH_ENV/AWK options or shell functions. Only external awk processes over bounded constant synthetic table; no background trees, sleeps or host marker search."
+    },
+    {
+      "topic": "Semantic regression coverage",
+      "result": "PASS STATIC",
+      "details": "Forward/reversed table and empty snapshot; root100 plus deep descendants101/102/103 expected in both TERM/KILL intent sets. Exact exclusions0/1, ancestors10/20, sibling110, unrelated200 and disconnected cycle300/301. PS/SLEEP event counts and signal names checked. Empty table intentionally records root fallback but establishes no production authority."
+    },
+    {
+      "topic": "PID0/1 refusal",
+      "result": "PASS STATIC",
+      "details": "stop_script now returns true newline for pid<=1 before any generated lookup or signal command. Same fixture asserts zero recorder events for roots0/1."
+    },
+    {
+      "topic": "Independent source-only checks",
+      "result": "PASS",
+      "details": "Decoded Rust concat literals independently and compared production formatting against allowlist for root100; asserted guard, same-shell recorder functions, exact comparison before launch and deletion of old spawn/sleep/host marker scan. This Python check reads/compares source only; no shell fixture execution."
+    }
+  ],
+  "remaining_baseline_risk": {
+    "path": "src/remote/session.rs:168",
+    "description": "Production stop_script still derives numeric signal targets from host ps ancestry. The membership algorithm lacks the removed SOPS insertion bug, but live PID ownership/reuse/reparenting are not solved by this unit. Do not run it against host PID tables under the new process policy. This PASS contains the default test, not that production architecture."
+  },
+  "authorized_next_step_request": [
+    "Root must explicitly accept this static PASS before the author executes the new fixture.",
+    "Candidate source is already committed, pushed and exact remote SHA independently verified; retain freeze throughout targeted validation.",
+    "Run ONLY exact remote::session::tests::stopping_ends_a_whole_tree recording fixture first, with SSH/WSL optional variables unset and private target CARGO_INCREMENTAL=0.",
+    "If targeted contained fixture passes, author/root may proceed to default private suite with GITCRAFT_TEST_SSH/WSL unset; no old binary/source/test may execute.",
+    "Bind fmt/strict Clippy/full local-suite logs to this exact head, then return for independent final adversarial PASS before integration.",
+    "Any generated stop script/recorder/allowlist change invalidates this static execution authorization and requires another review before launch."
+  ],
+  "runtime_status": {
+    "fixture_executed_by_reviewer": false,
+    "cargo_application_or_rust_tests": false,
+    "live_process_queries": false,
+    "real_signals": false
+  },
+  "limits": [
+    "Static source inspection and source-literal assertions only; shell portability/compiled Rust and actual runtime semantics still need the authorized recording fixture.",
+    "No production remote host ownership or live SSH/WSL timeout approval.",
+    "No Windows/macOS execution validation; test is cfg(unix).",
+    "Final full-suite/merge approval is withheld until runtime gates and independent immutable-head review."
+  ]
+}

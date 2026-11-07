@@ -1,0 +1,19 @@
+{
+  "status": "STATIC CHECKS PASS",
+  "head": "aab2a257b8598f6718431b40cd1058d9a273bd2c",
+  "fixture_executed": false,
+  "cargo_or_rust_tests_run": false,
+  "real_signals": false,
+  "live_process_table_queries": false,
+  "source_sha256": "f212529ec23eb6e5b22c15cf33500d91ddfcdd3a356f40d9370d7b1a3e5c215a",
+  "checks": [
+    "production script equals reviewed fixture allowlist before shell launch",
+    "same-shell ps/kill/sleep recording functions",
+    "synthetic-only snapshots forward/reverse/empty",
+    "deep descendant and ancestor/sibling/unrelated/PID0/1 assertions",
+    "pid0/1 production no-op guard",
+    "clean child environment and fixed shell/tool path",
+    "no real tree spawn/sleep/kill or host marker scan"
+  ],
+  "scope": "test containment only; production host-PID ownership not solved"
+}
