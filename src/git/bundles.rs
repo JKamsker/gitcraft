@@ -87,7 +87,7 @@ pub fn export_bundle(
     }
     let mut seen = BTreeSet::new();
     for r in refs {
-        valid_ref(&r.name)?;
+        valid_ref(repo, &r.name)?;
         if !valid_oid(&r.oid) || !seen.insert(&r.name) {
             return Err("Invalid or duplicate export ref".into());
         }
@@ -170,7 +170,7 @@ pub fn save_bundle_file(file: &Path, bytes: &[u8]) -> Result<(), String> {
 pub fn inspect_bundle(repo: &Path, bytes: Vec<u8>) -> Result<BundlePreview, String> {
     let (refs, prerequisites) = header(&bytes)?;
     for r in &refs {
-        valid_ref(&r.name)?;
+        valid_ref(repo, &r.name)?;
     }
     let temp = BundleFile::new(repo, &bytes)?;
     let verification_error = verify(repo, &temp.path, &refs).err();
@@ -215,7 +215,7 @@ pub fn import_bundle(
         {
             return Err("Import destinations must be new refs/heads/…, refs/tags/… or refs/bundles/… refs; HEAD and special namespaces cannot change".into());
         }
-        valid_ref(&i.destination)?;
+        valid_ref(repo, &i.destination)?;
         if checked_out.contains(&i.destination) {
             return Err(format!(
                 "{} is checked out in a worktree; choose a different destination",
@@ -376,15 +376,21 @@ fn valid_oid(oid: &str) -> bool {
         && oid.bytes().all(|b| b.is_ascii_hexdigit())
         && oid.bytes().any(|b| b != b'0')
 }
-fn valid_ref(name: &str) -> Result<(), String> {
+fn valid_ref(repo: &Path, name: &str) -> Result<(), String> {
     if name == "HEAD" {
         return Ok(());
     }
     if name.len() > 1024 || !name.starts_with("refs/") || name.chars().any(char::is_control) {
         return Err("Bundle ref must be a full refs/… name without control characters".into());
     }
-    // Ref syntax is repository-independent. Avoid a remote shell round trip per ref.
-    run(None, &["check-ref-format", name])
+    // Ref syntax is repository-independent. Avoid a remote shell round trip per ref,
+    // while keeping Practice independent from the active profile's config/error state.
+    let checked = if crate::practice::is_repository(repo) {
+        super::practice_run(repo, &["check-ref-format", name])
+    } else {
+        run(None, &["check-ref-format", name])
+    };
+    checked
         .map(|_| ())
         .map_err(|_| format!("Invalid bundle ref: {name}"))
 }
