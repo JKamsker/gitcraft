@@ -1,0 +1,20 @@
+{
+  "conversion_changed_after_initial_verification": true,
+  "error": null,
+  "index_bytes": [
+    110,
+    101,
+    119,
+    13,
+    10
+  ],
+  "production": "initial verify then remote_apply locked transaction",
+  "stale_change_refused": false,
+  "working_bytes": [
+    110,
+    101,
+    119,
+    13,
+    10
+  ]
+}

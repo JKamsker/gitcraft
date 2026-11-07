@@ -1,0 +1,36 @@
+{
+  "commit": "bd851ed75b092b447a4981c713d0d4b134b6624c",
+  "remote_sha": "bd851ed75b092b447a4981c713d0d4b134b6624c",
+  "tree": "5ab7793a7ff2f6194fa0e7d94769d5fe1c4f1704",
+  "branch": "codex/encrypted-diffs",
+  "parent_static_pass": "ee6e8482a09c27a2c40286996433bd1bd996b3d0",
+  "accepted_review": "/workspace/work/review-sops-static-ee6e848.json",
+  "clean": true,
+  "unit_status": "AUTHORIZED GUARD REMOVAL CHECKPOINT; RUNTIME/FEATURE UNVALIDATED",
+  "changes": [
+    "remove both compile-time quarantine guards after root acceptance",
+    "adapt pure static boundary assertions and safety authorization/gate documentation",
+    "static rustfmt formatting only"
+  ],
+  "changed_files": {
+    "src/repo/diff/encrypted/SAFETY.md": "3e8bade3e42b26617e6adfb0bb9395d6138ff5c401ed5233b1ec2aa54d2fdbc5",
+    "src/repo/diff/encrypted/mod.rs": "f65043542e59b613915e71724e9b2e10b5f6c4c49659302ccbebe3fd7b7035b2",
+    "src/repo/diff/encrypted/tests.rs": "44ad8f225f0c7ee195598181a103b777c50f212543ce2e1955ce0041e49bc28d",
+    "src/repo/diff/encrypted/tool.rs": "4b933c64e6d9f1a8634fdecda84e3597f0f28a10d15b9ad92a0ffdb5a9cccf2e",
+    "tools/test_sops_safety.py": "6078884481bff02adf3d6dbc6743e1cd2d19c74268bdbfb347093e9e3f5b12ae"
+  },
+  "static_tests": {
+    "passed": 11,
+    "synthetic_graphs": 216,
+    "log": "/workspace/work/sops-guard-removal-static.log",
+    "sha256": "f1d91f472fe5d1d0807759a51a9a8f02ecbc26a1e896c689036feafb5beb438d"
+  },
+  "cargo_or_sops_process_fixtures_run_for_unit": false,
+  "new_remote_runner_or_host_pid_selector": false,
+  "runtime_pending": [
+    "Assigned Cargo slot only, never simultaneous SOPS and containment Cargo.",
+    "Optional SSH/WSL env unset, CARGO_INCREMENTAL=0 and private target.",
+    "Skip exactly remote::session::tests::stopping_ends_a_whole_tree until separately accepted containment fix is merged; label such suites partial.",
+    "All final gates and immutable full feature independent adversarial review remain required."
+  ]
+}

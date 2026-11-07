@@ -1,0 +1,84 @@
+{
+  "review": "Independent static review of baseline process-test containment",
+  "verdict": "PASS",
+  "scope": "FINAL PASS for baseline test containment and PID0/1 no-op unit on exact immutable candidate. Production host-PID ownership and live remote timeout safety remain outside scope.",
+  "candidate": "aab2a257b8598f6718431b40cd1058d9a273bd2c",
+  "remote_sha_verified": "aab2a257b8598f6718431b40cd1058d9a273bd2c",
+  "remote_ref": "refs/heads/codex/process-test-containment",
+  "base": "82189c4fcdb2d77fbb2746cb25d6390072266e9e",
+  "tree": "9de1aa92b9181fa358e85601a7318481403035c6",
+  "patch_sha256": "72dddf262c19b0fc2ae3f7e9a7b64297829c6e0368ae4df8e6f5a4e4e55e1832",
+  "source": "src/remote/session.rs",
+  "source_sha256": "f212529ec23eb6e5b22c15cf33500d91ddfcdd3a356f40d9370d7b1a3e5c215a",
+  "canonical_source_changed": false,
+  "blocking_findings": [],
+  "static_findings": [
+    {
+      "topic": "Command containment",
+      "result": "PASS",
+      "details": "Exact production script compared to complete allowlist BEFORE /bin/sh output() launch. Allowlist admits only bare ps/kill/sleep calls, awk with fixed no-system/no-pipe program, builtin [, printf-derived recorder data and true. No command/builtin/absolute-executable escape to host signal/process-list commands. ps/kill/sleep functions are defined in the same shell before the script, remain visible in its pipeline/substitution, and contain only printf to FD3/synthetic stdout. No live PID is used as a fixture target."
+    },
+    {
+      "topic": "Launch environment",
+      "result": "PASS",
+      "details": "Absolute /bin/sh, env_clear, PATH=/usr/bin:/bin, neutral temp cwd, null stdin. No inherited ENV/BASH_ENV/AWK options or shell functions. Only external awk processes over bounded constant synthetic table; no background trees, sleeps or host marker search."
+    },
+    {
+      "topic": "Semantic regression coverage",
+      "result": "PASS STATIC",
+      "details": "Forward/reversed table and empty snapshot; root100 plus deep descendants101/102/103 expected in both TERM/KILL intent sets. Exact exclusions0/1, ancestors10/20, sibling110, unrelated200 and disconnected cycle300/301. PS/SLEEP event counts and signal names checked. Empty table intentionally records root fallback but establishes no production authority."
+    },
+    {
+      "topic": "PID0/1 refusal",
+      "result": "PASS STATIC",
+      "details": "stop_script now returns true newline for pid<=1 before any generated lookup or signal command. Same fixture asserts zero recorder events for roots0/1."
+    },
+    {
+      "topic": "Independent source-only checks",
+      "result": "PASS",
+      "details": "Decoded Rust concat literals independently and compared production formatting against allowlist for root100; asserted guard, same-shell recorder functions, exact comparison before launch and deletion of old spawn/sleep/host marker scan. This Python check reads/compares source only; no shell fixture execution."
+    }
+  ],
+  "remaining_baseline_risk": {
+    "path": "src/remote/session.rs:168",
+    "description": "Production stop_script still derives numeric signal targets from host ps ancestry. The membership algorithm lacks the removed SOPS insertion bug, but live PID ownership/reuse/reparenting are not solved by this unit. Do not run it against host PID tables under the new process policy. This PASS contains the default test, not that production architecture."
+  },
+  "authorized_next_step_request": [
+    "Eligible for sole integrator to merge this exact reviewed unit; do not execute any prior baseline fixture/binary.",
+    "After this reviewed fixture source is integrated, the one-test safety exclusion can be removed for default local suites with optional SSH/WSL variables unset.",
+    "Production remote host-PID stop logic remains excluded from live safety approval; no host-selector or live SSH/WSL timeout experiments authorized."
+  ],
+  "runtime_status": {
+    "independent_author_logs_verified": true,
+    "exact_recording_fixture_passed": 1,
+    "full_passed": 789,
+    "failed": 0,
+    "ignored": 3,
+    "total": 792,
+    "filtered": 0,
+    "gate_hashes_match": {
+      "exact": true,
+      "fmt": true,
+      "clippy": true,
+      "test": true
+    },
+    "test_list_hash_matches": true,
+    "source_hash_still_matches_static_review": true,
+    "private_exact_worktree_compile_evidenced": true,
+    "reviewer_reran_runtime": false
+  },
+  "limits": [
+    "No reviewer runtime repetition: relied on source review plus hash-bound exact-fixture/fmt/strict-Clippy/full-suite author logs.",
+    "Only test containment and invalid root refusal are approved; unchanged production host-PID ownership/reuse/reparenting are not solved or certified.",
+    "No native Windows/macOS or live SSH/WSL validation.",
+    "Three existing ignored tests remain explicit; no safety test was excluded from full suite."
+  ],
+  "full_gate_manifest": "/workspace/work/process-test-containment-aab2a25.json",
+  "full_gate_manifest_sha256": "f9b8d44e56b55a1a850f4121ed6d8e82886cd413442658f85b45776e1b3e287b",
+  "gate_log_hashes": {
+    "exact": "388822d3e573397fcd933a8878e89d668da725a06d9ce77a87cd62fc366bbbb7",
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "28e57c25a28ebed31cd607e9a11e041dcf8b8b4bfbdebb7051b675b4a629b176",
+    "test": "6ad286952f1158bc6630d464f1e4698aae34a926c5f674c431c82323975d1f31"
+  }
+}

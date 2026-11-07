@@ -1,0 +1,32 @@
+{
+  "reference_commit": "028242cd4bc3c82ced848ea0fa73639981cd71d7",
+  "author_name": "Jonas Kamsker",
+  "author_email": "11245306+JKamsker@users.noreply.github.com",
+  "configuration_scope": "shared repository-local config; global config untouched",
+  "verified_worktrees": [
+    "/workspace/gitcraft",
+    "/workspace/work/bundles",
+    "/workspace/work/clone-options",
+    "/workspace/work/contrast",
+    "/workspace/work/encrypted-diffs",
+    "/workspace/work/file-comparison-views",
+    "/workspace/work/gerrit",
+    "/workspace/work/graph-readability",
+    "/workspace/work/history-activity",
+    "/workspace/work/integration",
+    "/workspace/work/keyboard-staging",
+    "/workspace/work/onboarding-portability",
+    "/workspace/work/practice",
+    "/workspace/work/process-test-containment",
+    "/workspace/work/profile-connections",
+    "/workspace/work/push-preflight",
+    "/workspace/work/recovery-publish",
+    "/workspace/work/review-safety-checkpoints",
+    "/workspace/work/structural-diff",
+    "/workspace/work/weather",
+    "/workspace/work/windows-portability-fixes",
+    "/workspace/work/working-drafts"
+  ],
+  "existing_history_rewritten": false,
+  "final_delivery": "New clean PR branch from dev; one commit per feature with this exact author name/email; preserve existing WIP/recovery/integration branches and exact source provenance; final rebuilt candidate must pass full tests and independent adversarial review before ONE PR."
+}

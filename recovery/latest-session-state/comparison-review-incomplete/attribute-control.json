@@ -1,0 +1,6 @@
+{
+  "exit": 0,
+  "attribute_blob_still_missing": true,
+  "stdout": "file.txt\u0000filter\u0000unspecified\u0000file.txt\u0000working-tree-encoding\u0000unspecified\u0000file.txt\u0000eol\u0000unspecified\u0000file.txt\u0000text\u0000unspecified\u0000",
+  "stderr": ""
+}

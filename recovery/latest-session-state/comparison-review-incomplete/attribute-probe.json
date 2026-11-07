@@ -1,0 +1,18 @@
+{
+  "git": "git version 2.52.0",
+  "production_argv": [
+    "--literal-pathspecs",
+    "check-attr",
+    "-z",
+    "filter",
+    "working-tree-encoding",
+    "eol",
+    "text",
+    "--",
+    "file.txt"
+  ],
+  "attribute_blob_missing_before": true,
+  "attribute_blob_present_after": true,
+  "attributes_response": "file.txt\u0000filter\u0000unspecified\u0000file.txt\u0000working-tree-encoding\u0000unspecified\u0000file.txt\u0000eol\u0000lf\u0000file.txt\u0000text\u0000set\u0000",
+  "stderr": ""
+}

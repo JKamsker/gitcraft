@@ -1,0 +1,30 @@
+{
+  "status": "UNVALIDATED reviewer-only fixture preparation; no compilation or fixture execution yet",
+  "candidate": "146a2e33ba55bed5b5ce1cd9df9c206ebdaab387",
+  "tree": "7fcf629fa930e75019607d29f24377a70a7cbbf1",
+  "archive": "/workspace/work/review-file-comparison-146a2e3/source",
+  "private_target": "/workspace/work/review-file-comparison-146a2e3/target",
+  "production_original_prefixes_unchanged": {
+    "src/git/file_comparison/tests.rs": {
+      "original_sha256": "42b9cbb7a454a99840c8ac17ae1a6234b2686b1c9bc1e26eaf6ce5ed006f1766",
+      "test_only_augmented_sha256": "10c78d801937e3dfec21a21740f5c79214067c19f09d9b6550926572ce762959",
+      "original_prefix_unchanged": true
+    },
+    "src/git/file_comparison/transaction.rs": {
+      "original_sha256": "d9be4b60a4349a75f0ac321d636886693f5fad3b971477395294a47224e8999a",
+      "test_only_augmented_sha256": "45b7689bec97b24665905d925fc2372cd3f94e0c7afb326ede53e7ca18bc892e",
+      "original_prefix_unchanged": true
+    }
+  },
+  "author_partial_log_hashes_verified": {
+    "fmt": true,
+    "clippy": true,
+    "test_partial": true
+  },
+  "harness_script_sha256": "aa9ad552b010e37cf320e54996aaf2bfb2ca004672210d0c4800003741add0a5",
+  "tests": [
+    "reviewer_actual_lens_downloads_missing_attributes",
+    "reviewer_remote_locked_transaction_ignores_configuration_drift"
+  ],
+  "safety": "Exact filter reviewer_ only; optional liveSSH/WSL variables unset. Fake SSH shell defines ps and kill no-op functions before sourcing transport stdin, so even timeout cleanup cannot invoke host process selectors/signals. No baseline legacy fixture execution. Local missing-object remote paths are fixture-only file clones."
+}

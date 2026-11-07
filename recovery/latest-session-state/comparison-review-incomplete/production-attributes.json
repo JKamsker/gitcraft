@@ -1,0 +1,6 @@
+{
+  "attribute_blob_missing_before": true,
+  "attribute_blob_present_after": true,
+  "lens_conversion_warning": "Line staging is unavailable with clean filters, text/EOL or working-tree-encoding conversion. Use the normal patch to stage with Git's conversions.",
+  "production": "read_lens"
+}

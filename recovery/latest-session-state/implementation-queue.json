@@ -73,7 +73,8 @@
       "commit": "3ef21abfb112cc0105b437737427291ce44c4842",
       "reviewer": "baseline_validation",
       "validation": "private fmt/clippy/test PASS711+3ignored714total23feature+2duplicateprocess tests",
-      "review_result": "FAIL on3ef21ab; actualApp deletion/tag flows blocked, LFS upload before hook veto"
+      "review_result": "FAIL on3ef21ab; actualApp deletion/tag flows blocked, LFS upload before hook veto",
+      "latest_preserved_head": "80d19da3b26fbdfe13ba22204b68d4055ee82c26"
     },
     {
       "issue": 32,
@@ -131,7 +132,8 @@
       "agent": "audit_32_38",
       "branch": "codex/working-drafts",
       "worktree": "/workspace/work/working-drafts",
-      "base": "48f2b234c4b9535c820138442295caeada1410fc"
+      "base": "48f2b234c4b9535c820138442295caeada1410fc",
+      "latest_preserved_head": "9e14de06d55e214eb187de0b493deba095fe2ae9"
     },
     {
       "issue": 33,
@@ -943,7 +945,8 @@
       "agent": "audit_39_44",
       "branch": "codex/file-comparison-views",
       "worktree": "/workspace/work/file-comparison-views",
-      "base": "992ec15ebc53c41639b6f704ca9bd89dfd8f2988"
+      "base": "992ec15ebc53c41639b6f704ca9bd89dfd8f2988",
+      "latest_preserved_head": "591f42dd49d36cdb297162e8882e0fac6f8cb924"
     },
     {
       "issue": 40,
@@ -968,14 +971,15 @@
         ],
         "effort": "M"
       },
-      "status": "quarantined_static_safety_review",
+      "status": "static_safety_pass_guard_removed_runtime_pending",
       "agent": "implement_gerrit",
       "branch": "codex/encrypted-diffs",
       "worktree": "/workspace/work/encrypted-diffs",
       "base": "5af92d88aee563f9a3113c1edaef65d245a66f06",
       "commit": "ee6e8482a09c27a2c40286996433bd1bd996b3d0",
       "reviewer": "baseline_validation",
-      "validation": "Static-only11PASS/216syntheticgraphs; noCargo/runtime/signals; compileguards retained"
+      "validation": "Independent static ee6e848 PASS; authorized guard removal bd851ed pushed; local-only runtime gates pending.",
+      "latest_preserved_head": "bd851ed75b092b447a4981c713d0d4b134b6624c"
     },
     {
       "issue": 42,
@@ -1311,7 +1315,8 @@
       "branch": "codex/onboarding-portability",
       "worktree": "/workspace/work/onboarding-portability",
       "base": "06fe1bd74280f9d24c8a1e1e12dccb528097dec8",
-      "base_note": "Reviewed History e65a65b merged with green992ec15; own combined base checked"
+      "base_note": "Reviewed History e65a65b merged with green992ec15; own combined base checked",
+      "latest_preserved_head": "45d8f1e9d1c599ce0265ae2b26a12f961c8beb9b"
     },
     {
       "issue": 45,
@@ -1350,7 +1355,8 @@
       "branch": "codex/onboarding-portability",
       "worktree": "/workspace/work/onboarding-portability",
       "base": "06fe1bd74280f9d24c8a1e1e12dccb528097dec8",
-      "base_note": "Reviewed History e65a65b merged with green992ec15; own combined base checked"
+      "base_note": "Reviewed History e65a65b merged with green992ec15; own combined base checked",
+      "latest_preserved_head": "45d8f1e9d1c599ce0265ae2b26a12f961c8beb9b"
     },
     {
       "issue": 46,
@@ -2178,7 +2184,8 @@
       "agent": "audit_39_44",
       "branch": "codex/file-comparison-views",
       "worktree": "/workspace/work/file-comparison-views",
-      "base": "992ec15ebc53c41639b6f704ca9bd89dfd8f2988"
+      "base": "992ec15ebc53c41639b6f704ca9bd89dfd8f2988",
+      "latest_preserved_head": "591f42dd49d36cdb297162e8882e0fac6f8cb924"
     },
     {
       "issue": 50,
@@ -2211,7 +2218,8 @@
       "agent": "audit_39_44",
       "branch": "codex/file-comparison-views",
       "worktree": "/workspace/work/file-comparison-views",
-      "base": "992ec15ebc53c41639b6f704ca9bd89dfd8f2988"
+      "base": "992ec15ebc53c41639b6f704ca9bd89dfd8f2988",
+      "latest_preserved_head": "591f42dd49d36cdb297162e8882e0fac6f8cb924"
     }
   ],
   "audit_corrections": [
@@ -2246,5 +2254,6 @@
   "checkpoint_policy": "After every completed unit of work, each agent and the orchestrator must commit AND push its branch before starting the next unit or risky test. Verify the remote SHA. Label WIP unvalidated. Only one final giant PR; all required tests and independent adversarial review must pass on the final combined source before PR creation.",
   "recovery_status": "Filesystem restored after outage; execution paused for backup.",
   "verified_remote_head": "da0143c4f7574ab4ab9ec3607f927c89968c1a1f",
-  "preservation_policy": "Every completed unit commit AND push, verify remoteSHA, before next unit/riskytest. One final PR requires exact combined checks and independent adversarial PASS."
+  "preservation_policy": "Every completed unit commit AND push, verify remoteSHA, before next unit/riskytest. One final PR requires exact combined checks and independent adversarial PASS.",
+  "final_commit_author_reference": "028242cd4bc3c82ced848ea0fa73639981cd71d7"
 }
