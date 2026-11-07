@@ -1,0 +1,14 @@
+{
+  "source_commit": "c0a284f8afa319da5c3e7a32a117bff3a9597179",
+  "src_tree": "39b67633548e3414d80c84e2f26d2bcc8a384422",
+  "production_binding": "transaction.rs minus cfg(test,unix) module declaration byte-identical490a9e7",
+  "private_target": "/workspace/work/push-preflight/target",
+  "cargo_incremental": "0",
+  "jobs": 2,
+  "no_run_compile": "PASS; actual compiler worktree /workspace/work/push-preflight",
+  "executable": "/workspace/work/push-preflight/target/debug/deps/gitcraft-31822f5b138c0fe8",
+  "binary_sha256": "3b80e039317e07936161b1936f2627338bd25d2754703c2c98cee6a9a17737b7",
+  "runtime": "NOT RUN",
+  "first_fixture_compile": "test-only unsafe env mutation refused by -Dunsafe-code; fixed in c0a284f before execution",
+  "compiler_log_sha256": "6b1fd3061e35bcf2fed43c6a00817b888f47f66eeef4f80b775d8b85de394866"
+}
