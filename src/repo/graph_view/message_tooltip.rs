@@ -190,7 +190,7 @@ mod tests {
                     ..Default::default()
                 },
                 |ui| {
-                    tab.graph_message_hover(Some("hash"), ui.ctx());
+                    tab.hover_graph_message(ui.ctx(), Some("hash"));
                 },
             );
         }
