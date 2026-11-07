@@ -4,3 +4,6 @@ mod anchors;
 mod store;
 
 pub(super) use anchors::{Relocations, relocate_threads};
+
+mod continuous;
+pub(super) use continuous::{ReviewAct, ReviewState};

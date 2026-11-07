@@ -27,7 +27,20 @@ impl RepoTab {
         let Some(action) = self.fence_gate(action, ctx) else {
             return;
         };
+        if matches!(
+            &action,
+            Action::OpenDiff(_)
+                | Action::OpenPr(_)
+                | Action::Select(_)
+                | Action::SelectHash(_)
+                | Action::SelectPr(_)
+                | Action::SelectStash(_)
+                | Action::Compare { .. }
+        ) {
+            self.review_document.open = false;
+        }
         match action {
+            Action::Review(act) => self.review_act(act, ctx),
             Action::Select(row) => {
                 self.leave_pages();
                 self.doctor = None;
@@ -547,7 +560,7 @@ impl RepoTab {
     }
 
     /// Applies the patch of lines picked, saved at `saved` (see [`Self::pick_lines`]).
-    fn apply_picked(
+    pub(super) fn apply_picked(
         &mut self,
         pick: diff::Pick,
         label: &str,

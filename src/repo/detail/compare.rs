@@ -33,6 +33,18 @@ impl RepoTab {
                 });
             }
             Some(Ok(d)) => {
+                self.review_all_button(
+                    ui,
+                    d.files
+                        .iter()
+                        .map(|f| DiffKey::Range {
+                            from: d.from.clone(),
+                            to: d.to.clone(),
+                            path: f.path.clone(),
+                        })
+                        .collect(),
+                    acts,
+                );
                 files_header(ui, &d.files, None);
                 if d.files.is_empty() {
                     ui.add_space(10.0);

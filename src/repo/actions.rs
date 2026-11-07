@@ -33,6 +33,7 @@ pub(crate) enum Action {
     SelectPr(u64),
     SelectStash(usize),
     OpenDiff(DiffKey),
+    Review(super::review_workflow::ReviewAct),
     /// Show a pull request in the big area.
     OpenPr(u64),
     /// Open the worktree of a pull request (proposing `branch`, at `sha`), making it first

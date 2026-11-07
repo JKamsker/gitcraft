@@ -18,6 +18,17 @@ impl RepoTab {
         let t = Tokens::get(ui.ctx());
         widgets::panel_header(ui, "Changes", branch_tree::files_toggle);
 
+        self.review_all_button(
+            ui,
+            self.work
+                .unstaged
+                .iter()
+                .chain(&self.work.staged)
+                .cloned()
+                .map(DiffKey::Work)
+                .collect(),
+            acts,
+        );
         // The commit box stays at the bottom.
         egui::Panel::bottom("commit_box")
             .frame(
