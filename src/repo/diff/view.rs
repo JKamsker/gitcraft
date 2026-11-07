@@ -485,7 +485,12 @@ impl RepoTab {
                             ui.add_space(4.0);
                         }
                         // A folded diff shows no lines to arrange.
-                        if !as_file && !rendered && !folded && view.structural.shows_patch() {
+                        if !as_file
+                            && !rendered
+                            && !folded
+                            && !view.encrypted.enabled
+                            && view.structural.shows_patch()
+                        {
                             // A diff of some lines only (`git log -L`) shows them whole, with
                             // whitespace: those options don't apply to it.
                             if view.lines.is_none() {

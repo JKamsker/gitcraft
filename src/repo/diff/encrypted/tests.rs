@@ -988,6 +988,8 @@ mod fixture {
         out.shapes.clear();
         out.textures_delta.clear();
         assert!(text.contains("fixture-private-new"));
+        assert_eq!(text.lines().filter(|s| *s == "Wrap").count(), 1);
+        assert!(!text.contains("Algorithm"));
         assert!(
             !text.contains("Stage file")
                 && !text.contains("Stage hunk")

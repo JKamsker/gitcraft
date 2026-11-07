@@ -182,7 +182,9 @@ mod svg_tests {
             git::DiffOptions::default(),
             true,
         )?;
-        assert!(data.header.contains("rename from \""));
+        // Pure renames intentionally have no pickable hunk header in DiffData.
+        let raw = git::file_diff(&r.0, "HEAD", new, git::DiffOptions::default())?;
+        assert!(raw.contains("rename from \""));
         let image = data.image.as_ref().ok_or("SVG preview")?;
         assert!(image.svg);
         assert_eq!(image.old.as_deref(), Some(bytes.as_slice()));
