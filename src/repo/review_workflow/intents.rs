@@ -1,5 +1,5 @@
 //! Advisory, expiring notes exchanged as ordinary fast-forward Git refs, never locks.
-use super::tools::ToolsAct;
+use super::{sharing, tools::ToolsAct};
 use crate::{
     git, network,
     repo::{Action, RepoTab},
@@ -41,6 +41,8 @@ pub(crate) struct State {
     minutes: u32,
     synced: u64,
     checked: u64,
+    cache_key: Option<String>,
+    synced_remote: Option<git::Remote>,
 }
 #[derive(Clone)]
 pub(crate) enum Act {
@@ -168,6 +170,13 @@ fn read(repo: &Path) -> Result<Vec<Seen>, String> {
     }
     Ok(cards.into_values().collect())
 }
+fn read_active(repo: &Path, source: Option<&str>) -> Result<Vec<Seen>, String> {
+    let prefix = source.map(|s| format!("refs/gitcraft/intent-remotes/{s}/"));
+    Ok(read(repo)?
+        .into_iter()
+        .filter(|c| c.local || prefix.as_ref().is_none_or(|p| c.reference.starts_with(p)))
+        .collect())
+}
 fn applies(card: &Card, path: &str, at: u64) -> bool {
     card.expires > at
         && (path == card.path
@@ -177,6 +186,16 @@ fn applies(card: &Card, path: &str, at: u64) -> bool {
 }
 impl RepoTab {
     pub(in crate::repo) fn intent_frame(&mut self, ctx: &egui::Context) {
+        if self
+            .review_tools
+            .intents
+            .synced_remote
+            .as_ref()
+            .is_some_and(|old| !self.remotes.iter().any(|r| r == old))
+        {
+            self.review_tools.intents.synced = 0;
+            self.review_tools.intents.synced_remote = None;
+        }
         if !self.review_tools.intents.initialized {
             self.review_tools.intents.initialized = true;
             self.intent_act(Act::Read, ctx);
@@ -194,16 +213,24 @@ impl RepoTab {
             return;
         }
         let is_network = matches!(act, Act::Sync(_));
-        if let Act::Sync(remote) | Act::Publish(remote) = &act {
-            if !self.remotes.iter().any(|r| &r.name == remote) {
+        let observed = if let Act::Sync(remote) | Act::Publish(remote) = &act {
+            let Some(observed) = self.remotes.iter().find(|r| &r.name == remote).cloned() else {
                 self.review_tools.intents.error = Some("Pick a configured remote".into());
                 return;
-            }
+            };
             if let Some(p) = network::refused() {
                 self.review_tools.intents.error = Some(p.why().into());
                 return;
             }
+            Some(observed)
+        } else {
+            None
+        };
+        if matches!(act, Act::Read) {
+            self.review_tools.intents.synced = 0;
         }
+        let synced_observed = observed.clone();
+        let mut active_source = self.review_tools.intents.cache_key.clone();
         self.review_tools.intents.busy = true;
         self.review_tools.intents.checked = now();
         let (repo, creds) = (self.path.clone(), self.credentials.clone());
@@ -212,6 +239,10 @@ impl RepoTab {
             true,
             Err,
             move || {
+                let target = observed
+                    .as_ref()
+                    .map(|r| sharing::Target::capture(&repo, r))
+                    .transpose()?;
                 match act {
                     Act::Post {
                         path,
@@ -234,21 +265,29 @@ impl RepoTab {
                         save(&repo, &reference, &seen.card)?;
                     }
                     Act::Sync(remote) => {
-                        let destination =
-                            format!("refs/gitcraft/intent-remotes/{:x}", md5::compute(&remote));
+                        let target = target.as_ref().ok_or("No captured sharing destination")?;
+                        target.guard(&repo)?;
+                        let cache_key = target.cache_key();
+                        let destination = format!("refs/gitcraft/intent-remotes/{cache_key}");
                         git::run_unattended(
                             Some(&repo),
                             &[
                                 "fetch",
                                 "--no-tags",
                                 "--no-write-fetch-head",
+                                "--prune",
                                 &remote,
-                                &format!("{ROOT}*:{destination}/*"),
+                                &format!("+{ROOT}*:{destination}/*"),
                             ],
                             creds.as_ref(),
                         )?;
+                        active_source = Some(cache_key);
                     }
                     Act::Publish(remote) => {
+                        target
+                            .as_ref()
+                            .ok_or("No captured sharing destination")?
+                            .guard(&repo)?;
                         let (_, email) = identity(&repo)?;
                         let mine = format!("{ROOT}{:x}", md5::compute(email));
                         git::run_unattended(
@@ -259,20 +298,48 @@ impl RepoTab {
                     }
                     Act::Read => {}
                 }
-                read(&repo)
+                if let Some(target) = &target {
+                    target.guard(&repo)?;
+                }
+                Ok((read_active(&repo, active_source.as_deref())?, active_source))
             },
             move |tab, result, _| {
+                let current_source = synced_observed
+                    .as_ref()
+                    .is_none_or(|old| tab.remotes.iter().any(|r| r == old));
                 let s = &mut tab.review_tools.intents;
                 s.busy = false;
+                if is_network
+                    && (!current_source
+                        || synced_observed.as_ref().is_some_and(|r| r.name != s.remote))
+                {
+                    s.synced = 0;
+                    s.error = Some(
+                        "Sharing selection changed; fetch intents for the new destination".into(),
+                    );
+                    return;
+                }
                 match result {
-                    Ok(rows) => {
+                    Ok((rows, source)) => {
                         s.rows = rows;
                         s.error = None;
+                        s.cache_key = source;
                         if is_network {
-                            s.synced = now();
+                            if synced_observed.as_ref().is_some_and(|r| r.name == s.remote) {
+                                s.synced = now();
+                                s.synced_remote = synced_observed;
+                            } else {
+                                s.synced = 0;
+                                s.synced_remote = None;
+                            }
                         }
                     }
-                    Err(e) => s.error = Some(e),
+                    Err(e) => {
+                        s.error = Some(e);
+                        if is_network {
+                            s.synced = 0;
+                        }
+                    }
                 }
             },
         );
@@ -314,6 +381,7 @@ pub(super) fn show(
 ) {
     ui.heading("Intent cards");
     ui.label("Advisory notes travel through refs/gitcraft/intents. They never lock code or prevent another person's work.");
+    let previous_remote = s.remote.clone();
     egui::ComboBox::from_id_salt("intent-remote")
         .selected_text(if s.remote.is_empty() {
             "Choose sharing remote"
@@ -325,6 +393,12 @@ pub(super) fn show(
                 ui.selectable_value(&mut s.remote, r.name.clone(), &r.name);
             }
         });
+    if previous_remote != s.remote {
+        s.synced = 0;
+        s.synced_remote = None;
+        s.cache_key = None;
+        s.rows.retain(|row| row.local);
+    }
     ui.horizontal(|ui| {
         for (label, act) in [
             ("Read cached intents", Act::Read),
@@ -414,6 +488,8 @@ mod tests {
             "src/auth.rs",
             notes[0].card.expires
         ));
+        assert!(read_active(b.path(), Some("replacement-source"))?.is_empty());
+        assert_eq!(read_active(b.path(), Some("test"))?.len(), 1);
         assert_eq!(a.tip("HEAD")?, head);
         Ok(())
     }
