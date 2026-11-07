@@ -691,11 +691,31 @@ second.
 }
 
 /// The relation view's explicit older-context read; reuse the ordinary log format/parser.
-pub(crate) fn investigation_page(reader:&super::investigations::Reader<'_>,tips:&[String],skip:usize,limit:usize)->Result<Vec<Commit>,String>{
-    let max=format!("--max-count={limit}");let args=log_args(Some(tips),skip,Some(&max));
-    let output=reader.run(&args.as_args(),Vec::new(),&[0])?;
-    let text=std::str::from_utf8(&output).map_err(|_|"History page returned non-UTF-8 metadata")?;
-    let fields:Vec<_>=text.split('\0').collect();let (records,tail)=fields.as_chunks::<LOG_FIELDS>();
-    if !tail.iter().all(|s|s.trim().is_empty()){return Err("History page returned truncated metadata".into());}
-    records.iter().map(|record|parse_record(record).filter(|c|super::investigations::oid(&c.hash)&&c.parents.iter().all(|p|super::investigations::oid(p))).ok_or_else(||"History page returned invalid commit identity".into())).collect()
+pub(crate) fn investigation_page(
+    reader: &super::investigations::Reader<'_>,
+    tips: &[String],
+    skip: usize,
+    limit: usize,
+) -> Result<Vec<Commit>, String> {
+    let max = format!("--max-count={limit}");
+    let args = log_args(Some(tips), skip, Some(&max));
+    let output = reader.run(&args.as_args(), Vec::new(), &[0])?;
+    let text =
+        std::str::from_utf8(&output).map_err(|_| "History page returned non-UTF-8 metadata")?;
+    let fields: Vec<_> = text.split('\0').collect();
+    let (records, tail) = fields.as_chunks::<LOG_FIELDS>();
+    if !tail.iter().all(|s| s.trim().is_empty()) {
+        return Err("History page returned truncated metadata".into());
+    }
+    records
+        .iter()
+        .map(|record| {
+            parse_record(record)
+                .filter(|c| {
+                    super::investigations::oid(&c.hash)
+                        && c.parents.iter().all(|p| super::investigations::oid(p))
+                })
+                .ok_or_else(|| "History page returned invalid commit identity".into())
+        })
+        .collect()
 }

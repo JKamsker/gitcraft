@@ -103,7 +103,7 @@ impl RepoTab {
         let offset_id = ui.id().with("graph_offset");
         if let Some(row) = self.scroll_to.take() {
             let view_h = ui.available_height();
-            let row=self.saved_views.position(row).unwrap_or(row);
+            let row = self.saved_views.position(row).unwrap_or(row);
             let top = row as f32 * ROW_PITCH;
             // Only scroll if the row is outside the visible part.
             let offset = ui.data(|d| d.get_temp::<f32>(offset_id)).unwrap_or(0.0);
@@ -115,8 +115,12 @@ impl RepoTab {
         // `show_rows` sizes rows as ROW_PITCH + item spacing, so the spacing must be zero here.
         ui.spacing_mut().item_spacing.y = 0.0;
         let idle = self.busy_op.is_none();
-        let filtered=self.saved_views.active();
-        let total = if filtered {self.saved_views.len()}else{self.commits.len() + usize::from(self.has_more)};
+        let filtered = self.saved_views.active();
+        let total = if filtered {
+            self.saved_views.len()
+        } else {
+            self.commits.len() + usize::from(self.has_more)
+        };
         let mut hovered_message = None;
         let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
             // show_rows includes overscan and partially clipped rows. Require the text's
@@ -132,27 +136,46 @@ impl RepoTab {
             let first = visible.clone().next().unwrap_or(range.start);
             let end = visible.next_back().map_or(first, |i| i + 1);
             let readable = if filtered {
-                self.readable_rows(ui,(first..end).filter_map(|i|match self.saved_views.row(i){Some(super::saved_views::Row::Commit(raw))=>Some(*raw),_=>None}),lanes.shown)
-            }else{self.readable_viewport(ui, first..end, lanes.shown)};
+                self.readable_rows(
+                    ui,
+                    (first..end).filter_map(|i| match self.saved_views.row(i) {
+                        Some(super::saved_views::Row::Commit(raw)) => Some(*raw),
+                        _ => None,
+                    }),
+                    lanes.shown,
+                )
+            } else {
+                self.readable_viewport(ui, first..end, lanes.shown)
+            };
             if settings.fit_visible_refs() {
                 prefs.refs = readable.refs_width;
             }
             cols = prefs.squeezed(ui.available_width(), settings.last_resized);
             // Near the end: fetch the next page of history.
-            if !filtered && range.end + 40 >= self.commits.len() && self.has_more && !self.loading_more {
+            if !filtered
+                && range.end + 40 >= self.commits.len()
+                && self.has_more
+                && !self.loading_more
+            {
                 acts.push(Action::LoadMore);
             }
             for projected in range {
-                let i=if filtered {
-                    match self.saved_views.row(projected).cloned(){
-                        Some(super::saved_views::Row::Commit(raw))=>raw,
-                        Some(super::saved_views::Row::Gap{range,top,bottom})=>{
-                            if connector_row(ui,&t,cols,lanes,range.len(),&top,&bottom).clicked(){self.expand_graph_span(range);}
+                let i = if filtered {
+                    match self.saved_views.row(projected).cloned() {
+                        Some(super::saved_views::Row::Commit(raw)) => raw,
+                        Some(super::saved_views::Row::Gap { range, top, bottom }) => {
+                            if connector_row(ui, &t, cols, lanes, range.len(), &top, &bottom)
+                                .clicked()
+                            {
+                                self.expand_graph_span(range);
+                            }
                             continue;
                         }
-                        None=>continue,
+                        None => continue,
                     }
-                }else{projected};
+                } else {
+                    projected
+                };
                 if i >= self.commits.len() {
                     loading_row(ui, &t);
                     continue;
@@ -183,8 +206,8 @@ impl RepoTab {
     fn arrow_keys(&mut self, ui: &Ui, acts: &mut Vec<Action>) {
         let (up, down) = ui.input(|i| (i.key_pressed(Key::ArrowUp), i.key_pressed(Key::ArrowDown)));
         let current = self.selected.unwrap_or(0);
-        let next = if self.saved_views.active() && (up||down){
-            self.saved_views.next(current,down)
+        let next = if self.saved_views.active() && (up || down) {
+            self.saved_views.next(current, down)
         } else if up {
             Some(current.saturating_sub(1))
         } else if down {
@@ -456,20 +479,68 @@ mod tests {
 
 /// A collapsed run preserves only continuous lanes at its boundaries. Ended/reused lanes
 /// have separate caps; hidden internal merges are deliberately not invented as edges.
-fn connector_row(ui:&mut Ui,t:&Tokens,cols:Cols,lanes:Lanes,count:usize,top:&[Option<usize>;24],bottom:&[Option<usize>;24])->Response{
-    let (rect,response)=ui.allocate_exact_size(vec2(ui.available_width(),ROW_PITCH),Sense::click());
-    let painter=ui.painter_at(rect);let mid=rect.center().y;
-    for col in 0..lanes.shown.min(24){
-        let x=rect.left()+cols.refs+6.0+col as f32*lanes.width+lanes.width/2.0;
-        let stroke=egui::Stroke::new(1.3,t.lane(col).gamma_multiply(0.65));
-        let continuous=top[col].is_some()&&top[col]==bottom[col];
-        for step in 0..6{let y=rect.top()+step as f32*5.0;let upper=y<mid-3.0;let lower=y>mid+1.0;
-            if continuous||(upper&&top[col].is_some())||(lower&&bottom[col].is_some()){
-                painter.line_segment([egui::pos2(x,y),egui::pos2(x,(y+3.0).min(rect.bottom()))],stroke);
+fn connector_row(
+    ui: &mut Ui,
+    t: &Tokens,
+    cols: Cols,
+    lanes: Lanes,
+    count: usize,
+    top: &[Option<usize>; 24],
+    bottom: &[Option<usize>; 24],
+) -> Response {
+    let (rect, response) =
+        ui.allocate_exact_size(vec2(ui.available_width(), ROW_PITCH), Sense::click());
+    let painter = ui.painter_at(rect);
+    let mid = rect.center().y;
+    for col in 0..lanes.shown.min(24) {
+        let x = rect.left() + cols.refs + 6.0 + col as f32 * lanes.width + lanes.width / 2.0;
+        let stroke = egui::Stroke::new(1.3, t.lane(col).gamma_multiply(0.65));
+        let continuous = top[col].is_some() && top[col] == bottom[col];
+        for step in 0..6 {
+            let y = rect.top() + step as f32 * 5.0;
+            let upper = y < mid - 3.0;
+            let lower = y > mid + 1.0;
+            if continuous || (upper && top[col].is_some()) || (lower && bottom[col].is_some()) {
+                painter.line_segment(
+                    [
+                        egui::pos2(x, y),
+                        egui::pos2(x, (y + 3.0).min(rect.bottom())),
+                    ],
+                    stroke,
+                );
             }
         }
-        if !continuous {if top[col].is_some(){painter.line_segment([egui::pos2(x-2.0,mid-3.0),egui::pos2(x+2.0,mid-3.0)],stroke);}if bottom[col].is_some(){painter.line_segment([egui::pos2(x-2.0,mid+3.0),egui::pos2(x+2.0,mid+3.0)],stroke);}}
+        if !continuous {
+            if top[col].is_some() {
+                painter.line_segment(
+                    [
+                        egui::pos2(x - 2.0, mid - 3.0),
+                        egui::pos2(x + 2.0, mid - 3.0),
+                    ],
+                    stroke,
+                );
+            }
+            if bottom[col].is_some() {
+                painter.line_segment(
+                    [
+                        egui::pos2(x - 2.0, mid + 3.0),
+                        egui::pos2(x + 2.0, mid + 3.0),
+                    ],
+                    stroke,
+                );
+            }
+        }
     }
-    painter.text(egui::pos2(rect.left()+cols.refs+cols.graph+6.0,mid),Align2::LEFT_CENTER,format!("⋯ {count} intervening commits · expand"),FontId::proportional(12.0),if response.hovered(){t.text}else{t.text_dim});
+    painter.text(
+        egui::pos2(rect.left() + cols.refs + cols.graph + 6.0, mid),
+        Align2::LEFT_CENTER,
+        format!("⋯ {count} intervening commits · expand"),
+        FontId::proportional(12.0),
+        if response.hovered() {
+            t.text
+        } else {
+            t.text_dim
+        },
+    );
     response.on_hover_text("Expand this omitted history. Dashed lanes show continuous boundary runs; internal merges remain hidden until expanded.")
 }

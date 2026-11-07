@@ -39,9 +39,9 @@ pub(crate) mod pull;
 mod quick_edit;
 mod rebase;
 mod rewrite;
-mod saved_views;
 #[cfg(test)]
 mod samples;
+mod saved_views;
 mod sidebar;
 mod sparse;
 mod state;

@@ -1,10 +1,22 @@
 use super::*;
-impl RepoTab{
-    pub(in crate::repo) fn saved_graph_header(&mut self,ui:&mut egui::Ui){
-        if !self.saved_views.loaded&&!self.loading&&!self.deferred{
-            self.saved_views.prefs=ui.ctx().data_mut(|d|d.get_persisted::<Preferences>(preferences_id(self.repo_key()))).unwrap_or_default().normalize();self.saved_views.loaded=true;self.saved_views.dirty=true;
+impl RepoTab {
+    pub(in crate::repo) fn saved_graph_header(&mut self, ui: &mut egui::Ui) {
+        if !self.saved_views.loaded && !self.loading && !self.deferred {
+            self.saved_views.prefs = ui
+                .ctx()
+                .data_mut(|d| d.get_persisted::<Preferences>(preferences_id(self.repo_key())))
+                .unwrap_or_default()
+                .normalize();
+            self.saved_views.loaded = true;
+            self.saved_views.dirty = true;
         }
-        let ctx=ui.ctx().clone();let mut choose=None;let mut save=false;let mut remove=false;let mut refresh=false;let mut collapse=false;let mut page=false;
+        let ctx = ui.ctx().clone();
+        let mut choose = None;
+        let mut save = false;
+        let mut remove = false;
+        let mut refresh = false;
+        let mut collapse = false;
+        let mut page = false;
         ui.horizontal_wrapped(|ui|{
             let active=self.saved_views.prefs.active.as_ref();
             egui::ComboBox::from_id_salt("graph_relation_view").selected_text(active.map_or("All history",|p|p.name.as_str())).show_ui(ui,|ui|{
@@ -27,17 +39,63 @@ impl RepoTab{
                 if self.has_more{page=ui.add_enabled(!self.saved_views.reader.busy()&&!self.loading_more,egui::Button::new("Load older context")).on_hover_text("Read one bounded page at the view's pinned tips, without downloading objects").clicked();}
             }
         });
-        if let Some(preset)=choose{self.set_graph_view(preset,&ctx);}
-        if save{if let Some(mut preset)=self.saved_views.prefs.active.clone(){preset.name=self.saved_views.name.trim().to_owned();if preset.valid(){self.saved_views.prefs.saved.retain(|p|p.name!=preset.name);self.saved_views.prefs.saved.push(preset.clone());self.saved_views.prefs.active=Some(preset);self.saved_views.name.clear();self.save_graph_preferences(&ctx);}}}
-        if remove{let active=self.saved_views.prefs.active.clone();self.saved_views.prefs.saved.retain(|p|Some(p)!=active.as_ref());self.save_graph_preferences(&ctx);}
-        if refresh{self.saved_views.cancel();self.save_graph_preferences(&ctx);}
-        if collapse{self.saved_views.expanded.clear();self.saved_views.dirty=true;}
-        if page{self.load_graph_view_page();}
-        if self.saved_views.active(){
-            if let Some(selection)=&self.saved_views.selection{ui.small(format!("{} matches · {}{} · working changes, stashes and selection kept as context",selection.commits.len(),selection.explanation,if selection.limited{" · partial: 30000-commit budget"}else{""}));}
-            else if let Some(error)=&self.saved_views.error{ui.colored_label(crate::theme::Tokens::get(&ctx).danger,error);ui.small("Showing loaded context until a view can be computed.");}
-            else{ui.small("Computing view from pinned history; showing loaded context…");}
+        if let Some(preset) = choose {
+            self.set_graph_view(preset, &ctx);
         }
-        self.poll_saved_views(&ctx);self.prepare_graph_projection();
+        if save {
+            if let Some(mut preset) = self.saved_views.prefs.active.clone() {
+                preset.name = self.saved_views.name.trim().to_owned();
+                if preset.valid() {
+                    self.saved_views
+                        .prefs
+                        .saved
+                        .retain(|p| p.name != preset.name);
+                    self.saved_views.prefs.saved.push(preset.clone());
+                    self.saved_views.prefs.active = Some(preset);
+                    self.saved_views.name.clear();
+                    self.save_graph_preferences(&ctx);
+                }
+            }
+        }
+        if remove {
+            let active = self.saved_views.prefs.active.clone();
+            self.saved_views
+                .prefs
+                .saved
+                .retain(|p| Some(p) != active.as_ref());
+            self.save_graph_preferences(&ctx);
+        }
+        if refresh {
+            self.saved_views.cancel();
+            self.save_graph_preferences(&ctx);
+        }
+        if collapse {
+            self.saved_views.expanded.clear();
+            self.saved_views.dirty = true;
+        }
+        if page {
+            self.load_graph_view_page();
+        }
+        if self.saved_views.active() {
+            if let Some(selection) = &self.saved_views.selection {
+                ui.small(format!(
+                    "{} matches · {}{} · working changes, stashes and selection kept as context",
+                    selection.commits.len(),
+                    selection.explanation,
+                    if selection.limited {
+                        " · partial: 30000-commit budget"
+                    } else {
+                        ""
+                    }
+                ));
+            } else if let Some(error) = &self.saved_views.error {
+                ui.colored_label(crate::theme::Tokens::get(&ctx).danger, error);
+                ui.small("Showing loaded context until a view can be computed.");
+            } else {
+                ui.small("Computing view from pinned history; showing loaded context…");
+            }
+        }
+        self.poll_saved_views(&ctx);
+        self.prepare_graph_projection();
     }
 }

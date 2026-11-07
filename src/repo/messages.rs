@@ -321,7 +321,10 @@ impl RepoTab {
                 }
                 self.conflict_saved(path, saved, ctx)
             }
-            Msg::Identity(identity) => {self.identity = identity;self.saved_views.dirty=true;},
+            Msg::Identity(identity) => {
+                self.identity = identity;
+                self.saved_views.dirty = true;
+            }
             Msg::Watcher(watcher) => {
                 self.watcher = watcher.map(|w| *w);
                 self.watcher_arrived(ctx);

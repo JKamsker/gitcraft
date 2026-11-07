@@ -1,6 +1,7 @@
 //! Pinned, bounded history investigations. Every request uses the accepted raw transport.
+#[cfg(test)]
+pub(crate) mod tests;
 pub(crate) mod views;
-#[cfg(test)] pub(crate) mod tests;
 use crate::{git, remote};
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -56,8 +57,22 @@ pub(crate) fn oid(value: &str) -> bool {
 }
 
 /// Read a graph page from pinned tips through the same bounded/no-fetch transport.
-pub(crate) fn page(repo:&Path,tips:&[String],skip:usize,limit:usize,active:&dyn Fn()->bool)->Result<Vec<git::Commit>,String>{
-    if tips.is_empty(){return Ok(Vec::new());}
-    if tips.len()>30000||tips.iter().any(|id|!oid(id))||limit>git::LOG_PAGE||skip>100000{return Err("Invalid pinned graph page request".into());}
-    super::commits::investigation_page(&Reader::new(repo,active),tips,skip,limit)
+pub(crate) fn page(
+    repo: &Path,
+    tips: &[String],
+    skip: usize,
+    limit: usize,
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<git::Commit>, String> {
+    if tips.is_empty() {
+        return Ok(Vec::new());
+    }
+    if tips.len() > 30000
+        || tips.iter().any(|id| !oid(id))
+        || limit > git::LOG_PAGE
+        || skip > 100000
+    {
+        return Err("Invalid pinned graph page request".into());
+    }
+    super::commits::investigation_page(&Reader::new(repo, active), tips, skip, limit)
 }
