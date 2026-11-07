@@ -9,6 +9,18 @@ import sys
 
 def main():
     root = Path.cwd().resolve()
+    metadata = json.loads(
+        subprocess.check_output(
+            ["cargo", "metadata", "--no-deps", "--format-version", "1"],
+            text=True,
+            encoding="utf-8",
+        )
+    )
+    package_roots = {
+        package["id"]: Path(package["manifest_path"]).resolve().parent.relative_to(root).as_posix()
+        for package in metadata["packages"]
+    }
+
     print("Compiling all Windows test targets once", flush=True)
     proc = subprocess.Popen(
         ["cargo", "test", "--locked", "--no-run", "--message-format=json"],
@@ -17,7 +29,7 @@ def main():
         encoding="utf-8",
         errors="replace",
     )
-    binaries = set()
+    binaries = {}
     assert proc.stdout is not None
     for line in proc.stdout:
         try:
@@ -35,8 +47,12 @@ def main():
         binary = Path(executable).resolve()
         if binary.suffix.lower() != ".exe":
             continue
-        # Avoid accidentally packaging an executable outside this checkout.
-        binaries.add(binary.relative_to(root).as_posix())
+        # Keep Cargo's per-package working directory, including integration tests.
+        path = binary.relative_to(root).as_posix()
+        binaries[path] = {
+            "path": path,
+            "cwd": package_roots[message["package_id"]],
+        }
 
     status = proc.wait()
     if status:
@@ -49,8 +65,10 @@ def main():
             raise RuntimeError(f"Cargo test executable does not exist: {name}")
 
     output = root / "ci" / "test-binaries.json"
-    output.write_text(json.dumps({"binaries": sorted(binaries)}, indent=2) + "\n")
-    print(f"Built {len(binaries)} test executables: {sorted(binaries)}", flush=True)
+    output.write_text(
+        json.dumps({"binaries": [binaries[name] for name in sorted(binaries)]}, indent=2) + "\n"
+    )
+    print(f"Built {len(binaries)} Windows test executables: {sorted(binaries)}", flush=True)
     return 0
 
 
