@@ -94,8 +94,6 @@ struct State {
 pub(super) struct Taken<'a> {
     pool: &'a Pool,
     shell: Option<Shell>,
-    /// It ran commands before (it may have gone away since).
-    pub(super) reused: bool,
     /// Given back with this as the time it was last used (see [`Pool::take_idle`]).
     keep_used: Option<Instant>,
 }
@@ -217,11 +215,10 @@ impl Pool {
         }
     }
 
-    fn taken(&self, shell: Shell, reused: bool) -> Taken<'_> {
+    fn taken(&self, shell: Shell, _reused: bool) -> Taken<'_> {
         Taken {
             pool: self,
             shell: Some(shell),
-            reused,
             keep_used: None,
         }
     }

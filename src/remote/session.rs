@@ -3,11 +3,11 @@
 //! one round trip and not a new connection (well over a second for SSH, which can't share one
 //! connection between processes on Windows).
 //!
-//! Each command goes to a shell as a script in braces (which `sh` runs only once it has all of
-//! it, so a script cut short runs nothing) that runs it with its output into files of the
-//! shell's own temporary folder, then prints a header line (`R <nonce> <exit code> <stdout
-//! bytes> <stderr bytes>`) and both outputs as they are: any bytes, any size, no escaping. The
-//! nonce, new for every command, makes sure what is read answers that command and no other.
+//! Each kept-open transport runs an owned supervisor broker. A request is a single complete
+//! JSON line; user code cannot start from a partial line. Exact nonce-bound ownership and
+//! terminal-receipt frames precede the binary length header and frozen stdout/stderr. EOF,
+//! deadlines and cancellation stop and reap through the same owner without opening a second
+//! connection. Ambiguous delivery is never retried.
 
 use std::io::{Read, Write};
 use std::process::{Child, Command, Stdio};
@@ -15,14 +15,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use super::pool::{Lane, pool};
-use super::shell::{Failure, Shell};
+use super::shell::Shell;
 use super::{Host, sh_path, sh_quote};
 
 /// What a shell prints once it is ready, after whatever the login printed.
 pub(super) const READY: &str = "__GITCRAFT_READY__";
-
-/// Makes the shell's temporary folder (again, if something cleared it since).
-const MAKE_TEMP: &str = "T=$(mktemp -d \"${TMPDIR:-/tmp}/gitcraft-sh.XXXXXX\")";
 
 /// Where else git may be: a shell that isn't a login one has a short PATH.
 const MORE_PATH: &str =
@@ -32,7 +29,7 @@ const MORE_PATH: &str =
 const NO_FOLDER: &str = "gitcraft: no such folder: ";
 
 /// The largest output a header is believed for (a server that says more is broken).
-const MAX_OUTPUT: usize = 1 << 31;
+const MAX_OUTPUT: usize = 64 << 20;
 
 /// A command to run on another machine.
 #[derive(Clone, Default)]
@@ -135,44 +132,28 @@ pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
     exec_inner(host, req, false)
 }
 
-fn exec_inner(host: &Host, req: &Request, cleanup: bool) -> Result<Output, String> {
+fn exec_inner(host: &Host, req: &Request, _cleanup: bool) -> Result<Output, String> {
     super::ui_guard::off_ui_thread(&req.what())?;
     let lane = req.lane();
     let pool = pool(host, lane);
-    loop {
-        let mut taken = pool.take(host, lane)?;
-        let reused = taken.reused;
-        let nonce = nonce();
-        let script = framed(req, &nonce);
-        let Some(shell) = taken.shell() else {
-            continue;
-        };
-        let limit = req.time_limit();
-        match shell.run(&script, &nonce, Instant::now() + limit) {
-            Ok(out) => {
-                if super::transport::reusable(host) {
-                    taken.give_back();
-                }
-                return Ok(out);
+    let mut taken = pool.take(host, lane)?;
+    let nonce = nonce();
+    let script = framed(req, &nonce)?;
+    let shell = taken.shell().ok_or("remote shell unavailable")?;
+    let limit = req.time_limit();
+    match shell.run(&script, &nonce, Instant::now() + limit) {
+        Ok(out) => {
+            if super::transport::reusable(host) {
+                taken.give_back();
             }
-            // A shell left open went away meanwhile: the script never reached it, so another
-            // shell can run it. (`taken`, dropped, closes it.)
-            Err(Failure::NotSent(_)) if reused => {}
-            // Hung: its shell is closed (`taken`, dropped), and the command stopped there.
-            Err(Failure::TimedOut(pid)) => {
-                drop(taken);
-                if !cleanup && let Some(pid) = pid {
-                    stop(host.clone(), pid);
-                }
-                return Err(format!(
-                    "{} didn't finish within {} minutes on {} and was stopped",
-                    req.what(),
-                    limit.as_secs().div_ceil(60),
-                    host.label()
-                ));
-            }
-            Err(failure) => return Err(failure.message()),
+            Ok(out)
         }
+        Err(failure) => Err(format!(
+            "{} on {}: {}",
+            req.what(),
+            host.label(),
+            failure.message()
+        )),
     }
 }
 
@@ -186,7 +167,7 @@ pub fn exec_if_connected(host: &Host, req: &Request) -> Option<Result<Output, St
 fn exec_if_connected_inner(
     host: &Host,
     req: &Request,
-    cleanup: bool,
+    _cleanup: bool,
 ) -> Option<Result<Output, String>> {
     if let Err(e) = super::ui_guard::off_ui_thread(&req.what()) {
         return Some(Err(e));
@@ -197,7 +178,10 @@ fn exec_if_connected_inner(
     let pool = pool(host, Lane::Quick);
     let mut taken = pool.take_idle(UNASKED_FRESH)?;
     let nonce = nonce();
-    let script = framed(req, &nonce);
+    let script = match framed(req, &nonce) {
+        Ok(script) => script,
+        Err(e) => return Some(Err(e)),
+    };
     let limit = req.time_limit();
     let ran = taken.shell()?.run(&script, &nonce, Instant::now() + limit);
     Some(match ran {
@@ -205,28 +189,11 @@ fn exec_if_connected_inner(
             taken.give_back();
             Ok(out)
         }
-        Err(Failure::TimedOut(pid)) => {
-            drop(taken);
-            // Stopped only through another shell open there: never a new connection.
-            if !cleanup && let Some(pid) = pid {
-                let host = host.clone();
-                let cleanup = Cleanup::new();
-                std::thread::spawn(move || {
-                    let _cleanup = cleanup;
-                    let _ = exec_if_connected_inner(
-                        &host,
-                        &Request {
-                            script: stop_script(pid),
-                            timeout: Some(Duration::from_secs(30)),
-                            ..Request::default()
-                        },
-                        true,
-                    );
-                });
-            }
-            Err(format!("{} didn't answer in time", req.what()))
-        }
-        Err(failure) => Err(failure.message()),
+        Err(failure) => Err(format!(
+            "{} didn't answer in time: {}",
+            req.what(),
+            failure.message()
+        )),
     })
 }
 
@@ -428,18 +395,7 @@ pub(super) fn start_shell(host: &Host) -> Result<Shell, String> {
 /// What a new shell is sent first: its temporary folder (removed when the shell ends, also on
 /// a hang-up or a signal), its PATH, then [`READY`] and its process (see [`parse_ready`]).
 pub(super) fn setup_script() -> String {
-    format!(
-        concat!(
-            "{make} || exit 1\n",
-            "{path}\n",
-            "trap 'rm -rf \"$T\"' EXIT\n",
-            "trap 'rm -rf \"$T\"; exit 1' HUP INT TERM PIPE\n",
-            "printf '\\n{ready} %s\\n' \"$$\"\n",
-        ),
-        make = MAKE_TEMP,
-        path = MORE_PATH,
-        ready = READY
-    )
+    format!("{MORE_PATH}\n{}", super::supervisor::setup())
 }
 
 /// The process that runs `sh` on `host`, reading its script from its input, and (over SSH)
@@ -586,63 +542,12 @@ pub(super) fn nonce() -> String {
 /// copied before they are measured: something the command left running (a hook's background
 /// job) may still be writing to them, and the bytes sent must be the bytes the header counts.
 /// What can't be passed on or kept (a full disk) fails the command (125) and says why.
-pub(super) fn framed(req: &Request, nonce: &str) -> String {
-    let mut s = format!(
-        "{{\nprintf 'S %s\\n' {nonce}\n[ -d \"$T\" ] || {MAKE_TEMP} || exit 1\n: >\"$T/out\"; : >\"$T/err\"\n"
-    );
-    let (decode, input) = match &req.stdin {
-        Some(bytes) => {
-            use base64::Engine;
-            let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
-            (
-                format!("printf '%s' '{b64}' | base64 -d >\"$T/in\""),
-                "\"$T/in\"",
-            )
-        }
-        None => ("true".to_owned(), "/dev/null"),
-    };
-    s.push_str(&format!("if {decode}; then\n"));
-    // In the background, its process said (`J <nonce> <pid>`), so that one that hangs can be
-    // stopped (see `exec`).
-    s.push_str(&inline(
-        req,
-        &format!("<{input} >\"$T/out\" 2>\"$T/err\" &"),
-    ));
-    s.push_str(&format!(
-        "\np=$!\nprintf 'J %s %s\\n' {nonce} \"$p\"\nwait \"$p\"; r=$?\n"
-    ));
-    s.push_str(concat!(
-        "else r=125; echo 'gitcraft: could not pass the input on' >\"$T/err\"; fi\n",
-        "if cat \"$T/out\" >\"$T/sent-out\" && cat \"$T/err\" >\"$T/sent-err\"; then :; else\n",
-        "  r=125; : >\"$T/sent-out\"; echo 'gitcraft: no room for the output in '\"$T\" >\"$T/sent-err\"\n",
-        "fi\n",
-    ));
-    s.push_str(&format!(
-        "printf 'R %s %s %s %s\\n' {nonce} \"$r\" \"$(wc -c <\"$T/sent-out\")\" \"$(wc -c <\"$T/sent-err\")\"\n"
-    ));
-    s.push_str("cat \"$T/sent-out\" \"$T/sent-err\"\nrm -f \"$T/in\" \"$T/out\" \"$T/err\" \"$T/sent-out\" \"$T/sent-err\"\n}\n");
-    s
+pub(super) fn framed(req: &Request, nonce: &str) -> Result<String, String> {
+    super::supervisor::request(req, nonce, None)
 }
 
-/// `<READY> <pid>`, as a new shell says it's ready: `Some` with its process, which is stopped
-/// with what it runs if a command in it hangs before its own process is known.
-pub(super) fn parse_ready(line: &[u8]) -> Option<Option<u32>> {
-    let line = String::from_utf8_lossy(line);
-    let mut words = line.split_whitespace();
-    if words.next()? != READY {
-        return None;
-    }
-    let pid = words.next().and_then(|p| p.parse().ok());
-    (words.next().is_none()).then_some(pid)
-}
-
-/// `J <nonce> <pid>`: the process of the command of `nonce`.
-pub(super) fn parse_job(line: &str, nonce: &str) -> Option<u32> {
-    let mut words = line.split_whitespace();
-    if words.next()? != "J" || words.next()? != nonce {
-        return None;
-    }
-    words.next()?.parse().ok()
+pub(super) fn parse_ready(line: &[u8]) -> bool {
+    line.trim_ascii_end() == READY.as_bytes()
 }
 
 /// `R <nonce> <code> <stdout bytes> <stderr bytes>` (`wc -c` may pad the numbers with
@@ -655,7 +560,7 @@ pub(super) fn parse_header(line: &str, nonce: &str) -> Option<(i32, usize, usize
     let code = words.next()?.parse().ok()?;
     let out: usize = words.next()?.parse().ok()?;
     let err: usize = words.next()?.parse().ok()?;
-    (out <= MAX_OUTPUT && err <= MAX_OUTPUT).then_some((code, out, err))
+    (words.next().is_none() && out <= MAX_OUTPUT && err <= MAX_OUTPUT).then_some((code, out, err))
 }
 
 #[cfg(test)]
@@ -760,48 +665,32 @@ mod tests {
         );
     }
 
-    /// Nothing runs before the shell has the whole script: it is one group in braces.
     #[test]
-    fn a_framed_script_is_one_group() {
-        let s = framed(&Request::default(), "n1");
-        assert!(s.starts_with("{\n") && s.ends_with("\n}\n"), "{s}");
-    }
-
-    /// No two files of the framing differ only in case: on macOS (and Windows) they would be
-    /// one file, and copying one onto the other would empty it.
-    #[test]
-    fn framing_files_differ_beyond_case() {
-        let s = framed(
+    fn a_framed_request_has_one_complete_json_line() -> Result<(), String> {
+        let request = framed(
             &Request {
-                stdin: Some(b"x".to_vec()),
-                ..Request::default()
+                script: "echo x\necho y".into(),
+                stdin: Some(vec![0, 255, b'\n']),
+                ..Default::default()
             },
-            "n1",
+            "ab1",
+        )?;
+        assert_eq!(request.bytes().filter(|&b| b == b'\n').count(), 1);
+        let value: serde_json::Value = serde_json::from_str(&request).map_err(|e| e.to_string())?;
+        assert_eq!(value["nonce"], "ab1");
+        assert!(
+            value["script"]
+                .as_str()
+                .is_some_and(|s| s.contains("echo x\necho y"))
         );
-        let mut names: Vec<String> = s
-            .split("$T/")
-            .skip(1)
-            .map(|rest| {
-                rest.chars()
-                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '-')
-                    .collect::<String>()
-            })
-            .collect();
-        names.sort();
-        names.dedup();
-        let mut folded: Vec<String> = names.iter().map(|n| n.to_lowercase()).collect();
-        folded.sort();
-        folded.dedup();
-        assert_eq!(names.len(), folded.len(), "{names:?}");
-        assert!(names.len() >= 5, "{names:?}");
+        Ok(())
     }
 
     #[test]
-    fn a_ready_shell_says_its_process() {
-        assert_eq!(parse_ready(b"__GITCRAFT_READY__ 4242\n"), Some(Some(4242)));
-        assert_eq!(parse_ready(b"__GITCRAFT_READY__\n"), Some(None));
-        assert_eq!(parse_ready(b"login banner\n"), None);
-        assert_eq!(parse_ready(b"__GITCRAFT_READY__ 1 2\n"), None);
+    fn a_ready_supervisor_never_grants_pid_authority() {
+        assert!(parse_ready(b"__GITCRAFT_READY__\n"));
+        assert!(!parse_ready(b"__GITCRAFT_READY__ 4242\n"));
+        assert!(!parse_ready(b"login banner\n"));
     }
 
     /// The stop script ends a process and what it started, however deep.

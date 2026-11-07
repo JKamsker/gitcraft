@@ -1,0 +1,7 @@
+# Pooled-session migration (WIP prerequisite)
+
+Pooled sessions now bootstrap the owned broker, send one atomic JSON request line, and require strict start, endpoint, atomic-terminal-receipt, result-header and binary-length correlation. A timeout closes the controller input, then continues reading with a separate bounded five-second cleanup deadline. It distinguishes acknowledged stop/reap from unknown cleanup. Passive reads use the same channel without new connections. Partial/flush errors no longer authorize retry on a reused shell. Read queues/output/header lengths are bounded. The local transport uses the shared anchored owner.
+
+Gate run: `CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked --lib remote::supervisor::recording_tests -- --nocapture`: 2 passed, 0 failed; pure recording/parser tests only. `cargo +1.95.0 fmt --all` passed. All-target compilation passed before the final comments/pool-field cleanup; the focused test build compiled the updated library/tests after that cleanup. No process runtime execution or independent review occurred.
+
+This is still WIP: streamed Git/AI and parallel bisect callers use legacy stop APIs; those APIs and their unsafe tests have not yet been removed. The inherited suite stays held. No native Windows/SSH/WSL behavior is claimed. Newline request atomicity replaces the previous shell-brace dispatch boundary; backend behavior, disconnect cleanup and frozen binary outputs need owned-child validation before acceptance.

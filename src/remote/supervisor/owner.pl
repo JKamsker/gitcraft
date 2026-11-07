@@ -202,7 +202,7 @@ sub run {
     my $final = {%$o,state=>'stopped',code=>$code}; atomic("$o->{path}/terminal",encode($final),0);
     for my $client (values %clients) { syswrite($client->{handle},encode($final)); close($client->{handle}); }
     die $error if $error;
-    return ($code,\@output);
+    return ($code,\@output,$o);
 }
 sub serve {
     open(my $controller, '<&', \*STDIN) or die 'controller missing'; cloexec($controller);
@@ -214,7 +214,8 @@ sub serve {
         die 'oversized request' if length($line) > (96 << 20);
         if ($line =~ /\AP ([0-9a-f]{1,96})\n\z/) { print $line; next; }
         my $req = $JSON->decode($line); print "S $req->{nonce}\n";
-        my ($code,$out) = run($req,$controller,0);
+        my ($code,$out,$owner) = run($req,$controller,0);
+        print "C1 ",encode({%$owner,state=>'stopped',code=>$code});
         print "R $req->{nonce} $code ",length($out->[0]),' ',length($out->[1]),"\n",$out->[0],$out->[1];
     }
 }
