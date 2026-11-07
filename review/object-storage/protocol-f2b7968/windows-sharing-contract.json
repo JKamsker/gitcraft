@@ -1,0 +1,36 @@
+{
+  "candidate": "f2b7968b45d90afc1bd2f7d2347482a2463f0742",
+  "retrieval": "Read-only public MicrosoftDocs raw sources; no native execution/probe",
+  "sources": [
+    {
+      "title": "FILE_LINK_INFORMATION",
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_link_information",
+      "raw_url": "https://raw.githubusercontent.com/MicrosoftDocs/windows-driver-docs-ddi/staging/wdk-ddi-src/content/ntifs/ns-ntifs-_file_link_information.md",
+      "cached_local_path": "/workspace/work/object-storage-windows-contract/file-link-info.md",
+      "sha256": "10b34068c59c57f2a772788c169f393d30ca8d1fa5cc04114e363f8a8bae3c40",
+      "bytes": 8387
+    },
+    {
+      "title": "CreateFileW",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew",
+      "raw_url": "https://raw.githubusercontent.com/MicrosoftDocs/sdk-api/docs/sdk-api-src/content/fileapi/nf-fileapi-createfilew.md",
+      "cached_local_path": "/workspace/work/object-storage-windows-contract/create-file.md",
+      "sha256": "f3e2604b109bc721d4bb6674ce0e10dd883c3d820c48156ca527690b5d19e437",
+      "bytes": 64528
+    },
+    {
+      "title": "CreateHardLinkW",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createhardlinkw",
+      "raw_url": "https://raw.githubusercontent.com/MicrosoftDocs/sdk-api/docs/sdk-api-src/content/winbase/nf-winbase-createhardlinkw.md",
+      "cached_local_path": "/workspace/work/object-storage-windows-contract/create-hard-link.md",
+      "sha256": "8355667f3eacd838fbf9efe3c4c7352a5dfbc2aa8514d62d8e834ea90edeb86d",
+      "bytes": 9277
+    }
+  ],
+  "quoted_excerpts": {
+    "FILE_LINK_INFORMATION": "No specific access rights are required to set this information.",
+    "CreateFileW FILE_SHARE_DELETE": "Otherwise, no process can open the file or device if it requests delete access.",
+    "CreateHardLinkW": "Flags, attributes, access, and sharing that are specified in CreateFile operate on a per-file basis."
+  },
+  "conclusion": "DELETE-sharing blocks delete/rename opens; supplied Microsoft FILE_LINK_INFORMATION contract does not establish DELETE access as a prerequisite to adding a link. Current READ-shared linkcount sampling must not be claimed as a stable no-hardlink mutation guarantee. Windows truncation route remains incomplete pending a design that avoids shared-content mutation or proves exclusion."
+}
