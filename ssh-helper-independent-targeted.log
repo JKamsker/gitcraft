@@ -1,0 +1,44 @@
+
+running 39 tests
+test connections::tests::fenced_ssh_expansion_preserves_the_whole_path_and_refuses_ambiguous_fields ... ok
+test connections::tests::openssh_fixture_configuration_confirms_additive_identity_files_are_refused ... ok
+test connections::tests::profile_openssh_checks_options_after_the_hostname_until_the_command_boundary ... ok
+test connections::tests::profile_openssh_options_refuse_plink_dialects_before_any_probe ... ok
+test connections::tests::profile_ssh_fixture_child ... ok
+test connections::tests::ssh_effective_config_cannot_fall_back_to_another_identity ... ok
+test connections::tests::ssh_helper_command_quotes_executable_and_encodes_key_paths ... ok
+test forge::ssh_keys::public_key::tests::only_public_key_fields_leave_the_validator ... ok
+test connections::tests::openssh_expands_equivalent_tilde_and_percent_identity_paths_but_refuses_other_keys ... ok
+test forge::ssh_keys::tests::account_mismatch_cancel_and_diagnostics_never_submit_or_leak_private_input ... ok
+test forge::ssh_keys::tests::forgejo_and_gitea_registration_posts_only_public_key_to_user_keys ... ok
+test forge::tests::an_ssh_remote_gets_its_web_address_from_teas_login ... ok
+test forge::tests::the_web_server_keeps_its_port_and_an_ssh_one_is_dropped ... ok
+test forge::ssh_keys::tests::checked_github_upload_pins_token_across_login_and_profile_changes ... ok
+test git::command::tests::a_quiet_operation_tells_ssh_to_ask_nobody ... ok
+test remote::askpass::tests::what_ssh_asks_is_told_apart ... ok
+test remote::live_tests::a_repository_over_ssh_reads_like_a_local_one ... ok
+test remote::tests::joined_ssh_paths_keep_their_host ... ok
+test remote::tests::ssh_paths_are_never_opened_here ... ok
+test remote::tests::ssh_paths_name_a_host_and_a_path_there ... ok
+test connections::tests::actual_profile_ssh_wrapper_auto_probe_preserves_nondefault_port_over_inherited_plink ... ok
+test repo::ssh_setup::plan::tests::chosen_identity_test_ignores_other_identity_files_and_agent_keys ... ok
+test repo::ssh_setup::plan::tests::local_generation_is_interactive_and_requires_exclusive_new_folder ... ok
+test repo::ssh_setup::plan::tests::remote_scripts_quote_paths_without_local_key_or_credential_routing ... ok
+test repo::ssh_setup::tests::closing_worker_drops_late_results_without_applying_an_action ... ok
+test repo::ssh_setup::tests::exclusive_folder_reservation_never_reuses_or_removes_existing_files ... ok
+test repo::ssh_setup::tests::invalid_locations_and_unselected_local_upload_paths_refuse_before_any_io ... ok
+test repo::ssh_setup::tests::opening_setup_ui_exposes_each_step_without_running_tools_or_changing_profiles ... ok
+test repo::ssh_setup::tests::owned_recording_terminal_reports_actual_exit_without_generating_a_key ... ok
+test repo::ssh_setup::tests::practice_backstop_refuses_before_any_setup_job ... ok
+test repo::ssh_setup::tests::recording::remote_generation_agent_and_test_use_recording_tools_and_never_overwrite ... ok
+test repo::keyboard::tests::ssh_setup_owns_repository_keys_and_refuses_previously_queued_file_actions ... ok
+test repo::ssh_setup::tests::remote_plans_never_need_local_profile_key_or_token_values ... ok
+test connections::tests::actual_ssh_helper_refuses_lf_cr_and_different_keys_before_transport_and_accepts_equivalent_paths ... ok
+test repo::ssh_setup::tests::ssh_setup_terminal_prompt_remains_visible_at_minimum_window_height ... ok
+test settings::profiles::connection_tests::ssh_key_and_host_helpers_round_trip_through_git_config ... ok
+test git::activity::tests::ssh_analysis_uses_the_encoded_repository_and_background_transport ... ok
+test repo::ssh_setup::tests::recording::remote_registration_uploads_only_validated_public_fields_using_named_login ... ok
+test settings::profiles::connection_tests::selected_openssh_profile_overrides_inherited_putty_variant_and_keeps_nondefault_port ... ok
+
+test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 799 filtered out; finished in 0.53s
+

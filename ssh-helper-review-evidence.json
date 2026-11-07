@@ -1,0 +1,18 @@
+{
+  "candidate": "32f72244ca8b0386915173eacbbb9f87e39d25ad",
+  "base": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+  "tree": "8986db14cd8f17939e422bca85e2f525a491365d",
+  "binary": {
+    "path": "/workspace/work/ssh-key-helper/target/debug/deps/gitcraft-31822f5b138c0fe8",
+    "sha256": "d7d28dc05f6ec16f842cc4628ec0ee2da60953b98a74dc35ad31c9abb884acae"
+  },
+  "command": "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL /workspace/work/ssh-key-helper/target/debug/deps/gitcraft-31822f5b138c0fe8 ssh_ --nocapture",
+  "exit": 0,
+  "result": "39 passed; 0 failed; 0 ignored; 799 filtered out",
+  "log_sha256": "6fb7c6d4ca4d0d50494c773f6bce1c17faf01e8ebb9099da3b75942dce16a0a2",
+  "source_binding": "20 source files; 5 author logs; 14 exact authors verified",
+  "independent_compile": false,
+  "ci_used": false,
+  "verdict": "FAIL pending Windows malformed WSL UNC guard fix",
+  "native_windows_runtime": false
+}
