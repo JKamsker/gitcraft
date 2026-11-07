@@ -20,13 +20,28 @@ fn click(h: &mut egui_kittest::Harness<'_, App>, label: &str) {
     // Smooth scrolling/modal re-layout can move a control between pointer-down and
     // pointer-up; let those requested animation frames finish before clicking.
     h.run();
-    let node = h.get_by_label(label);
-    eprintln!(
-        "setup pointer target {label}: rect={:?}, screen={:?}, node={node:?}",
-        node.rect(),
-        h.ctx.content_rect()
-    );
-    node.click();
+    let pos = h.get_by_label(label).rect().center();
+    if std::env::var_os("GITCRAFT_SETUP_UI_SCREENSHOT").is_some()
+        && label.starts_with("Add profiles")
+    {
+        match h.render() {
+            Ok(image) => {
+                let _ = image.save("/workspace/work/setup-import-debug.png");
+            }
+            Err(e) => eprintln!("Screenshot unavailable: {e}"),
+        }
+    }
+    h.event(egui::Event::PointerMoved(pos));
+    h.step();
+    for pressed in [true, false] {
+        h.event(egui::Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: egui::Modifiers::NONE,
+        });
+        h.step();
+    }
     h.run_steps(3);
 }
 #[test]
