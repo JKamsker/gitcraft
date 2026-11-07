@@ -3,7 +3,7 @@ use crate::{git::Commit, graph::Graph};
 use std::{collections::BTreeSet, ops::Range, sync::Arc};
 const LANES: usize = 24;
 #[derive(Clone, Debug)]
-pub(super) enum Row {
+pub(in crate::repo) enum Row {
     Commit(usize),
     Gap {
         range: Range<usize>,

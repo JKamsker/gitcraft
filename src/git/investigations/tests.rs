@@ -1,5 +1,5 @@
 use super::{views::*, *};
-use std::{path::PathBuf, process::Command};
+use std::{collections::BTreeSet, path::PathBuf, process::Command};
 pub(crate) struct Repo(pub PathBuf);
 impl Repo {
     pub fn new() -> Result<Self, String> {
@@ -29,7 +29,7 @@ impl Repo {
             .output()
             .map_err(|e| e.to_string())?;
         if o.status.success() {
-            Ok(String::from_utf8_lossy(&o.stdout).trim_end().into_owned())
+            Ok(String::from_utf8_lossy(&o.stdout).trim_end().to_owned())
         } else {
             Err(String::from_utf8_lossy(&o.stderr).into_owned())
         }
