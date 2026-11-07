@@ -118,7 +118,7 @@ fn remote_script(identity: &Identity, path: &str, create: bool) -> Result<String
         "umask 077\ncd -P -- {} || exit 1\nrecovery_root=$(pwd -P) || exit 1\n[ \"$recovery_root\" = / ] && recovery_root=\n",
         sh_quote(root)
     );
-    script.push_str(&format!("recovery_metadata=$(cd -P -- {} && pwd -P) || exit 1\n[ \"$recovery_root\" != \"$recovery_metadata\" ] || exit 1\n", sh_quote(&identity.common)));
+    script.push_str(&format!("recovery_metadata=$(cd -P -- {} && pwd -P) || exit 1\n[ \"$recovery_metadata\" = / ] && recovery_metadata=\n[ \"$recovery_root\" != \"$recovery_metadata\" ] || exit 1\n", sh_quote(&identity.common)));
     let mut relative = String::new();
     for parent in parents {
         relative.push('/');

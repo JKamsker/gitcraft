@@ -295,7 +295,14 @@ pub(crate) fn prepare(
             {
                 return Err("Branch shorthand is not a new destination name".into());
             }
-            if optional_ref(&reader, &format!("refs/heads/{name}"))?.is_some() {
+            let reference = format!("refs/heads/{name}");
+            let symbolic = reader.output(&["symbolic-ref", "--quiet", &reference], None)?;
+            if symbolic.code != 1 || !symbolic.stderr.is_empty() {
+                return Err(
+                    "The branch destination is symbolic or unreadable; choose a new name".into(),
+                );
+            }
+            if optional_ref(&reader, &reference)?.is_some() {
                 return Err("That branch already exists; choose a new name".into());
             }
             if !valid_oid(&source.commit) {

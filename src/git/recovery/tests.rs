@@ -4,6 +4,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 pub(super) struct Fixture(pub(super) PathBuf);
 impl Fixture {
     pub(super) fn new() -> Result<Self, String> {
+        Self::format("sha1")
+    }
+    fn format(format: &str) -> Result<Self, String> {
         static ID: AtomicU64 = AtomicU64::new(0);
         let p = std::env::temp_dir().join(format!(
             "gitcraft-content-recovery-{}-{}",
@@ -12,7 +15,7 @@ impl Fixture {
         ));
         std::fs::create_dir(&p).map_err(|e| e.to_string())?;
         for args in [
-            vec!["init", "-q", "-b", "main"],
+            vec!["init", "-q", "-b", "main", "--object-format", format],
             vec!["config", "user.name", "Test"],
             vec!["config", "user.email", "test@example.com"],
             vec!["config", "commit.gpgSign", "false"],
@@ -497,5 +500,85 @@ fn pruning_an_unattached_blob_after_preview_refuses_recovery_without_creating_a_
     assert!(git::run(Some(&f.0), &["--no-lazy-fetch", "cat-file", "-e", &oid]).is_err());
     assert!(perform(&f.0, &prepared, &|| true).is_err());
     assert!(!f.0.join("recovered").exists());
+    Ok(())
+}
+
+#[test]
+fn branch_destinations_refuse_symbolic_collisions_and_never_parse_names_as_shell_or_commands()
+-> Result<(), String> {
+    let f = Fixture::new()?;
+    f.write("file", b"parse_header source")?;
+    let commit = f.commit("base")?;
+    let results = search(&f.0, "parse_header", &|| true)?;
+    let preview = inspect(&f.0, &results, &results.report.hits[0], Some(0), &|| true)?;
+    let pending = prepare(&f.0, &preview, Target::Branch("collision".into()), &|| true)?;
+    git::run(
+        Some(&f.0),
+        &[
+            "symbolic-ref",
+            "refs/heads/collision",
+            "refs/heads/missing-target",
+        ],
+    )?;
+    assert!(perform(&f.0, &pending, &|| true).is_err());
+    assert_eq!(
+        git::run(Some(&f.0), &["symbolic-ref", "refs/heads/collision"])?.trim(),
+        "refs/heads/missing-target"
+    );
+    assert!(
+        prepare(
+            &f.0,
+            &preview,
+            Target::Branch("evil\ncreate refs/heads/injected deadbeef".into()),
+            &|| true
+        )
+        .is_err()
+    );
+    let literal = "literal;$(touch${IFS}marker)";
+    let safe = prepare(&f.0, &preview, Target::Branch(literal.into()), &|| true)?;
+    perform(&f.0, &safe, &|| true)?;
+    assert_eq!(
+        git::resolve(&f.0, &format!("refs/heads/{literal}"))?,
+        commit
+    );
+    assert!(!f.0.join("marker").exists());
+    Ok(())
+}
+#[test]
+fn unborn_sha256_staged_blobs_and_commit_recovery_keep_hash_format_and_index() -> Result<(), String>
+{
+    let f = Fixture::format("sha256")?;
+    f.write("file", b"parse_header unborn bytes")?;
+    git::run(Some(&f.0), &["add", "file"])?;
+    git::run(Some(&f.0), &["rm", "--cached", "file"])?;
+    let index = std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?;
+    let results = search(&f.0, "parse_header", &|| true)?;
+    assert_eq!(results.identity.format, "sha256");
+    let found = results.report.hits.first().ok_or("Missing unborn blob")?;
+    assert_eq!(found.blob.len(), 64);
+    let preview = inspect(&f.0, &results, found, None, &|| true)?;
+    let prepared = prepare(&f.0, &preview, Target::File("recovered".into()), &|| true)?;
+    perform(&f.0, &prepared, &|| true)?;
+    assert_eq!(
+        std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?,
+        index
+    );
+    let commit = f.commit("first")?;
+    let results = search(&f.0, "parse_header", &|| true)?;
+    let found = results
+        .report
+        .hits
+        .iter()
+        .find(|hit| !hit.provenance.is_empty())
+        .ok_or("Missing commit source")?;
+    let preview = inspect(&f.0, &results, found, Some(0), &|| true)?;
+    let prepared = prepare(
+        &f.0,
+        &preview,
+        Target::Branch("sha256-rescue".into()),
+        &|| true,
+    )?;
+    perform(&f.0, &prepared, &|| true)?;
+    assert_eq!(git::resolve(&f.0, "refs/heads/sha256-rescue")?, commit);
     Ok(())
 }

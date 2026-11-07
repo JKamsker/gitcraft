@@ -202,8 +202,10 @@ pub(crate) fn search(
 fn search_inner(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<Results, String> {
     let reader = Reader::new(repo, active);
     let identity = reader.identity()?;
-    let mut report = Report::default();
-    report.shallow = reader.run(&["rev-parse", "--is-shallow-repository"], None)? == b"true\n";
+    let mut report = Report {
+        shallow: reader.run(&["rev-parse", "--is-shallow-repository"], None)? == b"true\n",
+        ..Default::default()
+    };
     let fsck = reader.output(
         &[
             "fsck",
@@ -581,7 +583,7 @@ fn excerpt(text: &str, at: usize) -> (usize, String) {
         .map_or(0, |(i, _)| i);
     let mut excerpt: String = text[start..].chars().take(400).collect();
     if start > 0 {
-        excerpt.insert_str(0, "…");
+        excerpt.insert(0, '…');
     }
     if text[start..].chars().count() > 400 {
         excerpt.push('…');
