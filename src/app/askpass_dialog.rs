@@ -112,8 +112,21 @@ impl App {
                             field.request_focus();
                         }
                         ui.add_space(8.0);
-                        ui.checkbox(&mut state.remember, "Remember connection")
-                            .on_hover_text(REMEMBER_HINT);
+                        if crate::portable::credential_store() {
+                            ui.checkbox(&mut state.remember, "Remember connection")
+                                .on_hover_text(REMEMBER_HINT);
+                        } else {
+                            // A portable copy set to leave nothing on this computer.
+                            state.remember = false;
+                            ui.label(
+                                RichText::new(
+                                    "Asked again after a restart: this portable copy doesn't \
+                                     use the credential store (Settings → General).",
+                                )
+                                .color(t.text_dim)
+                                .small(),
+                            );
+                        }
                         ui.add_space(12.0);
                         ui.horizontal(|ui| {
                             if crate::repo::primary_button(ui, "Sign in", true, 90.0).clicked()

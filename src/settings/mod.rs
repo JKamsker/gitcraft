@@ -5,6 +5,7 @@ mod custom_commands;
 mod external_tools;
 mod layout;
 mod page;
+mod portable_page;
 mod preview;
 mod profile_page;
 pub mod profiles;
@@ -102,6 +103,8 @@ pub struct Settings {
     pub merge_tool: crate::git::external_tool::ToolChoice,
     /// After a checkout, pull, merge or rebase, update the submodules to the commits it records.
     pub keep_submodules: bool,
+    /// Running portable: keep sign-ins in this computer's credential store all the same.
+    pub portable_credential_store: bool,
     /// Saved as `profiles` by the versions before profiles were what they are now.
     #[serde(rename = "profiles")]
     pub identities: Vec<SavedIdentity>,
@@ -156,6 +159,7 @@ impl Default for Settings {
             diff_tool: Default::default(),
             merge_tool: Default::default(),
             keep_submodules: false,
+            portable_credential_store: false,
             identities: Vec::new(),
             user_profiles: vec![UserProfile::default()],
             active_profile: UserProfile::default().id,
@@ -374,7 +378,9 @@ impl Settings {
                             "When a long operation ends in the background",
                         );
                     });
-                    if let Some(appimage) = crate::desktop_entry::appimage() {
+                    if let Some(appimage) =
+                        crate::desktop_entry::appimage().filter(|_| !crate::portable::asked())
+                    {
                         card.row(
                             "Applications menu",
                             "appimage desktop entry launcher",
@@ -394,6 +400,7 @@ impl Settings {
                         );
                     }
                 });
+                self.portable_ui(ui, f);
                 section(ui, f, "Updates", None, |card| {
                     card.row("Version", "about release", |ui| {
                         ui.add_space(4.0);

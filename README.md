@@ -458,6 +458,16 @@ until GitHub's macOS runners pick it up again, so on a Mac build from source (be
   macOS refuses to open it: go to _System Settings › Privacy & Security_ and click _Open
   Anyway_, or run `xattr -dr com.apple.quarantine /Applications/gitcraft.app`. git comes with
   the Xcode command line tools (`xcode-select --install`) or Homebrew.
+- **Portable** (a USB stick, a locked-down machine): put the AppImage, or what the `.zip` or
+  `.tar.gz` unpacks to, in a folder of its own, and add an empty `gitcraft.portable` file or an
+  empty `data` folder next to the program (next to `gitcraft.app` on macOS, once
+  `xattr -dr com.apple.quarantine` has been run on it). gitcraft then keeps its settings, open
+  tabs, profiles and their `.gitconfig` files, the avatar cache, downloaded updates and Mergiraf
+  in that `data` folder instead of your user's app data, starting fresh, and updates replace
+  the files there. SSH passwords are kept in this computer's credential store only when
+  Settings → General → Portable mode → _Remember SSH sign-ins in this computer's credential
+  store_ is on (it starts off). If the folder can't be written to, gitcraft says so and uses the
+  usual place. Git itself still uses your own config, credential helper and `~/.ssh`.
 
 A release is built by `.github/workflows/release.yml` whenever a `v*` tag is pushed
 (`packaging/windows/gitcraft.iss` for the installer, `packaging/linux/build-appimage.sh` for the

@@ -28,6 +28,13 @@ const FEATURES: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "Portable copy",
+        &[
+            "An empty gitcraft.portable file or an empty data folder next to gitcraft (next to gitcraft.app on macOS) keeps the settings, open tabs, profiles and their git config files, the avatar cache, downloaded updates and Mergiraf in that data folder, starting fresh; Settings → General → Portable mode shows where.",
+            "A portable copy keeps SSH passwords in this computer's credential store only when Remember SSH sign-ins in this computer's credential store is on (Settings → General → Portable mode; it starts off): otherwise they are asked again after a restart.",
+        ],
+    ),
+    (
         "Graph",
         &[
             "Every branch with its pill on its latest commit: solid for the checked-out one, a laptop when it is local, a cloud when a remote has it.",

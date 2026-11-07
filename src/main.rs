@@ -31,6 +31,8 @@ fn main() -> eframe::Result {
             }
         })),
         wgpu_options: wgpu_options(),
+        // Next to gitcraft when it runs portable; eframe's own place otherwise.
+        persistence_path: app::persistence_path(),
         ..Default::default()
     };
     let result = eframe::run_native(

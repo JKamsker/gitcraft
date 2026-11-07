@@ -69,7 +69,7 @@ fn quiet(mut cmd: Command) -> Command {
 
 /// The folder gitcraft downloads Mergiraf into.
 fn own_dir() -> Option<PathBuf> {
-    eframe::storage_dir("gitcraft").map(|d| d.join("mergiraf"))
+    crate::portable::data_dir().map(|d| d.join("mergiraf"))
 }
 
 fn probe(program: &Path) -> Option<String> {

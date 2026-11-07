@@ -161,6 +161,7 @@ impl App {
             });
         }
         if let Some(appimage) = crate::desktop_entry::appimage()
+            && !crate::portable::asked()
             && !crate::desktop_entry::installed()
         {
             ui.add_space(4.0);
