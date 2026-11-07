@@ -111,8 +111,27 @@ pub(crate) fn read(
         &["--no-lazy-fetch", "ls-tree", "-r", "-z", &tour.head],
         None,
     )?;
+    // Prefer the first-day README and policy documents even when a repository has many
+    // templates/attribute files. The whole tree listing is bounded by the shared reader.
+    let mut records = tree
+        .split(|b| *b == 0)
+        .filter(|b| !b.is_empty())
+        .collect::<Vec<_>>();
+    records.sort_by_key(|record| {
+        let path = record.split(|b| *b == b'\t').nth(1).unwrap_or_default();
+        let lower = String::from_utf8_lossy(path).to_ascii_lowercase();
+        if lower.starts_with("readme") {
+            0
+        } else if lower.contains("contributing") {
+            1
+        } else if lower.contains("pull_request_template") {
+            2
+        } else {
+            3
+        }
+    });
     let mut documents = 0;
-    for record in tree.split(|b| *b == 0).filter(|b| !b.is_empty()) {
+    for record in records {
         if !active() {
             return Err("Repository tour cancelled".into());
         }
@@ -122,7 +141,7 @@ pub(crate) fn read(
         let metadata = &record[..tab];
         let path = std::str::from_utf8(&record[tab + 1..]).unwrap_or_default();
         let lower = path.to_ascii_lowercase();
-        if path == ".gitmodules" {
+        if path == ".gitmodules" || metadata.starts_with(b"160000 ") {
             tour.needs.insert("Submodules".into());
         }
         if path == ".editorconfig" {

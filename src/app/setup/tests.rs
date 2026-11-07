@@ -125,7 +125,8 @@ fn cancelled_profile_answers_cannot_activate_stale_setup() {
     let active = Arc::new(AtomicBool::new(false));
     window.job = Some(Job { rx, active });
     let p = UserProfile::default();
-    tx.send(Ok(Answer::Verified(p.clone(), p))).unwrap();
+    tx.send(Ok(Answer::Verified(Box::new((p.clone(), p)))))
+        .unwrap();
     assert!(window.take_answer().unwrap().is_err());
 }
 #[test]
@@ -162,7 +163,8 @@ fn changed_profile_answers_do_not_clear_the_current_pending_requirements() {
     let mut ready = before.clone();
     ready.pending_setup = None;
     let (tx, rx) = channel();
-    tx.send(Ok(Answer::Verified(before, ready))).unwrap();
+    tx.send(Ok(Answer::Verified(Box::new((before, ready)))))
+        .unwrap();
     h.state_mut().setup.job = Some(Job {
         rx,
         active: Arc::new(AtomicBool::new(true)),

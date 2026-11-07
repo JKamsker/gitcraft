@@ -46,7 +46,7 @@ enum Answer {
     Loaded(Setup),
     Saved(PathBuf),
     Restored(usize, Outcome),
-    Verified(UserProfile, UserProfile),
+    Verified(Box<(UserProfile, UserProfile)>),
 }
 #[derive(Default)]
 pub(super) struct SetupWindow {
@@ -217,7 +217,8 @@ impl App {
                     }
                 }
             }
-            Ok(Answer::Verified(before, ready)) => {
+            Ok(Answer::Verified(result)) => {
+                let (before, ready) = *result;
                 if let Some(profile) = self
                     .settings
                     .user_profiles
@@ -457,7 +458,7 @@ impl App {
         if let Some((profile, fresh)) = verify {
             self.setup.launch(ctx, move |active| {
                 let ready = pending::verify(&profile, &fresh, active)?;
-                Ok(Answer::Verified(profile, ready))
+                Ok(Answer::Verified(Box::new((profile, ready))))
             });
         }
     }
