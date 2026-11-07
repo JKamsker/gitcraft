@@ -308,7 +308,7 @@ fn verify(
     // Verification resolves prerequisite commits, which otherwise triggers a promisor
     // fetch and modifies the object store before the user chooses Import.
     let no_lazy = no_lazy_fetch(repo)?;
-    let (args, input) = verification_command(&no_lazy, file, bytes)?;
+    let (args, input) = verification_command(cfg!(windows), &no_lazy, file, bytes)?;
     bounded::run(repo, &args, input, HEADER_LIMIT)?;
     Ok(no_lazy)
 }
@@ -316,11 +316,15 @@ fn verify(
 /// Git 2.45 added --no-lazy-fetch, after bundle verification gained stdin support.
 /// Use that existing capability probe to retain the older ordinary-repository fallback.
 fn verification_command<'a>(
+    use_stdin: bool,
     no_lazy: &[&'a str],
     file: &'a str,
     bytes: &[u8],
 ) -> Result<(Vec<&'a str>, Vec<u8>), String> {
-    let (file, input) = if no_lazy.is_empty() {
+    // Unix Git closes stdin before checking prerequisite connectivity; its fork/pipe
+    // setup can then close rev-list's fd 0. Keep pathname verification on Unix.
+    // Native Windows duplicates inherited handles instead and needs the pathname bypass.
+    let (file, input) = if !use_stdin || no_lazy.is_empty() {
         (file, Vec::new())
     } else {
         // Native Git for Windows opens bundle files before initializing long-path config.

@@ -765,7 +765,7 @@ fn verification_streams_only_the_validated_header_and_keeps_the_old_git_fallback
     bytes.extend_from_slice(b"PACK");
     bytes.extend(vec![0; 1024 * 1024]);
     let long_path = format!("C:/{}exchange.bundle", "deep ü/".repeat(80));
-    let (args, input) = verification_command(&["--no-lazy-fetch"], &long_path, &bytes)?;
+    let (args, input) = verification_command(true, &["--no-lazy-fetch"], &long_path, &bytes)?;
     assert_eq!(
         args,
         [
@@ -778,9 +778,12 @@ fn verification_streams_only_the_validated_header_and_keeps_the_old_git_fallback
         ]
     );
     assert_eq!(input, header.as_bytes());
-    let (args, input) = verification_command(&[], &long_path, &bytes)?;
+    let (args, input) = verification_command(true, &[], &long_path, &bytes)?;
     assert_eq!(args.last().copied(), Some(long_path.as_str()));
     assert!(input.is_empty());
-    assert!(verification_command(&["--no-lazy-fetch"], &long_path, b"not a bundle").is_err());
+    let (args, input) = verification_command(false, &["--no-lazy-fetch"], &long_path, &bytes)?;
+    assert_eq!(args.last().copied(), Some(long_path.as_str()));
+    assert!(input.is_empty());
+    assert!(verification_command(true, &["--no-lazy-fetch"], &long_path, b"not a bundle").is_err());
     Ok(())
 }
