@@ -2,6 +2,7 @@ use super::*;
 use std::path::PathBuf;
 use std::process::Command;
 
+static FIXTURES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 struct Repo(PathBuf);
 impl Repo {
     fn new() -> Result<Self, String> {
@@ -9,10 +10,13 @@ impl Repo {
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|e| e.to_string())?
             .as_nanos();
-        let r = Self(
-            std::env::temp_dir().join(format!("gitcraft-activity-{}-{stamp}", std::process::id())),
-        );
-        std::fs::create_dir(&r.0).map_err(|e| e.to_string())?;
+        let serial = FIXTURES.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "gitcraft-activity-{}-{stamp}-{serial}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&path).map_err(|e| e.to_string())?;
+        let r = Self(path);
         for args in [
             &["init", "-q"][..],
             &["config", "user.name", "Alias"],
