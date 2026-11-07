@@ -1,0 +1,22 @@
+{
+  "instruction": "Do not use CI until all work on our side is done; hurry implementation.",
+  "source": "Latest user message",
+  "effective": true,
+  "policy_commit": "8989a1fe580f52d08704011fe883081a1a9f26bc",
+  "automatic_work_branch_ci": "Disabled; workflow restored byte-for-byte to original dev (master push only, original PR/manual triggers). No premature PR.",
+  "during_development": "Implementation, local checks and independent reviews only; no dispatch/rerun/poll/wait for CI. Branch commits+pushes remain mandatory.",
+  "final_sequence": [
+    "Finish all eligible implementation and review fixes.",
+    "Build clean final branch with one correctly authored commit per named feature, preserving existing branches.",
+    "Run exact final local checks and independent adversarial whole-candidate review.",
+    "Only when all side work is complete, use CI for final candidate.",
+    "Create the single final PR after required gates pass."
+  ],
+  "existing_run_cancel_attempt": {
+    "run_id": 42335827283,
+    "command": "gh run cancel 42335827283 --repo JKamsker/gitcraft",
+    "result": "Blocked: API request Forbidden (HTTP403)",
+    "current_run_state": "Unknown; no further CI polling. Do not claim cancellation succeeded."
+  },
+  "cancellation_tools": "No callable GitHub cancel workflow tool or browser-control tool available. Do not use unrelated Forgejo/security-cloud cancel endpoints."
+}

@@ -8,12 +8,13 @@
   "agents": {
     "audit_32_38": "Fix Drafts reader actual completion ownership; content recovery backend8f992 preserved",
     "audit_39_44": "Standalone file tools plan/implementation fromc56; both Windowsbab and filecdd integrated",
-    "audit_45_50": "Tour/Portability bb606UI6of6PASS, strict/full upcoming; independent Drafts review FAIL now awaiting correction",
+    "audit_45_50": "Sole integration writer merging reviewed SOPS+Drafts then local combined gates; own Portabilityb05 fix2findings afterward",
     "baseline_validation": "Completed safe evidence handoff after platform account-security block; do not retry blocked old runtime action",
     "implement_gerrit": "SOPS ambiguity format fix0fc; plan SSH key helper afterward",
     "review_weather": "Preflight local protocol correction; remote automatic repair ownership follow-up required",
     "review_portability_and_file_views": "Filecdd scoped independent PASS; Windows static pass, exact nativeCI pending",
-    "review_push_repair_protocol": "SOPSa30 FAILformatP2, re-review fixed candidate upcoming; Preflight43 staticFAIL3blockers"
+    "review_push_repair_protocol": "Re-review Preflight static index/dependency coherence correction; corrected SOPS60cbPASS",
+    "review_portable_setup": "Tour/Portabilityb05 FAIL2findings: ambient clone URLrewrite, native Windows lockretry pathcompare; sourceauthor fixing"
   },
   "integration": {
     "worktree": "/workspace/work/integration",
@@ -40,7 +41,13 @@
     ],
     "initial_green_base": "4f4fb565c3ade34d3b974f0545af21c51bb34b93 (firstfive,686pass3ignored)",
     "final_gate": "At complete intended scope, exact combined final commit all required tests pass AND independent adversarial whole-combination review PASS before creating ONE PR. Existing scoped reviews do not replace finalcombinedreview.",
-    "platform_gates": "Linux/local green, actualWindowsCI failure11 from da0143c; no finalPR untilfixed andWindowsPASS. See ci-recovered-status.json."
+    "platform_gates": "Linux/local green, actualWindowsCI failure11 from da0143c; no finalPR untilfixed andWindowsPASS. See ci-recovered-status.json.",
+    "pending_candidate": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
+    "sole_writer": "audit_45_50 until combined gate/state handoff; root must not mutate integration meanwhile",
+    "pending_features": [
+      "SOPS60cb579 independentPASS",
+      "Drafts3cef22c independentPASS"
+    ]
   },
   "validation": "CRITICAL shared /workspace/gitcraft/target returned wrong-branch cached tests. Every feature uses PRIVATE CARGO_TARGET_DIR, force cargo clean -p gitcraft in private copy before gates; verify compiler worktree and added tests. Source /workspace/.gitcraft-env/env.sh. Dependency cp-al rootcache, unlink PRIVATE debug/.cargo-lock and target/.rustc_info.json before cargo. No sharedtarget gates. Review log hashes/commit binding; default3ignored tests documented. Windows/liveSSHWSL unavailable.",
   "cleanup": "All reviewed+integrated private targets Gerrit/clone/practice/contrast/structural/weather removed after checking noactivecargo tosave32GBdisk; source/logs/manifests/reviews preserved. Integrationtarget activekeep. Rootcache cargo clean-pgitcraft done, dependenciesretained. Monitor df; delete only completed inactive artifacts.",
@@ -58,7 +65,7 @@
   "new_feature_base": "c56d0502d7deb59ba85ac8a807c59a8d68729874 (exact combined Linux gates PASS; nativeWindowsCI pending)",
   "tools": "Use functions.exec tools.exec_command, tools.mcp__codex_apps__github_*; ALL_TOOLS filter specificnames forschemas. GitHubconnectorfor PR operations; normalgit pushbranches. No sendmessages/comments tothirdparties. GitHubupdate_pull_request stateclosed used153154155.",
   "environment": "Managedcloud /workspace ready, networkpolicy enforced restricted github/packagehosts, VPNfalse, nosecretbindings. Cloudruntime skill read c7/cloud-environment-runtime plusnetworking. Do not dumpenv/credentials. GitHubownerJKamsker adminpush. devstill74027116e8f20334716a6b1208717bb33c9c6280 onlastfetch.",
-  "communications": "Start/continue concise meaningfulcommentary <=60s, no finaluntilgoalhandled. No userquestionsneeded; usersteering PRpackagingnotclearstop. FinalonlylinkonegiantPR, nowork/pathdeliverablelinks. Projectlesssaved useroutputs onlydesignated outputpath ifneeded.",
+  "communications": "User is impatient: keep updates brief, prioritize coding/local verification, avoid repeated orchestration/CI polling. Status at last answer15verified+2merged undergoing localcombined gates;49queued.",
   "checkpoint_policy": "After every completed unit of work, each agent and the orchestrator must commit AND push its branch before starting the next unit or risky test. Verify the remote SHA. Label WIP unvalidated. Only one final giant PR; all required tests and independent adversarial review must pass on the final combined source before PR creation.",
   "recovery_status": "Current source units and review evidence committed/pushed; no app test quarantine on accepted containment branches. Historical recovery/checkpoint_worktrees.py must NOT be rerun (would restore obsolete quarantine/identity); normal agents preserve their own units with correct shared repo-local author.",
   "verified_remote_head": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
@@ -69,5 +76,7 @@
     "note": "Archive is immutable initial recovery snapshot; source branches and metadata continue advancing."
   },
   "commit_author_policy": "/workspace/work/commit-author-policy.json",
-  "final_history_plan": "/workspace/work/final-history-plan.json"
+  "final_history_plan": "/workspace/work/final-history-plan.json",
+  "ci_deferral_policy": "/workspace/work/ci-deferral-policy.json",
+  "local_checks": "Standing authorization after each source unit commit+push: needed local check/targeted/fmt/Clippy/full gates, private targets/INCR0/jobs2, optionalSSHWSLunset, avoid >3 active Cargo chains. New protocol/process-control execution still requires independent staticPASS first. No per-run root permission needed."
 }

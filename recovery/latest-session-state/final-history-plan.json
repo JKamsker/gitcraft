@@ -11,7 +11,8 @@
     "At completed scope build a NEW PR branch from dev; apply accepted source changes as one meaningful commit per named feature, folding its fixes and shared integration adaptations into the appropriate feature. Split multi-feature batches meaningfully; do not create empty feature commits.",
     "Create fresh correctly authored commits rather than merging old WIP ancestry into final branch. Preserve source-unit SHA provenance separately.",
     "Keep checkpoint ZIP/bundle/review-only branches outside application PR; transient validation logs can remain on their evidence branches.",
-    "Verify final application source/Cargo/assets equals accepted combined implementation; re-run exact final tests/platform CI and independent adversarial whole-candidate review after assembly.",
-    "Create exactly ONE final PR only after every required gate passes; no PR has been created."
-  ]
+    "Create exactly ONE final PR only after every required gate passes; no PR has been created.",
+    "After final history assembly run exact local checks and independent whole-candidate adversarial review. Only after all our side work is complete, use final-candidate CI; no interim work-branch CI."
+  ],
+  "ci_timing": "/workspace/work/ci-deferral-policy.json"
 }
