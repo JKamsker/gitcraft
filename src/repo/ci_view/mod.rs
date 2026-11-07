@@ -93,6 +93,7 @@ impl RepoTab {
         }
         self.diff = None;
         self.file_view = None;
+        self.tour = None;
         self.ci_view = Some(CiView {
             sha,
             request: 0,

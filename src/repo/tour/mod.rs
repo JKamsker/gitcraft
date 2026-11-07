@@ -195,7 +195,16 @@ mod tests {
                 .as_ref()
                 .is_some_and(|v| v.loading && v.error.is_none())
         );
-        tab.tour = None;
+        let cancelled = tab.tour.as_ref().unwrap()._jobs.0.clone();
+        assert!(
+            tab.current_view().is_none(),
+            "the tour must not be recorded as the graph"
+        );
+        tab.leave_pages();
+        assert!(
+            cancelled.is_cancelled(),
+            "leaving the tour releases its work"
+        );
         tab.tour_arrived(2, Err("closed".into()));
         assert!(tab.tour.is_none());
     }

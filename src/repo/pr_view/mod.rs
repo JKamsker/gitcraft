@@ -85,6 +85,7 @@ impl RepoTab {
             self.status = Some((why.to_owned(), true));
             return;
         }
+        self.tour = None;
         self.leave_pr();
         self.diff = None;
         self.file_view = None;

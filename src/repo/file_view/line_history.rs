@@ -18,6 +18,7 @@ impl RepoTab {
         range: LineRange,
         ctx: &egui::Context,
     ) {
+        self.tour = None;
         let range = (range.0.min(range.1), range.0.max(range.1));
         self.diff = None;
         self.conflict = None;

@@ -141,6 +141,7 @@ impl RepoTab {
         lines: Option<Vec<git::LineRange>>,
         ctx: &egui::Context,
     ) {
+        self.tour = None;
         if self
             .diff
             .as_ref()
@@ -343,6 +344,7 @@ impl RepoTab {
 
     /// Starts comparing two points of history (replacing the comparison shown).
     pub(super) fn compare(&mut self, compare: Compare, ctx: &egui::Context) {
+        self.tour = None;
         self.pr_selection_request = None;
         self.close_pr();
         self.close_range_diff();
@@ -425,6 +427,7 @@ impl RepoTab {
         tab: file_view::FileTab,
         ctx: &egui::Context,
     ) {
+        self.tour = None;
         self.diff = None;
         self.conflict = None;
         let view = match self.file_view.take() {
