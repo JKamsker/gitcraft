@@ -7,10 +7,37 @@ use std::process::Command;
 use std::time::Duration;
 
 const TEST: &str = "push_preflight::fix::transaction::owned_fixtures::gate2_owned_local_fixture";
-const GIT: &str = "/usr/local/bin/git";
+fn fixture_git() -> Result<PathBuf, String> {
+    if let Some(path) = std::env::var_os("GITCRAFT_GATE2_GIT") {
+        return Ok(PathBuf::from(path));
+    }
+    std::env::var_os("PATH")
+        .into_iter()
+        .flat_map(|path| std::env::split_paths(&path).collect::<Vec<_>>())
+        .map(|directory| directory.join("git"))
+        .find(|path| path.is_file())
+        .ok_or("No Git executable for owned fixture".into())
+}
+fn version(git: &Path) -> Result<Vec<u8>, String> {
+    let mut command = Command::new(git);
+    command.env_clear().arg("--version");
+    let output = crate::bounded_process::run_input(
+        command,
+        None,
+        &|| true,
+        Duration::from_secs(5),
+        4096,
+        4096,
+    )?;
+    if output.status.success() {
+        Ok(output.stdout)
+    } else {
+        Err("Owned Git version probe failed".into())
+    }
+}
 
 fn run(repo: &Path, args: &[&str], input: &[u8], index: Option<&Path>) -> Result<String, String> {
-    let mut command = Command::new(GIT);
+    let mut command = Command::new(fixture_git()?);
     command.arg("-C").arg(repo).args(args);
     if let Some(index) = index {
         command.env("GIT_INDEX_FILE", index);
@@ -74,15 +101,22 @@ impl Fixture {
     fn new(root: &Path, refs: &str, objects: &str) -> Result<Self, String> {
         let repo = root.join("repository ' quoted \\ path");
         fs::create_dir(&repo).map_err(|e| e.to_string())?;
+        let mut init = vec![
+            "init".to_owned(),
+            "--template=".into(),
+            "--initial-branch=main".into(),
+        ];
+        if supported_version(&version(&fixture_git()?)?) {
+            init.extend([
+                format!("--ref-format={refs}"),
+                format!("--object-format={objects}"),
+            ]);
+        } else if refs != "files" || objects != "sha1" {
+            return Err("Older Git fixture must use default files/sha1 for refusal proof".into());
+        }
         run(
             &repo,
-            &[
-                "init",
-                "--template=",
-                "--initial-branch=main",
-                &format!("--ref-format={refs}"),
-                &format!("--object-format={objects}"),
-            ],
+            &init.iter().map(String::as_str).collect::<Vec<_>>(),
             b"",
             None,
         )?;
@@ -269,7 +303,7 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
     }
     f.observer(case)?;
     let before = snapshot(&f.repo)?;
-    if case == "old-git" {
+    if case == "old-git" || case == "capability-refusal" {
         // The outer fixture supplied the old-Git PATH before this process started.
         let result = Hook::new(&f.repo, "refs/heads/main", &f.old, &f.new);
         let after = snapshot(&f.repo)?;
@@ -841,15 +875,70 @@ fi
 }
 
 #[test]
-#[ignore = "Gate 2 requires explicit root authorization and isolated owned fixture selection"]
 fn gate2_owned_local_fixture() -> Result<(), String> {
-    let case = std::env::var("GITCRAFT_GATE2_CASE").map_err(|_| "explicit Gate2 case required")?;
+    let Some(case) = std::env::var_os("GITCRAFT_GATE2_CASE") else {
+        return default_owned_suite();
+    };
+    let case = case.to_str().ok_or("Owned case must be UTF-8")?;
     let root = PathBuf::from(
-        std::env::var("GITCRAFT_GATE2_ROOT").map_err(|_| "explicit owned root required")?,
+        std::env::var_os("GITCRAFT_GATE2_ROOT").ok_or("Explicit owned root required")?,
     );
     if std::env::var_os("GITCRAFT_GATE2_CHILD").is_some() {
-        return crate::connections::Context::default().run(|| execute_case(&root, &case));
+        return crate::connections::Context::default().run(|| execute_case(&root, case));
     }
+    owned_child(&root, case, &fixture_git()?)
+}
+fn default_owned_suite() -> Result<(), String> {
+    let git = fixture_git()?;
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!(
+        "gitcraft-owned-repair-default-{}-{stamp}",
+        std::process::id()
+    ));
+    fs::create_dir(&root).map_err(|e| e.to_string())?;
+    fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).map_err(|e| e.to_string())?;
+    if !supported_version(&version(&git)?) {
+        println!(
+            "Owned repair: older Git must refuse before mutation; evidence {}",
+            root.display()
+        );
+        return owned_child(&root.join("capability-refusal"), "capability-refusal", &git);
+    }
+    for case in [
+        "files-sha1",
+        "files-sha256",
+        "reftable-sha1",
+        "reftable-sha256",
+        "prelock-switch-head",
+        "prelock-detach-head",
+        "switch-head",
+        "detach-head",
+        "reftable-switch-head",
+        "reftable-detach-head",
+        "held-ref-lock",
+        "veto",
+        "index-change",
+        "work-change",
+        "checkout-failure",
+        "committed-failure",
+        "timeout",
+        "split-index",
+        "missing-ack",
+        "full-fix",
+    ] {
+        println!("Owned default case {case}: {}", root.display());
+        owned_child(&root.join(case), case, &git)?;
+    }
+    let old = Path::new("/usr/bin/git");
+    if old.is_file() && !supported_version(&version(old)?) {
+        owned_child(&root.join("old-git"), "old-git", &git)?;
+    }
+    Ok(())
+}
+fn owned_child(root: &Path, case: &str, git: &Path) -> Result<(), String> {
     fs::create_dir(&root).map_err(|e| e.to_string())?;
     fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).map_err(|e| e.to_string())?;
     for name in ["home", "xdg", "tmp", "template"] {
@@ -860,21 +949,21 @@ fn gate2_owned_local_fixture() -> Result<(), String> {
     command
         .env_clear()
         .current_dir(&root)
-        .args([
-            "--exact",
-            TEST,
-            "--ignored",
-            "--nocapture",
-            "--test-threads=1",
-        ])
+        .args(["--exact", TEST, "--nocapture", "--test-threads=1"])
         .env(
             "PATH",
             if case == "old-git" {
-                "/usr/bin:/bin"
+                "/usr/bin:/bin".into()
             } else {
-                "/usr/local/bin:/usr/bin:/bin"
+                std::env::join_paths([
+                    git.parent().ok_or("Git executable has no parent")?,
+                    Path::new("/usr/bin"),
+                    Path::new("/bin"),
+                ])
+                .map_err(|e| e.to_string())?
             },
         )
+        .env("GITCRAFT_GATE2_GIT", git)
         .env("HOME", root.join("home"))
         .env("XDG_CONFIG_HOME", root.join("xdg"))
         .env("TMPDIR", root.join("tmp"))
@@ -885,7 +974,7 @@ fn gate2_owned_local_fixture() -> Result<(), String> {
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("LC_ALL", "C")
         .env("GIT_CONFIG_COUNT", "0")
-        .env("GITCRAFT_GATE2_CASE", &case)
+        .env("GITCRAFT_GATE2_CASE", case)
         .env("GITCRAFT_GATE2_ROOT", &root)
         .env("GITCRAFT_GATE2_CHILD", "1");
     let output = crate::bounded_process::run_input(

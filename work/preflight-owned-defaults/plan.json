@@ -1,0 +1,8 @@
+{
+  "status": "PRESERVED TEST-ONLY UNIT; NOT EXECUTED",
+  "basis": "21ownedproductioncasesPASS913d91f; acceptedgreenmergee7335fa",
+  "change": "Remove temporaryignore; ordinary Unix default test nowruns20productioncasesplusactualoldGitcontrolwhenavailable. On defaultGit<2.50 itcreatesownedfiles/sha1repo andassertsproductioncapabilityrefusalwithidenticalstate. GitexecutablepinnedfromPATHintochild; nohardcodednewGitrequirement; realprotocolcasesrequiremincapability.",
+  "production": "Entiretransaction.rs byte-identicalSTATICffc2851 SHA198e08476c1091d1a452926936d02b5ea4ac5346a7237bd1467ea08aa8df2f65",
+  "containment": "Everycase env_clear/privateHOME,XDG/config/template/TMPDIR; approvedboundedrunner; exclusiveownednewroot; no livehosts/userrepos/newcontrollers/CI. Existingthreebaselineignoredtestsremain; Gate2ignoregone.",
+  "required_next": "Commit/pushsource, exactprivatefmt/clippy/fullfeaturetests includingdefaultownedcases andexpectedtestunion; source/compiler/remoteSHAmanifest. Remotecompletion/outcome scope remainsOPEN."
+}
