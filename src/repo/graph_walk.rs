@@ -99,9 +99,11 @@ impl RepoTab {
     pub(super) fn graph_walk(
         &mut self,
         direction: Direction,
+        focused: Option<usize>,
         ctx: &egui::Context,
     ) -> Option<usize> {
-        let start = self.selected.unwrap_or(0);
+        let current = self.selected.or(focused);
+        let start = current.unwrap_or(0);
         let tips = self
             .refs
             .local
@@ -114,7 +116,7 @@ impl RepoTab {
         };
         // Worktree and stash rows deliberately have no topology edges. Enter the
         // actual history on the first arrow instead of trapping their keyboard focus.
-        let next = if self.selected.is_none() || !real(start) {
+        let next = if current.is_none() || !real(start) {
             self.index
                 .get(&self.refs.head)
                 .copied()
@@ -451,12 +453,12 @@ mod tests {
         tab.graph = crate::graph::layout(&tab.commits);
         tab.selected = Some(2);
         let _ = crate::audio::take_recorded();
-        assert_eq!(tab.graph_walk(Direction::Child, &ctx), Some(0));
+        assert_eq!(tab.graph_walk(Direction::Child, None, &ctx), Some(0));
         assert!(crate::audio::take_recorded().is_empty());
         let mut settings = crate::settings::Settings::get(&ctx);
         settings.graph_sounds = true;
         settings.set(&ctx);
-        assert_eq!(tab.graph_walk(Direction::Child, &ctx), Some(0));
+        assert_eq!(tab.graph_walk(Direction::Child, None, &ctx), Some(0));
         assert_eq!(
             crate::audio::take_recorded(),
             vec![crate::audio::Cue::Merge]
@@ -464,7 +466,7 @@ mod tests {
         assert!(tab.graph_description(0).contains("merge; 2 parents"));
         assert!(tab.graph_description(4).contains("divergence"));
         tab.selected = Some(0);
-        assert_eq!(tab.graph_walk(Direction::Parent, &ctx), Some(3));
+        assert_eq!(tab.graph_walk(Direction::Parent, None, &ctx), Some(3));
 
         use egui_kittest::{
             Harness,

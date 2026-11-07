@@ -125,6 +125,65 @@ fn topology_arrows_enter_history_from_uncommitted_changes_then_follow_parents() 
     frame(&ctx, &mut tab, size, vec![key(false)], 0.2);
     let (_, acts) = frame(&ctx, &mut tab, size, vec![key(true)], 0.3);
     assert!(acts.iter().any(|act| matches!(act, Action::Select(2))));
+
+    // A stash also has no edges in the walking topology, but must not trap focus.
+    let stash_hash = "stash-fixture".to_owned();
+    Arc::make_mut(&mut tab.commits[0]).hash = stash_hash.clone();
+    tab.stashes.push(git::Stash {
+        name: "stash@{0}".into(),
+        hash: stash_hash.clone(),
+        base: tab.refs.head.clone(),
+        message: "saved work".into(),
+        author: String::new(),
+        email: String::new(),
+        time: 0,
+        date: String::new(),
+    });
+    tab.index.remove(WIP_HASH);
+    tab.index.insert(stash_hash, 0);
+    tab.selected = Some(0);
+    tab.rebuild_graph_labels();
+    frame(&ctx, &mut tab, size, vec![key(false)], 0.4);
+    let (_, acts) = frame(&ctx, &mut tab, size, vec![key(true)], 0.5);
+    assert!(acts.iter().any(|act| matches!(act, Action::Select(1))));
+}
+
+#[test]
+fn topology_arrows_follow_the_focused_row_when_nothing_is_selected() {
+    let (ctx, mut tab) = fixture(10);
+    tab.index = tab
+        .commits
+        .iter()
+        .enumerate()
+        .map(|(row, commit)| (commit.hash.clone(), row))
+        .collect();
+    tab.topology = Arc::new(crate::repo::graph_walk::Topology::build(
+        &tab.commits,
+        &tab.index,
+        &Default::default(),
+    ));
+    tab.selected = None;
+    Settings {
+        graph_lane_walk: true,
+        ..Default::default()
+    }
+    .set(&ctx);
+    let mut acts = Vec::new();
+    let mut output = ctx.run_ui(
+        egui::RawInput {
+            events: vec![Event::Key {
+                key: Key::ArrowDown,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: egui::Modifiers::NONE,
+            }],
+            ..Default::default()
+        },
+        |ui| tab.arrow_keys(ui, Some(5), &mut acts),
+    );
+    output.textures_delta.clear();
+    assert!(acts.iter().any(|act| matches!(act, Action::Select(6))));
 }
 
 fn header_x(shapes: &[ClippedShape], label: &str) -> f32 {

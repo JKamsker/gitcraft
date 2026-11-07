@@ -422,7 +422,7 @@ impl RepoTab {
                 }
             });
             if let Some(direction) = direction
-                && let Some(next) = self.graph_walk(direction, ui.ctx())
+                && let Some(next) = self.graph_walk(direction, ringed, ui.ctx())
             {
                 acts.push(Action::Select(next));
                 self.scroll_to = Some(next);
