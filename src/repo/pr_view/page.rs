@@ -100,6 +100,7 @@ impl RepoTab {
                                         &mut view.storyboard,
                                         details,
                                         files,
+                                        &self.remotes,
                                         acts,
                                     );
                                 }

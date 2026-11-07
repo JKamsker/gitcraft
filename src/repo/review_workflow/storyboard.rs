@@ -1,5 +1,5 @@
 //! Author-arranged, revision-pinned review cards; immutable originals remain available.
-use super::store;
+use super::{sharing, store};
 use crate::{
     git,
     pull_request::{PrDetails, PrFiles},
@@ -54,10 +54,20 @@ pub(crate) struct Storyboard {
     request: u64,
     rows: Option<Result<Vec<Shown>, String>>,
     form: CardForm,
+    remote: String,
+    imported: bool,
 }
 #[derive(Clone)]
 pub(crate) enum StoryAct {
     Load,
+    Fetch {
+        remote: String,
+        head: String,
+    },
+    Publish {
+        remote: String,
+        head: String,
+    },
     OpenCode {
         commit: String,
         path: String,
@@ -129,7 +139,9 @@ fn card(repo: &Path, d: &PrDetails, f: &PrFiles, form: CardForm) -> Result<Card,
         Anchor::Test {
             commit,
             tree,
-            command,
+            command: format!(
+                "Configured when pinned (execution command not recorded by test lane): {command}"
+            ),
             verdict: verdict.word().into(),
         }
     } else {
@@ -268,6 +280,172 @@ fn preserve(repo: &Path, key: &str, board: &Board) -> Result<(), String> {
     }
     store::save(repo, "storyboard", key, board)
 }
+fn shared_ref(key: &str) -> String {
+    format!("refs/gitcraft/storyboards/{:x}", md5::compute(key))
+}
+fn export(repo: &Path, key: &str, board: &Board, previous: Option<&str>) -> Result<String, String> {
+    if board.cards.len() > 256 {
+        return Err("A shared storyboard supports at most 256 cards".into());
+    }
+    let json = serde_json::to_string(board).map_err(|e| e.to_string())?;
+    let blob = git::run_input(Some(repo), &["hash-object", "-w", "--stdin"], &json)?;
+    let tree = git::run_input(
+        Some(repo),
+        &["mktree"],
+        &format!("100644 blob {}\tstoryboard.json\n", blob.trim()),
+    )?;
+    let mut parents = std::collections::BTreeSet::new();
+    if let Some(previous) = previous {
+        parents.insert(oid(repo, previous)?);
+    }
+    for card in &board.cards {
+        for rev in [
+            &card.base,
+            &card.head,
+            match &card.anchor {
+                Anchor::Code { commit, .. } | Anchor::Test { commit, .. } => commit,
+            },
+        ] {
+            parents.insert(oid(repo, rev)?);
+        }
+    }
+    let mut args = vec![
+        "-c".into(),
+        "commit.gpgSign=false".into(),
+        "commit-tree".into(),
+        tree.trim().to_owned(),
+        "-m".into(),
+        format!("gitcraft review storyboard {key}"),
+    ];
+    for parent in parents {
+        args.extend(["-p".into(), parent]);
+    }
+    git::run(
+        Some(repo),
+        &args.iter().map(String::as_str).collect::<Vec<_>>(),
+    )
+    .map(|s| s.trim().into())
+}
+fn imported(repo: &Path, commit: &str) -> Result<Board, String> {
+    let json = git::run(Some(repo), &["show", &format!("{commit}:storyboard.json")])?;
+    if json.len() > 2 * 1024 * 1024 {
+        return Err("Shared storyboard exceeds the 2MiB metadata budget".into());
+    }
+    let board: Board =
+        serde_json::from_str(&json).map_err(|e| format!("Invalid shared storyboard: {e}"))?;
+    if board.cards.len() > 256 {
+        return Err("Shared storyboard has more than 256 cards".into());
+    }
+    // Verify pinned sources are present commits. Fetching the artifact retains them through
+    // its parent graph, including source commits removed by a later force push.
+    for card in &board.cards {
+        for rev in [
+            &card.base,
+            &card.head,
+            match &card.anchor {
+                Anchor::Code { commit, .. } | Anchor::Test { commit, .. } => commit,
+            },
+        ] {
+            if oid(repo, rev)? != *rev {
+                return Err("Shared storyboard revision is not an immutable commit ID".into());
+            }
+        }
+    }
+    for card in &board.cards {
+        if let Anchor::Code {
+            commit, path, blob, ..
+        } = &card.anchor
+            && file_blob(repo, commit, path)? != *blob
+        {
+            return Err("Shared storyboard blob does not match its pinned source".into());
+        }
+    }
+    Ok(board)
+}
+fn cached_ref(key: &str, target: &sharing::Target) -> String {
+    format!(
+        "refs/gitcraft/storyboard-remotes/{}/{:x}",
+        target.cache_key(),
+        md5::compute(key)
+    )
+}
+fn publish_board(
+    repo: &Path,
+    key: &str,
+    board: &Board,
+    target: &sharing::Target,
+    creds: Option<&crate::git::Credentials>,
+) -> Result<(), String> {
+    target.guard(repo)?;
+    let shared = shared_ref(key);
+    let cached = cached_ref(key, target);
+    // A remote can have different fetch/push URLs. The lease must describe the push server.
+    let remote_tip = git::run_unattended(
+        Some(repo),
+        &["ls-remote", "--refs", target.push_url(), &shared],
+        creds,
+    )?;
+    let previous = remote_tip.split_whitespace().next().map(str::to_owned);
+    if previous.is_some() {
+        target.guard(repo)?;
+        git::run_unattended(
+            Some(repo),
+            &[
+                "fetch",
+                "--no-tags",
+                "--no-write-fetch-head",
+                target.push_url(),
+                &format!("+{shared}:{cached}"),
+            ],
+            creds,
+        )?;
+        if git::run(Some(repo), &["rev-parse", &cached])?.trim()
+            != previous.as_deref().unwrap_or("")
+        {
+            return Err(
+                "Shared storyboard changed while preparing publication; fetch and retry".into(),
+            );
+        }
+    }
+    let commit = export(repo, key, board, previous.as_deref())?;
+    target.guard(repo)?;
+    git::run_unattended(
+        Some(repo),
+        &[
+            "push",
+            &format!(
+                "--force-with-lease={shared}:{}",
+                previous.as_deref().unwrap_or("")
+            ),
+            &target.name,
+            &format!("{commit}:{shared}"),
+        ],
+        creds,
+    )?;
+    git::run(Some(repo), &["update-ref", &cached, &commit])?;
+    Ok(())
+}
+fn fetch_board(
+    repo: &Path,
+    key: &str,
+    target: &sharing::Target,
+    creds: Option<&crate::git::Credentials>,
+) -> Result<Board, String> {
+    target.guard(repo)?;
+    let cached = cached_ref(key, target);
+    git::run_unattended(
+        Some(repo),
+        &[
+            "fetch",
+            "--no-tags",
+            "--no-write-fetch-head",
+            &target.name,
+            &format!("+{}:{cached}", shared_ref(key)),
+        ],
+        creds,
+    )?;
+    imported(repo, &oid(repo, &cached)?)
+}
 impl RepoTab {
     pub(in crate::repo) fn story_act(&mut self, act: StoryAct, ctx: &egui::Context) {
         if let StoryAct::OpenCode { commit, path, line } = act {
@@ -300,6 +478,84 @@ impl RepoTab {
             );
             return;
         }
+        if let StoryAct::Fetch { remote, head } | StoryAct::Publish { remote, head } = &act {
+            let publish = matches!(act, StoryAct::Publish { .. });
+            let (Some(v), Some(observed)) = (
+                &mut self.pr_view,
+                self.remotes.iter().find(|r| &r.name == remote).cloned(),
+            ) else {
+                self.status = Some(("Choose a configured storyboard sharing remote".into(), true));
+                return;
+            };
+            let (Some(Ok(d)), Some(Ok(f))) = (&v.details, &v.files) else {
+                return;
+            };
+            if &d.head_oid != head || &f.to != head {
+                self.status = Some(("Pull request changed; refresh the storyboard".into(), true));
+                return;
+            }
+            if publish
+                && !d
+                    .extras
+                    .viewer
+                    .as_deref()
+                    .is_some_and(|viewer| viewer.eq_ignore_ascii_case(&d.author))
+            {
+                self.status = Some((
+                    "Only the pull request author publishes its storyboard".into(),
+                    true,
+                ));
+                return;
+            }
+            let (d, f, repo, creds) = (
+                d.clone(),
+                f.clone(),
+                self.path.clone(),
+                self.credentials.clone(),
+            );
+            v.storyboard.request += 1;
+            let request = v.storyboard.request;
+            v.storyboard.rows = None;
+            let number = d.number;
+            self.then_or(
+                ctx,
+                true,
+                Err,
+                move || {
+                    let target = sharing::Target::capture(&repo, &observed)?;
+                    target.guard(&repo)?;
+                    if publish {
+                        let board = store::load::<Board>(&repo, "storyboard", &key(&d))?
+                            .unwrap_or_default();
+                        publish_board(&repo, &key(&d), &board, &target, creds.as_ref())?;
+                        Ok((read(&repo, &d, &f)?, false))
+                    } else {
+                        let rows = fetch_board(&repo, &key(&d), &target, creds.as_ref())?
+                            .cards
+                            .into_iter()
+                            .map(|c| show_card(&repo, c, &f))
+                            .collect::<Result<Vec<_>, _>>()?;
+                        Ok((rows, true))
+                    }
+                },
+                move |tab, result, _| {
+                    if let Some(v) = tab
+                        .pr_view
+                        .as_mut()
+                        .filter(|v| v.number == number && v.storyboard.request == request)
+                    {
+                        match result {
+                            Ok((rows, imported)) => {
+                                v.storyboard.imported = imported;
+                                v.storyboard.rows = Some(Ok(rows));
+                            }
+                            Err(e) => v.storyboard.rows = Some(Err(e)),
+                        }
+                    }
+                },
+            );
+            return;
+        }
         let Some(v) = &mut self.pr_view else { return };
         let (Some(Ok(d)), Some(Ok(f))) = (&v.details, &v.files) else {
             return;
@@ -312,6 +568,11 @@ impl RepoTab {
         );
         v.storyboard.request = request;
         let mutation = !matches!(act, StoryAct::Load);
+        if mutation && v.storyboard.imported {
+            self.status = Some(("Load your local storyboard before editing".into(), true));
+            return;
+        }
+        v.storyboard.imported = false;
         if mutation
             && !d
                 .extras
@@ -380,17 +641,26 @@ pub(in crate::repo) fn show(
     state: &mut Storyboard,
     d: &PrDetails,
     f: &PrFiles,
+    remotes: &[git::Remote],
     acts: &mut Vec<Action>,
 ) {
     egui::CollapsingHeader::new("Review storyboard").show(ui, |ui| {
         if ui.button("Load storyboard").clicked() {
             acts.push(Action::Story(StoryAct::Load));
         }
+        egui::ComboBox::from_id_salt("story-sharing-remote").selected_text(if state.remote.is_empty(){"Choose storyboard remote"}else{&state.remote}).show_ui(ui,|ui|{
+            for remote in remotes {ui.selectable_value(&mut state.remote,remote.name.clone(),&remote.name);}
+        });
+        ui.weak("Sharing publishes the cards and their pinned source history through a dedicated Git ref. Imported cards are advisory Git metadata; they never execute tests or commands.");
+        if ui.button("Fetch shared author storyboard").clicked(){acts.push(Action::Story(StoryAct::Fetch{remote:state.remote.clone(),head:f.to.clone()}));}
+        if state.imported {ui.label("Showing imported storyboard; load the local storyboard before editing.");}
         let own = d
             .extras
             .viewer
             .as_deref()
             .is_some_and(|v| v.eq_ignore_ascii_case(&d.author));
+        if own && ui.button("Publish my local storyboard").clicked(){acts.push(Action::Story(StoryAct::Publish{remote:state.remote.clone(),head:f.to.clone()}));}
+        let own=own && !state.imported;
         if let Some(rows) = &state.rows {
             match rows {
                 Err(e) => {
@@ -549,6 +819,87 @@ mod tests {
         assert!(shown.stale.is_none());
         f.to = r.commit("a.rs", "different\n", "change")?;
         assert!(show_card(r.path(), c, &f)?.stale.is_some());
+        Ok(())
+    }
+    #[test]
+    fn sharing_roundtrip_retains_rewritten_sources_and_never_moves_a_branch() -> Result<(), String>
+    {
+        let author = git::stack::test_repo::TestRepo::new("story-author")?;
+        let server = git::stack::test_repo::TestRepo::new("story-server")?;
+        let reviewer = git::stack::test_repo::TestRepo::new("story-reader")?;
+        let upstream = git::stack::test_repo::TestRepo::new("story-upstream")?;
+        let base = author.tip("HEAD")?;
+        let pinned = author.commit("old.rs", "old invariant\n", "original fix")?;
+        let board = Board {
+            cards: vec![Card {
+                phase: "Fix".into(),
+                text: "why".into(),
+                base: base.clone(),
+                head: pinned.clone(),
+                anchor: Anchor::Code {
+                    commit: pinned.clone(),
+                    path: "old.rs".into(),
+                    line: 1,
+                    blob: file_blob(author.path(), &pinned, "old.rs")?,
+                },
+            }],
+        };
+        author.git(&["reset", "--hard", &base])?;
+        let server_head = server.tip("HEAD")?;
+        let reviewer_head = reviewer.tip("HEAD")?;
+        author.git(&[
+            "remote",
+            "add",
+            "team",
+            upstream.path().to_str().ok_or("path")?,
+        ])?;
+        author.git(&[
+            "remote",
+            "set-url",
+            "--push",
+            "team",
+            server.path().to_str().ok_or("path")?,
+        ])?;
+        reviewer.git(&[
+            "remote",
+            "add",
+            "team",
+            server.path().to_str().ok_or("path")?,
+        ])?;
+        let observed = git::remotes(author.path())?
+            .into_iter()
+            .find(|r| r.name == "team")
+            .ok_or("remote")?;
+        let target = sharing::Target::capture(author.path(), &observed)?;
+        publish_board(author.path(), "example#1", &board, &target, None)?;
+        let observed = git::remotes(reviewer.path())?
+            .into_iter()
+            .find(|r| r.name == "team")
+            .ok_or("remote")?;
+        let read_target = sharing::Target::capture(reviewer.path(), &observed)?;
+        let imported = fetch_board(reviewer.path(), "example#1", &read_target, None)?;
+        assert_eq!(imported.cards.len(), 1);
+        assert_eq!(oid(reviewer.path(), &pinned)?, pinned);
+        assert_eq!(
+            git::run(
+                Some(reviewer.path()),
+                &["show", &format!("{pinned}:old.rs")]
+            )?
+            .trim(),
+            "old invariant"
+        );
+        let previous = oid(server.path(), &shared_ref("example#1"))?;
+        publish_board(author.path(), "example#1", &Board::default(), &target, None)?;
+        let latest = oid(server.path(), &shared_ref("example#1"))?;
+        assert!(git::is_ancestor(server.path(), &previous, &latest));
+        assert!(
+            fetch_board(reviewer.path(), "example#1", &read_target, None)?
+                .cards
+                .is_empty()
+        );
+        assert_eq!(author.tip("HEAD")?, base);
+        assert_eq!(server.tip("HEAD")?, server_head);
+        assert_eq!(reviewer.tip("HEAD")?, reviewer_head);
         Ok(())
     }
 }
