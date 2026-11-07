@@ -212,3 +212,62 @@ pub(super) fn dialog(ui: &mut egui::Ui, state: &mut State) -> super::dialogs::Ou
     }
     outcome
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn stale_paths_profiles_and_ref_reload_epochs_invalidate_inspector() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred(PathBuf::from("/fixture"), &ctx);
+        let make = |path: PathBuf, profile, read| State {
+            request: 1,
+            generation: Arc::new(AtomicU64::new(1)),
+            path,
+            profile,
+            read,
+            query: "HEAD".into(),
+            file: String::new(),
+            loading: true,
+            result: None,
+            independence_ack: false,
+        };
+        tab.dialog = Some(Dialog::ObjectStorage(Box::new(make(
+            tab.path.clone(),
+            connections::current(),
+            tab.reads,
+        ))));
+        tab.path = PathBuf::from("/other");
+        tab.sync_object_storage();
+        assert!(
+            matches!(&tab.dialog, Some(Dialog::ObjectStorage(s)) if !s.loading && s.generation.load(Ordering::Relaxed)==0 && matches!(s.result, Some(Err(_))))
+        );
+        tab.dialog = Some(Dialog::ObjectStorage(Box::new(make(
+            tab.path.clone(),
+            connections::Context {
+                error: Some("old profile".into()),
+                ..Default::default()
+            },
+            tab.reads,
+        ))));
+        tab.sync_object_storage();
+        assert!(matches!(&tab.dialog, Some(Dialog::ObjectStorage(s)) if !s.loading));
+        tab.dialog = Some(Dialog::ObjectStorage(Box::new(make(
+            tab.path.clone(),
+            connections::current(),
+            tab.reads.wrapping_sub(1),
+        ))));
+        tab.sync_object_storage();
+        assert!(matches!(&tab.dialog, Some(Dialog::ObjectStorage(s)) if !s.loading));
+        assert!(
+            tab.palette_items()
+                .iter()
+                .any(|(label, _, _)| label.contains("How an object"))
+        );
+        assert!(
+            tab.palette_items()
+                .iter()
+                .any(|(label, _, _)| label.contains("Shared and borrowed"))
+        );
+    }
+}

@@ -1197,7 +1197,7 @@ pub(super) fn object_storage_output(
             Some(input),
             active,
             std::time::Duration::from_secs(20),
-            max,
+            max as u64,
             64 * 1024,
         )?;
         remote::Output {

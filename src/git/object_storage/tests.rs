@@ -349,3 +349,139 @@ fn promisor_and_linked_worktrees_disable_independence() -> Result<(), String> {
     assert!(data.topology.worktrees.contains("linked"));
     Ok(())
 }
+
+#[test]
+fn known_promised_blobs_are_distinguished_without_fetching() -> Result<(), String> {
+    let f = Fixture::new()?;
+    let donor = f.repo("partial-source", "sha1")?;
+    Fixture::commit(&donor, b"not yet downloaded\n")?;
+    Fixture::git(&donor, &["config", "uploadpack.allowFilter", "true"])?;
+    let oid = Fixture::git(&donor, &["rev-parse", "HEAD:file ' $(touch ESCAPED).txt"])?;
+    let partial = f.0.join("partial");
+    Fixture::git(
+        &f.0,
+        &[
+            "clone",
+            "--filter=blob:none",
+            "--no-checkout",
+            "--no-local",
+            "--",
+            donor.to_str().ok_or("path")?,
+            partial.to_str().ok_or("path")?,
+        ],
+    )?;
+    Fixture::git(
+        &partial,
+        &[
+            "remote",
+            "set-url",
+            "origin",
+            "/nonexistent/gitcraft-never-fetch",
+        ],
+    )?;
+    let before = files::packs(&partial.join(".git/objects"), 64, &|| true)?;
+    let data = inspect(&partial, &oid, &|| true)?;
+    assert!(data.object.is_none());
+    assert!(
+        data.missing
+            .as_ref()
+            .is_some_and(|s| s.contains("missing promised object"))
+    );
+    assert_eq!(
+        files::packs(&partial.join(".git/objects"), 64, &|| true)?,
+        before
+    );
+    assert!(data.independence.is_none());
+    Ok(())
+}
+
+#[test]
+fn fallible_profile_is_preserved_and_practice_bypasses_it() -> Result<(), String> {
+    let f = Fixture::new()?;
+    let repo = f.repo("profile", "sha1")?;
+    Fixture::commit(&repo, b"normal\n")?;
+    let broken = crate::connections::Context {
+        error: Some("Profile cannot be materialized".into()),
+        ..Default::default()
+    };
+    broken.run(|| {
+        assert!(
+            inspect(&repo, "HEAD", &|| true)
+                .is_err_and(|e| e.contains("Profile cannot be materialized"))
+        );
+    });
+    let practice = crate::practice::create(crate::practice::Scenario::Published)?;
+    let result = broken.run(|| inspect(&practice, "HEAD", &|| true));
+    if let Some(root) = practice.parent() {
+        let _ = std::fs::remove_dir_all(root);
+    }
+    assert!(result?.object.is_some());
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn fake_ssh_inspection_and_independence_pin_paths_with_hostile_environment() -> Result<(), String> {
+    const CHILD: &str = "GITCRAFT_OBJECT_STORAGE_SSH_FIXTURE";
+    const NAME: &str = "git::object_storage::tests::fake_ssh_inspection_and_independence_pin_paths_with_hostile_environment";
+    if let Some(path) = std::env::var_os(CHILD) {
+        let path = PathBuf::from(path);
+        // The local route must reject inherited GIT_DIR/GIT_OBJECT_DIRECTORY as well.
+        let local = inspect(&path, "HEAD:file ' $(touch ESCAPED).txt", &|| true)?;
+        assert_eq!(local.object.as_ref().ok_or("no local object")?.size, 15);
+        let remote = remote::encode(
+            &remote::Host::Ssh("objects-fixture.invalid".into()),
+            path.to_str().ok_or("path")?,
+        );
+        let data = inspect(&remote, "HEAD:file ' $(touch ESCAPED).txt", &|| true)?;
+        assert_eq!(data.topology.stores.len(), 2);
+        assert_eq!(data.object.as_ref().ok_or("no remote object")?.size, 15);
+        let plan = data.independence.ok_or("no remote independence plan")?;
+        independent::make_independent(&plan, &|| true)?;
+        let data = inspect(&remote, "HEAD:file ' $(touch ESCAPED).txt", &|| true)?;
+        assert_eq!(data.topology.stores.len(), 1);
+        assert!(data.representations.iter().any(|r| !r.chain.is_empty()));
+        assert!(!path.join("ESCAPED").exists());
+        return Ok(());
+    }
+    let f = Fixture::new()?;
+    let (_donor, borrower) = f.borrowing()?;
+    let hostile = f.repo("hostile", "sha1")?;
+    Fixture::commit(&hostile, b"incorrect repository contents\n")?;
+    let bin = f.0.join("fixture-bin");
+    std::fs::create_dir(&bin).map_err(|e| e.to_string())?;
+    let ssh = bin.join("ssh");
+    std::fs::write(&ssh, "#!/bin/sh\nexec /bin/sh\n").map_err(|e| e.to_string())?;
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&ssh, std::fs::Permissions::from_mode(0o700))
+        .map_err(|e| e.to_string())?;
+    let mut paths = vec![bin];
+    paths.extend(std::env::split_paths(
+        &std::env::var_os("PATH").unwrap_or_default(),
+    ));
+    let output = Command::new(std::env::current_exe().map_err(|e| e.to_string())?)
+        .args(["--exact", NAME, "--nocapture"])
+        .env(CHILD, &borrower)
+        .env(
+            "PATH",
+            std::env::join_paths(paths).map_err(|e| e.to_string())?,
+        )
+        .env("GIT_DIR", hostile.join(".git"))
+        .env("GIT_WORK_TREE", &hostile)
+        .env("GIT_OBJECT_DIRECTORY", hostile.join(".git/objects"))
+        .env("GIT_ALTERNATE_OBJECT_DIRECTORIES", "/missing/ambient-donor")
+        .output()
+        .map_err(|e| e.to_string())?;
+    assert!(
+        output.status.success(),
+        "{} {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!borrower.join(".git/objects/info/alternates").exists());
+    assert_eq!(
+        Fixture::git(&borrower, &["show", "HEAD:file ' $(touch ESCAPED).txt"])?,
+        "borrowed bytes"
+    );
+    Ok(())
+}

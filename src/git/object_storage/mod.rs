@@ -354,7 +354,40 @@ pub(crate) fn inspect(
     let independence = independent::prepare(repo, &objects, &topology, active)
         .map_err(|e| notes.push(e))
         .ok();
-    let missing = object.is_none().then(|| format!("{oid} is missing from the available object stores. No download was attempted; a promisor configuration alone does not prove that this particular object is promised."));
+    let promised = if object.is_none() && topology.promisor {
+        let missing = text(
+            repo,
+            &[
+                "rev-list",
+                "--objects",
+                "--all",
+                "--missing=print",
+                "--no-object-names",
+            ],
+            active,
+        )?;
+        let allowed = object_storage_output(
+            repo,
+            &[
+                "rev-list",
+                "--objects",
+                "--all",
+                "--missing=allow-promisor",
+                "--no-object-names",
+            ],
+            Vec::new(),
+            16 * 1024 * 1024,
+            active,
+        )?;
+        missing.lines().any(|s| s == format!("?{oid}")) && allowed.code == 0
+    } else {
+        false
+    };
+    let missing = object.is_none().then(|| if promised {
+        format!("{oid} is a missing promised object, reachable in this partial clone. No download was attempted.")
+    } else {
+        format!("{oid} is missing from the available object stores. No download was attempted; a promisor configuration alone does not prove that this particular object is promised.")
+    });
     if object.is_some() && representations.is_empty() {
         notes.push("Git can read this object, but no representation was found in the primary store. It may be borrowed from an alternate; inspect shared and borrowed objects.".into());
     }
