@@ -178,6 +178,12 @@ impl Ownership {
             {
                 return Err(err("alternate file identity or content changed"));
             }
+        } else {
+            match fs::statat(self.info.as_ref(), "alternates", AtFlags::SYMLINK_NOFOLLOW) {
+                Err(rustix::io::Errno::NOENT) => (),
+                Ok(_) => return Err("An alternate link was created during final proof; independence was not committed".into()),
+                Err(error) => return Err(err(error)),
+            }
         }
         Ok(())
     }
@@ -282,16 +288,13 @@ impl Ownership {
         Ok(())
     }
     pub fn restore(&self, backup: &str) -> Result<(), String> {
-        match regular(&self.info, "alternates") {
-            Ok(existing) => {
-                if identity(&existing)? == identity(&self.alternate)?
-                    && read(&existing, 64 * 1024)? == self.expected
-                {
-                    return Ok(());
-                }
-                return Err("A newer alternate file exists; it was not overwritten.".into());
+        if let Ok(existing) = regular(&self.info, "alternates") {
+            if identity(&existing)? == identity(&self.alternate)?
+                && read(&existing, 64 * 1024)? == self.expected
+            {
+                return Ok(());
             }
-            Err(_) => (),
+            return Err("A newer alternate file exists; it was not overwritten.".into());
         }
         // Create the captured bytes privately, flush, then publish by a create-only link
         // from its held inode. Neither the source nor destination resolves ancestors again.
@@ -346,6 +349,7 @@ pub(super) struct Lock<'a>(&'a Ownership);
 impl Drop for Lock<'_> {
     fn drop(&mut self) {
         let _ = fs::flock(self.0.alternate.as_ref(), fs::FlockOperation::Unlock);
+        self.0.locked.store(false, Ordering::Release);
     }
 }
 pub(super) struct Stage {
