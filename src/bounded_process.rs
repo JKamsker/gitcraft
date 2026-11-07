@@ -196,6 +196,38 @@ mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
 
     #[test]
+    fn completed_commands_cannot_hide_an_input_writer_error_or_block_past_deadline() {
+        let mut early = Command::new("sh");
+        early.args(["-c", "exec 0<&-; sleep 0.03; exit 0"]);
+        assert!(
+            run_input(
+                early,
+                Some(vec![b'x'; 1024 * 1024]),
+                &|| true,
+                Duration::from_secs(2),
+                100,
+                100
+            )
+            .is_err()
+        );
+        let mut blocked = Command::new("sh");
+        blocked.args(["-c", "sleep 30"]);
+        let start = Instant::now();
+        assert!(
+            run_input(
+                blocked,
+                Some(vec![b'x'; 1024 * 1024]),
+                &|| true,
+                Duration::from_millis(100),
+                100,
+                100
+            )
+            .is_err_and(|e| e.contains("timed out"))
+        );
+        assert!(start.elapsed() < Duration::from_secs(2));
+    }
+
+    #[test]
     fn configured_stream_caps_are_independent_and_keep_boundary_bytes() {
         for (stdout, stderr, succeeds) in [(3, 2, true), (2, 2, false), (3, 1, false)] {
             let mut command = Command::new("sh");

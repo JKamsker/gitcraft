@@ -74,6 +74,7 @@ impl RepoTab {
     /// background.
     pub fn reload(&mut self, ctx: &egui::Context) {
         self.work_epoch = self.work_epoch.wrapping_add(1);
+        self.discard_decrypted();
         // Changes seen on disk so far are read by this reload (or the one queued after the
         // current one): reloading for them again would read the same.
         self.fs_pending = None;
@@ -179,6 +180,7 @@ impl RepoTab {
     }
 
     pub(super) fn reload_status(&mut self, ctx: &egui::Context) {
+        self.discard_decrypted();
         self.work_epoch = self.work_epoch.wrapping_add(1);
         let read = self.next_read();
         self.work_pending = read;

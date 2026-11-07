@@ -108,6 +108,7 @@ pub(crate) struct DiffView {
     /// dropped.
     pub(super) rendered_load: u64,
     pub(super) structural: diff::structural::State,
+    pub(super) encrypted: diff::encrypted::State,
     /// What the rendered Markdown keeps between frames.
     pub(super) markdown: egui_commonmark::CommonMarkCache,
     /// How far the lines were scrolled down last frame.
@@ -140,6 +141,7 @@ impl DiffView {
             rendered: None,
             rendered_load: 0,
             structural: Default::default(),
+            encrypted: Default::default(),
             markdown: Default::default(),
             scroll: 0.0,
             jump: None,
@@ -152,6 +154,7 @@ impl DiffView {
 
     /// Numbers a new read of this diff; from now on only its answer is shown.
     pub(super) fn next_request(&mut self) -> u64 {
+        self.encrypted.close();
         self.request = DIFF_REQUESTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
         self.request
     }

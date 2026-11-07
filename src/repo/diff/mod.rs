@@ -3,6 +3,7 @@
 //! their objects. Uncommitted changes can be staged, unstaged or discarded a hunk or a few
 //! lines at a time.
 
+pub(in crate::repo) mod encrypted;
 mod images;
 mod jump;
 mod lfs;
@@ -77,6 +78,8 @@ pub struct DiffData {
     pub header: String,
     /// Hunks and lines can be staged, unstaged or discarded on their own.
     pub partial: bool,
+    /// Recognized SOPS ciphertext; plaintext belongs only to a separate opt-in view.
+    pub sops: bool,
     /// The file is new: it has no old side, so it shows unified even side by side.
     pub new_file: bool,
     /// Characters in the longest line, for the width to scroll (counted once, not every frame).
@@ -208,6 +211,7 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         .map(|l| l.text.chars().count())
         .max()
         .unwrap_or(0);
+    let sops = encrypted::probe(repo, key);
     Ok(DiffData {
         lines,
         spans,
@@ -217,6 +221,7 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         lfs,
         header,
         partial,
+        sops,
         new_file,
         longest,
         uncut,

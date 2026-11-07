@@ -24,8 +24,10 @@ impl RepoTab {
         let idle = self.busy_op.is_none();
 
         let (path, origin) = self.diff_origin(&view.key);
-        let partial =
-            matches!(&view.data, Some(Ok(d)) if d.partial) && idle && !view.structural.enabled;
+        let partial = matches!(&view.data, Some(Ok(d)) if d.partial)
+            && idle
+            && !view.structural.enabled
+            && !view.encrypted.enabled;
         let settings = Settings::get(ui.ctx());
         let (split, ignore_ws, whole_file) = (
             settings.diff_split,
@@ -44,6 +46,36 @@ impl RepoTab {
             markdown,
             acts,
         );
+
+        if matches!(&view.data, Some(Ok(data)) if data.sops) {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(egui::RichText::new("SOPS encrypted file").color(t.text_dim));
+                let mut encoding = view.encrypted.json_encoding;
+                egui::ComboBox::from_id_salt("sops_json_encoding")
+                    .selected_text(encoding.label())
+                    .show_ui(ui, |ui| {
+                        use super::encrypted::JsonEncoding;
+                        for choice in [JsonEncoding::Ask, JsonEncoding::Document, JsonEncoding::Binary] {
+                            ui.selectable_value(&mut encoding, choice, choice.label());
+                        }
+                    }).response.on_hover_text("For a data + sops JSON envelope, explicitly choose whether its content is a JSON document or binary bytes. The choice applies to both ambiguous sides, independent of filenames; other formats are detected normally. Changing the choice discards the decrypted view.");
+                if encoding != view.encrypted.json_encoding {
+                    acts.push(Action::DiffDecryptedEncoding(encoding));
+                }
+                if view.encrypted.enabled {
+                    if ui.button("Encrypted patch / cancel").clicked() { acts.push(Action::DiffDecrypted(false)); }
+                    if ui.button("Retry decryption").clicked() { acts.push(Action::DiffDecrypted(true)); }
+                } else if ui.add_enabled(idle && !self.loading && self.work_pending == 0 && view.request == view.data_request, egui::Button::new("Show decrypted")).on_hover_text("Use local SOPS and keys on this computer; SSH/WSL repositories supply only ciphertext. Plaintext is shown only in this view and is discarded when you leave it.").clicked() {
+                    acts.push(Action::DiffDecrypted(true));
+                }
+            });
+        }
+        if view.encrypted.enabled {
+            if let Some(view) = &mut self.diff {
+                super::encrypted::show(ui, &mut view.encrypted);
+            }
+            return;
+        }
 
         if markdown == Some(true) {
             let Some(view) = &mut self.diff else { return };
@@ -201,6 +233,7 @@ impl RepoTab {
                         }
                         if let DiffKey::Work(file) = &view.key
                             && !view.structural.enabled
+                            && !view.encrypted.enabled
                         {
                             let partial = partial && !as_file && !rendered;
                             clear = self.file_actions(ui, view, file, partial, acts);
@@ -217,7 +250,11 @@ impl RepoTab {
                             structural::toggle(ui, view.structural.enabled, acts);
                             ui.add_space(4.0);
                         }
-                        if !as_file && !rendered && !view.structural.enabled {
+                        if !as_file
+                            && !rendered
+                            && !view.structural.enabled
+                            && !view.encrypted.enabled
+                        {
                             view_options(ui, &t, (split, ignore_ws, whole_file), acts);
                             ui.add_space(8.0);
                             change_steps(ui, acts);

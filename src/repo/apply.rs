@@ -253,17 +253,22 @@ impl RepoTab {
             Action::DiffAsFile(on) => self.show_diff_as_file(on, ctx),
             Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
             Action::DiffStructural(on) => self.show_diff_structural(on, ctx),
+            Action::DiffDecrypted(on) => self.show_diff_decrypted(on, ctx),
+            Action::DiffDecryptedEncoding(encoding) => {
+                if let Some(view) = &mut self.diff {
+                    view.encrypted.close();
+                    view.encrypted.json_encoding = encoding;
+                }
+            }
             Action::DiffStep(delta) => {
                 let rendered = self.diff_rendered
                     && self
                         .diff
                         .as_ref()
                         .is_some_and(|v| diff::rendered::is_markdown(v.key.path()));
-                if let Some(view) = self
-                    .diff
-                    .as_mut()
-                    .filter(|v| !self.diff_as_file && !rendered && !v.structural.enabled)
-                {
+                if let Some(view) = self.diff.as_mut().filter(|v| {
+                    !self.diff_as_file && !rendered && !v.structural.enabled && !v.encrypted.enabled
+                }) {
                     view.step_change(Settings::get(ctx).diff_split, delta);
                 }
             }
@@ -439,7 +444,7 @@ impl RepoTab {
         let (DiffKey::Work(file), Some(Ok(data))) = (&view.key, &view.data) else {
             return None;
         };
-        if view.request != view.data_request || !data.partial {
+        if view.request != view.data_request || !data.partial || view.encrypted.enabled {
             return None;
         }
         let patch = diff::partial_patch(&data.header, &data.lines, lines, pick)?;
@@ -484,6 +489,7 @@ impl RepoTab {
             view.key == prepared.key
                 && view.request == prepared.request
                 && view.data_request == view.request
+                && !view.encrypted.enabled
         });
         if self.path != prepared.path
             || self.work_read != prepared.read
