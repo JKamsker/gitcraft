@@ -1,0 +1,156 @@
+{
+  "scope": "pre-native debug harness, one-commit fixtures; loopback remote is not SSH",
+  "source_revision": "d7b3757a",
+  "results": [
+    {
+      "count": 1,
+      "elapsed_ms": 52.488375,
+      "heartbeat_max_ms": 3.171416,
+      "job_queue_peak": 3,
+      "jobs": [
+        8,
+        3
+      ],
+      "latency_p50_ms": 49.871084,
+      "latency_p95_ms": 49.871084,
+      "mode": "local-tabs",
+      "processes": {
+        "active": 8,
+        "peak": 8,
+        "queued": 1,
+        "spawned": 26
+      },
+      "submit_ms": 2.4023339999999997,
+      "peak_os_threads": 21,
+      "peak_rss_kib": 29728,
+      "peak_descendants": 3,
+      "backend": "cli",
+      "repeat": 0
+    },
+    {
+      "count": 10,
+      "elapsed_ms": 168.957791,
+      "heartbeat_max_ms": 2.8583749999999997,
+      "job_queue_peak": 115,
+      "jobs": [
+        8,
+        113
+      ],
+      "latency_p50_ms": 128.847708,
+      "latency_p95_ms": 166.419125,
+      "mode": "local-tabs",
+      "processes": {
+        "active": 8,
+        "peak": 8,
+        "queued": 2,
+        "spawned": 196
+      },
+      "submit_ms": 0.54075,
+      "peak_os_threads": 31,
+      "peak_rss_kib": 35568,
+      "peak_descendants": 8,
+      "backend": "cli",
+      "repeat": 0
+    },
+    {
+      "count": 50,
+      "elapsed_ms": 708.502333,
+      "heartbeat_max_ms": 3.054458,
+      "job_queue_peak": 512,
+      "jobs": [
+        8,
+        512
+      ],
+      "latency_p50_ms": 420.90558300000004,
+      "latency_p95_ms": 687.846625,
+      "mode": "local-tabs",
+      "processes": {
+        "active": 8,
+        "peak": 8,
+        "queued": 1,
+        "spawned": 834
+      },
+      "submit_ms": 1.1932909999999999,
+      "peak_os_threads": 72,
+      "peak_rss_kib": 39552,
+      "peak_descendants": 8,
+      "backend": "cli",
+      "repeat": 0
+    },
+    {
+      "count": 1,
+      "elapsed_ms": 164.525334,
+      "heartbeat_max_ms": 3.274834,
+      "job_queue_peak": 5,
+      "jobs": [
+        8,
+        5
+      ],
+      "latency_p50_ms": 162.00275,
+      "latency_p95_ms": 162.00275,
+      "mode": "remote-tabs",
+      "processes": {
+        "active": 0,
+        "peak": 1,
+        "queued": 0,
+        "spawned": 4
+      },
+      "submit_ms": 0.6042919999999999,
+      "peak_os_threads": 34,
+      "peak_rss_kib": 29520,
+      "peak_descendants": 10,
+      "backend": "cli",
+      "repeat": 0
+    },
+    {
+      "count": 10,
+      "elapsed_ms": 795.924375,
+      "heartbeat_max_ms": 2.8545,
+      "job_queue_peak": 123,
+      "jobs": [
+        8,
+        123
+      ],
+      "latency_p50_ms": 553.016833,
+      "latency_p95_ms": 793.395583,
+      "mode": "remote-tabs",
+      "processes": {
+        "active": 0,
+        "peak": 1,
+        "queued": 0,
+        "spawned": 22
+      },
+      "submit_ms": 0.516583,
+      "peak_os_threads": 41,
+      "peak_rss_kib": 35440,
+      "peak_descendants": 24,
+      "backend": "cli",
+      "repeat": 0
+    },
+    {
+      "count": 50,
+      "elapsed_ms": 3507.4614579999998,
+      "heartbeat_max_ms": 3.188959,
+      "job_queue_peak": 512,
+      "jobs": [
+        8,
+        511
+      ],
+      "latency_p50_ms": 1924.556458,
+      "latency_p95_ms": 3421.838958,
+      "mode": "remote-tabs",
+      "processes": {
+        "active": 0,
+        "peak": 1,
+        "queued": 0,
+        "spawned": 102
+      },
+      "submit_ms": 1.234375,
+      "peak_os_threads": 43,
+      "peak_rss_kib": 42576,
+      "peak_descendants": 23,
+      "backend": "cli",
+      "repeat": 0
+    }
+  ]
+}

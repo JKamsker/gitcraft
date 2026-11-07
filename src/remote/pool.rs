@@ -266,7 +266,7 @@ impl Pool {
     }
 }
 
-type Pools = Mutex<HashMap<(Host, Lane), Arc<Pool>>>;
+type Pools = Mutex<HashMap<(Host, Lane, String), Arc<Pool>>>;
 
 static POOLS: OnceLock<Pools> = OnceLock::new();
 
@@ -276,9 +276,12 @@ pub(super) fn connected(host: &Host) -> bool {
     let Some(pools) = POOLS.get() else {
         return false;
     };
-    let pools: Vec<Arc<Pool>> = [Lane::Quick, Lane::Long]
+    // This is queried while rendering. Checking configuration files belongs to the
+    // worker's exec_if_connected, which independently refuses stale security contexts.
+    let pools: Vec<Arc<Pool>> = lock(pools)
         .iter()
-        .filter_map(|lane| lock(pools).get(&(host.clone(), *lane)).cloned())
+        .filter(|((h, lane, _), _)| h == host && matches!(lane, Lane::Quick | Lane::Long))
+        .map(|(_, pool)| Arc::clone(pool))
         .collect();
     pools.iter().any(|pool| {
         let state = lock(&pool.state);
@@ -304,11 +307,16 @@ pub(super) fn pool(host: &Host, lane: Lane) -> Arc<Pool> {
         });
         Mutex::default()
     });
-    Arc::clone(lock(pools).entry((host.clone(), lane)).or_default())
+    let context = super::transport::context(host);
+    Arc::clone(
+        lock(pools)
+            .entry((host.clone(), lane, context))
+            .or_default(),
+    )
 }
 
 /// Close idle persistent shells at app exit; active jobs own and close their shells once
-/// their cancelled protocol read returns. The transport reuse policy is unchanged.
+/// their cancelled protocol read returns. Then release this instance's SSH transports.
 pub(crate) fn shutdown() {
     super::session::wait_for_cleanup();
     if let Some(pools) = POOLS.get() {
@@ -321,4 +329,5 @@ pub(crate) fn shutdown() {
             }
         }
     }
+    super::transport::shutdown();
 }

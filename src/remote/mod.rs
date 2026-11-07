@@ -15,6 +15,7 @@ mod fs;
 mod pool;
 mod session;
 mod shell;
+mod transport;
 mod ui_guard;
 mod vault;
 
@@ -231,13 +232,11 @@ pub fn terminal_command(t: &Target) -> (String, Vec<String>, String) {
             distro.clone(),
         ),
         Host::Ssh(dest) => {
+            let mut args = transport::terminal_args(dest);
             let dest = ssh_destination(dest);
             let remote = terminal_script(&t.path);
-            (
-                "ssh".to_owned(),
-                vec!["-t".to_owned(), "--".to_owned(), dest, remote],
-                t.host.label(),
-            )
+            args.extend(["-t".to_owned(), "--".to_owned(), dest, remote]);
+            ("ssh".to_owned(), args, t.host.label())
         }
     }
 }
@@ -291,16 +290,16 @@ pub fn terminal_running(t: &Target, script: &str) -> (String, Vec<String>, Strin
             .to_vec(),
             distro.clone(),
         ),
-        Host::Ssh(dest) => (
-            "ssh".to_owned(),
-            vec![
+        Host::Ssh(dest) => {
+            let mut args = transport::terminal_args(dest);
+            args.extend([
                 "-t".to_owned(),
                 "--".to_owned(),
                 ssh_destination(dest),
                 format!("exec sh -c '{RUN}' sh {path} {script}"),
-            ],
-            t.host.label(),
-        ),
+            ]);
+            ("ssh".to_owned(), args, t.host.label())
+        }
     }
 }
 

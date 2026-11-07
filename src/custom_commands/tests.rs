@@ -299,8 +299,12 @@ fn the_remote_terminal_runs_the_script_in_the_folder() -> Result<(), String> {
     let script = captured_program(&vars, "printf '%s|' \"$BRANCH\"; pwd");
     let (program, args, _) = crate::remote::terminal_running(&target, &script);
     assert_eq!(program, "ssh");
-    assert_eq!(&args[..3], ["-t", "--", "host"]);
-    let remote_line = args.get(3).cloned().unwrap_or_default();
+    let tty = args
+        .iter()
+        .position(|arg| arg == "-t")
+        .ok_or("missing SSH terminal option")?;
+    assert_eq!(&args[tty..tty + 3], ["-t", "--", "host"]);
+    let remote_line = args.get(tty + 3).cloned().unwrap_or_default();
     // Nothing csh or fish would read differently, as for the plain terminal.
     let quoted = remote_line.split('\'').nth(1).unwrap_or_default();
     assert!(!quoted.contains(['\\', '!']), "{quoted}");

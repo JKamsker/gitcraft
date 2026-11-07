@@ -150,7 +150,9 @@ fn exec_inner(host: &Host, req: &Request, cleanup: bool) -> Result<Output, Strin
         let limit = req.time_limit();
         match shell.run(&script, &nonce, Instant::now() + limit) {
             Ok(out) => {
-                taken.give_back();
+                if super::transport::reusable(host) {
+                    taken.give_back();
+                }
                 return Ok(out);
             }
             // A shell left open went away meanwhile: the script never reached it, so another
@@ -188,6 +190,9 @@ fn exec_if_connected_inner(
 ) -> Option<Result<Output, String>> {
     if let Err(e) = super::ui_guard::off_ui_thread(&req.what()) {
         return Some(Err(e));
+    }
+    if !super::transport::reusable(host) {
+        return None;
     }
     let pool = pool(host, Lane::Quick);
     let mut taken = pool.take_idle(UNASKED_FRESH)?;
@@ -333,7 +338,7 @@ pub(crate) struct Streaming {
 
 pub(crate) fn streaming_command(host: &Host, req: &Request) -> Result<Streaming, String> {
     super::ui_guard::off_ui_thread(&req.what())?;
-    let (command, attempt) = shell_command(host);
+    let (command, attempt) = shell_command(host, false);
     let input = format!(
         "{MORE_PATH}\nprintf '\\n%s\\n' {READY}\n{}\n",
         inline(req, "</dev/null")
@@ -351,7 +356,7 @@ pub(crate) fn streaming_command(host: &Host, req: &Request) -> Result<Streaming,
 /// (a long `git log`): from the command's first byte on, what a login printed skipped.
 pub fn spawn(host: &Host, req: &Request) -> Result<Child, String> {
     super::ui_guard::off_ui_thread(&req.what())?;
-    let (mut cmd, attempt) = shell_command(host);
+    let (mut cmd, attempt) = shell_command(host, false);
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -411,7 +416,7 @@ pub const LOOPBACK: &str = "gitcraft-loopback";
 
 /// A new shell kept open on `host`.
 pub(super) fn start_shell(host: &Host) -> Result<Shell, String> {
-    let (cmd, attempt) = shell_command(host);
+    let (cmd, attempt) = shell_command(host, true);
     let shell = Shell::start(cmd, &host.label())?;
     // Signed in: a password to remember is kept now (a failed start drops it).
     if let Some(attempt) = attempt {
@@ -439,12 +444,25 @@ pub(super) fn setup_script() -> String {
 
 /// The process that runs `sh` on `host`, reading its script from its input, and (over SSH)
 /// the attempt to tell once it has signed in.
-fn shell_command(host: &Host) -> (Command, Option<super::askpass::Attempt>) {
+struct Connection {
+    attempt: Option<super::askpass::Attempt>,
+    _opening: Option<super::transport::Opening>,
+}
+
+impl Connection {
+    fn connected(self) {
+        if let Some(attempt) = self.attempt {
+            attempt.connected();
+        }
+    }
+}
+
+fn shell_command(host: &Host, serialize: bool) -> (Command, Option<Connection>) {
     #[cfg(all(test, unix))]
     if *host == Host::Ssh(LOOPBACK.to_owned()) {
         return (Command::new("sh"), None);
     }
-    let mut attempt = None;
+    let mut connection = None;
     // Changed further only on Windows (no console window).
     #[cfg_attr(not(windows), allow(unused_mut))]
     let mut cmd = match host {
@@ -454,6 +472,7 @@ fn shell_command(host: &Host) -> (Command, Option<super::askpass::Attempt>) {
             cmd.args(["-T", "-e", "none"]);
             // Its questions (a password, a passphrase, a new host key) asked in the window
             // (see `askpass`); where that can't be, none asked: it fails, and says why.
+            let mut attempt = None;
             match super::askpass::env_for(&host.label()) {
                 Some((env, started)) => {
                     cmd.envs(env);
@@ -463,11 +482,19 @@ fn shell_command(host: &Host) -> (Command, Option<super::askpass::Attempt>) {
                     cmd.args(["-o", "BatchMode=yes"]);
                 }
             }
-            // Another ssh config than `~/.ssh/config`, when the user names one.
-            if let Some(config) = std::env::var_os("GITCRAFT_SSH_CONFIG").filter(|c| !c.is_empty())
+            let opening = super::transport::configure(&mut cmd, dest, serialize);
+            // The Unix wrapper includes the original configuration before its defaults.
+            // Unsupported platforms / inaccessible private storage keep the old behavior.
+            if opening.is_none()
+                && let Some(config) =
+                    std::env::var_os("GITCRAFT_SSH_CONFIG").filter(|c| !c.is_empty())
             {
                 cmd.arg("-F").arg(config);
             }
+            connection = Some(Connection {
+                attempt,
+                _opening: opening,
+            });
             cmd.args([
                 "-o",
                 "ConnectTimeout=15",
@@ -494,7 +521,7 @@ fn shell_command(host: &Host) -> (Command, Option<super::askpass::Attempt>) {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
-    (cmd, attempt)
+    (cmd, connection)
 }
 
 fn start_error(host: &Host, e: &std::io::Error) -> String {
