@@ -1,5 +1,6 @@
 //! Pinned, bounded history investigations. Every request uses the accepted raw transport.
 pub(crate) mod dossier;
+pub(crate) mod ignore;
 #[cfg(test)]
 pub(crate) mod tests;
 pub(crate) mod views;
