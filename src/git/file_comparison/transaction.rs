@@ -183,59 +183,7 @@ fn remote_apply(
     patch: &str,
     reverse: bool,
 ) -> Result<String, String> {
-    let b64 = |v: &[u8]| base64::engine::general_purpose::STANDARD.encode(v);
-    let mut work = lens
-        .work_raw
-        .mode
-        .as_deref()
-        .unwrap_or("missing")
-        .as_bytes()
-        .to_vec();
-    work.push(0);
-    work.extend(&lens.work_raw.bytes);
-    if lens.work_raw.warning.is_some() {
-        return Err("This working version cannot be staged safely".into());
-    }
-    let working = lens::working_script(&target.path, &lens.spec.path)?;
-    let head = crate::remote::sh_quote(lens.head.as_deref().unwrap_or(""));
-    // One exclusive index.lock across verification, alternate-index apply and replacement.
-    // All scratch names are constants; file paths and payloads are quoted/data, not code.
-    let script = format!(
-        "umask 077\nd=$(mktemp -d) || exit 1\nown=0\nidx=$(git --no-lazy-fetch rev-parse --path-format=absolute --git-path index) || exit 1\nlock=\"$idx.lock\"\ntrap '[ \"$own\" = 1 ] && rm -f -- \"$lock\"; rm -rf -- \"$d\"' 0\n\
-         if (set -C; : >\"$lock\") 2>/dev/null; then own=1; else echo 'Could not lock the Git index' >&2; exit 1; fi\n\
-         printf '%s' '{index_b64}' | base64 -d >\"$d/expected-index\" || exit 1\n\
-         printf '%s' '{work_b64}' | base64 -d >\"$d/expected-work\" || exit 1\n\
-         printf '%s' '{patch_b64}' | base64 -d >\"$d/patch\" || exit 1\n\
-         check_snapshot() {{\n\
-          current=$(git --no-lazy-fetch rev-parse --verify -q HEAD || :)\n[ \"$current\" = {head} ] || return 1\n\
-          {stamp_check}\n\
-          {attributes_check}\n\
-          git --no-lazy-fetch ls-files --stage -z >\"$d/current-index\" && cmp -s \"$d/expected-index\" \"$d/current-index\" || return 1\n\
-          ( {working} ) >\"$d/current-work\" && cmp -s \"$d/expected-work\" \"$d/current-work\" || return 1\n}}\n\
-         check_snapshot || {{ echo 'The staging lens is stale; refresh it' >&2; exit 1; }}\n\
-         [ -L \"$idx\" ] && {{ echo 'Symbolic-link index files are not modified' >&2; exit 1; }}\n\
-         if [ -f \"$idx\" ]; then [ \"$(wc -c <\"$idx\")\" -le {index_limit} ] && cp -- \"$idx\" \"$d/index\" || exit 1; else GIT_INDEX_FILE=\"$d/index\" git --no-lazy-fetch read-tree --empty || exit 1; fi\n\
-         {remove_intent}\n\
-         GIT_INDEX_FILE=\"$d/index\" git --no-lazy-fetch apply --cached --whitespace=nowarn {reverse} -- \"$d/patch\" || exit 1\n\
-         check_snapshot || {{ echo 'The staging lens changed before the patch was installed; refresh it' >&2; exit 1; }}\n\
-         [ \"$(wc -c <\"$d/index\")\" -le {index_limit} ] || exit 1\n\
-         cat \"$d/index\" >\"$lock\" && mv -f -- \"$lock\" \"$idx\" || exit 1\nown=0\n",
-        stamp_check = remote_stamp_check(&lens.index_stamp),
-        attributes_check = remote_attributes_check(lens),
-        index_b64 = b64(&lens.index),
-        work_b64 = b64(&work),
-        patch_b64 = b64(patch.as_bytes()),
-        index_limit = INDEX_LIMIT,
-        remove_intent = if lens.intent_to_add {
-            format!(
-                "GIT_INDEX_FILE=\"$d/index\" git --no-lazy-fetch update-index --force-remove -- {} || exit 1",
-                crate::remote::sh_quote(&lens.spec.path)
-            )
-        } else {
-            String::new()
-        },
-        reverse = if reverse { "--reverse" } else { "" }
-    );
+    let script = remote_apply_script(lens, patch, reverse)?;
     let out = super::super::command::comparison_remote(
         &target.host,
         crate::remote::Request {
@@ -252,24 +200,31 @@ fn remote_apply(
     }
 }
 
-fn remote_attributes_check(lens: &Lens) -> String {
-    format!(
-        "git --no-lazy-fetch --literal-pathspecs check-attr -z filter working-tree-encoding eol text -- {path} >\"$d/current-attributes\" 2>\"$d/attribute-errors\" || return 1\n\
-         [ ! -s \"$d/attribute-errors\" ] || return 1\n\
-         printf 'autocrlf\\0' >>\"$d/current-attributes\"\n\
-         git --no-lazy-fetch config --get core.autocrlf >>\"$d/current-attributes\" 2>\"$d/attribute-errors\"; rc=$?\n\
-         [ \"$rc\" -le 1 ] && [ ! -s \"$d/attribute-errors\" ] || return 1\n\
-         actual_attributes=$(md5sum \"$d/current-attributes\") || return 1\n\
-         [ \"${{actual_attributes%% *}}\" = {stamp} ] || return 1\n\
-         actual_filemode=$(git --no-lazy-fetch config --bool --get core.filemode); rc=$?\n\
-         [ \"$rc\" -le 1 ] && [ \"$actual_filemode\" = {filemode} ] || return 1\n\
-         actual_symlinks=$(git --no-lazy-fetch config --bool --get core.symlinks); rc=$?\n\
-         [ \"$rc\" -le 1 ] && [ \"$actual_symlinks\" = {symlinks} ] || return 1\n",
-        path = crate::remote::sh_quote(&lens.spec.path),
-        stamp = crate::remote::sh_quote(&lens.attributes_stamp),
-        filemode = crate::remote::sh_quote(&lens.filemode),
-        symlinks = crate::remote::sh_quote(&lens.symlinks),
-    )
+fn remote_apply_script(lens: &Lens, patch: &str, reverse: bool) -> Result<String, String> {
+    if lens.work_raw.warning.is_some() {
+        return Err("This working version cannot be staged safely".into());
+    }
+    let b64 = |v: &[u8]| base64::engine::general_purpose::STANDARD.encode(v);
+    let mut work = lens
+        .work_raw
+        .mode
+        .as_deref()
+        .unwrap_or("missing")
+        .as_bytes()
+        .to_vec();
+    work.push(0);
+    work.extend(&lens.work_raw.bytes);
+    let payload = serde_json::json!({
+        "head":lens.head.as_deref().unwrap_or(""), "index_stamp":lens.index_stamp,
+        "index":b64(&lens.index), "work":b64(&work), "patch":b64(patch.as_bytes()),
+        "path":lens.spec.path,"attributes_stamp":lens.attributes_stamp,
+        "filemode":lens.filemode,"symlinks":lens.symlinks,"intent":lens.intent_to_add,"reverse":reverse,
+    });
+    Ok(format!(
+        "command -v python3 >/dev/null 2>&1 || {{ echo 'Safe remote staging requires Python 3 standard-library no-follow file and ACL APIs; install python3 on the repository machine' >&2; exit 1; }}\npython3 -c {} <<'GITCRAFT_INDEX_DATA'\n{}\nGITCRAFT_INDEX_DATA\n",
+        crate::remote::sh_quote(include_str!("remote_index.py")),
+        payload
+    ))
 }
 
 pub(super) fn index_stamp(repo: &Path, active: &dyn Fn() -> bool) -> Result<String, String> {
@@ -305,15 +260,224 @@ pub(super) fn index_stamp(repo: &Path, active: &dyn Fn() -> bool) -> Result<Stri
 }
 fn remote_stamp_read() -> String {
     format!(
-        "[ -L \"$idx\" ] && exit 1\nif [ -e \"$idx\" ]; then\n[ -f \"$idx\" ] || exit 1\nhead -c {} \"$idx\" >\"$d/index-bytes\" || exit 1\n[ \"$(wc -c <\"$d/index-bytes\")\" -le {} ] || exit 1\nactual=$(md5sum \"$d/index-bytes\") || exit 1\nactual=${{actual%% *}}\nelse actual=missing; fi\n",
+        "{}\n[ -L \"$idx\" ] && exit 1\nif [ -e \"$idx\" ]; then\n[ -f \"$idx\" ] || exit 1\nhead -c {} \"$idx\" >\"$d/index-bytes\" || exit 1\n[ \"$(wc -c <\"$d/index-bytes\")\" -le {} ] || exit 1\nactual=$(gitcraft_md5 <\"$d/index-bytes\") || exit 1\nelse actual=missing; fi\n",
+        portable_md5(),
         INDEX_LIMIT + 1,
         INDEX_LIMIT
     )
 }
-fn remote_stamp_check(expected: &str) -> String {
-    format!(
-        "{}\n[ \"$actual\" = {} ] || return 1",
-        remote_stamp_read(),
-        crate::remote::sh_quote(expected)
-    )
+fn portable_md5() -> &'static str {
+    r#"gitcraft_md5() {
+ if command -v md5sum >/dev/null 2>&1; then result=$(md5sum) || return 1; result=${result%% *};
+ elif command -v md5 >/dev/null 2>&1; then result=$(md5 -q) || return 1;
+ else echo 'File comparison requires md5sum (Linux/WSL) or md5 (macOS)' >&2; return 1; fi
+ case "$result" in *[!a-fA-F0-9]*|'') return 1;; esac
+ [ "${#result}" = 32 ] || return 1
+ printf '%s' "$result"
+}
+probe=$(printf abc | gitcraft_md5) || exit 1
+[ "$probe" = 900150983cd24fb0d6963f7d28e17f72 ] || { echo 'Unsupported MD5 capability' >&2; exit 1; }
+"#
+}
+
+#[cfg(test)]
+mod correction_tests {
+    use super::*;
+    #[test]
+    fn remote_program_records_no_follow_create_only_policy_and_literal_data() -> Result<(), String>
+    {
+        let r = super::super::tests::Repo::new()?;
+        let path = "literal ' $(not-code) ü";
+        r.write(path, "old\n")?;
+        r.commit()?;
+        r.write(path, "new\n")?;
+        let lens = r.lens(path)?;
+        let script = remote_apply_script(&lens, "fixture patch", false)?;
+        assert!(script.contains("requires Python 3"));
+        assert!(script.contains("O_NOFOLLOW"));
+        assert!(script.contains("O_EXCL"));
+        assert!(script.contains("src_dir_fd=recovery,dst_dir_fd=parent,follow_symlinks=False"));
+        assert!(script.contains("os.fchown"));
+        assert!(script.contains("acl_get_fd_np"));
+        assert!(script.contains("core.sharedRepository"));
+        assert!(script.contains("released-lock"));
+        assert!(!script.contains("cat \"$d/index\" >\"$lock\""));
+        let json = script
+            .split("<<'GITCRAFT_INDEX_DATA'\n")
+            .nth(1)
+            .ok_or("payload")?
+            .lines()
+            .next()
+            .ok_or("json")?;
+        let data: serde_json::Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
+        assert_eq!(data["path"], path);
+        assert_eq!(
+            data["patch"],
+            base64::engine::general_purpose::STANDARD.encode(b"fixture patch")
+        );
+        let md5 = portable_md5();
+        assert!(md5.contains("md5sum"));
+        assert!(md5.contains("md5 -q"));
+        assert!(md5.contains("900150983cd24fb0d6963f7d28e17f72"));
+        Ok(())
+    }
+}
+
+#[cfg(all(test, unix))]
+mod owned_remote_correction_tests {
+    use super::*;
+    use crate::git::file_comparison::tests::Repo;
+    use std::os::unix::fs::PermissionsExt;
+    fn run(r: &Repo, script: &str, bin: Option<&Path>) -> Result<crate::processes::Output, String> {
+        let mut cmd = std::process::Command::new("/bin/sh");
+        cmd.args(["-c", script]).current_dir(&r.0);
+        if let Some(bin) = bin {
+            cmd.env(
+                "PATH",
+                format!(
+                    "{}:{}",
+                    bin.display(),
+                    std::env::var("PATH").unwrap_or_default()
+                ),
+            );
+        }
+        crate::processes::run(
+            cmd,
+            crate::processes::Options {
+                timeout: Some(std::time::Duration::from_secs(20)),
+                ..Default::default()
+            },
+        )?
+        .complete()
+    }
+    #[test]
+    fn owned_remote_program_preserves_foreign_locks_and_applies_native_sharing_policy()
+    -> Result<(), String> {
+        for case in ["0600", "group", "foreign-file", "foreign-link"] {
+            let r = Repo::new()?;
+            let path = "a ' $(literal) ü";
+            r.write(path, "before\n")?;
+            r.write("unrelated", "unchanged\n")?;
+            r.commit()?;
+            let sharing = if case == "group" { "group" } else { "0600" };
+            r.git(&["config", "core.sharedRepository", sharing])?;
+            r.git(&["add", path])?;
+            let expected = std::fs::metadata(r.0.join(".git/index"))
+                .map_err(|e| e.to_string())?
+                .permissions()
+                .mode()
+                & 0o777;
+            r.write(path, "after\n")?;
+            let lens = r.lens(path)?;
+            let patch = patch_header(path, Some("100644"), Some("100644"))
+                + "@@ -1 +1 @@\n-before\n+after\n";
+            let mut bin = None;
+            if case.starts_with("foreign") {
+                let tools = r.0.join("tools");
+                std::fs::create_dir(&tools).map_err(|e| e.to_string())?;
+                let real = std::process::Command::new("/bin/sh")
+                    .args(["-c", "command -v git"])
+                    .output()
+                    .map_err(|e| e.to_string())?;
+                let real = String::from_utf8(real.stdout).map_err(|e| e.to_string())?;
+                let lock = r.0.join(".git/index.lock");
+                let displaced = r.0.join("displaced-lock");
+                let sentinel = r.0.join("sentinel");
+                std::fs::write(&sentinel, b"outside-original").map_err(|e| e.to_string())?;
+                let replace = if case == "foreign-link" {
+                    format!(
+                        "ln -s {} {}",
+                        crate::remote::sh_quote(&sentinel.to_string_lossy()),
+                        crate::remote::sh_quote(&lock.to_string_lossy())
+                    )
+                } else {
+                    format!(
+                        "printf FOREIGN-LOCK-BYTES > {}",
+                        crate::remote::sh_quote(&lock.to_string_lossy())
+                    )
+                };
+                let wrapper = format!(
+                    "#!/bin/sh\n{} \"$@\"\nrc=$?\ncase \"$*\" in *'apply --cached'*) case \"$GIT_INDEX_FILE\" in {}/.git/gitcraft-index-recovery-*/candidate) mv {} {} && {};; esac;; esac\nexit \"$rc\"\n",
+                    crate::remote::sh_quote(real.trim()),
+                    crate::remote::sh_quote(&r.0.to_string_lossy()),
+                    crate::remote::sh_quote(&lock.to_string_lossy()),
+                    crate::remote::sh_quote(&displaced.to_string_lossy()),
+                    replace
+                );
+                let exe = tools.join("git");
+                std::fs::write(&exe, wrapper).map_err(|e| e.to_string())?;
+                std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755))
+                    .map_err(|e| e.to_string())?;
+                bin = Some(tools);
+            }
+            let out = run(
+                &r,
+                &remote_apply_script(&lens, &patch, false)?,
+                bin.as_deref(),
+            )?;
+            if case.starts_with("foreign") {
+                assert!(
+                    !out.status.success(),
+                    "{case}: {}",
+                    String::from_utf8_lossy(&out.stderr)
+                );
+                assert!(std::fs::symlink_metadata(r.0.join(".git/index.lock")).is_ok());
+                assert_eq!(
+                    std::fs::read(r.0.join("sentinel")).map_err(|e| e.to_string())?,
+                    b"outside-original"
+                );
+                assert_eq!(r.git(&["show", &format!(":{path}")])?, "before");
+                if case == "foreign-file" {
+                    assert_eq!(
+                        std::fs::read(r.0.join(".git/index.lock")).map_err(|e| e.to_string())?,
+                        b"FOREIGN-LOCK-BYTES"
+                    );
+                }
+            } else {
+                assert!(
+                    out.status.success(),
+                    "{case}: {}",
+                    String::from_utf8_lossy(&out.stderr)
+                );
+                assert_eq!(r.git(&["show", &format!(":{path}")])?, "after");
+                assert_eq!(
+                    std::fs::metadata(r.0.join(".git/index"))
+                        .map_err(|e| e.to_string())?
+                        .permissions()
+                        .mode()
+                        & 0o777,
+                    expected
+                );
+                assert!(!r.0.join(".git/index.lock").exists());
+            }
+            assert_eq!(r.git(&["show", ":unrelated"])?, "unchanged");
+            assert_eq!(
+                std::fs::read(r.0.join(path)).map_err(|e| e.to_string())?,
+                b"after\n"
+            );
+        }
+        Ok(())
+    }
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn stock_darwin_md5_is_accepted_without_gnu_md5sum() -> Result<(), String> {
+        let r = Repo::new()?;
+        let tools = r.0.join("tools");
+        std::fs::create_dir(&tools).map_err(|e| e.to_string())?;
+        std::os::unix::fs::symlink("/sbin/md5", tools.join("md5")).map_err(|e| e.to_string())?;
+        let mut cmd = std::process::Command::new("/bin/sh");
+        cmd.args([
+            "-c",
+            &format!("{}\nprintf abc | gitcraft_md5", portable_md5()),
+        ])
+        .env("PATH", &tools);
+        let out = crate::processes::run(cmd, crate::processes::Options::default())?.complete()?;
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert_eq!(out.stdout, b"900150983cd24fb0d6963f7d28e17f72");
+        Ok(())
+    }
 }
