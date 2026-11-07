@@ -63,21 +63,30 @@ impl RepoTab {
             return resp;
         };
         let (rect, mid, gx, cols) = (row.rect, row.mid(), row.gx, row.cols);
-        let refs_clip = Rect::from_min_max(rect.min, pos2(gx - 4.0, rect.bottom()));
-        let rp = painter.with_clip_rect(refs_clip);
+        let identity = match first.kind {
+            BadgeKind::Tag => format!("refs/tags/{}", first.label),
+            BadgeKind::Branch if first.local => format!("refs/heads/{}", first.label),
+            BadgeKind::Branch => format!("refs/remotes/{}", first.git_ref()),
+            BadgeKind::DetachedHead => String::new(),
+        };
+        let visual_row = self.saved_views.position(row.i).unwrap_or(row.i);
+        let offset = self.graph_motion.pill_offset(ui.ctx(), &identity, &row.commit.hash, visual_row);
+        let pill_mid = mid + offset;
+        let refs_clip = Rect::from_min_max(pos2(rect.left(), ui.clip_rect().top()), pos2(gx - 4.0, ui.clip_rect().bottom()));
+        let rp = ui.painter().with_clip_rect(refs_clip);
         let more = badges.len() - 1;
         let more_w = if more > 0 { 28.0 } else { 0.0 };
         let max_w = cols.refs - 10.0 - 5.0 - more_w - 14.0;
         let pill = ref_pill(
             ui,
             &rp,
-            pos2(rect.left() + 8.0, mid),
+            pos2(rect.left() + 8.0, pill_mid),
             first,
             row.color,
             max_w.max(40.0),
             self.marks(first, &row.commit.hash),
         );
-        self.pill_clicks(ui, &resp, pill, first, &row.commit.hash, acts);
+        if offset.abs() < 1.0 { self.pill_clicks(ui, &resp, pill, first, &row.commit.hash, acts); }
         let mut end = pill.right();
         let mut more_rect = None;
         if more > 0 {
@@ -88,7 +97,7 @@ impl RepoTab {
         }
         // Connector to the dot, drawn first so the lanes cross over it.
         painter.line_segment(
-            [pos2(end, mid), pos2(node_x.min(gx + cols.graph), mid)],
+            [pos2(end, pill_mid), pos2(node_x.min(gx + cols.graph), mid)],
             Stroke::new(1.5, row.color.gamma_multiply(0.8)),
         );
         let stack_open = more_rect.is_some_and(|more| {

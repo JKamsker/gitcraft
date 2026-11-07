@@ -61,6 +61,7 @@ impl RepoTab {
             });
             return;
         }
+        self.graph_motion.expire();
         self.saved_graph_header(ui);
         if self.commits.is_empty() {
             ui.centered_and_justified(|ui| {
@@ -108,8 +109,16 @@ impl RepoTab {
             // Only scroll if the row is outside the visible part.
             let offset = ui.data(|d| d.get_temp::<f32>(offset_id)).unwrap_or(0.0);
             if top < offset || top + ROW_PITCH > offset + view_h {
-                scroll = scroll.vertical_scroll_offset((top - view_h / 2.0).max(0.0));
+                let target = (top - view_h / 2.0).max(0.0);
+                scroll = scroll.vertical_scroll_offset(self.graph_motion.start_scroll(offset, target, ui.ctx()));
             }
+        }
+
+        if ui.input(|i| i.smooth_scroll_delta.y != 0.0 || i.pointer.any_pressed()) {
+            self.graph_motion.cancel_scroll();
+        }
+        if let Some(offset) = self.graph_motion.scroll_offset(ui.ctx()) {
+            scroll = scroll.vertical_scroll_offset(offset);
         }
 
         // `show_rows` sizes rows as ROW_PITCH + item spacing, so the spacing must be zero here.

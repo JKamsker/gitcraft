@@ -45,6 +45,8 @@ pub struct Settings {
     pub graph_width: f32,
     /// The graph's lanes closer together, for a narrower graph column.
     pub compact_graph: bool,
+    /// Explain graph changes with short motion (also follows the shared accessibility policy).
+    pub graph_motion: bool,
     /// Widths of the author, when, date and hash columns (dragged in the graph header).
     pub author_width: f32,
     pub when_width: f32,
@@ -116,6 +118,7 @@ impl Default for Settings {
             auto_refs_width: true,
             graph_width: 0.0,
             compact_graph: false,
+            graph_motion: true,
             author_width: 150.0,
             when_width: 100.0,
             date_width: 118.0,
@@ -560,6 +563,9 @@ impl Settings {
             }
             Page::Graph => {
                 section(ui, f, "Commit graph", None, |card| {
+                    card.row("Graph motion", "animation incoming new fetch refs HEAD", |ui| {
+                        ui.checkbox(&mut self.graph_motion, "Animate graph changes");
+                    });
                     card.preview(Preview::GraphRefs);
                     card.row("Branch column width", "refs tags pills", |ui| {
                         ui.spacing_mut().slider_width = layout::fit(ui, SLIDER_WIDTH + 70.0) - 70.0;

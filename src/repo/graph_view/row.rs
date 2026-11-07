@@ -87,6 +87,12 @@ impl RepoTab {
             self.is_compared(commit, is_wip),
         );
 
+        if self.graph_motion.new_commit(&commit.hash) {
+            let fade = self.graph_motion.highlight(ui.ctx());
+            painter.rect_filled(rect, 0.0, t.accent.gamma_multiply(fade));
+            painter.text(rect.right_top(), Align2::RIGHT_TOP, "new", FontId::proportional(9.0), t.accent);
+        }
+
         let gx = rect.left() + cols.refs;
         let graph_row = self.graph.rows.get(i);
         let row = Row {

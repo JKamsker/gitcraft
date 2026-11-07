@@ -483,6 +483,7 @@ impl RepoTab {
         }
         self.refresh_ci(ctx);
         self.rebuild(ctx);
+        self.graph_motion_loaded(loaded.read, ctx);
         self.hint_avatars(ctx);
         self.reload_compare(ctx);
     }

@@ -21,6 +21,7 @@ mod file_comparison;
 mod file_text;
 mod file_view;
 mod gerrit;
+mod graph_motion;
 pub(crate) mod graph_view;
 pub(crate) mod highlight;
 mod keep_submodules;
@@ -148,6 +149,7 @@ pub struct RepoTab {
     /// Ref names for continuous lane runs, rebuilt with the graph, never while scrolling.
     graph_labels: HashMap<usize, String>,
     graph_messages: graph_view::message_tooltip::MessageTooltips,
+    graph_motion: graph_motion::State,
     index: HashMap<String, usize>,
     worktrees: Vec<Worktree>,
     stashes: Vec<Stash>,
@@ -333,6 +335,7 @@ impl RepoTab {
             },
             graph_labels: HashMap::new(),
             graph_messages: Default::default(),
+            graph_motion: Default::default(),
             index: HashMap::new(),
             worktrees: Vec::new(),
             stashes: Vec::new(),
