@@ -45,18 +45,6 @@ pub enum Dialog {
         topic: String,
         skip_hooks: bool,
     },
-    HistoryLoading(u64),
-    DownloadHistory {
-        path: String,
-        action: Option<Box<Action>>,
-    },
-    SparseLoading(u64),
-    Sparse {
-        state: Box<crate::git::SparseState>,
-        selected: std::collections::BTreeSet<String>,
-        enabled: bool,
-        convert: bool,
-    },
     BundleLoading(u64),
     BundleExport {
         refs: Vec<crate::git::BundleRef>,
@@ -432,7 +420,7 @@ pub(crate) struct Instead {
     pub(super) described: Vec<String>,
 }
 
-pub(super) enum Outcome {
+enum Outcome {
     Open,
     /// Still open; the branch changed, so suggest a folder again.
     Suggest,
@@ -501,38 +489,6 @@ impl RepoTab {
                     topic,
                     skip_hooks,
                 } => gerrit::review(ui, remote, head, targets, target, topic, *skip_hooks),
-                Dialog::HistoryLoading(_) => {
-                    ui.label("Checking whether file contents need downloading…");
-                    ui.add(crate::spinner::Spinner::new());
-                    if ui.button("Cancel").clicked() { Outcome::Cancel } else { Outcome::Open }
-                }
-                Dialog::DownloadHistory { path, action } => {
-                    ui.heading("Download file contents?");
-                    ui.label(format!("{path} has file contents that are not stored locally. Opening this view lets Git download them from the repository's remote."));
-                    let mut outcome = Outcome::Open;
-                    ui.horizontal(|ui| {
-                        if ui.button("Download and open").clicked() && let Some(action) = action.take() {
-                            outcome = Outcome::Done(Box::new(Action::AllowHistoryDownload(action)));
-                        }
-                        if ui.button("Cancel").clicked() { outcome = Outcome::Cancel; }
-                    });
-                    outcome
-                }
-                Dialog::SparseLoading(_) => {
-                    ui.label("Reading sparse checkout and folders…");
-                    ui.add(crate::spinner::Spinner::new());
-                    if ui.button("Cancel").clicked() {
-                        Outcome::Cancel
-                    } else {
-                        Outcome::Open
-                    }
-                }
-                Dialog::Sparse {
-                    state,
-                    selected,
-                    enabled,
-                    convert,
-                } => super::sparse::dialog(ui, state, selected, enabled, convert),
                 Dialog::BundleLoading(_) => {
                     ui.heading("Reading bundle information…");
                     ui.label("Git runs on the repository's machine. Local bundle files are temporarily copied there for SSH / WSL verification. No refs change while inspecting.");
