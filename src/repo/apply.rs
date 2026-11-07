@@ -155,6 +155,7 @@ impl RepoTab {
             Action::Push => self.push(ctx),
             Action::Reload => self.reload(ctx),
             Action::OpenSparse => self.open_sparse(ctx),
+            Action::OpenSshSetup => self.open_ssh_setup(ctx),
             Action::SetSparse { before, folders } => self.set_sparse(*before, folders, ctx),
             Action::LoadMore => self.load_more(ctx),
             Action::Undo => self.undo(ctx),

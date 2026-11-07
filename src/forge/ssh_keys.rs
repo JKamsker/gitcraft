@@ -15,15 +15,15 @@ pub(crate) struct SshKeyAccount {
     target: Target,
 }
 enum Target {
-    Github { host: String, context: Box<Context> },
-    Gitea(Api),
+    Github { host: String, command: Command },
+    Gitea(Box<Api>),
 }
 impl SshKeyAccount {
     pub fn owner(&self) -> &str {
         &self.owner
     }
     pub fn upload(
-        &self,
+        self,
         title: &str,
         public_key: &PublicKey,
         active: &dyn Fn() -> bool,
@@ -33,13 +33,23 @@ impl SshKeyAccount {
         }
         if title.len() > 512 || title.chars().any(char::is_control) {
             return Err(
-                "Choose a public key title within512 bytes, without control characters.".into(),
+                "Choose a public key title within 512 bytes, without control characters.".into(),
             );
         }
         let body = json!({"title":title,"key":public_key.as_str()});
-        match &self.target {
-            Target::Github { host, context } => {
-                github(context, host, Some(&body), active)?;
+        match self.target {
+            Target::Github { host, mut command } => {
+                command.args([
+                    "api",
+                    "--hostname",
+                    &host,
+                    "--method",
+                    "POST",
+                    "user/keys",
+                    "--input",
+                    "-",
+                ]);
+                execute(command, Some(&body), active)?;
             }
             Target::Gitea(api) => {
                 api.send("POST", "user/keys", Some(&body))
@@ -70,7 +80,10 @@ pub(crate) fn prepare(
             context.choices.github.host = hosting.host.clone();
             context.choices.github.user = account.into();
             context.choices.github.validate()?;
-            let answer = github(&context, &hosting.host, None, active)?;
+            let command = github_command(&context, &hosting.host)?;
+            let mut check = duplicate_command(&command);
+            check.args(["api", "--hostname", &hosting.host, "user"]);
+            let answer = execute(check, None, active)?;
             let owner = answer
                 .get("login")
                 .and_then(Value::as_str)
@@ -81,7 +94,7 @@ pub(crate) fn prepare(
                 owner,
                 target: Target::Github {
                     host: hosting.host.clone(),
-                    context: Box::new(context),
+                    command,
                 },
             })
         }
@@ -109,22 +122,16 @@ pub(crate) fn prepare(
                 .to_owned();
             Ok(SshKeyAccount {
                 owner,
-                target: Target::Gitea(api),
+                target: Target::Gitea(Box::new(api)),
             })
         }
         Forge::GitLab => Err("This SSH helper registers keys on GitHub, Forgejo and Gitea.".into()),
     }
 }
 
-fn github(
-    context: &Context,
-    host: &str,
-    body: Option<&Value>,
-    active: &dyn Fn() -> bool,
-) -> Result<Value, String> {
-    if !active() {
-        return Err("Account action cancelled.".into());
-    }
+/// Capture the exact token once. The owner probe and eventual mutation use copies of
+/// the same command environment, rather than resolving a possibly changed login again.
+fn github_command(context: &Context, host: &str) -> Result<Command, String> {
     let mut command = Command::new(connections::program("gh"));
     crate::shell_path::apply(&mut command);
     context.run(|| connections::configure_cli(&mut command, "gh", host))?;
@@ -134,11 +141,29 @@ fn github(
         .env_remove("GH_FORCE_TTY")
         .env_remove("GH_REPO")
         .env("GH_PROMPT_DISABLED", "1");
-    command.args(["api", "--hostname", host]);
-    if body.is_some() {
-        command.args(["--method", "POST", "user/keys", "--input", "-"]);
-    } else {
-        command.arg("user");
+    Ok(command)
+}
+fn duplicate_command(command: &Command) -> Command {
+    let mut copy = Command::new(command.get_program());
+    if let Some(cwd) = command.get_current_dir() {
+        copy.current_dir(cwd);
+    }
+    for (key, value) in command.get_envs() {
+        if let Some(value) = value {
+            copy.env(key, value);
+        } else {
+            copy.env_remove(key);
+        }
+    }
+    copy
+}
+fn execute(
+    command: Command,
+    body: Option<&Value>,
+    active: &dyn Fn() -> bool,
+) -> Result<Value, String> {
+    if !active() {
+        return Err("Account action cancelled.".into());
     }
     let output = crate::bounded_process::run_input(
         command,

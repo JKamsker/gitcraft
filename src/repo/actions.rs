@@ -86,6 +86,7 @@ pub(crate) enum Action {
     Push,
     Reload,
     OpenSparse,
+    OpenSshSetup,
     AllowHistoryDownload(Box<Action>),
     SetSparse {
         before: Box<git::SparseState>,
@@ -358,6 +359,11 @@ impl RepoTab {
     /// What the command palette offers for this repository.
     pub(crate) fn palette_items(&self) -> Vec<(String, String, Action)> {
         let mut items: Vec<(String, String, Action)> = vec![
+            (
+                "Set up SSH…".into(),
+                "keys and accounts".into(),
+                Action::OpenSshSetup,
+            ),
             (
                 "File migration map".into(),
                 "files".into(),

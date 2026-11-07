@@ -42,6 +42,7 @@ mod rewrite;
 mod samples;
 mod sidebar;
 mod sparse;
+mod ssh_setup;
 mod state;
 mod terminals;
 #[cfg(test)]
@@ -229,6 +230,7 @@ pub struct RepoTab {
     focus_wip: bool,
     last_fetch: Instant,
 
+    ssh_setup: Option<ssh_setup::State>,
     terminals: Vec<Terminal>,
     active_terminal: usize,
     terminal_open: bool,
@@ -381,6 +383,7 @@ impl RepoTab {
             focus_branch_filter: false,
             focus_wip: false,
             last_fetch: Instant::now(),
+            ssh_setup: None,
             terminals: Vec::new(),
             active_terminal: 0,
             terminal_open: false,

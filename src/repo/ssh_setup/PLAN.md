@@ -38,3 +38,12 @@ plans similarly reduce/validate public fields; tea receives a new temporary file
 only those public fields, never a copy of the original file. Remote GH token lookup/output
 is suppressed and its checked named-account token stays transient in shell/environment.
 These components remain unwired WIP until the next UI/runner unit; no runtime claim.
+
+The third unit wires the repository palette/window, captured asynchronous workers,
+existing PTY status and explicit Profile-key adoption. Generation reserves its new local
+folder off the UI thread, and every worker checks the Practice boundary before any action.
+The GitHub account check captures an exact command/token environment for both the owner
+probe and eventual one-use upload, preventing a later login change from retargeting it.
+Only fixture/recording tests are added; no actual key/account action has run. Local compile
+and targeted gates are the next step after preserving this unit. CI remains disabled until
+the final consolidated work and reviews are complete.
