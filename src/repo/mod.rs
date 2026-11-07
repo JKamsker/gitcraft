@@ -20,6 +20,7 @@ mod drafts;
 #[cfg(test)]
 mod drafts_tests;
 mod drag_drop;
+mod external_tools;
 mod file_text;
 mod file_view;
 mod fold;

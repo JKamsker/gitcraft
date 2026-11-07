@@ -1,6 +1,7 @@
-//! The shells kept open per machine, in two lanes: quick reads (status, log, diffs…) and long
+//! The shells kept open per machine, in three lanes: quick reads (status, log, diffs…), long
 //! network operations (fetch, push…), which would otherwise take every shell of a machine for
-//! as long as they last and leave the tab waiting for its reads.
+//! as long as they last and leave the tab waiting for its reads, and diff or merge tools, which
+//! stay open as long as the user works in them and would otherwise hold up fetch and push.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
@@ -17,6 +18,8 @@ pub(super) enum Lane {
     /// A program other than git that may take minutes (an AI tool): apart from both, so that
     /// it never keeps a fetch or push waiting.
     Apart,
+    /// A diff or merge tool (`git difftool`, `git mergetool`) the user works in.
+    Tool,
 }
 
 impl Lane {
@@ -26,6 +29,31 @@ impl Lane {
             Lane::Quick => 6,
             Lane::Long => 3,
             Lane::Apart => 2,
+            Lane::Tool => 4,
+        }
+    }
+
+    /// How long a command waits for a shell when all are busy. A tool doesn't: those open
+    /// may stay so for hours.
+    fn wait_at_most(self) -> Duration {
+        match self {
+            Lane::Quick | Lane::Long => WAIT_AT_MOST,
+            Lane::Tool => Duration::ZERO,
+        }
+    }
+
+    /// What a command that found every shell busy for too long says.
+    pub(super) fn busy(self, host: &Host) -> String {
+        match self {
+            Lane::Quick | Lane::Long => format!(
+                "every connection to {} is busy; try again when what runs there is done",
+                host.label()
+            ),
+            Lane::Tool => format!(
+                "{} diff or merge tools are already open on {}: close one of them first",
+                self.max(),
+                host.label()
+            ),
         }
     }
 }
@@ -135,12 +163,9 @@ impl Pool {
                     }
                 };
             }
-            let left = WAIT_AT_MOST.saturating_sub(since.elapsed());
+            let left = lane.wait_at_most().saturating_sub(since.elapsed());
             if left.is_zero() {
-                return Err(format!(
-                    "every connection to {} is busy; try again when what runs there is done",
-                    host.label()
-                ));
+                return Err(lane.busy(host));
             }
             state = self
                 .freed

@@ -107,7 +107,12 @@ pub(super) struct Extra {
     stdin: Option<Vec<u8>>,
     /// It may take minutes (a large bundle): on another machine, run where that is allowed.
     long: bool,
+    /// It starts a program the user works in (a diff or merge tool) and waits until it closes.
+    tool: bool,
 }
+
+/// How long a diff or merge tool started on another machine may stay open before it is stopped.
+const TOOL_FOR: std::time::Duration = std::time::Duration::from_secs(12 * 3600);
 
 /// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
 fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
@@ -178,8 +183,9 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
             .collect(),
         unset: GIT_ENV_REMOVED.iter().map(|n| (*n).to_owned()).collect(),
         stdin: extra.stdin.clone(),
-        long: extra.long || goes_over_network(args),
-        timeout: None,
+        // A tool stays open as long as the user works in it, apart from ordinary git reads.
+        long: extra.tool || extra.long || goes_over_network(args),
+        timeout: extra.tool.then_some(TOOL_FOR),
         apart: false,
     }
 }
@@ -306,6 +312,31 @@ pub fn run_code(dir: Option<&Path>, args: &[&str], ok: &[i32]) -> Result<(i32, V
     }
 }
 
+/// How a diff or merge tool started through git ended.
+#[derive(Debug)]
+pub struct ToolRun {
+    pub code: Option<i32>,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+/// Runs `git difftool` / `git mergetool` (`args`) in `dir`, on whichever machine it is, and
+/// waits for the tool it starts to close, however long it stays open (on another machine, at
+/// most [`TOOL_FOR`]). Whatever git exits with is returned, not taken for an error: the caller
+/// tells a cancelled merge from a failed one.
+pub fn run_tool(dir: &Path, args: &[&str]) -> Result<ToolRun, String> {
+    let extra = Extra {
+        tool: true,
+        ..Extra::default()
+    };
+    let out = execute(Some(dir), &extra, args)?;
+    Ok(ToolRun {
+        code: out.code,
+        stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+    })
+}
+
 /// Starts git in `dir` with its output piped, for a caller that reads it bit by bit.
 pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Child, String> {
     if let Some(target) = remote::parse(dir) {
@@ -414,6 +445,7 @@ fn unattended_extra(unix: bool) -> Extra {
         pre: vec!["-c", "credential.interactive=false", "-c", "core.askPass="],
         env,
         ..Extra::default()
+        tool: false,
     }
 }
 
@@ -539,6 +571,31 @@ mod tests {
         ] {
             assert_eq!(goes_over_network(args), long, "{args:?}");
         }
+    }
+
+    /// A diff or merge tool on another machine stays open as long as the user works in it, in
+    /// a shell of its own; any other read keeps its lane's limit.
+    #[test]
+    fn a_tool_on_another_machine_may_stay_open_for_hours() {
+        let target = Target {
+            host: remote::Host::Ssh("build".to_owned()),
+            path: "/r".to_owned(),
+        };
+        let tool = Extra {
+            tool: true,
+            ..Extra::default()
+        };
+        let req = remote_request(&target, &tool, &["mergetool", "--tool=meld", "-y"]);
+        assert!(req.long);
+        assert_eq!(req.timeout, Some(TOOL_FOR));
+        assert!(
+            req.script.starts_with("exec git 'mergetool'"),
+            "{}",
+            req.script
+        );
+        let read = remote_request(&target, &Extra::default(), &["status"]);
+        assert!(!read.long);
+        assert_eq!(read.timeout, None);
     }
 
     /// `git config --global` reaches the user's own file, whatever comes before it; every

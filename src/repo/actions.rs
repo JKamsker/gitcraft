@@ -104,6 +104,10 @@ pub(crate) enum Action {
     /// Open a path (relative to the repository) with the system's default app.
     OpenPath(PathBuf),
     OpenInEditor(PathBuf),
+    /// Show the file of this diff in the external diff tool (Settings → Git).
+    OpenInDiffTool(DiffKey),
+    /// Resolve this conflicted file in the external merge tool (Settings → Git).
+    ResolveInMergeTool(String),
     SetIdentity(String, String),
     /// Takes the repository's own `user.name` / `user.email` out (which of them it sets), so
     /// that the profile's or the global config's apply again.

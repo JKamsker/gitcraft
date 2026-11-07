@@ -68,7 +68,7 @@ impl RepoTab {
                         selected(&f),
                         RowExtra::Stats(f.added, f.removed),
                     );
-                    widgets::file_menu(&r.row, &f.path, rev, false, acts);
+                    widgets::file_menu(&r.row, &f.path, rev, false, Some(&key(&f.path)), acts);
                     if r.row.clicked() {
                         acts.push(Action::OpenDiff(key(&f.path)));
                     }

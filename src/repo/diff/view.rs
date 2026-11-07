@@ -169,7 +169,7 @@ impl RepoTab {
                         DiffKey::Range { to: None, .. } => (None, false),
                         DiffKey::Work(_) => (None, true),
                     };
-                    widgets::file_menu(&title, path, rev, ignorable, acts);
+                    widgets::file_menu(&title, path, rev, ignorable, Some(&view.key), acts);
                     widgets::chip(ui, origin, t.text_dim);
                     let before = if rendered {
                         matches!(&view.rendered, Some(Ok(md)) if md.before)

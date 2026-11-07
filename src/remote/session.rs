@@ -67,6 +67,18 @@ impl Request {
         first.chars().take(80).collect()
     }
 
+    /// The shells it runs in. One allowed to run longer than any network operation is a
+    /// program the user works in (a diff or merge tool): a lane of its own, so that it never
+    /// holds up a fetch or a push.
+    pub(super) fn lane(&self) -> Lane {
+        match self.timeout {
+            _ if self.apart => Lane::Apart,
+            Some(limit) if limit > LONG_FOR => Lane::Tool,
+            _ if self.long => Lane::Long,
+            _ => Lane::Quick,
+        }
+    }
+
     /// How long it may run before it is stopped.
     pub(super) fn time_limit(&self) -> Duration {
         self.timeout
@@ -109,13 +121,7 @@ pub struct Output {
 /// Runs `req` on `host`, in one of the shells kept open there.
 pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
     super::ui_guard::off_ui_thread(&req.what())?;
-    let lane = if req.apart {
-        Lane::Apart
-    } else if req.long {
-        Lane::Long
-    } else {
-        Lane::Quick
-    };
+    let lane = req.lane();
     let pool = pool(host, lane);
     loop {
         let mut taken = pool.take(host, lane)?;
@@ -480,6 +486,26 @@ pub(super) fn parse_header(line: &str, nonce: &str) -> Option<(i32, usize, usize
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A diff or merge tool, allowed longer than any network operation, never takes a shell
+    /// fetch and push need; and, the lane full, a further one is refused at once.
+    #[test]
+    fn a_tool_runs_in_a_lane_of_its_own() {
+        let req = |long, timeout| Request {
+            long,
+            timeout,
+            ..Request::default()
+        };
+        assert_eq!(req(false, None).lane(), Lane::Quick);
+        assert_eq!(req(true, None).lane(), Lane::Long);
+        assert_eq!(req(true, Some(LONG_FOR)).lane(), Lane::Long);
+        assert_eq!(req(true, Some(LONG_FOR * 24)).lane(), Lane::Tool);
+        let busy = Lane::Tool.busy(&Host::Ssh("build".to_owned()));
+        assert_eq!(
+            busy,
+            "4 diff or merge tools are already open on SSH · build: close one of them first"
+        );
+    }
 
     #[test]
     fn headers_read_with_padded_numbers_for_their_command_only() {

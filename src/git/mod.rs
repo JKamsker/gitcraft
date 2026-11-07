@@ -6,6 +6,7 @@ mod commit_msg;
 mod commits;
 mod conflict;
 mod diff;
+pub mod external_tool;
 mod files;
 mod fold;
 mod lfs;
