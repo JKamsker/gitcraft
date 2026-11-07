@@ -45,8 +45,8 @@ rustix = { version = "1", features = ["fs", "process"] }
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
 
 [lints.rust]
-# Denied everywhere; the one exception, asking Windows where an open file really is
-# (safe_read.rs), allows it on that function alone.
+# Denied everywhere; narrowly scoped filesystem queries in safe_read.rs and
+# git/recovery/file.rs allow it only on their documented Windows handle queries.
 unsafe_code = "deny"
 
 [lints.clippy]

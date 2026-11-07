@@ -414,6 +414,33 @@ disabled. Snapshots and recovery run on the repository's machine, including SSH 
   - Background jobs retain the initiating profile's account choices and an immutable config
     snapshot across profile edits, switching or deletion. Git in WSL/SSH repositories keeps
     that machine's own credentials; forge commands run here with this profile's account.
+- **Set up SSH…** in the repository command palette guides four separate actions: create an
+  ed25519 key, add the selected key to the agent, register its public companion on GitHub,
+  Forgejo or Gitea, and test with `ssh -T`. You can select an existing key instead of copying
+  or generating one. Nothing runs when the helper opens, and Practice repositories refuse
+  these account/key actions.
+  - Generation exclusively creates a new chosen folder; existing folders/files are never
+    reused or overwritten. Passphrases are entered only in the installed OpenSSH terminal
+    prompt, never in app fields, command arguments, settings or activity. Cancelled/failed
+    generation retains any new folder/key for inspection.
+  - A local upload first checks an explicit existing profile account, then separately sends
+    only validated public-key fields. The checked GitHub token or tea API login stays pinned
+    for that upload. Public comments and malformed/private-key files are excluded. No global
+    active account is switched. Local keys can explicitly be selected for the active profile;
+    commit author/signing settings remain separate.
+  - For SSH/WSL repositories **all four steps run on that machine**, including registration
+    through its installed `gh` or `tea` and its own named login. Local tokens/private keys are
+    not copied there. Remote Forgejo/Gitea upload needs tea0.16+ and shows the login metadata
+    for confirmation. Native Windows uses OpenSSH/ConPTY and its agent; WSL uses its Linux
+    tools/agent. SSH setup disables local-agent forwarding so a remote key is not loaded into
+    this computer's forwarded agent. An agent must already be available on the indicated machine;
+    no daemon/global SSH configuration is changed.
+  - The direct SSH test uses only the selected key, ignoring additive identities/agent keys
+    and user SSH aliases/proxy settings. Enter the real destination and port. Host-key checks
+    remain enabled; review any new-host fingerprint. Read the server greeting as well as the
+    exit code: many forges return1 after successful authentication with no shell access.
+    Closing stops the local view/terminal connection; an already submitted remote/API action
+    may complete. Key files remain on their machine.
 - How a profile's git author, signing and connection choices reach git: gitcraft writes them to a config file of the
   profile's (in its data folder, `profiles/<id>.gitconfig`) that includes your own global config
   first and then sets the profile's values, and runs git with `GIT_CONFIG_GLOBAL` pointing at a leased immutable copy
@@ -632,3 +659,9 @@ Assets and their licences: [ATTRIBUTION.md](ATTRIBUTION.md).
 ## License
 
 MIT OR Apache-2.0, at your option ([LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE)).
+
+**Lost and found by content**
+
+Open **Lost and found by content…** in the palette and enter literal text you remember. It searches local reflog history, unreachable commits, dropped stash layers and unattached staged blobs, with timeline/provenance and a saved-content preview. Binary/non-UTF-8 and oversized blobs are skipped; the view explains budgets, missing data and incomplete results. No objects are downloaded.
+
+Preview recovery before deliberately creating a new branch, creating a new regular file, or returning a validated dropped stash to the stash list. Existing files/branches are refused; index and other working contents stay unchanged. A restored stash is not applied. Unattached blobs have no known original filename or staging time and recover as new files. File recovery pins the selected working root’s filesystem identity and refuses root/ancestor replacement. Remote new-file recovery needs GNU `stat`/`ln` and Git metadata on the working tree's filesystem; unsupported layouts refuse safely. Local disk-write errors can leave a clearly reported incomplete new file. Closing/replacing the view cancels further work; the newest queued reader waits until its predecessor actually returns.

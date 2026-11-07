@@ -3,6 +3,8 @@
 //! environment.
 
 pub(super) mod bounded;
+mod setup;
+pub(crate) use setup::setup_clone;
 
 mod completion;
 pub(crate) use completion::{ForecastCompletion, forecast_spawn};
@@ -620,6 +622,56 @@ fn activity_bytes_with_codes(
     limit: std::time::Duration,
     ok: &[i32],
 ) -> Result<Vec<u8>, String> {
+    let out = analysis_output(dir, args, input, active, limit, false)?;
+    if ok.contains(&out.code) && out.stderr.is_empty() {
+        Ok(out.stdout)
+    } else {
+        Err(format!(
+            "Could not analyze history: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ))
+    }
+}
+
+/// Shared bounded raw transport for content recovery. Retains captured profile and
+/// Practice routing; inherited repository overrides cannot redirect object/ref reads.
+pub(super) fn recovery_output(
+    dir: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+    active: &dyn Fn() -> bool,
+    limit: std::time::Duration,
+) -> Result<remote::Output, String> {
+    analysis_output(dir, args, input, active, limit, true)
+}
+
+fn analysis_output(
+    dir: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+    active: &dyn Fn() -> bool,
+    limit: std::time::Duration,
+    isolated: bool,
+) -> Result<remote::Output, String> {
+    const REMOVE: &[&str] = &[
+        "GIT_DIR",
+        "GIT_COMMON_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_ATTR_SOURCE",
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_NAMESPACE",
+        "GIT_SHALLOW_FILE",
+        "GIT_REPLACE_REF_BASE",
+        "GIT_SUPER_PREFIX",
+        "GIT_LITERAL_PATHSPECS",
+        "GIT_GLOB_PATHSPECS",
+        "GIT_NOGLOB_PATHSPECS",
+        "GIT_ICASE_PATHSPECS",
+    ];
     use std::{
         sync::mpsc,
         time::{Duration, Instant},
@@ -630,6 +682,11 @@ fn activity_bytes_with_codes(
     }
     let out = if let Some(target) = remote::parse(dir) {
         let mut request = remote_request(&target, &Extra::default(), args);
+        if isolated {
+            request
+                .unset
+                .extend(REMOVE.iter().map(|name| (*name).to_owned()));
+        }
         // The shared remote runner captures whole outputs. Bound both streams *there*,
         // before they cross the connection or allocate a large local buffer. FIFO readers
         // cap scratch files and give Git SIGPIPE on overflow; preserve Git's exit status.
@@ -657,27 +714,39 @@ fn activity_bytes_with_codes(
         request.stdin = input.map(<[u8]>::to_vec);
         request.timeout = Some(limit);
         request.long = true;
-        let (tx, rx) = mpsc::channel();
-        std::thread::spawn(move || {
-            let _ = tx.send(remote::exec(&target.host, &request));
-        });
-        let deadline = Instant::now() + limit;
-        loop {
-            if !active() {
-                return Err("Analysis cancelled".into());
-            }
-            if Instant::now() >= deadline {
-                return Err("History analysis timed out".into());
-            }
-            match rx.recv_timeout(Duration::from_millis(20)) {
-                Ok(out) => break out?,
-                Err(mpsc::RecvTimeoutError::Timeout) => (),
-                Err(_) => return Err("History worker stopped".into()),
+        if isolated {
+            // Recovery keeps one background owner until the underlying call actually
+            // returns. Cancellation stops subsequent queries; it cannot release a
+            // queued replacement while connection/pool work is still in flight.
+            remote::exec(&target.host, &request)?
+        } else {
+            let (tx, rx) = mpsc::channel();
+            std::thread::spawn(move || {
+                let _ = tx.send(remote::exec(&target.host, &request));
+            });
+            let deadline = Instant::now() + limit;
+            loop {
+                if !active() {
+                    return Err("Analysis cancelled".into());
+                }
+                if Instant::now() >= deadline {
+                    return Err("History analysis timed out".into());
+                }
+                match rx.recv_timeout(Duration::from_millis(20)) {
+                    Ok(out) => break out?,
+                    Err(mpsc::RecvTimeoutError::Timeout) => (),
+                    Err(_) => return Err("History worker stopped".into()),
+                }
             }
         }
     } else {
         let mut command = repository_command(Some(dir), args)?;
         command.args(args);
+        if isolated {
+            for name in REMOVE {
+                command.env_remove(name);
+            }
+        }
         let output = crate::bounded_process::run_with_input(
             command,
             input.map(<[u8]>::to_vec),
@@ -701,14 +770,10 @@ fn activity_bytes_with_codes(
     if out.stdout.len() > MAX || out.stderr.len() > MAX {
         return Err("A history page exceeded 16 MiB".into());
     }
-    if ok.contains(&out.code) && out.stderr.is_empty() {
-        Ok(out.stdout)
-    } else {
-        Err(format!(
-            "Could not analyze history: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
-        ))
+    if isolated && !active() && after_options(args).first() != Some(&"update-ref") {
+        return Err("Content recovery cancelled".into());
     }
+    Ok(out)
 }
 
 /// An absent option (exit 1) differs from an explicitly empty configured value (NUL).
@@ -749,6 +814,79 @@ pub(crate) fn activity_bytes(
     active: &dyn Fn() -> bool,
 ) -> Result<Vec<u8>, String> {
     activity_bytes_with_limit(dir, args, input, active, std::time::Duration::from_secs(20))
+}
+
+/// Allowlisted public onboarding metadata; no raw configuration snapshots are exposed.
+pub(crate) fn onboarding_config(
+    dir: &Path,
+    key: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<Option<String>, String> {
+    if !["user.name", "user.email"].contains(&key) {
+        return Err("Unsupported setup configuration key".into());
+    }
+    activity_mailmap_config(dir, key, false, active)
+}
+
+/// Only allowlisted local author fields are included in setup exports.
+pub(crate) fn onboarding_local_config(
+    dir: &Path,
+    key: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<Option<String>, String> {
+    if !["user.name", "user.email"].contains(&key) {
+        return Err("Unsupported setup configuration key".into());
+    }
+    let bytes = activity_bytes_with_codes(
+        dir,
+        &["config", "--local", "--null", "--get", key],
+        None,
+        active,
+        std::time::Duration::from_secs(20),
+        &[0, 1],
+    )?;
+    if bytes.is_empty() {
+        return Ok(None);
+    }
+    let bytes = bytes
+        .strip_suffix(&[0])
+        .ok_or("Invalid local identity response")?;
+    String::from_utf8(bytes.to_vec())
+        .map(Some)
+        .map_err(|_| "Local identity is not UTF-8".into())
+}
+/// Checkout/worktree/config steps never read profile/system command configuration or
+/// inherited Git routing. Only newly created, receipt-verified clones reach this helper.
+pub(crate) fn setup_run(
+    repo: &Path,
+    args: &[&str],
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    if crate::remote::is_remote(repo) {
+        return Err("Setup restoration targets local folders only".into());
+    }
+    let mut cmd = practice_command(repo);
+    cmd.args([
+        "--no-lazy-fetch",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "protocol.ext.allow=never",
+        "-c",
+        "protocol.file.allow=never",
+    ])
+    .args(args);
+    let out = crate::bounded_process::run(cmd, active, std::time::Duration::from_secs(120))?;
+    if out.status.success() {
+        Ok(out.stdout)
+    } else {
+        Err(format!(
+            "Setup step failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ))
+    }
 }
 
 #[cfg(test)]

@@ -12,6 +12,7 @@ pub(crate) mod file_comparison;
 mod files;
 pub(crate) mod investigations;
 mod lfs;
+pub(crate) mod recovery;
 mod refs;
 mod status;
 mod submodule;

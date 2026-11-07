@@ -71,6 +71,8 @@ impl RepoTab {
                     self.ci_view_ui(ui, &mut acts);
                 } else if self.pr_view.is_some() {
                     self.pr_view_ui(ui, &mut acts);
+                } else if self.tour.is_some() {
+                    self.tour_view(ui, &mut acts);
                 } else if self.activity.is_some() {
                     self.activity_view(ui, &mut acts);
                 } else {
@@ -81,6 +83,7 @@ impl RepoTab {
                 }
             });
 
+        self.ssh_setup_window(&ctx);
         self.dialogs(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
@@ -127,8 +130,10 @@ impl RepoTab {
     /// Escape closes the innermost view; Ctrl+Z / Ctrl+Y undo and redo, Ctrl+F searches, F7 and
     /// Shift+F7 (or Alt+↓ / Alt+↑) go to the next and previous change of a diff.
     fn shortcuts(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
-        let free_keys =
-            self.dialog.is_none() && !self.keys_blocked && !ctx.egui_wants_keyboard_input();
+        let free_keys = self.dialog.is_none()
+            && self.ssh_setup.is_none()
+            && !self.keys_blocked
+            && !ctx.egui_wants_keyboard_input();
         if free_keys {
             let (esc, undo, redo, find) = ctx.input(|i| {
                 (
@@ -149,6 +154,8 @@ impl RepoTab {
                 acts.push(Action::CloseDiff);
             } else if esc && self.rebase.is_some() {
                 acts.push(Action::CloseRebase);
+            } else if esc && self.tour.is_some() {
+                acts.push(Action::CloseTour);
             } else if esc && self.activity.is_some() {
                 acts.push(Action::CloseActivity);
             } else if esc && self.file_view.is_some() {

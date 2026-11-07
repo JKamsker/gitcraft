@@ -248,7 +248,7 @@ pub(crate) fn helper_command(tool: &str, account: &Account, executable: &Path) -
 }
 
 #[cfg(test)]
-thread_local! { static TEST_PROGRAMS: RefCell<std::collections::HashMap<String,PathBuf>> = RefCell::new(std::collections::HashMap::new()); }
+thread_local! { pub(crate) static TEST_PROGRAMS: RefCell<std::collections::HashMap<String,PathBuf>> = RefCell::new(std::collections::HashMap::new()); }
 
 struct Secret {
     value: String,
@@ -519,6 +519,9 @@ pub(crate) fn check_account(tool: &str, account: &Account) -> Result<String, Str
 
 pub(crate) fn configure_cli(cmd: &mut Command, tool: &str, host: &str) -> Result<(), String> {
     let context = current();
+    if let Some(error) = &context.error {
+        return Err(error.clone());
+    }
     let account = if tool == "gh" {
         &context.choices.github
     } else {

@@ -12,6 +12,7 @@ mod ci_view;
 pub(crate) mod columns;
 mod commands;
 mod conflict;
+mod content_recovery;
 mod detail;
 mod dialogs;
 mod diff;
@@ -45,11 +46,13 @@ mod samples;
 mod saved_views;
 mod sidebar;
 mod sparse;
+mod ssh_setup;
 mod state;
 mod terminals;
 #[cfg(test)]
 mod tests;
 mod toolbar;
+mod tour;
 mod watch;
 mod watch_remote;
 pub(crate) mod widgets;
@@ -94,6 +97,7 @@ pub struct RepoTab {
     pub name: String,
     tx: Sender<Msg>,
     rx: Receiver<Msg>,
+    content_recovery: content_recovery::State,
 
     /// When the tab was made: its opening screen shows only if the first read takes a while.
     opened: Instant,
@@ -180,6 +184,7 @@ pub struct RepoTab {
     /// The pull request the big area shows.
     pr_view: Option<pr_view::PrView>,
     activity: Option<activity::Activity>,
+    tour: Option<tour::TourView>,
     /// The builds of a commit the big area shows.
     ci_view: Option<ci_view::CiView>,
     pr_requests: u64,
@@ -235,6 +240,7 @@ pub struct RepoTab {
     focus_wip: bool,
     last_fetch: Instant,
 
+    ssh_setup: Option<ssh_setup::State>,
     terminals: Vec<Terminal>,
     active_terminal: usize,
     terminal_open: bool,
@@ -293,6 +299,7 @@ impl RepoTab {
             name,
             tx,
             rx,
+            content_recovery: Default::default(),
             opened: Instant::now(),
             deferred: true,
             reads: 0,
@@ -356,6 +363,7 @@ impl RepoTab {
             compare: None,
             pr_view: None,
             activity: None,
+            tour: None,
             ci_view: None,
             pr_requests: 0,
             pr_drafts: HashMap::new(),
@@ -390,6 +398,7 @@ impl RepoTab {
             focus_branch_filter: false,
             focus_wip: false,
             last_fetch: Instant::now(),
+            ssh_setup: None,
             terminals: Vec::new(),
             active_terminal: 0,
             terminal_open: false,

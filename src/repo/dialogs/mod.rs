@@ -29,6 +29,7 @@ pub enum Dialog {
         preview: Box<crate::git::drafts::RestorePreview>,
         selected: std::collections::BTreeSet<usize>,
     },
+    ContentRecovery,
     GerritReview {
         remote: String,
         head: String,
@@ -305,6 +306,10 @@ impl RepoTab {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         self.sync_draft_reader();
         let draft_reader_waiting = self.draft_reader_waiting();
+        if !matches!(self.dialog, Some(Dialog::ContentRecovery)) {
+            self.content_recovery.dismiss();
+        }
+        let content_recovery = &mut self.content_recovery;
         let Some(dialog) = &mut self.dialog else {
             return;
         };
@@ -342,6 +347,7 @@ impl RepoTab {
                 }
                 Dialog::DraftHistory { on, versions, error, index } => drafts::history(ui,on,versions,error.as_deref(),index,idle,draft_undo),
                 Dialog::DraftRecovery { preview, selected } => drafts::recovery(ui,preview,selected,idle),
+                Dialog::ContentRecovery => content_recovery.show(ui, idle),
                 Dialog::GerritReview {
                     remote,
                     head,
@@ -511,8 +517,22 @@ impl RepoTab {
 
         match response.inner {
             Outcome::Done(action) => {
+                // Content's next step consumes the current results/preview.
+                // Closing the modal here is a handoff, not a dismissal.
+                let content_step = matches!(
+                    action,
+                    Action::ContentSearch(_)
+                        | Action::ContentInspect(..)
+                        | Action::ContentPrepare(_)
+                        | Action::ContentPerform(_)
+                );
                 acts.push(action);
-                self.dismiss_dialog();
+                if content_step {
+                    self.cancel_draft_reads();
+                    self.dialog = None;
+                } else {
+                    self.dismiss_dialog();
+                }
             }
             Outcome::Cancel => self.dismiss_dialog(),
             Outcome::Open if response.should_close() => self.dismiss_dialog(),

@@ -211,3 +211,28 @@ fn themes_saved_before_and_now_load() {
     let back: Option<Saved> = eframe::get_value(&storage, eframe::APP_KEY);
     assert_eq!(back.map(|b| b.theme), Some(saved.theme));
 }
+
+#[test]
+fn a_pending_startup_profile_stays_parked_instead_of_using_ambient_accounts() {
+    let mut pending = crate::settings::UserProfile {
+        id: 7,
+        name: "Imported work".into(),
+        ..Default::default()
+    };
+    pending.pending_setup = Some(crate::portability::ConnectionRequirements {
+        ssh_key_reselection_required: true,
+        ..Default::default()
+    });
+    let mut saved = Saved::default();
+    saved.settings.user_profiles = vec![pending];
+    saved.settings.active_profile = 7;
+    saved.open = vec!["/fixture/work-project".into()];
+    super::profiles::resume_ready_profile(&mut saved);
+    assert_ne!(saved.settings.active_profile, 7);
+    assert!(!saved.settings.profile().pending_setup());
+    assert!(saved.open.is_empty());
+    assert_eq!(
+        saved.profile_states.get(&7).map(|s| s.open.clone()),
+        Some(vec![std::path::PathBuf::from("/fixture/work-project")])
+    );
+}

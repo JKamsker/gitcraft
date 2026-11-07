@@ -14,6 +14,7 @@ pub(crate) use gitea::{selected_tea_metadata, selected_tea_secret};
 mod github;
 mod gitlab;
 mod http;
+pub(crate) mod ssh_keys;
 
 use std::collections::HashMap;
 use std::path::Path;

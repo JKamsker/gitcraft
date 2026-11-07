@@ -980,6 +980,7 @@ mod fixture {
             crate::repo::Action::DiffRendered(false),
             crate::repo::Action::DiffStructural(false),
             crate::repo::Action::DiffDecryptedEncoding(JsonEncoding::Binary),
+            crate::repo::Action::OpenSshSetup,
             crate::repo::Action::OpenFileComparison(crate::repo::file_comparison::Page::Migration),
             crate::repo::Action::OpenFileComparison(crate::repo::file_comparison::Page::Lens),
             crate::repo::Action::OpenFileComparison(crate::repo::file_comparison::Page::Matrix),
@@ -994,6 +995,15 @@ mod fixture {
             tab.apply(action, &ctx);
             assert!(!active.load(Ordering::Acquire));
         }
+        tab.diff = Some(make_view()?);
+        let active = tab
+            .diff
+            .as_ref()
+            .and_then(|v| v.encrypted.active.clone())
+            .ok_or("No profile reload cancellation token")?;
+        tab.reload_profile_connections(&ctx);
+        assert!(!active.load(Ordering::Acquire));
+        assert!(tab.ssh_setup.is_none());
         tab.diff = Some(make_view()?);
         tab.poll_parked_view(&ctx);
         assert!(tab.diff.as_ref().is_some_and(|v| !v.encrypted.enabled));
