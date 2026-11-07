@@ -14,6 +14,7 @@ struct Pending {
     owner: remote::OwnedDispatch,
     directory: String,
     nonce: String,
+    kind: &'static str,
 }
 fn pending() -> &'static Mutex<HashMap<std::path::PathBuf, Pending>> {
     static VALUE: OnceLock<Mutex<HashMap<std::path::PathBuf, Pending>>> = OnceLock::new();
@@ -28,14 +29,41 @@ fn retire(repo: &Path, nonce: &str) {
     }
 }
 fn read(repo: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
-    git::forecast_bytes(
-        repo,
-        args,
-        &[("GIT_NO_LAZY_FETCH", "1".into())],
-        &[0],
-        &|| true,
-    )
+    let owner = remote::OwnedDispatch::default();
+    let words = args
+        .iter()
+        .map(|word| remote::sh_quote(word))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let command = if args == ["--version"] {
+        format!("exec git {words}")
+    } else {
+        format!("exec git --no-lazy-fetch {words}")
+    };
+    let output=git::owned_repair_host(repo,&command,Vec::new(),&[],&owner).map_err(|_|"Could not establish the remote repair metadata result; no repair transaction was dispatched".to_owned())?;
+    if output.code != 0 || output.stdout.len() > 16 * 1024 * 1024 {
+        return Err("Remote repair metadata is unavailable or oversized".into());
+    }
+    Ok(output.stdout)
 }
+fn terminal_receipt(bytes: &[u8], nonce: &str, kind: &str) -> bool {
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return false;
+    };
+    if !text.ends_with('\n') {
+        return false;
+    }
+    let fields = text.split_terminator('\n').collect::<Vec<_>>();
+    fields.len() == 5
+        && fields[0] == "gitcraft-owned-repair-v1"
+        && fields[1] == nonce
+        && !fields[2].is_empty()
+        && fields[2].bytes().all(|byte| byte.is_ascii_digit())
+        && fields[2].parse::<u8>().is_ok()
+        && fields[3] == kind
+        && (fields[4] == "unknown" || super::super::valid_object_id(fields[4]))
+}
+
 fn absolute(repo: &Path, args: &[&str]) -> Result<String, String> {
     let path = path_line(read(repo, args)?)?;
     if !path.starts_with('/') {
@@ -52,24 +80,21 @@ fn prior(repo: &Path) -> Result<(), String> {
     let Some(held) = held else {
         return Ok(());
     };
-    let target = remote::parse(repo).ok_or("Remote repair target unavailable")?;
     let result = held.owner.run(|| {
-        git::forecast_remote(
-            &target.host,
-            remote::Request {
-                script: format!(
-                    "test -f {0}/outcome && cat {0}/outcome",
-                    remote::sh_quote(&held.directory)
-                ),
-                ..Default::default()
-            },
-            &|| true,
+        let reader = remote::OwnedDispatch::default();
+        git::owned_repair_host(
+            repo,
+            &format!(
+                "test -f {0}/outcome && cat {0}/outcome",
+                remote::sh_quote(&held.directory)
+            ),
+            Vec::new(),
+            &[],
+            &reader,
         )
     });
     let finished = result.is_ok_and(|output| {
-        output.code == 0
-            && String::from_utf8_lossy(&output.stdout)
-                .starts_with(&format!("gitcraft-owned-repair-v1\n{}\n", held.nonce))
+        output.code == 0 && terminal_receipt(&output.stdout, &held.nonce, held.kind)
     });
     if finished && !held.owner.pending() {
         let mut entries = pending()
@@ -208,6 +233,11 @@ pub(super) fn execute(
                 owner: owner.clone(),
                 directory: directory.clone(),
                 nonce: nonce.clone(),
+                kind: if merge_base.is_some() {
+                    "merge"
+                } else {
+                    "rewrite"
+                },
             },
         );
     }
@@ -267,5 +297,66 @@ pub(super) fn execute(
             let _ = git::owned_repair_host(repo, &cleanup, Vec::new(), &[], &cleanup_owner);
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn recording_receipts_require_complete_schema_nonce_code_kind_and_oid() {
+        let good = format!(
+            "gitcraft-owned-repair-v1\nabc123\n0\nrewrite\n{}\n",
+            "1".repeat(40)
+        );
+        assert!(terminal_receipt(good.as_bytes(), "abc123", "rewrite"));
+        for cut in 0..good.len() {
+            assert!(!terminal_receipt(
+                &good.as_bytes()[..cut],
+                "abc123",
+                "rewrite"
+            ));
+        }
+        for bad in [
+            good.replace("v1", "v2"),
+            good.replace("abc123", "other"),
+            good.replace("\n0\n", "\n256\n"),
+            good.replace("rewrite", "merge"),
+            good.replace(&"1".repeat(40), "not-an-oid"),
+            format!("{good}extra\n"),
+        ] {
+            assert!(!terminal_receipt(bad.as_bytes(), "abc123", "rewrite"));
+        }
+        println!(
+            "complete receipt accepted; all truncations/wrong schema/nonce/code/kind/OID/extra rejected"
+        );
+    }
+    #[test]
+    fn recording_registry_retirement_cannot_erase_a_replacement_owner() {
+        let key = Path::new("/recording-only/remote-repair-retirement");
+        let value = Pending {
+            owner: remote::OwnedDispatch::default(),
+            directory: "/recording-only/private".into(),
+            nonce: "newer".into(),
+            kind: "rewrite",
+        };
+        pending()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(key.into(), value);
+        retire(key, "older");
+        assert!(
+            pending()
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .contains_key(key)
+        );
+        retire(key, "newer");
+        assert!(
+            !pending()
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .contains_key(key)
+        );
     }
 }

@@ -48,6 +48,14 @@ enum ReadError {
     TimedOut,
 }
 
+/// Shared by the actual transport and recording writers. An error here never proves
+/// zero delivery; owned callers must retain Unknown, including on flush failure.
+pub(super) fn write_request(writer: &mut impl Write, script: &str) -> std::io::Result<()> {
+    writer
+        .write_all(script.as_bytes())
+        .and_then(|()| writer.flush())
+}
+
 pub(super) struct Shell {
     child: Child,
     stdin: ChildStdin,
@@ -185,9 +193,7 @@ impl Shell {
         deadline: Instant,
     ) -> Result<Output, Failure> {
         lock(&self.said).clear();
-        self.stdin
-            .write_all(script.as_bytes())
-            .and_then(|()| self.stdin.flush())
+        write_request(&mut self.stdin, script)
             .map_err(|e| Failure::NotSent(self.lost(&e.to_string())))?;
         // From here on, the command may have run: nothing is run again.
         let lost = |s: &Self, why: &str| Failure::Lost(s.lost(why));

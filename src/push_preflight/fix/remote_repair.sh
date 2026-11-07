@@ -18,7 +18,7 @@ printf '%s\n' "$N" >"$G/owner" || exit 1
 finish() {
     code=$1
     actual=$(git --no-lazy-fetch rev-parse --verify HEAD 2>/dev/null) || actual=unknown
-    printf 'gitcraft-owned-repair-v1\n%s\n%s\n%s\n%s\n' "$N" "$code" "$GITCRAFT_REPAIR_KIND" "$actual" >"$D/outcome" || exit 1
+    printf 'gitcraft-owned-repair-v1\n%s\n%s\n%s\n%s\n' "$N" "$code" "$GITCRAFT_REPAIR_KIND" "$actual" >"$D/outcome.tmp" && mv -- "$D/outcome.tmp" "$D/outcome" || exit 1
     if [ "$(cat "$G/owner")" = "$N" ]; then
         rm -- "$G/owner" && rmdir -- "$G" || exit 1
     else
@@ -81,7 +81,7 @@ if [ "$GITCRAFT_REPAIR_KIND" = merge ]; then
     git --no-lazy-fetch status --porcelain=v1 --untracked-files=all >"$D/merge-status" || refuse 'Working state unreadable'
     [ ! -s "$D/merge-status" ] || refuse 'Working state changed before merge'
     printf 'native merge started\n' >"$D/phase"
-    git --no-lazy-fetch merge --no-edit --no-autostash "$GITCRAFT_REPAIR_BASE" >"$D/transaction.log" 2>&1
+    git --no-lazy-fetch merge --no-edit --no-autostash "$GITCRAFT_REPAIR_BASE" >/dev/null 2>&1
     finish "$?"
 fi
 for name in before after committed; do
@@ -89,7 +89,7 @@ for name in before after committed; do
     GIT_INDEX_FILE="$D/check-$name.index" git --no-lazy-fetch -c core.hooksPath= -c core.sparseCheckout=false read-tree "$target" || refuse 'Private validation index failed'
 done
 printf 'native rewrite started\n' >"$D/phase"
-printf 'start\nupdate HEAD %s %s\nprepare\ncommit\n' "$A" "$O" | git --no-lazy-fetch -c core.hooksPath="$D" update-ref -m 'gitcraft push preflight fix' --stdin >"$D/transaction.log" 2>&1
+printf 'start\nupdate HEAD %s %s\nprepare\ncommit\n' "$A" "$O" | git --no-lazy-fetch -c core.hooksPath="$D" update-ref -m 'gitcraft push preflight fix' --stdin >/dev/null 2>&1
 code=$?
 [ "$code" = 0 ] || finish "$code"
 printf '%s\n%s\n%s\n' "$B" "$O" "$A" >"$D/repair.expected"

@@ -1,0 +1,25 @@
+{
+  "status": "FROZEN STATIC CORRECTION; NO RECORDING/PROTOCOL EXECUTION",
+  "reviewed_failed_candidate": "e0c95b5f8e31020b6ce5bbea88af09dfaca16747",
+  "independent_report": "/workspace/work/review-preflight-remote-ownership/review/preflight-remote-ownership/e0c95b5-static.md (pusheda2e3f79)",
+  "corrections": [
+    "EveryownedShell.run error includingfailedwrite/flush/NotSent isUnknown/no retry; onlyknownbefore-shell.run failuresmaymarkNotDispatched. LegacyNone retry/stop unchanged",
+    "ActualShell.run nowuses sharedwrite_request; purewriterfixtures zero-delivery/partial-through-closingbrace/fullwrite-flushfail exerciserealboundary with0ownedretries/stop",
+    "ReceiptresolutionfreshOwnedDispatchinsideheldContext; newremote metadata alsoownedtransport; nonewlegacyforecast_remote callsinremote_repair.rs",
+    "Hostterminalreceipt atomicrename; readerstrict complete5-line version/nonce/u8code/kind/actualOID-orunknown; alltruncations/wrongfields rejected",
+    "Registryretirementcompare-and-remove nonce cannoteraseconcurrentreplacement; preservedownershipscope/context; nativehelperoutputdiscardedratherthanunboundeddiagnosticlog",
+    "UnusedFailure importremoved; priorcompileonlyfailedthere, no newbinary/runtimeclaim"
+  ],
+  "recording_tests": [
+    "remote::ownership::tests::recording_* (7state/writer/context cases)",
+    "push_preflight::fix::remote_repair::tests::recording_* (2receipt/registry cases)"
+  ],
+  "static_boundary": "Re-reviewbeforeANYnewrecording/ownedscript/faketransport execution. CompileonlyprivateINCR0/jobs2 allowedafterpush. No livehosts/userrepos/controllers/CI. Previouslocal21/default926green remainsbound1c6d161, notnewremotePASS.",
+  "hashes": {
+    "src/remote/ownership.rs": "d44d44c549f7a65ad850578857c9d7db02d52fe513a41d64684e51ce213f0771",
+    "src/remote/session.rs": "958c963e5723f78b4c5ca5ed2c8c14819db0f5035772c3aa7d244b270c1de253",
+    "src/remote/shell.rs": "efab00f399fec1e482019f403182711d31b00164271749eb12f0d3c0c7bd0c50",
+    "src/push_preflight/fix/remote_repair.rs": "f8a3f847754fa05eff79aa2ac503345405b4152258387fb1c95a2dca2c261256",
+    "src/push_preflight/fix/remote_repair.sh": "7779b6d6a4061bfce7831bc505c748a0eebf1dc897ccc46351c5e273e0917648"
+  }
+}

@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use super::pool::{Lane, pool};
-use super::shell::{Failure, Shell};
+use super::shell::Shell;
 use super::{Host, sh_path, sh_quote};
 
 /// What a shell prints once it is ready, after whatever the login printed.
@@ -136,7 +136,7 @@ fn exec_mode(
     if let Some(owner) = owned
         && let Some(error) = owner.context_error()
     {
-        owner.not_sent(false);
+        owner.not_dispatched();
         return Err(error);
     }
     let lane = if req.long { Lane::Long } else { Lane::Quick };
@@ -152,7 +152,7 @@ fn exec_mode(
             Ok(taken) => taken,
             Err(error) => {
                 if let Some(owner) = owned {
-                    owner.not_sent(false);
+                    owner.not_dispatched();
                 }
                 return Err(error);
             }
@@ -183,17 +183,7 @@ fn exec_mode(
                 return Ok(out);
             }
             Err(failure) => match failure_action(&failure, reused, owned.is_some()) {
-                FailureAction::Retry => {
-                    if let Some(owner) = owned {
-                        owner.not_sent(true);
-                    }
-                }
-                FailureAction::OwnedNotSent => {
-                    if let Some(owner) = owned {
-                        owner.not_sent(false);
-                    }
-                    return Err(failure.message());
-                }
+                FailureAction::Retry => {} // Legacy reader only; owned sends never retry.
                 FailureAction::OwnedUnknown => {
                     if let Some(owner) = owned {
                         owner.unknown();

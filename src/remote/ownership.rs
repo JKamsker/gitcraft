@@ -63,15 +63,17 @@ impl OwnedDispatch {
             true
         })
     }
-    pub(super) fn not_sent(&self, retry: bool) {
-        self.state(|state| {
-            state.phase = if state.cancel_requested {
-                Phase::Cancelled
-            } else if retry {
-                Phase::Queued
-            } else {
-                Phase::NotDispatched
+    pub(super) fn not_dispatched(&self) {
+        self.state(|state| match state.phase {
+            Phase::Queued => {
+                state.phase = if state.cancel_requested {
+                    Phase::Cancelled
+                } else {
+                    Phase::NotDispatched
+                }
             }
+            Phase::Running => state.phase = Phase::Unknown,
+            _ => {}
         });
     }
     pub(super) fn completed(&self) {
@@ -95,7 +97,6 @@ pub(crate) enum OwnedFailure {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum FailureAction {
     Retry,
-    OwnedNotSent,
     OwnedUnknown,
     LegacyTimeout(Option<u32>),
     LegacyError,
@@ -106,10 +107,11 @@ pub(super) fn failure_action(
     owned: bool,
 ) -> FailureAction {
     use super::shell::Failure;
+    if owned {
+        return FailureAction::OwnedUnknown;
+    }
     match failure {
         Failure::NotSent(_) if reused => FailureAction::Retry,
-        Failure::NotSent(_) if owned => FailureAction::OwnedNotSent,
-        Failure::Lost(_) | Failure::TimedOut(_) if owned => FailureAction::OwnedUnknown,
         Failure::TimedOut(pid) => FailureAction::LegacyTimeout(*pid),
         _ => FailureAction::LegacyError,
     }
@@ -141,20 +143,21 @@ mod tests {
         assert!(!owner.begin());
     }
     #[test]
-    fn recording_not_sent_retry_obeys_cancellation_and_only_retries_unsent() {
+    fn recording_only_pre_dispatch_refusal_can_retire_ownership() {
         let owner = fixture();
-        assert!(owner.begin());
-        owner.not_sent(true);
-        assert_eq!(owner.phase(), Phase::Queued);
-        assert!(owner.begin());
-        owner.cancel();
-        owner.not_sent(true);
-        assert_eq!(owner.phase(), Phase::Cancelled);
+        owner.not_dispatched();
+        assert_eq!(owner.phase(), Phase::NotDispatched);
         assert!(!owner.begin());
-        let other = fixture();
-        assert!(other.begin());
-        other.not_sent(false);
-        assert_eq!(other.phase(), Phase::NotDispatched);
+        let running = fixture();
+        assert!(running.begin());
+        running.not_dispatched();
+        assert_eq!(running.phase(), Phase::Unknown);
+        assert!(!running.begin());
+        let cancelled = fixture();
+        cancelled.cancel();
+        cancelled.not_dispatched();
+        assert_eq!(cancelled.phase(), Phase::Cancelled);
+        assert!(!cancelled.begin());
     }
     #[test]
     fn recording_owned_failures_never_select_the_legacy_stop_controller() {
@@ -167,17 +170,73 @@ mod tests {
                 Failure::TimedOut(Some(424242)),
             ] {
                 let action = failure_action(&failure, reused, true);
-                assert!(!matches!(
-                    action,
-                    FailureAction::LegacyTimeout(_) | FailureAction::LegacyError
-                ));
-                println!("owned reused={reused}: {action:?}; selected_stop_commands=0");
+                assert_eq!(action, FailureAction::OwnedUnknown);
+                println!(
+                    "owned reused={reused}: {action:?}; selected_stop_commands=0 selected_retries=0"
+                );
             }
         }
         assert_eq!(
             failure_action(&Failure::TimedOut(Some(424242)), false, false),
             FailureAction::LegacyTimeout(Some(424242))
         );
+    }
+    #[test]
+    fn recording_partial_and_flush_write_failures_are_unknown_without_retry() {
+        use std::io::{self, Write};
+        struct Writer {
+            bytes: Vec<u8>,
+            limit: usize,
+            fail_flush: bool,
+        }
+        impl Write for Writer {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                let count = bytes.len().min(self.limit.saturating_sub(self.bytes.len()));
+                if count == 0 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::BrokenPipe,
+                        "recording write failure",
+                    ));
+                }
+                self.bytes.extend_from_slice(&bytes[..count]);
+                Ok(count)
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                if self.fail_flush {
+                    Err(io::Error::new(
+                        io::ErrorKind::BrokenPipe,
+                        "recording flush failure",
+                    ))
+                } else {
+                    Ok(())
+                }
+            }
+        }
+        let frame = "{\nprintf fixture\n}\n";
+        for (limit, flush) in [(0, false), (frame.len() - 1, false), (usize::MAX, true)] {
+            let mut writer = Writer {
+                bytes: Vec::new(),
+                limit,
+                fail_flush: flush,
+            };
+            let error = super::super::shell::write_request(&mut writer, frame).err();
+            assert!(error.is_some());
+            if limit == frame.len() - 1 {
+                assert!(writer.bytes.ends_with(b"}"));
+            }
+            let failure =
+                super::super::shell::Failure::NotSent("recorded real writer error".into());
+            for reused in [false, true] {
+                assert_eq!(
+                    failure_action(&failure, reused, true),
+                    FailureAction::OwnedUnknown
+                );
+            }
+            println!(
+                "write bytes={} flush={flush}: Unknown; selected_retries=0 selected_stop_commands=0",
+                writer.bytes.len()
+            );
+        }
     }
     #[test]
     fn recording_scope_retains_context_and_ticket_for_the_whole_owned_wait() -> Result<(), String> {

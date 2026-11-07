@@ -1,0 +1,13 @@
+    Checking gitcraft v0.3.4 (/workspace/work/push-preflight)
+error: unused import: `Failure`
+  --> src/remote/session.rs:18:20
+   |
+18 | use super::shell::{Failure, Shell};
+   |                    ^^^^^^^
+   |
+   = note: `-D unused-imports` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(unused_imports)]`
+
+error: could not compile `gitcraft` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `gitcraft` (lib test) due to 1 previous error
