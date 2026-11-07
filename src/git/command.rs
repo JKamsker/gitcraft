@@ -85,6 +85,26 @@ pub(super) const GIT_ENV: [(&str, &str); 4] = [
 /// Interactive rebases set `sequence.editor` themselves; an inherited one would win.
 pub(super) const GIT_ENV_REMOVED: [&str; 1] = ["GIT_SEQUENCE_EDITOR"];
 
+/// A tab's explicit repository path selects its repository for both guards and
+/// mutations. Inherited shell plumbing must not silently select another index,
+/// namespace, object store or shallow boundary. Deliberate per-command overrides
+/// are installed afterwards through `Extra::env` (private indexes, for example).
+pub(super) const REPOSITORY_ENV_REMOVED: &[&str] = &[
+    "GIT_DIR",
+    "GIT_COMMON_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_NAMESPACE",
+    "GIT_SHALLOW_FILE",
+    "GIT_REPLACE_REF_BASE",
+    "GIT_CONFIG",
+    "GIT_CONFIG_COUNT",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_ATTR_SOURCE",
+];
+
 pub(super) fn git_cmd() -> Command {
     // With a bare name and an overridden PATH, Rust falls back to fork/exec on Unix.
     // Resolve through the child's PATH first, allowing its much cheaper posix_spawn path.
@@ -98,6 +118,9 @@ pub(super) fn git_cmd() -> Command {
         cmd.env(name, value);
     }
     for name in GIT_ENV_REMOVED {
+        cmd.env_remove(name);
+    }
+    for name in REPOSITORY_ENV_REMOVED {
         cmd.env_remove(name);
     }
     crate::shell_path::apply(&mut cmd);
@@ -238,6 +261,7 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
             .collect(),
         unset: GIT_ENV_REMOVED
             .iter()
+            .chain(REPOSITORY_ENV_REMOVED.iter())
             .chain(extra.unset.iter())
             .map(|n| (*n).to_owned())
             .collect(),
@@ -1416,7 +1440,10 @@ pub(crate) fn draft_bytes(
         return Err("Read cancelled".into());
     }
     let extra = Extra {
-        env: env.to_vec(),
+        env: [("GIT_NO_REPLACE_OBJECTS", "1".into())]
+            .into_iter()
+            .chain(env.iter().cloned())
+            .collect(),
         stdin: Some(input),
         long: true,
         timeout: Some(std::time::Duration::from_secs(15)),
@@ -1680,7 +1707,10 @@ pub(crate) fn push_preflight_with(
     let mut extra = Extra {
         pre: Vec::new(),
         unset: PREFLIGHT_REMOVE.to_vec(),
-        env: vec![("GIT_CONFIG_COUNT", values.len().to_string())],
+        env: vec![
+            ("GIT_CONFIG_COUNT", values.len().to_string()),
+            ("GIT_NO_REPLACE_OBJECTS", "1".into()),
+        ],
         ..Default::default()
     };
     for ((key, value), (key_var, value_var)) in values.into_iter().zip(VARS) {
@@ -1803,6 +1833,7 @@ pub(crate) fn local_repair_input(
     }
     command
         .env("GIT_NO_LAZY_FETCH", "1")
+        .env("GIT_NO_REPLACE_OBJECTS", "1")
         .arg("--no-lazy-fetch")
         .args(args);
     crate::processes::run(
@@ -1829,6 +1860,9 @@ pub(crate) fn repair_host(
     request.long = true;
     request.timeout = Some(std::time::Duration::from_secs(15));
     request.env.push(("GIT_NO_LAZY_FETCH".into(), "1".into()));
+    request
+        .env
+        .push(("GIT_NO_REPLACE_OBJECTS".into(), "1".into()));
     request
         .env
         .extend(env.iter().map(|(k, v)| ((*k).into(), v.clone())));
@@ -1867,6 +1901,73 @@ fn reviewed_refusal(bytes: &[u8], source: &str, destination: &str) -> Option<Str
 #[cfg(test)]
 mod reviewed_push_tests {
     use super::*;
+    #[test]
+    fn explicit_repository_context_clears_redirects_and_retains_private_index_overrides() {
+        let private = Extra {
+            env: vec![("GIT_INDEX_FILE", "private.index".into())],
+            ..Default::default()
+        };
+        let command = local_command(Some(Path::new("chosen")), &private, &["status"]);
+        let env: std::collections::BTreeMap<_, _> = command.get_envs().collect();
+        for key in REPOSITORY_ENV_REMOVED {
+            if *key != "GIT_INDEX_FILE" {
+                assert_eq!(env.get(std::ffi::OsStr::new(key)), Some(&None), "{key}");
+            }
+        }
+        assert_eq!(
+            env.get(std::ffi::OsStr::new("GIT_INDEX_FILE")),
+            Some(&Some(std::ffi::OsStr::new("private.index")))
+        );
+        let target = remote::Target {
+            host: remote::Host::Ssh("fixture.invalid".into()),
+            path: "/chosen".into(),
+        };
+        let request = remote_request(&target, &private, &["status"]);
+        for key in REPOSITORY_ENV_REMOVED {
+            assert!(request.unset.iter().any(|s| s == key));
+        }
+        assert!(
+            request
+                .env
+                .contains(&("GIT_INDEX_FILE".into(), "private.index".into()))
+        );
+    }
+
+    #[test]
+    fn safety_and_operation_reads_select_the_same_explicit_repository() -> Result<(), String> {
+        let a = crate::push_preflight::tests::Fixture::new()?;
+        let b = crate::push_preflight::tests::Fixture::new()?;
+        let expected = a.git(&["rev-parse", "--absolute-git-dir"])?;
+        // A separate owned command models the shell's inherited redirect without
+        // changing the process-global environment used by concurrent tests.
+        let inherited =
+            std::process::Command::new(crate::shell_path::executable("git").ok_or("git missing")?)
+                .env("GIT_DIR", b.repo.join(".git"))
+                .arg("-C")
+                .arg(&a.repo)
+                .args(["rev-parse", "--absolute-git-dir"])
+                .output()
+                .map_err(|e| e.to_string())?;
+        assert_ne!(String::from_utf8_lossy(&inherited.stdout).trim(), expected);
+        let ordinary = local_command(
+            Some(&a.repo),
+            &Extra::default(),
+            &["rev-parse", "--absolute-git-dir"],
+        )
+        .output()
+        .map_err(|e| e.to_string())?;
+        let safety = forecast_run(
+            &a.repo,
+            &["rev-parse", "--absolute-git-dir"],
+            &[],
+            &[0],
+            &|| true,
+        )?;
+        assert!(ordinary.status.success());
+        assert_eq!(String::from_utf8_lossy(&ordinary.stdout).trim(), expected);
+        assert_eq!(safety.trim(), expected);
+        Ok(())
+    }
     #[test]
     fn recording_refusal_only_relays_known_status_for_the_reviewed_ref() {
         let source = "a".repeat(40);

@@ -143,6 +143,49 @@ fn host_and_namespace_policies_preserve_profile_serialization_and_transport_iden
 }
 
 #[test]
+fn replacement_refs_cannot_hide_physical_outgoing_content_or_repair_inputs() -> Result<(), String> {
+    let f = Fixture::new()?;
+    let bad = f.commit(
+        "token.txt",
+        "api_key = 'ghp_DUMMY_REPLACEMENT_CANARY_123456789'\n",
+        "WIP physical",
+    )?;
+    let parent = f.git(&["rev-parse", "HEAD^"])?;
+    let safe_tree = f.git(&["rev-parse", &format!("{parent}^{{tree}}")])?;
+    let safe = f.git(&[
+        "commit-tree",
+        &safe_tree,
+        "-p",
+        &parent,
+        "-m",
+        "sanitized replacement",
+    ])?;
+    f.git(&["replace", &bad, &safe])?;
+    assert_eq!(
+        f.git(&["show", "-s", "--format=%s", &bad])?,
+        "sanitized replacement"
+    );
+    let plan = f.plan(f.profile())?;
+    assert_eq!(plan.head, bad);
+    assert!(
+        plan.commits
+            .iter()
+            .any(|c| c.oid == bad && c.subject == "WIP physical")
+    );
+    assert!(
+        plan.findings
+            .iter()
+            .any(|v| v.kind == Kind::Secret && v.path == "token.txt")
+    );
+    assert!(plan.findings.iter().any(|v| v.kind == Kind::Message));
+    assert!(read(&f.repo, &["cat-file", "commit", &bad], &|| true)?.contains("WIP physical"));
+    let out = git::local_repair_input(&f.repo, &["show", "-s", "--format=%s", &bad], &[], &[])?;
+    assert!(out.status.success());
+    assert_eq!(out.stdout, b"WIP physical\n");
+    Ok(())
+}
+
+#[test]
 fn six_categories_cover_actual_outgoing_history_and_never_return_secret_values()
 -> Result<(), String> {
     let f = Fixture::new()?;

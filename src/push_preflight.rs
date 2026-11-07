@@ -82,7 +82,7 @@ pub(crate) struct Plan {
 }
 
 fn read(repo: &Path, args: &[&str], active: &dyn Fn() -> bool) -> Result<String, String> {
-    let args: Vec<&str> = ["--no-lazy-fetch"]
+    let args: Vec<&str> = ["--no-lazy-fetch", "--no-replace-objects"]
         .into_iter()
         .chain(args.iter().copied())
         .collect();
@@ -91,7 +91,7 @@ fn read(repo: &Path, args: &[&str], active: &dyn Fn() -> bool) -> Result<String,
 }
 
 fn optional(repo: &Path, args: &[&str], active: &dyn Fn() -> bool) -> Result<String, String> {
-    let args: Vec<&str> = ["--no-lazy-fetch"]
+    let args: Vec<&str> = ["--no-lazy-fetch", "--no-replace-objects"]
         .into_iter()
         .chain(args.iter().copied())
         .collect();
