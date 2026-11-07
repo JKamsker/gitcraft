@@ -1,0 +1,156 @@
+{
+  "feature": "#32 Drafts of the working tree (L, opt-in)",
+  "candidate": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+  "branch": "codex/working-drafts",
+  "remote_branch": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+  "status": "validated correction; independent re-review pending",
+  "review_base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "original_base": "48f2b234c4b9535c820138442295caeada1410fc",
+  "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "tree": "3c68f7a2227fb86c3cdbca06d980f2ca4c7c7cfb",
+  "source_changed_files": {
+    "README.md": "e559db6a956905c68b37d15e89a19b1e50657d51ac2611426c9d76b8414cb4bf",
+    "src/git/command.rs": "4bbec0acfe33f816f9a727468b395653c43ce688769ce4660917461afb0eb087",
+    "src/git/command/completion.rs": "fc179dcf3e288f3005b2f4cc61cc205fd22735929e39f595dfdca56d8254c9ec",
+    "src/git/drafts/context.rs": "df04c4b46833f544cd291012bb28c2fd770a70635bd9879ced235a97e845a36c",
+    "src/git/drafts/mod.rs": "9d9dc06f77a8c9a60663c2d9a7b9f1901df50bad715aca336e555c160f4171b8",
+    "src/git/drafts/restore.rs": "3dd10e4b40f08ce4ede47f7b81ff7fb28cfe5915b7410784977ed881c3a298de",
+    "src/git/drafts/tests.rs": "9bc4cb13b5a9b8ecd42b88f317620eceb59e63b6557e89c085099b8302ae50a5",
+    "src/git/mod.rs": "c8c4a528504f84da16673443dc63dfd466cd5839371a363a75b4bc77b7efcbb7",
+    "src/manual.rs": "4e634f0244bae53054f2dc9d4a4cfb97b97214679ea38d48c64a7249313b89a2",
+    "src/remote/fs.rs": "508df7b036533dd2b943d439b8ab1916795ea2c2ee97281a3faa2fe11712c2e6",
+    "src/remote/mod.rs": "2acf80269bb32af3c2f8f4550a08b828a7f3cc71edab9f360879ee09f0dab264",
+    "src/repo/actions.rs": "f1bec62f3fdf9ca9f1577fbe421e75dba8ba50a90070897c91ba244a53049c4a",
+    "src/repo/apply.rs": "800dbe987c8242f3618c54a38b2459a17299f262efb4a9a56dbc827a44ced83c",
+    "src/repo/detail/changes.rs": "c765ab983864d4046cb7701fcf5638fb714f3372be515d7e108ec9848e10cf27",
+    "src/repo/dialogs/drafts.rs": "1c8dac30eeeb6187ec58645a312aef289f215271776702a5d51ce4de5be06c95",
+    "src/repo/dialogs/mod.rs": "a38510fc21cd308b547074b084964e06795207fc61bc12293b6ea4eef45cfe98",
+    "src/repo/drafts.rs": "4c0f94a159794a5c0a20548ed9c58647f8af2617a0cbc3b93bb6369045bd8a86",
+    "src/repo/graph_view/mod.rs": "9b113aabad93ceff53e378e27e3d42def08d3f403f74755348a8b9799235a763",
+    "src/repo/load.rs": "1529689125cb8c27b3146b1c02d3a47d149f6ab9b7d5a30da7719248742f259a",
+    "src/repo/messages.rs": "682c40b113179464926ae0dd43968f72c451222693d9c3ebc7b92da910330e99",
+    "src/repo/mod.rs": "8066c6435f5f6aaad42e555f00ac5a8a05764cea877c8fca5be4f49d8ec56f85",
+    "src/repo/operations.rs": "c624b0fb900d4b931730ca4a825394e4ae490ea9e3c281cfb5d6d8055c3d83e3",
+    "src/repo/worktree_tab/mod.rs": "35a44ab1a87026cc85b0833c80a8ad6c9c66e1f69c4bf4e33ca32b7d0ecd09dd"
+  },
+  "private_target": "/workspace/work/working-drafts/target",
+  "cargo_incremental": "0",
+  "cargo_build_jobs": "2",
+  "gates": {
+    "fmt": "PASS",
+    "clippy_all_targets_Dwarnings": "PASS",
+    "synthetic_completion": "1 passed; no processes or remote host",
+    "focused_readers": "6 passed; includes actual Escape dispatcher",
+    "full_test": "816 passed,0 failures,3 ignored,0 filtered,819 total"
+  },
+  "commands": {
+    "completion": "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo test completion_tracks_nested_workers_after_the_original_caller_stops_waiting -- --nocapture",
+    "reader": "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo test repo::drafts::tests:: -- --nocapture",
+    "fmt": "cargo fmt -- --check",
+    "clippy": "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo clippy --all-targets -- -D warnings",
+    "full_test": "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo test"
+  },
+  "logs": {
+    "completion": {
+      "path": "/workspace/work/working-drafts-completion-3cef22c.log",
+      "sha256": "c218737054eb5a6697e6571edde022ed1324d9b50c0fd7785c1e3f91890819e3"
+    },
+    "reader": {
+      "path": "/workspace/work/working-drafts-reader-3cef22c.log",
+      "sha256": "9f1ca183f6c2de5b2c7257a561b8cb726f287c7600b580bb171bb3b77747d3ba"
+    },
+    "fmt": {
+      "path": "/workspace/work/working-drafts-fmt-3cef22c.log",
+      "sha256": "c67889a806a930a70ac077c822dc9c9133c4453dcf994625b0490290abbfb85c"
+    },
+    "clippy": {
+      "path": "/workspace/work/working-drafts-clippy-3cef22c.log",
+      "sha256": "3c43edf91aead830b4747639ea5b60992ead1b2232707bf30edc401ed78fcd7e"
+    },
+    "test": {
+      "path": "/workspace/work/working-drafts-test-3cef22c.log",
+      "sha256": "b576d45c0e4add506880eb651612858be880d12d8ce9299810c78fd21a522031"
+    }
+  },
+  "new_tests": [
+    "git::command::completion::tests::completion_tracks_nested_workers_after_the_original_caller_stops_waiting",
+    "git::drafts::tests::ignored_rule_read_warnings_fail_closed_before_any_version_is_published",
+    "git::drafts::tests::changed_symlinks_and_conflicted_indexes_fail_without_following_targets_or_touching_index",
+    "git::drafts::tests::missing_paths_below_symlinks_fail_closed_and_do_not_publish_deletions",
+    "git::drafts::tests::limits_invalid_paths_and_cancellation_leave_all_real_state_untouched",
+    "git::drafts::tests::nested_untracked_repositories_are_excluded_without_hiding_outer_changes",
+    "git::drafts::tests::configured_filters_hooks_fsmonitor_and_signing_never_run_for_drafts_or_recovery",
+    "git::drafts::tests::mixed_index_work_and_untracked_are_independent_and_ignored_files_stay_out",
+    "git::drafts::tests::partial_shallow_drafts_and_missing_index_preview_never_call_network_helpers",
+    "git::drafts::tests::private_index_cache_handles_split_and_sparse_indexes_without_rewriting_the_real_index",
+    "git::drafts::tests::recovery_detects_intent_to_add_changes_even_when_index_object_records_match",
+    "git::drafts::tests::rename_unicode_no_newline_and_hardlinks_recover_only_the_selected_path",
+    "git::drafts::tests::recovery_refuses_stale_files_indexes_refs_and_new_ignore_rules",
+    "git::drafts::tests::tree_roots_survive_gc_restart_and_do_not_change_history_branches_reflog_or_normal_push",
+    "git::drafts::tests::typed_remote_reader_quotes_paths_and_never_confuses_links_with_missing_files",
+    "git::drafts::tests::retention_expires_owned_refs_with_cas_and_preserves_unknown_versions",
+    "git::drafts::tests::unchanged_large_tracked_files_are_not_copied_as_working_changes",
+    "git::drafts::tests::binary_empty_files_deletions_and_index_layer_recovery_preserve_the_real_index",
+    "git::drafts::tests::selected_hunks_recover_without_changing_staged_state_and_have_a_safety_version",
+    "git::drafts::tests::unborn_sha256_and_linked_worktree_versions_keep_separate_identities",
+    "repo::drafts::tests::dialog_replacement_profile_reload_and_tab_drop_cancel_reader_ownership",
+    "repo::drafts::tests::modal_escape_cancels_the_owned_reader_while_the_tab_remains_alive",
+    "repo::drafts::tests::pauses_coalesce_and_stale_or_disabled_jobs_cannot_publish_ui_results",
+    "repo::drafts::tests::remote_replacements_wait_for_actual_completion_after_a_simulated_caller_timeout",
+    "repo::drafts::tests::replacements_coalesce_until_the_previous_worker_finishes_and_ignore_stale_reads",
+    "repo::drafts::tests::a_due_pause_dispatches_a_background_snapshot_and_disabled_repos_stay_empty",
+    "repo::operations::tests::working_drafts_protect_checkout_and_rebase_before_any_operation_step"
+  ],
+  "ignored_tests": [
+    "test forge::gitea::live::live_forgejo ... ignored, needs a Forgejo: see ci/forge-server.sh",
+    "test forge::gitea::live::live_gitea ... ignored, needs a Gitea: see ci/forge-server.sh",
+    "test remote::vault::tests::the_system_store_keeps_and_forgets ... ignored, uses the system's credential store"
+  ],
+  "invariants": [
+    "Hidden tree refs refs/gitcraft/drafts/<worktree-id> protect separate raw index and working trees; no WIP commits or normal-push exposure.",
+    "Real index and shared split cache are read-only; private copied cache detects working edits and all recovery index bytes are pinned.",
+    "Ignored untracked, nested repositories and submodule contents excluded; changed links/special files/conflicts fail closed.",
+    "Empty private Git config, templates, hooks, raw attributes and --no-lazy-fetch block filters/signing/hooks/fsmonitor and implicit downloads.",
+    "Selected text hunks and whole binary files recover via guarded native patches; pre-recovery safety draft/Undo preview; index, mode, hardlink peers and unselected edits preserved.",
+    "Source generation/cancellation, HEAD/branch/index/raw-file/ref checks and compare-and-swap publication/deletion guard stale state; 50-version/14-day retention."
+  ],
+  "limitations": [
+    "Live SSH/WSL not exercised (optional env unset); typed remote read shell/quoting executed locally.",
+    "Snapshots require Git with --no-lazy-fetch; older Git fails closed before checkout/rebase when enabled.",
+    "Changed symlinks, special files, conflicted indexes and changed gitlinks require manual backup; regular file content recovery only, no mode-only restoration.",
+    "UTF-8 portable safe paths required;8MiB/file,32MiB captured content,2000 changed and20000 index paths; snapshot metadata1MiB and index/cache32MiB.",
+    "Mirror pushes/manual all-ref exports can include hidden drafts; normal push defaults skip them.",
+    "Raw index-layer recovery includes LFS pointers and no line-ending/filter conversion.",
+    "Native Git2.52 --attr-source apply segfault avoided using private highest-precedence info/attributes; no-index preview keeps explicit empty attribute source."
+  ],
+  "review_pending": true,
+  "review_correction": {
+    "id": "DRAFTS-1",
+    "prior_candidate": "51ea04904419b850805a8fc627f71af8b9255fb9",
+    "prior_report": "/workspace/work/review-working-drafts-51ea049.json",
+    "status": "implemented and locally validated; reviewer must independently recheck",
+    "changes": [
+      "Per-request cancellation generation invalidates on modal Cancel/Escape/replacement, profile reload, worktree parking or tab drop.",
+      "One running reader plus latest-only pending request; stale callbacks cannot publish.",
+      "Read config accepts cancellation; pending jobs retain their initiating immutable Profile context.",
+      "Actual underlying remote completion tickets gate new readers after the caller returns. No wall-clock cooldown or new process controls."
+    ]
+  },
+  "remote_completion_proof": {
+    "caller_timeout_seconds": 15,
+    "request_execution_timeout_seconds": 15,
+    "timeout_source": "src/git/command.rs::forecast_remote",
+    "timeouts_are_not_an_end_to_end_worker_bound": true,
+    "ticket_acquired": "forecast_spawn synchronously increments scoped pending count BEFORE connections::spawn can run.",
+    "ticket_held": "Ticket remains alive around the complete remote::exec invocation, including pool/connect waits and result sending.",
+    "nested_cleanup": "Context::drop uses forecast_spawn; nested forecast_remote workers inherit the same scope and acquire their own tickets.",
+    "release": "Actual closure return/unwind drops the ticket; no timer substitutes for completion.",
+    "reader_gate": "State reader_completion.pending() must be false before the latest pending reader can start.",
+    "synthetic_evidence": [
+      "completion_tracks_nested_workers_after_the_original_caller_stops_waiting",
+      "remote_replacements_wait_for_actual_completion_after_a_simulated_caller_timeout"
+    ],
+    "profile_proof": "The production completion-aware spawn uses connections::spawn; synthetic parent/child verify the same captured Profile Context without any real SSH key or host."
+  },
+  "ci": "Not used, dispatched, polled or awaited. User deferred CI until all implementation/history/local gates/adversarial reviews are complete."
+}

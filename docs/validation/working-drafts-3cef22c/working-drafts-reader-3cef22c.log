@@ -1,0 +1,20 @@
+Candidate 3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.29s
+     Running unittests src/lib.rs (target/debug/deps/gitcraft-31822f5b138c0fe8)
+
+running 6 tests
+test repo::drafts::tests::pauses_coalesce_and_stale_or_disabled_jobs_cannot_publish_ui_results ... ok
+test repo::drafts::tests::remote_replacements_wait_for_actual_completion_after_a_simulated_caller_timeout ... ok
+test repo::drafts::tests::replacements_coalesce_until_the_previous_worker_finishes_and_ignore_stale_reads ... ok
+test repo::drafts::tests::dialog_replacement_profile_reload_and_tab_drop_cancel_reader_ownership ... ok
+test repo::drafts::tests::modal_escape_cancels_the_owned_reader_while_the_tab_remains_alive ... ok
+test repo::drafts::tests::a_due_pause_dispatches_a_background_snapshot_and_disabled_repos_stay_empty ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 813 filtered out; finished in 1.38s
+
+     Running unittests src/main.rs (target/debug/deps/gitcraft-7e93e9ffb9045fe8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
