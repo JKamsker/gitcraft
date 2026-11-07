@@ -337,7 +337,11 @@ mod tests {
             &invocation.shell.args[..4],
             &["-t", "-a", "--", "ssh://work@build:2222"]
         );
-        let (_, payload) = invocation.shell.args[3]
+        let (_, payload) = invocation
+            .shell
+            .args
+            .last()
+            .ok_or("No remote script")?
             .rsplit_once(' ')
             .ok_or("No fixed encoded payload")?;
         let script = String::from_utf8(STANDARD.decode(payload).map_err(|e| e.to_string())?)
