@@ -1,7 +1,7 @@
 {
   "candidate": "3e5b685a17d9351ae59dd89cd4c148358c9644bd",
   "content_verdict": "FAIL",
-  "other_reviewers": "in progress",
+  "other_reviewers": "complete",
   "artifacts": [
     {
       "source": "/tmp/gitcraft-internals-content-r1.rs",
@@ -32,6 +32,142 @@
       "source": "/tmp/gitcraft-internals-content-r1-env-fixture.json",
       "archive": "05-gitcraft-internals-content-r1-env-fixture.json.gz",
       "sha256": "db3530643d4cba4054a0f92283ab5ecef5f5b40bca48d751bf43271a89b9359d"
+    },
+    {
+      "source": "/private/tmp/gitcraft-internals-review-core-r1/chained-rewrite.jsonl",
+      "archive": "core-00-chained-rewrite.jsonl.gz",
+      "sha256": "16d05dcce2cf9efdace486d6a8d869f24246b29cbee2baaca8017e2013a92cd7"
+    },
+    {
+      "source": "/private/tmp/gitcraft-internals-review-core-r1/credential_scope_probe.py",
+      "archive": "core-01-credential_scope_probe.py.gz",
+      "sha256": "c3cf04dc6dc9f29275013e3d511e6c10852aa813629637c4f6e24f254e54b4d9"
+    },
+    {
+      "source": "/private/tmp/gitcraft-internals-review-core-r1/publication-baseline.log",
+      "archive": "core-02-publication-baseline.log.gz",
+      "sha256": "47fa173260be61be414bbeb43ad40cf000ee1644e8f0994ab88d33db693c99bb"
+    },
+    {
+      "source": "/private/tmp/gitcraft-internals-review-core-r1/redirected-boolean.jsonl",
+      "archive": "core-03-redirected-boolean.jsonl.gz",
+      "sha256": "f9fd98b26b07230bf977769293b075074aac875fb67919b4daf57100638f1af9"
+    },
+    {
+      "source": "/private/tmp/gitcraft-internals-review-core-r1/remote-config-baseline.log",
+      "archive": "core-04-remote-config-baseline.log.gz",
+      "sha256": "8ee5f3f0dca889346a169e7e7e2c08514917ca00811fdb801e65e182fe2c0603"
+    },
+    {
+      "source": "/private/tmp/gitcraft-internals-review-core-r1/credential-scope.json",
+      "archive": "core-05-credential-scope.json.gz",
+      "sha256": "e6db1f234c3a3da4ac08de4ed18c78c7132e5130a5807c11a6336940798d15e2"
+    },
+    {
+      "source": "/private/tmp/gitcraft-internals-review-core-r1/routes-baseline.log",
+      "archive": "core-06-routes-baseline.log.gz",
+      "sha256": "989901732947daee09ba015db5f226ecbee4b21b82987e31cae4fc1b6b28ffdb"
+    },
+    {
+      "source": "/private/tmp/gitcraft-internals-review-core-r1/chained-rewrite-test.log",
+      "archive": "core-07-chained-rewrite-test.log.gz",
+      "sha256": "0472ce913f27a7ef561457b29f3c9939fd17b6d25361f50c0d2c1e7f49961f61"
+    },
+    {
+      "source": "/private/tmp/gitcraft-internals-review-core-r1/redirected-write.jsonl",
+      "archive": "core-08-redirected-write.jsonl.gz",
+      "sha256": "8df40cb517473ca2dc7a4cebf0778b08bfd103b4d7cb54c3d00cd47b56a91ab2"
+    },
+    {
+      "source": "/private/tmp/gitcraft-internals-review-core-r1/redirected-boolean-test.log",
+      "archive": "core-09-redirected-boolean-test.log.gz",
+      "sha256": "156a3995cc917781c0bc178f2bfd06800d6237481fca2ecee4f1881c7952812b"
+    },
+    {
+      "source": "/private/tmp/gitcraft-internals-review-core-r1/redirected-write-test.log",
+      "archive": "core-10-redirected-write-test.log.gz",
+      "sha256": "2623468cc185dd73b3e38bec35d1f0ec2396ca6216f4b68c7ae25fca51e2d80b"
+    },
+    {
+      "source": "/private/tmp/gitcraft-internals-review-core-r1/bin/git",
+      "archive": "core-11-git.gz",
+      "sha256": "509921dde1e37d24b8a07fe635ae4fda704fb692ab234a4794e59d0bf0063eb5"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-ui-r1/cancellation-recording.rs",
+      "archive": "ui-00-cancellation-recording.rs.gz",
+      "sha256": "c94838c475854d4a7118c5226f61c0a7d5dc7c172ab6e89c735e386be0874d30"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-ui-r1/duplicate-record.jsonl",
+      "archive": "ui-01-duplicate-record.jsonl.gz",
+      "sha256": "919cd6621b3bd37df89a5aea12e56d974844aa37b534289b18a5d10d5c8a50f9"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-ui-r1/baseline-submodule_conflict.log",
+      "archive": "ui-02-baseline-submodule_conflict.log.gz",
+      "sha256": "b811213041c5e15add46a57f5391961af1edc7041e3d9480b33e81b9b43e4747"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-ui-r1/tag-oid-record.jsonl",
+      "archive": "ui-03-tag-oid-record.jsonl.gz",
+      "sha256": "f729396bd891fcb21d9fa09781d1418051c8acbfe7d6995195fdf7eeacc98503"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-ui-r1/baseline-dependencies.log",
+      "archive": "ui-04-baseline-dependencies.log.gz",
+      "sha256": "bef92c60d52bf2b6ed623b81ac5ee5d50e992d39c7a75bfab7d531fa5d50bd29"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-ui-r1/index-race-record.jsonl",
+      "archive": "ui-05-index-race-record.jsonl.gz",
+      "sha256": "53a816bc25cf888816e3e42cb628bf49302252c20b01be219a675267dff0cb3f"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-ui-r1/duplicate.log",
+      "archive": "ui-06-duplicate.log.gz",
+      "sha256": "e278b7a97fff148f4d21e31e4a7d3c66baf428b7a60ff2b16bd47fd03820f4e1"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-ui-r1/baseline-sharing.log",
+      "archive": "ui-07-baseline-sharing.log.gz",
+      "sha256": "ec9e462d37618daadd51274eca7832ba236b28593de7e945a4f3326b9ca3360f"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-ui-r1/baseline-results.json",
+      "archive": "ui-08-baseline-results.json.gz",
+      "sha256": "97b9ed18f9cc4af03159aca2c972bec0720eac552cb862406408276ba6a1c230"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-ui-r1/adversarial-results.json",
+      "archive": "ui-09-adversarial-results.json.gz",
+      "sha256": "3f78f814c4af4c2188530b5b922d496d5c22bbf0c5ff7715ba19dfcf9a8f69c5"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-ui-r1/manifest.json",
+      "archive": "ui-10-manifest.json.gz",
+      "sha256": "b6789fecad20fef8e4dd0035790770676ae73057a4fa53228127195e0fd771c0"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-ui-r1/cancellation-recording.log",
+      "archive": "ui-11-cancellation-recording.log.gz",
+      "sha256": "79b24f532e4e45784f557ea98d147ad4d304b70f61e33fa331a03250c555f40b"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-ui-r1/tag-oid.log",
+      "archive": "ui-12-tag-oid.log.gz",
+      "sha256": "7fc622d60eae7481136025e534685deddf993b4fa7971abc8a25ed42274209b7"
+    },
+    {
+      "source": "/tmp/gitcraft-internals-ui-r1/index-race.log",
+      "archive": "ui-13-index-race.log.gz",
+      "sha256": "7fc622d60eae7481136025e534685deddf993b4fa7971abc8a25ed42274209b7"
     }
-  ]
+  ],
+  "verdict": "FAIL",
+  "findings": {
+    "content": 3,
+    "core": 3,
+    "ui": 4
+  }
 }

@@ -1,0 +1,8 @@
+{
+  "candidate": "6a289fd8fe90b50750d639958f70f1c48337b8c4",
+  "verdict": "STATIC FAIL",
+  "tests_executed": false,
+  "followup_candidate": "bc2521c6a8422571e67ae2da00e381bde48f6de5",
+  "followup_review": "three independent scoped static reviews in progress",
+  "runtime": "HELD"
+}
