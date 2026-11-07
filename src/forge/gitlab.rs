@@ -6,7 +6,7 @@ use std::path::Path;
 use serde_json::Value;
 
 use super::inbox;
-use super::{ForkInfo, Hosting, Issue, MergedPullRequest, NewPullRequest, Provider, PullRequest, cli};
+use super::{ForkInfo, Hosting, Found, PrState, Issue, MergedPullRequest, NewPullRequest, Provider, PullRequest, cli};
 use crate::avatars::Hint;
 
 pub(super) struct GitLab;
@@ -188,6 +188,52 @@ impl Provider for GitLab {
         Ok(list)
     }
 
+    fn retarget(&self, repo: &Path, _: &Hosting, number: u64, base: &str) -> Result<(), String> {
+        let number = number.to_string();
+        let args = [
+            "mr",
+            "update",
+            number.as_str(),
+            "--target-branch",
+            base,
+            "--yes",
+        ];
+        self.run(repo, &args).map(drop)
+    }
+
+    fn find(&self, repo: &Path, _: &Hosting, branch: &str) -> Result<Option<Found>, String> {
+        let args = [
+            "mr",
+            "list",
+            "--source-branch",
+            branch,
+            "--all",
+            "--output",
+            "json",
+            "--per-page",
+            "20",
+        ];
+        let out = self.run(repo, &args)?;
+        let states: Vec<PrState> = serde_json::from_str::<Value>(&out)
+            .ok()
+            .and_then(|v| v.as_array().cloned())
+            .unwrap_or_default()
+            .iter()
+            .map(|item| match item.get("state").and_then(Value::as_str) {
+                Some("opened") => PrState::Open,
+                Some("merged") => PrState::Merged,
+                _ => PrState::Closed,
+            })
+            .collect();
+        let found = parse_list(&out)?
+            .into_iter()
+            .zip(states)
+            .filter(|(pr, _)| pr.branch == branch)
+            .map(|(pr, state)| Found { pr, state })
+            .collect();
+        Ok(super::pick_found(found))
+    }
+
     /// The host's own avatar API, asked by email.
     fn avatars(&self, _: &Path, hosting: &Hosting, emails: &[String]) -> Vec<(String, Hint)> {
         let api = api_authority(hosting);
@@ -247,6 +293,8 @@ fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
             number: item.get("iid").and_then(Value::as_u64).unwrap_or(0),
             title: text(item, "/title"),
             branch: text(item, "/source_branch"),
+            base: text(item, "/target_branch"),
+            from_fork: item.get("source_project_id") != item.get("target_project_id"),
             sha: text(item, "/sha"),
             author: text(item, "/author/username"),
             url: text(item, "/web_url"),
@@ -316,13 +364,14 @@ mod tests {
 
     #[test]
     fn parses_merge_requests() {
-        let gl = r#"[{"iid":3,"title":"Add","source_branch":"feat","sha":"beef","author":{"username":"bo"},"web_url":"u","draft":false}]"#;
+        let gl = r#"[{"iid":3,"title":"Add","source_branch":"feat","target_branch":"main","sha":"beef","author":{"username":"bo"},"web_url":"u","draft":false}]"#;
         let mrs = parse_list(gl).unwrap_or_default();
         assert_eq!((mrs[0].number, mrs[0].author.as_str()), (3, "bo"));
         assert_eq!(
             (mrs[0].branch.as_str(), mrs[0].sha.as_str()),
             ("feat", "beef")
         );
+        assert_eq!(mrs[0].base, "main");
         assert!(parse_list("oops").is_err());
     }
 

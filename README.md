@@ -354,6 +354,41 @@ so your config, credentials and hooks apply as usual.
   menu to see only those; the graph then has just the commits of the branches it shows and the
   checked-out one. _Viewing 12 of 55_ at the top says how many it shows, with _Show all_. Kept
   per repository.
+- Stacked branches: _This branch is based on…_ in a branch's menu records the branch it is a
+  layer on (`branch.<name>.gitcraft-parent` in the repository's git config, with the parent's
+  commit it was based on as `gitcraft-parent-base`), the one history suggests picked first: the
+  local branch it forks from last. _STACKS_ then shows each stack as `main → schema → api → ui`,
+  every layer with the commits it adds, its pull request and a warning when its parent moved on
+  (amended, rebased, new commits) and it needs restacking; a branch pill's tooltip in the graph
+  names its stack. _Changes api adds to schema_ in a layer's menu shows only its own changes.
+  Undoable; _Remove from its stack_ takes a branch out, and renaming a branch takes the layers on
+  it along.
+- Restacking: after a lower branch changes (amended, rebased, new commits), STACKS says _3
+  dependent branches need updating_; _Restack…_ (or _Restack the branches on it…_ in a branch's
+  menu) previews each one's new base and how many commits move, then replays them in order with
+  `git rebase --onto <parent's tip> <its old base>`, the old base being the parent's commit it was
+  recorded on. A branch checked out in another worktree is rebased in that worktree (which git's
+  `--update-refs` would skip). The others are rebased here, which needs this worktree clean;
+  what you had checked out is checked out again at the end. A conflict stops it, kept in the repository's config
+  (`gitcraft-restack.*`), so _Continue restack_ (after resolving) or _Abort restack_ (every
+  branch back, with its recorded base) works after a restart too. One Ctrl+Z puts every branch
+  it moved back. The interactive rebase has _Update dependent branches_ (`--update-refs`, git
+  2.38+) for rebasing a stack from its top in one go.
+- Stacked pull requests, on GitHub, GitLab, Forgejo and Gitea alike: right-click a stack's
+  title in STACKS (or _Publish its stack's pull requests…_ in a layer's menu). Each layer's own
+  pull request is asked of the forge by its branch, whatever its state (never a fork's branch of
+  the same name). The preview shows each one's base (the layer below; the bottom one goes into
+  the branch the stack is on), its title (editable), its commits and `--shortstat` with a button
+  for its changes in full, and whether it will be opened, retargeted or just pushed. _Publish_
+  pushes each branch bottom-up (`--force-with-lease --force-if-includes`, git 2.30+: a restacked
+  branch goes over its old commits, never over a teammate's fetched but not taken in) and opens
+  the missing ones, each description naming the one it depends on, optionally as drafts. Publish
+  again later to update them all: pushed again, and any whose base is wrong pointed at the right
+  one. When a lower one is merged, it is left alone and the ones above go into what it went
+  into, also as recorded in git's config (restack them afterwards); one closed without merging
+  is opened anew. A layer with nothing of its own is pushed, with no pull request. Each one's
+  number is recorded on its branch (`branch.<name>.gitcraft-pr`) as soon as it is known, and a
+  publish that failed halfway is run again without opening any twice.
 - Remotes: add, edit (name and URL), fetch one, remove; their branches below each.
 - Worktrees: a yellow dot in place of the folder icon marks the others with uncommitted changes,
   here and in the switcher. Add (existing or new branch), open in the same tab (the tab then shows the branch, a searchable switcher and a button to close the worktree, and what you left keeps running; can be turned off in Settings) or a new one, open a terminal there, lock, remove,
@@ -1162,8 +1197,9 @@ was made this way, on a demo repository.
 | `src/graph.rs`           | lane layout for the commit graph                                                   |
 | `src/forge/mod.rs`       | the forges behind one `Provider` trait: which one hosts a remote, list, create, avatars, the page of one |
 | `src/forge/github/`      | GitHub through `gh`: list, `gh pr view`, GraphQL threads, comments, reviews, merges |
-| `src/forge/gitlab.rs`    | GitLab through `glab`: list and create                                             |
+| `src/forge/gitlab.rs`    | GitLab through `glab`: list, create, find by branch and retarget                   |
 | `src/forge/gitea/`       | Forgejo and Gitea through their REST API: list, the page of one, comments, reviews, merges; finding the login |
+| `src/forge/stack.rs`     | a stack's pull requests: planned, published bottom-up, retargeted, recorded         |
 | `src/forge/http.rs`      | the REST client for forges without a command-line tool                             |
 | `src/forge/cli.rs`       | running `gh` / `glab`                                                              |
 | `src/forge/links/` | links to commits, branches, files and lines for each forge; the remote they go to |
@@ -1231,6 +1267,8 @@ was made this way, on a demo repository.
 | `src/git/range_diff.rs` | running and reading `git range-diff`; `rewrites.rs` and `reviewed.rs` keep the old versions in refs |
 | `src/repo/file_view.rs`  | a file's history (or a few lines'), blame and contents at a commit                 |
 | `src/repo/revert_piece.rs` | reverting a file, hunk or lines of a past commit into the working tree           |
+| `src/git/stack/`         | stacked branches: the parents recorded in git's config, each layer's state, the parent suggested from history |
+| `src/repo/stack/`        | stacks in the tab: the sidebar's STACKS, _This branch is based on…_, the graph's tooltips |
 | `src/repo/file_text.rs`  | a whole file at a commit, coloured, for the file view and diffs                    |
 | `src/repo/find/`         | find in the diff, file or blame shown: the bar, matching, marks, keys              |
 | `src/custom_commands/`   | custom commands: what they are, the script each runs (its variables quoted), a repository's `.gitcraft/commands.json` and its trust |

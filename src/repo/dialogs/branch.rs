@@ -143,12 +143,14 @@ pub(super) fn tag(
     )
 }
 
+/// `children`: the layers of stacks based on the branch, which follow it to its new name.
 pub(super) fn rename_branch(
     ui: &mut Ui,
     enter: bool,
     old: &str,
     new: &mut String,
     focus: &mut bool,
+    children: &[String],
 ) -> Outcome {
     let t = Tokens::get(ui.ctx());
     title(
@@ -164,13 +166,18 @@ pub(super) fn rename_branch(
     buttons(ui, "Rename", valid, enter, || {
         let new = new.trim().to_owned();
         let old = old.to_owned();
+        let rename = |from: &str, to: &str| {
+            let mut steps = vec![vec!["branch".into(), "-m".into(), from.into(), to.into()]];
+            steps.extend(crate::git::stack::reparent_ops(children, to));
+            steps
+        };
         Action::UndoableOps {
             label: format!("Rename {old} to {new}"),
-            ops: vec![vec!["branch".into(), "-m".into(), old.clone(), new.clone()]],
+            ops: rename(&old, &new),
             refresh: Refresh::All,
             undo: Undo::Custom {
-                undo: vec![vec!["branch".into(), "-m".into(), new.clone(), old.clone()]],
-                redo: vec![vec!["branch".into(), "-m".into(), old, new]],
+                undo: rename(&new, &old),
+                redo: rename(&old, &new),
             },
         }
     })

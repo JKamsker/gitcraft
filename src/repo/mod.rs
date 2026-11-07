@@ -90,6 +90,7 @@ mod running;
 #[cfg(test)]
 mod samples;
 mod sidebar;
+mod stack;
 mod state;
 mod surgery;
 mod terminals;
@@ -267,6 +268,8 @@ pub struct RepoTab {
     split: Option<Box<surgery::SplitEditor>>,
     /// Staged fixes being distributed into the commits they belong to (`surgery`).
     absorb: Option<Box<surgery::AbsorbEditor>>,
+    /// Stacked branches: the recorded parents and the layers they make.
+    stacks: stack::Stacks,
     /// The selected commit's message, being edited in the right pane.
     reword: Option<Reword>,
     /// Push and Sync: the push running, Sync's push waiting for its pull, the banner after a
@@ -527,6 +530,7 @@ impl RepoTab {
             drop_menu: None,
             split: None,
             absorb: None,
+            stacks: Default::default(),
             reword: None,
             push_flow: Default::default(),
             credentials: None,

@@ -285,6 +285,8 @@ pub(crate) enum Action {
     /// Run the installed `git-absorb` instead.
     RunGitAbsorb,
     CloseAbsorb,
+    /// Something done on stacked branches.
+    Stack(super::stack::StackAct),
     /// Remember these HTTPS credentials and run the operation that needed them again.
     SignIn(git::Credentials),
     /// Ask before deleting the local tag `name` (at the commit `target`), once what it points

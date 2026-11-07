@@ -220,6 +220,13 @@ impl RepoTab {
             self.status = Some(("Resolve the conflicted files first".to_owned(), true));
             return;
         }
+        // A restack's rebase goes on as the restack: the layers after it too.
+        if self.stacks.restack_here().is_some()
+            && self.work.in_progress == Some(git::InProgress::Rebase)
+        {
+            self.resume_restack(ctx);
+            return;
+        }
         // A rebase or patch stopped on conflicts finishes with `--continue`, not a new commit.
         if let Some(state) = self.work.in_progress.filter(|s| s.continues()) {
             let label = format!("Continue {}", state.label().to_lowercase());

@@ -423,6 +423,7 @@ impl RepoTab {
         }
         self.count_worktrees(ctx);
         self.check_fence(ctx);
+        self.read_stacks(ctx);
         self.take_visibility(loaded.log_from, ctx);
         self.take_order(loaded.order, ctx);
         // Stash numbers shift when one is pushed or dropped; follow the commit.
@@ -735,6 +736,8 @@ mod tests {
             number: 7,
             title: "merged since".to_owned(),
             branch: "feat".to_owned(),
+            base: "main".to_owned(),
+            from_fork: false,
             sha: String::new(),
             author: String::new(),
             url: String::new(),

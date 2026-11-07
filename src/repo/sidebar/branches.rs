@@ -206,6 +206,7 @@ impl RepoTab {
         self.versions_items(ui, acts, b);
         ui.separator();
         self.publish_items(ui, acts, b, idle);
+        self.stack_menu_items(ui, acts, b, idle);
         ui.separator();
         if ui.button("Create branch here…").clicked() {
             acts.push(Action::Dialog(Dialog::create_branch(&b.target, &b.name)));

@@ -12,7 +12,7 @@ use std::path::Path;
 use serde_json::Value;
 
 use super::inbox;
-use super::{ForkInfo, Hosting, Issue, MergedPullRequest, NewPullRequest, Pages, Provider, PullRequest, cli};
+use super::{ForkInfo, Hosting, Found, PrState, Issue, MergedPullRequest, NewPullRequest, Pages, Provider, PullRequest, cli};
 use crate::avatars::Hint;
 use crate::pr_post::Target;
 use crate::pull_request::{PrDetails, at};
@@ -70,7 +70,7 @@ impl Provider for GitHub {
                 "--limit",
                 "100",
                 "--json",
-                "number,title,headRefName,headRefOid,author,url,isDraft",
+                "number,title,headRefName,baseRefName,headRefOid,author,url,isDraft,isCrossRepository",
             ],
         )?;
         parse_list(&out)
@@ -147,6 +147,47 @@ impl Provider for GitHub {
     fn approve_run(&self, repo: &Path, hosting: &Hosting, run: u64) -> Result<(), String> {
         let endpoint = format!("repos/{}/actions/runs/{run}/approve", hosting.path);
         api(repo, hosting, &["api", "-X", "POST", &endpoint]).map(|_| ())
+    }
+
+    fn retarget(&self, repo: &Path, _: &Hosting, number: u64, base: &str) -> Result<(), String> {
+        let number = number.to_string();
+        gh(repo, &["pr", "edit", &number, "--base", base]).map(drop)
+    }
+
+    fn find(&self, repo: &Path, _: &Hosting, branch: &str) -> Result<Option<Found>, String> {
+        let out = gh(
+            repo,
+            &[
+                "pr",
+                "list",
+                "--head",
+                branch,
+                "--state",
+                "all",
+                "--limit",
+                "20",
+                "--json",
+                "number,title,headRefName,baseRefName,headRefOid,author,url,isDraft,isCrossRepository,state",
+            ],
+        )?;
+        let states: Vec<PrState> = serde_json::from_str::<Value>(&out)
+            .ok()
+            .and_then(|v| v.as_array().cloned())
+            .unwrap_or_default()
+            .iter()
+            .map(|item| match at(item, "/state") {
+                "OPEN" => PrState::Open,
+                "MERGED" => PrState::Merged,
+                _ => PrState::Closed,
+            })
+            .collect();
+        let found = parse_list(&out)?
+            .into_iter()
+            .zip(states)
+            .filter(|(pr, _)| pr.branch == branch)
+            .map(|(pr, state)| Found { pr, state })
+            .collect();
+        Ok(super::pick_found(found))
     }
 
     /// The authors' GitHub accounts, from the repository's latest commits (the API ties each
@@ -233,6 +274,11 @@ fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
             number: item.get("number").and_then(Value::as_u64).unwrap_or(0),
             title: at(item, "/title").to_owned(),
             branch: at(item, "/headRefName").to_owned(),
+            base: at(item, "/baseRefName").to_owned(),
+            from_fork: item
+                .get("isCrossRepository")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
             sha: at(item, "/headRefOid").to_owned(),
             author: login(item, "/author/login"),
             url: at(item, "/url").to_owned(),
@@ -269,7 +315,7 @@ mod tests {
 
     #[test]
     fn parses_pull_requests() {
-        let gh = r#"[{"number":7,"title":"Fix","headRefName":"fix/x","headRefOid":"c0ffee","author":{"login":"ana"},"url":"https://g/7","isDraft":true}]"#;
+        let gh = r#"[{"number":7,"title":"Fix","headRefName":"fix/x","baseRefName":"main","headRefOid":"c0ffee","author":{"login":"ana"},"url":"https://g/7","isDraft":true}]"#;
         let prs = parse_list(gh).unwrap_or_default();
         assert_eq!(prs.len(), 1);
         assert_eq!(
@@ -277,6 +323,7 @@ mod tests {
             (7, "fix/x", true)
         );
         assert_eq!(prs[0].sha, "c0ffee");
+        assert_eq!(prs[0].base, "main");
         assert!(parse_list("oops").is_err());
     }
 }

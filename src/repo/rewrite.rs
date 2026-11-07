@@ -1,6 +1,6 @@
 //! Rewriting history: editing a commit's message, and the interactive rebase.
 
-use super::operations::{expect_ref_at, expect_symref};
+use super::operations::{expect_ref, expect_ref_at, expect_symref};
 use super::{Msg, Refresh, RepoTab, Undo, ops, rebase, short, spawn};
 use crate::git;
 
@@ -211,8 +211,23 @@ impl RepoTab {
         // be started again, and it runs only if this editor is still the one open then.
         editor.starting = true;
         let (plan, id) = (editor.clone(), editor.id);
+        if plan.update_refs {
+            // The branches moved along are read with it: always in the background, it is more
+            // git than the todo list alone.
+            let repo = self.path.clone();
+            self.then(
+                ctx,
+                move || Ok((plan.command_with_refs(&repo)?, plan.head)),
+                move |tab, ready: Result<_, String>, ctx| {
+                    let ready = ready.map(|((command, refs), head)| (command, head, refs));
+                    tab.rebase_ready(id, &label, ready, ctx);
+                },
+            );
+            return;
+        }
         self.with_rebase_command(plan, ctx, move |tab, command, ctx| {
-            tab.rebase_ready(id, &label, command, ctx);
+            let ready = command.map(|(command, head)| (command, head, Vec::new()));
+            tab.rebase_ready(id, &label, ready, ctx);
         });
     }
 
@@ -222,7 +237,7 @@ impl RepoTab {
         &mut self,
         id: u64,
         label: &str,
-        command: Result<(Vec<String>, String), String>,
+        command: Result<Ready, String>,
         ctx: &egui::Context,
     ) {
         let Some(editor) = self.rebase.as_mut().filter(|e| e.id == id) else {
@@ -237,20 +252,47 @@ impl RepoTab {
                     true,
                 ));
             }
-            Ok((command, head)) => {
+            Ok((command, head, refs)) => {
                 let guards = [self.same_branch(), expect_ref_at("HEAD", &head)];
                 self.rebase = None;
-                self.run_undoable(
-                    label,
-                    [guards.to_vec(), vec![command]].concat(),
-                    Refresh::All,
-                    Undo::HeadMove { mode: "--keep" },
-                    ctx,
-                );
+                let steps = [guards.to_vec(), vec![command]].concat();
+                let undo = if refs.is_empty() {
+                    Undo::HeadMove { mode: "--keep" }
+                } else {
+                    moved_refs_undo(self.same_branch(), &head, &refs, &steps)
+                };
+                self.run_undoable(label, steps, Refresh::All, undo, ctx);
             }
             Err(e) => self.status = Some((e, true)),
         }
     }
+}
+
+/// A rebase ready to run: its command, the HEAD it starts from, and the branches it moves along
+/// (their commit before, the ref).
+type Ready = (Vec<String>, String, Vec<(String, String)>);
+
+/// How to undo a rebase that moved other branches along (`refs`: their commit before, the
+/// ref): HEAD's branch reset to `head`, each moved back, each refusing unless still where the
+/// rebase left it. Redo runs the same rebase again (`steps`), from where it started.
+fn moved_refs_undo(
+    branch_guard: Vec<String>,
+    head: &str,
+    refs: &[(String, String)],
+    steps: &[Vec<String>],
+) -> Undo {
+    let mut undo = vec![branch_guard, expect_ref("HEAD")];
+    undo.extend(refs.iter().map(|(_, name)| expect_ref(name)));
+    undo.extend(ops(&[&["reset", "-q", "--keep", head]]));
+    for (before, name) in refs {
+        undo.extend(ops(&[&["update-ref", name, before]]));
+    }
+    let mut redo: Vec<Vec<String>> = refs
+        .iter()
+        .map(|(before, name)| expect_ref_at(name, before))
+        .collect();
+    redo.extend(steps.iter().cloned());
+    Undo::Custom { undo, redo }
 }
 
 #[cfg(test)]
@@ -341,6 +383,7 @@ mod tests {
             Ok((
                 vec!["rebase".to_owned(), "HEAD~1".to_owned()],
                 String::new(),
+                Vec::new(),
             ))
         };
 

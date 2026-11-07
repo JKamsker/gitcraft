@@ -50,6 +50,7 @@ mod reviewed;
 mod rewrites;
 mod revert;
 mod rehearse;
+pub mod stack;
 mod status;
 mod stream;
 mod submodule;

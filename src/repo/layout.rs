@@ -159,6 +159,7 @@ impl RepoTab {
         self.test_output_window(&ctx, &mut acts);
         self.rehearse_window(&ctx, &mut acts);
         self.interaction_window(&ctx, &mut acts);
+        self.stack_dialogs(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
         }
@@ -209,7 +210,7 @@ impl RepoTab {
     /// None of them while a dialog, a text field or the terminal has the keyboard.
     pub(super) fn shortcuts(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         let free_keys =
-            self.dialog.is_none() && !self.issue_picker_open() && !self.keys_blocked && !crate::a11y::keyboard_taken(ctx);
+            self.dialog.is_none() && !self.stacks.modal_open() && !self.issue_picker_open() && !self.keys_blocked && !crate::a11y::keyboard_taken(ctx);
         // Ctrl+F, Esc and the steps of the find bar, when a diff, file or blame is shown.
         self.find_keys(ctx, free_keys);
         if free_keys {

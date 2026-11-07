@@ -85,7 +85,13 @@ impl RepoTab {
         let refs_cell = Rect::from_min_max(rect.min, pos2(gx, rect.bottom()));
         // No tooltip in the way of a drag.
         if !stack_open && !dragging && ui.rect_contains_pointer(refs_cell) {
-            let lines: Vec<String> = badges.iter().map(Badge::describe).collect();
+            let mut lines: Vec<String> = badges.iter().map(Badge::describe).collect();
+            lines.extend(
+                badges
+                    .iter()
+                    .filter(|b| b.kind == BadgeKind::Branch && b.local)
+                    .filter_map(|b| self.stack_line(&b.label)),
+            );
             let drag = if first.kind == BadgeKind::Branch {
                 "Double-click a pill to check it out, or drag it onto a branch or a commit"
             } else {

@@ -56,6 +56,11 @@ impl RepoTab {
             .inner_margin(egui::Margin::symmetric(12, 8))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
+                // A restack's rebase: continued and aborted as the restack, not on its own.
+                let restack = self
+                    .stacks
+                    .restack_here()
+                    .filter(|_| state == InProgress::Rebase);
                 ui.horizontal(|ui| {
                     icons::inline(ui, "circle-alert", 16.0, t.warning);
                     // A fold stopped on a conflict says so: its changes are in the rebase.
@@ -63,18 +68,39 @@ impl RepoTab {
                         Some(fold) => format!("{} in progress (rebase)", fold.label),
                         None => format!("{} in progress", state.label()),
                     };
+                    let title = match restack {
+                        Some(p) => format!(
+                            "Restack paused at {} ({} of {})",
+                            p.current().map_or("", |s| s.branch.as_str()),
+                            p.done + 1,
+                            p.steps.len()
+                        ),
+                        None => format!("{} in progress", state.label()),
+                    };
                     ui.label(
-                        RichText::new(what)
+                        RichText::new(if restack.is_some() { title } else { what })
                             .color(t.warning)
                             .font(theme::medium(12.5)),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.add_enabled(idle, egui::Button::new("Abort")).clicked() {
+                        if restack.is_some() {
+                            if ui
+                                .add_enabled(idle, egui::Button::new("Abort restack"))
+                                .on_hover_text("Every branch back where it was before the restack")
+                                .clicked()
+                            {
+                                acts.push(Action::Stack(
+                                    crate::repo::stack::StackAct::AbortRestack,
+                                ));
+                            }
+                        } else if ui.add_enabled(idle, egui::Button::new("Abort")).clicked() {
                             acts.push(self.abort_for(state));
                         }
                     });
                 });
-                let hint = if self.work.conflicted.is_empty() && state == InProgress::Rebase {
+                let hint = if restack.is_some() {
+                    if self.work.conflicted.is_empty() { "All conflicts resolved: Continue restack to go on." } else { "Fix conflicted files, mark resolved, then Continue restack." }
+                } else if self.work.conflicted.is_empty() && state == InProgress::Rebase {
                     "No conflicts: Continue rebase goes on. At a commit it stopped at to edit, what is staged goes into that commit first."
                 } else if self.work.conflicted.is_empty() {
                     "All conflicts resolved: commit to finish."

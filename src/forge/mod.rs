@@ -17,6 +17,9 @@ mod gitlab;
 mod http;
 pub mod links;
 pub mod inbox;
+pub mod stack;
+#[cfg(test)]
+mod stack_tests;
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -115,6 +118,11 @@ pub struct PullRequest {
     pub title: String,
     /// The branch it proposes (head / source branch).
     pub branch: String,
+    /// The branch it goes into (base / target branch).
+    pub base: String,
+    /// It proposes a branch of another repository (a fork), which may share a name with one
+    /// here.
+    pub from_fork: bool,
     /// Its latest commit.
     pub sha: String,
     pub author: String,
@@ -189,6 +197,32 @@ pub struct Issue {
     pub labels: Vec<String>,
 }
 
+/// Where a pull request stands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PrState {
+    Open,
+    Merged,
+    /// Closed without being merged.
+    Closed,
+}
+
+/// A pull request found by its branch, and where it stands.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Found {
+    pub pr: PullRequest,
+    pub state: PrState,
+}
+
+/// The one to take of the pull requests proposing a branch, newest first: an open one, else
+/// the newest; never a fork's.
+pub(crate) fn pick_found(found: Vec<Found>) -> Option<Found> {
+    let own: Vec<Found> = found.into_iter().filter(|f| !f.pr.from_fork).collect();
+    own.iter()
+        .find(|f| f.state == PrState::Open)
+        .or_else(|| own.first())
+        .cloned()
+}
+
 /// What a forge does for gitcraft.
 pub trait Provider: Sync {
     /// "GitHub", "Forgejo"…
@@ -218,6 +252,21 @@ pub trait Provider: Sync {
         hosting: &Hosting,
         new: &NewPullRequest,
     ) -> Result<String, String>;
+
+    /// Changes the branch the pull request numbered `number` goes into: the next layer down of
+    /// a stack, or what that one went into once it merged.
+    fn retarget(
+        &self,
+        repo: &Path,
+        hosting: &Hosting,
+        number: u64,
+        base: &str,
+    ) -> Result<(), String>;
+
+    /// The latest pull request proposing `branch` of this repository (not a fork's branch of
+    /// the same name), whatever its state: asked of the forge by branch, so neither a long list
+    /// nor a branch copied or renamed here can mislead it.
+    fn find(&self, repo: &Path, hosting: &Hosting, branch: &str) -> Result<Option<Found>, String>;
 
     /// Where the account pictures of the authors (by commit email) are.
     fn avatars(&self, repo: &Path, hosting: &Hosting, emails: &[String]) -> Vec<(String, Hint)>;

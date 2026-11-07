@@ -316,6 +316,7 @@ impl RepoTab {
             Action::RunAbsorb => self.run_absorb(ctx),
             Action::RunGitAbsorb => self.run_git_absorb(ctx),
             Action::CloseAbsorb => self.absorb = None,
+            Action::Stack(act) => self.stack_act(act, ctx),
             Action::SignIn(creds) => self.sign_in(creds, ctx),
             Action::Ignore { pattern, path } => self.ignore(&pattern, &path, ctx),
             Action::PickLines {
