@@ -274,7 +274,8 @@ impl RepoTab {
             Err(e) if git::is_auth_error(e) && !quiet => {
                 self.agent_needs_sign_in(&label);
                 // Typed credentials that were refused are forgotten.
-                let refused = self.credentials.take().is_some();
+                let typed = self.credentials.take().is_some();
+                let refused = typed || e.contains("401") || e.contains("403");
                 self.status = Some((format!("{label}: sign-in needed"), true));
                 let url = self
                     .default_remote()

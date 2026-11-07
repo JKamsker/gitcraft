@@ -34,12 +34,29 @@ pub(crate) fn endpoint(value: &str) -> String {
         format!("{scheme}://{authority}")
     }
 }
-fn config(repo: &Path, key: &str, url: Option<&str>) -> Result<String, String> {
-    match url {
-        Some(url) => git::connection_read(repo, &["config", "--get-urlmatch", key, url]),
-        None => git::connection_read(repo, &["config", "--get", key]),
+fn config(repo: &Path, key: &str, url: Option<&str>) -> Result<Option<String>, String> {
+    let raw = match url {
+        Some(url) => git::connection_read(repo, &["config", "--null", "--get-urlmatch", key, url]),
+        None => git::connection_read(repo, &["config", "--null", "--get", key]),
+    }?;
+    if raw.is_empty() {
+        Ok(None)
+    } else {
+        raw.strip_suffix('\0')
+            .map(|v| Some(v.into()))
+            .ok_or_else(|| "Invalid network configuration response".into())
     }
 }
+fn disabled(value: Option<&str>) -> bool {
+    value.is_some_and(|v| {
+        matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "false" | "no" | "off" | "0"
+        )
+    })
+}
+const TLS_ENV: &str =
+    "case \"$GIT_SSL_NO_VERIFY\" in ''|false|FALSE|no|NO|off|OFF|0) ;; *) printf disabled;; esac";
 pub(crate) fn inventory(repo: &Path, chosen: Option<&str>) -> Result<Inventory, String> {
     let remotes: Vec<_> = git::remotes(repo)?
         .into_iter()
@@ -53,11 +70,22 @@ pub(crate) fn inventory(repo: &Path, chosen: Option<&str>) -> Result<Inventory, 
         lines.push(format!("Remote {name}: {}", endpoint(url)));
         let proxy = config(repo, "http.proxy", Some(url))?;
         let override_proxy = config(repo, &format!("remote.{name}.proxy"), None)?;
-        lines.push(format!("Git http.proxy: {}", endpoint(&proxy)));
-        if !override_proxy.is_empty() {
+        lines.push(format!(
+            "Git http.proxy: {}",
+            match proxy.as_deref() {
+                None => "not configured; environment applies".into(),
+                Some("") => "explicitly disabled".into(),
+                Some(v) => endpoint(v),
+            }
+        ));
+        if let Some(value) = override_proxy {
             lines.push(format!(
                 "Git remote proxy override: {}",
-                endpoint(&override_proxy)
+                if value.is_empty() {
+                    "explicitly disabled".into()
+                } else {
+                    endpoint(&value)
+                }
             ));
         }
         // Environment on the repository's machine, never copied from this computer to SSH/WSL.
@@ -80,6 +108,16 @@ pub(crate) fn inventory(repo: &Path, chosen: Option<&str>) -> Result<Inventory, 
                 });
             }
         }
+        if git::connection_shell(repo, TLS_ENV)?.trim() == "disabled" {
+            lines.push("Git GIT_SSL_NO_VERIFY: certificate verification disabled".into());
+        }
+        let overrides = git::connection_shell(
+            repo,
+            "test -z \"$GIT_SSH_COMMAND$GIT_SSH\" || printf configured",
+        )?;
+        if !overrides.is_empty() {
+            lines.push("Git SSH environment override: configured (command withheld; may override SSH config)".into());
+        }
         lines.push(format!(
             "Forge REST client (this computer): {}",
             crate::forge::environment_proxy(url)
@@ -94,8 +132,9 @@ pub(crate) fn inventory(repo: &Path, chosen: Option<&str>) -> Result<Inventory, 
             "http.sslCAPath",
             "http.sslBackend",
             "http.sslVerify",
+            "http.proxySSLVerify",
         ] {
-            let value = config(repo, key, Some(url))?;
+            let value = config(repo, key, Some(url))?.unwrap_or_default();
             lines.push(format!(
                 "{key}: {}",
                 if value.is_empty() {
@@ -107,7 +146,7 @@ pub(crate) fn inventory(repo: &Path, chosen: Option<&str>) -> Result<Inventory, 
                 }
             ));
         }
-        let custom = config(repo, "core.sshCommand", None)?;
+        let custom = config(repo, "core.sshCommand", None)?.unwrap_or_default();
         lines.push(format!(
             "SSH command override: {}",
             if custom.is_empty() {
@@ -117,7 +156,13 @@ pub(crate) fn inventory(repo: &Path, chosen: Option<&str>) -> Result<Inventory, 
             }
         ));
         if let Some(host) = ssh_host(url) {
-            let script = format!("ssh -G -- {}", crate::remote::sh_quote(&host));
+            let port = url
+                .strip_prefix("ssh://")
+                .and_then(|s| s.split('/').next())
+                .and_then(|a| a.rsplit_once(':'))
+                .and_then(|(_, p)| p.parse::<u16>().ok());
+            let port = port.map(|p| format!("-p {p} ")).unwrap_or_default();
+            let script = format!("ssh -G {port}-- {}", crate::remote::sh_quote(&host));
             // The managed Git alias supplies the repository machine and bounded I/O.
             match git::connection_shell(repo, &script) {
                 Ok(text) => for key in ["proxyjump", "proxycommand"] {
@@ -140,13 +185,25 @@ fn ssh_host(url: &str) -> Option<String> {
     } else {
         return None;
     };
-    let host = authority.rsplit('@').next()?.split(':').next()?;
-    (!host.is_empty()
-        && !host.starts_with('-')
-        && host
+    let userhost = authority.rsplit_once(':').map_or(authority, |(h, p)| {
+        if p.parse::<u16>().is_ok() {
+            h
+        } else {
+            authority
+        }
+    });
+    if userhost.chars().filter(|c| *c == '@').count() > 1 {
+        return None;
+    }
+    (!userhost.is_empty()
+        && !userhost.starts_with('-')
+        && userhost
+            .split('@')
+            .all(|part| !part.is_empty() && !part.starts_with('-'))
+        && userhost
             .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_')))
-    .then(|| host.into())
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_' | b'@')))
+    .then(|| userhost.into())
 }
 #[derive(Clone, Debug)]
 pub(crate) struct Report {
@@ -162,6 +219,10 @@ pub(crate) fn test(repo: &Path, name: &str) -> Result<Report, String> {
     if !(url.starts_with("https://") || url.starts_with("http://") || ssh_host(&url).is_some()) {
         return Err("Choose an HTTPS, HTTP or SSH remote to test a network connection".into());
     }
+    let unverified = url.starts_with("https://")
+        && (disabled(config(repo, "http.sslVerify", Some(&url))?.as_deref())
+            || disabled(config(repo, "http.proxySSLVerify", Some(&url))?.as_deref())
+            || git::connection_shell(repo, TLS_ENV)?.trim() == "disabled");
     let result = git::connection_probe(repo, name)?;
     let mut report = classify(
         result.success,
@@ -169,6 +230,9 @@ pub(crate) fn test(repo: &Path, name: &str) -> Result<Report, String> {
         url.starts_with("https://"),
         result.elapsed,
     );
+    if unverified {
+        report.lines[2]="TLS chain: NOT verified — certificate verification is disabled in Git's configuration or environment".into();
+    }
     if url.starts_with("http://") {
         report.lines[2] = "TLS chain: not used for an unencrypted HTTP remote".into();
     }
@@ -217,7 +281,7 @@ fn classify(success: bool, trace: &str, tls: bool, elapsed: std::time::Duration)
         if tls {
             "TLS chain (Git's configured CA trust)"
         } else {
-            "SSH host-key / transport verification"
+            "SSH transport handshake"
         },
         "Authentication",
     ];
@@ -250,6 +314,69 @@ fn classify(success: bool, trace: &str, tls: bool, elapsed: std::time::Duration)
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn actual_git_inventory_distinguishes_empty_proxy_and_redacts_configured_secrets()
+    -> Result<(), String> {
+        let repo = crate::practice::create(crate::practice::Scenario::Detached)?;
+        struct Cleanup(std::path::PathBuf);
+        impl Drop for Cleanup {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+        let _owned = Cleanup(repo.parent().ok_or("No fixture root")?.into());
+        git::practice_run(
+            &repo,
+            &[
+                "remote",
+                "add",
+                "origin",
+                "https://example.invalid/team/repo",
+            ],
+        )?;
+        git::practice_run(
+            &repo,
+            &[
+                "config",
+                "http.proxy",
+                "http://user:NEVER_SHOW_SECRET@proxy.invalid:8443/private",
+            ],
+        )?;
+        git::practice_run(
+            &repo,
+            &["config", "http.sslCAInfo", "/private/NEVER_SHOW_CA_PATH"],
+        )?;
+        let result = inventory(&repo, Some("origin"))?;
+        let text = result.lines.join("\n");
+        assert!(text.contains("http://proxy.invalid:8443"));
+        assert!(text.contains("custom CA location configured"));
+        assert!(!text.contains("NEVER_SHOW_SECRET"));
+        assert!(!text.contains("NEVER_SHOW_CA_PATH"));
+        git::practice_run(&repo, &["config", "http.proxy", ""])?;
+        assert_eq!(
+            config(
+                &repo,
+                "http.proxy",
+                Some("https://example.invalid/team/repo")
+            )?,
+            Some(String::new())
+        );
+        assert!(
+            inventory(&repo, Some("origin"))?
+                .lines
+                .iter()
+                .any(|line| line == "Git http.proxy: explicitly disabled")
+        );
+        Ok(())
+    }
+    #[test]
+    fn disabled_certificate_verification_cannot_be_reported_as_verified() {
+        for value in ["false", "0", "off", "no"] {
+            assert!(disabled(Some(value)));
+        }
+        assert!(!disabled(None));
+        assert!(!disabled(Some("true")));
+    }
     #[test]
     fn endpoint_removes_every_secret_component() {
         assert_eq!(
@@ -299,7 +426,7 @@ mod tests {
     fn ssh_destinations_are_not_shell_programs() {
         assert_eq!(
             ssh_host("git@example.org:r.git"),
-            Some("example.org".into())
+            Some("git@example.org".into())
         );
         assert_eq!(ssh_host("ssh://-oProxyCommand=bad/r"), None);
         assert_eq!(ssh_host("file:///tmp/r"), None);
