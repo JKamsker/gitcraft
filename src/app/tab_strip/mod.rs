@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use egui::{Color32, Galley, Rect, Sense, Ui, UiBuilder, pos2, vec2};
+use egui::{Color32, Galley, Rect, Ui, UiBuilder, pos2, vec2};
 
 use super::{App, Tab};
 use crate::app_buttons::{self, AppButton, Flow, Look, Place};
@@ -32,8 +32,17 @@ const MAX_CHIP_W: f32 = MAX_TAB_W - 32.0 - 28.0 - BADGE_W;
 const PLUS_W: f32 = 4.0 + 20.0 + GAP;
 /// What the list of the tabs that don't fit takes after `+`.
 const LIST_W: f32 = 4.0 + 20.0 + GAP;
-/// Space between the tabs and the strip's buttons with the system's title bar.
-const GUTTER: f32 = 12.0;
+/// The list of the tabs out of view (with `+` in it) at the end of the strip, with the space
+/// around it.
+const CONTROLS_W: f32 = 4.0 + 20.0 + 4.0;
+/// Space between the tabs and the buttons at the end of the strip.
+const END_GAP: f32 = 4.0;
+/// The free strip below which the grip that moves the window shows.
+const MIN_DRAG_ROOM: f32 = 40.0;
+/// How wide the fade is where tabs are scrolled out of view.
+const FADE_W: f32 = 28.0;
+/// Seconds the tabs take to scroll where they are sent.
+const SCROLL_TIME: f32 = 0.12;
 /// A tab at its narrowest.
 const MIN_TAB_W: f32 = 110.0;
 /// A button of the title bar with the space after it.
@@ -102,34 +111,37 @@ struct TabEnv<'a> {
 }
 
 impl App {
-    /// PhotoCraft-style document tabs on a dark strip, `+` after them, the theme menu at the end.
-    /// A tab can be dragged along the strip, the others sliding out of its way.
+    /// PhotoCraft-style document tabs on a dark strip, `+` after them, the buttons at the end.
+    /// A tab can be dragged along the strip, the others sliding out of its way. When they don't
+    /// all fit, they scroll sideways under the end of the strip (wheel or touchpad), and `+` and
+    /// a list of those out of view wait there.
     pub(super) fn tab_strip(&mut self, ui: &mut Ui) {
         let t = Tokens::get(ui.ctx());
         let mut actions = StripActions::default();
         let title_bar = super::title_bar::wanted(&self.settings);
         let strip = ui.available_rect_before_wrap();
         let strip = Rect::from_min_size(strip.min, vec2(strip.width(), TAB_H));
+        let right_to_left = egui::Layout::right_to_left(egui::Align::Center);
 
-        // From the right: the caption buttons, the strip's own buttons against them, room to
-        // move the window, and the tabs in what is left, those that don't fit in a list.
+        // From the right: the caption buttons, the strip's own buttons against them and the
+        // profile, the grip that moves the window when the tabs leave no room for that, then
+        // the tabs in what is left.
         let mut right = strip.right();
         if title_bar {
             let width = super::title_bar::captions_width(ui.ctx());
             super::title_bar::captions(ui, &t, strip.with_min_x(right - width));
             right -= width;
         }
-        let gutter = if title_bar {
-            super::title_bar::DRAG_GUTTER
-        } else {
-            GUTTER
-        };
         let titles = self.titles(ui, &t);
         // When the buttons would leave the tabs too little room, they go into the profile menu.
+        let handle_w = if title_bar {
+            super::title_bar::HANDLE_W
+        } else {
+            0.0
+        };
         let top = self.title_bar_buttons();
-        let buttons_w = top.len() as f32 * BAR_BUTTON_W + PROFILE_MAX_W;
-        let folded = right - strip.left() - gutter - buttons_w < tabs_needed(&titles, self.active);
-        let right_to_left = egui::Layout::right_to_left(egui::Align::Center);
+        let buttons_w = top.len() as f32 * BAR_BUTTON_W + PROFILE_MAX_W + handle_w;
+        let folded = right - strip.left() - END_GAP - buttons_w < tabs_needed(&titles, self.active);
         let buttons = ui
             .scope_builder(
                 UiBuilder::new()
@@ -139,106 +151,173 @@ impl App {
             )
             .response
             .rect;
-        let tabs_area = strip.with_max_x((buttons.left() - gutter).max(strip.left()));
+
+        let widths: Vec<f32> = titles.iter().map(|title| title.width).collect();
+        let total = row_width(&widths);
+        // The grip only when the tabs leave too little of the strip free to move the window by.
+        let free = buttons.left() - END_GAP - strip.left() - total - PLUS_W;
+        let buttons_left = if title_bar && free < MIN_DRAG_ROOM {
+            let rect = strip.with_max_x(buttons.left());
+            let layout = UiBuilder::new().max_rect(rect).layout(right_to_left);
+            ui.scope_builder(layout, |ui| {
+                ui.add_space(2.0);
+                super::title_bar::handle(ui, &t);
+            })
+            .response
+            .rect
+            .left()
+        } else {
+            buttons.left()
+        };
+        let end = (buttons_left - END_GAP).max(strip.left());
+        let overflow = total + PLUS_W > end - strip.left();
+        let controls = if overflow { CONTROLS_W } else { 0.0 };
+        let area = Rect::from_min_max(
+            strip.left_top(),
+            pos2((end - controls).max(strip.left()), strip.bottom()),
+        );
+        let offset = self.scroll_tabs(ui, area, &widths);
+        let row = Rect::from_min_size(pos2(area.left() - offset, strip.top()), vec2(total, TAB_H));
+
         let left_to_right = egui::Layout::left_to_right(egui::Align::Center);
-        let tabs = ui.scope_builder(
-            UiBuilder::new().max_rect(tabs_area).layout(left_to_right),
+        ui.scope_builder(
+            UiBuilder::new().max_rect(area).layout(left_to_right),
             |ui| {
-                ui.set_clip_rect(tabs_area.intersect(ui.clip_rect()));
-                ui.spacing_mut().item_spacing.x = GAP;
-                let widths: Vec<f32> = titles.iter().map(|title| title.width).collect();
-                let room = tabs_area.width() - PLUS_W;
-                let mut shown = shown_tabs(&widths, self.active, room);
-                if shown.len() < widths.len() {
-                    shown = shown_tabs(&widths, self.active, room - LIST_W);
+                ui.set_clip_rect(area.intersect(ui.clip_rect()));
+                // The strip is as tall as a tab however the tabs are scrolled.
+                ui.advance_cursor_after_rect(area);
+                self.tabs_row(ui, &t, &mut actions, &titles, row);
+                // The ends fade where more tabs are scrolled out of view.
+                let max = (total - area.width()).max(0.0);
+                if offset > 0.5 {
+                    let edge = area.with_max_x(area.left() + FADE_W);
+                    fade(ui.painter(), edge, t.tab_strip, false);
                 }
-                self.tabs_row(ui, &t, &mut actions, &titles, &shown);
-                ui.add_space(4.0);
-                if icons::small_button(ui, "plus", "New tab (Ctrl+T)").clicked() {
-                    actions.add = true;
-                }
-                if shown.len() < titles.len() {
-                    self.tabs_list(ui, &titles, &shown, &mut actions);
+                if offset < max - 0.5 {
+                    let edge = area.with_min_x(area.right() - FADE_W);
+                    fade(ui.painter(), edge, t.tab_strip, true);
                 }
             },
         );
-        if title_bar {
-            // What is left between the tabs and the buttons moves the window.
-            let from = tabs.response.rect.right().min(buttons.left());
-            let rest = Rect::from_min_max(pos2(from, strip.top()), buttons.left_bottom());
-            super::title_bar::drag_area(ui, rest, "between");
+        if overflow {
+            // The list of the tabs out of view, `+` at its top, next to the grip.
+            let rect =
+                Rect::from_min_max(pos2(area.right(), strip.top()), pos2(end, strip.bottom()));
+            let hidden = out_of_view(&widths, offset, area.width());
+            ui.scope_builder(
+                UiBuilder::new().max_rect(rect).layout(right_to_left),
+                |ui| {
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    self.tabs_list(ui, &titles, &hidden, &mut actions);
+                },
+            );
+        } else {
+            let x = row.right() + 4.0;
+            let rect = Rect::from_min_size(pos2(x, strip.top()), vec2(20.0, TAB_H));
+            ui.scope_builder(
+                UiBuilder::new().max_rect(rect).layout(left_to_right),
+                |ui| {
+                    if icons::small_button(ui, "plus", "New tab (Ctrl+T)").clicked() {
+                        actions.add = true;
+                    }
+                },
+            );
+            if title_bar {
+                // What is left between `+` and the grip moves the window too.
+                let rest =
+                    Rect::from_min_max(pos2(x + 24.0, strip.top()), pos2(end, strip.bottom()));
+                super::title_bar::drag_area(ui, rest, "between");
+            }
         }
         self.apply_strip_actions(actions, ui.ctx());
     }
 
-    /// The tabs that don't fit on the strip, in a list to pick one from.
+    /// How far the tabs are scrolled, given the room `area` they show in: moved by the wheel or
+    /// touchpad over them, and so that the active tab is in view when it changes.
+    fn scroll_tabs(&mut self, ui: &Ui, area: Rect, widths: &[f32]) -> f32 {
+        let room = area.width();
+        let max = (row_width(widths) - room).max(0.0);
+        let mut offset = self.tab_scroll;
+        if ui.rect_contains_pointer(area) {
+            // A mouse wheel scrolls up and down; either way moves the tabs along.
+            let delta = ui.input(|i| i.smooth_scroll_delta);
+            offset -= delta.x + delta.y;
+        }
+        let active = self.tab_ids().get(self.active).copied();
+        if self.tab_scrolled_to != active {
+            self.tab_scrolled_to = active;
+            if let Some((left, right)) = tab_span(widths, self.active) {
+                offset = scroll_to_show(offset, room, left, right);
+            }
+        }
+        self.tab_scroll = offset.clamp(0.0, max);
+        ui.ctx()
+            .animate_value_with_time(egui::Id::new("tab-scroll"), self.tab_scroll, SCROLL_TIME)
+    }
+
+    /// The tabs out of view, in a list to pick one from, after a new tab (the strip has no room
+    /// left for `+`).
     fn tabs_list(
         &self,
         ui: &mut Ui,
         titles: &[Title],
-        shown: &[usize],
+        hidden: &[usize],
         actions: &mut StripActions,
     ) {
-        ui.add_space(4.0);
-        let hidden = titles.len() - shown.len();
-        let resp = icons::small_button(ui, "chevron-down", &format!("{hidden} more tabs"));
+        let tip = format!("New tab, and {} more tabs", hidden.len());
+        let resp = icons::small_button(ui, "chevron-down", &tip);
         egui::Popup::menu(&resp)
             .style(theme::menu_style)
             .show(|ui| {
-                for (i, title) in titles.iter().enumerate() {
-                    if !shown.contains(&i) && ui.button(title.galley.text()).clicked() {
+                if ui.button("New tab").on_hover_text("Ctrl+T").clicked() {
+                    actions.add = true;
+                }
+                ui.separator();
+                for &i in hidden {
+                    if let Some(title) = titles.get(i)
+                        && ui.button(title.galley.text()).clicked()
+                    {
                         actions.select = Some(i);
                     }
                 }
             });
     }
 
-    /// The tabs `shown` in their places, the dragged one following the pointer over the others.
+    /// Every tab in its place along `row` (which may run past what is in view), the dragged one
+    /// following the pointer over the others.
     fn tabs_row(
         &mut self,
         ui: &mut Ui,
         t: &Tokens,
         actions: &mut StripActions,
         titles: &[Title],
-        shown: &[usize],
+        row: Rect,
     ) {
         let ctx = ui.ctx().clone();
-        // Places on the strip, left to right; `shown` says which tab is in each.
-        let n = shown.len();
-        let width = |place: usize| {
-            shown
-                .get(place)
-                .and_then(|&i| titles.get(i))
-                .map_or(0.0, |g| g.width)
-        };
-        let total: f32 = (0..n).map(|p| width(p) + GAP).sum::<f32>() - GAP;
-        let (strip, _) = ui.allocate_exact_size(vec2(total.max(0.0), TAB_H), Sense::hover());
+        let n = titles.len();
+        let width = |i: usize| titles.get(i).map_or(0.0, |g| g.width);
 
         // The dragged tab follows the pointer; the slot it would drop into is where its
         // middle is among the others.
-        let dragged = self.tab_drag.and_then(|d| {
-            let from = shown.iter().position(|&i| i == d.from)?;
+        let dragged = self.tab_drag.filter(|d| d.from < n).and_then(|d| {
             let x = ctx.pointer_interact_pos()?.x - d.grab;
-            let max = (strip.right() - width(from)).max(strip.left());
-            Some((from, x.clamp(strip.left(), max)))
+            let max = (row.right() - width(d.from)).max(row.left());
+            Some((d.from, x.clamp(row.left(), max)))
         });
-        let (place, slot) = places(strip.left(), n, width, dragged);
+        let (place, slot) = places(row.left(), n, width, dragged);
         if let (Some((from, _)), Some(slot)) = (dragged, slot)
             && !ctx.input(|i| i.pointer.primary_down())
-            && let (Some(&from), Some(&to)) = (shown.get(from), shown.get(slot))
         {
-            actions.moved = Some((from, to));
+            actions.moved = Some((from, slot));
         }
 
         // The dragged tab is drawn last, over the others.
-        let dragged_place = dragged.map(|(from, _)| from);
-        let paint_order = (0..n)
-            .filter(|&p| Some(p) != dragged_place)
-            .chain(dragged_place);
+        let dragging = dragged.map(|(from, _)| from);
+        let paint_order = (0..n).filter(|&j| Some(j) != dragging).chain(dragging);
         let ids = self.tab_ids();
         let mut env = TabEnv {
             active: self.active,
-            dragging: dragged_place.and_then(|p| shown.get(p).copied()),
+            dragging,
             can_reopen: !self.closed.is_empty(),
             tab_looks: &self.tab_looks,
             switcher_query: &mut self.switcher_query,
@@ -246,23 +325,24 @@ impl App {
             t,
             actions,
         };
-        for p in paint_order {
-            let Some(&i) = shown.get(p) else {
-                continue;
-            };
+        for i in paint_order {
             let (Some(tab), Some(title), Some(&id)) = (self.tabs.get(i), titles.get(i), ids.get(i))
             else {
                 continue;
             };
+            // Places are kept from the row's start, so scrolling moves the tabs at once and
+            // only a change of order slides.
             let x = match dragged {
-                Some((from, x)) if from == p => ctx.animate_value_with_time(id.with("x"), x, 0.0),
-                _ => ctx.animate_value_with_time(
-                    id.with("x"),
-                    place.get(p).copied().unwrap_or(strip.left()),
-                    TAB_SLIDE,
-                ),
+                // Kept as its place, so that when let go it slides from there.
+                Some((from, x)) if from == i => {
+                    row.left() + ctx.animate_value_with_time(id.with("x"), x - row.left(), 0.0)
+                }
+                _ => {
+                    let at = place.get(i).copied().unwrap_or(row.left()) - row.left();
+                    row.left() + ctx.animate_value_with_time(id.with("x"), at, TAB_SLIDE)
+                }
             };
-            let rect = Rect::from_min_size(pos2(x, strip.top()), vec2(title.width, TAB_H));
+            let rect = Rect::from_min_size(pos2(x, row.top()), vec2(title.width, TAB_H));
             let placed = Placed {
                 index: i,
                 tab,
@@ -421,28 +501,57 @@ fn tabs_needed(titles: &[Title], active: usize) -> f32 {
     active_w + another + PLUS_W
 }
 
-/// The tabs that fit in `room` given their `widths`, in order: as many as fit from the first,
-/// and the `active` one always, in place of those before it it needs the room of.
-fn shown_tabs(widths: &[f32], active: usize, room: f32) -> Vec<usize> {
-    let span = |tabs: &[usize]| -> f32 {
-        let gaps = tabs.len().saturating_sub(1) as f32 * GAP;
-        tabs.iter().filter_map(|&i| widths.get(i)).sum::<f32>() + gaps
+/// The width of a row of tabs of `widths`.
+fn row_width(widths: &[f32]) -> f32 {
+    let gaps = widths.len().saturating_sub(1) as f32 * GAP;
+    widths.iter().sum::<f32>() + gaps
+}
+
+/// Where tab `i` starts and ends along the row.
+fn tab_span(widths: &[f32], i: usize) -> Option<(f32, f32)> {
+    let width = *widths.get(i)?;
+    let left = widths.iter().take(i).map(|w| w + GAP).sum::<f32>();
+    Some((left, left + width))
+}
+
+/// The scroll that brings `left..right` into a view of `room` from `offset`, moving as little
+/// as it can: the start shows when it doesn't all fit.
+fn scroll_to_show(offset: f32, room: f32, left: f32, right: f32) -> f32 {
+    if left < offset || right - left > room {
+        left
+    } else if right > offset + room {
+        right - room
+    } else {
+        offset
+    }
+}
+
+/// The tabs not wholly in a view of `room` scrolled to `offset`.
+fn out_of_view(widths: &[f32], offset: f32, room: f32) -> Vec<usize> {
+    (0..widths.len())
+        .filter(|&i| {
+            tab_span(widths, i)
+                .is_some_and(|(left, right)| left < offset - 0.5 || right > offset + room + 0.5)
+        })
+        .collect()
+}
+
+/// A band in `color` fading out across `rect`, toward its right end when `toward_right` is
+/// false, so that what is under it fades into `color` at the other end.
+fn fade(painter: &egui::Painter, rect: Rect, color: Color32, toward_right: bool) {
+    let (left, right) = if toward_right {
+        (Color32::TRANSPARENT, color)
+    } else {
+        (color, Color32::TRANSPARENT)
     };
-    let mut shown: Vec<usize> = Vec::new();
-    for i in 0..widths.len() {
-        shown.push(i);
-        if span(&shown) > room {
-            shown.pop();
-            break;
-        }
-    }
-    if active < widths.len() && !shown.contains(&active) {
-        while !shown.is_empty() && span(&[shown.as_slice(), &[active]].concat()) > room {
-            shown.pop();
-        }
-        shown.push(active);
-    }
-    shown
+    let mut mesh = egui::Mesh::default();
+    mesh.colored_vertex(rect.left_top(), left);
+    mesh.colored_vertex(rect.right_top(), right);
+    mesh.colored_vertex(rect.right_bottom(), right);
+    mesh.colored_vertex(rect.left_bottom(), left);
+    mesh.add_triangle(0, 1, 2);
+    mesh.add_triangle(0, 2, 3);
+    painter.add(mesh);
 }
 
 /// Each tab's left edge from `left` on, the dragged one (index, left edge) moved to the slot
@@ -484,39 +593,39 @@ fn places(
 mod tests {
     use super::*;
 
-    /// Room for exactly `n` tabs of 100.
-    fn room(n: usize) -> f32 {
-        n as f32 * 100.0 + (n - 1) as f32 * GAP
+    #[test]
+    fn a_row_is_its_tabs_and_the_gaps_between() {
+        assert!((row_width(&[100.0, 50.0]) - (150.0 + GAP)).abs() < 0.01);
+        assert!(row_width(&[]).abs() < 0.01);
     }
 
     #[test]
-    fn all_tabs_show_when_they_fit() {
-        assert_eq!(shown_tabs(&[100.0; 4], 0, room(4)), [0, 1, 2, 3]);
+    fn a_tab_spans_from_the_end_of_those_before_it() {
+        assert_eq!(
+            tab_span(&[100.0, 50.0, 80.0], 2),
+            Some((150.0 + 2.0 * GAP, 230.0 + 2.0 * GAP))
+        );
+        assert_eq!(tab_span(&[100.0], 3), None);
     }
 
     #[test]
-    fn the_tabs_stop_where_the_room_ends() {
-        assert_eq!(shown_tabs(&[100.0; 6], 1, room(3) + 50.0), [0, 1, 2]);
+    fn a_tab_is_scrolled_into_view_as_little_as_needed() {
+        // In view: stays.
+        assert!((scroll_to_show(100.0, 300.0, 150.0, 250.0) - 100.0).abs() < 0.01);
+        // Past the right end: its right edge at the end of the view.
+        assert!((scroll_to_show(0.0, 300.0, 350.0, 450.0) - 150.0).abs() < 0.01);
+        // Before the start: its left edge at the start.
+        assert!((scroll_to_show(200.0, 300.0, 50.0, 150.0) - 50.0).abs() < 0.01);
+        // Wider than the view: its start.
+        assert!((scroll_to_show(0.0, 100.0, 50.0, 400.0) - 50.0).abs() < 0.01);
     }
 
     #[test]
-    fn the_active_tab_shows_in_place_of_the_last_that_fit() {
-        assert_eq!(shown_tabs(&[100.0; 6], 5, room(3)), [0, 1, 5]);
-    }
-
-    #[test]
-    fn a_wide_active_tab_takes_the_room_of_several() {
-        let widths = [100.0, 100.0, 100.0, 100.0, 250.0];
-        assert_eq!(shown_tabs(&widths, 4, room(4)), [0, 4]);
-    }
-
-    #[test]
-    fn the_active_tab_shows_even_alone_in_too_little_room() {
-        assert_eq!(shown_tabs(&[100.0; 3], 2, 50.0), [2]);
-    }
-
-    #[test]
-    fn no_tabs_none_shown() {
-        assert!(shown_tabs(&[], 0, 500.0).is_empty());
+    fn the_list_has_the_tabs_not_wholly_in_view() {
+        let widths = [100.0; 5];
+        // A view of 250 from 120: the second wholly, the third wholly, the rest not.
+        let hidden = out_of_view(&widths, 100.0 + GAP, 2.0 * 100.0 + GAP);
+        assert_eq!(hidden, [0, 3, 4]);
+        assert!(out_of_view(&widths, 0.0, row_width(&widths)).is_empty());
     }
 }

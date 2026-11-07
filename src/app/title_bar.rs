@@ -17,9 +17,6 @@ use crate::theme::Tokens;
 const CAPTION_W: f32 = 46.0;
 /// The three caption buttons together.
 const CAPTIONS_W: f32 = 3.0 * CAPTION_W;
-/// Space between the tabs and the strip's buttons kept free to move the window by, however many
-/// tabs there are.
-pub(super) const DRAG_GUTTER: f32 = 40.0;
 /// Half the size of a caption button's glyph.
 const GLYPH_HALF: f32 = 5.0;
 /// How far in from the window's edge a press resizes it: thin, as it lies over the caption
@@ -218,7 +215,34 @@ pub(super) fn drag_area(ui: &mut Ui, rect: Rect, name: &str) {
     }
     let id = egui::Id::new(("title-bar-drag", name));
     let resp = ui.interact(rect, id, Sense::click_and_drag());
-    let ctx = ui.ctx();
+    moves_window(ui.ctx(), &resp);
+}
+
+/// The width of [`handle`] with the space before it.
+pub(super) const HANDLE_W: f32 = 28.0 + 6.0;
+
+/// A grip the size of the strip's buttons, there only to move the window by (and maximize it
+/// with a double click): the strip always has one, however many tabs scroll under its end.
+pub(super) fn handle(ui: &mut Ui, t: &Tokens) {
+    let (rect, _) = ui.allocate_exact_size(vec2(28.0, 28.0), Sense::hover());
+    let resp = ui
+        .interact(
+            rect,
+            egui::Id::new("title-bar-handle"),
+            Sense::click_and_drag(),
+        )
+        .on_hover_cursor(CursorIcon::Grab)
+        .on_hover_text("Drag to move the window, double-click to maximize it");
+    if resp.hovered() {
+        ui.painter().rect_filled(rect, t.radius, t.pressed);
+    }
+    let tint = if resp.hovered() { t.text } else { t.text_faint };
+    crate::icons::paint(ui, rect, "grip-vertical", 17.0, tint);
+    moves_window(ui.ctx(), &resp);
+}
+
+/// Dragged, `resp` moves the window; double-clicked, it maximizes or restores it.
+fn moves_window(ctx: &egui::Context, resp: &Response) {
     if resp.double_clicked() {
         let maximized = window_state(ctx).maximized;
         ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(!maximized));

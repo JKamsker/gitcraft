@@ -123,6 +123,10 @@ pub struct App {
     /// The folders of the last repository tabs closed, the last one at the end.
     closed: Vec<PathBuf>,
     tab_drag: Option<TabDrag>,
+    /// How far the tabs are scrolled along the strip.
+    tab_scroll: f32,
+    /// The active tab the strip last scrolled into view.
+    tab_scrolled_to: Option<egui::Id>,
     /// The window has the system's title bar (see `title_bar`).
     decorated: bool,
     /// Windows' border was last asked shown (true) or hidden (see `title_bar::sync_border`).
@@ -169,6 +173,8 @@ impl App {
             toasts: Vec::new(),
             closed: Vec::new(),
             tab_drag: None,
+            tab_scroll: 0.0,
+            tab_scrolled_to: None,
             decorated: title_bar::decorated_now(),
             window_border: None,
             error: None,

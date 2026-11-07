@@ -50,6 +50,7 @@ const SOURCES: &[(&str, &str)] = icons![
     "git-merge",
     "git-pull-request",
     "globe",
+    "grip-vertical",
     "heart",
     "history",
     "key-round",

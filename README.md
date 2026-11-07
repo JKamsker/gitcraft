@@ -227,8 +227,9 @@ so your config, credentials and hooks apply as usual.
 - The settings, command palette, theme and manual buttons sit in the title bar, or in the footer
   of a repository's left or right panel, in any order: drag one there (it snaps into the opening
   made for it), right-click it, or pick in Settings → Appearance. On a folded panel they stack up
-  its strip. Tabs that don't fit go in a list after `+`, and when the title bar
-  gets too narrow its buttons go into the profile menu.
+  its strip. Tabs that don't fit scroll sideways under the end of the strip (wheel or touchpad),
+  with `+` and a list of those out of view next to a grip that moves the window; when the title
+  bar gets too narrow its buttons go into the profile menu.
 - Previews beside the settings: point at a setting and a panel on the right (above the page in
   a narrow window) draws what it does with the values set now, as the app draws it. The branch
   column measured on a small graph with long branch names cut to fit, the columns at their
