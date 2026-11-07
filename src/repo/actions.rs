@@ -15,6 +15,9 @@ use crate::terminal::ShellSpec;
 
 /// Everything the views ask for; applied after drawing so views only borrow the state.
 pub(crate) enum Action {
+    Keyboard(super::keyboard::Request),
+    KeyboardStep(i32),
+    FocusPane(super::keyboard::Pane),
     /// What a key of the tab does (see [`crate::keymap`]), or why it can't now.
     Key(crate::keymap::Command),
     /// Show the changes and put the cursor in the commit summary.

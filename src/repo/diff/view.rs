@@ -268,8 +268,19 @@ impl RepoTab {
         let sel = rows.show(ui, &path, acts);
         let (clicked, offset, jumped, seen) = (rows.clicked, rows.offset, rows.jumped, rows.seen);
         self.find.saw(seen);
+        let hunk = if let Some(line) = clicked {
+            data.hunk_at(false, line)
+        } else if view.keyboard_hunk.is_none()
+            || (view.scroll - offset).abs() > 0.5
+            || jumped.is_some()
+        {
+            data.hunk_at(split, (offset / super::LINE_H) as usize + 3)
+        } else {
+            view.keyboard_hunk
+        };
 
         if let Some(view) = &mut self.diff {
+            view.keyboard_hunk = hunk;
             view.auto_opened.extend(auto_opened);
             view.text_sel = sel;
             view.scroll = offset;
@@ -287,6 +298,7 @@ impl RepoTab {
                 view.pick_line(i, shift);
             }
         }
+        self.keyboard_hunk(ui, acts);
     }
 
     /// Why the diff shown starts folded, while it does (a conflicted file never does, nor one

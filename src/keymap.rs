@@ -8,7 +8,7 @@ mod resolver;
 
 pub(crate) use config::{Overrides, Stroke};
 use egui::{Key, Modifiers};
-pub(crate) use resolver::{cancel, owner, pressed, which_key};
+pub(crate) use resolver::{active, cancel, owner, pressed, take, which_key};
 
 /// What a key does.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -33,6 +33,16 @@ pub(crate) enum Command {
     Terminal,
     StageAll,
     Commit,
+    FocusSidebar,
+    FocusGraph,
+    FocusDetail,
+    FileNext,
+    FilePrevious,
+    FileToggleStage,
+    FileOpen,
+    HunkStage,
+    HunkUnstage,
+    HunkDiscard,
 }
 
 /// Where a key works: anywhere in the window, or in a repository tab.
@@ -40,11 +50,16 @@ pub(crate) enum Command {
 pub(crate) enum Scope {
     Window,
     Repository,
+    Files,
+    Diff,
 }
 
 impl Scope {
-    fn overlaps(self, _other: Self) -> bool {
-        true
+    fn overlaps(self, other: Self) -> bool {
+        !matches!(
+            (self, other),
+            (Self::Files, Self::Diff) | (Self::Diff, Self::Files)
+        )
     }
 }
 
@@ -69,7 +84,15 @@ impl Command {
             | Command::NewBranch
             | Command::Terminal
             | Command::StageAll
-            | Command::Commit => Scope::Repository,
+            | Command::Commit
+            | Command::FocusSidebar
+            | Command::FocusGraph
+            | Command::FocusDetail => Scope::Repository,
+            Command::FileNext
+            | Command::FilePrevious
+            | Command::FileToggleStage
+            | Command::FileOpen => Scope::Files,
+            Command::HunkStage | Command::HunkUnstage | Command::HunkDiscard => Scope::Diff,
         }
     }
 
@@ -94,6 +117,16 @@ impl Command {
             Self::Terminal => "terminal",
             Self::StageAll => "stage_all",
             Self::Commit => "commit",
+            Self::FocusSidebar => "focus_sidebar",
+            Self::FocusGraph => "focus_graph",
+            Self::FocusDetail => "focus_detail",
+            Self::FileNext => "file_next",
+            Self::FilePrevious => "file_previous",
+            Self::FileToggleStage => "file_toggle_stage",
+            Self::FileOpen => "file_open",
+            Self::HunkStage => "hunk_stage",
+            Self::HunkUnstage => "hunk_unstage",
+            Self::HunkDiscard => "hunk_discard",
             Self::GoToTab(1) => "tab_1",
             Self::GoToTab(2) => "tab_2",
             Self::GoToTab(3) => "tab_3",
@@ -110,6 +143,7 @@ impl Command {
         WINDOW_ROWS
             .iter()
             .chain(REPOSITORY_ROWS)
+            .chain(LOCAL_ROWS)
             .find(|r| r.commands.contains(&self))
             .map_or("Action", |r| r.what)
     }
@@ -117,7 +151,10 @@ impl Command {
     /// Whether holding the key down does it again: going through the tabs does, an operation
     /// started once doesn't.
     fn repeats(self) -> bool {
-        matches!(self, Command::NextTab | Command::PreviousTab)
+        matches!(
+            self,
+            Command::NextTab | Command::PreviousTab | Command::FileNext | Command::FilePrevious
+        )
     }
 }
 
@@ -173,6 +210,16 @@ pub(crate) const BINDINGS: &[Binding] = &[
     bind(Command::Terminal, CMD, Key::J),
     bind(Command::StageAll, CMD_SHIFT, Key::A),
     bind(Command::Commit, CMD, Key::Enter),
+    bind(Command::FocusSidebar, CMD.plus(Modifiers::ALT), Key::Num1),
+    bind(Command::FocusGraph, CMD.plus(Modifiers::ALT), Key::Num2),
+    bind(Command::FocusDetail, CMD.plus(Modifiers::ALT), Key::Num3),
+    bind(Command::FileNext, NONE, Key::J),
+    bind(Command::FilePrevious, NONE, Key::K),
+    bind(Command::FileToggleStage, NONE, Key::Space),
+    bind(Command::FileOpen, NONE, Key::Enter),
+    bind(Command::HunkStage, NONE, Key::S),
+    bind(Command::HunkUnstage, NONE, Key::U),
+    bind(Command::HunkDiscard, NONE, Key::D),
 ];
 
 /// The command `key` with `modifiers` held does, if any.
@@ -296,6 +343,12 @@ pub(crate) const WINDOW_ROWS: &[Row] = &[
 /// The manual's rows for a repository tab's keys. None works while a text field or the
 /// terminal has the keyboard.
 pub(crate) const REPOSITORY_ROWS: &[Row] = &[
+    row(&[Command::FocusSidebar], "Focus the sidebar"),
+    row(&[Command::FocusGraph], "Focus the graph or diff"),
+    row(
+        &[Command::FocusDetail],
+        "Focus the right pane and its files",
+    ),
     row(&[Command::Fetch], "Fetch all remotes"),
     row(&[Command::Pull], "Pull the current branch"),
     row(&[Command::Push], "Push the current branch"),
@@ -309,6 +362,22 @@ pub(crate) const REPOSITORY_ROWS: &[Row] = &[
     row(
         &[Command::Commit],
         "Commit; with nothing staged, everything; with no summary yet, go to the message. In a note editor, save the note",
+    ),
+];
+
+pub(crate) const LOCAL_ROWS: &[Row] = &[
+    row(&[Command::FileNext], "Next file"),
+    row(&[Command::FilePrevious], "Previous file"),
+    row(
+        &[Command::FileToggleStage],
+        "Stage or unstage selected file",
+    ),
+    row(&[Command::FileOpen], "Open selected file diff"),
+    row(&[Command::HunkStage], "Stage current hunk"),
+    row(&[Command::HunkUnstage], "Unstage current hunk"),
+    row(
+        &[Command::HunkDiscard],
+        "Discard current hunk (confirmation)",
     ),
 ];
 

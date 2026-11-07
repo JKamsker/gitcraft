@@ -144,6 +144,22 @@ impl RepoTab {
         let mut items = self.selection_items();
         items.extend(self.command_items(ctx));
         items.extend(self.pick_items());
+        for command in crate::keymap::LOCAL_ROWS
+            .iter()
+            .chain(&crate::keymap::REPOSITORY_ROWS[..3])
+            .flat_map(|r| r.commands.iter().copied())
+        {
+            if self.command_refusal(command).is_none() {
+                items.push(
+                    PaletteItem::action(
+                        command.title(),
+                        "keyboard selection",
+                        Action::Key(command),
+                    )
+                    .shortcut(&crate::keymap::label(ctx, command)),
+                );
+            }
+        }
         let mut labels: std::collections::HashSet<String> = items
             .iter()
             .map(|i| i.label.trim_end_matches('…').to_owned())

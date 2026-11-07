@@ -58,6 +58,7 @@ impl RepoTab {
     /// Re-reads refs, history, working tree, worktrees, stashes, remotes and submodules in the
     /// background.
     pub fn reload(&mut self, ctx: &egui::Context) {
+        self.work_epoch = self.work_epoch.wrapping_add(1);
         // Not read yet, or suspended: woken as when shown, which watches and reads once.
         if self.sleeping() {
             self.start_deferred(ctx);
@@ -168,7 +169,9 @@ impl RepoTab {
     }
 
     pub(super) fn reload_status(&mut self, ctx: &egui::Context) {
+        self.work_epoch = self.work_epoch.wrapping_add(1);
         let read = self.next_read();
+        self.work_pending = read;
         let path = self.path.clone();
         spawn(&self.tx, ctx, move || Msg::Status(read, git::status(&path)));
     }
@@ -411,6 +414,9 @@ impl RepoTab {
         // A status read since this reload started is newer.
         let state = loaded.work.in_progress;
         if Self::newer(loaded.read, &mut self.work_read) {
+            if loaded.read >= self.work_pending {
+                self.work_pending = 0;
+            }
             self.work = loaded.work;
             self.stash_picks.keep_changed(&self.work);
         }

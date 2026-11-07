@@ -32,6 +32,7 @@ impl RepoTab {
         self.owners_frame(&ctx);
         self.forks_frame(&ctx);
         self.hotfix_frame(&ctx);
+        self.keyboard_panes(&ctx);
         self.shortcuts(&ctx, &mut acts);
         self.drag_frame_start(&ctx);
         self.nav_shortcuts(&ctx, &mut acts);
@@ -114,6 +115,7 @@ impl RepoTab {
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(t.dock))
             .show(ui, |ui| {
+                let pane_rect = ui.max_rect().intersect(ui.clip_rect());
                 if self.conflict.is_some() {
                     self.conflict_view(ui, &mut acts);
                 } else if self.rebase.is_some() {
@@ -149,6 +151,7 @@ impl RepoTab {
                     }
                     self.graph_view(ui, &mut acts);
                 }
+                self.keyboard_pane(ui, super::keyboard::Pane::Graph, pane_rect);
             });
 
         self.drag_overlay(&ctx, &mut acts);
@@ -378,7 +381,9 @@ impl RepoTab {
                     }
                 });
                 if open {
+                    let pane_rect = ui.max_rect().intersect(ui.clip_rect());
                     self.sidebar(ui, acts);
+                    self.keyboard_pane(ui, super::keyboard::Pane::Sidebar, pane_rect);
                 } else {
                     let slid = widgets::slide_offset(ui, area.left(), false);
                     let below = app_buttons::folded_column(ui, Place::BottomLeft, slid);
@@ -420,7 +425,9 @@ impl RepoTab {
                     }
                 });
                 if open {
+                    let pane_rect = ui.max_rect().intersect(ui.clip_rect());
                     self.detail_panel(ui, acts);
+                    self.keyboard_pane(ui, super::keyboard::Pane::Detail, pane_rect);
                 } else {
                     let slid = widgets::slide_offset(ui, area.right(), true);
                     app_buttons::folded_column(ui, Place::BottomRight, slid);

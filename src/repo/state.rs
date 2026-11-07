@@ -147,6 +147,8 @@ pub(crate) struct DiffView {
     pub(super) jump: Option<usize>,
     /// The change jumped to last, and the scroll offset that left.
     pub(super) at_change: Option<(usize, f32)>,
+    pub(super) keyboard_hunk: Option<usize>,
+    pub(super) data_request: u64,
     /// A line (by its index in the diff) to scroll to on the next frame.
     pub(super) jump_line: Option<usize>,
     /// The moved block whose two places are shown together.
@@ -200,6 +202,8 @@ impl DiffView {
             scroll: 0.0,
             jump: None,
             at_change: None,
+            keyboard_hunk: None,
+            data_request: 0,
             jump_line: None,
             moved: None,
             revealed: Default::default(),
@@ -226,6 +230,8 @@ impl DiffView {
         if request != self.request {
             return;
         }
+        self.data_request = request;
+        self.keyboard_hunk = None;
         self.repairing = false;
         if result.is_ok() {
             self.restore = self.keep_place.take();

@@ -33,7 +33,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Copy diagnostics (at the top of this manual, or Help: Copy diagnostics in the palette) puts what a bug report needs on the clipboard: gitcraft's version and channel, the system, the graphics adapter, git, gh, glab and tea (with a login or not, never a token) and the git settings in effect, without your name, email, signing key, paths or home folder. Check it before posting.",
             "Drag a tab along the strip to reorder the tabs.",
             "What you type is kept, per repository, if gitcraft crashes or is closed: the commit message, unsent pull-request comments, reviews and replies, and an interactive rebase being set up come back when the repository is opened again. Each goes once committed, sent or started, or when you empty or cancel it. After a crash, gitcraft says so when it starts again. Nothing typed into a password or sign-in prompt is kept.",
-            "The main actions have keys: fetch, pull, push, stash, new branch, terminal, stage all and commit, and keys to go through the tabs (listed below, and in Settings → Keyboard shortcuts). Tooltips, the palette and menus show them. They do nothing while a text field or the terminal has the keyboard, so typing never runs one; only Ctrl+Enter in the commit message commits.",
+            "Cmd/Ctrl+1…9 select tabs; Cmd/Ctrl+Alt+1/2/3 focus the sidebar, graph and right pane. All registry keys can be changed or unbound in Settings, including multi-key chords. The main actions have keys: fetch, pull, push, stash, new branch, terminal, stage all and commit, and keys to go through the tabs (listed below, and in Settings → Keyboard shortcuts). Tooltips, the palette and menus show them. They do nothing while a text field or the terminal has the keyboard, so typing never runs one; only Ctrl+Enter in the commit message commits.",
             "A greyed-out menu entry says why under it.",
             "One window: started again while it runs (gitcraft <folder>, Open in gitcraft, the menu entry), gitcraft opens that folder in a tab of the window already open, or switches to its tab, and brings the window to the front (where the system won't allow that, its taskbar button flashes). Started without a folder, it just comes to the front.",
             "A repository with no commits shows its first steps in the graph: make the first commit, add a remote, publish.",
@@ -513,6 +513,7 @@ pub(crate) fn shortcut_groups(
     let mut groups = vec![
         ("Window", from_keymap(keymap::WINDOW_ROWS)),
         ("Repository", from_keymap(keymap::REPOSITORY_ROWS)),
+        ("Files and hunks", from_keymap(keymap::LOCAL_ROWS)),
     ];
     groups.extend(SHORTCUTS.iter().map(|(title, keys)| {
         let keys = keys

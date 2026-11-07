@@ -46,6 +46,16 @@ impl RepoTab {
                 refresh: Refresh::Status,
             },
             Command::Commit => return self.commit_key().map(Some),
+            Command::FocusSidebar => Action::FocusPane(super::keyboard::Pane::Sidebar),
+            Command::FocusGraph => Action::FocusPane(super::keyboard::Pane::Graph),
+            Command::FocusDetail => Action::FocusPane(super::keyboard::Pane::Detail),
+            Command::FileNext
+            | Command::FilePrevious
+            | Command::FileToggleStage
+            | Command::FileOpen
+            | Command::HunkStage
+            | Command::HunkUnstage
+            | Command::HunkDiscard => return self.keyboard_command(command).map(Some),
             Command::NewTab
             | Command::CloseTab
             | Command::ReopenTab
@@ -215,7 +225,7 @@ mod tests {
         let mut tab = loaded(&dir, &ctx);
         for b in crate::keymap::BINDINGS {
             let resolved = tab.key_action(b.command);
-            let tabs = b.command.scope() == crate::keymap::Scope::Repository;
+            let tabs = b.command.scope() != crate::keymap::Scope::Window;
             match resolved {
                 Ok(Some(_)) => assert!(tabs, "{:?}", b.command),
                 Ok(None) => assert!(!tabs, "{:?}", b.command),

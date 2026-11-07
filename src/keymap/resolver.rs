@@ -13,6 +13,7 @@ struct Resolver {
     config: config::Overrides,
     pass: Option<u64>,
     commands: Vec<Command>,
+    active: Vec<Scope>,
 }
 
 fn id(ctx: &Context, _scope: Scope) -> Id {
@@ -64,7 +65,10 @@ impl Resolver {
         });
         let mut found = None;
         let mut candidates = Vec::new();
-        for c in config::commands() {
+        for c in config::commands().filter(|c| {
+            self.active.is_empty() && matches!(c.scope(), Scope::Window | Scope::Repository)
+                || self.active.contains(&c.scope())
+        }) {
             let seq = config::effective(&self.config, c);
             if seq.len() <= self.prefix.len() || seq[..self.prefix.len()] != self.prefix {
                 continue;
@@ -100,6 +104,38 @@ impl Resolver {
     }
 }
 
+pub(crate) fn active(ctx: &Context, scopes: Vec<Scope>) {
+    let key = id(ctx, Scope::Window).with("active");
+    let old: Option<Vec<Scope>> = ctx.data(|d| d.get_temp(key));
+    if old.as_ref() != Some(&scopes) {
+        cancel(ctx, Scope::Window);
+    }
+    ctx.data_mut(|d| d.insert_temp(key, scopes));
+}
+
+/// Consume one contextual command without draining unrelated keys for the same list.
+pub(crate) fn take(ctx: &Context, command: Command) -> bool {
+    let key = id(ctx, command.scope());
+    // Resolve the frame if no app-wide dispatcher ran (for independent viewports/tests).
+    let pass = ctx.cumulative_pass_nr();
+    let ready = ctx
+        .data(|d| d.get_temp::<Resolver>(key))
+        .is_some_and(|r| r.pass == Some(pass));
+    if !ready {
+        // Window commands are delivered by the window coordinator; preserve local results.
+        let _ = pressed(ctx, Scope::Window);
+    }
+    ctx.data_mut(|d| {
+        let mut r = d.get_temp::<Resolver>(key).unwrap_or_default();
+        let at = r.commands.iter().position(|c| *c == command);
+        if let Some(at) = at {
+            r.commands.remove(at);
+        }
+        d.insert_temp(key, r);
+        at.is_some()
+    })
+}
+
 pub(crate) fn pressed(ctx: &Context, scope: Scope) -> Vec<Command> {
     let key_id = id(ctx, scope);
     let mut r = ctx
@@ -112,6 +148,9 @@ pub(crate) fn pressed(ctx: &Context, scope: Scope) -> Vec<Command> {
         return commands;
     }
     r.pass = Some(pass);
+    r.active = ctx
+        .data(|d| d.get_temp::<Vec<Scope>>(key_id.with("active")))
+        .unwrap_or_default();
     let config = config::usable(&crate::settings::Settings::get(ctx).key_bindings);
     let owner = ctx.memory(|m| m.focused());
     let (now, focused, events) = ctx.input(|i| (i.time, i.focused, i.events.clone()));

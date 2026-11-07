@@ -564,6 +564,13 @@ impl App {
                 }),
             )),
         );
+        keymap::active(
+            ctx,
+            match self.tabs.get(self.active) {
+                Some(Tab::Repo(r)) => r.key_scopes(ctx),
+                _ => vec![keymap::Scope::Window],
+            },
+        );
         // A focused text field or the terminal keeps these keys for itself.
         let modal_open = self.clone_form.is_some()
             || self.remote_form.is_some()
@@ -576,7 +583,10 @@ impl App {
             || (crate::a11y::keyboard_taken(ctx) && !home_filter::search_has_focus(ctx));
         let focused =
             ctx.input(|i| i.focused || i.raw.viewports.values().any(|v| v.focused == Some(true)));
-        let commands = if modal_open {
+        let commands = if keymap::editor::capturing(ctx) {
+            keymap::cancel(ctx, keymap::Scope::Window);
+            Vec::new()
+        } else if modal_open {
             keymap::cancel(ctx, keymap::Scope::Window);
             keymap::pressed(ctx, keymap::Scope::Window)
                 .into_iter()
@@ -645,7 +655,17 @@ impl App {
             | Command::NewBranch
             | Command::Terminal
             | Command::StageAll
-            | Command::Commit => {}
+            | Command::Commit
+            | Command::FocusSidebar
+            | Command::FocusGraph
+            | Command::FocusDetail
+            | Command::FileNext
+            | Command::FilePrevious
+            | Command::FileToggleStage
+            | Command::FileOpen
+            | Command::HunkStage
+            | Command::HunkUnstage
+            | Command::HunkDiscard => {}
         }
         false
     }

@@ -55,6 +55,16 @@ const EVERY_COMMAND: &[Command] = &[
     Command::Terminal,
     Command::StageAll,
     Command::Commit,
+    Command::FocusSidebar,
+    Command::FocusGraph,
+    Command::FocusDetail,
+    Command::FileNext,
+    Command::FilePrevious,
+    Command::FileToggleStage,
+    Command::FileOpen,
+    Command::HunkStage,
+    Command::HunkUnstage,
+    Command::HunkDiscard,
 ];
 
 #[test]
@@ -67,7 +77,11 @@ fn no_two_bindings_share_a_key() {
 
 #[test]
 fn no_binding_takes_a_key_a_view_already_uses() {
-    let bound: HashSet<_> = BINDINGS.iter().map(normalised).collect();
+    let bound: HashSet<_> = BINDINGS
+        .iter()
+        .filter(|b| matches!(b.command.scope(), Scope::Window | Scope::Repository))
+        .map(normalised)
+        .collect();
     for (group, rows) in crate::manual::SHORTCUTS {
         for (keys, what) in *rows {
             for combo in keys.split(" / ") {
@@ -93,7 +107,7 @@ fn every_command_has_one_key_and_finds_its_way_back() {
 
 #[test]
 fn every_command_is_in_the_manual_once() {
-    let rows = WINDOW_ROWS.iter().chain(REPOSITORY_ROWS);
+    let rows = WINDOW_ROWS.iter().chain(REPOSITORY_ROWS).chain(LOCAL_ROWS);
     let listed: Vec<Command> = rows.flat_map(|r| r.commands.iter().copied()).collect();
     for command in EVERY_COMMAND {
         let times = listed.iter().filter(|c| *c == command).count();

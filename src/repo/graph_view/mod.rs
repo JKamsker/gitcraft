@@ -176,6 +176,7 @@ impl RepoTab {
         let keys_free =
             !ui.ctx().egui_wants_keyboard_input() || crate::a11y::list_has_focus(ui.ctx(), rows_id);
         if !ghost
+            && self.keyboard_graph_active()
             && keys_free
             && self.dialog.is_none()
             && self.package.is_none()

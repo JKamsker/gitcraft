@@ -8,6 +8,12 @@ struct Editing {
     sequence: Vec<Stroke>,
 }
 
+pub(crate) fn capturing(ctx: &egui::Context) -> bool {
+    ctx.data(|d| d.get_temp::<Option<Editing>>(Id::new(("key-binding-editor", ctx.viewport_id()))))
+        .flatten()
+        .is_some()
+}
+
 pub(crate) fn page(overrides: &mut Overrides, ui: &mut Ui) {
     ui.label("Select Change, press up to four keys, then Save. Empty bindings disable an action. Escape cancels capture.");
     if let Err(error) = config::validate(overrides) {
