@@ -21,7 +21,7 @@ REPO_A_S = REPO_A_F + REPO_G_M + REPO_N_S
 
 # These Git-process-heavy tests need their own libtest invocation.
 ISOLATED = {
-    "repo-rest": ["repo::reflog::tests::a_commit_lost_in_the_terminal_comes_back_as_a_branch"],
+    "repo-n-s": ["repo::reflog::tests::a_commit_lost_in_the_terminal_comes_back_as_a_branch"],
     "core": ["parallel_bisect::tests::finds_the_first_bad_commit_with_any_parallelism"],
 }
 
@@ -32,12 +32,11 @@ SHARDS = {
     "git-rest": ["git::", *[arg for p in GIT_FIRST for arg in ("--skip", p)]],
     "repo-a-f": [*REPO_A_F, "--skip", "git::"],
     "repo-g-m": [*REPO_G_M, "--skip", "git::"],
-    "repo-n-s": [*REPO_N_S, "--skip", "git::"],
+    "repo-n-s": [*REPO_N_S, "--skip", "git::", "--skip", ISOLATED["repo-n-s"][0]],
     "repo-rest": [
         "repo::",
         "--skip", "git::",
         *[arg for p in REPO_A_S for arg in ("--skip", p)],
-        "--skip", ISOLATED["repo-rest"][0],
     ],
     "core": [
         "--skip", "git::",
