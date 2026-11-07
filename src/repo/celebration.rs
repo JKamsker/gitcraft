@@ -154,6 +154,10 @@ impl RepoTab {
     }
 }
 
+fn reduced(ctx: &egui::Context) -> bool {
+    crate::a11y::motion::reduced(ctx) || ctx.global_style().animation_time == 0.0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,8 +248,4 @@ mod tests {
         tab.celebration_loaded(tab.reads + 1, &ctx);
         assert!(tab.celebration.visible.is_none());
     }
-}
-
-fn reduced(ctx: &egui::Context) -> bool {
-    crate::a11y::motion::reduced(ctx) || ctx.global_style().animation_time == 0.0
 }

@@ -214,4 +214,52 @@ mod tests {
         }
         assert!(!out[0].1.intersects(out[2].1.shrink(0.01)));
     }
+    #[test]
+    fn atlas_folder_hotspot_zooms_and_file_hotspot_opens_pinned_history() -> Result<(), String> {
+        use egui_kittest::{Harness, kittest::Queryable};
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/atlas-ui".into(), &ctx);
+        let nodes = vec![
+            atlas::Node {
+                children: vec![1],
+                bytes: 4,
+                ..Default::default()
+            },
+            atlas::Node {
+                path: b"src".to_vec(),
+                children: vec![2],
+                bytes: 4,
+                ..Default::default()
+            },
+            atlas::Node {
+                path: b"src/a".to_vec(),
+                bytes: 4,
+                ..Default::default()
+            },
+        ];
+        tab.atlas = Some(State {
+            data: Some(Atlas {
+                head: "a".repeat(40),
+                history: std::sync::Arc::new(crate::git::activity::History::default()),
+                nodes,
+                selected: 0,
+                query: Query::default(),
+            }),
+            ..Default::default()
+        });
+        let mut harness = Harness::builder()
+            .with_size(vec2(1200.0, 900.0))
+            .build_ui_state(|ui, tab: &mut RepoTab| tab.atlas_window(ui.ctx()), tab);
+        harness.run();
+        harness.get_by_label_contains("src, 4 bytes").click();
+        harness.run();
+        assert_eq!(harness.state().atlas.as_ref().ok_or("atlas")?.zoom, 1);
+        harness.get_by_label_contains("src/a, 4 bytes").click();
+        harness.run();
+        assert!(harness.state().atlas.is_none());
+        let file = harness.state().file_view.as_ref().ok_or("file history")?;
+        assert_eq!(file.path, "src/a");
+        assert_eq!(file.rev, Some("a".repeat(40)));
+        Ok(())
+    }
 }

@@ -402,4 +402,56 @@ mod tests {
         assert!(render::render(&snapshot, &|| false).is_err());
         Ok(())
     }
+    #[test]
+    fn postcard_controls_anonymize_then_compose_the_displayed_preview() -> Result<(), String> {
+        use egui_kittest::{Harness, kittest::Queryable};
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/postcard-ui".into(), &ctx);
+        tab.postcards = State {
+            open: true,
+            name: "Release".into(),
+            date: "2026-11-07".into(),
+            target: "a".repeat(40),
+            include_names: true,
+            commits: Some(vec![Commit {
+                hash: "a".repeat(40),
+                author: "Private Person".into(),
+                summary: "Private subject".into(),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+        let mut harness = Harness::builder()
+            .with_size(egui::vec2(1200.0, 1000.0))
+            .build_ui_state(|ui, tab: &mut RepoTab| tab.postcard_window(ui.ctx()), tab);
+        harness.run();
+        harness
+            .get_by_label("Anonymize names and replace all subjects with commit numbers")
+            .click();
+        harness.run();
+        assert!(harness.state().postcards.anonymize);
+        harness.get_by_label("Compose PNG preview").click();
+        harness.run_steps(2);
+        let began = std::time::Instant::now();
+        while harness.state().postcards.preview.is_none() {
+            if began.elapsed() > std::time::Duration::from_secs(4) {
+                return Err(format!(
+                    "Preview did not finish: {:?}",
+                    harness.state().postcards.status
+                ));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            harness.run_steps(1);
+        }
+        let preview = harness
+            .state()
+            .postcards
+            .preview
+            .as_ref()
+            .ok_or("preview")?;
+        assert_eq!(preview.snapshot.messages, vec!["Commit 1"]);
+        assert_eq!(preview.snapshot.contributors, vec!["Contributor 1"]);
+        assert!(preview.png.starts_with(b"\x89PNG"));
+        Ok(())
+    }
 }

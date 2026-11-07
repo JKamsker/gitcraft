@@ -230,10 +230,9 @@ fn ssh_analysis_uses_the_encoded_repository_and_background_transport() -> Result
         assert_eq!(h.commits.len(), 1);
         assert_eq!(h.commits[0].subject, "remote fixture");
         assert_eq!(h.commits[0].name, "Remote Canonical");
-        for alias in ["alias.activitylarge=!head -c 16777218 /dev/zero"] {
-            let result = process::run(&encoded, &["-c", alias, "activitylarge"], None, &|| true);
-            assert!(result.is_err_and(|e| e.contains("size limit") || e.contains("limit")));
-        }
+        let alias = "alias.activitylarge=!head -c 16777218 /dev/zero";
+        let result = process::run(&encoded, &["-c", alias, "activitylarge"], None, &|| true);
+        assert!(result.is_err_and(|e| e.contains("limit")));
         return Ok(());
     }
     let mut r = Repo::new()?;
