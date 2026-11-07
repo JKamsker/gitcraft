@@ -617,3 +617,11 @@ Assets and their licences: [ATTRIBUTION.md](ATTRIBUTION.md).
 ## License
 
 MIT OR Apache-2.0, at your option ([LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE)).
+
+Use **File views → How an object is stored…** (also in the command palette) to inspect
+an object ID, revision, or a file version. The read-only view shows the repository's
+SHA-1/SHA-256 format, logical and compressed sizes, loose files, containing packs,
+pack offsets and delta ancestry. Follow a tree entry or delta base to inspect it.
+Reads run on the repository machine (including SSH/WSL), use bounded responses,
+and disable lazy fetching. Missing objects and unsupported Git capabilities are
+reported explicitly; this view requires Git 2.45 or newer.

@@ -31,6 +31,10 @@ impl RepoTab {
             }
             widgets::toolbar_separator(ui);
             ui.menu_button("File views", |ui| {
+                if ui.button("How an object is stored…").clicked() {
+                    acts.push(Action::OpenObjectStorage);
+                    ui.close();
+                }
                 for (label, page) in [
                     (
                         "File migration map",

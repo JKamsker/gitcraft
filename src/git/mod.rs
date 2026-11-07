@@ -11,6 +11,7 @@ pub mod drafts;
 pub(crate) mod file_comparison;
 mod files;
 mod lfs;
+pub(crate) mod object_storage;
 mod refs;
 mod status;
 mod submodule;

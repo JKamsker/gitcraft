@@ -29,6 +29,7 @@ mod load;
 mod messages;
 mod navigate;
 mod operations;
+mod object_storage;
 mod patches;
 mod pinned_sections;
 mod pr_merge;

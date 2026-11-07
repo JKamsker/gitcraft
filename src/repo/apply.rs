@@ -289,6 +289,8 @@ impl RepoTab {
             Action::EditMessage(hash) => self.edit_message(hash, ctx),
             Action::SavePatch { hash, summary } => self.save_patch(hash, &summary, ctx),
             Action::ApplyPatch => self.apply_patch(ctx),
+            Action::OpenObjectStorage => self.open_object_storage(None, ctx),
+            Action::InspectObject(query) => self.open_object_storage(Some(query), ctx),
             Action::OpenBundleExport => self.open_bundle_export(ctx),
             Action::OpenBundleImport => self.open_bundle_import(ctx),
             Action::ExportBundle { refs, base } => self.export_bundle(refs, base, ctx),

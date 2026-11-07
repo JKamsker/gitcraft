@@ -18,6 +18,7 @@ use super::{Action, Refresh, RepoTab, Undo};
 use crate::theme::{self, Tokens};
 
 pub enum Dialog {
+    ObjectStorage(Box<super::object_storage::State>),
     DraftLoading(u64),
     DraftHistory {
         on: bool,
@@ -303,6 +304,7 @@ pub(super) enum Outcome {
 
 impl RepoTab {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
+        self.sync_object_storage();
         self.sync_draft_reader();
         let draft_reader_waiting = self.draft_reader_waiting();
         let Some(dialog) = &mut self.dialog else {
@@ -335,6 +337,7 @@ impl RepoTab {
             ui.set_width(380.0);
             let enter = ui.input(|i| i.key_pressed(Key::Enter));
             match dialog {
+                Dialog::ObjectStorage(state) => super::object_storage::dialog(ui, state),
                 Dialog::DraftLoading(_) => {
                     ui.heading("Reading earlier versions…");ui.add(crate::spinner::Spinner::new());
                     if draft_reader_waiting { ui.label("Waiting for the previous read to stop…"); }
