@@ -77,6 +77,7 @@ impl RepoTab {
             return;
         }
 
+        self.intent_badge(ui, &view.path);
         egui::Frame::new()
             .fill(t.chrome)
             .inner_margin(egui::Margin::symmetric(10, 6))

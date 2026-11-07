@@ -362,6 +362,7 @@ impl RepoTab {
         let rendered = markdown == Some(true) || rich_ready;
         let t = Tokens::get(ui.ctx());
         let mut clear = false;
+        self.intent_badge(ui, path);
         egui::Frame::new()
             .fill(t.chrome)
             .inner_margin(egui::Margin::symmetric(10, 6))

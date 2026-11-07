@@ -33,6 +33,7 @@ impl RepoTab {
         self.forks_frame(&ctx);
         self.hotfix_frame(&ctx);
         self.echo_frame(&ctx);
+        self.intent_frame(&ctx);
         self.shortcuts(&ctx, &mut acts);
         self.drag_frame_start(&ctx);
         self.nav_shortcuts(&ctx, &mut acts);
