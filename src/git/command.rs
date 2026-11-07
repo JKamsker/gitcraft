@@ -626,22 +626,29 @@ fn analysis_output(
         request.stdin = input.map(<[u8]>::to_vec);
         request.timeout = Some(limit);
         request.long = true;
-        let (tx, rx) = mpsc::channel();
-        std::thread::spawn(move || {
-            let _ = tx.send(remote::exec(&target.host, &request));
-        });
-        let deadline = Instant::now() + limit;
-        loop {
-            if !active() {
-                return Err("Analysis cancelled".into());
-            }
-            if Instant::now() >= deadline {
-                return Err("History analysis timed out".into());
-            }
-            match rx.recv_timeout(Duration::from_millis(20)) {
-                Ok(out) => break out?,
-                Err(mpsc::RecvTimeoutError::Timeout) => (),
-                Err(_) => return Err("History worker stopped".into()),
+        if isolated {
+            // Recovery keeps one background owner until the underlying call actually
+            // returns. Cancellation stops subsequent queries; it cannot release a
+            // queued replacement while connection/pool work is still in flight.
+            remote::exec(&target.host, &request)?
+        } else {
+            let (tx, rx) = mpsc::channel();
+            std::thread::spawn(move || {
+                let _ = tx.send(remote::exec(&target.host, &request));
+            });
+            let deadline = Instant::now() + limit;
+            loop {
+                if !active() {
+                    return Err("Analysis cancelled".into());
+                }
+                if Instant::now() >= deadline {
+                    return Err("History analysis timed out".into());
+                }
+                match rx.recv_timeout(Duration::from_millis(20)) {
+                    Ok(out) => break out?,
+                    Err(mpsc::RecvTimeoutError::Timeout) => (),
+                    Err(_) => return Err("History worker stopped".into()),
+                }
             }
         }
     } else {
@@ -674,6 +681,9 @@ fn analysis_output(
     };
     if out.stdout.len() > MAX || out.stderr.len() > MAX {
         return Err("A history page exceeded 16 MiB".into());
+    }
+    if isolated && !active() {
+        return Err("Content recovery cancelled".into());
     }
     Ok(out)
 }

@@ -1,9 +1,9 @@
 use super::*;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
-struct Fixture(PathBuf);
+pub(super) struct Fixture(pub(super) PathBuf);
 impl Fixture {
-    fn new() -> Result<Self, String> {
+    pub(super) fn new() -> Result<Self, String> {
         static ID: AtomicU64 = AtomicU64::new(0);
         let p = std::env::temp_dir().join(format!(
             "gitcraft-content-recovery-{}-{}",
@@ -180,4 +180,164 @@ fn commit_and_excerpt_parsers_refuse_invalid_identity_and_keep_unicode_ranges() 
     let (line, excerpt) = super::excerpt(text, text.find("remember").unwrap_or(0));
     assert_eq!(line, 2);
     assert!(excerpt.contains("🌱 remember"));
+}
+
+#[test]
+fn prepared_branch_and_file_recovery_are_create_only_and_preserve_head_and_index()
+-> Result<(), String> {
+    let f = Fixture::new()?;
+    f.write("file", b"recover parse_header exactly\n")?;
+    let commit = f.commit("source")?;
+    let results = search(&f.0, "parse_header", &|| true)?;
+    let found = results.report.hits.first().ok_or("No hit")?;
+    let preview = inspect(&f.0, &results, found, Some(0), &|| true)?;
+    let index = std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?;
+    let branch = prepare(
+        &f.0,
+        &preview,
+        Target::Branch("content-rescue".into()),
+        &|| true,
+    )?;
+    perform(&f.0, &branch, &|| true)?;
+    assert_eq!(git::resolve(&f.0, "refs/heads/content-rescue")?, commit);
+    assert!(perform(&f.0, &branch, &|| true).is_err());
+    assert_eq!(git::head(&f.0), commit);
+    let file = prepare(
+        &f.0,
+        &preview,
+        Target::File("recovered ü.txt".into()),
+        &|| true,
+    )?;
+    perform(&f.0, &file, &|| true)?;
+    assert_eq!(
+        std::fs::read(f.0.join("recovered ü.txt")).map_err(|e| e.to_string())?,
+        preview.bytes.as_slice()
+    );
+    assert!(perform(&f.0, &file, &|| true).is_err());
+    assert!(prepare(&f.0, &preview, Target::File("file".into()), &|| true).is_err());
+    f.write(".gitignore", b"*.secret\n")?;
+    assert!(
+        prepare(
+            &f.0,
+            &preview,
+            Target::File("private.secret".into()),
+            &|| true
+        )
+        .is_err()
+    );
+    let race = prepare(&f.0, &preview, Target::File("raced".into()), &|| true)?;
+    f.write("raced", b"preserve raced bytes")?;
+    assert!(perform(&f.0, &race, &|| true).is_err());
+    assert_eq!(
+        std::fs::read(f.0.join("raced")).map_err(|e| e.to_string())?,
+        b"preserve raced bytes"
+    );
+    assert_eq!(
+        std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?,
+        index
+    );
+    Ok(())
+}
+#[test]
+fn dropped_stash_recovery_only_updates_its_list_and_refuses_a_moved_destination()
+-> Result<(), String> {
+    let f = Fixture::new()?;
+    f.write("file", b"base")?;
+    f.commit("base")?;
+    f.write("file", b"parse_header working stash")?;
+    git::run(Some(&f.0), &["stash", "push", "-qm", "lost"])?;
+    let stash = git::resolve(&f.0, "refs/stash")?;
+    git::run(Some(&f.0), &["stash", "drop"])?;
+    let results = search(&f.0, "parse_header", &|| true)?;
+    let found = results
+        .report
+        .hits
+        .iter()
+        .find(|hit| {
+            hit.provenance
+                .iter()
+                .any(|source| source.origin == Origin::DroppedStash)
+        })
+        .ok_or("No stash content")?;
+    let selection = found
+        .provenance
+        .iter()
+        .position(|source| source.origin == Origin::DroppedStash)
+        .ok_or("No provenance")?;
+    let preview = inspect(&f.0, &results, found, Some(selection), &|| true)?;
+    let prepared = prepare(&f.0, &preview, Target::Stash, &|| true)?;
+    f.write("file", b"different current stash")?;
+    git::run(Some(&f.0), &["stash", "push", "-qm", "current"])?;
+    let current = git::resolve(&f.0, "refs/stash")?;
+    assert!(perform(&f.0, &prepared, &|| true).is_err());
+    assert_eq!(git::resolve(&f.0, "refs/stash")?, current);
+    let index = std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?;
+    let file = std::fs::read(f.0.join("file")).map_err(|e| e.to_string())?;
+    let prepared = prepare(&f.0, &preview, Target::Stash, &|| true)?;
+    perform(&f.0, &prepared, &|| true)?;
+    assert_eq!(git::resolve(&f.0, "refs/stash")?, stash);
+    assert_eq!(git::resolve(&f.0, "stash@{1}")?, current);
+    assert!(prepare(&f.0, &preview, Target::Stash, &|| true).is_err());
+    assert_eq!(
+        std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?,
+        index
+    );
+    assert_eq!(
+        std::fs::read(f.0.join("file")).map_err(|e| e.to_string())?,
+        file
+    );
+    Ok(())
+}
+#[cfg(unix)]
+#[test]
+fn new_file_recovery_refuses_links_special_destinations_and_missing_tracked_paths()
+-> Result<(), String> {
+    let f = Fixture::new()?;
+    f.write("file", b"parse_header saved")?;
+    f.commit("base")?;
+    let results = search(&f.0, "parse_header", &|| true)?;
+    let found = results.report.hits.first().ok_or("No hit")?;
+    let preview = inspect(&f.0, &results, found, Some(0), &|| true)?;
+    std::fs::remove_file(f.0.join("file")).map_err(|e| e.to_string())?;
+    assert!(prepare(&f.0, &preview, Target::File("file".into()), &|| true).is_err());
+    std::os::unix::fs::symlink(".git", f.0.join("linked")).map_err(|e| e.to_string())?;
+    assert!(
+        prepare(
+            &f.0,
+            &preview,
+            Target::File("linked/config-copy".into()),
+            &|| true
+        )
+        .is_err()
+    );
+    std::fs::create_dir(f.0.join("directory")).map_err(|e| e.to_string())?;
+    let prepared = prepare(
+        &f.0,
+        &preview,
+        Target::File("directory/new".into()),
+        &|| true,
+    )?;
+    std::fs::remove_dir(f.0.join("directory")).map_err(|e| e.to_string())?;
+    std::os::unix::fs::symlink(".git", f.0.join("directory")).map_err(|e| e.to_string())?;
+    assert!(perform(&f.0, &prepared, &|| true).is_err());
+    assert!(!f.0.join(".git/new").exists());
+    assert!(prepare(&f.0, &preview, Target::File("safe".into()), &|| false).is_err());
+    assert!(!f.0.join("safe").exists());
+    Ok(())
+}
+#[test]
+fn preview_rejects_forged_provenance_and_pruned_blob_identity() -> Result<(), String> {
+    let f = Fixture::new()?;
+    f.write("file", b"parse_header saved")?;
+    f.commit("base")?;
+    let results = search(&f.0, "parse_header", &|| true)?;
+    let mut found = results.report.hits.first().ok_or("No hit")?.clone();
+    found.provenance[0].path = "wrong".into();
+    assert!(inspect(&f.0, &results, &found, Some(0), &|| true).is_err());
+    let preview = inspect(&f.0, &results, &results.report.hits[0], Some(0), &|| true)?;
+    let mut forged = preview.clone();
+    forged.blob = "0".repeat(40);
+    assert!(prepare(&f.0, &forged, Target::File("untrusted".into()), &|| true).is_err());
+    assert!(!f.0.join("untrusted").exists());
+    Ok(())
 }

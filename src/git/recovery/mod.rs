@@ -1,5 +1,8 @@
 //! Remembered text in raw Git objects, without checking out, fetching or filtering data.
 mod batch;
+mod file;
+mod recover;
+pub(crate) use recover::{Prepared, Preview, Target, inspect, perform, prepare};
 #[cfg(test)]
 mod tests;
 
@@ -49,6 +52,7 @@ impl Hit {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Identity {
+    pub host: Option<remote::Host>,
     pub common: String,
     pub root: Option<String>,
     pub format: String,
@@ -147,12 +151,27 @@ impl<'a> Reader<'a> {
     }
     pub fn identity(&self) -> Result<Identity, String> {
         let text = |args: &[&str]| -> Result<String, String> {
-            String::from_utf8(self.run(args, None)?)
-                .map(|s| s.trim_end_matches(['\r', '\n']).to_owned())
-                .map_err(|_| "Repository metadata is not UTF-8".into())
+            let bytes = self.run(args, None)?;
+            let bytes = bytes
+                .strip_suffix(b"\n")
+                .ok_or("Truncated repository metadata")?;
+            let bytes = if cfg!(windows) && !remote::is_remote(self.repo) {
+                bytes.strip_suffix(b"\r").unwrap_or(bytes)
+            } else {
+                bytes
+            };
+            let value =
+                std::str::from_utf8(bytes).map_err(|_| "Repository metadata is not UTF-8")?;
+            if value.chars().any(char::is_control) {
+                return Err(
+                    "Repository metadata paths contain unsupported control characters".into(),
+                );
+            }
+            Ok(value.to_owned())
         };
         let bare = text(&["rev-parse", "--is-bare-repository"])? == "true";
         let identity = Identity {
+            host: remote::parse(self.repo).map(|target| target.host),
             common: text(&["rev-parse", "--path-format=absolute", "--git-common-dir"])?,
             root: if bare {
                 None
@@ -454,41 +473,45 @@ fn read_commits(
     Ok(commits)
 }
 fn parse_commit(oid: &str, bytes: &[u8]) -> Result<Commit, String> {
-    let text = std::str::from_utf8(bytes).map_err(|_| "Commit metadata is not UTF-8")?;
-    let (headers, message) = text.split_once("\n\n").ok_or("Malformed commit object")?;
+    let split = bytes
+        .windows(2)
+        .position(|window| window == b"\n\n")
+        .ok_or("Malformed commit object")?;
     let mut tree = None;
     let mut parents = Vec::new();
     let mut when = None;
-    for line in headers.lines() {
-        if let Some(value) = line.strip_prefix("tree ") {
+    for line in bytes[..split].split(|b| *b == b'\n') {
+        if let Some(value) = line.strip_prefix(b"tree ") {
+            let value = std::str::from_utf8(value).map_err(|_| "Invalid commit tree")?;
             if tree.is_some() || !valid_oid(value) {
                 return Err("Invalid commit tree".into());
             }
             tree = Some(value.to_owned());
         }
-        if let Some(value) = line.strip_prefix("parent ") {
+        if let Some(value) = line.strip_prefix(b"parent ") {
+            let value = std::str::from_utf8(value).map_err(|_| "Invalid commit parent")?;
             if !valid_oid(value) || parents.len() >= 64 {
                 return Err("Invalid commit parents".into());
             }
             parents.push(value.to_owned());
         }
-        if let Some(value) = line.strip_prefix("committer ") {
+        if let Some(value) = line.strip_prefix(b"committer ") {
             when = value
-                .split_whitespace()
-                .rev()
+                .rsplit(|b| b.is_ascii_whitespace())
+                .filter(|part| !part.is_empty())
                 .nth(1)
-                .and_then(|t| t.parse::<i64>().ok());
+                .and_then(|time| std::str::from_utf8(time).ok())
+                .and_then(|time| time.parse::<i64>().ok());
         }
     }
+    let message = bytes.get(split + 2..).ok_or("Missing commit message")?;
+    let subject = message.split(|b| *b == b'\n').next().unwrap_or_default();
     Ok(Commit {
         oid: oid.into(),
         tree: tree.ok_or("Missing commit tree")?,
         parents,
         when: when.ok_or("Missing commit time")?,
-        subject: message
-            .lines()
-            .next()
-            .unwrap_or("")
+        subject: String::from_utf8_lossy(subject)
             .chars()
             .filter(|c| !c.is_control())
             .take(200)

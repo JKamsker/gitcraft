@@ -2,7 +2,7 @@
 
 Base: accepted integration `ff901aad4346ee409509b60f9c6e7b12689fde44`.
 Branch: `codex/content-recovery`; independent of unreviewed working drafts.
-Status: read-only search engine and source-level regressions implemented, unvalidated. No Cargo/runtime test has run; UI and recovery actions remain to implement.
+Status: read-only search, guarded previews and create-only recovery actions with source-level regressions implemented, unvalidated. No Cargo/runtime test has run; the user interface remains to implement.
 
 The eligible named idea searches remembered text through reflog-reachable commits, dropped stashes, unreachable commits and dangling blobs, then shows content hits with timeline/provenance and guarded recovery. The audit explicitly requires bounded background `fsck --unreachable --no-reflogs`, `cat-file` batching, cancellation, binary/large-object limits and non-destructive recovery previews.
 
@@ -30,3 +30,5 @@ Open PR [#54](https://github.com/JKamsker/gitcraft/pull/54) owns the reflog brow
 Real repositories: content lost by amend/reset/rebase and reflog expiry; dropped stashes including their index/untracked parents; staged-only dangling blobs; reachable/reflog/unreachable provenance deduplication; Unicode/multiline/no-newline snippets; malformed/oversized/binary blobs and bounded/truncated batch framing; missing promisor objects with a network-helper negative/positive control; cancellation and stale generation/ref/source/destination guards; local/typed-remote quoting; symlink and directory races; create-only branch/file/stash recovery preserving existing refs, real index and working files. Read-only scans must compare refs/reflogs/index/worktree/object packs before and after.
 
 Preserve each implementation unit by commit, push, correct-author verification and exact remote SHA before the next unit or risky test. No Cargo run is authorized until the parent hands over a slot. Final private fmt, strict all-target Clippy, full tests and independent adversarial review are required before the root-owned combined PR.
+
+Implementation detail: recovery-only raw remote calls remain owned by their background caller until `remote::exec` actually returns, including pool/connect waits. Cancellation invalidates the request and stops subsequent queries; the latest queued request cannot launch while that owner remains. No timeout constant is treated as proof of actual completion. Remote new-file publication uses a private Git-metadata scratch file and GNU `ln -T`; cross-filesystem publication refuses rather than replacing data. Local exclusive creation can leave an explicitly diagnosed incomplete new file on disk-write failure, while preserving all preexisting files.
