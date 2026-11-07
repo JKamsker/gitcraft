@@ -100,6 +100,27 @@ Glossary tips stay out of the way while typing, scrolling or dragging.
   there, nor do a profile's author and signing: that machine's own git config does (the commit
   box says `· global (SSH · host)`).
 
+**Working drafts (opt in)**
+
+**Earlier versions…** in the Changes pane, the uncommitted-row menu or the palette enables
+repository-local working drafts. They save after 15 seconds of quiet and before operations
+that move the checkout, including checkout and rebase. Saved index contents and working bytes
+stay separate; no WIP commits appear in history. Choose a version, preview a file from either
+layer, then recover selected hunks. Recovery preserves the real index and other working edits,
+and first saves a safety version; **Undo last recovery…** previews that safety version.
+
+Drafts include tracked changes and nonignored untracked regular files. Ignored files and
+submodule contents are excluded; changed links, special files and conflicted indexes require
+a manual backup. Staged versions contain raw Git blobs, including LFS pointers. Recovery does
+not run filters, signing tools or network helpers, and does not convert line endings.
+
+Draft trees are protected from Git garbage collection under local `refs/gitcraft/drafts/…`.
+Normal pushes skip them; mirror pushes and manual all-ref exports can include them. Keep up
+to 50 versions for 14 days. Limits are 8 MiB per file, 32 MiB of changed content, 2000 changed
+paths and 20000 index entries. Git must support `--no-lazy-fetch`; an unavailable safety
+snapshot stops a checkout-moving operation until the problem is resolved or drafts are
+disabled. Snapshots and recovery run on the repository's machine, including SSH and WSL.
+
 **Graph**
 
 - Every branch, coloured lanes, ↑/↓ to move. History loads 1500 commits at a time as you scroll.

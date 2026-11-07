@@ -20,7 +20,7 @@ pub(super) fn history(
     let mut outcome = Outcome::Open;
     if ui
         .add_enabled(
-            idle,
+            idle && (*on || error.is_none()),
             egui::Checkbox::new(on, "Automatically save working drafts (opt in)"),
         )
         .changed()
@@ -55,17 +55,51 @@ pub(super) fn history(
         index,
         "Preview the saved staged/index contents (otherwise the working version)",
     );
-    egui::ScrollArea::vertical().max_height(420.0).show(ui,|ui|{
-  if versions.is_empty(){ui.label("No saved versions. Enabling drafts starts saving after the next pause; a clean tree has nothing to save.");}
-  for draft in versions{
-   egui::CollapsingHeader::new(format!("{} · {} · {} files",crate::git::relative_time(draft.metadata.created,crate::git::now()),draft.metadata.reason,draft.metadata.files.len())).id_salt(&draft.id.reference).show(ui,|ui|{
-    ui.label(format!("{} · {}",draft.metadata.branch.as_deref().unwrap_or("detached/unborn"),draft.metadata.head.as_deref().unwrap_or("no HEAD").chars().take(12).collect::<String>()));
-    egui::ScrollArea::vertical().max_height(200.0).id_salt((&draft.id.reference,"files")).show_rows(ui,26.0,draft.metadata.files.len(),|ui,rows|{
-     for file in &draft.metadata.files[rows]{ui.horizontal(|ui|{let mut label:String=file.path.chars().take(75).collect();if file.untracked{label.push_str(" (untracked)");}if ui.add_enabled(idle,egui::Button::new(label)).on_hover_text(&file.path).clicked(){outcome=Outcome::Done(Action::DraftPreview{id:draft.id.clone(),path:file.path.clone(),index:*index});}});}
-    });
-   });
-  }
- });
+    ui.label("Staged versions contain raw Git blobs (including LFS pointers). Recovery does not run filters or line-ending conversions; working versions contain the saved on-disk bytes.");
+    egui::ScrollArea::vertical()
+        .max_height(420.0)
+        .show(ui, |ui| {
+            if versions.is_empty() {
+                ui.label("No saved versions. Enabling drafts starts saving after the next pause; a clean tree has nothing to save.");
+            }
+            for draft in versions {
+                let title = format!(
+                    "{} · {} · {} files",
+                    crate::git::relative_time(draft.metadata.created, crate::git::now()),
+                    draft.metadata.reason,
+                    draft.metadata.files.len()
+                );
+                egui::CollapsingHeader::new(title)
+                    .id_salt(&draft.id.reference)
+                    .show(ui, |ui| {
+                        ui.label(format!(
+                            "{} · {}",
+                            draft.metadata.branch.as_deref().unwrap_or("detached/unborn"),
+                            draft.metadata.head.as_deref().unwrap_or("no HEAD").chars().take(12).collect::<String>()
+                        ));
+                        egui::ScrollArea::vertical()
+                            .max_height(200.0)
+                            .id_salt((&draft.id.reference, "files"))
+                            .show_rows(ui, 26.0, draft.metadata.files.len(), |ui, rows| {
+                                for file in &draft.metadata.files[rows] {
+                                    let mut label: String = file.path.chars().take(75).collect();
+                                    if file.untracked {
+                                        label.push_str(" (untracked)");
+                                    }
+                                    if ui.add_enabled(idle, egui::Button::new(label))
+                                        .on_hover_text(&file.path).clicked()
+                                    {
+                                        outcome = Outcome::Done(Action::DraftPreview {
+                                            id: draft.id.clone(),
+                                            path: file.path.clone(),
+                                            index: *index,
+                                        });
+                                    }
+                                }
+                            });
+                    });
+            }
+        });
     if ui.button("Close").clicked() {
         outcome = Outcome::Cancel;
     }
