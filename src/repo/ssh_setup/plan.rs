@@ -16,18 +16,23 @@ impl Machine {
         if let Some(target) = crate::remote::parse(repo) {
             return Ok(Self::Remote(target));
         }
+        Self::unparsed(repo, cfg!(windows))
+    }
+
+    /// The exact fallback boundary stays pure so Windows rejection is also exercised
+    /// by fixtures on other platforms, without contacting a share or starting WSL.
+    fn unparsed(repo: &Path, windows: bool) -> Result<Self, String> {
         let path = repo.to_string_lossy();
         if path.starts_with("ssh:")
             || path.starts_with("wsl:")
+            || (windows && reserved_wsl_unc(&path))
             || path
                 .split_once("://")
                 .is_some_and(|(scheme, _)| !scheme.contains(['/', '\\']))
         {
             return Err("The repository machine is invalid or unsupported. Reopen the correct local/SSH/WSL repository before setting up its keys.".into());
         }
-        Ok(Self::Local {
-            windows: cfg!(windows),
-        })
+        Ok(Self::Local { windows })
     }
     pub fn label(&self) -> String {
         match self {
@@ -130,6 +135,20 @@ impl Machine {
             reserve_folder: None,
         })
     }
+}
+
+/// WSL share names are reserved, including when no valid distro follows them.
+/// Match a complete server component, rather than a prefix of an ordinary UNC name.
+fn reserved_wsl_unc(path: &str) -> bool {
+    let normalized = path.replace('\\', "/").to_ascii_lowercase();
+    let rest = normalized
+        .strip_prefix("//?/unc/")
+        .or_else(|| normalized.strip_prefix("//./unc/"))
+        .or_else(|| normalized.strip_prefix("//"));
+    matches!(
+        rest.and_then(|rest| rest.split('/').next()),
+        Some("wsl.localhost" | "wsl$")
+    )
 }
 
 pub(super) struct Invocation {
@@ -367,6 +386,80 @@ mod tests {
         assert_eq!(&plan.shell.args[..3], &["-F", "none", "-T"]);
         for bad in ["-oProxyCommand=fixture", "bad\nhost", "git@host;touch"] {
             assert!(test(&Machine::Local { windows: false }, "/fixture/key", bad).is_err());
+        }
+        Ok(())
+    }
+    #[test]
+    fn windows_reserved_wsl_unc_never_falls_back_after_parse_failure() {
+        for path in [
+            r"\\wsl.localhost\-bad\repo",
+            r"\\wsl$\\repo",
+            r"\\WSL.LOCALHOST\",
+            r"\\wsl$",
+            r"\\?\UNC\wsl.localhost\-bad\repo",
+            r"\\?\uNc\WSL$\\repo",
+            r"\\.\UNC\wsl$\-bad\repo",
+            "//wsl.localhost/-bad/repo",
+            r"\\WsL.LocalHost/-bad\repo",
+            "//?/UnC/WSL.LOCALHOST//repo",
+        ] {
+            assert!(reserved_wsl_unc(path), "{path}");
+            let mut operation = false;
+            let result = Machine::unparsed(Path::new(path), true).map(|machine| {
+                operation = true;
+                machine
+            });
+            assert!(result.is_err(), "{path}");
+            assert!(
+                !operation,
+                "No key/agent/account operation may follow an invalid machine"
+            );
+        }
+    }
+
+    #[test]
+    fn ordinary_unc_and_local_paths_keep_their_platform_boundary() -> Result<(), String> {
+        for path in [
+            r"\\server\share\repo",
+            r"\\?\UNC\server\share\repo",
+            r"\\.\UNC\server\share\repo",
+            r"\\wsl.localhost.example\share\repo",
+            r"\\wsl$-backup\share\repo",
+            r"C:\work\repo",
+            r"\\?\C:\work\repo",
+            "/home/me/repo",
+        ] {
+            assert!(!reserved_wsl_unc(path), "{path}");
+            assert!(
+                matches!(
+                    Machine::unparsed(Path::new(path), true)?,
+                    Machine::Local { windows: true }
+                ),
+                "{path}"
+            );
+        }
+        // On non-Windows systems these spellings remain ordinary local share paths.
+        assert!(matches!(
+            Machine::unparsed(Path::new(r"\\wsl.localhost\-bad\repo"), false)?,
+            Machine::Local { windows: false }
+        ));
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn native_windows_valid_wsl_unc_variants_stay_remote() -> Result<(), String> {
+        for path in [
+            r"\\wsl.localhost\Ubuntu\home\me\repo",
+            r"\\wsl$\Ubuntu\home\me\repo",
+            r"\\?\UNC\wsl.localhost\Ubuntu\home\me\repo",
+            r"\\?\unc\WSL$\Ubuntu\home\me\repo",
+            "//wsl.localhost/Ubuntu/home/me/repo",
+            r"\\WsL.LocalHost/Ubuntu\home/me\repo",
+        ] {
+            assert!(
+                matches!(Machine::of(Path::new(path))?, Machine::Remote(Target { host: Host::Wsl(distro), path }) if distro=="Ubuntu" && path=="/home/me/repo")
+            );
         }
         Ok(())
     }

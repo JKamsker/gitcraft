@@ -572,3 +572,33 @@ fn ssh_setup_terminal_prompt_remains_visible_at_minimum_window_height() -> Resul
         Ok(())
     })
 }
+
+#[cfg(windows)]
+#[test]
+fn failed_open_wsl_unc_cannot_construct_a_local_setup_view() -> Result<(), String> {
+    Context::default().run(|| {
+        let fixture = Fixture::new()?;
+        let ctx = egui::Context::default();
+        for path in [
+            r"\\wsl.localhost\-bad\repo",
+            r"\\wsl$\\repo",
+            r"\\?\UNC\WSL.LOCALHOST\\repo",
+            "//?/unc/wsl$/-bad/repo",
+        ] {
+            // Start the existing watcher only on our owned local fixture, then model
+            // the failed-open path. No UNC filesystem lookup or WSL process is needed.
+            let mut tab = RepoTab::new_deferred(fixture.0.clone(), &ctx);
+            tab.path = PathBuf::from(path);
+            tab.load_error = Some("fixture failed-open repository".into());
+            assert!(!tab.opening());
+            tab.apply(super::super::Action::OpenSshSetup, &ctx);
+            assert!(tab.ssh_setup.is_none() && tab.terminals.is_empty());
+            assert!(
+                tab.status
+                    .as_ref()
+                    .is_some_and(|(text, failed)| *failed && text.contains("machine is invalid"))
+            );
+        }
+        Ok(())
+    })
+}
