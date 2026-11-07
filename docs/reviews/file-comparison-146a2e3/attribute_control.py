@@ -1,0 +1,5 @@
+exec(open('/workspace/work/review-file-comparison-146a2e3/attribute_probe.py').read().split("src=root/'source'")[0])
+src=root/'source';p=root/'control';run(root,'clone','--no-checkout','--no-local','--filter=blob:none',str(src),str(p));run(p,'--no-lazy-fetch','read-tree','HEAD');run(p,'--no-lazy-fetch','hash-object','-w','--stdin',input=b'plain\n');(p/'file.txt').write_bytes(b'plain\n')
+attr=run(src,'rev-parse','HEAD:.gitattributes').stdout.strip().decode()
+out=run(p,'--no-lazy-fetch','--literal-pathspecs','check-attr','-z','filter','working-tree-encoding','eol','text','--','file.txt',check=False)
+r={'exit':out.returncode,'attribute_blob_still_missing':run(p,'--no-lazy-fetch','cat-file','-e',attr,check=False).returncode!=0,'stdout':out.stdout.decode(),'stderr':out.stderr.decode()};(root.parent/'attribute-control.json').write_text(json.dumps(r,indent=2)+'\n');print(json.dumps(r,indent=2))
