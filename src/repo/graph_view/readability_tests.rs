@@ -525,7 +525,9 @@ fn cached_badges_refresh_when_refs_change_even_without_changing_the_graph() {
     tab.refs.local = vec![git::Branch {
         name: "origin/topic".into(),
         is_head: true,
-        ..Default::default()
+        target: String::new(),
+        upstream: String::new(),
+        track: String::new(),
     }];
     tab.refs.current = Some("origin/topic".into());
     tab.rebuild_graph_labels();
