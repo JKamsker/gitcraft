@@ -19,8 +19,8 @@ def endpoint(value):
 def encode(value):
     return json.dumps(value, separators=(',', ':')).encode() + b'\n'
 
-def receipt(owner, state, code):
-    return dict(owner, state=state, code=code)
+def receipt(owner, state, code, complete=True):
+    return dict(owner, state=state, code=code, complete=complete)
 
 def atomic(path, data, exclusive=False):
     name = path if exclusive else path + '.new'
@@ -42,9 +42,9 @@ def read_receipt(owner):
     fd = os.open(owner['path'] + '/terminal', os.O_RDONLY | os.O_NOFOLLOW)
     with os.fdopen(fd, 'rb') as f:
         value = json.loads(f.read(2049))
-    if set(value) != {'v', 'nonce', 'path', 'token', 'state', 'code'}:
+    if set(value) != {'v', 'nonce', 'path', 'token', 'state', 'code', 'complete'}:
         raise ValueError('invalid terminal receipt')
-    if any(value[k] != owner[k] for k in owner) or value['state'] != 'stopped' or type(value['code']) is not int or not 0 <= value['code'] <= 255:
+    if any(value[k] != owner[k] for k in owner) or value['state'] != 'stopped' or type(value['complete']) is not bool or type(value['code']) is not int or not 0 <= value['code'] <= 255:
         raise ValueError('unconfirmed cleanup')
     return value
 
@@ -177,6 +177,7 @@ def run(req, controller, stream=False):
         selector = selectors.DefaultSelector()
         output = [bytearray(), bytearray()]
         forward = Forwarder() if stream else None
+        delivery = True
         deadline = time.monotonic() + duration
         # Ignore hangup in the supervisor; EOF/deadline uses the same owned stop/reap path.
         signal.signal(signal.SIGHUP, signal.SIG_IGN)
@@ -207,7 +208,7 @@ def run(req, controller, stream=False):
             status_bytes = bytearray()
             while not stopped:
                 if time.monotonic() >= deadline: break
-                if forward and not forward.flush(): break
+                if forward and not forward.flush(): delivery = False; break
                 for client in list(clients):
                     if expiries.get(client, 0) < time.monotonic():
                         try: selector.unregister(client)
@@ -247,9 +248,9 @@ def run(req, controller, stream=False):
                     else:
                         chunk = os.read(key.fd, 8192)
                         if not chunk: selector.unregister(key.fd); continue
-                        if len(output[which]) + len(chunk) > MAX: stopped = True
+                        if len(output[which]) + len(chunk) > MAX: stopped = True; delivery = False
                         output[which].extend(chunk[:max(0, MAX - len(output[which]))])
-                        if forward and not forward.add(which, chunk): stopped = True
+                        if forward and not forward.add(which, chunk): stopped = True; delivery = False
         finally:
             # The owned anchor has never been waited on. Even premature anchor death
             # retains its identity as our unreaped direct child until these signals finish.
@@ -260,43 +261,63 @@ def run(req, controller, stream=False):
             end = time.monotonic() + .3
             for fd, index in ((out_r, 0), (err_r, 1)):
                 os.set_blocking(fd, False)
+                eof = False
                 while time.monotonic() < end:
                     try: chunk = os.read(fd, 8192)
-                    except BlockingIOError: break
-                    if not chunk: break
-                    output[index].extend(chunk[:max(0, MAX - len(output[index]))])
-                    if forward: forward.add(index, chunk)
+                    except BlockingIOError:
+                        time.sleep(.002); continue
+                    if not chunk: eof = True; break
+                    room = max(0, MAX - len(output[index]))
+                    if len(chunk) > room: delivery = False
+                    output[index].extend(chunk[:room])
+                    if forward and not forward.add(index, chunk): delivery = False
+                if not eof: delivery = False
                 os.close(fd)
             os.close(status_r)
             # Final forwarding has a finite drain; an unread controller cannot hold ownership.
             if forward:
                 while time.monotonic() < end and any(forward.pending):
-                    if not forward.flush(): break
+                    if not forward.flush(): delivery = False; break
                     time.sleep(.005)
-            final = receipt(owner, 'stopped', code)
+            if forward and any(forward.pending): delivery = False
+            final = receipt(owner, 'stopped', code, delivery)
             atomic(owner['path'] + '/terminal', encode(final))
             for client in clients:
                 try: client.settimeout(.1); client.sendall(encode(final))
                 except OSError: pass
                 client.close()
             selector.close(); sock.close()
-        return code, output, owner
+        return delivery_code(code, delivery), output, owner
+
+def delivery_code(command_code, complete):
+    # An ownership receipt can be valid while the output transport is incomplete.
+    return command_code if complete else 125
+
+class Frames:
+    def __init__(self): self.pending = bytearray()
+    def read(self, receive):
+        while True:
+            end = self.pending.find(b'\n')
+            if end >= 0:
+                if end >= 96 << 20: raise ValueError('oversized request frame')
+                result = bytes(self.pending[:end+1]); del self.pending[:end+1]
+                return result
+            if len(self.pending) >= 96 << 20: raise ValueError('oversized request frame')
+            chunk = receive(65536)
+            if not chunk:
+                if self.pending: raise ValueError('incomplete request frame')
+                return None
+            self.pending.extend(chunk)
 
 def serve():
     # Unbuffered reads prevent input for the next request from being stolen by buffering.
     controller = os.fdopen(os.dup(0), 'rb', buffering=0)
     print('__GITCRAFT_READY__', flush=True)
     previous = None
+    frames = Frames()
     while True:
-        line = bytearray()
-        while len(line) <= 96 << 20:
-            chunk = os.read(controller.fileno(), 65536)
-            if not chunk: return
-            line.extend(chunk)
-            if b'\n' in chunk: break
-        if len(line) > 96 << 20 or line.count(b'\n') != 1 or not line.endswith(b'\n'):
-            raise ValueError('oversized or pipelined request')
-        line = bytes(line)
+        line = frames.read(lambda count: os.read(controller.fileno(), count))
+        if line is None: return
         if line.startswith(b'A '):
             if previous is None or line != ('A ' + previous['nonce'] + '\n').encode():
                 raise ValueError('invalid retirement acknowledgement')
@@ -308,7 +329,7 @@ def serve():
         print('S ' + req['nonce'], flush=True)
         code, output, owner = run(req, controller)
         previous = owner
-        sys.stdout.buffer.write(b'C1 ' + encode(receipt(owner, 'stopped', code))); sys.stdout.buffer.flush()
+        sys.stdout.buffer.write(b'C1 ' + encode(read_receipt(owner))); sys.stdout.buffer.flush()
         print('R {} {} {} {}'.format(req['nonce'], code, len(output[0]), len(output[1])), flush=True)
         sys.stdout.buffer.write(output[0]); sys.stdout.buffer.write(output[1]); sys.stdout.buffer.flush()
 

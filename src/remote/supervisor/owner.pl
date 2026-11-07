@@ -49,7 +49,7 @@ sub terminal {
     my $bytes = ''; read($f, $bytes, 2049); close($f);
     die 'oversized receipt' if length($bytes) > 2048;
     my $v = $JSON->decode($bytes);
-    die 'invalid receipt' unless ref($v) eq 'HASH' && join(',',sort keys %$v) eq 'code,nonce,path,state,token,v';
+    die 'invalid receipt' unless ref($v) eq 'HASH' && join(',',sort keys %$v) eq 'code,complete,nonce,path,state,token,v';
     for my $k (keys %$o) { die 'unconfirmed receipt' unless $v->{$k} eq $o->{$k}; }
     die 'unconfirmed receipt' unless $v->{state} eq 'stopped' && $v->{code} =~ /\A[0-9]+\z/ && $v->{code} <= 255;
     return $v;
@@ -98,8 +98,8 @@ sub finish_owned {
             $ops->{signal}->(1,'KILL',$anchor);
         } else { $ops->{signal}->(0,'KILL',$anchor); }
     }; $error = $@;
-    if ($error) { $ops->{signal}->(0,'KILL',$anchor); }
-    $ops->{reap}->($anchor);
+    if ($error) { eval { $ops->{signal}->(0,'KILL',$anchor); }; $error .= $@ if $@; }
+    my $reaped=eval { $ops->{reap}->($anchor); 1; }; $error .= $@ unless $reaped;
     die $error if $error;
 }
 sub forward_add {
@@ -164,7 +164,7 @@ sub run {
         _exit(125);
     }
     close($out_w); close($err_w); close($status_w); close($gate_r); close($input);
-    my @pending = ('','');
+    my @pending = ('',''); my $delivery=1;
     my $code = 125; my @output = ('',''); my %clients; my $established = 0;
     local $SIG{HUP} = 'IGNORE';
     my $error;
@@ -183,7 +183,7 @@ sub run {
         my %kind = (fileno($controller)=>'controller',fileno($server)=>'socket',fileno($status_r)=>'status',fileno($out_r)=>0,fileno($err_r)=>1);
         my $deadline = time()+$duration; my $status = ''; my $stopped = 0;
         while (!$stopped && time() < $deadline) {
-            last if $stream && !forward_flush(\@pending);
+            if ($stream && !forward_flush(\@pending)) { $delivery=0; last; }
             for my $key (keys %clients) { if (time() > $clients{$key}{until}) { $select->remove($clients{$key}{handle}); close($clients{$key}{handle}); delete $clients{$key}; } }
             for my $fd ($select->can_read(.05)) {
                 my $which = $kind{fileno($fd)} // 'client';
@@ -213,9 +213,9 @@ sub run {
                 else {
                     my $n = sysread($fd, my $bytes, 8192);
                     if (!$n) { $select->remove($fd); next; }
-                    my $room = $MAX-length($output[$which]); $stopped = 1 if length($bytes) > $room;
+                    my $room = $MAX-length($output[$which]); if (length($bytes) > $room) { $stopped=1; $delivery=0; }
                     $output[$which] .= substr($bytes,0,$room);
-                    $stopped = 1 if $stream && !forward_add(\@pending,$which,$bytes);
+                    if ($stream && !forward_add(\@pending,$which,$bytes)) { $stopped=1; $delivery=0; }
                 }
             }
         }
@@ -227,30 +227,52 @@ sub run {
     for my $index (0,1) {
         my $fd = $index == 0 ? $out_r : $err_r;
         my $select = IO::Select->new($fd);
-        while (time() < $end && $select->can_read(0)) {
-            my $n = sysread($fd,my $bytes,8192); last unless $n;
-            $output[$index] .= substr($bytes,0,$MAX-length($output[$index]));
-            forward_add(\@pending,$index,$bytes) if $stream;
+        my $eof=0;
+        while (time() < $end) {
+            next unless $select->can_read(.002);
+            my $n = sysread($fd,my $bytes,8192); if (defined($n) && !$n) { $eof=1; last; } last unless defined($n);
+            my $room=$MAX-length($output[$index]); $delivery=0 if length($bytes)>$room;
+            $output[$index] .= substr($bytes,0,$room);
+            $delivery=0 if $stream && !forward_add(\@pending,$index,$bytes);
         }
+        $delivery=0 unless $eof;
         close($fd);
     }
-    while ($stream && time() < $end && (length($pending[0]) || length($pending[1]))) { last unless forward_flush(\@pending); sleep(.005); }
+    while ($stream && time() < $end && (length($pending[0]) || length($pending[1]))) { if (!forward_flush(\@pending)) {$delivery=0; last;} sleep(.005); }
+    $delivery=0 if $stream && (length($pending[0]) || length($pending[1]));
     close($status_r); close($server);
-    my $final = {%$o,state=>'stopped',code=>$code}; atomic("$o->{path}/terminal",encode($final),0);
+    my $final = {%$o,state=>'stopped',code=>$code,complete=>$delivery ? JSON::PP::true : JSON::PP::false}; atomic("$o->{path}/terminal",encode($final),0);
     for my $client (values %clients) { syswrite($client->{handle},encode($final)); close($client->{handle}); }
     die $error if $error;
-    return ($code,\@output,$o);
+    return (delivery_code($code,$delivery),\@output,$o);
+}
+sub delivery_code { my ($code,$complete)=@_; return $complete ? $code : 125; }
+sub frame_read {
+    my ($state,$receive)=@_;
+    while (1) {
+        my $end=index($state->{pending},"\n");
+        if ($end>=0) {
+            die 'oversized request frame' if $end >= (96<<20);
+            return substr($state->{pending},0,$end+1,'');
+        }
+        die 'oversized request frame' if length($state->{pending}) >= (96<<20);
+        my $chunk=$receive->(65536);
+        if (!defined($chunk) || !length($chunk)) {
+            die 'incomplete request frame' if length($state->{pending});
+            return undef;
+        }
+        $state->{pending}.=$chunk;
+    }
 }
 sub serve {
     open(my $controller, '<&', \*STDIN) or die 'controller missing'; cloexec($controller);
     STDOUT->autoflush(1); binmode(STDOUT); binmode(STDERR); binmode($controller);
     print "__GITCRAFT_READY__\n";
     my $previous;
+    my $frames={pending=>''};
     while (1) {
-        my $line = '';
-        while (length($line) <= (96 << 20)) { my $n = sysread($controller,my $part,65536); return unless $n; $line .= $part; last if index($part,"\n") >= 0; }
-        die 'pipelined request rejected' unless $line =~ /\A[^\n]*\n\z/s;
-        die 'oversized request' if length($line) > (96 << 20);
+        my $line=frame_read($frames,sub { my ($count)=@_; my $n=sysread($controller,my $bytes,$count); die 'controller read failed' unless defined($n); return $n ? $bytes : undef; });
+        return unless defined($line);
         if ($line =~ /\AA ([0-9a-f]{1,96})\n\z/) {
             die 'invalid retirement acknowledgement' unless $previous && $previous->{nonce} eq $1;
             retire($previous); undef($previous); next;
@@ -259,7 +281,7 @@ sub serve {
         my $req = $JSON->decode($line); print "S $req->{nonce}\n";
         my ($code,$out,$owner) = run($req,$controller,0);
         $previous=$owner;
-        print "C1 ",encode({%$owner,state=>'stopped',code=>$code});
+        print "C1 ",encode(terminal($owner));
         print "R $req->{nonce} $code ",length($out->[0]),' ',length($out->[1]),"\n",$out->[0],$out->[1];
     }
 }
@@ -280,6 +302,21 @@ elsif ($mode eq 'stream') {
     my ($code,$out) = run($req,$controller,1); exit($code);
 }
 elsif ($mode eq 'recording') {
+    my $frames_input="A oldnonce\n{\"nonce\":\"next\"}\nP ping\n";
+    for my $split (0..length($frames_input)) {
+        my @chunks=grep {length($_)} (substr($frames_input,0,$split),substr($frames_input,$split));
+        my $state={pending=>''}; my @frames;
+        push @frames, frame_read($state,sub {shift @chunks;}) for 1..3;
+        die 'coalesced frame loss' unless join('',@frames) eq $frames_input;
+        die 'unexpected trailing frame' if defined(frame_read($state,sub {shift @chunks;}));
+    }
+    die 'incomplete output reported success' unless delivery_code(0,0)==125 && delivery_code(0,1)==0 && delivery_code(7,1)==7;
+    {
+        my @failed;
+        my $ops={signal=>sub {push @failed,'signal'; die 'refused';},pause=>sub {},reap=>sub {push @failed,'reap';}};
+        my $ok=eval {finish_owned(424242,1,$ops);1;};
+        die 'double refusal skipped reap' if $ok || join(',',@failed) ne 'signal,signal,reap';
+    }
     my @retired;
     my $retiring={v=>1,nonce=>'a',path=>'/tmp/gitcraft-owned-'.('b'x32),token=>'c'x64};
     my $retire_ops={receipt=>sub {die 'missing atomic receipt';},unlink=>sub {push @retired,$_[0];},rmdir=>sub {push @retired,$_[0];}};
@@ -307,6 +344,6 @@ elsif ($mode eq 'recording') {
     my $ops = {signal=>sub {push @events, $_[0] ? 'group' : 'direct'; die 'refused' if $_[0];},pause=>sub {},reap=>sub {push @events,'reap';}};
     my $ok = eval {finish_owned(424242,1,$ops);1;};
     die 'refusal acknowledged' if $ok || join(',',@events) ne 'group,direct,reap';
-    print "8 recording-only owner gates passed\n";
+    print "11 recording-only owner gates passed\n";
 }
 else { die 'unknown owner operation'; }

@@ -43,6 +43,8 @@ pub(crate) struct Options {
     pub stop_remote: Option<Box<dyn FnOnce() -> Result<(), String> + Send>>,
     /// Best-effort removal of private artifacts, authenticated by a terminal receipt.
     pub retire_remote: Option<Box<dyn FnOnce() -> Result<(), String> + Send>>,
+    /// Require delivery proof independently of target cleanup before reporting success.
+    pub complete_remote: Option<Box<dyn FnOnce() -> Result<(), String> + Send>>,
     pub stop_ready: Option<Box<dyn Fn() -> bool + Send + Sync>>,
     pub stdout_ready: Option<&'static str>,
     pub output_limit: usize,
@@ -67,6 +69,7 @@ impl Default for Options {
             stdout_file: None,
             stop_remote: None,
             retire_remote: None,
+            complete_remote: None,
             stop_ready: None,
             stdout_ready: None,
             output_limit: OUTPUT_LIMIT,
@@ -598,7 +601,7 @@ async fn execute(
         // A native helper owns another group/Job. Deliver controller EOF before control
         // recovery; an unconfirmed helper is retained for reaping, never killed here.
         if options.native_controller {
-            input = None;
+            drop(input.take());
         }
         #[cfg(test)]
         if let Some(trace) = trace {
@@ -679,6 +682,27 @@ async fn execute(
     child
         .finish()
         .map_err(|e| format!("could not finish owned process: {e}"))?;
+    if stopped.is_none()
+        && let Some(confirm) = options.complete_remote.take()
+    {
+        match Arc::clone(blocking).acquire_owned().await {
+            Ok(_permit) => match tokio::task::spawn_blocking(confirm).await {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => {
+                    stopped = Some(error);
+                    remote_confirmed = false;
+                }
+                Err(error) => {
+                    stopped = Some(format!("output delivery confirmation failed: {error}"));
+                    remote_confirmed = false;
+                }
+            },
+            Err(error) => {
+                stopped = Some(format!("output delivery confirmation unavailable: {error}"));
+                remote_confirmed = false;
+            }
+        }
+    }
     if remote_confirmed
         && let Some(retire) = options.retire_remote.take()
         && let Ok(_permit) = Arc::clone(blocking).acquire_owned().await

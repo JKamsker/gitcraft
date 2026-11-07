@@ -257,6 +257,14 @@ impl Streaming {
         options.stderr_filter = Some(Box::new(move |bytes| marker.feed(bytes)));
         let ready = self.lease.clone();
         options.stop_ready = Some(Box::new(move || ready.endpoint().is_some()));
+        let lease = self.lease.clone();
+        let host = self.host.clone();
+        options.complete_remote = Some(Box::new(move || {
+            let endpoint = lease
+                .endpoint()
+                .ok_or("missing output completion endpoint")?;
+            confirm_delivery(&host, &endpoint)
+        }));
         if !self.durable {
             let lease = self.lease.clone();
             let host = self.host.clone();
@@ -351,6 +359,27 @@ pub(crate) fn retire_endpoint(
         Ok(())
     } else {
         Err("private endpoint evidence retained".into())
+    }
+}
+
+fn confirm_delivery(host: &Host, endpoint: &super::supervisor::Endpoint) -> Result<(), String> {
+    let _cleanup = Cleanup::new();
+    let (command, _connection) = shell_command(host, false);
+    let out = crate::processes::run_cleanup(
+        command,
+        crate::processes::Options {
+            input: Some(endpoint.control_script()?.into_bytes()),
+            timeout: Some(Duration::from_secs(10)),
+            output_limit: 4096,
+            stderr_limit: Some(4096),
+            ..Default::default()
+        },
+    )?
+    .complete()?;
+    if out.status.success() && endpoint.complete(&out.stdout) {
+        Ok(())
+    } else {
+        Err("owned command stopped but output delivery is incomplete or unconfirmed".into())
     }
 }
 

@@ -97,6 +97,8 @@ impl Endpoint {
             token: String,
             state: String,
             code: i32,
+            #[serde(rename = "complete")]
+            _complete: bool,
         }
         if bytes.len() > 2048 {
             return false;
@@ -110,6 +112,13 @@ impl Endpoint {
             && receipt.token == self.token
             && receipt.state == "stopped"
             && (0..=255).contains(&receipt.code)
+    }
+    pub(super) fn complete(&self, bytes: &[u8]) -> bool {
+        self.confirms(bytes)
+            && serde_json::from_slice::<serde_json::Value>(bytes)
+                .ok()
+                .and_then(|v| v.get("complete").and_then(serde_json::Value::as_bool))
+                .unwrap_or(false)
     }
 }
 
@@ -254,9 +263,19 @@ mod recording_tests {
         assert_eq!(lease.endpoint(), Some(ep.clone()));
         let mut value = serde_json::to_value(&ep).map_err(|e| e.to_string())?;
         value["state"] = "stopped".into();
+        value["complete"] = true.into();
         value["code"] = 7.into();
         let good = serde_json::to_vec(&value).map_err(|e| e.to_string())?;
         assert!(ep.confirms(&good));
+        assert!(ep.complete(&good));
+        let mut partial = value.clone();
+        partial["complete"] = false.into();
+        let partial = serde_json::to_vec(&partial).map_err(|e| e.to_string())?;
+        assert!(
+            ep.confirms(&partial),
+            "cleanup proof is independent of output delivery"
+        );
+        assert!(!ep.complete(&partial));
         assert!(!ep.confirms(&good[..good.len() - 1]));
         for key in ["token", "nonce", "state"] {
             let mut wrong = value.clone();

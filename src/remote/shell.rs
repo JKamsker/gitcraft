@@ -244,6 +244,14 @@ impl Shell {
         let stdout = self.protocol_bytes(out_len, &mut deadline, &mut expired)?;
         let stderr = self.protocol_bytes(err_len, &mut deadline, &mut expired)?;
         self.used = Instant::now();
+        if !receipt
+            .strip_prefix(b"C1 ")
+            .is_some_and(|bytes| owner.complete(bytes))
+        {
+            return Err(Failure::Lost(
+                "owned command stopped but output delivery is incomplete".into(),
+            ));
+        }
         if expired {
             return Err(Failure::TimedOut(true));
         }

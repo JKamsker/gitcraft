@@ -86,6 +86,7 @@ struct Receipt {
     endpoint: Endpoint,
     state: String,
     code: i64,
+    complete: bool,
 }
 fn hex(value: &str, length: usize) -> bool {
     value.len() == length
@@ -258,6 +259,21 @@ impl NativeCommand {
             })
         }));
         let endpoint = self.endpoint.clone();
+        options.complete_remote = Some(Box::new(move || {
+            let endpoint = endpoint
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone()
+                .ok_or("missing native completion endpoint")?;
+            let receipt: Receipt =
+                serde_json::from_slice(&endpoint.terminal()?).map_err(|e| e.to_string())?;
+            if receipt.complete {
+                Ok(())
+            } else {
+                Err("native command stopped but output delivery is incomplete".into())
+            }
+        }));
+        let endpoint = self.endpoint.clone();
         options.stop_ready = Some(Box::new(move || {
             endpoint
                 .lock()
@@ -418,6 +434,7 @@ fn helper() -> Result<i32, String> {
         endpoint,
         state: "stopped".into(),
         code: i64::from(code),
+        complete: result.stopped.is_none(),
     };
     let mut bytes = serde_json::to_vec(&receipt).map_err(|e| e.to_string())?;
     bytes.push(b'\n');
@@ -488,6 +505,7 @@ mod tests {
             endpoint: ep.clone(),
             state: "stopped".into(),
             code: 7,
+            complete: true,
         })
         .map_err(|e| e.to_string())?;
         assert!(ep.confirms(&receipt));

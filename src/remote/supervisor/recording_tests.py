@@ -9,6 +9,19 @@ class Recording:
     def kill(self,p,s): self.events.append(('direct',p,s))
     def waitpid(self,p,f): self.events.append(('reap',p,f)); return p,0
 class Pure(unittest.TestCase):
+    def test_actual_frame_reader_retains_coalesced_ack_and_request_at_every_split(self):
+        data=b'A oldnonce\n{"nonce":"next"}\nP ping\n'
+        expected=[b'A oldnonce\n',b'{"nonce":"next"}\n',b'P ping\n',None]
+        for split in range(len(data)+1):
+            chunks=iter([p for p in (data[:split],data[split:]) if p])
+            frames=m.Frames()
+            self.assertEqual([frames.read(lambda _:next(chunks,b'')) for _ in range(4)],expected)
+        frames=m.Frames()
+        with self.assertRaises(ValueError): frames.read(lambda _:b'incomplete' if not frames.pending else b'')
+    def test_incomplete_output_is_never_success_even_with_clean_target_exit(self):
+        self.assertEqual(m.delivery_code(0,False),125)
+        self.assertEqual(m.delivery_code(0,True),0)
+        self.assertEqual(m.delivery_code(7,True),7)
     def test_retirement_without_receipt_erases_nothing(self):
         owner=dict(v=1,nonce='a',path=m.ROOT+'b'*32,token='c'*64)
         actions=[]
