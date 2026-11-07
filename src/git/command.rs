@@ -186,6 +186,57 @@ pub fn run(dir: Option<&Path>, args: &[&str]) -> Result<String, String> {
     run_ok_codes(dir, args, &[0])
 }
 
+/// Setup/read-only checks of a local practice sandbox. Never called for user repositories.
+/// Inherited git directory overrides and global hooks/URL rewrites must not escape it.
+pub(crate) fn practice_run(dir: &Path, args: &[&str]) -> Result<String, String> {
+    if remote::is_remote(dir) {
+        return Err("Practice repositories are local".to_owned());
+    }
+    let mut cmd = practice_command(dir);
+    cmd.args(args);
+    let output = cmd
+        .output()
+        .map_err(|e| format!("Could not run practice git: {e}"))?;
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_owned())
+    }
+}
+
+fn practice_command(dir: &Path) -> Command {
+    let mut cmd = git_cmd();
+    for name in [
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_COMMON_DIR",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_NAMESPACE",
+        "GIT_CONFIG",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_TEMPLATE_DIR",
+        "GIT_SHALLOW_FILE",
+        "GIT_AUTHOR_NAME",
+        "GIT_AUTHOR_EMAIL",
+        "GIT_COMMITTER_NAME",
+        "GIT_COMMITTER_EMAIL",
+        "GIT_AUTHOR_DATE",
+        "GIT_COMMITTER_DATE",
+    ] {
+        cmd.env_remove(name);
+    }
+    cmd.env("GIT_CONFIG_GLOBAL", "")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_COUNT", "0")
+        .env("GIT_ATTR_NOSYSTEM", "1")
+        .arg("--no-replace-objects")
+        .arg("-C")
+        .arg(dir);
+    cmd
+}
+
 /// Runs git and returns stdout as raw bytes (file contents: images…).
 pub fn run_bytes(dir: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
     let out = execute(dir, &Extra::default(), args)?;
@@ -614,5 +665,38 @@ mod tests {
         );
         assert!(parse_credentials("protocol=https\nhost=x\n").is_none());
         assert!(parse_credentials("username=ana\npassword=\n").is_none());
+    }
+}
+
+#[cfg(test)]
+mod practice_tests {
+    use super::*;
+
+    #[test]
+    fn practice_commands_cannot_inherit_a_caller_repository_or_global_configuration() {
+        let command = practice_command(Path::new("sandbox"));
+        let env: std::collections::HashMap<_, _> = command.get_envs().collect();
+        for name in [
+            "GIT_DIR",
+            "GIT_WORK_TREE",
+            "GIT_INDEX_FILE",
+            "GIT_COMMON_DIR",
+            "GIT_OBJECT_DIRECTORY",
+            "GIT_CONFIG_PARAMETERS",
+            "GIT_TEMPLATE_DIR",
+        ] {
+            assert_eq!(env.get(std::ffi::OsStr::new(name)), Some(&None), "{name}");
+        }
+        for (name, value) in [
+            ("GIT_CONFIG_GLOBAL", ""),
+            ("GIT_CONFIG_NOSYSTEM", "1"),
+            ("GIT_CONFIG_COUNT", "0"),
+        ] {
+            assert_eq!(
+                env.get(std::ffi::OsStr::new(name)).copied().flatten(),
+                Some(std::ffi::OsStr::new(value)),
+                "{name}"
+            );
+        }
     }
 }

@@ -89,6 +89,15 @@ impl App {
                         }
                     });
 
+                    ui.add_space(12.0);
+                    if ui
+                        .button("Practice git…")
+                        .on_hover_text("Try a real throwaway repository, with a goal to check")
+                        .clicked()
+                    {
+                        self.practice_open = true;
+                    }
+
                     if let Some(err) = &self.error {
                         ui.add_space(12.0);
                         ui.colored_label(t.danger, err);

@@ -5,6 +5,7 @@ mod clone;
 mod home;
 mod palette;
 mod panels;
+mod practice;
 mod profiles;
 mod remote_open;
 mod tab_strip;
@@ -85,6 +86,8 @@ pub struct App {
     error: Option<String>,
     was_focused: bool,
     clone_form: Option<CloneForm>,
+    practice_open: bool,
+    practicing: Option<Receiver<Result<PathBuf, String>>>,
     /// A clone running in the background: (destination, result).
     cloning: Option<(PathBuf, Receiver<Result<(), String>>)>,
     /// The form of the running clone, back on screen if it needs credentials.
@@ -167,6 +170,8 @@ impl App {
             error: None,
             was_focused: true,
             clone_form: None,
+            practice_open: false,
+            practicing: None,
             cloning: None,
             cloning_form: None,
             remote_form: None,
@@ -367,6 +372,7 @@ impl App {
             || self.remote_form.is_some()
             || self.askpass_open()
             || self.palette.is_some()
+            || self.practice_open
             || self.manual_open
             || ctx.egui_wants_keyboard_input();
         let (new_tab, reopen, close, refresh, focused, palette, manual, settings) =
@@ -387,7 +393,10 @@ impl App {
             self.open_settings();
         }
         // Not over a dialog that asks something (the clone, the remote one, ssh's question).
-        let asking = self.clone_form.is_some() || self.remote_form.is_some() || self.askpass_open();
+        let asking = self.practice_open
+            || self.clone_form.is_some()
+            || self.remote_form.is_some()
+            || self.askpass_open();
         if manual && !asking && self.palette.is_none() {
             self.manual_open = !self.manual_open;
         }
@@ -426,6 +435,7 @@ impl App {
         match self.tabs.get_mut(active) {
             Some(Tab::Repo(repo)) => {
                 repo.keys_blocked = self.palette.is_some()
+                    || self.practice_open
                     || self.manual_open
                     || self.clone_form.is_some()
                     || self.remote_form.is_some()
@@ -482,6 +492,7 @@ impl eframe::App for App {
             return;
         }
         self.poll_clone(&ctx);
+        self.poll_practice(&ctx);
         self.poll_connecting(&ctx);
         self.poll_update(&ctx);
         self.notice_profile_git(&ctx);
@@ -534,6 +545,8 @@ impl eframe::App for App {
         self.askpass_dialog(&ctx);
         self.palette_ui(&ctx);
         self.manual_ui(&ctx);
+        self.practice_dialog(&ctx);
+        crate::glossary::hover(&ctx);
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
     }

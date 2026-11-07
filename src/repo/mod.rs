@@ -28,6 +28,7 @@ mod pinned_sections;
 mod pr_merge;
 mod pr_review;
 mod pr_view;
+mod practice;
 pub(crate) mod pull;
 mod quick_edit;
 mod rebase;
@@ -129,6 +130,9 @@ pub struct RepoTab {
     submodules: Vec<Submodule>,
     /// It keeps files in Git LFS, and git-lfs is installed.
     lfs: bool,
+    practice: Option<crate::practice::Session>,
+    practice_checking: bool,
+    practice_result: Option<Result<bool, String>>,
     identity: Identity,
     /// Where `origin` is hosted, when it's on a forge gitcraft knows.
     hosting: Option<Hosting>,
@@ -293,6 +297,9 @@ impl RepoTab {
             remotes: Vec::new(),
             submodules: Vec::new(),
             lfs: false,
+            practice: None,
+            practice_checking: false,
+            practice_result: None,
             identity: Identity::default(),
             hosting: None,
             prs: Vec::new(),

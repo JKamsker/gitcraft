@@ -16,6 +16,14 @@ pub(crate) fn command() -> &'static str {
 /// What each part of the window does: (title, points).
 const FEATURES: &[(&str, &[&str])] = &[
     (
+        "Practice and glossary",
+        &[
+            "Practice git… on the start page or in the palette opens a new local throwaway repository: a merge conflict, diverged branches, a detached HEAD or undoing a published commit. The goal banner has a hint and Check goal reads the repository in the background.",
+            "The published-commit scenario pushes only to a local bare origin. Your own repositories are untouched. Practice folders stay in the system temporary directory when closed; the system may remove them. Copy a folder elsewhere to keep it.",
+            "Pause over words such as HEAD, upstream, fast-forward and rebase anywhere in the window for their meaning. Glossary tips do not appear while typing, scrolling or dragging.",
+        ],
+    ),
+    (
         "Repositories and tabs",
         &[
             "Open, create or clone a repository from the start page; recent ones are listed there.",

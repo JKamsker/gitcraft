@@ -42,6 +42,7 @@ enum AppCommand {
     Themes,
     Profile(u64),
     NewProfile,
+    Practice,
 }
 
 enum Entry {
@@ -63,6 +64,11 @@ impl App {
     /// Every palette entry: (label, hint, what it runs).
     fn palette_entries(&self) -> Vec<(String, String, Entry)> {
         let mut list = vec![
+            (
+                "Practice git…".to_owned(),
+                "app".to_owned(),
+                Entry::App(AppCommand::Practice),
+            ),
             (
                 "New tab".to_owned(),
                 "Ctrl+T".to_owned(),
@@ -156,6 +162,7 @@ impl App {
     fn run_entry(&mut self, entry: Entry, ctx: &egui::Context) {
         match entry {
             Entry::App(AppCommand::NewTab) => self.new_tab(),
+            Entry::App(AppCommand::Practice) => self.practice_open = true,
             Entry::App(AppCommand::ReopenTab) => self.reopen_closed_tab(ctx),
             Entry::App(AppCommand::Open) => self.pick_existing(ctx),
             Entry::App(AppCommand::Create) => self.pick_new(ctx),
