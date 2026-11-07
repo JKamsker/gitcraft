@@ -140,6 +140,7 @@ impl RepoTab {
     }
 
     pub(super) fn issue_act(&mut self, act: IssueAct, ctx: &egui::Context) {
+        self.sync_forge_selection(ctx);
         match act {
             IssueAct::OpenPicker => self.open_issue_picker(ctx),
             IssueAct::Start {
@@ -215,6 +216,13 @@ impl RepoTab {
         if let Some(busy) = &self.busy_op {
             self.status = Some((
                 format!("Start work on #{}: wait for {busy}", issue.number),
+                true,
+            ));
+            return;
+        }
+        if !self.issue_matches_forge(&IssueLink::of(issue)) {
+            self.status = Some((
+                "This issue belongs to another primary forge; choose it again".into(),
                 true,
             ));
             return;
@@ -332,23 +340,32 @@ impl RepoTab {
         }
     }
 
-    /// The remote-tracking branch (`origin/42-x`) of the name `branch`: on the default remote,
-    /// else another one. The work on the issue was pushed from elsewhere.
+    /// Prefer the primary repository's tracking branch. A branch of the same name on
+    /// another forge is not evidence that this issue's work was pushed from elsewhere.
     fn remote_branch_named(&self, branch: &str) -> Option<String> {
-        let default = self.default_remote();
+        let primary = self.primary_forge_remote().map(str::to_owned).or_else(|| {
+            self.hosting
+                .is_none()
+                .then(|| self.default_remote())
+                .flatten()
+        });
         let mut found = self
             .refs
             .remotes
             .iter()
             .filter(|(remote, list)| {
-                let name = format!("{remote}/{branch}");
-                list.iter().any(|b| b.name == name)
+                let eligible = self.hosting.as_ref().is_none_or(|h| {
+                    self.remotes
+                        .iter()
+                        .any(|r| &r.name == remote && h.matches_git_remote(&r.url))
+                });
+                eligible && list.iter().any(|b| b.name == format!("{remote}/{branch}"))
             })
             .map(|(remote, _)| remote.as_str());
         let first = found.next()?;
         let remote = std::iter::once(first)
             .chain(found)
-            .find(|r| Some(*r) == default.as_deref())
+            .find(|r| Some(*r) == primary.as_deref())
             .unwrap_or(first);
         Some(format!("{remote}/{branch}"))
     }
@@ -377,10 +394,12 @@ impl RepoTab {
     /// The branch pull requests of the work on an issue go into: the remote's default branch
     /// (where its `HEAD` points), else the usual guess (main, master or develop).
     pub(super) fn issue_base(&self) -> Base {
-        let remote = self
-            .primary_forge_remote()
-            .map(str::to_owned)
-            .or_else(|| self.default_remote());
+        let remote = self.primary_forge_remote().map(str::to_owned).or_else(|| {
+            self.hosting
+                .is_none()
+                .then(|| self.default_remote())
+                .flatten()
+        });
         let known = remote
             .as_ref()
             .and_then(|r| self.issue_work.remote_heads.get(r))
@@ -392,7 +411,16 @@ impl RepoTab {
                 known: true,
             },
             None => Base {
-                name: self.default_base(),
+                name: remote
+                    .as_deref()
+                    .and_then(|remote| {
+                        ["main", "master", "develop"].into_iter().find(|name| {
+                            self.remote_branches(remote)
+                                .any(|b| b.name == format!("{remote}/{name}"))
+                        })
+                    })
+                    .unwrap_or("main")
+                    .to_owned(),
                 remote,
                 known: false,
             },

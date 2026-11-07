@@ -4,6 +4,7 @@
 
 use std::path::Path;
 
+use super::guard::Destination;
 use crate::forge::{ForkInfo, Hosting};
 use crate::git::{self, Remote};
 use crate::repo::operations::{expect_ref, expect_ref_at, expect_symref};
@@ -231,7 +232,8 @@ pub(crate) fn checkout(
     }
     let origin = remotes
         .iter()
-        .find(|r| r.name == "origin")
+        .find(|r| hosting.is_some_and(|h| h.matches_git_remote(&r.url)))
+        .or_else(|| remotes.iter().find(|r| r.name == "origin"))
         .or_else(|| remotes.first());
     let ssh = origin.is_some_and(|r| is_ssh(&r.url));
     let url = if ssh && !info.clone_ssh.is_empty() {
@@ -244,6 +246,15 @@ pub(crate) fn checkout(
             "The forge didn't say where {}'s fork is",
             info.owner
         ));
+    }
+    if let Some(hosting) = hosting {
+        let fork = Hosting {
+            path: info.repo_path.clone(),
+            ..hosting.clone()
+        };
+        if !fork.matches_git_remote(&url) {
+            return Err("The advertised fork clone URL does not match this primary forge".into());
+        }
     }
     let (remote, new_remote) = match fork_remote(info, remotes, hosting) {
         Some(r) => (r, false),
@@ -258,11 +269,15 @@ pub(crate) fn checkout(
             (name, true)
         }
     };
+    let fetch_url = remotes
+        .iter()
+        .find(|r| r.name == remote)
+        .map_or(url.as_str(), |r| r.url.as_str());
     let tracking = format!("refs/remotes/{remote}/{}", info.branch);
     let fetch = strings(&[
         "fetch",
         "--",
-        &remote,
+        fetch_url,
         &format!("+refs/heads/{}:{tracking}", info.branch),
     ]);
     let mut steps = Vec::new();
@@ -361,6 +376,9 @@ pub(crate) struct Rebase {
     pub tracking: String,
     /// The commits the base has that the branch hasn't.
     pub behind: usize,
+    /// Captured effective URLs, rechecked before every step and push.
+    pub(super) destinations: Vec<Destination>,
+    pub(super) base_head: String,
 }
 
 /// Plans rebasing the checked-out branch, set up for `info`'s fork, onto `base` of `upstream`
@@ -369,18 +387,36 @@ pub(crate) struct Rebase {
 pub(crate) fn plan_rebase(
     repo: &Path,
     info: &ForkInfo,
-    upstream: &str,
+    upstream: &Remote,
     setup: &Setup,
     creds: Option<&git::Credentials>,
     hosting: Option<&Hosting>,
+    scope: Option<&super::guard::Scope>,
 ) -> Result<Rebase, String> {
+    if let Some(scope) = scope {
+        scope.check_remote(repo)?;
+    }
     let remotes = git::remotes(repo)?;
+    if !remotes.iter().any(|r| r == upstream)
+        || hosting.is_some_and(|h| !h.matches_git_remote(&upstream.url))
+    {
+        return Err("The selected primary remote changed; plan the rebase again".into());
+    }
+    let base_destination = Destination::read(repo, &upstream.name)?;
+    base_destination.validate(hosting, false)?;
     let fork = fork_remote(info, &remotes, hosting).ok_or_else(|| {
         format!(
             "Check out #{}'s branch to push to {} first: no remote is their fork",
             info.number, info.owner
         )
     })?;
+    let fork_destination = Destination::read(repo, &fork)?;
+    let fork_hosting = hosting.map(|h| Hosting {
+        path: info.repo_path.clone(),
+        ..h.clone()
+    });
+    fork_destination.validate(fork_hosting.as_ref(), false)?;
+    fork_destination.validate(fork_hosting.as_ref(), true)?;
     let full = git::run_ok_codes(Some(repo), &["symbolic-ref", "-q", "HEAD"], &[0, 1])?;
     let local = full
         .trim()
@@ -406,27 +442,36 @@ pub(crate) fn plan_rebase(
         return Err("Commit or stash your changes first: this rebases the branch".to_owned());
     }
     let tracking = format!("refs/remotes/{fork}/{}", info.branch);
-    let onto = format!("refs/remotes/{upstream}/{}", info.base);
+    let onto = format!("refs/remotes/{}/{}", upstream.name, info.base);
+    if let Some(scope) = scope {
+        scope.check_remote(repo)?;
+    }
     git::run_with(
         Some(repo),
         &[
             "fetch",
             "--",
-            fork.as_str(),
+            &fork_destination.fetch[0],
             &format!("+refs/heads/{}:{tracking}", info.branch),
         ],
         creds,
     )?;
+    if let Some(scope) = scope {
+        scope.check_remote(repo)?;
+    }
     git::run_with(
         Some(repo),
         &[
             "fetch",
             "--",
-            upstream,
+            &base_destination.fetch[0],
             &format!("+refs/heads/{}:{onto}", info.base),
         ],
         creds,
     )?;
+    if let Some(scope) = scope {
+        scope.check_remote(repo)?;
+    }
     let head = git::head(repo);
     let seen = git::resolve(repo, &tracking)?;
     let missing = count(repo, &format!("{head}..{seen}"))?;
@@ -438,22 +483,25 @@ pub(crate) fn plan_rebase(
             if missing == 1 { "" } else { "s" }
         ));
     }
-    let behind = count(repo, &format!("{head}..{onto}"))?;
+    let base_head = git::resolve(repo, &onto)?;
+    let behind = count(repo, &format!("{head}..{base_head}"))?;
     if behind == 0 {
         return Err(format!(
-            "{local} already has every commit of {upstream}/{}",
-            info.base
+            "{local} already has every commit of {}/{}",
+            upstream.name, info.base
         ));
     }
     Ok(Rebase {
         local,
         fork,
         branch: info.branch.clone(),
-        onto,
+        onto: onto.clone(),
         head,
         seen,
         tracking,
         behind,
+        base_head,
+        destinations: vec![base_destination, fork_destination],
     })
 }
 
@@ -469,19 +517,25 @@ impl Rebase {
         format!("refs/heads/{}", self.local)
     }
 
+    fn guards(&self) -> Vec<Vec<String>> {
+        self.destinations.iter().map(Destination::step).collect()
+    }
     fn rebase(&self) -> Vec<String> {
-        strings(&["-c", "rebase.updateRefs=false", "rebase", &self.onto])
+        strings(&["-c", "rebase.updateRefs=false", "rebase", &self.base_head])
     }
 
     /// The rebase and the push, only while the branch is where the plan saw it.
     pub(crate) fn steps(&self) -> Vec<Vec<String>> {
         let local = self.local_ref();
-        vec![
-            expect_symref("HEAD", &local),
-            expect_ref_at(&local, &self.head),
-            self.rebase(),
-            self.push(&local, Some(&self.seen)),
-        ]
+        self.guards()
+            .into_iter()
+            .chain([
+                expect_symref("HEAD", &local),
+                expect_ref_at(&local, &self.head),
+                self.rebase(),
+                self.push(&local, Some(&self.seen)),
+            ])
+            .collect()
     }
 
     /// The push of `what` to the fork's branch, replacing it only if it is `seen` (or, without
@@ -504,34 +558,49 @@ impl Rebase {
     /// The push alone, of the branch as it is now (after a rebase continued past conflicts, or
     /// to retry after signing in): replacing the fork's branch only if it is still `seen`.
     pub(crate) fn push_now(&self) -> Vec<Vec<String>> {
-        vec![self.push(&self.local_ref(), Some(&self.seen))]
+        self.guards()
+            .into_iter()
+            .chain([
+                expect_symref("HEAD", &self.local_ref()),
+                self.push(&self.local_ref(), Some(&self.seen)),
+            ])
+            .collect()
     }
 
     /// The fork's branch back as it was, only while it is what was pushed.
     pub(crate) fn fork_undo_steps(&self) -> Vec<Vec<String>> {
-        vec![expect_ref(&self.tracking), self.push(&self.head, None)]
+        self.guards()
+            .into_iter()
+            .chain([expect_ref(&self.tracking), self.push(&self.head, None)])
+            .collect()
     }
 
     /// Back as it was: on the fork first, then here.
     pub(crate) fn undo_steps(&self) -> Vec<Vec<String>> {
         let local = self.local_ref();
-        vec![
-            expect_symref("HEAD", &local),
-            expect_ref(&local),
-            expect_ref(&self.tracking),
-            self.push(&self.head, None),
-            strings(&["reset", "--keep", &self.head]),
-        ]
+        self.guards()
+            .into_iter()
+            .chain([
+                expect_symref("HEAD", &local),
+                expect_ref(&local),
+                expect_ref(&self.tracking),
+                self.push(&self.head, None),
+                strings(&["reset", "--keep", &self.head]),
+            ])
+            .collect()
     }
 
     pub(crate) fn redo_steps(&self) -> Vec<Vec<String>> {
         let local = self.local_ref();
-        vec![
-            expect_symref("HEAD", &local),
-            expect_ref(&local),
-            self.rebase(),
-            self.push(&local, None),
-        ]
+        self.guards()
+            .into_iter()
+            .chain([
+                expect_symref("HEAD", &local),
+                expect_ref(&local),
+                self.rebase(),
+                self.push(&local, None),
+            ])
+            .collect()
     }
 
     /// The undo of a rebase whose push failed: the branch back, here only.

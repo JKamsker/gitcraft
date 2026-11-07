@@ -80,6 +80,7 @@ impl RepoTab {
         // Credential Manager would otherwise open its sign-in window every few minutes while a
         // token has expired.
         let path = self.path.clone();
+        let fork_scope = self.fork_execution_scope(label);
         let label = label.to_owned();
         let creds = self.credentials.clone();
         // Ended all the same if it panics: the tab stays busy until then.
@@ -103,8 +104,15 @@ impl RepoTab {
             } else {
                 Vec::new()
             };
-            let (result, kind, stopped) =
-                run_steps_counted(&path, &ops, kind, creds.as_ref(), quiet, Some(&control));
+            let (result, kind, stopped) = run_steps_guarded(
+                &path,
+                &ops,
+                kind,
+                creds.as_ref(),
+                quiet,
+                Some(&control),
+                fork_scope.as_ref(),
+            );
             let result = match result {
                 Err(e) if control.is_cancelled() && !e.contains("CONFLICT") => {
                     Err(cancelled_message(&path, &ops, &locks_before))
@@ -482,6 +490,18 @@ pub(super) fn run_steps_counted(
     quiet: bool,
     control: Option<&Arc<git::OpControl>>,
 ) -> (Result<String, String>, OpKind, usize) {
+    run_steps_guarded(path, ops, kind, creds, quiet, control, None)
+}
+
+pub(super) fn run_steps_guarded(
+    path: &Path,
+    ops: &[Vec<String>],
+    kind: OpKind,
+    creds: Option<&git::Credentials>,
+    quiet: bool,
+    control: Option<&Arc<git::OpControl>>,
+    fork_scope: Option<&super::forks::guard::Scope>,
+) -> (Result<String, String>, OpKind, usize) {
     // Undoing a HEAD move resets the branch checked out now: after a checkout or a commit made
     // elsewhere since, that would throw away commits that aren't the operation's.
     let expected = match &kind {
@@ -521,6 +541,18 @@ pub(super) fn run_steps_counted(
     let mut stopped = ops.len();
     let mut tried = Vec::new();
     for (i, op) in ops.iter().enumerate() {
+        #[cfg(test)]
+        if !is_expectation(op) {
+            super::forks::before_step(op);
+        }
+        if let Err(e) = fork_scope
+            .map_or(Ok(()), |scope| scope.check_remote(path))
+            .and_then(|()| super::forks::guard::check(path, ops))
+        {
+            result = Err(e);
+            stopped = i;
+            break;
+        }
         if is_expectation(op) {
             continue;
         }
@@ -694,7 +726,8 @@ pub(super) fn tried_note(out: &str) -> Option<&str> {
 
 /// Whether `op` is a step that runs nothing, only checks.
 pub(super) fn is_expectation(op: &[String]) -> bool {
-    expected_ref(op).is_some()
+    super::forks::guard::is_guard(op)
+        || expected_ref(op).is_some()
         || expected_symref(op).is_some()
         || expected_tree(op).is_some()
         || matches!(op, [mark, _, _] if mark == crate::gerrit::CHECK)

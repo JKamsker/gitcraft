@@ -179,6 +179,7 @@ impl RepoTab {
         if !changed {
             return;
         }
+        self.clear_forge_forks();
         let moved = !super::load::same_repository(self.hosting.as_ref(), hosting.as_ref());
         self.forge_generation += 1;
         if moved || self.forge_repository_generation == 0 {
@@ -224,7 +225,6 @@ impl RepoTab {
         }
         self.forget_merged_prs();
         self.branch_health = Default::default();
-        self.forks = Default::default();
         self.forge_issues_changed();
         self.clear_forge_drift();
         self.owners = Default::default();

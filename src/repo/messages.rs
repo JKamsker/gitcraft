@@ -473,6 +473,7 @@ impl RepoTab {
                 if generation == self.forge_generation || same_review {
                     self.handle(*msg, ctx);
                 } else if operation {
+                    self.stale_fork_operation_finished();
                     // The mutation used its captured old target. Let the busy slot go, but
                     // never run old continuations (or retries) against the new hosting.
                     self.busy_op = None;
