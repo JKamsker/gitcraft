@@ -31,3 +31,7 @@ mod terminal;
 mod theme;
 mod update;
 mod vscode_theme;
+
+pub(crate) mod tour;
+
+pub(crate) mod portability;

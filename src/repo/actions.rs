@@ -37,6 +37,8 @@ pub(crate) enum Action {
     OpenActivity(super::activity::Page),
     ActivityCommit(String),
     CloseActivity,
+    OpenTour,
+    CloseTour,
     SelectHash(String),
     SelectStash(usize),
     OpenDiff(DiffKey),
@@ -416,6 +418,11 @@ impl RepoTab {
                 Action::OpenSparse,
             ),
         ];
+        items.push((
+            "A tour of this repository".into(),
+            "setup and history".into(),
+            Action::OpenTour,
+        ));
         items.extend(
             PullMode::ALL.map(|m| (m.label().into(), "remote".into(), Action::PullWith(m))),
         );

@@ -48,6 +48,7 @@ mod terminals;
 #[cfg(test)]
 mod tests;
 mod toolbar;
+mod tour;
 mod watch;
 mod watch_remote;
 pub(crate) mod widgets;
@@ -176,6 +177,7 @@ pub struct RepoTab {
     /// The pull request the big area shows.
     pr_view: Option<pr_view::PrView>,
     activity: Option<activity::Activity>,
+    tour: Option<tour::TourView>,
     /// The builds of a commit the big area shows.
     ci_view: Option<ci_view::CiView>,
     pr_requests: u64,
@@ -350,6 +352,7 @@ impl RepoTab {
             compare: None,
             pr_view: None,
             activity: None,
+            tour: None,
             ci_view: None,
             pr_requests: 0,
             pr_drafts: HashMap::new(),

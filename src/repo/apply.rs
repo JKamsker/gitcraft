@@ -68,6 +68,8 @@ impl RepoTab {
                 whole,
             } => self.comparison_pick(request, boundary, lines, whole, ctx),
             Action::ComparisonNormalPatch => self.comparison_normal_patch(ctx),
+            Action::OpenTour => self.open_tour(false, ctx),
+            Action::CloseTour => self.tour = None,
             Action::Keyboard(request) => self.apply_keyboard(request, ctx),
             Action::OpenActivity(page) => self.open_activity(page, ctx),
             Action::ActivityCommit(hash) => self.activity_commit(hash, ctx),

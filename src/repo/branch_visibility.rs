@@ -130,6 +130,17 @@ pub(crate) enum Change {
 }
 
 impl RepoTab {
+    pub(crate) fn portable_visibility(ctx: &egui::Context, path: &Path) -> Vec<String> {
+        Visibility::load(ctx, path).hidden.into_iter().collect()
+    }
+    pub(crate) fn restore_portable_visibility(ctx: &egui::Context, path: &Path, hidden: &[String]) {
+        Visibility {
+            hidden: hidden.iter().cloned().collect(),
+            solo: Default::default(),
+        }
+        .store(ctx, path);
+    }
+
     /// Changes which branches the graph shows, keeps that, and reads the graph again.
     pub(super) fn change_visibility(&mut self, change: Change, ctx: &egui::Context) {
         match change {
