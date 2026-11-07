@@ -14,6 +14,7 @@ pub(crate) struct Lens {
     pub index_stamp: String,
     pub work_raw: Version,
     pub filemode: String,
+    pub symlinks: String,
     pub intent_to_add: bool,
     pub attributes_stamp: String,
     pub versions: [Version; 3],
@@ -55,6 +56,13 @@ pub(crate) fn read_lens(
     if filemode == "false" && third.regular() && second.regular() {
         third.mode = second.mode.clone();
     }
+    let symlinks = symlinks(repo, active)?;
+    if symlinks == "false" && second.mode.as_deref() == Some("120000") && third.regular() {
+        // Git checks links out as regular target-text files on these repositories,
+        // while git add preserves the indexed link type. Keep the physical read
+        // separately in work_raw for stale/type checks and never follow a target.
+        third.mode = Some("120000".into());
+    }
     let (staging_warning, attributes_stamp) = attribute_state(repo, &spec.path, active)?;
     if index(repo, active)?.0 != before
         || super::head(repo, active)? != head
@@ -72,6 +80,7 @@ pub(crate) fn read_lens(
         index_stamp,
         work_raw,
         filemode,
+        symlinks,
         intent_to_add,
         attributes_stamp,
         versions: [first, second, third],
@@ -363,13 +372,15 @@ pub(super) fn index_path(repo: &Path, active: &dyn Fn() -> bool) -> Result<PathB
 }
 
 pub(super) fn filemode(repo: &Path, active: &dyn Fn() -> bool) -> Result<String, String> {
-    let out = output(
-        repo,
-        &["config", "--bool", "--get", "core.filemode"],
-        active,
-    )?;
+    boolean_config(repo, "core.filemode", active)
+}
+pub(super) fn symlinks(repo: &Path, active: &dyn Fn() -> bool) -> Result<String, String> {
+    boolean_config(repo, "core.symlinks", active)
+}
+fn boolean_config(repo: &Path, key: &str, active: &dyn Fn() -> bool) -> Result<String, String> {
+    let out = output(repo, &["config", "--bool", "--get", key], active)?;
     if !matches!(out.code, 0 | 1) {
-        return Err("Could not read core.filemode".into());
+        return Err(format!("Could not read {key}"));
     }
     Ok(String::from_utf8_lossy(&out.stdout).trim().into())
 }

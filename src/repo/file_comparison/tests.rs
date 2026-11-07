@@ -441,3 +441,58 @@ fn mode_only_boundaries_and_staged_rename_content_keep_paths_and_working_bytes()
     );
     Ok(())
 }
+
+#[test]
+fn emulated_symlinks_keep_the_index_type_like_git_add_and_guard_config_changes()
+-> Result<(), String> {
+    let r = Repo::new()?;
+    r.git(&["config", "core.symlinks", "false"])?;
+    r.write("link", b"original-target")?;
+    let original = r.git(&["hash-object", "--no-filters", "-w", "link"])?;
+    r.git(&[
+        "update-index",
+        "--add",
+        "--cacheinfo",
+        &format!("120000,{original},link"),
+    ])?;
+    r.git(&["commit", "-qm", "emulated link"])?;
+    let unchanged = read(&r, "link")?;
+    assert_eq!(unchanged.snapshot.work_raw.mode.as_deref(), Some("100644"));
+    assert!(
+        unchanged
+            .snapshot
+            .versions
+            .iter()
+            .all(|v| v.mode.as_deref() == Some("120000"))
+    );
+    assert!(unchanged.boundaries[1].changed().is_empty());
+    assert_eq!(
+        unchanged.boundaries[1].old_mode,
+        unchanged.boundaries[1].new_mode
+    );
+    r.write("link", b"new-target")?;
+    r.git(&["add", "link"])?;
+    let native_result = r.git(&["ls-files", "--stage", "link"])?;
+    assert!(native_result.starts_with("120000"));
+    r.git(&[
+        "update-index",
+        "--cacheinfo",
+        &format!("120000,{original},link"),
+    ])?;
+    let lens = read(&r, "link")?;
+    files::apply_lens_patch(&r.0, &lens.snapshot, &lens.boundaries[1].full, false)?;
+    assert_eq!(r.git(&["ls-files", "--stage", "link"])?, native_result);
+    assert_eq!(
+        std::fs::read(r.0.join("link")).map_err(|e| e.to_string())?,
+        b"new-target"
+    );
+    r.write("link", b"later-target")?;
+    let lens = read(&r, "link")?;
+    r.git(&["config", "core.symlinks", "true"])?;
+    assert!(
+        files::apply_lens_patch(&r.0, &lens.snapshot, &lens.boundaries[1].full, false)
+            .is_err_and(|e| e.contains("stale"))
+    );
+    assert_eq!(r.git(&["ls-files", "--stage", "link"])?, native_result);
+    Ok(())
+}

@@ -88,6 +88,7 @@ fn verify(repo: &Path, lens: &Lens) -> Result<(), String> {
         || lens::working(repo, &lens.spec.path, &|| true)? != lens.work_raw
         || index_stamp(repo, &|| true)? != lens.index_stamp
         || lens::filemode(repo, &|| true)? != lens.filemode
+        || lens::symlinks(repo, &|| true)? != lens.symlinks
         || warning.is_some()
         || attributes_stamp != lens.attributes_stamp
     {
@@ -317,10 +318,13 @@ fn remote_attributes_check(lens: &Lens) -> String {
          actual_attributes=$(md5sum \"$d/current-attributes\") || return 1\n\
          [ \"${{actual_attributes%% *}}\" = {stamp} ] || return 1\n\
          actual_filemode=$(git --no-lazy-fetch config --bool --get core.filemode); rc=$?\n\
-         [ \"$rc\" -le 1 ] && [ \"$actual_filemode\" = {filemode} ] || return 1\n",
+         [ \"$rc\" -le 1 ] && [ \"$actual_filemode\" = {filemode} ] || return 1\n\
+         actual_symlinks=$(git --no-lazy-fetch config --bool --get core.symlinks); rc=$?\n\
+         [ \"$rc\" -le 1 ] && [ \"$actual_symlinks\" = {symlinks} ] || return 1\n",
         path = crate::remote::sh_quote(&lens.spec.path),
         stamp = crate::remote::sh_quote(&lens.attributes_stamp),
         filemode = crate::remote::sh_quote(&lens.filemode),
+        symlinks = crate::remote::sh_quote(&lens.symlinks),
     )
 }
 
