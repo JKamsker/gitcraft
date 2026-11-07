@@ -99,6 +99,17 @@ impl RepoTab {
         egui::Popup::menu(&more.inner)
             .style(crate::theme::menu_style)
             .show(|ui| pull_menu(ui, acts));
+        if let Some(dialog) = self.review_dialog() {
+            if icons::tool_button(ui, "arrow-up-from-line", "Push for review", idle)
+                .on_hover_text(
+                    "Submit commits to Gerrit; amend and submit again to update the patch set",
+                )
+                .clicked()
+            {
+                acts.push(Action::Dialog(dialog));
+            }
+            return;
+        }
         if icons::tool_button_count(ui, "arrow-up-from-line", "Push", ahead, idle && has_remote)
             .on_hover_text("Push the current branch (publishes it if it has no upstream yet)")
             .clicked()

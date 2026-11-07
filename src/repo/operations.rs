@@ -354,12 +354,23 @@ pub(super) fn run_steps_counted(
         if is_expectation(op) {
             continue;
         }
-        let args: Vec<&str> = op.iter().map(String::as_str).collect();
-        result = if quiet {
-            git::run_unattended(Some(path), &args, creds)
-        } else {
-            git::run_with(Some(path), &args, creds)
-        };
+        result = (|| {
+            let prepared;
+            let op = if let [mark, message] = op.as_slice()
+                && mark == crate::gerrit::AMEND
+            {
+                prepared = crate::gerrit::amend_args(path, message)?;
+                &prepared
+            } else {
+                op
+            };
+            let args: Vec<&str> = op.iter().map(String::as_str).collect();
+            if quiet {
+                git::run_unattended(Some(path), &args, creds)
+            } else {
+                git::run_with(Some(path), &args, creds)
+            }
+        })();
         if result.is_err() {
             stopped = i;
             break;
@@ -447,10 +458,19 @@ fn expected_symref(op: &[String]) -> Option<(&str, &str)> {
 
 /// Whether `op` is a step that runs nothing, only checks.
 fn is_expectation(op: &[String]) -> bool {
-    expected_ref(op).is_some() || expected_symref(op).is_some()
+    expected_ref(op).is_some()
+        || expected_symref(op).is_some()
+        || matches!(op, [mark, _, _] if mark == crate::gerrit::CHECK)
 }
 
 fn check_expected(path: &Path, ops: &[Vec<String>]) -> Result<(), String> {
+    for op in ops {
+        if let [mark, base, head] = op.as_slice()
+            && mark == crate::gerrit::CHECK
+        {
+            crate::gerrit::check_stack(path, base, head)?;
+        }
+    }
     for (name, target) in ops.iter().filter_map(|op| expected_symref(op)) {
         // Exit 1, nothing printed: detached.
         let now = git::run_ok_codes(Some(path), &["symbolic-ref", "-q", name], &[0, 1])
