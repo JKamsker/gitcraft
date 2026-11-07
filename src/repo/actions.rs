@@ -666,6 +666,11 @@ impl RepoTab {
                 Action::SelectStaleBranches,
             ),
             (
+                "Ref storage and reftable migration…".into(),
+                "refs compatibility".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Reftable),
+            ),
+            (
                 "How an object is stored…".into(),
                 "objects pack delta file version".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Object("HEAD".into())),

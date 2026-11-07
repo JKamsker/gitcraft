@@ -1,29 +1,51 @@
 //! Reachable repository internals dialogs; stale background answers never replace a new view.
 use super::{Action, Dialog, RepoTab};
-use crate::git::repository_tools::{all_refs, object};
+use crate::git::repository_tools::{all_refs, guard, object, reftable};
 use std::sync::atomic::{AtomicU64, Ordering};
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Tool {
+    Refs,
+    Object,
+    Reftable,
+}
 static REQUESTS: AtomicU64 = AtomicU64::new(1);
 
 pub(crate) enum Act {
     AllRefs(String),
     Object(String),
+    Reftable,
+    Migrate(Box<reftable::Storage>, String),
 }
 enum Data {
     Refs(all_refs::Browser),
     Object(object::Inspection),
+    Reftable(reftable::Storage),
 }
 pub(crate) struct State {
     id: u64,
     query: String,
     result: Option<Result<Data, String>>,
     filter: String,
-    object: bool,
+    tool: Tool,
+    acknowledged: bool,
+    compatible: bool,
 }
 impl RepoTab {
     pub(super) fn repository_tools_act(&mut self, act: Act, ctx: &egui::Context) {
-        let (query, is_object) = match act {
-            Act::AllRefs(q) => (q, false),
-            Act::Object(q) => (q, true),
+        let act = match act {
+            Act::Migrate(snapshot, target) => {
+                self.repository_tool_mutation("Migrate ref storage", false, ctx, move |runner| {
+                    reftable::migrate(runner, &snapshot, &target)
+                });
+                return;
+            }
+            act => act,
+        };
+        let (query, tool) = match act {
+            Act::AllRefs(q) => (q, Tool::Refs),
+            Act::Object(q) => (q, Tool::Object),
+            Act::Reftable => (String::new(), Tool::Reftable),
+            Act::Migrate(..) => return,
         };
         let id = REQUESTS.fetch_add(1, Ordering::Relaxed);
         self.dialog = Some(Dialog::RepositoryTools(Box::new(State {
@@ -31,7 +53,9 @@ impl RepoTab {
             query: query.clone(),
             result: None,
             filter: String::new(),
-            object: is_object,
+            tool,
+            acknowledged: false,
+            compatible: false,
         })));
         let path = self.path.clone();
         let expected_path = path.clone();
@@ -40,15 +64,13 @@ impl RepoTab {
             ctx,
             false,
             Err,
-            move || {
-                if is_object {
-                    object::inspect(&path, &query, &|| {
-                        !crate::tasks::cancellation().is_cancelled()
-                    })
-                    .map(Data::Object)
-                } else {
-                    all_refs::read(&path, &query).map(Data::Refs)
-                }
+            move || match tool {
+                Tool::Object => object::inspect(&path, &query, &|| {
+                    !crate::tasks::cancellation().is_cancelled()
+                })
+                .map(Data::Object),
+                Tool::Refs => all_refs::read(&path, &query).map(Data::Refs),
+                Tool::Reftable => reftable::inspect(&path).map(Data::Reftable),
             },
             move |tab, result, _| {
                 if tab.path != expected_path || crate::git::profile_config() != profile {
@@ -64,9 +86,67 @@ impl RepoTab {
     }
 }
 
+impl RepoTab {
+    fn repository_tool_mutation(
+        &mut self,
+        label: &str,
+        network: bool,
+        ctx: &egui::Context,
+        work: impl FnOnce(&guard::Runner<'_>) -> Result<String, String> + Send + 'static,
+    ) {
+        if let Some(busy) = &self.busy_op {
+            self.status = Some((format!("{busy} is still running"), true));
+            return;
+        }
+        if network && let Some(why) = crate::network::refused() {
+            self.status = Some((why.why().to_owned(), true));
+            return;
+        }
+        let ops = super::ops(&[&[if network { "push" } else { "refs" }]]);
+        let control = self.follow_op(&ops, false, ctx);
+        self.busy_op = Some(label.into());
+        self.op_started = Some(std::time::Instant::now());
+        self.last_op = None;
+        self.timeline_op_started(false, super::Refresh::All);
+        let repo = self.path.clone();
+        let label = label.to_owned();
+        let credentials = self.credentials.clone();
+        self.then_or(
+            ctx,
+            true,
+            Err,
+            move || {
+                work(&guard::Runner {
+                    repo: &repo,
+                    control: &control,
+                    credentials: credentials.as_ref(),
+                })
+            },
+            move |tab, result, ctx| {
+                tab.op_done(
+                    label,
+                    result,
+                    super::Refresh::All,
+                    super::OpKind::plain(),
+                    false,
+                    ctx,
+                );
+                // Drop snapshots after a mutation. A subsequent action must reread all guards.
+                if matches!(tab.dialog, Some(Dialog::RepositoryTools(_))) {
+                    tab.dialog = None;
+                }
+            },
+        );
+    }
+}
+
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.set_width(850.0);
-    if state.object {
+    if state.tool == Tool::Reftable {
+        reftable_view(ui, state, acts);
+        return;
+    }
+    if state.tool == Tool::Object {
         object_view(ui, state, acts);
         return;
     }
@@ -178,4 +258,54 @@ fn object_view(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
             if ui.link(format!("{} · {} · {}", entry.name, entry.kind, entry.oid)).clicked() { acts.push(Action::RepositoryTools(Act::Object(entry.oid.clone()))); }
         }
     });
+}
+
+fn reftable_view(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
+    ui.heading("Ref storage and guided migration");
+    let Some(result) = &state.result else {
+        ui.spinner();
+        return;
+    };
+    let storage = match result {
+        Ok(Data::Reftable(v)) => v,
+        Ok(_) => return,
+        Err(e) => {
+            ui.label(e);
+            return;
+        }
+    };
+    ui.label(format!(
+        "{} · current storage: {}",
+        storage.git, storage.format
+    ));
+    ui.label("Reftable requires Git 2.45+ and compatible third-party tools. Some IDEs, embedded Git libraries, backup tools and older clients only support files. Check every tool that accesses this repository before migration. Files is the broadest compatibility choice.");
+    ui.label("Migration preserves refs and reflogs, refuses linked worktrees, and verifies both afterwards. Stop all other programs that write to this repository. Keep a repository backup before proceeding.");
+    if let Some(why) = &storage.blocked {
+        ui.label(why);
+    }
+    ui.checkbox(
+        &mut state.acknowledged,
+        "All other writers are stopped and I have a backup",
+    );
+    ui.checkbox(
+        &mut state.compatible,
+        "I checked compatibility of my installed tools with the target format",
+    );
+    let target = if storage.format == "files" {
+        "reftable"
+    } else {
+        "files"
+    };
+    if ui
+        .add_enabled(
+            storage.migrates && storage.blocked.is_none() && state.acknowledged && state.compatible,
+            egui::Button::new(format!("Migrate to {target} and verify")),
+        )
+        .clicked()
+    {
+        acts.push(Action::RepositoryTools(Act::Migrate(
+            Box::new(storage.clone()),
+            target.into(),
+        )));
+    }
 }
