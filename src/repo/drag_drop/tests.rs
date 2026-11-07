@@ -87,9 +87,16 @@ fn open(dir: &Path) -> (egui::Context, RepoTab) {
 /// Runs `action` as a click on it would, until it and the reload after it are done.
 fn run(tab: &mut RepoTab, ctx: &egui::Context, action: Action) {
     let status = tab.status.clone();
+    let completed = tab.activity.last().map(|entry| entry.id);
     tab.apply(action, ctx);
     // Some first read what they rewrite in the background.
-    wait(tab, ctx, |t| t.busy_op.is_some() || t.status != status);
+    // An earlier operation's receipt can change its successful status during that read.
+    // Use the activity id to also catch an operation that finished within a single poll.
+    wait(tab, ctx, |t| {
+        t.busy_op.is_some()
+            || t.activity.last().map(|entry| entry.id) != completed
+            || (t.status != status && t.status.as_ref().is_some_and(|(_, failed)| *failed))
+    });
     settle(tab, ctx);
 }
 
@@ -377,6 +384,19 @@ fn a_commit_dropped_on_another_of_the_branch_is_squashed_into_it() {
         "Fixup {} into {} “a”",
         short(&tip(&dir, "main")),
         short(&squashed_a)
+    );
+    // A rewrite's receipt arrives separately from its operation and reload. Deliver one
+    // from the squash while the following fixup is still preparing in the background.
+    let receipt = format!(
+        "{} (late receipt)",
+        tab.status.as_ref().map_or("", |(message, _)| message)
+    );
+    assert!(
+        tab.tx
+            .send(crate::repo::Msg::Then(Box::new(move |tab, _| {
+                tab.status = Some((receipt, false));
+            })))
+            .is_ok()
     );
     choose(&mut tab, &ctx, &offers, &fixup);
     let fixed = subjects(&dir);
