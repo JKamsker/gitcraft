@@ -9,7 +9,7 @@ use windows::Win32::System::Diagnostics::ToolHelp::{
 use windows::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
-    SetInformationJobObject,
+    SetInformationJobObject, TerminateJobObject,
 };
 use windows::Win32::System::Threading::{
     OpenProcess, OpenThread, PROCESS_SET_QUOTA, PROCESS_TERMINATE, ResumeThread,
@@ -25,10 +25,24 @@ fn raw(handle: &OwnedHandle) -> HANDLE {
     HANDLE(handle.as_raw_handle())
 }
 
+/// Owns the job's kill-on-close lifetime, with an explicit failure status when stopped.
+pub struct ProcessJob {
+    handle: OwnedHandle,
+}
+
+impl ProcessJob {
+    /// Stop every process in this job with a nonzero exit code. Closing the handle remains
+    /// a fallback; kill-on-close alone can report a successful child exit on Windows.
+    pub fn terminate(&self) -> Result<(), String> {
+        // SAFETY: this owner holds a valid job handle created with termination access.
+        unsafe { TerminateJobObject(raw(&self.handle), 1) }.map_err(|e| e.to_string())
+    }
+}
+
 /// `pid` must name a child created with CREATE_SUSPENDED. On success the primary thread
 /// runs, and dropping the returned job stops that child and all of its descendants. On
 /// failure the caller must kill and reap its still-suspended child.
-pub fn supervise_suspended_process(pid: u32) -> Result<OwnedHandle, String> {
+pub fn supervise_suspended_process(pid: u32) -> Result<ProcessJob, String> {
     // SAFETY: no inherited security attributes and no name; all returned handles are owned.
     let job = owned(unsafe { CreateJobObjectW(None, None) }.map_err(|e| e.to_string())?);
     let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
@@ -76,7 +90,7 @@ pub fn supervise_suspended_process(pid: u32) -> Result<OwnedHandle, String> {
             if unsafe { ResumeThread(raw(&thread)) } == u32::MAX {
                 return Err(std::io::Error::last_os_error().to_string());
             }
-            return Ok(job);
+            return Ok(ProcessJob { handle: job });
         }
         // SAFETY: same snapshot and structure as Thread32First above.
         if unsafe { Thread32Next(raw(&snapshot), &mut entry) }.is_err() {

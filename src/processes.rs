@@ -521,7 +521,14 @@ async fn execute(
             ));
         }
         #[cfg(windows)]
-        drop(process_job.take());
+        if let Some(job) = &process_job
+            && let Err(error) = job.terminate()
+        {
+            stopped = Some(format!(
+                "{}; could not stop process job: {error}",
+                stopped.as_deref().unwrap_or_default()
+            ));
+        }
         let _ = child.start_kill();
         if status.is_none() {
             status = Some(
@@ -531,6 +538,8 @@ async fn execute(
                     .map_err(|e| format!("could not reap process: {e}"))?,
             );
         }
+        #[cfg(windows)]
+        drop(process_job.take());
         // Killing/reaping does not consume bytes already buffered in the pipes. Retain
         // those diagnostics without waiting indefinitely for an inherited pipe to close.
         let until = tokio::time::Instant::now() + options.drain_for;
@@ -786,6 +795,7 @@ mod tests {
     #[test]
     fn timeout_keeps_partial_output_and_reaps_the_child() -> Result<(), String> {
         let service = Service::new(1, 2).map_err(|e| e.to_string())?;
+        let started = Instant::now();
         let out = service
             .submit(
                 command("hang")?,
@@ -803,6 +813,9 @@ mod tests {
         assert!(String::from_utf8_lossy(&out.stdout).contains("partial stdout"));
         assert!(String::from_utf8_lossy(&out.stderr).contains("partial stderr"));
         assert!(!out.status.success());
+        assert!(started.elapsed() < Duration::from_secs(10));
+        #[cfg(windows)]
+        assert_eq!(out.status.code(), Some(1));
         Ok(())
     }
 

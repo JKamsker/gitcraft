@@ -30,7 +30,7 @@ mod process_job;
 #[cfg(windows)]
 mod windows_shell;
 #[cfg(windows)]
-pub use process_job::supervise_suspended_process;
+pub use process_job::{ProcessJob, supervise_suspended_process};
 
 /// Stop a process group owned by the caller. A group already gone needs no cleanup.
 #[cfg(unix)]
