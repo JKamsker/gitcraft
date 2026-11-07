@@ -113,7 +113,15 @@ impl Context {
             "objects",
         ])?;
         let index_file = initial(&["rev-parse", "--path-format=absolute", "--git-path", "index"])?;
-        let shared_file = initial(&["rev-parse", "--path-format=absolute", "--shared-index-path"])?;
+        // The safe default disables split-index writes, but this read-only query
+        // must still discover an existing shared cache for the private copy.
+        let shared_file = initial(&[
+            "-c",
+            "core.splitIndex=true",
+            "rev-parse",
+            "--path-format=absolute",
+            "--shared-index-path",
+        ])?;
         let format = initial(&["rev-parse", "--show-object-format"])?;
         if !matches!(format.as_str(), "sha1" | "sha256") {
             return Err("Unknown Git object format".into());
