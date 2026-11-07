@@ -9,6 +9,7 @@ pub(crate) struct ConnectionProbe {
 }
 fn probe_extra(dir: &Path) -> Extra {
     let mut extra = unattended_extra(cfg!(unix) || remote::is_remote(dir));
+    extra.normalize_repository = true;
     extra.timeout = Some(Duration::from_secs(45));
     extra.output_limit = Some(2 << 20);
     extra.env.extend([
@@ -31,15 +32,37 @@ pub(crate) fn connection_probe(dir: &Path, url: &str) -> Result<ConnectionProbe,
         elapsed: started.elapsed(),
     })
 }
-pub(crate) fn connection_read(dir: &Path, args: &[&str]) -> Result<String, String> {
+/// Captured exit codes, bounded output/deadline, selected repository and captured profile.
+/// Callers interpreting exit 1 must not fall back to unsanitized run_captured.
+pub(crate) fn connection_captured(
+    dir: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+) -> Result<Captured, String> {
     let mut extra = unattended_extra(cfg!(unix) || remote::is_remote(dir));
+    extra.normalize_repository = true;
+    extra.stdin = input.map(<[u8]>::to_vec);
     extra.timeout = Some(Duration::from_secs(10));
     extra.output_limit = Some(128 << 10);
     let out = execute(Some(dir), &extra, args)?;
-    finish(out, args, &[0, 1])
+    Ok(Captured {
+        code: out.code,
+        stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+        raw: out.stdout,
+    })
+}
+pub(crate) fn connection_read(dir: &Path, args: &[&str]) -> Result<String, String> {
+    let out = connection_captured(dir, args, None)?;
+    if matches!(out.code, Some(0 | 1)) {
+        Ok(out.stdout)
+    } else {
+        Err(crate::diagnostics::crash::scrub(&out.stderr))
+    }
 }
 pub(crate) fn connection_shell(dir: &Path, script: &str) -> Result<String, String> {
     let extra = Extra {
+        normalize_repository: true,
         pre: vec!["-c", SHELL_ALIAS_ENV_DEF],
         env: vec![(SHELL_SCRIPT_VAR, script.into())],
         timeout: Some(Duration::from_secs(10)),
@@ -83,6 +106,7 @@ fn helper_trace(trace: &str) -> Vec<String> {
 }
 pub(crate) fn https_account(dir: &Path, url: &str) -> Result<HttpsAccount, String> {
     let mut extra = unattended_extra(cfg!(unix) || remote::is_remote(dir));
+    extra.normalize_repository = true;
     extra.env.extend([
         ("GCM_INTERACTIVE", "never".into()),
         ("GIT_TRACE", "1".into()),
@@ -103,6 +127,7 @@ pub(crate) fn https_account(dir: &Path, url: &str) -> Result<HttpsAccount, Strin
 }
 pub(crate) fn https_reject(dir: &Path, url: &str) -> Result<(), String> {
     let mut extra = unattended_extra(cfg!(unix) || remote::is_remote(dir));
+    extra.normalize_repository = true;
     extra.stdin = Some(format!("url={url}\n\n").into_bytes());
     extra.timeout = Some(Duration::from_secs(15));
     extra.output_limit = Some(64 << 10);

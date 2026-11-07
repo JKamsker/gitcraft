@@ -122,6 +122,9 @@ struct Ran {
 /// Options before the subcommand, and variables, a call is run with on top of [`GIT_ENV`].
 #[derive(Clone, Default)]
 pub(super) struct Extra {
+    /// Opt-in captured connection reads/recovery use the selected repository/profile,
+    /// not repository/config redirection inherited from the launching terminal.
+    normalize_repository: bool,
     output_limit: Option<usize>,
     stdout_file: Option<PathBuf>,
     pre: Vec<&'static str>,
@@ -201,7 +204,39 @@ pub(super) fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) ->
         cmd.env(name, value);
     }
     cmd.args(args);
+    if extra.normalize_repository && !dir.is_some_and(crate::practice::is_repository) {
+        normalize_connection_command(&mut cmd, args);
+    }
     cmd
+}
+
+pub(super) const CONNECTION_REDIRECT_ENV: &[&str] = &[
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_COMMON_DIR",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_NAMESPACE",
+    "GIT_CONFIG",
+    "GIT_CONFIG_GLOBAL",
+    "GIT_CONFIG_SYSTEM",
+    "GIT_CONFIG_COUNT",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_CONFIG_NOSYSTEM",
+];
+fn normalize_connection_command(cmd: &mut Command, args: &[&str]) {
+    for name in CONNECTION_REDIRECT_ENV {
+        cmd.env_remove(name);
+    }
+    for (name, _) in std::env::vars_os() {
+        let text = name.to_string_lossy();
+        if text.starts_with("GIT_CONFIG_KEY_") || text.starts_with("GIT_CONFIG_VALUE_") {
+            cmd.env_remove(name);
+        }
+    }
+    // Intentional immutable profile config is reinstalled after inherited config is removed.
+    with_profile(cmd, args);
 }
 
 /// The request that runs git with `args` in `target`'s folder, on its machine.
@@ -226,7 +261,19 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
             .map(|(n, v)| ((*n).to_owned(), (*v).to_owned()))
             .chain(extra.env.iter().map(|(n, v)| ((*n).to_owned(), v.clone())))
             .collect(),
-        unset: GIT_ENV_REMOVED.iter().map(|n| (*n).to_owned()).collect(),
+        unset: GIT_ENV_REMOVED
+            .iter()
+            .copied()
+            .chain(
+                extra
+                    .normalize_repository
+                    .then_some(CONNECTION_REDIRECT_ENV)
+                    .into_iter()
+                    .flatten()
+                    .copied(),
+            )
+            .map(str::to_owned)
+            .collect(),
         stdin: extra.stdin.clone(),
         // A tool stays open as long as the user works in it, apart from ordinary git reads.
         long: extra.tool || extra.long || goes_over_network(args),
