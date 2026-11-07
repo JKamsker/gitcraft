@@ -53,7 +53,7 @@ impl RepoTab {
                 if view.encrypted.enabled {
                     if ui.button("Encrypted patch / cancel").clicked() { acts.push(Action::DiffDecrypted(false)); }
                     if ui.button("Retry decryption").clicked() { acts.push(Action::DiffDecrypted(true)); }
-                } else if ui.add_enabled(idle && !self.loading && self.work_pending == 0 && view.request == view.data_request, egui::Button::new("Show decrypted")).on_hover_text("Use SOPS and keys on the repository's machine. Plaintext is shown only in this view and is discarded when you leave it.").clicked() {
+                } else if ui.add_enabled(idle && !self.loading && self.work_pending == 0 && view.request == view.data_request, egui::Button::new("Show decrypted")).on_hover_text("Use local SOPS and keys on this computer; SSH/WSL repositories supply only ciphertext. Plaintext is shown only in this view and is discarded when you leave it.").clicked() {
                     acts.push(Action::DiffDecrypted(true));
                 }
             });

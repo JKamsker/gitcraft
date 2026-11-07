@@ -107,7 +107,7 @@ fn load(repo: &Path, key: &DiffKey, active: &dyn Fn() -> bool) -> Result<Compari
         "Could not read both encrypted sides within 2 MiB. Refresh the encrypted patch.".to_owned()
     })?;
     let result = compare(key.path(), &old, &new, active, |format, input| {
-        tool::decrypt(repo, format, input, active)
+        tool::decrypt(format, input, active)
     })?;
     if !active() {
         return Err("Decryption cancelled.".into());

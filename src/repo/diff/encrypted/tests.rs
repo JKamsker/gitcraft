@@ -221,7 +221,6 @@ mod fixture {
     use crate::git::{self, Area, StatusFile};
     use std::os::unix::fs::PermissionsExt;
     use std::path::PathBuf;
-    use std::process::Command;
     use std::sync::atomic::AtomicU64;
     struct Repo(PathBuf);
     impl Repo {
@@ -376,76 +375,12 @@ mod fixture {
     }
 
     #[test]
-    fn remote_sops_request_preserves_stdin_and_fixed_argv_without_plaintext_files()
-    -> Result<(), String> {
-        let repo = Repo::new()?;
-        let executable = program(
-            &repo,
-            "test \"$#\" = 7 || exit 21; test \"$1 $2 $3 $4 $5 $6 $7\" = 'decrypt --input-type json --output-type json --filename-override gitcraft.json' || exit 22; input=$(cat); case \"$input\" in *'ENC[cipher]'*) printf fixture-private-remote;; *) exit 23;; esac",
-        )?;
-        let bin = repo.0.join("bin");
-        std::fs::create_dir_all(&bin).map_err(|e| e.to_string())?;
-        std::os::unix::fs::symlink(executable, bin.join("sops")).map_err(|e| e.to_string())?;
-        let target = crate::remote::Target {
-            host: crate::remote::Host::Ssh("fixture.invalid".into()),
-            path: repo.0.to_string_lossy().into_owned(),
-        };
-        let request = tool::request(&target, Format::Json, &json("age1fixture", "cipher"));
-        let mut command = Command::new("sh");
-        command
-            .args(["-c", &request.script])
-            .current_dir(&repo.0)
-            .env(
-                "PATH",
-                std::env::join_paths([bin, PathBuf::from("/usr/bin"), PathBuf::from("/bin")])
-                    .map_err(|e| e.to_string())?,
-            );
-        let out = crate::bounded_process::run_input(
-            command,
-            request.stdin.clone(),
-            &|| true,
-            Duration::from_secs(2),
-            1024,
-            1024,
-        )?;
-        assert!(out.status.success());
-        assert_eq!(out.stdout, b"fixture-private-remote");
-        assert!(
-            !request.script.contains("cipher")
-                && !request.script.contains("mktemp")
-                && !request.script.contains("fixture-private-remote")
-        );
-        // Exercise the identical host-side watchdog with a shorter fixture deadline.
-        program(
-            &repo,
-            "cat >/dev/null; sleep 30; printf late-fixture-private-output",
-        )?;
-        let mut command = Command::new("sh");
-        command
-            .args(["-c", &request.script.replace("sleep 20;", "sleep 0.1;")])
-            .current_dir(&repo.0)
-            .env(
-                "PATH",
-                std::env::join_paths([
-                    repo.0.join("bin"),
-                    PathBuf::from("/usr/bin"),
-                    PathBuf::from("/bin"),
-                ])
-                .map_err(|e| e.to_string())?,
-            );
-        let start = std::time::Instant::now();
-        let out = crate::bounded_process::run_input(
-            command,
-            request.stdin.clone(),
-            &|| true,
-            Duration::from_secs(2),
-            1024,
-            1024,
-        )?;
-        assert!(!out.status.success());
-        assert!(out.stdout.is_empty());
-        assert!(start.elapsed() < Duration::from_secs(2));
-        Ok(())
+    fn sops_command_is_local_and_has_only_fixed_format_arguments() {
+        // Pure command construction. There is no repository/host parameter to route it.
+        let command = tool::command(Format::Json);
+        assert_eq!(command.get_program(), std::ffi::OsStr::new("sops"));
+        assert_eq!(command.get_current_dir(), Some(std::env::temp_dir().as_path()));
+        assert_eq!(command.get_args().collect::<Vec<_>>(), tool::args(Format::Json).map(std::ffi::OsStr::new));
     }
 
     #[test]
@@ -511,29 +446,29 @@ mod fixture {
             &repo,
             "cat >/dev/null; printf 'fixture-private-stdout'; printf 'fixture-private-stderr' >&2; exit 1",
         )?;
-        let error = tool::decrypt(&repo.0, Format::Json, &input, &|| true)
+        let error = tool::decrypt(Format::Json, &input, &|| true)
             .err()
             .ok_or("Expected tool failure")?;
         assert!(!error.contains("fixture-private"));
         assert!(error.contains("keys/permissions"));
         tool::TEST_PROGRAM.with(|p| *p.borrow_mut() = Some(repo.0.join("not-installed")));
         assert!(
-            tool::decrypt(&repo.0, Format::Json, &input, &|| true)
+            tool::decrypt(Format::Json, &input, &|| true)
                 .is_err_and(|e| e.contains("Install SOPS"))
         );
         program(&repo, "cat >/dev/null; printf '\\377'")?;
         assert!(
-            tool::decrypt(&repo.0, Format::Json, &input, &|| true)
+            tool::decrypt(Format::Json, &input, &|| true)
                 .is_err_and(|e| e.contains("UTF-8"))
         );
         program(&repo, "cat >/dev/null; head -c 2097153 /dev/zero")?;
         assert!(
-            tool::decrypt(&repo.0, Format::Json, &input, &|| true)
+            tool::decrypt(Format::Json, &input, &|| true)
                 .is_err_and(|e| e.contains("size limit"))
         );
         program(&repo, "cat >/dev/null; head -c 32769 /dev/zero >&2")?;
         assert!(
-            tool::decrypt(&repo.0, Format::Json, &input, &|| true)
+            tool::decrypt(Format::Json, &input, &|| true)
                 .is_err_and(|e| e.contains("size limit"))
         );
         Ok(())
@@ -554,7 +489,6 @@ mod fixture {
         let start = std::time::Instant::now();
         assert!(
             tool::decrypt(
-                &repo.0,
                 Format::Json,
                 &json("age1fixture", "cipher"),
                 &|| start.elapsed() < Duration::from_millis(100)
@@ -580,7 +514,7 @@ mod fixture {
             &format!(
                 "cat >/dev/null; printf '%s' {} > {}; printf 'fixture-private-output'",
                 crate::remote::sh_quote(&json("age1fixture", "cipher3")),
-                crate::remote::sh_quote(path)
+                crate::remote::sh_quote(&repo.0.join(path).to_string_lossy())
             ),
         )?;
         let result = load(&repo.0, &work(path, Area::Unstaged, 'M'), &|| true);

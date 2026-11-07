@@ -8,7 +8,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &State) {
     match &state.result {
         None => {
             ui.add(crate::spinner::Spinner::new());
-            ui.label("Decrypting with this repository machine's SOPS and keys… Cancel returns to the encrypted patch.");
+            ui.label("Decrypting with local SOPS and keys on this computer… Cancel returns to the encrypted patch.");
         }
         Some(Err(reason)) => {
             ui.colored_label(t.warning, reason);
