@@ -565,7 +565,9 @@ mod tests {
                 .recv_timeout(Duration::from_secs(5))
                 .map_err(|e| e.to_string())?
         );
-        let _ = ctx.run(Default::default(), |ctx| tab.dialogs(ctx, &mut Vec::new()));
+        let _ = ctx.run_ui(Default::default(), |ui| {
+            tab.dialogs(ui.ctx(), &mut Vec::new())
+        });
         let input = egui::RawInput {
             events: vec![egui::Event::Key {
                 key: egui::Key::Escape,
@@ -576,7 +578,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let _ = ctx.run(input, |ctx| tab.dialogs(ctx, &mut Vec::new()));
+        let _ = ctx.run_ui(input, |ui| tab.dialogs(ui.ctx(), &mut Vec::new()));
         assert!(tab.dialog.is_none());
         step.send(()).map_err(|e| e.to_string())?;
         assert!(
