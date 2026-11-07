@@ -1,0 +1,20 @@
+{
+  "verdict": "PASS",
+  "application": "9bb73a3256573a68f665f09cc390def05ba2f139",
+  "tree": "36df8a02e1ce88ad5b78cda5cec4770d39664b2b",
+  "base": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+  "prior_finding": "STANDALONE-1 RESOLVED; original 7fb report afd7fab1 remains immutable",
+  "manifest_sha256": "f4fdc7c923778376897450dd639c17637f41e8d7a16caada073cbde2f019ba55",
+  "independent_tests": {
+    "bound_existing_library": "25 passed;0 failed;820 filtered",
+    "bound_existing_cli": "3 passed;0 failed;0 filtered",
+    "fresh_compile": false
+  },
+  "native_protocol_static_safety": "PASS before native execution; no native execution performed",
+  "source_scope": "Corrective 7fb..9bb delta plus prior whole feature source review",
+  "limitations": [
+    "Linux local evidence; native Windows/macOS code reviewed statically, neither compiled nor executed here",
+    "No new Cargo build, CI, provider/global-config/live-account actions",
+    "Final combined review remains separate"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/workspace/work/standalone-file-tools/target/debug/deps/gitcraft-cdb92a3e5c63a8e6",
+    "standalone::",
+    "--test-threads=2"
+  ],
+  "exit_code": 0,
+  "binary_sha256": "5732349bfc9d2958aeb94dfee44b8b922fa2ed01371942fe0e366743aa2edc3a",
+  "log_sha256": "cf696fdb1001b8b0052fcc915e70454a9b9bd984dfc33e0c0d87c845d70ea518",
+  "results": [
+    "test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 820 filtered out; finished in 0.35s"
+  ],
+  "no_compilation": true
+}

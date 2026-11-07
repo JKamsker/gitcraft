@@ -1,0 +1,13 @@
+{
+  "command": [
+    "/workspace/work/standalone-file-tools/target/debug/deps/standalone_cli-f55959dae1e687f5",
+    "--test-threads=2"
+  ],
+  "exit_code": 0,
+  "binary_sha256": "c83848b73c725dfaa441c9dcbd10031e902f82fefe6ea5b6c7a54b2ba60dba88",
+  "log_sha256": "e7a3fe368736ba29e76d2e7808438280e4b9f77a2abfe94169f3aa19202c2f99",
+  "results": [
+    "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+  ],
+  "no_compilation": true
+}
