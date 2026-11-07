@@ -668,7 +668,7 @@ Preview recovery before deliberately creating a new branch, creating a new regul
 
 ### Branch-model graph lanes
 
-The graph offers compact, trunk/release/feature, and Git-flow lane models. Bands stay contiguous from left to right; continuous first-parent runs retain branch-derived colours when history reloads. Use **Pin branch to band…** to override a local branch, or **Use preset** to remove its override. Choices are kept per repository. Shared ancestry follows the first branch in band/name order; detached and unnamed runs occupy the last band. Lanes beyond the visible graph width remain clipped like compact lanes.
+The graph offers compact, trunk/release/feature, and Git-flow lane models. Bands stay contiguous from left to right; continuous first-parent runs retain branch-derived colours when history reloads. Open **Graph tools…**, then use **Pin branch to band…** to override a local branch, or **Use preset** to remove its override. Choices are kept per repository. Shared ancestry follows the first branch in band/name order; detached and unnamed runs occupy the last band. Lanes beyond the visible graph width remain clipped like compact lanes.
 
 ### History minimap
 
@@ -676,6 +676,6 @@ Wide graph panes show an overview of the loaded history and its current viewport
 
 ### Release history postcards
 
-Use **History postcard…** above the graph to choose an excluded base and included release tip from immutable commit IDs, tags or branches. Read the release range, enter its title and date, and review exactly which subjects and optional contributor names will appear. Names follow `.mailmap`. Subjects include at most 96 characters and no message bodies. Anonymization replaces names and subjects with numbered labels; the title, date and immutable range IDs remain visible. Compose the actual PNG preview before saving. The card includes the range graph, release name, date and optional contributors.
+Use **Graph tools… → History postcard…** above the graph to choose an excluded base and included release tip from immutable commit IDs, tags or branches. Read the release range, enter its title and date, and review exactly which subjects and optional contributor names will appear. Names follow `.mailmap` and include at most 256 characters per contributor. Subjects include at most 96 characters and no message bodies. Anonymization replaces names and subjects with numbered labels; the title, date and immutable range IDs remain visible. Compose the actual PNG preview before saving. The card includes the range graph, release name, date and optional contributors.
 
 Postcards support at most 200 commits per range and refuse larger ranges explicitly. Reads and CPU rendering run in cancellable background jobs without fetching missing objects; close the window or use Cancel to stop pending work. Export saves exactly the preview bytes to a new local PNG through a held physical destination directory. Existing files are preserved, linked parents are refused, and cancellation before publication creates no output. A disk-write failure may leave the newly created PNG incomplete; existing files remain intact. No PNG metadata embeds the original names or commit messages.
