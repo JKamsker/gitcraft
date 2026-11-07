@@ -646,6 +646,7 @@ fn line_history_header_wrap_toggles_without_reloading_or_losing_logical_selectio
             },
             tab,
         );
+    h.run_steps(2);
     let before = crate::settings::Settings::get(&h.ctx).diff_wrap;
     h.get_by_label("Wrap").click();
     h.run_steps(2);
