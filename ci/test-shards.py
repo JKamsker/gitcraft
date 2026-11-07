@@ -20,13 +20,18 @@ REPO_G_M = [f"repo::{letter}" for letter in "ghijklm"]
 REPO_N_S = [f"repo::{letter}" for letter in "nopqrs"]
 REPO_A_S = REPO_A_C + REPO_D_F + REPO_G_M + REPO_N_S
 
-# These Git-process-heavy tests need their own libtest invocation.
+# These tests run in their own libtest process: some race with concurrent Git
+# subprocesses, while the palette performance test has a strict 10-second budget
+# that can be exceeded when other libtest threads contend for the Windows runner.
 ISOLATED = {
     # This rewrite test can race with concurrent Git-heavy test processes on Windows.
     # Run it separately from the main repo-d-f libtest harness.
     "repo-d-f": ["repo::drag_drop::tests::a_commit_dropped_on_another_of_the_branch_is_squashed_into_it"],
     "repo-n-s": ["repo::reflog::tests::a_commit_lost_in_the_terminal_comes_back_as_a_branch"],
-    "core": ["parallel_bisect::tests::finds_the_first_bad_commit_with_any_parallelism"],
+    "core": [
+        "parallel_bisect::tests::finds_the_first_bad_commit_with_any_parallelism",
+        "app::palette::tests::thousands_of_branches_open_and_filter_quickly",
+    ],
 }
 
 # libtest accepts multiple substring includes and --skip exclusions.
@@ -46,7 +51,7 @@ SHARDS = {
     "core": [
         "--skip", "git::",
         "--skip", "repo::",
-        "--skip", ISOLATED["core"][0],
+        *[arg for test in ISOLATED["core"] for arg in ("--skip", test)],
     ],
 }
 
