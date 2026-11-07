@@ -190,3 +190,121 @@ fn resume_after_an_undo_refuses_and_skip_goes_on() {
     assert!(!remote_tag);
     assert_eq!(after_skip, [Status::Done, Status::Skipped]);
 }
+
+#[test]
+fn adversarial_unrelated_catalog_edit_keeps_release_completion_and_undo() {
+    let _pause = crate::network::test_pause::set(Some(crate::network::Pause::Switch));
+    let (dir, bare) = project("catalog-edit");
+    let ctx = egui::Context::default();
+    let mut tab = open(&dir, &ctx);
+    // The initial check is in flight; its continuation must still own the run.
+    tab.release_act(ReleaseAct::Run, &ctx);
+    tab.remotes.push(crate::git::Remote {
+        name: "unrelated".into(),
+        url: "/unused".into(),
+    });
+    tab.take_forge_selection(true, &ctx);
+    assert!(
+        tab.release.as_ref().is_some_and(|v| v.run.is_some()),
+        "catalog edit discarded the active release and its undo bookkeeping"
+    );
+    wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
+    assert_eq!(statuses(&tab), [Status::Done, Status::Done, Status::Done]);
+    assert!(
+        tab.release
+            .as_ref()
+            .and_then(|v| v.run.as_ref())
+            .is_some_and(|run| run.done.bump_commit.is_some() && run.done.tag_object.is_some())
+    );
+    assert!(git::resolve(&bare, "refs/tags/v2.3.2").is_ok());
+    assert_eq!(
+        tab.timeline
+            .current_entry()
+            .and_then(|e| e.undo.as_ref())
+            .map(|e| e.label.as_str()),
+        Some("Cut release v2.3.2")
+    );
+    tab.undo(&ctx);
+    wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
+    assert!(git::resolve(&dir, "refs/tags/v2.3.2").is_err());
+    assert!(
+        std::fs::read_to_string(dir.join("package.json"))
+            .unwrap_or_default()
+            .contains("2.3.1")
+    );
+    let _ = std::fs::remove_dir_all(dir);
+    let _ = std::fs::remove_dir_all(bare);
+}
+
+#[test]
+fn adversarial_changed_primary_stops_later_publication_but_keeps_local_undo() {
+    let _pause = crate::network::test_pause::set(Some(crate::network::Pause::Switch));
+    let (dir, bare) = project("catalog-forge-move");
+    let ctx = egui::Context::default();
+    let mut tab = open(&dir, &ctx);
+    let original = crate::forge::Hosting {
+        forge: crate::forge::Forge::GitHub,
+        host: "github.com".into(),
+        path: "original/project".into(),
+        web: "https://github.com".into(),
+    };
+    tab.hosting = Some(original.clone());
+    if let Some(view) = &mut tab.release {
+        view.form.publish = true;
+    }
+    tab.release_act(ReleaseAct::Run, &ctx);
+    let replacement = crate::forge::Hosting {
+        path: "replacement/project".into(),
+        ..original.clone()
+    };
+    tab.remotes.push(crate::git::Remote {
+        name: "forge".into(),
+        url: "https://github.com/replacement/project".into(),
+    });
+    tab.forge_remotes = vec![("forge".into(), replacement)];
+    tab.take_forge_selection(true, &ctx);
+    assert!(
+        tab.release
+            .as_ref()
+            .and_then(|v| v.run.as_ref())
+            .is_some_and(|run| run.hosting.as_ref() == Some(&original)),
+        "publication destination was discarded or retargeted"
+    );
+    wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
+    let steps = statuses(&tab);
+    assert_eq!(&steps[..3], &[Status::Done, Status::Done, Status::Done]);
+    assert!(
+        matches!(steps.get(3), Some(Status::Failed(why)) if why.contains("primary forge changed")),
+        "{steps:?}"
+    );
+    assert!(
+        git::resolve(&bare, "refs/tags/v2.3.2").is_ok(),
+        "the original Git push completed"
+    );
+    assert!(
+        tab.release
+            .as_ref()
+            .and_then(|v| v.run.as_ref())
+            .is_some_and(|run| run.recorded
+                && run.done.bump_commit.is_some()
+                && run.done.tag_object.is_some())
+    );
+    assert_eq!(
+        tab.timeline
+            .entries
+            .iter()
+            .filter(|e| e.undo.is_some())
+            .count(),
+        1
+    );
+    tab.undo(&ctx);
+    wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
+    assert!(git::resolve(&dir, "refs/tags/v2.3.2").is_err());
+    assert!(
+        std::fs::read_to_string(dir.join("package.json"))
+            .unwrap_or_default()
+            .contains("2.3.1")
+    );
+    let _ = std::fs::remove_dir_all(dir);
+    let _ = std::fs::remove_dir_all(bare);
+}

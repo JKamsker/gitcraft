@@ -313,3 +313,34 @@ fn unrelated_remote_edits_and_same_repository_renames_do_not_strand_a_posting_re
         "same-repository edits must still discard stale reads"
     );
 }
+
+#[test]
+fn adversarial_completed_post_settling_is_released_when_catalog_discards_its_refresh() {
+    let _pause = crate::network::test_pause::set(Some(crate::network::Pause::Switch));
+    let ctx = egui::Context::default();
+    let mut tab = tab(&ctx);
+    let old = tab.forge_sender();
+    // The mutation succeeded; only load_pr/details/files still keeps the editor busy.
+    let draft = tab.pr_drafts.entry(7).or_default();
+    draft.posting = true;
+    draft.settling = true;
+    draft.review = "unsent review text".into();
+    tab.remotes.push(remote("unrelated", "other"));
+    tab.take_forge_selection(true, &ctx);
+    assert!(
+        !tab.pr_drafts[&7].posting && !tab.pr_drafts[&7].settling,
+        "a completed post's discarded refresh must not block primary selection"
+    );
+    assert_eq!(tab.pr_drafts[&7].review, "unsent review text");
+    let _ = old.send(Msg::Then(Box::new(|tab, _| {
+        tab.status = Some(("discarded refresh".into(), true))
+    })));
+    tab.poll(&ctx);
+    assert!(tab.status.is_none());
+    assert!(!tab.forge_change_blocked());
+    // A mutation with no completion yet must keep blocking selection.
+    tab.pr_drafts.entry(8).or_default().posting = true;
+    tab.take_forge_selection(true, &ctx);
+    assert!(tab.pr_drafts[&8].posting && !tab.pr_drafts[&8].settling);
+    assert!(tab.forge_change_blocked());
+}
