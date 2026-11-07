@@ -87,6 +87,7 @@ impl RepoTab {
             Action::Detached(act) => self.detached_act(act, ctx),
             Action::Dialog(dialog) => self.open_dialog(dialog, ctx),
             Action::SelectStaleBranches => self.dialog = Some(self.cleanup_dialog(ctx)),
+            Action::OpenCollisions => self.open_collisions(),
             Action::DeleteTag { name, target } => self.delete_tag(name, target, ctx),
             Action::Commit => self.commit(ctx),
             Action::Key(command) => self.run_key(command, ctx),

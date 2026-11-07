@@ -254,6 +254,8 @@ pub(crate) enum Action {
     Dco(super::dco::DcoAct),
     /// Something the guide asks for: the first commit, a first-time hint.
     Guide(super::guide::GuideAct),
+    /// Open the collision matrix of the worktrees' branches.
+    OpenCollisions,
 }
 
 /// Compares two branches, given to git by their full refs (a tag of the same name is not

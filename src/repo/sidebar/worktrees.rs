@@ -206,6 +206,15 @@ fn worktree_menu_items(
     if ui.button("Copy path").clicked() {
         ui.ctx().copy_text(path.clone());
     }
+    if ui
+        .button("Collision matrix…")
+        .on_hover_text(
+            "Which worktree branches would conflict when merged, and the order to land them in",
+        )
+        .clicked()
+    {
+        acts.push(Action::OpenCollisions);
+    }
     if !wt.main {
         ui.separator();
         let (label, args) = if wt.locked.is_some() {

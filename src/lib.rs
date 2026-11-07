@@ -6,6 +6,7 @@ pub mod app;
 mod avatars;
 mod ci;
 mod custom_commands;
+mod collision;
 mod desktop_entry;
 mod drafts;
 mod error_card;

@@ -102,6 +102,7 @@ impl RepoTab {
         self.ai_review_window(&ctx);
         self.lfs_locks_ui(&ctx, &mut acts);
         self.ghost_frame(&ctx);
+        self.collision_window(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
         }

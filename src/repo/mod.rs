@@ -13,6 +13,7 @@ mod branch_tree;
 mod branch_visibility;
 mod ci_status;
 mod ci_view;
+mod collision_view;
 pub(crate) mod columns;
 mod commands;
 mod commit_actions;
@@ -186,6 +187,8 @@ pub struct RepoTab {
     weakened: weakened_marks::WeakenedMarks,
     /// Whether commits are signed off (DCO), and the sign-offs of the pull request shown.
     dco: dco::Dco,
+    /// The collision matrix window, while it is open.
+    collisions: Option<collision_view::CollisionView>,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -412,6 +415,7 @@ impl RepoTab {
             ci: ci_status::CiStatuses::default(),
             weakened: Default::default(),
             dco: dco::Dco::default(),
+            collisions: None,
             selected: None,
             stash_view: None,
             scroll_to: None,
