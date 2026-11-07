@@ -1,0 +1,24 @@
+#!/bin/sh
+# Reviewer-only adapter around the frozen candidate's ordinary fake-SSH fixture.
+# The candidate fixture writes its conversion marker just before alternate apply.
+# Replace only that marker with configuration drift in its own temporary repo.
+for arg do
+    if [ "$arg" = apply ] && [ -n "$GIT_INDEX_FILE" ] && [ -f .git/index.lock ] && [ -f .gitattributes ]; then
+        case "$PWD" in
+            /tmp/gitcraft-file-views-test-*) ;;
+            *) exec /usr/local/bin/git "$@" ;;
+        esac
+        if [ "$(cat .gitattributes)" = '* filter=fixture' ]; then
+            # Keep the file so the original fixture can remove it normally later.
+            : > .gitattributes || exit 1
+            case "$REVIEW_DRIFT_CASE" in
+                filemode) /usr/local/bin/git config core.filemode false || exit 1 ;;
+                symlinks) /usr/local/bin/git config core.symlinks false || exit 1 ;;
+                autocrlf) /usr/local/bin/git config --unset core.autocrlf || exit 1 ;;
+                *) echo 'Unknown reviewer drift fixture' >&2; exit 1 ;;
+            esac
+            printf 'INJECTED %s while real index lock held and alternate index selected\n' "$REVIEW_DRIFT_CASE" >> "$REVIEW_DRIFT_TRACE" || exit 1
+        fi
+    fi
+done
+exec /usr/local/bin/git "$@"
