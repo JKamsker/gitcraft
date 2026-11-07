@@ -4,6 +4,8 @@
 //! user applies what it resolved: those files are written here and marked resolved.
 
 mod panel;
+mod review;
+mod review_view;
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -30,6 +32,19 @@ pub(crate) enum ResolverAct {
     Dismiss,
     /// Folds the card to a pill, or opens it again.
     Fold(bool),
+    /// Shows what the agent did to the files, at the file of this index.
+    Review(usize),
+    /// Shows the file reviewed by conflict, or as a line diff.
+    ReviewAsDiff(bool),
+    CloseReview,
+}
+
+/// The agent's work under review, in the big area.
+struct ReviewState {
+    /// What it did to each file, in the order of the run's results; `None` while read.
+    files: Option<Vec<(String, review::FileReview)>>,
+    selected: usize,
+    as_diff: bool,
 }
 
 /// Where a run is.
@@ -72,6 +87,8 @@ struct Run {
     /// What the agent said last, and what it cost (Claude Code says).
     last_words: Option<String>,
     cost_usd: Option<f64>,
+    /// Its files under review, while they are.
+    review: Option<ReviewState>,
 }
 
 /// The tab's run, if one.
@@ -85,6 +102,11 @@ impl ResolverState {
     /// Whether a run is under way or waits for the user: another can't start.
     pub(crate) fn busy(&self) -> bool {
         self.run.is_some()
+    }
+
+    /// Whether the agent's work is shown for review in the big area.
+    pub(crate) fn reviewing(&self) -> bool {
+        self.run.as_ref().is_some_and(|r| r.review.is_some())
     }
 }
 
@@ -240,7 +262,68 @@ impl RepoTab {
                 self.resolver.folded = false;
             }
             ResolverAct::Fold(folded) => self.resolver.folded = folded,
+            ResolverAct::Review(i) => self.open_review(i, ctx),
+            ResolverAct::ReviewAsDiff(on) => {
+                if let Some(r) = self.resolver.run.as_mut().and_then(|r| r.review.as_mut()) {
+                    r.as_diff = on;
+                }
+            }
+            ResolverAct::CloseReview => {
+                if let Some(run) = &mut self.resolver.run {
+                    run.review = None;
+                }
+            }
         }
+    }
+
+    /// Shows the agent's work on its files, at the `i`th: read in the background the first
+    /// time.
+    fn open_review(&mut self, i: usize, ctx: &egui::Context) {
+        let Some(run) = self
+            .resolver
+            .run
+            .as_mut()
+            .filter(|r| r.phase == Phase::Ready)
+        else {
+            return;
+        };
+        if let Some(review) = &mut run.review {
+            review.selected = i;
+            return;
+        }
+        let Some(ws) = run.workspace.clone() else {
+            return;
+        };
+        run.review = Some(ReviewState {
+            files: None,
+            selected: i,
+            as_diff: false,
+        });
+        let paths: Vec<String> = run.results.iter().map(|(p, _)| p.clone()).collect();
+        let id = run.id.clone();
+        self.then(
+            ctx,
+            move || {
+                paths
+                    .into_iter()
+                    .map(|p| {
+                        let r = review::of_file(&ws, &p);
+                        (p, r)
+                    })
+                    .collect::<Vec<_>>()
+            },
+            move |tab, files, _| {
+                let review = tab
+                    .resolver
+                    .run
+                    .as_mut()
+                    .filter(|r| r.id == id)
+                    .and_then(|r| r.review.as_mut());
+                if let Some(review) = review {
+                    review.files = Some(files);
+                }
+            },
+        );
     }
 
     /// Whether the run `id` is this tab's.
@@ -293,6 +376,7 @@ impl RepoTab {
             error: None,
             last_words: None,
             cost_usd: None,
+            review: None,
         });
         let repo = self.path.clone();
         let for_id = id.clone();
@@ -468,6 +552,7 @@ impl RepoTab {
         let Applied { written, failed } = applied;
         run.applied = written.len();
         run.phase = Phase::Applied;
+        run.review = None;
         let mut said = Vec::new();
         if !failed.is_empty() {
             let each: Vec<String> = failed.iter().map(|(p, e)| format!("{p}: {e}")).collect();

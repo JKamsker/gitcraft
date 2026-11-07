@@ -115,7 +115,9 @@ impl RepoTab {
         let big_area = egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(t.dock))
             .show(ui, |ui| {
-                if self.conflict.is_some() {
+                if self.resolver.reviewing() {
+                    self.resolver_review_view(ui, &mut acts);
+                } else if self.conflict.is_some() {
                     self.conflict_view(ui, &mut acts);
                 } else if self.rebase.is_some() {
                     self.rebase_view(ui, &mut acts);

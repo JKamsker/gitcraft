@@ -144,6 +144,58 @@ fn run(phase: Phase, now: Instant) -> Run {
         error: None,
         last_words: None,
         cost_usd: (!working).then_some(0.42),
+        review: None,
+    }
+}
+
+/// The first file under review: two conflicts, one side taken, both sides kept in the other.
+fn under_review(as_diff: bool) -> super::ReviewState {
+    let before = "impl RepoTab {
+    pub(super) fn run_ops(&mut self, label: &str, ops: Vec<Vec<String>>, ctx: &Context) {
+<<<<<<< HEAD
+        if self.busy_op.is_some() {
+            self.status = Some((\"Wait for the running operation\".into(), true));
+            return;
+        }
+=======
+        let ops = self.worktree_root.rewrite(ops);
+>>>>>>> dev
+        self.busy_op = Some(label.to_owned());
+<<<<<<< HEAD
+        self.op_started = Some(Instant::now());
+=======
+        self.started_at = Instant::now();
+>>>>>>> dev
+        self.spawn(ops, ctx);
+    }
+}
+";
+    let after = "impl RepoTab {
+    pub(super) fn run_ops(&mut self, label: &str, ops: Vec<Vec<String>>, ctx: &Context) {
+        if self.busy_op.is_some() {
+            self.status = Some((\"Wait for the running operation\".into(), true));
+            return;
+        }
+        let ops = self.worktree_root.rewrite(ops);
+        self.busy_op = Some(label.to_owned());
+        self.op_started = Some(Instant::now());
+        self.spawn(ops, ctx);
+    }
+}
+";
+    let files = FILES
+        .iter()
+        .map(|f| {
+            (
+                f.to_string(),
+                super::review::review(Some(before), Some(after)),
+            )
+        })
+        .collect();
+    super::ReviewState {
+        files: Some(files),
+        selected: 0,
+        as_diff,
     }
 }
 
@@ -216,13 +268,17 @@ fn the_card_in_each_state() -> Result<(), String> {
     for dark in [true, false] {
         let mut h = harness(repo.path().to_owned(), dark);
         settle(&mut h);
-        for (name, phase, folded) in [
-            ("working", Phase::Working, false),
-            ("ready", Phase::Ready, false),
-            ("folded", Phase::Working, true),
+        for (name, phase, folded, review) in [
+            ("working", Phase::Working, false, None),
+            ("ready", Phase::Ready, false, None),
+            ("folded", Phase::Working, true, None),
+            ("review", Phase::Ready, false, Some(false)),
+            ("review-diff", Phase::Ready, false, Some(true)),
         ] {
             if let Some(tab) = h.state_mut().as_mut() {
-                tab.resolver.run = Some(run(phase, Instant::now()));
+                let mut run = run(phase, Instant::now());
+                run.review = review.map(under_review);
+                tab.resolver.run = Some(run);
                 tab.resolver.folded = folded;
             }
             for _ in 0..4 {

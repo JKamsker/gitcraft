@@ -76,33 +76,7 @@ impl ConflictEditor {
                         if icons::small_button(ui, "x", "Close (Esc)").clicked() {
                             acts.push(Action::CloseDiff);
                         }
-                        if ui
-                            .button("Resolve in background")
-                            .on_hover_text(
-                                "An agent resolves this file in a private copy of the checkout                                  while you go on; you see its progress and apply its result",
-                            )
-                            .clicked()
-                        {
-                            acts.push(Action::Resolver(
-                                crate::repo::resolver::ResolverAct::Start(Some(vec![
-                                    self.path.clone(),
-                                ])),
-                            ));
-                        }
-                        if ui
-                            .button("Send to agent")
-                            .on_hover_text(
-                                "Types the conflicts, each with its three sides, into the agent's \
-                                 terminal. The agent then edits the file itself: close this editor \
-                                 then, and don't save over its work",
-                            )
-                            .clicked()
-                        {
-                            acts.push(Action::Agent(crate::repo::agents::AgentAct::Send(
-                                self.for_agent(),
-                                "the conflicts",
-                            )));
-                        }
+                        self.agent_menu(ui, acts);
                         if widgets::primary_button(
                             ui,
                             "Save and mark resolved",
@@ -121,6 +95,41 @@ impl ConflictEditor {
                     });
                 });
             });
+    }
+
+    /// _Agent_: have one resolve this file in the background (see `repo::resolver`), or type
+    /// its conflicts into the agent's terminal.
+    fn agent_menu(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        ui.menu_button("Agent", |ui| {
+            if ui
+                .button("Resolve in background")
+                .on_hover_text(
+                    "An agent resolves this file in a private copy of the checkout while you go \
+                     on; you watch its progress, review what it did and apply it",
+                )
+                .clicked()
+            {
+                acts.push(Action::Resolver(crate::repo::resolver::ResolverAct::Start(
+                    Some(vec![self.path.clone()]),
+                )));
+                ui.close();
+            }
+            if ui
+                .button("Send to agent's terminal")
+                .on_hover_text(
+                    "Types the conflicts, each with its three sides, into the agent's terminal. \
+                     The agent then edits the file itself: close this editor then, and don't \
+                     save over its work",
+                )
+                .clicked()
+            {
+                acts.push(Action::Agent(crate::repo::agents::AgentAct::Send(
+                    self.for_agent(),
+                    "the conflicts",
+                )));
+                ui.close();
+            }
+        });
     }
 
     /// Solve with UnityYAMLMerge, for a Unity YAML file of a Unity project.

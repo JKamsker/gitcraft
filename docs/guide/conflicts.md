@@ -24,7 +24,7 @@ The three-pane conflict editor, Mergiraf, conflict warnings before you act, exte
 ## Resolving in the background with an agent
 
 - _Resolve all with agent_ on the banner of a merge, rebase, cherry-pick or revert in progress
-  (or _Resolve in background_ in the conflict editor, for that file) hands the conflicted files
+  (or _Agent → Resolve in background_ in the conflict editor, for that file) hands the conflicted files
   to Claude Code, or to Codex when Settings → AI picks it, running headless. You go on working
   meanwhile; nothing in your checkout changes until you apply the result.
 - The agent works in a private copy of the checkout: a scratch worktree in the temporary
@@ -37,8 +37,15 @@ The three-pane conflict editor, Mergiraf, conflict warnings before you act, exte
   done). Fold it to a pill that keeps counting; _Show agent_ on the banner brings it back.
   _Stop_ ends the agent; what it resolved by then can still be applied.
 - When it is done, the card lists each file: resolved, deleted (as one side did), still
-  conflicted, or changed by you meanwhile (left as you made it). _Apply_ writes the files you
-  tick and marks them resolved; _Discard_ forgets the agent's work.
+  conflicted, not decided, or changed by you meanwhile (left as you made it). _Apply_ writes
+  the files you tick and marks them resolved; _Discard_ forgets the agent's work.
+- _Review changes_ (or a file's _Review_) shows what you are applying, in the big area: for
+  each conflict its two sides next to each other, named after them, and what the agent wrote
+  in its place ("took main", "kept both, main first", "combined in its own words"), with the
+  agent's note on the file. A file it also changed outside the conflicts says so. _As a diff_
+  shows the file with its conflicts and as the agent left it, line by line (the only view
+  when its text can't be lined up with the conflicts). Tick or untick each file there and
+  apply from the same bar.
 - Claude Code runs `--restricted`: it reads and edits files in its copy only, reads git through
   gitcraft's own tools, and has no shell; no settings file is read, so hooks or permissions a
   branch being merged brings (`.claude/settings.json`) don't apply. Codex runs in its

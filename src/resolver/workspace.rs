@@ -63,6 +63,9 @@ pub enum FileResult {
     NotPlain,
 }
 
+/// A file as the agent was given it and as it left it (`None`: not there).
+pub type BeforeAndAfter<'a> = (Option<&'a [u8]>, Option<Vec<u8>>);
+
 /// What applying wrote, and what it couldn't.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Applied {
@@ -319,6 +322,17 @@ impl Workspace {
             }
         }
         applied
+    }
+
+    /// `path` as the agent was given it, and as it left it, for showing what it did: `None`
+    /// for one that isn't there; an error for one that isn't a plain file.
+    pub fn before_and_after(&self, path: &str) -> Result<BeforeAndAfter<'_>, String> {
+        let file = self
+            .files
+            .iter()
+            .find(|f| f.path == path)
+            .ok_or_else(|| format!("{path} wasn't given to the agent"))?;
+        Ok((file.original.as_deref(), read(self.dir(), path)?))
     }
 
     /// Removes the scratch worktree now, saying why if it couldn't be.

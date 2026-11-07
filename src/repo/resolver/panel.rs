@@ -29,7 +29,8 @@ impl RepoTab {
         area: egui::Rect,
         acts: &mut Vec<Action>,
     ) {
-        let Some(run) = &self.resolver.run else {
+        // Under review, the big area shows the run itself.
+        let Some(run) = self.resolver.run.as_ref().filter(|r| r.review.is_none()) else {
             return;
         };
         let t = Tokens::get(ctx);
@@ -422,7 +423,7 @@ fn outcome(ui: &mut Ui, t: &Tokens, run: &Run, acts: &mut Vec<Action>) {
     if let Some(e) = &run.error {
         ui.add(egui::Label::new(RichText::new(e).color(t.warning).small()).wrap());
     }
-    for (path, result) in &run.results {
+    for (i, (path, result)) in run.results.iter().enumerate() {
         let (icon, color, words) = result_line(t, result);
         ui.horizontal(|ui| {
             let mut on = run.picked.contains(path);
@@ -434,12 +435,35 @@ fn outcome(ui: &mut Ui, t: &Tokens, run: &Run, acts: &mut Vec<Action>) {
                 acts.push(Action::Resolver(ResolverAct::Pick(path.clone(), on)));
             }
             icons::inline(ui, icon, 13.0, color);
-            ui.label(RichText::new(path).font(theme::mono(11.5)));
+            let name = ui
+                .add(
+                    egui::Label::new(RichText::new(path).font(theme::mono(11.5)))
+                        .sense(Sense::click()),
+                )
+                .on_hover_text("See what the agent did to it")
+                .on_hover_cursor(egui::CursorIcon::PointingHand);
             ui.label(RichText::new(words).color(t.text_faint).small());
+            let review = ui.add_enabled(
+                run.phase == Phase::Ready,
+                egui::Button::new(RichText::new("Review").small()).small(),
+            );
+            if name.clicked() || review.clicked() {
+                acts.push(Action::Resolver(ResolverAct::Review(i)));
+            }
         });
     }
     ui.add_space(8.0);
     ui.horizontal(|ui| {
+        if ui
+            .add_enabled(
+                run.phase == Phase::Ready && !run.results.is_empty(),
+                egui::Button::new("Review changes"),
+            )
+            .on_hover_text("Each conflict with its two sides and what the agent wrote in its place")
+            .clicked()
+        {
+            acts.push(Action::Resolver(ResolverAct::Review(0)));
+        }
         let n = run.picked.len();
         let label = match n {
             0 => "Nothing to apply".to_owned(),
