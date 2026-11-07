@@ -1,0 +1,86 @@
+{
+  "application_head": "ab68bdedd387236c03f26f839572860d405a2f7f",
+  "accepted_gates": "/workspace/work/integration-ab68bde-gates.json",
+  "accepted_gate_sha256": "4d5a360135e7163f72224c075d0529008deb8d68f9eb76347fbdd1d5129dd4a3",
+  "accepted_binary": {
+    "path": "/workspace/work/integration/target/debug/deps/gitcraft-98b7c97eceab1e2d",
+    "sha256": "77570ac410be281f89dca00a3b2abbbb4d537c9d242f25a68816dc8f71d0dffd",
+    "source_binding": "Fresh integration-only package clean and actual compile from this private worktree; all source gates on immutable pushed head"
+  },
+  "case": "app::practice::isolation::normal_practice_tab_operations_and_shells_are_isolated",
+  "command": [
+    "/usr/local/bin/docker-init",
+    "-s",
+    "-w",
+    "-v",
+    "--",
+    "/bin/bash",
+    "--noprofile",
+    "--norc",
+    "-c",
+    "\"$1\" --exact \"$2\" --nocapture; fixture_status=$?; sleep 3; exit \"$fixture_status\"",
+    "gitcraft-exact-capacity-diagnosis",
+    "/workspace/work/integration/target/debug/deps/gitcraft-98b7c97eceab1e2d",
+    "app::practice::isolation::normal_practice_tab_operations_and_shells_are_isolated"
+  ],
+  "cwd": "/workspace/work/integration",
+  "executables": {
+    "git": {
+      "path": "/usr/local/bin/git",
+      "version": "git version 2.52.0"
+    },
+    "difft": {
+      "path": "/workspace/work/difft-bin/difft",
+      "version": "Difftastic 0.72.0\n\nRevision:  6201bc9 2026-10-29\nToolchain: 1.85.0\nSystem:    linux x86_64"
+    }
+  },
+  "environment": {
+    "CARGO_TARGET_DIR": "/workspace/work/integration/target",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "1",
+    "RUST_TEST_THREADS": "2",
+    "RAYON_NUM_THREADS": "2"
+  },
+  "path_prepend": "/workspace/work/difft-bin",
+  "optional_ssh_wsl": "unset",
+  "git_config_overrides_added": false,
+  "counts_before": {
+    "visible_processes": 31317,
+    "visible_zombies": 31301
+  },
+  "counts_after": {
+    "visible_processes": 31317,
+    "visible_zombies": 31301
+  },
+  "zombie_delta": 0,
+  "exit_status": 101,
+  "elapsed_seconds": 23.67,
+  "summary": [
+    "running 1 test",
+    "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 947 filtered out; finished in 20.10s"
+  ],
+  "logs": {
+    "test": {
+      "path": "/workspace/work/test-capacity-earliest-exact-ab68bde.test.log",
+      "bytes": 469,
+      "sha256": "f21f6bdb0aa49c32caa6f846e72b247c948b897941ac165e90b44df11809ac85"
+    },
+    "tini": {
+      "path": "/workspace/work/test-capacity-earliest-exact-ab68bde.tini.log",
+      "bytes": 967,
+      "sha256": "2bb2ac89b69a4f931843465e96558a8d764998bd756deeb1b727c57d170249c4"
+    }
+  },
+  "tini_reaped_orphan_warning_count": 3,
+  "ci_used": false,
+  "limitations": [
+    "One exact test only; no broad retry.",
+    "Three-second grace cannot guarantee arbitrary lingering-descendant draining.",
+    "Prior failed recovery evidence unchanged; lacked difftastic in PATH."
+  ],
+  "outcome": "failed; real fork exhaustion observed",
+  "failure": "Practice child: cannot fork() for git-receive-pack; Resource temporarily unavailable; fatal unable to fork",
+  "prior_recovery_environment_qualification": "Prior recovery command sourced toolchain but omitted accepted /workspace/work/difft-bin prepend. Recreated sourced resolution selected /usr/local/bin/git2.52.0 but no difftastic.",
+  "notify_causality_qualification": "notify8.2.1 inotify.rs123-125 discards Builder::spawn Result; a failed spawn can surface later as SendError without an EAGAIN line.",
+  "integration_clean_after": true
+}

@@ -1,0 +1,13 @@
+
+running 1 test
+test app::practice::isolation::normal_practice_tab_operations_and_shells_are_isolated ... FAILED
+
+failures:
+
+failures:
+    app::practice::isolation::normal_practice_tab_operations_and_shells_are_isolated
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 947 filtered out; finished in 20.10s
+
+[INFO  tini (1640715)] Spawned child process '/bin/bash' with pid '1640716'
+[INFO  tini (1640715)] Main child exited normally (with status '101')
