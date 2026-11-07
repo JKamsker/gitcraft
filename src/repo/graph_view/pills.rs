@@ -530,6 +530,7 @@ mod tests {
         let ctx = egui::Context::default();
         let mut tab = RepoTab::new_deferred("/nonexistent/pills-test".into(), &ctx);
         tab.refs = refs;
+        tab.rebuild_graph_labels();
         tab
     }
 

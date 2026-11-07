@@ -40,7 +40,7 @@ impl Builtin {
             t.pressed,
             t.row_selected,
         ];
-        // Button fill changes also affect the tint over picked diff lines.
+        // Preserve primary-button label contrast before deriving picked diff-line tints.
         p.accent = aa_foreground(p.accent, &[t.accent_text]);
         let mut text_surfaces = surfaces.to_vec();
         for bg in [
@@ -67,8 +67,6 @@ impl Builtin {
         ];
         p.text_dim = aa_foreground(p.text_dim, &surfaces);
         p.text_faint = aa_foreground(p.text_faint, &quiet_surfaces);
-        // The Pro themes deliberately have white primary-button labels.
-        p.accent = aa_foreground(p.accent, &[t.accent_text]);
         p.accent_text = Some(t.accent_text);
         let tinted = |mut color: Color32, fill: Color32| {
             // Chips sit on panels; diff hunk labels sit on a tinted field.

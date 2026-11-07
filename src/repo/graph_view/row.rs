@@ -192,14 +192,16 @@ impl RepoTab {
                     rect.bottom(),
                 ),
             );
-            if super::message_tooltip::show(
-                ui,
-                &resp,
-                description_rect.intersect(rect),
-                &self.path,
-                &commit.hash,
-                self.graph_messages.message(&self.path, &commit.hash),
-            ) {
+            if !self.ghost.drawing()
+                && super::message_tooltip::show(
+                    ui,
+                    &resp,
+                    description_rect.intersect(rect),
+                    &self.path,
+                    &commit.hash,
+                    self.graph_messages.message(&self.path, &commit.hash),
+                )
+            {
                 hovered_message = Some(commit.hash.clone());
             }
             trailing_columns(ui, &painter, &t, &row, viewport.now);

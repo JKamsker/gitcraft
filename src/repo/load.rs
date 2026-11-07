@@ -405,6 +405,7 @@ impl RepoTab {
         self.loading_more = false;
         let refs_moved = loaded.refs != self.refs;
         self.refs = loaded.refs;
+        self.graph_badge_index = super::graph_view::BadgeIndex::new(&self.refs);
         self.has_more = loaded.history.len() >= loaded.requested;
         self.history = loaded.history;
         // A status read since this reload started is newer.

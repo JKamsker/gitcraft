@@ -19,7 +19,8 @@ pub(super) struct Viewport {
 impl RepoTab {
     pub(in crate::repo) fn rebuild_graph_labels(&mut self) {
         self.graph_labels.clear();
-        let index = BadgeIndex::new(&self.refs);
+        self.graph_badge_index = BadgeIndex::new(&self.refs);
+        let index = &self.graph_badge_index;
         for (i, commit) in self.commits.iter().enumerate() {
             if commit.refs.is_empty() {
                 continue;

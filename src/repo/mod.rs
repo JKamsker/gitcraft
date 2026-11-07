@@ -189,6 +189,7 @@ pub struct RepoTab {
     reload_again: bool,
     load_error: Option<String>,
     refs: Refs,
+    graph_badge_index: graph_view::BadgeIndex,
     /// Commits as git listed them.
     history: Vec<Arc<Commit>>,
     /// A selected pull request's tip, including one with no local or tracking ref.
@@ -526,6 +527,7 @@ impl RepoTab {
             reload_again: false,
             load_error: None,
             refs: Refs::default(),
+            graph_badge_index: graph_view::BadgeIndex::default(),
             history: Vec::new(),
             pr_graph_head: None,
             has_more: false,

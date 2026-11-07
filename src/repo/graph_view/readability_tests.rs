@@ -470,3 +470,67 @@ fn auto_sized_pills_keep_double_click_and_branch_context_hitboxes() {
     );
     assert!(egui::Popup::is_any_open(&ctx));
 }
+
+#[test]
+fn ghost_rows_do_not_offer_an_unresolvable_message_popup() {
+    let (ctx, mut tab) = fixture(10);
+    let created = git::Commit {
+        hash: "\0ghost-test".into(),
+        summary: "Preview only".into(),
+        parents: vec![tab.commits[0].hash.clone()],
+        ..Default::default()
+    };
+    tab.ghost.show_for_test(
+        crate::repo::ghost::Outcome {
+            created: vec![created],
+            copies: 1,
+            ..Default::default()
+        },
+        &tab.commits,
+    );
+    let size = vec2(900.0, 220.0);
+    let (shapes, _) = frame(&ctx, &mut tab, size, vec![], 0.0);
+    let point = egui::pos2(
+        header_x(&shapes, "DESCRIPTION") + 35.0,
+        26.0 + ROW_PITCH / 2.0,
+    );
+    for time in [0.1, 1.0, 2.0] {
+        let (shapes, _) = frame(&ctx, &mut tab, size, vec![Event::PointerMoved(point)], time);
+        assert!(
+            !texts(&shapes)
+                .iter()
+                .any(|t| t.galley.text().contains("Loading full commit message"))
+        );
+    }
+    assert!(
+        tab.graph_messages
+            .message(&tab.path, "\0ghost-test")
+            .is_none()
+    );
+}
+
+#[test]
+fn cached_badges_refresh_when_refs_change_even_without_changing_the_graph() {
+    let (ctx, mut tab) = fixture(1);
+    let commit = git::Commit {
+        refs: vec!["origin/topic".into()],
+        ..Default::default()
+    };
+    tab.refs.remotes = vec![("origin".into(), vec![])];
+    tab.rebuild_graph_labels();
+    let first = tab.graph_badges(&commit);
+    assert_eq!(first[0].label, "topic");
+    assert!(!first[0].local);
+    tab.refs.remotes.clear();
+    tab.refs.local = vec![git::Branch {
+        name: "origin/topic".into(),
+        is_head: true,
+        ..Default::default()
+    }];
+    tab.refs.current = Some("origin/topic".into());
+    tab.rebuild_graph_labels();
+    let refreshed = tab.graph_badges(&commit);
+    assert_eq!(refreshed[0].label, "origin/topic");
+    assert!(refreshed[0].local && refreshed[0].head && refreshed[0].remotes.is_empty());
+    frame(&ctx, &mut tab, vec2(900.0, 220.0), vec![], 0.0);
+}

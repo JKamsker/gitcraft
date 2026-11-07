@@ -102,35 +102,36 @@ pub(super) fn badges(decorations: &[String], refs: &Refs) -> Vec<Badge> {
 }
 
 /// Reuse the repository-wide lookup tables across all decorated commits in a rebuild.
-pub(super) struct BadgeIndex<'a> {
-    local: HashSet<&'a str>,
-    heads: HashSet<&'a str>,
-    current: Option<&'a str>,
-    names: Vec<&'a str>,
-    remote_branches: HashMap<&'a str, &'a str>,
+#[derive(Default)]
+pub(in crate::repo) struct BadgeIndex {
+    local: HashSet<String>,
+    heads: HashSet<String>,
+    current: Option<String>,
+    names: Vec<String>,
+    remote_branches: HashMap<String, String>,
 }
 
-impl<'a> BadgeIndex<'a> {
-    pub(super) fn new(refs: &'a Refs) -> Self {
-        let local = refs.local.iter().map(|b| b.name.as_str()).collect();
-        let names = refs.remotes.iter().map(|(r, _)| r.as_str()).collect();
+impl BadgeIndex {
+    pub(in crate::repo) fn new(refs: &Refs) -> Self {
+        let local = refs.local.iter().map(|b| b.name.clone()).collect();
+        let names = refs.remotes.iter().map(|(r, _)| r.clone()).collect();
         let mut remote_branches = HashMap::new();
         for (remote, branches) in &refs.remotes {
             for branch in branches {
                 remote_branches
-                    .entry(branch.name.as_str())
-                    .or_insert(remote.as_str());
+                    .entry(branch.name.clone())
+                    .or_insert_with(|| remote.clone());
             }
         }
         let heads = refs
             .local
             .iter()
             .filter(|b| b.is_head)
-            .map(|b| b.name.as_str())
+            .map(|b| b.name.clone())
             .collect();
         Self {
             heads,
-            current: refs.current.as_deref(),
+            current: refs.current.clone(),
             local,
             names,
             remote_branches,
@@ -157,7 +158,10 @@ impl<'a> BadgeIndex<'a> {
                     if !tracking && local.contains(d) {
                         return None;
                     }
-                    match sidebar::remote_of(d, names) {
+                    match sidebar::remote_of(
+                        d,
+                        &names.iter().map(String::as_str).collect::<Vec<_>>(),
+                    ) {
                         Some(remote) => Some(remote.to_owned()),
                         None if tracking => d.split_once('/').map(|(remote, _)| remote.to_owned()),
                         None => None,
@@ -242,7 +246,7 @@ impl<'a> BadgeIndex<'a> {
             // A log's decorations needn't include HEAD (for example a filtered graph). The refs
             // read alongside it still identify the checked-out local branch.
             if badge.kind == BadgeKind::Branch && badge.local {
-                badge.head = match *current {
+                badge.head = match current.as_deref() {
                     Some(current) => current == badge.label,
                     None => badge.head || heads.contains(badge.label.as_str()),
                 };

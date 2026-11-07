@@ -1019,13 +1019,40 @@ pub(crate) fn syntax_read(
     let args: Vec<_> = std::iter::once("--no-lazy-fetch")
         .chain(args.iter().copied())
         .collect();
-    bounded::local(repo, &args, Vec::new(), limit, timeout).map_err(|e| {
-        format!("Syntax preparation failed (requires Git with --no-lazy-fetch support): {e}")
-    })
+    bounded::local(repo, &args, Vec::new(), limit, timeout).map_err(syntax_read_error)
+}
+
+fn syntax_read_error(error: String) -> String {
+    if error
+        .lines()
+        .any(|line| line.trim() == "unknown option: --no-lazy-fetch")
+    {
+        format!("Syntax preparation requires Git with --no-lazy-fetch support: {error}")
+    } else {
+        error
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn syntax_errors_only_suggest_upgrade_for_the_unknown_git_option() {
+        for error in [
+            "cancelled",
+            "process timed out and was stopped",
+            "fatal: bad object",
+            "process exceeded capture limit",
+        ] {
+            assert_eq!(super::syntax_read_error(error.into()), error);
+        }
+        let unsupported = "unknown option: --no-lazy-fetch\nusage: git [...]";
+        assert!(
+            super::syntax_read_error(unsupported.into())
+                .contains("requires Git with --no-lazy-fetch support")
+        );
+        let incidental = "fatal: file named unknown option: --no-lazy-fetch";
+        assert_eq!(super::syntax_read_error(incidental.into()), incidental);
+    }
     use std::io::Write;
     use std::process::Stdio;
 
