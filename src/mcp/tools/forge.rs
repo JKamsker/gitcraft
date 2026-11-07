@@ -374,6 +374,7 @@ mod tests {
             link_dir: None,
             wait: std::time::Duration::from_secs(1),
             cancelled: std::sync::Arc::new(|| false),
+            run: None,
         };
         let remotes = git::remotes(repo.path())?;
         let main = project("up/repo");
