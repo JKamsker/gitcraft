@@ -341,7 +341,7 @@ pub(super) struct Search {
     /// The query the results are for.
     pub(super) searched: String,
     pub(super) results: Vec<String>,
-    pub(super) matches: HashSet<String>,
+    pub(super) matches: std::sync::Arc<HashSet<String>>,
     pub(super) current: usize,
     pub(super) running: bool,
     pub(super) edited: Option<Instant>,

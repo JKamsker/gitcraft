@@ -171,7 +171,11 @@ impl RepoTab {
         self.search.edited = None;
         self.search.running = false;
         self.search.searched = AGENT_FILTER.to_owned();
-        self.search.matches = found.iter().cloned().collect();
+        self.search.matches = found
+            .iter()
+            .cloned()
+            .collect::<std::collections::HashSet<_>>()
+            .into();
         self.search.results = found;
         if jump {
             self.search.current = 0;
@@ -193,7 +197,7 @@ impl RepoTab {
         } else if self.search.searched == AGENT_FILTER {
             self.search.searched.clear();
             self.search.results.clear();
-            self.search.matches.clear();
+            self.search.matches = Default::default();
         }
     }
 

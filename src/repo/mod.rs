@@ -563,7 +563,7 @@ impl RepoTab {
             work: WorkStatus::default(),
             commits: Vec::new(),
             graph: Graph {
-                rows: Vec::new(),
+                rows: Vec::new().into(),
                 width: 0,
             },
             graph_labels: HashMap::new(),
