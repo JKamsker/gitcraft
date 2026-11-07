@@ -1,0 +1,7 @@
+{
+  "core_symlinks_false": true,
+  "working_file_is_regular": true,
+  "working_bytes": "target.txt",
+  "normal_git_add_index_before": "120000 4cbb553f3f4ac2ee7b01ff6c951d6bf583c39c15 0\tlink",
+  "normal_git_add_index_after": "120000 4cbb553f3f4ac2ee7b01ff6c951d6bf583c39c15 0\tlink"
+}

@@ -1,0 +1,116 @@
+{
+  "review": "Independent ordinary Git correctness handoff: file comparison views",
+  "verdict": "FAIL",
+  "review_complete": false,
+  "candidate": "146a2e33ba55bed5b5ce1cd9df9c206ebdaab387",
+  "tree": "7fcf629fa930e75019607d29f24377a70a7cbbf1",
+  "reviewed_application_base": "4fcb0dfe226f30785dd2758a2959ff4379daa8ed",
+  "features": [
+    "#40 File migration map",
+    "#50 Three-state staging lens",
+    "#50 File versions across branches"
+  ],
+  "scope": "Confirmed initial-candidate correctness failures only. Review stopped by parent instruction; no PASS, no further runtime or concern probes. Later fix308b9ac remains unreviewed.",
+  "canonical_source_changed": false,
+  "findings": [
+    {
+      "id": "COMPARISON-1",
+      "priority": "P2",
+      "title": "Staging lens implicitly downloads a missing governing attribute blob",
+      "path": "src/git/file_comparison/lens.rs:108",
+      "reproduction": "Exact146a2e3 production read_lens on local fixture partial clone: selected file blob is present, indexed .gitattributes is promised/missing, working .gitattributes absent. read_lens returns after check-attr implicitly downloads governing attribute blob.",
+      "observed": {
+        "attribute_blob_missing_before": true,
+        "attribute_blob_present_after": true,
+        "lens_conversion_warning": "Line staging is unavailable with clean filters, text/EOL or working-tree-encoding conversion. Use the normal patch to stage with Git's conversions.",
+        "production": "read_lens"
+      },
+      "impact": "Opening the promised no-automatic-download view performs transport and obtains missing objects.",
+      "evidence": "review-file-comparison-146a2e3/production-attributes.json",
+      "repair_contract": "Prevent lazy fetch across comparison commands and explicitly reject unavailable governing attribute data. Flag-only fix is insufficient: independent exact Git primitive with --no-lazy-fetch returns success/unspecified attributes for missing .gitattributes, bypassing conversion checks."
+    },
+    {
+      "id": "COMPARISON-2",
+      "priority": "P2",
+      "title": "Locked remote staging transaction accepts changed conversion attributes",
+      "path": "src/git/file_comparison/transaction.rs:264",
+      "reproduction": "Exact production initial verify succeeds for oldLF index/newCRLF work; local fake-SSH fixture then adds a text/eol=lf .gitattributes before invoking exact remote_apply. Locked transaction rechecks HEAD/index/work but omits conversion attributes.",
+      "observed": {
+        "conversion_changed_after_initial_verification": true,
+        "error": null,
+        "index_bytes": [
+          110,
+          101,
+          119,
+          13,
+          10
+        ],
+        "production": "initial verify then remote_apply locked transaction",
+        "stale_change_refused": false,
+        "working_bytes": [
+          110,
+          101,
+          119,
+          13,
+          10
+        ]
+      },
+      "impact": "Transaction stages raw newCRLF bytes despite changed conversion policy; local transaction has a guard that remote path lacks.",
+      "evidence": "review-file-comparison-146a2e3/production-remote-drift.json",
+      "repair_contract": "Pin and recheck effective attributes/autocrlf and relevant file-mode settings in local and remote locked transaction before and after alternate-index application."
+    }
+  ],
+  "unvalidated_remaining_concern": {
+    "topic": "core.symlinks=false physical regular checkout",
+    "status": "UNVALIDATED PRODUCTION HYPOTHESIS; NO FURTHER PROBE PER PARENT",
+    "static_basis": "read_lens normalizes core.filemode only, so an indexed120000 symlink materialized by core.symlinks=false as physical regular file appears100644 to lens. Author independently agreed with static interpretation.",
+    "completed_ordinary_git_primitive": "Existing local fixture confirmed normal git checkout creates a regular physical target file and normal git add retains index mode120000. This establishes expected native Git behavior only; no production lens/action reproduction was run.",
+    "evidence": "review-file-comparison-146a2e3/symlink-primitive.json"
+  },
+  "test_evidence": {
+    "author_gates": "Initial146a fmt/strictClippy PASS; partial812passed3ignored1legacy-safety-excluded; all24comparison tests passed. Not final full-suite evidence.",
+    "author_manifest": "/workspace/work/file-comparison-146a2e3.json",
+    "author_log_hashes_verified": {
+      "fmt": true,
+      "clippy": true,
+      "test_partial": true
+    },
+    "independent_targeted": {
+      "candidate": "146a2e33ba55bed5b5ce1cd9df9c206ebdaab387",
+      "passed": 2,
+      "failed": 0,
+      "filtered": 816,
+      "log": "/workspace/work/review-file-comparison-146a2e3/reviewer-targeted.log",
+      "log_sha256": "2dd02aad2f948ef003f468ed7bfe6c2ed0968f5c101720fa74c36588cbd15abf",
+      "fresh_compile": "Compiling gitcraft at disposable exact-head archive/source; private target, CARGO_INCREMENTAL=0/jobs2",
+      "selection": "reviewer_ plus explicit skip of unsafe baseline test; optional SSH/WSL variables unset.",
+      "harness_binding": "/workspace/work/review-file-comparison-146a2e3/harness-binding.json",
+      "production_source": "Exact git archive146a, original production file prefixes unchanged; reviewer-only tests appended to two files.",
+      "transport": "Local file promisor fixture and fake SSH shell only. Fake transport disables ps/kill in same shell; no external accounts/remote writes or host process selectors/signals."
+    }
+  },
+  "later_author_work": {
+    "candidate": "308b9ac6e0f85c823ef9262f89fd97793b576cd3",
+    "status": "UNVALIDATED WIP; author reports fixes for two confirmed findings; no review PASS or gate acceptance",
+    "static_symlink_proposal": "Author proposed mode normalization/captured core.symlinks plus stale configuration guards and a fixture; no completed verification in this handoff."
+  },
+  "containment_review": {
+    "candidate": "aab2a257b8598f6718431b40cd1058d9a273bd2c",
+    "verdict": "FINAL PASS",
+    "report": "/workspace/work/review-process-test-containment-aab2a25-final.json",
+    "gates": "789passed3ignored0filtered; exact recording-only fixture passed; no reviewer runtime repeat",
+    "notes_commit": "66eab7b95a5377282e95d483ab15215bbc525ed3"
+  },
+  "remaining_work": [
+    "Root/assigned reviewer must continue ordinary correctness review on a new immutable author candidate after its gates.",
+    "Verify missing attribute handling, no implicit downloads, local/remote conversion guard parity and core.symlinks behavior before acceptance.",
+    "Remaining acceptance/UI/profile/Practice/raw-byte/path/stale regressions were inspected partly but have no complete adversarial PASS.",
+    "No further probe or runtime retry is authorized by this handoff. Final combined PR remains gated."
+  ],
+  "limits": [
+    "Review incomplete and later fixes unvalidated.",
+    "No whole-suite reviewer run; only two focused concerns executed before parent stop instruction.",
+    "No production symlink lens/action test or later repair verification.",
+    "No new Cargo/runtime/test/concern execution while producing this reporting-only handoff."
+  ]
+}
