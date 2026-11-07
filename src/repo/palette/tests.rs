@@ -127,6 +127,8 @@ fn a_selected_commit_puts_its_actions_first() {
         .enumerate()
         .map(|(i, c)| (c.hash.clone(), i))
         .collect();
+    tab.history = tab.commits.clone();
+    tab.history_index = tab.index.clone();
     tab.selected = Some(1);
     let items = tab.palette_items();
     let got = labels(&items);
@@ -176,6 +178,8 @@ fn the_uncommitted_changes_row_and_merges_offer_less() {
     tab.commits = vec![commit(WIP_HASH, 1), commit(&"b".repeat(40), 2)];
     tab.selected = Some(0);
     assert!(!tab.palette_items().iter().any(|i| i.selection));
+    tab.history = tab.commits.clone();
+    tab.history_index = tab.index.clone();
     tab.selected = Some(1);
     let items = tab.palette_items();
     assert!(!labels(&items).iter().any(|l| l.starts_with("Create patch")));
@@ -287,6 +291,8 @@ fn area_d_hidden_optional_tools_stay_in_palette_with_selected_commit_scope() {
         .enumerate()
         .map(|(i, c)| (c.hash.clone(), i))
         .collect();
+    tab.history = tab.commits.clone();
+    tab.history_index = tab.index.clone();
     tab.selected = Some(1);
     let items = tab.palette_items();
     for key in [

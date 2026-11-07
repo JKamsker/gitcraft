@@ -17,6 +17,7 @@ struct DragStart {
     available: f32,
     pointer: f32,
     preference: f32,
+    auto_refs_width: bool,
 }
 
 /// Persist only the intended column; temporary viewport compression is never saved.
@@ -109,6 +110,7 @@ impl RepoTab {
                             available: header.width(),
                             pointer: origin,
                             preference: preference(settings, bar),
+                            auto_refs_width: settings.auto_refs_width,
                         },
                     )
                 });
@@ -130,6 +132,9 @@ impl RepoTab {
             if widths.width(bar) == start.prefs.width(bar) {
                 *preference_mut(&mut next, bar) = start.preference;
                 next.description_space = start.description;
+                if bar == Bar::Refs {
+                    next.auto_refs_width = start.auto_refs_width;
+                }
             } else {
                 // Keep every other displayed allocation exactly as at gesture start. Changing
                 // only the dragged preference would let the squeeze policy restore a sibling.
@@ -297,6 +302,11 @@ mod interaction_tests {
                 assert_eq!(
                     preference(&Settings::get(&ctx), bar),
                     preference(&initial, bar)
+                );
+                assert_eq!(
+                    Settings::get(&ctx).auto_refs_width,
+                    initial.auto_refs_width,
+                    "returning to the press must preserve automatic ref sizing"
                 );
                 frame(vec![button(press, false)]);
             }
