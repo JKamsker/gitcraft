@@ -215,51 +215,6 @@ impl RepoTab {
         forge::web_url(url)
     }
 
-    pub(super) fn push(&mut self, ctx: &egui::Context) {
-        let Some(current) = self.refs.current.clone() else {
-            self.status = Some(("Push needs a checked-out branch".to_owned(), true));
-            return;
-        };
-        let has_upstream = self
-            .refs
-            .local
-            .iter()
-            .any(|b| b.name == current && !b.upstream.is_empty() && !b.upstream_gone());
-        if has_upstream {
-            self.run_ops(
-                "Push",
-                ops(&[&["push"]]),
-                Refresh::All,
-                OpKind::plain(),
-                ctx,
-            );
-            return;
-        }
-        // First push of a branch: publish it and track the remote one.
-        match self.default_remote() {
-            Some(remote) => self.run_ops(
-                &format!("Push {current} to {remote}"),
-                // Full refs: a tag of the same name must not be what is pushed.
-                ops(&[&[
-                    // push.default=upstream would push it to the branch it tracks.
-                    "-c",
-                    "push.default=simple",
-                    "push",
-                    "-u",
-                    &remote,
-                    // No `:dst`, which would bypass `remote.<name>.push`.
-                    &format!("refs/heads/{current}"),
-                ]]),
-                Refresh::All,
-                OpKind::plain(),
-                ctx,
-            ),
-            None => {
-                self.status = Some(("This repository has no remote to push to".to_owned(), true))
-            }
-        }
-    }
-
     pub(super) fn commit(&mut self, ctx: &egui::Context) {
         if !self.work.conflicted.is_empty() {
             self.status = Some(("Resolve the conflicted files first".to_owned(), true));

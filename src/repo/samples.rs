@@ -62,6 +62,7 @@ impl RepoTab {
                     &self.path, None, "HEAD",
                 )));
                 acts.push(Action::Fetch);
+                acts.push(Action::Sync);
                 acts.push(Action::InteractiveRebase {
                     onto: "HEAD~1".to_owned(),
                     label: "HEAD~1".to_owned(),

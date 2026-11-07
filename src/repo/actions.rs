@@ -64,6 +64,10 @@ pub(crate) enum Action {
     Pull,
     PullWith(PullMode),
     Push,
+    /// Pull, then push the checked-out branch.
+    Sync,
+    /// A button of the banner after a refused push.
+    PushFlow(super::push::PushAct),
     Reload,
     LoadMore,
     Undo,
@@ -331,6 +335,11 @@ impl RepoTab {
             ("Fetch".into(), "remote".into(), Action::Fetch),
             ("Pull".into(), "remote".into(), Action::Pull),
             ("Push".into(), "remote".into(), Action::Push),
+            (
+                "Sync (pull, then push)".into(),
+                "remote".into(),
+                Action::Sync,
+            ),
         ];
         items.extend(
             PullMode::ALL.map(|m| (m.label().into(), "remote".into(), Action::PullWith(m))),

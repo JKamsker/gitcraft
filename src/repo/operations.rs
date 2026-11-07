@@ -246,6 +246,8 @@ impl RepoTab {
             Refresh::All => self.reload(ctx),
         }
         self.follow_checkout_move(result.is_ok(), ctx);
+        // Last: it may start the next operation (Sync's push after its pull).
+        self.push_op_ended(&label, &result, ctx);
     }
 
     fn record_undo(&mut self, label: &str, kind: OpKind) {

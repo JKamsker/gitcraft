@@ -30,6 +30,7 @@ mod pr_merge;
 mod pr_review;
 mod pr_view;
 pub(crate) mod pull;
+mod push;
 mod quick_edit;
 mod rebase;
 mod reflog;
@@ -164,6 +165,9 @@ pub struct RepoTab {
     rebase: Option<rebase::RebaseEditor>,
     /// The selected commit's message, being edited in the right pane.
     reword: Option<Reword>,
+    /// Push and Sync: the push running, Sync's push waiting for its pull, the banner after a
+    /// refused push.
+    push_flow: push::PushFlow,
     /// HTTPS credentials typed in this session, used for every later git command of the tab.
     credentials: Option<git::Credentials>,
     /// The last operation started, to run again after signing in.
@@ -322,6 +326,7 @@ impl RepoTab {
             file_view: None,
             rebase: None,
             reword: None,
+            push_flow: Default::default(),
             credentials: None,
             last_op: None,
             avatars_hinted: false,
