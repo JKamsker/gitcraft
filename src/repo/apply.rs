@@ -86,10 +86,7 @@ impl RepoTab {
             Action::Pull => self.pull(Settings::get(ctx).pull_mode, ctx),
             Action::PullWith(mode) => self.pull(mode, ctx),
             Action::Push => self.push(ctx),
-            Action::Reload => {
-                self.conflict_checks.forget_finished();
-                self.reload(ctx);
-            }
+            Action::Reload => self.refresh(ctx),
             Action::LoadMore => self.load_more(ctx),
             Action::Undo => self.undo(ctx),
             Action::Redo => self.redo(ctx),

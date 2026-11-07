@@ -84,9 +84,14 @@ pub fn features(repo: &Path) -> Result<Features, String> {
 
 /// Whether `repo` is a partial clone (`git clone --filter`): merging there downloads the
 /// files it lacks from the remote, which a check must not do behind the user's back.
-pub fn partial_clone(repo: &Path) -> bool {
-    run(Some(repo), &["config", "--get", "extensions.partialClone"])
-        .is_ok_and(|v| !v.trim().is_empty())
+pub fn partial_clone(repo: &Path) -> Result<bool, String> {
+    // 1: the key isn't set. Any other failure (a machine out of reach) is not a "no".
+    let (code, out) = run_code(
+        Some(repo),
+        &["config", "--get", "extensions.partialClone"],
+        &[0, 1],
+    )?;
+    Ok(code == 0 && !String::from_utf8_lossy(&out).trim().is_empty())
 }
 
 /// A file a merge would leave conflicted.
@@ -236,7 +241,9 @@ pub struct Prediction {
 pub fn merge(repo: &Path, ours: &str, theirs: &str) -> Result<Prediction, String> {
     let merged = merge_tree(repo, None, ours, theirs)?;
     let outcome = if merged.conflicts.is_empty() {
-        let changes = tree_of(repo, ours)? != merged.tree;
+        // Already merged only when `theirs` is in `ours`' history: a branch with the same
+        // files but its own commits still makes a merge commit.
+        let changes = !is_ancestor(repo, theirs, ours)? || tree_of(repo, ours)? != merged.tree;
         Outcome::Clean { changes }
     } else {
         Outcome::Conflicts {
@@ -259,8 +266,108 @@ pub fn rebase(
     onto: &str,
 ) -> Result<Prediction, String> {
     let picks = rebase_picks(repo, branch, onto)?;
-    let replay = replay(repo, features, onto, &picks)?;
+    finish_rebase(repo, features, branch, onto, &picks)
+}
+
+/// Pulling with `--rebase` into `branch` from `upstream` (the ref, as `origin/main`), at
+/// commit `onto`: like `git pull`, the commits replayed start from the upstream's fork point,
+/// so commits the upstream once had and then lost (a force-pushed upstream) are not replayed.
+pub fn pull_rebase(
+    repo: &Path,
+    features: Features,
+    branch: &str,
+    upstream: &str,
+    onto: &str,
+) -> Result<Prediction, String> {
+    let picks = match fork_point(repo, upstream, branch) {
+        Some(fork) => picks_since(repo, branch, &fork)?,
+        None => rebase_picks(repo, branch, onto)?,
+    };
+    finish_rebase(repo, features, branch, onto, &picks)
+}
+
+/// Replays `picks` of `branch` onto `onto`, unless the user's git recreates merges in a
+/// rebase (`rebase.rebaseMerges`) and there are merges to recreate, which this doesn't
+/// simulate.
+fn finish_rebase(
+    repo: &Path,
+    features: Features,
+    branch: &str,
+    onto: &str,
+    picks: &[Pick],
+) -> Result<Prediction, String> {
+    if rebases_merges(repo) && has_merges(repo, branch, onto)? {
+        return Ok(Prediction {
+            outcome: Outcome::Unsure(
+                "rebase.rebaseMerges is set, and the merges it would recreate aren't checked"
+                    .to_owned(),
+            ),
+            commits: picks.len(),
+        });
+    }
+    let replay = replay(repo, features, onto, picks)?;
     Ok(replay.prediction(picks.len()))
+}
+
+/// Whether `ancestor` is in `of`'s history.
+fn is_ancestor(repo: &Path, ancestor: &str, of: &str) -> Result<bool, String> {
+    let (code, _) = run_code(
+        Some(repo),
+        &["merge-base", "--is-ancestor", END_OPTS, ancestor, of],
+        &[0, 1],
+    )?;
+    Ok(code == 0)
+}
+
+/// Where `branch` forked from `upstream`, by the upstream's reflog (`merge-base
+/// --fork-point`), if git can tell.
+fn fork_point(repo: &Path, upstream: &str, branch: &str) -> Option<String> {
+    run(
+        Some(repo),
+        &["merge-base", "--fork-point", END_OPTS, upstream, branch],
+    )
+    .ok()
+    .map(|s| s.trim().to_owned())
+    .filter(|s| !s.is_empty())
+}
+
+/// The commits of `branch` after `base`, oldest first, less merges: what `git rebase --onto
+/// <upstream> <base>` picks.
+fn picks_since(repo: &Path, branch: &str, base: &str) -> Result<Vec<Pick>, String> {
+    let range = format!("{base}..{branch}");
+    let out = run(
+        Some(repo),
+        &[
+            "log",
+            NO_SIGNATURE,
+            UTF8,
+            "--format=%H%x00%P%x00%s%x00",
+            "--reverse",
+            "--topo-order",
+            "--no-merges",
+            END_OPTS,
+            &range,
+        ],
+    )?;
+    Ok(parse_picks(&out))
+}
+
+/// Whether the user's git config has rebases recreate merges.
+fn rebases_merges(repo: &Path) -> bool {
+    run(Some(repo), &["config", "--get", "rebase.rebaseMerges"]).is_ok_and(|v| {
+        let v = v.trim().to_ascii_lowercase();
+        !v.is_empty() && !["false", "no", "off", "0"].contains(&v.as_str())
+    })
+}
+
+/// Whether `branch` has merges `onto` doesn't.
+fn has_merges(repo: &Path, branch: &str, onto: &str) -> Result<bool, String> {
+    let range = format!("{onto}..{branch}");
+    let out = run(
+        Some(repo),
+        &["rev-list", "--merges", "--count", END_OPTS, &range],
+    )?;
+    Ok(out.trim() != "0")
 }
 
 /// Cherry-picking `commits`, oldest first, onto `onto`.

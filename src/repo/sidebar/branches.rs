@@ -337,7 +337,7 @@ impl RepoTab {
 /// A local or remote-tracking branch found by name.
 pub(in crate::repo) struct OwnedBranch {
     pub(in crate::repo) name: String,
-    remote: bool,
+    pub(in crate::repo) remote: bool,
 }
 
 impl OwnedBranch {

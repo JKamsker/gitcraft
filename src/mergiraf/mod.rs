@@ -215,12 +215,13 @@ pub fn use_in_merges(ctx: &egui::Context, on: bool) {
 }
 
 /// The file name patterns Mergiraf has a language for (`*.rs`, `*.json`…), as `mergiraf
-/// languages --gitattributes` lists them, read once for each Mergiraf found. Runs it: not
+/// languages --gitattributes` lists them, read once for each Mergiraf (and version). Runs it: not
 /// from the UI thread.
 pub fn patterns(found: &Found) -> Result<Vec<String>, String> {
     if let Ok(cache) = PATTERNS.lock()
-        && let Some((program, patterns)) = cache.as_ref()
+        && let Some((program, version, patterns)) = cache.as_ref()
         && *program == found.program
+        && *version == found.version
     {
         return Ok(patterns.clone());
     }
@@ -236,13 +237,19 @@ pub fn patterns(found: &Found) -> Result<Vec<String>, String> {
     }
     let patterns = parse_patterns(&String::from_utf8_lossy(&out.stdout));
     if let Ok(mut cache) = PATTERNS.lock() {
-        *cache = Some((found.program.clone(), patterns.clone()));
+        *cache = Some((
+            found.program.clone(),
+            found.version.clone(),
+            patterns.clone(),
+        ));
     }
     Ok(patterns)
 }
 
-/// The patterns of [`patterns`], by the Mergiraf they were read from.
-static PATTERNS: Mutex<Option<(PathBuf, Vec<String>)>> = Mutex::new(None);
+/// The patterns of [`patterns`], by the Mergiraf (program and version) they were read from:
+/// one upgraded in place may know more languages.
+type Patterns = (PathBuf, String, Vec<String>);
+static PATTERNS: Mutex<Option<Patterns>> = Mutex::new(None);
 
 /// The patterns in gitattributes lines such as `*.rs merge=mergiraf` (or several patterns on
 /// one line).
