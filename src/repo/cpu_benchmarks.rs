@@ -241,6 +241,7 @@ fn real_world_cpu() -> Result<(), String> {
         .map(|(i, c)| (c.hash.clone(), i))
         .collect();
     tab.refs = git::refs(&inputs.repo)?;
+    tab.rebuild_graph_labels();
     tab.loading = false;
     tab.has_more = false;
     let mut frame = 0u64;
