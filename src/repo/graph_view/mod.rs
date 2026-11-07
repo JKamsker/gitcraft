@@ -123,6 +123,7 @@ impl RepoTab {
     }
 
     fn graph_rows_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        self.graph_walk_header(ui);
         let map_area = ui.available_rect_before_wrap();
         let map_rect = egui::Rect::from_min_max(
             egui::pos2(map_area.right() - 78.0, map_area.top()),
@@ -384,6 +385,32 @@ impl RepoTab {
     /// Up and down select the row above or below the selected one.
     /// `ringed`: the row Tab reaches, where they start while nothing is selected.
     fn arrow_keys(&mut self, ui: &Ui, ringed: Option<usize>, acts: &mut Vec<Action>) {
+        if Settings::get(ui.ctx()).graph_lane_walk {
+            let direction = ui.input(|i| {
+                if !i.modifiers.is_none() {
+                    return None;
+                }
+                use crate::repo::graph_walk::Direction;
+                if i.key_pressed(Key::ArrowDown) {
+                    Some(Direction::Parent)
+                } else if i.key_pressed(Key::ArrowUp) {
+                    Some(Direction::Child)
+                } else if i.key_pressed(Key::ArrowRight) {
+                    Some(Direction::Merge)
+                } else if i.key_pressed(Key::ArrowLeft) {
+                    Some(Direction::Tip)
+                } else {
+                    None
+                }
+            });
+            if let Some(direction) = direction
+                && let Some(next) = self.graph_walk(direction, ui.ctx())
+            {
+                acts.push(Action::Select(next));
+                self.scroll_to = Some(next);
+            }
+            return;
+        }
         // Alt+↑ / Alt+↓ go from change to change of the diff shown below the graph.
         let below = self.diff_beside_graph(ui.ctx());
         let (up, down) = ui.input(|i| {

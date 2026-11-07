@@ -386,6 +386,7 @@ impl RepoTab {
             self.handle(msg, ctx);
         }
         self.poll_branch_bands(ctx);
+        self.poll_graph_topology(ctx);
         self.poll_postcards(ctx);
         self.poll_history_activity(ctx);
         self.agent_step(ctx);

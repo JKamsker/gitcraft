@@ -57,6 +57,8 @@ pub struct Settings {
     pub graph_width: f32,
     /// The graph's lanes closer together, for a narrower graph column.
     pub compact_graph: bool,
+    pub graph_lane_walk: bool,
+    pub graph_sounds: bool,
     /// Widths of the author, when, date and hash columns (dragged in the graph header).
     pub author_width: f32,
     pub when_width: f32,
@@ -182,6 +184,8 @@ impl Default for Settings {
             branch_names_keep_end: true,
             graph_width: 0.0,
             compact_graph: false,
+            graph_lane_walk: false,
+            graph_sounds: false,
             author_width: 150.0,
             when_width: 100.0,
             date_width: 118.0,
@@ -710,6 +714,20 @@ impl Settings {
             }
             Page::Graph => {
                 section(ui, f, "Commit graph", None, |card| {
+                    card.row(
+                        "Topology navigation",
+                        "accessibility audio lanes graph parent child",
+                        |ui| {
+                            ui.checkbox(
+                                &mut self.graph_lane_walk,
+                                "Walk graph topology with arrow keys",
+                            );
+                            ui.checkbox(
+                                &mut self.graph_sounds,
+                                "Soft sounds for merges and lane crossings",
+                            );
+                        },
+                    );
                     card.preview(Preview::GraphRefs);
                     card.row("Branch column width", "refs tags pills", |ui| {
                         ui.spacing_mut().slider_width = layout::fit(ui, SLIDER_WIDTH + 70.0) - 70.0;

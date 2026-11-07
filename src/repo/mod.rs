@@ -55,6 +55,7 @@ mod gerrit;
 mod ghost;
 mod graph_order;
 pub(crate) mod graph_view;
+mod graph_walk;
 mod growth;
 mod guide;
 pub(crate) mod highlight;
@@ -409,6 +410,9 @@ pub struct RepoTab {
     waiting: running::Waiting,
     /// The operations run, with their commands and output (the Activity panel).
     activity: activity::ActivityLog,
+    topology: std::sync::Arc<graph_walk::Topology>,
+    topology_reader: history_reader::Reader<std::sync::Arc<graph_walk::Topology>>,
+    graph_narration: graph_walk::Narration,
     postcards: postcards::State,
     growth: Option<growth::State>,
     atlas: Option<atlas::State>,
@@ -666,6 +670,9 @@ impl RepoTab {
             running: None,
             waiting: Default::default(),
             activity: Default::default(),
+            topology: Default::default(),
+            topology_reader: Default::default(),
+            graph_narration: Default::default(),
             postcards: Default::default(),
             growth: None,
             atlas: None,

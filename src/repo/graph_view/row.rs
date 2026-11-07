@@ -88,7 +88,13 @@ impl RepoTab {
         // Known by its commit, not its place: rows shift when a reload adds commits or the
         // changes row above them, and a menu opened on one must stay that commit's.
         let resp = ui.interact(rect, row_id(ui, &commit.hash), sense);
-        let label = || self.row_label(commit, viewport.now);
+        let label = || {
+            format!(
+                "{}. {}",
+                self.graph_description(i),
+                self.row_label(commit, viewport.now)
+            )
+        };
         widgets::a11y_selected(&resp, label, self.selected == Some(i));
         let painter = ui.painter_at(rect);
         let mut hovered_message = None;

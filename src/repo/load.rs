@@ -612,6 +612,7 @@ impl RepoTab {
         let old_index = std::mem::replace(&mut self.index, index);
         self.rebuild_graph_labels();
         self.queue_branch_bands();
+        self.queue_graph_topology();
         self.cancel_minimap();
         // Freeing tens of thousands of commits (those a reload replaced), rows and index entries
         // takes a while: not on the UI thread.

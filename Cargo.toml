@@ -42,6 +42,8 @@ ron = "0.12"
 # The window's handle, to hide Windows' border when the tabs are in the title bar (app::title_bar).
 raw-window-handle = "0.6"
 rfd = "0.17"
+# Quiet synthesized native earcons; no codec or media-file support. Device opens only on opt-in.
+rodio = { version = "0.21", default-features = false, features = ["playback"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
