@@ -372,11 +372,12 @@ mod tests {
         let (_temp, paths) = fixture()?;
         let (mut h, code) = harness(Invocation::Merge(paths.clone()));
         settle(&mut h)?;
-        h.get_by_role(egui::accesskit::Role::TextInput).focus();
+        h.get_by_role(egui::accesskit::Role::MultilineTextInput)
+            .focus();
         h.run_steps(1);
         h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
         h.run_steps(1);
-        h.get_by_role(egui::accesskit::Role::TextInput)
+        h.get_by_role(egui::accesskit::Role::MultilineTextInput)
             .type_text("manual result\nlast");
         h.run_steps(1);
         h.get_by_label("Save and finish").click();
