@@ -52,6 +52,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          # Keep the expensive native build even when a platform test fails.
+          cache-on-failure: true
       - name: Linux build dependencies
         if: runner.os == 'Linux'
         run: |

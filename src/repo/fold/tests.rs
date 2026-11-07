@@ -674,6 +674,23 @@ fn a_rebase_that_never_started_leaves_an_undoable_fixup_commit() {
     assert_eq!(subjects(&dir)[0], "fixup! c2");
     assert!(tab.fold.stopped.is_none());
     let fixup = git::head(&dir);
+    let recovery = tab
+        .timeline
+        .current_entry()
+        .ok_or("missing recovery entry")
+        .cloned();
+    assert!(recovery.is_ok());
+    let Ok(recovery) = recovery else { return };
+    assert_eq!(
+        recovery.before.head, before,
+        "recovery starts before the fixup commit"
+    );
+    assert_eq!(recovery.after.head, fixup);
+    assert_eq!(
+        tab.timeline.entries.len(),
+        1,
+        "one operation, including its recovery"
+    );
 
     done(undo(&mut tab, &ctx));
     assert_eq!(git::head(&dir), before);
@@ -834,6 +851,10 @@ fn a_patch_stopped_since_the_dialog_stops_the_fold() {
     assert_eq!(git::in_progress(&dir), Ok(Some(InProgress::Am)));
     let before = git::head(&dir);
     tab.apply(Action::RunFold(Box::new(found)), &ctx);
+    assert!(
+        tab.busy_op.is_some(),
+        "the preflight check holds the operation busy"
+    );
     settle(&mut tab, &ctx);
     let said = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
     assert!(said.contains("patch is in progress"), "{said}");

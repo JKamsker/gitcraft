@@ -156,23 +156,27 @@ impl RepoTab {
         }
         // What is going on now, not when the dialog read it: a `git am` stopped since (which
         // no guard step can see) would take the fixup commit as its own.
+        self.busy_op = Some(plan.label());
         let path = self.path.clone();
         self.then(
             ctx,
             move || git::in_progress(&path),
-            move |tab, state, ctx| match state {
-                Ok(None) => tab.run_fold_now(plan, ctx),
-                Ok(Some(state)) => {
-                    tab.status = Some((
-                        format!(
-                            "{}: a {} is in progress now: finish or abort it first",
-                            plan.label(),
-                            state.label().to_lowercase()
-                        ),
-                        true,
-                    ));
+            move |tab, state, ctx| {
+                tab.busy_op = None;
+                match state {
+                    Ok(None) => tab.run_fold_now(plan, ctx),
+                    Ok(Some(state)) => {
+                        tab.status = Some((
+                            format!(
+                                "{}: a {} is in progress now: finish or abort it first",
+                                plan.label(),
+                                state.label().to_lowercase()
+                            ),
+                            true,
+                        ));
+                    }
+                    Err(e) => tab.status = Some((format!("{}: {e}", plan.label()), true)),
                 }
-                Err(e) => tab.status = Some((format!("{}: {e}", plan.label()), true)),
             },
         );
     }
@@ -347,7 +351,25 @@ impl RepoTab {
         if !on_top || self.refs.current.as_deref() != Some(stopped.branch.as_str()) {
             return;
         }
-        self.remember_undo(&stopped.label, stopped.leftover_undo(&head), ctx);
+        let mut undo = stopped.leftover_undo(&head);
+        let failed = format!("{} (stopped partway)", stopped.label);
+        if let Some(entry) = self
+            .timeline
+            .entries
+            .iter_mut()
+            .rev()
+            .find(|entry| entry.label == failed && entry.after.head == head)
+        {
+            // The failed operation already recorded the move to the fixup commit. Recovery
+            // belongs to that entry: a second, unchanged-ref entry would have its undo move
+            // HEAD to a different state than its parent says it has.
+            undo.id = entry.id;
+            entry.label = undo.label.clone();
+            entry.undo = Some(undo);
+            self.save_timeline(ctx);
+        } else {
+            self.remember_undo(&stopped.label, undo, ctx);
+        }
         self.status = Some((
             format!(
                 "{}: the rebase didn't run, so the changes are in a commit on top. Ctrl+Z \
