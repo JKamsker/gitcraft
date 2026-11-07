@@ -21,6 +21,7 @@ pub(super) struct Loaded {
     pub(super) history: Vec<Arc<Commit>>,
     pub(super) work: WorkStatus,
     pub(super) worktrees: Vec<Worktree>,
+    pub(super) worktree_root: String,
     pub(super) stashes: Vec<Stash>,
     pub(super) remotes: Vec<Remote>,
     /// The forge `origin` is on, if gitcraft knows it.
@@ -129,6 +130,8 @@ impl RepoTab {
                     crate::tasks::read(move || super::issue_work::read(&path))?
                 };
                 let identity = git::identity(&path);
+                let worktree_root = git::read_worktree_root(&path)
+                    .map_err(|e| format!("Could not read the worktrees root: {e}"))?;
                 let history = history.join()??.into_iter().map(Arc::new).collect();
                 let (work, worktrees) = work_trees.join()??;
                 let (stashes, remotes, submodules, lfs, issues) = (
@@ -150,6 +153,7 @@ impl RepoTab {
                     history,
                     work,
                     worktrees,
+                    worktree_root,
                     stashes,
                     remotes,
                     hosting,
@@ -425,6 +429,7 @@ impl RepoTab {
             .map(|w| (w.path.clone(), w.changes))
             .collect();
         self.worktrees = loaded.worktrees;
+        self.worktree_root = loaded.worktree_root;
         if crate::remote::is_remote(&self.path) {
             self.tx.repo = self.repo_key().to_owned();
         }

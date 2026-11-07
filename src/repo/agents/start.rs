@@ -37,15 +37,17 @@ pub(crate) struct StartForm {
     repo: std::path::PathBuf,
     /// The local branches, which the new one mustn't be.
     branches: Vec<String>,
-    /// Where the folder suggested for a branch goes: beside the main worktree.
+    /// Where the folder suggested for a branch goes: under the saved repository root.
     folder_for: Box<dyn Fn(&str) -> String>,
 }
 
 impl StartForm {
     pub(super) fn new(tab: &RepoTab) -> Self {
-        let main = tab.main_worktree().unwrap_or(&tab.path).to_path_buf();
+        let main = tab.worktrees.first().map_or(&tab.path, |w| &w.path).clone();
         let taken: Vec<std::path::PathBuf> = tab.worktrees.iter().map(|w| w.path.clone()).collect();
-        let folder_for = Box::new(move |branch: &str| suggest_folder(&main, branch, &taken));
+        let root = crate::git::resolve_worktree_root(&main, &tab.worktree_root)
+            .unwrap_or_else(|_| crate::git::default_worktree_root(&main));
+        let folder_for = Box::new(move |branch: &str| suggest_folder(&root, branch, &taken));
         let base = tab
             .refs
             .current
@@ -282,31 +284,13 @@ fn single(ui: &mut Ui, text: &mut String) -> egui::Response {
     )
 }
 
-/// The folder beside `main` for `branch` (`app` + `agent/x` → `app-agent-x`), as git of its
-/// machine takes it, not one of the worktrees `taken` (`-2`, `-3`… then).
-fn suggest_folder(main: &std::path::Path, branch: &str, taken: &[std::path::PathBuf]) -> String {
-    let suffix = branch.trim().replace(['/', '\\', ' '], "-");
-    let (parent, name, sep) = match crate::remote::parse(main) {
-        Some(target) => {
-            let parent = crate::remote::parent_there(&target.path).trim_end_matches('/');
-            let name = target.path.rsplit('/').next().unwrap_or("repo").to_owned();
-            (parent.to_owned(), name, "/")
-        }
-        None => (
-            main.parent().unwrap_or(main).display().to_string(),
-            main.file_name()
-                .map_or_else(|| "repo".to_owned(), |n| n.to_string_lossy().into_owned()),
-            std::path::MAIN_SEPARATOR_STR,
-        ),
-    };
-    let base = format!(
-        "{}{sep}{name}-{suffix}",
-        parent.trim_end_matches(['/', '\\'])
-    );
+/// A branch folder under `root`, avoiding the worktrees `taken` (`-2`, `-3`… then).
+fn suggest_folder(root: &std::path::Path, branch: &str, taken: &[std::path::PathBuf]) -> String {
+    let base = crate::remote::git_path(&crate::git::branch_worktree_folder(root, branch));
     let is_taken = |candidate: &str| {
         taken.iter().any(|w| {
             crate::remote::git_path(w) == candidate || w.display().to_string() == candidate
-        }) || (!crate::remote::is_remote(main) && std::path::Path::new(candidate).exists())
+        }) || (!crate::remote::is_remote(root) && std::path::Path::new(candidate).exists())
     };
     if !is_taken(&base) {
         return base;
@@ -404,16 +388,35 @@ mod tests {
     }
 
     #[test]
-    fn a_task_folder_goes_beside_the_main_worktree_and_is_never_taken() {
-        let main = Path::new("ssh://build/home/me/app");
+    fn a_task_folder_uses_the_root_and_is_never_taken() {
+        let main = Path::new("ssh://build/home/me/app.wt");
         assert_eq!(
             suggest_folder(main, "agent/fix ü", &[]),
-            "/home/me/app-agent-fix-ü"
+            "/home/me/app.wt/agent/fix-ü"
         );
-        let taken = [PathBuf::from("ssh://build/home/me/app-agent-x")];
+        let taken = [PathBuf::from("ssh://build/home/me/app.wt/agent/x")];
         assert_eq!(
             suggest_folder(main, "agent/x", &taken),
-            "/home/me/app-agent-x-2"
+            "/home/me/app.wt/agent/x-2"
+        );
+    }
+
+    /// Agent tasks use the configured root when opened from a linked worktree.
+    #[test]
+    fn a_task_form_uses_the_saved_root_of_the_main_checkout() {
+        let ctx = egui::Context::default();
+        let mut tab =
+            crate::repo::RepoTab::new_deferred("ssh://build/elsewhere/linked".into(), &ctx);
+        tab.worktrees = vec![crate::git::Worktree {
+            path: "ssh://build/home/me/app".into(),
+            main: true,
+            ..Default::default()
+        }];
+        tab.worktree_root = "custom.worktrees".to_owned();
+        let form = super::StartForm::new(&tab);
+        assert_eq!(
+            (form.folder_for)("feat/awesome-stuff"),
+            "/home/me/app/custom.worktrees/feat/awesome-stuff"
         );
     }
 }
