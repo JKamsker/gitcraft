@@ -260,6 +260,7 @@ impl RepoTab {
         });
         self.load_diff_file(ctx);
         self.load_diff_rendered(ctx);
+        self.load_diff_structural(ctx);
     }
 
     /// Renders the Markdown file of the open diff, when diffs show Markdown rendered.
@@ -282,6 +283,9 @@ impl RepoTab {
         self.diff_rendered = on;
         if on {
             self.diff_rich = None;
+            if let Some(view) = &mut self.diff {
+                view.structural.enabled = false;
+            }
         }
         // Read again each time it's turned on: the file may have changed since.
         if on {
@@ -305,6 +309,9 @@ impl RepoTab {
     /// Shows diffs as the whole file, or as the changes.
     pub(super) fn show_diff_as_file(&mut self, on: bool, ctx: &egui::Context) {
         self.diff_as_file = on;
+        if on && let Some(view) = &mut self.diff {
+            view.structural.enabled = false;
+        }
         if self.diff.as_ref().is_some_and(|d| d.file.is_none()) {
             self.load_diff_file(ctx);
         }

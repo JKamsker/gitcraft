@@ -138,6 +138,7 @@ pub(crate) struct DiffView {
     pub(super) rich_load: u64,
     /// What the rich view keeps between frames.
     pub(super) rich_state: diff::rich::RichState,
+    pub(super) structural: diff::structural::State,
     /// What the rendered Markdown keeps between frames.
     pub(super) markdown: egui_commonmark::CommonMarkCache,
     /// How far the lines were scrolled down last frame.
@@ -194,6 +195,7 @@ impl DiffView {
             rich: None,
             rich_load: 0,
             rich_state: Default::default(),
+            structural: Default::default(),
             markdown: Default::default(),
             scroll: 0.0,
             jump: None,

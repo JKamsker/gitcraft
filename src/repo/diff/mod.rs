@@ -32,6 +32,7 @@ pub(super) mod rendered;
 pub(super) mod rich;
 mod rows;
 mod select;
+pub(in crate::repo) mod structural;
 #[cfg(test)]
 mod tests;
 mod view;

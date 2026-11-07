@@ -62,6 +62,10 @@ pub(super) enum Msg {
         diff::rich::RichKind,
         Box<Result<diff::rich::Rich, String>>,
     ),
+    DiffStructural(
+        (u64, u64),
+        Box<Result<diff::structural::Structural, String>>,
+    ),
     FileHistory(String, Option<String>, Result<Vec<git::FileCommit>, String>),
     Blame(String, Option<String>, Result<file_view::BlameData, String>),
     /// A file as it is at a revision, for the file view.
@@ -440,6 +444,15 @@ impl RepoTab {
             Msg::DiffRendered(request, result) => {
                 if let Some(view) = &mut self.diff {
                     view.rendered_arrived(request, *result, ctx);
+                }
+            }
+            Msg::DiffStructural(ids, result) => {
+                let reload = self
+                    .diff
+                    .as_mut()
+                    .is_some_and(|view| view.structural.arrived(ids, view.request, *result));
+                if reload {
+                    self.load_diff_structural(ctx);
                 }
             }
             Msg::PrDetails(request, result) => self.pr_details_arrived(request, *result, ctx),
