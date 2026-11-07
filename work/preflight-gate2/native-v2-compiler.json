@@ -1,0 +1,8 @@
+{
+  "source_commit": "fb8428f369c163c05bab06eb317687e2d9cb08fe",
+  "src_tree": "c668401243a20e216bf19330870366ceb71af6e3",
+  "binary": "/workspace/work/push-preflight/target/debug/deps/gitcraft-31822f5b138c0fe8",
+  "binary_sha256": "4651a6018b6041fbc55bda3ccd7798d5a970a1a011bb60afbc37dc5d1113aa3e",
+  "compiler": "PASS private INCR0/jobs2 no-run",
+  "runtime": "NOT RUN; production unchanged"
+}
