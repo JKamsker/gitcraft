@@ -57,6 +57,7 @@ pub(super) fn read(
     Ok(out.stdout)
 }
 pub(crate) mod guard;
+pub(crate) mod publication;
 pub(crate) mod reftable;
 pub(crate) mod remote_config;
 pub(crate) mod replacements;

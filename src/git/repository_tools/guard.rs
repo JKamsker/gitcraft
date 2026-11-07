@@ -38,6 +38,22 @@ impl Snapshot {
             profile: git::profile_config(),
         })
     }
+    pub(crate) fn check_publication(&self, repo: &Path) -> Result<(), String> {
+        let mut now = Self::capture(repo)?;
+        let without_tracking = |s: &str| {
+            s.lines()
+                .filter(|line| !line.starts_with("refs/remotes/"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        let mut expected = self.clone();
+        now.refs = without_tracking(&now.refs);
+        expected.refs = without_tracking(&expected.refs);
+        if now != expected {
+            return Err("Source refs, worktree, repository or routing configuration changed. Prepare publication again.".into());
+        }
+        Ok(())
+    }
     pub(crate) fn check(&self, repo: &Path) -> Result<(), String> {
         if *self != Self::capture(repo)? {
             return Err("Repository, refs, configuration or worktree changed. Read a fresh preview before applying.".into());

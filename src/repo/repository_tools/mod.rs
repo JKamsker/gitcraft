@@ -1,8 +1,9 @@
+mod publication;
 mod remotes;
 // Reachable repository internals dialogs; stale background answers never replace a new view.
 use super::{Action, Dialog, RepoTab};
 use crate::git::repository_tools::{
-    all_refs, guard, object, reftable, remote_config, replacements,
+    all_refs, guard, object, publication as publishing, reftable, remote_config, replacements,
 };
 use std::sync::atomic::{AtomicU64, Ordering};
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -12,6 +13,7 @@ enum Tool {
     Reftable,
     Replacements,
     Remote,
+    Publication,
 }
 static REQUESTS: AtomicU64 = AtomicU64::new(1);
 
@@ -27,6 +29,10 @@ pub(crate) enum Act {
     Remote(String),
     RemotePreview(Box<remote_config::Editor>),
     SaveRemote(Box<remote_config::Editor>),
+    Publication(String),
+    SaveGroup(Box<publishing::Manager>),
+    PreparePublication(Box<publishing::Manager>),
+    PublishGroup(Box<publishing::Manager>, bool),
 }
 enum Data {
     Refs(all_refs::Browser),
@@ -34,6 +40,7 @@ enum Data {
     Reftable(reftable::Storage),
     Replacements(replacements::Histories),
     Remote(remote_config::Editor),
+    Publication(publishing::Manager),
 }
 pub(crate) struct State {
     id: u64,
@@ -49,6 +56,23 @@ pub(crate) struct State {
 impl RepoTab {
     pub(super) fn repository_tools_act(&mut self, act: Act, ctx: &egui::Context) {
         let act = match act {
+            Act::SaveGroup(manager) => {
+                self.repository_tool_mutation(
+                    "Save publication group",
+                    false,
+                    ctx,
+                    move |runner| publishing::save_group(runner, &manager),
+                );
+                return;
+            }
+            Act::PreparePublication(manager) => {
+                self.prepare_publication(*manager, ctx);
+                return;
+            }
+            Act::PublishGroup(manager, retry) => {
+                self.publish_group(*manager, retry, ctx);
+                return;
+            }
             Act::SaveRemote(editor) => {
                 self.repository_tool_mutation(
                     "Save remote configuration",
@@ -100,6 +124,8 @@ impl RepoTab {
             Act::Reftable => (String::new(), Tool::Reftable),
             Act::Replacements => (String::new(), Tool::Replacements),
             Act::Remote(name) => (name, Tool::Remote),
+            Act::Publication(name) => (name, Tool::Publication),
+            Act::SaveGroup(..) | Act::PreparePublication(..) | Act::PublishGroup(..) => return,
             Act::SaveRemote(..) | Act::RemotePreview(..) => return,
             Act::Migrate(..)
             | Act::Graft(..)
@@ -134,6 +160,7 @@ impl RepoTab {
                 Tool::Reftable => reftable::inspect(&path).map(Data::Reftable),
                 Tool::Replacements => replacements::read(&path).map(Data::Replacements),
                 Tool::Remote => remote_config::inspect(&path, &query).map(Data::Remote),
+                Tool::Publication => publishing::read(&path, &query).map(Data::Publication),
             },
             move |tab, result, _| {
                 if tab.path != expected_path || crate::git::profile_config() != profile {
@@ -205,6 +232,10 @@ impl RepoTab {
 
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.set_width(850.0);
+    if state.tool == Tool::Publication {
+        publication::show(ui, state, acts);
+        return;
+    }
     if state.tool == Tool::Remote {
         remotes::show(ui, state, acts);
         return;
@@ -507,5 +538,65 @@ impl RepoTab {
                 }
             },
         );
+    }
+}
+
+impl RepoTab {
+    fn prepare_publication(&mut self, manager: publishing::Manager, ctx: &egui::Context) {
+        let Some(Dialog::RepositoryTools(state)) = &mut self.dialog else {
+            return;
+        };
+        let id = REQUESTS.fetch_add(1, Ordering::Relaxed);
+        state.id = id;
+        let repo = self.path.clone();
+        self.then_or(
+            ctx,
+            false,
+            Err,
+            move || publishing::prepare(&repo, manager),
+            move |tab, result, _| {
+                if let Some(Dialog::RepositoryTools(state)) = &mut tab.dialog
+                    && state.id == id
+                {
+                    match result {
+                        Ok(v) => {
+                            state.result = Some(Ok(Data::Publication(v)));
+                            state.acknowledged = false;
+                        }
+                        Err(e) => tab.status = Some((e, true)),
+                    }
+                }
+            },
+        );
+    }
+    fn publish_group(&mut self, manager: publishing::Manager, retry: bool, ctx: &egui::Context) {
+        if self.busy_op.is_some() {
+            return;
+        }
+        if let Some(pause) = crate::network::refused() {
+            self.status = Some((pause.why().into(), true));
+            return;
+        }
+        let Some(Dialog::RepositoryTools(state)) = &self.dialog else {
+            return;
+        };
+        let id = state.id;
+        let control = self.follow_op(&super::ops(&[&["push"]]), false, ctx);
+        self.busy_op = Some("Publish group".into());
+        self.op_started = Some(std::time::Instant::now());
+        self.last_op = None;
+        self.timeline_op_started(false, super::Refresh::All);
+        let repo = self.path.clone();
+        let credentials = self.credentials.clone();
+        self.then_or(ctx, true, Err, move || publishing::publish(&guard::Runner { repo: &repo, control: &control, credentials: credentials.as_ref() }, manager, retry), move |tab, result, ctx| {
+            let outcome = result.as_ref().map_err(Clone::clone).and_then(|m| {
+                let failed = m.plan.as_ref().map_or(0, |p| p.destinations.iter().filter(|d| matches!(d.result, Some(Err(_)))).count());
+                if failed > 0 { Err(format!("Publication incomplete: {failed} destinations failed. Inspect per-destination results.")) } else { Ok("Every destination published the prepared commit".into()) }
+            });
+            tab.op_done("Publish group".into(), outcome, super::Refresh::All, super::OpKind::plain(), false, ctx);
+            if let Some(Dialog::RepositoryTools(state)) = &mut tab.dialog && state.id == id {
+                match result { Ok(m) => state.result = Some(Ok(Data::Publication(m))), Err(e) => tab.status = Some((e, true)) }
+            }
+        });
     }
 }

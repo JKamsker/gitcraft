@@ -666,6 +666,11 @@ impl RepoTab {
                 Action::SelectStaleBranches,
             ),
             (
+                "Publish to several hosts…".into(),
+                "publication group retry mirrors".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Publication(String::new())),
+            ),
+            (
                 "Remote URLs, refspecs and mirror policy…".into(),
                 "fetch push mapping prune".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Remote(String::new())),
