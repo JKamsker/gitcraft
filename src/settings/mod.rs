@@ -2,8 +2,8 @@
 
 mod layout;
 mod page;
-mod preview;
 mod portable_page;
+mod preview;
 mod profile_page;
 pub mod profiles;
 mod signing;
