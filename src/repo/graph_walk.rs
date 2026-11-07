@@ -294,6 +294,9 @@ impl RepoTab {
     pub(super) fn graph_walk_header(&mut self, ui: &mut egui::Ui) {
         let mut settings = crate::settings::Settings::get(ui.ctx());
         self.update_graph_narration(ui.ctx());
+        if !settings.graph_lane_walk {
+            return;
+        }
         ui.horizontal_wrapped(|ui| {
             if ui
                 .checkbox(&mut settings.graph_lane_walk, "Walk graph topology")

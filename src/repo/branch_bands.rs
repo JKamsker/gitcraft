@@ -173,6 +173,14 @@ impl RepoTab {
     pub(super) fn branch_bands_header(&mut self, ui: &mut egui::Ui) {
         let mut changed = false;
         ui.menu_button("Graph tools…", |ui| {
+            let mut settings = crate::settings::Settings::get(ui.ctx());
+            if ui
+                .checkbox(&mut settings.graph_lane_walk, "Walk graph topology")
+                .changed()
+            {
+                settings.set(ui.ctx());
+            }
+
             self.postcard_button(ui);
             if ui.button("Watch the repository grow…").clicked() {
                 self.open_growth();

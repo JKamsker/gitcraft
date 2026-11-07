@@ -16,6 +16,7 @@ pub(super) struct State {
     moved: HashMap<String, (String, usize)>,
     started: Option<Instant>,
     scroll: Option<(f32, f32, Instant)>,
+    follow_head: bool,
 }
 
 struct Snapshot {
@@ -102,11 +103,15 @@ impl RepoTab {
             .collect();
         self.graph_motion.started = Some(Instant::now());
         self.scroll_to = self.index.get(&self.refs.head).copied();
+        self.graph_motion.follow_head = self.scroll_to.is_some();
         ctx.request_repaint();
     }
 }
 
 impl State {
+    pub(super) fn take_head_scroll(&mut self) -> bool {
+        std::mem::take(&mut self.follow_head)
+    }
     pub(super) fn expire(&mut self) {
         if self.started.is_some_and(|t| t.elapsed() >= MARK) {
             self.incoming.clear();

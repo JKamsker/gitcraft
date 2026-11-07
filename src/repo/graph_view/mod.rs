@@ -213,16 +213,20 @@ impl RepoTab {
             _ => {}
         }
         if let Some(row) = self.scroll_to.take_if(|_| !ghost) {
+            let follow_head = self.graph_motion.take_head_scroll();
             let view_h = ui.available_height();
             let top = row as f32 * ROW_PITCH;
             // Only scroll if the row is outside the visible part.
             let offset = ui.data(|d| d.get_temp::<f32>(offset_id)).unwrap_or(0.0);
             if top < offset || top + ROW_PITCH > offset + view_h {
-                scroll = scroll.vertical_scroll_offset(self.graph_motion.start_scroll(
-                    offset,
-                    (top - view_h / 2.0).max(0.0),
-                    ui.ctx(),
-                ));
+                let target = (top - view_h / 2.0).max(0.0);
+                let offset = if follow_head {
+                    self.graph_motion.start_scroll(offset, target, ui.ctx())
+                } else {
+                    self.graph_motion.cancel_scroll();
+                    target
+                };
+                scroll = scroll.vertical_scroll_offset(offset);
             }
         }
 
