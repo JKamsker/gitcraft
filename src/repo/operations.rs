@@ -68,6 +68,7 @@ impl RepoTab {
         // A quiet one (the background fetch) never asks to sign in, and must not take the place
         // of the operation that did while its sign-in dialog is open.
         if !quiet {
+            self.invalidate_https_challenge();
             self.last_op = Some(PendingOp {
                 label: label.to_owned(),
                 ops: ops.clone(),
@@ -160,6 +161,7 @@ impl RepoTab {
                 .is_some_and(|c| c.scope.as_ref().is_some_and(|scope| scope.matches_url(url)))
         {
             self.credentials = None;
+            self.invalidate_https_challenge();
             if matches!(self.dialog, Some(Dialog::Credentials { .. })) {
                 self.dialog = None;
             }
@@ -180,17 +182,31 @@ impl RepoTab {
             return;
         }
         let path = self.path.clone();
-        let original = url.clone();
         self.forget_https_memory(&path, &url);
         crate::settings::network_page::rejected(ctx, path.clone(), url.clone());
-        self.then_or(ctx,true,Err,move || git::https_reject(&path,&url),move |tab,result,_|match result {
-            Ok(())=>{tab.status=Some(("Stored HTTPS sign-in rejected. Choose the correct account; profile-selected forge accounts can be changed in Settings → Profile.".into(),false));tab.dialog=Some(Dialog::credentials(&original,false));},
-            Err(e)=>tab.status=Some((format!("Could not forget the stored sign-in: {}",crate::diagnostics::crash::scrub(&e)),true)),
-        });
+        let ticket = self.https_ticket(url.clone());
+        self.then_or(
+            ctx,
+            true,
+            Err,
+            move || git::https_reject(&path, &url),
+            move |tab, result, _| tab.https_rejection_done(ticket, result),
+        );
     }
 
     /// Remembers the credentials and runs the operation that needed them again.
     pub(super) fn sign_in(&mut self, creds: git::Credentials, ctx: &egui::Context) {
+        let challenge = self.https_challenge.take();
+        if !challenge.as_ref().is_some_and(|ticket| {
+            self.https_ticket_current(ticket)
+                && creds
+                    .scope
+                    .as_ref()
+                    .is_some_and(|scope| scope.matches_url(&ticket.url))
+        }) {
+            self.status = Some(("The sign-in destination or account context changed. Run the operation again before signing in.".into(), true));
+            return;
+        }
         self.credentials = Some(creds);
         if let Some(busy) = &self.busy_op
             && let Some(op) = &self.last_op
@@ -292,7 +308,7 @@ impl RepoTab {
                     .unwrap_or_default();
                 // An undo or redo stays where it is in the timeline until signing in runs it
                 // again, so that cancelling the sign-in keeps it.
-                self.dialog = Some(Dialog::credentials(&url, refused));
+                self.offer_https_signin(url, refused);
             }
             Err(e) => {
                 self.note_reused(Some(e));

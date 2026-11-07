@@ -298,6 +298,7 @@ impl RepoTab {
             return;
         }
         self.connection_context = now;
+        self.invalidate_https_challenge();
         self.credentials = None;
         if matches!(self.dialog, Some(super::Dialog::Credentials { .. })) {
             self.dialog = None;
@@ -516,6 +517,9 @@ impl RepoTab {
         // Another project (origin pointed elsewhere): its pull requests are other ones, under
         // the same numbers, and a list asked of the old one is not to be taken in.
         let remotes_changed = loaded.remotes != self.remotes;
+        if remotes_changed {
+            self.invalidate_https_challenge();
+        }
         self.remotes = loaded.remotes;
         self.gerrit = loaded.gerrit;
         if loaded.hosting != self.hosting || remotes_changed {

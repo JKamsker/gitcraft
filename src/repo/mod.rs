@@ -57,6 +57,7 @@ mod guide;
 pub(crate) mod highlight;
 mod hooks;
 mod hotfix;
+mod https_recovery;
 mod interaction;
 mod issue_work;
 mod keep_submodules;
@@ -332,6 +333,8 @@ pub struct RepoTab {
     connection_context: crate::connections::Context,
     /// The last operation started, to run again after signing in.
     last_op: Option<PendingOp>,
+    https_generation: u64,
+    https_challenge: Option<https_recovery::Ticket>,
     /// A known git failure explained, with its fix (see [`crate::error_card`]).
     error_card: Option<crate::error_card::ErrorCard>,
     /// The forge has been asked for avatars.
@@ -627,6 +630,8 @@ impl RepoTab {
             credentials: None,
             connection_context: crate::connections::current(),
             last_op: None,
+            https_generation: 0,
+            https_challenge: None,
             error_card: None,
             avatars_hinted: false,
             diff_ignore_ws: false,
