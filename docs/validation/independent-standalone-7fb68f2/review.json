@@ -1,0 +1,49 @@
+{
+  "verdict": "FAIL",
+  "application_candidate": "7fb68f226a1056970d5f722751a1bd2f0b937cbf",
+  "application_tree": "6fb37833541172109ec37ac21089f02e7fb25f04",
+  "review_base": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+  "scope": "Independent ordinary software correctness/adversarial scoped review of standalone file tools, not entire inherited base/final combined source.",
+  "findings": [
+    {
+      "id": "STANDALONE-1",
+      "priority": "P2",
+      "title": "Guard the access metadata copied into the replacement against concurrent drift",
+      "file": "src/standalone/files.rs",
+      "lines": [
+        35,
+        51
+      ],
+      "trigger": "An ACL/xattr-only edit tightens MERGED after permissions::candidate copied access metadata but before move/install; bytes, identity, mtime, uid/gid and mode are unchanged.",
+      "behavior": "Snapshot guards do not retain ctime or bounded ACL/xattr metadata. Both the last guard at save.rs:156 and displaced comparison at182 accept the unchanged Stamp/bytes, and installed candidate matches its own earlier snapshot. Save can report success with stale copied ACL, undoing the concurrent policy tightening on the current result. Retaining old inode in recovery does not preserve the current result access policy.",
+      "evidence": "Owned Linux fixture changes named-user POSIX ACL read(4) to none(0) while mask/mode remains0640. All sampled guarded fields and source bytes remain equal; only ctime/ACL bytes change. Candidate retains old ACL. See acl-drift-reproducer.json. Application save outcome is inferred from immutable control flow; no injected app runtime/new compile claimed.",
+      "recommendation": "Capture a bounded access-metadata fingerprint/descriptor with the guarded source and revalidate it before move and on the displaced inode before install. Account for rename changing ctime rather than naively comparing ctime across rename. Add deterministic save_with BeforeMove/AfterMove ACL-only mutation regression proving refusal/current policy retention. Review equivalent Windows descriptor-only changes because deny-data-write sharing need not deny security changes."
+    }
+  ],
+  "validation": {
+    "source_binding": "All349app src/tests/Cargo/build/assets files equal immutable7fb; reviewer computed all26changed source hashes because author manifest lacks source hashes.",
+    "logs": "All5gate logs and test-names artifact hash match; author full839lib+3exe=842passed,3ignored,0filtered;all25new names actually pass.",
+    "independent_focused": "22module tests passed0failed820filtered(0.35s);3executable tests passed0failed(0.02s), using retained bound existing binaries.",
+    "fresh_compile": false,
+    "ci": "No use/dispatch/rerun/poll/wait"
+  },
+  "windows_protocol_static": {
+    "result": "PASS for command/literal-path protocol inspection; feature functionality/native access semantics remain unvalidated",
+    "assessment": [
+      "Constant UTF16LE encoded script is never interpolated with filenames; native filenames use environment values and LiteralPath/.NET APIs.",
+      "Absolute shipped Windows PowerShell path, NoProfile/NonInteractive, cleared module path/policy, explicitly imported shipped module and disabled autoload; no Invoke-Expression or generated code.",
+      "Bounded20s subprocess,1MiB descriptor check, named-stream/unsupported attribute refusal, exact target owner/group/access SDDL comparison; failures occur before MERGED displacement.",
+      "No native Windows PowerShell/ACL fixture invoked; runtime compatibility and security-descriptor-only concurrency remain for corrected source/native gates."
+    ]
+  },
+  "other_reviewed_paths": [
+    "Create-only hardlink publication, retained displaced inode/late writers, explicit temp lock, parent-directory identity and no-follow routing, alias/read-only/device refusal.",
+    "Native CLI exact arity/nonUTF8 dispatch before App/profile/repository; explicit diff/merge outcomes, unsaved cancellation and save-error codes.",
+    "Shared result/conflict editor and read-only renderer; actual UI save/close/error behavior; Settings explicit registration preview and opt-in defaults use bounded isolated commands."
+  ],
+  "limits": [
+    "No native Windows/macOS execution or real provider/account/global-config writes; all development fixtures owned temp/recording only.",
+    "Existing binary source/depfile/log/name/hash consistency was checked; no cryptographic retroactive compile proof or independent full-suite rerun claim.",
+    "FAIL candidate requires correction and new exact-source gate/re-review before integration."
+  ]
+}

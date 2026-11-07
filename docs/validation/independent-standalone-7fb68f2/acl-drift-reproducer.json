@@ -1,0 +1,35 @@
+{
+  "application_candidate": "7fb68f226a1056970d5f722751a1bd2f0b937cbf",
+  "scope": "Owned Linux filesystem primitive reproduction of ctime/ACL change with unchanged byte/id/mtime/mode/uid/gid/readonly guards. Creation time is not separately sampled by Python; an ACL update does not recreate the file. Static save control-flow inference only, not an application save/runtime claim. No custom compile/nativeWindows/globalconfig/network.",
+  "source_stamp_before": {
+    "len": 8,
+    "mtime_ns": 1794030042078743006,
+    "created": "Creation time not exposed by Python os.stat here; ACL update preserves the same allocated inode (creation time equality is source/OS semantics, not separately sampled)",
+    "readonly": false,
+    "dev": 27,
+    "ino": 1454434,
+    "mode": 33184,
+    "uid": 1000,
+    "gid": 1000
+  },
+  "source_stamp_after": {
+    "len": 8,
+    "mtime_ns": 1794030042078743006,
+    "created": "Creation time not exposed by Python os.stat here; ACL update preserves the same allocated inode (creation time equality is source/OS semantics, not separately sampled)",
+    "readonly": false,
+    "dev": 27,
+    "ino": 1454434,
+    "mode": 33184,
+    "uid": 1000,
+    "gid": 1000
+  },
+  "all_guarded_fields_equal": true,
+  "source_bytes_equal": true,
+  "source_ctime_changed": true,
+  "acl_before_hex": "0200000001000600ffffffff02000400e903000004000400ffffffff10000400ffffffff20000000ffffffff",
+  "acl_after_hex": "0200000001000600ffffffff02000000e903000004000400ffffffff10000400ffffffff20000000ffffffff",
+  "candidate_keeps_stale_read_permission": true,
+  "named_user_uid": 1001,
+  "acl_change": "Named user permission read(4) to none(0), unchanged POSIX mask/mode; source metadata tightening is absent from prepared replacement.",
+  "temp_fixture_deleted": true
+}
