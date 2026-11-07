@@ -1,0 +1,7 @@
+{
+  "source_commit": "eca6eca728d3e2296645946d9649befd4f6c9193",
+  "binary": "/workspace/work/push-preflight-cold-index-diagnostic-v2-bin",
+  "binary_sha256": "956a52f73c80e757772f60f9b38623fed848be9f8231ac6135e81e1ebbb5dcac",
+  "bounded_runner_sha256": "42b340340b9dd7d289f44f57bb51b8738c8a82b2984885a0254951f9b119024a",
+  "runtime": "NOT EXECUTED"
+}
