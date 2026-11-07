@@ -1,0 +1,73 @@
+{
+  "review": "Independent ordinary correctness acceptance of file comparison views",
+  "verdict": "PASS",
+  "candidate": "cdd45af340b433b125f29e2347705cf2335053c3",
+  "tree": "dc3255b5b76703f295591890242ce516895b451d",
+  "source_unchanged": true,
+  "application_base": "4fcb0dfe226f30785dd2758a2959ff4379daa8ed",
+  "containment_base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "features": [
+    "#40 File migration map",
+    "#50 Three-state staging lens",
+    "#50 File versions across branches"
+  ],
+  "scope": "Exact frozen new candidate; full static feature review plus independent frozen executable tests and fixture-only adversarial variants. No old-head blocked runtime action was retried.",
+  "findings": [],
+  "prior_findings": {
+    "COMPARISON-1": "FIX VERIFIED: missing root/nested governing indexed attributes fail explicitly; transport trace remains absent and missing object inventory unchanged. Static central no-lazy guard covers every comparison command.",
+    "COMPARISON-2": "FIX VERIFIED: deterministic after-apply effective attribute drift refuses transaction; additional reviewer variants exercise core.filemode, core.symlinks and core.autocrlf changes while index lock held and alternate index selected. Original fixture checks refusal, preserved real index and cleanup.",
+    "core.symlinks=false": "FIX VERIFIED: native Git add parity regression passes; independent UI stage and unstage fixture preserves120000 semantic index mode, physical regular checkout and exact bytes."
+  },
+  "independent_runtime": {
+    "binary": "/workspace/work/file-comparison-views/target/debug/deps/gitcraft-31822f5b138c0fe8",
+    "binary_sha256_unchanged": "88c9b178edc6ba36d66a1b4df926167331c614fb5632dff6156875034702eb47",
+    "build_binding": "Author fresh gitcraft compilation from frozen clean worktree verified in targeted/full logs. Reviewer reused read-only executable and does not claim an independent compile.",
+    "existing_tests": {
+      "passed": 29,
+      "failed": 0,
+      "ignored": 0,
+      "filtered_out": 789,
+      "selection": "All26 file_comparison tests plus hostile Practice app isolation, nested worker context restore, and pinned local/remote Git profile behavior."
+    },
+    "reviewer_fixture_variants": {
+      "passed": 4,
+      "failed": 0,
+      "selection": [
+        "Locked remote core.filemode drift",
+        "Locked remote core.symlinks drift",
+        "Locked remote core.autocrlf drift",
+        "UI stage and unstage with emulated symlink checkout"
+      ],
+      "source_mutations": false,
+      "transport": "Fixture-owned fake SSH shell only; no live remote or account actions."
+    },
+    "platform_blocks": false,
+    "live_transport_options": "GITCRAFT_TEST_SSH and GITCRAFT_TEST_WSL explicitly unset"
+  },
+  "author_gates_verified": {
+    "manifest_sha256": "99c1331d0ce478df0ae570b980da6ba8569cd20b628d0fb6e0b71630541b429d",
+    "all_log_hashes_and_sizes": true,
+    "all_manifest_test_names": true,
+    "fmt": "PASS",
+    "strict_clippy": "PASS",
+    "full_test_suite": {
+      "passed": 815,
+      "failed": 0,
+      "ignored": 3,
+      "filtered_out": 0,
+      "safety_skips": 0
+    },
+    "targeted": {
+      "passed": 26,
+      "failed": 0
+    }
+  },
+  "limitations": [
+    "Linux scope only. Actual Windows CI remains required for this feature and separate Windows portability candidate.",
+    "No independent whole-suite repeat; exact author whole-suite evidence verified and preserved.",
+    "No live SSH/WSL execution; fake encoded SSH exercises local shell transport path.",
+    "No final combined-source review or final PR approval is claimed."
+  ],
+  "evidence": "Sibling binding-before.json, independent-tests.json/log, configuration-drift-results.json and per-case logs/traces, symlink-ui.json/log/trace, frozen test list and preserved verified author logs/manifest.",
+  "notes_branch": "codex/review-portability-and-file-views"
+}

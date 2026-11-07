@@ -1,0 +1,109 @@
+{
+  "status": "AUTHOR_GATES_PASS_INDEPENDENT_REVIEW_PENDING",
+  "head": "cdd45af340b433b125f29e2347705cf2335053c3",
+  "tree": "dc3255b5b76703f295591890242ce516895b451d",
+  "reviewed_application_base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "initial_base": "992ec15ebc53c41639b6f704ca9bd89dfd8f2988",
+  "branch": "codex/file-comparison-views",
+  "worktree": "/workspace/work/file-comparison-views",
+  "working_tree_clean": true,
+  "remote_sha_verified": "cdd45af340b433b125f29e2347705cf2335053c3",
+  "acceptance": [
+    {
+      "issue": 40,
+      "feature": "File migration map",
+      "scope": "Staged, commit or pinned commit-range rename/copy ribbons, old/new folders, Git similarity percentage or unknown score, click opens pinned blob content edits separate from move metadata.",
+      "tests": [
+        "migration_reads_renames_copies_scores_and_immutable_blob_sides",
+        "actual_migration_ribbon_opens_content_edits_apart_from_the_rename",
+        "encoded_remote_readers_and_locked_staging_preserve_raw_files_and_existing_locks"
+      ]
+    },
+    {
+      "issue": 50,
+      "feature": "Three-state staging lens",
+      "scope": "Aligned raw HEAD/index/work versions and row/whole-boundary stage/unstage, exact working-edits-undo-staged markers; immutable HEAD/full-index/working snapshots checked before and under index lock; alternate index preserves working bytes, other entries and existing locks; request epochs reject old row actions. Covers unborn/add/delete/ITA/empty/mode/staged-rename/CRLF/no-LF/symlink and read-only binary/submodule/conversion handling.",
+      "tests": [
+        "three_way_alignment_marks_working_edits_undoing_staged_changes_and_preserves_lf",
+        "actual_lens_boundary_buttons_stage_and_unstage_the_displayed_snapshot",
+        "guarded_patch_keeps_working_bytes_and_other_index_entries_and_preserves_an_existing_lock",
+        "snapshot_checks_refuse_changed_head_index_flags_working_bytes_and_filters",
+        "closed_refreshed_or_reopened_views_cannot_apply_old_line_actions",
+        "intent_to_add_and_empty_file_creation_deletion_keep_commit_semantics",
+        "mode_only_boundaries_and_staged_rename_content_keep_paths_and_working_bytes",
+        "normal_practice_tab_operations_and_shells_are_isolated"
+      ]
+    },
+    {
+      "issue": 50,
+      "feature": "File versions across branches",
+      "scope": "Choose 2-8 fully-qualified branch refs plus folder; pinned commit/tree rows and columns; shared content OID markers distinct from modes and missing cells; select two cells opens pinned raw content diff without staging.",
+      "tests": [
+        "matrix_distinguishes_equal_blobs_missing_modes_and_pins_ambiguous_branch_refs",
+        "actual_matrix_cells_open_a_read_only_content_diff_from_pinned_branches",
+        "raw_non_utf8_paths_stay_distinct_and_literal_folders_do_not_expand_globs",
+        "blobless_matrix_does_not_fetch_and_missing_blob_comparisons_fail_explicitly"
+      ]
+    }
+  ],
+  "lifetime_and_routing": "All reads/background work use captured connection contexts; raw repository commands preserve Practice-first routing even a hostile profile has configuration errors. Opening views drops DiffView and all transformed reading state; profile connection changes drop comparison state. Plaintext/decrypted objects are never an input to these models or staging actions. No unreviewed SOPS branch dependency.",
+  "checks": {
+    "fmt": "PASS cargo fmt --all -- --check",
+    "clippy": "PASS cargo clippy --locked --all-targets -j2 -- -D warnings",
+    "tests": "PASS env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo test --locked -j2 (no safety skip)",
+    "result": {
+      "passed": 815,
+      "failed": 0,
+      "ignored": 3,
+      "safety_excluded": 0,
+      "new_feature_tests_passed": 26,
+      "existing_hostile_practice_app_test_extended_and_passed": true
+    },
+    "private_target": "/workspace/work/file-comparison-views/target",
+    "CARGO_INCREMENTAL": "0",
+    "real_difftastic_path": "/workspace/work/difft-bin",
+    "actual_compile_worktree_in_log": true,
+    "targeted": "PASS cargo test --locked -j2 file_comparison:: (26passed)"
+  },
+  "limits": [
+    "Git with --no-lazy-fetch support required; no implicit downloads; missing objects fail explicitly.",
+    "2 MiB/version; 20,000 text lines/version; 2,000 matrix paths or changed migration records; 2-8 branches; 8 MiB command metadata and 64 KiB stderr cap; per-command 20s deadline.",
+    "Git similarity threshold50%, exhaustive rename/copy candidate limit2000; unmatched changes and Git warnings explicit. Working reorganizations must be staged first.",
+    "Binary/non-UTF8 contents, submodules, unsafe working paths and filter/text/EOL/encoding conversions are read-only in lens; use normal patch/Git staging for conversion semantics. Raw non-UTF8 Git paths remain distinct in read-only migration/matrix.",
+    "Staged rename lens compares content using prior HEAD name; content-only unstaging preserves move.",
+    "Linux shell/coreutils required on SSH/WSL; fake-SSH fixture exercises real encoded transport locally. No live remote/credentials/network writes used for validation. Remote cancellation stops waiting; underlying bounded session may finish until its20s deadline.",
+    "Lines visually abbreviated after2000 characters; actions apply complete selected raw lines. Binary pair byte preview limited512 bytes and labelled.",
+    "Windows hostile-name fixture is native-valid; native Windows runtime validation pending CI and separate baseline portability fixes.",
+    "Independent follow-up adversarial review is pending; author gates do not establish review acceptance."
+  ],
+  "logs": {
+    "fmt": {
+      "path": "/workspace/work/file-comparison-fix-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "clippy": {
+      "path": "/workspace/work/file-comparison-fix-clippy.log",
+      "sha256": "fc4c8e5e15db3ff2fd337c06012372506af2992d6b5d6a861ec00a54a54b6404",
+      "bytes": 142
+    },
+    "targeted": {
+      "path": "/workspace/work/file-comparison-fix-targeted.log",
+      "sha256": "55027bbc067c3ac6e138b164ca39f1316e10b92c0779f2a37e512850338b154f",
+      "bytes": 3463
+    },
+    "test": {
+      "path": "/workspace/work/file-comparison-fix-test.log",
+      "sha256": "76ec791d72223596927ef126393998607f4f845dae3f0db4eb34a456946eb7e1",
+      "bytes": 66973
+    }
+  },
+  "publication": "Feature branch pushed by explicit user checkpoint policy; no PR created.",
+  "fixes_since_initial_failed_review": {
+    "initial_report": "/workspace/work/review-file-comparison-146a2e3.json",
+    "missing_attributes": "Every comparison Git invocation including config/index/raw transaction uses --no-lazy-fetch. Every ancestor working .gitattributes and possible indexed fallback must be safely readable; missing promised attributes cause explicit error because check-attr alone silently returns unspecified. Regression checks root/nested cases, no transport trace and unchanged missing object set.",
+    "remote_snapshot_drift": "Locked remote apply compares the same check-attr/autocrlf stamp and core.filemode/core.symlinks as local verification, before and after applying the alternate index. Deterministic fixture changes attributes during Git apply and verifies real index remains unchanged.",
+    "emulated_symlinks": "core.symlinks=false regular checkout of indexed120000 retains effective symlink mode while keeping original physical bytes/type snapshot separate. All-platform fixture compares stage result with normal git add and rejects setting drift.",
+    "unsafe_parent_fixture": "New attribute preflight rejects unsafe parent symlinks earlier; existing fixture now verifies explicit refusal and owned outside sentinel preservation."
+  }
+}

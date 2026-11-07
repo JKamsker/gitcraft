@@ -1,0 +1,64 @@
+{
+  "review": "Independent SOPS ordinary correctness and end-to-end opt-in review",
+  "verdict": "FAIL",
+  "candidate": "a30f1f178099f5a38f4ae470434972ddbd2e1973",
+  "candidate_tree": "21559f661541569000c1c7b8ad91fe7c8ea2072c",
+  "base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "scope": "All 28 changed files and surrounding view, lifecycle, profile, staging, bounded-process and Git reader paths. Ordinary correctness only; no security scan or old-head probe.",
+  "findings": [
+    {
+      "id": "SOPS-CORRECTNESS-1",
+      "priority": "P2",
+      "title": "Binary-envelope heuristic rejects valid structured JSON and decodes binary .json files with the wrong store",
+      "paths": ["src/repo/diff/encrypted/model.rs:61", "src/repo/diff/encrypted/tool.rs:12", "src/repo/diff/encrypted/mod.rs:175"],
+      "static_trace": "inspect treats every parseable JSON envelope containing only data+sops as Binary when its path does not end .json, and always Json when it does end .json. compare passes this guessed format to tool::decrypt, whose input and output store types both use that format. No opt-in format selector or ambiguity fallback exists.",
+      "confirmed_cases": [
+        "A legitimate SOPS structured JSON document with plaintext {data:42}, stored at an extensionless encrypted-config path (or .yaml), has exactly data+sops keys. Source routes it to Binary; official SOPS3.10.0's binary decoder exits 4, whereas its JSON decoder successfully returns the original structured JSON. Show decrypted therefore fails despite valid data and keys.",
+        "A SOPS binary envelope containing dummy fixture NUL bytes, stored as fixture.enc.json, is routed to Json. Official SOPS3.10.0 successfully returns a JSON object with the binary value escaped as a string, rather than the binary bytes. The production NUL refusal no longer sees a NUL, and the displayed comparison represents the wrong decoded format. The same issue changes UTF-8 binary-file presentation."
+      ],
+      "evidence": "review-evidence/sops_format_check.py is an independently preserved env-cleared, private HOME/XDG, generated-age-key fixture. It directly checks official fixed input/output-store behavior; production recognition dispatch is established statically at the cited lines. No independent application compilation or newly compiled production reproduction is claimed.",
+      "required_fix": "Handle JSON/binary store ambiguity explicitly instead of silently using extension plus object-key count as an authoritative format. Preserve correct structured JSON for a single data field and preserve actual binary output validation for binary envelopes, including .json names. An explicit per-view format choice or safe ambiguity refusal with a useful choice is acceptable.",
+      "required_regressions": [
+        "Real generated-age structured JSON {data:42} at extensionless/.yaml paths compares successfully as JSON.",
+        "Real generated-age binary UTF-8 envelope named .json displays actual text through Binary mode.",
+        "Real generated-age binary NUL/non-UTF8 envelope named .json is refused by binary-output validation.",
+        "A rename across extensions preserves or explicitly resolves chosen formats for both exact compared versions."
+      ]
+    }
+  ],
+  "verified_author_evidence": {
+    "source_hashes": "28 of 28 match supplied manifest",
+    "log_hashes": "7 of 7 match supplied manifest",
+    "private_compile_worktree": "/workspace/work/encrypted-diffs",
+    "full_tests": "810 passed, 0 failed, 3 ignored, 0 filtered; 813 registered",
+    "fmt": "PASS supplied checked log",
+    "strict_clippy": "PASS supplied checked log",
+    "inert_tests": "11 passed supplied checked log"
+  },
+  "independent_checks": {
+    "compile": "NONE; frozen author binary reused read-only",
+    "binary_sha256_before_and_after": "249eacee81cb9ac5649aad784e7c0b5e64f54897d681e23cd0c35bd4ced6b423",
+    "registered_tests": 813,
+    "selected_result": "20 passed, 0 failed, 0 ignored, 793 filtered; real official SOPS3.10.0 and age-keygen1.2.1 fixture executed with generated offline keys",
+    "list_log_sha256": "70a642d38a513e007777852db5e73b8eb0e2cc55f1c2f67ebb87f753eb9ac77f",
+    "targeted_log_sha256": "5be94fc437b87203a69d2a0ae25decdc66ba1c6b056cad70ee30faa40ee83024",
+    "format_edge_fixture_result_sha256": "d83cdb3c0c719b3a98a283836e6ca37143f3dd62fb43c6cb9147367c121dc841"
+  },
+  "accepted_observations": [
+    "Decryption requires explicit UI action; ordinary recognition reads ciphertext and invokes no SOPS.",
+    "The production tool boundary accepts only fixed format values and ciphertext; SOPS always runs on the UI machine from a neutral directory, including SSH/WSL repository sources.",
+    "Private worker/result channels belong to the view and do not enter shared Msg/DiffData/settings/activity. Current tests cover close/drop/request changes, late results, input revalidation and initiating profile context.",
+    "Inactive tabs discard decrypted state; profile switching drops/reconstructs tabs; refresh, mode changes and operation starts discard it. Existing raw Git ciphertext transport remains Practice aware.",
+    "Decrypted display disables normal selection/copy/comment/staging paths; queued partial writes also reject an enabled private view. Git patch requests add --no-textconv.",
+    "Raw tool stderr/errors are suppressed, capped and generalized; stdout is capped and validated for UTF-8/NUL/line limits. Tests cover cancellation of owned local children and output limits.",
+    "Private galley layout bypasses egui shared GalleyCache; independently executed test confirms unchanged cache count.",
+    "No new production remote runner, PID selector, signal controller or process-control architecture is introduced. Existing approved bounded-process production code is unchanged by this feature."
+  ],
+  "limits": [
+    "No fresh independent Cargo compile; read-only author binary binding relies on supplied checked source/compile records.",
+    "No live SSH/WSL, Windows, external account, user keys, or credential environment used.",
+    "The format edge fixture uses official CLI stores directly; the app's private recognizer dispatch was inspected statically.",
+    "This scoped review does not replace exact final combined tests and independent whole-combination review."
+  ],
+  "release_decision": "Fix SOPS-CORRECTNESS-1 and re-review the immutable pushed candidate before feature acceptance. No merge/PR approval."
+}

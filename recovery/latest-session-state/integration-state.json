@@ -2,12 +2,12 @@
   "branch": "codex/remaining-features",
   "worktree": "/workspace/work/integration",
   "base": "74027116e8f20334716a6b1208717bb33c9c6280",
-  "head": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "head": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
   "remote": "origin",
-  "remote_head": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "remote_head": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
   "pushed": true,
   "remote_branch_url": "https://github.com/JKamsker/gitcraft/tree/codex/remaining-features",
-  "status": "Accepted process-test containment and exact user authorship policy committed/pushed; source byte-identical to independently approved aab2a25. Full Linux789pass3ignored0filtered bound; Windows11known failures remain pending separate fix, final whole-candidate review pending.",
+  "status": "15 eligible features integrated. Linux combined fmt/strictClippy/full817passed3ignored0filtered PASS, all820 expected test names match union. Windows CI run42335827283 in progress; final all-scope source/review/history assembly pending.",
   "merged_features": [
     {
       "feature": "gerrit",
@@ -96,6 +96,19 @@
       "strategy": "merge --no-ff",
       "individual_review": "PASS",
       "review_report": "/workspace/work/review-profile-connections-0854fa1.json"
+    },
+    {
+      "feature": "file_comparison_views",
+      "named_features": [
+        "#40 File migration map",
+        "#50 Three-state staging lens",
+        "#50 File versions across branches"
+      ],
+      "reviewed_sha": "cdd45af340b433b125f29e2347705cf2335053c3",
+      "integration_merge_sha": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+      "strategy": "merge --no-ff",
+      "individual_review": "PASS",
+      "review_report": "/workspace/work/review-portability-and-file-views/docs/reviews/file-comparison-cdd45af/review-final.json"
     }
   ],
   "merge_conflicts": [
@@ -273,30 +286,34 @@
       "src/app/practice/isolation.rs: crossfeatureactualAppregression",
       "src/bounded_process.rs: canonical shared input/cap API and independent cap regression",
       "src/git/bundles.rs: Practice-context ref-syntax validation",
-      "src/git/command/bounded.rs: propagate fallible shared builder"
+      "src/git/command/bounded.rs: propagate fallible shared builder",
+      "src/git/bundles.rs and tests: independently static-reviewed Windows native argument conversion/config+fixtures",
+      "src/connections/tests.rs, src/git/activity/tests.rs, src/repo/diff/structural/tests.rs: Windows-valid fixtures retain Unix edge cases",
+      "src/git/command.rs and src/app/practice/isolation.rs: reviewed file raw readers and hostile selected-profile actual App staging extension"
     ],
     "keyboard_and_history_unshared_unique_files_byte_identical_to_reviewed_heads": true,
     "all_eleven_reviewed_commits_ancestors_of_head": true,
     "profile_unshared_unique_files_byte_identical_to_reviewed_head": 13
   },
   "combined_checks": {
-    "private_target": "/workspace/work/process-test-containment/target",
+    "private_target": "/workspace/work/integration/target",
     "dependency_seed": "cp -al /workspace/gitcraft/target; removed private copied cargo/rustc locks then cargo clean -p gitcraft before build. Gitcraft compiler explicitly reports /workspace/work/integration. No shared-target test result used.",
-    "jobs": "per preserved containment log",
+    "jobs": 2,
     "difft": "Real0.72.0 via /workspace/work/difft-bin onPATH",
     "fmt": "PASS cargo fmt --check",
     "clippy": "PASS cargo clippy --locked --all-targets -- -D warnings",
     "tests": {
-      "result": "PASS full cargo test --locked, no safety skip; source-identical binding to accepted aab2a25",
-      "total": 792,
-      "passed": 789,
+      "result": "PASS cargo test --locked, no safety exclusions",
+      "total": 820,
+      "passed": 817,
       "failed": 0,
       "ignored": 3,
       "every_expected_test_name_present": true,
       "unexpected_test_names": [],
-      "filtered_out": 0
+      "filtered_out": 0,
+      "expected_name_union_matches": true
     },
-    "expected_tests_manifest": "/workspace/work/integration-4fcb0df-expected-tests.json",
+    "expected_tests_manifest": "/workspace/work/integration-c56d050-gates.json",
     "feature_new_tests": {
       "gerrit": 8,
       "clone": 8,
@@ -308,7 +325,9 @@
       "bundles": 16,
       "keyboard_staging": 8,
       "history_activity": 25,
-      "profile_connections": 28
+      "profile_connections": 28,
+      "file_comparison_views": 26,
+      "windows_portability": 2
     },
     "feature_net_test_increase": {
       "gerrit": 8,
@@ -321,31 +340,38 @@
       "bundles": 16,
       "keyboard_staging": 8,
       "history_activity": 25,
-      "profile_connections": 28
+      "profile_connections": 28,
+      "file_comparison_views": 26,
+      "windows_portability": 2
     },
     "contrast_replaced_baseline_test": [
       "theme::catalog::tests::every_theme_keeps_its_text_readable"
     ],
     "logs": {
-      "exact": {
-        "status": "PASS",
-        "path": "/workspace/work/process-test-containment-exact.log",
-        "sha256": "388822d3e573397fcd933a8878e89d668da725a06d9ce77a87cd62fc366bbbb7"
+      "clean": {
+        "path": "/workspace/work/integration-c56d050-clean.log",
+        "sha256": "daacd4485215947245c728c8ccf97ae2867aa58384531ac5dd5477f2d97c09eb",
+        "bytes": 38
       },
       "fmt": {
-        "status": "PASS",
-        "path": "/workspace/work/process-test-containment-fmt.log",
-        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        "path": "/workspace/work/integration-c56d050-fmt.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
       },
       "clippy": {
-        "status": "PASS",
-        "path": "/workspace/work/process-test-containment-clippy.log",
-        "sha256": "28e57c25a28ebed31cd607e9a11e041dcf8b8b4bfbdebb7051b675b4a629b176"
+        "path": "/workspace/work/integration-c56d050-clippy.log",
+        "sha256": "844f51cb66314531481ea536096be88477fa449d2043640bfac63894318bc90e",
+        "bytes": 132
       },
       "test": {
-        "status": "PASS",
-        "path": "/workspace/work/process-test-containment-test.log",
-        "sha256": "6ad286952f1158bc6630d464f1e4698aae34a926c5f674c431c82323975d1f31"
+        "path": "/workspace/work/integration-c56d050-test.log",
+        "sha256": "0b27a40962e8b753823b8594b72fd204324e2ae2449b971e0edc6f329e39dfb7",
+        "bytes": 67177
+      },
+      "test-list": {
+        "path": "/workspace/work/integration-c56d050-test-list.log",
+        "sha256": "a535433494ac107e96e80dbacfdb25a4668842230683b4569bf5c8ab9dbe5c3a",
+        "bytes": 61791
       }
     },
     "integration_cross_feature_regressions": {
@@ -381,13 +407,17 @@
       "bounded_process::tests::configured_stream_caps_are_independent_and_keep_boundary_bytes"
     ],
     "prior_gates_state": "/workspace/work/integration-state-4fcb0df.json",
-    "source_commit": "aab2a257b8598f6718431b40cd1058d9a273bd2c",
-    "test_list": "/workspace/work/process-test-containment-test-list.log",
-    "test_list_sha256": "c0b1b1c4b59a484ee0c4923320ade3521444a1059e8746383344ac6649f7958d",
+    "source_commit": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+    "test_list": "/workspace/work/integration-c56d050-test-list.log",
+    "test_list_sha256": "a535433494ac107e96e80dbacfdb25a4668842230683b4569bf5c8ab9dbe5c3a",
     "independent_supporting_unit_review": "/workspace/work/review-process-test-containment-aab2a25-final.json"
   },
   "not_merged": [
-    "Parent-coordinated additional features (push preflight, encrypted diffs, commit drafts and other remaining batches) awaiting independent PASS and integration."
+    "Drafts application51ea049 failed independent lifecycle review; corrective reader ownership unit in progress",
+    "SOPS a30f1f1 failed independent ambiguous-format review; explicit-format fix0fc6c54 awaits gates/re-review",
+    "Tour/Portability bb606027 targeted UI6/6 plus prior5Tour+8restore pass; strict/full gates pending",
+    "Push Preflight protocol43c1691 static FAIL3ownership/capability blockers; local correction and remote owned completion follow-up pending",
+    "Content recovery8f992 backend WIP; standalone file tools and SSH helper assigned; other eligible queued ideas remain in scope"
   ],
   "publication": {
     "giant_pr_created": false,
@@ -396,7 +426,7 @@
     "instructions": "Continue accumulating passed exact feature commits on this sole-writer branch; no per-feature PRs.",
     "final_branch_history": "Rebuild from dev with one correctly authored commit per feature, preserving existing source/recovery branches. Rebuilt exact candidate must pass tests and independent adversarial review before ONE PR."
   },
-  "previous_head": "82189c4fcdb2d77fbb2746cb25d6390072266e9e",
+  "previous_head": "ff901aad4346ee409509b60f9c6e7b12689fde44",
   "previous_round_state": "/workspace/work/integration-state-4fcb0df.json",
   "next_batch_cross_feature_requirements": [
     "Preserve practice context recognition and sandbox routing before active-profile/global application, including credential helpers, raw reads, piped history and terminals.",
@@ -405,20 +435,18 @@
     "Keepnewboundedbinarybundlelocalroute onsharedrepository_command; extendedPractice hostileApp test mustcontinuepassing afterprofile/account/workerscope merges.",
     "Preserve fallible repository_command and Practice-first error/SSH/credential bypass; rerun combined hostile selected-connection App fixture after further transport/account changes."
   ],
-  "tree": "23b5b565ba302633e102a26e7b3c82461cf19110",
-  "source_diff_sha256": "3bc9728151743b1a6edfce8567bab7e02f533e202258c30f919d0a2e46d33be9",
+  "tree": "90ea31abb1d07cf00a60a2b65f7e5faff8115913",
+  "source_diff_sha256": "1b8addb7da00d8035dd4b688ad0a12161853c8e91b95eafd20ba561d8688d1fe",
   "held_keyboard_candidate_evidence": "/workspace/work/integration-candidate-04b737d.json",
   "application_validation_binding": {
-    "application_commit": "aab2a257b8598f6718431b40cd1058d9a273bd2c",
-    "source_tree": "bc4991c718edb0f6572895f037bf83d0003b826b",
-    "manifest": "/workspace/work/process-test-containment-aab2a25.json",
-    "independent_review": "/workspace/work/review-process-test-containment-aab2a25-final.json",
-    "changed_files_since_gates": [
-      "AGENTS.md"
-    ],
-    "application_files_byte_identical": true,
-    "cargo_tests_repeated": false,
-    "new_test_claim": false
+    "application_commit": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+    "source_tree": "6e11e2e9c07b57d55590e28c0ac37aa71b12a2c0",
+    "manifest": "/workspace/work/integration-c56d050-gates.json",
+    "fresh_private_package_clean": true,
+    "actual_compile_worktree": "/workspace/work/integration",
+    "cargo_tests_repeated": true,
+    "new_test_claim": true,
+    "scope": "Exact combined Linux gates, not final whole-scope review or native Windows result"
   },
   "workflow_validation": {
     "commit": "da0143c4f7574ab4ab9ec3607f927c89968c1a1f",
@@ -430,16 +458,19 @@
     "push": "SUCCESS, remote SHA verified before recovery",
     "actions_result": "Verified GitHub plugin jobs/logs: da0143c run42329842602 and82189c4 run42332992572 both Linux+lintPASS, WindowsFAIL same11 cases (724pass3ignored). Separate Windows correction queued; final PR blocked until full platform gates pass.",
     "recovered_status": "/workspace/work/ci-recovered-status.json",
-    "latest_candidate": "ff901aad4346ee409509b60f9c6e7b12689fde44",
-    "latest_candidate_actions_result": "Pending; previous82189 Windows11 failures known. No full platform green claim."
+    "latest_candidate": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+    "latest_candidate_actions_result": "GitHub plugin verified Ubuntu+lintSUCCESS, WindowsIN_PROGRESS; forges manual job skipped. Previous11 Windows failures are not yet claimed fixed by native execution.",
+    "latest_candidate_run": 42335827283,
+    "latest_candidate_windows_job": 128292411286
   },
   "unit_preservation": {
-    "commit": "ff901aad4346ee409509b60f9c6e7b12689fde44",
-    "status": "Pushed; exact remote and author verified; GitHub associates author+committer with JKamsker",
+    "commit": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+    "status": "Both integration merge units committed/pushed and exact remote+author verified before gates",
     "author_reference": "028242cd4bc3c82ced848ea0fa73639981cd71d7",
     "author_name": "Jonas Kamsker",
     "author_email": "11245306+JKamsker@users.noreply.github.com",
-    "other_agent_worktrees_modified": false
+    "combined_gate_manifest": "/workspace/work/integration-c56d050-gates.json",
+    "giant_pr_created": false
   },
   "supporting_units": [
     {
@@ -452,6 +483,13 @@
         "ignored": 3,
         "filtered_out": 0
       }
+    },
+    {
+      "feature": "Windows bundle path handling and portable fixtures",
+      "reviewed_sha": "babdceee232928bfbc84f98ca032dd8b4bec096e",
+      "merge_sha": "383cb362abcae813b906fa08bf524aa89b37c719",
+      "review": "STATIC PASS; full Linux gates PASS; native Windows CI pending",
+      "review_report": "/workspace/work/review-portability-and-file-views/docs/reviews/windows-portability-babdcee-static.json"
     }
   ]
 }

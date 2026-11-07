@@ -1,0 +1,83 @@
+{
+  "feature": "Issue #40 named bullet: Encrypted files (SOPS)",
+  "status": "LOCAL GATES PASS; INDEPENDENT FEATURE REVIEW PENDING",
+  "head": "a30f1f178099f5a38f4ae470434972ddbd2e1973",
+  "remote_sha": "a30f1f178099f5a38f4ae470434972ddbd2e1973",
+  "branch": "codex/encrypted-diffs",
+  "worktree": "/workspace/work/encrypted-diffs",
+  "accepted_green_base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "merge_checkpoint": "2317d8acc1bf92eae3a78a97bc780131cebfaa5d",
+  "real_fixture_checkpoint": "c9c277e5d76624d7b99eccf9b6662dad7f7a4c92",
+  "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "source_sha256": {
+    "Cargo.lock": "cfb90bef781e5f955e35a8fb46542e50c66792ee6187f841ba1cd9937c12c407",
+    "Cargo.toml": "dc6249af3b2c11a920205442fffb30154cab5a96ce1535e3128296db7cd3f610",
+    "README.md": "75b7419ccc6ffda4c40b57b9776a2fd9cb2c9a386e09154579f81cc2c66e16d4",
+    "src/app/mod.rs": "fd73f9af8e8f91a2225046c2593978628153ed5c678c8b5d980a2d7aed493a88",
+    "src/bounded_process.rs": "1772e6941e03719b89784ec2faffa5a280b1398edeb35c4777b724245b294ab8",
+    "src/git/diff.rs": "5d357a138533f7a517be06facc5bfc981a19b3be6b27f5d173e939abb142b2ee",
+    "src/manual.rs": "b3f98c1ac02d93e0323c2867a064ad4c5385c1e2e89fe09e791dd130aaba3b47",
+    "src/repo/actions.rs": "04cfbb516ae2fb60f44f191df3729feded545737d1dce76a7e702156ce0ac1a0",
+    "src/repo/apply.rs": "02dbfd3ee7f0045ef9e46293265f49a229dfbd7d069eef211a90cf90afe2082a",
+    "src/repo/diff/encrypted/SAFETY.md": "3bea3eca0ec403f45af7e1889ed65a434bc97d68343e5ce95b79eaa6e7843e8e",
+    "src/repo/diff/encrypted/mod.rs": "f65043542e59b613915e71724e9b2e10b5f6c4c49659302ccbebe3fd7b7035b2",
+    "src/repo/diff/encrypted/model.rs": "52921428d5e9573286bc1099e07ffb98b657d690b805ec28c270201dee9f22b6",
+    "src/repo/diff/encrypted/tests.rs": "f61a7f13beb745a53e3dc42ee8991a1c5f4046d7874dd17d9f2684373cbbdf4f",
+    "src/repo/diff/encrypted/tool.rs": "4b933c64e6d9f1a8634fdecda84e3597f0f28a10d15b9ad92a0ffdb5a9cccf2e",
+    "src/repo/diff/encrypted/view.rs": "ed7e9f96fd619aa3c9ef7fe47e6530f28ddaf383f8eca20e6dec42fe04056793",
+    "src/repo/diff/mod.rs": "f6f5ae9d72bdfa607661f1da56e95542116ce4e7de64fccd4854656e34dcb7cc",
+    "src/repo/diff/structural/mod.rs": "839725e9fcb85bf1dcb21843dae6fee622fbe974d71edc68666f4ac4a2b306c8",
+    "src/repo/diff/structural/reader.rs": "43546ab756283838df94715da5eeae97628a5fc638482b2307b0877559b63872",
+    "src/repo/diff/view.rs": "c45747cdae3a4fcdae7b204ef3504b84c7214aa113dc7e40d6cdb25bb71237fb",
+    "src/repo/keyboard.rs": "2834a7f5d4112cf5297e7929734e7c7d95ad031b4a91d513058622b3e604f507",
+    "src/repo/layout.rs": "9d8678738da8d506fb85bb466158ef62ff40ea7f41ac10a28b95c18779b7d822",
+    "src/repo/load.rs": "961f2bcac14af9ddb9acb10c420fc7fbab799f0bb142c3d6f4b76ee8e055724b",
+    "src/repo/messages.rs": "d74997aa187feba8dfdf8aa031eccc8b412007cf3b737ca4ab70141fdc680e8e",
+    "src/repo/navigate.rs": "b14f59ff1278cc6fda515a85f70b2ef7f5253a477f8a6853de507a85668aa887",
+    "src/repo/operations.rs": "e05fbaf132765c7eeb782719cc226ad58bbbeb50c5cc2d7ac754a20eeefda6eb",
+    "src/repo/state.rs": "df1a41b779ac2ac4c2dda6b9e87d8abd4a7a7288839d70c11309b4eeabf26a8e",
+    "tools/sops_safety.py": "34b165f05f6f06c5795f2dde7adc736934342000c7ba1228b59b75158cbc70b2",
+    "tools/test_sops_safety.py": "6078884481bff02adf3d6dbc6743e1cd2d19c74268bdbfb347093e9e3f5b12ae"
+  },
+  "logs_sha256": {
+    "/workspace/work/encrypted-diffs-clean.log": "605a283b804edc04ff42a36761d67efb69af8e82354563780614cb8f6f72f245",
+    "/workspace/work/encrypted-diffs-local-targeted.log": "a74b57b69c77405c06b1d243dafbdd10927ae8673145388b69e6bdee30e8e6e7",
+    "/workspace/work/encrypted-diffs-static-final.log": "f1d91f472fe5d1d0807759a51a9a8f02ecbc26a1e896c689036feafb5beb438d",
+    "/workspace/work/encrypted-diffs-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/workspace/work/encrypted-diffs-clippy.log": "234ace0d23fba913fbd208601f8805b5091cca1733fcb3cd9a48eeeb9fbf1074",
+    "/workspace/work/encrypted-diffs-test.log": "2a8410bbfb84cbc104d80033c4c36f025c74e4f8e548838d746eb099c5c808f2",
+    "/workspace/work/encrypted-diffs-test-list.log": "85f610c2b9c85727ed110129cd1453ad3282f23dba7573602e28fc104dcdabec"
+  },
+  "gates": {
+    "targeted_sops": "20 passed, 0 failed; actual SOPS generated-age fixture ran",
+    "inert_static": "11 passed, including216 synthetic parent graphs, recording only",
+    "fmt": "cargo fmt --all -- --check PASS",
+    "clippy": "cargo clippy --locked --all-targets -- -D warnings PASS",
+    "full": "cargo test --locked -- --nocapture:810 passed,3 ignored,0 filtered; no safety skip; actual SOPS fixture ran",
+    "test_list": "813 library tests,0 main tests,0 doc tests"
+  },
+  "environment": {
+    "target_dir": "/workspace/work/encrypted-diffs/target",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "optional_SSH_WSL": "unset",
+    "real_SOPS": "/workspace/work/sops-fixture-tools/sops v3.10.0 official checksum verified",
+    "real_age_keygen": "/workspace/work/sops-fixture-tools/age-keygen v1.2.1 official release",
+    "fixtures": "isolated HOME/XDG, env_clear, new generated age keys and dummy plaintext only; no user keys/credentials or actual SSH/WSL",
+    "cache": "inactive completed containment target hardlinked; private lock/rustc info unlinked; private cargo clean -p gitcraft before source compile"
+  },
+  "safety": {
+    "independent_static_pass": "/workspace/work/review-sops-static-ee6e848.json",
+    "contained_baseline_pass": "/workspace/work/review-process-test-containment-aab2a25-final.json",
+    "transport": "Only ciphertext uses existing Practice-aware Git; SOPS is local UI-machine command with captured Profile background context",
+    "plaintext": "local bounded pipes and view-owned private result only; no plaintext files/settings/activity/logs/shared caches",
+    "production_process_control": "No new remote/session APIs, host process-table selectors or signal logic; reviewed bounded_process production unchanged"
+  },
+  "limits": [
+    "Local SOPS3.10+ and local keys required even for SSH/WSL repositories.",
+    "UTF-8 only,2MiB per side,20k lines,8192chars per line; YAML anchors/aliases unsupported;20-second decrypt deadline.",
+    "Linux default suite and real offline age validated; optional live SSH/WSL/Windows not run.",
+    "Full independent feature adversarial review and final combined PR gates remain required."
+  ],
+  "created_utc": "2026-11-07T03:47:30.566113+00:00"
+}

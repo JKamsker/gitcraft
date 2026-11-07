@@ -65,7 +65,7 @@
           "Open #57 handles rejected pushes and leases; #96 DCO is distinct; #106 LFS tools and #52/#134 autosquash helpers could be reused after merge."
         ]
       },
-      "status": "fixing_confirmed_adversarial_findings",
+      "status": "fixing_static_protocol_review_blockers",
       "agent": "review_weather",
       "branch": "codex/push-preflight",
       "worktree": "/workspace/work/push-preflight",
@@ -74,7 +74,9 @@
       "reviewer": "baseline_validation",
       "validation": "private fmt/clippy/test PASS711+3ignored714total23feature+2duplicateprocess tests",
       "review_result": "FAIL on3ef21ab; actualApp deletion/tag flows blocked, LFS upload before hook veto",
-      "latest_preserved_head": "80d19da3b26fbdfe13ba22204b68d4055ee82c26"
+      "latest_preserved_head": "43c169159af81b3e85c13b8e6a19e1d040ddc4d3",
+      "review_report": "/workspace/work/review-push-repair-protocol/review-evidence/push-repair-protocol-43c1691.json",
+      "remaining_scope_note": "Remote automatic tree repair fails closed as interim; owned completion support remains acceptance follow-up"
     },
     {
       "issue": 32,
@@ -101,7 +103,12 @@
           "Needs Git object reader and content search, remote background command support."
         ]
       },
-      "status": "queued"
+      "status": "implementing",
+      "agent": "audit_32_38",
+      "branch": "codex/content-recovery",
+      "worktree": "/workspace/work/content-recovery",
+      "latest_preserved_head": "8f99238873465133ecde6294197be107f32d4913",
+      "validation": "Backend source+5tests WIP, no Cargo yet"
     },
     {
       "issue": 32,
@@ -128,12 +135,14 @@
           "Open #132 agent checkpoints and #64 teleport use related temporary-index snapshots, but do not supply periodic general working-tree drafts."
         ]
       },
-      "status": "implementing",
+      "status": "fixing_confirmed_reader_lifetime_finding",
       "agent": "audit_32_38",
       "branch": "codex/working-drafts",
       "worktree": "/workspace/work/working-drafts",
       "base": "48f2b234c4b9535c820138442295caeada1410fc",
-      "latest_preserved_head": "9e14de06d55e214eb187de0b493deba095fe2ae9"
+      "latest_preserved_head": "cbf05e57b8ecf4f7ac142a813a3df4ddd3019622",
+      "reviewer": "audit_45_50",
+      "review_report": "/workspace/work/review-working-drafts-51ea049.json"
     },
     {
       "issue": 33,
@@ -941,12 +950,17 @@
         ],
         "effort": "M"
       },
-      "status": "implementing",
+      "status": "integrated",
       "agent": "audit_39_44",
       "branch": "codex/file-comparison-views",
       "worktree": "/workspace/work/file-comparison-views",
       "base": "992ec15ebc53c41639b6f704ca9bd89dfd8f2988",
-      "latest_preserved_head": "591f42dd49d36cdb297162e8882e0fac6f8cb924"
+      "latest_preserved_head": "591f42dd49d36cdb297162e8882e0fac6f8cb924",
+      "commit": "cdd45af340b433b125f29e2347705cf2335053c3",
+      "integration_merge": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+      "reviewer": "review_portability_and_file_views",
+      "review_report": "/workspace/work/review-portability-and-file-views/docs/reviews/file-comparison-cdd45af/review-final.json",
+      "validation": "Private full815pass3ignored, independent29tests+4fixturevariantsPASS; combinedc56full817pass3ignored"
     },
     {
       "issue": 40,
@@ -971,15 +985,16 @@
         ],
         "effort": "M"
       },
-      "status": "static_safety_pass_guard_removed_runtime_pending",
+      "status": "fixing_confirmed_format_review_finding",
       "agent": "implement_gerrit",
       "branch": "codex/encrypted-diffs",
       "worktree": "/workspace/work/encrypted-diffs",
       "base": "5af92d88aee563f9a3113c1edaef65d245a66f06",
       "commit": "ee6e8482a09c27a2c40286996433bd1bd996b3d0",
-      "reviewer": "baseline_validation",
+      "reviewer": "review_push_repair_protocol",
       "validation": "Independent static ee6e848 PASS; authorized guard removal bd851ed pushed; local-only runtime gates pending.",
-      "latest_preserved_head": "bd851ed75b092b447a4981c713d0d4b134b6624c"
+      "latest_preserved_head": "0fc6c54922bddd6f2c748b06cb3f515ce94fd795",
+      "review_report": "/workspace/work/review-sops-a30f1f1/review-evidence/sops-a30f1f1-review.json"
     },
     {
       "issue": 42,
@@ -1179,7 +1194,10 @@
         ],
         "effort": "S-M"
       },
-      "status": "queued"
+      "status": "assigned_static_plan",
+      "agent": "implement_gerrit",
+      "branch": "codex/ssh-key-helper",
+      "worktree": "/workspace/work/ssh-key-helper"
     },
     {
       "issue": 43,
@@ -1229,7 +1247,10 @@
         ],
         "effort": "M"
       },
-      "status": "queued"
+      "status": "assigned_static_plan",
+      "agent": "audit_39_44",
+      "branch": "codex/standalone-file-tools",
+      "worktree": "/workspace/work/standalone-file-tools"
     },
     {
       "issue": 45,
@@ -1316,7 +1337,8 @@
       "worktree": "/workspace/work/onboarding-portability",
       "base": "06fe1bd74280f9d24c8a1e1e12dccb528097dec8",
       "base_note": "Reviewed History e65a65b merged with green992ec15; own combined base checked",
-      "latest_preserved_head": "45d8f1e9d1c599ce0265ae2b26a12f961c8beb9b"
+      "latest_preserved_head": "bb606027d336f96fcc953f47deb5057724d12756",
+      "validation": "Actual setup/UI6of6PASS; strict/full upcoming, unvalidated as final candidate"
     },
     {
       "issue": 45,
@@ -1356,7 +1378,8 @@
       "worktree": "/workspace/work/onboarding-portability",
       "base": "06fe1bd74280f9d24c8a1e1e12dccb528097dec8",
       "base_note": "Reviewed History e65a65b merged with green992ec15; own combined base checked",
-      "latest_preserved_head": "45d8f1e9d1c599ce0265ae2b26a12f961c8beb9b"
+      "latest_preserved_head": "bb606027d336f96fcc953f47deb5057724d12756",
+      "validation": "Actual setup/UI6of6PASS; strict/full upcoming, unvalidated as final candidate"
     },
     {
       "issue": 46,
@@ -2180,12 +2203,17 @@
         ],
         "estimated_effort": "M"
       },
-      "status": "implementing",
+      "status": "integrated",
       "agent": "audit_39_44",
       "branch": "codex/file-comparison-views",
       "worktree": "/workspace/work/file-comparison-views",
       "base": "992ec15ebc53c41639b6f704ca9bd89dfd8f2988",
-      "latest_preserved_head": "591f42dd49d36cdb297162e8882e0fac6f8cb924"
+      "latest_preserved_head": "591f42dd49d36cdb297162e8882e0fac6f8cb924",
+      "commit": "cdd45af340b433b125f29e2347705cf2335053c3",
+      "integration_merge": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+      "reviewer": "review_portability_and_file_views",
+      "review_report": "/workspace/work/review-portability-and-file-views/docs/reviews/file-comparison-cdd45af/review-final.json",
+      "validation": "Private full815pass3ignored, independent29tests+4fixturevariantsPASS; combinedc56full817pass3ignored"
     },
     {
       "issue": 50,
@@ -2214,12 +2242,17 @@
         ],
         "estimated_effort": "M"
       },
-      "status": "implementing",
+      "status": "integrated",
       "agent": "audit_39_44",
       "branch": "codex/file-comparison-views",
       "worktree": "/workspace/work/file-comparison-views",
       "base": "992ec15ebc53c41639b6f704ca9bd89dfd8f2988",
-      "latest_preserved_head": "591f42dd49d36cdb297162e8882e0fac6f8cb924"
+      "latest_preserved_head": "591f42dd49d36cdb297162e8882e0fac6f8cb924",
+      "commit": "cdd45af340b433b125f29e2347705cf2335053c3",
+      "integration_merge": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+      "reviewer": "review_portability_and_file_views",
+      "review_report": "/workspace/work/review-portability-and-file-views/docs/reviews/file-comparison-cdd45af/review-final.json",
+      "validation": "Private full815pass3ignored, independent29tests+4fixturevariantsPASS; combinedc56full817pass3ignored"
     }
   ],
   "audit_corrections": [

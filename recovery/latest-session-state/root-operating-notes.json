@@ -6,19 +6,21 @@
   "user_steering": "ONE final giant PR; rebuild clean branch from dev with one commit per feature, all authored exactly Jonas Kamsker <11245306+JKamsker@users.noreply.github.com> matching028242cd4bc3. Preserve published branches/history; each new unit still commit+push before next/riskytest.",
   "agent_model": "All subagents explicitly GPT-6.1-sol high reasoning, fork none. User authorizes orchestrated agents; do not spawn other models.",
   "agents": {
-    "audit_32_38": "Working drafts author; static edits pending test-hold release",
-    "audit_39_44": "Finish three file-comparison candidate; then separate Windows CI path/fixture failures fix from82189c4",
-    "audit_45_50": "Tour and portability author; static edits pending test-hold release",
-    "baseline_validation": "Review turn hit platform account-security block; safe completed-evidence handoff requested, no new blocked runtime probes.",
-    "implement_gerrit": "SOPS local-only safety unit ee6e848 pushed, compile quarantine remains",
-    "review_weather": "Push Preflight takeover author; integration sole writer when candidate reviews pass"
+    "audit_32_38": "Fix Drafts reader actual completion ownership; content recovery backend8f992 preserved",
+    "audit_39_44": "Standalone file tools plan/implementation fromc56; both Windowsbab and filecdd integrated",
+    "audit_45_50": "Tour/Portability bb606UI6of6PASS, strict/full upcoming; independent Drafts review FAIL now awaiting correction",
+    "baseline_validation": "Completed safe evidence handoff after platform account-security block; do not retry blocked old runtime action",
+    "implement_gerrit": "SOPS ambiguity format fix0fc; plan SSH key helper afterward",
+    "review_weather": "Preflight local protocol correction; remote automatic repair ownership follow-up required",
+    "review_portability_and_file_views": "Filecdd scoped independent PASS; Windows static pass, exact nativeCI pending",
+    "review_push_repair_protocol": "SOPSa30 FAILformatP2, re-review fixed candidate upcoming; Preflight43 staticFAIL3blockers"
   },
   "integration": {
     "worktree": "/workspace/work/integration",
     "branch": "codex/remaining-features",
-    "remote_green_head": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+    "remote_green_head": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
     "state": "/workspace/work/integration-state.json",
-    "checks": "Linux full789passed3ignored0filtered source-identical aab2a25 binding, independent containment PASS; known Windows11failures pending",
+    "checks": "Linux fmt/strictClippy/full817pass3ignored0filtered,820name union PASS; actual Ubuntu+lintCI PASS, nativeWindowsCI in progress",
     "features": [
       "Gerrit",
       "Clone",
@@ -31,7 +33,10 @@
       "Keyboard staging",
       "Activity calendar",
       "Contributor statistics",
-      "Profile SSH/accounts"
+      "Profile SSH/accounts",
+      "File migration map",
+      "Three-state staging lens",
+      "File versions across branches"
     ],
     "initial_green_base": "4f4fb565c3ade34d3b974f0545af21c51bb34b93 (firstfive,686pass3ignored)",
     "final_gate": "At complete intended scope, exact combined final commit all required tests pass AND independent adversarial whole-combination review PASS before creating ONE PR. Existing scoped reviews do not replace finalcombinedreview.",
@@ -50,18 +55,19 @@
     "/workspace/work/prs.json (99originalopenPRs,allinflightfeaturesexcludedwhole-namedbullet)"
   ],
   "scope_rule": "Namedidea with anyopenPR excludedwholeevenifomissions. Registry #38excludedbecausePR75sharedkeymap. ContrasteligiblePR66explicitlyexcludesit.",
-  "new_feature_base": "ff901aad4346ee409509b60f9c6e7b12689fde44 (Linux gates and containment PASS; Windows fixes pending)",
+  "new_feature_base": "c56d0502d7deb59ba85ac8a807c59a8d68729874 (exact combined Linux gates PASS; nativeWindowsCI pending)",
   "tools": "Use functions.exec tools.exec_command, tools.mcp__codex_apps__github_*; ALL_TOOLS filter specificnames forschemas. GitHubconnectorfor PR operations; normalgit pushbranches. No sendmessages/comments tothirdparties. GitHubupdate_pull_request stateclosed used153154155.",
   "environment": "Managedcloud /workspace ready, networkpolicy enforced restricted github/packagehosts, VPNfalse, nosecretbindings. Cloudruntime skill read c7/cloud-environment-runtime plusnetworking. Do not dumpenv/credentials. GitHubownerJKamsker adminpush. devstill74027116e8f20334716a6b1208717bb33c9c6280 onlastfetch.",
   "communications": "Start/continue concise meaningfulcommentary <=60s, no finaluntilgoalhandled. No userquestionsneeded; usersteering PRpackagingnotclearstop. FinalonlylinkonegiantPR, nowork/pathdeliverablelinks. Projectlesssaved useroutputs onlydesignated outputpath ifneeded.",
   "checkpoint_policy": "After every completed unit of work, each agent and the orchestrator must commit AND push its branch before starting the next unit or risky test. Verify the remote SHA. Label WIP unvalidated. Only one final giant PR; all required tests and independent adversarial review must pass on the final combined source before PR creation.",
-  "recovery_status": "Workspace access restored. Current source and WIP preserved on remote branches; recovery ZIP published and download verified. Unsafe SOPS new remote watchdog removed in pushed static-only ee6e848, compile guards remain; independent safety review pending before runtime hold is lifted.",
-  "verified_remote_head": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "recovery_status": "Current source units and review evidence committed/pushed; no app test quarantine on accepted containment branches. Historical recovery/checkpoint_worktrees.py must NOT be rerun (would restore obsolete quarantine/identity); normal agents preserve their own units with correct shared repo-local author.",
+  "verified_remote_head": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
   "backup": {
     "url": "https://raw.githubusercontent.com/JKamsker/gitcraft/f6896061a3bc6c3a049f5cdd592ff21860ccb50b/recovery/gitcraft-recovery-20261107.zip",
     "sha256": "0816c7c383acb5c130d3d019efacd573d6c70a8872f9cd91b67b076ccb887bf7",
     "initial_integration_snapshot": "da0143c4f7574ab4ab9ec3607f927c89968c1a1f",
     "note": "Archive is immutable initial recovery snapshot; source branches and metadata continue advancing."
   },
-  "commit_author_policy": "/workspace/work/commit-author-policy.json"
+  "commit_author_policy": "/workspace/work/commit-author-policy.json",
+  "final_history_plan": "/workspace/work/final-history-plan.json"
 }

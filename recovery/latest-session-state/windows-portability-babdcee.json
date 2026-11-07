@@ -1,0 +1,61 @@
+{
+  "status": "LINUX_AUTHOR_GATES_PASS_INDEPENDENT_REVIEW_AND_NATIVE_WINDOWS_CI_PENDING",
+  "head": "babdceee232928bfbc84f98ca032dd8b4bec096e",
+  "tree": "7dab0d78808dc0fe08c88b7dbb0660e7da30a4e9",
+  "base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "initial_base": "82189c4",
+  "branch": "codex/windows-portability-fixes",
+  "worktree": "/workspace/work/windows-portability-fixes",
+  "clean": true,
+  "confirmed_ci_failures": "/workspace/work/ci-windows-82189c4.log",
+  "scope": {
+    "three_fixture_failures": "Use native absolute account config directory with shell metacharacters; Activity filename controls retained on Unix and legal Unicode/metacharacters on Windows; Structural quoted rename preserves Unix double quote, forces core.quotePath=true and uses Unicode/apostrophe on Windows. No tests disabled.",
+    "eight_bundle_failures": "Convert only canonical Windows verbatim drive and UNC spellings to Git-compatible arguments while retaining native PathBuf for filesystem cleanup. Verify uses command-local core.longpaths=true. No global/repository configuration writes and no broad prefix stripping, symlink resolution or dot-component normalization."
+  },
+  "new_tests": [
+    "windows_bundle_arguments_preserve_drive_unc_unicode_and_long_paths",
+    "native_long_bundle_paths_verify_exact_bytes_and_cleanup_without_changing_config"
+  ],
+  "gates": {
+    "fmt": "PASS cargo fmt --all -- --check",
+    "clippy": "PASS cargo clippy --locked --all-targets -j2 -- -D warnings",
+    "focused": "PASS18 bundle/dialog tests plus3 exact original account/activity/structural cases (21total)",
+    "full_linux": "PASS env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo test --locked -j2;791passed,3ignored,0filtered",
+    "windows": "NOT RUN YET: root will preserve reviewed merge candidate on consolidated branch and require its exact Windows CI pass before acceptance. No tests disabled.",
+    "private_target": "/workspace/work/windows-portability-fixes/target",
+    "CARGO_INCREMENTAL": "0",
+    "private_package_clean": "cargo clean -p gitcraft removed1218private files5.3GiB before compilation; original target lock and .rustc_info.json were unlinked after hardlink copy",
+    "fresh_worktree_compile_verified": true,
+    "Difftastic_PATH": "/workspace/work/difft-bin"
+  },
+  "windows_limits": "Native UNC share runtime unavailable locally; pure UNC mapping cases included. Actual long bundle path over260 characters runs on all supported test hosts. Unsupported generic Win32 device namespaces return an explicit error rather than rewriting their target.",
+  "publication": "Branch pushed and remote SHA verified. No PR; root will obtain exact Windows CI through consolidated candidate after Linux/static review.",
+  "remote_sha_verified": "babdceee232928bfbc84f98ca032dd8b4bec096e",
+  "logs": {
+    "clean": {
+      "path": "/workspace/work/windows-portability-clean.log",
+      "sha256": "5fea11af3453df866a467b90bdc7e1f5b22fb6dc01826b0fc48dd2146207dd0f",
+      "bytes": 38
+    },
+    "fmt": {
+      "path": "/workspace/work/windows-portability-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "clippy": {
+      "path": "/workspace/work/windows-portability-clippy.log",
+      "sha256": "1eaa90a88d8a17cc7879890116b1f02dfe0d8876353828596dc49901f0581153",
+      "bytes": 146
+    },
+    "focused": {
+      "path": "/workspace/work/windows-portability-targeted.log",
+      "sha256": "ea50f9aa91c49e39522481dac6a311346b799cdfc58c40cc2a3f30ebbefbb3d1",
+      "bytes": 3968
+    },
+    "test": {
+      "path": "/workspace/work/windows-portability-test.log",
+      "sha256": "96950387f4b3a2b5545654fe45817a8c99069e023ae9bb6dd581a278056ae1db",
+      "bytes": 64260
+    }
+  }
+}

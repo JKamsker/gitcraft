@@ -1,0 +1,17 @@
+{
+  "repository": "JKamsker/gitcraft",
+  "reference_author_commit": "028242cd4bc3c82ced848ea0fa73639981cd71d7",
+  "author_name": "Jonas Kamsker",
+  "author_email": "11245306+JKamsker@users.noreply.github.com",
+  "current_source_integration": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+  "final_branch_created": false,
+  "history_rewritten": false,
+  "instructions": [
+    "Keep existing source/WIP/recovery branches intact and pushed.",
+    "At completed scope build a NEW PR branch from dev; apply accepted source changes as one meaningful commit per named feature, folding its fixes and shared integration adaptations into the appropriate feature. Split multi-feature batches meaningfully; do not create empty feature commits.",
+    "Create fresh correctly authored commits rather than merging old WIP ancestry into final branch. Preserve source-unit SHA provenance separately.",
+    "Keep checkpoint ZIP/bundle/review-only branches outside application PR; transient validation logs can remain on their evidence branches.",
+    "Verify final application source/Cargo/assets equals accepted combined implementation; re-run exact final tests/platform CI and independent adversarial whole-candidate review after assembly.",
+    "Create exactly ONE final PR only after every required gate passes; no PR has been created."
+  ]
+}

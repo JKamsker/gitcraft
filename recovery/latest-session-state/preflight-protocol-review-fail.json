@@ -1,0 +1,52 @@
+{
+  "review": "Independent static protocol/correctness review of prepared repair reference transaction",
+  "verdict": "FAIL",
+  "candidate": "43c169159af81b3e85c13b8e6a19e1d040ddc4d3",
+  "candidate_tree": "de1a8c438feb4a638881aba7b07ed17a0303ef38",
+  "scope": "Static review only. No Cargo, fake-Git recording fixture, real repository fixture, protocol execution, or process/signal experiment was run. This is not a whole-feature review or security scan.",
+  "findings": [
+    {
+      "id": "REPAIR-PROTOCOL-1",
+      "priority": "P1",
+      "title": "Unsupported Git can commit the reference update without executing the checkout wrapper",
+      "paths": ["src/push_preflight/fix/transaction.rs:14", "src/push_preflight/fix/transaction.rs:82", "src/push_preflight/fix.rs:309", "src/push_preflight/fix.rs:324"],
+      "static_evidence": "The only initial Git operation is rev-parse --path-format=absolute --git-path hooks/reference-transaction. No version/capability gate requires reference-transaction hooks, GIT_CONFIG_COUNT, or git hook run --to-stdin. Git versions predating reference-transaction support ignore that hook; versions predating GIT_CONFIG_COUNT can ignore the environment-selected hooksPath. rev-parse's permissive handling of unrecognized options is not a capability check. The caller accepts update-ref exit status zero without requiring a successful prepared/committed marker. Such Git can move the branch while leaving the actual index/worktree at the old tree and report repair success.",
+      "required_fix": "Refuse unsupported Git before launching a mutating update-ref. Establish every required capability, including selecting this private wrapper, and require owned completion evidence for successful repair. A post-update check alone cannot provide the required pre-mutation safe refusal.",
+      "required_evidence": "First recording-only cases for unsupported/missing-hook/unsupported-hook-command backends must prove no mutating update-ref is launched. Once authorized, run an actual supported-Git repair and an explicit old-Git safe-refusal fixture. Do not claim native Windows compatibility from Unix recording tests."
+    },
+    {
+      "id": "REPAIR-PROTOCOL-2",
+      "priority": "P1",
+      "title": "Remote timeout permits destruction of a wrapper or recovery directory still owned by a live operation",
+      "paths": ["src/git/command.rs:317", "src/git/command.rs:339", "src/remote/session.rs:111", "src/remote/session.rs:128", "src/remote/session.rs:148", "src/push_preflight/fix/transaction.rs:92", "src/push_preflight/fix/transaction.rs:118", "src/push_preflight/fix.rs:324"],
+      "static_evidence": "forecast_remote returns at its own deadline without joining its spawned remote::exec worker. That worker can still be waiting for a pooled long-lane shell, running an original prepared hook, or undergoing asynchronous session stop. Hook::recovery treats a current absence of checkout-attempted as proof that it may delete the directory. Drop then schedules rm -rf on another lane. A delayed update-ref can consequently see the now-missing private hook and commit without checkout, or a worker can pass the marker check between recovery's test and deletion, perform read-tree, and lose its backup/recovery evidence. The retained-evidence protocol therefore requires a confirmed end of ownership, not a marker snapshot.",
+      "required_fix": "Do not delete the wrapper or evidence after a mutating remote request unless that exact request is proven complete/quiescent. Conservatively retain the owned directory on uncertain/timeout outcomes, and make a delayed request unable to commit after its caller abandons the operation. Integrate with existing approved ownership controls; introduce no host-wide PID selectors or signals.",
+      "required_evidence": "Recording-only lifecycle simulations must cover delayed dispatch, timeout before prepared, timeout between marker observation and checkout, and timeout after checkout. Only after acceptance and root authorization should controlled owned remote/worker fixtures demonstrate no late reference update, no deleted recovery evidence, and preserved concurrent edits."
+    },
+    {
+      "id": "REPAIR-PROTOCOL-3",
+      "priority": "P1",
+      "title": "Prepared reference ownership does not establish ownership of the current checkout",
+      "paths": ["src/push_preflight/fix.rs:301", "src/push_preflight/fix/transaction.rs:153", "src/push_preflight/fix/transaction.rs:162", "src/push_preflight/fix/transaction.rs:166", "src/push_preflight.rs:1170"],
+      "static_evidence": "check verifies HEAD and its symbolic target before Hook::new/update-ref. The private prepared hook then invokes the original hook and immediately backs up/indexes and runs read-tree against whichever checkout exists at that later time. Locking refs/heads/main does not lock the HEAD symref. An original prepared hook, or another actor in this interval, can switch HEAD to an existing other branch at the same old object without changing index/worktree. The branch old/new tuple still matches, read-tree -u -m old new succeeds on the other branch's checkout, update-ref moves main, and success removes the backup. The other branch is left with the repair's tree staged while its ref still names old; the repair's checkout ownership and journal context have changed.",
+      "required_fix": "Establish and validate checkout ownership after the original prepared hook and retain it through checkout/ref completion, or explicitly refuse when it cannot be established. At minimum, deterministic hook-induced HEAD changes must be refused before index/worktree mutation. Do not treat a lock on one branch ref as a lock on HEAD/current checkout.",
+      "required_evidence": "First add recording-only ownership-change cases. Once authorized, use an owned fixture with main and other at the same old commit and an original prepared hook that switches HEAD; assert repair refusal with both refs, index, and worktree unchanged. Also cover a detached HEAD transition and concurrent edits without rollback over those edits."
+    }
+  ],
+  "positive_static_observations": [
+    "Branch/object/recovery payload interpolation uses sh_quote; replay uses quoted --to-stdin paths and exact wrapper argv.",
+    "The original prepared hook is called before backup/checkout, and its nonzero status vetoes checkout.",
+    "Restoring hooksPath for nested Git calls avoids recursion through this private wrapper in the ordinary supported-Git path.",
+    "Raw hook stdin is copied with cat and original index contents with cp; no Rust UTF-8 conversion is applied to index bytes.",
+    "The new protocol introduces no FIFO, PID selector, or signal controller."
+  ],
+  "remaining_static_or_runtime_limits": [
+    "Windows/native Git path/interpreter/mode behavior is unvalidated; current recording test is Unix-only.",
+    "Recovery of split-index dependencies and exact original permission metadata is not established by the before.index copy alone.",
+    "Original hook directory discovery uses a lossy UTF-8 forecast result and trim_end; arbitrary non-UTF-8/trailing-whitespace paths are not proven preserved.",
+    "Current recording fixture manually executes the wrapper and supplies fake Git; it cannot prove selection by real Git, real ref-lock ownership, old-Git refusal, or remote request lifetime.",
+    "Actual held-ref-lock/index/worktree fixture remains required after static issues are resolved and recording acceptance/root authorization are obtained.",
+    "Default-port normalization unit 80d19da and remaining full-feature dispatch/auth/journal review are outside this protocol verdict."
+  ],
+  "release_decision": "Do not accept the proposed recording test as evidence that the protocol is ready for real mutation fixtures. Resolve blocking static ownership/capability issues first; root owns all test scheduling and Cargo slots. No PR or merge approval."
+}

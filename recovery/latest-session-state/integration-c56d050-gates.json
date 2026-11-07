@@ -1,0 +1,45 @@
+{
+  "head": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+  "status": "LINUX_COMBINED_GATES_PASS_WINDOWS_CI_AND_FINAL_REVIEW_PENDING",
+  "fmt": "PASS",
+  "strict_clippy": "PASS",
+  "tests": {
+    "passed": 817,
+    "failed": 0,
+    "ignored": 3,
+    "filtered_out": 0,
+    "registered": 820,
+    "expected_name_union_matches": true
+  },
+  "private_target": "/workspace/work/integration/target",
+  "fresh_package_clean": true,
+  "CARGO_INCREMENTAL": 0,
+  "optional_remote_env": "unset",
+  "logs": {
+    "clean": {
+      "path": "/workspace/work/integration-c56d050-clean.log",
+      "sha256": "daacd4485215947245c728c8ccf97ae2867aa58384531ac5dd5477f2d97c09eb",
+      "bytes": 38
+    },
+    "fmt": {
+      "path": "/workspace/work/integration-c56d050-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "clippy": {
+      "path": "/workspace/work/integration-c56d050-clippy.log",
+      "sha256": "844f51cb66314531481ea536096be88477fa449d2043640bfac63894318bc90e",
+      "bytes": 132
+    },
+    "test": {
+      "path": "/workspace/work/integration-c56d050-test.log",
+      "sha256": "0b27a40962e8b753823b8594b72fd204324e2ae2449b971e0edc6f329e39dfb7",
+      "bytes": 67177
+    },
+    "test-list": {
+      "path": "/workspace/work/integration-c56d050-test-list.log",
+      "sha256": "a535433494ac107e96e80dbacfdb25a4668842230683b4569bf5c8ab9dbe5c3a",
+      "bytes": 61791
+    }
+  }
+}
