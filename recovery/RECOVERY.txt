@@ -1,0 +1,41 @@
+GITCRAFT RECOVERY BACKUP
+
+This is a backup, not the requested final PR or a release-ready completion of all ideas.
+
+WHAT IS INCLUDED
+- gitcraft/: exact reviewed consolidated application snapshot at da0143c.
+- gitcraft-all-branches.bundle: complete Git objects/history for all backed-up Codex branches.
+- recovery/: branch SHAs, WIP status, original task inventory, audits, validation/review evidence,
+  process-safety warning and the new commit-and-push checkpoint policy.
+- environment/: non-secret Rust setup scripts.
+
+RESTORE ALL BRANCHES OFFLINE
+  git clone -b codex/remaining-features gitcraft-all-branches.bundle restored-gitcraft
+  cd restored-gitcraft
+  git branch -r
+  git remote set-url origin https://github.com/JKamsker/gitcraft.git
+
+The same branches were also pushed to JKamsker/gitcraft and verified against remote SHAs.
+The consolidated application has 12 reviewed features; last application gates passed
+formatting, strict Clippy and 789 tests (3 existing integration tests ignored).
+The da0143c follow-up changes only CI triggers. Windows CI was not verified.
+
+UNFINISHED WORK
+The WIP branches preserve preflight, drafts, encrypted diffs, file-comparison views and
+onboarding/portability. They are NOT release-ready. Read recovery/session-checkpoint.json
+and review reports before using them. No final PR exists; interim PRs 153-155 are closed.
+
+IMPORTANT QUARANTINE
+codex/encrypted-diffs contains compile_error guards in its encrypted module and tool.
+They intentionally prevent accidental builds/tests of an unsafe process-tree watchdog.
+Do not remove them or run the watchdog until it is replaced, checked on synthetic PID
+snapshots with recording-only signals, then reviewed and tested in owned process isolation.
+Original files are preserved as .txt under recovery/original-wip/encrypted-diffs/.
+Do not run bundled reproduction scripts blindly; executable source evidence is stored as text.
+
+CHECKPOINT POLICY
+After EVERY completed unit of work, every agent and the orchestrator must commit and PUSH
+the branch before another unit or risky test. Verify remote SHA. WIP is labeled unvalidated.
+Only ONE final giant PR may be opened, after complete combined tests and adversarial review.
+
+BUILD CACHES AND CREDENTIAL FILES ARE NOT INCLUDED.

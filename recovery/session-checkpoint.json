@@ -1,0 +1,255 @@
+{
+  "repository": "JKamsker/gitcraft",
+  "purpose": "Recovery backup only; do not merge this backup branch into the final application PR.",
+  "consolidated_branch": "codex/remaining-features",
+  "consolidated_head": "da0143c4f7574ab4ab9ec3607f927c89968c1a1f",
+  "last_tested_application_head": "4fcb0dfe226f30785dd2758a2959ff4379daa8ed",
+  "ci_only_followup": "Only .github/workflows/ci.yml push-branch trigger differs from the tested application head.",
+  "validation": {
+    "fmt": "passed",
+    "strict_all_target_clippy": "passed",
+    "tests_passed": 789,
+    "tests_failed": 0,
+    "existing_ignored_tests": 3,
+    "platform": "Linux private integration target",
+    "windows_ci": "Not verified; Actions run lookup returned Forbidden.",
+    "whole_final_combined_adversarial_review": "Pending; individual integrated features passed."
+  },
+  "delivery": {
+    "one_final_giant_pr": true,
+    "final_pr_created": false,
+    "interim_prs_closed": [
+      153,
+      154,
+      155
+    ],
+    "original_eligible_ideas": 72,
+    "integrated_ideas": 12,
+    "incomplete_ideas_started": 8,
+    "not_started": 52
+  },
+  "integrated_features": [
+    "Gerrit review submissions",
+    "Clone depth/partial/sparse options",
+    "Practice repositories and glossary",
+    "Contrast improvements",
+    "Structural refactor diffs",
+    "Rebase weather",
+    "Graph readability",
+    "Git bundles",
+    "Keyboard staging",
+    "Activity calendar",
+    "Contributor statistics",
+    "Per-profile SSH keys and forge accounts"
+  ],
+  "checkpoint_policy": "After every completed unit of work, each agent and the orchestrator must commit AND push its branch before starting the next unit or risky test. Verify the remote SHA. Label WIP unvalidated. Only one final giant PR; all required tests and independent adversarial review must pass on the final combined source before PR creation.",
+  "pushed_branches": [
+    {
+      "branch": "codex/clone-options",
+      "sha": "c70f104aff780d798ffd9eb3318edf7f1786dce4"
+    },
+    {
+      "branch": "codex/contrast-aa",
+      "sha": "1a77cfd99d2f72b002d95780f423f0b9ec8fa5dc"
+    },
+    {
+      "branch": "codex/encrypted-diffs",
+      "sha": "2528738ff76f6d1bb04b2c8d5a109a1adb5db22e"
+    },
+    {
+      "branch": "codex/file-comparison-views",
+      "sha": "faee36e1253bda57218813c8fec3297b239d7c9e"
+    },
+    {
+      "branch": "codex/gerrit-review",
+      "sha": "c08ff3bf079397e9f8e4e500828a16b192c73d4b"
+    },
+    {
+      "branch": "codex/git-bundles",
+      "sha": "6625a2c2d62e422964017fce1bffd0de1952c980"
+    },
+    {
+      "branch": "codex/graph-readability",
+      "sha": "05d818add970e0b081166c71255048f4673e5390"
+    },
+    {
+      "branch": "codex/history-activity",
+      "sha": "e65a65bf217a4a0eeb8f46297fd16f96de868584"
+    },
+    {
+      "branch": "codex/keyboard-staging",
+      "sha": "34b1564e668adc08db73f3355fa3d4c66a542cb2"
+    },
+    {
+      "branch": "codex/onboarding-portability",
+      "sha": "77d55a7ee8a14f7d796005911de27d71314724b1"
+    },
+    {
+      "branch": "codex/practice-repositories",
+      "sha": "bdd0ebd67a43ca6b7327cd4393d11a41b155f639"
+    },
+    {
+      "branch": "codex/profile-connections",
+      "sha": "0854fa158cd7c9857db317378f586f3eebb91457"
+    },
+    {
+      "branch": "codex/push-preflight",
+      "sha": "3ef21abfb112cc0105b437737427291ce44c4842"
+    },
+    {
+      "branch": "codex/recovery-sops-pre-watchdog-80852d3",
+      "sha": "80852d3ae5970bfb3e4d24ed9f8499f48db4fae6"
+    },
+    {
+      "branch": "codex/remaining-features",
+      "sha": "da0143c4f7574ab4ab9ec3607f927c89968c1a1f"
+    },
+    {
+      "branch": "codex/repository-weather",
+      "sha": "a2b2f479756f27cf14e9e4e9500f23bc88af8068"
+    },
+    {
+      "branch": "codex/structural-refactor-diff",
+      "sha": "c4971a83711973d4f1c29ab6b5d420a03eba2e86"
+    },
+    {
+      "branch": "codex/working-drafts",
+      "sha": "82660c12722ece7e0ba0d64d4137389a61603653"
+    }
+  ],
+  "wip_worktree_checkpoints": [
+    {
+      "worktree": "/workspace/work/push-preflight",
+      "branch": "codex/push-preflight",
+      "previous_head": "3ef21abfb112cc0105b437737427291ce44c4842",
+      "changed_paths": [],
+      "quarantined_files": [],
+      "validation": "WIP recovery checkpoint only; no tests run during backup",
+      "head": "3ef21abfb112cc0105b437737427291ce44c4842",
+      "tree": "e19bc362813509a9c81d2b045a1a16dcc1eace8c",
+      "status_after": []
+    },
+    {
+      "worktree": "/workspace/work/working-drafts",
+      "branch": "codex/working-drafts",
+      "previous_head": "48f2b234c4b9535c820138442295caeada1410fc",
+      "changed_paths": [
+        "src/bounded_process.rs",
+        "src/git/command.rs",
+        "src/git/mod.rs",
+        "src/remote/fs.rs",
+        "src/remote/mod.rs",
+        "src/repo/actions.rs",
+        "src/repo/apply.rs",
+        "src/repo/detail/changes.rs",
+        "src/repo/dialogs/mod.rs",
+        "src/repo/graph_view/mod.rs",
+        "src/repo/messages.rs",
+        "src/repo/mod.rs",
+        "src/repo/operations.rs",
+        "src/git/drafts/context.rs",
+        "src/git/drafts/mod.rs",
+        "src/git/drafts/restore.rs",
+        "src/git/drafts/tests.rs",
+        "src/repo/dialogs/drafts.rs",
+        "src/repo/drafts.rs"
+      ],
+      "quarantined_files": [],
+      "validation": "WIP recovery checkpoint only; no tests run during backup",
+      "head": "82660c12722ece7e0ba0d64d4137389a61603653",
+      "tree": "3ab40700bd027acb99beeffc821452bac82a0d82",
+      "status_after": []
+    },
+    {
+      "worktree": "/workspace/work/encrypted-diffs",
+      "branch": "codex/encrypted-diffs",
+      "previous_head": "4fcb0dfe226f30785dd2758a2959ff4379daa8ed",
+      "changed_paths": [
+        "Cargo.lock",
+        "Cargo.toml",
+        "README.md",
+        "src/app/mod.rs",
+        "src/bounded_process.rs",
+        "src/git/diff.rs",
+        "src/manual.rs",
+        "src/remote/mod.rs",
+        "src/remote/session.rs",
+        "src/repo/actions.rs",
+        "src/repo/apply.rs",
+        "src/repo/diff/mod.rs",
+        "src/repo/diff/structural/mod.rs",
+        "src/repo/diff/structural/reader.rs",
+        "src/repo/diff/view.rs",
+        "src/repo/keyboard.rs",
+        "src/repo/layout.rs",
+        "src/repo/load.rs",
+        "src/repo/messages.rs",
+        "src/repo/navigate.rs",
+        "src/repo/operations.rs",
+        "src/repo/state.rs",
+        "src/repo/diff/encrypted/mod.rs",
+        "src/repo/diff/encrypted/model.rs",
+        "src/repo/diff/encrypted/tests.rs",
+        "src/repo/diff/encrypted/tool.rs",
+        "src/repo/diff/encrypted/view.rs"
+      ],
+      "quarantined_files": [
+        "src/repo/diff/encrypted/mod.rs",
+        "src/repo/diff/encrypted/tool.rs"
+      ],
+      "validation": "WIP recovery checkpoint only; no tests run during backup",
+      "head": "2528738ff76f6d1bb04b2c8d5a109a1adb5db22e",
+      "tree": "1303c014403a094e7170905b47adb3bfea48f5e7",
+      "status_after": []
+    },
+    {
+      "worktree": "/workspace/work/file-comparison-views",
+      "branch": "codex/file-comparison-views",
+      "previous_head": "faee36e1253bda57218813c8fec3297b239d7c9e",
+      "changed_paths": [],
+      "quarantined_files": [],
+      "validation": "WIP recovery checkpoint only; no tests run during backup",
+      "head": "faee36e1253bda57218813c8fec3297b239d7c9e",
+      "tree": "cf8af9c6f30e6489893dbcd5938e86b62455a90c",
+      "status_after": []
+    },
+    {
+      "worktree": "/workspace/work/onboarding-portability",
+      "branch": "codex/onboarding-portability",
+      "previous_head": "bf85b73ac9bda264f512941fc76ad30a236834cf",
+      "changed_paths": [
+        "src/lib.rs",
+        "src/settings/profiles.rs",
+        "src/theme/mod.rs",
+        "src/portability.rs",
+        "src/portability/repository.rs",
+        "src/portability/restore.rs",
+        "src/portability/tests.rs",
+        "src/portability/url.rs"
+      ],
+      "quarantined_files": [],
+      "validation": "WIP recovery checkpoint only; no tests run during backup",
+      "head": "77d55a7ee8a14f7d796005911de27d71314724b1",
+      "tree": "b91a6412974591e3a6c08ad071931e075b6b36dc",
+      "status_after": []
+    }
+  ],
+  "critical_safety": {
+    "encrypted_diffs": "UNVALIDATED and compile-time quarantined. A stop_tree AWK selector in src/repo/diff/encrypted/tool.rs may have killed unrelated ancestors because selected[parent[pid]] created false entries and the final loop emitted all keys. Do not run its watchdog or tests. Prove a replacement against synthetic PID snapshots, then recording-only signals, then isolated owned child processes before removing quarantine. Original module/tool copies are preserved as text.",
+    "pre_watchdog_stash": "80852d3ae5970bfb3e4d24ed9f8499f48db4fae6 is protected by codex/recovery-sops-pre-watchdog-80852d3. It is a stash-shaped commit, not a normal release branch.",
+    "preflight": "UNVALIDATED/REVIEW FAIL. Existing remote deletion and detached-tag flows regress; LFS upload precedes a rejecting original pre-push hook. Pending journal-lock/identity-port reproductions were unread at outage. Do not use this WIP against real repositories/remotes.",
+    "other_wip": "Drafts, file-comparison views and onboarding/portability have incomplete tests/review. Do not treat recovery commits as release-ready."
+  },
+  "recovery_files": {
+    "queue": "recovery/implementation-queue.json",
+    "operating_notes": "recovery/root-operating-notes.json",
+    "audits": "recovery/audit_*.json",
+    "original_inputs": "recovery/issues.json and recovery/prs.json"
+  },
+  "environment": {
+    "original_workspace": "/workspace",
+    "rust": "1.95.0",
+    "setup_scripts": "environment/env.sh and environment/install.sh",
+    "validation_rule": "Use a private CARGO_TARGET_DIR per worktree. Force a gitcraft package rebuild after copying dependency artifacts and confirm its compiler path. A shared target once returned another branch test executable, so those shared-target results are invalid. Unlink copied private Cargo locks. Do not run the quarantined code."
+  }
+}
