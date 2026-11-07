@@ -250,9 +250,9 @@ fn folders_odd_names_and_missing_files() -> Result<(), String> {
         // Nothing of that name: said so.
         let gone = explain(&dir, "nowhere.txt")?;
         assert!(gone.missing && !gone.tracked);
-        // Absolute inside the repository works; "." doesn't.
-        let top = crate::git::toplevel(&dir)?;
-        let absolute = format!("{}/src/one.txt", top.display());
+        // Absolute inside the repository works; "." doesn't. Built from the tab's own path, as
+        // the doctor gets it (on Windows git may spell the same folder in its long form).
+        let absolute = format!("{}/src/one.txt", crate::remote::git_path(&dir));
         assert_eq!(explain(&dir, &absolute)?.path, "src/one.txt");
         assert!(explain(&dir, ".").is_err());
         // t/ holds a tracked file: git lists its ignored files one by one, each once.
