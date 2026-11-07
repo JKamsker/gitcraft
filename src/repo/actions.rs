@@ -156,6 +156,16 @@ pub(crate) enum Action {
     },
     /// Apply a patch file, asking which.
     ApplyPatch,
+    OpenBundleExport,
+    OpenBundleImport,
+    ExportBundle {
+        refs: Vec<git::BundleRef>,
+        base: String,
+    },
+    ImportBundle {
+        preview: Box<git::BundlePreview>,
+        imports: Vec<git::BundleImport>,
+    },
     /// Drop or move a commit of the checked-out branch.
     QuickEdit {
         edit: quick_edit::Edit,
@@ -361,6 +371,16 @@ impl RepoTab {
         );
         items.extend([
             ("Apply patch…".into(), "patch".into(), Action::ApplyPatch),
+            (
+                "Export Git bundle…".into(),
+                "offline backup".into(),
+                Action::OpenBundleExport,
+            ),
+            (
+                "Inspect / import local Git bundle…".into(),
+                "offline exchange".into(),
+                Action::OpenBundleImport,
+            ),
             ("Undo".into(), "Ctrl+Z".into(), Action::Undo),
             ("Redo".into(), "Ctrl+Y".into(), Action::Redo),
             (

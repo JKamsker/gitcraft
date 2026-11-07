@@ -38,6 +38,8 @@ pub struct Settings {
     pub shell: String,
     /// Width of the branch/tag column of the graph.
     pub refs_width: f32,
+    /// Fit Branch / Tag to visible pills; dragging its border switches to a fixed width.
+    pub auto_refs_width: bool,
     /// Width of the graph column; 0 = fit the lanes of the repository.
     pub graph_width: f32,
     /// The graph's lanes closer together, for a narrower graph column.
@@ -109,7 +111,8 @@ impl Default for Settings {
             ui_scale: 1.0,
             terminal_font: 12.5,
             shell: String::new(),
-            refs_width: 280.0,
+            refs_width: DEFAULT_REFS_WIDTH,
+            auto_refs_width: true,
             graph_width: 0.0,
             compact_graph: false,
             author_width: 150.0,
@@ -152,6 +155,8 @@ fn id() -> egui::Id {
 }
 
 /// What "Compact graph" does.
+pub(crate) const DEFAULT_REFS_WIDTH: f32 = 280.0;
+
 pub const COMPACT_TIP: &str = "Lanes closer together, for a narrower graph column";
 
 impl Settings {
@@ -160,10 +165,16 @@ impl Settings {
             .unwrap_or_default()
     }
 
+    /// Older settings with a custom ref width keep that explicit preference.
+    pub(crate) fn fit_visible_refs(&self) -> bool {
+        self.auto_refs_width && self.refs_width == DEFAULT_REFS_WIDTH
+    }
+
     /// Gives the graph's columns their first widths back; which of them show stays.
     pub fn reset_columns(&mut self) {
         let fresh = Settings::default();
         self.refs_width = fresh.refs_width;
+        self.auto_refs_width = fresh.auto_refs_width;
         self.graph_width = fresh.graph_width;
         self.author_width = fresh.author_width;
         self.when_width = fresh.when_width;
@@ -551,11 +562,23 @@ impl Settings {
                     card.preview(Preview::GraphRefs);
                     card.row("Branch column width", "refs tags pills", |ui| {
                         ui.spacing_mut().slider_width = layout::fit(ui, SLIDER_WIDTH + 70.0) - 70.0;
-                        ui.add(layout::slider(
-                            egui::Slider::new(&mut self.refs_width, 210.0..=2000.0)
-                                .step_by(10.0)
-                                .suffix(" px"),
-                        ));
+                        if ui
+                            .add(layout::slider(
+                                egui::Slider::new(&mut self.refs_width, 96.0..=2000.0)
+                                    .step_by(10.0)
+                                    .suffix(" px"),
+                            ))
+                            .changed()
+                        {
+                            self.auto_refs_width = false;
+                        }
+                        let mut fit = self.fit_visible_refs();
+                        if ui.checkbox(&mut fit, "Fit visible refs").changed() {
+                            self.auto_refs_width = fit;
+                            if fit {
+                                self.refs_width = DEFAULT_REFS_WIDTH;
+                            }
+                        }
                     });
                     card.preview(Preview::GraphColumns);
                     card.row_hint(

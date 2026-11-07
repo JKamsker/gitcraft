@@ -144,6 +144,51 @@ fn exercise_app(root: &Path) -> Result<(), String> {
         "The App's plain push must reach the local practice origin"
     );
 
+    // Every binary/bounded bundle path must use the same practice context as the App.
+    // With inherited caller GIT_DIR and an active hostile profile, a raw command builder
+    // would expose caller refs here even though the normal HEAD read stays in practice.
+    let bundle_refs = git::bundle_refs(&path)?;
+    let bundle_head = git::head(&path);
+    assert!(
+        bundle_refs
+            .iter()
+            .all(|reference| reference.oid == bundle_head),
+        "Bounded bundle ref reads must remain in the practice repository"
+    );
+    let selected = bundle_refs
+        .iter()
+        .find(|reference| reference.name == "HEAD")
+        .ok_or("No practice bundle HEAD")?;
+    let bytes = git::export_bundle(&path, std::slice::from_ref(selected), None)?;
+    let bundle_file = root.join("isolated-practice.bundle");
+    git::save_bundle_file(&bundle_file, &bytes)?;
+    let snapshot = git::read_bundle_file(&bundle_file)?;
+    assert_eq!(snapshot, bytes);
+    let refs_before_preview = git::run(Some(&path), &["show-ref"])?;
+    let preview = git::inspect_bundle(&path, snapshot)?;
+    assert!(
+        preview.verification_error.is_none(),
+        "{:?}",
+        preview.verification_error
+    );
+    assert_eq!(git::run(Some(&path), &["show-ref"])?, refs_before_preview);
+    git::import_bundle(
+        &path,
+        &preview,
+        &[git::BundleImport {
+            source: "HEAD".to_owned(),
+            destination: "refs/heads/practice-bundle-copy".to_owned(),
+        }],
+    )?;
+    assert_eq!(
+        git::resolve(&path, "refs/heads/practice-bundle-copy")?,
+        bundle_head
+    );
+    assert!(
+        !root.join("escaped").exists(),
+        "Bundle paths must not run caller/profile helpers"
+    );
+
     // Opening a linked practice worktree must not return to inherited caller routing.
     let linked = path
         .parent()

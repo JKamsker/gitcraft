@@ -29,6 +29,7 @@ const FEATURES: &[(&str, &[&str])] = &[
         &[
             "Open, create or clone a repository from the start page; recent ones are listed there.",
             "Clone options choose shallow history (depth), blobless file contents on demand, and sparse folders. The server must support partial clones. Sparse checkout… in the palette edits the folder tree later, with all changes committed or stashed first. Move ignored files outside the working tree too: Git can delete them during sparse changes. Root files and files immediately inside parent folders remain included. Custom non-cone patterns are replaced only when explicitly chosen. Partial clones show when history may download contents; missing files ask before downloading.",
+            "The palette exports Git bundles of selected refs or an incremental range (exclude a base commit), and inspects local bundle refs/prerequisites before a deliberate import. Choose new destination refs: existing refs are never overwritten and import does not check out work. File pickers use this machine's disk; SSH/WSL repositories receive temporary copies. Bundle limit: 128 MiB, 1000 header entries and two minutes per Git call. Incremental bundles need their base commits already present.",
             "One tab per repository. Changes made elsewhere (editor, terminal) show up by themselves.",
             "Right-click a tab to give it its own icon and highlight colour.",
             "Drag a tab along the strip to reorder the tabs.",
@@ -51,7 +52,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Double-click a pill to check that branch out (and pull it when its remote is ahead; on the checked-out branch's remote pill, just pull); hover +N to see every branch of the commit, and right-click any of them.",
             "Right-click a commit or a pill for branches, tags, merge, rebase, cherry-pick, revert, reset and more.",
             "Search messages, authors and hashes, or switch to Code to find the commits that added or removed some text.",
-            "Drag the borders in the column header to resize; right-click it to pick the columns, make the graph column compact or reset the columns.",
+            "Description takes the flexible width; Branch / Tag fits visible pills until you drag its border. Right-click the header to restore Fit visible branch / tag pills, pick columns, make the graph compact or reset widths. Faint lane labels identify offscreen tips; hover a description for the full message.",
             "Interactive rebase: reorder, reword, squash, fix up or drop commits, then start it.",
         ],
     ),
