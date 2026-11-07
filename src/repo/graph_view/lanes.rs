@@ -32,18 +32,18 @@ impl RepoTab {
             if lane < lanes {
                 gp.line_segment(
                     [pos2(x(lane), top), pos2(x(lane), bottom)],
-                    Stroke::new(width, t.lane(lane)),
+                    Stroke::new(width, t.lane(graph_row.colours.get(&lane).copied().unwrap_or(lane))),
                 );
             }
         }
         for &lane in &graph_row.incoming {
-            edge(&gp, node, pos2(x(lane), top), t.lane(lane), width);
+            edge(&gp, node, pos2(x(lane), top), t.lane(graph_row.colours.get(&lane).copied().unwrap_or(lane)), width);
         }
         for &lane in &graph_row.outgoing {
             let color = if is_wip || stash.is_some() {
                 t.text_faint
             } else {
-                t.lane(lane)
+                t.lane(graph_row.colours.get(&lane).copied().unwrap_or(lane))
             };
             edge(&gp, node, pos2(x(lane), bottom), color, width);
         }

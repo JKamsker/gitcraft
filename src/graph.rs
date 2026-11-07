@@ -6,6 +6,7 @@
 //! lines that pass through a row are always vertical.
 
 use std::borrow::Borrow;
+use std::collections::HashMap;
 
 use crate::git::Commit;
 
@@ -13,6 +14,8 @@ use crate::git::Commit;
 pub struct Row {
     /// Column of the commit's dot.
     pub col: usize,
+    /// Stable colour identities for the lanes crossing this row.
+    pub colours: HashMap<usize, usize>,
     /// Identity of this continuous lane run, distinct when a column is reused.
     pub origin: usize,
     /// Lanes drawn straight through the row, top to bottom.
@@ -29,8 +32,24 @@ pub struct Graph {
     pub width: usize,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct LaneHint {
+    pub band: usize,
+    pub colour: usize,
+}
+
 pub fn layout<C: Borrow<Commit>>(commits: &[C]) -> Graph {
+    layout_banded(commits, &HashMap::new())
+}
+
+/// Keep each band contiguous while preserving every parent edge and continuous lane identity.
+pub fn layout_banded<C: Borrow<Commit>>(
+    commits: &[C],
+    hints: &HashMap<String, LaneHint>,
+) -> Graph {
     let mut lanes: Vec<Option<&str>> = Vec::new();
+    let mut bands = Vec::new();
+    let mut keys = Vec::new();
     let mut rows = Vec::with_capacity(commits.len());
     let mut origins = Vec::new();
     let mut next_origin = 0;
@@ -42,16 +61,20 @@ pub fn layout<C: Borrow<Commit>>(commits: &[C]) -> Graph {
         let incoming: Vec<usize> = (0..lanes.len())
             .filter(|&i| lanes[i] == Some(hash))
             .collect();
+        let hint = hints.get(hash).copied().unwrap_or(LaneHint { band: 0, colour: 0 });
         let col = match incoming.first() {
             Some(&c) => c,
-            None => free_lane(&mut lanes),
+            None => band_lane(&mut lanes, &mut bands, hint.band),
         };
+        keys.resize(lanes.len(), 0);
+        if incoming.is_empty() { keys[col] = hint.colour; }
         origins.resize(lanes.len(), row_index);
         if incoming.is_empty() {
             origins[col] = next_origin;
             next_origin += 1;
         }
         let origin = origins[col];
+        let mut colours: HashMap<usize, usize> = (0..lanes.len()).map(|i| (i, if hints.is_empty() { i } else { keys[i] })).collect();
         let through: Vec<usize> = (0..lanes.len())
             .filter(|&i| lanes[i].is_some() && lanes[i] != Some(hash))
             .collect();
@@ -70,7 +93,11 @@ pub fn layout<C: Borrow<Commit>>(commits: &[C]) -> Graph {
             } else if let Some(existing) = lanes.iter().position(|l| *l == Some(parent)) {
                 outgoing.push(existing);
             } else {
-                let lane = free_lane(&mut lanes);
+                let parent_hint = hints.get(parent).copied().unwrap_or(hint);
+                let lane = band_lane(&mut lanes, &mut bands, parent_hint.band);
+                keys.resize(lanes.len(), 0);
+                keys[lane] = parent_hint.colour;
+                colours.insert(lane, if hints.is_empty() { lane } else { keys[lane] });
                 lanes[lane] = Some(parent);
                 origins.resize(lanes.len(), row_index);
                 origins[lane] = next_origin;
@@ -79,12 +106,14 @@ pub fn layout<C: Borrow<Commit>>(commits: &[C]) -> Graph {
             }
         }
 
-        while lanes.last() == Some(&None) {
+        while hints.is_empty() && lanes.last() == Some(&None) {
             lanes.pop();
+            bands.pop();
         }
         width = width.max(lanes.len()).max(col + 1);
         rows.push(Row {
             col,
+            colours,
             origin,
             through,
             incoming,
@@ -92,16 +121,28 @@ pub fn layout<C: Borrow<Commit>>(commits: &[C]) -> Graph {
         });
     }
 
+    if !hints.is_empty() {
+        let mut order: Vec<usize> = (0..bands.len()).collect();
+        order.sort_by_key(|&i| (bands[i], i));
+        let mut remap = vec![0; bands.len()];
+        for (new, old) in order.into_iter().enumerate() { remap[old] = new; }
+        for row in &mut rows {
+            row.col = remap[row.col];
+            for lane in row.through.iter_mut().chain(&mut row.incoming).chain(&mut row.outgoing) { *lane = remap[*lane]; }
+            row.colours = std::mem::take(&mut row.colours).into_iter().map(|(col,key)| (remap[col],key)).collect();
+        }
+        width = bands.len();
+    }
     Graph { rows, width }
 }
 
-fn free_lane(lanes: &mut Vec<Option<&str>>) -> usize {
-    match lanes.iter().position(Option::is_none) {
-        Some(i) => i,
-        None => {
-            lanes.push(None);
-            lanes.len() - 1
-        }
+fn band_lane<'a>(lanes: &mut Vec<Option<&'a str>>, bands: &mut Vec<usize>, band: usize) -> usize {
+    if let Some(i) = lanes.iter().enumerate().position(|(i,l)| l.is_none() && bands[i] == band) {
+        i
+    } else {
+        lanes.push(None);
+        bands.push(band);
+        lanes.len() - 1
     }
 }
 

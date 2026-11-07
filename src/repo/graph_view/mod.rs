@@ -62,6 +62,7 @@ impl RepoTab {
             return;
         }
         self.saved_graph_header(ui);
+        self.branch_bands_header(ui);
         if self.commits.is_empty() {
             ui.centered_and_justified(|ui| {
                 if self.loading {

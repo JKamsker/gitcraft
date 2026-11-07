@@ -510,6 +510,7 @@ impl RepoTab {
     /// Rebuilds the graph rows from `history` and `work`, keeping the selection.
     pub(super) fn rebuild(&mut self, ctx: &egui::Context) {
         let previous = self.selected_hash();
+        self.branch_bands = super::branch_bands::Preferences::load(ctx, self.repo_key());
         self.rebuild_rows();
         self.restore_selection(previous, ctx);
         self.saved_views.dirty = true;
@@ -574,7 +575,7 @@ impl RepoTab {
             // Shared with `history`, not copied: tens of thousands of commits may be loaded.
             self.commits.push(Arc::clone(commit));
         }
-        let graph = graph::layout(&self.commits);
+        let graph = graph::layout_banded(&self.commits, &self.branch_bands.hints(&self.commits, &self.refs));
         let index = self
             .commits
             .iter()

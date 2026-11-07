@@ -5,6 +5,7 @@ mod actions;
 mod activity;
 mod apply;
 mod branch_tree;
+mod branch_bands;
 mod branch_visibility;
 mod bundles;
 mod ci_status;
@@ -145,6 +146,7 @@ pub struct RepoTab {
     /// Rows of the graph: the WIP pseudo-commit (when the tree is dirty) followed by `history`.
     commits: Vec<Arc<Commit>>,
     graph: Graph,
+    branch_bands: branch_bands::Preferences,
     /// Ref names for continuous lane runs, rebuilt with the graph, never while scrolling.
     graph_labels: HashMap<usize, String>,
     graph_messages: graph_view::message_tooltip::MessageTooltips,
@@ -331,6 +333,7 @@ impl RepoTab {
                 rows: Vec::new(),
                 width: 0,
             },
+            branch_bands: Default::default(),
             graph_labels: HashMap::new(),
             graph_messages: Default::default(),
             index: HashMap::new(),
