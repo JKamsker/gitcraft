@@ -56,6 +56,12 @@ pub(super) enum Msg {
     /// The Markdown file of the diff rendered, read along with the diff request numbered so.
     /// The diff's request, and which reading of it.
     DiffRendered((u64, u64), Box<Result<diff::rendered::RenderedMd, String>>),
+    /// The diff read as a rich view, along with the diff request numbered so.
+    DiffRich(
+        (u64, u64),
+        diff::rich::RichKind,
+        Box<Result<diff::rich::Rich, String>>,
+    ),
     FileHistory(String, Option<String>, Result<Vec<git::FileCommit>, String>),
     Blame(String, Option<String>, Result<file_view::BlameData, String>),
     /// A file as it is at a revision, for the file view.
@@ -405,13 +411,30 @@ impl RepoTab {
             }
             Msg::TreeFiles(hash, result) => self.all_files.arrived(&hash, result),
             Msg::Diff(request, result) => {
+                let mut reread = false;
                 if let Some(view) = &mut self.diff {
+                    // The rich view is read again only when the change itself changed.
+                    let source = |d: &Option<Result<diff::DiffData, String>>| match d {
+                        Some(Ok(d)) => Some(d.source),
+                        _ => None,
+                    };
+                    let before = source(&view.data);
+                    let fresh = request == view.request;
                     view.arrived(request, result.map(|data| *data));
+                    reread = fresh && (before != source(&view.data) || view.rich.is_none());
+                }
+                if reread {
+                    self.load_diff_rich(ctx);
                 }
             }
             Msg::DiffFile(request, result) => {
                 if let Some(view) = &mut self.diff {
                     view.file_arrived(request, result);
+                }
+            }
+            Msg::DiffRich(request, kind, result) => {
+                if let Some(view) = &mut self.diff {
+                    view.rich_arrived(request, kind, *result);
                 }
             }
             Msg::DiffRendered(request, result) => {

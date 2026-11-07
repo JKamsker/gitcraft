@@ -131,6 +131,12 @@ pub(crate) struct DiffView {
     /// Which reading of the rendered Markdown is the latest: an older one arriving last is
     /// dropped.
     pub(super) rendered_load: u64,
+    /// The diff read as a rich view, when one is on.
+    pub(super) rich: Option<(diff::rich::RichKind, Result<diff::rich::Rich, String>)>,
+    /// Which reading of the rich view is the latest.
+    pub(super) rich_load: u64,
+    /// What the rich view keeps between frames.
+    pub(super) rich_state: diff::rich::RichState,
     /// What the rendered Markdown keeps between frames.
     pub(super) markdown: egui_commonmark::CommonMarkCache,
     /// How far the lines were scrolled down last frame.
@@ -139,6 +145,15 @@ pub(crate) struct DiffView {
     pub(super) jump: Option<usize>,
     /// The change jumped to last, and the scroll offset that left.
     pub(super) at_change: Option<(usize, f32)>,
+    /// A line (by its index in the diff) to scroll to on the next frame.
+    pub(super) jump_line: Option<usize>,
+    /// The moved block whose two places are shown together.
+    pub(super) moved: Option<diff::moved_view::Opened>,
+    /// Unchanged lines opened from their folds (by their number on the new side), opened again
+    /// when the diff is read again.
+    pub(super) revealed: std::collections::BTreeSet<u32>,
+    /// Lines commented on (old side or not, number) whose fold was opened for them already.
+    pub(super) auto_opened: std::collections::BTreeSet<(bool, u32)>,
     /// The latest read of this diff: only its answer is shown, so a slower answer to an older
     /// read (before the whitespace or whole-file setting changed…) can't replace it.
     pub(super) request: u64,
@@ -175,10 +190,17 @@ impl DiffView {
             file: None,
             rendered: None,
             rendered_load: 0,
+            rich: None,
+            rich_load: 0,
+            rich_state: Default::default(),
             markdown: Default::default(),
             scroll: 0.0,
             jump: None,
             at_change: None,
+            jump_line: None,
+            moved: None,
+            revealed: Default::default(),
+            auto_opened: Default::default(),
             request: 0,
             lines: None,
             unfolded: false,
@@ -205,12 +227,27 @@ impl DiffView {
         if result.is_ok() {
             self.restore = self.keep_place.take();
         }
+        // The moved block shown stays open while the diff read again still has it.
+        let place = match (&self.data, &self.moved) {
+            (Some(Ok(data)), Some(open)) => diff::moved_view::Opened::place(data, open.block),
+            _ => None,
+        };
         self.data = Some(result);
         // The lines may have moved.
         self.chosen.clear();
         self.anchor = None;
         self.text_sel = None;
         self.at_change = None;
+        self.jump_line = None;
+        // The blocks are found again, numbered anew.
+        self.moved = None;
+        self.reopen();
+        self.moved = match (&self.data, place) {
+            (Some(Ok(data)), Some(place)) => (0..data.moves.blocks.len())
+                .find(|&b| diff::moved_view::Opened::place(data, b) == Some(place))
+                .and_then(|b| diff::moved_view::Opened::new(data, b)),
+            _ => None,
+        };
     }
 
     /// Shows the whole file read along with the read numbered `request`, unless a newer read

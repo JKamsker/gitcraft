@@ -13,6 +13,7 @@ use super::rows::Rows;
 use super::{DiffData, Kind, Pick, old_name, picked_in_file, unstage_args};
 use crate::forge::links::Target;
 use super::{remerge, rendered};
+use super::{rendered, rich};
 use crate::git::{Area, StatusFile};
 use crate::icons;
 use crate::pull_request::DiffSide;
@@ -66,13 +67,20 @@ impl RepoTab {
         } else {
             self.fold_reason(view, &settings, acts)
         };
+        // The rich views the file has, and the one shown (not with the file, nor rendered).
+        let rich_kinds = self.rich_kinds_of(&path);
+        let rich_on = self
+            .diff_rich_kind()
+            .filter(|_| !as_file && markdown != Some(true));
+        let rich_ready =
+            rich_on.is_some() && !matches!(&view.rich, Some((_, Ok(rich::Rich::Plain(_)))));
         let clear = self.diff_header(
             ui,
             view,
             (&path, &origin),
-            partial,
+            partial && !rich_ready,
             (split, ignore_ws, whole_file, as_file, folded.is_some()),
-            markdown,
+            (markdown, &rich_kinds, rich_on, rich_ready),
             acts,
         );
 
@@ -132,6 +140,29 @@ impl RepoTab {
             }
             return;
         }
+        if let Some(kind) = rich_on {
+            let Some(view) = &mut self.diff else { return };
+            match &view.rich {
+                None => {
+                    ui.centered_and_justified(|ui| ui.add(crate::spinner::Spinner::new()));
+                    return;
+                }
+                Some((_, Err(e))) => {
+                    ui.add_space(12.0);
+                    ui.horizontal(|ui| {
+                        ui.add_space(12.0);
+                        ui.colored_label(t.danger, e);
+                    });
+                    return;
+                }
+                Some((_, Ok(rich::Rich::Ready(diff)))) => {
+                    rich::show(ui, diff, &mut view.rich_state, acts);
+                    return;
+                }
+                Some((_, Ok(rich::Rich::Plain(note)))) => rich::fallback_note(ui, kind, note),
+            }
+        }
+        let Some(view) = &self.diff else { return };
         if let Some(reason) = folded {
             let data = match &view.data {
                 Some(Ok(data)) => Some(data),
@@ -162,6 +193,26 @@ impl RepoTab {
             let draft = self.pr_drafts.entry(pr.number).or_default();
             line_comment_panel(ui, &t, pr, draft, data, acts);
         }
+        // Lines commented on in the pull request stay in view, their fold opened (once each,
+        // so a fold that can't open isn't asked again every frame).
+        let mut auto_opened = None;
+        if let (Some(review), Some(ctx)) = (&review, &data.context) {
+            let folded = review.marks.keys().find_map(|&(side, line)| {
+                let line = u32::try_from(line).ok()?;
+                let old = side == crate::pull_request::DiffSide::Left;
+                if view.auto_opened.contains(&(old, line)) {
+                    return None;
+                }
+                super::context::unfold_to(ctx, line, old, 3).map(|f| (f, (old, line)))
+            });
+            if let Some(((gap, how), mark)) = folded {
+                acts.push(Action::DiffUnfold { gap, how });
+                auto_opened = Some(mark);
+            }
+        }
+        if let Some(open) = &view.moved {
+            super::moved_view::panel(ui, &t, data, open, acts);
+        }
 
         if let Some(program) = &data.textconv {
             let area = match &view.key {
@@ -188,10 +239,12 @@ impl RepoTab {
         self.find.saw(seen);
 
         if let Some(view) = &mut self.diff {
+            view.auto_opened.extend(auto_opened);
             view.text_sel = sel;
             view.scroll = offset;
             view.jump = None;
             view.scroll_to = None;
+            view.jump_line = None;
             if let Some(i) = jumped {
                 view.at_change = Some((i, offset));
             }
@@ -256,8 +309,9 @@ impl RepoTab {
     }
 
     /// Header: file, where it comes from, options, actions, close. `opts`: (side by side,
-    /// ignore whitespace, whole file, the file instead of the diff, folded); `markdown`: for a Markdown
-    /// file, whether it shows rendered. True when the picked lines are to be cleared.
+    /// ignore whitespace, whole file, the file instead of the diff); `views`: for a Markdown
+    /// file, whether it shows rendered; the rich views of the file, the one on, and whether it
+    /// is shown in place of the lines. True when the picked lines are to be cleared.
     #[allow(clippy::too_many_arguments)]
     fn diff_header(
         &self,
@@ -266,10 +320,15 @@ impl RepoTab {
         (path, origin): (&str, &str),
         partial: bool,
         (split, ignore_ws, whole_file, as_file, folded): (bool, bool, bool, bool, bool),
-        markdown: Option<bool>,
+        (markdown, rich_kinds, rich_on, rich_ready): (
+            Option<bool>,
+            &[rich::RichKind],
+            Option<rich::RichKind>,
+            bool,
+        ),
         acts: &mut Vec<Action>,
     ) -> bool {
-        let rendered = markdown == Some(true);
+        let rendered = markdown == Some(true) || rich_ready;
         let t = Tokens::get(ui.ctx());
         let mut clear = false;
         egui::Frame::new()
@@ -307,7 +366,7 @@ impl RepoTab {
                     if let Some(ranges) = &view.lines {
                         widgets::chip(ui, &lines_chip(ranges), t.accent);
                     }
-                    let before = if rendered {
+                    let before = if markdown == Some(true) {
                         matches!(&view.rendered, Some(Ok(md)) if md.before)
                     } else {
                         matches!(&view.file, Some(Ok(f)) if f.before)
@@ -348,18 +407,28 @@ impl RepoTab {
                         if self.split_toggle(ui) {
                             ui.add_space(8.0);
                         }
+                        for &kind in rich_kinds.iter().rev() {
+                            let on = rich_on == Some(kind);
+                            let r = icons::small_button(ui, kind.icon(), kind.tip(on));
+                            if on {
+                                widgets::active_underline(ui, r.rect, t.accent);
+                            }
+                            if r.clicked() {
+                                acts.push(Action::DiffRich((!on).then_some(kind)));
+                            }
+                        }
                         if markdown.is_some() {
-                            let tip = match (rendered, as_file) {
+                            let tip = match (markdown == Some(true), as_file) {
                                 (true, _) => "Show the Markdown as text",
                                 (false, false) => "Show the changes rendered",
                                 (false, true) => "Show the file rendered",
                             };
                             let r = icons::small_button(ui, "eye", tip);
-                            if rendered {
+                            if markdown == Some(true) {
                                 widgets::active_underline(ui, r.rect, t.accent);
                             }
                             if r.clicked() {
-                                acts.push(Action::DiffRendered(!rendered));
+                                acts.push(Action::DiffRendered(markdown != Some(true)));
                             }
                             ui.add_space(4.0);
                         }

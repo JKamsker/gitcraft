@@ -178,8 +178,25 @@ pub(crate) enum Action {
     DiffAsFile(bool),
     /// Markdown files show rendered in diffs, or as text.
     DiffRendered(bool),
+    /// Diffs show as this rich view (prose…), for the files it reads, or as their lines.
+    DiffRich(Option<diff::rich::RichKind>),
+    /// Back from a rich view to the plain diff, at the line numbered `old` before the change
+    /// or `new` after it.
+    DiffGoToLine {
+        old: Option<u32>,
+        new: Option<u32>,
+    },
     /// Scroll the diff to the next change (`1`) or the previous one (`-1`).
     DiffStep(i32),
+    /// Show the two places of a moved block of the diff together (by its index), or stop.
+    DiffMoved(Option<usize>),
+    /// Scroll the diff to one of its lines (by its index).
+    DiffJumpLine(usize),
+    /// Show some of the unchanged lines folded in a gap of the diff (by its index).
+    DiffUnfold {
+        gap: usize,
+        how: diff::Unfold,
+    },
     /// The commit pane lists every file of the commit, or only those it changed.
     ViewAllFiles(bool),
     /// The commit pane of a merge shows what it resolved, or the files it changed.

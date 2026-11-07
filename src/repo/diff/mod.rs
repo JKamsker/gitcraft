@@ -8,6 +8,8 @@ mod algorithm;
 mod algorithm_tests;
 mod binary;
 mod image_compare;
+pub(super) mod context;
+mod fold_view;
 mod images;
 mod interdiff;
 mod jump;
@@ -17,12 +19,17 @@ mod lines;
 pub(super) mod line_diff;
 mod map;
 mod notebook;
+pub(super) mod moved;
+#[cfg(test)]
+mod moved_tests;
+pub(super) mod moved_view;
 mod paint;
 mod parse;
 mod patch;
 mod remerge;
 mod place;
 pub(super) mod rendered;
+pub(super) mod rich;
 mod rows;
 mod select;
 #[cfg(test)]
@@ -37,6 +44,7 @@ use super::highlight::{self, MAX_LINE_CHARS, Spans, cap_line};
 use crate::git::{self, Area, DiffOptions};
 
 pub(super) use algorithm::algorithm_for;
+pub use context::Unfold;
 pub use images::ImagePair;
 use images::{is_image, load_images};
 pub(in crate::repo) use interdiff::{interdiff_data, interdiff_rows};
@@ -65,6 +73,8 @@ pub enum Kind {
     Hunk,
     /// Binary notices, "No newline at end of file".
     Meta,
+    /// The unchanged lines after the last hunk, folded (see [`context`]).
+    Fold,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -106,6 +116,10 @@ pub struct DiffData {
     pub partial: bool,
     /// Hunks and lines of a commit's diff can be reverted on their own.
     pub revertable: bool,
+    /// Blocks removed in one place and added in another.
+    pub moves: moved::Moves,
+    /// The unchanged lines between the hunks, folded, and the file they open from.
+    pub context: Option<context::Context>,
     /// The file is new: it has no old side, so it shows unified even side by side.
     pub new_file: bool,
     /// The lines added and removed; `None` when there are none to count (a binary file, one
@@ -113,6 +127,8 @@ pub struct DiffData {
     pub line_counts: (Option<u32>, Option<u32>),
     /// Characters in the longest line, for the width to scroll (counted once, not every frame).
     longest: usize,
+    /// A hash of the diff text git gave: two reads with the same one show the same change.
+    pub(super) source: u64,
     /// The lines cut to be shown, as they were: what copying them copies.
     pub(super) uncut: std::collections::HashMap<usize, String>,
     /// The runs of changed rows and the changes they make, unified and side by side: worked
@@ -196,7 +212,7 @@ pub fn load_lines(
         (Some(ranges), DiffKey::Commit { hash, path }) => {
             let text = git::line_diff(repo, hash, path, ranges)?;
             // Not the commit's patch: nothing of it is picked to revert.
-            Ok(prepare(repo, key, path, &text, false, dark))
+            Ok(prepare(repo, key, path, &text, false, true, dark))
         }
         _ => load(repo, key, opts, dark),
     }
@@ -237,7 +253,7 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         ),
     };
     let pickable = !opts.ignore_ws;
-    Ok(prepare(repo, key, &path, &text, pickable, dark))
+    Ok(prepare(repo, key, &path, &text, pickable, opts.whole_file, dark))
 }
 
 /// The diff `text` of `path` read into lines, coloured and paired. `pickable`: hunks and lines
@@ -248,12 +264,24 @@ fn prepare(
     path: &str,
     text: &str,
     pickable: bool,
+    whole_file: bool,
     dark: bool,
 ) -> DiffData {
     let path = path.to_owned();
     let mut lines = parse(text);
     if let DiffKey::Remerge { conflicts, .. } = key {
         lines = remerge::label(conflicts, lines, !pickable);
+    }
+    // Read only when the diff doesn't show the whole file already.
+    let context = (!whole_file && !is_image(&path))
+        .then(|| context::read(repo, key, &lines, dark))
+        .flatten();
+    if context
+        .as_ref()
+        .and_then(|c| c.gaps.last())
+        .is_some_and(|g| g.trailing && g.hidden() > 0)
+    {
+        lines.push(context::fold_row());
     }
     let header = patch_header(text);
     let picks = pickable && can_pick(&header, &lines);
@@ -286,6 +314,7 @@ fn prepare(
         .then(|| notebook::load(repo, key, &path, renamed_from(&text)))
         .flatten();
     let mut spans = highlight_sides(&path, &lines, dark);
+    let moves = find_moves(&lines);
     let (mut changed, split) = pair_lines(&lines);
     let mut uncut = std::collections::HashMap::new();
     for (i, (line, spans)) in lines.iter_mut().zip(spans.iter_mut()).enumerate() {
@@ -319,12 +348,35 @@ fn prepare(
         header,
         partial,
         revertable,
+        moves,
+        context,
         new_file,
         longest,
+        source: {
+            use std::hash::{Hash, Hasher};
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            text.hash(&mut h);
+            h.finish()
+        },
         uncut,
         weakened,
         authors,
         map: Default::default(),
+    }
+}
+
+/// The moved blocks of a two-sided diff; a combined one (a conflict's) has no line numbers to
+/// tell its sides by.
+fn find_moves(lines: &[DiffLine]) -> moved::Moves {
+    let numbered = lines.iter().all(|l| match l.kind {
+        Kind::Add => l.new.is_some(),
+        Kind::Del => l.old.is_some(),
+        _ => true,
+    });
+    if numbered {
+        moved::detect(lines)
+    } else {
+        moved::Moves::default()
     }
 }
 

@@ -31,6 +31,8 @@ impl RepoTab {
                 acts.push(Action::CloseReflog);
                 if let Some(file) = self.work.unstaged.first() {
                     acts.push(Action::OpenDiff(DiffKey::Work(file.clone())));
+                    // Read again as prose (a.txt), both sides read on that machine.
+                    acts.push(Action::DiffRich(Some(diff::rich::RichKind::Prose)));
                 }
                 acts.push(Action::FileView {
                     path: "a.txt".to_owned(),
@@ -85,7 +87,17 @@ impl RepoTab {
                         pick: diff::Pick::Stage,
                         lines: diff::hunk_changes(&data.lines, 0),
                     });
+                    // After the pick, whose lines it numbers.
+                    acts.push(Action::DiffUnfold {
+                        gap: 0,
+                        how: diff::Unfold::All,
+                    });
                 }
+                // Back from the prose view opened in phase 1, to a line of the diff.
+                acts.push(Action::DiffGoToLine {
+                    old: None,
+                    new: Some(1),
+                });
                 acts.push(Action::RunRebase);
                 acts.push(Action::Stash(StashRequest::everything("sample")));
                 // A bisect from start to end, a run in it, and the dialog that starts one.

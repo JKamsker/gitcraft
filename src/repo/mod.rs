@@ -311,6 +311,11 @@ pub struct RepoTab {
     diff_rendered: bool,
     /// What is known of which files start folded (generated, lockfiles).
     folding: fold::Folding,
+    /// Diffs show as this rich view, for the files it reads.
+    diff_rich: Option<diff::rich::RichKind>,
+    /// The file a rich view was turned on for that only its contents offer (an API document
+    /// not named like one): the view applies to it, and its button shows on it.
+    diff_rich_for: Option<String>,
     /// Whether the commit pane lists every file of the commit, and those read.
     all_files: detail::AllFiles,
     /// What merges resolved: the commit pane's view of one, the graph's badges.
@@ -573,6 +578,8 @@ impl RepoTab {
             diff_as_file: false,
             diff_rendered: false,
             folding: Default::default(),
+            diff_rich: None,
+            diff_rich_for: None,
             all_files: Default::default(),
             remerges: Default::default(),
             conflict: None,

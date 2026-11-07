@@ -269,15 +269,40 @@ impl RepoTab {
             Action::FoldAttributes(paths) => self.ask_fold_attributes(&paths, ctx),
             Action::DiffAsFile(on) => self.show_diff_as_file(on, ctx),
             Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
+            Action::DiffRich(kind) => self.show_diff_rich(kind, ctx),
+            Action::DiffGoToLine { old, new } => self.diff_go_to_line(old, new),
             Action::DiffStep(delta) => {
+                // Shown in place of the lines (not fallen back to them).
+                let rich = self.diff_rich_kind().is_some()
+                    && self.diff.as_ref().is_some_and(|v| {
+                        matches!(&v.rich, Some((_, Ok(diff::rich::Rich::Ready(_)))))
+                    });
                 let rendered =
                     self.diff_rendered && self.diff.as_ref().is_some_and(|v| v.key.renders());
                 if let Some(view) = self
                     .diff
                     .as_mut()
-                    .filter(|_| !self.diff_as_file && !rendered)
+                    .filter(|_| !self.diff_as_file && !rendered && !rich)
                 {
                     view.step_change(Settings::get(ctx).diff_split, delta);
+                }
+            }
+            Action::DiffMoved(block) => {
+                if let Some(view) = &mut self.diff {
+                    view.moved = match (&view.data, block) {
+                        (Some(Ok(data)), Some(b)) => diff::moved_view::Opened::new(data, b),
+                        _ => None,
+                    };
+                }
+            }
+            Action::DiffUnfold { gap, how } => {
+                if let Some(view) = &mut self.diff {
+                    view.unfold(gap, how);
+                }
+            }
+            Action::DiffJumpLine(i) => {
+                if let Some(view) = &mut self.diff {
+                    view.jump_line = Some(i);
                 }
             }
             Action::ViewAllFiles(on) => self.all_files.on = on,

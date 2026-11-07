@@ -253,6 +253,8 @@ impl RepoTab {
                 acts.push(Action::Agent(super::agents::AgentAct::Tray(super::agents::TrayAct::Close)));
             } else if esc && diff_keys && self.line_comment_open() {
                 acts.push(Action::Pr(pr_review::PrAct::CloseLine));
+            } else if esc && self.diff.as_ref().is_some_and(|d| d.moved.is_some()) {
+                acts.push(Action::DiffMoved(None));
             } else if esc && self.conflict.is_none() && self.rebase.is_some() {
                 // What is drawn first (see the central panel) closes first: a diff opened
                 // meanwhile is under it.

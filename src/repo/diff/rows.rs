@@ -6,7 +6,7 @@ use egui::{FontId, Galley, Pos2, Rect, Sense, Stroke, Ui, pos2, vec2};
 use super::jump::{change_at, offset_of};
 use super::link::{LineLinks, note_right_click};
 use super::map::change_map;
-use super::paint::{filler, hunk_button, paint_line};
+use super::paint::{filler, hunk_button, paint_line, text_button};
 use super::select::{Hit, Side, TextSel, copy_selection, drag_selection};
 use super::{DiffData, Kind, LINE_H, MAP_W, NUM_W, Pick, hunk_changes};
 use crate::git::Area;
@@ -180,6 +180,8 @@ impl<'a> Rows<'a> {
         if let (Some(find), Some(hit)) = (self.find, self.reveal) {
             let text = data.lines.get(hit.line).map_or("", |l| l.text.as_str());
             scroll = find.scroll_to(scroll, &hit, text, char_w);
+        } else if let Some(row) = self.view.jump_line.and_then(|i| row_of(data, split, i)) {
+            scroll = scroll.vertical_scroll_offset(offset_of(row));
         }
         let out = ui.scope_builder(egui::UiBuilder::new().max_rect(body), |ui| {
             scroll.show_rows(ui, LINE_H, count, |ui, range| {
@@ -303,7 +305,7 @@ impl<'a> Rows<'a> {
             && let Some(i) = l
             && matches!(
                 self.data.lines.get(i).map(|x| x.kind),
-                Some(Kind::Hunk | Kind::Meta)
+                Some(Kind::Hunk | Kind::Meta | Kind::Fold)
             )
         {
             self.line(ui, left.union(right), i, Side::Both, 0.0, acts);
@@ -376,14 +378,78 @@ impl<'a> Rows<'a> {
         if let Some(spot) = spot {
             self.comment_gutter(ui, rect, i, side, spot, acts);
         }
+        let mut right = rect.right().min(ui.clip_rect().right()) - 6.0;
+        if kind == Some(Kind::Hunk) && !self.hunk_picks.is_empty() {
+            right = self.hunk_buttons(ui, rect, i, acts) - 8.0;
+        }
         if kind == Some(Kind::Hunk) {
-            let mut right = rect.right().min(ui.clip_rect().right()) - 6.0;
-            if !self.hunk_picks.is_empty() {
-                right = self.hunk_buttons(ui, rect, i, acts) - 4.0;
-            }
-            if let Some(tip) = data.weakened.get(&i) {
-                super::weakened::badge(ui, right, rect.center().y, tip, i);
-            }
+            if let Some(tip) = data.weakened.get(&i) { super::weakened::badge(ui, right, rect.center().y, tip, i); right -= 24.0; }
+        }
+        if matches!(kind, Some(Kind::Hunk | Kind::Fold)) {
+            // Right of where the header's own text ends.
+            let gutter = if side == Side::Unified {
+                NUM_W * 2.0
+            } else {
+                0.0
+            };
+            let text = data.lines.get(i).map_or(String::new(), |l| l.text.clone());
+            let text_w = ui
+                .painter()
+                .layout_no_wrap(text, self.font.clone(), self.t.text)
+                .size()
+                .x;
+            let left = (rect.left() + gutter + 24.0 + text_w + 12.0).max(ui.clip_rect().left());
+            super::fold_view::controls(ui, data, i, (left, right, rect.center().y), acts);
+        }
+        if kind.is_some_and(|k| side.shows(k)) {
+            self.moved_button(ui, rect, i, acts);
+        }
+    }
+
+    /// On the first line of each place of a moved block: where its other place is, and a click
+    /// to see the two together.
+    fn moved_button(&self, ui: &mut Ui, rect: Rect, i: usize, acts: &mut Vec<Action>) {
+        let moves = &self.data.moves;
+        let Some((b, _)) = moves.at(i) else { return };
+        let Some(block) = moves.blocks.get(b) else {
+            return;
+        };
+        let lines = &self.data.lines;
+        let number = |at: usize, old: bool| {
+            lines
+                .get(at)
+                .and_then(|l| if old { l.old } else { l.new })
+                .unwrap_or(0)
+        };
+        let label = if i == block.del.start {
+            format!("Moved to line {}", number(block.add.start, false))
+        } else if i == block.add.start {
+            format!("Moved from line {}", number(block.del.start, true))
+        } else {
+            return;
+        };
+        let label = if block.exact {
+            label
+        } else {
+            format!("{label}, edited")
+        };
+        let right = rect.right().min(ui.clip_rect().right()) - 6.0;
+        let id = ui.id().with(("moved_btn", i));
+        let (resp, _) = text_button(ui, right, rect.center().y, &label, self.t.accent, id);
+        // The block whose places the panel below shows.
+        if self.view.moved.as_ref().is_some_and(|o| o.block == b) {
+            ui.painter().rect_stroke(
+                resp.rect,
+                self.t.radius_sm,
+                Stroke::new(1.5, self.t.accent),
+                egui::StrokeKind::Inside,
+            );
+        }
+        if resp
+            .on_hover_text("Show both places of the moved block, and what changed on the way")
+            .clicked()
+        {
+            acts.push(Action::DiffMoved(Some(b)));
         }
     }
 
@@ -506,6 +572,16 @@ impl<'a> Rows<'a> {
         }
         right + 4.0
     }
+}
+
+/// The row line `i` shows on, unified or side by side (`split`).
+pub(super) fn row_of(data: &DiffData, split: bool, i: usize) -> Option<usize> {
+    if !split {
+        return (i < data.lines.len()).then_some(i);
+    }
+    data.split
+        .iter()
+        .position(|&(l, r)| l == Some(i) || r == Some(i))
 }
 
 /// The half of the side-by-side view a side is, for comments (`None`: unified).

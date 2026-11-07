@@ -43,7 +43,17 @@ pub(super) fn paint_line(
         Kind::Del => (Some(t.diff_del_bg), t.text),
         Kind::Hunk => (Some(t.accent.gamma_multiply(0.12)), t.accent),
         Kind::Meta => (None, t.text_faint),
+        Kind::Fold => (Some(t.accent.gamma_multiply(0.06)), t.text_dim),
         Kind::Context => (None, t.text_dim),
+    };
+    // Moved here or away unchanged: the block's own muted colour instead of red or green.
+    let moved = data
+        .moves
+        .at(i)
+        .filter(|_| matches!(line.kind, Kind::Add | Kind::Del));
+    let bg = match moved {
+        Some((_, true)) => Some(moved_bg(t)),
+        _ => bg,
     };
     if let Some(bg) = bg {
         p.rect_filled(rect, 0.0, bg);
@@ -94,11 +104,22 @@ pub(super) fn paint_line(
         Kind::Del => "−",
         _ => "",
     };
-    let mark_color = if line.kind == Kind::Add {
-        t.success
-    } else {
-        t.danger
+    let mark_color = match (moved, line.kind) {
+        (Some(_), _) => t.accent,
+        (None, Kind::Add) => t.success,
+        _ => t.danger,
     };
+    // A moved block's lines, edited ones too, share a bar beside the mark.
+    if moved.is_some() {
+        p.rect_filled(
+            Rect::from_min_size(
+                pos2(rect.left() + gutter + 2.0, rect.top()),
+                vec2(2.0, LINE_H),
+            ),
+            0.0,
+            t.accent.gamma_multiply(0.8),
+        );
+    }
     p.text(
         pos2(rect.left() + gutter + 8.0, y),
         Align2::LEFT_CENTER,
@@ -109,6 +130,7 @@ pub(super) fn paint_line(
 
     // Text: syntax colours when known, the changed part on a stronger background.
     let strong = match line.kind {
+        _ if moved.is_some_and(|(_, same)| same) => Color32::TRANSPARENT,
         Kind::Add => t.success.gamma_multiply(0.35),
         Kind::Del => t.danger.gamma_multiply(0.35),
         _ => Color32::TRANSPARENT,
@@ -193,6 +215,11 @@ pub(super) fn line_job(
     job
 }
 
+/// The muted colour of moved lines, removed or added.
+pub(super) fn moved_bg(t: &Tokens) -> Color32 {
+    t.accent.gamma_multiply(0.09)
+}
+
 /// A small text button in a hunk header, its right edge at `right`; returns it and its left edge.
 pub(super) fn hunk_button(
     ui: &mut Ui,
@@ -208,18 +235,39 @@ pub(super) fn hunk_button(
     } else {
         t.accent
     };
+    let id = ui.id().with(("hunk_btn", hunk, pick.verb()));
+    let (resp, left) = text_button(ui, right, y, &label, color, id);
+    let tip = match pick {
+        Pick::Stage => {
+            "Stage this hunk. Click lines to stage only some of them (Shift+click for a range)."
+        }
+        Pick::Unstage => {
+            "Unstage this hunk. Click lines to unstage only some of them (Shift+click for a range)."
+        }
+        Pick::Discard => "Throw away this hunk's changes (Ctrl+Z brings them back).",
+    };
+    (resp.on_hover_text(tip), left)
+}
+
+/// A small text button on a diff row, its right edge at `right` and its middle at `y`; returns
+/// it and its left edge.
+pub(super) fn text_button(
+    ui: &mut Ui,
+    right: f32,
+    y: f32,
+    label: &str,
+    color: Color32,
+    id: egui::Id,
+) -> (egui::Response, f32) {
+    let t = Tokens::get(ui.ctx());
     let galley = ui
         .painter()
-        .layout_no_wrap(label, theme::medium(11.0), color);
+        .layout_no_wrap(label.to_owned(), theme::medium(11.0), color);
     let r = Rect::from_min_max(
         pos2(right - galley.size().x - 14.0, y - 9.0),
         pos2(right, y + 9.0),
     );
-    let resp = ui.interact(
-        r,
-        ui.id().with(("hunk_btn", hunk, pick.verb())),
-        Sense::click(),
-    );
+    let resp = ui.interact(r, id, Sense::click());
     let fill = if resp.hovered() { t.hover } else { t.dock };
     ui.painter().rect_filled(r, t.radius_sm, fill);
     ui.painter().rect_stroke(
@@ -233,18 +281,8 @@ pub(super) fn hunk_button(
         galley,
         color,
     );
-    let tip = match pick {
-        Pick::Stage => {
-            "Stage this hunk. Click lines to stage only some of them (Shift+click for a range)."
-        }
-        Pick::Unstage => {
-            "Unstage this hunk. Click lines to unstage only some of them (Shift+click for a range)."
-        }
-        Pick::Discard => "Throw away this hunk's changes (Ctrl+Z brings them back).",
-        Pick::Revert => {
-            "Undo this hunk of the commit in the working tree, to look over before committing. \
-             Click lines to revert only some of them (Shift+click for a range)."
-        }
-    };
-    (resp.on_hover_text(tip), r.left())
+    (
+        resp.on_hover_cursor(egui::CursorIcon::PointingHand),
+        r.left(),
+    )
 }

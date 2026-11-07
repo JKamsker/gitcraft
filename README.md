@@ -761,6 +761,25 @@ so your config, credentials and hooks apply as usual.
   the diff, which follows the next file opened, and the border between them drags to resize.
   Diffs of a file's history, of a pull request, over the builds, and the conflict editor keep
   their own place.
+- Context that opens where you need it: each hunk's header says how many unchanged lines are
+  folded above it (_42 unchanged lines_), and a row after the last hunk those below it. _↑ 20_
+  shows the lines right above the hunk, _↓ 20_ those right below the hunk before, _Show all_
+  every one, and _Function_ the lines of the function git names for the hunk (when it encloses
+  the hunk), up to its first line and down to its end. In a narrow pane the least needed
+  buttons give way first. The lines opened join their hunk as context, so staging, unstaging
+  and discarding hunks or picked lines work as before; those next to a hunk stay open when the
+  diff is read again (after staging, or a change on disk), and a line a pull request's review
+  commented on opens by itself. Folds are only offered when the file read matches what git
+  diffed: not after a clean filter (`core.autocrlf`, Git LFS) or textconv, nor for files that
+  aren't UTF-8. Close and reopen the diff to fold everything again.
+- Moved code: a block removed in one place of the file and added in another (the whitespace
+  around its lines aside, so re-indenting doesn't hide it) shows in a muted colour of its own
+  instead of red and green, with a bar beside both places. _Moved to line…_ / _Moved from
+  line…_ on its first line opens a panel with the two places together: the lines kept, those
+  edited on the way (the changed part of each marked), and buttons to go to either place; the
+  button reads _…, edited_ when lines changed on the way. Esc or its × closes the panel.
+  Staging hunks and lines works as before (a click on the button opens the panel rather than
+  picking that line).
 - The _Diff_ / _File_ switch shows the whole file as it is after the change instead (before it,
   for a deleted file), coloured and with line numbers.
 - Ctrl+F in a diff (unified or side by side), a file or a blame finds in it rather than in the
@@ -782,6 +801,61 @@ so your config, credentials and hooks apply as usual.
   clicked there opens. Reached another way (its history, a pull request's timeline), its diff
   shows only a line such as _+1,204 −880, lockfile_ until _Show the changes_. Settings → Git → Diffs adds patterns of your
   own (`*.snap`, `dist/**`, `vendor/`) or turns folding off.
+- Readings that understand the file: some files get a button in the diff's header that shows
+  their change in a way of their own instead of as lines (click it again for the lines, where
+  staging stays). They read both sides of the file in the background (on the repository's
+  machine, for WSL and SSH, under its old name before a rename); a click on a part goes back
+  to the lines, at its line or the nearest one the diff shows, and a file they can't read (not UTF-8, over 8 MB, malformed) shows the plain diff with a note
+  saying why.
+  - _Prose_ (the book, for `.md`, `.adoc`, `.rst` and `.txt`): paragraphs wrapped to the
+    pane. In an edited paragraph the removed words are struck through on red and the added
+    ones on green, compared word by word (a punctuation mark counts as a word of its own;
+    the text keeps its own spacing), so a paragraph only re-wrapped says _re-wrapped_ and
+    marks nothing. Removed and added paragraphs show whole; long runs of unchanged ones fold
+    (click to open).
+  - _By key_ (the list, for JSON, YAML and TOML): one row per key path that changed, such as
+    `server.timeout: 30 → 60`, keys added and removed, a value that became another kind
+    (`boolean → string`), and keys that only moved within their map listed apart from
+    changed values (_moved, same value_). List items are matched by content, so an item
+    inserted at the top doesn't make every one after it changed (in lists of a few thousand
+    items that differ; longer ones are compared item by item in place). Comments and
+    formatting don't count (quoting does in YAML, where `'5'` is a string and `5` a number);
+    a YAML alias is compared as what its anchor holds; JSON may have the comments and
+    trailing commas of JSON-with-comments files. A file that doesn't parse says on which side
+    and line.
+  - _As a table_ (for `.csv` and `.tsv`): a grid of the rows added, removed and changed, the
+    changed cells as `old → new`, the unchanged rows between them folded (click to open) and
+    the header kept on top. Columns are matched by name; one renamed (most of its values the
+    same) shows `old → new name`, and columns added or removed are marked. Rows are matched
+    by their first column when its values are all there and all different (a key), else by
+    content. Quoted cells may hold commas, quotes and line breaks; a quote that never ends
+    falls back to the plain diff with the line.
+  - _Data tracked by DVC_ (for `.dvc` files): each path it tracks before and after, with its
+    size, hash and, for a folder, how many files it holds, as files in Git LFS show.
+  - _Dependency changes_ (the package, for `Cargo.lock`, `package-lock.json`,
+    `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `poetry.lock`, `uv.lock`, `composer.lock` and
+    `go.sum`): the packages upgraded, downgraded, added and removed, each with its versions,
+    a link to its registry page (crates.io, npm, PyPI, Packagist, pkg.go.dev) and one to what
+    changed between the two versions (diff.rs for crates, npmdiff.dev for npm packages, the
+    release history elsewhere); changes of licence are shown where the lockfile records them
+    (npm, Composer). A version installed in several places counts once; a package kept at
+    several versions is listed per version added or removed; a git dependency or a Composer
+    branch shows its commit, so moving it is seen; `go.sum` is read as the newest version of
+    each module (it keeps lines of older ones). The project's own packages (workspace members,
+    path dependencies) get no registry links. A click on a package's name goes to its line. The links open in the browser only
+    when clicked: reading the lockfile asks nothing of any server.
+  - _API contract changes_ (the server, for an OpenAPI or Swagger file: offered on files named
+    like one, and from the view by key of any JSON or YAML file that is one): what breaks the
+    API's clients, each with its endpoint — endpoints removed, parameters that became required
+    or are new and required, a request body or request field now required (read-only fields
+    aside), a request media type dropped, request values narrowed (an enum value taken away,
+    no more other fields), types that no longer take what they took (`integer` → `number` is
+    wider, not breaking), success responses removed, response fields that were always there
+    removed or no longer always returned, and responses that can now return an enum value
+    clients don't know — then the endpoints added. A path parameter renamed is the same
+    endpoint; header names are compared in any case. Local `$ref`s are followed, each pair
+    once per endpoint (schemas that refer to each other end). A click opens the change's
+    place in the file.
 - A Markdown file's diff has an eye button that renders it: the changes block by block (removed
   ones red, added ones green, the rest as they are) or, with _File_, the whole file. Images of
   the repository show as they are on each side of the change; any other image is a link, so a
