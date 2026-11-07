@@ -153,6 +153,10 @@ impl App {
         else {
             return false;
         };
+        if next.pending_setup() {
+            self.toasts.push(Toast::new("This imported profile needs local keys and verified accounts. Open Import setup → Finish profile setup before activating it.".into(),true));
+            return false;
+        }
         if id == self.settings.active_profile {
             return true;
         }
