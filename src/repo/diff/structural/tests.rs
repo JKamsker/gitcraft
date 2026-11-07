@@ -305,16 +305,24 @@ fn remote_request_is_data_safe_and_runs_the_same_real_tool() -> Result<(), Strin
     if Command::new("difft").arg("--version").output().is_err() {
         return Ok(());
     }
+    let repo = Repo::new()?;
+    let old = "fn f() { call(1); }\n";
+    let new = "fn f() { call(2); }\n";
+    let report = remote_compare(&repo, "x '$(touch gotcha) ü.rs", old, new)?;
+    assert!(model::parse(&report, old, new).is_ok());
+    assert!(!repo.0.join("gotcha").exists());
+    Ok(())
+}
+
+#[cfg(unix)]
+fn remote_compare(repo: &Repo, path: &str, old: &str, new: &str) -> Result<Vec<u8>, String> {
     use std::io::Write;
     use std::process::Stdio;
-    let repo = Repo::new()?;
     let target = crate::remote::Target {
         host: crate::remote::Host::Ssh("test".into()),
         path: repo.0.display().to_string(),
     };
-    let old = "fn f() { call(1); }\n";
-    let new = "fn f() { call(2); }\n";
-    let request = tool::request(&target, "x '$(touch gotcha) ü.rs", old, new);
+    let request = tool::request(&target, path, old, new);
     assert!(!request.script.contains(old));
     let mut command = Command::new("sh");
     command
@@ -343,9 +351,7 @@ fn remote_request_is_data_safe_and_runs_the_same_real_tool() -> Result<(), Strin
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(model::parse(&output.stdout, old, new).is_ok());
-    assert!(!repo.0.join("gotcha").exists());
-    Ok(())
+    Ok(output.stdout)
 }
 
 #[cfg(unix)]
@@ -460,55 +466,6 @@ fn syntax_view_renders_unicode_source_and_no_syntax_changes() -> Result<(), Stri
 }
 
 #[test]
-fn staging_names_are_portable_language_hints_not_repository_paths() {
-    for (path, expected) in [
-        (r"C:\victim.rs", "source.rs"),
-        (r"C:drive-relative.rs", "source.rs"),
-        (r"\victim.rs", "source.rs"),
-        (r"..\victim.rs", "source.rs"),
-        (r"\\server\share\victim.rs", "source.rs"),
-        (r"\\?\C:\victim.rs", "source.rs"),
-        (r"\\.\C:\victim.rs", "source.rs"),
-        ("/outside/victim.rs", "source.rs"),
-        ("../../victim.rs", "source.rs"),
-        (r"nested/..\..\victim.rs", "source.rs"),
-        (r"C:\victim.rs:stream", "source"),
-        ("CON.rs", "source.rs"),
-        ("NUL", "source"),
-        ("file.rs.", "source"),
-        ("file.rs ", "source"),
-        ("file.\0rs", "source"),
-        ("code ü.rs", "source.rs"),
-        ("日本語.py", "source.py"),
-        ("header.c++", "source.c++"),
-        ("Dockerfile", "source.dockerfile"),
-        ("containers/Dockerfile.dev", "source.dockerfile"),
-        ("CMakeLists.txt", "source.cmake"),
-        ("Makefile", "source.mk"),
-        ("Gemfile", "source.rb"),
-        ("Cargo.lock", "source.toml"),
-        (".bashrc", "source.sh"),
-        ("configure.sh.in", "source.sh"),
-        ("unknown", "source"),
-    ] {
-        let name = tool::staging_name(path);
-        assert_eq!(name, expected, "{path:?}");
-        assert!(name.starts_with("source"));
-        assert!(
-            name.bytes()
-                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'+' | b'_' | b'-'))
-        );
-        assert!(!name.contains(".."));
-        assert_eq!(std::path::Path::new(&name).components().count(), 1);
-        assert!(!std::path::Path::new(&name).is_absolute());
-    }
-    assert_eq!(
-        tool::staging_name(&format!("file.{}", "r".repeat(33))),
-        "source"
-    );
-}
-
-#[test]
 fn temporary_writes_preserve_outside_files_for_absolute_and_windows_tree_names()
 -> Result<(), String> {
     let repo = Repo::new()?;
@@ -525,6 +482,10 @@ fn temporary_writes_preserve_outside_files_for_absolute_and_windows_tree_names()
         r"\\.\C:\victim.rs".to_owned(),
         "../victim.rs".to_owned(),
         "code ü.rs".to_owned(),
+        "--override=*.rs:Text.rs".to_owned(),
+        "nested/..\\..\\victim.rs".to_owned(),
+        "$(touch gotcha).rs".to_owned(),
+        "x '$(touch gotcha) ü.rs".to_owned(),
     ];
     // On native Windows these reproduce drive-absolute, drive-relative, rooted and
     // backslash traversal forms targeting an existing file, with no drive assumptions.
@@ -546,15 +507,38 @@ fn temporary_writes_preserve_outside_files_for_absolute_and_windows_tree_names()
         ));
     }
     for path in paths.drain(..) {
-        let (_temp, before, after) = tool::prepare(&path, "fn old() {}", "fn new() {}")?;
+        let (_temp, before, after) = tool::prepare("fn old() {}", "fn new() {}")?;
         let root = before
             .parent()
             .and_then(std::path::Path::parent)
             .ok_or("no temp root")?;
-        assert_eq!(before, root.join("before").join("source.rs"), "{path:?}");
-        assert_eq!(after, root.join("after").join("source.rs"), "{path:?}");
+        assert_eq!(before, root.join("before").join("source"), "{path:?}");
+        assert_eq!(after, root.join("after").join("source"), "{path:?}");
         assert_ne!(before, outside);
         assert_ne!(after, outside);
+        let args = tool::protocol_args(&path, &before, &after);
+        assert_eq!(args[0], std::ffi::OsStr::new(&path));
+        assert_eq!(args[1], before.as_os_str());
+        assert_eq!(args[4], after.as_os_str());
+        assert_eq!(args[2], "0000000");
+        assert_eq!(args[3], "100644");
+        assert_eq!(args[5], "0000000");
+        assert_eq!(args[6], "100644");
+        if Command::new("difft").arg("--version").output().is_ok() {
+            let report = tool::compare(&repo.0, &path, "fn old() {}", "fn new() {}")?;
+            assert!(
+                model::parse(&report, "fn old() {}", "fn new() {}").is_ok(),
+                "{path:?}"
+            );
+            #[cfg(unix)]
+            {
+                let report = remote_compare(&repo, &path, "fn old() {}", "fn new() {}")?;
+                assert!(
+                    model::parse(&report, "fn old() {}", "fn new() {}").is_ok(),
+                    "{path:?}"
+                );
+            }
+        }
         assert_eq!(
             std::fs::read(&before).map_err(|e| e.to_string())?,
             b"fn old() {}"
@@ -568,6 +552,7 @@ fn temporary_writes_preserve_outside_files_for_absolute_and_windows_tree_names()
             b"keep this outside file"
         );
     }
+    assert!(!repo.0.join("gotcha").exists());
     Ok(())
 }
 
@@ -594,17 +579,60 @@ fn safe_staging_preserves_real_difftastic_language_detection() -> Result<(), Str
         ),
         ("CMakeLists.txt", "set(X 1)\n", "set(X 2)\n", "CMake"),
         ("Cargo.lock", "version = 3\n", "version = 4\n", "TOML"),
+        ("composer.lock", "{\"a\":1}\n", "{\"a\":2}\n", "JSON"),
+        ("Pipfile.lock", "{\"a\":1}\n", "{\"a\":2}\n", "JSON"),
+        (
+            "yarn.lock",
+            "foo:\n  version: \"1\"\n",
+            "foo:\n  version: \"2\"\n",
+            "YAML",
+        ),
+        (
+            ".emacs",
+            "(message \"one\")\n",
+            "(message \"two\")\n",
+            "Emacs Lisp",
+        ),
+        (
+            "rebar.config",
+            "{one, true}.\n",
+            "{one, false}.\n",
+            "Erlang",
+        ),
+        (
+            "App.config",
+            "<root>one</root>\n",
+            "<root>two</root>\n",
+            "XML",
+        ),
+        ("TARGETS", "x = 1\n", "x = 2\n", "Python"),
+        ("CITATION.cff", "title: one\n", "title: two\n", "YAML"),
+        (
+            "file.app.src",
+            "{application, one, []}.\n",
+            "{application, two, []}.\n",
+            "Erlang",
+        ),
+        ("state.tfstate.backup", "{\"a\":1}\n", "{\"a\":2}\n", "JSON"),
     ] {
         let report = tool::compare(&repo.0, path, old, new)?;
         let parsed = model::parse(&report, old, new)?;
         assert_eq!(parsed.language, language, "{path}");
         assert!(!parsed.unchanged);
+        #[cfg(unix)]
+        {
+            let report = remote_compare(&repo, path, old, new)?;
+            let parsed = model::parse(&report, old, new)?;
+            assert_eq!(parsed.language, language, "remote {path}");
+            assert!(!parsed.unchanged);
+        }
     }
+    assert!(!repo.0.join("gotcha").exists());
     Ok(())
 }
 
-/// Exercise PathBuf's native drive/root interpretation at the real write boundary, including
-/// Git names that Windows cannot check out. This also runs with an absolute UNC temp folder.
+/// Exercise native Windows absolute Git names as display metadata, including
+/// names that Windows cannot check out. This also runs with an absolute UNC temp folder.
 #[cfg(windows)]
 #[test]
 fn windows_absolute_git_name_cannot_overwrite_an_existing_file() -> Result<(), String> {
@@ -616,15 +644,13 @@ fn windows_absolute_git_name_cannot_overwrite_an_existing_file() -> Result<(), S
         .ok_or("non-UTF8 test path")?
         .replace('/', "\\");
     assert!(std::path::Path::new(&git_name).is_absolute());
-    let (_temp, before, after) = tool::prepare(&git_name, "old source", "new source")?;
-    assert_eq!(
-        before.file_name().and_then(|n| n.to_str()),
-        Some("source.rs")
-    );
-    assert_eq!(
-        after.file_name().and_then(|n| n.to_str()),
-        Some("source.rs")
-    );
+    if Command::new("difft").arg("--version").output().is_ok() {
+        let report = tool::compare(&repo.0, &git_name, "fn old() {}", "fn new() {}")?;
+        assert!(model::parse(&report, "fn old() {}", "fn new() {}").is_ok());
+    }
+    let (_temp, before, after) = tool::prepare("old source", "new source")?;
+    assert_eq!(before.file_name().and_then(|n| n.to_str()), Some("source"));
+    assert_eq!(after.file_name().and_then(|n| n.to_str()), Some("source"));
     assert_ne!(before, outside);
     assert_ne!(after, outside);
     assert_eq!(

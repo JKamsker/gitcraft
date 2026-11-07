@@ -1,5 +1,6 @@
 //! Bounded, noninteractive tool execution on the repository's machine.
 
+use std::ffi::OsString;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -57,15 +58,14 @@ pub(super) fn compare(repo: &Path, path: &str, old: &str, new: &str) -> Result<V
         let out = remote::exec(&target.host, &request)?;
         return output(out.code, out.stdout, out.stderr);
     }
-    let (temp, before, after) = prepare(path, old, new)?;
+    let (temp, before, after) = prepare(old, new)?;
     let mut command = Command::new("difft");
     crate::shell_path::apply(&mut command);
     command
         .current_dir(&temp.0)
         .args(ARGS)
         .arg("--")
-        .arg(before)
-        .arg(after)
+        .args(protocol_args(path, &before, &after))
         .env("DFT_UNSTABLE", "yes");
     for name in removed_env() {
         command.env_remove(name);
@@ -74,62 +74,27 @@ pub(super) fn compare(repo: &Path, path: &str, old: &str, new: &str) -> Result<V
     output(out.code, out.stdout, out.stderr)
 }
 
-/// Repository paths are language hints only, never names to join to a temporary folder.
-/// Git tree names can contain Windows drives, roots, backslashes and device names even when
-/// Windows would refuse to check them out. Only a short ASCII extension crosses this boundary;
-/// extensionless/special names map to application-owned constants.
-pub(super) fn staging_name(path: &str) -> String {
-    let name = path.rsplit('/').next().unwrap_or_default();
-    let special = match name {
-        "Dockerfile" | "Containerfile" => Some("source.dockerfile"),
-        "CMakeLists.txt" => Some("source.cmake"),
-        "Makefile" | "makefile" | "GNUmakefile" | "BSDmakefile" | "Kbuild" | "mkfile"
-        | "Makefile.am" | "Makefile.boot" | "Makefile.frag" | "Makefile.inc" | "Makefile.wat"
-        | "makefile.sco" => Some("source.mk"),
-        "Gemfile" | "Rakefile" => Some("source.rb"),
-        "Cargo.lock" | "Gopkg.lock" | "Pipfile" | "pdm.lock" | "poetry.lock" | "uv.lock" => {
-            Some("source.toml")
-        }
-        ".bash_aliases" | ".bash_history" | ".bash_logout" | ".bash_profile" | ".bashrc"
-        | ".cshrc" | ".env" | ".env.example" | ".flaskenv" | ".kshrc" | ".login" | ".profile"
-        | ".zlogin" | ".zlogout" | ".zprofile" | ".zshenv" | ".zshrc" | "9fs" | "PKGBUILD"
-        | "bash_aliases" | "bash_logout" | "bash_profile" | "bashrc" | "cshrc" | "gradlew"
-        | "kshrc" | "login" | "man" | "profile" | "zlogin" | "zlogout" | "zprofile" | "zshenv"
-        | "zshrc" => Some("source.sh"),
-        _ if name.starts_with("Dockerfile.") => Some("source.dockerfile"),
-        _ if name.starts_with("Makefile") && name.ends_with(".in") => Some("source.mk"),
-        _ if name.ends_with(".sh.in") => Some("source.sh"),
-        _ if name.ends_with(".cmake.in") => Some("source.cmake"),
-        _ => None,
-    };
-    if let Some(name) = special {
-        return name.to_owned();
-    }
-    match name.rsplit_once('.').map(|(_, extension)| extension) {
-        Some(extension)
-            if !extension.is_empty()
-                && extension.len() <= 32
-                && extension
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'_' | b'-')) =>
-        {
-            format!("source.{extension}")
-        }
-        _ => "source".to_owned(),
-    }
+/// Difftastic's documented GIT_EXTERNAL_DIFF protocol separates the display/language
+/// hint from the files it opens. Git paths must only appear in the display argument:
+/// even legal tree names can be absolute paths or Windows drive/device names.
+pub(super) fn protocol_args(path: &str, before: &Path, after: &Path) -> [OsString; 7] {
+    [
+        path.into(),
+        before.into(),
+        "0000000".into(),
+        "100644".into(),
+        after.into(),
+        "0000000".into(),
+        "100644".into(),
+    ]
 }
 
-/// Keep the actual write boundary shared by production and containment regression tests.
-pub(super) fn prepare(
-    path: &str,
-    old: &str,
-    new: &str,
-) -> Result<(Temp, PathBuf, PathBuf), String> {
+/// Only application-owned constants reach the temporary-file write boundary.
+pub(super) fn prepare(old: &str, new: &str) -> Result<(Temp, PathBuf, PathBuf), String> {
     let temp = Temp::new()?;
-    let name = staging_name(path);
     let (before, after) = (
-        temp.0.join("before").join(&name),
-        temp.0.join("after").join(&name),
+        temp.0.join("before").join("source"),
+        temp.0.join("after").join("source"),
     );
     for (file, text) in [(&before, old), (&after, new)] {
         std::fs::write(file, text)
@@ -163,24 +128,25 @@ pub(super) fn request(
     old: &str,
     new: &str,
 ) -> remote::Request {
-    let name = remote::sh_quote(&staging_name(path));
+    let display = remote::sh_quote(path);
     let args = ARGS
         .iter()
         .map(|a| remote::sh_quote(a))
         .collect::<Vec<_>>()
         .join(" ");
     // A private directory on that machine, removed whether difft succeeds or fails. The
-    // input is data, never interpolated into shell code. No repository programs are run.
+    // source is transported as data; the quoted Git path is display metadata only.
+    // The seven-argument protocol opens only the fixed application-owned source paths.
     let script = format!(
         "umask 077\n\
          d=$(mktemp -d) || exit 1\n\
          trap 'rm -rf \"$d\"' 0\n\
          mkdir \"$d/before\" \"$d/after\" || exit 1\n\
          IFS= read -r before && IFS= read -r after || exit 1\n\
-         printf '%s' \"$before\" | base64 -d > \"$d/before/\"{name} || exit 1\n\
-         printf '%s' \"$after\" | base64 -d > \"$d/after/\"{name} || exit 1\n\
+         printf '%s' \"$before\" | base64 -d > \"$d/before/source\" || exit 1\n\
+         printf '%s' \"$after\" | base64 -d > \"$d/after/source\" || exit 1\n\
          cd \"$d\" || exit 1\n\
-         (ulimit -f 32768; difft {args} -- \"$d/before/\"{name} \"$d/after/\"{name}) > \"$d/report\" 2> \"$d/error\"\n\
+         (ulimit -f 32768; difft {args} -- {display} \"$d/before/source\" 0000000 100644 \"$d/after/source\" 0000000 100644) > \"$d/report\" 2> \"$d/error\"\n\
          code=$?\n\
          head -c {max_error} \"$d/error\" >&2\n\
          [ \"$code\" = 0 ] || exit \"$code\"\n\
