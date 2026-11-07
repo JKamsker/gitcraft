@@ -111,7 +111,8 @@ so your config, credentials and hooks apply as usual.
   import; file pickers and saved bundles always refer to this machine's disk. Supports v2/v3
   bundles and matching SHA-1/SHA-256 repositories, up to 128 MiB and 1000 header entries, with
   a two minute deadline per Git stream. Requires Git 2.36 or newer. Larger exchanges can use
-  Git in the terminal.
+  Git in the terminal. In partial clones, inspection and import require Git's explicit
+  `--no-lazy-fetch` support; older Git refuses them instead of fetching from the remote.
 - Interactive rebase: the commits to rewrite, newest on top; pick, reword (edit the message in
   place), squash, fix up or drop each one, move them up and down, then _Start rebase_. Ctrl+Z
   undoes it.

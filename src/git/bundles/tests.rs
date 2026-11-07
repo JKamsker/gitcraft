@@ -523,3 +523,146 @@ fn import_cannot_create_the_checked_out_unborn_branch() -> Result<(), String> {
     assert!(!dest.join("file").exists());
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn partial_shallow_bundle_preview_never_fetches_missing_prerequisites() -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new()?;
+    let source = f.repo("source")?;
+    run(Some(&source), &["config", "uploadpack.allowFilter", "true"])?;
+    run(
+        Some(&source),
+        &["config", "uploadpack.allowAnySHA1InWant", "true"],
+    )?;
+    let base = f.commit(&source, "base")?;
+    f.commit(&source, "tip")?;
+    let bytes = export_bundle(&source, &[head(&source)?], Some(&base))?;
+    let bundle = f.0.join("incremental.bundle");
+    save_bundle_file(&bundle, &bytes)?;
+    let dest = f.0.join("partial");
+    run(
+        None,
+        &[
+            "-c",
+            "protocol.file.allow=always",
+            "clone",
+            "--no-local",
+            "--filter=blob:none",
+            "--depth=1",
+            "--",
+            source.to_str().ok_or("source path")?,
+            dest.to_str().ok_or("destination path")?,
+        ],
+    )?;
+    run(Some(&dest), &["config", "protocol.file.allow", "always"])?;
+    assert_eq!(
+        run(Some(&dest), &["rev-parse", "--is-shallow-repository"])?.trim(),
+        "true"
+    );
+    assert_eq!(
+        run(Some(&dest), &["config", "--get", "remote.origin.promisor"])?.trim(),
+        "true"
+    );
+    assert!(run(Some(&dest), &["--no-lazy-fetch", "cat-file", "-e", &base]).is_err());
+    let marker = f.0.join("network-helper-ran");
+    let upload = f.0.join("upload-pack");
+    std::fs::write(
+        &upload,
+        format!(
+            "#!/bin/sh\nprintf 'fetch\\n' >> {}\nexec git-upload-pack \"$@\"\n",
+            remote::sh_quote(marker.to_str().ok_or("marker path")?)
+        ),
+    )
+    .map_err(|e| e.to_string())?;
+    std::fs::set_permissions(&upload, std::fs::Permissions::from_mode(0o700))
+        .map_err(|e| e.to_string())?;
+    run(
+        Some(&dest),
+        &[
+            "config",
+            "remote.origin.uploadpack",
+            upload.to_str().ok_or("helper path")?,
+        ],
+    )?;
+    let object_store = run(Some(&dest), &["count-objects", "-v"])?;
+    let refs_before = refs(&dest)?;
+    let index = std::fs::read(dest.join(".git/index")).map_err(|e| e.to_string())?;
+    let config = std::fs::read(dest.join(".git/config")).map_err(|e| e.to_string())?;
+    let shallow = std::fs::read(dest.join(".git/shallow")).map_err(|e| e.to_string())?;
+    let preview = inspect_bundle(&dest, bytes)?;
+    assert!(
+        preview
+            .verification_error
+            .as_ref()
+            .is_some_and(|e| e.contains(&base)),
+        "{:?}",
+        preview.verification_error
+    );
+    assert_eq!(preview.prerequisites[0].oid, base);
+    assert_eq!(run(Some(&dest), &["count-objects", "-v"])?, object_store);
+    assert_eq!(refs(&dest)?, refs_before);
+    assert!(!marker.exists());
+    assert!(import_bundle(&dest, &preview, &[mapping("refs/heads/imported")]).is_err());
+    assert_eq!(run(Some(&dest), &["count-objects", "-v"])?, object_store);
+    assert_eq!(refs(&dest)?, refs_before);
+    assert_eq!(
+        std::fs::read(dest.join(".git/index")).map_err(|e| e.to_string())?,
+        index
+    );
+    assert_eq!(
+        std::fs::read(dest.join(".git/config")).map_err(|e| e.to_string())?,
+        config
+    );
+    assert_eq!(
+        std::fs::read(dest.join(".git/shallow")).map_err(|e| e.to_string())?,
+        shallow
+    );
+    assert_eq!(
+        std::fs::read_to_string(dest.join("file")).map_err(|e| e.to_string())?,
+        "tip"
+    );
+    assert!(!marker.exists());
+    // Positive control: this same prerequisite is fetchable, and ordinary native verify
+    // really does contact our upload-pack helper and mutate this fixture's object store.
+    run(
+        Some(&dest),
+        &["bundle", "verify", bundle.to_str().ok_or("bundle path")?],
+    )?;
+    assert!(marker.exists());
+    assert_ne!(run(Some(&dest), &["count-objects", "-v"])?, object_store);
+    let calls = std::fs::read(&marker).map_err(|e| e.to_string())?;
+    import_bundle(&dest, &preview, &[mapping("refs/heads/imported")])?;
+    assert_eq!(std::fs::read(&marker).map_err(|e| e.to_string())?, calls);
+    assert_eq!(
+        std::fs::read(dest.join(".git/index")).map_err(|e| e.to_string())?,
+        index
+    );
+    Ok(())
+}
+
+#[test]
+fn old_git_verification_is_fail_closed_for_promisor_or_unreadable_configuration()
+-> Result<(), String> {
+    let unsupported = || Err("unknown option: --no-lazy-fetch\nusage: git ...".to_owned());
+    assert_eq!(
+        no_lazy_compatibility(Ok(vec![]), || Err(
+            "must not read config for supported Git".into()
+        ))?,
+        vec!["--no-lazy-fetch"]
+    );
+    assert!(no_lazy_compatibility(unsupported(), || Ok(String::new()))?.is_empty());
+    for config in [
+        "remote.origin.promisor true",
+        "remote.origin.promisor false",
+        "extensions.partialclone origin",
+    ] {
+        assert!(
+            no_lazy_compatibility(unsupported(), || Ok(config.into()))
+                .is_err_and(|e| e.contains("will not be fetched automatically"))
+        );
+    }
+    assert!(no_lazy_compatibility(unsupported(), || Err("cannot read config".into())).is_err());
+    assert!(no_lazy_compatibility(Err("SSH failed".into()), || Ok(String::new())).is_err());
+    Ok(())
+}

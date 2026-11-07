@@ -233,7 +233,7 @@ pub fn import_bundle(
     }
     transaction.push_str("prepare\ncommit\n");
     let temp = BundleFile::new(repo, &preview.bytes)?;
-    verify(repo, &temp.path, &refs)?;
+    let no_lazy = verify(repo, &temp.path, &refs)?;
     // `bundle unbundle` does not honor fetch/transfer.fsckObjects. Feed only the pack
     // to strict index-pack so malformed objects, not only bad checksums, stop the import.
     let pack_at = preview
@@ -242,15 +242,20 @@ pub fn import_bundle(
         .position(|s| s == b"\n\n")
         .ok_or("No bundle pack")?
         + 2;
-    bounded::run(
-        repo,
-        &[
+    let pack_args: Vec<_> = no_lazy
+        .iter()
+        .copied()
+        .chain([
             "index-pack",
             "--stdin",
             "--fix-thin",
             "--strict",
             "--max-input-size=134217728",
-        ],
+        ])
+        .collect();
+    bounded::run(
+        repo,
+        &pack_args,
         preview.bytes[pack_at..].to_vec(),
         HEADER_LIMIT,
     )?;
@@ -258,12 +263,12 @@ pub fn import_bundle(
     if imports.iter().any(|i| checked_out.contains(&i.destination)) {
         return Err("A destination became checked out while reading the bundle; choose different destination refs".into());
     }
-    bounded::run(
-        repo,
-        &["update-ref", "--no-deref", "--stdin"],
-        transaction.into_bytes(),
-        HEADER_LIMIT,
-    )?;
+    let ref_args: Vec<_> = no_lazy
+        .iter()
+        .copied()
+        .chain(["update-ref", "--no-deref", "--stdin"])
+        .collect();
+    bounded::run(repo, &ref_args, transaction.into_bytes(), HEADER_LIMIT)?;
     Ok(())
 }
 
@@ -282,7 +287,7 @@ fn checked_out_refs(repo: &Path) -> Result<BTreeSet<String>, String> {
         .collect())
 }
 
-fn verify(repo: &Path, file: &str, refs: &[BundleRef]) -> Result<(), String> {
+fn verify(repo: &Path, file: &str, refs: &[BundleRef]) -> Result<Vec<&'static str>, String> {
     let format = run(Some(repo), &["rev-parse", "--show-object-format"])?;
     let expected_len = match format.trim() {
         "sha1" => 40,
@@ -295,7 +300,60 @@ fn verify(repo: &Path, file: &str, refs: &[BundleRef]) -> Result<(), String> {
             format.trim()
         ));
     }
-    bounded::run(repo, &["bundle", "verify", file], vec![], HEADER_LIMIT).map(|_| ())
+    // Verification resolves prerequisite commits, which otherwise triggers a promisor
+    // fetch and modifies the object store before the user chooses Import.
+    let no_lazy = no_lazy_fetch(repo)?;
+    let args: Vec<_> = no_lazy
+        .iter()
+        .copied()
+        .chain(["bundle", "verify", file])
+        .collect();
+    bounded::run(repo, &args, vec![], HEADER_LIMIT)?;
+    Ok(no_lazy)
+}
+
+fn no_lazy_fetch(repo: &Path) -> Result<Vec<&'static str>, String> {
+    let probe = bounded::run(
+        repo,
+        &["--no-lazy-fetch", "rev-parse", "--git-dir"],
+        vec![],
+        HEADER_LIMIT,
+    );
+    no_lazy_compatibility(probe, || {
+        super::run_ok_codes(
+            Some(repo),
+            &[
+                "config",
+                "--get-regexp",
+                "^(extensions\\.partialclone|remote\\..*\\.promisor)$",
+            ],
+            &[0, 1],
+        )
+    })
+}
+
+fn no_lazy_compatibility(
+    probe: Result<Vec<u8>, String>,
+    configured: impl FnOnce() -> Result<String, String>,
+) -> Result<Vec<&'static str>, String> {
+    match probe {
+        Ok(_) => Ok(vec!["--no-lazy-fetch"]),
+        // Git 2.36 supports bundles but predates this global option. Only an ordinary
+        // repository with no promisor/partial-clone configuration may safely fall back.
+        Err(error)
+            if error
+                .lines()
+                .any(|line| line.trim() == "unknown option: --no-lazy-fetch") =>
+        {
+            if !configured()?.trim().is_empty() {
+                return Err("This Git cannot disable lazy fetching in a repository with promisor/partial-clone configuration. Upgrade Git before inspecting or importing this bundle; prerequisite commits will not be fetched automatically.".into());
+            }
+            Ok(Vec::new())
+        }
+        Err(error) => Err(format!(
+            "Could not establish read-only bundle verification: {error}"
+        )),
+    }
 }
 
 pub fn bundle_destination(source: &str) -> String {
