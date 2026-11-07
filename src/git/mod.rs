@@ -22,6 +22,7 @@ pub mod doctor;
 pub mod dry_run;
 pub mod errors;
 pub mod external_tool;
+pub(crate) mod file_comparison;
 mod files;
 mod fold;
 mod hooks;

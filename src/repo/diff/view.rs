@@ -440,6 +440,13 @@ impl RepoTab {
                         }
                         ui.add_space(8.0);
                         if !as_file && !rendered && !folded && !rich_ready && view.lines.is_none() {
+                            if matches!(view.key, DiffKey::Work(_))
+                                && ui.button("Three-state").clicked()
+                            {
+                                acts.push(Action::OpenFileComparison(
+                                    crate::repo::file_comparison::Page::Lens,
+                                ));
+                            }
                             structural::toggle(ui, view.structural.enabled, acts);
                             ui.add_space(4.0);
                         }

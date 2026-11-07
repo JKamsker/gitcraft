@@ -42,6 +42,7 @@ mod drift_view;
 mod error_help;
 mod external_tools;
 pub(crate) mod fence_view;
+mod file_comparison;
 mod file_text;
 pub(crate) mod file_view;
 mod find;
@@ -272,6 +273,7 @@ pub struct RepoTab {
     /// One active syntax comparison and at most one latest replacement across diff views.
     structural_running: Option<(u64, u64)>,
     structural_pending: bool,
+    file_comparison: Option<file_comparison::State>,
     compare: Option<Compare>,
     /// The pull request the big area shows.
     pr_view: Option<pr_view::PrView>,
@@ -582,6 +584,7 @@ impl RepoTab {
             diff: None,
             structural_running: None,
             structural_pending: false,
+            file_comparison: None,
             compare: None,
             pr_view: None,
             ci_view: None,

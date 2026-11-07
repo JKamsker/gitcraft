@@ -27,7 +27,32 @@ impl RepoTab {
         let Some(action) = self.fence_gate(action, ctx) else {
             return;
         };
+        if matches!(
+            &action,
+            Action::OpenDiff(_)
+                | Action::OpenPr(_)
+                | Action::OpenCi { .. }
+                | Action::FileView { .. }
+        ) {
+            self.file_comparison = None;
+        }
         match action {
+            Action::OpenFileComparison(page) => self.open_file_comparison(page, ctx),
+            Action::RefreshFileComparison => self.load_file_comparison(ctx),
+            Action::CloseFileComparison => self.file_comparison = None,
+            Action::ComparisonMove { request, index } => self.comparison_move(request, index, ctx),
+            Action::ComparisonCell {
+                request,
+                path,
+                column,
+            } => self.comparison_cell(request, path, column, ctx),
+            Action::ComparisonPick {
+                request,
+                boundary,
+                lines,
+                whole,
+            } => self.comparison_pick(request, boundary, lines, whole, ctx),
+            Action::ComparisonNormalPatch => self.comparison_normal_patch(ctx),
             Action::Select(row) => {
                 self.leave_pages();
                 self.doctor = None;

@@ -1359,3 +1359,70 @@ mod tests {
         assert!(parse_credentials("username=ana\npassword=\n").is_none());
     }
 }
+
+/// Bounded raw snapshots: no implicit network fetches, filters or detached workers.
+pub(super) fn comparison_output(
+    repo: &Path,
+    args: &[&str],
+    env: &[(&'static str, String)],
+    active: &dyn Fn() -> bool,
+) -> Result<remote::Output, String> {
+    if !active() {
+        return Err("Comparison cancelled".into());
+    }
+    let guarded: Vec<_> = std::iter::once("--no-lazy-fetch")
+        .chain(args.iter().copied())
+        .collect();
+    let out = if let Some(target) = remote::parse(repo) {
+        let mut request = bounded::request(&target, &guarded, Vec::new(), 8 * 1024 * 1024);
+        request
+            .env
+            .extend(env.iter().map(|(k, v)| ((*k).into(), v.clone())));
+        comparison_remote(&target.host, request, active)?
+    } else {
+        let extra = Extra {
+            env: env.to_vec(),
+            ..Default::default()
+        };
+        let cmd = local_command(Some(repo), &extra, &guarded);
+        let out = crate::processes::run_while(
+            cmd,
+            crate::processes::Options {
+                timeout: Some(std::time::Duration::from_secs(20)),
+                output_limit: 8 * 1024 * 1024,
+                stderr_limit: Some(64 * 1024),
+                ..Default::default()
+            },
+            active,
+        )?
+        .complete()?;
+        remote::Output {
+            code: out.status.code().unwrap_or(-1),
+            stdout: out.stdout,
+            stderr: out.stderr,
+        }
+    };
+    if out.stdout.len() > 8 * 1024 * 1024 || out.stderr.len() > 64 * 1024 {
+        return Err("Comparison output exceeds the size limit; choose fewer files".into());
+    }
+    if !active() {
+        return Err("Comparison cancelled".into());
+    }
+    Ok(out)
+}
+pub(super) fn comparison_remote(
+    host: &remote::Host,
+    mut request: remote::Request,
+    active: &dyn Fn() -> bool,
+) -> Result<remote::Output, String> {
+    if !active() {
+        return Err("Comparison cancelled".into());
+    }
+    request.timeout = Some(std::time::Duration::from_secs(20));
+    request.long = true;
+    let out = remote::exec(host, &request)?;
+    if !active() {
+        return Err("Comparison cancelled".into());
+    }
+    Ok(out)
+}
