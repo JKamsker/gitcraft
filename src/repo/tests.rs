@@ -348,6 +348,7 @@ fn an_older_read_of_the_working_tree_does_not_replace_a_newer_one() {
         remotes: Vec::new(),
         forge_remotes: Vec::new(),
         forge_generation: 0,
+        gerrit: None,
         submodules: Vec::new(),
         lfs: false,
         identity: Default::default(),
@@ -938,7 +939,11 @@ fn feature_failure_continuation_runs_when_a_queued_job_is_cancelled() -> Result<
 fn rapid_reloads_finish_and_coalesce() {
     let dir = repo("rapid-reloads");
     let ctx = egui::Context::default();
-    let mut tab = super::RepoTab::new(dir.clone(), &ctx);
+    // Drive reloads without an OS watcher: its arrival starts independent status
+    // and submodule reads, which share `reads` but do not measure coalescing.
+    let mut tab = super::RepoTab::new_deferred(dir.clone(), &ctx);
+    tab.life.shown(std::time::Instant::now());
+    tab.reload(&ctx);
     let settle = |tab: &mut super::RepoTab| {
         let start = std::time::Instant::now();
         while tab.loading || tab.reload_again {
@@ -959,7 +964,7 @@ fn rapid_reloads_finish_and_coalesce() {
     assert!(!tab.reload_again);
     assert!(tab.load_error.is_none());
     assert!(tab.history.iter().any(|commit| commit.summary == "base"));
-    assert!(tab.reads <= before + 3); // a watcher arriving may also request a recheck
+    assert_eq!(tab.reads, before + 2);
     drop(tab);
     let _ = std::fs::remove_dir_all(dir);
 }

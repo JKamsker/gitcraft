@@ -7,6 +7,7 @@ pub mod backend;
 mod backlinks;
 mod bisect;
 mod branch_health;
+mod bundles;
 #[cfg(test)]
 mod clone_tests;
 mod command;
@@ -71,6 +72,7 @@ pub use self::attributes::*;
 pub use self::backlinks::*;
 pub use self::bisect::*;
 pub use self::branch_health::*;
+pub use self::bundles::*;
 pub use self::command::*;
 pub use self::commit_msg::*;
 pub use self::commits::*;

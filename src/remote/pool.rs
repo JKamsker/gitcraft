@@ -243,6 +243,21 @@ impl Pool {
         (state.open, state.failed.is_some(), used)
     }
 
+    /// Test synchronization after transport loss: every pooled client has exited.
+    #[cfg(test)]
+    pub(super) fn idle_shells_exited(&self) -> std::io::Result<bool> {
+        let mut state = lock(&self.state);
+        if state.connecting != 0 || state.idle.len() != state.open {
+            return Ok(false);
+        }
+        for shell in &mut state.idle {
+            if !shell.exited()? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
     /// One shell less (already closed by the caller, outside the lock).
     fn close_one(&self) {
         let mut state = lock(&self.state);

@@ -64,6 +64,7 @@ pub(super) fn pill(
     } else {
         color.lerp_to_gamma(Color32::BLACK, crate::repo::graph_view::DIMMED)
     };
+    let fill = theme::palette::white_text_fill(fill);
     let font = if head {
         theme::semibold(11.0)
     } else {

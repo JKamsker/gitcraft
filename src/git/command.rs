@@ -2,6 +2,8 @@
 //! repository in WSL or over SSH runs git there (see [`crate::remote`]), with the same
 //! environment.
 
+pub(super) mod bounded;
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::RwLock;
@@ -1005,8 +1007,56 @@ fn parse_credentials(out: &str) -> Option<Credentials> {
     (!password.is_empty()).then_some(Credentials { username, password })
 }
 
+/// Bounded, non-fetching preparation for opt-in local syntax comparison.
+pub(crate) fn syntax_read(
+    repo: &Path,
+    args: &[&str],
+    limit: usize,
+    timeout: std::time::Duration,
+) -> Result<Vec<u8>, String> {
+    if crate::remote::is_remote(repo) {
+        return Err(
+            "Syntax comparison is currently available for local repositories. Showing the patch."
+                .to_owned(),
+        );
+    }
+    let args: Vec<_> = std::iter::once("--no-lazy-fetch")
+        .chain(args.iter().copied())
+        .collect();
+    bounded::local(repo, &args, Vec::new(), limit, timeout).map_err(syntax_read_error)
+}
+
+fn syntax_read_error(error: String) -> String {
+    if error
+        .lines()
+        .any(|line| line.trim() == "unknown option: --no-lazy-fetch")
+    {
+        format!("Syntax preparation requires Git with --no-lazy-fetch support: {error}")
+    } else {
+        error
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn syntax_errors_only_suggest_upgrade_for_the_unknown_git_option() {
+        for error in [
+            "cancelled",
+            "process timed out and was stopped",
+            "fatal: bad object",
+            "process exceeded capture limit",
+        ] {
+            assert_eq!(super::syntax_read_error(error.into()), error);
+        }
+        let unsupported = "unknown option: --no-lazy-fetch\nusage: git [...]";
+        assert!(
+            super::syntax_read_error(unsupported.into())
+                .contains("requires Git with --no-lazy-fetch support")
+        );
+        let incidental = "fatal: file named unknown option: --no-lazy-fetch";
+        assert_eq!(super::syntax_read_error(incidental.into()), incidental);
+    }
     use std::io::Write;
     use std::process::Stdio;
 

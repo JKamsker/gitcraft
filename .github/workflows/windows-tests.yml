@@ -71,5 +71,6 @@ jobs:
         timeout-minutes: 20
         env:
           RUST_BACKTRACE: "1"
+          GITCRAFT_TEST_PROCESS_TRACE: "1"
         run: python ci/test-shards.py ${{ matrix.shard }}
 

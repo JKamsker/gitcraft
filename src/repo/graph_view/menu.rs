@@ -168,6 +168,7 @@ impl RepoTab {
         });
         group(ui, "Links / Copy", |ui| {
             self.link_items(ui, &hash, pill.as_deref(), branch_name.as_deref(), acts);
+            self.gerrit_menu(ui, commit, acts);
             copy_items(ui, &hash, &summary, branch_name.as_deref());
         });
         // Custom commands retain the clicked commit/branch identity, even in a submenu.

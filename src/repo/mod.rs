@@ -15,6 +15,7 @@ mod branch_health;
 mod branch_order;
 mod branch_tree;
 mod branch_visibility;
+mod bundles;
 mod ci_status;
 mod ci_view;
 mod collision_view;
@@ -49,6 +50,7 @@ mod folding;
 mod forge_link;
 mod forge_selection;
 pub(crate) mod forks;
+mod gerrit;
 mod ghost;
 mod graph_order;
 pub(crate) mod graph_view;
@@ -189,6 +191,7 @@ pub struct RepoTab {
     reload_again: bool,
     load_error: Option<String>,
     refs: Refs,
+    graph_badge_index: graph_view::BadgeIndex,
     /// Commits as git listed them.
     history: Vec<Arc<Commit>>,
     /// A selected pull request's tip, including one with no local or tracking ref.
@@ -211,6 +214,9 @@ pub struct RepoTab {
     /// Rows of the graph: the WIP pseudo-commit (when the tree is dirty) followed by `history`.
     commits: Vec<Arc<Commit>>,
     graph: Graph,
+    /// Ref names for continuous lane runs, rebuilt with the graph, never while scrolling.
+    graph_labels: HashMap<usize, String>,
+    graph_messages: graph_view::message_tooltip::MessageTooltips,
     index: HashMap<String, usize>,
     worktrees: Vec<Worktree>,
     stashes: Vec<Stash>,
@@ -234,6 +240,7 @@ pub struct RepoTab {
     forge_generation: u64,
     /// The selection lifetime when the actual hosting repository last changed.
     forge_repository_generation: u64,
+    gerrit: Option<crate::gerrit::Server>,
     prs: Vec<PullRequest>,
     pr_error: Option<String>,
     prs_loaded: Option<Instant>,
@@ -270,6 +277,9 @@ pub struct RepoTab {
     /// The selected commit's signature, containment, notes and backlinks.
     extras: detail::Extras,
     diff: Option<DiffView>,
+    /// One active syntax comparison and at most one latest replacement across diff views.
+    structural_running: Option<(u64, u64)>,
+    structural_pending: bool,
     compare: Option<Compare>,
     /// The pull request the big area shows.
     pr_view: Option<pr_view::PrView>,
@@ -527,6 +537,7 @@ impl RepoTab {
             reload_again: false,
             load_error: None,
             refs: Refs::default(),
+            graph_badge_index: graph_view::BadgeIndex::default(),
             history: Vec::new(),
             pr_graph_head: None,
             has_more: false,
@@ -543,6 +554,8 @@ impl RepoTab {
                 rows: Vec::new(),
                 width: 0,
             },
+            graph_labels: HashMap::new(),
+            graph_messages: Default::default(),
             index: HashMap::new(),
             worktrees: Vec::new(),
             stashes: Vec::new(),
@@ -559,6 +572,7 @@ impl RepoTab {
             forge_remotes: Vec::new(),
             forge_generation: 0,
             forge_repository_generation: 0,
+            gerrit: None,
             prs: Vec::new(),
             pr_error: None,
             prs_loaded: None,
@@ -581,6 +595,8 @@ impl RepoTab {
             detail_error: None,
             extras: Default::default(),
             diff: None,
+            structural_running: None,
+            structural_pending: false,
             compare: None,
             pr_view: None,
             ci_view: None,

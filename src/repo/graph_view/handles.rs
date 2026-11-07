@@ -20,6 +20,9 @@ struct DragStart {
 /// Persist only the intended column; temporary viewport compression is never saved.
 fn save_drag(next: &mut Settings, bar: Bar, _prefs: &Cols, widths: &Cols) {
     next.last_resized = Some(bar);
+    if bar == Bar::Refs {
+        next.auto_refs_width = false;
+    }
     *preference_mut(next, bar) = widths.width(bar);
 
     next.column_push = widths.push;
@@ -171,6 +174,34 @@ mod tests {
         let widths = Bar::Graph.drag(&prefs, None, 10.0, 700.0);
         save_drag(&mut next, Bar::Graph, &prefs, &widths);
         assert_eq!(next.graph_width, 110.0);
+    }
+    #[test]
+    fn resizing_auto_refs_fixes_the_width_without_an_initial_jump() {
+        let prefs = Cols {
+            refs: crate::repo::columns::MIN_REFS_W,
+            graph: 60.0,
+            hash: 0.0,
+            author: 150.0,
+            when: 100.0,
+            date: 0.0,
+            push: 0.0,
+        };
+        let mut settings = Settings::default();
+        let width = Bar::Refs.drag(&prefs, None, 10.0, 900.0);
+        save_drag(&mut settings, Bar::Refs, &prefs, &width);
+        assert_eq!(settings.refs_width, prefs.refs + 10.0);
+        assert!(!settings.auto_refs_width);
+        let mut at_minimum = Settings::default();
+        let width = Bar::Refs.drag(&prefs, None, -100.0, 900.0);
+        save_drag(&mut at_minimum, Bar::Refs, &prefs, &width);
+        assert_eq!(at_minimum.refs_width, prefs.refs);
+
+        // Resizing another column must never persist a temporary auto-sized refs width.
+        let mut settings = Settings::default();
+        let width = Bar::Author.drag(&prefs, None, -100.0, 500.0);
+        save_drag(&mut settings, Bar::Author, &prefs, &width);
+        assert_eq!(settings.refs_width, Settings::default().refs_width);
+        assert!(settings.fit_visible_refs());
     }
 }
 

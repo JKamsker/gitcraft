@@ -168,7 +168,15 @@ impl RepoTab {
         let mut items = vec![
             PaletteItem::action("Fetch", "remote", Action::Fetch),
             PaletteItem::action("Pull", "remote", Action::Pull),
-            PaletteItem::action("Push", "remote", Action::Push),
+            PaletteItem::action(
+                if self.gerrit.is_some() {
+                    "Push for review"
+                } else {
+                    "Push"
+                },
+                "remote",
+                Action::Push,
+            ),
         ];
         items.extend(
             PullMode::ALL.map(|m| PaletteItem::action(m.label(), "remote", Action::PullWith(m))),
@@ -217,6 +225,9 @@ impl RepoTab {
                 Action::OpenInEditor(PathBuf::new()),
             ),
         ]);
+        if self.gerrit.is_some() {
+            items.retain(|item| !matches!(item.run, PaletteRun::Action(Action::Sync)));
+        }
         if let Some(url) = self.web_page() {
             items.push(PaletteItem::action(
                 "Open in browser",

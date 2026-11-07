@@ -433,7 +433,7 @@ fn diff_line(p: &Painter, t: &Tokens, r: Rect, i: usize, kind: char, w: f32) {
     let (bg, fg) = match kind {
         '-' => (Some(t.diff_del_bg), t.danger),
         '+' => (Some(t.diff_add_bg), t.success),
-        '@' => (Some(t.accent.gamma_multiply(0.12)), t.accent),
+        '@' => (Some(t.accent.gamma_multiply(0.12)), t.accent_fg),
         _ => (None, t.text_dim),
     };
     if let Some(bg) = bg {

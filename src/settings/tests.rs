@@ -51,6 +51,7 @@ fn settings_of_an_older_version_still_load() {
 fn resetting_the_columns_keeps_which_show() {
     let mut settings = Settings {
         refs_width: 500.0,
+        auto_refs_width: false,
         graph_width: 90.0,
         author_width: 300.0,
         date_width: 60.0,

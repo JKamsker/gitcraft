@@ -41,7 +41,7 @@ pub(super) fn paint_line(
     let (bg, fg) = match line.kind {
         Kind::Add => (Some(t.diff_add_bg), t.text),
         Kind::Del => (Some(t.diff_del_bg), t.text),
-        Kind::Hunk => (Some(t.accent.gamma_multiply(0.12)), t.accent),
+        Kind::Hunk => (Some(t.accent.gamma_multiply(0.12)), t.accent_fg),
         Kind::Meta => (None, t.text_faint),
         Kind::Fold => (Some(t.accent.gamma_multiply(0.06)), t.text_dim),
         Kind::Context => (None, t.text_dim),
@@ -131,8 +131,8 @@ pub(super) fn paint_line(
     // Text: syntax colours when known, the changed part on a stronger background.
     let strong = match line.kind {
         _ if moved.is_some_and(|(_, same)| same) => Color32::TRANSPARENT,
-        Kind::Add => t.success.gamma_multiply(0.35),
-        Kind::Del => t.danger.gamma_multiply(0.35),
+        Kind::Add => t.diff_strong_bg(true),
+        Kind::Del => t.diff_strong_bg(false),
         _ => Color32::TRANSPARENT,
     };
     let changed = data.changed.get(i).copied().flatten();
@@ -238,7 +238,7 @@ pub(super) fn hunk_button(
     let color = if matches!(pick, Pick::Discard | Pick::Revert) {
         t.text_dim
     } else {
-        t.accent
+        t.accent_fg
     };
     let id = ui.id().with(("hunk_btn", hunk, pick.verb()));
     let (resp, left) = text_button(ui, right, y, &label, color, id);

@@ -191,6 +191,8 @@ pub(crate) enum Action {
         old: Option<u32>,
         new: Option<u32>,
     },
+    /// Read syntax changes through Difftastic; staging stays in the patch.
+    DiffStructural(bool),
     /// Scroll the diff to the next change (`1`) or the previous one (`-1`).
     DiffStep(i32),
     /// Show the two places of a moved block of the diff together (by its index), or stop.
@@ -284,6 +286,12 @@ pub(crate) enum Action {
     DropMenu(drag_drop::DropMenu),
     /// Move or squash a commit of the checked-out branch onto another of it.
     CommitDrop(drag_drop::CommitDrop),
+    OpenBundleExport,
+    OpenBundleInspect,
+    ExportBundle {
+        refs: Vec<git::BundleRef>,
+        base: String,
+    },
     /// Drop or move a commit of the checked-out branch.
     QuickEdit {
         edit: quick_edit::Edit,
@@ -525,22 +533,49 @@ impl RepoTab {
         let mut items: Vec<(String, String, Action)> = vec![
             ("Fetch".into(), label(Command::Fetch), Action::Fetch),
             ("Pull".into(), label(Command::Pull), Action::Pull),
-            ("Push".into(), label(Command::Push), Action::Push),
+            (
+                if self.gerrit.is_some() {
+                    "Push for review"
+                } else {
+                    "Push"
+                }
+                .into(),
+                label(Command::Push),
+                Action::Push,
+            ),
             (
                 "Sync (pull, then push)".into(),
                 "remote".into(),
                 Action::Sync,
             ),
             (
-                "Push, skipping hooks".into(),
+                if self.gerrit.is_some() {
+                    "Push for review, skipping hooks"
+                } else {
+                    "Push, skipping hooks"
+                }
+                .into(),
                 "--no-verify".into(),
                 Action::PushSkippingHooks,
             ),
         ];
+        if self.gerrit.is_some() {
+            items.retain(|(_, _, action)| !matches!(action, Action::Sync));
+        }
         items.extend(
             PullMode::ALL.map(|m| (m.label().into(), "remote".into(), Action::PullWith(m))),
         );
         items.extend([
+            (
+                "Export Git bundle…".into(),
+                "offline backup".into(),
+                Action::OpenBundleExport,
+            ),
+            (
+                "Inspect local Git bundle…".into(),
+                "offline exchange".into(),
+                Action::OpenBundleInspect,
+            ),
             (
                 "Stash only what is staged…".into(),
                 "stash".into(),
@@ -551,7 +586,6 @@ impl RepoTab {
                 "stash".into(),
                 Action::Dialog(Dialog::stash_as(StashChoice::Snapshot)),
             ),
-            ("Apply patch…".into(), "patch".into(), Action::ApplyPatch),
             (
                 "Distribute staged fixes…".into(),
                 "absorb".into(),

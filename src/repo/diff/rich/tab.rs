@@ -65,6 +65,9 @@ impl RepoTab {
         if kind.is_some() {
             self.diff_rendered = false;
             self.diff_as_file = false;
+            if let Some(view) = &mut self.diff {
+                view.structural.enabled = false;
+            }
         }
         if let Some(view) = &mut self.diff {
             view.rich = None;

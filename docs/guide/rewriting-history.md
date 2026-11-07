@@ -11,6 +11,17 @@ Interactive rebase, splitting and moving commits, bisecting, drag and drop, and 
 
 ## Interactive rebase
 
+- Git bundles: **Export Git bundle…** in the palette saves selected refs, with an optional
+  excluded base commit for an incremental range. Ref tips are pinned to the dialog's snapshot;
+  a moved ref asks you to reopen it. Output is a new local file; existing files are preserved.
+  **Inspect local Git bundle…** shows incoming refs and prerequisites without unpacking
+  pack data or creating refs. Import is deferred pending OS memory and process containment
+  for untrusted packs. File pickers use this machine's disk; SSH/WSL inspection uses a
+  temporary copy on the repository machine. Supports v2/v3 headers and matching SHA-1/
+  SHA-256 repositories, up to 128 MiB and 1000 header entries. Pack contents are unverified.
+  Each Git stream has a two minute deadline. Requires Git 2.36 or newer. Larger exchanges
+  can use Git in the terminal. Partial-clone inspection requires Git's explicit
+  `--no-lazy-fetch` support; older Git refuses inspection instead of fetching from the remote.
 - Interactive rebase: the commits to rewrite, newest on top; pick, reword (edit the message in
   place), edit (stop there to change the commit; _Continue rebase_ amends it with what is staged
   and goes on), squash, fix up

@@ -28,6 +28,7 @@ pub(super) struct Loaded {
     /// Usable forge remotes; the latest UI preference chooses among these on arrival.
     pub(super) forge_remotes: Vec<(String, Hosting)>,
     pub(super) forge_generation: u64,
+    pub(super) gerrit: Option<crate::gerrit::Server>,
     pub(super) submodules: Vec<Submodule>,
     /// It keeps files in Git LFS, and git-lfs is installed.
     pub(super) lfs: bool,
@@ -151,6 +152,7 @@ impl RepoTab {
                     issues.join()?,
                 );
                 let path = path.as_path();
+                let gerrit = crate::gerrit::detect(path, &remotes);
                 let forge_remotes = forge::detect_remotes(path, &remotes);
                 Ok(Box::new(Loaded {
                     refs,
@@ -163,6 +165,7 @@ impl RepoTab {
                     remotes,
                     forge_remotes,
                     forge_generation,
+                    gerrit,
                     submodules,
                     lfs,
                     identity,
@@ -425,6 +428,7 @@ impl RepoTab {
         self.loading_more = false;
         let refs_moved = loaded.refs != self.refs;
         self.refs = loaded.refs;
+        self.graph_badge_index = super::graph_view::BadgeIndex::new(&self.refs);
         self.has_more = loaded.history.len() >= loaded.requested;
         let namespace_changed = self
             .history_filter
@@ -522,6 +526,7 @@ impl RepoTab {
         self.remotes = loaded.remotes;
         self.forge_remotes = loaded.forge_remotes;
         self.take_forge_catalog(remotes_changed, loaded.forge_generation, ctx);
+        self.gerrit = loaded.gerrit;
         // The forge is asked by itself only while gitcraft may go on the network by itself.
         let paused = !crate::network::background_may_run();
         if !paused
@@ -685,6 +690,7 @@ impl RepoTab {
             .collect();
         let old_graph = std::mem::replace(&mut self.graph, graph);
         let old_index = std::mem::replace(&mut self.index, index);
+        self.rebuild_graph_labels();
         // Freeing tens of thousands of commits (those a reload replaced), rows and index entries
         // takes a while: not on the UI thread.
         if old_rows.len() > 5000 {
