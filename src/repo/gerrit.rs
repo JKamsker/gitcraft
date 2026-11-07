@@ -157,7 +157,7 @@ mod tests {
         assert!(run_steps(&path, &plan, OpKind::plain(), None).0.is_ok());
         assert_eq!(git::resolve(&receiver, "refs/for/main"), Ok(second.clone()));
         assert_eq!(
-            git::log(&path, None, 0, 1)
+            git::log(&path, None, Default::default(), 0, 1)
                 .ok()
                 .and_then(|list| list.first().and_then(|c| c.change_id.clone())),
             Some(ID.to_owned())

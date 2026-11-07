@@ -188,6 +188,8 @@ pub(crate) enum Action {
         old: Option<u32>,
         new: Option<u32>,
     },
+    /// Read syntax changes through Difftastic; staging stays in the patch.
+    DiffStructural(bool),
     /// Scroll the diff to the next change (`1`) or the previous one (`-1`).
     DiffStep(i32),
     /// Show the two places of a moved block of the diff together (by its index), or stop.
