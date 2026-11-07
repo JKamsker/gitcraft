@@ -6,6 +6,7 @@ mod clone_options;
 mod command;
 mod commits;
 mod diff;
+pub(crate) mod file_comparison;
 mod files;
 mod lfs;
 mod refs;

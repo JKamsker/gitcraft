@@ -1,0 +1,427 @@
+//! Separate raw snapshot panes. Opening one drops DiffView and its reading-mode lifetimes.
+mod model;
+#[cfg(test)]
+mod tests;
+mod view;
+
+use super::{Action, DiffKey, Msg, OpKind, Refresh, RepoTab, messages::spawn_or};
+use crate::git::file_comparison::{self as files, Entry, MigrationSource};
+use std::collections::BTreeSet;
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Page {
+    Migration,
+    Lens,
+    Matrix,
+}
+enum Data {
+    Migration(files::Migration),
+    Lens(Box<model::LensData>),
+    Matrix(files::Matrix),
+}
+pub(super) struct State {
+    page: Page,
+    generation: Arc<AtomicU64>,
+    request: u64,
+    /// Ownership epoch for displayed rows, independent of later read-only pair requests.
+    data_request: u64,
+    loading: bool,
+    data: Option<Result<Arc<Data>, String>>,
+    pair: Option<Result<model::Pair, String>>,
+    source: u8,
+    from: String,
+    to: String,
+    path: String,
+    previous: Option<String>,
+    folder: String,
+    branches: Vec<String>,
+    selected: BTreeSet<String>,
+    cells: Vec<(Vec<u8>, usize)>,
+}
+impl State {
+    fn begin(&mut self, clear: bool) -> u64 {
+        static REQUESTS: AtomicU64 = AtomicU64::new(0);
+        self.request = REQUESTS.fetch_add(1, Ordering::Relaxed) + 1;
+        self.generation.store(self.request, Ordering::Relaxed);
+        self.loading = true;
+        self.pair = None;
+        if clear {
+            self.data = None;
+            self.cells.clear();
+        }
+        self.request
+    }
+    fn accept(&mut self, request: u64, result: Result<Data, String>) {
+        if request == self.request {
+            self.loading = false;
+            self.data_request = request;
+            self.data = Some(result.map(Arc::new));
+        }
+    }
+    fn accept_pair(&mut self, request: u64, result: Result<model::Pair, String>) {
+        if request == self.request {
+            self.loading = false;
+            self.pair = Some(result);
+        }
+    }
+}
+impl RepoTab {
+    pub(super) fn open_file_comparison(&mut self, page: Page, ctx: &egui::Context) {
+        if self.conflict.is_some() || self.rebase.is_some() {
+            self.status = Some(("Finish or close the editor first".into(), true));
+            return;
+        }
+        let focused = self
+            .diff
+            .as_ref()
+            .and_then(|d| match &d.key {
+                DiffKey::Work(f) => Some((f.path.clone(), f.old_path.clone())),
+                _ => None,
+            })
+            .or_else(|| {
+                self.work
+                    .unstaged
+                    .first()
+                    .or(self.work.staged.first())
+                    .map(|f| (f.path.clone(), f.old_path.clone()))
+            });
+        let mut branches: Vec<String> = self
+            .refs
+            .local
+            .iter()
+            .map(|b| format!("refs/heads/{}", b.name))
+            .chain(
+                self.refs
+                    .remotes
+                    .iter()
+                    .flat_map(|(_, bs)| bs.iter().map(|b| format!("refs/remotes/{}", b.name))),
+            )
+            .collect();
+        branches.sort();
+        branches.dedup();
+        if !branches.iter().any(|b| b == "HEAD") {
+            branches.push("HEAD".into());
+        }
+        let selected = branches.iter().take(2).cloned().collect();
+        let (path, previous) = focused.unwrap_or_default();
+        let revision = self
+            .selected_hash()
+            .filter(|h| h != super::WIP_HASH)
+            .unwrap_or_else(|| "HEAD".into());
+        self.diff = None;
+        self.file_view = None;
+        self.ci_view = None;
+        self.close_pr();
+        self.file_comparison = Some(State {
+            page,
+            generation: Arc::new(AtomicU64::new(0)),
+            request: 0,
+            data_request: 0,
+            loading: false,
+            data: None,
+            pair: None,
+            source: 0,
+            from: "HEAD~1".into(),
+            to: revision,
+            path,
+            previous,
+            folder: String::new(),
+            branches,
+            selected,
+            cells: Vec::new(),
+        });
+        self.load_file_comparison(ctx);
+    }
+    pub(super) fn load_file_comparison(&mut self, ctx: &egui::Context) {
+        let Some(state) = &mut self.file_comparison else {
+            return;
+        };
+        let request = state.begin(true);
+        let alive = Arc::downgrade(&state.generation);
+        let (page, source, from, to, path, previous, folder, branches) = (
+            state.page,
+            state.source,
+            state.from.clone(),
+            state.to.clone(),
+            state.path.clone(),
+            state.previous.clone(),
+            state.folder.clone(),
+            state.selected.iter().cloned().collect::<Vec<_>>(),
+        );
+        let repo = self.path.clone();
+        spawn_or(
+            &self.tx,
+            ctx,
+            move |e| {
+                Msg::Then(Box::new(move |tab, _| {
+                    if let Some(s) = &mut tab.file_comparison {
+                        s.accept(request, Err(e));
+                    }
+                }))
+            },
+            move || {
+                let active = || {
+                    alive
+                        .upgrade()
+                        .is_some_and(|g| g.load(Ordering::Relaxed) == request)
+                };
+                let result = match page {
+                    Page::Migration => files::read_migration(
+                        &repo,
+                        &match source {
+                            0 => MigrationSource::Staged,
+                            1 => MigrationSource::Commit(to),
+                            _ => MigrationSource::Range(from, to),
+                        },
+                        &active,
+                    )
+                    .map(Data::Migration),
+                    Page::Matrix => {
+                        files::matrix(&repo, &branches, &folder, &active).map(Data::Matrix)
+                    }
+                    Page::Lens => {
+                        files::read_lens(&repo, &files::LensSpec { path, previous }, &active)
+                            .and_then(|s| model::prepare_lens(s, &active))
+                            .map(|s| Data::Lens(Box::new(s)))
+                    }
+                };
+                Msg::Then(Box::new(move |tab, _| {
+                    if tab.path == repo
+                        && let Some(s) = &mut tab.file_comparison
+                    {
+                        s.accept(request, result);
+                    }
+                }))
+            },
+        );
+    }
+    pub(super) fn comparison_move(&mut self, request: u64, index: usize, ctx: &egui::Context) {
+        let entries = self
+            .file_comparison
+            .as_ref()
+            .filter(|s| s.data_request == request)
+            .and_then(|s| s.data.as_ref())
+            .and_then(|r| r.as_ref().ok())
+            .and_then(|d| match d.as_ref() {
+                Data::Migration(m) => m.moves.get(index),
+                _ => None,
+            })
+            .map(|m| {
+                (
+                    [Some(m.before.clone()), Some(m.after.clone())],
+                    [m.before.name(), m.after.name()],
+                )
+            });
+        if let Some((entries, labels)) = entries {
+            self.load_comparison_pair(entries, labels, ctx);
+        }
+    }
+    pub(super) fn comparison_cell(
+        &mut self,
+        request: u64,
+        path: Vec<u8>,
+        column: usize,
+        ctx: &egui::Context,
+    ) {
+        let Some(state) = self
+            .file_comparison
+            .as_mut()
+            .filter(|s| s.data_request == request)
+        else {
+            return;
+        };
+        let cell = (path, column);
+        if let Some(i) = state.cells.iter().position(|c| *c == cell) {
+            state.cells.remove(i);
+            return;
+        }
+        if state.cells.len() == 2 {
+            state.cells.clear();
+        }
+        state.cells.push(cell);
+        if state.cells.len() != 2 {
+            return;
+        }
+        let Some(Ok(data)) = &state.data else {
+            return;
+        };
+        let Data::Matrix(matrix) = data.as_ref() else {
+            return;
+        };
+        let cells = state
+            .cells
+            .iter()
+            .filter_map(|(path, col)| {
+                matrix.columns.get(*col).map(|c| {
+                    (
+                        c.files.get(path).cloned(),
+                        format!(
+                            "{} · {} · {}",
+                            c.label,
+                            &c.oid[..8],
+                            files::display_path(path)
+                        ),
+                    )
+                })
+            })
+            .collect::<Vec<_>>();
+        if cells.len() == 2 {
+            self.load_comparison_pair(
+                [cells[0].0.clone(), cells[1].0.clone()],
+                [cells[0].1.clone(), cells[1].1.clone()],
+                ctx,
+            );
+        }
+    }
+    fn load_comparison_pair(
+        &mut self,
+        entries: [Option<Entry>; 2],
+        labels: [String; 2],
+        ctx: &egui::Context,
+    ) {
+        let Some(state) = &mut self.file_comparison else {
+            return;
+        };
+        let request = state.begin(false);
+        let alive = Arc::downgrade(&state.generation);
+        let repo = self.path.clone();
+        spawn_or(
+            &self.tx,
+            ctx,
+            move |e| {
+                Msg::Then(Box::new(move |tab, _| {
+                    if let Some(s) = &mut tab.file_comparison {
+                        s.accept_pair(request, Err(e));
+                    }
+                }))
+            },
+            move || {
+                let active = || {
+                    alive
+                        .upgrade()
+                        .is_some_and(|g| g.load(Ordering::Relaxed) == request)
+                };
+                let result = (|| {
+                    let a = files::blob(&repo, entries[0].as_ref(), &active)?;
+                    let b = files::blob(&repo, entries[1].as_ref(), &active)?;
+                    let boundary = model::boundary("comparison", &a, &b, &active)?;
+                    Ok(model::Pair {
+                        labels,
+                        versions: [a, b],
+                        boundary,
+                    })
+                })();
+                Msg::Then(Box::new(move |tab, _| {
+                    if tab.path == repo
+                        && let Some(s) = &mut tab.file_comparison
+                    {
+                        s.accept_pair(request, result);
+                    }
+                }))
+            },
+        );
+    }
+    pub(super) fn comparison_pick(
+        &mut self,
+        request: u64,
+        boundary: usize,
+        lines: BTreeSet<usize>,
+        whole: bool,
+        ctx: &egui::Context,
+    ) {
+        if self.busy_op.is_some() {
+            return;
+        }
+        let Some(state) = self
+            .file_comparison
+            .as_ref()
+            .filter(|s| !s.loading && s.data_request == request)
+        else {
+            return;
+        };
+        let Some(Ok(data)) = &state.data else {
+            return;
+        };
+        let Data::Lens(lens) = data.as_ref() else {
+            return;
+        };
+        let Some(part) = lens.boundaries.get(boundary).filter(|p| p.reason.is_none()) else {
+            return;
+        };
+        if lens.snapshot.staging_warning.is_some() {
+            return;
+        }
+        let pick = if boundary == 0 {
+            super::diff::Pick::Unstage
+        } else {
+            super::diff::Pick::Stage
+        };
+        let patch = if whole {
+            Some(part.full.clone())
+        } else {
+            part.patch(&lens.snapshot.spec.path, pick, &lines)
+        };
+        let Some(patch) = patch else {
+            return;
+        };
+        let snapshot = lens.snapshot.clone();
+        let repo = self.path.clone();
+        let label = format!("{} {} from staging lens", pick.verb(), snapshot.spec.path);
+        self.busy_op = Some(label.clone());
+        self.op_started = Some(std::time::Instant::now());
+        self.last_op = None;
+        let failure_label = label.clone();
+        spawn_or(
+            &self.tx,
+            ctx,
+            move |e| {
+                Msg::Then(Box::new(move |tab, ctx| {
+                    tab.op_done(
+                        failure_label,
+                        Err(e),
+                        Refresh::Status,
+                        OpKind::plain(),
+                        false,
+                        ctx,
+                    );
+                }))
+            },
+            move || {
+                let result = files::apply_lens_patch(&repo, &snapshot, &patch, boundary == 0);
+                Msg::Then(Box::new(move |tab, ctx| {
+                    tab.op_done(label, result, Refresh::Status, OpKind::plain(), false, ctx);
+                    if tab
+                        .file_comparison
+                        .as_ref()
+                        .is_some_and(|s| s.page == Page::Lens)
+                    {
+                        tab.load_file_comparison(ctx);
+                    }
+                }))
+            },
+        );
+    }
+    pub(super) fn comparison_normal_patch(&mut self, ctx: &egui::Context) {
+        let file = self
+            .file_comparison
+            .as_ref()
+            .and_then(|s| {
+                self.work
+                    .unstaged
+                    .iter()
+                    .chain(&self.work.staged)
+                    .find(|f| f.path == s.path)
+            })
+            .cloned();
+        self.file_comparison = None;
+        self.diff_as_file = false;
+        self.diff_rendered = false;
+        if let Some(file) = file {
+            self.open_diff(DiffKey::Work(file), ctx);
+        }
+    }
+}

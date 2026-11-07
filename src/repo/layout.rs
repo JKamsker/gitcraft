@@ -50,7 +50,9 @@ impl RepoTab {
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(t.dock))
             .show(ui, |ui| {
-                if self.conflict.is_some() {
+                if self.file_comparison.is_some() {
+                    self.file_comparison_view(ui, &mut acts);
+                } else if self.conflict.is_some() {
                     self.conflict_view(ui, &mut acts);
                 } else if self.rebase.is_some() {
                     self.rebase_view(ui, &mut acts);
@@ -125,7 +127,9 @@ impl RepoTab {
                     i.modifiers.command && i.key_pressed(Key::F),
                 )
             });
-            if esc && self.diff.is_some() && self.line_comment_open() {
+            if esc && self.file_comparison.is_some() {
+                acts.push(Action::CloseFileComparison);
+            } else if esc && self.diff.is_some() && self.line_comment_open() {
                 acts.push(Action::Pr(pr_review::PrAct::CloseLine));
             } else if esc && self.diff.is_some() {
                 acts.push(Action::CloseDiff);
