@@ -173,3 +173,11 @@ fn changed_profile_answers_do_not_clear_the_current_pending_requirements() {
     h.state_mut().poll_setup(&ctx);
     assert_eq!(h.state().settings.user_profiles.last(), Some(&changed));
 }
+
+#[test]
+fn deleted_imported_profile_mappings_are_not_reused_for_another_profiles_id() {
+    let mut setup = SetupWindow::default();
+    setup.mappings.insert(12, 77);
+    setup.forget_profile(77);
+    assert!(!setup.mappings.values().any(|id| *id == 77));
+}

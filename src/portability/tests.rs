@@ -354,8 +354,16 @@ fn practice_export_and_local_restore_isolate_hostile_git_environment_and_profile
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700))
         .map_err(|e| e.to_string())?;
+    let hooks = fixture.root.join("recording-hooks");
+    std::fs::create_dir(&hooks).map_err(|e| e.to_string())?;
+    for name in ["post-checkout", "post-merge"] {
+        let hook = hooks.join(name);
+        std::fs::copy(&script, &hook).map_err(|e| e.to_string())?;
+        std::fs::set_permissions(hook, std::fs::Permissions::from_mode(0o700))
+            .map_err(|e| e.to_string())?;
+    }
     let global = fixture.root.join("hostile.gitconfig");
-    std::fs::write(&global,format!("[url \"ssh://fixture.invalid/redirect/\"]\n insteadOf = /\n[core]\n hooksPath = {}\n sshCommand = {}\n",fixture.root.display(),script.display())).map_err(|e|e.to_string())?;
+    std::fs::write(&global,format!("[url \"ssh://fixture.invalid/redirect/\"]\n insteadOf = /\n[core]\n hooksPath = {}\n sshCommand = {}\n",hooks.display(),script.display())).map_err(|e|e.to_string())?;
     let result=std::process::Command::new(std::env::current_exe().map_err(|e|e.to_string())?).args(["--exact","portability::tests::practice_export_and_local_restore_isolate_hostile_git_environment_and_profile","--nocapture"]).env(FLAG,"1").env("GIT_DIR",fixture.repo.join(".git")).env("GIT_WORK_TREE",&fixture.repo).env("GIT_CONFIG_GLOBAL",&global).env("GIT_CONFIG_COUNT","1").env("GIT_CONFIG_KEY_0","core.sshCommand").env("GIT_CONFIG_VALUE_0",&script).env("GIT_SSH_COMMAND",&script).env("GITCRAFT_PORTABILITY_EXEC_MARKER",&marker).output().map_err(|e|e.to_string())?;
     assert!(
         result.status.success(),

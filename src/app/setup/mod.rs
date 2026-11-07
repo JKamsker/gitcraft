@@ -63,6 +63,10 @@ pub(super) struct SetupWindow {
     fresh: BTreeMap<u64, pending::Fresh>,
 }
 impl SetupWindow {
+    pub(super) fn forget_profile(&mut self, id: u64) {
+        self.mappings.retain(|_, mapped| *mapped != id);
+        self.fresh.remove(&id);
+    }
     pub(super) fn busy(&self) -> bool {
         self.job.is_some()
     }
@@ -331,7 +335,7 @@ impl App {
                             for notice in &r.notices {ui.label(notice);}
                             if self.setup.import {
                                 let matching=r.profile_ids.iter().filter_map(|id|self.setup.mappings.get(id)).copied().collect::<Vec<_>>();
-                                let permitted=self.setup.applied && (matching.is_empty() || matching.contains(&self.settings.active_profile)) && !self.settings.profile().pending_setup();
+                                let permitted=self.setup.applied && (r.profile_ids.is_empty() || matching.contains(&self.settings.active_profile)) && !self.settings.profile().pending_setup();
                                 let plan=&mut self.setup.plans[index];
                                 ui.add_enabled_ui(!busy,|ui|{
                                     ui.checkbox(&mut plan.selected,"Select this repository");

@@ -218,6 +218,7 @@ impl App {
             }
         }
         self.settings.user_profiles.retain(|p| p.id != id);
+        self.setup.forget_profile(id);
         self.profile_states.remove(&id);
         settings::profiles::forget(id);
         self.settings.set(ctx);
