@@ -14,6 +14,10 @@ No repository, profile, forge, filter or decryption mode is used. Diff is read-o
 `/dev/null` (or bare `NUL` on Windows) represents an empty input. Other missing inputs
 produce an error rather than opening a repository. MERGED may be a new file.
 
+Text alignment and computed merges use the installed Git with `--no-lazy-fetch` support,
+with private temporary files and isolated configuration. Missing/incompatible Git is
+reported explicitly; binary whole-file choices and existing-result editing remain available.
+
 The merge window starts from existing MERGED, preserving earlier manual work. If it does
 not exist, the window prepares a three-way merge from BASE, LOCAL and REMOTE. **Use computed
 merge** deliberately replaces only the unsaved result in the window. Resolve conflict

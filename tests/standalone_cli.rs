@@ -43,3 +43,26 @@ fn native_non_utf8_file_arguments_never_panic_in_utf8_helper_dispatch() -> Resul
     assert!(String::from_utf8_lossy(&out.stderr).contains("Expected 2"));
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn malformed_native_helper_fields_fail_closed_instead_of_opening_a_repository() -> Result<(), String>
+{
+    use std::os::unix::ffi::OsStringExt;
+    let executable = env!("CARGO_BIN_EXE_gitcraft");
+    for helper in ["--gitcraft-profile-ssh", "--gitcraft-profile-credential"] {
+        let out = Command::new(executable)
+            .arg(helper)
+            .arg(std::ffi::OsString::from_vec(b"invalid\xfffield".to_vec()))
+            .output()
+            .map_err(|e| e.to_string())?;
+        assert_eq!(out.status.code(), Some(1));
+    }
+    let out = Command::new(executable)
+        .arg(std::ffi::OsString::from_vec(b"invalid\xffprompt".to_vec()))
+        .env("GITCRAFT_ASKPASS", "fixture-invalid-request")
+        .output()
+        .map_err(|e| e.to_string())?;
+    assert_eq!(out.status.code(), Some(1));
+    Ok(())
+}

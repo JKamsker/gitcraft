@@ -21,10 +21,7 @@ fn main() -> std::process::ExitCode {
     // Started by ssh to ask the running app something (see `remote::askpass`): no window.
     // Helpers expect UTF-8 protocol fields. Native file arguments never pass through
     // their std::env::args conversion, repository discovery or profile fallback.
-    if !explicit
-        && args.iter().all(|a| a.to_str().is_some())
-        && let Some(code) = app::askpass_helper()
-    {
+    if !explicit && let Some(code) = app::askpass_helper() {
         return std::process::ExitCode::from(u8::try_from(code).unwrap_or(1));
     }
     let invocation = match standalone::parse(args) {
