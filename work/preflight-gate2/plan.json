@@ -52,5 +52,18 @@
     "case": "files-sha1-diagnostic",
     "reason": "First actual native capability files/sha1 failed safely; capture exact stderr of same transaction in owned bare scratch using existing bounded production transport; no production changes",
     "expected": "May remain FAIL; diagnostics only, no successful feature claim"
+  },
+  "native_alternative_diagnostic": {
+    "authorization": "Root proposed native update HEAD dereference as bounded owned scratch diagnostic; production change still requires independent static re-review",
+    "cases": [
+      "native-files-sha1",
+      "native-files-sha256",
+      "native-reftable-sha1",
+      "native-reftable-sha256",
+      "native-switch-head",
+      "native-detach-head",
+      "native-prelock-switch"
+    ],
+    "scope": "Owned refs only, no checkout; exact expected main+HEAD old/new hook stdin, HEAD before/after, prepared/committed ACK; attempted symbolic/detached changes must hit native HEAD lock. Same-tip switch before transaction must refuse while preserving it."
   }
 }
