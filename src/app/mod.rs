@@ -56,6 +56,8 @@ struct Saved {
     settings: Settings,
     /// A release the user chose to skip.
     skipped_version: String,
+    /// The version gone back to with "Go back to x.y.z": no update is offered while it is set.
+    pinned_version: String,
     /// Repository tabs given their own icon or colour.
     tab_looks: BTreeMap<PathBuf, TabLook>,
     /// What the profiles not in use had open; `open`, `active`, `recent` and `theme` are the
@@ -117,6 +119,10 @@ pub struct App {
     /// Why the update didn't go in place.
     update_error: Option<String>,
     skipped_version: String,
+    /// See `Saved::pinned_version`.
+    pinned_version: String,
+    /// The version the last update replaced, kept to go back to.
+    previous_version: Option<update::Previous>,
     tab_looks: BTreeMap<PathBuf, TabLook>,
     settings: Settings,
     /// The profiles not in use: their tabs, recent repositories and theme.
@@ -198,6 +204,8 @@ impl App {
             update_later: false,
             update_error: None,
             skipped_version: saved.skipped_version,
+            pinned_version: update::settle_pin(&saved.pinned_version, update::CURRENT),
+            previous_version: update::previous(),
             tab_looks: saved.tab_looks,
         };
         update::clean_up();
@@ -315,6 +323,7 @@ impl App {
         let s = &self.settings;
         let want = (s.check_updates, s.update_channel, s.download_updates);
         if self.update_looked != Some(want) {
+            let pinned = self.pinned_version.clone();
             self.update_looked = Some(want);
             self.update = None;
             self.update_rx = None;
@@ -324,7 +333,7 @@ impl App {
                 let ctx = ctx.clone();
                 let skipped = self.skipped_version.clone();
                 std::thread::spawn(move || {
-                    let _ = tx.send(update::look(releases, download, &skipped));
+                    let _ = tx.send(update::look(releases, download, &skipped, &pinned));
                     ctx.request_repaint();
                 });
                 self.update_rx = Some(rx);
@@ -354,8 +363,9 @@ impl App {
         let (releases, download) = (s.update_channel, s.download_updates);
         let (tx, rx) = channel();
         let ctx = ctx.clone();
+        let pinned = self.pinned_version.clone();
         std::thread::spawn(move || {
-            let _ = tx.send(update::look(releases, download, ""));
+            let _ = tx.send(update::look(releases, download, "", &pinned));
             ctx.request_repaint();
         });
         self.update_rx = Some(rx);
@@ -367,7 +377,9 @@ impl App {
     /// Where the look for a newer version stands, for the settings page.
     pub(super) fn update_check(&self) -> crate::settings::UpdateCheck {
         use crate::settings::UpdateCheck;
-        if self.update_rx.is_some() {
+        if !self.pinned_version.is_empty() {
+            UpdateCheck::Pinned(self.pinned_version.clone())
+        } else if self.update_rx.is_some() {
             UpdateCheck::Checking
         } else if let Some(found) = &self.update {
             UpdateCheck::Found(found.release.version.clone())
@@ -595,6 +607,7 @@ impl eframe::App for App {
             clone_parent: self.clone_parent.clone(),
             settings: self.settings.clone(),
             skipped_version: self.skipped_version.clone(),
+            pinned_version: self.pinned_version.clone(),
             tab_looks: self.tab_looks.clone(),
             profile_states: self.profile_states.clone(),
             palette_recent: self.palette_recent.clone(),

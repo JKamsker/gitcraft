@@ -57,6 +57,14 @@ impl App {
                 || self.manual_open,
             update: self.update_check(),
             check_updates_now: false,
+            previous: self.previous_version.as_ref().map(|p| p.label().to_owned()),
+            previous_is_newer: self
+                .previous_version
+                .as_ref()
+                .is_some_and(update::Previous::is_newer),
+            pinned: self.pinned_version.clone(),
+            go_back: false,
+            unpin: false,
             request: None,
         };
         let tweaks = self.settings.theme_tweaks;
@@ -67,6 +75,12 @@ impl App {
             }
         }
         let check_now = view.check_updates_now;
+        if view.go_back {
+            self.go_back(&ctx);
+        }
+        if view.unpin {
+            self.unpin();
+        }
         if let Some(request) = view.request {
             self.profile_request(request, &ctx);
         }

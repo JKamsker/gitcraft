@@ -83,6 +83,40 @@ impl App {
             });
     }
 
+    /// Goes back to the version the last update replaced ("Go back to 0.3.3" in the settings)
+    /// and pins it, or forward again to the one gone back from, unpinned: the window closes, which saves the tabs, and `main` starts that version.
+    pub(super) fn go_back(&mut self, ctx: &egui::Context) {
+        match update::go_back() {
+            Ok((program, previous)) => {
+                if previous.is_newer() {
+                    // Forward again, to the version gone back from: no longer staying put.
+                    self.pinned_version.clear();
+                    self.skipped_version.clear();
+                } else {
+                    self.pinned_version = previous
+                        .version
+                        .unwrap_or_else(|| update::PIN_THIS.to_owned());
+                    // Versions before pins existed skip this one instead.
+                    self.skipped_version = update::CURRENT.to_owned();
+                }
+                self.update = None;
+                update::relaunch_after_exit(program);
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+            Err(e) => self.toasts.push(super::panels::Toast::new(
+                format!("Couldn't go back: {e}"),
+                true,
+            )),
+        }
+    }
+
+    /// Stops staying on the version gone back to: updates are looked for again.
+    pub(super) fn unpin(&mut self) {
+        self.pinned_version.clear();
+        self.skipped_version.clear();
+        self.update_looked = None;
+    }
+
     /// Puts the downloaded version `new` in place and closes the window, which saves the tabs;
     /// `main` then starts the new version.
     fn update_now(&mut self, new: &Path, ctx: &egui::Context) {

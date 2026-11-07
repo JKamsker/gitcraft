@@ -159,6 +159,11 @@ fn profiles_are_added_named_and_kept_apart() {
 
 /// How many rows a search finds on each page, with the page drawn nowhere.
 fn found(query: &str) -> Vec<(Page, usize)> {
+    found_with(query, None, "")
+}
+
+/// [`found`], with a previous version kept to go back to, and a version pinned.
+fn found_with(query: &str, previous: Option<&str>, pinned: &str) -> Vec<(Page, usize)> {
     let ctx = egui::Context::default();
     let mut settings = Settings::default();
     let mut counts = Vec::new();
@@ -173,6 +178,11 @@ fn found(query: &str) -> Vec<(Page, usize)> {
                     dialog_open: false,
                     update: UpdateCheck::NotYet,
                     check_updates_now: false,
+                    previous: previous.map(str::to_owned),
+                    previous_is_newer: false,
+                    pinned: pinned.to_owned(),
+                    go_back: false,
+                    unpin: false,
                     request: None,
                 };
                 settings.page_ui(ui, page, &filter, &mut view);
@@ -255,6 +265,11 @@ fn every_preview_and_page_draws() {
                         dialog_open: false,
                         update: UpdateCheck::NotYet,
                         check_updates_now: false,
+                        previous: None,
+                        previous_is_newer: false,
+                        pinned: String::new(),
+                        go_back: false,
+                        unpin: false,
                         request: None,
                     };
                     settings.page(ui, &mut view);
@@ -262,4 +277,15 @@ fn every_preview_and_page_draws() {
             }
         }
     }
+}
+
+#[test]
+fn going_back_and_unpinning_show_only_when_they_can_be_done() {
+    assert!(found("go back").is_empty());
+    assert!(found("unpin").is_empty());
+    assert_eq!(
+        found_with("go back", Some("0.3.3"), ""),
+        [(Page::General, 1)]
+    );
+    assert_eq!(found_with("unpin", None, "0.3.3"), [(Page::General, 1)]);
 }

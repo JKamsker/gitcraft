@@ -412,12 +412,21 @@ impl Settings {
                     card.row("Check now", "check for updates new version look", |ui| {
                         ui.horizontal_wrapped(|ui| {
                             let checking = view.update == UpdateCheck::Checking;
+                            let pinned = matches!(view.update, UpdateCheck::Pinned(_));
                             if ui
-                                .add_enabled(!checking, egui::Button::new("Check for updates"))
+                                .add_enabled(
+                                    !checking && !pinned,
+                                    egui::Button::new("Check for updates"),
+                                )
                                 .on_hover_text(format!(
                                     "Looks on GitHub for a newer version on the {} channel",
                                     self.update_channel.label()
                                 ))
+                                .on_disabled_hover_text(if pinned {
+                                    "Pinned to this version: unpin it to look for updates"
+                                } else {
+                                    "Looking…"
+                                })
                                 .clicked()
                             {
                                 view.check_updates_now = true;
@@ -443,9 +452,12 @@ impl Settings {
                                 UpdateCheck::Failed(e) => {
                                     ui.label(RichText::new(e).color(t.danger).small());
                                 }
+                                // Said in the Pinned row, with its Unpin button.
+                                UpdateCheck::Pinned(_) => {}
                             }
                         });
                     });
+                    rollback_rows(card, view);
                     card.row("New versions", "check download github restart", |ui| {
                         ui.checkbox(
                             &mut self.check_updates,
@@ -862,6 +874,58 @@ pub enum UpdateCheck {
     /// This version is out.
     Found(String),
     Failed(String),
+    /// Gone back to this version: no update is offered until it is unpinned.
+    Pinned(String),
+}
+
+/// The Updates section's rows for going back to the version the last update replaced, and for
+/// the pin that keeps it.
+fn rollback_rows(card: &mut Card, view: &mut SettingsView) {
+    if let Some(version) = view.previous.clone() {
+        let (button, tip) = if view.previous_is_newer {
+            (
+                format!("Go forward to {version}"),
+                format!(
+                    "Restarts as gitcraft {version}, the newer version kept when you went back; \
+                     the open tabs stay, and updates are offered again."
+                ),
+            )
+        } else {
+            (
+                format!("Go back to {version}"),
+                format!(
+                    "Restarts as {version}, kept by the last update; the open tabs stay. No \
+                     update is offered until you unpin it."
+                ),
+            )
+        };
+        card.row(
+            "Previous version",
+            "go back forward rollback undo update downgrade",
+            |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    if ui.button(button).on_hover_text(tip).clicked() {
+                        view.go_back = true;
+                    }
+                });
+            },
+        );
+    }
+    if !view.pinned.is_empty() {
+        let pinned = view.pinned.clone();
+        card.row("Pinned", "pin stay version unpin", |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(format!("Staying on gitcraft {pinned}"));
+                if ui
+                    .button("Unpin")
+                    .on_hover_text("Look for new versions again, as the update settings say")
+                    .clicked()
+                {
+                    view.unpin = true;
+                }
+            });
+        });
+    }
 }
 
 /// The pages of the settings, in the order of their tabs.
