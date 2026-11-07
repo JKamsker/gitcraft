@@ -453,7 +453,7 @@ fn choose(host: &str, config: &HashMap<String, String>) -> Option<Forge> {
 /// gitcraft's own settings in git's config, keys lowercase. For a repository on another
 /// machine, also this machine's global config, where the README says to set them: that
 /// machine's (and the repository's own) win.
-fn gitcraft_config(repo: &Path) -> HashMap<String, String> {
+pub(crate) fn gitcraft_config(repo: &Path) -> HashMap<String, String> {
     // Exit code 1: nothing set, which is the usual.
     let read = |dir: Option<&Path>, scope: &[&str]| {
         let mut args = vec!["config"];

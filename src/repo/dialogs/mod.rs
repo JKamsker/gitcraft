@@ -6,6 +6,7 @@ mod cleanup;
 mod confirm;
 mod custom;
 mod fold;
+mod gerrit;
 mod interaction;
 mod keep_detached;
 mod parallel_bisect;
@@ -35,6 +36,14 @@ use super::{Action, Refresh, RepoTab, Undo};
 use crate::theme::{self, Tokens};
 
 pub enum Dialog {
+    GerritReview {
+        remote: String,
+        head: String,
+        targets: Vec<(String, String)>,
+        target: String,
+        topic: String,
+        skip_hooks: bool,
+    },
     CreateBranch {
         /// Commit the branch starts at.
         at: String,
@@ -459,6 +468,14 @@ impl RepoTab {
             ui.set_width(380.0);
             let enter = ui.input(|i| i.key_pressed(Key::Enter));
             match dialog {
+                Dialog::GerritReview {
+                    remote,
+                    head,
+                    targets,
+                    target,
+                    topic,
+                    skip_hooks,
+                } => gerrit::review(ui, remote, head, targets, target, topic, *skip_hooks),
                 Dialog::CreateBranch {
                     at,
                     at_label,

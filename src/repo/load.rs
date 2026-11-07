@@ -25,6 +25,7 @@ pub(super) struct Loaded {
     pub(super) remotes: Vec<Remote>,
     /// The forge `origin` is on, if gitcraft knows it.
     pub(super) hosting: Option<Hosting>,
+    pub(super) gerrit: Option<crate::gerrit::Server>,
     pub(super) submodules: Vec<Submodule>,
     /// It keeps files in Git LFS, and git-lfs is installed.
     pub(super) lfs: bool,
@@ -134,7 +135,12 @@ impl RepoTab {
                             issues.join().map_err(join)?,
                         ))
                     })?;
-                let hosting = forge::detect(path, &remotes);
+                let gerrit = crate::gerrit::detect(path, &remotes);
+                let hosting = if gerrit.is_none() {
+                    forge::detect(path, &remotes)
+                } else {
+                    None
+                };
                 Ok(Box::new(Loaded {
                     refs,
                     history,
@@ -143,6 +149,7 @@ impl RepoTab {
                     stashes,
                     remotes,
                     hosting,
+                    gerrit,
                     submodules,
                     lfs,
                     identity,
@@ -453,6 +460,7 @@ impl RepoTab {
         // the same numbers, and a list asked of the old one is not to be taken in.
         let remotes_changed = loaded.remotes != self.remotes;
         self.remotes = loaded.remotes;
+        self.gerrit = loaded.gerrit;
         if loaded.hosting != self.hosting || remotes_changed {
             let moved = !same_repository(self.hosting.as_ref(), loaded.hosting.as_ref());
             self.hosting = loaded.hosting;
