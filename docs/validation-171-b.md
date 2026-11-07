@@ -127,3 +127,25 @@ results; they do not create real PRs, post reviews, approve CI runs, or make net
 mutations. Native Windows/Linux accessibility/platform behavior is not run on this
 macOS host. The parent owns the integrated full-suite run and integration with the
 other areas; shared load.rs, messages.rs, mod.rs and graph files need merge review.
+
+
+## Review 8 adversarial follow-up
+
+- P1: catalog rebinds retain every started release, including its initial validation,
+  in-flight completion, captured hosting destination, Done state and undo recording.
+  Unstarted previews are still invalidated. Publication/upload steps stop if the
+  hosting repository changed (including away and back); local mutation results are
+  recorded and remain undoable. Ordinary Git transport routing is unchanged.
+- P2: invalidating the follow-up details/files refresh clears a completed post's
+  settling/posting flags and preserves unsent text. A genuinely pending mutation
+  (`posting=true`, `settling=false`) remains blocked and can receive its completion.
+- Before the fixes, both new reproductions ran and failed (2 tests, zero passed).
+  Afterward, all three regressions pass, including a real local release whose
+  publication is stopped after a primary change and whose commit/tag can be undone.
+- Private target `/tmp/gitcraft-167-171/target-b`: inventory 3,101 tests; focused
+  forge-selection (10), release-dialog (5), PR-review (18), and PR-view (11) filters
+  passed all 44 tests, with each exact nonzero count asserted. Rust 1.95.0,
+  CARGO_BUILD_JOBS=3, GNU Git/sed PATH. Clippy with `-D clippy::all`, formatting and
+  diff checks pass; only existing dead_code warnings remain.
+- Evidence: `/tmp/gitcraft-review8/area-b-fixes/{before.log,after.log,focused.log,inventory.txt,clippy.log}`.
+  No live forge writes, UI layout changes, CI changes, PR, or dev merge were needed.

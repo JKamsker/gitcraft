@@ -199,12 +199,20 @@ impl RepoTab {
         self.ci = Default::default();
         if moved {
             self.pr_drafts.clear();
+        } else {
+            // Completed posts are only waiting on the details/files reads invalidated
+            // below. Pending mutations have settling=false and must remain blocked.
+            for draft in self.pr_drafts.values_mut() {
+                if std::mem::take(&mut draft.settling) {
+                    draft.posting = false;
+                }
+            }
         }
         self.pr_graph_head = None;
         self.versions.seen_heads.clear();
         self.versions.since = None;
         self.versions.view = None;
-        self.release = None;
+        self.clear_forge_release();
         self.hotfix.finish = None;
         self.clear_forge_dco();
         let was_pr_comparison = self.pr_selection_request.take().is_some() || pr_comparison;
