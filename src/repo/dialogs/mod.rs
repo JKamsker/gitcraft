@@ -37,6 +37,7 @@ use super::{Action, Refresh, RepoTab, Undo};
 use crate::theme::{self, Tokens};
 
 pub enum Dialog {
+    ContentRecovery,
     GerritReview {
         remote: String,
         head: String,
@@ -420,7 +421,7 @@ pub(crate) struct Instead {
     pub(super) described: Vec<String>,
 }
 
-enum Outcome {
+pub(super) enum Outcome {
     Open,
     /// Still open; the branch changed, so suggest a folder again.
     Suggest,
@@ -481,6 +482,7 @@ impl RepoTab {
             ui.set_width(380.0);
             let enter = ui.input(|i| i.key_pressed(Key::Enter));
             match dialog {
+                Dialog::ContentRecovery => self.content_recovery.show(ui, idle),
                 Dialog::GerritReview {
                     remote,
                     head,

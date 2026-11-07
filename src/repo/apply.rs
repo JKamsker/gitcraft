@@ -86,6 +86,11 @@ impl RepoTab {
             }
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),
+            Action::OpenContentRecovery => self.dialog = Some(super::Dialog::ContentRecovery),
+            Action::ContentSearch(query) => self.content_search(query, ctx),
+            Action::ContentInspect(hit, source) => self.content_inspect(hit, source, ctx),
+            Action::ContentPrepare(target) => self.content_prepare(target, ctx),
+            Action::ContentPerform(prepared) => self.content_perform(prepared, ctx),
             Action::Reflog(act) => self.reflog_act(act, ctx),
             Action::CloseReflog => self.close_reflog(ctx),
             Action::Issue(act) => self.issue_act(act, ctx),

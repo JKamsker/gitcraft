@@ -51,6 +51,15 @@ impl RepoTab {
         if !open {
             return;
         }
+        if ui
+            .button("Lost and found by content…")
+            .on_hover_text(
+                "Search remembered text in reflogs, dropped stashes and unreachable blobs",
+            )
+            .clicked()
+        {
+            acts.push(Action::OpenContentRecovery);
+        }
         let t = Tokens::get(ui.ctx());
         let shown = self.reflog.as_ref().map(|v| &v.source);
         for (icon, title, about, source, act) in rows {

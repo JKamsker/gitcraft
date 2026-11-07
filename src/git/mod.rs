@@ -43,6 +43,7 @@ mod overview;
 mod preview;
 pub mod progress;
 mod range_diff;
+pub(crate) mod recovery;
 mod redact;
 mod reflog;
 mod refs;

@@ -1467,3 +1467,92 @@ pub(crate) fn forecast_remote(
     request.long = true;
     remote::exec(host, &request)
 }
+
+/// Raw object recovery transport with bounded output and current task ownership. It never
+/// abandons a remote call while that call still owns a session or remote process.
+pub(super) fn recovery_output(
+    dir: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+    active: &dyn Fn() -> bool,
+    timeout: std::time::Duration,
+) -> Result<remote::Output, String> {
+    if !active() {
+        return Err("Recovery cancelled".into());
+    }
+    const MAX: usize = 16 << 20;
+    const REMOVE: &[&str] = &[
+        "GIT_DIR",
+        "GIT_COMMON_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_ATTR_SOURCE",
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_NAMESPACE",
+        "GIT_SHALLOW_FILE",
+        "GIT_REPLACE_REF_BASE",
+        "GIT_SUPER_PREFIX",
+        "GIT_LITERAL_PATHSPECS",
+        "GIT_GLOB_PATHSPECS",
+        "GIT_NOGLOB_PATHSPECS",
+        "GIT_ICASE_PATHSPECS",
+    ];
+    let extra = Extra {
+        stdin: input.map(<[u8]>::to_vec),
+        timeout: Some(timeout),
+        long: true,
+        ..Default::default()
+    };
+    let out = if let Some(target) = remote::parse(dir) {
+        let mut request = remote_request(&target, &extra, args);
+        request.unset.extend(REMOVE.iter().map(|s| (*s).into()));
+        let command = request
+            .script
+            .strip_prefix("exec ")
+            .unwrap_or(&request.script)
+            .to_owned();
+        request.script = format!(
+            "umask 077\nrecovery_io=$(mktemp -d) || exit 1\ntrap 'rm -rf -- \"$recovery_io\"' 0\n\
+             mkfifo \"$recovery_io/out\" \"$recovery_io/err\" || exit 1\n\
+             head -c {cap} <\"$recovery_io/out\" >\"$recovery_io/out-cap\" & recovery_stdout=$!\n\
+             head -c {cap} <\"$recovery_io/err\" >\"$recovery_io/err-cap\" & recovery_stderr=$!\n\
+             {command} >\"$recovery_io/out\" 2>\"$recovery_io/err\"; recovery_code=$?\n\
+             wait \"$recovery_stdout\"; wait \"$recovery_stderr\"\n\
+             cat \"$recovery_io/out-cap\"; cat \"$recovery_io/err-cap\" >&2\nexit \"$recovery_code\"",
+            cap = MAX + 1
+        );
+        remote::exec(&target.host, &request)?
+    } else {
+        let mut command = local_command(Some(dir), &extra, args);
+        for key in REMOVE {
+            command.env_remove(key);
+        }
+        let out = crate::processes::run(
+            command,
+            crate::processes::Options {
+                input: extra.stdin,
+                background: true,
+                timeout: Some(timeout),
+                output_limit: MAX,
+                stderr_limit: Some(MAX),
+                ..Default::default()
+            },
+        )?
+        .complete()?;
+        remote::Output {
+            code: out.status.code().unwrap_or(-1),
+            stdout: out.stdout,
+            stderr: out.stderr,
+        }
+    };
+    if !active() {
+        return Err("Recovery cancelled".into());
+    }
+    if out.stdout.len() > MAX || out.stderr.len() > MAX {
+        return Err("Recovery output exceeds limit".into());
+    }
+    Ok(out)
+}

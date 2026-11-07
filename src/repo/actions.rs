@@ -15,6 +15,11 @@ use crate::terminal::ShellSpec;
 
 /// Everything the views ask for; applied after drawing so views only borrow the state.
 pub(crate) enum Action {
+    OpenContentRecovery,
+    ContentSearch(String),
+    ContentInspect(usize, Option<usize>),
+    ContentPrepare(crate::git::recovery::Target),
+    ContentPerform(std::sync::Arc<crate::git::recovery::Prepared>),
     /// What a key of the tab does (see [`crate::keymap`]), or why it can't now.
     Key(crate::keymap::Command),
     /// Show the changes and put the cursor in the commit summary.

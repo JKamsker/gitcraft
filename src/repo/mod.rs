@@ -24,6 +24,7 @@ mod commands;
 mod commit_actions;
 mod conflict;
 mod conflict_check;
+mod content_recovery;
 #[cfg(test)]
 mod cpu_benchmarks;
 pub(crate) mod custom_commands;
@@ -192,6 +193,7 @@ pub struct RepoTab {
     refs: Refs,
     graph_badge_index: graph_view::BadgeIndex,
     /// Commits as git listed them.
+    content_recovery: content_recovery::State,
     saved_views: saved_views::State,
     history: Vec<Arc<Commit>>,
     /// A selected pull request's tip, including one with no local or tracking ref.
@@ -530,6 +532,7 @@ impl RepoTab {
             load_error: None,
             refs: Refs::default(),
             graph_badge_index: graph_view::BadgeIndex::default(),
+            content_recovery: Default::default(),
             saved_views: Default::default(),
             history: Vec::new(),
             pr_graph_head: None,

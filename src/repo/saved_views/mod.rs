@@ -1,6 +1,6 @@
 //! Repository-scoped saved graph relations and their display-only projection.
 mod projection;
-mod reader;
+pub(in crate::repo) mod reader;
 #[cfg(test)]
 mod tests;
 mod view;

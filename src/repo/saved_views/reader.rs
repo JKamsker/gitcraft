@@ -8,7 +8,7 @@ struct Running<T> {
     rx: Receiver<Result<T, String>>,
     scope: Scope,
 }
-pub(super) struct Reader<T> {
+pub(in crate::repo) struct Reader<T> {
     parent: Cancellation,
     generation: u64,
     pending: Option<Job<T>>,
