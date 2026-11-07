@@ -25,6 +25,8 @@ portable-pty = "0.9"
 pulldown-cmark = { version = "0.13", default-features = false }
 # Reads one setting from eframe's saved state before the window is made (app::title_bar).
 ron = "0.12"
+# The window's handle, to hide Windows' border when the tabs are in the title bar (app::title_bar).
+raw-window-handle = "0.6"
 rfd = "0.17"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -42,8 +44,6 @@ vt100 = "0.18"
 rustix = { version = "1", features = ["fs"] }
 
 [target.'cfg(windows)'.dependencies]
-# The window's border colour, hidden when the tabs are in the title bar (app/title_bar.rs).
-raw-window-handle = "0.6"
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Storage_FileSystem"] }
 
 [lints.rust]
