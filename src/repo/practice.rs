@@ -84,12 +84,24 @@ mod tests {
         Ok(())
     }
 
+    // These checks exercise the tab's background goal jobs and explicit reloads.
+    // Filesystem watching has separate tests; its startup recheck intentionally
+    // invalidates a concurrent goal answer even when no fixture file changed.
+    fn fixture_tab(path: std::path::PathBuf, ctx: &egui::Context) -> RepoTab {
+        let mut tab = RepoTab::new(path, ctx);
+        tab.watches += 1;
+        tab.watcher = None;
+        tab.fs_rx = None;
+        tab.fs_pending = None;
+        tab
+    }
+
     #[test]
     fn a_reopened_tab_loads_and_checks_its_goal_in_the_background() -> Result<(), String> {
         let path = crate::practice::create(Scenario::Detached)?;
         let root = path.parent().ok_or("Practice root missing")?.to_owned();
         let ctx = egui::Context::default();
-        let mut tab = RepoTab::new(path.clone(), &ctx);
+        let mut tab = fixture_tab(path.clone(), &ctx);
         wait(&mut tab, &ctx)?;
         assert_eq!(
             tab.practice.as_ref().map(|s| s.scenario),
@@ -122,7 +134,7 @@ mod tests {
         let path = crate::practice::create(Scenario::Detached)?;
         let root = path.parent().ok_or("Practice root missing")?.to_owned();
         let ctx = egui::Context::default();
-        let mut tab = RepoTab::new(path, &ctx);
+        let mut tab = fixture_tab(path, &ctx);
         wait(&mut tab, &ctx)?;
         tab.check_practice(&ctx);
         // A newer read starts before the check's answer is consumed.
