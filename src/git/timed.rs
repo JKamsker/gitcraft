@@ -16,6 +16,7 @@ pub fn run_timed(
     input: Option<&[u8]>,
     limit: Duration,
 ) -> Result<String, String> {
+    let _timer = super::backend::CliTimer::new(args);
     let what = format!("git {}", args.first().copied().unwrap_or_default());
     let (code, stdout, stderr) = match remote::parse(dir) {
         Some(target) => {

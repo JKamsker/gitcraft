@@ -1,4 +1,4 @@
-//! gitcraft: a small, personal visual git client (egui front end over the git command line).
+//! gitcraft: a small, personal visual git client with native local reads and Git CLI fallback.
 
 mod a11y;
 mod across;

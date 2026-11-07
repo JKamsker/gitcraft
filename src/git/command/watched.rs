@@ -181,6 +181,7 @@ pub fn run_watched_recorded(
         let not_run = Recorded::new(args, None, "Not run: cancelled", creds, started);
         return (Err(CANCELLED.to_owned()), not_run);
     }
+    let _timer = crate::git::backend::CliTimer::new(args);
     let words = if quiet {
         args.iter().map(|a| (*a).to_owned()).collect()
     } else {

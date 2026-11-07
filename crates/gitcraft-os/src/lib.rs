@@ -138,3 +138,8 @@ mod tests {
         );
     }
 }
+
+#[cfg(unix)]
+mod account;
+#[cfg(unix)]
+pub use account::account_home;
