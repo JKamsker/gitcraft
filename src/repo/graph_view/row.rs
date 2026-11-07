@@ -88,9 +88,11 @@ impl RepoTab {
         // Known by its commit, not its place: rows shift when a reload adds commits or the
         // changes row above them, and a menu opened on one must stay that commit's.
         let resp = ui.interact(rect, row_id(ui, &commit.hash), sense);
+        // WidgetInfo invokes its label closure while holding egui's context lock.
+        let walk_topology = crate::settings::Settings::get(ui.ctx()).graph_lane_walk;
         let label = || {
             let mut label = self.row_label(commit, viewport.now);
-            if crate::settings::Settings::get(ui.ctx()).graph_lane_walk {
+            if walk_topology {
                 label.push_str(". ");
                 label.push_str(&self.graph_description(i));
             }
