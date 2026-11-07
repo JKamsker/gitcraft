@@ -210,6 +210,7 @@ impl RepoTab {
             whole_file: settings.diff_whole_file,
             algorithm: diff::algorithm_for(&settings, key.path()),
         };
+        view.algorithm = opts.algorithm;
         let dark = Tokens::get(ctx).dark();
         spawn(&self.tx, ctx, move || {
             let result = diff::load(&path, &key, opts, dark).map(Box::new);

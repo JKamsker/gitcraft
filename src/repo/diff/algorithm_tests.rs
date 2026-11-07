@@ -38,6 +38,8 @@ impl Repo {
             &["config", "user.email", "t@t"],
             &["config", "commit.gpgSign", "false"],
             &["config", "core.autocrlf", "false"],
+            // What "Default" is here, whatever the global config of the machine says.
+            &["config", "diff.algorithm", "myers"],
         ] {
             git(args)?;
         }
@@ -141,7 +143,8 @@ fn the_choice_wins_over_the_config_and_never_changes_it() -> Result<(), String> 
     Ok(())
 }
 
-/// Lines picked from a patience diff still apply: staging works whatever the pairing.
+/// Lines picked from a patience diff stage what they show: every change picked, the index
+/// holds the file as it is in the working tree.
 #[test]
 fn lines_picked_from_a_patience_diff_stage() -> Result<(), String> {
     let name = "f.c";
@@ -149,15 +152,21 @@ fn lines_picked_from_a_patience_diff_stage() -> Result<(), String> {
     let [.., work] = repo.keys(name);
     let data = repo.load(&work, Some(DiffAlgorithm::Patience))?;
     assert!(data.partial);
-    let chosen = hunk_changes(&data.lines, 0);
+    let hunks = data.lines.iter().filter(|l| l.kind == Kind::Hunk).count();
+    let chosen: std::collections::BTreeSet<usize> = (0..hunks)
+        .flat_map(|h| hunk_changes(&data.lines, h))
+        .collect();
     let patch = partial_patch(&data.header, &data.lines, &chosen, Pick::Stage).ok_or("none")?;
     let saved = git::save_patch(&patch)?;
     let applied = git::run(
         Some(&repo.dir),
-        &["apply", "--cached", "--check", &saved.to_string_lossy()],
+        &["apply", "--cached", &saved.to_string_lossy()],
     );
     let _ = std::fs::remove_file(saved);
-    applied.map(|_| ())
+    applied?;
+    let staged = git::run(Some(&repo.dir), &["show", &format!(":w-{name}")])?;
+    assert_eq!(staged, AFTER);
+    Ok(())
 }
 
 #[test]
@@ -257,5 +266,42 @@ fn the_line_at_the_top_stays_there_when_the_pairing_changes() -> Result<(), Stri
         // Past the end, or of an empty diff: the top.
         assert_eq!(place_at(&myers, split, 1.0e9), None);
     }
+    Ok(())
+}
+
+/// A place whose new line is further down than a removed line of its old number goes back to
+/// its new line, not to the removal.
+#[test]
+fn a_place_goes_back_to_its_new_line_first() -> Result<(), String> {
+    let dir = std::env::temp_dir().join(format!("gitcraft-alg-new-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let git = |args: &[&str]| git::run(Some(&dir), args);
+    for args in [
+        &["init", "-q"][..],
+        &["config", "user.name", "t"],
+        &["config", "user.email", "t@t"],
+        &["config", "commit.gpgSign", "false"],
+    ] {
+        git(args)?;
+    }
+    let write = |body: &str| std::fs::write(dir.join("f.txt"), body).map_err(|e| e.to_string());
+    write("x\n1\n2\n3\n4\n5\n")?;
+    git(&["add", "-A"])?;
+    git(&["commit", "-qm", "one"])?;
+    write("1\n2\n3\n4\nY\n5\n")?;
+    let key = DiffKey::Work(StatusFile {
+        path: "f.txt".to_owned(),
+        old_path: None,
+        code: 'M',
+        area: Area::Unstaged,
+    });
+    let data = load(&dir, &key, DiffOptions::default(), true);
+    let _ = std::fs::remove_dir_all(&dir);
+    let data = data?;
+    let place = super::place::Place::at(Some(1), Some(5));
+    let row = (offset_of_place(&data, false, place) / LINE_H) as usize;
+    assert_eq!(data.lines[row].new, Some(5), "{:?}", data.lines[row]);
+    assert_eq!(data.lines[row].text, "Y");
     Ok(())
 }
