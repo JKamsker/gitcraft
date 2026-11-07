@@ -181,6 +181,7 @@ fn actual_pack_representation_exposes_delta_ancestry() -> Result<(), String> {
     assert!(packed.chain[0].disk < got.object.as_ref().ok_or("missing object")?.size);
     Ok(())
 }
+#[cfg(target_os = "linux")]
 #[test]
 fn shared_clone_independence_survives_donor_removal() -> Result<(), String> {
     let f = Fixture::new()?;
@@ -219,6 +220,7 @@ fn shared_clone_independence_survives_donor_removal() -> Result<(), String> {
     );
     Ok(())
 }
+#[cfg(target_os = "linux")]
 #[test]
 fn missing_donor_is_visible_and_copy_failure_preserves_borrowing() -> Result<(), String> {
     let f = Fixture::new()?;
@@ -248,6 +250,7 @@ fn missing_donor_is_visible_and_copy_failure_preserves_borrowing() -> Result<(),
     assert!(missing.independence.is_none());
     Ok(())
 }
+#[cfg(target_os = "linux")]
 #[test]
 fn stale_alternates_refs_index_and_post_copy_changes_refuse_safely() -> Result<(), String> {
     let f = Fixture::new()?;
@@ -292,6 +295,7 @@ fn stale_alternates_refs_index_and_post_copy_changes_refuse_safely() -> Result<(
     );
     Ok(())
 }
+#[cfg(target_os = "linux")]
 #[test]
 fn failed_final_proof_restores_original_borrowing_link() -> Result<(), String> {
     let f = Fixture::new()?;
@@ -436,11 +440,9 @@ fn fake_ssh_inspection_and_independence_pin_paths_with_hostile_environment() -> 
         let data = inspect(&remote, "HEAD:file ' $(touch ESCAPED).txt", &|| true)?;
         assert_eq!(data.topology.stores.len(), 2);
         assert_eq!(data.object.as_ref().ok_or("no remote object")?.size, 15);
-        let plan = data.independence.ok_or("no remote independence plan")?;
-        independent::make_independent(&plan, &|| true)?;
-        let data = inspect(&remote, "HEAD:file ' $(touch ESCAPED).txt", &|| true)?;
-        assert_eq!(data.topology.stores.len(), 1);
-        assert!(data.representations.iter().any(|r| !r.chain.is_empty()));
+        assert!(data.independence.is_none());
+        assert!(data.notes.iter().any(|s| s.contains("ownership handles")));
+        assert!(path.join(".git/objects/info/alternates").exists());
         assert!(!path.join("ESCAPED").exists());
         return Ok(());
     }
@@ -478,7 +480,7 @@ fn fake_ssh_inspection_and_independence_pin_paths_with_hostile_environment() -> 
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(!borrower.join(".git/objects/info/alternates").exists());
+    assert!(borrower.join(".git/objects/info/alternates").exists());
     assert_eq!(
         Fixture::git(&borrower, &["show", "HEAD:file ' $(touch ESCAPED).txt"])?,
         "borrowed bytes"
@@ -567,4 +569,182 @@ fn fake_wsl_uses_production_bounded_object_request_without_a_live_distribution()
         String::from_utf8_lossy(&output.stderr)
     );
     Ok(())
+}
+
+#[cfg(target_os = "linux")]
+mod fixed_ownership {
+    use super::*;
+    fn copy_owned_tree(from: &Path, to: &Path) -> Result<(), String> {
+        std::fs::create_dir(to).map_err(|e| e.to_string())?;
+        for entry in std::fs::read_dir(from).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let target = to.join(entry.file_name());
+            if entry.file_type().map_err(|e| e.to_string())?.is_dir() {
+                copy_owned_tree(&entry.path(), &target)?;
+            } else {
+                std::fs::copy(entry.path(), target).map_err(|e| e.to_string())?;
+            }
+        }
+        Ok(())
+    }
+    #[test]
+    fn fixed_candidate_refuses_git_directory_and_repository_ancestor_links() -> Result<(), String> {
+        let f = Fixture::new()?;
+        let (_, borrower) = f.borrowing()?;
+        let git = borrower.join(".git");
+        let saved = borrower.join("actual-git");
+        std::fs::rename(&git, &saved).map_err(|e| e.to_string())?;
+        std::os::unix::fs::symlink(&saved, &git).map_err(|e| e.to_string())?;
+        let data = inspect(&borrower, "HEAD", &|| true)?;
+        assert!(data.object.is_some());
+        assert!(data.independence.is_none());
+        std::fs::remove_file(&git).map_err(|e| e.to_string())?;
+        std::fs::rename(&saved, &git).map_err(|e| e.to_string())?;
+        let alias = f.0.join("ancestor-alias");
+        std::os::unix::fs::symlink(&borrower, &alias).map_err(|e| e.to_string())?;
+        assert!(inspect(&alias, "HEAD", &|| true)?.independence.is_none());
+        assert!(git.join("objects/info/alternates").is_file());
+        Ok(())
+    }
+    #[test]
+    fn fixed_candidate_rejects_same_text_git_directory_replacement_before_action()
+    -> Result<(), String> {
+        let f = Fixture::new()?;
+        let (_, borrower) = f.borrowing()?;
+        let plan = inspect(&borrower, "HEAD", &|| true)?
+            .independence
+            .ok_or("no plan")?;
+        let git = borrower.join(".git");
+        let saved = borrower.join("held-git");
+        std::fs::rename(&git, &saved).map_err(|e| e.to_string())?;
+        copy_owned_tree(&saved, &git)?;
+        assert!(
+            independent::make_independent(&plan, &|| true)
+                .is_err_and(|e| e.contains("identity changed"))
+        );
+        assert!(git.join("objects/info/alternates").is_file());
+        assert!(saved.join("objects/info/alternates").is_file());
+        Ok(())
+    }
+    #[test]
+    fn fixed_candidate_holds_git_info_and_ancestor_identity_after_final_verification()
+    -> Result<(), String> {
+        for part in ["git", "info", "ancestor", "alternate"] {
+            let f = Fixture::new()?;
+            let (_, borrower) = f.borrowing()?;
+            let plan = inspect(&borrower, "HEAD", &|| true)?
+                .independence
+                .ok_or("no plan")?;
+            let alternate = borrower.join(".git/objects/info/alternates");
+            let expected = std::fs::read(&alternate).map_err(|e| e.to_string())?;
+            let (current, moved) = match part {
+                "git" => (borrower.join(".git"), borrower.join("held-git")),
+                "info" => (
+                    borrower.join(".git/objects/info"),
+                    borrower.join(".git/objects/held-info"),
+                ),
+                "ancestor" => (borrower.clone(), f.0.join("held-borrower")),
+                _ => (
+                    alternate.clone(),
+                    borrower.join(".git/objects/info/held-alternate"),
+                ),
+            };
+            let result = independent::make_with_checkpoints(&plan, &|| true, &mut |phase| {
+                if phase == "verified" {
+                    std::fs::rename(&current, &moved).map_err(|e| e.to_string())?;
+                    if part == "alternate" {
+                        std::fs::write(&current, &expected).map_err(|e| e.to_string())?;
+                    } else {
+                        copy_owned_tree(&moved, &current)?;
+                    }
+                }
+                Ok(())
+            });
+            assert!(result.is_err_and(|e| e.contains("identity")), "{part}");
+            assert_eq!(
+                std::fs::read(&alternate).map_err(|e| e.to_string())?,
+                expected
+            );
+            let retained = match part {
+                "git" => moved.join("objects/info/alternates"),
+                "info" => moved.join("alternates"),
+                "ancestor" => moved.join(".git/objects/info/alternates"),
+                _ => moved,
+            };
+            assert_eq!(
+                std::fs::read(retained).map_err(|e| e.to_string())?,
+                expected
+            );
+        }
+        Ok(())
+    }
+    #[test]
+    fn fixed_candidate_restoration_uses_held_info_and_does_not_overwrite_new_metadata()
+    -> Result<(), String> {
+        let f = Fixture::new()?;
+        let (_, borrower) = f.borrowing()?;
+        let plan = inspect(&borrower, "HEAD", &|| true)?
+            .independence
+            .ok_or("no plan")?;
+        let info = borrower.join(".git/objects/info");
+        let held = borrower.join(".git/objects/held-info");
+        let expected = std::fs::read(info.join("alternates")).map_err(|e| e.to_string())?;
+        let result = independent::make_with_checkpoints(&plan, &|| true, &mut |phase| {
+            if phase == "detached" {
+                std::fs::rename(&info, &held).map_err(|e| e.to_string())?;
+                std::fs::create_dir(&info).map_err(|e| e.to_string())?;
+                std::fs::write(info.join("alternates"), b"new metadata must survive\n")
+                    .map_err(|e| e.to_string())?;
+            }
+            Ok(())
+        });
+        assert!(result.is_err_and(|e| e.contains("Borrowing was restored")));
+        assert_eq!(
+            std::fs::read(info.join("alternates")).map_err(|e| e.to_string())?,
+            b"new metadata must survive\n"
+        );
+        assert_eq!(
+            std::fs::read(held.join("alternates")).map_err(|e| e.to_string())?,
+            expected
+        );
+        Ok(())
+    }
+    #[test]
+    fn fixed_candidate_create_only_recovery_preserves_a_new_alternate_file() -> Result<(), String> {
+        let f = Fixture::new()?;
+        let (_, borrower) = f.borrowing()?;
+        let plan = inspect(&borrower, "HEAD", &|| true)?
+            .independence
+            .ok_or("no plan")?;
+        let info = borrower.join(".git/objects/info");
+        let expected = std::fs::read(info.join("alternates")).map_err(|e| e.to_string())?;
+        let result = independent::make_with_checkpoints(&plan, &|| true, &mut |phase| {
+            if phase == "detached" {
+                std::fs::write(info.join("alternates"), b"new alternate\n")
+                    .map_err(|e| e.to_string())?;
+                return Err("owned fixture interrupts final proof".into());
+            }
+            Ok(())
+        });
+        assert!(result.is_err_and(|e| e.contains("did not overwrite")));
+        assert_eq!(
+            std::fs::read(info.join("alternates")).map_err(|e| e.to_string())?,
+            b"new alternate\n"
+        );
+        let backups = std::fs::read_dir(&info)
+            .map_err(|e| e.to_string())?
+            .filter_map(Result::ok)
+            .filter(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .starts_with("alternates.gitcraft-backup-")
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(backups.len(), 1);
+        assert_eq!(
+            std::fs::read(backups[0].path()).map_err(|e| e.to_string())?,
+            expected
+        );
+        Ok(())
+    }
 }

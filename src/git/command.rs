@@ -1172,6 +1172,17 @@ pub(super) fn object_storage_output(
     max: usize,
     active: &dyn Fn() -> bool,
 ) -> Result<remote::Output, String> {
+    object_storage_output_with_env(repo, args, input, max, &[], active)
+}
+
+pub(super) fn object_storage_output_with_env(
+    repo: &Path,
+    args: &[&str],
+    input: Vec<u8>,
+    max: usize,
+    env: &[(&'static str, String)],
+    active: &dyn Fn() -> bool,
+) -> Result<remote::Output, String> {
     if !active() {
         return Err("Object storage operation cancelled".into());
     }
@@ -1184,6 +1195,9 @@ pub(super) fn object_storage_output(
     .chain(args.iter().copied())
     .collect();
     let out = if let Some(target) = remote::parse(repo) {
+        if !env.is_empty() {
+            return Err("Held object storage mutation is only supported locally.".into());
+        }
         let request = object_storage_request(&target, args, input, max);
         comparison_remote(&target.host, request, active)?
     } else {
@@ -1191,6 +1205,9 @@ pub(super) fn object_storage_output(
         command.args(&guarded);
         for key in OBJECT_STORAGE_REMOVE {
             command.env_remove(key);
+        }
+        for (key, value) in env {
+            command.env(key, value);
         }
         let out = crate::bounded_process::run_input(
             command,
