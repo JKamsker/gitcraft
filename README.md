@@ -303,7 +303,11 @@ Glossary tips stay out of the way while typing, scrolling or dragging.
   (`grep`, `cut`, `head`). Secret heuristics return locations, never matched values; external LFS
   payloads are not downloaded or scanned and embedded signatures are not trust-verified. LFS
   endpoints use inspected Git configuration and the current committed `.lfsconfig`; routing
-  edits must be committed or stashed first. Multi-ref/mirror/delete pushes need separate reviews.
+  edits must be committed or stashed first. Multi-ref/mirror pushes need separate reviews.
+  Single-ref deletions preview their exact server lease and retain the requested local/remote
+  operation order. Automatic history rewrites currently require a local repository, Git 2.50
+  or later, and a successful checkout/reference capability check. For remote repairs, use Git
+  explicitly on the repository host, then recheck; remote preview and reviewed push remain available.
 - Pull's arrow (or a right-click on it) sets what it does: fast-forward, merging when the branch
   has diverged; fast-forward only; or rebase. Also in Settings, and the menu has _Fetch all_.
 - Background fetch every few minutes (Settings; 0 turns it off).
@@ -414,8 +418,6 @@ Glossary tips stay out of the way while typing, scrolling or dragging.
     under the buttons.
   - For any theme: your own accent colour, rounder or square corners, and the graph's lanes in
     the theme's hues, gitcraft's classic ones or colour-blind-safe ones (Okabe–Ito).
-
-Automatic preflight repairs currently require a local repository, Git 2.50 or later, and a successful checkout/reference capability check. Remote previews and reviewed pushes remain available; automatic remote repair awaits completion-aware request ownership.
 
 ## Download
 
