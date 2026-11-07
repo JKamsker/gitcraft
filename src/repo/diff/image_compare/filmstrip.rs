@@ -95,13 +95,16 @@ fn work(shared: &Mutex<Shared>, ctx: &egui::Context, repo: &std::path::Path) {
 pub fn read(repo: &std::path::Path, hash: &str, path: &str) -> Option<ColorImage> {
     let bytes = crate::git::file_at(repo, Some(hash), path).ok()?;
     let img = image::load_from_memory(&bytes).ok()?;
+    drop(bytes);
     // Scaled down only: a small picture stays as it is.
     let img = if img.width().max(img.height()) > THUMB {
-        img.thumbnail(THUMB, THUMB)
+        let thumbnail = img.thumbnail(THUMB, THUMB);
+        drop(img);
+        thumbnail
     } else {
         img
     }
-    .to_rgba8();
+    .into_rgba8();
     let size = [img.width() as usize, img.height() as usize];
     Some(ColorImage::from_rgba_unmultiplied(size, img.as_raw()))
 }

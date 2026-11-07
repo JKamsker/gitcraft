@@ -184,15 +184,22 @@ fn maps(path: &str, a: &[Field], b: &[Field], out: &mut Vec<Entry>) {
     // is still there.
     let mut removed_before: HashMap<usize, Vec<usize>> = HashMap::new();
     let mut removed_at_end = Vec::new();
-    for (i, f) in a.iter().enumerate() {
-        if ib.contains_key(f.key.as_str()) || ia.get(f.key.as_str()) != Some(&i) {
-            continue;
-        }
-        match a[i + 1..].iter().find_map(|g| ib.get(g.key.as_str())) {
-            Some(&j) => removed_before.entry(j).or_default().push(i),
-            None => removed_at_end.push(i),
+    let mut next = None;
+    for (i, f) in a.iter().enumerate().rev() {
+        if let Some(&j) = ib.get(f.key.as_str()) {
+            // Even an earlier duplicate is an anchor for preceding removals.
+            next = Some(j);
+        } else if ia.get(f.key.as_str()) == Some(&i) {
+            match next {
+                Some(j) => removed_before.entry(j).or_default().push(i),
+                None => removed_at_end.push(i),
+            }
         }
     }
+    for indices in removed_before.values_mut() {
+        indices.reverse();
+    }
+    removed_at_end.reverse();
     let removed = |i: usize, out: &mut Vec<Entry>| {
         let f = &a[i];
         out.push(entry(

@@ -74,7 +74,7 @@ pub struct Settings {
     pub show_detail: bool,
     /// A worktree opens in the tab it was opened from, which then shows its branch.
     pub worktrees_in_same_tab: bool,
-    /// Windows: the tab strip stands in for the system's title bar.
+    /// Windows and macOS: the tab strip stands in for the system's title bar.
     pub tabs_in_title_bar: bool,
     /// Where the settings, command palette, theme and manual buttons sit, and in what order.
     pub button_layout: crate::app_buttons::ButtonLayout,
@@ -589,10 +589,10 @@ impl Settings {
                             }
                         }
                     });
-                    if cfg!(windows) {
+                    if cfg!(any(windows, target_os = "macos")) {
                         card.row("Title bar", "window frame caption native tabs", |ui| {
                             ui.checkbox(&mut self.tabs_in_title_bar, "Tabs in the title bar")
-                                .on_hover_text("The tabs take the place of Windows' title bar, as in a browser: drag the space next to them to move the window, double-click it to maximize, and the buttons to minimize, maximize and close are at the end of the strip.");
+                                .on_hover_text("The tabs take the place of the system's title bar, as in a browser: drag the space next to them to move the window, double-click it to maximize, and the buttons to minimize, maximize and close are at the end of the strip.");
                         });
                     }
                     for button in crate::app_buttons::AppButton::ALL {

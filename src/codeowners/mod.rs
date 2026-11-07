@@ -94,6 +94,8 @@ pub(crate) struct CodeOwners {
     pub forge: Option<Forge>,
     rules: Vec<parse::Rule>,
     sections: Vec<parse::Section>,
+    /// Rule positions per section, including repeated section headers, in file order.
+    section_rules: Vec<Vec<usize>>,
     /// Lines the forge would skip or misread, and why.
     pub problems: Vec<Problem>,
 }
@@ -163,6 +165,12 @@ impl CodeOwners {
             other => other,
         };
         let parsed = parse::parse(flavor, text);
+        let mut section_rules = vec![Vec::new(); parsed.sections.len()];
+        if flavor == Flavor::GitLab {
+            for (i, rule) in parsed.rules.iter().enumerate() {
+                section_rules[rule.section].push(i);
+            }
+        }
         CodeOwners {
             path: path.to_owned(),
             flavor,
@@ -170,6 +178,7 @@ impl CodeOwners {
             forge: None,
             rules: parsed.rules,
             sections: parsed.sections,
+            section_rules,
             problems: parsed.problems,
         }
     }
@@ -193,12 +202,12 @@ impl CodeOwners {
             Flavor::GitLab => {
                 // In each section the last line that matches counts, unless an exclusion
                 // anywhere in it matches: then the section has nothing to say of the file.
-                for i in 0..self.sections.len() {
-                    let in_section = || self.rules.iter().filter(move |r| r.section == i);
+                for indices in &self.section_rules {
+                    let in_section = || indices.iter().map(|&i| &self.rules[i]);
                     if in_section().any(|r| r.negated && r.matches(path)) {
                         continue;
                     }
-                    if let Some(rule) = in_section().filter(|r| !r.negated).last_match(path) {
+                    if let Some(rule) = in_section().rev().find(|r| !r.negated && r.matches(path)) {
                         add(&rule.owners);
                     }
                 }
@@ -353,15 +362,4 @@ pub(crate) fn reviewers_for<'a>(
         .iter()
         .filter_map(|o| Reviewer::of(o))
         .collect()
-}
-
-/// The last of some rules that matches a path.
-trait LastMatch<'a> {
-    fn last_match(self, path: &str) -> Option<&'a parse::Rule>;
-}
-
-impl<'a, I: Iterator<Item = &'a parse::Rule>> LastMatch<'a> for I {
-    fn last_match(self, path: &str) -> Option<&'a parse::Rule> {
-        self.filter(|r| r.matches(path)).last()
-    }
 }

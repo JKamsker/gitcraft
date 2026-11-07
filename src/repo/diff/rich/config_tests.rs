@@ -4,6 +4,101 @@ use super::config::{self, Change, Entry};
 use super::tree::{Node, Ty};
 use super::*;
 
+#[test]
+fn bulk_removals_keep_source_order_and_duplicate_anchors() -> Result<(), String> {
+    let old = r#"{"gone":0,"anchor":0,"first":1,"second":2,"anchor":3,"last":4,"dup":5,"dup":6}"#;
+    let diff = config::diff("config.json", &sides(old, r#"{"anchor":3}"#))?;
+    let paths: Vec<_> = diff.entries.iter().map(|e| e.path.as_str()).collect();
+    assert_eq!(paths, ["gone", "first", "second", "last", "dup"]);
+    assert!(diff.entries.iter().all(|e| e.change == Change::Removed));
+    assert_eq!(
+        diff.entries.last().and_then(|e| e.old.as_deref()),
+        Some("6")
+    );
+    let old = format!(
+        "{{{}}}",
+        (0..5000)
+            .map(|i| format!("\"key{i}\":{i}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    let diff = config::diff("config.json", &sides(&old, r#"{"key0":0}"#))?;
+    assert_eq!(diff.entries.len(), 4999);
+    assert_eq!(diff.entries[0].path, "key1");
+    assert_eq!(diff.entries[4998].path, "key4999");
+    Ok(())
+}
+
+#[test]
+fn whole_config_removal_and_missing_sides_are_distinguished() -> Result<(), String> {
+    let removed = config::diff(
+        "settings.json",
+        &Sides {
+            old: Some("{\"enabled\":true}".into()),
+            new: None,
+        },
+    )?;
+    assert_eq!(removed.entries.len(), 1);
+    assert_eq!(removed.entries[0].change, Change::Removed);
+    assert_eq!(removed.entries[0].path, "(the whole file)");
+    assert!(
+        config::diff(
+            "settings.json",
+            &Sides {
+                old: None,
+                new: None
+            }
+        )?
+        .entries
+        .is_empty()
+    );
+    assert!(config::diff("unsupported.xml", &sides("<old/>", "<new/>")).is_err());
+    let error = config::diff("settings.json", &sides("{broken", "{}"));
+    assert!(error.is_err_and(|e| e.contains("before")));
+    Ok(())
+}
+
+#[test]
+fn large_config_rewrites_keep_value_changes_when_alignment_is_bounded() -> Result<(), String> {
+    let n = 2001;
+    let old = format!(
+        "[{}]",
+        (0..n).map(|i| i.to_string()).collect::<Vec<_>>().join(",")
+    );
+    let new = format!(
+        "[{}]",
+        (n..2 * n)
+            .map(|i| i.to_string())
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    let diff = config::diff("settings.json", &sides(&old, &new))?;
+    assert_eq!(diff.entries.len(), n);
+    assert_eq!(diff.entries[0].path, "[0]");
+    assert_eq!(diff.entries[n - 1].path, format!("[{}]", n - 1));
+    assert!(diff.entries.iter().all(|e| e.change == Change::Changed));
+    let old = format!(
+        "{{{}}}",
+        (0..n)
+            .map(|i| format!("\"key{i}\":{i}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    let new = format!(
+        "{{{}}}",
+        (0..n)
+            .rev()
+            .map(|i| format!("\"key{i}\":{}", i + usize::from(i == 0)))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    let diff = config::diff("settings.json", &sides(&old, &new))?;
+    assert_eq!(diff.entries.len(), 1);
+    assert_eq!(diff.entries[0].path, "key0");
+    assert_eq!(diff.entries[0].change, Change::Changed);
+    Ok(())
+}
+
 fn sides(old: &str, new: &str) -> Sides {
     Sides {
         old: Some(old.to_owned()),

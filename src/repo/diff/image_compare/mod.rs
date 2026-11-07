@@ -8,6 +8,11 @@ mod lazy;
 mod view;
 mod view_state;
 
+#[cfg(test)]
+pub(in crate::repo) mod cpu {
+    pub(in crate::repo) use super::decode::{decode, difference, ready};
+}
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};

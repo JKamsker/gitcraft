@@ -84,6 +84,13 @@ pub(super) const GIT_ENV: [(&str, &str); 4] = [
 pub(super) const GIT_ENV_REMOVED: [&str; 1] = ["GIT_SEQUENCE_EDITOR"];
 
 pub(super) fn git_cmd() -> Command {
+    // With a bare name and an overridden PATH, Rust falls back to fork/exec on Unix.
+    // Resolve through the child's PATH first, allowing its much cheaper posix_spawn path.
+    // Look up each time so installing or removing a git still takes effect while running.
+    #[cfg(unix)]
+    let mut cmd =
+        Command::new(crate::shell_path::executable("git").unwrap_or_else(|| "git".into()));
+    #[cfg(not(unix))]
     let mut cmd = Command::new("git");
     for (name, value) in GIT_ENV {
         cmd.env(name, value);

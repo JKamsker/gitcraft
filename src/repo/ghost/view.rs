@@ -201,7 +201,7 @@ fn ghost_lanes(graph: &Graph, kinds: &[Kind]) -> Vec<RowGhost> {
         let incoming = is(&row.incoming, &ghost);
         let going_through = is(&row.through, &going);
         let going_incoming = is(&row.incoming, &going);
-        for &l in &row.incoming {
+        for &l in row.incoming.iter() {
             for lanes in [&mut ghost, &mut going] {
                 if let Some(g) = lanes.get_mut(l) {
                     *g = false;

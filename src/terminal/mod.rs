@@ -8,6 +8,9 @@ mod shells;
 mod tests;
 mod view;
 
+#[cfg(test)]
+pub(crate) use view::cpu_paint;
+
 use std::io::{Read, Write};
 use std::num::NonZeroU16;
 use std::path::Path;

@@ -4,7 +4,7 @@
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
-use eframe::egui_wgpu::{WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew, wgpu};
+use eframe::egui_wgpu::{SurfaceConfig, WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew, wgpu};
 use gitcraft::app;
 
 fn main() -> eframe::Result {
@@ -44,13 +44,12 @@ fn main() -> eframe::Result {
     }
     app::warm_up();
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
+        viewport: app::window_viewport()
             .with_title("GitCraft")
             // Matches gitcraft.desktop, so Linux desktops show its icon and group its windows.
             .with_app_id("gitcraft")
             .with_inner_size([1400.0, 860.0])
             .with_min_inner_size([800.0, 500.0])
-            .with_decorations(app::window_decorated())
             .with_icon(app::window_icon()),
         // Runs after eframe restored the last session's size and position.
         window_builder: Some(Box::new(|builder| {
@@ -103,6 +102,9 @@ fn wgpu_options() -> WgpuConfiguration {
     }
 
     WgpuConfiguration {
+        // Prefer lower memory and input latency over queueing another frame. On macOS the
+        // extra full-window drawable alone costs 16 MiB at 2800×1720.
+        surface: SurfaceConfig::LOW_LATENCY,
         wgpu_setup: WgpuSetup::CreateNew(setup),
         ..Default::default()
     }

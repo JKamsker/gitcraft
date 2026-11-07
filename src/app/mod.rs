@@ -232,6 +232,7 @@ impl App {
         let ctx = &cc.egui_ctx;
         egui_extras::install_image_loaders(ctx);
         crate::image_fit::install(ctx);
+        crate::image_cache::install(ctx);
         theme::install_fonts(ctx);
         let mut settings = saved.settings;
         theme::apply(ctx, &saved.theme, &settings.theme_tweaks);
@@ -674,6 +675,7 @@ impl App {
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        crate::image_cache::maintain(&ctx);
         let t = Tokens::get(&ctx);
         // A button dropped moves in the settings, read just below.
         crate::app_buttons::begin_frame(&ctx);
@@ -953,11 +955,10 @@ pub fn after_exit() {
     update::relaunch();
 }
 
-/// Whether to make the window with the system's title bar: not when the saved settings put the
-/// tabs in its place. Call it once, before the window is made.
-pub fn window_decorated() -> bool {
+/// The window's native frame, configured before creation from the saved title-bar setting.
+pub fn window_viewport() -> egui::ViewportBuilder {
     let app_ron = eframe::storage_dir("gitcraft").map(|dir| dir.join("app.ron"));
-    title_bar::decorated_at_start(app_ron.as_deref())
+    title_bar::viewport(title_bar::decorated_at_start(app_ron.as_deref()))
 }
 
 /// The window and taskbar icon (the `.exe` gets the same picture from `build.rs`).

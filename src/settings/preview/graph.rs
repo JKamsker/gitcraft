@@ -252,7 +252,7 @@ fn paint_graph(p: &Painter, t: &Tokens, rect: Rect, l: &Layout, rows: usize) {
             pos2(l.gx(), r.top()),
             pos2(l.gx() + l.graph, r.bottom()),
         ));
-        for &lane in &row.through {
+        for &lane in row.through.iter() {
             gp.line_segment(
                 [
                     pos2(l.lane_x(lane), r.top()),
@@ -261,11 +261,11 @@ fn paint_graph(p: &Painter, t: &Tokens, rect: Rect, l: &Layout, rows: usize) {
                 Stroke::new(2.0, t.lane(lane)),
             );
         }
-        for &lane in &row.incoming {
+        for &lane in row.incoming.iter() {
             edge(&gp, node, pos2(l.lane_x(lane), r.top()), t.lane(lane), 2.0);
         }
         // The last row drawn: its lines run on, as into older history.
-        for &lane in &row.outgoing {
+        for &lane in row.outgoing.iter() {
             edge(
                 &gp,
                 node,

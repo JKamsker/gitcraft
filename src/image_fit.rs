@@ -43,6 +43,9 @@ impl ImageLoader for Fitting {
         if is_svg(uri) {
             return Err(egui::load::LoadError::NotSupported);
         }
+        if let Some(image) = self.shrunk().get(uri).cloned() {
+            return Ok(ImagePoll::Ready { image });
+        }
         match self.inner.load(ctx, uri, size_hint)? {
             ImagePoll::Ready { image } => {
                 let max = ctx.input(|i| i.max_texture_side).max(1);
@@ -54,6 +57,9 @@ impl ImageLoader for Fitting {
                         .entry(uri.to_owned())
                         .or_insert_with(|| Arc::new(fit(&image, max))),
                 );
+                // The fitted copy is enough for every later request. In particular, don't
+                // keep the full-resolution decoded image beside its smaller replacement.
+                self.inner.forget(uri);
                 Ok(ImagePoll::Ready { image })
             }
             pending => Ok(pending),
@@ -108,19 +114,17 @@ fn fit(image: &ColorImage, max: usize) -> ColorImage {
     let longest = w.max(h).max(1) as f64;
     let side = |n: usize| ((n as f64 * max as f64 / longest).round() as usize).clamp(1, max);
     let (nw, nh) = (side(w), side(h));
-    let bytes: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
-    let pixels = match image::RgbaImage::from_raw(w as u32, h as u32, bytes) {
-        Some(rgba) => image::imageops::resize(
-            &rgba,
-            nw as u32,
-            nh as u32,
-            image::imageops::FilterType::Triangle,
-        )
-        .pixels()
-        .map(|p| egui::Color32::from_rgba_premultiplied(p[0], p[1], p[2], p[3]))
-        .collect(),
-        None => vec![egui::Color32::TRANSPARENT; nw * nh],
-    };
+    // Resize directly from egui's pixels: converting the whole source to an RgbaImage first
+    // temporarily duplicated it (another 256 MiB for an 8192×8192 image).
+    let pixels = image::imageops::resize(
+        &Pixels(image),
+        nw as u32,
+        nh as u32,
+        image::imageops::FilterType::Triangle,
+    )
+    .pixels()
+    .map(|p| egui::Color32::from_rgba_premultiplied(p[0], p[1], p[2], p[3]))
+    .collect();
     ColorImage {
         size: [nw, nh],
         source_size: image.source_size,
@@ -128,9 +132,24 @@ fn fit(image: &ColorImage, max: usize) -> ColorImage {
     }
 }
 
+struct Pixels<'a>(&'a ColorImage);
+
+impl image::GenericImageView for Pixels<'_> {
+    type Pixel = image::Rgba<u8>;
+
+    fn dimensions(&self) -> (u32, u32) {
+        (self.0.size[0] as u32, self.0.size[1] as u32)
+    }
+
+    fn get_pixel(&self, x: u32, y: u32) -> Self::Pixel {
+        image::Rgba(self.0[(x as usize, y as usize)].to_array())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::GenericImageView as _;
 
     #[test]
     fn a_picture_too_wide_for_a_texture_is_shrunk_to_fit() {
@@ -145,6 +164,29 @@ mod tests {
             8192,
         );
         assert_eq!(tall.size, [1, 8192]);
+    }
+
+    #[test]
+    fn fitting_without_a_source_copy_preserves_the_pixels() {
+        let pixels = (0..48 * 31)
+            .map(|i| egui::Color32::from_rgba_premultiplied((i % 90) as u8, (i % 70) as u8, 0, 100))
+            .collect();
+        let image = ColorImage::new([48, 31], pixels);
+        let small = fit(&image, 16);
+        let rgba = image::RgbaImage::from_fn(48, 31, |x, y| Pixels(&image).get_pixel(x, y));
+        let expected = image::imageops::resize(
+            &rgba,
+            small.size[0] as u32,
+            small.size[1] as u32,
+            image::imageops::FilterType::Triangle,
+        );
+        assert!(
+            small
+                .pixels
+                .iter()
+                .zip(expected.pixels())
+                .all(|(a, b)| a.to_array() == b.0)
+        );
     }
 
     /// Through the loader, as the image views ask for it: what comes back fits.
@@ -191,6 +233,17 @@ mod tests {
                 ImagePoll::Ready { image } => {
                     assert!(fits(&image, max), "{:?}", image.size);
                     assert_eq!(image.source_size, egui::vec2(max as f32 + 10.0, 2.0));
+                    assert_eq!(
+                        loader.inner.byte_size(),
+                        0,
+                        "full-size pixels were retained"
+                    );
+                    let again = loader
+                        .load(&ctx, uri, SizeHint::default())
+                        .map_err(|e| e.to_string())?;
+                    assert!(
+                        matches!(again, ImagePoll::Ready { image: again } if Arc::ptr_eq(&image, &again))
+                    );
                     return Ok(());
                 }
                 ImagePoll::Pending { .. } if started.elapsed().as_secs() < 10 => {
