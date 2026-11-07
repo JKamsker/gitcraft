@@ -49,26 +49,48 @@ Description reaches its floor. It does not cascade into other cells. A drag back
 origin restores the starting preference and Description allocation, including automatic Graph
 mode. The saved column width remains independent of all other saved column widths.
 
-Description's exchanged space is an explicit persisted `description_space` preference,
-containing its requested width and the viewport width of the gesture. At viewport `v`,
-its allocation floor is `max(140, requested - max(0, gesture_viewport - v))`, capped so
-visible column minima still fit. It receives any remaining space above that floor too.
-The fixed squeeze order is unchanged. This separates a deliberate Description exchange
-from automatic compression: with Refs/Graph preferred 280/100 and displayed 150/60 at
-600 points, shrinking Refs 20 saves Refs 130, retains Graph preference 100, and requests
-Description 160 at viewport 600. The next frame and release display Refs/Graph 130/60
-and Description 160. At 580 Description gives back its 20 first; at 640 Graph can return
-to 100. Revisiting 600 gives exactly the same layout regardless of intermediate widths.
-Viewport changes never write this preference; another intentional divider gesture replaces
-it, returning to the gesture origin restores it, and Reset columns clears it. No temporary
-compression is copied into unrelated column preferences.
+Description's exchanged space is an explicit persisted `description_space` preference.
+It stores the gesture viewport, requested Description width, and six compression gaps in
+Refs/Graph/Commit/Author/When/Date order. A gap is the bounded effective preference minus
+the displayed width at the gesture; the dragged column's gap is zero because its new
+manual preference is exactly its displayed width. Hidden columns have zero gaps when a
+new gesture is recorded. These gaps describe an allocation, not new column preferences
+or a last-drag priority. A scalar Description width alone cannot retain this shape: growing
+a compressed Graph could otherwise cause the squeeze pass to give its space to Refs.
 
-Integration with incoming dev's automatic refs fitting: capture `DragStart.prefs` after the
-viewport's `fit_visible_refs` adjustment and `DragStart.shown` after final allocation. Keep
-incoming `save_drag` disabling `auto_refs_width` for a changed Refs gesture. Also snapshot
-and restore the original automatic-refs flag when returning to an unchanged gesture,
-alongside the original raw width; do not overwrite the incoming badges, lane labels or lazy
-message tooltip. The follow-up branch intentionally does not merge dev.
+Each frame first computes current effective preferences, including automatic Graph fitting
+and `readable_viewport`'s visible-pill Refs fitting. Subtracting the saved gaps (bounded by
+visible minima) reconstructs the allocation at the gesture viewport. Description's floor at
+viewport `v` is `max(140, requested - max(0, gesture_viewport - v))`, capped so visible
+column minima still fit. If more room is needed, the fixed Graph/Refs/Commit/Author/When/Date
+order removes column slack. If room remains after reserving Description, the reverse fixed
+order restores compression toward current effective preferences. Description receives the
+remainder. The order never depends on the last divider. Smaller viewports consume
+Description's exchanged slack first; larger viewports restore compressed preferences before
+adding further Description space. Allocation is a pure function of these persisted settings,
+current effective preferences, visibility and viewport; intermediate viewport visits do not
+write settings. Hiding and revealing without another gesture returns to the same allocation.
+Automatic fitting can still change effective widths as visible pills or graph lanes change;
+the snapshot never replaces those modes with manual widths.
+
+For example, after shrinking Author at 760 points, preferred Refs/Graph/Author/When can be
+280/100/150/100 while displayed widths are 180/60/150/100 and Description is 270.
+Growing Graph ten points saves only Graph 70 and records gaps 100/0/0/0/0/0 with Description
+260. The next frame and release remain 180/70/150/100. At 860 points Refs can return to 280;
+revisiting 760 returns exactly to 180/70/150/100, regardless of intervening viewport widths.
+The earlier 600-point example also holds: shrinking displayed Refs 150 by twenty saves Refs
+130, retains Graph preference 100, and displays Refs/Graph 130/60 with Description 160.
+At 580 Description gives back its twenty first; at 640 Graph returns to 100.
+
+A changed gesture replaces the full reservation; zero/blocked motion and returning to its
+exact pointer origin restore the original reservation, raw width and automatic-Refs flag.
+The handle captures effective preferences after visible-pill fitting and actual widths after
+final allocation. Only a changed Refs gesture disables automatic Refs fitting; only a changed
+Graph gesture replaces its automatic width sentinel. Reset columns clears the reservation.
+Settings files from the scalar-only implementation remain readable: a missing compression
+snapshot retains their legacy scalar allocation until a changed divider gesture records the
+full shape. Invalid compression snapshots are ignored. No temporary compression is copied
+into unrelated column preferences, and the snapshot survives settings serialization/restart.
 
 When minima cannot fit, one horizontal scroll area contains both the header and the
 vertically virtualized rows. Headers, row cells, clips and handles derive their bounds

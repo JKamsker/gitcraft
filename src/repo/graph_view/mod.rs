@@ -58,6 +58,21 @@ pub(crate) const DIMMED: f32 = 0.4;
 const HANDLE_COLOR: egui::Color32 = egui::Color32::from_black_alpha(130);
 const HANDLE_WIDTH: f32 = 2.0;
 const AVATAR_D: f32 = 20.0;
+
+// Observe the geometry actually painted after readable_viewport's automatic refs adjustment.
+// Tests drive graph_view itself; this hook never computes an alternative test-only layout.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug)]
+struct PaintedColumns {
+    header: egui::Rect,
+    prefs: Cols,
+    cols: Cols,
+}
+
+#[cfg(test)]
+fn painted_columns_id() -> egui::Id {
+    egui::Id::new("history-painted-columns")
+}
 /// How opaque a commit a ghost run would make is drawn.
 const GHOST_OPACITY: f32 = 0.6;
 /// How opaque a commit it would leave on no ref is drawn.
@@ -329,6 +344,17 @@ impl RepoTab {
                 }
                 let graph_label = crate::repo::graph_order::header_label(self.log_order);
                 header::column_headers(ui, &t, header, &cols, &graph_label);
+                #[cfg(test)]
+                ui.ctx().data_mut(|d| {
+                    d.insert_temp(
+                        painted_columns_id(),
+                        PaintedColumns {
+                            header,
+                            prefs,
+                            cols,
+                        },
+                    );
+                });
                 self.test_lane_frame(&settings, ui.ctx());
                 if self.test_lane.visible {
                     self.test_lane_header(ui, header, &cols, acts);

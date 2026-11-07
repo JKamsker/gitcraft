@@ -4,13 +4,14 @@ use egui::{Rect, Sense, Stroke, Ui, pos2, vec2};
 
 use super::{HANDLE_COLOR, HANDLE_WIDTH};
 use crate::repo::RepoTab;
-use crate::repo::columns::{Bar, Cols, DescriptionSpace, MIN_DESCRIPTION_W};
+use crate::repo::columns::{Bar, Cols, DescriptionSpace};
 use crate::settings::Settings;
 use crate::theme::Tokens;
 
 /// One pointer gesture, including its original grab offset and saved preference.
 #[derive(Clone, Copy)]
 struct DragStart {
+    prefs: Cols,
     shown: Cols,
     description: DescriptionSpace,
     available: f32,
@@ -103,6 +104,7 @@ impl RepoTab {
                     d.insert_temp(
                         drag_id,
                         DragStart {
+                            prefs: *prefs,
                             shown: *cols,
                             description: settings.description_space,
                             available: header.width(),
@@ -137,14 +139,10 @@ impl RepoTab {
                     next.auto_refs_width = start.auto_refs_width;
                 }
             } else {
-                // Keep every other displayed allocation exactly as at gesture start. Changing
-                // only the dragged preference would let the squeeze policy restore a sibling.
-                let shown_sum = start.shown.refs + start.shown.graph + start.shown.trailing();
-                let change = widths.width(bar) - start.shown.width(bar);
-                next.description_space = DescriptionSpace {
-                    viewport: start.available,
-                    width: (start.available - shown_sum - change).max(MIN_DESCRIPTION_W),
-                };
+                // Retain each sibling's compression, not just the total Description space.
+                // prefs was captured after readable_viewport's automatic refs adjustment.
+                next.description_space =
+                    DescriptionSpace::exchanged(start.available, &start.prefs, &widths, bar);
             }
         }
         if next != *settings {
@@ -377,7 +375,8 @@ mod interaction_tests {
                     saved.description_space,
                     DescriptionSpace {
                         viewport: 760.0,
-                        width: 170.0
+                        width: 170.0,
+                        compression: Some([0.0, 40.0, 0.0, 0.0, 0.0, 0.0]),
                     }
                 );
                 assert!(!saved.auto_refs_width);
@@ -399,6 +398,7 @@ mod interaction_tests {
                     description_space: DescriptionSpace {
                         viewport: 760.0,
                         width: 270.0,
+                        ..Default::default()
                     },
                     ..Default::default()
                 };
