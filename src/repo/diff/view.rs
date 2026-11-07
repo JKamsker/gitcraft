@@ -363,6 +363,7 @@ impl RepoTab {
         let t = Tokens::get(ui.ctx());
         let mut clear = false;
         self.intent_badge(ui, path);
+        self.reproducer_badge(ui, &view.key);
         egui::Frame::new()
             .fill(t.chrome)
             .inner_margin(egui::Margin::symmetric(10, 6))
