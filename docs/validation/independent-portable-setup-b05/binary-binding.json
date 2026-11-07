@@ -1,0 +1,14 @@
+{
+  "application_candidate": "b05e51c529c12cc66bb907772e66450cd4ad9cc8",
+  "binary_path": "/workspace/work/onboarding-portability/target/debug/deps/gitcraft-31822f5b138c0fe8",
+  "binary_sha256": "c53627b80e8c37aea2f2e03369ea05100be9288688358f664cf53caa197e997e",
+  "binary_size": 792660608,
+  "depfile_sha256": "cc3dd7fc028fef72f92f6eaf8e21ca9b0fb6d5171ccc779bc537c058d5085322",
+  "depfile_first_target_binds_worktree": true,
+  "source_matches_candidate": true,
+  "source_count": 262,
+  "author_full_log_names_812": true,
+  "binary_registered_tests": 812,
+  "new_tests_all_registered": true,
+  "scope": "Reuse existing author binary read-only, no new compile. Depfile binds worktree; current source matches exact application. Author logs bind same binary filename and tests. Binary source identity cannot be cryptographically proven retroactively."
+}
