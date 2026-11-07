@@ -151,6 +151,25 @@ impl Provider for GiteaFamily {
         let items = self.api(hosting).get_all(&endpoint, 100)?;
         Ok(items.iter().map(super::forks::gitea_one).collect())
     }
+
+    fn create_release(
+        &self,
+        _: &Path,
+        hosting: &Hosting,
+        new: &super::NewRelease,
+    ) -> Result<String, String> {
+        create_release(&self.api(hosting), hosting, new)
+    }
+
+    fn upload_assets(
+        &self,
+        _: &Path,
+        hosting: &Hosting,
+        tag: &str,
+        files: &[PathBuf],
+    ) -> Result<(), String> {
+        upload_assets(&self.api(hosting), hosting, tag, files)
+    }
 }
 
 impl Pages for GiteaFamily {
@@ -291,6 +310,87 @@ fn reviewers_payload(reviewers: &[String]) -> Value {
         .map(|t| t.rsplit('/').next().unwrap_or(t))
         .collect();
     json!({ "reviewers": users, "team_reviewers": teams })
+}
+
+/// Makes the release of the pushed tag `new.tag`; its web page.
+fn create_release(api: &Api, hosting: &Hosting, new: &super::NewRelease) -> Result<String, String> {
+    let tag = encode(new.tag);
+    // Made already (a step that timed out after the forge made it): that one.
+    if let Ok(made) = api.get(&format!("repos/{}/releases/tags/{tag}", hosting.path)) {
+        return Ok(at(&made, "/html_url").to_owned());
+    }
+    // The tag must be on the server: without it, the forge would make one of the default branch.
+    api.get(&format!("repos/{}/tags/{tag}", hosting.path))
+        .map_err(|e| {
+            format!(
+                "{} isn't on {} yet: push it first ({})",
+                new.tag, hosting.host, e.message
+            )
+        })?;
+    let answer = api.send(
+        "POST",
+        &format!("repos/{}/releases", hosting.path),
+        Some(&json!({
+            "tag_name": new.tag,
+            "name": new.title,
+            "body": new.notes,
+            "prerelease": new.prerelease,
+            "draft": false,
+        })),
+    )?;
+    Ok(at(&answer, "/html_url").to_owned())
+}
+
+/// Sends each of `files` to the release of `tag`, found by its tag.
+fn upload_assets(api: &Api, hosting: &Hosting, tag: &str, files: &[PathBuf]) -> Result<(), String> {
+    let release = api.get(&format!(
+        "repos/{}/releases/tags/{}",
+        hosting.path,
+        encode(tag)
+    ))?;
+    let attached: Vec<String> = release
+        .get("assets")
+        .and_then(Value::as_array)
+        .map(|a| a.iter().map(|x| at(x, "/name").to_owned()).collect())
+        .unwrap_or_default();
+    let id = release
+        .get("id")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| format!("{} didn't say which release {tag} is", api.name()))?;
+    for file in files {
+        let name = file
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "file".to_owned());
+        // Sent already (a resumed upload): not twice.
+        if attached.contains(&name) {
+            continue;
+        }
+        let bytes =
+            std::fs::read(file).map_err(|e| format!("Couldn't read {}: {e}", file.display()))?;
+        let query = encode(&name);
+        api.upload(
+            &format!("repos/{}/releases/{id}/assets?name={query}", hosting.path),
+            "attachment",
+            &name,
+            &bytes,
+        )
+        .map_err(|e| format!("Couldn't attach {name}: {}", e.message))?;
+    }
+    Ok(())
+}
+
+/// `text` as one part of a URL: everything but letters, digits and `-_.~` percent-encoded.
+fn encode(text: &str) -> String {
+    text.bytes()
+        .map(|b| {
+            if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) {
+                (b as char).to_string()
+            } else {
+                format!("%{b:02X}")
+            }
+        })
+        .collect()
 }
 
 /// Whether a title marks its pull request a draft (work in progress), as both forges read it.

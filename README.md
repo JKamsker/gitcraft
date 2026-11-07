@@ -518,9 +518,37 @@ so your config, credentials and hooks apply as usual.
   account that is gone — is said and doesn't keep the others from being asked. _Check
   CODEOWNERS_ in the palette lists the lines the forge would skip or read differently, the
   patterns that match no file and the files without an owner.
-
-**Changes and commits** (right)
-
+- _Cut release…_ (a commit's menu, or the palette for HEAD) suggests the next version from the
+  Conventional Commits since the last version tag (`v1.2.3` or `1.2.3`; other tags are passed
+  over): `feat` moves the minor version, `!` or `BREAKING CHANGE` the major one (the minor one
+  before 1.0), anything else the patch; a release candidate becomes its release; the tag's `v`
+  (or its absence) is kept. It drafts the notes, grouped by type (breaking changes, features, bug
+  fixes, performance, documentation, other), with links to the pull requests their summaries
+  name (`(#12)`), to edit. It can move the version in `Cargo.toml` (and the package's entry in
+  `Cargo.lock`) and `package.json` (and `package-lock.json`), changing nothing else in them, and
+  add the notes on top of `CHANGELOG.md`, in one commit, `chore(release): v1.3.0` (from the tip
+  of the branch checked out, with those files unchanged); make an annotated or signed tag whose
+  message is the notes (headings kept); push that commit to the branch's upstream and the tag,
+  both or neither (`--atomic`); and make the release on the forge (`gh release create`,
+  `glab release create`, Forgejo's and Gitea's API; pre-releases except on GitLab) with files
+  of this computer attached. The dialog says what each step will do before anything runs, then
+  how each went. A step that failed (a push refused, the forge unreachable) can be resumed from
+  there — a release or file the forge has already is kept, not made twice — or skipped; a push
+  that needs signing in asks. Ctrl+Z takes the version commit and the tag back off here (the
+  tag put back as it was on Ctrl+Y); what was pushed and published stays.
+- Hotfixes, the git-flow way: _Start hotfix from v2.3.1…_ in a version tag's menu offers a branch
+  `hotfix/2.3.2` there (git-flow's prefix when it is set up), checked out. _Finish hotfix…_ (the
+  branch's menu, or the palette while it is checked out) shows the tag it will make (`v2.3.2`,
+  with notes from its commits to edit) and what it will do, then, as one step: merges it into the
+  development branch (`develop` or git-flow's, if there is one) and the main one (`main`,
+  `master` or git-flow's) with `--no-ff`, tags main's merge (annotated, or signed when ticked;
+  git-flow's tag prefix when it is set up), deletes it here, and pushes those branches (to their
+  upstreams) and the tag at once (`--atomic`). A merge that would stop on conflicts is said
+  beforehand (git 2.38 or later) and refused, and so is a branch checked out in another
+  worktree. Ctrl+Z puts the hotfix branch back (checked out, with its upstream), the branches
+  where they were and takes the tag off here; what was pushed stays, and Ctrl+Y brings back the
+  same merges and tag. Should it stop part-way (a checkout or a merge refused), Ctrl+Z puts back
+  what it did.
 - Conflicted / unstaged / staged lists with stage, unstage, discard and mark-resolved buttons,
   _Stage all_ / _Unstage all_; right-click a file to open it, open it in your editor, show it in
   its folder, see its history or blame, or ignore it (the file, its extension or its folder go
@@ -1364,6 +1392,9 @@ was made this way, on a demo repository.
 | `src/repo/owners/` | CODEOWNERS in the tab: owners on file rows, who a change needs, reviewers to suggest, the check's window |
 | `src/forge/forks.rs` | where each forge's pull requests come from (forks), what their authors allow, runs awaiting approval |
 | `src/repo/forks/` | pull requests from forks: badges, checking out to push to the contributor, rebase and push, tidying fork remotes |
+| `src/release/` | cutting a release: versions, Conventional Commits, notes, manifests, each step |
+| `src/repo/release/` | the release dialog: choices, what it will do, the steps as they run, resume and undo |
+| `src/repo/hotfix/` | the hotfix flow: starting one from a tag, finishing it (tag, merges, push) and its undo |
 | `src/avatars.rs`         | avatars from GitHub, Forgejo / Gitea, GitLab or Gravatar, cached on disk           |
 | `src/update.rs`          | new-release check                                                                  |
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |

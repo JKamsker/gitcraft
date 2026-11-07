@@ -282,6 +282,7 @@ impl RepoTab {
         self.fold_op_done(&label, &result, ctx);
         self.dco_op_done(&label, &result, ctx);
         self.forks_op_done(&label, &result, ctx);
+        self.hotfix_op_done(&label, &result, ctx);
         match refresh {
             Refresh::Status => self.reload_status(ctx),
             Refresh::All => self.reload(ctx),

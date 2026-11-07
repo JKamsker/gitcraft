@@ -285,6 +285,18 @@ impl RepoTab {
             )));
         }
         if ui
+            .add_enabled(idle, egui::Button::new("Cut release…"))
+            .on_hover_text(
+                "The next version, notes from the commits since the last tag, a tag, the push \
+                 and the forge's release, shown before it runs",
+            )
+            .clicked()
+        {
+            acts.push(Action::Release(super::super::release::ReleaseAct::Open(
+                hash.to_owned(),
+            )));
+        }
+        if ui
             .button("Create worktree from this commit…")
             .on_hover_text("A second working folder on a new branch starting here")
             .clicked()

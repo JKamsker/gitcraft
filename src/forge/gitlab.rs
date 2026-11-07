@@ -234,6 +234,60 @@ impl Provider for GitLab {
         Ok(super::pick_found(found))
     }
 
+    fn create_release(
+        &self,
+        repo: &Path,
+        hosting: &Hosting,
+        new: &super::NewRelease,
+    ) -> Result<String, String> {
+        let url = format!("{}/{}/-/releases/{}", hosting.web, hosting.path, new.tag);
+        // Made already: that one.
+        if self.run(repo, &["release", "view", new.tag]).is_ok() {
+            return Ok(url);
+        }
+        // The notes from a file: a long history would not fit a command line.
+        let notes = std::env::temp_dir().join(format!(
+            "gitcraft-release-notes-{}-{}.md",
+            std::process::id(),
+            new.tag.replace(['/', '\\'], "-")
+        ));
+        std::fs::write(&notes, new.notes).map_err(|e| format!("Couldn't write the notes: {e}"))?;
+        let path = notes.to_string_lossy().into_owned();
+        let made = self.run(
+            repo,
+            &[
+                "release",
+                "create",
+                new.tag,
+                "--name",
+                new.title,
+                "--notes-file",
+                &path,
+            ],
+        );
+        let _ = std::fs::remove_file(&notes);
+        made.map(|_| url)
+    }
+
+    fn upload_assets(
+        &self,
+        repo: &Path,
+        _: &Hosting,
+        tag: &str,
+        files: &[std::path::PathBuf],
+    ) -> Result<(), String> {
+        // One at a time: one sent already (a resumed upload) is passed over.
+        for path in super::path_args(files) {
+            match self.run(repo, &["release", "upload", tag, &path]) {
+                Err(e) if e.to_lowercase().contains("already") => {}
+                other => {
+                    other?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// The host's own avatar API, asked by email.
     fn avatars(&self, _: &Path, hosting: &Hosting, emails: &[String]) -> Vec<(String, Hint)> {
         let api = api_authority(hosting);

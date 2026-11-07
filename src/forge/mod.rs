@@ -113,6 +113,14 @@ pub struct NewPullRequest<'a> {
     pub reviewers: &'a [String],
 }
 
+/// What a new release on the forge is made of: its tag is pushed already.
+pub struct NewRelease<'a> {
+    pub tag: &'a str,
+    pub title: &'a str,
+    pub notes: &'a str,
+    pub prerelease: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PullRequest {
     pub number: u64,
@@ -330,6 +338,38 @@ pub trait Provider: Sync {
             self.name()
         ))
     }
+
+    /// Makes the release of a pushed tag; returns its URL (or whatever the forge said).
+    fn create_release(
+        &self,
+        _repo: &Path,
+        _hosting: &Hosting,
+        _new: &NewRelease,
+    ) -> Result<String, String> {
+        Err(format!("gitcraft can't make releases on {}", self.name()))
+    }
+
+    /// Attaches `files` (of this machine) to the release of `tag`.
+    fn upload_assets(
+        &self,
+        _repo: &Path,
+        _hosting: &Hosting,
+        _tag: &str,
+        _files: &[std::path::PathBuf],
+    ) -> Result<(), String> {
+        Err(format!(
+            "gitcraft can't attach files to releases on {}",
+            self.name()
+        ))
+    }
+}
+
+/// The paths of `files` as arguments.
+pub(crate) fn path_args(files: &[std::path::PathBuf]) -> Vec<String> {
+    files
+        .iter()
+        .map(|f| f.to_string_lossy().into_owned())
+        .collect()
 }
 
 /// One pull request in full: reading it, and acting on it.

@@ -398,6 +398,8 @@ impl RepoTab {
             Action::Rerere(act) => self.rerere_act(act, ctx),
             Action::Decisions(act) => self.decisions_act(act, ctx),
             Action::Fork(act) => self.fork_act(act, ctx),
+            Action::Release(act) => self.release_act(act, ctx),
+            Action::Hotfix(act) => self.hotfix_act(act, ctx),
         }
     }
 

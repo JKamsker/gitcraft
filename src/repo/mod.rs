@@ -54,6 +54,7 @@ pub(crate) mod highlight;
 mod hooks;
 mod issue_work;
 mod interaction;
+mod hotfix;
 mod keep_submodules;
 mod keys;
 mod layout;
@@ -89,6 +90,7 @@ mod revert_piece;
 #[cfg(test)]
 mod revert_tests;
 mod rehearse;
+mod release;
 mod rewrite;
 mod running;
 #[cfg(test)]
@@ -282,6 +284,10 @@ pub struct RepoTab {
     absorb: Option<Box<surgery::AbsorbEditor>>,
     /// Stacked branches: the recorded parents and the layers they make.
     stacks: stack::Stacks,
+    /// The release being prepared or cut (its dialog).
+    release: Option<release::ReleaseView>,
+    /// The hotfix flow: the dialog that finishes one, and the push after it.
+    hotfix: hotfix::Hotfix,
     /// The selected commit's message, being edited in the right pane.
     reword: Option<Reword>,
     /// Push and Sync: the push running, Sync's push waiting for its pull, the banner after a
@@ -551,6 +557,8 @@ impl RepoTab {
             split: None,
             absorb: None,
             stacks: Default::default(),
+            release: None,
+            hotfix: hotfix::Hotfix::default(),
             reword: None,
             push_flow: Default::default(),
             credentials: None,

@@ -362,6 +362,10 @@ pub(crate) enum Action {
     AgentFilter(bool),
     /// Work out how much of a local branch agents wrote.
     BranchAuthorship(String),
+    /// Preparing or cutting a release.
+    Release(super::release::ReleaseAct),
+    /// Starting or finishing a hotfix.
+    Hotfix(super::hotfix::HotfixAct),
 }
 
 /// Compares two branches, given to git by their full refs (a tag of the same name is not
@@ -738,7 +742,24 @@ impl RepoTab {
                 },
             ));
         }
+        if self
+            .refs
+            .current
+            .as_deref()
+            .is_some_and(|b| b.starts_with(&self.hotfix_prefix()))
+        {
+            items.push((
+                "Finish hotfix…".into(),
+                "release".into(),
+                Action::Hotfix(super::hotfix::HotfixAct::OpenFinish),
+            ));
+        }
         if !self.refs.head.is_empty() {
+            items.push((
+                "Cut release…".into(),
+                "release".into(),
+                Action::Release(super::release::ReleaseAct::Open(self.refs.head.clone())),
+            ));
             items.push((
                 "Create branch".into(),
                 label(Command::NewBranch),

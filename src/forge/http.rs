@@ -162,6 +162,54 @@ impl Api {
                 .send_string(&payload.to_string()),
             None => request.call(),
         };
+        self.take(answer)
+    }
+
+    /// Sends the file `name` (`bytes`) as `multipart/form-data`, the field named `field`, to
+    /// `endpoint` (a release's assets).
+    pub fn upload(
+        &self,
+        endpoint: &str,
+        field: &str,
+        name: &str,
+        bytes: &[u8],
+    ) -> Result<Value, Failure> {
+        let url = format!("{}/{}", self.base, endpoint.trim_start_matches('/'));
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_nanos());
+        let boundary = format!("gitcraft-{stamp:x}-{:x}", bytes.len());
+        // The name as the header can carry it: no quote, no line break.
+        let safe: String = name
+            .chars()
+            .map(|c| if c == '"' || c.is_control() { '_' } else { c })
+            .collect();
+        let mut body = format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"{field}\"; \
+             filename=\"{safe}\"\r\nContent-Type: application/octet-stream\r\n\r\n"
+        )
+        .into_bytes();
+        body.extend_from_slice(bytes);
+        body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+        // A big file takes its time: half a minute, and more for each 50 KB.
+        let time = std::time::Duration::from_secs(30 + bytes.len() as u64 / 51_200);
+        let mut request = self
+            .agent
+            .request("POST", &url)
+            .timeout(time)
+            .set("Accept", "application/json")
+            .set(
+                "Content-Type",
+                &format!("multipart/form-data; boundary={boundary}"),
+            );
+        if let Some(login) = &self.login {
+            request = request.set("Authorization", &login.header());
+        }
+        self.take(request.send_bytes(&body))
+    }
+
+    /// What an answer of the server says: its JSON, or why it failed.
+    fn take(&self, answer: Result<ureq::Response, ureq::Error>) -> Result<Value, Failure> {
         match answer {
             Ok(response) if (300..400).contains(&response.status()) => {
                 let to = response
