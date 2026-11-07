@@ -994,6 +994,27 @@ fn parse_credentials(out: &str) -> Option<Credentials> {
     (!password.is_empty()).then_some(Credentials { username, password })
 }
 
+/// Bounded, non-fetching preparation for opt-in local syntax comparison.
+pub(crate) fn syntax_read(
+    repo: &Path,
+    args: &[&str],
+    limit: usize,
+    timeout: std::time::Duration,
+) -> Result<Vec<u8>, String> {
+    if crate::remote::is_remote(repo) {
+        return Err(
+            "Syntax comparison is currently available for local repositories. Showing the patch."
+                .to_owned(),
+        );
+    }
+    let args: Vec<_> = std::iter::once("--no-lazy-fetch")
+        .chain(args.iter().copied())
+        .collect();
+    bounded::local(repo, &args, Vec::new(), limit, timeout).map_err(|e| {
+        format!("Syntax preparation failed (requires Git with --no-lazy-fetch support): {e}")
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Write;
@@ -1271,25 +1292,4 @@ mod tests {
         assert!(parse_credentials("protocol=https\nhost=x\n").is_none());
         assert!(parse_credentials("username=ana\npassword=\n").is_none());
     }
-}
-
-/// Bounded, non-fetching preparation for opt-in local syntax comparison.
-pub(crate) fn syntax_read(
-    repo: &Path,
-    args: &[&str],
-    limit: usize,
-    timeout: std::time::Duration,
-) -> Result<Vec<u8>, String> {
-    if crate::remote::is_remote(repo) {
-        return Err(
-            "Syntax comparison is currently available for local repositories. Showing the patch."
-                .to_owned(),
-        );
-    }
-    let args: Vec<_> = std::iter::once("--no-lazy-fetch")
-        .chain(args.iter().copied())
-        .collect();
-    bounded::local(repo, &args, Vec::new(), limit, timeout).map_err(|e| {
-        format!("Syntax preparation failed (requires Git with --no-lazy-fetch support): {e}")
-    })
 }

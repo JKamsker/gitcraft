@@ -184,7 +184,8 @@ mod flow_tests {
     use crate::git::{Branch, Remote};
 
     #[test]
-    fn review_targets_come_only_from_the_detected_remote_and_prefer_the_upstream() {
+    fn review_targets_come_only_from_the_detected_remote_and_prefer_the_upstream()
+    -> Result<(), String> {
         let ctx = egui::Context::default();
         let mut tab = RepoTab::new_deferred("/nonexistent/gerrit-targets".into(), &ctx);
         tab.gerrit = Some(crate::gerrit::Server {
@@ -221,9 +222,9 @@ mod flow_tests {
                 target: pushed_target,
                 ..
             }),
-        ) = tab.push_branch(&tab.refs.local[1]).expect("review action")
+        ) = tab.push_branch(&tab.refs.local[1]).ok_or("review action")?
         else {
-            panic!("expected review dialog")
+            return Err("expected review dialog".to_owned());
         };
         assert_eq!(pushed_target, "main");
         let dialog = tab.review_dialog();
@@ -236,7 +237,7 @@ mod flow_tests {
             ..
         }) = dialog
         else {
-            return;
+            return Err("expected review dialog".to_owned());
         };
         assert_eq!(remote, "review");
         assert_eq!(target, "stable");
@@ -248,6 +249,7 @@ mod flow_tests {
                 .collect::<Vec<_>>(),
             vec!["main", "stable"]
         );
+        Ok(())
     }
 }
 
@@ -372,7 +374,7 @@ mod integration_tests {
         assert!(trailers.contains("Co Author"), "{message}");
         tab.reword_commit(
             reworded.clone(),
-            format!("Changed identity\n\nChange-Id: I1123456789abcdef0123456789abcdef01234567"),
+            "Changed identity\n\nChange-Id: I1123456789abcdef0123456789abcdef01234567".to_owned(),
             &ctx,
         );
         settle(&mut tab, &ctx);

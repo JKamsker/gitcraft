@@ -42,7 +42,8 @@ fn amendments_keep_the_review_identity_when_replacing_the_description() {
 }
 
 #[test]
-fn gerrit_projects_and_explicit_web_overrides_are_detected_without_a_network_probe() {
+fn gerrit_projects_and_explicit_web_overrides_are_detected_without_a_network_probe()
+-> Result<(), String> {
     let remote = |url: &str| {
         vec![Remote {
             name: "origin".into(),
@@ -95,10 +96,11 @@ fn gerrit_projects_and_explicit_web_overrides_are_detected_without_a_network_pro
     assert_eq!(proxy.map(|server| server.project), Some("project".into()));
     config.insert("gitcraft.gerriturl".into(), "javascript:alert(1)".into());
     let invalid = detect_with(&remote("ssh://review.example/project"), &config)
-        .expect("invalid web setting must keep review routing");
+        .ok_or("invalid web setting must keep review routing")?;
     assert_eq!(invalid.web, "https://review.example");
     assert!(invalid.web_warning.is_some());
     assert!(detect_with(&remote("/tmp/project"), &config).is_none());
+    Ok(())
 }
 
 #[test]
@@ -195,13 +197,13 @@ fn divergence_and_merge_commits_need_a_linear_rebase_first() {
 }
 
 #[test]
-fn restored_identity_joins_existing_trailers_and_preserves_continuations() {
+fn restored_identity_joins_existing_trailers_and_preserves_continuations() -> Result<(), String> {
     let original = format!("Original\n\nChange-Id: {ID}");
     for edited in [
         "New\n\nCo-authored-by: A <a@b>",
         "New\n\nReviewed-by: A\n continued",
     ] {
-        let result = amended_message(&original, edited).unwrap();
+        let result = amended_message(&original, edited)?;
         assert_eq!(result, format!("{edited}\nChange-Id: {ID}"));
         assert_eq!(change_id(&result), Ok(ID));
     }
@@ -210,6 +212,7 @@ fn restored_identity_joins_existing_trailers_and_preserves_continuations() {
         amended_message(&original, prose),
         Ok(format!("{prose}\n\nChange-Id: {ID}"))
     );
+    Ok(())
 }
 
 #[test]
