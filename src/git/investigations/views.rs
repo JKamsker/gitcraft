@@ -50,7 +50,7 @@ pub(crate) struct Selection {
 }
 fn revisions(include: &[String], exclude: &[String]) -> Result<Vec<u8>, String> {
     if include.len() + exclude.len() > MAX {
-        return Err("View scope exceeds30000 pinned revision tips".into());
+        return Err("View scope exceeds 30000 pinned revision tips".into());
     }
     let mut input = Vec::new();
     for (ids, prefix) in [(include, ""), (exclude, "^")] {
@@ -155,7 +155,9 @@ pub(crate) fn query(
     let profile = crate::connections::current();
     profile.run(||{
         let reader=Reader::new(repo,active);
-        let (commits,limited,explanation)=match &preset.kind{
+        let shallow=reader.run(&["rev-parse","--is-shallow-repository"],Vec::new(),&[0])?;
+        let shallow=match shallow.trim_ascii(){b"true"=>true,b"false"=>false,_=>return Err("Invalid shallow-history metadata".into())};
+        let (commits,limited,mut explanation)=match &preset.kind{
             Kind::MyUnpushed=>{
                 let (ids,limited)=walk(&reader,&scope.tips,&scope.remotes,&[])?;
                 (mine(&reader,&ids,&scope.email,None)?,limited,format!("Commits authored as {} that are absent from every pinned remote-tracking branch",scope.email))
@@ -178,6 +180,7 @@ pub(crate) fn query(
                 (ids,limited,format!("Merge commits on the first-parent history of {branch}"))
             }
         };
+        if shallow {explanation.push_str(" · shallow history: ancestry stops at the local boundary");}
         if !reader.active(){return Err("Saved graph view cancelled".into());}
         Ok(Selection{commits,limited,explanation})
     })

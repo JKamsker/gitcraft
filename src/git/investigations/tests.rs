@@ -238,12 +238,9 @@ fn shallow_partial_views_and_pages_do_not_download_or_run_configured_helpers() -
         default_branch: None,
         now: 1_700_000_002,
     };
-    assert_eq!(
-        query(&path, &p(Kind::MyUnpushed), &scope, &|| true)?
-            .commits
-            .len(),
-        1
-    );
+    let selected = query(&path, &p(Kind::MyUnpushed), &scope, &|| true)?;
+    assert_eq!(selected.commits.len(), 1);
+    assert!(selected.explanation.contains("shallow history"));
     assert_eq!(
         super::page(&path, &scope.tips, 0, git::LOG_PAGE, &|| true)?.len(),
         1

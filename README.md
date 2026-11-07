@@ -136,7 +136,7 @@ disabled. Snapshots and recovery run on the repository's machine, including SSH 
   the pinned tips. Selection and matches still refer to the original commits.
   Queries run in the background, stop on replacement/cancel, and never download missing
   objects or run source hooks/filters/signing. Counts distinguish loaded matches from selected
-  history; a 30,000-commit query budget is reported when reached. Missing history, unsupported
+  history; shallow boundaries and a 30,000-commit query budget stay visible. Missing history, unsupported
   Git `--no-lazy-fetch`, and query errors leave loaded context visible with an explanation.
 
 - Every branch, coloured lanes, ↑/↓ to move. History loads 1500 commits at a time as you scroll.
