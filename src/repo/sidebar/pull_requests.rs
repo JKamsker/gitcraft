@@ -199,11 +199,16 @@ impl RepoTab {
                     } else if let Some(b) = self.pr_remote_branch(pr) {
                         acts.push(Action::CheckoutRemote(b.name.clone()));
                     } else {
-                        let remote = self
-                            .primary_forge_remote()
-                            .map(str::to_owned)
-                            .or_else(|| self.default_remote())
-                            .unwrap_or_else(|| "origin".to_owned());
+                        let Some(remote) =
+                            self.primary_forge_remote().map(str::to_owned).or_else(|| {
+                                self.hosting
+                                    .is_none()
+                                    .then(|| self.default_remote())
+                                    .flatten()
+                            })
+                        else {
+                            return;
+                        };
                         acts.push(Action::CheckoutRemote(format!("{remote}/{}", pr.branch)));
                     }
                 }
@@ -235,16 +240,24 @@ impl RepoTab {
 
     /// The remote-tracking branch named `branch` on any remote, at `sha` if one is.
     fn remote_branch_of(&self, branch: &str, sha: &str) -> Option<&Branch> {
-        let default = self
-            .primary_forge_remote()
-            .map(str::to_owned)
-            .or_else(|| self.default_remote());
+        let default = self.primary_forge_remote().map(str::to_owned).or_else(|| {
+            self.hosting
+                .is_none()
+                .then(|| self.default_remote())
+                .flatten()
+        });
         let found: Vec<(&str, &Branch)> = self
             .remotes
             .iter()
             .flat_map(|r| {
                 self.remote_branches(&r.name)
                     .filter(|b| remote_short(&b.name, &r.name) == Some(branch))
+                    .filter(|b| {
+                        self.hosting
+                            .as_ref()
+                            .is_none_or(|h| h.matches_git_remote(&r.url))
+                            || (!sha.is_empty() && b.target == sha)
+                    })
                     .map(|b| (r.name.as_str(), b))
             })
             .collect();
@@ -320,6 +333,14 @@ impl RepoTab {
         sha: &str,
         ctx: &egui::Context,
     ) {
+        if self.hosting.is_some() && self.primary_forge_remote().is_none() {
+            self.status = Some((
+                "The primary forge remote is unavailable; refresh before opening this pull request"
+                    .into(),
+                true,
+            ));
+            return;
+        }
         match self.pr_worktree_plan(number, branch, sha) {
             PrWorktree::Here => {
                 self.status = Some((format!("#{number}'s branch is checked out here"), false));
@@ -428,7 +449,12 @@ impl RepoTab {
                 let from = self
                     .primary_forge_remote()
                     .map(str::to_owned)
-                    .or_else(|| self.default_remote())
+                    .or_else(|| {
+                        self.hosting
+                            .is_none()
+                            .then(|| self.default_remote())
+                            .flatten()
+                    })
                     .unwrap_or_else(|| "origin".to_owned());
                 // Not forced: a `pr-N` of the user's own that went elsewhere is refused by git
                 // rather than overwritten.
@@ -512,6 +538,53 @@ enum PrWorktree {
 mod tests {
     use super::*;
     use crate::git::{self, Remote};
+
+    #[test]
+    fn review14_pr_branch_lookup_does_not_fall_back_to_another_instance() {
+        use crate::forge::Hosting;
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/review14-pr-lookup".into(), &ctx);
+        let h = Hosting {
+            forge: Forge::GitLab,
+            host: "forge.example".into(),
+            web: "https://forge.example:4000/proxy".into(),
+            path: "Group/Project".into(),
+        };
+        tab.remotes = [
+            ("origin", "https://forge.example:3000/proxy/Group/Project"),
+            ("case", "https://forge.example:4000/proxy/group/project"),
+            ("selected", "https://forge.example:4000/proxy/Group/Project"),
+        ]
+        .map(|(name, url)| Remote {
+            name: name.into(),
+            url: url.into(),
+        })
+        .into();
+        tab.forge_remotes = vec![("selected".into(), h)];
+        tab.take_forge_selection(false, &ctx);
+        tab.refs.remotes = tab
+            .remotes
+            .iter()
+            .map(|r| {
+                (
+                    r.name.clone(),
+                    vec![branch(&format!("{}/fix", r.name), &r.name)],
+                )
+            })
+            .collect();
+        assert_eq!(
+            tab.remote_branch_of("fix", "").map(|b| b.name.as_str()),
+            Some("selected/fix")
+        );
+        tab.refs.remotes.retain(|(r, _)| r != "selected");
+        assert!(tab.remote_branch_of("fix", "").is_none());
+        // A known immutable commit can safely be read from another local object source.
+        assert_eq!(
+            tab.remote_branch_of("fix", "origin")
+                .map(|b| b.name.as_str()),
+            Some("origin/fix")
+        );
+    }
 
     fn branch(name: &str, target: &str) -> Branch {
         Branch {

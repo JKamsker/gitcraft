@@ -750,3 +750,113 @@ fn review13_saved_issue_refresh_refuses_mismatch_and_preserves_metadata() {
 fn review13_saved_issue_refresh_accepts_same_canonical_instance() {
     review13_refresh_cases(true, "instance-accepted");
 }
+
+#[test]
+fn review14_issue_remote_branch_uses_primary_or_same_canonical_repository_only() {
+    use crate::forge::{Forge, Hosting};
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred("/nonexistent/review14-issues".into(), &ctx);
+    let h = Hosting {
+        forge: Forge::GitLab,
+        host: "forge.example".into(),
+        web: "https://forge.example:4000/proxy".into(),
+        path: "Group/Project".into(),
+    };
+    tab.remotes = [
+        ("origin", "https://forge.example:3000/proxy/Group/Project"),
+        ("case", "https://forge.example:4000/proxy/group/project"),
+        ("selected", "https://forge.example:4000/proxy/Group/Project"),
+        ("ssh", "ssh://git@forge.example:2222/Group/Project.git"),
+    ]
+    .map(|(name, url)| git::Remote {
+        name: name.into(),
+        url: url.into(),
+    })
+    .into();
+    tab.forge_remotes = vec![("selected".into(), h)];
+    tab.take_forge_selection(false, &ctx);
+    tab.refs.remotes = tab
+        .remotes
+        .iter()
+        .map(|r| {
+            (
+                r.name.clone(),
+                vec![git::Branch {
+                    name: format!("{}/7-fix", r.name),
+                    target: r.name.clone(),
+                    is_head: false,
+                    upstream: String::new(),
+                    track: String::new(),
+                }],
+            )
+        })
+        .collect();
+    if let Some((_, branches)) = tab
+        .refs
+        .remotes
+        .iter_mut()
+        .find(|(name, _)| name == "selected")
+    {
+        branches.push(git::Branch {
+            name: "selected/develop".into(),
+            target: "selected-base".into(),
+            is_head: false,
+            upstream: String::new(),
+            track: String::new(),
+        });
+    }
+    assert_eq!(
+        tab.issue_base().name,
+        "develop",
+        "the forge's fallback base must not use origin"
+    );
+    assert_eq!(
+        tab.remote_branch_named("7-fix").as_deref(),
+        Some("selected/7-fix")
+    );
+    tab.refs.remotes.retain(|(r, _)| r != "selected");
+    assert_eq!(
+        tab.remote_branch_named("7-fix").as_deref(),
+        Some("ssh/7-fix")
+    );
+    tab.refs.remotes.retain(|(r, _)| r != "ssh");
+    assert!(tab.remote_branch_named("7-fix").is_none());
+}
+
+#[test]
+fn review14_queued_issue_start_from_previous_forge_is_refused() {
+    use crate::forge::{Forge, Hosting};
+    let dir = repo("stale-picker");
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    tab.hosting = Some(Hosting {
+        forge: Forge::Forgejo,
+        host: "forge.example".into(),
+        web: "https://forge.example:4000".into(),
+        path: "team/repo".into(),
+    });
+    let mut old = issue(7, "A's issue");
+    old.url = "https://forge.example:3000/team/repo/issues/7".into();
+    let before = git::head(&dir);
+    let config = std::fs::read(dir.join(".git/config")).unwrap_or_default();
+    tab.issue_act(
+        IssueAct::Start {
+            issue: Box::new(old),
+            branch: "7-fix".into(),
+            worktree: false,
+        },
+        &ctx,
+    );
+    assert!(tab.busy_op.is_none());
+    assert_eq!(git::head(&dir), before);
+    assert_eq!(
+        std::fs::read(dir.join(".git/config")).unwrap_or_default(),
+        config
+    );
+    assert!(
+        tab.status
+            .as_ref()
+            .is_some_and(|(s, _)| s.contains("another primary forge"))
+    );
+    clean(&dir);
+}
