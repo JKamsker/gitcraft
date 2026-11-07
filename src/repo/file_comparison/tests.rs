@@ -123,7 +123,11 @@ fn partial_deletions_and_reversed_deleted_file_creation_are_safe() -> Result<(),
 fn quoted_git_names_and_crlf_no_newline_patches_do_not_run_programs_or_change_other_files()
 -> Result<(), String> {
     let r = Repo::new()?;
-    let path = "space ' $(touch INJECTED); \"quoted\"\tline\n.txt";
+    let path = if cfg!(windows) {
+        "space ' $(touch INJECTED); quoted ü.txt"
+    } else {
+        "space ' $(touch INJECTED); \"quoted\"\tline\n.txt"
+    };
     r.write(path, "old\r\nlast")?;
     r.commit()?;
     r.write(path, "new\r\nlast")?;
