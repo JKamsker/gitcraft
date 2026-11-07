@@ -78,6 +78,34 @@ impl Settings {
                 .collect()
         };
 
+        if ui.available_width() < 760.0 {
+            ui.add_space(12.0);
+            ui.horizontal_wrapped(|ui| {
+                egui::ComboBox::from_id_salt("settings-page-compact")
+                    .selected_text(view.page.title())
+                    .show_ui(ui, |ui| {
+                        for page in Page::ALL {
+                            if ui
+                                .selectable_value(&mut view.page, page, page.title())
+                                .clicked()
+                            {
+                                view.query.clear();
+                            }
+                        }
+                    });
+                search_field(ui, &mut view.query);
+            });
+            if counts.is_empty()
+                && let Some(shown) = preview::shown(ui.ctx(), Some(view.page))
+            {
+                egui::CollapsingHeader::new("Preview").show(ui, |ui| {
+                    preview::panel(ui, shown, self, &app.theme);
+                });
+            }
+            self.page_column(ui, &mut view, &counts, app);
+            ui.data_mut(|d| d.insert_temp(view_id(), view));
+            return *self != before;
+        }
         let (nav_width, gap) = nav_size(ui.available_width());
         ui.horizontal_top(|ui| {
             ui.add_space(SIDE);
@@ -121,16 +149,13 @@ impl Settings {
                     ui.vertical(|ui| {
                         ui.add_space(TOP);
                         let width = CONTENT_WIDTH.min(ui.available_width() - 16.0);
-                        ui.allocate_ui_with_layout(
-                            vec2(width, preview::ABOVE_MAX_H),
-                            egui::Layout::top_down(egui::Align::Min),
-                            |ui| {
-                                egui::ScrollArea::vertical()
-                                    .id_salt("settings-preview-above")
-                                    .max_height(preview::ABOVE_MAX_H)
-                                    .show(ui, |ui| preview::panel(ui, shown, self, &app.theme));
-                            },
-                        );
+                        ui.set_max_width(width);
+                        egui::CollapsingHeader::new("Preview").show(ui, |ui| {
+                            egui::ScrollArea::vertical()
+                                .id_salt("settings-preview-above")
+                                .max_height(preview::ABOVE_MAX_H)
+                                .show(ui, |ui| preview::panel(ui, shown, self, &app.theme));
+                        });
                         self.page_column(ui, &mut view, &counts, app);
                     });
                 }

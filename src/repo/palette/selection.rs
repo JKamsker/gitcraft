@@ -100,6 +100,66 @@ impl RepoTab {
                 .key("commit:patch"),
             );
         }
+        // Menu visibility is presentation only; preserve every optional tool in the palette,
+        // with the same selected-commit scope and eligibility as its menu counterpart.
+        if idle {
+            items.push(
+                PaletteItem::action(
+                    format!("Cut release at {at}…"),
+                    "release",
+                    Action::Release(crate::repo::release::ReleaseAct::Open(hash.to_owned())),
+                )
+                .key("commit:release"),
+            );
+        }
+        if idle && self.surgery_refusal(hash).is_none() {
+            items.push(
+                PaletteItem::action(
+                    format!("Split commit {at}…"),
+                    "rewrite",
+                    Action::OpenSplit(hash.to_owned()),
+                )
+                .key("commit:split"),
+            );
+            items.push(
+                PaletteItem::action(
+                    format!("Move changes from {at}…"),
+                    "rewrite",
+                    Action::OpenMove(hash.to_owned()),
+                )
+                .key("commit:move"),
+            );
+        }
+        if self.bisect_blocker().is_none() {
+            items.push(
+                PaletteItem::action(
+                    format!("Start bisect at {at}…"),
+                    "bisect",
+                    Action::Dialog(self.start_bisect_dialog(hash)),
+                )
+                .key("commit:bisect"),
+            );
+        }
+        if !self.parallel.running() {
+            items.push(
+                PaletteItem::action(
+                    format!("Bisect in parallel from {at}…"),
+                    "bisect",
+                    self.parallel_dialog_for(hash),
+                )
+                .key("commit:parallel-bisect"),
+            );
+        }
+        if !self.test_lane.running() {
+            items.push(
+                PaletteItem::action(
+                    format!("Test commits up to {at}…"),
+                    "test",
+                    self.test_dialog(Some(hash)),
+                )
+                .key("commit:test"),
+            );
+        }
         items
     }
 

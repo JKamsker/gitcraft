@@ -295,44 +295,53 @@ impl RepoTab {
         let open = icons::tool_button(ui, "external-link", "", true)
             .named("Open the folder or the repository's page")
             .on_hover_text("Open the folder or the repository's page…");
-        let page = self.web_page();
         egui::Popup::menu(&open)
             .style(crate::theme::menu_style)
             .show(|ui| {
-                let browser = MenuItem::new("Open in browser")
-                    .refused(page.is_none().then_some("No remote with a web page"))
-                    .show(ui);
-                if let Some(url) = &page {
-                    let browser = browser.on_hover_text(url);
-                    if browser.clicked() {
-                        acts.push(Action::OpenUrl(url.clone()));
-                    }
-                }
-                // Over SSH, nothing of this machine can open the folder.
-                let here = crate::remote::openable_here(&self.path);
-                let why = here.as_ref().err().map(String::as_str);
-                if MenuItem::new(reveal_label())
-                    .refused(why)
-                    .explained_below(true)
-                    .show(ui)
-                    .clicked()
-                {
-                    acts.push(Action::OpenPath(PathBuf::new()));
-                }
-                if MenuItem::new("Open in editor")
-                    .refused(why)
-                    .show(ui)
-                    .clicked()
-                {
-                    acts.push(Action::OpenInEditor(PathBuf::new()));
-                }
-                if ui.button("Copy path").clicked() {
-                    // Elsewhere, the path there: what a shell on that machine takes.
-                    let path = crate::remote::parse(&self.path)
-                        .map_or_else(|| self.path.display().to_string(), |t| t.path);
-                    ui.ctx().copy_text(path);
-                }
+                crate::menu_item::bounded_menu(ui, "open-in", |ui| self.open_in_items(ui, acts))
             });
+    }
+
+    fn open_in_items(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        let page = self.web_page();
+        // Over SSH, nothing of this machine can open the folder.
+        let here = crate::remote::openable_here(&self.path);
+        let why = here.as_ref().err().map(String::as_str);
+        if MenuItem::new(reveal_label())
+            .icon("folder-open")
+            .refused(why)
+            .explained_below(true)
+            .show(ui)
+            .clicked()
+        {
+            acts.push(Action::OpenPath(PathBuf::new()));
+        }
+        if MenuItem::new("Open in editor")
+            .icon("code")
+            .refused(why)
+            .show(ui)
+            .clicked()
+        {
+            acts.push(Action::OpenInEditor(PathBuf::new()));
+        }
+        ui.add_space(4.0);
+        if MenuItem::new("Copy path").icon("copy").show(ui).clicked() {
+            // Elsewhere, the path there: what a shell on that machine takes.
+            let path = crate::remote::parse(&self.path)
+                .map_or_else(|| self.path.display().to_string(), |t| t.path);
+            ui.ctx().copy_text(path);
+        }
+        ui.separator();
+        let browser = MenuItem::new("Open in browser")
+            .icon("external-link")
+            .refused(page.is_none().then_some("No remote with a web page"))
+            .show(ui);
+        if let Some(url) = &page {
+            let browser = browser.on_hover_text(url);
+            if browser.clicked() {
+                acts.push(Action::OpenUrl(url.clone()));
+            }
+        }
     }
 
     /// The checked-out branch (or detached HEAD), and a merge or rebase in progress.
@@ -539,5 +548,80 @@ pub(super) fn headline(msg: &str) -> String {
         line.to_owned()
     } else {
         format!("{label}: {line}")
+    }
+}
+
+#[cfg(test)]
+mod area_d_tests {
+    use super::*;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn area_d_open_in_order_icons_remote_reasons_and_copy_scope() -> Result<(), String> {
+        for width in [640.0, 1100.0, 1600.0] {
+            for scale in [1.0, 1.25, 1.5] {
+                for path in [
+                    "/nonexistent/local repo",
+                    "ssh://host/home/user/remote repo",
+                ] {
+                    let ctx = egui::Context::default();
+                    let tab = RepoTab::new_deferred(path.into(), &ctx);
+                    let mut h = egui_kittest::Harness::builder()
+                        .with_size([width / scale, 760.0 / scale])
+                        .with_pixels_per_point(scale)
+                        .build_ui_state(
+                            |ui, (tab, fonts): &mut (RepoTab, bool)| {
+                                if !*fonts {
+                                    crate::theme::install_fonts(ui.ctx());
+                                    egui_extras::install_image_loaders(ui.ctx());
+                                    *fonts = true;
+                                    return;
+                                }
+                                let open = ui.button("Open In");
+                                egui::Popup::menu(&open)
+                                    .style(crate::theme::menu_style)
+                                    .show(|ui| {
+                                        crate::menu_item::bounded_menu(ui, "open-in", |ui| {
+                                            tab.open_in_items(ui, &mut Vec::new())
+                                        });
+                                    });
+                            },
+                            (tab, false),
+                        );
+                    h.run();
+                    h.get_by_label("Open In").click();
+                    h.run();
+                    let manager = h.get_by_label(reveal_label()).rect();
+                    let editor = h.get_by_label("Open in editor").rect();
+                    let copy = h.get_by_label("Copy path").rect();
+                    let web = h.get_by_label("Open in browser").rect();
+                    assert!(
+                        manager.bottom() <= editor.top()
+                            && editor.bottom() <= copy.top()
+                            && copy.bottom() < web.top()
+                    );
+                    h.get_by_label("No remote with a web page");
+                    if path.starts_with("ssh:") {
+                        assert!(
+                            h.query_all_by_label_contains("programs of this machine")
+                                .next()
+                                .is_some()
+                        );
+                    } else if let Ok(dir) = std::env::var("GITCRAFT_AREA_D_SCREENSHOTS") {
+                        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+                        h.render()?
+                            .save(format!("{dir}/open-in-{width:.0}-{scale:.2}.png"))
+                            .map_err(|e| e.to_string())?;
+                    }
+                    h.get_by_label("Copy path").click();
+                    h.step();
+                    let expected = crate::remote::parse(std::path::Path::new(path))
+                        .map_or_else(|| path.to_owned(), |remote| remote.path);
+                    assert!(h.output().platform_output.commands.iter().any(|command| matches!(command, egui::OutputCommand::CopyText(text) if text == &expected)));
+                    h.run();
+                }
+            }
+        }
+        Ok(())
     }
 }

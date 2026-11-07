@@ -42,6 +42,7 @@ pub(crate) enum PaletteRun {
 pub(crate) enum Pick {
     Checkout,
     Interaction,
+    Rehearse,
     Merge,
     Rebase,
     InteractiveRebase,
@@ -69,6 +70,7 @@ impl Pick {
         match self {
             Pick::Checkout => "checkout",
             Pick::Interaction => "interaction",
+            Pick::Rehearse => "rehearse",
             Pick::Merge => "merge",
             Pick::Rebase => "rebase",
             Pick::InteractiveRebase => "interactive-rebase",
