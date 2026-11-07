@@ -68,6 +68,7 @@ impl RepoTab {
 
         self.drag_overlay(&ctx, &mut acts);
         self.dialogs(&ctx, &mut acts);
+        self.keep_both_dialog(&ctx);
         for action in acts {
             self.apply(action, &ctx);
         }

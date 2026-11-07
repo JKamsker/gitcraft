@@ -247,6 +247,15 @@ so your config, credentials and hooks apply as usual.
   settings and extensions, when it is dark or light like gitcraft's; a setting turns it off.
 - Conflicts open in a three-pane editor: each conflict's two sides with _Ours_, _Theirs_ and
   _Both_ buttons, and the result below (editable). _Use mine_ / _Use theirs_ for a whole file.
+- Each conflict's _Original_ section shows the text both sides started from and what each
+  inserted and deleted relative to it ("one side deleted the validation, the other changed
+  it"): from diff3 markers in the file, or rebuilt from the index. Without one (both sides
+  added the file) the card says so.
+- _Keep both…_ on a file that can't be merged (an image, an archive) previews the two files it
+  would write, named after each side's branch (`logo.main.png`, `logo.feature-x.png`; _ours_ /
+  _theirs_ without one, `-2` when a name is taken), with each version's origin and size; it
+  never writes over an existing file, warns that references to the old name may need updating,
+  and stages nothing until you have checked them.
 - With [Mergiraf](https://mergiraf.org) installed, _Solve with Mergiraf_ lets it solve the
   conflicts it can from the syntax of the code; the rest stay to choose, and nothing is saved
   before you check the result. Settings → Git installs it in one click and can have git merge
@@ -498,7 +507,7 @@ was made this way, on a demo repository.
 | `src/repo/diff.rs`       | diff loading, pairing and the diff view (unified, split, images)                   |
 | `src/repo/highlight.rs`  | syntax colours (syntect)                                                           |
 | `src/vscode_theme.rs`    | VS Code's current colour theme as a syntect theme                                  |
-| `src/repo/conflict.rs`   | three-pane conflict editor                                                         |
+| `src/repo/conflict.rs`   | three-pane conflict editor, each conflict's original, Keep both                    |
 | `src/repo/conflict_check.rs` | conflict warnings in the menus and the toolbar, checked in the background and kept |
 | `src/mergiraf.rs` | Mergiraf, run as the user's own command when it is installed |
 | `src/repo/rebase.rs`     | interactive rebase editor and its todo list                                        |

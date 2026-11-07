@@ -4,6 +4,7 @@
 mod command;
 mod commit_msg;
 mod commits;
+mod conflict;
 mod diff;
 mod files;
 mod fold;
@@ -20,6 +21,7 @@ mod worktree;
 pub use self::command::*;
 pub use self::commit_msg::*;
 pub use self::commits::*;
+pub use self::conflict::*;
 pub use self::diff::*;
 pub use self::files::*;
 pub use self::fold::*;

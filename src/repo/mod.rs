@@ -197,6 +197,8 @@ pub struct RepoTab {
     conflict_checks: conflict_check::ConflictChecks,
     /// What the toolbar's conflict badge compares the checked-out branch with.
     target_watch: conflict_check::TargetWatch,
+    /// The Keep both dialog of a conflicted file that can't be merged.
+    keep_both: Option<conflict::KeepBoth>,
 
     commit_summary: String,
     commit_body: String,
@@ -353,6 +355,7 @@ impl RepoTab {
             conflict_generation: 0,
             conflict_checks: Default::default(),
             target_watch: Default::default(),
+            keep_both: None,
             commit_summary: String::new(),
             commit_body: String::new(),
             compose: Default::default(),

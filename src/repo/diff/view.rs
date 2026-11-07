@@ -232,6 +232,22 @@ impl RepoTab {
                 refresh: Refresh::Status,
             });
         }
+        if file.area == Area::Conflicted
+            && ui
+                .add_enabled(
+                    idle && self.keep_both.is_none(),
+                    egui::Button::new("Keep both…"),
+                )
+                .on_hover_text(
+                    "For a file both sides changed that can't be merged (an image, an \
+                     archive…): write each side's version as a file of its own, named after its \
+                     branch. Shows what it would write first.",
+                )
+                .on_disabled_hover_text("Keep both is already open for a file")
+                .clicked()
+        {
+            acts.push(Action::KeepBoth(file.path.clone()));
+        }
         // The lines clicked in the diff.
         let chosen = view.chosen.len();
         if !partial || chosen == 0 {
