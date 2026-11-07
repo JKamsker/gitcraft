@@ -86,6 +86,7 @@ mod running;
 mod samples;
 mod sidebar;
 mod state;
+mod surgery;
 mod terminals;
 #[cfg(test)]
 mod tests;
@@ -247,6 +248,8 @@ pub struct RepoTab {
     rebase: Option<rebase::RebaseEditor>,
     /// What a drop offers, while its menu is open.
     drop_menu: Option<drag_drop::DropMenu>,
+    /// A commit being split (`surgery`).
+    split: Option<Box<surgery::SplitEditor>>,
     /// The selected commit's message, being edited in the right pane.
     reword: Option<Reword>,
     /// Push and Sync: the push running, Sync's push waiting for its pull, the banner after a
@@ -492,6 +495,7 @@ impl RepoTab {
             nav_jump: false,
             rebase: None,
             drop_menu: None,
+            split: None,
             reword: None,
             push_flow: Default::default(),
             credentials: None,

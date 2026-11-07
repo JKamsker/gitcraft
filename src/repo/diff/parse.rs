@@ -106,7 +106,7 @@ pub(super) fn meta(text: &str) -> DiffLine {
 /// Everything before the first hunk of a one-file patch, each line ending in `\n`. A mode
 /// change is left out: picking some lines shouldn't also stage, unstage or throw away a
 /// `chmod`.
-pub(super) fn patch_header(text: &str) -> String {
+pub(in crate::repo) fn patch_header(text: &str) -> String {
     let mut header = String::new();
     for line in text.split_terminator('\n') {
         if line.starts_with("@@") {

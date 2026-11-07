@@ -283,6 +283,11 @@ impl RepoTab {
             Action::RunFold(plan) => self.run_fold(*plan, ctx),
             Action::AbortFold => self.abort_fold(ctx),
             Action::CloseRebase => self.rebase = None,
+            Action::OpenSplit(hash) => self.open_split(hash, ctx),
+            Action::OpenMove(hash) => self.open_move(hash, ctx),
+            Action::CheckSplit => self.check_split(ctx),
+            Action::RunSplit => self.run_split(ctx),
+            Action::CloseSplit => self.split = None,
             Action::SignIn(creds) => self.sign_in(creds, ctx),
             Action::Ignore { pattern, path } => self.ignore(&pattern, &path, ctx),
             Action::PickLines {

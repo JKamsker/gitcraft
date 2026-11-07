@@ -224,6 +224,17 @@ so your config, credentials and hooks apply as usual.
   question visibly shrinks; a tree tested before isn't tested again, and a test past its time
   limit is stopped and skipped. The checkout isn't touched; Cancel stops every test and removes
   the worktrees.
+- _Split commit…_ (a commit's menu, for commits of the checked-out branch): hand its files,
+  hunks or lines out to two or more new commits (up to 9), each with its own message. _Check
+  split_ makes the new commits without touching the working tree and shows each one's patch;
+  _Split commit_ puts them in place of the old one (together they are exactly the old commit) and
+  replays the commits after it. Ctrl+Z undoes it. A merge, merges after the commit, and the
+  first commit are greyed out with why.
+- _Move changes to another commit…_ (same menu): click the files, hunks or lines to take out of
+  the commit, then pick where they go: another commit of the branch (newer or older), or the
+  working changes, staged. _Check move_ shows what stays in the commit and what moves;
+  _Move changes_ rewrites the branch from the older of the two (a commit left with nothing is
+  dropped). Ctrl+Z undoes it; a conflict stops the rebase as usual.
 - Quick edits from a commit's menu, for commits of the checked-out branch: _Edit commit
   message_, _Drop commit_ (which asks first), _Move commit up_ / _down_, each a rebase without
   the editor and undone with Ctrl+Z. What can't be done (a merge, merges after the commit) is greyed out with why.
@@ -1057,6 +1068,8 @@ was made this way, on a demo repository.
 | `src/repo/conflict_check.rs` | conflict warnings in the menus and the toolbar, checked in the background and kept |
 | `src/git/external_tool/` | external diff and merge tools: presets, how git starts them (here, in WSL, over SSH), how a merge ended |
 | `src/mergiraf.rs` | Mergiraf, run as the user's own command when it is installed |
+| `src/repo/surgery/`      | history surgery: splitting a commit (`split/`), moving changes (`moving.rs`), patches of some lines (`patchset.rs`) |
+| `src/git/trees.rs`       | commits made in a scratch index (`tree_after`, `commit_tree`) for rewrites         |
 | `src/repo/rebase.rs`     | interactive rebase editor and its todo list (`rebase/rows.rs`: its rows, drag, keys) |
 | `src/repo/reflog/` | the reflog view and the scan for lost commits (`src/git/reflog/`: reading and parsing them) |
 | `src/repo/drag_drop/` | drag and drop: what a drop offers, the drop menu, moving and squashing commits |

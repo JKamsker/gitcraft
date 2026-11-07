@@ -93,6 +93,9 @@ pub(crate) struct RebaseEditor {
     /// A text field had the keyboard at the end of the last frame: the Esc that takes it away
     /// (egui does, before the frame) doesn't also close the editor.
     pub typing: bool,
+    /// Every commit is made again (`--no-ff`), even one already on its parent: commits a
+    /// rewrite prepared with `commit-tree` are then signed and hooked like any other.
+    pub no_ff: bool,
 }
 
 impl RebaseEditor {
@@ -120,6 +123,7 @@ impl RebaseEditor {
             selected,
             heights: std::collections::HashMap::new(),
             typing: false,
+            no_ff: false,
         }
     }
 
@@ -232,6 +236,7 @@ impl RebaseEditor {
             "-i".to_owned(),
             "--autostash".to_owned(),
         ];
+        if self.no_ff { args.push("--no-ff".to_owned()); }
         if self.onto.is_empty() {
             args.push("--root".to_owned());
         } else {

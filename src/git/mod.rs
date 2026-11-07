@@ -49,6 +49,7 @@ mod status;
 mod stream;
 mod submodule;
 mod timed;
+mod trees;
 mod worktree;
 
 pub use self::backlinks::*;
@@ -87,6 +88,7 @@ pub use self::status::*;
 pub use self::stream::*;
 pub use self::submodule::*;
 pub use self::timed::*;
+pub use self::trees::*;
 pub use self::worktree::*;
 
 use std::path::{Path, PathBuf};
