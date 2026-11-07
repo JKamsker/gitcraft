@@ -203,12 +203,7 @@ impl<'a> Rows<'a> {
         if let (Some(find), Some(hit)) = (self.find, self.reveal) {
             let text = data.lines.get(hit.line).map_or("", |l| l.text.as_str());
             if let Some(g) = &geometry {
-                let width = if split {
-                    body.width() / 2.0 - NUM_W - 40.0
-                } else {
-                    body.width() - NUM_W * 2.0 - 40.0
-                };
-                let galley = super::wrap::galley(ui, text, &self.font, width);
+                let galley = super::wrap::galley(ui, text, &self.font, g.text_width);
                 let y = g.at(hit.row)
                     + galley
                         .pos_from_cursor(egui::text::CCursor::new(hit.start))
@@ -422,8 +417,18 @@ impl<'a> Rows<'a> {
             .and_then(|f| f.marks(i))
             .filter(|_| kind.is_some_and(|k| side.shows(k)));
         let placed = paint_line(
-            ui, rect, data, i, side, scroll_x, &self.font, &self.t, picked, sel_chars, found,
-            self.wrap,
+            ui,
+            rect,
+            data,
+            i,
+            side,
+            scroll_x,
+            &self.font,
+            &self.t,
+            picked,
+            sel_chars,
+            found,
+            self.geometry.as_ref().map(|g| g.text_width),
         );
         if let Some(who) = data.authors.get(i).copied().flatten() {
             crate::repo::authorship_view::stripe(ui.painter(), &self.t, rect, who, 4.0);

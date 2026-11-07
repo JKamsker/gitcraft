@@ -34,7 +34,7 @@ pub(super) fn paint_line(
     text_sel: Option<Range<usize>>,
     // The find bar's matches in the line.
     found: Option<LineMarks<'_>>,
-    wrap: bool,
+    wrap_width: Option<f32>,
 ) -> Option<(Pos2, Arc<egui::Galley>)> {
     let line = data.lines.get(i)?;
     let p = ui.painter().with_clip_rect(rect.intersect(ui.clip_rect()));
@@ -144,8 +144,8 @@ pub(super) fn paint_line(
         _ => vec![(fg, line.text.as_str())],
     };
     let mut job = line_job(&spans, changed, font, strong);
-    if wrap && side.shows(line.kind) {
-        job.wrap.max_width = (rect.width() - gutter - 24.0).max(1.0);
+    if let Some(width) = wrap_width.filter(|_| side.shows(line.kind)) {
+        job.wrap.max_width = width.max(1.0);
         job.wrap.break_anywhere = true;
     }
     let galley = ui.fonts_mut(|f| f.layout_job(job));
@@ -158,7 +158,7 @@ pub(super) fn paint_line(
     };
     let origin = pos2(
         x - scroll_x,
-        if wrap {
+        if wrap_width.is_some() {
             rect.top() + 2.0
         } else {
             y - galley.size().y / 2.0
@@ -174,7 +174,7 @@ pub(super) fn paint_line(
         }
     }
     if let Some(found) = found {
-        if wrap {
+        if wrap_width.is_some() {
             for (k, range) in found.ranges.iter().enumerate() {
                 for rect in super::wrap::rectangles(&galley, range.clone()) {
                     let rect = rect.translate(origin.to_vec2());

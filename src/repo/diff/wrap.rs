@@ -6,6 +6,7 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub(super) struct Geometry {
     pub offsets: Arc<Vec<f32>>,
+    pub text_width: f32,
 }
 impl Geometry {
     pub fn at(&self, row: usize) -> f32 {
@@ -43,6 +44,8 @@ pub(super) fn geometry(
     let width = width.max(1.0);
     let key = (
         data.source,
+        data.lines.len(),
+        data.split.len(),
         split,
         width.to_bits(),
         font.size.to_bits(),
@@ -86,6 +89,7 @@ pub(super) fn geometry(
     }
     let g = Arc::new(Geometry {
         offsets: Arc::new(offsets),
+        text_width,
     });
     ui.ctx().data_mut(|d| d.insert_temp(id, (key, g.clone())));
     g
@@ -127,7 +131,7 @@ mod tests {
     #[test]
     fn wrapped_geometry_keeps_logical_indices_and_maps_unicode_selection_to_all_rows() {
         let ctx = egui::Context::default();
-        let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+        let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
             let text = "long αβγ function_name_and_arguments ".repeat(20);
             let galley = galley(ui, &text, &crate::theme::mono(12.0), 130.0);
             assert!(galley.rows.len() > 3);
@@ -141,5 +145,6 @@ mod tests {
             assert_eq!(g.row(g.at(1) + 1.0), 1);
             assert_eq!(g.offsets.len(), data.lines.len() + 1);
         });
+        out.textures_delta.clear();
     }
 }
