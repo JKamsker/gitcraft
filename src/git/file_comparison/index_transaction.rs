@@ -336,6 +336,15 @@ mod tests {
     use super::*;
     use crate::git::file_comparison::{LensSpec, read_lens, tests::Repo};
     use std::os::unix::fs::PermissionsExt;
+    fn record<T, E: std::fmt::Display>(result: Result<T, E>, error: &mut Option<String>) -> bool {
+        match result {
+            Ok(_) => true,
+            Err(e) => {
+                *error = Some(e.to_string());
+                false
+            }
+        }
+    }
     fn fixture() -> Result<(Repo, Lens, String), String> {
         let r = Repo::new()?;
         r.write("a", "before\n")?;
@@ -368,20 +377,36 @@ mod tests {
             std::fs::write(&outside, b"outside-original").map_err(|e| e.to_string())?;
             let displaced = r.0.join("owned-displaced-lock");
             let mut injected = false;
+            let mut operation_hook_error: Option<String> = None;
             let result = apply(&r.0, &lens, &patch, false, &mut |at| {
                 if at == phase {
-                    std::fs::rename(&lock, &displaced)
-                        .unwrap_or_else(|e| panic!("owned fixture lock rename: {e}"));
+                    if !record(
+                        std::fs::rename(&lock, &displaced),
+                        &mut operation_hook_error,
+                    ) {
+                        return;
+                    }
                     if symlink {
-                        std::os::unix::fs::symlink(&outside, &lock)
-                            .unwrap_or_else(|e| panic!("owned fixture symlink: {e}"));
+                        if !record(
+                            std::os::unix::fs::symlink(&outside, &lock),
+                            &mut operation_hook_error,
+                        ) {
+                            return;
+                        }
                     } else {
-                        std::fs::write(&lock, b"FOREIGN-LOCK-BYTES")
-                            .unwrap_or_else(|e| panic!("owned fixture foreign lock: {e}"));
+                        if !record(
+                            std::fs::write(&lock, b"FOREIGN-LOCK-BYTES"),
+                            &mut operation_hook_error,
+                        ) {
+                            return;
+                        }
                     }
                     injected = true;
                 }
             });
+            if let Some(e) = operation_hook_error {
+                return Err(e);
+            }
             assert!(injected && result.is_err(), "{phase:?}: {result:?}");
             assert_eq!(bytes(&outside)?, b"outside-original");
             assert!(std::fs::symlink_metadata(&lock).is_ok());
@@ -405,20 +430,35 @@ mod tests {
             let saved = r.0.join("saved-git");
             let old = bytes(&gitdir.join("index"))?;
             let mut injected = false;
+            let mut operation_hook_error: Option<String> = None;
             let result = apply(&r.0, &lens, &patch, false, &mut |at| {
                 if parent_swap && at == Phase::BeforeMove {
-                    std::fs::rename(&gitdir, &saved)
-                        .unwrap_or_else(|e| panic!("owned parent move: {e}"));
-                    std::fs::create_dir(&gitdir).unwrap_or_else(|e| panic!("new parent: {e}"));
-                    std::fs::write(gitdir.join("index"), b"FOREIGN-PARENT")
-                        .unwrap_or_else(|e| panic!("new parent bytes: {e}"));
+                    if !record(std::fs::rename(&gitdir, &saved), &mut operation_hook_error) {
+                        return;
+                    }
+                    if !record(std::fs::create_dir(&gitdir), &mut operation_hook_error) {
+                        return;
+                    }
+                    if !record(
+                        std::fs::write(gitdir.join("index"), b"FOREIGN-PARENT"),
+                        &mut operation_hook_error,
+                    ) {
+                        return;
+                    }
                     injected = true;
                 } else if !parent_swap && at == Phase::BeforeInstall {
-                    std::fs::write(gitdir.join("index"), b"LATE-CREATOR")
-                        .unwrap_or_else(|e| panic!("owned late creator: {e}"));
+                    if !record(
+                        std::fs::write(gitdir.join("index"), b"LATE-CREATOR"),
+                        &mut operation_hook_error,
+                    ) {
+                        return;
+                    }
                     injected = true;
                 }
             });
+            if let Some(e) = operation_hook_error {
+                return Err(e);
+            }
             assert!(injected && result.is_err());
             if parent_swap {
                 assert_eq!(bytes(&gitdir.join("index"))?, b"FOREIGN-PARENT");
@@ -469,17 +509,29 @@ mod tests {
             let (r, lens, patch) = fixture()?;
             let idx = r.0.join(".git/index");
             let old = bytes(&idx)?;
+            let mut operation_hook_error: Option<String> = None;
             let result = apply(&r.0, &lens, &patch, false, &mut |at| {
                 if at == Phase::Prepared {
                     if config {
-                        r.git(&["config", "core.sharedRepository", "0600"])
-                            .unwrap_or_else(|e| panic!("owned config drift: {e}"));
+                        if !record(
+                            r.git(&["config", "core.sharedRepository", "0600"]),
+                            &mut operation_hook_error,
+                        ) {
+                            return;
+                        }
                     } else {
-                        std::fs::set_permissions(&idx, std::fs::Permissions::from_mode(0o600))
-                            .unwrap_or_else(|e| panic!("owned mode drift: {e}"));
+                        if !record(
+                            std::fs::set_permissions(&idx, std::fs::Permissions::from_mode(0o600)),
+                            &mut operation_hook_error,
+                        ) {
+                            return;
+                        }
                     }
                 }
             });
+            if let Some(e) = operation_hook_error {
+                return Err(e);
+            }
             assert!(result.is_err());
             assert_eq!(bytes(&idx)?, old);
         }
@@ -527,10 +579,10 @@ mod tests {
         if let Some(gid) = groups.iter().find(|g| g.as_raw() != group) {
             let mut hook_error = None;
             let result = apply(&r.0, &lens, &patch, false, &mut |phase| {
-                if phase == Phase::Prepared {
-                    if let Err(e) = std::os::unix::fs::chown(&idx, None, Some(gid.as_raw())) {
-                        hook_error = Some(e.to_string());
-                    }
+                if phase == Phase::Prepared
+                    && let Err(e) = std::os::unix::fs::chown(&idx, None, Some(gid.as_raw()))
+                {
+                    hook_error = Some(e.to_string());
                 }
             });
             if let Some(e) = hook_error {
@@ -567,6 +619,7 @@ mod tests {
             exacl::Perm::READ,
             None,
         )];
+        let mut operation_hook_error: Option<String> = None;
         let result = apply(
             &r.0,
             &lens,
@@ -576,11 +629,18 @@ mod tests {
             false,
             &mut |at| {
                 if at == Phase::Prepared {
-                    exacl::setfacl(&[&idx], &changed, None)
-                        .unwrap_or_else(|e| panic!("owned ACL drift: {e}"));
+                    if !record(
+                        exacl::setfacl(&[&idx], &changed, None),
+                        &mut operation_hook_error,
+                    ) {
+                        return;
+                    }
                 }
             },
         );
+        if let Some(e) = operation_hook_error {
+            return Err(e);
+        }
         assert!(result.is_err());
         assert_eq!(bytes(&idx)?, old);
         Ok(())
