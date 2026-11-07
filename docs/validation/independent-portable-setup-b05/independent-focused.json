@@ -1,0 +1,14 @@
+{
+  "application_candidate": "b05e51c529c12cc66bb907772e66450cd4ad9cc8",
+  "command": [
+    "/workspace/work/onboarding-portability/target/debug/deps/gitcraft-31822f5b138c0fe8",
+    "app::setup::",
+    "tour::",
+    "portability::",
+    "a_pending_startup_profile_stays_parked",
+    "--test-threads=2"
+  ],
+  "exit_code": 0,
+  "log_sha256": "7ca6ada71b412239f8799089add8e79e9a2eb820d38efc65d0467a6fb6926647",
+  "scope": "Independent execution using existing author binary, no Cargo build. Linux focused application tests only; no native Windows/live account/remote host testing."
+}
