@@ -82,6 +82,7 @@ mod terminals;
 #[cfg(test)]
 mod tests;
 mod toolbar;
+mod versions;
 mod watch;
 mod watch_remote;
 mod weakened_marks;
@@ -219,6 +220,9 @@ pub struct RepoTab {
     ci_view: Option<ci_view::CiView>,
     /// The reflog (or the lost commits) shown above the graph.
     reflog: Option<reflog::ReflogView>,
+    /// Two versions of a series of commits compared, the rewrites kept and the pull requests'
+    /// versions seen.
+    versions: versions::Versions,
     pr_requests: u64,
     /// What was written on each pull request and not sent, by its number.
     pr_drafts: HashMap<u64, pr_review::PrDraft>,
@@ -453,6 +457,7 @@ impl RepoTab {
             pr_view: None,
             ci_view: None,
             reflog: None,
+            versions: Default::default(),
             pr_requests: 0,
             pr_drafts: HashMap::new(),
             compare_requests: 0,

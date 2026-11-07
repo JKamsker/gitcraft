@@ -4,6 +4,7 @@
 //! lines at a time.
 
 mod images;
+mod interdiff;
 mod jump;
 mod lfs;
 pub(in crate::repo) mod link;
@@ -28,6 +29,7 @@ use crate::git::{self, Area, DiffOptions};
 
 pub use images::ImagePair;
 use images::{is_image, load_images, renamed_from};
+pub(in crate::repo) use interdiff::{interdiff_data, interdiff_rows};
 pub use lfs::LfsPair;
 use lfs::lfs_pair;
 pub use parse::parse;

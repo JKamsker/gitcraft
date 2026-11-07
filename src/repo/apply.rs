@@ -66,6 +66,7 @@ impl RepoTab {
             }
             Action::ReloadPr => self.load_pr(ctx),
             Action::Pr(act) => self.pr_act(act, ctx),
+            Action::Versions(act) => self.versions_act(act, ctx),
             Action::OpenCi { sha, run } => self.open_ci(sha, run, ctx),
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),

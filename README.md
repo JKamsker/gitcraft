@@ -239,6 +239,18 @@ so your config, credentials and hooks apply as usual.
   merges from 2.38) in memory, or a scratch clone in the temporary folder on an older git. A
   hover never goes to the network: a pull is shown as of the last fetch. _Force push to origin/x (with
   lease)…_ is in a local branch's menu when its upstream has commits it hasn't.
+- Compare versions (`git range-diff`): two versions of a series of commits side by side, the
+  old one on the left and the new on the right, paired up. Unchanged commits fade; changed,
+  added, dropped and moved ones stand out, and a commit whose patch became empty says so. Click
+  a pair to see how its patch changed (the diff of the two diffs, coloured like a diff), or the
+  whole patch of a commit only one side has.
+- Before / after: every rewrite gitcraft makes (rebase, interactive rebase, quick edits, amend,
+  pull with rebase, a reset; a rebase continued after conflicts too) keeps the branch's old
+  commits under `refs/gitcraft/rewrites/`, so `git gc` can't take them and the graph doesn't
+  list them. _Compare before / after_ beside the message saying it's done, _Compare before /
+  after the last rewrite_ in the branch's menu, or the palette compares the two. A branch that
+  has diverged from its upstream has _Compare commits with origin/x_. Rewrites are kept for 30
+  days, the newest 20 of each branch.
 
 **Branches, remotes, worktrees, stashes, tags** (left)
 
@@ -308,6 +320,14 @@ so your config, credentials and hooks apply as usual.
   and git renames or deletes it with the branch; it isn't pushed. _Create pull request…_ (merge
   request, on GitLab) on that branch starts with the issue's title and `Closes #42`, into the
   branch it started from.
+- What changed since you last looked: gitcraft remembers which version of each pull request you
+  looked at (its page opened for the first time, or its comparison shown), in refs of the repository (`refs/gitcraft/reviewed/…`, which also keep its commits
+  here once the forge no longer has them). After the author pushes again, the page says
+  _Rewritten since you last looked: 2 commits changed, 1 added, 3 identical_ (or _New commits_
+  when they were only added to); click it to compare the two versions, or ✕ to take the new one
+  as seen. In the list (every forge, GitLab too) a request that changed says _changed since you
+  last looked_, and its menu has _What changed since you last looked_ and _Mark as seen_. A
+  request that only moved onto a newer base, every commit the same, says so quietly.
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
 
 **Changes and commits** (right)
@@ -945,6 +965,8 @@ was made this way, on a demo repository.
 | `src/repo/reflog/` | the reflog view and the scan for lost commits (`src/git/reflog/`: reading and parsing them) |
 | `src/repo/drag_drop/` | drag and drop: what a drop offers, the drop menu, moving and squashing commits |
 | `src/repo/dco/` | DCO sign-off: the commit box's toggle, commits without one, signing off a branch |
+| `src/repo/versions/` | two versions of a series compared (range-diff), before / after rewrites, pull requests since last looked at |
+| `src/git/range_diff.rs` | running and reading `git range-diff`; `rewrites.rs` and `reviewed.rs` keep the old versions in refs |
 | `src/repo/file_view.rs`  | a file's history, blame and contents at a commit                                   |
 | `src/repo/file_text.rs`  | a whole file at a commit, coloured, for the file view and diffs                    |
 | `src/repo/find/`         | find in the diff, file or blame shown: the bar, matching, marks, keys              |

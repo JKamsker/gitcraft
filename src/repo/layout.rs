@@ -113,6 +113,8 @@ impl RepoTab {
                     self.file_view(ui, &mut acts);
                 } else if self.ci_view.is_some() && self.docked(Panel::Ci) {
                     self.ci_view_ui(ui, &mut acts);
+                } else if self.versions.view.is_some() {
+                    self.versions_ui(ui, &mut acts);
                 } else if self.pr_view.is_some() && self.docked(Panel::Pr) {
                     self.pr_view_ui(ui, &mut acts);
                 } else {
@@ -220,6 +222,18 @@ impl RepoTab {
                 acts.push(Action::CloseFileView);
             } else if esc && self.ci_view.is_some() && self.main_keys(ctx, Panel::Ci) {
                 acts.push(Action::CloseCi);
+            } else if esc && self.versions.view.is_some() {
+                // The patch of a pair first, then the comparison.
+                let open_pair = self
+                    .versions
+                    .view
+                    .as_ref()
+                    .is_some_and(|v| v.selected.is_some());
+                acts.push(Action::Versions(if open_pair {
+                    super::versions::VersionsAct::Deselect
+                } else {
+                    super::versions::VersionsAct::Close
+                }));
             } else if esc && self.pr_view.is_some() && self.main_keys(ctx, Panel::Pr) {
                 acts.push(Action::ClosePr);
             } else if esc && self.compare.is_some() {

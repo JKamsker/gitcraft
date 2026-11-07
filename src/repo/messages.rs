@@ -439,6 +439,7 @@ impl RepoTab {
                     self.prs = prs;
                     self.pr_error = None;
                     self.refresh_ci(ctx);
+                    self.load_seen_heads(ctx);
                 }
                 Err(e) => self.pr_error = Some(e),
             },

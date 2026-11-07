@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use super::dialogs::StashChoice;
 use super::pull::PullMode;
 use super::{
-    Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view, ops, pr_review, quick_edit, reflog, drag_drop, partial_stash, issue_work,
+    Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view, ops, pr_review, quick_edit, reflog, drag_drop, partial_stash, issue_work, versions,
 };
 use crate::git::{self, InProgress};
 use crate::keymap::{Command, label, written};
@@ -268,6 +268,8 @@ pub(crate) enum Action {
     Guide(super::guide::GuideAct),
     /// Open the collision matrix of the worktrees' branches.
     OpenCollisions,
+    /// Something about comparing two versions of a series of commits.
+    Versions(versions::VersionsAct),
 }
 
 /// Compares two branches, given to git by their full refs (a tag of the same name is not
@@ -503,6 +505,7 @@ impl RepoTab {
                 Action::OpenUrl(url),
             ));
         }
+        items.extend(self.versions_palette_item());
         if !self.submodules.is_empty() {
             items.push((
                 "Update submodules".into(),

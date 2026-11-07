@@ -25,6 +25,14 @@ impl RepoTab {
             return;
         };
         page_header(ui, view, popped, acts);
+        if let Some(Ok(_)) = &view.details {
+            crate::repo::versions::since_banner(
+                ui,
+                self.versions.since.as_ref(),
+                view.number,
+                acts,
+            );
+        }
         match &view.details {
             None => {
                 ui.add_space(40.0);

@@ -353,6 +353,7 @@ impl RepoTab {
             Ok(loaded) => {
                 self.take_loaded(*loaded, ctx);
                 self.read_custom_commands(ctx);
+                self.versions_after_load(ctx);
             }
             Err(e) => {
                 self.explain_failure(&e, super::error_help::RELOAD, ctx);

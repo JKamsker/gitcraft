@@ -59,6 +59,7 @@ impl RepoTab {
             self.head_label(ui, idle, acts);
             self.target_conflict_badge(ui);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                self.fresh_rewrite_button(ui, acts);
                 self.op_status(ui, acts);
                 self.hint_status(ui);
             });

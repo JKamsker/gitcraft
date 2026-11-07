@@ -250,6 +250,7 @@ impl RepoTab {
                 if let Some((_, path)) = self.open_when_done.take_if(|(l, _)| *l == label) {
                     self.open_request = Some(super::OpenRequest::Worktree(path));
                 }
+                self.note_rewrite(&label, &kind, ctx);
                 undoable = self.record_undo(&label, kind);
             }
             Err(e) if cancelled => {
@@ -290,6 +291,7 @@ impl RepoTab {
                 if !quiet {
                     self.explain_failure(e, &label, ctx);
                 }
+                self.note_stopped_rewrite(&label, &kind, e);
                 // A failed undo stays undoable.
                 match kind {
                     OpKind::Undo(entry) => self.undo_stack.push(entry),

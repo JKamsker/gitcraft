@@ -203,6 +203,7 @@ impl RepoTab {
             }
         }
         self.review_item(ui, acts, b);
+        self.versions_items(ui, acts, b);
         ui.separator();
         self.publish_items(ui, acts, b, idle);
         ui.separator();

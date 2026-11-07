@@ -109,8 +109,15 @@ impl RepoTab {
             egui::FontId::proportional(12.5),
             t.text,
         );
+        let moved = self.pr_moved_since_seen(pr);
+        // First, where a long branch name can't cut it off.
         let sub = format!(
-            "{} · {}{}",
+            "{}{} · {}{}",
+            if moved {
+                "changed since you last looked · "
+            } else {
+                ""
+            },
             pr.branch,
             pr.author,
             if pr.draft { " · draft" } else { "" }
@@ -127,6 +134,11 @@ impl RepoTab {
             acts.extend(ci_status::dot(ui, r.id.with("ci"), center, &pr.sha, status));
         }
         let has_view = forge.has_pages();
+        // Without a page here, opening it in the browser is looking at it.
+        // Not when it changed since: that would take away what changed before it is compared.
+        let seen_on_open = (!has_view && !moved).then_some(Action::Versions(
+            crate::repo::versions::VersionsAct::PrSeen(pr.number),
+        ));
         let r = r.on_hover_text(if has_view {
             format!("{}\nClick to open", pr.url)
         } else {
@@ -139,6 +151,7 @@ impl RepoTab {
             }
         } else if r.double_clicked() {
             acts.push(Action::OpenUrl(pr.url.clone()));
+            acts.extend(seen_on_open);
         } else if r.clicked()
             && let Some(target) = self.pr_target(pr)
         {
@@ -152,7 +165,13 @@ impl RepoTab {
                 }
                 if ui.button("Open in the browser").clicked() {
                     acts.push(Action::OpenUrl(pr.url.clone()));
+                    if !has_view && !moved {
+                        acts.push(Action::Versions(
+                            crate::repo::versions::VersionsAct::PrSeen(pr.number),
+                        ));
+                    }
                 }
+                self.pr_since_items(ui, acts, pr);
                 self.pr_worktree_button(ui, acts, pr.number, &pr.branch, &pr.sha, idle, true);
                 if ui
                     .add_enabled(idle, egui::Button::new(format!("Check out {}", pr.branch)))
