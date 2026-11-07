@@ -20,20 +20,30 @@ impl RepoTab {
 
         // Keep both staging and composition reachable after reopening in a short window.
         // Always use the same scroll container, so resizing preserves editor/scroll state.
-        let composer_height = (ui.available_height() * 0.65 - 20.0).max(1.0);
+        let frame = egui::Frame::new()
+            .fill(t.card)
+            .inner_margin(egui::Margin::symmetric(12, 10))
+            .stroke(egui::Stroke::new(1.0, t.separator));
+        let content_id = ui.id().with("commit_box_content_height");
+        let maximum_height = (ui.available_height() * 0.65).max(1.0);
+        // A ScrollArea doesn't grow its parent panel intrinsically. Give the panel the
+        // measured content height, bounded by the space left for staging. exact_size also
+        // overrides a small persisted panel size after shrinking and expanding the window.
+        let margins = frame.total_margin().sum().y + 1.0; // Panel separator
+        let natural_height = ui
+            .data(|d| d.get_temp::<f32>(content_id))
+            .map_or(maximum_height, |height| height + margins);
+        let composer_height = natural_height.min(maximum_height);
         egui::Panel::bottom("commit_box")
-            .frame(
-                egui::Frame::new()
-                    .fill(t.card)
-                    .inner_margin(egui::Margin::symmetric(12, 10))
-                    .stroke(egui::Stroke::new(1.0, t.separator)),
-            )
+            .exact_size(composer_height)
+            .frame(frame)
             .show(ui, |ui| {
-                egui::ScrollArea::vertical()
+                let scroll = egui::ScrollArea::vertical()
                     .id_salt("commit_box_scroll")
-                    .max_height(composer_height)
+                    .max_height((composer_height - margins).max(1.0))
                     .auto_shrink([false, true])
                     .show(ui, |ui| self.commit_box(ui, acts));
+                ui.data_mut(|d| d.insert_temp(content_id, scroll.content_size.y));
             });
 
         egui::ScrollArea::vertical()
