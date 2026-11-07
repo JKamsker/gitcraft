@@ -347,7 +347,9 @@ fn splits(before: &Symbol, primary: &Symbol, all: &[Symbol]) -> Vec<Symbol> {
         .cloned()
         .collect::<BTreeSet<_>>();
     all.iter()
-        .filter(|s| s.path != primary.path || s.first != primary.first)
+        .filter(|s| {
+            s.path != primary.path || s.first != primary.first || s.qualified != primary.qualified
+        })
         .filter(|s| {
             let fp = fingerprints(&s.tokens);
             let overlap = old.intersection(&fp).count();
@@ -355,7 +357,17 @@ fn splits(before: &Symbol, primary: &Symbol, all: &[Symbol]) -> Vec<Symbol> {
             overlap >= 6
                 && overlap * 100 >= fp.len() * 55
                 && union * 100 >= old.len() * 65
-                && primary_fp.intersection(&fp).count() * 100 < fp.len() * 45
+                && old
+                    .intersection(&fp)
+                    .filter(|p| !primary_fp.contains(*p))
+                    .count()
+                    >= 6
+                && old
+                    .intersection(&fp)
+                    .filter(|p| !primary_fp.contains(*p))
+                    .count()
+                    * 100
+                    >= fp.len() * 30
         })
         .take(8)
         .cloned()
