@@ -64,6 +64,26 @@ impl App {
 /// Hands `incoming` to the tab of its repository, unless agents may not change anything
 /// (`writes` off) or no tab has it open; then it is answered here.
 fn route(writes: bool, tabs: &mut [Tab], incoming: Incoming, ctx: &egui::Context) {
+    // A report changes nothing: it goes to the tab whose background run it is about, which
+    // the user started (the agent works in a worktree of its own, no tab's).
+    if let crate::mcp::wire::WriteOp::Report { run, report } = &incoming.op {
+        let tab = tabs.iter_mut().find_map(|tab| match tab {
+            Tab::Repo(r) if r.resolver_owns(run) => Some(r),
+            _ => None,
+        });
+        let reply = match tab {
+            Some(tab) => {
+                tab.resolver_report(report.clone(), ctx);
+                Reply::new(Outcome::Done, "noted")
+            }
+            None => Reply::new(
+                Outcome::NotOpen,
+                "No gitcraft tab is waiting for this run any more: the user closed it. Stop.",
+            ),
+        };
+        let _ = incoming.reply.send(reply);
+        return;
+    }
     if !writes {
         let _ = incoming.reply.send(Reply::new(
             Outcome::Disabled,

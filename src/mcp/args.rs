@@ -30,6 +30,11 @@ impl<'a> Args<'a> {
         }
     }
 
+    /// The argument as it was given, for one of a shape of its own (a list of objects).
+    pub fn value(&self, name: &str) -> Option<&'a Value> {
+        self.map.get(name).filter(|v| !v.is_null())
+    }
+
     pub fn opt_str(&self, name: &str) -> Result<Option<&'a str>, String> {
         match self.map.get(name) {
             None | Some(Value::Null) => Ok(None),

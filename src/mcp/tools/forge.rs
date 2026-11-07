@@ -322,6 +322,7 @@ mod tests {
             link_dir: None,
             wait: std::time::Duration::from_secs(1),
             cancelled: std::sync::Arc::new(|| false),
+            run: None,
         };
         let args = serde_json::Map::from_iter([("failed_log".to_owned(), json!(true))]);
         let e = ci_status(&ctx, &Args::new(&args));

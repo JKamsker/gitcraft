@@ -77,6 +77,19 @@ impl ConflictEditor {
                             acts.push(Action::CloseDiff);
                         }
                         if ui
+                            .button("Resolve in background")
+                            .on_hover_text(
+                                "An agent resolves this file in a private copy of the checkout                                  while you go on; you see its progress and apply its result",
+                            )
+                            .clicked()
+                        {
+                            acts.push(Action::Resolver(
+                                crate::repo::resolver::ResolverAct::Start(Some(vec![
+                                    self.path.clone(),
+                                ])),
+                            ));
+                        }
+                        if ui
                             .button("Send to agent")
                             .on_hover_text(
                                 "Types the conflicts, each with its three sides, into the agent's \

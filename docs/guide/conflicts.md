@@ -21,6 +21,30 @@ The three-pane conflict editor, Mergiraf, conflict warnings before you act, exte
   with it everywhere ([Mergiraf setup](../mergiraf.md)). gitcraft only runs the `mergiraf`
   program: it neither bundles nor links Mergiraf (GPL-3.0), so gitcraft's licence is unchanged.
 
+## Resolving in the background with an agent
+
+- _Resolve all with agent_ on the banner of a merge, rebase, cherry-pick or revert in progress
+  (or _Resolve in background_ in the conflict editor, for that file) hands the conflicted files
+  to Claude Code, or to Codex when Settings → AI picks it, running headless. You go on working
+  meanwhile; nothing in your checkout changes until you apply the result.
+- The agent works in a private copy of the checkout: a scratch worktree in the temporary
+  folder, not listed among the worktrees and removed when the run ends (or, after a crash, the
+  next time gitcraft makes one). The operation is replayed there so it sees all of it, and each
+  conflicted file is copied in as it is in your checkout, with what you already chose there.
+- A card over the big area shows its progress: the plan it reported (a step per file and any
+  check it makes) as a bar of steps and a list, each step's note and time, what it is doing
+  now, the time gone and an estimate of the time left (its own at first, then from the steps
+  done). Fold it to a pill that keeps counting; _Show agent_ on the banner brings it back.
+  _Stop_ ends the agent; what it resolved by then can still be applied.
+- When it is done, the card lists each file: resolved, deleted (as one side did), still
+  conflicted, or changed by you meanwhile (left as you made it). _Apply_ writes the files you
+  tick and marks them resolved; _Discard_ forgets the agent's work.
+- It may read the files and git (`git diff`, `log`, `show`, `blame`) and gitcraft's own reading
+  tools, and edit its copy's files; it can't stage, commit, continue the operation or run
+  anything else. It reports its plan and steps with the `resolve_plan`, `resolve_step` and
+  `resolve_finish` tools of `gitcraft mcp`, which only an agent gitcraft started this way is
+  offered. For repositories on this machine only, for now.
+
 ## Warnings before you act
 
 - Conflict warnings before you act: in the menus of branches and pills, _Merge_ and _Rebase_,

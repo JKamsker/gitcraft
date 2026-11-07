@@ -113,6 +113,8 @@ pub(crate) fn plan(repo: &Path, op: &WriteOp) -> Result<Plan, String> {
         WriteOp::DropCommit { commit } => rewrite(repo, &here, commit, Edit::Drop),
         WriteOp::DeleteBranch { name, force } => delete_branch(repo, &here, name, *force),
         WriteOp::Push { force } => push(repo, &here, *force),
+        // Taken by the run it is for before it reaches a tab (see `app::agent_card`).
+        WriteOp::Report { .. } => Err("a report is not an operation".to_owned()),
     }
 }
 

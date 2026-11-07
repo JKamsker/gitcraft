@@ -93,6 +93,7 @@ impl RepoTab {
             Action::CloseDoctor => self.doctor = None,
             Action::Doctor(act) => self.doctor_act(act, ctx),
             Action::Agent(act) => self.agent_act(act, ctx),
+            Action::Resolver(act) => self.resolver_act(act, ctx),
             Action::Bake(act) => self.bake_act(act, ctx),
             Action::CloseDiff => {
                 self.diff = None;

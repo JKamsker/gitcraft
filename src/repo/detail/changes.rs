@@ -97,6 +97,9 @@ impl RepoTab {
                         } else if ui.add_enabled(idle, egui::Button::new("Abort")).clicked() {
                             acts.push(self.abort_for(state));
                         }
+                        if !self.work.conflicted.is_empty() {
+                            self.resolve_all_button(ui, acts);
+                        }
                     });
                 });
                 let hint = if restack.is_some() {

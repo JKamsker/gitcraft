@@ -28,6 +28,8 @@ pub struct Gitcraft {
     repo: Arc<std::sync::OnceLock<PathBuf>>,
     link_dir: Option<PathBuf>,
     wait: Duration,
+    /// The background resolving run this server reports for (`--run`), if one.
+    run: Option<String>,
 }
 
 impl Gitcraft {
@@ -37,7 +39,14 @@ impl Gitcraft {
             repo: Arc::default(),
             link_dir,
             wait,
+            run: None,
         }
+    }
+
+    /// The server of an agent gitcraft started to resolve conflicts: it offers the tools that
+    /// report on that run.
+    pub fn for_run(self, run: Option<String>) -> Self {
+        Self { run, ..self }
     }
 }
 
@@ -60,7 +69,7 @@ fn listed(def: &ToolDef) -> Tool {
         _ => Default::default(),
     };
     let annotations = ToolAnnotations::with_title(def.title)
-        .read_only(def.kind == Kind::Read)
+        .read_only(matches!(def.kind, Kind::Read | Kind::Report))
         // `reset` asks first only in its `hard` mode, but the hint is per tool.
         .destructive(def.kind == Kind::Approve || def.name == "reset")
         .idempotent(def.kind == Kind::Read)
@@ -133,8 +142,13 @@ impl ServerHandler for Gitcraft {
         _request: Option<PaginatedRequestParams>,
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
+        let run = self.run.is_some();
         Ok(ListToolsResult::with_all_items(
-            tools::all().into_iter().map(listed).collect(),
+            tools::all()
+                .into_iter()
+                .filter(|t| run || t.kind != Kind::Report)
+                .map(listed)
+                .collect(),
         ))
     }
 
@@ -159,7 +173,7 @@ impl ServerHandler for Gitcraft {
             },
         );
         let (start, found) = (self.start.clone(), self.repo.clone());
-        let (link_dir, wait) = (self.link_dir.clone(), self.wait);
+        let (link_dir, wait, run) = (self.link_dir.clone(), self.wait, self.run.clone());
         // Cancelled by the client, or the session ended: a wait for the window stops.
         let token = context.ct.clone();
         let cancelled: Arc<dyn Fn() -> bool + Send + Sync> = Arc::new(move || token.is_cancelled());
@@ -178,6 +192,7 @@ impl ServerHandler for Gitcraft {
                 link_dir,
                 wait,
                 cancelled,
+                run,
             };
             tools::call(def, &ctx, &args)
         })

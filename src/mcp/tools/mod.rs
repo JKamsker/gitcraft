@@ -6,6 +6,7 @@
 mod forge;
 mod history;
 mod refs;
+mod resolve;
 mod work;
 pub(crate) mod write;
 
@@ -27,6 +28,8 @@ pub struct Ctx {
     pub wait: Duration,
     /// Whether the call was cancelled (or the session ended): a wait for the window stops.
     pub cancelled: std::sync::Arc<dyn Fn() -> bool + Send + Sync>,
+    /// The background resolving run the agent reports for (`gitcraft mcp --run`), if one.
+    pub run: Option<String>,
 }
 
 /// What a tool does to the repository.
@@ -38,6 +41,9 @@ pub enum Kind {
     Write,
     /// Changes it in a way the user approves first, in the window.
     Approve,
+    /// Changes nothing: tells the window how the agent's background work goes. Offered only to
+    /// an agent gitcraft started for that (`gitcraft mcp --run`).
+    Report,
 }
 
 /// One tool.
@@ -59,6 +65,7 @@ pub fn all() -> Vec<&'static ToolDef> {
         refs::TOOLS,
         forge::TOOLS,
         write::TOOLS,
+        resolve::TOOLS,
     ]
     .concat()
 }
@@ -148,6 +155,7 @@ mod tests {
         for tool in all() {
             match tool.kind {
                 Kind::Read => {}
+                Kind::Report => assert!(tool.name.starts_with("resolve_"), "{}", tool.name),
                 Kind::Write => assert!(tool.description.contains("undo"), "{}", tool.name),
                 Kind::Approve => assert!(tool.description.contains("approve"), "{}", tool.name),
             }

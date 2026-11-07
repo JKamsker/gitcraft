@@ -19,6 +19,7 @@ impl RepoTab {
         self.start_deferred(&ctx);
         self.poll(&ctx);
         self.agents_frame(&ctx);
+        self.resolver_frame(&ctx);
         let t = Tokens::get(&ctx);
         if self.opening() {
             egui::CentralPanel::default()
@@ -111,7 +112,7 @@ impl RepoTab {
         if self.conflict.is_none() && self.rebase.is_none() {
             self.issue_card(ui, &mut acts);
         }
-        egui::CentralPanel::default()
+        let big_area = egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(t.dock))
             .show(ui, |ui| {
                 if self.conflict.is_some() {
@@ -151,6 +152,7 @@ impl RepoTab {
                 }
             });
 
+        self.resolver_card(&ctx, big_area.response.rect, &mut acts);
         self.drag_overlay(&ctx, &mut acts);
         self.dialogs(&ctx, &mut acts);
         self.keep_both_dialog(&ctx);

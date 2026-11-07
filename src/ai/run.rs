@@ -103,7 +103,7 @@ impl CommandLine {
             CommandLine::Words(words) => words
                 .iter()
                 .map(|w| {
-                    if w.contains([' ', '&', '|', '<', '>', '^', '(', ')']) {
+                    if w.contains([' ', '&', '|', '<', '>', '^', '(', ')', '=', ',', ';', '\'']) {
                         format!("\"{w}\"")
                     } else {
                         w.clone()
@@ -321,7 +321,7 @@ fn collect(reader: Option<&Reader>, until: Instant) -> Option<Vec<u8>> {
 }
 
 /// The shell that runs `command` here.
-fn shell_here(command: &CommandLine) -> Command {
+pub(crate) fn shell_here(command: &CommandLine) -> Command {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -369,7 +369,7 @@ fn read_capped(mut pipe: impl Read + Send + 'static) -> Reader {
 }
 
 /// Stops a tool run here and everything it started: politely, then for good.
-fn stop_here(child: &mut Child) {
+pub(crate) fn stop_here(child: &mut Child) {
     let pid = child.id().to_string();
     #[cfg(windows)]
     {

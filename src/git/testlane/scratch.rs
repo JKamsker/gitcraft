@@ -14,7 +14,7 @@ use crate::remote;
 pub const SCRATCH_DIR: &str = "gitcraft-scratch";
 
 /// What the worktrees are made for: the first part of their names.
-const LABELS: [&str; 3] = ["test", "rehearse", "interaction"];
+const LABELS: [&str; 4] = ["test", "rehearse", "interaction", "resolve"];
 
 /// Numbers the worktrees this process makes.
 static MADE: AtomicU64 = AtomicU64::new(0);
