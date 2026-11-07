@@ -1,0 +1,7 @@
+
+running 1 test
+test push_preflight::fix::transaction::owned_fixtures::gate2_owned_local_fixture ... owned case index-change, evidence /workspace/work/push-preflight-gate2-porcelain-index-change
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 826 filtered out; finished in 1.05s
+

@@ -1,0 +1,11 @@
+Guarded repair recovery
+Branch: refs/heads/main
+Original: eddc94b5e54bf33abb03e2e473b7adc0913904a7
+Rewritten: 8f70b4a1dfc2c145cca6460272f7bd4fa2dd9c7c
+Index path: /workspace/work/push-preflight-gate2-porcelain-timeout/repository ' quoted \ path/.git/index
+Shared-index dependency: none
+
+Inspect HEAD, git status, git diff and git diff --cached before recovery.
+Saved before.index and before.shared-index (when present) are owned evidence, not permission to overwrite concurrent edits.
+Save concurrent work before deliberately restoring the original tree/ref.
+After saving work, git reset --merge eddc94b5e54bf33abb03e2e473b7adc0913904a7 may help; do not remove locks owned by another operation.

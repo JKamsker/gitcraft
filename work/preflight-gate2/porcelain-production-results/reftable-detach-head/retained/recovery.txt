@@ -1,0 +1,11 @@
+Guarded repair recovery
+Branch: refs/heads/main
+Original: dec77604955133c69e15380b114a7a247f9b2d3b
+Rewritten: b2bb74fe6ff8f70191b6ca40b1fca7386ef435fc
+Index path: /workspace/work/push-preflight-gate2-porcelain-reftable-detach-head/repository ' quoted \ path/.git/index
+Shared-index dependency: none
+
+Inspect HEAD, git status, git diff and git diff --cached before recovery.
+Saved before.index and before.shared-index (when present) are owned evidence, not permission to overwrite concurrent edits.
+Save concurrent work before deliberately restoring the original tree/ref.
+After saving work, git reset --merge dec77604955133c69e15380b114a7a247f9b2d3b may help; do not remove locks owned by another operation.

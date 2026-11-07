@@ -1,0 +1,39 @@
+{
+  "after": {
+    "head": "bd3dc72035e6ab9ff39721ca58edb287a2866970",
+    "index": {
+      "hex": "4449524300000002000000016aeeb4dc065d62b86aeeb4dc065d62b80000001b00183ac0000081a4000003e8000003e80000000790be1f3056c4f471f977a28497b8d4b392c55a02000866696c652e74787400005452454500000019003120300a37a68520af137b3fdf786836871dc4bc0162963a433fd2634db986564a5c0e03ebf740d4868c5592",
+      "mode": 33152
+    },
+    "refs": "bd3dc72035e6ab9ff39721ca58edb287a2866970 refs/heads/main\ndc4156615ce1a6b224e62718b86d66a7289faaf2 refs/remotes/origin/main",
+    "shared": null,
+    "shared_path": "",
+    "symref": "refs/heads/main",
+    "work": {
+      "hex": "6265666f72650a",
+      "mode": 33152
+    }
+  },
+  "baseline": "dc4156615ce1a6b224e62718b86d66a7289faaf2",
+  "before": {
+    "head": "a8547187517f0515fe4cbedf78e05ef7f5c9ea72",
+    "index": {
+      "hex": "4449524300000002000000026aeeb4dc065d62b86aeeb4dc065d62b80000001b00183ac0000081a4000003e8000003e80000000790be1f3056c4f471f977a28497b8d4b392c55a02000866696c652e74787400006aeeb4dc15258b976aeeb4dc15258b970000001b00183a9d000081a4000003e8000003e80000002139551a7e1005e6b3c12b8fdef75e7ccad171ccc2000b707269766174652e747874000000000000005452454500000019003220300abded4824c92fac051cc5e0ba7a1f1c66a1687eb257812ed31b8bfeb11e4d2fcc451289a207ab3eb7",
+      "mode": 33152
+    },
+    "refs": "a8547187517f0515fe4cbedf78e05ef7f5c9ea72 refs/heads/main\ndc4156615ce1a6b224e62718b86d66a7289faaf2 refs/remotes/origin/main",
+    "shared": null,
+    "shared_path": "",
+    "symref": "refs/heads/main",
+    "work": {
+      "hex": "6265666f72650a",
+      "mode": 33152
+    }
+  },
+  "case": "full-fix",
+  "receiver_head": "dc4156615ce1a6b224e62718b86d66a7289faaf2",
+  "result": {
+    "Ok": "Outgoing history fixed. Reopen preflight to verify it; Ctrl+Z restores the previous history."
+  },
+  "secret_file_exists_after": false
+}

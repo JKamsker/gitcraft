@@ -1,0 +1,11 @@
+Guarded repair recovery
+Branch: refs/heads/main
+Original: 76887380ab4c8c33e6022691969a664795128be7
+Rewritten: bac76bbfc16ab7c320b3a6e616623d4d52ca6eab
+Index path: /workspace/work/push-preflight-gate2-porcelain-veto/repository ' quoted \ path/.git/index
+Shared-index dependency: none
+
+Inspect HEAD, git status, git diff and git diff --cached before recovery.
+Saved before.index and before.shared-index (when present) are owned evidence, not permission to overwrite concurrent edits.
+Save concurrent work before deliberately restoring the original tree/ref.
+After saving work, git reset --merge 76887380ab4c8c33e6022691969a664795128be7 may help; do not remove locks owned by another operation.
