@@ -798,9 +798,45 @@ mod tests {
     #[test]
     fn recording_hook_changes_are_refused_before_checkout_and_keep_external_bytes()
     -> Result<(), String> {
-        use std::io::Write;
+        recording_scenarios(
+            &[
+                "unsupported-hook-command",
+                "veto",
+                "head-other",
+                "detached",
+                "index-changed",
+                "work-changed",
+                "unchanged",
+            ],
+            false,
+        )
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn recording_pre_hook_identity_guards_prevent_relay_and_checkout() -> Result<(), String> {
+        recording_scenarios(
+            &[
+                "wrong-target",
+                "wrong-old",
+                "wrong-new",
+                "duplicate-input",
+                "extra-reference",
+                "extra-field",
+                "empty-input",
+                "pre-head-other",
+                "pre-head-detached",
+                "pre-head-oid-changed",
+            ],
+            true,
+        )
+    }
+
+    #[cfg(unix)]
+    fn recording_scenarios(scenarios: &[&str], guards: bool) -> Result<(), String> {
         use std::os::unix::fs::PermissionsExt;
-        use std::process::{Command, Stdio};
+        use std::process::Command;
+        use std::time::Duration;
         let stamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|e| e.to_string())?
@@ -846,16 +882,18 @@ esac
             let old = "1".repeat(40);
             let new = "2".repeat(40);
             let proof = format!("refs/heads/main\n{old}\n{new}\n");
-            let updates = format!("{old} {new} refs/heads/main\n");
-            for scenario in [
-                "unsupported-hook-command",
-                "veto",
-                "head-other",
-                "detached",
-                "index-changed",
-                "work-changed",
-                "unchanged",
-            ] {
+            let correct = format!("{old} {new} refs/heads/main\n");
+            for &scenario in scenarios {
+                let updates = match scenario {
+                    "wrong-target" => format!("{old} {new} refs/heads/other\n"),
+                    "wrong-old" => format!("{} {new} refs/heads/main\n", "3".repeat(40)),
+                    "wrong-new" => format!("{old} {} refs/heads/main\n", "3".repeat(40)),
+                    "duplicate-input" => format!("{correct}{correct}"),
+                    "extra-reference" => format!("{correct}{old} {new} refs/heads/other\n"),
+                    "extra-field" => format!("{old} {new} refs/heads/main unexpected\n"),
+                    "empty-input" => String::new(),
+                    _ => correct.clone(),
+                };
                 let directory = root.join(scenario);
                 std::fs::create_dir(&directory).map_err(|e| e.to_string())?;
                 for (name, value) in [
@@ -868,6 +906,18 @@ esac
                 ] {
                     std::fs::write(directory.join(name), value).map_err(|e| e.to_string())?;
                 }
+                match scenario {
+                    "pre-head-other" => {
+                        std::fs::write(directory.join("head"), b"refs/heads/other\n")
+                    }
+                    "pre-head-detached" => std::fs::write(directory.join("head"), b""),
+                    "pre-head-oid-changed" => std::fs::write(directory.join("oid"), "3".repeat(40)),
+                    _ => Ok(()),
+                }
+                .map_err(|e| e.to_string())?;
+                let head_before =
+                    std::fs::read(directory.join("head")).map_err(|e| e.to_string())?;
+                let oid_before = std::fs::read(directory.join("oid")).map_err(|e| e.to_string())?;
                 let wrapper = directory.join("reference-transaction");
                 std::fs::write(
                     &wrapper,
@@ -887,22 +937,20 @@ esac
                 let run = |phase: &str| -> Result<std::process::Output, String> {
                     let mut command = Command::new("sh");
                     command
+                        .env_clear()
                         .arg(&wrapper)
                         .arg(phase)
                         .env("PATH", format!("{}:/usr/bin:/bin", bin.display()))
                         .env("REC_SCENARIO", scenario)
-                        .env("REC_DIRECTORY", &directory)
-                        .stdin(Stdio::piped())
-                        .stdout(Stdio::piped())
-                        .stderr(Stdio::piped());
-                    let mut child = command.spawn().map_err(|e| e.to_string())?;
-                    child
-                        .stdin
-                        .take()
-                        .ok_or("No recording input")?
-                        .write_all(updates.as_bytes())
-                        .map_err(|e| e.to_string())?;
-                    child.wait_with_output().map_err(|e| e.to_string())
+                        .env("REC_DIRECTORY", &directory);
+                    crate::bounded_process::run_input(
+                        command,
+                        Some(updates.as_bytes().to_vec()),
+                        &|| true,
+                        Duration::from_secs(5),
+                        1024 * 1024,
+                        1024 * 1024,
+                    )
                 };
                 let output = run("prepared")?;
                 assert_eq!(
@@ -931,11 +979,40 @@ esac
                         "original-work"
                     }
                 );
-                assert_eq!(
-                    std::fs::read_to_string(directory.join("original-input-prepared"))
-                        .map_err(|e| e.to_string())?,
-                    updates
-                );
+                if guards {
+                    assert!(
+                        !directory.join("original-input-prepared").exists(),
+                        "{scenario}: original relay"
+                    );
+                    assert!(
+                        !directory.join("prepared.ok").exists(),
+                        "{scenario}: prepared ACK"
+                    );
+                    assert!(
+                        !directory.join("checkout-attempted").exists(),
+                        "{scenario}: checkout"
+                    );
+                    assert_eq!(
+                        std::fs::read(directory.join("head")).map_err(|e| e.to_string())?,
+                        head_before
+                    );
+                    assert_eq!(
+                        std::fs::read(directory.join("oid")).map_err(|e| e.to_string())?,
+                        oid_before
+                    );
+                    let commands =
+                        std::fs::read_to_string(directory.join("commands")).unwrap_or_default();
+                    assert!(!commands.lines().any(|line| line.starts_with("hook ") || line.starts_with("read-tree ")), "{scenario}: {commands}");
+                    println!(
+                        "guard {scenario}: refused; original_prepared=0 checkout=0; external HEAD/index/work preserved"
+                    );
+                } else {
+                    assert_eq!(
+                        std::fs::read_to_string(directory.join("original-input-prepared"))
+                            .map_err(|e| e.to_string())?,
+                        updates
+                    );
+                }
                 if scenario == "unchanged" {
                     assert!(
                         ack(&directory, "prepared", proof.as_bytes())

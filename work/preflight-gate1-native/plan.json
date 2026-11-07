@@ -1,0 +1,37 @@
+{
+  "status": "PRESERVED PLAN; NOT EXECUTED",
+  "production_commit": "5f348cecf859d91a5af90da25b2927819edc6dac",
+  "production_prefix_sha256": "37b090eaaa01d28c9183a24f51fe4cb71e6f06ebde06e2f0f3207dad83e4bb60",
+  "binding": "production bytes preceding cfg(test) identical independent STATIC PASS5f348ce",
+  "review": "review-push-repair-5f348ce/review-evidence/push-repair-protocol-5f348ce.json",
+  "authorization": "Root accepts exactSTATIC PASS; Gate1 recording-only repeat originalfive + newguards; no real protocol/live/remote/defaultfullsuite/CI",
+  "tests": [
+    "rotated_split_index_dependency_is_resolved_from_the_saved_index",
+    "synthetic_capability_versions_refuse_before_user_dispatch",
+    "missing_backend_acknowledgement_cannot_qualify_user_dispatch",
+    "synthetic_uncertain_lifecycle_always_retains_owned_evidence",
+    "recording_hook_changes_are_refused_before_checkout_and_keep_external_bytes",
+    "recording_pre_hook_identity_guards_prevent_relay_and_checkout"
+  ],
+  "new_guard_cases": [
+    "wrong-target",
+    "wrong-old",
+    "wrong-new",
+    "duplicate-input",
+    "extra-reference",
+    "extra-field",
+    "empty-input",
+    "pre-head-other",
+    "pre-head-detached",
+    "pre-head-oid-changed"
+  ],
+  "guard_assertions": [
+    "refusal before originalprepared relay and checkout",
+    "no preparedACK/checkoutattempt",
+    "HEAD bytes/OIDs/rawindex/workbytes preserve external values",
+    "fakeGit recording contains no hook or read-tree calls"
+  ],
+  "containment": "Only supplied fake Git and owned temp plain files; env_clear wrapper process via existing bounded_process::run_input5s; no repository/ref protocol, process selectors/signals/controllers, live hosts, credentials, CI",
+  "required_before_execution": "Correct-author source+plan push, private INCR0/jobs2 exact no-run compile+binaryhash binding push",
+  "next": "Preserve six exact test results+log hashes, commit+push/remoteverify; root accepts before full owned production Gate2"
+}
