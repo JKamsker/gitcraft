@@ -75,6 +75,7 @@ impl ForecastGit {
                 "-c",
                 "init.defaultBranch=forecast",
                 "init",
+                "--quiet",
                 "--bare",
                 "--template=",
                 &format!("--object-format={}", format.trim()),

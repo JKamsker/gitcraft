@@ -156,6 +156,7 @@ impl Context {
         let mut init = prefix(repo, Some(&context.path.join("hooks")), true);
         init.extend([
             "init".to_owned(),
+            "--quiet".into(),
             "--bare".into(),
             "--template=".into(),
             format!("--object-format={format}"),
