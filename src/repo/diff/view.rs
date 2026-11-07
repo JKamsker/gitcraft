@@ -5,9 +5,9 @@ use egui::{Sense, Stroke, Ui};
 
 use super::images::image_view;
 use super::lfs::lfs_view;
-use super::rendered;
 use super::rows::Rows;
 use super::{DiffData, Kind, Pick, unstage_args};
+use super::{rendered, structural};
 use crate::git::{Area, StatusFile};
 use crate::icons;
 use crate::pull_request::DiffSide;
@@ -24,7 +24,8 @@ impl RepoTab {
         let idle = self.busy_op.is_none();
 
         let (path, origin) = self.diff_origin(&view.key);
-        let partial = matches!(&view.data, Some(Ok(d)) if d.partial) && idle;
+        let partial =
+            matches!(&view.data, Some(Ok(d)) if d.partial) && idle && !view.structural.enabled;
         let settings = Settings::get(ui.ctx());
         let (split, ignore_ws, whole_file) = (
             settings.diff_split,
@@ -64,6 +65,23 @@ impl RepoTab {
         if as_file {
             file_text::show(ui, ("diff_file", &path), view.file.as_ref());
             return;
+        }
+        if view.structural.enabled {
+            match &view.structural.result {
+                None => {
+                    ui.centered_and_justified(|ui| ui.add(crate::spinner::Spinner::new()));
+                    return;
+                }
+                Some(Ok(data)) => {
+                    structural::show(ui, data);
+                    return;
+                }
+                Some(Err(reason)) => {
+                    ui.colored_label(t.warning, reason);
+                    ui.label("Showing the patch. Turn off Syntax to stage changes.");
+                    ui.separator();
+                }
+            }
         }
         let Some(data) = ready_data(ui, view, ignore_ws, &t) else {
             return;
@@ -169,12 +187,18 @@ impl RepoTab {
                         if icons::small_button(ui, "x", "Close (Esc)").clicked() {
                             acts.push(Action::CloseDiff);
                         }
-                        if let DiffKey::Work(file) = &view.key {
+                        if let DiffKey::Work(file) = &view.key
+                            && !view.structural.enabled
+                        {
                             let partial = partial && !as_file && !rendered;
                             clear = self.file_actions(ui, view, file, partial, acts);
                         }
                         ui.add_space(8.0);
                         if !as_file && !rendered {
+                            structural::toggle(ui, view.structural.enabled, acts);
+                            ui.add_space(4.0);
+                        }
+                        if !as_file && !rendered && !view.structural.enabled {
                             view_options(ui, &t, (split, ignore_ws, whole_file), acts);
                             ui.add_space(8.0);
                             change_steps(ui, acts);

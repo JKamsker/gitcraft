@@ -107,6 +107,7 @@ pub(crate) struct DiffView {
     /// Which reading of the rendered Markdown is the latest: an older one arriving last is
     /// dropped.
     pub(super) rendered_load: u64,
+    pub(super) structural: diff::structural::State,
     /// What the rendered Markdown keeps between frames.
     pub(super) markdown: egui_commonmark::CommonMarkCache,
     /// How far the lines were scrolled down last frame.
@@ -134,6 +135,7 @@ impl DiffView {
             file: None,
             rendered: None,
             rendered_load: 0,
+            structural: Default::default(),
             markdown: Default::default(),
             scroll: 0.0,
             jump: None,

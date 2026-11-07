@@ -183,6 +183,7 @@ impl RepoTab {
             } => self.set_diff_options(split, ignore_ws, whole_file, ctx),
             Action::DiffAsFile(on) => self.show_diff_as_file(on, ctx),
             Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
+            Action::DiffStructural(on) => self.show_diff_structural(on, ctx),
             Action::DiffStep(delta) => {
                 let rendered = self.diff_rendered
                     && self
@@ -192,7 +193,7 @@ impl RepoTab {
                 if let Some(view) = self
                     .diff
                     .as_mut()
-                    .filter(|_| !self.diff_as_file && !rendered)
+                    .filter(|v| !self.diff_as_file && !rendered && !v.structural.enabled)
                 {
                     view.step_change(Settings::get(ctx).diff_split, delta);
                 }

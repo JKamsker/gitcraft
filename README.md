@@ -163,6 +163,11 @@ so your config, credentials and hooks apply as usual.
 - Unified or side by side (a new file takes the whole width, with no empty old side), syntax
   colours, the changed part of each line marked, whitespace changes optional, images shown
   before / after. Esc closes.
+- **Syntax** in a diff compares syntax through an installed [Difftastic](https://difftastic.wilfred.me.uk/)
+  (`difft`), so reindentation and wrapping do not obscure the tokens that changed. It is a reading
+  mode: turn off Syntax to stage changes or see formatting edits. Unsupported languages, parse
+  errors, a missing tool or a comparison over its limits show the patch with an explanation.
+  Difftastic runs where the repository is (locally, in WSL or over SSH), off the window thread.
 - A file kept in Git LFS shows as its LFS objects before and after, with their sizes, rather
   than the text of the pointer git stores. With git-lfs installed, the palette (Ctrl+P) of a
   repository that uses LFS has _LFS: Fetch_ and _LFS: Pull_.

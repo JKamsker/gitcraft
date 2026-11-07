@@ -70,6 +70,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Right-click a file for its history, its blame or the whole file as it is at the commit.",
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",
+            "Syntax in a diff compares syntax with Difftastic (difft), installed where the repository is. Changed tokens stand out through reindentation and wrapping. Turn off Syntax to stage or see formatting edits; unsupported languages, parse errors and tool errors show the patch with a note.",
             "Right-click a pull request and choose Open in worktree to work on its branch in a worktree of its own, made for it when there is none.",
             "A terminal panel with tabs, in the repository's folder.",
         ],
