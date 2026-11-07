@@ -49,6 +49,7 @@ mod guide;
 pub(crate) mod highlight;
 mod hooks;
 mod issue_work;
+mod interaction;
 mod keep_submodules;
 mod keys;
 mod layout;
@@ -312,6 +313,8 @@ pub struct RepoTab {
     test_lane: test_lane::TestLane,
     /// The rehearsal shown in its window.
     rehearsing: rehearse::Rehearsing,
+    /// The search for the commits of two branches that fail together.
+    interactions: interaction::Interactions,
 
     commit_summary: String,
     commit_body: String,
@@ -547,6 +550,7 @@ impl RepoTab {
             decisions_pending: None,
             test_lane: Default::default(),
             rehearsing: Default::default(),
+            interactions: Default::default(),
             commit_summary: String::new(),
             commit_body: String::new(),
             compose: Default::default(),

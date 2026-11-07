@@ -368,6 +368,7 @@ impl RepoTab {
             Action::Unity(act) => self.apply_unity_act(act, ctx),
             Action::TestLane(act) => self.test_lane_act(act, ctx),
             Action::Rehearse(act) => self.rehearse_act(act, ctx),
+            Action::Interaction(act) => self.interaction_act(act, ctx),
             Action::SaveConflict => self.save_conflict(ctx),
             Action::KeepBoth(path) => self.keep_both(path, ctx),
             Action::Archaeology(act) => self.archaeology_act(act, ctx),

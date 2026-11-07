@@ -10,6 +10,7 @@ mod custom;
 mod keep_detached;
 mod parallel_bisect;
 mod rehearse;
+mod interaction;
 mod remote;
 mod stash;
 mod test_commits;
@@ -155,6 +156,11 @@ pub enum Dialog {
         rebase: bool,
         compare: bool,
         command: String,
+        focus: bool,
+    },
+    /// Look for the commits of two branches that fail together.
+    FindInteraction {
+        spec: crate::git::InteractionSpec,
         focus: bool,
     },
     /// Test a range of commits; `stored` is the repository's test command.
@@ -583,6 +589,9 @@ impl RepoTab {
                     command,
                     focus,
                 ),
+                Dialog::FindInteraction { spec, focus } => {
+                    interaction::find_interaction(ui, enter, &machine, spec, focus)
+                }
                 Dialog::TestCommits {
                     start,
                     stored,

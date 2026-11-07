@@ -292,6 +292,11 @@ so your config, credentials and hooks apply as usual.
   are. Ctrl+Z undoes it. With
   `git-absorb` installed (on the repository's machine for WSL / SSH), _Run git-absorb instead_
   hands it over.
+- Find the interaction: two branches pass alone but fail together. _Find the interaction…_ on a
+  branch tests subsets of its commits and the checked-out branch's, applied where the two
+  diverged, in a scratch worktree (delta debugging, `ddmin`), until it can say _these two
+  commits fail together; either alone passes_. It has a test budget, and re-runs a failure
+  before believing it, setting flaky results aside.
 - Quick edits from a commit's menu, for commits of the checked-out branch: _Edit commit
   message_, _Drop commit_ (which asks first), _Move commit up_ / _down_, each a rebase without
   the editor and undone with Ctrl+Z. What can't be done (a merge, merges after the commit) is greyed out with why.

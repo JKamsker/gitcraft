@@ -339,6 +339,8 @@ pub(crate) enum Action {
     OpenDrift(PathBuf),
     /// Rehearse a rebase or merge, stop it, or do it for real.
     Rehearse(super::rehearse::RehearseAct),
+    /// Look for the commits of two branches that fail together, or stop looking.
+    Interaction(super::interaction::InteractionAct),
     /// Test commits for the test lane, stop them, show what one printed.
     TestLane(super::test_lane::LaneAct),
     /// Something done on a pull request from a fork.
@@ -703,6 +705,7 @@ impl RepoTab {
         items.extend(self.parallel_palette_items());
         items.extend(self.test_palette_items());
         items.extend(self.rehearse_palette_items());
+        items.extend(self.interaction_palette_items());
         for b in &self.refs.local {
             if !b.is_head {
                 items.push((

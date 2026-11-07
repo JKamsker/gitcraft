@@ -588,6 +588,7 @@ fn capitalise(text: &str) -> String {
         first.to_uppercase().chain(chars).collect()
     })
     }
+    crate::repo::interaction::interaction_item(ui, acts, &b.name);
     crate::repo::rehearse::rehearse_item(ui, acts, BranchRef::local(&b.name));
 
 /// A word on a branch's row saying it could be cleaned up.
