@@ -514,3 +514,61 @@ fn invalid_locations_and_unselected_local_upload_paths_refuse_before_any_io() ->
     assert_eq!(fixture.0.read_dir().map_err(|e| e.to_string())?.count(), 0);
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn ssh_setup_terminal_prompt_remains_visible_at_minimum_window_height() -> Result<(), String> {
+    Context::default().run(|| {
+        let fixture = Fixture::new()?;
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let mut tab = RepoTab::new_deferred(fixture.0.clone(), &ctx);
+        tab.open_ssh_setup(&ctx);
+        let state = tab.ssh_setup.as_mut().ok_or("No setup view")?;
+        let terminal = Terminal::spawn(
+            &fixture.0,
+            &crate::terminal::ShellSpec {
+                program: "/bin/sh".into(),
+                args: vec!["-c".into(), "printf fixture-prompt".into()],
+                label: "owned recording prompt".into(),
+            },
+            &ctx,
+        )?;
+        state.command = Some(CommandRun {
+            terminal,
+            step: Step::Generate,
+            finished: true,
+        });
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        loop {
+            let out = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(800., 500.),
+                    )),
+                    ..Default::default()
+                },
+                |ui| tab.ssh_setup_window(ui.ctx()),
+            );
+            let visible = out.shapes.iter().any(|shape| match &shape.shape {
+                egui::Shape::Text(text) if text.galley.text().contains("fixture-prompt") => {
+                    let rect = egui::Rect::from_min_size(text.pos, text.galley.size());
+                    rect.min.y >= 0. && rect.max.y <= 500. && rect.intersects(shape.clip_rect)
+                }
+                _ => false,
+            });
+            out.drop_without_applying_deltas();
+            if visible {
+                break;
+            }
+            if std::time::Instant::now() >= until {
+                return Err(
+                    "Owned setup prompt was clipped at the supported800x500 viewport".into(),
+                );
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        Ok(())
+    })
+}

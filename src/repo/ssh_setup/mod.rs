@@ -499,12 +499,30 @@ impl RepoTab {
         state.poll(ctx);
         let busy = state.busy();
         let mut open = true;
-        egui::Window::new("Set up SSH").id(egui::Id::new(("ssh_setup",&self.path))).open(&mut open).default_width(760.0).show(ctx,|ui|{
-            egui::ScrollArea::vertical().max_height(430.0).show(ui,|ui|ui.add_enabled_ui(!busy,|ui|state.fields(ui)));
-            ui.separator();ui.label(&state.status);
-            if busy {ui.label("Closing stops this view/terminal connection. An already submitted remote or API action may still complete; key files are retained.");}
-            if let Some(run)=&mut state.command {ui.allocate_ui_with_layout(egui::vec2(ui.available_width(),260.0),egui::Layout::top_down(egui::Align::Min),|ui|run.terminal.ui(ui));}
-        });
+        let height = ctx.content_rect().height();
+        let terminal_height = (height * 0.3).clamp(100.0, 260.0);
+        let reserved = if state.command.is_some() {
+            terminal_height + 180.0
+        } else {
+            150.0
+        };
+        let fields_height = (height - reserved).clamp(60.0, 430.0);
+        egui::Window::new("Set up SSH")
+            .id(egui::Id::new(("ssh_setup",&self.path)))
+            .open(&mut open)
+            .default_width(760.0)
+            .max_height((height-16.0).max(100.0))
+            .vscroll(true)
+            .show(ctx,|ui|{
+                egui::ScrollArea::vertical().id_salt("ssh_setup_fields").max_height(fields_height).show(ui,|ui|ui.add_enabled_ui(!busy,|ui|state.fields(ui)));
+                ui.separator();
+                ui.label(&state.status);
+                if busy {ui.label("Closing stops this view/terminal connection. An already submitted remote or API action may still complete; key files are retained.");}
+                if let Some(run)=&mut state.command {
+                    ui.allocate_ui_with_layout(egui::vec2(ui.available_width(),terminal_height),egui::Layout::top_down(egui::Align::Min),|ui|run.terminal.ui(ui));
+                }
+            });
+
         if open {
             self.ssh_setup = Some(state);
         }
