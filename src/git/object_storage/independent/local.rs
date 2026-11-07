@@ -1,7 +1,7 @@
 //! Deliberate independence copies a self-contained pack; donors are read-only throughout.
-//! An alternate hard-link backup survives success/failure for recoverability.
+//! The actual alternate inode is retained by a guarded create-only rename.
 use super::super::{files, pack_rows, topology::Topology, valid_oid};
-use crate::{connections, remote};
+use crate::connections;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -266,7 +266,7 @@ pub(crate) fn make_with_checkpoints(
     checkpoint("verified")?;
     let backup_name = format!("alternates.gitcraft-backup-{nonce}");
     if let Err(error) = owner.detach(&backup_name) {
-        let restored = owner.restore();
+        let restored = owner.restore(&backup_name);
         return Err(format!(
             "Guarded alternate removal failed: {error}. Create-only recovery: {restored:?}. Recovery directory: {}",
             owner.recovery_path(&backup_name).display()
@@ -275,6 +275,7 @@ pub(crate) fn make_with_checkpoints(
     let proof = (|| {
         checkpoint("detached")?;
         owner.current(false)?;
+        owner.verify_backup(&backup_name)?;
         if required(&snapshot.repo, owner, active)? != before
             || references(&snapshot.repo, owner, active)? != snapshot.refs
         {
@@ -289,10 +290,11 @@ pub(crate) fn make_with_checkpoints(
             active,
         )?;
         owner.current(false)?;
+        owner.verify_backup(&backup_name)?;
         Ok::<(), String>(())
     })();
     if let Err(error) = proof {
-        let recovery = match owner.restore() {
+        let recovery = match owner.restore(&backup_name) {
             Ok(()) => "Borrowing was restored.".into(),
             Err(e) => format!("Create-only restoration did not overwrite a newer file: {e}"),
         };

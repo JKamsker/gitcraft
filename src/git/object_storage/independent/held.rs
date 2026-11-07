@@ -2,10 +2,12 @@
 use rustix::fs::{self, AtFlags, CWD, FileType, Mode, OFlags, RenameFlags};
 use std::ffi::OsString;
 use std::fs::File;
+use std::io::Write;
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::FileExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 fn err(e: impl std::fmt::Display) -> String {
     format!("Cannot establish held object-store ownership: {e}")
@@ -73,6 +75,7 @@ pub(super) struct Ownership {
     pack: Arc<File>,
     alternate: Arc<File>,
     expected: Vec<u8>,
+    locked: AtomicBool,
 }
 impl Ownership {
     pub fn capture(
@@ -123,6 +126,7 @@ impl Ownership {
             pack,
             alternate,
             expected: expected.into(),
+            locked: AtomicBool::new(false),
         };
         // Proc descriptor access is required by guarded Git reads and create-only links.
         let via = File::open(proc_path(&result.repo)).map_err(err)?;
@@ -210,11 +214,18 @@ impl Ownership {
         Ok(out.stdout)
     }
     pub fn lock(&self) -> Result<Lock<'_>, String> {
-        fs::flock(
+        self.locked
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .map_err(|_| "This prepared independence operation is already running".to_owned())?;
+        if let Err(error) = fs::flock(
             self.alternate.as_ref(),
             fs::FlockOperation::NonBlockingLockExclusive,
-        )
-        .map_err(|e| format!("Could not lock the inspected alternate file: {e}"))?;
+        ) {
+            self.locked.store(false, Ordering::Release);
+            return Err(format!(
+                "Could not lock the inspected alternate file: {error}"
+            ));
+        }
         Ok(Lock(self))
     }
     pub fn stage(&self, name: &str) -> Result<Stage, String> {
@@ -261,19 +272,46 @@ impl Ownership {
         }
         Ok(())
     }
-    pub fn restore(&self) -> Result<(), String> {
-        match link_file(&self.alternate, &self.info, "alternates") {
-            Ok(()) => Ok(()),
-            Err(rustix::io::Errno::EXIST) => {
-                let current = regular(&self.info, "alternates")?;
-                if identity(&current)? == identity(&self.alternate)? {
-                    Ok(())
-                } else {
-                    Err("A newer alternate file exists; it was not overwritten. The original backup remains in the held info directory.".into())
-                }
-            }
-            Err(e) => Err(err(e)),
+    pub fn verify_backup(&self, name: &str) -> Result<(), String> {
+        let backup = regular(&self.info, name)?;
+        if identity(&backup)? != identity(&self.alternate)?
+            || read(&backup, 64 * 1024)? != self.expected
+        {
+            return Err("Retained alternate backup identity or content changed".into());
         }
+        Ok(())
+    }
+    pub fn restore(&self, backup: &str) -> Result<(), String> {
+        match regular(&self.info, "alternates") {
+            Ok(existing) => {
+                if identity(&existing)? == identity(&self.alternate)?
+                    && read(&existing, 64 * 1024)? == self.expected
+                {
+                    return Ok(());
+                }
+                return Err("A newer alternate file exists; it was not overwritten.".into());
+            }
+            Err(_) => (),
+        }
+        // Create the captured bytes privately, flush, then publish by a create-only link
+        // from its held inode. Neither the source nor destination resolves ancestors again.
+        let name = format!("{backup}.restore");
+        let mut file = File::from(
+            fs::openat(
+                self.info.as_ref(),
+                name.as_str(),
+                OFlags::WRONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::CREATE | OFlags::EXCL,
+                Mode::RUSR | Mode::WUSR,
+            )
+            .map_err(err)?,
+        );
+        file.write_all(&self.expected).map_err(err)?;
+        file.sync_all().map_err(err)?;
+        link_file(&file, &self.info, "alternates").map_err(|e| {
+            format!(
+                "Create-only restore did not replace an existing alternate: {e}; retained {name}"
+            )
+        })
     }
     pub fn recovery_path(&self, name: &str) -> PathBuf {
         std::fs::read_link(proc_path(&self.info))
