@@ -158,7 +158,8 @@ jobs:
           dir="$PKG"
           mkdir "$dir"
           cp target/release/gitcraft README.md ATTRIBUTION.md LICENSE-MIT LICENSE-APACHE \
-            packaging/gitcraft.desktop "$dir/"
+            packaging/gitcraft.desktop packaging/linux/gitcraft-link.desktop \
+            packaging/linux/gitcraft-servicemenu.desktop "$dir/"
           cp assets/app-icon/gitcraft-256.png "$dir/gitcraft.png"
           strip "$dir/gitcraft"
           tar czf "$dir.tar.gz" "$dir"
@@ -192,6 +193,7 @@ jobs:
           # The .deb installs, with its menu entry and icon; the .rpm holds the same files.
           sudo apt-get install -y desktop-file-utils rpm "./$name.deb"
           desktop-file-validate /usr/share/applications/gitcraft.desktop
+          desktop-file-validate /usr/share/applications/gitcraft-link.desktop
           test -x /usr/bin/gitcraft
           test -f /usr/share/icons/hicolor/256x256/apps/gitcraft.png
           rpm -qp --requires "$name.rpm"

@@ -59,6 +59,15 @@ const FEATURES: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "From the terminal and the file manager",
+        &[
+            "gitcraft . opens the repository the current folder is in, from any of its subfolders or worktrees; gitcraft <folder> does the same for that folder.",
+            "gitcraft log <file> opens the file's history, gitcraft blame <file>:<line> its blame scrolled to that line, gitcraft show <rev> a commit and gitcraft compare a..b (or a...b, since they diverged) the files that differ. gitcraft --help lists them. While gitcraft is running, each goes to its window.",
+            "Links from the browser: a gitcraft://open?url=<link> link (or the link itself pasted into the palette, the start page or given to gitcraft) opens a pull request, commit or file#L40 of GitHub, GitLab, Gitea / Forgejo or Bitbucket in the clone you have of that repository, among the open tabs and recent repositories; with none, it offers to clone it.",
+            "Files have History in gitcraft and Blame in gitcraft in their right-click menu: in Explorer when the installer adds them, in Dolphin from the .deb and .rpm packages, and in Finder (Quick Actions) and Files (Scripts) once Settings → General adds them there.",
+        ],
+    ),
+    (
         "Graph",
         &[
             "Every branch with its pill on its latest commit: solid for the checked-out one, a laptop when it is local, a cloud when a remote has it.",

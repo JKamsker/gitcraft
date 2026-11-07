@@ -5,6 +5,7 @@ mod custom_commands;
 mod external_tools;
 mod agents;
 mod diffs;
+mod file_menus;
 mod layout;
 mod page;
 mod portable_page;
@@ -19,6 +20,7 @@ use egui::{RichText, Ui};
 use serde::{Deserialize, Serialize};
 
 use crate::theme::Tokens;
+use file_menus::file_menu_rows;
 use layout::{Card, Filter, section};
 pub(crate) use page::show as show_page;
 use preview::Preview;
@@ -432,6 +434,7 @@ impl Settings {
                             "When a long operation ends in the background",
                         );
                     });
+                    file_menu_rows(card);
                     card.row("Tips", "did you know hints help first time", |ui| {
                         self.tips_ui(ui);
                     });

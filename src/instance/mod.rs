@@ -53,11 +53,21 @@ static PRIMARY: OnceLock<Primary> = OnceLock::new();
 /// Settles whether this process opens the window or hands `arg` (what it was started with)
 /// to the instance already running. Called before the window is made.
 pub fn start(arg: Option<&Path>) -> Start {
+    start_with(&request_for(arg))
+}
+
+/// [`start`] for a command line that asks more than a folder (`log <file>`…): handed over
+/// as it was typed, with this start's folder to read its relative paths against.
+pub fn start_launch(args: &[std::ffi::OsString]) -> Start {
+    start_with(&launch_request(args))
+}
+
+fn start_with(request: &Result<Request, String>) -> Start {
     // No data folder: nothing saved for two windows to write over.
     let Some(dir) = eframe::storage_dir("gitcraft") else {
         return Start::Window;
     };
-    match claim(&dir, &request_for(arg), PATIENCE) {
+    match claim(&dir, request, PATIENCE) {
         Claim::Primary(primary) => {
             let _ = PRIMARY.set(primary);
             Start::Window
@@ -216,6 +226,32 @@ fn request_for(arg: Option<&Path>) -> Result<Request, String> {
     message::valid_path(text)
         .map(Request::Open)
         .map_err(|why| format!("{} can't be opened: {why}.", path.display()))
+}
+
+/// What to ask the running instance for the command line `args`.
+fn launch_request(args: &[std::ffi::OsString]) -> Result<Request, String> {
+    let cwd = std::env::current_dir()
+        .map_err(|e| format!("gitcraft can't tell which folder it was started in: {e}"))?;
+    let cwd = crate::app::strip_verbatim(cwd);
+    let cwd = cwd.to_str().map(str::to_owned).ok_or_else(|| {
+        "gitcraft is already running, and this folder's name can't be handed to it: it isn't \
+         valid UTF-8."
+            .to_owned()
+    })?;
+    let args = args
+        .iter()
+        .map(|a| a.to_str().map(str::to_owned))
+        .collect::<Option<Vec<String>>>()
+        .ok_or_else(|| {
+            "gitcraft is already running, and a name on this command line can't be handed to \
+             it: it isn't valid UTF-8. Open it from the running window instead."
+                .to_owned()
+        })?;
+    message::valid_args(&args)?;
+    Ok(Request::Launch {
+        cwd: message::valid_path(&cwd)?,
+        args,
+    })
 }
 
 /// A new, empty folder for a test, under the system's temporary folder.

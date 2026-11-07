@@ -755,3 +755,58 @@ fn dropped_patches_are_applied() {
     assert!(matches!(gone_outcome, Some(Err(e)) if e.contains("gone.patch")));
     assert!(!waits_after);
 }
+
+/// `gitcraft blame "<file>:2"` from a subfolder, through what the window does with it: the tab
+/// of the repository reads it, then shows the file's blame scrolled to and marking line 2.
+#[test]
+fn the_command_line_opens_a_file_s_blame_at_a_line() -> Result<(), String> {
+    use std::time::{Duration, Instant};
+    let dir = repo("launch blame ü");
+    std::fs::create_dir_all(dir.join("sub dir")).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join("sub dir/a b.txt"), "one\ntwo\nthree\n").map_err(|e| e.to_string())?;
+    git::run(Some(&dir), &["add", "-A"])?;
+    git::run(Some(&dir), &["commit", "-q", "-m", "file"])?;
+    let result = (|| {
+        let cmd = crate::launch::Command::Blame {
+            file: "a b.txt".into(),
+            line: Some(2),
+        };
+        let resolved = crate::launch::resolve::resolve(&cmd, &dir.join("sub dir"))?;
+        let ctx = egui::Context::default();
+        let mut tab = super::RepoTab::new(resolved.root.clone(), &ctx);
+        let wait = |tab: &mut super::RepoTab, done: &dyn Fn(&super::RepoTab) -> bool| {
+            let until = Instant::now() + Duration::from_secs(20);
+            while !done(tab) && Instant::now() < until {
+                tab.poll(&ctx);
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            done(tab)
+        };
+        if !wait(&mut tab, &|t| !t.opening() && !t.loading) {
+            return Err("the repository wasn't read".to_owned());
+        }
+        for action in crate::launch::actions(resolved.then) {
+            tab.apply(action, &ctx);
+        }
+        let blamed = wait(&mut tab, &|t| {
+            t.file_view
+                .as_ref()
+                .is_some_and(|v| matches!(v.blame, Some(Ok(_))))
+        });
+        let view = tab.file_view.as_ref().ok_or("no file view")?;
+        Ok::<_, String>((
+            blamed,
+            view.path.clone(),
+            view.marked_line,
+            view.goto_line.get(),
+        ))
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    let (blamed, path, marked, goto) = result?;
+    assert!(blamed);
+    assert_eq!(path, "sub dir/a b.txt");
+    assert_eq!(marked, Some(2));
+    // Asked for, and taken (scrolled to) when the blame is first drawn, which hasn't happened.
+    assert_eq!(goto, Some(2));
+    Ok(())
+}

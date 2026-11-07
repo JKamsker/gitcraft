@@ -17,9 +17,20 @@ fn main() -> eframe::Result {
     if args.first().is_some_and(|a| a == "mcp") {
         std::process::exit(gitcraft::mcp::main(&args[1..]));
     }
+    let args = gitcraft::launch::args::from_system(std::env::args_os().skip(1));
+    let launch = match gitcraft::launch::parse(args.clone()) {
+        gitcraft::launch::Parsed::Run(cmd) => cmd,
+        gitcraft::launch::Parsed::Print(text) => {
+            app::tell(&text, false);
+            return Ok(());
+        }
+        gitcraft::launch::Parsed::Fail(why) => {
+            app::tell(&why, true);
+            std::process::exit(2);
+        }
+    };
     // gitcraft is running already: what this start was given goes to its window.
-    let open_arg = std::env::args_os().nth(1).map(std::path::PathBuf::from);
-    match app::single_instance(open_arg.as_deref()) {
+    match app::single_instance(launch.as_ref(), &args) {
         app::Start::Window => {}
         app::Start::HandedOver => return Ok(()),
         app::Start::Failed(message) => {
@@ -53,7 +64,7 @@ fn main() -> eframe::Result {
     let result = eframe::run_native(
         "gitcraft",
         options,
-        Box::new(|cc| Ok(Box::new(app::App::new(cc, open_arg)))),
+        Box::new(|cc| Ok(Box::new(app::App::launched(cc, launch)))),
     );
     app::after_exit();
     result

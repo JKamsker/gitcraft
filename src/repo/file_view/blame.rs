@@ -92,6 +92,10 @@ impl RepoTab {
         let mut scroll = egui::ScrollArea::both()
             .id_salt(("file_blame", &view.path, &view.rev))
             .auto_shrink(false);
+        if let Some(line) = view.goto_line.take() {
+            let row = line.clamp(1, data.lines.len().max(1)) - 1;
+            scroll = scroll.vertical_scroll_offset(row.saturating_sub(5) as f32 * LINE_H);
+        }
         if let Some(hit) = find.take_reveal() {
             let text = data.lines.get(hit.line).map_or("", |l| l.text.as_str());
             scroll = find.scroll_to(scroll, &hit, text, char_w);
@@ -111,6 +115,7 @@ impl RepoTab {
                 if first && i > 0 {
                     p.hline(rect.x_range(), rect.top(), Stroke::new(1.0, t.separator));
                 }
+                if view.marked_line == Some(i + 1) { p.rect_filled(rect, 0.0, t.row_selected); }
                 let gutter = Rect::from_min_size(rect.min, vec2(GUTTER_W, LINE_H));
                 p.rect_filled(gutter, 0.0, t.card);
                 p.rect_filled(

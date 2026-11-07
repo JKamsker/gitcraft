@@ -215,6 +215,13 @@ pub(crate) enum Action {
         hash: String,
         path: String,
     },
+    /// A file's blame (at `rev`, or HEAD and the working tree), scrolled to `line` (1 is the
+    /// first) and marking it.
+    BlameAt {
+        path: String,
+        rev: Option<String>,
+        line: usize,
+    },
     /// Open the interactive rebase editor for the commits after `onto`.
     /// Gives a commit of the checked-out branch a new message: amending the latest, rebasing
     /// for an older one.

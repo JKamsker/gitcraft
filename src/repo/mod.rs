@@ -36,7 +36,7 @@ mod diff_split;
 pub(crate) mod fence_view;
 mod drift_view;
 mod file_text;
-mod file_view;
+pub(crate) mod file_view;
 mod forge_link;
 mod fold;
 mod find;
@@ -595,6 +595,29 @@ impl RepoTab {
     /// the read after it was suspended: it is shown.
     pub fn start_deferred(&mut self, ctx: &egui::Context) {
         self.shown_now(ctx);
+    }
+
+    /// The commit selected, for tests of what opens it.
+    #[cfg(test)]
+    pub(crate) fn selected_commit(&self) -> Option<String> {
+        self.selected_hash()
+    }
+
+    /// The file whose history, blame or contents the big area shows, if one is.
+    #[cfg(test)]
+    pub(crate) fn file_view_path(&self) -> Option<String> {
+        self.file_view.as_ref().map(|v| v.path.clone())
+    }
+
+    /// The remotes the tab read, once it has read the repository.
+    pub(crate) fn remotes_read(&self) -> Option<Vec<git::Remote>> {
+        (!self.opening()).then(|| self.remotes.clone())
+    }
+
+    /// An editor holds work that showing something else would close: a conflict being
+    /// solved, an interactive rebase being set up.
+    pub(crate) fn editor_open(&self) -> bool {
+        self.conflict.is_some() || self.rebase.is_some()
     }
 
     /// Nothing read yet: the tab shows its opening screen.

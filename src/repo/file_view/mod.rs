@@ -38,6 +38,9 @@ pub(crate) struct FileView {
     /// The history of only these lines (where their numbers count from, and the lines), not
     /// of the whole file.
     pub lines: Option<(git::LinesAt, git::LineRange)>,
+    /// A line to scroll to once the blame is read, and to mark (1 is the first).
+    pub goto_line: std::cell::Cell<Option<usize>>,
+    pub marked_line: Option<usize>,
 }
 
 impl FileView {
@@ -50,6 +53,8 @@ impl FileView {
             blame: None,
             text: None,
             lines: None,
+            goto_line: Default::default(),
+            marked_line: None,
         }
     }
 

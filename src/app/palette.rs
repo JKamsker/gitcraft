@@ -65,6 +65,7 @@ enum Outcome {
     Back,
     /// Run (or step into) the entry at this index of the list in use.
     Choose(usize),
+    OpenLink(crate::launch::link::ForgeLink),
 }
 
 impl App {
@@ -140,6 +141,7 @@ impl App {
                 }
             }
             Outcome::Choose(i) => self.choose(i, ctx),
+            Outcome::OpenLink(link) => { self.palette = None; self.open_link(link, ctx); }
         }
     }
 
@@ -258,6 +260,8 @@ impl Palette {
         if up {
             self.selected = self.selected.saturating_sub(1);
         }
+        let link = super::links::palette_link(&self.query);
+        let mut open_link = false;
         let moved = up || down;
         let mut outcome = if esc { Outcome::Close } else { Outcome::Stay };
         let frame = egui::Frame::new()
@@ -274,8 +278,13 @@ impl Palette {
                 ui.set_width(560.0);
                 self.field(ui, &t);
                 ui.add_space(6.0);
-                if let Some(i) = self.list_ui(ui, &t, count, moved) {
-                    outcome = Outcome::Choose(i);
+                match &link {
+                    Some(Ok(link)) => {
+                        let what = super::links::describe(link);
+                        if ui.button(format!("Open link: {what}")).clicked() { open_link = true; }
+                    }
+                    Some(Err(why)) => { ui.label(RichText::new(why).color(t.text_faint)); }
+                    None => if let Some(i) = self.list_ui(ui, &t, count, moved) { outcome = Outcome::Choose(i); },
                 }
             });
         });
@@ -287,11 +296,17 @@ impl Palette {
         {
             outcome = Outcome::Choose(s.index);
         }
+        if enter && matches!(link, Some(Ok(_))) {
+            open_link = true;
+        }
         if resp.response.clicked_elsewhere()
             && ctx.input(|i| i.pointer.any_pressed())
             && matches!(outcome, Outcome::Stay)
         {
             outcome = Outcome::Close;
+        }
+        if open_link && let Some(Ok(link)) = link {
+            return Outcome::OpenLink(link);
         }
         outcome
     }
@@ -308,7 +323,7 @@ impl Palette {
                 ui.add_space(4.0);
                 step.pick.placeholder()
             }
-            None => "Type a command or a branch…",
+            None => "Type a command or a branch, or paste a forge link…",
         };
         let edit = ui.add(
             egui::TextEdit::singleline(&mut self.query)

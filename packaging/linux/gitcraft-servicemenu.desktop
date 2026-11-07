@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Service
+X-KDE-ServiceTypes=KonqPopupMenu/Plugin
+MimeType=all/allfiles;
+Actions=history;blame;
+
+[Desktop Action history]
+Name=History in gitcraft
+Icon=gitcraft
+Exec=gitcraft log %f
+
+[Desktop Action blame]
+Name=Blame in gitcraft
+Icon=gitcraft
+Exec=gitcraft blame -- %f

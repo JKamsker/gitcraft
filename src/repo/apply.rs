@@ -268,7 +268,13 @@ impl RepoTab {
                     self.diff = None;
                 }
             }
-            Action::FileView { path, rev, tab } => self.open_file_view(path, rev, tab, ctx),
+            Action::FileView { path, rev, tab } => {
+                self.open_file_view(path, rev, tab, ctx);
+                // A line marked by an earlier `BlameAt` isn't what this one asks for.
+                if let Some(view) = &mut self.file_view {
+                    view.marked_line = None;
+                }
+            }
             Action::CloseFileView => self.file_view = None,
             Action::Navigate(step) => self.navigate(step, ctx),
             Action::LineHistory { path, at, range } => self.open_line_history(path, at, range, ctx),
@@ -277,6 +283,13 @@ impl RepoTab {
                 self.open_diff_of_lines(DiffKey::Commit { hash, path }, lines, ctx);
             }
             Action::RevertFile { hash, path } => self.revert_file(hash, path, ctx),
+            Action::BlameAt { path, rev, line } => {
+                self.open_file_view(path, rev, super::file_view::FileTab::Blame, ctx);
+                if let Some(view) = &mut self.file_view {
+                    view.goto_line.set(Some(line));
+                    view.marked_line = Some(line);
+                }
+            }
             Action::InteractiveRebase { onto, label } => self.interactive_rebase(onto, label, ctx),
             Action::Reword { hash, message } => self.reword_commit(hash, message, ctx),
             Action::EditMessage(hash) => self.edit_message(hash, ctx),

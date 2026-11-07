@@ -12,6 +12,8 @@ mod home_recent;
 mod my_work;
 mod os_shell;
 mod inbox;
+mod launch;
+mod links;
 mod palette;
 mod panels;
 mod profiles;
@@ -188,11 +190,21 @@ pub struct App {
     my_work: my_work::MyWork,
     inbox: inbox::Inbox,
     inbox_seen: BTreeMap<String, crate::forge::inbox::Seen>,
+    /// What gitcraft was started for, being carried out.
+    launching: launch::Launching,
+    /// A forge link typed or pasted into the start page.
+    home_link: String,
 }
 
 impl App {
     /// `open_arg`: a repository passed on the command line, opened (or focused) on start.
     pub fn new(cc: &eframe::CreationContext<'_>, open_arg: Option<PathBuf>) -> Self {
+        Self::launched(cc, open_arg.map(crate::launch::Command::Open))
+    }
+
+    /// The window, carrying out `cmd` from the command line (`gitcraft log <file>`…): its
+    /// relative paths are taken from the current folder.
+    pub fn launched(cc: &eframe::CreationContext<'_>, cmd: Option<crate::launch::Command>) -> Self {
         // The window's thread: it never waits for another machine (see `remote::ui_guard`).
         crate::remote::mark_ui_thread();
         // ssh's questions (passwords, new host keys) come to this window.
@@ -242,6 +254,8 @@ impl App {
             last_opened: saved.last_opened,
             patches: Default::default(),
             repo_scan: None,
+            launching: Default::default(),
+            home_link: String::new(),
             error: None,
             error_card: None,
             was_focused: true,
@@ -294,14 +308,11 @@ impl App {
             app.tabs.push(Tab::Home);
         }
         app.active = active_among_kept(&kept, saved.active).min(app.tabs.len() - 1);
-        // Started from the taskbar button's or launcher's menu, or with a folder to open.
-        if app.git_version.is_ok() {
-            match crate::os_shell::start_action(open_arg.as_deref().map(Path::as_os_str)) {
-                crate::os_shell::StartAction::Open(path) => app.open_repo(&path, ctx),
-                crate::os_shell::StartAction::Clone => app.start_clone(),
-                crate::os_shell::StartAction::PickFolder => app.pick_on_start = true,
-                crate::os_shell::StartAction::Nothing => {}
-            }
+        if let Some(cmd) = cmd
+            && app.git_version.is_ok()
+        {
+            let cwd = std::env::current_dir().unwrap_or_default();
+            app.launch(cmd, cwd, ctx);
         }
         app
     }
@@ -637,6 +648,7 @@ impl eframe::App for App {
         self.poll_clone(&ctx);
         self.os_shell(&ctx, frame);
         self.poll_connecting(&ctx);
+        self.poll_launch(&ctx);
         self.poll_update(&ctx);
         self.poll_inbox_opening(&ctx);
         self.notice_profile_git(&ctx);
@@ -761,13 +773,7 @@ fn repo_scope(path: &Path) -> egui::Id {
 
 /// The top of the repository `path` is in, in the form tabs are told apart by.
 pub(crate) fn repo_root(path: &Path) -> Result<PathBuf, String> {
-    let root = git::toplevel(path)?;
-    // Already in its one form; resolving it here would mean nothing.
-    if crate::remote::is_remote(&root) {
-        return Ok(root);
-    }
-    let root = std::fs::canonicalize(&root).unwrap_or(root);
-    Ok(strip_verbatim(root))
+    crate::launch::resolve::repo_root(path)
 }
 
 pub use draft_saving::keep_no_drafts;
@@ -802,14 +808,45 @@ pub fn persistence_path() -> Option<PathBuf> {
 
 pub use crate::instance::Start;
 
-/// Settles, before any window is made, whether this start opens the window or hands `open_arg`
-/// to the gitcraft already running (see `crate::instance`).
-pub fn single_instance(open_arg: Option<&Path>) -> Start {
-    crate::instance::start(open_arg)
+/// Settles, before any window is made, whether this start opens the window or hands what it was
+/// started for (a folder, or a command line such as `log <file>`) to the gitcraft already running
+/// (see `crate::instance`).
+pub fn single_instance(
+    launch: Option<&crate::launch::Command>,
+    args: &[std::ffi::OsString],
+) -> Start {
+    use crate::launch::Command;
+    match launch {
+        None => crate::instance::start(None),
+        Some(Command::Open(path)) => crate::instance::start(Some(path)),
+        // `log <file>`…: the command line as typed, read again by the running window.
+        Some(_) => crate::instance::start_launch(args),
+    }
 }
 
 /// Tells the user why this start ends without a window: in a dialog, and on stderr for a start
 /// from a terminal.
+/// What the command line asked to be told (`--help`, a mistake in it): on the terminal it was
+/// typed in, or in a dialog when there is none to see it (a Windows release has no console; a
+/// menu or a file manager starts gitcraft without one).
+pub fn tell(message: &str, error: bool) {
+    use std::io::IsTerminal;
+    let terminal = !cfg!(all(windows, not(debug_assertions))) && std::io::stderr().is_terminal();
+    match (terminal, error) {
+        (true, true) => eprintln!("gitcraft: {message}"),
+        (true, false) => println!("{message}"),
+        (false, true) => report_failed_start(message),
+        (false, false) => {
+            let _ = rfd::MessageDialog::new()
+                .set_level(rfd::MessageLevel::Info)
+                .set_title("gitcraft")
+                .set_description(message)
+                .set_buttons(rfd::MessageButtons::Ok)
+                .show();
+        }
+    }
+}
+
 pub fn report_failed_start(message: &str) {
     eprintln!("gitcraft: {message}");
     // rfd's dialogs are zenity's on Linux; without it (KDE, minimal installs) a start from the
@@ -850,7 +887,7 @@ pub fn window_icon() -> egui::IconData {
 }
 
 /// `canonicalize` on Windows returns `\\?\C:\…`; show and store the familiar form.
-fn strip_verbatim(path: PathBuf) -> PathBuf {
+pub(crate) fn strip_verbatim(path: PathBuf) -> PathBuf {
     let s = path.to_string_lossy();
     match s.strip_prefix(r"\\?\") {
         Some(rest) if !rest.starts_with("UNC") => PathBuf::from(rest),

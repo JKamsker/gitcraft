@@ -94,6 +94,8 @@ impl App {
                         action = Some(4);
                     }
 
+                    self.home_link_field(ui, &t);
+
                     // The card has git's words itself.
                     if let Some(err) = self.error.as_ref().filter(|_| self.error_card.is_none()) {
                         ui.add_space(12.0);

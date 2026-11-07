@@ -94,6 +94,10 @@ extended-description = "A visual git client: commit graph with branch pills, dif
 assets = [
     ["target/release/gitcraft", "usr/bin/", "755"],
     ["packaging/gitcraft.desktop", "usr/share/applications/", "644"],
+    # gitcraft:// links from the browser.
+    ["packaging/linux/gitcraft-link.desktop", "usr/share/applications/", "644"],
+    # History / Blame in gitcraft in Dolphin's menu of files (KDE wants it executable).
+    ["packaging/linux/gitcraft-servicemenu.desktop", "usr/share/kio/servicemenus/gitcraft.desktop", "755"],
     ["assets/app-icon/gitcraft-256.png", "usr/share/icons/hicolor/256x256/apps/gitcraft.png", "644"],
     ["README.md", "usr/share/doc/gitcraft/", "644"],
 ]
@@ -102,6 +106,8 @@ assets = [
 assets = [
     { source = "target/release/gitcraft", dest = "/usr/bin/gitcraft", mode = "755" },
     { source = "packaging/gitcraft.desktop", dest = "/usr/share/applications/gitcraft.desktop", mode = "644" },
+    { source = "packaging/linux/gitcraft-link.desktop", dest = "/usr/share/applications/gitcraft-link.desktop", mode = "644" },
+    { source = "packaging/linux/gitcraft-servicemenu.desktop", dest = "/usr/share/kio/servicemenus/gitcraft.desktop", mode = "755" },
     { source = "assets/app-icon/gitcraft-256.png", dest = "/usr/share/icons/hicolor/256x256/apps/gitcraft.png", mode = "644" },
     { source = "README.md", dest = "/usr/share/doc/gitcraft/README.md", mode = "644", doc = true },
     { source = "LICENSE-MIT", dest = "/usr/share/licenses/gitcraft/LICENSE-MIT", mode = "644", doc = true },
