@@ -661,7 +661,8 @@ borrowing metadata, then retains handles throughout copying, installation and re
 Filesystems without birth-time identity support refuse the action. Requests/replies
 are capped at 4 MiB and the existing remote deadline applies. Only an exact transaction
 completion reply proves success; an interrupted connection reports the known recovery
-backup path and never retries automatically.
+backup path and never retries automatically. Each prepared action permits one attempt;
+inspect borrowing again before another deliberate attempt after an uncertain result.
 
 For a source installation on the repository machine, build the helper from the same
 GitCraft checkout and put it on that account's PATH:

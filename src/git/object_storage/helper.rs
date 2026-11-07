@@ -4,6 +4,7 @@ use crate::{connections, remote};
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use std::time::Duration;
 const PROTOCOL: &str = "gitcraft-owned-objects/1";
 const LIMIT: usize = 4 * 1024 * 1024;
@@ -39,7 +40,7 @@ struct Reply {
     result: Result<Payload, String>,
 }
 #[derive(Serialize, Deserialize)]
-#[serde(tag = "kind", content = "data")]
+#[serde(tag = "kind", content = "data", deny_unknown_fields)]
 enum Payload {
     Prepared(Ticket),
     Completed {
@@ -52,12 +53,16 @@ pub(super) struct RemotePlan {
     pub repo: PathBuf,
     profile: connections::Context,
     ticket: Ticket,
+    attempted: Arc<AtomicBool>,
 }
 fn request(
     repo: &Path,
     ticket: Option<Ticket>,
     active: &dyn Fn() -> bool,
 ) -> Result<Payload, String> {
+    if !active() {
+        return Err("Object independence was cancelled before dispatch; no helper request was sent.".into());
+    }
     let target = remote::parse(repo).ok_or("Owned helper requires an SSH/WSL repository")?;
     request_target(&target, ticket, active)
 }
@@ -66,6 +71,9 @@ fn request_target(
     ticket: Option<Ticket>,
     active: &dyn Fn() -> bool,
 ) -> Result<Payload, String> {
+    if !active() {
+        return Err("Object independence was cancelled before dispatch; no helper request was sent.".into());
+    }
     let payload = serde_json::to_vec(&Request {
         protocol: PROTOCOL.into(),
         repo: target.path.clone(),
@@ -90,14 +98,17 @@ fn request_target(
     );
     req.timeout = Some(Duration::from_secs(20));
     let out = super::super::command::comparison_remote(&target.host, req, active)?;
+    parse_reply(out)
+}
+fn parse_reply(out: remote::Output) -> Result<Payload, String> {
+    if out.stdout.len() > LIMIT || out.stderr.len() > 64 * 1024 {
+        return Err("Owned-helper reply exceeds its byte limit".into());
+    }
     if out.code != 0 {
         return Err(format!(
             "Install the matching gitcraft-object-storage-helper executable in PATH on the repository machine to enable owned object independence ({PROTOCOL}). No helper is installed automatically. Read-only inspection remains available. {}",
             String::from_utf8_lossy(&out.stderr).trim()
         ));
-    }
-    if out.stdout.len() > LIMIT {
-        return Err("Owned-helper reply exceeds 4 MiB".into());
     }
     let reply: Reply = serde_json::from_slice(&out.stdout).map_err(|_| {
         "The installed helper did not return a complete ownership protocol reply".to_owned()
@@ -125,22 +136,104 @@ pub(super) fn prepare(repo: &Path, active: &dyn Fn() -> bool) -> Result<RemotePl
         repo: repo.into(),
         profile: connections::current(),
         ticket,
+        attempted: Arc::new(AtomicBool::new(false)),
     })
 }
-pub(super) fn execute(plan: &RemotePlan, active: &dyn Fn() -> bool) -> Result<String, String> {
+fn claim(plan: &RemotePlan, active: &dyn Fn() -> bool) -> Result<(), String> {
+    if !active() {
+        return Err("Object independence was cancelled before dispatch; no helper request was sent.".into());
+    }
     if plan.profile != connections::current() {
         return Err("Profile changed; prepare remote independence again.".into());
     }
+    // A prepared mutation is one deliberate attempt, shared by every Snapshot clone.
+    // Unknown/lost/malformed outcomes never turn the same ticket into a retry action.
+    plan.attempted.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .map_err(|_| "This prepared independence attempt was already used. Inspect borrowing and recovery evidence again before another deliberate action.".to_owned())?;
+    Ok(())
+}
+pub(super) fn execute(plan: &RemotePlan, active: &dyn Fn() -> bool) -> Result<String, String> {
+    claim(plan, active)?;
     let recovery = format!(
         "{}/info/alternates.gitcraft-backup-{}",
         plan.ticket.primary, plan.ticket.transaction
     );
     let result=request(&plan.repo,Some(plan.ticket.clone()),active).map_err(|e|format!("{e}. No completion proof was received; do not assume independence or retry automatically. Inspect borrowing and the recovery backup (if created) on that machine: {recovery}"))?;
+    completed(result, &plan.ticket.transaction, &recovery)
+}
+
+#[cfg(test)]
+mod protocol_tests {
+    use super::*;
+    fn plan() -> RemotePlan {
+        RemotePlan {
+            repo: PathBuf::from("ssh://owned-helper-fixture.invalid/recording-only/repo"),
+            profile: connections::current(),
+            ticket: Ticket {
+                repo: "/recording-only/repo".into(),
+                primary: "/recording-only/repo/.git/objects".into(),
+                transaction: "abc123".into(),
+                identities: Vec::new(),
+                refs: Vec::new(),
+                topology: Vec::new(),
+            },
+            attempted: Arc::new(AtomicBool::new(false)),
+        }
+    }
+    fn output(value: serde_json::Value) -> remote::Output {
+        remote::Output {
+            code: 0,
+            stdout: value.to_string().into_bytes(),
+            stderr: Vec::new(),
+        }
+    }
+    #[test]
+    fn recording_prepared_attempt_is_single_use_across_clones_and_cancel_does_not_claim() -> Result<(), String> {
+        connections::Context::default().run(|| {
+            let plan = plan();
+            let copy = plan.clone();
+            assert!(claim(&plan, &|| false).is_err_and(|e| e.contains("no helper request")));
+            assert!(!plan.attempted.load(Ordering::Acquire));
+            claim(&plan, &|| true)?;
+            assert!(claim(&copy, &|| true).is_err_and(|e| e.contains("already used")));
+            Ok(())
+        })
+    }
+    #[test]
+    fn recording_changed_profile_cannot_claim_a_prepared_attempt() {
+        connections::Context::default().run(|| {
+            let mut plan = plan();
+            plan.profile.error = Some("previous profile".into());
+            assert!(claim(&plan, &|| true).is_err_and(|e| e.contains("Profile changed")));
+            assert!(!plan.attempted.load(Ordering::Acquire));
+        });
+    }
+    #[test]
+    fn recording_only_exact_complete_protocol_and_transaction_prove_success() -> Result<(), String> {
+        let good = serde_json::json!({"protocol":PROTOCOL,"result":{"Ok":{"kind":"Completed","data":{"transaction":"abc123","message":"verified"}}}});
+        assert_eq!(completed(parse_reply(output(good.clone()))?, "abc123", "backup")?, "verified");
+        assert!(completed(parse_reply(output(good.clone()))?, "different", "backup").is_err());
+        let mut wrong = good.clone();
+        wrong["protocol"] = "gitcraft-owned-objects/999".into();
+        assert!(parse_reply(output(wrong)).is_err());
+        let mut extra = good.clone();
+        extra["result"]["Ok"]["data"]["unexpected"] = true.into();
+        assert!(parse_reply(output(extra)).is_err());
+        let bytes = good.to_string().into_bytes();
+        for cut in 0..bytes.len() {
+            assert!(parse_reply(remote::Output { code:0,stdout:bytes[..cut].into(),stderr:Vec::new() }).is_err());
+        }
+        assert!(parse_reply(remote::Output {code:0,stdout:vec![b' '; LIMIT+1],stderr:Vec::new()}).is_err());
+        assert!(parse_reply(remote::Output {code:127,stdout:Vec::new(),stderr:b"helper: not found".to_vec()}).is_err_and(|e|e.contains("Install the matching")));
+        Ok(())
+    }
+}
+fn completed(result: Payload, expected: &str, recovery: &str) -> Result<String, String> {
     match result {
         Payload::Completed {
             transaction,
             message,
-        } if transaction == plan.ticket.transaction => Ok(message),
+        } if transaction == expected => Ok(message),
         _ => Err(format!(
             "Missing/mismatched helper completion proof. Inspect borrowing and {recovery}; no automatic retry was performed."
         )),
