@@ -526,6 +526,17 @@ pub(super) fn activity_bytes_with_limit(
     active: &dyn Fn() -> bool,
     limit: std::time::Duration,
 ) -> Result<Vec<u8>, String> {
+    activity_bytes_with_codes(dir, args, input, active, limit, &[0])
+}
+
+fn activity_bytes_with_codes(
+    dir: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+    active: &dyn Fn() -> bool,
+    limit: std::time::Duration,
+    ok: &[i32],
+) -> Result<Vec<u8>, String> {
     use std::{
         sync::mpsc,
         time::{Duration, Instant},
@@ -607,7 +618,7 @@ pub(super) fn activity_bytes_with_limit(
     if out.stdout.len() > MAX || out.stderr.len() > MAX {
         return Err("A history page exceeded 16 MiB".into());
     }
-    if out.code == 0 {
+    if ok.contains(&out.code) && out.stderr.is_empty() {
         Ok(out.stdout)
     } else {
         Err(format!(
@@ -615,6 +626,37 @@ pub(super) fn activity_bytes_with_limit(
             String::from_utf8_lossy(&out.stderr).trim()
         ))
     }
+}
+
+/// An absent option (exit 1) differs from an explicitly empty configured value (NUL).
+pub(super) fn activity_mailmap_config(
+    dir: &Path,
+    key: &str,
+    path: bool,
+    active: &dyn Fn() -> bool,
+) -> Result<Option<String>, String> {
+    let mut args = vec!["config", "--null"];
+    if path {
+        args.push("--path");
+    }
+    args.extend(["--get", key]);
+    let bytes = activity_bytes_with_codes(
+        dir,
+        &args,
+        None,
+        active,
+        std::time::Duration::from_secs(20),
+        &[0, 1],
+    )?;
+    if bytes.is_empty() {
+        return Ok(None);
+    }
+    let value = bytes
+        .strip_suffix(&[0])
+        .ok_or("Invalid mailmap configuration response")?;
+    String::from_utf8(value.to_vec())
+        .map(Some)
+        .map_err(|_| "Mailmap configuration is not UTF-8".into())
 }
 
 pub(crate) fn activity_bytes(

@@ -107,7 +107,8 @@ Glossary tips stay out of the way while typing, scrolling or dragging.
   opens a day/month calendar and author statistics. Click a day, drag across days, choose a
   month, or enter an inclusive date range; choose author or committer dates. Click a listed
   commit to open its detail, and an author to see their commits. Days use each timestamp’s
-  recorded timezone. Authors follow Git’s current `.mailmap`; statistics show commits,
+  recorded timezone. Authors are resolved together against one consistent Git mailmap;
+  unavailable configured map sources stop analysis without fetching. Statistics show commits,
   distinct paths, active days and the first/last activity in the selected period. Each reachable
   commit counts once across local/remote branches, tags and HEAD; stash and app-only refs
   are excluded. Renames touch both paths and merges compare files against their first parent.

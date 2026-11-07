@@ -1,6 +1,7 @@
 //! Bounded history snapshot shared by calendar and contributor views. Date filtering happens
 //! after walking commits: Git's --since would prune out-of-order author dates.
 mod date;
+mod mailmap;
 mod process;
 #[cfg(test)]
 mod tests;
@@ -12,7 +13,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 const PAGE: usize = 250;
 const MAX_BYTES: usize = 64 * 1024 * 1024;
-const FORMAT: &str = "--format=%x00%H%x00%aN%x00%aE%x00%aI%x00%cI%x00%s";
+const FORMAT: &str = "--format=%x00%H%x00%an%x00%ae%x00%aI%x00%cI%x00%s";
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum Clock {
@@ -150,6 +151,18 @@ pub(crate) fn read(
     active: &dyn Fn() -> bool,
     progress: &AtomicUsize,
 ) -> Result<History, String> {
+    read_observing(repo, limit, active, progress, |_| {})
+}
+
+/// The observer lets tests change real metadata at an exact page boundary without timing
+/// races or global environment mutation. Production supplies an empty callback.
+fn read_observing(
+    repo: &Path,
+    limit: usize,
+    active: &dyn Fn() -> bool,
+    progress: &AtomicUsize,
+    mut page_read: impl FnMut(usize),
+) -> Result<History, String> {
     let run = |args: &[&str], input: Option<&[u8]>| process::run(repo, args, input, active);
     let roots = run(
         &[
@@ -206,10 +219,13 @@ pub(crate) fn read(
                 "--stdin",
                 "--no-show-signature",
                 "--encoding=UTF-8",
-                "--use-mailmap",
+                "--no-use-mailmap",
                 "--no-ext-diff",
                 "--no-textconv",
                 "--no-renames",
+                "--no-relative",
+                "--no-color",
+                "--ignore-submodules=none",
                 "--diff-merges=first-parent",
                 "--root",
                 "--raw",
@@ -239,11 +255,13 @@ pub(crate) fn read(
             }
         }
         progress.store(history.commits.len(), Ordering::Relaxed);
+        page_read(history.commits.len());
         if history.more || count < take {
             break;
         }
         skip += count;
     }
+    mailmap::resolve(repo, &mut history.commits, active)?;
     Ok(history)
 }
 
