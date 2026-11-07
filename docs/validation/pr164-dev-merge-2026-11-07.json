@@ -253,5 +253,11 @@
     "path": "docs/validation/pr164-dev-merge-2026-11-07-tests.log.gz",
     "sha256": "4c6c2f415672bd45669e3df7dc47e481555c896809f9692b88981357c152f2e0",
     "uncompressed_sha256": "da3fbfe148130a4fdb209ca2e2b6dcb509d08376ebc22516ce4d5476e19e3e9f"
+  },
+  "documentation_review": {
+    "candidate": "2e83296d18ebf6848eccba9536d74b9004bc0e6c",
+    "result": "PASS",
+    "reviewer": "independent adversarial review agent /root/review_codex_integration",
+    "verbatim_result": "PASS \u2014 2e83296d18ebf6848eccba9536d74b9004bc0e6c. Verified application, crate, manifest, lockfile, test and workflow files are unchanged from approved 978fb9bb. The guide ports preserve feature scope and limitations; merged agent instructions retain the recovery requirements. The application review PASS carries forward. No new tests or CI executed."
   }
 }
