@@ -103,6 +103,10 @@ struct Ran {
 pub(super) struct Extra {
     pre: Vec<&'static str>,
     env: Vec<(&'static str, String)>,
+    /// What git reads on its input; nothing when `None`.
+    stdin: Option<Vec<u8>>,
+    /// It may take minutes (a large bundle): on another machine, run where that is allowed.
+    long: bool,
 }
 
 /// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
@@ -120,15 +124,39 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
         cmd.env(name, value);
     }
     cmd.args(args);
-    let out = cmd
-        .output()
-        .map_err(|e| format!("could not run git: {e}"))?;
+    let out = match &extra.stdin {
+        Some(input) => output_with_input(cmd, input),
+        None => cmd.output(),
+    }
+    .map_err(|e| format!("could not run git: {e}"))?;
     Ok(Ran {
         code: out.status.code(),
         status: out.status.to_string(),
         stdout: out.stdout,
         stderr: out.stderr,
     })
+}
+
+/// Runs `cmd` with `input` on its input, written from a thread of its own: git may answer
+/// before it has read all of it, and a full pipe both ways would wait for good.
+fn output_with_input(mut cmd: Command, input: &[u8]) -> std::io::Result<std::process::Output> {
+    use std::io::Write;
+    use std::process::Stdio;
+    cmd.stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = cmd.spawn()?;
+    let stdin = child.stdin.take();
+    let input = input.to_vec();
+    let writer = std::thread::spawn(move || {
+        if let Some(mut stdin) = stdin {
+            // Git that stopped reading (it failed) says why on its error output.
+            let _ = stdin.write_all(&input);
+        }
+    });
+    let out = child.wait_with_output();
+    let _ = writer.join();
+    out
 }
 
 /// The request that runs git with `args` in `target`'s folder, on its machine.
@@ -149,8 +177,8 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
             .chain(extra.env.iter().map(|(n, v)| ((*n).to_owned(), v.clone())))
             .collect(),
         unset: GIT_ENV_REMOVED.iter().map(|n| (*n).to_owned()).collect(),
-        stdin: None,
-        long: goes_over_network(args),
+        stdin: extra.stdin.clone(),
+        long: extra.long || goes_over_network(args),
         timeout: None,
     }
 }
@@ -230,6 +258,38 @@ pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Chi
     cmd.spawn().map_err(|e| format!("could not run git: {e}"))
 }
 
+/// What a [`run_call`] is run with besides its arguments.
+#[derive(Default)]
+pub struct Call {
+    /// Variables set for it (`GIT_INDEX_FILE`…).
+    pub env: Vec<(&'static str, String)>,
+    /// What it reads on its input.
+    pub stdin: Option<Vec<u8>>,
+    /// It may take minutes (see `remote::Request::long`).
+    pub long: bool,
+}
+
+/// Runs git with `args` in `dir` as `call` says, and returns its output as raw bytes, or the
+/// error output.
+pub fn run_call(dir: Option<&Path>, args: &[&str], call: Call) -> Result<Vec<u8>, String> {
+    let extra = Extra {
+        pre: Vec::new(),
+        env: call.env,
+        stdin: call.stdin,
+        long: call.long,
+    };
+    let out = execute(dir, &extra, args)?;
+    if out.code == Some(0) {
+        return Ok(out.stdout);
+    }
+    let said = String::from_utf8_lossy(&out.stderr).trim().to_owned();
+    Err(if said.is_empty() {
+        format!("git {} failed ({})", args.join(" "), out.status)
+    } else {
+        said
+    })
+}
+
 /// Like [`run`], but exit codes in `ok` count as success (`diff --no-index` exits 1 on changes).
 pub fn run_ok_codes(dir: Option<&Path>, args: &[&str], ok: &[i32]) -> Result<String, String> {
     run_inner(dir, args, ok, None, false)
@@ -288,6 +348,7 @@ fn unattended_extra(unix: bool) -> Extra {
     Extra {
         pre: vec!["-c", "credential.interactive=false", "-c", "core.askPass="],
         env,
+        ..Extra::default()
     }
 }
 

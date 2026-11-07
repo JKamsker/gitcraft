@@ -51,6 +51,7 @@ impl App {
             git_version: &version,
             dialog_open: self.clone_form.is_some()
                 || self.remote_form.is_some()
+                || self.teleport.is_some()
                 || self.askpass_open()
                 || self.palette.is_some()
                 || self.manual_open,

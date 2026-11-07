@@ -10,6 +10,7 @@ mod profiles;
 mod remote_open;
 mod tab_strip;
 mod tabs;
+mod teleport;
 #[cfg(test)]
 mod tests;
 mod update_banner;
@@ -94,6 +95,8 @@ pub struct App {
     remote_form: Option<RemoteForm>,
     /// Repositories on other machines being reached, each tab to open once it answers.
     connecting: Vec<Connecting>,
+    /// The teleport dialog, and the teleport it runs.
+    teleport: Option<teleport::TeleportForm>,
     /// ssh's question being answered (a password, a new host key).
     askpass: askpass_dialog::AskpassState,
     /// A newer release than this build.
@@ -178,6 +181,7 @@ impl App {
             cloning_form: None,
             remote_form: None,
             connecting: Vec::new(),
+            teleport: None,
             askpass: Default::default(),
             update: None,
             update_rx: None,
@@ -372,6 +376,7 @@ impl App {
         // A focused text field or the terminal keeps these keys for itself.
         let modal_open = self.clone_form.is_some()
             || self.remote_form.is_some()
+            || self.teleport.is_some()
             || self.askpass_open()
             || self.palette.is_some()
             || self.manual_open
@@ -394,7 +399,10 @@ impl App {
             self.open_settings();
         }
         // Not over a dialog that asks something (the clone, the remote one, ssh's question).
-        let asking = self.clone_form.is_some() || self.remote_form.is_some() || self.askpass_open();
+        let asking = self.clone_form.is_some()
+            || self.remote_form.is_some()
+            || self.teleport.is_some()
+            || self.askpass_open();
         if manual && !asking && self.palette.is_none() {
             self.manual_open = !self.manual_open;
         }
@@ -436,6 +444,7 @@ impl App {
                     || self.manual_open
                     || self.clone_form.is_some()
                     || self.remote_form.is_some()
+                    || self.teleport.is_some()
                     || asking;
                 // Its widgets' state (scroll offsets, text fields' undo, open menus) is its own:
                 // every repository tab lays out the same widgets, which would otherwise share
@@ -538,6 +547,7 @@ impl eframe::App for App {
         self.active_tab_ui(ui, &t);
         self.clone_dialog(&ctx);
         self.remote_dialog(&ctx);
+        self.teleport_dialog(&ctx);
         self.askpass_dialog(&ctx);
         self.palette_ui(&ctx);
         self.manual_ui(&ctx);
@@ -545,6 +555,10 @@ impl eframe::App for App {
         self.keep_drafts(&ctx, focused);
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
+    }
+
+    fn on_exit(&mut self) {
+        self.stop_teleport();
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {

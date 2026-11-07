@@ -234,6 +234,11 @@ fn skip_to_ready(stdout: &mut std::process::ChildStdout) -> bool {
     }
 }
 
+/// For the tests: the SSH host whose shells are `sh` on this machine, so that everything
+/// sent to another machine (the framing, the input, the pools) runs as it does over SSH.
+#[cfg(all(test, unix))]
+pub const LOOPBACK: &str = "gitcraft-loopback";
+
 /// A new shell kept open on `host`.
 pub(super) fn start_shell(host: &Host) -> Result<Shell, String> {
     let (cmd, attempt) = shell_command(host);
@@ -265,6 +270,10 @@ pub(super) fn setup_script() -> String {
 /// The process that runs `sh` on `host`, reading its script from its input, and (over SSH)
 /// the attempt to tell once it has signed in.
 fn shell_command(host: &Host) -> (Command, Option<super::askpass::Attempt>) {
+    #[cfg(all(test, unix))]
+    if *host == Host::Ssh(LOOPBACK.to_owned()) {
+        return (Command::new("sh"), None);
+    }
     let mut attempt = None;
     // Changed further only on Windows (no console window).
     #[cfg_attr(not(windows), allow(unused_mut))]

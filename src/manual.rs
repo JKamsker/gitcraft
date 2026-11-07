@@ -24,6 +24,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Drag a tab along the strip to reorder the tabs.",
             "What you type is kept, per repository, if gitcraft crashes or is closed: the commit message, unsent pull-request comments, reviews and replies, and an interactive rebase being set up come back when the repository is opened again. Each goes once committed, sent or started, or when you empty or cancel it. After a crash, gitcraft says so when it starts again. Nothing typed into a password or sign-in prompt is kept.",
             "Remote on the start page opens a repository in WSL or over SSH: git runs there, this window shows it. Browse… lists that machine's folders, its repositories marked. The toolbar names the machine; the terminal opens a shell there. What ssh asks (a password, a passphrase, a new host key) is asked in this window; Remember connection keeps a password encrypted in the system's credential store, and Forget saved SSH sign-ins (Ctrl+P) removes them.",
+            "Right-click a tab and choose Teleport to… (or Ctrl+P, Teleport to another machine…) to carry its work to this machine, a WSL distribution or an SSH host: the branch, the staged and unstaged changes and the untracked files arrive in a new worktree there, and a tab opens on it. It goes in a clone of the same project found there, another repository there, a clone made first or a new repository made from what is sent; nothing here is changed. No push or forge is needed.",
         ],
     ),
     (

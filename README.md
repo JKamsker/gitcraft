@@ -76,6 +76,22 @@ so your config, credentials and hooks apply as usual.
 - Settings that write this machine's global git config (commit signing, Mergiraf) don't apply
   there, nor do a profile's author and signing: that machine's own git config does (the commit
   box says `· global (SSH · host)`).
+- **Teleport** (a tab's right-click menu, or the palette's _Teleport to another machine…_):
+  carries the tab's work to another machine — this one, a WSL distribution, an SSH host — where
+  it arrives in a new worktree, a tab opening on it: the branch with its commits, the staged
+  changes still staged, the unstaged ones still unstaged, and the untracked files (not the
+  ignored ones). No push, forge or cloud is involved, and nothing of the source is changed: a
+  snapshot is taken through a temporary index (one tree for the index, one for the working
+  tree), sent as a `git bundle` of only the commits the other machine lacks, through the shells
+  already open to it, checked there (`git bundle verify`, and every object as it is unpacked)
+  and then checked out. The work goes in a clone of the same project found there (by its
+  remotes' URLs, among the recent and open repositories), another repository named, a clone
+  made first (the work then goes in its own working tree), or a new repository made from the
+  bundle. A bundle over 100 MB asks first. Submodules, uncommitted files kept in Git LFS, files
+  marked assume-unchanged, a shallow clone, a branch checked out there already (or there with
+  commits this one lacks) and a merge or rebase in progress are refused, with the reason. What
+  it made (temporary refs, index and bundle, a half-made worktree, a clone made for it) is
+  removed again, also when it fails or is cancelled.
 
 **Graph**
 

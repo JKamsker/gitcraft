@@ -34,6 +34,7 @@ enum AppCommand {
     Create,
     Clone,
     OpenRemote,
+    Teleport,
     ForgetSignIns,
     Settings,
     Manual,
@@ -146,6 +147,11 @@ impl App {
             Entry::App(AppCommand::NewProfile),
         ));
         if let Some(Tab::Repo(repo)) = self.tabs.get(self.active) {
+            list.push((
+                "Teleport to another machine…".to_owned(),
+                "tab".to_owned(),
+                Entry::App(AppCommand::Teleport),
+            ));
             for (label, hint, action) in repo.palette_items() {
                 list.push((label, hint, Entry::Repo(action)));
             }
@@ -161,6 +167,12 @@ impl App {
             Entry::App(AppCommand::Create) => self.pick_new(ctx),
             Entry::App(AppCommand::Clone) => self.start_clone(),
             Entry::App(AppCommand::OpenRemote) => self.start_open_remote(ctx),
+            Entry::App(AppCommand::Teleport) => {
+                if let Some(Tab::Repo(repo)) = self.tabs.get(self.active) {
+                    let source = repo.path.clone();
+                    self.start_teleport(source, ctx);
+                }
+            }
             // The system's store can take a while (the Secret Service is another process).
             Entry::App(AppCommand::ForgetSignIns) => {
                 std::thread::spawn(crate::remote::askpass::forget_saved);
