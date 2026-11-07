@@ -184,7 +184,7 @@ mod tests {
         let mut tab = RepoTab::new_deferred("unread-message-repository".into(), &ctx);
         tab.tx.cancel.cancel();
         for time in [0.0, 1.0] {
-            let _ = ctx.run_ui(
+            let mut output = ctx.run_ui(
                 egui::RawInput {
                     time: Some(time),
                     ..Default::default()
@@ -193,6 +193,7 @@ mod tests {
                     tab.hover_graph_message(ui.ctx(), Some("hash"));
                 },
             );
+            output.textures_delta.clear();
         }
         let start = std::time::Instant::now();
         while tab.graph_messages.pending.is_some()
