@@ -40,12 +40,35 @@ Author, When, then Date surrender their slack in that fixed order. Legacy `last_
 and `column_push` settings remain readable but do not affect allocation. Neither viewport
 compression nor a different divider writes unrelated preferences.
 
-A divider takes a starting preference snapshot, available width and pointer press origin.
+A divider takes separate starting snapshots of saved preferences, actual displayed widths,
+Description allocation, available width and pointer press origin.
 The initial offset within its 10-point hit area is retained. Each frame uses total pointer
 displacement from that origin, including after overshooting and returning from a limit.
 Dragging exchanges only its own displayed width with Description; growth stops when
 Description reaches its floor. It does not cascade into other cells. A drag back to its
-origin restores the starting preference, including automatic Graph mode.
+origin restores the starting preference and Description allocation, including automatic Graph
+mode. The saved column width remains independent of all other saved column widths.
+
+Description's exchanged space is an explicit persisted `description_space` preference,
+containing its requested width and the viewport width of the gesture. At viewport `v`,
+its allocation floor is `max(140, requested - max(0, gesture_viewport - v))`, capped so
+visible column minima still fit. It receives any remaining space above that floor too.
+The fixed squeeze order is unchanged. This separates a deliberate Description exchange
+from automatic compression: with Refs/Graph preferred 280/100 and displayed 150/60 at
+600 points, shrinking Refs 20 saves Refs 130, retains Graph preference 100, and requests
+Description 160 at viewport 600. The next frame and release display Refs/Graph 130/60
+and Description 160. At 580 Description gives back its 20 first; at 640 Graph can return
+to 100. Revisiting 600 gives exactly the same layout regardless of intermediate widths.
+Viewport changes never write this preference; another intentional divider gesture replaces
+it, returning to the gesture origin restores it, and Reset columns clears it. No temporary
+compression is copied into unrelated column preferences.
+
+Integration with incoming dev's automatic refs fitting: capture `DragStart.prefs` after the
+viewport's `fit_visible_refs` adjustment and `DragStart.shown` after final allocation. Keep
+incoming `save_drag` disabling `auto_refs_width` for a changed Refs gesture. Also snapshot
+and restore the original automatic-refs flag when returning to an unchanged gesture,
+alongside the original raw width; do not overwrite the incoming badges, lane labels or lazy
+message tooltip. The follow-up branch intentionally does not merge dev.
 
 When minima cannot fit, one horizontal scroll area contains both the header and the
 vertically virtualized rows. Headers, row cells, clips and handles derive their bounds
@@ -88,7 +111,9 @@ zero. Refs moving between the two read-only count walks can temporarily affect t
 a subsequent reload refreshes it.
 
 History initial loads and pagination retain the same namespace snapshot; changing rules
-reloads history and invalidates the older pagination generation. Search resolves the same
+reloads history and invalidates the older pagination generation. Pages additionally carry
+the namespace snapshot and are rejected immediately when it differs from current rules,
+even before that replacement reload finishes. Search resolves the same
 namespace roots before using the existing safe search API. Attribution and backlinks use
 the same namespace exclusions, including repository overrides and reveal mode. Exact
 single-commit reads and rewrite/checkout operations do not apply presentation rules.
@@ -99,14 +124,26 @@ The raw paginated history and operational Commit objects always retain their ori
 hashes, parents, refs, trees and authors. Filtering builds a separate layout projection:
 
 1. Keep visible ref tips, HEAD, selection, explicit navigation/search targets, stash bases,
-   and matching commits whose parents are not all loaded. The last rule retains a visible
-   pagination frontier until the next page resolves it.
-2. For a hidden commit, follow **every** parent path to its nearest visible ancestors.
+   and matching commits with an unloaded traversed parent **while `has_more` is true**.
+   In first-parent mode only the first parent is traversed; side parents intentionally
+   omitted by Git are never pagination frontiers. With a complete scope no missing parent
+   can be resolved by loading another page.
+2. For a hidden commit, follow **every** traversed parent path to its nearest visible
+   ancestors (all parents normally, only first parents in first-parent mode).
    Iterative post-order traversal and cached frontiers avoid recursive stack overflow on
    long generated histories. Stable de-duplication preserves first-parent ordering.
 3. Reconnect a visible child's layout parents to those frontiers. Feed this projection to
-   the existing merge-aware graph layout. Operations, drag/drop and detail reads still use
-   the original Commit objects. First-parent mode keeps its existing layout semantics.
+   the existing merge-aware graph layout. Operations and detail reads use original Commit
+   objects. A separate `history_index` indexes raw paginated history for operational
+   first-parent traversal and ancestry; `index` indexes displayed rows for selection and
+   painting only. Quick message/drop/move eligibility, fold menus/picker/stopped-state
+   detection, surgery/move targets, drag/drop reachability and reordering, and bisect parent
+   lookup use the raw history/index. Background rewrite plans continue reading Git directly.
+   Navigation history and message editing reveal a hidden raw-loaded target through `goto`.
+   A hidden merge still blocks rewriting commits below it, preserving flattening guards.
+   Drag/drop requires proven negative ancestry before offering CherryPick. An omitted side
+   path in first-parent mode yields unknown, never a false negative; positive loaded paths
+   remain usable. Commits outside loaded ancestry can be loaded before dragging them.
 4. Search and explicit navigation can reveal a hidden loaded commit without changing the
    filters. Selection remains protected during later rebuilds. A selected commit removed
    specifically by a namespace-scope change is kept as an explicit selected row. Its layout
@@ -235,3 +272,55 @@ Integration-sensitive shared files: `repo/load.rs`, `repo/mod.rs`, `repo/message
 `repo/navigate.rs`, `repo/detail/extras/mod.rs`, and `settings/mod.rs`. Area B's branch/remote
 visibility must continue supplying the explicit `log_from` branch roots. Area D's context
 menu implementation was not changed; its existing tests are included in the focused run.
+
+## Independent review follow-up
+
+All three findings against integrated `e9a6812d` are fixed in this original worktree:
+
+- [x] P1 operational ancestry: raw-history index at every rebuild, raw first-parent and
+  drag reach inputs, unchanged merge barriers, navigation reveal at EOF. Regression coverage
+  includes a real drop/undo replay preserving a hidden commit, editable visible ancestors,
+  fold/surgery eligibility, and an invisible merge that must still prohibit flattening.
+- [x] P2 post-release geometry: a persisted Description exchange distinct from column
+  preferences; exact allocator assertions for every divider at five viewport widths plus
+  production-renderer pointer/release/shrink/restore assertions at 100/125/150% zoom.
+- [x] P2 first-parent frontiers: active mode and `has_more` distinguish intentionally omitted
+  side parents from genuine unloaded first parents. Tests include a real Git merge/log,
+  both complete and paginated histories, and next-page resolution.
+- [x] Asynchronous namespace acceptance: a real Git fixture holds an actual page worker's
+  stream lock across a rule change while search and backlinks are also in flight. It
+  asserts no stale page/search/backlinks are applied, replacement reload/count and reveal
+  agree, and refs/HEAD/worktree remain unchanged.
+
+Native human-driven desktop drags and Windows/Linux execution are still not claimed.
+The automated evidence drives the production egui renderer and real Git subprocesses on
+macOS. Final counts, copied-executable inventory, screenshots and logs are recorded in the
+follow-up evidence manifest.
+
+Follow-up validation uses private `/tmp/gitcraft-area-a-followup-target`, seeded with
+`cp -cR /Users/jonas/Documents/gitcraft/target/debug` on APFS, followed by touching
+`src/lib.rs` and a Rust 1.95.0 build with `CARGO_BUILD_JOBS=3`. It never uses the parent's
+`/tmp/gitcraft-167-171/target`. Cargo's compiler-artifact manifest path and `fresh: false`
+were checked, the executable copied out, and all 11 new regression names verified in its
+3,087-test inventory before execution. This avoids the shared-target binary collision.
+
+- Production fix and relevant existing suites: 332 passed, zero failed. This includes
+  graph/columns, history filters, drag/drop, quick edits, fold, surgery, navigation,
+  lifecycle, parallel bisect, details/extras, ghost previews, tab loading, graph order,
+  fetched PR tips, namespace readers, authorship, and settings.
+- Final `cargo +1.95.0 fmt --check` and `cargo +1.95.0 clippy --locked --lib --tests`
+  passed. Only existing macOS dead-code warnings remain in `desktop_entry.rs` and
+  `diagnostics.rs`; no lint policy was changed.
+- After the final test-only lint cleanup: all 11 new regressions passed again separately.
+  No further broad suite was run, as requested by the parent during integrated checks.
+- Original 17-render matrix regenerated in `followup/`, plus 18 gesture images:
+  `post-drag-{600,900,1800}-{100,125,150}.png` and
+  `restored-drag-{600,900,1800}-{100,125,150}.png`. These gesture widths are logical points;
+  their PNG widths include the requested zoom factor. The original matrix retains its
+  fixed physical widths. Numerical clip measurements are in the regression log.
+- `followup-test-inventory.txt`, `followup-tests.log`, `followup-final-regressions.log`,
+  `followup-clippy.log`, and `followup-evidence.json` live in
+  `/tmp/gitcraft-167-171/area-a/`. The manifest lists each PNG's absolute path/dimensions.
+- Follow-ups were committed and pushed to `t3/history-graph-layout-filters` before running
+  the corresponding test checks, following the parent's updated instruction. No PR or
+  issue changes were made. Latest dev was not merged into this worktree.
