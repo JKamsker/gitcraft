@@ -127,7 +127,7 @@ fn current() -> State {
         Some((when, state)) => {
             if when.elapsed() >= RECHECK && !REFRESHING.swap(true, Ordering::AcqRel) {
                 let generation = FORGOTTEN.load(Ordering::Acquire);
-                std::thread::spawn(move || {
+                crate::connections::spawn(move || {
                     let fresh = read_state();
                     // Not over what a `forget` meanwhile said is out of date.
                     if let Ok(mut cache) = STATE.lock()
@@ -187,7 +187,7 @@ fn start(ctx: &egui::Context, doing: &'static str, work: fn() -> Result<String, 
     }
     *job = Job::Running(doing);
     let ctx = ctx.clone();
-    std::thread::spawn(move || {
+    crate::connections::spawn(move || {
         let result = work();
         forget();
         if let Ok(mut job) = JOB.lock() {

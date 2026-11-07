@@ -17,6 +17,7 @@ pub(crate) fn run(
     run_with_input(command, None, active, limit)
 }
 
+/// The same deadline, cancellation and output caps, also while passing bounded input.
 pub(crate) fn run_with_input(
     command: Command,
     input: Option<Vec<u8>>,
@@ -26,7 +27,7 @@ pub(crate) fn run_with_input(
     run_input(command, input, active, limit, MAX_OUTPUT, MAX_OUTPUT)
 }
 
-/// Raw plumbing input shares the same cancellation/deadline as both output pipes.
+/// Shared process contract: independent stream caps, with the same input/deadline lifecycle.
 pub(crate) fn run_input(
     mut command: Command,
     input: Option<Vec<u8>>,
@@ -57,6 +58,19 @@ pub(crate) fn run_input(
             .map_err(|e| format!("Could not start forecast command: {e}"))?,
         false,
     );
+    let input = input.map(|bytes| {
+        let stdin = child.0.stdin.take();
+        let (tx, rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let result = stdin
+                .ok_or("No command stdin".to_owned())
+                .and_then(|mut stdin| stdin.write_all(&bytes).map_err(|e| e.to_string()))
+                .map(|_| Vec::new());
+            let _ = tx.send(result);
+        });
+        rx
+    });
+    let mut written = input.is_none();
     let stdout = drain(
         child.0.stdout.take().ok_or("No forecast stdout")?,
         max_stdout,
@@ -65,29 +79,17 @@ pub(crate) fn run_input(
         child.0.stderr.take().ok_or("No forecast stderr")?,
         max_stderr,
     );
-    let written = if let Some(input) = input {
-        let mut pipe = child.0.stdin.take().ok_or("No background stdin")?;
-        let (tx, rx) = mpsc::channel();
-        std::thread::spawn(move || {
-            let _ = tx.send(
-                pipe.write_all(&input)
-                    .map(|_| Vec::new())
-                    .map_err(|e| e.to_string()),
-            );
-        });
-        Some(rx)
-    } else {
-        None
-    };
     let deadline = Instant::now() + limit;
     let (mut out, mut err, mut status) = (None, None, None);
-    let mut input_done = written.is_none();
     loop {
         if !active() {
             return Err("Forecast cancelled".into());
         }
         if Instant::now() >= deadline {
             return Err("Forecast command timed out".into());
+        }
+        if !written && let Some(input) = &input {
+            written = receive(input)?.is_some();
         }
         if out.is_none() {
             out = receive(&stdout)?;
@@ -98,15 +100,10 @@ pub(crate) fn run_input(
         if status.is_none() {
             status = child.0.try_wait().map_err(|e| e.to_string())?;
         }
-        if let Some(rx) = &written
-            && !input_done
-        {
-            input_done = receive(rx)?.is_some();
-        }
-        if status.is_some()
+        if written
+            && status.is_some()
             && out.is_some()
             && err.is_some()
-            && input_done
             && let (Some(status), Some(stdout), Some(stderr)) = (status, out.take(), err.take())
         {
             child.1 = true;
@@ -122,17 +119,17 @@ pub(crate) fn run_input(
 
 fn drain(
     mut pipe: impl Read + Send + 'static,
-    limit: u64,
+    max_output: u64,
 ) -> mpsc::Receiver<Result<Vec<u8>, String>> {
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
         let mut bytes = Vec::new();
         let result = (&mut pipe)
-            .take(limit + 1)
+            .take(max_output.saturating_add(1))
             .read_to_end(&mut bytes)
             .map_err(|e| e.to_string())
             .and_then(|_| {
-                if bytes.len() as u64 > limit {
+                if bytes.len() as u64 > max_output {
                     Err("Forecast output exceeded its limit".into())
                 } else {
                     Ok(bytes)
@@ -197,6 +194,27 @@ mod tests {
     use super::*;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
+
+    #[test]
+    fn configured_stream_caps_are_independent_and_keep_boundary_bytes() {
+        for (stdout, stderr, succeeds) in [(3, 2, true), (2, 2, false), (3, 1, false)] {
+            let mut command = Command::new("sh");
+            command.args(["-c", "printf abc; printf xy >&2"]);
+            let result = run_input(
+                command,
+                None,
+                &|| true,
+                Duration::from_secs(2),
+                stdout,
+                stderr,
+            );
+            if succeeds {
+                assert!(result.is_ok_and(|o| o.stdout == b"abc" && o.stderr == b"xy"));
+            } else {
+                assert!(result.is_err_and(|e| e.contains("output exceeded")));
+            }
+        }
+    }
 
     #[test]
     fn bounded_input_is_delivered_and_a_blocked_writer_is_cancelled() {

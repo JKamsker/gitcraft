@@ -2,22 +2,10 @@
 //! repository in WSL or over SSH runs git there (see [`crate::remote`]), with the same
 //! environment.
 
-use std::path::{Path, PathBuf};
+pub(super) mod bounded;
+
+use std::path::Path;
 use std::process::Command;
-use std::sync::RwLock;
-
-/// The config file the active gitcraft profile has git read as its global config (see
-/// `settings::profiles`), if it sets anything.
-static PROFILE_CONFIG: RwLock<Option<PathBuf>> = RwLock::new(None);
-
-/// Has every git command from now on read `path` as its global config, or the user's own again
-/// with `None`. It is still the global scope, so what a repository sets itself (`--local`,
-/// `--worktree`) wins over it.
-pub fn set_profile_config(path: Option<PathBuf>) {
-    if let Ok(mut current) = PROFILE_CONFIG.write() {
-        *current = path;
-    }
-}
 
 /// Whether `args` reads or writes the user's own global config: `git config --global …`
 /// (signing settings, Mergiraf's set-up), which must never land in the profile's file, which is
@@ -41,14 +29,23 @@ fn after_options<'a>(args: &'a [&'a str]) -> &'a [&'a str] {
 }
 
 /// Points `cmd` at the active profile's config, unless `args` is about the user's own.
-fn with_profile(cmd: &mut Command, args: &[&str]) {
+fn with_profile(cmd: &mut Command, args: &[&str]) -> Result<(), String> {
     if user_global_config(args) {
-        return;
+        return Ok(());
     }
-    let path = PROFILE_CONFIG.read().ok().and_then(|p| p.clone());
-    if let Some(path) = path {
+    let context = crate::connections::current();
+    if let Some(error) = context.error {
+        return Err(error);
+    }
+    if let Some(path) = context.git_config {
         cmd.env("GIT_CONFIG_GLOBAL", path);
     }
+    if !context.choices.ssh_key.is_empty() {
+        cmd.env_remove("GIT_SSH_COMMAND")
+            .env_remove("GIT_SSH")
+            .env_remove("GIT_SSH_VARIANT");
+    }
+    Ok(())
 }
 
 use crate::remote::{self, Target};
@@ -107,16 +104,16 @@ struct Extra {
 
 /// Construct every local repository process through one route, including piped logs.
 /// Practice detection reads bounded marker metadata, never Git or inherited configuration.
-fn repository_command(dir: Option<&Path>, args: &[&str]) -> Command {
+fn repository_command(dir: Option<&Path>, args: &[&str]) -> Result<Command, String> {
     if let Some(dir) = dir.filter(|dir| crate::practice::is_repository(dir)) {
-        return practice_command(dir);
+        return Ok(practice_command(dir));
     }
     let mut cmd = git_cmd();
-    with_profile(&mut cmd, args);
+    with_profile(&mut cmd, args)?;
     if let Some(dir) = dir {
         cmd.arg("-C").arg(dir);
     }
-    cmd
+    Ok(cmd)
 }
 
 /// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
@@ -124,7 +121,7 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
     if let Some(target) = dir.and_then(remote::parse) {
         return execute_there(&target, extra, args);
     }
-    let mut cmd = repository_command(dir, args);
+    let mut cmd = repository_command(dir, args)?;
     cmd.args(&extra.pre);
     for (name, value) in &extra.env {
         cmd.env(name, value);
@@ -244,7 +241,7 @@ pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Chi
             &remote_request(&target, &Extra::default(), args),
         );
     }
-    let mut cmd = repository_command(Some(dir), args);
+    let mut cmd = repository_command(Some(dir), args)?;
     cmd.args(args);
     cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
@@ -292,7 +289,7 @@ pub(crate) fn forecast_bytes(
         forecast_remote(&target.host, request, active)?
     } else {
         let mut command = git_cmd();
-        with_profile(&mut command, args);
+        with_profile(&mut command, args)?;
         command.arg("-C").arg(dir).args(args);
         for name in REMOVE {
             command.env_remove(name);
@@ -408,7 +405,7 @@ pub(crate) fn draft_bytes(
         );
         forecast_remote(&target.host, request, active)?
     } else {
-        let mut command = repository_command(Some(dir), args);
+        let mut command = repository_command(Some(dir), args)?;
         command.args(args);
         for name in REMOVE {
             command.env_remove(name);
@@ -572,7 +569,7 @@ pub fn stored_credentials(url: &str) -> Option<Credentials> {
     use std::io::Write;
     use std::process::Stdio;
     let mut cmd = git_cmd();
-    with_profile(&mut cmd, &["credential", "fill"]);
+    with_profile(&mut cmd, &["credential", "fill"]).ok()?;
     unattended(&mut cmd);
     cmd.args(["credential", "fill"])
         .env("GCM_INTERACTIVE", "never")
@@ -599,6 +596,156 @@ fn parse_credentials(out: &str) -> Option<Credentials> {
     };
     let (username, password) = (field("username")?, field("password")?);
     (!password.is_empty()).then_some(Credentials { username, password })
+}
+
+/// Read-only, bounded background analysis transport. Cancellation never holds a newer view.
+pub(super) fn activity_bytes_with_limit(
+    dir: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+    active: &dyn Fn() -> bool,
+    limit: std::time::Duration,
+) -> Result<Vec<u8>, String> {
+    activity_bytes_with_codes(dir, args, input, active, limit, &[0])
+}
+
+fn activity_bytes_with_codes(
+    dir: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+    active: &dyn Fn() -> bool,
+    limit: std::time::Duration,
+    ok: &[i32],
+) -> Result<Vec<u8>, String> {
+    use std::{
+        sync::mpsc,
+        time::{Duration, Instant},
+    };
+    const MAX: usize = 16 * 1024 * 1024;
+    if !active() {
+        return Err("Analysis cancelled".into());
+    }
+    let out = if let Some(target) = remote::parse(dir) {
+        let mut request = remote_request(&target, &Extra::default(), args);
+        // The shared remote runner captures whole outputs. Bound both streams *there*,
+        // before they cross the connection or allocate a large local buffer. FIFO readers
+        // cap scratch files and give Git SIGPIPE on overflow; preserve Git's exit status.
+        let git = request
+            .script
+            .strip_prefix("exec ")
+            .unwrap_or(&request.script)
+            .to_owned();
+        request.script = format!(
+            concat!(
+                "umask 077\n",
+                "history_tmp=$(mktemp -d \"${{TMPDIR:-/tmp}}/gitcraft-activity.XXXXXXXX\") || exit 1\n",
+                "trap 'rm -rf -- \"$history_tmp\"' 0\n",
+                "mkfifo \"$history_tmp/out\" \"$history_tmp/err\" || exit 1\n",
+                "head -c {cap} <\"$history_tmp/out\" >\"$history_tmp/out-cap\" & history_out=$!\n",
+                "head -c {cap} <\"$history_tmp/err\" >\"$history_tmp/err-cap\" & history_err=$!\n",
+                "{git} >\"$history_tmp/out\" 2>\"$history_tmp/err\"; history_code=$?\n",
+                "wait \"$history_out\"; wait \"$history_err\"\n",
+                "cat \"$history_tmp/out-cap\"; cat \"$history_tmp/err-cap\" >&2\n",
+                "exit \"$history_code\""
+            ),
+            cap = MAX + 1,
+            git = git
+        );
+        request.stdin = input.map(<[u8]>::to_vec);
+        request.timeout = Some(limit);
+        request.long = true;
+        let (tx, rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(remote::exec(&target.host, &request));
+        });
+        let deadline = Instant::now() + limit;
+        loop {
+            if !active() {
+                return Err("Analysis cancelled".into());
+            }
+            if Instant::now() >= deadline {
+                return Err("History analysis timed out".into());
+            }
+            match rx.recv_timeout(Duration::from_millis(20)) {
+                Ok(out) => break out?,
+                Err(mpsc::RecvTimeoutError::Timeout) => (),
+                Err(_) => return Err("History worker stopped".into()),
+            }
+        }
+    } else {
+        let mut command = repository_command(Some(dir), args)?;
+        command.args(args);
+        let output = crate::bounded_process::run_with_input(
+            command,
+            input.map(<[u8]>::to_vec),
+            active,
+            limit,
+        )
+        .map_err(|e| {
+            if e.contains("output exceeded") {
+                "A history page exceeded 16 MiB".to_owned()
+            } else {
+                e.replace("Forecast", "History analysis")
+                    .replace("forecast", "history analysis")
+            }
+        })?;
+        remote::Output {
+            code: output.status.code().unwrap_or(-1),
+            stdout: output.stdout,
+            stderr: output.stderr,
+        }
+    };
+    if out.stdout.len() > MAX || out.stderr.len() > MAX {
+        return Err("A history page exceeded 16 MiB".into());
+    }
+    if ok.contains(&out.code) && out.stderr.is_empty() {
+        Ok(out.stdout)
+    } else {
+        Err(format!(
+            "Could not analyze history: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ))
+    }
+}
+
+/// An absent option (exit 1) differs from an explicitly empty configured value (NUL).
+pub(super) fn activity_mailmap_config(
+    dir: &Path,
+    key: &str,
+    path: bool,
+    active: &dyn Fn() -> bool,
+) -> Result<Option<String>, String> {
+    let mut args = vec!["config", "--null"];
+    if path {
+        args.push("--path");
+    }
+    args.extend(["--get", key]);
+    let bytes = activity_bytes_with_codes(
+        dir,
+        &args,
+        None,
+        active,
+        std::time::Duration::from_secs(20),
+        &[0, 1],
+    )?;
+    if bytes.is_empty() {
+        return Ok(None);
+    }
+    let value = bytes
+        .strip_suffix(&[0])
+        .ok_or("Invalid mailmap configuration response")?;
+    String::from_utf8(value.to_vec())
+        .map(Some)
+        .map_err(|_| "Mailmap configuration is not UTF-8".into())
+}
+
+pub(crate) fn activity_bytes(
+    dir: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    activity_bytes_with_limit(dir, args, input, active, std::time::Duration::from_secs(20))
 }
 
 #[cfg(test)]
@@ -874,5 +1021,47 @@ mod practice_tests {
                 "{name}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod profile_connection_tests {
+    use super::*;
+    use crate::connections::{Choices, Context};
+
+    #[test]
+    fn local_git_gets_the_pinned_profile_but_remote_git_does_not_get_local_paths_or_accounts() {
+        let context = Context {
+            git_config: Some("/tmp/profile-work.gitconfig".into()),
+            choices: Choices {
+                ssh_key: "/tmp/work key".into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        context.run(|| {
+            let mut cmd = git_cmd();
+            assert!(with_profile(&mut cmd, &["push"]).is_ok());
+            let env: std::collections::HashMap<_, _> = cmd.get_envs().collect();
+            assert_eq!(
+                env.get(std::ffi::OsStr::new("GIT_CONFIG_GLOBAL")),
+                Some(&Some(std::ffi::OsStr::new("/tmp/profile-work.gitconfig")))
+            );
+            assert_eq!(
+                env.get(std::ffi::OsStr::new("GIT_SSH_COMMAND")),
+                Some(&None)
+            );
+            let target = crate::remote::parse(Path::new("ssh://build/home/me/app"));
+            assert!(target.is_some());
+            if let Some(target) = target {
+                let request = remote_request(&target, &Extra::default(), &["push"]);
+                assert!(
+                    !request.env.iter().any(|(key, _)| key == "GIT_CONFIG_GLOBAL"
+                        || key == "GH_TOKEN"
+                        || key == "GITLAB_TOKEN")
+                );
+                assert!(!request.script.contains("/tmp/work key"));
+            }
+        });
     }
 }

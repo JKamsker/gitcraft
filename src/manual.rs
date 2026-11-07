@@ -29,6 +29,7 @@ const FEATURES: &[(&str, &[&str])] = &[
         &[
             "Open, create or clone a repository from the start page; recent ones are listed there.",
             "Clone options choose shallow history (depth), blobless file contents on demand, and sparse folders. The server must support partial clones. Sparse checkout… in the palette edits the folder tree later, with all changes committed or stashed first. Move ignored files outside the working tree too: Git can delete them during sparse changes. Root files and files immediately inside parent folders remain included. Custom non-cone patterns are replaced only when explicitly chosen. Partial clones show when history may download contents; missing files ask before downloading.",
+            "The palette exports Git bundles of selected refs or an incremental range (exclude a base commit), and inspects local bundle refs/prerequisites before a deliberate import. Choose new destination refs: existing refs are never overwritten and import does not check out work. File pickers use this machine's disk; SSH/WSL repositories receive temporary copies. Bundle limit: 128 MiB, 1000 header entries and two minutes per Git call. Incremental bundles need their base commits already present.",
             "One tab per repository. Changes made elsewhere (editor, terminal) show up by themselves.",
             "Earlier versions… in Changes, the uncommitted-row menu or the palette opts this repository into working drafts. Versions save after a 15-second pause and before checkout/rebase or other checkout-moving operations. Preview saved working bytes or raw staged contents, then recover selected hunks without changing the real index. Recovery first saves a safety version; Undo last recovery… previews it. Drafts include nonignored untracked regular files, exclude ignored files/submodule contents, and refuse changed links, special files or conflicts. They stay under local tree refs, outside normal history and pushes; mirror/all-ref exports can include them. Retention: 50 versions/14 days. Limits: 8 MiB/file, 32 MiB changed content, 2000 changed/20000 index paths; Git --no-lazy-fetch support required. Filters, signing and network helpers do not run.",
             "Right-click a tab to give it its own icon and highlight colour.",
@@ -52,8 +53,16 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Double-click a pill to check that branch out (and pull it when its remote is ahead; on the checked-out branch's remote pill, just pull); hover +N to see every branch of the commit, and right-click any of them.",
             "Right-click a commit or a pill for branches, tags, merge, rebase, cherry-pick, revert, reset and more.",
             "Search messages, authors and hashes, or switch to Code to find the commits that added or removed some text.",
-            "Drag the borders in the column header to resize; right-click it to pick the columns, make the graph column compact or reset the columns.",
+            "Description takes the flexible width; Branch / Tag fits visible pills until you drag its border. Right-click the header to restore Fit visible branch / tag pills, pick columns, make the graph compact or reset widths. Faint lane labels identify offscreen tips; hover a description for the full message.",
             "Interactive rebase: reorder, reword, squash, fix up or drop commits, then start it.",
+        ],
+    ),
+    (
+        "History activity",
+        &[
+            "Activity in the toolbar opens the activity calendar and contributor statistics; both are also in Ctrl+P. Click a day, drag across dates, pick a month or apply a date range. Select a commit to open its detail.",
+            "Choose author or committer dates. Days use each timestamp’s recorded timezone, and date ranges include both ends. Authors follow Git’s .mailmap. Counts show distinct paths, active days and first/last activity within the selected period; renames touch both paths and merge changes compare with their first parent.",
+            "Each reachable commit counts once across local/remote branches, tags and HEAD. Stash and app-only refs are excluded. Coverage says when the snapshot is partial or shallow. Scan more history expands the initial 5,000 commits up to 100,000, within a 64 MiB snapshot and 16 MiB page limit. Cancel stops waiting; Refresh takes a new snapshot without fetching. Analysis needs Git with --no-lazy-fetch support and reads tree changes without file contents; missing trees or metadata are reported as errors.",
         ],
     ),
     (
@@ -72,9 +81,10 @@ const FEATURES: &[(&str, &[&str])] = &[
             "A file kept in Git LFS shows as its LFS objects and their sizes; the palette has LFS: Fetch and LFS: Pull when git-lfs is installed.",
             "The arrows in a diff's header jump from change to change; the marks beside the scrollbar show where the changes are, and a click on one jumps there.",
             "Write the summary and description and commit; amend the last commit; pick the identity you commit as, or Use the profile's author to take a repository's own one out.",
-            "Profiles (title bar, or Settings → Profile): each has its own tabs, recent repositories, theme, git author and commit signing. A repository's own git config (user.name, user.email, signing) still wins over the profile's.",
+            "Profiles (title bar, or Settings → Profile): each has its own tabs, recent repositories, theme, git author, commit signing, SSH key and forge accounts. A repository's own git config (user.name, user.email, signing) still wins over the profile's.",
             "Themes: the palette icon in the title bar, or Settings → Appearance with a thumbnail of each (point at one to preview it). Import a VS Code theme or a Base16 scheme, follow VS Code's theme, or save a copy of one as a file to edit; set your own accent, corners and lane colours for any.",
             "Point at a setting and the panel beside it shows what it does, drawn with the values set now.",
+            "Settings → Profile → Profile’s connections chooses a local SSH private key, named gh/glab accounts and a tea login alias. Check account verifies a named forge account in the background. GitHub uses gh’s existing named accounts; glab can use a separate configuration folder for another account on the same server. Selected accounts override inherited token variables per command, without switching a global login. HTTPS Git uses the same accounts. Git in WSL or over SSH keeps that machine’s own credentials.",
             "Settings → Commit signing sets the format, key and program git signs with, and whether it signs commits and tags by default, in your global git config; Settings → Profile can sign just for the profile instead.",
             "Double-click a commit's message in the right pane to edit it (any commit of the checked-out branch with no merges after it).",
             "Undo and redo commits, merges, rebases, resets, checkouts, branches, tags and stashes.",
@@ -108,6 +118,10 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("Cmd+P", "Command palette: every action and branch"),
             ("Cmd+,", "Settings"),
             ("F5", "Reload the repository"),
+            (
+                "Cmd+Alt+1 / 2 / 3",
+                "Focus sidebar / graph or diff / detail pane",
+            ),
             ("F1", "This manual"),
         ],
     ),
@@ -126,6 +140,16 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
         "Changes",
         &[
             ("Cmd+Enter", "Commit (from the message fields)"),
+            ("j / k", "Next / previous file in the focused detail pane"),
+            (
+                "Space",
+                "Stage / unstage the selected file; conflicts are excluded",
+            ),
+            ("Enter", "Open the selected file's diff"),
+            (
+                "S / U / D",
+                "Stage / unstage / confirm discard of the current diff hunk",
+            ),
             (
                 "Click / Shift+click",
                 "Pick lines in a diff, or a range of them",

@@ -13,7 +13,11 @@ use crate::terminal::ShellSpec;
 
 /// Everything the views ask for; applied after drawing so views only borrow the state.
 pub(crate) enum Action {
+    Keyboard(super::keyboard::Request),
     Select(usize),
+    OpenActivity(super::activity::Page),
+    ActivityCommit(String),
+    CloseActivity,
     SelectHash(String),
     SelectStash(usize),
     OpenDiff(DiffKey),
@@ -166,6 +170,16 @@ pub(crate) enum Action {
     },
     /// Apply a patch file, asking which.
     ApplyPatch,
+    OpenBundleExport,
+    OpenBundleImport,
+    ExportBundle {
+        refs: Vec<git::BundleRef>,
+        base: String,
+    },
+    ImportBundle {
+        preview: Box<git::BundlePreview>,
+        imports: Vec<git::BundleImport>,
+    },
     /// Drop or move a commit of the checked-out branch.
     QuickEdit {
         edit: quick_edit::Edit,
@@ -338,6 +352,16 @@ impl RepoTab {
     /// What the command palette offers for this repository.
     pub(crate) fn palette_items(&self) -> Vec<(String, String, Action)> {
         let mut items: Vec<(String, String, Action)> = vec![
+            (
+                "Activity calendar".into(),
+                "history".into(),
+                Action::OpenActivity(super::activity::Page::Calendar),
+            ),
+            (
+                "Contributor statistics".into(),
+                "history".into(),
+                Action::OpenActivity(super::activity::Page::Contributors),
+            ),
             ("Fetch".into(), "remote".into(), Action::Fetch),
             ("Pull".into(), "remote".into(), Action::Pull),
             (
@@ -365,6 +389,16 @@ impl RepoTab {
                 "Earlier versions of working changes…".into(),
                 "working drafts".into(),
                 Action::EarlierVersions,
+            ),
+            (
+                "Export Git bundle…".into(),
+                "offline backup".into(),
+                Action::OpenBundleExport,
+            ),
+            (
+                "Inspect / import local Git bundle…".into(),
+                "offline exchange".into(),
+                Action::OpenBundleImport,
             ),
             ("Undo".into(), "Ctrl+Z".into(), Action::Undo),
             ("Redo".into(), "Ctrl+Y".into(), Action::Redo),

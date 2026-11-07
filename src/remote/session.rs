@@ -161,6 +161,11 @@ fn stop(host: Host, pid: u32) {
 /// The script [`stop`] runs: `pid` and its descendants (from `ps`, which every system has with
 /// these options), else `pid` alone.
 fn stop_script(pid: u32) -> String {
+    // Zero denotes a process group to kill(2), and one can be the host init process.
+    // Neither can identify an owned timed-out command.
+    if pid <= 1 {
+        return "true\n".to_owned();
+    }
     format!(
         concat!(
             "all=$(ps -A -o pid= -o ppid= 2>/dev/null | awk -v root={pid} '",
@@ -533,30 +538,112 @@ mod tests {
         assert_eq!(parse_ready(b"__GITCRAFT_READY__ 1 2\n"), None);
     }
 
-    /// The stop script ends a process and what it started, however deep.
+    /// Run the exact production selector only over synthetic data and recording sinks.
+    /// This contains the test; it does not establish ownership of production host PIDs.
     #[cfg(unix)]
     #[test]
     fn stopping_ends_a_whole_tree() -> Result<(), String> {
-        let marker = format!("{}.5", std::process::id() % 1000 + 200);
-        let mut tree = Command::new("sh")
-            .args(["-c", &format!("sh -c 'sleep {marker}; true'; true")])
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        std::thread::sleep(Duration::from_millis(300));
-        let stopped = Command::new("sh")
-            .args(["-c", &stop_script(tree.id())])
-            .status()
-            .map_err(|e| e.to_string())?;
-        assert!(stopped.success());
-        let _ = tree.wait();
-        let left = Command::new("sh")
-            .args([
-                "-c",
-                &format!("ps -A -o args | grep -c '^sleep {marker}$' || true"),
-            ])
-            .output()
-            .map_err(|e| e.to_string())?;
-        assert_eq!(String::from_utf8_lossy(&left.stdout).trim(), "0");
+        const SNAPSHOT: &str = concat!(
+            "1 0\n",
+            "10 1\n",
+            "20 10\n",
+            "100 20\n",
+            "101 100\n",
+            "102 101\n",
+            "103 102\n",
+            "110 20\n",
+            "200 1\n",
+            "0 0\n",
+            "300 301\n",
+            "301 300\n",
+        );
+        // A safety allowlist checked BEFORE starting the shell. Any new command,
+        // absolute/builtin escape or awk extension requires a separate static review.
+        // Semantic assertions below still exercise the actual production awk program.
+        const ALLOWED: &str = concat!(
+            "all=$(ps -A -o pid= -o ppid= 2>/dev/null | awk -v root=@PID@ '",
+            "{ up[$1] = $2 } END { print root; seen[root] = 1; more = 1; ",
+            "while (more) { more = 0; for (p in up) if (!(p in seen) && (up[p] in seen)) ",
+            "{ seen[p] = 1; print p; more = 1 } } }')\n",
+            "[ -n \"$all\" ] || all=@PID@\n",
+            "kill -TERM $all 2>/dev/null\n",
+            "sleep 2\n",
+            "kill -KILL $all 2>/dev/null\n",
+            "true\n",
+        );
+        let reversed = SNAPSHOT.lines().rev().collect::<Vec<_>>().join("\n") + "\n";
+        for (pid, snapshot, expected) in [
+            (100, SNAPSHOT, vec![100, 101, 102, 103]),
+            (100, reversed.as_str(), vec![100, 101, 102, 103]),
+            // Empty synthetic lookup retains the requested-root fallback; it proves no
+            // authority to signal that PID outside this inert fixture.
+            (100, "", vec![100]),
+            (0, SNAPSHOT, vec![]),
+            (1, SNAPSHOT, vec![]),
+        ] {
+            let script = stop_script(pid);
+            let allowed = if pid <= 1 {
+                "true\n".to_owned()
+            } else {
+                ALLOWED.replace("@PID@", &pid.to_string())
+            };
+            assert_eq!(
+                script, allowed,
+                "Unreviewed stop-script change: do not execute it"
+            );
+            let fixture = format!(
+                concat!(
+                    "exec 3>&1\n",
+                    "fixture_snapshot={}\n",
+                    "ps() {{ printf 'PS' >&3; printf ' %s' \"$@\" >&3; printf '\\n' >&3; printf '%s' \"$fixture_snapshot\"; }}\n",
+                    "kill() {{ printf 'SIGNAL' >&3; printf ' %s' \"$@\" >&3; printf '\\n' >&3; }}\n",
+                    "sleep() {{ printf 'SLEEP' >&3; printf ' %s' \"$@\" >&3; printf '\\n' >&3; }}\n",
+                    "{}"
+                ),
+                sh_quote(snapshot),
+                script,
+            );
+            // ps's event must bypass command substitution, while its fixed numeric
+            // snapshot alone goes to the real awk. Functions shadow every signal/sleep.
+            let output = Command::new("/bin/sh")
+                .args(["-c", &fixture])
+                .env_clear()
+                .env("PATH", "/usr/bin:/bin")
+                .current_dir(std::env::temp_dir())
+                .stdin(Stdio::null())
+                .output()
+                .map_err(|e| e.to_string())?;
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(output.stderr.is_empty());
+            let events = String::from_utf8(output.stdout).map_err(|e| e.to_string())?;
+            if expected.is_empty() {
+                assert!(events.is_empty(), "{events}");
+                continue;
+            }
+            let lines = events.lines().collect::<Vec<_>>();
+            assert_eq!(lines.len(), 4, "{events}");
+            assert_eq!(lines[0], "PS -A -o pid= -o ppid=");
+            assert_eq!(lines[2], "SLEEP 2");
+            let expected = expected
+                .into_iter()
+                .collect::<std::collections::BTreeSet<_>>();
+            for (line, signal) in [(lines[1], "-TERM"), (lines[3], "-KILL")] {
+                let words = line.split_whitespace().collect::<Vec<_>>();
+                assert_eq!(words.get(..2), Some(["SIGNAL", signal].as_slice()));
+                let selected = words[2..]
+                    .iter()
+                    .map(|p| p.parse::<u32>().map_err(|e| e.to_string()))
+                    .collect::<Result<std::collections::BTreeSet<_>, _>>()?;
+                assert_eq!(selected, expected, "{events}");
+                for foreign in [0, 1, 10, 20, 110, 200, 300, 301] {
+                    assert!(!selected.contains(&foreign), "{events}");
+                }
+            }
+        }
         Ok(())
     }
 

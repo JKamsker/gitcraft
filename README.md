@@ -47,8 +47,8 @@ Glossary tips stay out of the way while typing, scrolling or dragging.
 - Browser-like tabs, one per repository (Ctrl+T, Ctrl+W, middle-click; Ctrl+Shift+T reopens a
   closed one). Open tabs, recents, theme and settings are remembered.
 - Profiles, as in GitKraken: switch between them from the title bar (or the palette). Each has
-  its own open tabs, recent repositories, theme, git author and commit signing (Settings →
-  Profile); the other settings pages are shared. Switching closes this profile's tabs and opens the
+  its own open tabs, recent repositories, theme, git author, commit signing, SSH key and forge
+  accounts (Settings → Profile); the other settings pages are shared. Switching closes this profile's tabs and opens the
   other one's (refused while a tab has unfinished work).
 - Changes made elsewhere (editor, terminal) show up by themselves: the folder is watched.
 - Repositories on another machine, in a WSL distribution or over SSH: the window stays here and
@@ -124,11 +124,39 @@ disabled. Snapshots and recovery run on the repository's machine, including SSH 
 **Graph**
 
 - Every branch, coloured lanes, ↑/↓ to move. History loads 1500 commits at a time as you scroll.
+- _Activity_ in the toolbar (or _Activity calendar_ / _Contributor statistics_ in Ctrl+P)
+  opens a day/month calendar and author statistics. Click a day, drag across days, choose a
+  month, or enter an inclusive date range; choose author or committer dates. Click a listed
+  commit to open its detail, and an author to see their commits. Days use each timestamp’s
+  recorded timezone. Authors are resolved together against one consistent Git mailmap;
+  unavailable configured map sources stop analysis without fetching. Statistics show commits,
+  distinct paths, active days and the first/last activity in the selected period. Each reachable
+  commit counts once across local/remote branches, tags and HEAD; stash and app-only refs
+  are excluded. Renames touch both paths and merges compare files against their first parent.
+  Analysis runs in the background with Cancel and Refresh. Coverage says when history is
+  shallow or partial: initially 5,000 commits, _Scan more history_ up to 100,000, with a
+  64 MiB snapshot limit and a 16 MiB page limit. Date filtering uses the scanned history,
+  including backdated authors. File counts read trees, not file contents. Analysis requires
+  Git with `--no-lazy-fetch` support and never downloads missing objects; missing trees or
+  metadata are reported as errors. Refresh takes a new reference snapshot; it does not fetch.
 - Branch and tag pills in their own column left of the graph, on each branch's tip only, joined
   to their commit: white text, a laptop icon when the branch is local, a cloud when a remote has
   it at that commit (`x` and `origin/x` make one pill), a pull-request icon when one is open,
   `+N` when more refs share the commit, the author's avatar and how long ago it was ("2 hours
   ago"). Author, date and hash columns are optional (Settings).
+- Description takes the flexible width. Branch / Tag fits visible pills and shrinks when none
+  are in view; dragging its border keeps a fixed width. Restore _Fit visible branch / tag
+  pills_ from the header's menu. Faint branch names (or _detached_) identify lanes whose tips
+  are offscreen. Long summaries end in an ellipsis; hover the description to read its original
+  message, loaded in the background. Messages over the 256 KiB tooltip limit open in the detail
+  pane by selecting the commit.
+- Ctrl+Alt+1/2/3 (Cmd+Alt on macOS) focuses the sidebar, graph or diff, and detail pane;
+  an outline shows the active pane. In the detail pane, j/k selects files in display order,
+  opening their folders and scrolling them into view; Space stages or unstages, Enter opens
+  the diff. Conflicted files require the explicit Resolve/Mark resolved controls. In a text
+  diff, F7/Shift+F7 picks the next/previous change; S/U acts on the current hunk and D asks
+  before discarding it (Ctrl+Z restores it). These keys stay with text fields, terminals,
+  menus and dialogs while those have focus. Held action keys do not repeat operations.
 - Drag the column borders in the header to resize. Right-click the header to pick the columns,
   make the graph column compact (lanes closer together), or _Reset columns_ to their first
   widths.
@@ -154,6 +182,18 @@ disabled. Snapshots and recovery run on the repository's machine, including SSH 
   patch…_ (the latest commit's menu, the changes row's menu or the palette) turns one from
   `git format-patch` into commits (`git am`) and puts any other diff on the working tree
   (`git apply`). Ctrl+Z undoes either.
+- Git bundles: **Export Git bundle…** in the palette saves selected refs, with an optional
+  excluded base commit for an incremental range. Ref tips are pinned to the dialog's snapshot;
+  a moved ref asks you to reopen it. Output is a new local file; existing files are preserved.
+  **Inspect / import local Git bundle…** shows incoming refs, prerequisite commits and Git's
+  verification result before importing. Edit each new destination (branches, tags or
+  `refs/bundles/…`); collisions stop the whole ref transaction. Import does not check out or
+  merge incoming work. SSH and WSL repositories receive a temporary copy for verification and
+  import; file pickers and saved bundles always refer to this machine's disk. Supports v2/v3
+  bundles and matching SHA-1/SHA-256 repositories, up to 128 MiB and 1000 header entries, with
+  a two minute deadline per Git stream. Requires Git 2.36 or newer. Larger exchanges can use
+  Git in the terminal. In partial clones, inspection and import require Git's explicit
+  `--no-lazy-fetch` support; older Git refuses them instead of fetching from the remote.
 - Interactive rebase: the commits to rewrite, newest on top; pick, reword (edit the message in
   place), squash, fix up or drop each one, move them up and down, then _Start rebase_. Ctrl+Z
   undoes it. Rebase weather updates after each reorder or action change: a sun applies cleanly,
@@ -299,10 +339,45 @@ disabled. Snapshots and recovery run on the repository's machine, including SSH 
   config's `gpg.format`, `user.signingkey`, `gpg.program` (`gpg.ssh.program`, `gpg.x509.program`),
   `commit.gpgSign` and `tag.gpgSign`, shown as they are set and written back there; git does
   the signing as usual. A profile can sign its own way instead (Settings → Profile).
-- How a profile's git author and signing reach git: gitcraft writes them to a config file of the
+- Settings → Profile → **Profile's connections** chooses an SSH private key and named GitHub,
+  GitLab and Forgejo/Gitea accounts. Empty account names preserve the CLI's normal behavior.
+  **Check account** checks the selected GitHub/GitLab user in the background. No global CLI
+  account is switched, and tokens are never saved in gitcraft's settings or generated config.
+  - GitHub: select an existing `gh` username and server. Requires a `gh` version supporting
+    `auth token --user` (multi-account support, gh 2.40 or later). An optional account config
+    folder is passed as `GH_CONFIG_DIR`.
+  - GitLab: enter the expected `glab` username and server. `glab` has one account per host in a
+    config folder; for two accounts on the same server choose separate folders and sign in
+    with `GLAB_CONFIG_DIR` set accordingly. The token's actual owner is checked before use;
+    a mismatch stops the operation. A host-wide OS keyring slot cannot hold two accounts at
+    once; use the CLI's supported separate configuration/file-storage setup for that case.
+    OAuth sessions refresh only through that selected CLI configuration after its stored
+    login name matches. Gitcraft re-reads the refreshed access token, verifies its owner,
+    and pins that exact token for the operation; expiry during an operation fails rather
+    than refreshing into another identity. A missing stored login name requires CLI sign-in.
+  - Forgejo/Gitea: enter the login **name** from `tea login add --name …`. It is bound to that
+    login's HTTPS server; a missing/refused login does not fall back to another identity.
+  - HTTPS Git pushes use the same selected accounts through host-scoped credential helpers.
+    Helpers resolve credentials only when Git asks for that HTTPS server, and never store
+    them. CLI errors and unsupported versions fail without exposing token output.
+  - The SSH private key is separate from the signing key. `core.sshCommand` uses a helper that selects it
+    with `IdentitiesOnly=yes`, checks the effective host configuration and refuses additional
+    `IdentityFile` entries instead of falling back to another account. Proxy and host options
+    remain in use. Equivalent tilde and SSH token paths are expanded by OpenSSH itself.
+    The generated profile sets `ssh.variant=auto` so an inherited PuTTY configuration cannot
+    change the wrapper's port arguments; repository-local transports are still detected by
+    Git, and a repository's explicit `ssh.variant` still wins. Ambiguous/control-character
+    identity paths are refused before starting the transport. If a repository explicitly
+    selects a PuTTY variant while retaining this OpenSSH helper, incompatible options are
+    refused before probing or connecting; use `ssh.variant=auto`/`ssh`, or that repository's
+    own matching PuTTY command.
+  - Background jobs retain the initiating profile's account choices and an immutable config
+    snapshot across profile edits, switching or deletion. Git in WSL/SSH repositories keeps
+    that machine's own credentials; forge commands run here with this profile's account.
+- How a profile's git author, signing and connection choices reach git: gitcraft writes them to a config file of the
   profile's (in its data folder, `profiles/<id>.gitconfig`) that includes your own global config
-  first and then sets the profile's values, and runs git with `GIT_CONFIG_GLOBAL` pointing at it
-  (git 2.32 or later). So the profile wins over `~/.gitconfig`, and a repository's own config
+  first and then sets the profile's values, and runs git with `GIT_CONFIG_GLOBAL` pointing at a leased immutable copy
+  (git 2.32 or later), so an in-flight operation keeps its original profile. So the profile wins over `~/.gitconfig`, and a repository's own config
   (`git config --local`, `--worktree`) wins over the profile, as it does over `~/.gitconfig`.
   `git config --global` from gitcraft still reads and writes your own file. The built-in
   terminal keeps your own config.

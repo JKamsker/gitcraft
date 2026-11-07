@@ -49,6 +49,7 @@ impl RepoTab {
             )
             .show(ui, |ui| self.commit_box(ui, acts));
 
+        self.keyboard_work_files(ui, acts);
         egui::ScrollArea::vertical()
             .id_salt("changes_scroll")
             .auto_shrink(false)
@@ -195,7 +196,10 @@ impl RepoTab {
         mut on: impl FnMut(&mut Vec<Action>, &StatusFile, RowClick),
     ) {
         let id = egui::Id::new(("file-folder", self.repo_key(), tree));
-        let selected = |f: &&StatusFile| self.open_key() == Some(&DiffKey::Work((*f).clone()));
+        let selected = |f: &&StatusFile| {
+            self.open_key() == Some(&DiffKey::Work((*f).clone()))
+                || self.keyboard_file_selected(&DiffKey::Work((*f).clone()))
+        };
         // Rows are known by their path within the list: a file can be both staged and unstaged.
         ui.push_id(("work-list", tree), |ui| {
             branch_tree::files(
@@ -222,7 +226,7 @@ impl RepoTab {
         buttons: &[(&str, &str)],
     ) -> RowClick {
         let key = DiffKey::Work(f.clone());
-        let selected = self.open_key() == Some(&key);
+        let selected = self.open_key() == Some(&key) || self.keyboard_file_selected(&key);
         let buttons = if self.busy_op.is_none() { buttons } else { &[] };
         let r = widgets::file_row(
             ui,
@@ -233,6 +237,10 @@ impl RepoTab {
             selected,
             RowExtra::Buttons(buttons),
         );
+        self.keyboard_file_row(ui, r.row.rect, &key);
+        if r.row.clicked() || r.button.is_some() {
+            self.keyboard_select_file(egui::Id::new("working-files"), key.clone());
+        }
         if f.code != 'D' {
             widgets::file_menu(&r.row, &f.path, None, true, acts);
         }

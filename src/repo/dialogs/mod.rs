@@ -1,6 +1,7 @@
 //! Modal dialogs: create a branch, confirm a destructive operation.
 
 mod branch;
+mod bundles;
 mod confirm;
 mod drafts;
 mod gerrit;
@@ -47,6 +48,17 @@ pub enum Dialog {
         enabled: bool,
         convert: bool,
     },
+    BundleLoading(u64),
+    BundleExport {
+        refs: Vec<crate::git::BundleRef>,
+        selected: std::collections::BTreeSet<String>,
+        base: String,
+    },
+    BundleIncoming {
+        label: String,
+        preview: Box<crate::git::BundlePreview>,
+        imports: Vec<(bool, crate::git::BundleImport)>,
+    },
     CreateBranch {
         /// Commit the branch starts at.
         at: String,
@@ -71,6 +83,9 @@ pub enum Dialog {
         /// How to show `base`.
         base_label: String,
         focus: bool,
+    },
+    KeyboardDiscard {
+        request: super::keyboard::Request,
     },
     Confirm {
         title: String,
@@ -363,6 +378,14 @@ impl RepoTab {
                     enabled,
                     convert,
                 } => super::sparse::dialog(ui, state, selected, enabled, convert),
+                Dialog::BundleLoading(_) => {
+                    ui.heading("Reading bundle information…");
+                    ui.label("Git runs on the repository's machine. Local bundle files are temporarily copied there for SSH / WSL verification. No refs change while inspecting.");
+                    ui.add(crate::spinner::Spinner::new());
+                    if ui.button("Cancel").clicked() { Outcome::Cancel } else { Outcome::Open }
+                }
+                Dialog::BundleExport { refs, selected, base } => bundles::export(ui, refs, selected, base, idle),
+                Dialog::BundleIncoming { label, preview, imports } => bundles::incoming(ui, label, preview, imports, idle),
                 Dialog::CreateBranch {
                     at,
                     at_label,
@@ -451,6 +474,15 @@ impl RepoTab {
                     draft,
                     focus,
                 } => remote::create_pr(ui, noun, branch, base, title, body, draft, focus),
+                Dialog::KeyboardDiscard { request } => {
+                    let mut alternative = false;
+                    match confirm::confirm(ui, "Discard this hunk?",
+                        "This removes the current hunk from the working tree. Ctrl+Z restores it.",
+                        "Discard hunk", &[], &None, &mut alternative, Refresh::Status, &Undo::None) {
+                        Outcome::Done(_) => Outcome::Done(Action::Keyboard(request.clone())),
+                        outcome => outcome,
+                    }
+                }
                 Dialog::Confirm {
                     title,
                     body,

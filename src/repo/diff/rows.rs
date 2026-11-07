@@ -263,6 +263,14 @@ impl<'a> Rows<'a> {
         let placed = paint_line(
             ui, rect, data, i, side, scroll_x, &self.font, &self.t, picked, sel_chars,
         );
+        if self.view.keyboard_hunk == Some(i) && self.data.lines[i].kind == Kind::Hunk {
+            ui.painter().with_clip_rect(ui.clip_rect()).rect_stroke(
+                rect.shrink(1.0),
+                0.0,
+                Stroke::new(2.0, self.t.accent),
+                egui::StrokeKind::Inside,
+            );
+        }
         // Where the drag started and where the pointer is, in this line's text.
         if let Some((origin, galley)) = placed.filter(|_| kind.is_some_and(|k| side.shows(k))) {
             self.hit_test(rect, (i, side), origin, &galley, pickable);

@@ -53,9 +53,25 @@ pub(super) fn same_repository(before: Option<&Hosting>, now: Option<&Hosting>) -
 }
 
 impl RepoTab {
+    /// Account-specific permissions, viewer identity and cached private data must be read
+    /// again after the profile's connection choices change. Request ids discard old replies.
+    pub(crate) fn reload_profile_connections(&mut self, ctx: &egui::Context) {
+        self.reload_identity(ctx);
+        self.load_prs(ctx);
+        if self.pr_view.is_some() {
+            self.load_pr(ctx);
+        }
+        self.ci.account_changed();
+        self.refresh_ci(ctx);
+        self.ci_view = None;
+        self.avatars_hinted = false;
+        self.hint_avatars(ctx);
+    }
+
     /// Re-reads refs, history, working tree, worktrees, stashes, remotes and submodules in the
     /// background.
     pub fn reload(&mut self, ctx: &egui::Context) {
+        self.work_epoch = self.work_epoch.wrapping_add(1);
         // Changes seen on disk so far are read by this reload (or the one queued after the
         // current one): reloading for them again would read the same.
         self.fs_pending = None;
@@ -81,27 +97,37 @@ impl RepoTab {
                 // Independent reads, side by side: a reload waits for the slowest of them
                 // rather than for all of them in turn.
                 let path = path.as_path();
+                let connection = crate::connections::current();
                 let (history, work, worktrees, stashes, remotes, submodules, lfs, identity) =
                     std::thread::scope(|scope| {
-                        let history = scope.spawn(|| git::log(path, log_from.as_deref(), 0, count));
-                        let work_trees = scope.spawn(|| {
-                            let work = git::status(path)?;
-                            let changes = Some(work.changed_files());
-                            // Very old gits have no `worktree list`; the section just stays
-                            // empty.
-                            // Elsewhere, the others are counted after the tab shows.
-                            let worktrees = if crate::remote::is_remote(path) {
-                                git::worktree_list(path, changes)
-                            } else {
-                                git::worktrees(path, changes)
-                            };
-                            let worktrees = worktrees.unwrap_or_default();
-                            Ok::<_, String>((work, worktrees))
+                        let history = scope.spawn(|| {
+                            connection.run(|| git::log(path, log_from.as_deref(), 0, count))
                         });
-                        let stashes = scope.spawn(|| git::stashes(path).unwrap_or_default());
-                        let remotes = scope.spawn(|| git::remotes(path).unwrap_or_default());
-                        let submodules = scope.spawn(|| git::submodules(path).unwrap_or_default());
-                        let lfs = scope.spawn(|| git::uses_lfs(path) && git::lfs_installed(path));
+                        let work_trees = scope.spawn(|| {
+                            connection.run(|| {
+                                let work = git::status(path)?;
+                                let changes = Some(work.changed_files());
+                                // Very old gits have no `worktree list`; the section just stays
+                                // empty.
+                                // Elsewhere, the others are counted after the tab shows.
+                                let worktrees = if crate::remote::is_remote(path) {
+                                    git::worktree_list(path, changes)
+                                } else {
+                                    git::worktrees(path, changes)
+                                };
+                                let worktrees = worktrees.unwrap_or_default();
+                                Ok::<_, String>((work, worktrees))
+                            })
+                        });
+                        let stashes = scope
+                            .spawn(|| connection.run(|| git::stashes(path).unwrap_or_default()));
+                        let remotes = scope
+                            .spawn(|| connection.run(|| git::remotes(path).unwrap_or_default()));
+                        let submodules = scope
+                            .spawn(|| connection.run(|| git::submodules(path).unwrap_or_default()));
+                        let lfs = scope.spawn(|| {
+                            connection.run(|| git::uses_lfs(path) && git::lfs_installed(path))
+                        });
                         let identity = git::identity(path);
                         let join = |e| format!("Reading the repository failed: {e:?}");
                         let history: Vec<Arc<Commit>> = history
@@ -151,7 +177,9 @@ impl RepoTab {
     }
 
     pub(super) fn reload_status(&mut self, ctx: &egui::Context) {
+        self.work_epoch = self.work_epoch.wrapping_add(1);
         let read = self.next_read();
+        self.work_pending = read;
         let path = self.path.clone();
         spawn(&self.tx, ctx, move || Msg::Status(read, git::status(&path)));
     }
@@ -367,6 +395,9 @@ impl RepoTab {
         self.history = loaded.history;
         // A status read since this reload started is newer.
         if Self::newer(loaded.read, &mut self.work_read) {
+            if loaded.read >= self.work_pending {
+                self.work_pending = 0;
+            }
             self.work = loaded.work;
         }
         // The last counts of worktrees this read left uncounted (on another machine) stay
@@ -535,10 +566,11 @@ impl RepoTab {
             .collect();
         let old_graph = std::mem::replace(&mut self.graph, graph);
         let old_index = std::mem::replace(&mut self.index, index);
+        self.rebuild_graph_labels();
         // Freeing tens of thousands of commits (those a reload replaced), rows and index entries
         // takes a while: not on the UI thread.
         if old_rows.len() > 5000 {
-            std::thread::spawn(move || drop((old_rows, old_graph, old_index)));
+            crate::connections::spawn(move || drop((old_rows, old_graph, old_index)));
         }
     }
 
@@ -650,7 +682,7 @@ impl RepoTab {
         emails.sort();
         emails.dedup();
         let ctx = ctx.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             for (email, hint) in hosting.forge.provider().avatars(&repo, &hosting, &emails) {
                 crate::avatars::hint(&email, hint);
             }

@@ -85,19 +85,23 @@ pub fn count_changes(repo: &Path, list: &mut [Worktree]) {
     }
     // One `status` per worktree, side by side. `--no-optional-locks` so that looking doesn't take
     // the index lock from under whatever runs in that worktree.
+    let connection = crate::connections::current();
     std::thread::scope(|scope| {
         for wt in list.iter_mut().filter(|w| w.needs_count()) {
+            let connection = &connection;
             scope.spawn(|| {
-                let args = [
-                    "--no-optional-locks",
-                    "status",
-                    "--porcelain=v1",
-                    "-z",
-                    "--untracked-files=all",
-                ];
-                wt.changes = run(Some(&wt.path), &args)
-                    .ok()
-                    .map(|out| parse_status(&out).changed_files());
+                connection.run(|| {
+                    let args = [
+                        "--no-optional-locks",
+                        "status",
+                        "--porcelain=v1",
+                        "-z",
+                        "--untracked-files=all",
+                    ];
+                    wt.changes = run(Some(&wt.path), &args)
+                        .ok()
+                        .map(|out| parse_status(&out).changed_files());
+                })
             });
         }
     });

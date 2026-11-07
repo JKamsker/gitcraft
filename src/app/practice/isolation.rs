@@ -57,7 +57,33 @@ fn exercise_app(root: &Path) -> Result<(), String> {
             app
         });
     // This is the real active-profile override; normal tabs must keep it, practice must not.
-    git::set_profile_config(Some(root.join("hostile.gitconfig")));
+    // A selected SSH/account profile with a configuration error must never obstruct or
+    // redirect a practice command, including captured worker contexts and binary reads.
+    let hostile_context = crate::connections::Context {
+        git_config: Some(root.join("hostile.gitconfig")),
+        choices: crate::connections::Choices {
+            ssh_key: root
+                .join("missing-selected-key")
+                .to_string_lossy()
+                .into_owned(),
+            github: crate::connections::Account {
+                host: "fixture.invalid".into(),
+                user: "selected-hostile-account".into(),
+                config_dir: root
+                    .join("missing-account-config")
+                    .to_string_lossy()
+                    .into_owned(),
+            },
+            ..Default::default()
+        },
+        error: Some("Fixture profile must not govern Practice".into()),
+        ..Default::default()
+    };
+    crate::connections::set(hostile_context.clone());
+    assert!(
+        git::run(Some(&root.join("caller")), &["rev-parse", "HEAD"])
+            .is_err_and(|error| error.contains("Fixture profile"))
+    );
     let ctx = harness.ctx.clone();
     harness
         .state_mut()
@@ -76,6 +102,45 @@ fn exercise_app(root: &Path) -> Result<(), String> {
     assert!(git::run(Some(&path), &["config", "--get", "practice.profile"]).is_err());
     assert!(git::run(Some(&path), &["config", "--get", "practice.injected"]).is_err());
     assert_eq!(git::identity(&path).email, "practice@example.invalid");
+    // New shared activity transport must use the same practice-aware command builder.
+    let activity = git::activity::read(
+        &path,
+        100,
+        &|| true,
+        &std::sync::atomic::AtomicUsize::new(0),
+    )?;
+    assert!(!activity.commits.is_empty());
+    assert!(
+        activity
+            .commits
+            .iter()
+            .all(|c| c.email == "practice@example.invalid" && c.subject != "Caller history")
+    );
+    use egui_kittest::kittest::Queryable as _;
+    let active = harness.state().active;
+    let action = match harness.state().tabs.get(active) {
+        Some(Tab::Repo(tab)) => tab
+            .palette_items()
+            .into_iter()
+            .find(|(label, _, _)| label == "Activity calendar")
+            .map(|(_, _, action)| action),
+        _ => None,
+    }
+    .ok_or("No activity command")?;
+    apply(&mut harness, action)?;
+    let until = Instant::now() + Duration::from_secs(5);
+    let label = format!("{} unique commits", activity.commits.len());
+    loop {
+        harness.step();
+        if harness.query_by_label_contains(&label).is_some() {
+            break;
+        }
+        if Instant::now() >= until {
+            return Err("Practice activity did not show its own history".into());
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    apply(&mut harness, Action::CloseActivity)?;
     // Streaming/piped history is a separate spawn route from ordinary reads/mutations.
     let mut stream = git::LogStream::start(&path, None, 0)?;
     assert!(
@@ -103,6 +168,51 @@ fn exercise_app(root: &Path) -> Result<(), String> {
     assert!(
         session.check(&path)?,
         "The App's plain push must reach the local practice origin"
+    );
+
+    // Every binary/bounded bundle path must use the same practice context as the App.
+    // With inherited caller GIT_DIR and an active hostile profile, a raw command builder
+    // would expose caller refs here even though the normal HEAD read stays in practice.
+    let bundle_refs = git::bundle_refs(&path)?;
+    let bundle_head = git::head(&path);
+    assert!(
+        bundle_refs
+            .iter()
+            .all(|reference| reference.oid == bundle_head),
+        "Bounded bundle ref reads must remain in the practice repository"
+    );
+    let selected = bundle_refs
+        .iter()
+        .find(|reference| reference.name == "HEAD")
+        .ok_or("No practice bundle HEAD")?;
+    let bytes = git::export_bundle(&path, std::slice::from_ref(selected), None)?;
+    let bundle_file = root.join("isolated-practice.bundle");
+    git::save_bundle_file(&bundle_file, &bytes)?;
+    let snapshot = git::read_bundle_file(&bundle_file)?;
+    assert_eq!(snapshot, bytes);
+    let refs_before_preview = git::run(Some(&path), &["show-ref"])?;
+    let preview = git::inspect_bundle(&path, snapshot)?;
+    assert!(
+        preview.verification_error.is_none(),
+        "{:?}",
+        preview.verification_error
+    );
+    assert_eq!(git::run(Some(&path), &["show-ref"])?, refs_before_preview);
+    git::import_bundle(
+        &path,
+        &preview,
+        &[git::BundleImport {
+            source: "HEAD".to_owned(),
+            destination: "refs/heads/practice-bundle-copy".to_owned(),
+        }],
+    )?;
+    assert_eq!(
+        git::resolve(&path, "refs/heads/practice-bundle-copy")?,
+        bundle_head
+    );
+    assert!(
+        !root.join("escaped").exists(),
+        "Bundle paths must not run caller/profile helpers"
     );
 
     // Opening a linked practice worktree must not return to inherited caller routing.
@@ -180,6 +290,10 @@ fn exercise_app(root: &Path) -> Result<(), String> {
 
     // The same active profile still applies to a non-practice repository. This fix must
     // not globally sanitize the user's environment or change normal tab behavior.
+    crate::connections::set(crate::connections::Context {
+        error: None,
+        ..hostile_context
+    });
     assert_eq!(
         git::run(
             Some(&root.join("caller")),
@@ -189,7 +303,7 @@ fn exercise_app(root: &Path) -> Result<(), String> {
         "normal-tabs-keep-this"
     );
     drop(harness);
-    git::set_profile_config(None);
+    crate::connections::set(Default::default());
     std::fs::remove_dir_all(path.parent().ok_or("No sandbox root")?).map_err(|e| e.to_string())?;
     Ok(())
 }

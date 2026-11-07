@@ -163,7 +163,7 @@ impl App {
         let (tx, rx) = channel();
         let ctx2 = ctx.clone();
         let dest2 = dest.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let result = if options == git::CloneOptions::default() {
                 git::clone(&url, &dest2, creds.as_ref())
             } else {
