@@ -65,6 +65,15 @@ const FEATURES: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "Standalone diff and merge tools",
+        &[
+            "gitcraft --diff BEFORE AFTER opens a read-only file comparison outside repositories. gitcraft --merge BASE LOCAL REMOTE MERGED (or --mergetool) opens the conflict/result editor; input files stay read-only. Native paths and an optional -- separator are supported.",
+            "A merge starts with existing MERGED so previous manual work stays visible. Use computed merge deliberately resets only the unsaved editor. Whole-file choices preserve binary/non-UTF8 bytes. Save and finish checks snapshots, retains the previous output in a sibling recovery folder and installs create-only; concurrent destinations are never silently overwritten. Inspect retained recovery files before deleting them.",
+            "Normal close of a loaded diff exits 0. Cancel or an unsaved merge exits 1; usage/load/save errors exit 2. A merge exits 0 only after explicit successful saving. Limits: 2 MiB per default file stream, 20,000 text input lines, 200 editable conflict blocks. Unsupported save filesystems/metadata and output links/devices are refused explicitly.",
+            "Settings → Git → Git file tools previews and explicitly registers this executable as Git's named difftool/mergetool, with trusted merge exit status. Defaults change only if selected. Use git difftool --tool=gitcraft --trust-exit-code and git mergetool --tool=gitcraft; standalone startup never installs configuration or opens a repository/profile.",
+        ],
+    ),
+    (
         "File comparison views",
         &[
             "File views in the toolbar and the palette open File migration map, Three-state staging lens, and File versions across branches. They read raw repository bytes in the background; alternate diff renderers and their selections are closed when entering these views.",

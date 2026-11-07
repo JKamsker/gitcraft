@@ -4,6 +4,7 @@ mod directory;
 mod files;
 mod model;
 mod permissions;
+pub(crate) mod registration;
 mod save;
 mod ui;
 
