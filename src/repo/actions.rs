@@ -62,6 +62,12 @@ pub(crate) enum Action {
     PullWith(PullMode),
     Push,
     Reload,
+    OpenSparse,
+    AllowHistoryDownload(Box<Action>),
+    SetSparse {
+        before: Box<git::SparseState>,
+        folders: Option<Vec<String>>,
+    },
     LoadMore,
     Undo,
     Redo,
@@ -328,6 +334,11 @@ impl RepoTab {
                 .into(),
                 "remote".into(),
                 Action::Push,
+            ),
+            (
+                "Sparse checkout…".into(),
+                "folders".into(),
+                Action::OpenSparse,
             ),
         ];
         items.extend(

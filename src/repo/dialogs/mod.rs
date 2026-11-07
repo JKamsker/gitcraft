@@ -23,6 +23,18 @@ pub enum Dialog {
         target: String,
         topic: String,
     },
+    HistoryLoading(u64),
+    DownloadHistory {
+        path: String,
+        action: Option<Box<Action>>,
+    },
+    SparseLoading(u64),
+    Sparse {
+        state: Box<crate::git::SparseState>,
+        selected: std::collections::BTreeSet<String>,
+        enabled: bool,
+        convert: bool,
+    },
     CreateBranch {
         /// Commit the branch starts at.
         at: String,
@@ -254,7 +266,7 @@ impl Dialog {
     }
 }
 
-enum Outcome {
+pub(super) enum Outcome {
     Open,
     /// Still open; the branch changed, so suggest a folder again.
     Suggest,
@@ -299,6 +311,38 @@ impl RepoTab {
                     target,
                     topic,
                 } => gerrit::review(ui, remote, head, targets, target, topic),
+                Dialog::HistoryLoading(_) => {
+                    ui.label("Checking whether file contents need downloading…");
+                    ui.add(crate::spinner::Spinner::new());
+                    if ui.button("Cancel").clicked() { Outcome::Cancel } else { Outcome::Open }
+                }
+                Dialog::DownloadHistory { path, action } => {
+                    ui.heading("Download file contents?");
+                    ui.label(format!("{path} has file contents that are not stored locally. Opening this view lets Git download them from the repository's remote."));
+                    let mut outcome = Outcome::Open;
+                    ui.horizontal(|ui| {
+                        if ui.button("Download and open").clicked() && let Some(action) = action.take() {
+                            outcome = Outcome::Done(Action::AllowHistoryDownload(action));
+                        }
+                        if ui.button("Cancel").clicked() { outcome = Outcome::Cancel; }
+                    });
+                    outcome
+                }
+                Dialog::SparseLoading(_) => {
+                    ui.label("Reading sparse checkout and folders…");
+                    ui.add(crate::spinner::Spinner::new());
+                    if ui.button("Cancel").clicked() {
+                        Outcome::Cancel
+                    } else {
+                        Outcome::Open
+                    }
+                }
+                Dialog::Sparse {
+                    state,
+                    selected,
+                    enabled,
+                    convert,
+                } => super::sparse::dialog(ui, state, selected, enabled, convert),
                 Dialog::CreateBranch {
                     at,
                     at_label,

@@ -12,6 +12,17 @@ so your config, credentials and hooks apply as usual.
 
 - Start page: checks that `git` is installed; open, create (`git init`) or clone a repository;
   recent repositories.
+- Clone options: shallow history with a chosen depth, blobless partial clones, and selected
+  folders (one path per line). With blobless and sparse combined, only checked-out file
+  contents download initially. In an open
+  repository, **Sparse checkout…** in the palette offers a folder tree, or a return to a full
+  checkout. Root files and files immediately inside parent folders are always included. It
+  refuses uncommitted, untracked or ignored files and asks before replacing custom non-cone
+  patterns. Move ignored files outside the working tree first; Git can delete them during
+  sparse changes, even when an ordinary status looks clean.
+  Partial clones show a download notice; opening a historical file or diff whose contents
+  are missing asks before Git downloads them. The server must support partial clones.
+  These options run on the repository's machine, including WSL and SSH.
 - Browser-like tabs, one per repository (Ctrl+T, Ctrl+W, middle-click; Ctrl+Shift+T reopens a
   closed one). Open tabs, recents, theme and settings are remembered.
 - Profiles, as in GitKraken: switch between them from the title bar (or the palette). Each has

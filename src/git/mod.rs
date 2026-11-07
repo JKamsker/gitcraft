@@ -1,6 +1,7 @@
 //! Thin wrapper over the `git` command line. Every call shells out to the installed git, so
 //! gitcraft behaves exactly like the user's own git (config, credentials, hooks).
 
+mod clone_options;
 mod command;
 mod commits;
 mod diff;
@@ -11,6 +12,7 @@ mod status;
 mod submodule;
 mod worktree;
 
+pub use self::clone_options::*;
 pub use self::command::*;
 pub use self::commits::*;
 pub use self::diff::*;
@@ -61,13 +63,7 @@ fn not_an_option(rev: &str) -> Result<&str, String> {
 /// `git clone url dest`, run from `dest`'s parent.
 /// For a `dest` in WSL or over SSH, git there clones it, from that machine's home folder.
 pub fn clone(url: &str, dest: &Path, creds: Option<&Credentials>) -> Result<(), String> {
-    if let Some(target) = crate::remote::parse(dest) {
-        let (from, there) = clone_from(&target.path);
-        let from = crate::remote::encode(&target.host, from);
-        return run_with(Some(&from), &["clone", "--", url, &there], creds).map(|_| ());
-    }
-    let dest = dest.to_string_lossy();
-    run_with(None, &["clone", "--", url, &dest], creds).map(|_| ())
+    clone_with_options(url, dest, creds, &CloneOptions::default())
 }
 
 /// Where git clones into `dest` (a path on another machine) from, and `dest` as it is given:
