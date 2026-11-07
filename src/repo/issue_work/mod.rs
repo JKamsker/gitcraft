@@ -121,6 +121,26 @@ pub(super) struct Plan {
 }
 
 impl RepoTab {
+    pub(super) fn forge_issues_changed(&mut self) {
+        self.issue_work.requests += 1;
+        self.issue_work.picker = None;
+        self.issue_work.refreshing = None;
+    }
+
+    fn issue_matches_forge(&self, link: &IssueLink) -> bool {
+        let Some(hosting) = &self.hosting else {
+            return true;
+        };
+        let place = link
+            .url
+            .rsplit_once("/-/issues/")
+            .or_else(|| link.url.rsplit_once("/issues/"))
+            .and_then(|(repo, _)| crate::forge::location(repo));
+        place.is_some_and(|(host, path)| {
+            host == hosting.host && path.eq_ignore_ascii_case(&hosting.path)
+        })
+    }
+
     pub(super) fn issue_act(&mut self, act: IssueAct, ctx: &egui::Context) {
         match act {
             IssueAct::OpenPicker => self.open_issue_picker(ctx),
@@ -138,6 +158,9 @@ impl RepoTab {
     /// into, when it was made for an issue.
     pub(super) fn issue_pull_request(&self, branch: &str) -> Option<(String, String, String)> {
         let link = self.issue_work.links.get(branch)?;
+        if !self.issue_matches_forge(link) {
+            return None;
+        }
         let (title, body) = link.pull_request_text();
         Some((title, body, self.issue_base().name))
     }
@@ -177,7 +200,7 @@ impl RepoTab {
             .unwrap_or_default();
         self.issue_work.picker = Some(picker::Picker::new(hosting.forge.name(), filter));
         let path = self.path.clone();
-        self.then(
+        self.forge_then(
             ctx,
             move || hosting.forge.provider().assigned_issues(&path, &hosting),
             move |tab, result, _| {
@@ -356,7 +379,10 @@ impl RepoTab {
     /// The branch pull requests of the work on an issue go into: the remote's default branch
     /// (where its `HEAD` points), else the usual guess (main, master or develop).
     pub(super) fn issue_base(&self) -> Base {
-        let remote = self.default_remote();
+        let remote = self
+            .primary_forge_remote()
+            .map(str::to_owned)
+            .or_else(|| self.default_remote());
         let known = remote
             .as_ref()
             .and_then(|r| self.issue_work.remote_heads.get(r))
@@ -419,7 +445,18 @@ impl RepoTab {
             ));
             return;
         };
-        let Some(number) = self.issue_work.links.get(&branch).map(|l| l.number) else {
+        let Some(number) = self
+            .issue_work
+            .links
+            .get(&branch)
+            .filter(|l| self.issue_matches_forge(l))
+            .map(|l| l.number)
+        else {
+            self.status = Some((
+                "This issue belongs to another forge repository; open its saved URL to view it"
+                    .into(),
+                true,
+            ));
             return;
         };
         if self.issue_work.refreshing.is_some() {
@@ -427,7 +464,7 @@ impl RepoTab {
         }
         self.issue_work.refreshing = Some(branch.clone());
         let path = self.path.clone();
-        self.then(
+        self.forge_then(
             ctx,
             move || hosting.forge.provider().issue(&path, &hosting, number),
             move |tab, result, ctx| {

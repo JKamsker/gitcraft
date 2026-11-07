@@ -156,6 +156,8 @@ impl super::RepoTab {
         self._jobs = crate::tasks::Scope::default();
         self.tx = super::messages::JobSender {
             sender,
+            forge_generation: None,
+            forge_operation: false,
             cancel: self._jobs.0.clone(),
             repo: self.path.clone(),
         };

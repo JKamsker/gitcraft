@@ -79,7 +79,11 @@ impl CiStatuses {
 impl RepoTab {
     /// The repository on its forge, whose builds are shown.
     pub(super) fn ci_project(&self) -> Option<Project> {
-        Project::of(self.forge()?, &self.remotes)
+        let remote = self
+            .remotes
+            .iter()
+            .find(|r| Some(r.name.as_str()) == self.primary_forge_remote())?;
+        Project::of(self.forge()?, std::slice::from_ref(remote))
     }
 
     /// The build status of commit `sha`, if it has one.
@@ -143,7 +147,7 @@ impl RepoTab {
         let path = self.path.clone();
         // Answered all the same if it panics: no statuses are read again until it is.
         let failed = move |e| Msg::CiStatuses(fresh, Err(e));
-        super::messages::spawn_or(&self.tx, ctx, failed, move || {
+        super::messages::spawn_or(&self.forge_sender(), ctx, failed, move || {
             Msg::CiStatuses(fresh, ci::statuses(&path, &project, &shas))
         });
     }

@@ -23,8 +23,9 @@ pub(super) struct Loaded {
     pub(super) worktrees: Vec<Worktree>,
     pub(super) stashes: Vec<Stash>,
     pub(super) remotes: Vec<Remote>,
-    /// The forge `origin` is on, if gitcraft knows it.
-    pub(super) hosting: Option<Hosting>,
+    /// Usable forge remotes; the latest UI preference chooses among these on arrival.
+    pub(super) forge_remotes: Vec<(String, Hosting)>,
+    pub(super) forge_generation: u64,
     pub(super) submodules: Vec<Submodule>,
     /// It keeps files in Git LFS, and git-lfs is installed.
     pub(super) lfs: bool,
@@ -75,6 +76,7 @@ impl RepoTab {
         self.loading = true;
         self.load_started = Some(Instant::now());
         let read = self.next_read();
+        let forge_generation = self.forge_generation;
         let path = self.path.clone();
         // Keep the pages already loaded.
         let count = self.history.len().clamp(git::LOG_PAGE, MAX_HISTORY);
@@ -113,7 +115,7 @@ impl RepoTab {
                 };
                 let remotes = {
                     let path = path.clone();
-                    crate::tasks::read(move || git::remotes(&path).unwrap_or_default())?
+                    crate::tasks::read(move || git::remotes(&path))?
                 };
                 let submodules = {
                     let path = path.clone();
@@ -132,13 +134,13 @@ impl RepoTab {
                 let (work, worktrees) = work_trees.join()??;
                 let (stashes, remotes, submodules, lfs, issues) = (
                     stashes.join()?,
-                    remotes.join()?,
+                    remotes.join()??,
                     submodules.join()?,
                     lfs.join()?,
                     issues.join()?,
                 );
                 let path = path.as_path();
-                let hosting = forge::detect(path, &remotes);
+                let forge_remotes = forge::detect_remotes(path, &remotes);
                 Ok(Box::new(Loaded {
                     refs,
                     history,
@@ -146,7 +148,8 @@ impl RepoTab {
                     worktrees,
                     stashes,
                     remotes,
-                    hosting,
+                    forge_remotes,
+                    forge_generation,
                     submodules,
                     lfs,
                     identity,
@@ -344,7 +347,7 @@ impl RepoTab {
         let asked = Instant::now();
         self.prs_loaded = Some(asked);
         let path = self.path.clone();
-        spawn(&self.tx, ctx, move || {
+        spawn(&self.forge_sender(), ctx, move || {
             Msg::Prs(asked, hosting.forge.provider().list(&path, &hosting))
         });
         self.load_merged_prs(ctx);
@@ -456,26 +459,10 @@ impl RepoTab {
         }
         self.lfs = loaded.lfs;
         self.take_issue_read(loaded.issues);
-        // Another project (origin pointed elsewhere): its pull requests are other ones, under
-        // the same numbers, and a list asked of the old one is not to be taken in.
         let remotes_changed = loaded.remotes != self.remotes;
         self.remotes = loaded.remotes;
-        if loaded.hosting != self.hosting || remotes_changed {
-            let moved = !same_repository(self.hosting.as_ref(), loaded.hosting.as_ref());
-            self.hosting = loaded.hosting;
-            self.prs.clear();
-            self.pr_error = None;
-            self.prs_loaded = None;
-            self.forget_merged_prs();
-            if moved {
-                // The page and what was written for it are another repository's now: sent, they
-                // would go to this one, under that number.
-                self.close_pr();
-                self.ci_view = None;
-                self.pr_drafts.clear();
-                self.avatars_hinted = false;
-            }
-        }
+        self.forge_remotes = loaded.forge_remotes;
+        self.take_forge_catalog(remotes_changed, loaded.forge_generation, ctx);
         // The forge is asked by itself only while gitcraft may go on the network by itself.
         let paused = !crate::network::background_may_run();
         if !paused
@@ -740,13 +727,16 @@ impl RepoTab {
         let mut emails: Vec<String> = self.history.iter().map(|c| c.email.clone()).collect();
         emails.sort();
         emails.dedup();
-        let ctx = ctx.clone();
-        std::thread::spawn(move || {
-            for (email, hint) in hosting.forge.provider().avatars(&repo, &hosting, &emails) {
-                crate::avatars::hint(&email, hint);
-            }
-            ctx.request_repaint();
-        });
+        self.forge_then(
+            ctx,
+            move || hosting.forge.provider().avatars(&repo, &hosting, &emails),
+            |_, hints, ctx| {
+                for (email, hint) in hints {
+                    crate::avatars::hint(&email, hint);
+                }
+                ctx.request_repaint();
+            },
+        );
     }
 }
 
