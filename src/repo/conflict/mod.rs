@@ -362,15 +362,16 @@ impl ConflictEditor {
         let text =
             String::from_utf8(crate::git::worktree_file(&crate::remote::join(repo, path)).ok()?)
                 .ok()?;
+        let editor = Self::from_text(path, text, state);
+        (editor.on_disk > 0).then_some(editor)
+    }
+    fn from_text(path: &str, text: String, state: Option<InProgress>) -> Self {
         let (segments, ours_label, theirs_label) = parse(&text);
         let conflicts = segments
             .iter()
             .filter(|s| matches!(s, Segment::Conflict { .. }))
             .count();
-        if conflicts == 0 {
-            return None;
-        }
-        Some(Self {
+        Self {
             path: path.to_owned(),
             choices: vec![None; conflicts],
             original: original::State::new(&segments),
@@ -389,7 +390,18 @@ impl ConflictEditor {
             history: Default::default(),
             reused: None,
             memo: Default::default(),
-        })
+        }
+    }
+
+    pub(crate) fn standalone(text: String) -> Result<Self, String> {
+        let editor = Self::from_text("MERGED", text, None);
+        if editor.on_disk > 200 {
+            return Err("More than 200 conflicts; choose a whole file".into());
+        }
+        Ok(editor)
+    }
+    pub(crate) fn resolved(&self) -> bool {
+        self.unresolved() == 0
     }
 
     /// Whether the file in the repository at `repo` is no longer as it was opened (here, one

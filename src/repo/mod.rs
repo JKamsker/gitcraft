@@ -22,7 +22,7 @@ mod collision_view;
 pub(crate) mod columns;
 mod commands;
 mod commit_actions;
-mod conflict;
+pub(crate) mod conflict;
 mod conflict_check;
 #[cfg(test)]
 mod cpu_benchmarks;
@@ -42,7 +42,7 @@ mod drift_view;
 mod error_help;
 mod external_tools;
 pub(crate) mod fence_view;
-mod file_comparison;
+pub(crate) mod file_comparison;
 mod file_text;
 pub(crate) mod file_view;
 mod find;

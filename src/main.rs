@@ -8,18 +8,82 @@ use eframe::egui_wgpu::{SurfaceConfig, WgpuConfiguration, WgpuSetup, WgpuSetupCr
 use gitcraft::app;
 
 fn main() -> eframe::Result {
+    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    let explicit = args.first().is_some_and(|a| {
+        [
+            "--diff",
+            "--difftool",
+            "--merge",
+            "--mergetool",
+            "--help",
+            "--version",
+            "-h",
+            "-V",
+        ]
+        .iter()
+        .any(|flag| a == flag)
+    });
+    if args.len() == 1 && args.first().is_some_and(|a| a == "--help" || a == "-h") {
+        println!(
+            "{}\n{}",
+            gitcraft::launch::args::USAGE,
+            gitcraft::standalone::USAGE
+        );
+        return Ok(());
+    }
+    if args.len() == 1 && args.first().is_some_and(|a| a == "--version" || a == "-V") {
+        println!("gitcraft {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+    if !explicit
+        && args.iter().any(|a| a.to_str().is_none())
+        && (std::env::var_os("GITCRAFT_ASKPASS").is_some()
+            || args.first().is_some_and(|a| {
+                a == "--gitcraft-profile-ssh" || a == "--gitcraft-profile-credential"
+            }))
+    {
+        std::process::exit(1);
+    }
     // Started by ssh to ask the running app something (see `remote::askpass`): no window.
-    if let Some(code) = app::askpass_helper() {
+    if !explicit && let Some(code) = app::askpass_helper() {
         std::process::exit(code);
     }
     // `gitcraft mcp`: the MCP server for coding agents, on stdin and stdout; no window.
-    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
     if args.first().is_some_and(|a| a == "mcp") {
         std::process::exit(gitcraft::mcp::main(&args[1..]));
     }
     // Run by a coding agent's hook after each turn (see `agent::checkpoint`): no window.
     if let Some(code) = app::checkpoint_cli() {
         std::process::exit(code);
+    }
+    if args
+        .first()
+        .is_some_and(|a| a == "--diff" || a == "--difftool" || a == "--merge" || a == "--mergetool")
+    {
+        let invocation = match gitcraft::standalone::parse(args.clone()) {
+            Ok(invocation) => invocation,
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(2);
+            }
+        };
+        let options = eframe::NativeOptions {
+            viewport: app::window_viewport()
+                .with_title("GitCraft file tools")
+                .with_inner_size([1400.0, 860.0])
+                .with_icon(app::window_icon()),
+            wgpu_options: wgpu_options(),
+            ..Default::default()
+        };
+        let outcome = gitcraft::standalone::run(invocation, options);
+        app::after_exit();
+        match outcome {
+            Ok(code) => std::process::exit(i32::from(code)),
+            Err(error) => {
+                app::tell(&error, true);
+                std::process::exit(2);
+            }
+        }
     }
     let args = gitcraft::launch::args::from_system(std::env::args_os().skip(1));
     let launch = match gitcraft::launch::parse(args.clone()) {

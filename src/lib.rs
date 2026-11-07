@@ -51,6 +51,7 @@ mod safe_read;
 mod settings;
 mod shell_path;
 mod spinner;
+pub mod standalone;
 mod tab_look;
 mod tasks;
 mod teleport;

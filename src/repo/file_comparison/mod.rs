@@ -15,6 +15,41 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
+/// The same content-only renderer, without a repository tab or mutation actions.
+pub(crate) struct ReadOnlyComparison(model::Pair);
+impl ReadOnlyComparison {
+    pub(crate) fn prepare(
+        labels: [String; 2],
+        bytes: [Vec<u8>; 2],
+        present: [bool; 2],
+        active: &dyn Fn() -> bool,
+    ) -> Result<Self, String> {
+        let [a, b] = bytes;
+        let versions = [a, b]
+            .into_iter()
+            .zip(present)
+            .map(|(bytes, present)| files::Version {
+                mode: present.then(|| "100644".into()),
+                oid: None,
+                bytes,
+                warning: None,
+            })
+            .collect::<Vec<_>>();
+        let boundary = model::boundary("standalone", &versions[0], &versions[1], active)?;
+        let [a, b]: [files::Version; 2] = versions
+            .try_into()
+            .map_err(|_| "Invalid comparison sides")?;
+        Ok(Self(model::Pair {
+            labels,
+            versions: [a, b],
+            boundary,
+        }))
+    }
+    pub(crate) fn ui(&self, ui: &mut egui::Ui) {
+        view::show_pair(ui, &self.0, &crate::theme::Tokens::get(ui.ctx()));
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Page {
     Migration,

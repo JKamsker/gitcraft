@@ -376,3 +376,5 @@ pub fn clone_with(
     args.extend(["--", url, &there]);
     run_with(from.as_deref(), &args, creds).map(|_| ())
 }
+
+pub(crate) use bundles::bundle_git_path;

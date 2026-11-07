@@ -904,6 +904,19 @@ impl Settings {
                 section(
                     ui,
                     f,
+                    "Git file tools",
+                    Some("Use gitcraft as Git's difftool and mergetool."),
+                    |card| {
+                        card.row(
+                            "Register gitcraft",
+                            "difftool mergetool compare files standalone global config",
+                            crate::standalone::registration::settings_ui,
+                        );
+                    },
+                );
+                section(
+                    ui,
+                    f,
                     "Remote machines",
                     Some(
                         "Repositories in WSL or over SSH run git there, with that machine's own \
