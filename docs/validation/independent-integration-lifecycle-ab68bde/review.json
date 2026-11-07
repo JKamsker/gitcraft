@@ -1,0 +1,40 @@
+{
+  "verdict": "STATIC PASS",
+  "from": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+  "to": "ab68bdedd387236c03f26f839572860d405a2f7f",
+  "tree": "e5f6b5b28e574c2ab6506aebbeb6acbb3a344e5c",
+  "scope": "integration-only SSH/Drafts/SOPS/Content/SavedViews lifecycle and message/dispatch/painter handoff; feature bodies excluded",
+  "manifests": [
+    {
+      "head": "2db60b38b9e79f35c6158d81ca20be41c4427852",
+      "tree": "503e943a17dc91a89200b83711dfed00c1fe08f8",
+      "manifest_sha256": "4e3abfc2c9d5d9aefea99ff227d1df2f9184bdb134d875094ad2529c63486025",
+      "logs_verified": 7,
+      "summary": "911 passed;0 failed;3 ignored;0 filtered;914 registered",
+      "expected_name_union_sha256": "c126deeeb176726a430a361c17114e268ca10ddde0b62819e8a2ba36d95e838e"
+    },
+    {
+      "head": "23dd87fb5ff98af98846a517f983d8afb0d567a4",
+      "tree": "c60dc1bb1b16cad1179fab4d09378bec3b9b7f8f",
+      "manifest_sha256": "8631245b593e843e9c614bbd36979f63dcf4ad57a364476133315ee7c6e73830",
+      "logs_verified": 5,
+      "summary": "933 passed;0 failed;3 ignored;0 filtered;936 registered",
+      "expected_name_union_sha256": "af95ac0f1ba922abacebfbfd3fc1740f7f967ca48ffeb6d01da8a8dcac904436"
+    },
+    {
+      "head": "ab68bdedd387236c03f26f839572860d405a2f7f",
+      "tree": "e5f6b5b28e574c2ab6506aebbeb6acbb3a344e5c",
+      "manifest_sha256": "4d5a360135e7163f72224c075d0529008deb8d68f9eb76347fbdd1d5129dd4a3",
+      "logs_verified": 4,
+      "summary": "945 passed;0 failed;3 ignored;0 filtered;948 registered",
+      "expected_name_union_sha256": "2242c36f0875d2820e154b29ccea8723baa65165d34b0ee1981de6471ba537af"
+    }
+  ],
+  "lifecycle_diff_sha256": "f9090eb139f176c14cb3e5d6b31d8a2d2b637efc1bd2191a91fb8e056b61caa1",
+  "runtime": "No independent integration runtime/compile executed; supplied exact gate logs hash-verified",
+  "limits": [
+    "No CI",
+    "No native Windows/live SSH/WSL/provider accounts",
+    "Final whole candidate independent review remains pending"
+  ]
+}
