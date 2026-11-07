@@ -121,3 +121,57 @@ pub(super) fn verify(
     ready.pending_setup = None;
     Ok(ready)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn tea_round_trip_pins_public_owner_and_host_without_exporting_token_or_auth_folder()
+    -> Result<(), String> {
+        const CHILD: &str = "GITCRAFT_PORTABLE_TEA_FIXTURE";
+        if let Some(root) = std::env::var_os(CHILD) {
+            let root = std::path::PathBuf::from(root);
+            let config = root.join("tea/config.yml");
+            let write = |host: &str, user: &str| {
+                std::fs::write(&config,format!("logins:\n- name: work\n  url: https://{host}\n  user: {user}\n  token: FIXTURE_TOKEN_MUST_NOT_EXPORT\n")).map_err(|e|e.to_string())
+            };
+            write("forge.fixture.invalid", "expected-work-user")?;
+            let mut settings = crate::settings::Settings::default();
+            settings.user_profiles[0].connections.tea_login = "work".into();
+            settings.user_profiles[0].connections.tea_host = "forge.fixture.invalid".into();
+            let mut file = crate::portability::Setup::new(&settings, &Default::default());
+            file.resolve_public_accounts()?;
+            let bytes = file.encode()?;
+            assert!(!String::from_utf8_lossy(&bytes).contains("FIXTURE_TOKEN"));
+            assert!(!String::from_utf8_lossy(&bytes).contains(root.to_str().ok_or("UTF-8 root")?));
+            let profile = crate::portability::Setup::decode(&bytes)?.profiles[0].materialize(99);
+            assert!(profile.pending_setup());
+            let ready = verify(&profile, &Fresh::default(), &|| true)?;
+            assert_eq!(ready.connections.tea_login, "work");
+            assert!(!ready.pending_setup());
+            write("forge.fixture.invalid", "different-personal-user")?;
+            assert!(
+                verify(&profile, &Fresh::default(), &|| true)
+                    .is_err_and(|e| e.contains("different account"))
+            );
+            write("different.fixture.invalid", "expected-work-user")?;
+            assert!(
+                verify(&profile, &Fresh::default(), &|| true)
+                    .is_err_and(|e| e.contains("different HTTPS"))
+            );
+            return Ok(());
+        }
+        let repo = crate::practice::create(crate::practice::Scenario::Published)?;
+        let root = repo.parent().ok_or("root")?.join("portable-tea-config");
+        std::fs::create_dir_all(root.join("tea")).map_err(|e| e.to_string())?;
+        let output=std::process::Command::new(std::env::current_exe().map_err(|e|e.to_string())?).args(["--exact","app::setup::pending::tests::tea_round_trip_pins_public_owner_and_host_without_exporting_token_or_auth_folder","--nocapture"]).env(CHILD,&root).env("XDG_CONFIG_HOME",&root).output().map_err(|e|e.to_string())?;
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        std::fs::remove_dir_all(repo.parent().ok_or("root")?).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+}

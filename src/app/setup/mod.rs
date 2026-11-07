@@ -176,6 +176,8 @@ impl App {
                 .messages
                 .push(format!("Setup saved to {}", path.display())),
             Ok(Answer::Restored(index, outcome)) => {
+                let complete = outcome.complete;
+                let restored_root = outcome.receipt.as_ref().map(|r| r.root.clone());
                 if let Some(plan) = self.setup.plans.get_mut(index) {
                     plan.receipt = outcome.receipt;
                     plan.messages = outcome.messages;
@@ -188,6 +190,30 @@ impl App {
                                 &r.hidden,
                             );
                         }
+                    }
+                }
+                if complete
+                    && let (Some(root), Some(file)) = (restored_root, &self.setup.file)
+                    && let Some(repo) = file.repositories.get(index)
+                {
+                    let mut owners = repo
+                        .profile_ids
+                        .iter()
+                        .filter_map(|id| self.setup.mappings.get(id))
+                        .copied()
+                        .collect::<Vec<_>>();
+                    if owners.is_empty() {
+                        owners.push(self.settings.active_profile);
+                    }
+                    for id in owners {
+                        let recent = if id == self.settings.active_profile {
+                            &mut self.recent
+                        } else {
+                            &mut self.profile_states.entry(id).or_default().recent
+                        };
+                        recent.retain(|p| p != &root);
+                        recent.insert(0, root.clone());
+                        recent.truncate(super::MAX_RECENT);
                     }
                 }
             }
@@ -281,6 +307,7 @@ impl App {
         let modal=egui::Modal::new(egui::Id::new("portable-setup")).show(ctx,|ui|{
             ui.set_width(760.0_f32.min((ctx.content_rect().width()-48.0).max(240.0)));
             ui.heading("New machine, same setup");
+            ui.label("Retries remain available during this app session while the owned clone/config is unchanged. Quitting retains files; finish them manually or choose a fresh destination. LFS content and submodules need separate setup after checkout.");
             ui.label("One versioned setup file carries public settings and repository descriptions. It contains no credentials, key bytes, authentication folders or executable configuration. Old paths are labels only; working files, stashes and local-only objects need a separate backup.");
             egui::ScrollArea::vertical().max_height((ctx.content_rect().height()*0.72).max(150.0)).show(ui,|ui|{
                 ui.add_enabled_ui(!busy,|ui|{ui.horizontal(|ui|{ui.selectable_value(&mut self.setup.import,false,"Export setup");ui.selectable_value(&mut self.setup.import,true,"Import setup");});

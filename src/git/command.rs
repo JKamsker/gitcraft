@@ -739,7 +739,9 @@ pub(crate) fn setup_clone(
         cmd.env_remove(name);
     }
     cmd.env("GIT_CONFIG_COUNT", "0")
+        .env("GIT_NO_LAZY_FETCH", "1")
         .args([
+            "--no-lazy-fetch",
             "-c",
             "core.hooksPath=/dev/null",
             "-c",

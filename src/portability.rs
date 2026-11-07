@@ -332,6 +332,9 @@ impl Repository {
         let r = self;
         leaf(&r.name)?;
         text(&r.previous_path, 4096)?;
+        if r.profile_ids.len() > 64 {
+            return Err("Too many profile associations".into());
+        }
         if r.remotes.len() > 32
             || r.worktrees.len() > 64
             || r.hidden.len() > 2000
