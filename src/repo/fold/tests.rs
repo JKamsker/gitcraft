@@ -85,6 +85,24 @@ fn settle(tab: &mut RepoTab, ctx: &egui::Context) {
     }
 }
 
+/// A quiet message queue does not mean an asynchronous read has finished. Wait
+/// for the state requested by the test, even when Git takes longer than 300 ms.
+fn wait_for(tab: &mut RepoTab, ctx: &egui::Context, label: &str, ready: impl Fn(&RepoTab) -> bool) {
+    let start = Instant::now();
+    while !ready(tab) {
+        assert!(
+            start.elapsed() < Duration::from_secs(30),
+            "waiting for {label}: loading={}, busy={:?}, status={:?}",
+            tab.loading,
+            tab.busy_op,
+            tab.status
+        );
+        if let Ok(msg) = tab.rx.recv_timeout(Duration::from_millis(100)) {
+            tab.handle(msg, ctx);
+        }
+    }
+}
+
 /// Waits for the operation the tab started, takes it in (undo history, the reload after), and
 /// says how it ended.
 fn finish(tab: &mut RepoTab, ctx: &egui::Context) -> Option<Result<String, String>> {
@@ -319,7 +337,7 @@ fn a_conflict_aborted_goes_back_to_before_the_fold() {
         Action::AbortFold
     ));
     tab.apply(Action::AbortFold, &ctx);
-    settle(&mut tab, &ctx);
+    wait_for(&mut tab, &ctx, "abort confirmation", |t| t.dialog.is_some());
     let steps = match tab.dialog.take() {
         Some(Dialog::Confirm { ops, title, .. }) => Some((title, ops)),
         _ => None,
@@ -376,9 +394,15 @@ fn a_conflict_continued_is_one_undo() {
         write(&dir, "f1.txt", resolved);
         git_ok(&dir, &["add", "f1.txt"]);
         tab.reload_status(&ctx);
-        settle(&mut tab, &ctx);
+        let read = tab.reads;
+        wait_for(&mut tab, &ctx, "resolved status", |t| {
+            t.work_read >= read && t.work.conflicted.is_empty()
+        });
         tab.apply(Action::Commit, &ctx);
-        let _ = finish(&mut tab, &ctx);
+        assert!(
+            finish(&mut tab, &ctx).is_some(),
+            "continuing the rebase did not start an operation"
+        );
     }
     assert_eq!(git::in_progress(&dir), Ok(None));
     assert_eq!(subjects(&dir), ["c4", "c3", "c2", "c1", "root"]);
@@ -753,7 +777,7 @@ fn abort_is_the_folds_only_while_its_rebase_is_going_on() {
     settle(&mut tab, &ctx);
 
     tab.apply(tab.abort_for(InProgress::Rebase), &ctx);
-    settle(&mut tab, &ctx);
+    wait_for(&mut tab, &ctx, "abort confirmation", |t| t.dialog.is_some());
     let ops = match tab.dialog.take() {
         Some(Dialog::Confirm { ops, .. }) => ops,
         _ => Vec::new(),
@@ -873,7 +897,7 @@ fn an_abort_confirmed_after_the_rebase_was_replaced_resets_no_other_branch() {
     let result = fold(&mut tab, &ctx, "HEAD~3", false);
     assert!(matches!(result, Some(Err(_))), "{result:?}");
     tab.apply(Action::AbortFold, &ctx);
-    settle(&mut tab, &ctx);
+    wait_for(&mut tab, &ctx, "abort confirmation", |t| t.dialog.is_some());
     let asked = match tab.dialog.take() {
         Some(Dialog::Confirm { ops, title, .. }) => Some((title, ops)),
         _ => None,
