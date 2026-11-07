@@ -408,6 +408,11 @@ so your config, credentials and hooks apply as usual.
 - The arrows in a diff's header (F7 / Shift+F7, or Alt+↓ / Alt+↑) jump to the next and previous
   change. The strip beside the scrollbar marks where the changes are, removals red and additions
   green; click a mark to jump to its change, or anywhere else on the strip to scroll there.
+- The panel button in a diff's header (or Settings → Graph → Diffs) puts the diff below the graph
+  instead of in its place (remembered): the graph stays usable, selecting another commit keeps
+  the diff, which follows the next file opened, and the border between them drags to resize.
+  Diffs of a file's history, of a pull request, over the builds, and the conflict editor keep
+  their own place.
 - The _Diff_ / _File_ switch shows the whole file as it is after the change instead (before it,
   for a deleted file), coloured and with line numbers.
 - Ctrl+F in a diff (unified or side by side), a file or a blame finds in it rather than in the
@@ -560,6 +565,11 @@ so your config, credentials and hooks apply as usual.
 
 - Undo, redo, Fetch, Pull, Push (with incoming / outgoing counts) and Sync, new branch, stash, terminal,
   search, open the folder (Explorer / Finder, your editor), refresh (F5).
+- Back and forward (the arrows at the start of the toolbar, Alt+← / Alt+→, or the mouse's back
+  and forward buttons) go through the tab's recent views: the graph with its selected commit,
+  diffs, a file's history, blame or contents, pull requests and builds. Clicking through commits
+  in the graph is one step; following a link (a parent, a branch, a tag) is a step of its own.
+  If its commit or change has gone since, the status bar says so.
 - Pull's arrow (or a right-click on it) sets what it does: fast-forward, merging when the branch
   has diverged; fast-forward only; or rebase. Also in Settings, and the menu has _Fetch all_.
 - _Sync_ pulls (the way Pull is set to), then pushes; if the pull fails (conflicts, or it can't
@@ -870,6 +880,9 @@ was made this way, on a demo repository.
 | `src/repo/detail.rs`     | commit / stash detail, changes and commit box                                      |
 | `src/repo/detail/extras/` | a commit's signature, containing branches and tags, notes and backlinks          |
 | `src/repo/diff.rs`       | diff loading, pairing and the diff view (unified, split, images)                   |
+| `src/repo/diff_split.rs` | the diff below the graph instead of in its place |
+| `src/repo/nav_history.rs` | the back / forward list of a tab's recent views |
+| `src/repo/navigation/` | back and forward: the view shown as a place, showing one again, keys and buttons |
 | `src/repo/highlight.rs`  | syntax colours (syntect)                                                           |
 | `src/vscode_theme.rs`    | VS Code's current colour theme as a syntect theme                                  |
 | `src/repo/conflict.rs`   | three-pane conflict editor, each conflict's original, Keep both                    |

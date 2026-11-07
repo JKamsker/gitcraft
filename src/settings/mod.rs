@@ -75,6 +75,8 @@ pub struct Settings {
     pub diff_split: bool,
     /// Diffs show the whole file, not just the lines around the changes.
     pub diff_whole_file: bool,
+    /// Diffs of commits and of the working tree show below the graph, not in its place.
+    pub diff_beside_graph: bool,
     /// Background fetch interval in minutes; 0 turns it off.
     pub auto_fetch_minutes: u32,
     /// What the toolbar's Pull does.
@@ -156,6 +158,7 @@ impl Default for Settings {
             files_as_tree: true,
             diff_split: false,
             diff_whole_file: false,
+            diff_beside_graph: false,
             auto_fetch_minutes: 10,
             pull_mode: Default::default(),
             avatars: true,
@@ -216,6 +219,13 @@ impl Settings {
     pub fn set_compact_graph(&mut self, compact: bool) {
         self.compact_graph = compact;
         self.graph_width = 0.0;
+    }
+
+    /// Puts these settings in place for a test, without what `set` does around them (the
+    /// zoom, the profile's git config, which are the whole process's).
+    #[cfg(test)]
+    pub(crate) fn put_for_test(&self, ctx: &egui::Context) {
+        ctx.data_mut(|d| d.insert_temp(id(), self.clone()));
     }
 
     pub fn set(&self, ctx: &egui::Context) {
@@ -628,6 +638,10 @@ impl Settings {
                             });
                         },
                     );
+                    card.row("Diffs", "diff split below beside graph", |ui| {
+                        ui.checkbox(&mut self.diff_beside_graph, "Show diffs below the graph")
+                            .on_hover_text("A diff of a commit or of the working tree opens below the graph instead of in its place; the button in a diff's header switches it too.");
+                    });
                     card.preview(Preview::GraphLanes);
                     card.row("Lanes", "compact graph narrow", |ui| {
                         let mut compact = self.compact_graph;

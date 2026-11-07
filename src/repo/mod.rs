@@ -31,6 +31,7 @@ mod drafts_tests;
 mod drag_drop;
 mod external_tools;
 mod error_help;
+mod diff_split;
 mod file_text;
 mod file_view;
 mod forge_link;
@@ -49,7 +50,9 @@ mod lfs_locks;
 mod lifecycle;
 mod load;
 mod messages;
+mod nav_history;
 mod navigate;
+mod navigation;
 mod operations;
 mod palette;
 mod partial_stash;
@@ -213,6 +216,10 @@ pub struct RepoTab {
     pr_drafts: HashMap<u64, pr_review::PrDraft>,
     compare_requests: u64,
     file_view: Option<file_view::FileView>,
+    /// The recent views, for back and forward.
+    nav: nav_history::NavHistory<navigation::View>,
+    /// The frame followed a link to a commit: a step of its own in `nav`.
+    nav_jump: bool,
     rebase: Option<rebase::RebaseEditor>,
     /// What a drop offers, while its menu is open.
     drop_menu: Option<drag_drop::DropMenu>,
@@ -432,6 +439,8 @@ impl RepoTab {
             pr_drafts: HashMap::new(),
             compare_requests: 0,
             file_view: None,
+            nav: Default::default(),
+            nav_jump: false,
             rebase: None,
             drop_menu: None,
             reword: None,

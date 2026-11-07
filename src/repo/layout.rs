@@ -29,6 +29,7 @@ impl RepoTab {
         self.dco_frame(&ctx);
         self.shortcuts(&ctx, &mut acts);
         self.drag_frame_start(&ctx);
+        self.nav_shortcuts(&ctx, &mut acts);
 
         egui::Panel::top("repo_toolbar")
             .frame(
@@ -77,6 +78,8 @@ impl RepoTab {
                     self.conflict_view(ui, &mut acts);
                 } else if self.rebase.is_some() {
                     self.rebase_view(ui, &mut acts);
+                } else if self.diff_beside_graph(&ctx) {
+                    self.split_view(ui, &mut acts);
                 } else if self.diff.is_some()
                     && !self.history_beside_diff()
                     && self.docked(Panel::Diff)
@@ -106,6 +109,7 @@ impl RepoTab {
         for action in acts {
             self.apply(action, &ctx);
         }
+        self.record_view();
     }
 
     /// Until the first read is in: rather than branches, history and changes that all look

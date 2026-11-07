@@ -231,6 +231,9 @@ impl RepoTab {
                             change_steps(ui, acts);
                             ui.add_space(8.0);
                         }
+                        if self.split_toggle(ui) {
+                            ui.add_space(8.0);
+                        }
                         if markdown.is_some() {
                             let tip = match (rendered, as_file) {
                                 (true, _) => "Show the Markdown as text",

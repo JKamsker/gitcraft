@@ -168,6 +168,8 @@ pub(crate) enum Action {
         tab: file_view::FileTab,
     },
     CloseFileView,
+    /// Go back (`-1`) or forward (`1`) through the recent views.
+    Navigate(i32),
     /// Open the interactive rebase editor for the commits after `onto`.
     /// Gives a commit of the checked-out branch a new message: amending the latest, rebasing
     /// for an older one.

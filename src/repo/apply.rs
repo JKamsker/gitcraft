@@ -19,19 +19,18 @@ impl RepoTab {
         let plain = OpKind::plain();
         match action {
             Action::Select(row) => {
-                self.close_pr();
-                self.ci_view = None;
+                self.leave_pages();
                 self.select(row, ctx);
                 self.hint_after_select(row, ctx);
             }
             Action::SelectHash(hash) => {
-                self.close_pr();
-                self.ci_view = None;
+                self.leave_pages();
+                // Following a link is a step of its own, back and forward.
+                self.nav_jump = true;
                 self.goto(&hash, ctx);
             }
             Action::SelectStash(i) => {
-                self.close_pr();
-                self.ci_view = None;
+                self.leave_pages();
                 self.select_stash(i, ctx);
             }
             Action::OpenDiff(key) => {
@@ -245,6 +244,7 @@ impl RepoTab {
             }
             Action::FileView { path, rev, tab } => self.open_file_view(path, rev, tab, ctx),
             Action::CloseFileView => self.file_view = None,
+            Action::Navigate(step) => self.navigate(step, ctx),
             Action::InteractiveRebase { onto, label } => self.interactive_rebase(onto, label, ctx),
             Action::Reword { hash, message } => self.reword_commit(hash, message, ctx),
             Action::EditMessage(hash) => self.edit_message(hash, ctx),

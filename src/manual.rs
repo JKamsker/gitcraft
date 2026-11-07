@@ -67,6 +67,8 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Drag a branch's pill (or its row on the left) onto another branch or a commit: a menu offers merging, rebasing, an interactive rebase or a fast-forward, those that make sense there. The targets that take it light up; Esc cancels.",
             "Drag a commit onto the checked-out branch to cherry-pick it, or onto another commit of the checked-out branch to move it above or below that one, or squash or fix it up into it. Ctrl+Z undoes a drop like the menu's entries.",
             "Ghost run: rest the pointer on a Rebase, Hard reset, Pull, Force push, Delete or Drop commit entry, in a menu or on the toolbar (hold Alt to skip the wait), and the graph shows the result: the new commits faint with dashed lanes, the pills where they would point outlined, the commits that would be lost crossed out. A strip over the foot of the graph lists those commits with their authors, the files of the working tree that would change and where it would stop on a conflict. Looking changes nothing: only choosing the entry does.",
+            "Back and forward (Alt+← / Alt+→, the mouse's back and forward buttons, or the arrows at the start of the toolbar) go through the tab's recent views: the graph with its selected commit, diffs, a file's history, blame or contents, pull requests and builds. Clicking through commits is one step; following a link (a parent, a branch, a tag) is a step of its own.",
+            "The panel button in a diff's header (or Settings → Graph → Diffs) shows the diff below the graph instead of in its place: the graph stays usable, the diff follows the file opened next, and the border between them drags to resize. Esc still closes the diff.",
         ],
     ),
     (
@@ -251,7 +253,7 @@ pub(crate) fn tips() -> &'static [&'static str] {
 pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
     (
         "Keyboard navigation",
-        &[("Tab / Shift+Tab", "Next / previous button, row or field"), ("Enter / Space", "Click the focused button or row")],
+        &[("Alt+← / Alt+→", "Back / forward through recent views"), ("Mouse back / forward", "Back / forward through recent views"), ("Tab / Shift+Tab", "Next / previous button, row or field"), ("Enter / Space", "Click the focused button or row")],
     ),
     (
         "Graph",

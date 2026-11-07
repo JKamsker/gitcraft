@@ -290,7 +290,15 @@ impl RepoTab {
     /// Up and down select the row above or below the selected one.
     /// `ringed`: the row Tab reaches, where they start while nothing is selected.
     fn arrow_keys(&mut self, ui: &Ui, ringed: Option<usize>, acts: &mut Vec<Action>) {
-        let (up, down) = ui.input(|i| (i.key_pressed(Key::ArrowUp), i.key_pressed(Key::ArrowDown)));
+        // Alt+↑ / Alt+↓ go from change to change of the diff shown below the graph.
+        let below = self.diff_beside_graph(ui.ctx());
+        let (up, down) = ui.input(|i| {
+            let plain = !(below && i.modifiers.alt);
+            (
+                plain && i.key_pressed(Key::ArrowUp),
+                plain && i.key_pressed(Key::ArrowDown),
+            )
+        });
         let current = self.selected.or(ringed).unwrap_or(0);
         let next = if up {
             Some(current.saturating_sub(1))
