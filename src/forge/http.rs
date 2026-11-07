@@ -81,7 +81,7 @@ impl Api {
     }
 
     /// Owned loopback fixtures bypass proxy/environment state and use a short deadline.
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     pub(super) fn fixture(base: &str, login: Login) -> Self {
         let mut api = Self::new("fixture", base, "127.0.0.1", Some(login));
         api.agent = ureq::AgentBuilder::new()

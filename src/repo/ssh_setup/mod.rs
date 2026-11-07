@@ -235,28 +235,28 @@ impl State {
                 }
             }
         }
-        if let Some(run) = &mut self.command {
-            if !run.finished {
-                if let Some(code) = run.terminal.exit_code() {
-                    run.finished = true;
-                    self.status = if run.step == Step::Test {
-                        format!(
-                            "SSH test exited {code}. Read the server greeting below: forges often return1 after successful authentication because shell access is disabled."
-                        )
-                    } else if code == 0 {
-                        format!(
-                            "{} command completed successfully. Key files are retained; continue with the next explicit step.",
-                            run.step.label()
-                        )
-                    } else {
-                        format!(
-                            "{} exited {code}. Read the terminal's explanation. No existing key was overwritten by generation; missing agent/tool/permission must be fixed on this machine.",
-                            run.step.label()
-                        )
-                    };
+        if let Some(run) = &mut self.command
+            && !run.finished
+        {
+            if let Some(code) = run.terminal.exit_code() {
+                run.finished = true;
+                self.status = if run.step == Step::Test {
+                    format!(
+                        "SSH test exited {code}. Read the server greeting below: forges often return1 after successful authentication because shell access is disabled."
+                    )
+                } else if code == 0 {
+                    format!(
+                        "{} command completed successfully. Key files are retained; continue with the next explicit step.",
+                        run.step.label()
+                    )
                 } else {
-                    ctx.request_repaint_after(std::time::Duration::from_millis(100));
-                }
+                    format!(
+                        "{} exited {code}. Read the terminal's explanation. No existing key was overwritten by generation; missing agent/tool/permission must be fixed on this machine.",
+                        run.step.label()
+                    )
+                };
+            } else {
+                ctx.request_repaint_after(std::time::Duration::from_millis(100));
             }
         }
     }
@@ -361,8 +361,12 @@ impl State {
                         ui.selectable_value(&mut self.forge, forge, forge.name());
                     }
                 });
-            ui.label("HTTPS server");
-            ui.text_edit_singleline(&mut self.host);
+            if self.machine.is_local() || self.forge == Forge::GitHub {
+                ui.label("HTTPS server");
+                ui.text_edit_singleline(&mut self.host);
+            } else {
+                ui.label("Server comes from the selected tea login; verify its URL before upload.");
+            }
         });
         ui.horizontal(|ui| {
             ui.label(if self.forge == Forge::GitHub {
@@ -455,12 +459,15 @@ impl Drop for State {
 }
 
 fn reserve_folder(folder: &std::path::Path) -> Result<(), String> {
-    let mut create = std::fs::DirBuilder::new();
     #[cfg(unix)]
-    {
+    let create = {
         use std::os::unix::fs::DirBuilderExt;
+        let mut create = std::fs::DirBuilder::new();
         create.mode(0o700);
-    }
+        create
+    };
+    #[cfg(not(unix))]
+    let create = std::fs::DirBuilder::new();
     create.create(folder).map_err(|_|"Could not exclusively create the new key folder. Choose a new folder under an existing parent; existing files/folders are never reused or overwritten.".into())
 }
 
