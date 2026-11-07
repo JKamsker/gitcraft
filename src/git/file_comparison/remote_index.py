@@ -1,6 +1,6 @@
 # Fixed remote transaction program; stdin is data, never executable repository input.
 # Python 3 + its standard library supply no-follow dir-fd I/O and native ACL snapshots.
-import base64, ctypes, hashlib, json, os, stat, subprocess, sys, tempfile, time
+import base64, ctypes, errno, hashlib, json, os, stat, subprocess, sys, tempfile, time
 LIMIT = 16 * 1024 * 1024
 DEADLINE = time.monotonic() + 40
 payload = json.load(sys.stdin)
@@ -25,7 +25,9 @@ def native_acl(fd):
     lib.acl_to_text.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ssize_t)]; lib.acl_to_text.restype = ctypes.c_void_p
     lib.acl_free.argtypes = [ctypes.c_void_p]
     acl = lib.acl_get_fd_np(fd, 0x100)
-    if not acl: raise RuntimeError('Cannot establish native index ACL')
+    if not acl:
+        if ctypes.get_errno() == errno.ENOENT: return b''  # established absence, not unreadable
+        raise RuntimeError('Cannot establish native index ACL')
     text = None
     try:
         size = ctypes.c_ssize_t()
@@ -40,7 +42,8 @@ def set_acl(fd, text):
     lib = ctypes.CDLL('/usr/lib/libSystem.B.dylib', use_errno=True)
     lib.acl_from_text.argtypes=[ctypes.c_char_p]; lib.acl_from_text.restype=ctypes.c_void_p
     lib.acl_set_fd_np.argtypes=[ctypes.c_int,ctypes.c_void_p,ctypes.c_int]; lib.acl_free.argtypes=[ctypes.c_void_p]
-    acl = lib.acl_from_text(text)
+    lib.acl_init.argtypes=[ctypes.c_int]; lib.acl_init.restype=ctypes.c_void_p
+    acl = lib.acl_from_text(text) if text else lib.acl_init(0)
     if not acl: raise RuntimeError('Cannot prepare native index ACL')
     try:
         if lib.acl_set_fd_np(fd,acl,0x100) != 0: raise RuntimeError('Cannot preserve native index ACL')
