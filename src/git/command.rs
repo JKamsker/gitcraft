@@ -4,6 +4,9 @@
 
 pub(super) mod bounded;
 
+mod completion;
+pub(crate) use completion::{ForecastCompletion, forecast_spawn};
+
 use std::path::Path;
 use std::process::Command;
 
@@ -330,7 +333,7 @@ pub(crate) fn forecast_remote(
     request.long = true;
     let host = host.clone();
     let (tx, rx) = mpsc::channel();
-    std::thread::spawn(move || {
+    forecast_spawn(move || {
         let _ = tx.send(remote::exec(&host, &request));
     });
     let deadline = Instant::now() + LIMIT;

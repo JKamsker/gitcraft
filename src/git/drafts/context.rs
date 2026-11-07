@@ -307,7 +307,7 @@ fn private_dir(repo: &Path, active: &dyn Fn() -> bool) -> Result<PathBuf, String
 impl Drop for Context {
     fn drop(&mut self) {
         if let Some(target) = remote::parse(&self.path) {
-            std::thread::spawn(move || {
+            git::forecast_spawn(move || {
                 let _ = git::forecast_remote(
                     &target.host,
                     remote::Request {

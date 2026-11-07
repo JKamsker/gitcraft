@@ -11,9 +11,6 @@ use std::time::{Duration, Instant};
 
 pub(super) const CHECK_FAILED: &str = "Working draft safety check:";
 const PAUSE: Duration = Duration::from_secs(15);
-// The existing remote transport can return cancellation before its detached command
-// reaches its own 15s deadline. Keep replacements coalesced through that whole bound.
-const REMOTE_READ_DRAIN: Duration = Duration::from_secs(15);
 type ReadJob = Box<dyn FnOnce(&dyn Fn() -> bool) -> Result<Read, String> + Send>;
 struct PendingRead {
     id: u64,
@@ -35,9 +32,9 @@ pub(super) struct State {
     edited: Option<Instant>,
     alive: Arc<()>,
     reader_generation: Arc<AtomicU64>,
-    reader_running: Option<(u64, bool)>,
+    reader_running: Option<u64>,
     reader_pending: Option<PendingRead>,
-    reader_not_before: Option<Instant>,
+    reader_completion: Option<crate::git::ForecastCompletion>,
 }
 impl Default for State {
     fn default() -> Self {
@@ -55,7 +52,7 @@ impl Default for State {
             reader_generation: Arc::new(AtomicU64::new(0)),
             reader_running: None,
             reader_pending: None,
-            reader_not_before: None,
+            reader_completion: None,
         }
     }
 }
@@ -246,7 +243,7 @@ impl RepoTab {
                 || self
                     .drafts
                     .reader_running
-                    .is_some_and(|(running, _)| running == id))
+                    .is_some_and(|running| running == id))
         {
             self.cancel_draft_reads();
         }
@@ -256,23 +253,29 @@ impl RepoTab {
             && (self.drafts.reader_running.is_some()
                 || self
                     .drafts
-                    .reader_not_before
-                    .is_some_and(|until| until > Instant::now()))
+                    .reader_completion
+                    .as_ref()
+                    .is_some_and(|scope| scope.pending()))
     }
     fn start_draft_reader(&mut self, ctx: &egui::Context) {
         if self.drafts.reader_running.is_some() {
             return;
         }
-        if let Some(until) = self.drafts.reader_not_before {
-            let left = until.saturating_duration_since(Instant::now());
-            if !left.is_zero() {
-                if self.drafts.reader_pending.is_some() {
-                    ctx.request_repaint_after(left);
-                }
-                return;
+        // A canceled/timed-out caller can finish before remote::exec returns. Its
+        // completion scope includes pool/connect waits and nested private-dir cleanup;
+        // a matching timeout constant is not evidence of worker completion.
+        if self
+            .drafts
+            .reader_completion
+            .as_ref()
+            .is_some_and(|scope| scope.pending())
+        {
+            if self.drafts.reader_pending.is_some() {
+                ctx.request_repaint_after(Duration::from_millis(20));
             }
-            self.drafts.reader_not_before = None;
+            return;
         }
+        self.drafts.reader_completion = None;
         let Some(PendingRead { id, context, read }) = self.drafts.reader_pending.take() else {
             return;
         };
@@ -281,7 +284,9 @@ impl RepoTab {
         {
             return;
         }
-        self.drafts.reader_running = Some((id, crate::remote::is_remote(&self.path)));
+        self.drafts.reader_running = Some(id);
+        let completion = crate::git::ForecastCompletion::default();
+        self.drafts.reader_completion = Some(completion.clone());
         let generation = Arc::downgrade(&self.drafts.reader_generation);
         let alive = Arc::downgrade(&self.drafts.alive);
         spawn_or(
@@ -290,20 +295,22 @@ impl RepoTab {
             move |e| Msg::DraftRead(id, Err(e)),
             move || {
                 context.run(|| {
-                    let began = Instant::now();
-                    let active = || {
-                        alive.upgrade().is_some()
-                            && generation
-                                .upgrade()
-                                .is_some_and(|generation| generation.load(Ordering::Acquire) == id)
-                            && began.elapsed() < Duration::from_secs(120)
-                    };
-                    let result = if active() {
-                        read(&active)
-                    } else {
-                        Err("Draft read cancelled".into())
-                    };
-                    Msg::DraftRead(id, result.map(Box::new))
+                    completion.run(|| {
+                        let began = Instant::now();
+                        let active = || {
+                            alive.upgrade().is_some()
+                                && generation.upgrade().is_some_and(|generation| {
+                                    generation.load(Ordering::Acquire) == id
+                                })
+                                && began.elapsed() < Duration::from_secs(120)
+                        };
+                        let result = if active() {
+                            read(&active)
+                        } else {
+                            Err("Draft read cancelled".into())
+                        };
+                        Msg::DraftRead(id, result.map(Box::new))
+                    })
                 })
             },
         );
@@ -314,7 +321,7 @@ impl RepoTab {
         result: Result<Box<Read>, String>,
         ctx: &egui::Context,
     ) {
-        let Some((running, remote)) = self.drafts.reader_running else {
+        let Some(running) = self.drafts.reader_running else {
             return;
         };
         if running != id {
@@ -324,9 +331,6 @@ impl RepoTab {
         if !matches!(self.dialog,Some(Dialog::DraftLoading(current))if current==id)
             || self.drafts.reader_generation.load(Ordering::Acquire) != id
         {
-            if remote {
-                self.drafts.reader_not_before = Some(Instant::now() + REMOTE_READ_DRAIN);
-            }
             self.start_draft_reader(ctx);
             return;
         }
@@ -565,9 +569,10 @@ mod tests {
                 .recv_timeout(Duration::from_secs(5))
                 .map_err(|e| e.to_string())?
         );
-        let _ = ctx.run_ui(Default::default(), |ui| {
+        let mut frame = ctx.run_ui(Default::default(), |ui| {
             tab.dialogs(ui.ctx(), &mut Vec::new())
         });
+        frame.textures_delta.clear();
         let input = egui::RawInput {
             events: vec![egui::Event::Key {
                 key: egui::Key::Escape,
@@ -578,7 +583,8 @@ mod tests {
             }],
             ..Default::default()
         };
-        let _ = ctx.run_ui(input, |ui| tab.dialogs(ui.ctx(), &mut Vec::new()));
+        let mut frame = ctx.run_ui(input, |ui| tab.dialogs(ui.ctx(), &mut Vec::new()));
+        frame.textures_delta.clear();
         assert!(tab.dialog.is_none());
         step.send(()).map_err(|e| e.to_string())?;
         assert!(
@@ -636,35 +642,38 @@ mod tests {
         Ok(())
     }
     #[test]
-    fn remote_replacements_wait_through_the_existing_detached_command_bound_without_connecting()
+    fn remote_replacements_wait_for_actual_completion_after_a_simulated_caller_timeout()
     -> Result<(), String> {
         use std::sync::atomic::AtomicUsize;
         let ctx = egui::Context::default();
         let mut tab = reader_tab(&ctx);
-        // Only the path classifier sees this host. Injected closures never run transport.
-        tab.path = crate::remote::encode(
-            &crate::remote::Host::Ssh("recording-only.invalid".into()),
-            "/repo",
-        );
-        let (step, states) = delayed_reader(&mut tab, &ctx);
-        assert!(
-            states
+        // The production completion-aware spawn wraps this recording-only delayed
+        // remote worker. No real host, process, signal or wall-clock timeout is used.
+        let (release, released) = std::sync::mpsc::channel();
+        let (caller_end, caller_ended) = std::sync::mpsc::channel();
+        let (entered, entry) = std::sync::mpsc::channel();
+        let (done, completed) = std::sync::mpsc::channel();
+        tab.draft_reader(&ctx, move |_| {
+            crate::git::forecast_spawn(move || {
+                let _ = entered.send(());
+                let _ = released.recv_timeout(Duration::from_secs(5));
+                let _ = done.send(());
+            });
+            caller_ended
                 .recv_timeout(Duration::from_secs(5))
-                .map_err(|e| e.to_string())?
-        );
+                .map_err(|e| e.to_string())?;
+            Err("Simulated caller deadline while the underlying exec is still waiting".into())
+        });
+        entry
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?;
         let started = Arc::new(AtomicUsize::new(0));
         let count = started.clone();
         tab.draft_reader(&ctx, move |_| {
             count.fetch_add(1, Ordering::Relaxed);
-            Ok(history("remote latest"))
+            Ok(history("latest"))
         });
-        step.send(()).map_err(|e| e.to_string())?;
-        assert!(
-            !states
-                .recv_timeout(Duration::from_secs(5))
-                .map_err(|e| e.to_string())?
-        );
-        step.send(()).map_err(|e| e.to_string())?;
+        caller_end.send(()).map_err(|e| e.to_string())?;
         finish_reader(&mut tab, &ctx)?;
         for _ in 0..100 {
             tab.poll_drafts(&ctx);
@@ -672,12 +681,24 @@ mod tests {
         assert_eq!(started.load(Ordering::Relaxed), 0);
         assert!(tab.drafts.reader_running.is_none());
         assert!(tab.draft_reader_waiting());
-        assert!(tab.drafts.reader_not_before.is_some_and(|until| {
-            until.saturating_duration_since(Instant::now()) > Duration::from_secs(14)
-        }));
-        // Advance the synthetic deadline instead of sleeping or using a watchdog.
-        tab.drafts.reader_not_before = Some(Instant::now());
-        tab.poll_drafts(&ctx);
+        assert!(
+            tab.drafts
+                .reader_completion
+                .as_ref()
+                .is_some_and(|scope| scope.pending())
+        );
+        release.send(()).map_err(|e| e.to_string())?;
+        completed
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?;
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while tab.drafts.reader_running.is_none() {
+            tab.poll_drafts(&ctx);
+            if Instant::now() >= deadline {
+                return Err("Completion ticket did not release the latest request".into());
+            }
+            std::thread::yield_now();
+        }
         finish_reader(&mut tab, &ctx)?;
         assert_eq!(started.load(Ordering::Relaxed), 1);
         Ok(())
