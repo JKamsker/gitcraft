@@ -2,6 +2,7 @@
 mod cli;
 mod directory;
 mod files;
+mod model;
 mod save;
 
 pub use cli::{Invocation, USAGE, parse};

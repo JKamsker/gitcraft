@@ -30,6 +30,9 @@ pub(super) enum Phase {
 }
 
 impl Output {
+    pub fn initial_bytes(&self) -> Option<&[u8]> {
+        self.original.as_ref().map(|s| s.bytes.as_slice())
+    }
     pub fn capture(path: &Path, inputs: &[Snapshot]) -> Result<Self, String> {
         let path = std::path::absolute(path).map_err(|e| e.to_string())?;
         let name = path

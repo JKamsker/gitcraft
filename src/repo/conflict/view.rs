@@ -26,6 +26,12 @@ impl RepoTab {
 }
 
 impl ConflictEditor {
+    pub(crate) fn standalone_ui(&mut self, ui: &mut Ui, editable: bool) {
+        let t = Tokens::get(ui.ctx());
+        ui.label(format!("{} unresolved conflict(s)", self.unresolved()));
+        self.result_panel(ui, &t, editable);
+        self.conflict_list(ui, &t, ("Local", "Remote"), editable);
+    }
     /// Header: the file, how many conflicts are resolved, save, the whole-file actions, close.
     fn header(&self, ui: &mut Ui, t: &Tokens, idle: bool, left: usize, acts: &mut Vec<Action>) {
         let total = self.choices.len();
