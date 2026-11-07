@@ -1,0 +1,59 @@
+{
+  "verdict": "PASS_RECORDING_ONLY",
+  "plan_commit": "069cbccae4dc9a0f04e7e47fa6360fc9c56dbcbd",
+  "compiler_binding_commit": "ca4b4805007f49be15c9eb9bc1c68482278f7800",
+  "compiled_source_commit": "069cbccae4dc9a0f04e7e47fa6360fc9c56dbcbd",
+  "application_source_tree": "d7e71fc9ff630b17ea4ed54f9552fafc84dd3853",
+  "production_static_pass": "ffc2851a9e5077443d0ec9a4f32654886e3435de",
+  "binary_sha256": "69fff01579bbc05c83e9417fd442c4e8a7da969502ed8dc25c4147b77e98d973",
+  "tests": [
+    {
+      "test": "push_preflight::fix::transaction::tests::rotated_split_index_dependency_is_resolved_from_the_saved_index",
+      "exit_code": 0,
+      "passed_exactly_one": true,
+      "log": "01-rotated_split_index_dependency_is_resolved_from_the_saved_index.log",
+      "sha256": "93a6cd2b0709ac1556c01d48625acbfaeb8281a9b1707e20d776f5f0d04b3ba2"
+    },
+    {
+      "test": "push_preflight::fix::transaction::tests::synthetic_capability_versions_refuse_before_user_dispatch",
+      "exit_code": 0,
+      "passed_exactly_one": true,
+      "log": "02-synthetic_capability_versions_refuse_before_user_dispatch.log",
+      "sha256": "c39d69d0a5cdd4b3c036ca7c875534ef5ef016cb1f8e563f5c364d98b5aae1f8"
+    },
+    {
+      "test": "push_preflight::fix::transaction::tests::missing_backend_acknowledgement_cannot_qualify_user_dispatch",
+      "exit_code": 0,
+      "passed_exactly_one": true,
+      "log": "03-missing_backend_acknowledgement_cannot_qualify_user_dispatch.log",
+      "sha256": "e9742d74b52411f78c1726c399f6a26141a72f65c72f3f4e7b4901108016e092"
+    },
+    {
+      "test": "push_preflight::fix::transaction::tests::synthetic_uncertain_lifecycle_always_retains_owned_evidence",
+      "exit_code": 0,
+      "passed_exactly_one": true,
+      "log": "04-synthetic_uncertain_lifecycle_always_retains_owned_evidence.log",
+      "sha256": "948a971b0f82eaceaddd6ee50c808f105b280c037dcb8e7c4fffeaccbb74bf2b"
+    },
+    {
+      "test": "push_preflight::fix::transaction::tests::recording_hook_changes_are_refused_before_checkout_and_keep_external_bytes",
+      "exit_code": 0,
+      "passed_exactly_one": true,
+      "log": "05-recording_hook_changes_are_refused_before_checkout_and_keep_external_bytes.log",
+      "sha256": "f8044f6f4838321ee441c108fb4aaffcde2d9c14fa8e519aba1f84bcbde526ab"
+    },
+    {
+      "test": "push_preflight::fix::transaction::tests::recording_pre_hook_identity_guards_prevent_relay_and_checkout",
+      "exit_code": 0,
+      "passed_exactly_one": true,
+      "log": "06-recording_pre_hook_identity_guards_prevent_relay_and_checkout.log",
+      "sha256": "204a23b441e7964eb818161236d0451ff238ba1176f351327a10b9c4aff31e23"
+    }
+  ],
+  "passed": 6,
+  "failed": 0,
+  "new_guards_proved_zero_original_and_checkout": 10,
+  "real_protocol_executed": false,
+  "ci_used": false,
+  "next": "Rootacceptancebeforepreserved21productioncases; no live/remote/defaultfullsuite"
+}

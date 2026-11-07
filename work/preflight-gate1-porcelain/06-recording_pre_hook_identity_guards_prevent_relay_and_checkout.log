@@ -1,0 +1,16 @@
+
+running 1 test
+test push_preflight::fix::transaction::tests::recording_pre_hook_identity_guards_prevent_relay_and_checkout ... guard wrong-target: refused; original_prepared=0 checkout=0; external HEAD/index/work preserved
+guard wrong-old: refused; original_prepared=0 checkout=0; external HEAD/index/work preserved
+guard wrong-new: refused; original_prepared=0 checkout=0; external HEAD/index/work preserved
+guard duplicate-input: refused; original_prepared=0 checkout=0; external HEAD/index/work preserved
+guard extra-reference: refused; original_prepared=0 checkout=0; external HEAD/index/work preserved
+guard extra-field: refused; original_prepared=0 checkout=0; external HEAD/index/work preserved
+guard empty-input: refused; original_prepared=0 checkout=0; external HEAD/index/work preserved
+guard pre-head-other: refused; original_prepared=0 checkout=0; external HEAD/index/work preserved
+guard pre-head-detached: refused; original_prepared=0 checkout=0; external HEAD/index/work preserved
+guard pre-head-oid-changed: refused; original_prepared=0 checkout=0; external HEAD/index/work preserved
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 826 filtered out; finished in 0.22s
+
