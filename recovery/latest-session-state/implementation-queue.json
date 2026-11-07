@@ -550,12 +550,15 @@
           "Open #73 search operators and #84 graph order/first-parent are distinct and should compose."
         ]
       },
-      "status": "awaiting_independent_review",
+      "status": "reviewed_ready_to_integrate",
       "agent": "audit_32_38",
       "branch": "codex/history-investigations",
       "worktree": "/workspace/work/history-investigations",
       "commit": "80b2e50f069d8215b0801c7d674a03331da8d819",
-      "validation": "Local878pass3ignored881registered;12new focusedcases. Frozen copiedreviewbinary bound in manifest."
+      "validation": "Individualfull878pass3ignore881names; independent12/12PASS and360apphasheschecked; integrationafterContentauthorized.",
+      "reviewer": "audit_45_50",
+      "review_commit": "df98bbdf10b1eb8b5595af95572c382c596e77a4",
+      "review_report": "/workspace/work/review-saved-views-80b2e50.json"
     },
     {
       "issue": 36,
@@ -1219,15 +1222,16 @@
         ],
         "effort": "S-M"
       },
-      "status": "integrating",
+      "status": "integrated",
       "agent": "implement_gerrit",
       "branch": "codex/ssh-key-helper",
       "worktree": "/workspace/work/ssh-key-helper",
       "latest_preserved_head": "3c51d183b199fc49e46efb484d045ee08e59ffbb",
-      "validation": "Local837pass3ignored840registered; independent41focusedPASS; integrationd2bc962 gatespending.",
+      "validation": "Combined2db60b3 privatefmt/strictClippy/full911pass3ignored0filtered914names, exacttestunion; independentfeaturePASS; lifecyclefocused3/3.",
       "commit": "bcb0e78ba1fca0622126a2e72885554ee3fc9e0e",
       "reviewer": "review_ssh_key_helper",
-      "review_commit": "057e74ec27a17e4344a23148ab100c00a0138eb4"
+      "review_commit": "057e74ec27a17e4344a23148ab100c00a0138eb4",
+      "integration_merge": "d2bc96292209598b24244b9814ef591baf0b2044"
     },
     {
       "issue": 43,
@@ -1277,14 +1281,15 @@
         ],
         "effort": "M"
       },
-      "status": "independent_review",
+      "status": "fixing_review_finding",
       "agent": "audit_39_44",
       "branch": "codex/standalone-file-tools",
       "worktree": "/workspace/work/standalone-file-tools",
       "latest_preserved_head": "15fb8de83c051575d6671b563f2e2419ed336769",
-      "validation": "Local842pass3ignored including3executabletests; fmtstrictClippyPASS; independentreviewinprogress.",
+      "validation": "Individual842pass3ignore; independent25/25PASS; reviewFAILP2 concurrentACLdrift STANDALONE-1. Authoractivatedforfix; nativeWindowshelperprotocolSTATICPASS only.",
       "commit": "7fb68f226a1056970d5f722751a1bd2f0b937cbf",
-      "reviewer": "review_portable_setup"
+      "reviewer": "review_portable_setup",
+      "review_commit": "afd7fab1b04014e256255a2b72ad8639484edb09"
     },
     {
       "issue": 45,
@@ -2330,24 +2335,22 @@
       154,
       155
     ],
-    "integration_remote_head": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+    "integration_remote_head": "2db60b38b9e79f35c6158d81ca20be41c4427852",
     "initial_combined_validation": "fmt/clippy/fulltest PASS686+3ignored689total",
-    "combined_validation": "Latest green d182 LOCAL fmt/strictClippy/full891passed3ignored894registered; SSHmerge d2bc962 gatespending; all CI deferred."
+    "combined_validation": "LOCALfmt/strictClippy/full911pass3ignore914registered on2db60b3; noCI."
   },
   "checkpoint_policy": "After every completed unit of work, each agent and the orchestrator must commit AND push its branch before starting the next unit or risky test. Verify the remote SHA. Label WIP unvalidated. Only one final giant PR; all required tests and independent adversarial review must pass on the final combined source before PR creation.",
   "recovery_status": "Filesystem recovered; all current completed source/review units committed and pushed. Initial immutableZIP retained; live recoverymetadata updated separately.",
-  "verified_remote_head": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+  "verified_remote_head": "2db60b38b9e79f35c6158d81ca20be41c4427852",
   "preservation_policy": "Every completed unit commit AND push, verify remoteSHA, before next unit/riskytest. One final PR requires exact combined checks and independent adversarial PASS.",
   "final_commit_author_reference": "028242cd4bc3c82ced848ea0fa73639981cd71d7",
   "status_counts": {
-    "integrated": 19,
+    "integrated": 20,
     "implementing_remote_repair": 1,
-    "reviewed_ready_to_integrate": 1,
+    "reviewed_ready_to_integrate": 2,
     "queued": 41,
-    "awaiting_independent_review": 1,
     "implementing": 4,
     "assigned": 3,
-    "integrating": 1,
-    "independent_review": 1
+    "fixing_review_finding": 1
   }
 }

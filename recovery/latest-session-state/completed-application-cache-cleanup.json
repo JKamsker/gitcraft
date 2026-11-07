@@ -47,5 +47,12 @@
     "kind": "completed reviewed or abandoned candidate application cache only; source, dependencies and evidence retained",
     "status": "failed",
     "output": "error: could not find `Cargo.toml` in `/workspace/work/review-file-comparison-146a2e3` or any parent directory"
+  },
+  {
+    "worktree": "/workspace/work/review-file-comparison-146a2e3/source",
+    "target": "/workspace/work/review-file-comparison-146a2e3/target",
+    "kind": "abandonedoldcandidate privateapplicationcacheonly; source/logs/depsretained",
+    "status": "cleaned",
+    "output": "Removed32files,942.5MiBtotal"
   }
 ]

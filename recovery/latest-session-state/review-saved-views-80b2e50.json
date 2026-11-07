@@ -1,0 +1,121 @@
+{
+  "scope": "Independent ordinary correctness review of #36 Saved views of the graph",
+  "candidate": "80b2e50f069d8215b0801c7d674a03331da8d819",
+  "tree": "fb1aa04db5b830565707d5aace39578c8b4a94ef",
+  "base": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
+  "status": "PASS",
+  "source_binding": {
+    "application_hashes_verified": 360,
+    "log_hashes_verified": 3,
+    "binary": {
+      "path": "/workspace/work/history-views-80b2e50-test-binary",
+      "sha256": "7461c4e18d8b6e7d01f24c734cbb89db011d19a73ed9e85c3864d68abf98cfb2"
+    }
+  },
+  "static_checks": [
+    "Exact issue bullet and audit PR-overlap acceptance read; all19 changed files inspected.",
+    "Queries validate object IDs, feed revisions on stdin, compare raw author emails without regex and expose30k/shallow boundaries; ref changes require a new scope.",
+    "Git invocations use accepted draft-byte/Practice-first/Profile-captured transport with explicit no-lazy-fetch/no-replace/no-optional-locks and no hooks/signing/fsmonitor. No fetch command introduced.",
+    "Projection preserves raw graph indices and selected/WIP/stash context; omitted runs>=3 become bounded expandable gaps, with separate caps for lane reuse; viewport sizing receives projected commit rows.",
+    "Preferences version/name/day/count checks; actual save/delete/choose/refresh/cancel UI routes inspected; search selection can expose context and projected keyboard/scroll indices map back to originals.",
+    "Latest-only pending reader retains initiating Profile and ForecastCompletion tickets; exit/park/reload/profile changes cancel generations; no timer assumed to bound remote pool/connect."
+  ],
+  "findings": [],
+  "focused_names": [
+    "git::investigations::tests::cancellation_empty_scope_invalid_ids_and_stale_branch_names_are_explicit",
+    "git::investigations::tests::all_four_relations_use_pinned_merge_ancestry_exact_authors_and_stay_read_only",
+    "git::investigations::views::tests::persisted_presets_and_revision_inputs_reject_options_and_control_bytes",
+    "git::investigations::tests::shallow_partial_views_and_pages_do_not_download_or_run_configured_helpers",
+    "repo::saved_views::projection::tests::connector_boundaries_keep_merge_lanes_distinct_and_stashes_visible",
+    "repo::saved_views::projection::tests::connector_never_claims_reused_columns_are_one_continuous_lane",
+    "repo::saved_views::projection::tests::expanding_preserves_raw_identity_and_selection_and_long_gaps_are_single_rows",
+    "repo::saved_views::reader::tests::queued_read_keeps_initiating_profile_even_when_started_later",
+    "repo::saved_views::reader::tests::replacement_and_cancel_keep_the_slot_until_actual_nested_work_returns",
+    "repo::saved_views::tests::actual_view_exit_park_and_drop_cancel_owned_work_and_ignore_stale_answers",
+    "repo::saved_views::tests::persisted_unknown_versions_bad_presets_and_saved_counts_fail_closed",
+    "repo::saved_views::tests::pointer_select_save_restart_expand_and_return_to_all_history"
+  ],
+  "author_evidence": {
+    "fmt": "PASS",
+    "strict_clippy_all_targets": "PASS",
+    "full_tests": "878passed;0failed;3ignored;0filtered;881total",
+    "new_feature_tests": "12/12 PASS in exact candidate full log"
+  },
+  "limits": [
+    "Author fullsuite/log hashes verified; independent full compilation/default suite not rerun.",
+    "Native Windows/macOS/liveSSH/WSL not exercised; no CI used.",
+    "Query selection intersects current graph/branch scope and uses locally recorded remote tips; explicitly bounded coverage is not server knowledge."
+  ],
+  "verdict": "PASS: no actionable correctness blockers found in the immutable named-feature scope",
+  "focused_execution": {
+    "result": "12/12 independent focused tests PASS (1 passed per exact name;880filtered each)",
+    "fresh_compile": false,
+    "log": "/workspace/work/review-saved-views/docs/reviews/saved-views-80b2e50/focused.log",
+    "log_sha256": "66b37ec8c60399dcb9012064b0305fa45c0c653f622019b2c6ad011506c4040c",
+    "results": [
+      {
+        "name": "git::investigations::tests::cancellation_empty_scope_invalid_ids_and_stale_branch_names_are_explicit",
+        "exit_code": 0,
+        "result": "PASS1/1"
+      },
+      {
+        "name": "git::investigations::tests::all_four_relations_use_pinned_merge_ancestry_exact_authors_and_stay_read_only",
+        "exit_code": 0,
+        "result": "PASS1/1"
+      },
+      {
+        "name": "git::investigations::views::tests::persisted_presets_and_revision_inputs_reject_options_and_control_bytes",
+        "exit_code": 0,
+        "result": "PASS1/1"
+      },
+      {
+        "name": "git::investigations::tests::shallow_partial_views_and_pages_do_not_download_or_run_configured_helpers",
+        "exit_code": 0,
+        "result": "PASS1/1"
+      },
+      {
+        "name": "repo::saved_views::projection::tests::connector_boundaries_keep_merge_lanes_distinct_and_stashes_visible",
+        "exit_code": 0,
+        "result": "PASS1/1"
+      },
+      {
+        "name": "repo::saved_views::projection::tests::connector_never_claims_reused_columns_are_one_continuous_lane",
+        "exit_code": 0,
+        "result": "PASS1/1"
+      },
+      {
+        "name": "repo::saved_views::projection::tests::expanding_preserves_raw_identity_and_selection_and_long_gaps_are_single_rows",
+        "exit_code": 0,
+        "result": "PASS1/1"
+      },
+      {
+        "name": "repo::saved_views::reader::tests::queued_read_keeps_initiating_profile_even_when_started_later",
+        "exit_code": 0,
+        "result": "PASS1/1"
+      },
+      {
+        "name": "repo::saved_views::reader::tests::replacement_and_cancel_keep_the_slot_until_actual_nested_work_returns",
+        "exit_code": 0,
+        "result": "PASS1/1"
+      },
+      {
+        "name": "repo::saved_views::tests::actual_view_exit_park_and_drop_cancel_owned_work_and_ignore_stale_answers",
+        "exit_code": 0,
+        "result": "PASS1/1"
+      },
+      {
+        "name": "repo::saved_views::tests::persisted_unknown_versions_bad_presets_and_saved_counts_fail_closed",
+        "exit_code": 0,
+        "result": "PASS1/1"
+      },
+      {
+        "name": "repo::saved_views::tests::pointer_select_save_restart_expand_and_return_to_all_history",
+        "exit_code": 0,
+        "result": "PASS1/1"
+      }
+    ]
+  },
+  "source_unchanged": true,
+  "ci": "Not used, dispatched, polled or awaited; deferred per explicit user policy",
+  "final_combined_review": "This immutable unit review does not replace final whole-scope integration review."
+}
