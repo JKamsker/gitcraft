@@ -344,6 +344,7 @@ fn an_older_read_of_the_working_tree_does_not_replace_a_newer_one() {
         history: Vec::new(),
         work: git::WorkStatus::default(),
         worktrees: vec![here(0)],
+        worktree_root: String::new(),
         stashes: Vec::new(),
         remotes: Vec::new(),
         forge_remotes: Vec::new(),

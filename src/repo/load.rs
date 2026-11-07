@@ -23,6 +23,7 @@ pub(super) struct Loaded {
     pub(super) excluded_namespace_count: Option<usize>,
     pub(super) work: WorkStatus,
     pub(super) worktrees: Vec<Worktree>,
+    pub(super) worktree_root: String,
     pub(super) stashes: Vec<Stash>,
     pub(super) remotes: Vec<Remote>,
     /// Usable forge remotes; the latest UI preference chooses among these on arrival.
@@ -142,6 +143,8 @@ impl RepoTab {
                 )
                 .ok();
                 let identity = git::identity(&path);
+                let worktree_root = git::read_worktree_root(&path)
+                    .map_err(|e| format!("Could not read the worktrees root: {e}"))?;
                 let history = history.join()??.into_iter().map(Arc::new).collect();
                 let (work, worktrees) = work_trees.join()??;
                 let (stashes, remotes, submodules, lfs, issues) = (
@@ -161,6 +164,7 @@ impl RepoTab {
                     excluded_namespace_count,
                     work,
                     worktrees,
+                    worktree_root,
                     stashes,
                     remotes,
                     forge_remotes,
@@ -484,6 +488,7 @@ impl RepoTab {
             .map(|w| (w.path.clone(), w.changes))
             .collect();
         self.worktrees = loaded.worktrees;
+        self.worktree_root = loaded.worktree_root;
         if crate::remote::is_remote(&self.path) {
             self.tx.repo = self.repo_key().to_owned();
         }

@@ -3,6 +3,7 @@
 
 pub(crate) mod github;
 pub(crate) mod gitlab;
+pub(crate) mod route;
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -11,8 +12,8 @@ use crate::forge::{self, Forge};
 use crate::git::Remote;
 pub use crate::pull_request::{Check, CheckState};
 
-/// The repository on its forge whose builds are read: from `origin` (or the first remote).
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// A repository on its forge whose builds are read.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Project {
     pub forge: Forge,
     pub host: String,
@@ -29,15 +30,21 @@ impl Project {
             web: format!("https://{}", self.host),
         }
     }
+    /// The repository's main project: that of `origin` (or the first remote).
     pub fn of(forge: Forge, remotes: &[Remote]) -> Option<Self> {
-        // Builds are read through `gh` and `glab`; Forgejo's and Gitea's aren't yet.
-        if !matches!(forge, Forge::GitHub | Forge::GitLab) {
-            return None;
-        }
         let remote = remotes
             .iter()
             .find(|r| r.name == "origin")
             .or_else(|| remotes.first())?;
+        Self::of_remote(forge, remote)
+    }
+
+    /// The project `remote` points at, on `forge`.
+    pub fn of_remote(forge: Forge, remote: &Remote) -> Option<Self> {
+        // Builds are read through `gh` and `glab`; Forgejo's and Gitea's aren't yet.
+        if !matches!(forge, Forge::GitHub | Forge::GitLab) {
+            return None;
+        }
         // GitLab's host with the port of an `http(s)` remote: its API is on it.
         let (host, path) = forge::tool_location(forge, &remote.url)?;
         // Both go into the tools' arguments and the API's paths as they are.

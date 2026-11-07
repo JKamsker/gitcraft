@@ -444,29 +444,15 @@ impl RepoTab {
         PrWorktree::Create { ops, path }
     }
 
-    /// The folder a worktree on `branch` goes in, beside the main one: `app` + `feature/x` →
-    /// `app-feature-x`, as the dialog that adds one suggests.
-    /// For a repository on another machine, a folder of that machine.
+    /// A branch folder under the repository's shared worktree root.
     pub(in crate::repo) fn worktree_folder(&self, branch: &str) -> PathBuf {
-        let main = self.main_worktree().unwrap_or(&self.path);
-        let suffix = branch.replace(['/', '\\', ' '], "-");
-        if let Some(target) = crate::remote::parse(main) {
-            let parent = crate::remote::parent_there(&target.path);
-            let repo_name = target.path[parent.len()..].trim_start_matches('/');
-            let repo_name = if repo_name.is_empty() {
-                "worktree"
-            } else {
-                repo_name
-            };
-            let there = format!("{}/{repo_name}-{suffix}", parent.trim_end_matches('/'));
-            return crate::remote::encode(&target.host, &there);
-        }
-        let repo_name = main
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "worktree".to_owned());
-        let parent = main.parent().unwrap_or(main);
-        parent.join(format!("{repo_name}-{suffix}"))
+        let main = self
+            .worktrees
+            .first()
+            .map_or(self.path.as_path(), |w| w.path.as_path());
+        let root = crate::git::resolve_worktree_root(main, &self.worktree_root)
+            .unwrap_or_else(|_| crate::git::default_worktree_root(main));
+        crate::git::branch_worktree_folder(&root, branch)
     }
 
     /// `path`, or `path-2`, `path-3`… when there is something there already. On another
@@ -667,16 +653,37 @@ mod tests {
         tab.refs.local = vec![branch("main", "m"), branch("feat", "f")];
         tab.worktrees = vec![
             worktree("ssh://build/home/me/app", "main", true),
-            worktree("ssh://build/home/me/app-feat", "other", false),
+            worktree("ssh://build/home/me/app.wt/feat", "other", false),
         ];
         assert_eq!(
             tab.pr_worktree_plan(3, "feat", "f"),
             PrWorktree::Create {
                 ops: vec![
                     strings(&["worktree", "prune"]),
-                    strings(&["worktree", "add", "--", "/home/me/app-feat-2", "feat"]),
+                    strings(&["worktree", "add", "--", "/home/me/app.wt/feat-2", "feat"]),
                 ],
-                path: PathBuf::from("ssh://build/home/me/app-feat-2"),
+                path: PathBuf::from("ssh://build/home/me/app.wt/feat-2"),
+            }
+        );
+    }
+
+    /// A saved root takes precedence over the default, including from linked checkouts.
+    #[test]
+    fn a_pull_request_worktree_uses_the_saved_root() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("ssh://build/elsewhere/linked".into(), &ctx);
+        tab.worktrees = vec![worktree("ssh://build/home/me/app", "main", false)];
+        tab.worktree_root = "custom.worktrees".to_owned();
+        tab.refs.local = vec![branch("feat/awesome-stuff", "f")];
+        let path = "/home/me/app/custom.worktrees/feat/awesome-stuff";
+        assert_eq!(
+            tab.pr_worktree_plan(3, "feat/awesome-stuff", "f"),
+            PrWorktree::Create {
+                ops: vec![
+                    strings(&["worktree", "prune"]),
+                    strings(&["worktree", "add", "--", path, "feat/awesome-stuff"])
+                ],
+                path: format!("ssh://build{path}").into(),
             }
         );
     }
@@ -711,7 +718,7 @@ mod tests {
             worktree("/nonexistent/r/app-mine", "mine", false),
         ];
         // Joined as the code joins it (with `\\` on Windows).
-        let folder = |name: &str| Path::new("/nonexistent/r").join(format!("app-{name}"));
+        let folder = |name: &str| Path::new("/nonexistent/r/app.wt").join(name);
         let prune = strings(&["worktree", "prune"]);
         // As this system joins paths (with `\\` on Windows).
         let arg = |name: &str| folder(name).display().to_string();
@@ -720,7 +727,7 @@ mod tests {
         assert_eq!(tab.pr_worktree_plan(1, "main", "m"), PrWorktree::Here);
         assert_eq!(
             tab.pr_worktree_plan(2, "mine", "x"),
-            PrWorktree::Open(folder("mine"))
+            PrWorktree::Open(PathBuf::from("/nonexistent/r/app-mine"))
         );
         // A local branch at the pull request's commit: a worktree on it.
         assert_eq!(
@@ -764,11 +771,11 @@ mod tests {
                         "-b",
                         "fix/x",
                         "--",
-                        &arg("fix-x"),
+                        &arg("fix/x"),
                         "origin/fix/x",
                     ]),
                 ],
-                path: folder("fix-x"),
+                path: folder("fix/x"),
             }
         );
         // From a fork that isn't a remote: fetched from the pull request's ref (never forced).

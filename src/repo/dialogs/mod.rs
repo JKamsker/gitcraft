@@ -66,8 +66,9 @@ pub enum Dialog {
         focus: bool,
     },
     AddWorktree {
-        /// The repository, to suggest a folder next to it.
+        /// The main checkout, so relative roots stay the same from every worktree.
         repo: PathBuf,
+        root: String,
         path: String,
         /// The user typed a path; stop suggesting one.
         path_edited: bool,
@@ -365,6 +366,7 @@ impl Dialog {
     pub fn add_worktree(repo: &Path, branch: Option<&str>, base: &str) -> Self {
         let mut dialog = Dialog::AddWorktree {
             repo: repo.to_path_buf(),
+            root: crate::remote::git_path(&crate::git::default_worktree_root(repo)),
             path: String::new(),
             path_edited: false,
             new_branch: branch.is_none(),
@@ -422,8 +424,6 @@ pub(crate) struct Instead {
 
 enum Outcome {
     Open,
-    /// Still open; the branch changed, so suggest a folder again.
-    Suggest,
     Cancel,
     Done(Box<Action>),
 }
@@ -509,6 +509,7 @@ impl RepoTab {
                 }
                 Dialog::AddWorktree {
                     repo,
+                    root,
                     path,
                     path_edited,
                     new_branch,
@@ -523,6 +524,7 @@ impl RepoTab {
                     worktree::add_worktree(
                         ui,
                         repo,
+                        root,
                         enter,
                         &free,
                         path,
@@ -684,7 +686,6 @@ impl RepoTab {
             Outcome::Cancel => self.dialog = None,
             Outcome::Open if response.should_close() => self.dialog = None,
             Outcome::Open => {}
-            Outcome::Suggest => dialog.suggest_path(),
         }
     }
 }

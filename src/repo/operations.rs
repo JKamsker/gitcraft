@@ -534,6 +534,17 @@ pub(super) fn run_steps_counted(
             continue;
         }
         let args: Vec<&str> = op.iter().map(String::as_str).collect();
+        if let Some(folder) = crate::agent::added_worktree(op)
+            && let Err(e) = if control.is_some_and(|c| c.is_cancelled()) {
+                Err(git::CANCELLED.to_owned())
+            } else {
+                git::prepare_worktree_folder(path, folder)
+            }
+        {
+            result = Err(e);
+            stopped = i;
+            break;
+        }
         result = (|| {
             if let [mark, original @ ..] = op.as_slice()
                 && mark == crate::gerrit::AMEND

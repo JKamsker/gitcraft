@@ -344,3 +344,38 @@ fn adversarial_completed_post_settling_is_released_when_catalog_discards_its_ref
     assert!(tab.pr_drafts[&8].posting && !tab.pr_drafts[&8].settling);
     assert!(tab.forge_change_blocked());
 }
+
+#[test]
+fn primary_forge_is_ci_fallback_while_pushed_commits_retain_their_source() {
+    let ctx = egui::Context::default();
+    let mut tab = tab(&ctx);
+    tab.bind_forge_selection(
+        Selection {
+            name: "fork".into(),
+            url: remote("fork", "JKamsker").url,
+        },
+        false,
+    );
+    assert_eq!(
+        tab.ci_project().map(|p| p.path),
+        Some("JKamsker/gitcraft".into())
+    );
+    let sha = "a".repeat(40);
+    tab.refs.remotes = vec![(
+        "origin".into(),
+        vec![crate::git::Branch {
+            name: "origin/main".into(),
+            target: sha.clone(),
+            upstream: String::new(),
+            track: String::new(),
+            is_head: false,
+        }],
+    )];
+    let projects = tab.ci_projects_for(&sha);
+    assert_eq!(
+        projects.first().map(|p| p.path.as_str()),
+        Some("Vancete/gitcraft")
+    );
+    assert!(projects.iter().any(|p| p.path == "JKamsker/gitcraft"));
+    assert_eq!(tab.primary_forge_remote(), Some("fork"));
+}
