@@ -277,6 +277,7 @@ impl RepoTab {
     }
 
     /// Publishes `branch` on the forge's remote, then opens a pull (or merge) request for it.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn create_pr(
         &mut self,
         branch: String,
@@ -284,6 +285,7 @@ impl RepoTab {
         title: String,
         body: String,
         draft: bool,
+        reviewers: Vec<String>,
         ctx: &egui::Context,
     ) {
         let Some(hosting) = self.hosting.clone() else {
@@ -332,6 +334,7 @@ impl RepoTab {
                     title: &title,
                     body: &body,
                     draft,
+                    reviewers: &reviewers,
                 };
                 hosting.forge.provider().create(&path, &hosting, &new)
             });

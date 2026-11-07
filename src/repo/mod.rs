@@ -63,6 +63,7 @@ mod operations;
 mod palette;
 mod partial_stash;
 mod parallel_bisect;
+mod owners;
 mod patches;
 mod pinned_sections;
 pub(crate) mod popout;
@@ -207,6 +208,8 @@ pub struct RepoTab {
     collisions: Option<collision_view::CollisionView>,
     /// The issues branches were made for, and the list of those assigned to you.
     issue_work: issue_work::IssueWork,
+    /// Who owns which files (CODEOWNERS).
+    owners: owners::Owners,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -457,6 +460,7 @@ impl RepoTab {
             dco: dco::Dco::default(),
             collisions: None,
             issue_work: Default::default(),
+            owners: owners::Owners::default(),
             selected: None,
             stash_view: None,
             scroll_to: None,

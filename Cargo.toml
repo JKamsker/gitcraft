@@ -39,6 +39,8 @@ ureq = { version = "2", features = ["native-certs"] }
 base64 = "0.22"
 # What a repository's trusted command file read as (Settings → Custom commands).
 sha2 = "0.11"
+# Gitea's and Forgejo's CODEOWNERS patterns are regular expressions.
+regex = "1"
 vt100 = "0.18"
 # `gitcraft mcp`: the Model Context Protocol over stdio (the official SDK), on a small runtime.
 rmcp = { version = "3.7", default-features = false, features = ["server", "transport-io"] }

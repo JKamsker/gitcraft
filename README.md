@@ -338,6 +338,24 @@ so your config, credentials and hooks apply as usual.
   last looked_, and its menu has _What changed since you last looked_ and _Mark as seen_. A
   request that only moved onto a newer base, every commit the same, says so quietly.
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
+- CODEOWNERS: the file at HEAD, found where the forge of `origin` looks for it (GitHub:
+  `.github/`, the root, `docs/`; GitLab: the root, `docs/`, `.gitlab/`; Gitea: the root, `docs/`,
+  `.gitea/`, and on Forgejo `.forgejo/` after those) and read its way: on GitHub,
+  gitignore-like patterns where the last match wins; on GitLab, patterns anchored only by a
+  leading `/` and matching files only (a trailing `/` for a folder's contents), in sections
+  (`[Docs]`, `^[Optional]`, `[Approvals][2] @owner`, those of one name merged) whose owners add
+  up, where an exclusion (`!pattern`) that matches drops the section; on Gitea and Forgejo,
+  regular expressions on the whole path (`^pattern$`), where every match adds its owners and
+  `!regex` stands for the other files. Each file row (changes, a commit, a comparison, a pull
+  request) shows its owners; a line above the files of a commit, comparison or pull request,
+  and above the staged files, says who they need ("Needs payments and infra · 2 files without
+  an owner"), worked out in the background. _Create pull request_ suggests, ticked, the owners
+  of what the branch changes since its base, read from the base's CODEOWNERS as the forge reads
+  it (none for a draft). Once it is open they are asked one at a time (GitHub: accounts and
+  teams; GitLab: accounts; Forgejo and Gitea: both), so one the forge refuses — the author, an
+  account that is gone — is said and doesn't keep the others from being asked. _Check
+  CODEOWNERS_ in the palette lists the lines the forge would skip or read differently, the
+  patterns that match no file and the files without an owner.
 
 **Changes and commits** (right)
 
@@ -953,6 +971,8 @@ was made this way, on a demo repository.
 | `src/pull_request/mod.rs` | one pull request in full, whatever the forge: details, checks, comments, changes, safe markdown |
 | `src/pr_post/mod.rs` | what goes out: the `Target` trait each forge implements, and what they share (suggestions, merge rules) |
 | `src/pr_threads.rs` | review threads, the pending review and permissions                          |
+| `src/codeowners/` | CODEOWNERS of GitHub, GitLab and Gitea / Forgejo: where each looks, its patterns, who owns a file, the check |
+| `src/repo/owners/` | CODEOWNERS in the tab: owners on file rows, who a change needs, reviewers to suggest, the check's window |
 | `src/avatars.rs`         | avatars from GitHub, Forgejo / Gitea, GitLab or Gravatar, cached on disk           |
 | `src/update.rs`          | new-release check                                                                  |
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |

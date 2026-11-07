@@ -89,7 +89,11 @@ impl Provider for GitHub {
         if new.draft {
             args.push("--draft");
         }
-        gh(repo, &args).map(|out| out.trim().to_owned())
+        let url = gh(repo, &args)?.trim().to_owned();
+        // Asked after opening it: gh refuses the whole of `--reviewer` for one name it can't ask.
+        super::ask_reviewers(url.clone(), new.reviewers, |who| {
+            gh(repo, &["pr", "edit", &url, "--add-reviewer", who]).map(|_| ())
+        })
     }
 
     fn assigned_issues(&self, repo: &Path, _: &Hosting) -> Result<Vec<Issue>, String> {

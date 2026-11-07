@@ -55,6 +55,8 @@ impl RepoTab {
         let selected = |f: &&ChangedFile| self.open_key() == Some(&key(&f.path));
         let (scope, generation) = super::weakened_marks::scope_of(&key(""), self.work_read);
         let found = self.weakened.get(ui.ctx(), &self.path, scope, generation);
+        let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
+        self.owners_summary(ui, &paths);
         // Rows are known by their path within the list of this commit (or range): a menu left
         // open while another one is shown is not that one's file of the same path.
         ui.push_id(("file-list", tree, rev), |ui| {
@@ -68,7 +70,7 @@ impl RepoTab {
                     let stats = RowExtra::Stats(f.added, f.removed);
                     let (extra, flags) =
                         super::weakened_marks::extra(found.as_ref(), &f.path, &stats);
-                    let r = widgets::file_row(
+                    let r = widgets::file_row_owned(
                         ui,
                         f.status,
                         &f.path,
@@ -76,6 +78,7 @@ impl RepoTab {
                         indent,
                         selected(&f),
                         extra,
+                        self.owner_tag(&f.path).as_ref(),
                     );
                     super::weakened_marks::hover(ui, &r, flags);
                     // A file the commit deleted isn't in it, and has nothing to link to.

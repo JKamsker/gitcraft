@@ -194,23 +194,32 @@ fn whole_life(family: &'static GiteaFamily) -> Result<(), String> {
 
     // Opening pull requests, and the list.
     eprintln!("{}: Opening pull requests, and the list", family.name);
-    let new = |branch, title, draft| NewPullRequest {
+    let asked = ["reviewer".to_owned()];
+    let new = |branch, title, draft, reviewers| NewPullRequest {
         branch,
         base: "main",
         title,
         body: "Does things.\n\n![upload](/attachments/none)",
         draft,
+        reviewers,
     };
     let url = create(
         &server.author(),
         &hosting,
-        &new("feat", "Change things", false),
+        &new("feat", "Change things", false, &asked),
     )?;
     ensure!(
         url == format!("{}/{path}/pulls/1", server.url),
         "created {url}"
     );
-    create(&server.author(), &hosting, &new("wip", "Later", true))?;
+    // The reviewers CODEOWNERS suggested were asked.
+    let opened = server.author().get(&format!("repos/{path}/pulls/1"))?;
+    ensure!(
+        at(&opened, "/requested_reviewers/0/login") == "reviewer",
+        "reviewers asked: {:?}",
+        opened.get("requested_reviewers")
+    );
+    create(&server.author(), &hosting, &new("wip", "Later", true, &[]))?;
     let prs = list(&server.author(), &hosting)?;
     let feat = prs
         .iter()

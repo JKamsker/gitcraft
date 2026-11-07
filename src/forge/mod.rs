@@ -102,6 +102,8 @@ pub struct NewPullRequest<'a> {
     pub title: &'a str,
     pub body: &'a str,
     pub draft: bool,
+    /// Who to ask for a review: accounts (`ann`) and teams (`acme/payments`).
+    pub reviewers: &'a [String],
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -419,6 +421,36 @@ pub(crate) fn tool(forge: Forge, repo: &Path, args: &[&str]) -> Result<String, S
     cli::run(tool, forge.noun(), repo, args)
 }
 
+/// Asks each of `reviewers` for a review of the pull request just opened at `url`, one at a
+/// time with `ask`: one the forge refuses (the author, an account or team that is gone) doesn't
+/// keep the others from being asked, and doesn't undo the opening. The URL, or what went wrong.
+pub(crate) fn ask_reviewers(
+    url: String,
+    reviewers: &[String],
+    ask: impl Fn(&str) -> Result<(), String>,
+) -> Result<String, String> {
+    let refused: Vec<(String, String)> = reviewers
+        .iter()
+        .filter_map(|r| ask(r).err().map(|e| (r.clone(), e)))
+        .collect();
+    match refused.as_slice() {
+        [] => Ok(url),
+        [(who, why)] => Err(format!(
+            "Opened {url}, but couldn't ask {who} for a review: {}",
+            why.lines().next().unwrap_or_default()
+        )),
+        [(_, why), ..] => Err(format!(
+            "Opened {url}, but couldn't ask {} for a review: {}",
+            refused
+                .iter()
+                .map(|(w, _)| w.as_str())
+                .collect::<Vec<_>>()
+                .join(", "),
+            why.lines().next().unwrap_or_default()
+        )),
+    }
+}
+
 /// Account pictures by commit email, from a list of commits as GitHub's, Forgejo's and Gitea's
 /// APIs give it: each commit is tied to the accounts its emails belong to.
 fn parse_commit_avatars(json: &str) -> HashMap<String, String> {
@@ -474,6 +506,29 @@ mod merged_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// One refused reviewer doesn't keep the others from being asked, and the URL is said.
+    #[test]
+    fn reviewers_are_asked_one_at_a_time() {
+        let asked = std::cell::RefCell::new(Vec::new());
+        let reviewers = ["me".to_owned(), "ann".to_owned(), "gone".to_owned()];
+        let result = ask_reviewers("https://x/pr/1".to_owned(), &reviewers, |who| {
+            asked.borrow_mut().push(who.to_owned());
+            match who {
+                "me" => Err("Review cannot be requested from pull request author".to_owned()),
+                "gone" => Err("not found".to_owned()),
+                _ => Ok(()),
+            }
+        });
+        assert_eq!(*asked.borrow(), ["me", "ann", "gone"]);
+        assert!(
+            result.is_err_and(|e| e.starts_with("Opened https://x/pr/1") && e.contains("me, gone"))
+        );
+        assert_eq!(
+            ask_reviewers("u".to_owned(), &[], |_| Err(String::new())),
+            Ok("u".to_owned())
+        );
+    }
 
     #[test]
     fn remote_locations() {

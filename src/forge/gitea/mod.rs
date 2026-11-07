@@ -178,13 +178,47 @@ fn create(api: &Api, hosting: &Hosting, new: &NewPullRequest) -> Result<String, 
             answer => break answer?,
         }
     };
-    match at(&answer, "/html_url") {
-        "" => Err(format!(
-            "{} didn't say which pull request it opened",
-            api.name()
-        )),
-        url => Ok(url.to_owned()),
+    let url = match at(&answer, "/html_url") {
+        "" => {
+            return Err(format!(
+                "{} didn't say which pull request it opened",
+                api.name()
+            ));
+        }
+        url => url.to_owned(),
+    };
+    let number = answer.get("number").and_then(Value::as_u64).unwrap_or(0);
+    if new.reviewers.is_empty() {
+        return Ok(url);
     }
+    if number == 0 {
+        return Err(format!(
+            "Opened {url}, but {} didn't say its number: ask for the reviews on its page",
+            api.name()
+        ));
+    }
+    let endpoint = format!("repos/{}/pulls/{number}/requested_reviewers", hosting.path);
+    super::ask_reviewers(url, new.reviewers, |who| {
+        api.send(
+            "POST",
+            &endpoint,
+            Some(&reviewers_payload(&[who.to_owned()])),
+        )
+        .map(|_| ())
+        .map_err(|e| e.message)
+    })
+}
+
+/// Who to ask, as the API takes them: accounts, and teams by their name (the organisation is
+/// the repository's).
+fn reviewers_payload(reviewers: &[String]) -> Value {
+    let (teams, users): (Vec<&String>, Vec<&String>) =
+        reviewers.iter().partition(|r| r.contains('/'));
+    let teams: Vec<&str> = teams
+        .iter()
+        .map(|t| t.rsplit('/').next().unwrap_or(t))
+        .collect();
+    json!({ "reviewers": users, "team_reviewers": teams })
 }
 
 /// Whether a title marks its pull request a draft (work in progress), as both forges read it.

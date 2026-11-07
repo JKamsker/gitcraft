@@ -27,6 +27,7 @@ impl RepoTab {
         self.publish_custom_commands(&ctx);
         let mut acts: Vec<Action> = std::mem::take(&mut self.queued);
         self.dco_frame(&ctx);
+        self.owners_frame(&ctx);
         self.shortcuts(&ctx, &mut acts);
         self.drag_frame_start(&ctx);
         self.nav_shortcuts(&ctx, &mut acts);
@@ -134,6 +135,7 @@ impl RepoTab {
         self.collision_window(&ctx, &mut acts);
         self.lfs_storage_ui(&ctx, &mut acts);
         self.issue_picker(&ctx, &mut acts);
+        self.owners_lint_window(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
         }

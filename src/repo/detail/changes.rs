@@ -148,6 +148,8 @@ impl RepoTab {
         ) {
             acts.push(stage_action("Unstage all", vec![unstage_all_args(head)]));
         }
+        let paths: Vec<&str> = staged.iter().map(|f| f.path.as_str()).collect();
+        self.owners_summary(ui, &paths);
         let buttons = [("minus", "Unstage")];
         self.work_list(
             ui,
@@ -227,7 +229,7 @@ impl RepoTab {
             .get(ui.ctx(), &self.path, scope, self.work_read);
         let plain = RowExtra::Buttons(buttons);
         let (extra, flags) = super::super::weakened_marks::extra(found.as_ref(), &f.path, &plain);
-        let r = widgets::file_row(
+        let r = widgets::file_row_owned(
             ui,
             f.code,
             &f.path,
@@ -235,6 +237,7 @@ impl RepoTab {
             indent,
             selected,
             extra,
+            self.owner_tag(&f.path).as_ref(),
         );
         if picked.contains(&f.path) {
             mark_picked(ui, r.row.rect);

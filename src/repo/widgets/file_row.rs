@@ -26,6 +26,17 @@ pub struct FileRowResponse {
     pub badge: Option<Rect>,
 }
 
+/// How wide each hover button is, with its gap: room kept for them beside the owners.
+const BUTTON_ROOM: f32 = 22.0;
+
+/// Who owns a file (CODEOWNERS), as its row shows it.
+pub struct OwnerTag {
+    /// Short, on the row: `payments +1`.
+    pub label: String,
+    /// Every owner, for the row's tooltip.
+    pub full: String,
+}
+
 /// One file: status letter, file name, its folder dimmed, and `extra` on the right.
 /// In a tree (`indent` is how far in) the folder is above the row instead.
 pub fn file_row(
@@ -36,6 +47,21 @@ pub fn file_row(
     indent: Option<f32>,
     selected: bool,
     extra: RowExtra<'_>,
+) -> FileRowResponse {
+    file_row_owned(ui, code, path, old_path, indent, selected, extra, None)
+}
+
+/// [`file_row`], with the file's owners left of `extra`.
+#[allow(clippy::too_many_arguments)]
+pub fn file_row_owned(
+    ui: &mut Ui,
+    code: char,
+    path: &str,
+    old_path: Option<&str>,
+    indent: Option<f32>,
+    selected: bool,
+    extra: RowExtra<'_>,
+    owners: Option<&OwnerTag>,
 ) -> FileRowResponse {
     let shift = indent.unwrap_or(0.0);
     let t = Tokens::get(ui.ctx());
@@ -89,6 +115,9 @@ pub fn file_row(
             } else if label.is_some() {
                 // The badge stays where it is when the buttons come up on hover.
                 right -= BUTTON_W * buttons.len() as f32;
+            } else if owners.is_some() {
+                // The owners stay put when the buttons come with the pointer.
+                right -= BUTTON_ROOM * buttons.len() as f32;
             }
         }
         RowExtra::Badged(..) => {}
@@ -99,6 +128,19 @@ pub fn file_row(
         let at = warning_badge(ui, &painter, &t, (right, y), label, room < 180.0);
         right = at.left() - 6.0;
         badge = Some(at);
+    }
+
+    if let Some(owners) = owners {
+        let room = ((right - rect.left()) * 0.4).max(0.0);
+        let clip = Rect::from_min_max(pos2(right - room, rect.top()), pos2(right, rect.bottom()));
+        let r = painter.with_clip_rect(clip).text(
+            pos2(right - 4.0, y),
+            Align2::RIGHT_CENTER,
+            &owners.label,
+            egui::FontId::proportional(11.0),
+            t.accent,
+        );
+        right = r.left().max(clip.left()) - 8.0;
     }
 
     let (dir, name) = split_dir(path);
@@ -133,9 +175,18 @@ pub fn file_row(
         );
     }
     // The full path only adds something when the row shows it cut short.
-    let row = match old_path {
-        Some(old) => row.on_hover_text(format!("{old} → {path}")),
-        None if !dir.is_empty() => row.on_hover_text(path),
+    let shown = match old_path {
+        Some(old) => Some(format!("{old} → {path}")),
+        None if !dir.is_empty() => Some(path.to_owned()),
+        None => None,
+    };
+    let tip = match (shown, owners) {
+        (Some(p), Some(o)) => Some(format!("{p}\nOwners: {}", o.full)),
+        (None, Some(o)) => Some(format!("Owners: {}", o.full)),
+        (shown, None) => shown,
+    };
+    let row = match tip {
+        Some(tip) => row.on_hover_text(tip),
         None => row,
     };
     FileRowResponse { row, button, badge }

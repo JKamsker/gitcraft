@@ -8,6 +8,7 @@ mod avatars;
 mod ci;
 mod custom_commands;
 mod collision;
+mod codeowners;
 mod desktop_entry;
 mod drafts;
 mod error_card;
