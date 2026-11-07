@@ -82,12 +82,14 @@ fn verify(repo: &Path, lens: &Lens) -> Result<(), String> {
     if lens.staging_warning.is_some() {
         return Err("Use normal Git staging for files with conversions".into());
     }
+    let (warning, attributes_stamp) = lens::attribute_state(repo, &lens.spec.path, &|| true)?;
     if super::head(repo, &|| true)? != lens.head
         || index(repo, &|| true)?.0 != lens.index
         || lens::working(repo, &lens.spec.path, &|| true)? != lens.work_raw
         || index_stamp(repo, &|| true)? != lens.index_stamp
         || lens::filemode(repo, &|| true)? != lens.filemode
-        || lens::attributes(repo, &lens.spec.path, &|| true)?.is_some()
+        || warning.is_some()
+        || attributes_stamp != lens.attributes_stamp
     {
         return Err("The staging lens is stale. Refresh before staging or unstaging.".into());
     }
@@ -254,32 +256,34 @@ fn remote_apply(
     // One exclusive index.lock across verification, alternate-index apply and replacement.
     // All scratch names are constants; file paths and payloads are quoted/data, not code.
     let script = format!(
-        "umask 077\nd=$(mktemp -d) || exit 1\nown=0\nidx=$(git rev-parse --path-format=absolute --git-path index) || exit 1\nlock=\"$idx.lock\"\ntrap '[ \"$own\" = 1 ] && rm -f -- \"$lock\"; rm -rf -- \"$d\"' 0\n\
+        "umask 077\nd=$(mktemp -d) || exit 1\nown=0\nidx=$(git --no-lazy-fetch rev-parse --path-format=absolute --git-path index) || exit 1\nlock=\"$idx.lock\"\ntrap '[ \"$own\" = 1 ] && rm -f -- \"$lock\"; rm -rf -- \"$d\"' 0\n\
          if (set -C; : >\"$lock\") 2>/dev/null; then own=1; else echo 'Could not lock the Git index' >&2; exit 1; fi\n\
          printf '%s' '{index_b64}' | base64 -d >\"$d/expected-index\" || exit 1\n\
          printf '%s' '{work_b64}' | base64 -d >\"$d/expected-work\" || exit 1\n\
          printf '%s' '{patch_b64}' | base64 -d >\"$d/patch\" || exit 1\n\
          check_snapshot() {{\n\
-          current=$(git rev-parse --verify -q HEAD || :)\n[ \"$current\" = {head} ] || return 1\n\
+          current=$(git --no-lazy-fetch rev-parse --verify -q HEAD || :)\n[ \"$current\" = {head} ] || return 1\n\
           {stamp_check}\n\
-          git ls-files --stage -z >\"$d/current-index\" && cmp -s \"$d/expected-index\" \"$d/current-index\" || return 1\n\
+          {attributes_check}\n\
+          git --no-lazy-fetch ls-files --stage -z >\"$d/current-index\" && cmp -s \"$d/expected-index\" \"$d/current-index\" || return 1\n\
           ( {working} ) >\"$d/current-work\" && cmp -s \"$d/expected-work\" \"$d/current-work\" || return 1\n}}\n\
          check_snapshot || {{ echo 'The staging lens is stale; refresh it' >&2; exit 1; }}\n\
          [ -L \"$idx\" ] && {{ echo 'Symbolic-link index files are not modified' >&2; exit 1; }}\n\
-         if [ -f \"$idx\" ]; then [ \"$(wc -c <\"$idx\")\" -le {index_limit} ] && cp -- \"$idx\" \"$d/index\" || exit 1; else GIT_INDEX_FILE=\"$d/index\" git read-tree --empty || exit 1; fi\n\
+         if [ -f \"$idx\" ]; then [ \"$(wc -c <\"$idx\")\" -le {index_limit} ] && cp -- \"$idx\" \"$d/index\" || exit 1; else GIT_INDEX_FILE=\"$d/index\" git --no-lazy-fetch read-tree --empty || exit 1; fi\n\
          {remove_intent}\n\
-         GIT_INDEX_FILE=\"$d/index\" git apply --cached --whitespace=nowarn {reverse} -- \"$d/patch\" || exit 1\n\
+         GIT_INDEX_FILE=\"$d/index\" git --no-lazy-fetch apply --cached --whitespace=nowarn {reverse} -- \"$d/patch\" || exit 1\n\
          check_snapshot || {{ echo 'The staging lens changed before the patch was installed; refresh it' >&2; exit 1; }}\n\
          [ \"$(wc -c <\"$d/index\")\" -le {index_limit} ] || exit 1\n\
          cat \"$d/index\" >\"$lock\" && mv -f -- \"$lock\" \"$idx\" || exit 1\nown=0\n",
         stamp_check = remote_stamp_check(&lens.index_stamp),
+        attributes_check = remote_attributes_check(lens),
         index_b64 = b64(&lens.index),
         work_b64 = b64(&work),
         patch_b64 = b64(patch.as_bytes()),
         index_limit = INDEX_LIMIT,
         remove_intent = if lens.intent_to_add {
             format!(
-                "GIT_INDEX_FILE=\"$d/index\" git update-index --force-remove -- {} || exit 1",
+                "GIT_INDEX_FILE=\"$d/index\" git --no-lazy-fetch update-index --force-remove -- {} || exit 1",
                 crate::remote::sh_quote(&lens.spec.path)
             )
         } else {
@@ -303,10 +307,27 @@ fn remote_apply(
     }
 }
 
+fn remote_attributes_check(lens: &Lens) -> String {
+    format!(
+        "git --no-lazy-fetch --literal-pathspecs check-attr -z filter working-tree-encoding eol text -- {path} >\"$d/current-attributes\" 2>\"$d/attribute-errors\" || return 1\n\
+         [ ! -s \"$d/attribute-errors\" ] || return 1\n\
+         printf 'autocrlf\\0' >>\"$d/current-attributes\"\n\
+         git --no-lazy-fetch config --get core.autocrlf >>\"$d/current-attributes\" 2>\"$d/attribute-errors\"; rc=$?\n\
+         [ \"$rc\" -le 1 ] && [ ! -s \"$d/attribute-errors\" ] || return 1\n\
+         actual_attributes=$(md5sum \"$d/current-attributes\") || return 1\n\
+         [ \"${{actual_attributes%% *}}\" = {stamp} ] || return 1\n\
+         actual_filemode=$(git --no-lazy-fetch config --bool --get core.filemode); rc=$?\n\
+         [ \"$rc\" -le 1 ] && [ \"$actual_filemode\" = {filemode} ] || return 1\n",
+        path = crate::remote::sh_quote(&lens.spec.path),
+        stamp = crate::remote::sh_quote(&lens.attributes_stamp),
+        filemode = crate::remote::sh_quote(&lens.filemode),
+    )
+}
+
 pub(super) fn index_stamp(repo: &Path, active: &dyn Fn() -> bool) -> Result<String, String> {
     if let Some(target) = crate::remote::parse(repo) {
         let script = format!(
-            "umask 077\nd=$(mktemp -d) || exit 1\ntrap 'rm -rf -- \"$d\"' 0\nidx=$(git rev-parse --path-format=absolute --git-path index) || exit 1\n{}\nprintf '%s' \"$actual\"",
+            "umask 077\nd=$(mktemp -d) || exit 1\ntrap 'rm -rf -- \"$d\"' 0\nidx=$(git --no-lazy-fetch rev-parse --path-format=absolute --git-path index) || exit 1\n{}\nprintf '%s' \"$actual\"",
             remote_stamp_read()
         );
         let out = super::super::command::comparison_remote(

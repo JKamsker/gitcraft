@@ -129,6 +129,22 @@ fn encoded_remote_readers_and_locked_staging_preserve_raw_files_and_existing_loc
         assert_eq!(current.versions[1].bytes, b"working\n");
         assert_eq!(current.versions[2].bytes, b"working\n");
         apply_lens_patch(&encoded, &current, &patch, true)?;
+        let before_race = read_lens(&encoded, &spec, &|| true)?;
+        std::fs::write(
+            PathBuf::from(&path).join("attribute-race-trigger"),
+            b"armed",
+        )
+        .map_err(|e| e.to_string())?;
+        assert!(
+            apply_lens_patch(&encoded, &before_race, &patch, false)
+                .is_err_and(|e| e.contains("changed") || e.contains("stale"))
+        );
+        assert_eq!(
+            read_lens(&encoded, &spec, &|| true)?.versions[1].bytes,
+            b"base\n"
+        );
+        std::fs::remove_file(PathBuf::from(&path).join(".gitattributes"))
+            .map_err(|e| e.to_string())?;
         let stale = read_lens(&encoded, &spec, &|| true)?;
         std::fs::write(PathBuf::from(&path).join(&spec.path), b"newer\n")
             .map_err(|e| e.to_string())?;
@@ -154,10 +170,23 @@ fn encoded_remote_readers_and_locked_staging_preserve_raw_files_and_existing_loc
     r.write("new folder/quoted ' $(touch ESCAPED).txt", b"working\n")?;
     let bin = r.0.join("fixture-bin");
     std::fs::create_dir(&bin).map_err(|e| e.to_string())?;
+    let real_git = std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+        .map(|p| p.join("git"))
+        .find(|p| p.is_file())
+        .ok_or("No fixture Git executable")?;
+    let wrapped_git = bin.join("git");
+    std::fs::write(&wrapped_git, format!(
+        "#!/bin/sh\nfor arg do\nif [ \"$arg\" = apply ] && [ -f {trigger} ]; then printf '* filter=fixture\\n' > {attrs}; rm -f -- {trigger}; fi\ndone\nexec {git} \"$@\"\n",
+        trigger = crate::remote::sh_quote(&r.0.join("attribute-race-trigger").to_string_lossy()),
+        attrs = crate::remote::sh_quote(&r.0.join(".gitattributes").to_string_lossy()),
+        git = crate::remote::sh_quote(&real_git.to_string_lossy()),
+    )).map_err(|e| e.to_string())?;
     let ssh = bin.join("ssh");
     std::fs::write(&ssh, "#!/bin/sh\nexec /bin/sh\n").map_err(|e| e.to_string())?;
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(&ssh, std::fs::Permissions::from_mode(0o700))
+        .map_err(|e| e.to_string())?;
+    std::fs::set_permissions(&wrapped_git, std::fs::Permissions::from_mode(0o700))
         .map_err(|e| e.to_string())?;
     let mut paths = vec![bin];
     paths.extend(std::env::split_paths(
@@ -467,5 +496,130 @@ fn size_and_cancellation_limits_fail_explicitly() -> Result<(), String> {
         .is_err_and(|e| e.contains("cancelled"))
     );
     assert!(matrix(&r.0, &["HEAD".into()], "", &|| true).is_err());
+    Ok(())
+}
+
+#[test]
+fn missing_promised_attributes_fail_closed_without_starting_a_transport() -> Result<(), String> {
+    const CHILD: &str = "GITCRAFT_MISSING_ATTRIBUTES_FIXTURE";
+    const NAME: &str = "git::file_comparison::tests::missing_promised_attributes_fail_closed_without_starting_a_transport";
+    if let Some(path) = std::env::var_os(CHILD) {
+        let path = PathBuf::from(path);
+        let file = std::env::var("GITCRAFT_MISSING_ATTRIBUTES_FILE").map_err(|e| e.to_string())?;
+        let expected = if file.starts_with("nested/") {
+            "nested/.gitattributes"
+        } else {
+            ".gitattributes"
+        };
+        let result = read_lens(
+            &path,
+            &LensSpec {
+                path: file,
+                previous: None,
+            },
+            &|| true,
+        );
+        assert!(
+            result.is_err_and(|e| e.contains(expected)),
+            "Missing conversion rules must be explicit and read-only"
+        );
+        return Ok(());
+    }
+    let source = Repo::new()?;
+    source.write("file.txt", b"plain\n")?;
+    source.write("nested/file.txt", b"plain\n")?;
+    source.write(".gitattributes", b"file.txt text eol=lf\n")?;
+    source.write("nested/.gitattributes", b"file.txt filter=fixture\n")?;
+    source.commit()?;
+    source.git(&["config", "uploadpack.allowFilter", "true"])?;
+    let attr_oids = [
+        source.git(&["rev-parse", "HEAD:.gitattributes"])?,
+        source.git(&["rev-parse", "HEAD:nested/.gitattributes"])?,
+    ];
+    let partial = Repo(source.0.join("partial"));
+    let out = source
+        .command(&["clone", "--no-checkout", "--no-local", "--filter=blob:none"])
+        .arg(&source.0)
+        .arg(&partial.0)
+        .output()
+        .map_err(|e| e.to_string())?;
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    partial.git(&["--no-lazy-fetch", "read-tree", "HEAD"])?;
+    partial.write("file.txt", b"plain\n")?;
+    partial.write("nested/file.txt", b"plain\n")?;
+    // Seed only the compared file blob. Both indexed attribute files stay promised
+    // and absent, so Git's attribute fallback would otherwise fetch them silently.
+    partial.git(&[
+        "--no-lazy-fetch",
+        "hash-object",
+        "--no-filters",
+        "-w",
+        "file.txt",
+    ])?;
+    for oid in &attr_oids {
+        assert!(
+            partial
+                .git(&["--no-lazy-fetch", "cat-file", "-e", oid])
+                .is_err()
+        );
+    }
+    for (i, file) in ["file.txt", "nested/file.txt"].into_iter().enumerate() {
+        if i == 1 {
+            // Make the root rule available for the second case, so the nested
+            // attribute blob is the independently exercised unavailable source.
+            let mut seed =
+                partial.command(&["--no-lazy-fetch", "hash-object", "--no-filters", "-w"]);
+            let out = seed
+                .arg(source.0.join(".gitattributes"))
+                .output()
+                .map_err(|e| e.to_string())?;
+            assert!(out.status.success());
+        }
+        let missing = partial.git(&[
+            "--no-lazy-fetch",
+            "rev-list",
+            "--objects",
+            "--all",
+            "--missing=print",
+        ])?;
+        let trace = source.0.join(format!("transport-trace-{i}"));
+        let out = Command::new(std::env::current_exe().map_err(|e| e.to_string())?)
+            .args(["--exact", NAME, "--nocapture"])
+            .env(CHILD, &partial.0)
+            .env("GITCRAFT_MISSING_ATTRIBUTES_FILE", file)
+            .env("GIT_TRACE", &trace)
+            .output()
+            .map_err(|e| e.to_string())?;
+        assert!(
+            out.status.success(),
+            "{} {}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let trace = std::fs::read_to_string(trace).map_err(|e| e.to_string())?;
+        assert!(
+            !trace.contains(" fetch ") && !trace.contains("upload-pack"),
+            "No transport may start: {trace}"
+        );
+        assert!(
+            partial
+                .git(&["--no-lazy-fetch", "cat-file", "-e", &attr_oids[i]])
+                .is_err()
+        );
+        assert_eq!(
+            partial.git(&[
+                "--no-lazy-fetch",
+                "rev-list",
+                "--objects",
+                "--all",
+                "--missing=print"
+            ])?,
+            missing
+        );
+    }
     Ok(())
 }

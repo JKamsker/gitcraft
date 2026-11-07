@@ -15,6 +15,7 @@ pub(crate) struct Lens {
     pub work_raw: Version,
     pub filemode: String,
     pub intent_to_add: bool,
+    pub attributes_stamp: String,
     pub versions: [Version; 3],
     pub staging_warning: Option<String>,
 }
@@ -54,7 +55,7 @@ pub(crate) fn read_lens(
     if filemode == "false" && third.regular() && second.regular() {
         third.mode = second.mode.clone();
     }
-    let staging_warning = attributes(repo, &spec.path, active)?;
+    let (staging_warning, attributes_stamp) = attribute_state(repo, &spec.path, active)?;
     if index(repo, active)?.0 != before
         || super::head(repo, active)? != head
         || working(repo, &spec.path, active)? != work_raw
@@ -72,6 +73,7 @@ pub(crate) fn read_lens(
         work_raw,
         filemode,
         intent_to_add,
+        attributes_stamp,
         versions: [first, second, third],
         staging_warning,
     })
@@ -104,14 +106,16 @@ fn intent_to_add(repo: &Path, path: &str, active: &dyn Fn() -> bool) -> Result<b
 }
 
 /// Partial patches use raw bytes; a filter/encoding conversion belongs to normal Git staging.
-pub(super) fn attributes(
+pub(super) fn attribute_state(
     repo: &Path,
     path: &str,
     active: &dyn Fn() -> bool,
-) -> Result<Option<String>, String> {
-    let data = run(
+) -> Result<(Option<String>, String), String> {
+    require_attribute_sources(repo, path, active)?;
+    let response = output(
         repo,
         &[
+            "--no-lazy-fetch",
             "--literal-pathspecs",
             "check-attr",
             "-z",
@@ -124,6 +128,15 @@ pub(super) fn attributes(
         ],
         active,
     )?;
+    // Git can report unreadable attribute blobs on stderr while exiting zero.
+    // Unknown conversion rules must not become permission to stage raw bytes.
+    if response.code != 0 || !response.stderr.is_empty() {
+        return Err(format!(
+            "Could not read file attributes without downloading objects: {}",
+            String::from_utf8_lossy(&response.stderr).trim()
+        ));
+    }
+    let data = response.stdout;
     let fields: Vec<_> = data.split(|b| *b == 0).filter(|s| !s.is_empty()).collect();
     if !fields.len().is_multiple_of(3) {
         return Err("Invalid attribute response".into());
@@ -132,8 +145,48 @@ pub(super) fn attributes(
         .chunks(3)
         .any(|f| f[2] != b"unspecified" && f[2] != b"unset");
     let autocrlf = output(repo, &["config", "--get", "core.autocrlf"], active)?;
-    let autocrlf = String::from_utf8_lossy(&autocrlf.stdout);
-    Ok((conversions||(!autocrlf.trim().is_empty()&&autocrlf.trim()!="false")).then(||"Line staging is unavailable with clean filters, text/EOL or working-tree-encoding conversion. Use the normal patch to stage with Git's conversions.".into()))
+    if !matches!(autocrlf.code, 0 | 1) || !autocrlf.stderr.is_empty() {
+        return Err("Could not establish the file's EOL conversion settings".into());
+    }
+    let value = String::from_utf8_lossy(&autocrlf.stdout);
+    let warning = (conversions || (!value.trim().is_empty() && value.trim() != "false"))
+        .then(|| "Line staging is unavailable with clean filters, text/EOL or working-tree-encoding conversion. Use the normal patch to stage with Git's conversions.".into());
+    let mut state = data;
+    state.extend_from_slice(b"autocrlf\0");
+    state.extend_from_slice(&autocrlf.stdout);
+    Ok((warning, format!("{:x}", md5::compute(state))))
+}
+
+/// With lazy fetch disabled, check-attr silently treats an unavailable indexed
+/// attribute blob as absent (success, no diagnostics). Check every governing
+/// directory's working file and possible index fallback before trusting conversion
+/// rules. Requiring the fallback even with a working file also makes removal of
+/// that working file safe during the later locked remote transaction.
+fn require_attribute_sources(
+    repo: &Path,
+    path: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<(), String> {
+    let (_, entries) = index(repo, active)?;
+    let mut parent = String::new();
+    for component in path.split('/') {
+        let name = format!("{parent}.gitattributes");
+        let working = working(repo, &name, active)?;
+        if working.warning.is_some() || (working.mode.is_some() && !working.regular()) {
+            return Err(format!("File attributes are not safely readable: {name}"));
+        }
+        if let Some(entry) = entries.get(name.as_bytes()) {
+            if !matches!(entry.mode.as_str(), "100644" | "100755") {
+                return Err(format!("Unsupported indexed attributes: {name}"));
+            }
+            blob(repo, Some(entry), active).map_err(|_| format!(
+                "File attributes are unavailable without downloading objects: {name}. Fetch explicitly before using the staging lens."
+            ))?;
+        }
+        parent.push_str(component);
+        parent.push('/');
+    }
+    Ok(())
 }
 
 pub(super) fn working(

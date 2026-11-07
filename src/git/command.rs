@@ -952,6 +952,13 @@ pub(super) fn comparison_output(
     if !active() {
         return Err("Comparison cancelled".into());
     }
+    // Attributes may themselves live in promised blobs. Enforce this on every
+    // raw-view command, including metadata/config reads and alternate-index writes,
+    // rather than relying on individual callers to remember the global option.
+    let guarded_args: Vec<_> = std::iter::once("--no-lazy-fetch")
+        .chain(args.iter().copied())
+        .collect();
+    let args = guarded_args.as_slice();
     let out = if let Some(target) = remote::parse(repo) {
         let mut request = bounded::request(&target, args, Vec::new(), MAX);
         request

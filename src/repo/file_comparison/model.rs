@@ -134,6 +134,7 @@ pub(super) fn boundary(
             .env("GIT_ATTR_NOSYSTEM", "1")
             .env("GIT_CEILING_DIRECTORIES", &temp.0)
             .args([
+                "--no-lazy-fetch",
                 "diff",
                 "--no-index",
                 "--no-ext-diff",
