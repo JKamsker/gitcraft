@@ -1,0 +1,27 @@
+
+running 21 tests
+test repo::diff::encrypted::tests::cancellation_between_sides_never_returns_or_decrypts_a_second_plaintext ... ok
+test repo::diff::encrypted::tests::cancelled_slow_ciphertext_reads_do_not_hold_the_plaintext_owner_waiting ... ok
+test repo::diff::encrypted::tests::close_reload_drop_and_late_answers_discard_private_results ... ok
+test repo::diff::encrypted::tests::content_changes_are_distinct_from_recipients_and_reencryption ... ok
+test repo::diff::encrypted::tests::creation_deletion_and_plaintext_to_encrypted_transitions_use_the_correct_sides ... ok
+test repo::diff::encrypted::tests::data_envelopes_require_explicit_format_independent_of_filename ... ok
+test repo::diff::encrypted::tests::fixture::cancellation_kills_local_decryption_and_late_descendants_without_disk_output ... ok
+test repo::diff::encrypted::tests::fixture::changed_encrypted_sides_discard_plaintext_before_returning_a_result ... ok
+test repo::diff::encrypted::tests::fixture::commit_index_worktree_and_extensionless_sops_are_recognized_without_decrypting ... ok
+test repo::diff::encrypted::tests::fixture::decrypt_action_is_asynchronous_and_close_cancels_its_private_worker ... ok
+test repo::diff::encrypted::tests::fixture::decrypted_ui_is_read_only_and_mode_close_reload_or_park_disposes_it ... ok
+test repo::diff::encrypted::tests::fixture::git_textconv_cannot_decrypt_ordinary_patches_or_run_before_opt_in ... ok
+test repo::diff::encrypted::tests::fixture::local_cli_uses_only_ciphertext_stdin_and_fixed_safe_format_argv ... ok
+test repo::diff::encrypted::tests::fixture::plaintext_tool_diagnostics_missing_tools_binary_and_oversized_output_are_redacted ... ok
+test repo::diff::encrypted::tests::fixture::private_mode_and_stale_generation_refuse_queued_raw_hunk_writes ... ok
+test repo::diff::encrypted::tests::fixture::real_sops_and_generated_age_compare_formats_and_key_rotation_offline ... Real local SOPS generated-age fixture completed: JSON/YAML/dotenv/INI/binary UTF-8, recipient rotation, explicit ambiguous formats, cross-extension rename, binary NUL/non-UTF8 refusal; isolated HOME and explicit fixture keys only
+ok
+test repo::diff::encrypted::tests::fixture::sops_command_is_local_and_has_only_fixed_format_arguments ... ok
+test repo::diff::encrypted::tests::formats_recognize_sops_metadata_without_invoking_a_tool ... ok
+test repo::diff::encrypted::tests::malformed_and_oversized_documents_fail_without_leaking_their_contents ... ok
+test repo::diff::encrypted::tests::private_ciphertext_reader_retains_its_initiating_profile_context ... ok
+test repo::diff::encrypted::tests::private_text_layout_does_not_enter_eguis_shared_galley_cache ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 821 filtered out; finished in 3.31s
+

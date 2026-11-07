@@ -1,0 +1,51 @@
+{
+  "review": "Independent corrected SOPS ordinary correctness re-review",
+  "verdict": "PASS",
+  "candidate": "60cb5790cd478a0b1811ee4a705fd758a0b61a14",
+  "tree": "d3d84bab0be9c730b9290cea40bf81e2f5135efb",
+  "base": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+  "scope": "Corrected SOPS feature relative to reviewed local-green file/portability base, prior P2 format defect, format-choice lifecycle, ciphertext staging and all three file-comparison view transitions. No security scan, CI, live hosts, or fresh compile.",
+  "findings": [],
+  "prior_finding": {
+    "id": "SOPS-CORRECTNESS-1",
+    "status": "RESOLVED",
+    "evidence": [
+      "model::inspect marks data+sops JSON shape ambiguous regardless filename, rather than treating shape plus suffix as the selected binary/JSON store.",
+      "compare_with_encoding refuses Ask mode before invoking any decryptor if either side is ambiguous; independently executed regression asserts zero decrypt calls.",
+      "Per-view explicit JSON document/Binary envelope control selects actual store for ambiguous sides. Captured choice belongs to the initiating worker; changing it calls close before replacing choice, cancelling and dropping the old receiver/result.",
+      "Official SOPS3.10.0/age1.2.1 generated-key regression independently passed structured data42/data43 under extensionless/.yaml/.json paths and actual staged rename from .json to .yaml.",
+      "Official generated-key regression independently passed binary UTF8 envelope named .json with exact text row, Binary-mode NUL/nonUTF8 refusal, and JSON-mode escaped-NUL refusal."
+    ]
+  },
+  "lifecycle_and_integration": [
+    "New DiffView uses default Ask; refreshed requests cancel private results. Format selection is view-local and not stored in settings/shared messages.",
+    "Close/refresh/drop, changed ciphertext, cancelled first side, old receiver responses and initiating Profile context are covered by independently executed selected tests and inspected production paths.",
+    "Opening Migration, Lens or Matrix executes the existing open_file_comparison path that drops DiffView; independently executed lifecycle test verifies all three active tokens become false.",
+    "Raw hunk preparation/application and keyboard writes reject private mode; returning to encrypted patch retains the raw Git source. Fixed Git --no-textconv behavior and ciphertext-only staging checks independently pass.",
+    "SOPS tool runner remains local fixed-format argv with bounded stdin/stdout/stderr and safe error messages; plaintext remains in view-private channel/data and uncached private galley rendering. No production process controller changes."
+  ],
+  "verified_author_gates": {
+    "source_hashes": "28/28 match supplied manifest",
+    "log_hashes": "6/6 match supplied manifest",
+    "private_compilation_worktree": "/workspace/work/encrypted-diffs",
+    "full": "839 passed, 0 failed, 3 ignored, 0 filtered; 842 registered",
+    "targeted": "21 passed including real generated offline SOPS fixture",
+    "inert": "11 passed",
+    "fmt_and_strict_clippy": "PASS supplied checked logs"
+  },
+  "independent_local_checks": {
+    "compile": "NONE; checked author binary reused read-only",
+    "frozen_library_binary": "/workspace/work/encrypted-diffs/target/debug/deps/gitcraft-98b7c97eceab1e2d",
+    "binary_sha256_before_and_after": "c9a1433e889c7bc037adc00f5f204e1c31225db510dfe9654e8882392ff999c7",
+    "registered_tests": 842,
+    "result": "21 passed, 0 failed, 0 ignored, 821 filtered; one thread; real generated-key offline SOPS fixture executed",
+    "list_log_sha256": "6f58547bf1b309875ef3ad305dd178f593c542a9072bd252cea19602d49ca559",
+    "targeted_log_sha256": "871b89a6fd63a58829906b8d683226caa3c1b1ede5c71da2e26a63111c23ddf8"
+  },
+  "limits": [
+    "A single explicit JSON/Binary choice applies to both ambiguous sides, as the UI/docs state. Ambiguous sides with different stores require another comparison; filenames never infer the format.",
+    "No independent compilation; source/log/binary binding and reused-binary limitations are explicit.",
+    "No CI access, Windows/live SSH/WSL, user keys, external accounts or credentials used.",
+    "Scoped feature PASS does not replace final combined local gates, independent whole-combination review or final-stage platform checks. No PR created."
+  ]
+}
