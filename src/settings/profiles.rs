@@ -180,8 +180,9 @@ pub fn config_text(profile: &UserProfile, includes: &[PathBuf]) -> String {
         && let Ok(exe) = std::env::current_exe()
     {
         // The installed helper speaks OpenSSH even if the included user config selects
-        // PuTTY. Repository-local ssh.variant/core.sshCommand still have normal precedence.
-        text.push_str(&entry("ssh.variant", "ssh"));
+        // PuTTY. Auto probes this wrapper as OpenSSH and still detects a repository-local
+        // Plink override by its executable name; local ssh.variant retains precedence.
+        text.push_str(&entry("ssh.variant", "auto"));
         text.push_str(&entry(
             "core.sshCommand",
             &crate::connections::ssh_helper_command(&profile.connections.ssh_key, &exe),
@@ -577,7 +578,7 @@ mod connection_tests {
             )
         );
         assert_eq!(get("user.name")?, "Work author");
-        assert_eq!(get("ssh.variant")?, "ssh");
+        assert_eq!(get("ssh.variant")?, "auto");
         let helpers = get("credential.https://github.com.helper")?;
         assert!(helpers.starts_with('\n'));
         assert!(helpers.contains("--gitcraft-profile-credential gh "));
@@ -614,7 +615,7 @@ mod connection_tests {
         // This transport only records Git's arguments and asks real OpenSSH to parse them.
         // -G never connects, and stdout is kept away from Git's protocol parser.
         let script = format!(
-            "#!/bin/sh\nprintf '%s\\n' \"$@\" > {}\nssh -F /dev/null -G -o IdentitiesOnly=yes -i {} \"$@\" > {} 2>/dev/null\nexit 1\n",
+            "#!/bin/sh\nprintf '%s\\n' \"$@\" > {}\nssh -F /dev/null -G -o IdentitiesOnly=yes -i {} \"$@\" > {} 2>/dev/null\ncase \" $* \" in *' -G '*) exit 0;; esac\nexit 1\n",
             crate::connections::shell_quote(&args_file.to_string_lossy()),
             crate::connections::shell_quote(&key.to_string_lossy()),
             crate::connections::shell_quote(&effective.to_string_lossy())
@@ -664,6 +665,53 @@ mod connection_tests {
                 "{variant}: {parsed}"
             );
         }
+        // A local command alone must retain Git's Plink basename detection; requiring
+        // users to add a second local ssh.variant setting would break existing repos.
+        let plink = dir.join("plink");
+        std::fs::write(
+            &plink,
+            format!(
+                "#!/bin/sh\nprintf '%s\\n' \"$@\" > {}\nexit 1\n",
+                crate::connections::shell_quote(&args_file.to_string_lossy())
+            ),
+        )
+        .map_err(|e| e.to_string())?;
+        std::fs::set_permissions(&plink, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| e.to_string())?;
+        assert!(
+            Command::new("git")
+                .current_dir(&repo)
+                .args([
+                    "config",
+                    "core.sshCommand",
+                    &crate::connections::shell_quote(&plink.to_string_lossy())
+                ])
+                .status()
+                .map_err(|e| e.to_string())?
+                .success()
+        );
+        let context = crate::connections::Context {
+            git_config: Some(config.clone()),
+            choices: profile.connections.clone(),
+            ..Default::default()
+        };
+        assert!(
+            context
+                .run(|| crate::git::run(
+                    Some(&repo),
+                    &["ls-remote", "ssh://git@fixture.invalid:2222/team/repo"]
+                ))
+                .is_err()
+        );
+        let args = std::fs::read_to_string(&args_file).map_err(|e| e.to_string())?;
+        assert!(
+            args.lines()
+                .collect::<Vec<_>>()
+                .windows(2)
+                .any(|pair| pair == ["-P", "2222"]),
+            "{args}"
+        );
+        assert!(!args.lines().any(|arg| arg == "-p"), "{args}");
         // Git's repository-local policy still has precedence over the generated profile.
         assert!(
             Command::new("git")

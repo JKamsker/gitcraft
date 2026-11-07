@@ -256,8 +256,10 @@ so your config, credentials and hooks apply as usual.
     with `IdentitiesOnly=yes`, checks the effective host configuration and refuses additional
     `IdentityFile` entries instead of falling back to another account. Proxy and host options
     remain in use. Equivalent tilde and SSH token paths are expanded by OpenSSH itself.
-    The generated profile sets `ssh.variant=ssh` so an inherited PuTTY configuration cannot
-    change port arguments; repository-local `core.sshCommand` and `ssh.variant` still win.
+    The generated profile sets `ssh.variant=auto` so an inherited PuTTY configuration cannot
+    change the wrapper's port arguments; repository-local transports are still detected by
+    Git, and a repository's explicit `ssh.variant` still wins. Ambiguous/control-character
+    identity paths are refused before starting the transport.
   - Background jobs retain the initiating profile's account choices and an immutable config
     snapshot across profile edits, switching or deletion. Git in WSL/SSH repositories keeps
     that machine's own credentials; forge commands run here with this profile's account.

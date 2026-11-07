@@ -645,9 +645,14 @@ pub(crate) fn validate_ssh_identities(
     };
     let selected = normalized(key);
     for identity in config
-        .lines()
+        .split_terminator('\n')
         .filter_map(|line| line.strip_prefix("identityfile "))
     {
+        if identity.chars().any(char::is_control) {
+            return Err(
+                "SSH returned an ambiguous identity path containing control characters".into(),
+            );
+        }
         if identity == "none" {
             continue;
         }
@@ -658,15 +663,15 @@ pub(crate) fn validate_ssh_identities(
                 // tilde/environment/percent expansion, including passwd home and %C, and -G
                 // prints that expanded value without opening a connection or reading a key.
                 let mut cmd = ssh_command(key);
-                let quoted = identity.replace('\\', "\\\\").replace('"', "\\\"");
+                // Fence the complete raw expansion: a Unix filename can contain LF/CR.
+                // Taking only its first line would accept a different key's selected prefix.
+                let fence = "__GITCRAFT_IDENTITY_END__";
+                let tagged = format!("{identity}{fence}");
+                let quoted = tagged.replace('\\', "\\\\").replace('"', "\\\"");
                 cmd.args(["-G", "-o", &format!("ControlPath=\"{quoted}\"")])
                     .args(ssh_args);
                 let output = read_private(cmd)?;
-                expanded = output
-                    .lines()
-                    .find_map(|line| line.strip_prefix("controlpath "))
-                    .ok_or("SSH did not expand the configured identity path")?
-                    .to_owned();
+                expanded = expanded_identity(&output, fence)?;
                 expanded.as_str()
             } else {
                 identity
@@ -680,6 +685,36 @@ pub(crate) fn validate_ssh_identities(
         return Err("SSH could not select this profile's identity file".to_owned());
     }
     Ok(())
+}
+
+/// Read one fenced value without line splitting, CR removal, or whitespace trimming.
+/// `rfind` includes any embedded fence in the path; a later field containing a fence
+/// makes the result fail closed because the intervening newlines remain in the value.
+fn expanded_identity(output: &str, fence: &str) -> Result<String, String> {
+    let mut fields = output
+        .match_indices("controlpath ")
+        .filter(|(at, _)| *at == 0 || output.as_bytes().get(at - 1) == Some(&b'\n'));
+    let start = fields
+        .next()
+        .ok_or("SSH did not expand the configured identity path")?
+        .0
+        + "controlpath ".len();
+    if fields.next().is_some() {
+        return Err("SSH returned ambiguous identity expansion fields".into());
+    }
+    let end = output
+        .rfind(fence)
+        .filter(|end| *end >= start)
+        .ok_or("SSH did not finish expanding the configured identity path")?;
+    let tail = &output[end + fence.len()..];
+    if !tail.starts_with('\n') && !tail.starts_with("\r\n") {
+        return Err("SSH returned an ambiguous identity expansion boundary".into());
+    }
+    let value = &output[start..end];
+    if value.chars().any(char::is_control) {
+        return Err("SSH returned an identity path containing control characters".into());
+    }
+    Ok(value.to_owned())
 }
 
 pub(crate) fn ssh_helper_command(key: &str, executable: &Path) -> String {
@@ -714,18 +749,7 @@ pub(crate) fn ssh_helper() -> Option<i32> {
                 .map_err(|_| "Invalid profile SSH key path")?,
         )
         .map_err(|_| "Invalid profile SSH key path")?;
-        if !Path::new(&key).is_absolute() || key.chars().any(char::is_control) {
-            return Err("Invalid profile SSH key path".to_owned());
-        }
-        let mut inspect = ssh_command(&key);
-        inspect.arg("-G").args(rest);
-        let config = read_private(inspect)?;
-        validate_ssh_identities(&key, &config, rest)?;
-        let status = ssh_command(&key)
-            .args(rest)
-            .status()
-            .map_err(|_| "Could not start SSH")?;
-        Ok(status.code().unwrap_or(1))
+        run_ssh(&key, rest)
     };
     Some(match run() {
         Ok(code) => code,
@@ -734,6 +758,23 @@ pub(crate) fn ssh_helper() -> Option<i32> {
             1
         }
     })
+}
+
+/// Shared with the helper-boundary fixtures: these are the exact checks and transport
+/// launch used by --gitcraft-profile-ssh, without reading any key contents in gitcraft.
+fn run_ssh(key: &str, rest: &[String]) -> Result<i32, String> {
+    if !Path::new(key).is_absolute() || key.chars().any(char::is_control) {
+        return Err("Invalid profile SSH key path".to_owned());
+    }
+    let mut inspect = ssh_command(key);
+    inspect.arg("-G").args(rest);
+    let config = read_private(inspect)?;
+    validate_ssh_identities(key, &config, rest)?;
+    let status = ssh_command(key)
+        .args(rest)
+        .status()
+        .map_err(|_| "Could not start SSH")?;
+    Ok(status.code().unwrap_or(1))
 }
 
 /// Nonsecret metadata for push-preflight diagnostics. A transport username such as SSH's
