@@ -8,20 +8,20 @@
   "agents": {
     "audit_32_38": "Fix Drafts reader actual completion ownership; content recovery backend8f992 preserved",
     "audit_39_44": "Standalone file tools plan/implementation fromc56; both Windowsbab and filecdd integrated",
-    "audit_45_50": "Sole integration writer merging reviewed SOPS+Drafts then local combined gates; own Portabilityb05 fix2findings afterward",
+    "audit_45_50": "Portability two reviewed fix regressions23816bd, own local gates; integration handed back",
     "baseline_validation": "Completed safe evidence handoff after platform account-security block; do not retry blocked old runtime action",
     "implement_gerrit": "SOPS ambiguity format fix0fc; plan SSH key helper afterward",
-    "review_weather": "Preflight local protocol correction; remote automatic repair ownership follow-up required",
+    "review_weather": "Gate1 five recordingPASS accepted; Gate2 owned temp realGit fixtures authorized",
     "review_portability_and_file_views": "Filecdd scoped independent PASS; Windows static pass, exact nativeCI pending",
-    "review_push_repair_protocol": "Re-review Preflight static index/dependency coherence correction; corrected SOPS60cbPASS",
-    "review_portable_setup": "Tour/Portabilityb05 FAIL2findings: ambient clone URLrewrite, native Windows lockretry pathcompare; sourceauthor fixing"
+    "review_push_repair_protocol": "SOPS60cbPASS merged; Preflight8b STATICPASS, final whole-feature after runtime still pending",
+    "review_portable_setup": "Portability238 fixes re-review preliminary; Content801 root identity race fix with author"
   },
   "integration": {
     "worktree": "/workspace/work/integration",
     "branch": "codex/remaining-features",
-    "remote_green_head": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+    "remote_green_head": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
     "state": "/workspace/work/integration-state.json",
-    "checks": "Linux fmt/strictClippy/full817pass3ignored0filtered,820name union PASS; actual Ubuntu+lintCI PASS, nativeWindowsCI in progress",
+    "checks": "LOCAL fmt/strictClippy/full866pass3ignored0filtered869names PASS; CI DEFERRED until all our side finished",
     "features": [
       "Gerrit",
       "Clone",
@@ -37,13 +37,15 @@
       "Profile SSH/accounts",
       "File migration map",
       "Three-state staging lens",
-      "File versions across branches"
+      "File versions across branches",
+      "Encrypted files explicitSOPS",
+      "Working tree drafts"
     ],
     "initial_green_base": "4f4fb565c3ade34d3b974f0545af21c51bb34b93 (firstfive,686pass3ignored)",
     "final_gate": "At complete intended scope, exact combined final commit all required tests pass AND independent adversarial whole-combination review PASS before creating ONE PR. Existing scoped reviews do not replace finalcombinedreview.",
     "platform_gates": "Linux/local green, actualWindowsCI failure11 from da0143c; no finalPR untilfixed andWindowsPASS. See ci-recovered-status.json.",
-    "pending_candidate": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
-    "sole_writer": "audit_45_50 until combined gate/state handoff; root must not mutate integration meanwhile",
+    "pending_candidate": null,
+    "sole_writer": "root; audit_45_50 integration handback complete",
     "pending_features": [
       "SOPS60cb579 independentPASS",
       "Drafts3cef22c independentPASS"
@@ -62,13 +64,13 @@
     "/workspace/work/prs.json (99originalopenPRs,allinflightfeaturesexcludedwhole-namedbullet)"
   ],
   "scope_rule": "Namedidea with anyopenPR excludedwholeevenifomissions. Registry #38excludedbecausePR75sharedkeymap. ContrasteligiblePR66explicitlyexcludesit.",
-  "new_feature_base": "c56d0502d7deb59ba85ac8a807c59a8d68729874 (exact combined Linux gates PASS; nativeWindowsCI pending)",
+  "new_feature_base": "b5df68070a6df9d91cd29ca5d6270db80c9040c9 (local17features green; CI prohibited until final side completion)",
   "tools": "Use functions.exec tools.exec_command, tools.mcp__codex_apps__github_*; ALL_TOOLS filter specificnames forschemas. GitHubconnectorfor PR operations; normalgit pushbranches. No sendmessages/comments tothirdparties. GitHubupdate_pull_request stateclosed used153154155.",
   "environment": "Managedcloud /workspace ready, networkpolicy enforced restricted github/packagehosts, VPNfalse, nosecretbindings. Cloudruntime skill read c7/cloud-environment-runtime plusnetworking. Do not dumpenv/credentials. GitHubownerJKamsker adminpush. devstill74027116e8f20334716a6b1208717bb33c9c6280 onlastfetch.",
   "communications": "User is impatient: keep updates brief, prioritize coding/local verification, avoid repeated orchestration/CI polling. Status at last answer15verified+2merged undergoing localcombined gates;49queued.",
   "checkpoint_policy": "After every completed unit of work, each agent and the orchestrator must commit AND push its branch before starting the next unit or risky test. Verify the remote SHA. Label WIP unvalidated. Only one final giant PR; all required tests and independent adversarial review must pass on the final combined source before PR creation.",
   "recovery_status": "Current source units and review evidence committed/pushed; no app test quarantine on accepted containment branches. Historical recovery/checkpoint_worktrees.py must NOT be rerun (would restore obsolete quarantine/identity); normal agents preserve their own units with correct shared repo-local author.",
-  "verified_remote_head": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+  "verified_remote_head": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
   "backup": {
     "url": "https://raw.githubusercontent.com/JKamsker/gitcraft/f6896061a3bc6c3a049f5cdd592ff21860ccb50b/recovery/gitcraft-recovery-20261107.zip",
     "sha256": "0816c7c383acb5c130d3d019efacd573d6c70a8872f9cd91b67b076ccb887bf7",

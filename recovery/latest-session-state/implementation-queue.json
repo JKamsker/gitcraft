@@ -107,8 +107,9 @@
       "agent": "audit_32_38",
       "branch": "codex/content-recovery",
       "worktree": "/workspace/work/content-recovery",
-      "latest_preserved_head": "8f99238873465133ecde6294197be107f32d4913",
-      "validation": "Backend source+5tests WIP, no Cargo yet"
+      "latest_preserved_head": "8011a392fafe8a7e4d5964c809b83c1ff88b9769",
+      "validation": "Targeted19retry, root identity race fix in progress",
+      "reviewer": "review_portable_setup"
     },
     {
       "issue": 32,
@@ -135,14 +136,17 @@
           "Open #132 agent checkpoints and #64 teleport use related temporary-index snapshots, but do not supply periodic general working-tree drafts."
         ]
       },
-      "status": "fixing_confirmed_reader_lifetime_finding",
+      "status": "integrated",
       "agent": "audit_32_38",
       "branch": "codex/working-drafts",
       "worktree": "/workspace/work/working-drafts",
       "base": "48f2b234c4b9535c820138442295caeada1410fc",
       "latest_preserved_head": "cbf05e57b8ecf4f7ac142a813a3df4ddd3019622",
       "reviewer": "audit_45_50",
-      "review_report": "/workspace/work/review-working-drafts-51ea049.json"
+      "review_report": "/workspace/work/review-working-drafts-3cef22c.json",
+      "commit": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+      "integration_merge": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
+      "validation": "Independent27PASS; combined866pass3ignored0filtered"
     },
     {
       "issue": 33,
@@ -985,16 +989,17 @@
         ],
         "effort": "M"
       },
-      "status": "fixing_confirmed_format_review_finding",
+      "status": "integrated",
       "agent": "implement_gerrit",
       "branch": "codex/encrypted-diffs",
       "worktree": "/workspace/work/encrypted-diffs",
       "base": "5af92d88aee563f9a3113c1edaef65d245a66f06",
-      "commit": "ee6e8482a09c27a2c40286996433bd1bd996b3d0",
+      "commit": "60cb5790cd478a0b1811ee4a705fd758a0b61a14",
       "reviewer": "review_push_repair_protocol",
-      "validation": "Independent static ee6e848 PASS; authorized guard removal bd851ed pushed; local-only runtime gates pending.",
+      "validation": "Independent21PASS incl generated realSOPS; combined866pass3ignored0filtered",
       "latest_preserved_head": "0fc6c54922bddd6f2c748b06cb3f515ce94fd795",
-      "review_report": "/workspace/work/review-sops-a30f1f1/review-evidence/sops-a30f1f1-review.json"
+      "review_report": "/workspace/work/review-sops-60cb579/review-evidence/sops-60cb579-review.json",
+      "integration_merge": "49ee305779b726434873a800544e4fe2df2a3ffb"
     },
     {
       "issue": 42,
@@ -1194,10 +1199,12 @@
         ],
         "effort": "S-M"
       },
-      "status": "assigned_static_plan",
+      "status": "implementing",
       "agent": "implement_gerrit",
       "branch": "codex/ssh-key-helper",
-      "worktree": "/workspace/work/ssh-key-helper"
+      "worktree": "/workspace/work/ssh-key-helper",
+      "latest_preserved_head": "3c51d183b199fc49e46efb484d045ee08e59ffbb",
+      "validation": "Plan/public-key registration/UI wired; initial compile ongoing"
     },
     {
       "issue": 43,
@@ -1247,10 +1254,12 @@
         ],
         "effort": "M"
       },
-      "status": "assigned_static_plan",
+      "status": "implementing",
       "agent": "audit_39_44",
       "branch": "codex/standalone-file-tools",
-      "worktree": "/workspace/work/standalone-file-tools"
+      "worktree": "/workspace/work/standalone-file-tools",
+      "latest_preserved_head": "15fb8de83c051575d6671b563f2e2419ed336769",
+      "validation": "Foundation8PASS; UI/main wiring ongoing"
     },
     {
       "issue": 45,
@@ -1337,8 +1346,9 @@
       "worktree": "/workspace/work/onboarding-portability",
       "base": "06fe1bd74280f9d24c8a1e1e12dccb528097dec8",
       "base_note": "Reviewed History e65a65b merged with green992ec15; own combined base checked",
-      "latest_preserved_head": "bb606027d336f96fcc953f47deb5057724d12756",
-      "validation": "Actual setup/UI6of6PASS; strict/full upcoming, unvalidated as final candidate"
+      "latest_preserved_head": "23816bd15ae471e9346730522d7941a491185dde",
+      "validation": "Two reviewed fixes/source regressions pushed; gates ongoing",
+      "reviewer": "review_portable_setup"
     },
     {
       "issue": 45,
@@ -1378,8 +1388,9 @@
       "worktree": "/workspace/work/onboarding-portability",
       "base": "06fe1bd74280f9d24c8a1e1e12dccb528097dec8",
       "base_note": "Reviewed History e65a65b merged with green992ec15; own combined base checked",
-      "latest_preserved_head": "bb606027d336f96fcc953f47deb5057724d12756",
-      "validation": "Actual setup/UI6of6PASS; strict/full upcoming, unvalidated as final candidate"
+      "latest_preserved_head": "23816bd15ae471e9346730522d7941a491185dde",
+      "validation": "Two reviewed fixes/source regressions pushed; gates ongoing",
+      "reviewer": "review_portable_setup"
     },
     {
       "issue": 46,

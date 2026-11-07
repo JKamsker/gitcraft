@@ -1,0 +1,113 @@
+{
+  "feature": "#32 Working Drafts",
+  "candidate": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+  "candidate_tree": "3c68f7a2227fb86c3cdbca06d980f2ca4c7c7cfb",
+  "review_base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "prior_failed_candidate": "51ea04904419b850805a8fc627f71af8b9255fb9",
+  "reviewer": "audit_45_50; independent, did not author Drafts",
+  "status": "PASS",
+  "blocking_findings": [],
+  "resolved_findings": [
+    {
+      "id": "DRAFTS-1",
+      "status": "RESOLVED",
+      "evidence": [
+        "The actual reader active callback now requires its own request generation and tab lifetime. Modal Cancel/Escape/replacement, Profile reload, parking and tab drop invalidate request ownership.",
+        "A running reader keeps the slot until its matching result. Repeated requests coalesce into one latest-only PendingRead carrying the initiating immutable Profile context; stale callbacks cannot publish or free a newer slot.",
+        "Cancellation of a remote caller is not confused with remote worker completion. ForecastCompletion acquires a ticket synchronously before worker scheduling and holds it around the full remote::exec invocation, including pool/connect waits. Nested cleanup spawns inherit their own tickets before parent release.",
+        "Replacement dispatch checks both the retained running slot and the actual completion counter, without a wall-clock cooldown assumption. The counter releases on closure return/unwind.",
+        "Independent injected-dispatcher tests prove real Escape cancellation with tab alive,100 replacements starting only newest request, stale callback rejection, Profile/dialog/drop invalidation, and a replacement blocked after simulated caller timeout until the underlying recording worker completes."
+      ]
+    }
+  ],
+  "source_review": [
+    "Re-read production reader generation/dispatch/response code and every cancellation hook in dialogs/apply/load/messages/worktree parking.",
+    "Traced actual forecast_remote spawn and nested Context cleanup through the new thread-local completion scope; acquisition precedes scheduling, parent/child tickets have no zero-count gap, and normal callers without a scope retain their existing transport semantics.",
+    "Rechecked snapshot/recovery/retention/index/path/Practice/Profile/typed-remote boundaries against the prior complete static review. Core capture/restore algorithms are unchanged; context changes add cancellable config reads and completion-aware cleanup. No new process controller/signals or destructive user-ref/index/file operations were introduced by the fix."
+  ],
+  "supplied_gate_evidence": {
+    "manifest": "/workspace/work/working-drafts-validation.json",
+    "manifest_sha256": "87dc9a19895af1f48129feecfeacd970b5d00ac5e66b8ef19a838add419447bd",
+    "all_source_and_log_hashes_independently_verified": true,
+    "all27_named_cases_present_and_passing": true,
+    "fmt": "PASS",
+    "strict_all_target_clippy": "PASS",
+    "full_default": "816 passed;0 failed;3 ignored;0 filtered;819 total",
+    "source_compiler_worktree": "/workspace/work/working-drafts",
+    "evidence_only_head": "9da1ac5ca49855ba06dbe2760189f360bff35a32",
+    "evidence_only_head_application_bytes_identical": true
+  },
+  "independent_runtime_confirmation": {
+    "retained_private_binary": "/workspace/work/working-drafts/target/debug/deps/gitcraft-31822f5b138c0fe8",
+    "binary_sha256": "b819be1f02e379ed6ca7efa7eda8d8521ba56c0b448dde6695681a663f0deeb0",
+    "cargo_rebuilds": 0,
+    "commands": "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL <retained-binary> <filter> --nocapture",
+    "counts": {
+      "completion": 1,
+      "reader_lifecycle": 6,
+      "real_repository_core": 19,
+      "pre_operation": 1,
+      "total": 27
+    },
+    "result": "27 passed;0 failed;0 ignored in selected confirmations",
+    "actually_executed_tests": [
+      "git::command::completion::tests::completion_tracks_nested_workers_after_the_original_caller_stops_waiting",
+      "git::drafts::tests::binary_empty_files_deletions_and_index_layer_recovery_preserve_the_real_index",
+      "git::drafts::tests::changed_symlinks_and_conflicted_indexes_fail_without_following_targets_or_touching_index",
+      "git::drafts::tests::configured_filters_hooks_fsmonitor_and_signing_never_run_for_drafts_or_recovery",
+      "git::drafts::tests::ignored_rule_read_warnings_fail_closed_before_any_version_is_published",
+      "git::drafts::tests::limits_invalid_paths_and_cancellation_leave_all_real_state_untouched",
+      "git::drafts::tests::missing_paths_below_symlinks_fail_closed_and_do_not_publish_deletions",
+      "git::drafts::tests::mixed_index_work_and_untracked_are_independent_and_ignored_files_stay_out",
+      "git::drafts::tests::nested_untracked_repositories_are_excluded_without_hiding_outer_changes",
+      "git::drafts::tests::partial_shallow_drafts_and_missing_index_preview_never_call_network_helpers",
+      "git::drafts::tests::private_index_cache_handles_split_and_sparse_indexes_without_rewriting_the_real_index",
+      "git::drafts::tests::recovery_detects_intent_to_add_changes_even_when_index_object_records_match",
+      "git::drafts::tests::recovery_refuses_stale_files_indexes_refs_and_new_ignore_rules",
+      "git::drafts::tests::rename_unicode_no_newline_and_hardlinks_recover_only_the_selected_path",
+      "git::drafts::tests::retention_expires_owned_refs_with_cas_and_preserves_unknown_versions",
+      "git::drafts::tests::selected_hunks_recover_without_changing_staged_state_and_have_a_safety_version",
+      "git::drafts::tests::tree_roots_survive_gc_restart_and_do_not_change_history_branches_reflog_or_normal_push",
+      "git::drafts::tests::typed_remote_reader_quotes_paths_and_never_confuses_links_with_missing_files",
+      "git::drafts::tests::unborn_sha256_and_linked_worktree_versions_keep_separate_identities",
+      "git::drafts::tests::unchanged_large_tracked_files_are_not_copied_as_working_changes",
+      "repo::drafts::tests::a_due_pause_dispatches_a_background_snapshot_and_disabled_repos_stay_empty",
+      "repo::drafts::tests::dialog_replacement_profile_reload_and_tab_drop_cancel_reader_ownership",
+      "repo::drafts::tests::modal_escape_cancels_the_owned_reader_while_the_tab_remains_alive",
+      "repo::drafts::tests::pauses_coalesce_and_stale_or_disabled_jobs_cannot_publish_ui_results",
+      "repo::drafts::tests::remote_replacements_wait_for_actual_completion_after_a_simulated_caller_timeout",
+      "repo::drafts::tests::replacements_coalesce_until_the_previous_worker_finishes_and_ignore_stale_reads",
+      "repo::operations::tests::working_drafts_protect_checkout_and_rebase_before_any_operation_step"
+    ],
+    "logs": {
+      "completion": {
+        "path": "/workspace/work/review-drafts-fix-completion.log",
+        "bundled_path": "docs/reviews/working-drafts-3cef22c/review-drafts-fix-completion.log",
+        "sha256": "3d21b63aad02895b031b72f889d0a9b6147936a6259cc589a0322ad2e1cbad67"
+      },
+      "readers": {
+        "path": "/workspace/work/review-drafts-fix-readers.log",
+        "bundled_path": "docs/reviews/working-drafts-3cef22c/review-drafts-fix-readers.log",
+        "sha256": "e0c754649ac49f2dd71668f1738ab3447842f1a3ca299edd5a8bab9bcdae86ac"
+      },
+      "core": {
+        "path": "/workspace/work/review-drafts-fix-core.log",
+        "bundled_path": "docs/reviews/working-drafts-3cef22c/review-drafts-fix-core.log",
+        "sha256": "0278dbc855380222896db5f69fbb0d33f8643df49259602f8c00727e0faabbc0"
+      },
+      "preop": {
+        "path": "/workspace/work/review-drafts-fix-preop.log",
+        "bundled_path": "docs/reviews/working-drafts-3cef22c/review-drafts-fix-preop.log",
+        "sha256": "56586cc14142711ad8fa6425348175f6a344766f89770596b9ffb3e7ef3ee383"
+      }
+    }
+  },
+  "limits": [
+    "No live SSH/WSL/provider/credentials or Windows runtime was exercised. Remote completion proof uses the production ownership wrapper around controlled recording-only worker closures; source tracing binds that same wrapper to actual remote::exec.",
+    "UI cancellation stops the caller/read generation; already scheduled underlying remote transport may continue according to existing transport behavior. New reader work stays gated until its actual tracked completion, including nested cleanup.",
+    "No new OS/process-control experiments, full Cargo rerun or CI calls were performed. Exact immutable supplied full gates were independently hash-verified; focused existing compiled tests were rerun instead.",
+    "Approval covers this immutable application candidate. Final integration/history assembly still requires root-owned combined local gates and independent review before the single final PR."
+  ],
+  "source_mutation": "None. Only notes/evidence added to codex/review-working-drafts-fix in separate review worktree.",
+  "ci": "Not used, dispatched, polled or awaited."
+}

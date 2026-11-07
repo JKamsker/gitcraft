@@ -1,0 +1,128 @@
+{
+  "head": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
+  "tree": "b190db7e84d3db04c305daf31dca79e207bb85de",
+  "starting_head": "8989a1fe580f52d08704011fe883081a1a9f26bc",
+  "worktree": "/workspace/work/integration",
+  "branch": "codex/remaining-features",
+  "remote_verified": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
+  "source_diff_sha256": "8b8c670d53a54c742214388663ca6ebf1534c087d2b2ecb75473838d7532dfc4",
+  "merges": [
+    {
+      "feature": "SOPS encrypted comparisons",
+      "reviewed": "60cb5790cd478a0b1811ee4a705fd758a0b61a14",
+      "merge": "49ee305779b726434873a800544e4fe2df2a3ffb",
+      "review": "/workspace/work/review-sops-60cb579/review-evidence/sops-60cb579-review.json"
+    },
+    {
+      "feature": "Working Drafts",
+      "reviewed": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+      "merge": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
+      "review": "/workspace/work/review-working-drafts-3cef22c.json"
+    }
+  ],
+  "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "gates": {
+    "fmt": "PASS",
+    "strict_all_target_clippy": "PASS",
+    "full_default": "866 passed;0 failed;3 ignored;0 filtered;869 total",
+    "test_list_union": "Exact869 expected names match; all49 added SOPS/Drafts cases actually pass"
+  },
+  "private_target": "/workspace/work/integration/target",
+  "fresh_package_clean": true,
+  "cargo_incremental": "0",
+  "cargo_build_jobs": "2",
+  "optional_ssh_wsl_env": "unset",
+  "logs": {
+    "clean": {
+      "path": "/workspace/work/integration-b5df680-clean.log",
+      "sha256": "a0b7d2b060fbf2188bf8b8bfb513257e7be7fb287b38c466dd4c16e968172703",
+      "bytes": 36
+    },
+    "fmt": {
+      "path": "/workspace/work/integration-b5df680-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "clippy": {
+      "path": "/workspace/work/integration-b5df680-clippy.log",
+      "sha256": "e0a13be946bc946193ab4edacd58dc15a919e88ef5a4cd5a30493a06c21c5743",
+      "bytes": 160
+    },
+    "test": {
+      "path": "/workspace/work/integration-b5df680-test.log",
+      "sha256": "0edb2a825b5f095d686ac6c24a5c824d1abadaaf11c4e1039497872b21b27e85",
+      "bytes": 72610
+    },
+    "test-list": {
+      "path": "/workspace/work/integration-b5df680-test-list.log",
+      "sha256": "be4e189122d87d72f53d3d6576c0aa3c8cb123f9e41f22f220346ce6d9443b62",
+      "bytes": 66902
+    }
+  },
+  "unique_reviewed_files": {
+    "src/repo/diff/encrypted/SAFETY.md": {
+      "reviewed_commit": "60cb5790cd478a0b1811ee4a705fd758a0b61a14",
+      "sha256": "3bea3eca0ec403f45af7e1889ed65a434bc97d68343e5ce95b79eaa6e7843e8e"
+    },
+    "src/repo/diff/encrypted/mod.rs": {
+      "reviewed_commit": "60cb5790cd478a0b1811ee4a705fd758a0b61a14",
+      "sha256": "f4568e16b4a00449ba2c2eff08150474c574f89c97eb3278fd32dc621adaa95e"
+    },
+    "src/repo/diff/encrypted/model.rs": {
+      "reviewed_commit": "60cb5790cd478a0b1811ee4a705fd758a0b61a14",
+      "sha256": "dd4b06f31e20ff26e7aae8e9be04f1eee5f04d13045c6a569116aef75c02aa54"
+    },
+    "src/repo/diff/encrypted/tests.rs": {
+      "reviewed_commit": "60cb5790cd478a0b1811ee4a705fd758a0b61a14",
+      "sha256": "bf795473a0ee9f1180c6b00e21e42f2291588c61f505d9e15bf2c87cc32caa03"
+    },
+    "src/repo/diff/encrypted/tool.rs": {
+      "reviewed_commit": "60cb5790cd478a0b1811ee4a705fd758a0b61a14",
+      "sha256": "4b933c64e6d9f1a8634fdecda84e3597f0f28a10d15b9ad92a0ffdb5a9cccf2e"
+    },
+    "src/repo/diff/encrypted/view.rs": {
+      "reviewed_commit": "60cb5790cd478a0b1811ee4a705fd758a0b61a14",
+      "sha256": "ed7e9f96fd619aa3c9ef7fe47e6530f28ddaf383f8eca20e6dec42fe04056793"
+    },
+    "src/git/command/completion.rs": {
+      "reviewed_commit": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+      "sha256": "fc179dcf3e288f3005b2f4cc61cc205fd22735929e39f595dfdca56d8254c9ec"
+    },
+    "src/git/drafts/context.rs": {
+      "reviewed_commit": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+      "sha256": "df04c4b46833f544cd291012bb28c2fd770a70635bd9879ced235a97e845a36c"
+    },
+    "src/git/drafts/mod.rs": {
+      "reviewed_commit": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+      "sha256": "9d9dc06f77a8c9a60663c2d9a7b9f1901df50bad715aca336e555c160f4171b8"
+    },
+    "src/git/drafts/restore.rs": {
+      "reviewed_commit": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+      "sha256": "3dd10e4b40f08ce4ede47f7b81ff7fb28cfe5915b7410784977ed881c3a298de"
+    },
+    "src/git/drafts/tests.rs": {
+      "reviewed_commit": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+      "sha256": "9bc4cb13b5a9b8ecd42b88f317620eceb59e63b6557e89c085099b8302ae50a5"
+    },
+    "src/repo/drafts.rs": {
+      "reviewed_commit": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+      "sha256": "4c0f94a159794a5c0a20548ed9c58647f8af2617a0cbc3b93bb6369045bd8a86"
+    },
+    "src/repo/dialogs/drafts.rs": {
+      "reviewed_commit": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+      "sha256": "1c8dac30eeeb6187ec58645a312aef289f215271776702a5d51ce4de5be06c95"
+    }
+  },
+  "expected_tests_manifest": "/workspace/work/integration-b5df680-expected-tests.json",
+  "expected_tests_sha256": "c28e3587c8bfbd7a5a3fed4f75831b69a1da9a61adc2bd3df01874cf5374b43c",
+  "workflow": {
+    "matches_original_dev_bytes": true,
+    "push_branches": [
+      "master"
+    ],
+    "ci_used": false,
+    "ci_policy": "Deferred until all implementation, final history assembly, local tests and adversarial reviews are complete."
+  },
+  "application_only_merge": "Incoming old51ea validation copies omitted; evidence9da/244 heads not merged as units. Original evidence branches remain pushed.",
+  "combined_review": "Individual immutable SOPS/Drafts PASS; final whole-scope integration review still pending."
+}
