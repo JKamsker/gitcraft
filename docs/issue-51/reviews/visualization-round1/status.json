@@ -1,0 +1,16 @@
+{
+  "reviewed_tip": "39d8c4cecd63fbb225d6a32f8dac1186aab538ea",
+  "application_candidate": "0b5718ce575d3ba6332ca0ae6ea96f90d6493073",
+  "overall": "FAIL",
+  "corrections": [
+    {
+      "finding": "UI-R1-1",
+      "commits": [
+        "903de82d539c1cc7c0ed08c48bc59f31b8522922",
+        "33a74a5ed917a4ef27d9944f67ee5799dbc8de30"
+      ],
+      "status": "parent fix and two safe actual-key-event tests pass; independent rereview pending"
+    }
+  ],
+  "unresolved": "All other blocking findings remain open. Lifecycle C1 is an API/test contract gap; normal Reader cancellation uses the owned token. No full-suite or CI claim."
+}

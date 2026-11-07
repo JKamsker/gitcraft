@@ -1,0 +1,10 @@
+{
+  "candidate": "33a74a5ed917a4ef27d9944f67ee5799dbc8de30",
+  "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked --lib topology_arrows -- --nocapture",
+  "exit_code": 0,
+  "passed": 2,
+  "failed": 0,
+  "sha256": "6ce31932f30268fb48a3efdd785c28db2f235d07156097869e36510f6f65ec85",
+  "log": "parent-topology-key-tests.log.gz",
+  "scope": "safe synthetic UI key events only; no full-suite validation"
+}
