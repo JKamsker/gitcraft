@@ -1,0 +1,35 @@
+{
+  "candidate": "bf6089b684597d878d3c2f256b7c69d64c6785a0",
+  "branch": "t3/implement-review-workflow-ideas",
+  "remote_sha_verified": true,
+  "writer_gates": "81 targeted tests; check; formatting; qualified clippy allowing baseline dead_code",
+  "independent_review": "in_progress",
+  "limits": [
+    "No real Docker execution",
+    "No full suite",
+    "No native Linux/Windows gate",
+    "No CI or PR"
+  ],
+  "logs": [
+    {
+      "source": "/tmp/gitcraft-51-review-final-tests.log",
+      "archive": "tests.log.gz",
+      "sha256": "3d47b914014bbe05c8bd676a4bf9914782b8eea84c3847491c59823da88c3d58"
+    },
+    {
+      "source": "/tmp/gitcraft-51-review-final-clippy.log",
+      "archive": "clippy.log.gz",
+      "sha256": "7ad9ef0b91e59f1cfae22d81d26a7c4b7f1c781200b458d8602d500685dc6214"
+    },
+    {
+      "source": "/tmp/gitcraft-51-review-final-fmt.log",
+      "archive": "fmt.log.gz",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/tmp/gitcraft-51-review-final-check.log",
+      "archive": "check.log.gz",
+      "sha256": "3fb7ed0ae4057d82adae154a34a3a9500617e2e59baec27c8fa4505b4ea7322c"
+    }
+  ]
+}

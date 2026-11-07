@@ -1,0 +1,141 @@
+{
+  "candidate": "c82112a5ab8ba461c487c3266462a81896c85d33",
+  "application": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+  "verdict": "FAIL",
+  "findings": {
+    "core": [
+      "B1",
+      "B2",
+      "B3",
+      "C1"
+    ],
+    "content": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "ui": [
+      "FV-UI-R1-1",
+      "FV-UI-R1-2",
+      "FV-UI-R1-3"
+    ]
+  },
+  "correction_status": "in_progress_original_writer",
+  "artifacts": [
+    {
+      "source": "/tmp/gitcraft-review-sops-repro.py",
+      "archive": "00-gitcraft-review-sops-repro.py.gz",
+      "sha256": "46aa6a18c2a294c9b0de1127132be4c87d871fd6c1cf463bf94fa713871814b2",
+      "bytes": 1684
+    },
+    {
+      "source": "/tmp/gitcraft-review-svg.rs",
+      "archive": "01-gitcraft-review-svg.rs.gz",
+      "sha256": "0b69deeb2f6381f1227708d50beeaacea94caaabb28257214e032a08b55b2c4b",
+      "bytes": 346
+    },
+    {
+      "source": "/tmp/gitcraft-review-sops-reader.rs",
+      "archive": "02-gitcraft-review-sops-reader.rs.gz",
+      "sha256": "8f52f83d001b5f5055281df06f1ef61db843e9a93664521e02d6521e6203a058",
+      "bytes": 1385
+    },
+    {
+      "source": "/tmp/gitcraft-fileviews-content-focused-r1.log",
+      "archive": "03-gitcraft-fileviews-content-focused-r1.log.gz",
+      "sha256": "9effc1af11fc8df7bac8ba58d2d9205449f73e8f5df75fa0b4bf73d5e4c513b6",
+      "bytes": 2617
+    },
+    {
+      "source": "/tmp/gitcraft-fileviews-ui-review-moved-bench.rs",
+      "archive": "04-gitcraft-fileviews-ui-review-moved-bench.rs.gz",
+      "sha256": "a70cc0badea016941ea6f4829ab6435ada84cdd9d499519d0b5146b8a26d8bbb",
+      "bytes": 11665
+    },
+    {
+      "source": "/tmp/gitcraft-fileviews-ui-review-moved-bench.log",
+      "archive": "05-gitcraft-fileviews-ui-review-moved-bench.log.gz",
+      "sha256": "2ec21c4550325633d8cda5671363ab4ef7e7093cdfc7d6e6f69471e549cefcea",
+      "bytes": 249
+    },
+    {
+      "source": "/tmp/gitcraft-fileviews-ui-review-c82112a5-tests.json",
+      "archive": "06-gitcraft-fileviews-ui-review-c82112a5-tests.json.gz",
+      "sha256": "256d2e9c5e9cca600b23a4c0374782227a0142a42d272f56d339539bd0011fe5",
+      "bytes": 2068
+    },
+    {
+      "source": "/tmp/gitcraft-fileviews-ui-review-c82112a5-tests.log",
+      "archive": "07-gitcraft-fileviews-ui-review-c82112a5-tests.log.gz",
+      "sha256": "f45ffeb0d10261ae8e5868fba60e12dbd3c42424a14132355cca032f1577ce4a",
+      "bytes": 3550
+    },
+    {
+      "source": "/private/tmp/gitcraft-fileviews-review-core-r1/index-lock-race-test.log",
+      "archive": "08-index-lock-race-test.log.gz",
+      "sha256": "9aaa8bfdf9446d6102571ea4fdabf60bad1f2cff00106945371e54850112ee00",
+      "bytes": 460
+    },
+    {
+      "source": "/private/tmp/gitcraft-fileviews-review-core-r1/index-mode-test.log",
+      "archive": "09-index-mode-test.log.gz",
+      "sha256": "d5407855010593e519484472f89fddc5ec20038aa3371d650608a7bcfacdebf0",
+      "bytes": 245
+    },
+    {
+      "source": "/private/tmp/gitcraft-fileviews-review-core-r1/private-index-test.log",
+      "archive": "10-private-index-test.log.gz",
+      "sha256": "373804666c14ffdbf1626ed63a653c0cdfc0e599e924c2ad2a56cc0dfb42ed1f",
+      "bytes": 245
+    },
+    {
+      "source": "/private/tmp/gitcraft-fileviews-review-core-r1/reset-keep-tests.log",
+      "archive": "11-reset-keep-tests.log.gz",
+      "sha256": "2e5dd05aa7859c5a3700234899af76e1ac20460f7158fca4e9dbac9b2c321c15",
+      "bytes": 301
+    },
+    {
+      "source": "/private/tmp/gitcraft-fileviews-review-core-r1/shared-index-test.log",
+      "archive": "12-shared-index-test.log.gz",
+      "sha256": "88bdaf168b02d19fbe3448b944345eeab3dfb9406e969447a42b5a76b39b758c",
+      "bytes": 245
+    },
+    {
+      "source": "/private/tmp/gitcraft-fileviews-review-core-r1/split-index-test.log",
+      "archive": "13-split-index-test.log.gz",
+      "sha256": "67bc3db71918118606dcea63a434ea8fd0fab19dff52ced49f174f644c1753c1",
+      "bytes": 245
+    },
+    {
+      "source": "/private/tmp/gitcraft-fileviews-review-core-r1/standalone-tests.log",
+      "archive": "14-standalone-tests.log.gz",
+      "sha256": "050e1dbf443c32fc98bf5d12e5d0a377e9495a2a0f999c7e09d089e6a147ebc1",
+      "bytes": 2847
+    },
+    {
+      "source": "/private/tmp/gitcraft-fileviews-review-core-r1/index-lock-race.jsonl",
+      "archive": "15-index-lock-race.jsonl.gz",
+      "sha256": "51b2ce782a43373f9d6d32dadd917dc0ba30d7342f7650de6f41172dc4d46d4a",
+      "bytes": 253
+    },
+    {
+      "source": "/private/tmp/gitcraft-fileviews-review-core-r1/index-mode.jsonl",
+      "archive": "16-index-mode.jsonl.gz",
+      "sha256": "003440043f29382a889ffd5f7f93fc15dc3c8cb69aaa447037beb6823868b72a",
+      "bytes": 1986
+    },
+    {
+      "source": "/private/tmp/gitcraft-fileviews-review-core-r1/split-index.jsonl",
+      "archive": "17-split-index.jsonl.gz",
+      "sha256": "dc34dc02e121798a9943f0d40765c20978a2a9738300c67029c9554a61ab27a0",
+      "bytes": 118
+    },
+    {
+      "source": "/private/tmp/gitcraft-fileviews-review-core-r1/bin/git",
+      "archive": "18-git.gz",
+      "sha256": "bf8aed4aa41152ba82b61199484b94e863a0c9adda20c141a5903889dcf0722f",
+      "bytes": 2360
+    }
+  ]
+}
