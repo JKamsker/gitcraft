@@ -83,11 +83,17 @@ impl RepoTab {
             amending.then(|| "Untick Amend last commit to fold into an older commit".to_owned())
         });
         let button = ui
-            .add_enabled(idle && blocked.is_none(), egui::Button::new("Fold…"))
+            .add_enabled(idle && blocked.is_none(), |ui: &mut Ui| {
+                crate::icons::small_button(
+                    ui,
+                    "git-merge",
+                    "Fold staged changes into an older commit",
+                )
+            })
             .on_hover_text("Fold the staged changes into an older commit of this branch");
         let button = match &blocked {
             Some(why) => button.on_disabled_hover_text(why),
-            None => button,
+            None => button.on_disabled_hover_text("Wait for the operation running to end"),
         };
         egui::Popup::menu(&button)
             .style(crate::theme::menu_style)

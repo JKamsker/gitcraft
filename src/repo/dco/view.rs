@@ -14,7 +14,7 @@ const WHAT: &str = "Adds Signed-off-by with your name and email (DCO)";
 impl Dco {
     /// The commit box's _Sign off_ toggle.
     pub(crate) fn toggle(&self, ui: &mut Ui, enabled: bool, acts: &mut Vec<Action>) {
-        let mut on = self.signs_off();
+        let on = self.signs_off();
         let tip = match (self.rules.choice, self.reason()) {
             (Some(true), Some(why)) => format!("{WHAT}. You turned it on here; {} too", why.text()),
             (Some(false), Some(why)) => {
@@ -29,11 +29,13 @@ impl Dco {
             ),
         };
         let r = ui
-            .add_enabled(enabled, egui::Checkbox::new(&mut on, "Sign off"))
+            .add_enabled(enabled, |ui: &mut Ui| {
+                crate::icons::toggle_button(ui, "check", "Sign off", on)
+            })
             .on_hover_text(tip)
             .on_disabled_hover_text("The commits being replayed keep their own messages");
-        if r.changed() {
-            acts.push(Action::Dco(DcoAct::SetSignOff(on)));
+        if r.clicked() {
+            acts.push(Action::Dco(DcoAct::SetSignOff(!on)));
         }
     }
 

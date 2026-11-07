@@ -382,9 +382,72 @@ impl RepoTab {
                 }
             },
         );
+        // Keep a usable expanded width independently of temporary window compression.
+        // A small panel folds completely; no minimum forces it over the central view.
+        let detail_id = egui::Id::new("repo_detail");
+        let remembered_id = detail_id.with("usable-width");
+        let was_automatic_id = detail_id.with("auto-collapsed");
+        let forced_id = detail_id.with("reopen-small");
+        let was_automatic = ctx
+            .data(|d| d.get_temp::<bool>(was_automatic_id))
+            .unwrap_or(false);
+        let was_forced = ctx.data(|d| d.get_temp::<bool>(forced_id)).unwrap_or(false);
+        let width = egui::PanelState::load(&ctx, detail_id)
+            .map(|s| s.size().x)
+            .unwrap_or(420.0);
+        let remembered = ctx
+            .data(|d| d.get_temp::<f32>(remembered_id))
+            .unwrap_or(420.0);
+        if show_detail && width < DETAIL_COLLAPSE_W && !was_automatic && !was_forced {
+            show_detail = false;
+            if let Some(mut state) = egui::PanelState::load(&ctx, detail_id) {
+                state.outer_rect.set_width(remembered);
+                ctx.data_mut(|d| d.insert_persisted(detail_id, state));
+            }
+        } else if width >= DETAIL_COLLAPSE_W && !was_automatic && !was_forced {
+            ctx.data_mut(|d| d.insert_temp(remembered_id, width));
+        }
+        let room = ui.available_width();
+        let fits = detail_fits(room, ui.available_height());
+        let mut forced = was_forced;
+        if fits || !show_detail {
+            forced = false;
+        }
+        let automatic = show_detail && !forced && !fits;
+        let mut expanded = show_detail && !automatic;
+        ctx.data_mut(|d| d.insert_temp(was_automatic_id, automatic));
+        // Temporary compression, including an explicit reopen in a narrow window, never
+        // becomes the preferred width. Restore before egui lays out the expanded panel.
+        if ((was_automatic && !automatic) || (was_forced && fits))
+            && let Some(mut state) = egui::PanelState::load(&ctx, detail_id)
+        {
+            state.outer_rect.set_width(remembered);
+            ctx.data_mut(|d| d.insert_persisted(detail_id, state));
+        }
+        let visible_id = detail_id.with("was-visible");
+        let focus_id = detail_id.with("saved-focus");
+        let was_visible = ctx
+            .data(|d| d.get_temp::<bool>(visible_id))
+            .unwrap_or(false);
+        if was_visible && !expanded {
+            if let Some(focus) = ctx.memory(|m| m.focused())
+                && let Some(response) = ctx.read_response(focus)
+                && let Some(panel) = egui::PanelState::load(&ctx, detail_id)
+                && panel.outer_rect.intersects(response.rect)
+            {
+                ctx.data_mut(|d| d.insert_temp(focus_id, focus));
+            }
+        } else if !was_visible
+            && expanded
+            && let Some(focus) = ctx.data(|d| d.get_temp::<egui::Id>(focus_id))
+        {
+            ctx.data_mut(|d| d.remove::<egui::Id>(focus_id));
+            ctx.memory_mut(|m| m.request_focus(focus));
+        }
+        ctx.data_mut(|d| d.insert_temp(visible_id, expanded));
         egui::Panel::show_switched(
             ui,
-            &mut show_detail,
+            &mut expanded,
             egui::Panel::right("repo_detail_folded")
                 .resizable(true)
                 .exact_size(widgets::FOLDED_W)
@@ -392,15 +455,21 @@ impl RepoTab {
             egui::Panel::right("repo_detail")
                 .resizable(true)
                 .default_size(420.0)
-                .size_range(280.0..=900.0)
+                .size_range(0.0..=900.0)
                 .frame(side),
             |ui, open| {
                 widgets::panel_footer(ui, "repo_detail_footer", area.right(), true, |ui| {
-                    if panel_toggle(ui, "panel-right", "detail", open) {
-                        acts.push(Action::ToggleDetail);
+                    if panel_toggle(ui, "panel-right", "detail", open && !automatic) {
+                        if automatic {
+                            // An explicit reopen gives the details priority until the window
+                            // has room again. The repository and editors were never reset.
+                            forced = true;
+                        } else {
+                            acts.push(Action::ToggleDetail);
+                        }
                     }
                     // This build's version, at the other end.
-                    if open {
+                    if open && !automatic && ui.available_width() >= DETAIL_COLLAPSE_W {
                         app_buttons::footer_row(ui, Place::BottomRight);
                         ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                             ui.add_space(6.0);
@@ -415,7 +484,7 @@ impl RepoTab {
                         });
                     }
                 });
-                if open {
+                if open && !automatic && ui.available_width() >= DETAIL_COLLAPSE_W {
                     self.detail_panel(ui, acts);
                 } else {
                     let slid = widgets::slide_offset(ui, area.right(), true);
@@ -423,6 +492,10 @@ impl RepoTab {
                 }
             },
         );
+        ctx.data_mut(|d| d.insert_temp(forced_id, forced));
+        if !automatic {
+            show_detail = expanded;
+        }
         if (show_branches, show_detail) != (settings.show_branches, settings.show_detail) {
             settings.show_branches = show_branches;
             settings.show_detail = show_detail;
@@ -455,4 +528,144 @@ fn panel_toggle(ui: &mut Ui, icon: &str, name: &str, open: bool) -> bool {
         .named(&tip)
         .on_hover_text(tip)
         .clicked()
+}
+
+/// Below this usable width, show the reopening strip instead of compressed controls.
+const DETAIL_COLLAPSE_W: f32 = 240.0;
+
+fn detail_fits(available_width: f32, available_height: f32) -> bool {
+    available_width >= DETAIL_COLLAPSE_W + 200.0 && available_height >= 280.0
+}
+
+#[cfg(test)]
+mod responsive_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn responsive_detail_collapses_and_reopens_without_losing_drafts_or_width()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/responsive-layout".into(), &ctx);
+        tab.commit_summary = "keep this draft".into();
+        tab.commit_body = "and its description".into();
+        tab.amend = true;
+        let hash = "a".repeat(40);
+        tab.refs.head = hash.clone();
+        tab.detail = Some(crate::git::CommitDetail {
+            hash: hash.clone(),
+            parents: Vec::new(),
+            author: "Tester".into(),
+            email: "test@example.invalid".into(),
+            author_date: "2026-11-07".into(),
+            committer: "Tester".into(),
+            commit_date: "2026-11-07".into(),
+            message: "Original subject".into(),
+            files: Vec::new(),
+            in_head: true,
+            merges_after: false,
+        });
+        tab.reword = Some(crate::repo::Reword {
+            hash,
+            subject: "Editing survives collapse".into(),
+            body: "Retain this edit too".into(),
+            focus: true,
+            fill: false,
+        });
+        let mut styled = false;
+        let mut h = Harness::builder()
+            .with_size([1100.0, 800.0])
+            .build_ui_state(
+                move |ui, tab: &mut RepoTab| {
+                    if !styled {
+                        crate::theme::install_fonts(ui.ctx());
+                        crate::theme::apply(
+                            ui.ctx(),
+                            &crate::theme::ThemeId::default(),
+                            &crate::theme::Tweaks::default(),
+                        );
+                        egui_extras::install_image_loaders(ui.ctx());
+                        let mut settings = Settings::get(ui.ctx());
+                        settings.show_branches = false;
+                        settings.show_detail = true;
+                        settings.set(ui.ctx());
+                        styled = true;
+                        return;
+                    }
+                    tab.side_panels(ui, &mut Vec::new());
+                    egui::CentralPanel::default().show(ui, |ui| {
+                        ui.label("Central content");
+                    });
+                },
+                tab,
+            );
+        for _ in 0..5 {
+            h.step();
+        }
+        assert!(h.query_by_label("Hide the detail panel").is_some());
+        assert!(h.get_by_role(egui::accesskit::Role::TextInput).is_focused());
+        let original = egui::PanelState::load(&h.ctx, egui::Id::new("repo_detail"))
+            .ok_or("responsive layout fixture lost its panel/editor state")?
+            .size()
+            .x;
+        h.set_size(egui::vec2(360.0, 800.0));
+        for _ in 0..6 {
+            h.step();
+        }
+        assert!(h.query_by_label("Show the detail panel").is_some());
+        assert!(
+            Settings::get(&h.ctx).show_detail,
+            "temporary collapse overwrote visibility preference"
+        );
+        assert_eq!(h.state().commit_summary, "keep this draft");
+        assert_eq!(h.state().commit_body, "and its description");
+        assert!(h.state().amend);
+        crate::repo::detail::responsive_tests::evidence(&mut h, "detail-auto-collapsed");
+        h.get_by_label("Show the detail panel").click();
+        for _ in 0..6 {
+            h.step();
+        }
+        assert!(
+            h.query_by_label("Hide the detail panel").is_some(),
+            "explicit reopening at the narrow width failed"
+        );
+        assert_eq!(
+            h.state()
+                .reword
+                .as_ref()
+                .ok_or("responsive layout fixture lost its panel/editor state")?
+                .subject,
+            "Editing survives collapse"
+        );
+        assert!(
+            h.get_by_role(egui::accesskit::Role::TextInput).is_focused(),
+            "reopening lost the editor's keyboard focus"
+        );
+        h.set_size(egui::vec2(1100.0, 800.0));
+        for _ in 0..6 {
+            h.step();
+        }
+        let restored = egui::PanelState::load(&h.ctx, egui::Id::new("repo_detail"))
+            .ok_or("responsive layout fixture lost its panel/editor state")?
+            .size()
+            .x;
+        assert!(
+            (original - restored).abs() < 1.0,
+            "preferred width changed: {original} → {restored}"
+        );
+        assert!(h.query_by_label("Hide the detail panel").is_some());
+        // A divider dragged below usable size collapses fully and retains a reopening width.
+        let mut state = egui::PanelState::load(&h.ctx, egui::Id::new("repo_detail"))
+            .ok_or("responsive layout fixture lost its panel/editor state")?;
+        state.outer_rect.set_width(180.0);
+        h.ctx
+            .data_mut(|d| d.insert_persisted(egui::Id::new("repo_detail"), state));
+        for _ in 0..6 {
+            h.step();
+        }
+        assert!(!Settings::get(&h.ctx).show_detail);
+        assert!(h.query_by_label("Show the detail panel").is_some());
+        assert_eq!(h.state().commit_summary, "keep this draft");
+        Ok(())
+    }
 }
