@@ -1,4 +1,5 @@
 //! Pinned, bounded history investigations. Every request uses the accepted raw transport.
+pub(crate) mod dossier;
 #[cfg(test)]
 pub(crate) mod tests;
 pub(crate) mod views;
@@ -36,6 +37,8 @@ impl<'a> Reader<'a> {
             "--no-optional-locks",
             "-c",
             "core.fsmonitor=false",
+            "-c",
+            "color.ui=false",
             "-c",
             "core.untrackedCache=false",
             "-c",
