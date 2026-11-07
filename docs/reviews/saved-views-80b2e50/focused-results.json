@@ -1,0 +1,62 @@
+[
+  {
+    "name": "git::investigations::tests::cancellation_empty_scope_invalid_ids_and_stale_branch_names_are_explicit",
+    "exit_code": 0,
+    "result": "PASS1/1"
+  },
+  {
+    "name": "git::investigations::tests::all_four_relations_use_pinned_merge_ancestry_exact_authors_and_stay_read_only",
+    "exit_code": 0,
+    "result": "PASS1/1"
+  },
+  {
+    "name": "git::investigations::views::tests::persisted_presets_and_revision_inputs_reject_options_and_control_bytes",
+    "exit_code": 0,
+    "result": "PASS1/1"
+  },
+  {
+    "name": "git::investigations::tests::shallow_partial_views_and_pages_do_not_download_or_run_configured_helpers",
+    "exit_code": 0,
+    "result": "PASS1/1"
+  },
+  {
+    "name": "repo::saved_views::projection::tests::connector_boundaries_keep_merge_lanes_distinct_and_stashes_visible",
+    "exit_code": 0,
+    "result": "PASS1/1"
+  },
+  {
+    "name": "repo::saved_views::projection::tests::connector_never_claims_reused_columns_are_one_continuous_lane",
+    "exit_code": 0,
+    "result": "PASS1/1"
+  },
+  {
+    "name": "repo::saved_views::projection::tests::expanding_preserves_raw_identity_and_selection_and_long_gaps_are_single_rows",
+    "exit_code": 0,
+    "result": "PASS1/1"
+  },
+  {
+    "name": "repo::saved_views::reader::tests::queued_read_keeps_initiating_profile_even_when_started_later",
+    "exit_code": 0,
+    "result": "PASS1/1"
+  },
+  {
+    "name": "repo::saved_views::reader::tests::replacement_and_cancel_keep_the_slot_until_actual_nested_work_returns",
+    "exit_code": 0,
+    "result": "PASS1/1"
+  },
+  {
+    "name": "repo::saved_views::tests::actual_view_exit_park_and_drop_cancel_owned_work_and_ignore_stale_answers",
+    "exit_code": 0,
+    "result": "PASS1/1"
+  },
+  {
+    "name": "repo::saved_views::tests::persisted_unknown_versions_bad_presets_and_saved_counts_fail_closed",
+    "exit_code": 0,
+    "result": "PASS1/1"
+  },
+  {
+    "name": "repo::saved_views::tests::pointer_select_save_restart_expand_and_return_to_all_history",
+    "exit_code": 0,
+    "result": "PASS1/1"
+  }
+]

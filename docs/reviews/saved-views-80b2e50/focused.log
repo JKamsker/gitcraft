@@ -1,0 +1,72 @@
+
+running 1 test
+test git::investigations::tests::cancellation_empty_scope_invalid_ids_and_stale_branch_names_are_explicit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 880 filtered out; finished in 0.08s
+
+
+running 1 test
+test git::investigations::tests::all_four_relations_use_pinned_merge_ancestry_exact_authors_and_stay_read_only ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 880 filtered out; finished in 0.33s
+
+
+running 1 test
+test git::investigations::views::tests::persisted_presets_and_revision_inputs_reject_options_and_control_bytes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 880 filtered out; finished in 0.00s
+
+
+running 1 test
+test git::investigations::tests::shallow_partial_views_and_pages_do_not_download_or_run_configured_helpers ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 880 filtered out; finished in 0.19s
+
+
+running 1 test
+test repo::saved_views::projection::tests::connector_boundaries_keep_merge_lanes_distinct_and_stashes_visible ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 880 filtered out; finished in 0.00s
+
+
+running 1 test
+test repo::saved_views::projection::tests::connector_never_claims_reused_columns_are_one_continuous_lane ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 880 filtered out; finished in 0.00s
+
+
+running 1 test
+test repo::saved_views::projection::tests::expanding_preserves_raw_identity_and_selection_and_long_gaps_are_single_rows ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 880 filtered out; finished in 0.00s
+
+
+running 1 test
+test repo::saved_views::reader::tests::queued_read_keeps_initiating_profile_even_when_started_later ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 880 filtered out; finished in 0.00s
+
+
+running 1 test
+test repo::saved_views::reader::tests::replacement_and_cancel_keep_the_slot_until_actual_nested_work_returns ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 880 filtered out; finished in 0.00s
+
+
+running 1 test
+test repo::saved_views::tests::actual_view_exit_park_and_drop_cancel_owned_work_and_ignore_stale_answers ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 880 filtered out; finished in 0.00s
+
+
+running 1 test
+test repo::saved_views::tests::persisted_unknown_versions_bad_presets_and_saved_counts_fail_closed ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 880 filtered out; finished in 0.00s
+
+
+running 1 test
+test repo::saved_views::tests::pointer_select_save_restart_expand_and_return_to_all_history ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 880 filtered out; finished in 0.24s
+
