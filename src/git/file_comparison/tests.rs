@@ -463,12 +463,22 @@ fn raw_non_utf8_paths_stay_distinct_and_literal_folders_do_not_expand_globs() ->
 {
     use std::os::unix::ffi::OsStringExt;
     let r = Repo::new()?;
-    for bytes in [b"odd\xff".to_vec(), b"odd\xfe".to_vec()] {
-        std::fs::write(r.0.join(std::ffi::OsString::from_vec(bytes)), "raw")
-            .map_err(|e| e.to_string())?;
-    }
     r.write("[folder]/file", "literal\n")?;
     r.commit()?;
+    // APFS cannot create invalid UTF-8 filenames, but Git trees preserve raw paths.
+    // Populate the index directly so this tests the object model on every Unix host.
+    let oid = r.git(&["rev-parse", "HEAD:[folder]/file"])?;
+    for bytes in [b"odd\xff".to_vec(), b"odd\xfe".to_vec()] {
+        let out = r
+            .command(&["update-index", "--add", "--cacheinfo", "100644", &oid])
+            .arg(std::ffi::OsString::from_vec(bytes))
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !out.status.success() {
+            return Err(String::from_utf8_lossy(&out.stderr).into());
+        }
+    }
+    r.git(&["commit", "-qm", "raw paths"])?;
     r.git(&["branch", "release"])?;
     let m = matrix(
         &r.0,
