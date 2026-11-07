@@ -42,7 +42,10 @@ pub(super) fn tab_ui(ui: &mut Ui, placed: Placed<'_>, env: &mut TabEnv<'_>) {
         labels::with_notes(&labels::join([name, more]), &[(busy, "busy")])
     };
     widgets::a11y_selected(&resp, label, active);
-    let hovered = resp.hovered() && env.dragging.is_none();
+    // The pointer anywhere on the tab, its close button too: `hovered` passes to the button
+    // when the pointer reaches it, which would hide the button just as it is about to be
+    // clicked on a tab in the background.
+    let hovered = resp.contains_pointer() && env.dragging.is_none();
     let default_look = TabLook::default();
     let look = match tab {
         Tab::Repo(r) => tab_looks.get(&r.path).unwrap_or(&default_look),

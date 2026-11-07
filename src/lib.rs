@@ -6,6 +6,7 @@ mod across;
 mod agent;
 pub mod app;
 mod authorship;
+mod app_buttons;
 mod avatars;
 mod ci;
 mod custom_commands;

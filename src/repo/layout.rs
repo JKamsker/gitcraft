@@ -6,6 +6,7 @@ use egui::{Key, Ui};
 use super::popout::Panel;
 use super::{Action, RepoTab, pr_review, widgets};
 use crate::a11y::Named;
+use crate::app_buttons::{self, Place};
 use crate::icons;
 use crate::keymap;
 use crate::settings::Settings;
@@ -351,11 +352,16 @@ impl RepoTab {
                     if panel_toggle(ui, "panel-left", "branches", open) {
                         acts.push(Action::ToggleBranches);
                     }
+                    if open {
+                        app_buttons::footer_row(ui, Place::BottomLeft);
+                    }
                 });
                 if open {
                     self.sidebar(ui, acts);
                 } else {
-                    self.folded_sidebar(ui, area.left(), acts);
+                    let slid = widgets::slide_offset(ui, area.left(), false);
+                    let below = app_buttons::folded_column(ui, Place::BottomLeft, slid);
+                    self.folded_sidebar(ui, area.left(), below, acts);
                 }
             },
         );
@@ -378,6 +384,7 @@ impl RepoTab {
                     }
                     // This build's version, at the other end.
                     if open {
+                        app_buttons::footer_row(ui, Place::BottomRight);
                         ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                             ui.add_space(6.0);
                             ui.label(
@@ -385,11 +392,17 @@ impl RepoTab {
                                     .size(11.0)
                                     .color(t.text_faint),
                             );
+                            // Between the version and the buttons, the window can be moved.
+                            let rest = ui.available_rect_before_wrap();
+                            crate::app::title_bar::window_drag(ui, rest, "detail-footer");
                         });
                     }
                 });
                 if open {
                     self.detail_panel(ui, acts);
+                } else {
+                    let slid = widgets::slide_offset(ui, area.right(), true);
+                    app_buttons::folded_column(ui, Place::BottomRight, slid);
                 }
             },
         );

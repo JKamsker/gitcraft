@@ -63,6 +63,9 @@ impl RepoTab {
                 self.fresh_rewrite_button(ui, acts);
                 self.op_status(ui, acts);
                 self.hint_status(ui);
+                // What is left between the branch and the status moves the window.
+                let rest = ui.available_rect_before_wrap();
+                crate::app::title_bar::window_drag(ui, rest, "toolbar");
             });
         });
     }

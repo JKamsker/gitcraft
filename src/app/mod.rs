@@ -26,6 +26,7 @@ mod tabs;
 mod teleport;
 #[cfg(test)]
 mod tests;
+pub(crate) mod title_bar;
 mod update_banner;
 mod workspaces;
 mod worktrees;
@@ -199,6 +200,14 @@ pub struct App {
     launching: launch::Launching,
     /// A forge link typed or pasted into the start page.
     home_link: String,
+    /// How far the tabs are scrolled along the strip.
+    tab_scroll: f32,
+    /// The active tab the strip last scrolled into view.
+    tab_scrolled_to: Option<egui::Id>,
+    /// The window has the system's title bar (see `title_bar`).
+    decorated: bool,
+    /// Windows' border was last asked shown (true) or hidden (see `title_bar::sync_border`).
+    window_border: Option<bool>,
 }
 
 impl App {
@@ -263,6 +272,10 @@ impl App {
             repo_scan: None,
             launching: Default::default(),
             home_link: String::new(),
+            tab_scroll: 0.0,
+            tab_scrolled_to: None,
+            decorated: title_bar::decorated_now(),
+            window_border: None,
             error: None,
             error_card: None,
             was_focused: true,
@@ -295,6 +308,8 @@ impl App {
             inbox: Default::default(),
             inbox_seen: saved.inbox_seen,
         };
+        // Before the window first shows, so its title bar doesn't flash.
+        title_bar::apply(ctx, &app.settings, &mut app.decorated);
         update::clean_up();
         if let crate::portable::Mode::Unusable(why) = crate::portable::mode() {
             app.toasts.push(Toast::new(why.clone(), true));
@@ -419,6 +434,31 @@ impl App {
             .chain(self.profile_states.values().flat_map(|s| &s.recent))
             .collect();
         self.last_opened.retain(|p, _| kept.contains(&p));
+    }
+
+    /// Carries out what was done with the app's buttons this frame, wherever they are.
+    fn app_button_events(&mut self, ctx: &egui::Context) {
+        use crate::app_buttons::{AppButton, Event};
+        use crate::settings::ThemePick;
+        for event in crate::app_buttons::take_events(ctx) {
+            match event {
+                Event::Clicked(AppButton::Settings) => self.open_settings(),
+                Event::Clicked(AppButton::Palette) => self.open_palette(),
+                Event::Clicked(AppButton::Manual) => self.manual_open = true,
+                // The theme button opens its menu rather than being clicked.
+                Event::Clicked(AppButton::Theme) => {}
+                Event::Theme(ThemePick::Theme(id)) => self.set_theme(ctx, id),
+                Event::Theme(ThemePick::Browse) => {
+                    crate::settings::show_page(ctx, crate::settings::Page::Appearance);
+                    self.open_settings();
+                }
+                Event::Move(button, place) => {
+                    let layout = self.settings.button_layout.normalized();
+                    self.settings.button_layout = layout.moved(button, place, usize::MAX);
+                    self.settings.set(ctx);
+                }
+            }
+        }
     }
 
     fn set_theme(&mut self, ctx: &egui::Context, id: ThemeId) {
@@ -627,6 +667,8 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         let t = Tokens::get(&ctx);
+        // A button dropped moves in the settings, read just below.
+        crate::app_buttons::begin_frame(&ctx);
         // Column widths dragged in a graph header live in the context; keep them for saving.
         self.settings = Settings::get(&ctx);
         // A theme file being edited, VS Code's theme switched: shown as they change.
@@ -634,6 +676,9 @@ impl eframe::App for App {
         crate::portable::set_credential_store(self.settings.portable_credential_store);
         crate::network::set_choices(self.settings.offline, self.settings.pause_on_metered);
         crate::network::start_watching(&ctx);
+        title_bar::apply(&ctx, &self.settings, &mut self.decorated);
+        title_bar::sync_border(frame, &self.settings, &mut self.window_border);
+        crate::app_buttons::set_current_theme(&ctx, &self.theme);
 
         // eframe shows the window after the first frame; maximize it on the next one.
         if MAXIMIZE_WHEN_SHOWN.load(Ordering::Relaxed) {
@@ -681,13 +726,21 @@ impl eframe::App for App {
             }
         }
 
+        // The caption buttons go up to the window's corner.
+        let strip_right = if title_bar::wanted(&self.settings) {
+            0
+        } else {
+            6
+        };
         egui::Panel::top("tabs")
             .frame(
                 egui::Frame::new()
                     .fill(t.tab_strip)
                     .inner_margin(egui::Margin {
-                        left: 6,
-                        right: 6,
+                        // The first tab starts at the window's edge: a gap before it shows as a
+                        // dark band beside it when it is the active one.
+                        left: 0,
+                        right: strip_right,
                         top: 0,
                         bottom: 0,
                     }),
@@ -729,6 +782,11 @@ impl eframe::App for App {
     fn on_exit(&mut self) {
         self.stop_teleport();
         self.dropped_files(&ctx);
+        self.app_button_events(&ctx);
+        crate::app_buttons::end_frame(&ctx);
+        if title_bar::wanted(&self.settings) {
+            title_bar::resize_edges(&ctx);
+        }
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
@@ -892,6 +950,13 @@ fn on_path(name: &str) -> bool {
 pub fn after_exit() {
     crate::instance::shut_down();
     update::relaunch();
+}
+
+/// Whether to make the window with the system's title bar: not when the saved settings put the
+/// tabs in its place. Call it once, before the window is made.
+pub fn window_decorated() -> bool {
+    let app_ron = eframe::storage_dir("gitcraft").map(|dir| dir.join("app.ron"));
+    title_bar::decorated_at_start(app_ron.as_deref())
 }
 
 /// The window and taskbar icon (the `.exe` gets the same picture from `build.rs`).

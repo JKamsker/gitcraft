@@ -29,6 +29,10 @@ pulldown-cmark = { version = "0.13", default-features = false }
 regex = "1"
 # Find in a diff, a file or blame: its regular expressions and whole-word matching.
 regex = "1"
+# Reads one setting from eframe's saved state before the window is made (app::title_bar).
+ron = "0.12"
+# The window's handle, to hide Windows' border when the tabs are in the title bar (app::title_bar).
+raw-window-handle = "0.6"
 rfd = "0.17"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -58,7 +62,7 @@ yaml-rust2 = "0.13.0"
 rustix = { version = "1", features = ["fs"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Storage_FileSystem"] }
 # Whether the connection is metered (WinRT's NetworkInformation: safe calls, no unsafe code).
 windows = { version = "0.62", features = ["Networking_Connectivity"] }
 # The taskbar button's progress and the jump list: COM calls, in a crate of their own.
@@ -76,8 +80,8 @@ members = [".", "crates/gitcraft-os"]
 default-members = [".", "crates/gitcraft-os"]
 
 [lints.rust]
-# Denied everywhere; the one exception, asking Windows where an open file really is
-# (safe_read.rs), allows it on that function alone.
+# Denied everywhere; the exceptions, asking Windows where an open file really is (safe_read.rs)
+# and setting the window's border colour (app/title_bar.rs), allow it on that function alone.
 unsafe_code = "deny"
 
 [lints.clippy]
