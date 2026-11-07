@@ -95,6 +95,7 @@ mod reflog;
 mod rehearse;
 mod release;
 mod remerge;
+mod repository_tools;
 mod revert_piece;
 #[cfg(test)]
 mod revert_tests;

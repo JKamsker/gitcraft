@@ -15,6 +15,7 @@ use crate::terminal::ShellSpec;
 
 /// Everything the views ask for; applied after drawing so views only borrow the state.
 pub(crate) enum Action {
+    RepositoryTools(super::repository_tools::Act),
     /// What a key of the tab does (see [`crate::keymap`]), or why it can't now.
     Key(crate::keymap::Command),
     /// Show the changes and put the cursor in the commit summary.
@@ -663,6 +664,11 @@ impl RepoTab {
                 "Select stale or merged branches…".into(),
                 "branch".into(),
                 Action::SelectStaleBranches,
+            ),
+            (
+                "All refs and namespace history…".into(),
+                "refs internals".into(),
+                Action::RepositoryTools(super::repository_tools::Act::AllRefs(String::new())),
             ),
             (
                 "Repository doctor".into(),

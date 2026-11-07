@@ -28,6 +28,7 @@ impl RepoTab {
             return;
         };
         match action {
+            Action::RepositoryTools(act) => self.repository_tools_act(act, ctx),
             Action::Select(row) => {
                 self.leave_pages();
                 self.doctor = None;
