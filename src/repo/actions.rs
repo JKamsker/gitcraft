@@ -310,6 +310,8 @@ pub(crate) enum Action {
     Owners(super::owners::OwnersAct),
     /// Open the agent fence's window.
     OpenFence,
+    /// Open the scope drift window of the worktree at this folder.
+    OpenDrift(PathBuf),
 }
 
 /// Compares two branches, given to git by their full refs (a tag of the same name is not

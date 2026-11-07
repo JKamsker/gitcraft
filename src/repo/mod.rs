@@ -34,6 +34,7 @@ mod external_tools;
 mod error_help;
 mod diff_split;
 pub(crate) mod fence_view;
+mod drift_view;
 mod file_text;
 mod file_view;
 mod forge_link;
@@ -217,6 +218,8 @@ pub struct RepoTab {
     owners: owners::Owners,
     /// The agent fence: its list, the worktrees checked against it, its editor.
     fence: fence_view::FenceState,
+    /// The scope drift window of a worktree, while it is open.
+    drift: Option<drift_view::DriftView>,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -478,6 +481,7 @@ impl RepoTab {
             issue_work: Default::default(),
             owners: owners::Owners::default(),
             fence: Default::default(),
+            drift: None,
             selected: None,
             stash_view: None,
             scroll_to: None,

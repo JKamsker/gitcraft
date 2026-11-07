@@ -100,6 +100,7 @@ impl RepoTab {
             Action::SelectStaleBranches => self.dialog = Some(self.cleanup_dialog(ctx)),
             Action::OpenCollisions => self.open_collisions(),
             Action::OpenFence => self.open_fence(ctx),
+            Action::OpenDrift(path) => self.open_drift(&path, ctx),
             Action::DeleteTag { name, target } => self.delete_tag(name, target, ctx),
             Action::Commit => self.commit(ctx),
             Action::Key(command) => self.run_key(command, ctx),

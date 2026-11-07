@@ -13,6 +13,7 @@ mod desktop_entry;
 mod drafts;
 mod error_card;
 mod fence;
+mod drift;
 mod folder_browser;
 mod forge;
 mod git;
