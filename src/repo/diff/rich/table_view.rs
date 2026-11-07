@@ -157,6 +157,7 @@ pub(super) fn show(ui: &mut Ui, diff: &TableDiff, state: &mut RichState, acts: &
                             .interact(rect, ui.id().with(("table_fold", first)), Sense::click())
                             .on_hover_cursor(egui::CursorIcon::PointingHand)
                             .on_hover_text("Show them");
+                        crate::a11y::expanded(&resp, || format!("Show {label}"), false);
                         ui.painter().rect_filled(
                             rect,
                             0.0,
@@ -333,7 +334,7 @@ fn row(
         .or(r.old.as_ref())
         .map(|v| v.join(", "))
         .unwrap_or_default();
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &label));
+    crate::a11y::a11y(&resp, egui::WidgetType::Button, &label);
     let where_ = match (r.change, r.old_line, r.new_line) {
         (Change::Removed, Some(o), _) => format!("Go to line {o} of the file before the change"),
         (_, _, Some(n)) => format!("Go to line {n}"),

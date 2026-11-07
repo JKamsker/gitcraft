@@ -491,6 +491,7 @@ pub fn area(ui: &mut Ui, place: Place, look: Look, flow: Flow, fixed: &[AppButto
         // when it leaves, with the drag egui keeps for it.
         let (rect, _) = ui.allocate_exact_size(Vec2::splat(SIZE), Sense::hover());
         let resp = ui.interact(rect, button_id(button), Sense::click_and_drag());
+        crate::a11y::a11y(&resp, egui::WidgetType::Button, button.tooltip());
         span = span.union(rect);
         // Where it would be without the opening, which the drop is worked out against.
         let shift = if opening.is_some() { pitch } else { 0.0 };
@@ -525,6 +526,7 @@ pub fn area(ui: &mut Ui, place: Place, look: Look, flow: Flow, fixed: &[AppButto
     for &button in fixed {
         let (rect, _) = ui.allocate_exact_size(Vec2::splat(SIZE), Sense::hover());
         let resp = ui.interact(rect, button_id(button).with("fixed"), Sense::click());
+        crate::a11y::a11y(&resp, egui::WidgetType::Button, button.tooltip());
         let resp = resp.on_hover_text(button.tooltip());
         paint(
             ui,

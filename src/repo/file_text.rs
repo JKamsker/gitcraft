@@ -233,6 +233,11 @@ pub(crate) fn show(
                 continue;
             };
             let (rect, resp) = ui.allocate_exact_size(vec2(width, LINE_H), Sense::click_and_drag());
+            crate::a11y::a11y_selected(
+                &resp,
+                || format!("Line {}: {line}", i + 1),
+                pick.is_some_and(|p| p.contains(i)),
+            );
             if resp.drag_started() {
                 // A drag picks the lines it goes over, from where it started.
                 dragging = true;

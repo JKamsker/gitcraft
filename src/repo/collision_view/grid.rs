@@ -109,6 +109,15 @@ fn matrix(ui: &mut Ui, m: &Matrix, acts: &mut Vec<Action>) {
                 other,
                 cell,
             ));
+            crate::a11y::a11y(
+                &r,
+                if cell.as_ref().is_ok_and(|p| !p.clean()) {
+                    egui::WidgetType::Button
+                } else {
+                    egui::WidgetType::Label
+                },
+                || cell_tip(&m.branches[i], other, cell),
+            );
             if r.clicked() && cell.as_ref().is_ok_and(|p| !p.clean()) {
                 acts.push(compare(other, &m.branches[i]));
             }

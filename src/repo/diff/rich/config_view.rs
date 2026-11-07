@@ -123,7 +123,7 @@ fn row(ui: &mut Ui, t: &Tokens, font: &egui::FontId, e: &Entry, acts: &mut Vec<A
             _ => String::new(),
         }
     );
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &text));
+    crate::a11y::a11y(&resp, egui::WidgetType::Button, &text);
     let tip = match (e.change, e.old_line, e.new_line) {
         (Change::Removed, Some(o), _) => format!("Go to line {o} of the file before the change"),
         (_, _, Some(n)) => format!("Go to line {n}"),

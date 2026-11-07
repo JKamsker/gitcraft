@@ -370,7 +370,7 @@ pub(in crate::repo) fn button(ui: &mut Ui, panel: Panel, popped: bool, acts: &mu
     };
     let resp = icons::small_button(ui, icon, &tip);
     // Named for screen readers (and tests), as the icon says nothing to them.
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &tip));
+    crate::a11y::a11y(&resp, egui::WidgetType::Button, &tip);
     if resp.clicked() {
         acts.push(Action::Popout(request));
     }

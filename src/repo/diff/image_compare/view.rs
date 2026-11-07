@@ -77,6 +77,12 @@ pub(in crate::repo::diff) fn compare_view(ui: &mut Ui, cmp: &Compare, acts: &mut
     let height = (ui.available_height() - strip - 8.0).max(120.0);
     let (area, resp) =
         ui.allocate_exact_size(vec2(ui.available_width(), height), Sense::click_and_drag());
+    crate::a11y::a11y(&resp, egui::WidgetType::Slider, || {
+        format!(
+            "Image comparison for {}. Arrow keys pan, plus and minus zoom, Home fits. Use controls above to change comparison mode.",
+            cmp.path
+        )
+    });
     let area = area.shrink(8.0);
     let canvas = canvas(cmp);
     let ctx = ui.ctx().clone();
@@ -258,6 +264,40 @@ fn input(
     swipe: Option<(f32, Rect)>,
 ) {
     let pane = left.unwrap_or(area);
+    if resp.has_focus() {
+        ui.memory_mut(|m| {
+            m.set_focus_lock_filter(
+                resp.id,
+                egui::EventFilter {
+                    vertical_arrows: true,
+                    horizontal_arrows: true,
+                    ..Default::default()
+                },
+            )
+        });
+        for (key, delta) in [
+            (egui::Key::ArrowLeft, vec2(32.0, 0.0)),
+            (egui::Key::ArrowRight, vec2(-32.0, 0.0)),
+            (egui::Key::ArrowUp, vec2(0.0, 32.0)),
+            (egui::Key::ArrowDown, vec2(0.0, -32.0)),
+        ] {
+            if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, key)) {
+                state.pan(delta, size, pane);
+            }
+        }
+        for (key, factor) in [
+            (egui::Key::Plus, 1.25),
+            (egui::Key::Equals, 1.25),
+            (egui::Key::Minus, 0.8),
+        ] {
+            if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, key)) {
+                state.zoom_at(factor, pane.center(), size, pane);
+            }
+        }
+        if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Home)) {
+            state.zoom = None;
+        }
+    }
     if resp.double_clicked() {
         state.zoom = None;
         return;
@@ -392,6 +432,18 @@ fn filmstrip(
                         vec2(THUMB as f32 + 8.0, THUMB as f32 + 30.0),
                         Sense::click(),
                     );
+                    crate::a11y::a11y_selected(
+                        &resp,
+                        || {
+                            format!(
+                                "Image version {}, {}, {}",
+                                crate::repo::short(&v.hash),
+                                v.summary,
+                                v.path
+                            )
+                        },
+                        current,
+                    );
                     let p = ui.painter_at(rect);
                     if current {
                         p.rect_filled(rect, 4.0, t.row_selected);
@@ -455,4 +507,48 @@ fn filmstrip(
                 }
             });
         });
+}
+
+#[cfg(test)]
+mod accessibility_tests {
+    use super::*;
+    #[test]
+    fn focused_canvas_pans_zooms_and_fits_without_a_pointer() {
+        let ctx = egui::Context::default();
+        let mut state = ViewState::default();
+        for key in [egui::Key::ArrowRight, egui::Key::Equals, egui::Key::Home] {
+            ctx.run_ui(
+                egui::RawInput {
+                    events: vec![egui::Event::Key {
+                        key,
+                        physical_key: Some(key),
+                        pressed: true,
+                        repeat: false,
+                        modifiers: egui::Modifiers::NONE,
+                    }],
+                    ..Default::default()
+                },
+                |ui| {
+                    let (_, resp) =
+                        ui.allocate_exact_size(vec2(400.0, 300.0), Sense::click_and_drag());
+                    resp.request_focus();
+                    input(
+                        ui,
+                        &resp,
+                        &mut state,
+                        vec2(800.0, 600.0),
+                        (resp.rect, None),
+                        None,
+                    );
+                },
+            )
+            .drop_without_applying_deltas();
+            match key {
+                egui::Key::ArrowRight => assert!(state.center.x > 0.5),
+                egui::Key::Equals => assert!(state.zoom.unwrap() > 0.5),
+                egui::Key::Home => assert!(state.zoom.is_none()),
+                _ => unreachable!(),
+            }
+        }
+    }
 }

@@ -721,3 +721,36 @@ fn delayed_patch_completion_cannot_apply_after_an_actual_failed_full_reload() ->
     assert!(matches!(&t.tab.status, Some((message, true)) if message.contains("Changes reloaded")));
     Ok(())
 }
+
+#[test]
+fn tabbing_to_a_file_updates_the_keyboard_target_before_space_stages() -> Result<(), String> {
+    let mut t = Test::new("tab-file-owner")?;
+    t.frame(vec![]);
+    t.pane(Key::Num3);
+    t.frame(vec![]);
+    for _ in 0..40 {
+        t.key(Key::Tab);
+        if t.tab
+            .keyboard
+            .borrow()
+            .cursor
+            .as_ref()
+            .is_some_and(|(_, key)| key.path() == "b.txt")
+        {
+            break;
+        }
+    }
+    assert!(
+        t.tab
+            .keyboard
+            .borrow()
+            .cursor
+            .as_ref()
+            .is_some_and(|(_, key)| key.path() == "b.txt"),
+        "Tab must follow real focus to the second file"
+    );
+    t.key(Key::Space);
+    t.wait()?;
+    assert_eq!(t.git(&["diff", "--cached", "--name-only"])?.trim(), "b.txt");
+    Ok(())
+}

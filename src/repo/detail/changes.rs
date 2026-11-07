@@ -326,7 +326,7 @@ impl RepoTab {
             ui.separator();
             stash_menu_items(ui, &f.path, problem.as_deref(), picked, acts);
         };
-        self.keyboard_file_row(ui, &r.row, &key);
+        self.keyboard_file_row(egui::Id::new("working-files"), &r.row, &key);
         if r.row.clicked() || r.button.is_some() {
             self.keyboard_select_file(egui::Id::new("working-files"), key.clone());
         }

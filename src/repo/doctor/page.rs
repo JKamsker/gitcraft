@@ -195,6 +195,7 @@ fn nav(ui: &mut Ui, shown: Section, acts: &mut Vec<Action>) {
     for section in Section::ALL {
         let selected = section == shown;
         let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 32.0), Sense::click());
+        crate::a11y::a11y_selected(&resp, section.title(), selected);
         let fill = if selected {
             t.hover
         } else if resp.hovered() {

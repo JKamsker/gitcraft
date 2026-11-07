@@ -274,6 +274,7 @@ pub(super) fn text_button(
         pos2(right, y + 9.0),
     );
     let resp = ui.interact(r, id, Sense::click());
+    crate::a11y::a11y(&resp, egui::WidgetType::Button, label);
     let fill = if resp.hovered() { t.hover } else { t.dock };
     ui.painter().rect_filled(r, t.radius_sm, fill);
     ui.painter().rect_stroke(

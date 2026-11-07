@@ -201,3 +201,36 @@ fn a_rows_parts_say_what_matters() {
         .collect();
     assert_eq!(texts, ["detached at abc1234", "no remote"]);
 }
+
+#[test]
+fn accessibility_workspace_remove_is_reachable_without_hover() {
+    use egui_kittest::{Harness, kittest::Queryable};
+    let path = PathBuf::from("/workspace/日本語");
+    let fonts = std::cell::Cell::new(false);
+    let mut h = Harness::new_ui_state(
+        move |ui, removed: &mut bool| {
+            if !fonts.replace(true) {
+                crate::theme::install_fonts(ui.ctx());
+                return;
+            }
+            let t = Tokens::get(ui.ctx());
+            if matches!(workspace_row(ui, &path, None, &t), Some(RowClick::Remove)) {
+                *removed = true;
+            }
+            crate::a11y::end_frame(ui.ctx());
+        },
+        false,
+    );
+    h.run();
+    h.key_press(egui::Key::Tab);
+    h.run();
+    h.key_press(egui::Key::Tab);
+    h.run();
+    assert!(
+        h.get_by_label("Remove 日本語 from the workspace")
+            .is_focused()
+    );
+    h.key_press(egui::Key::Enter);
+    h.run();
+    assert!(*h.state());
+}

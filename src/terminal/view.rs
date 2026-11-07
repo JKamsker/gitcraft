@@ -73,12 +73,33 @@ impl Terminal {
         let rect = ui.available_rect_before_wrap();
         let id = ui.id().with("terminal");
         let resp = ui.interact(rect, id, Sense::click_and_drag());
+        crate::a11y::a11y(
+            &resp,
+            egui::WidgetType::TextEdit,
+            "Terminal. Tab and arrow keys go to the shell. Shift+Escape returns focus to the app.",
+        );
+        ui.ctx().accesskit_node_builder(resp.id, |node| {
+            node.set_role(egui::accesskit::Role::Terminal);
+            node.set_value(
+                lock(&self.parser)
+                    .screen()
+                    .contents()
+                    .chars()
+                    .filter(|&c| c == '\n' || !crate::a11y::labels::hidden_control(c))
+                    .collect::<String>(),
+            );
+        });
         ui.allocate_rect(rect, Sense::hover());
         let grid = Grid {
             inner: rect.shrink2(vec2(8.0, 6.0)),
             cell,
         };
         self.pointer(ui, &resp, rect, grid);
+        let focused = resp.has_focus();
+        if focused && release_focus(ui, id) {
+            // Consume the escape before the terminal encoder or repository shortcuts see it.
+            resp.surrender_focus();
+        }
         let focused = resp.has_focus();
         if focused {
             // Keep Tab, arrows and Escape for the shell.
@@ -358,4 +379,59 @@ fn paint_row(
         job.append(&run, 0.0, format);
     }
     job
+}
+
+/// Widget navigation, separate from shell key encoding: Escape alone still reaches vim/readline.
+fn release_focus(ui: &Ui, id: egui::Id) -> bool {
+    ui.memory(|m| m.has_focus(id))
+        && ui.input_mut(|i| i.consume_key(egui::Modifiers::SHIFT, Key::Escape))
+}
+
+#[cfg(test)]
+mod focus_tests {
+    use super::*;
+    #[test]
+    fn only_the_terminal_owner_consumes_shift_escape() {
+        for (focused, modifiers, expected) in [
+            (true, egui::Modifiers::SHIFT, true),
+            (true, egui::Modifiers::NONE, false),
+            (false, egui::Modifiers::SHIFT, false),
+        ] {
+            let ctx = egui::Context::default();
+            let id = egui::Id::new("terminal-test");
+            ctx.run_ui(egui::RawInput::default(), |ui| {
+                if focused {
+                    ui.memory_mut(|m| m.request_focus(id));
+                }
+            })
+            .drop_without_applying_deltas();
+            ctx.run_ui(
+                egui::RawInput {
+                    events: vec![Event::Key {
+                        key: Key::Escape,
+                        physical_key: Some(Key::Escape),
+                        pressed: true,
+                        repeat: false,
+                        modifiers,
+                    }],
+                    ..Default::default()
+                },
+                |ui| {
+                    assert_eq!(release_focus(ui, id), expected);
+                    assert_eq!(
+                        ui.input(|i| i.events.iter().any(|e| matches!(
+                            e,
+                            Event::Key {
+                                key: Key::Escape,
+                                pressed: true,
+                                ..
+                            }
+                        ))),
+                        !expected
+                    );
+                },
+            )
+            .drop_without_applying_deltas();
+        }
+    }
 }

@@ -305,6 +305,7 @@ impl RepoTab {
                     if i == stop {
                         crate::a11y::list_stop(&resp, rows_id, self.selected == Some(i));
                     }
+                    self.keyboard_graph_focus(&resp);
                     if resp.clicked() {
                         // Ctrl+click: compare the selected commit with this one.
                         let compare = ui

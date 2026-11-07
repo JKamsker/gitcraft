@@ -113,7 +113,11 @@ impl RepoTab {
             ui.id().with("history-minimap"),
             Sense::click_and_drag(),
         );
-        response.widget_info(||egui::WidgetInfo::labeled(egui::WidgetType::Slider,true,"Loaded history minimap. Drag to scroll; arrow and Page Up/Down keys move the viewport. Blue HEAD, green tags, yellow search hits."));
+        crate::a11y::a11y(
+            &response,
+            egui::WidgetType::Slider,
+            "Loaded history minimap. Drag to scroll; arrow and Page Up/Down keys move the viewport. Blue HEAD, green tags, yellow search hits.",
+        );
         let p = ui.painter_at(rect);
         p.rect_filled(rect, 3.0, t.dock);
         p.text(

@@ -14,7 +14,7 @@ pub fn clean(text: &str) -> String {
             out.push(' ');
             chars += 1;
         }
-        for c in word.chars() {
+        for c in word.chars().filter(|&c| !hidden_control(c)) {
             if chars >= MAX_CHARS {
                 // Cut at the limit, not after a trailing space.
                 let kept = out.trim_end().len();
@@ -199,4 +199,11 @@ pub fn without_keys(text: &str) -> &str {
     } else {
         text
     }
+}
+
+/// Repository data must not reorder or hide an assistive label with terminal/bidi controls.
+/// Directional text remains intact; only explicit control characters are omitted.
+pub(crate) fn hidden_control(c: char) -> bool {
+    c.is_control()
+        || matches!(c, '\u{061c}' | '\u{200b}'..='\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2060}'..='\u{2069}' | '\u{feff}')
 }

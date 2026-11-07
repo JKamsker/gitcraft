@@ -351,6 +351,18 @@ impl RebaseEditor {
                             .selectable(false)
                             .sense(Sense::click()),
                     );
+                    let label = || {
+                        format!(
+                            "Rebase commit {}, {}, {}, {}",
+                            short(&e.commit.hash),
+                            e.commit.summary,
+                            e.commit.author,
+                            e.step.label()
+                        )
+                    };
+                    for response in [&hash, &avatar, &summary] {
+                        crate::a11y::a11y_selected(response, label, selected);
+                    }
                     picked |= hash.clicked() || avatar.clicked() || summary.clicked();
                     if matches!(e.step, Step::Squash | Step::Fixup) {
                         ui.label(
@@ -371,6 +383,7 @@ impl RebaseEditor {
                         egui::vec2(ui.available_width(), 20.0),
                         Sense::click(),
                     );
+                    crate::a11y::a11y_selected(&rest.1, label, selected);
                     picked |= rest.1.clicked();
                 });
                 if e.step == Step::Reword {

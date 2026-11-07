@@ -68,6 +68,7 @@ pub(super) fn section(
         id.with("header"),
         Sense::click(),
     );
+    crate::a11y::expanded(&fold, title, open);
     if fold.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }

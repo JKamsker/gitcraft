@@ -55,11 +55,12 @@ impl RepoTab {
         let shown = self.reflog.as_ref().map(|v| &v.source);
         for (icon, title, about, source, act) in rows {
             let (_, rect) = ui.allocate_space(vec2(ui.available_width(), 36.0));
-            let r = ui.interact(rect, ui.id().with(("recovery-row", title)), Sense::click());
+            let r = ui.interact(rect, ui.id().with(("recovery-row", icon)), Sense::click());
             let on = matches!(
                 (&source, shown),
                 (Source::Lost, Some(Source::Lost)) | (Source::Ref(_), Some(Source::Ref(_)))
             );
+            crate::a11y::a11y_selected(&r, || format!("{title}: {about}"), on);
             if on {
                 ui.painter().rect_filled(rect, 0.0, t.row_selected);
             } else if r.hovered() {

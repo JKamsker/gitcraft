@@ -522,6 +522,18 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
             ui.painter()
                 .rect_filled(rect, 0.0, if resp.hovered() { t.hover } else { t.chrome });
             let folded = editor.folded.contains(&f);
+            crate::a11y::a11y(&resp, egui::WidgetType::Button, || {
+                format!(
+                    "Assign file {}: {}",
+                    file.path,
+                    tip(
+                        editor,
+                        f,
+                        editor.units.get(f).map_or(&[], Vec::as_slice),
+                        "the whole file"
+                    )
+                )
+            });
             let fold = icons::small_button(
                 ui,
                 if folded {
@@ -569,6 +581,9 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
         Row::Line(f, i) => {
             let file = editor.files.get(f)?;
             let line = file.lines.get(i)?;
+            crate::a11y::a11y(&resp, egui::WidgetType::Button, || {
+                format!("Assign {} line {}: {}", file.path, i + 1, line.text)
+            });
             let changed = matches!(line.kind, Kind::Add | Kind::Del);
             let whole = file.whole.is_some();
             let clickable = whole || changed || line.kind == Kind::Hunk;

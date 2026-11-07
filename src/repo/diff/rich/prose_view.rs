@@ -273,7 +273,7 @@ fn part(ui: &mut Ui, t: &Tokens, part: &Part, rect: Rect, captions: bool, acts: 
         }
         Part::Changed { words, .. } => words.iter().map(|(_, w)| w.as_str()).collect::<String>(),
     };
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &label));
+    crate::a11y::a11y(&resp, egui::WidgetType::Button, &label);
     if resp.on_hover_text(tip).clicked() {
         acts.push(Action::DiffGoToLine { old, new });
     }

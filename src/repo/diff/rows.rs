@@ -145,6 +145,11 @@ impl<'a> Rows<'a> {
                 Sense::click_and_drag(),
             )
             .on_hover_cursor(egui::CursorIcon::PointingHand);
+        crate::a11y::a11y(
+            &map,
+            egui::WidgetType::Slider,
+            "Diff change map. Arrow keys scroll a line; Page Up and Page Down scroll a page; Home and End reach the ends.",
+        );
         // Under the lines, so dragging over them selects text (a click still picks a line).
         let text_drag = ui.interact(
             body,
@@ -182,6 +187,20 @@ impl<'a> Rows<'a> {
             scroll = find.scroll_to(scroll, &hit, text, char_w);
         } else if let Some(row) = self.view.jump_line.and_then(|i| row_of(data, split, i)) {
             scroll = scroll.vertical_scroll_offset(offset_of(row));
+        }
+        if map.has_focus() {
+            ui.memory_mut(|m| {
+                m.set_focus_lock_filter(
+                    map.id,
+                    egui::EventFilter {
+                        vertical_arrows: true,
+                        ..Default::default()
+                    },
+                )
+            });
+            if let Some(offset) = map_keyboard(ui, self.view.scroll, body.height(), total_h) {
+                scroll = scroll.vertical_scroll_offset(offset);
+            }
         }
         let out = ui.scope_builder(egui::UiBuilder::new().max_rect(body), |ui| {
             scroll.show_rows(ui, LINE_H, count, |ui, range| {
@@ -377,12 +396,23 @@ impl<'a> Rows<'a> {
             let resp = ui
                 .interact(rect, ui.id().with(("diff_line", i)), Sense::click())
                 .on_hover_cursor(egui::CursorIcon::PointingHand);
+            crate::a11y::a11y_selected(&resp, || line_label(&data.lines[i]), picked);
             // A right-click on a changed line not picked picks it, for its menu to be about it.
             let unpicked = !self.view.chosen.contains(&i) && self.text_sel.is_none();
             if resp.clicked() || resp.secondary_clicked() && unpicked {
                 self.clicked = Some(i);
             }
             self.picks.push(resp);
+        }
+        if !pickable {
+            let resp = ui.interact(
+                rect,
+                ui.id().with(("diff_read_line", i, column_of(side))),
+                Sense::hover(),
+            );
+            crate::a11y::a11y(&resp, egui::WidgetType::Label, || {
+                line_label(&data.lines[i])
+            });
         }
         // After the line's own click: its numbers take a note, the rest of it picks it.
         if let Some(spot) = spot {
@@ -553,6 +583,9 @@ impl<'a> Rows<'a> {
         .on_hover_text(tip);
         let count = review.marks.get(&(spot_side, number)).copied();
         let active = self.is_target((spot_side, number));
+        crate::a11y::a11y(&resp, egui::WidgetType::Button, || {
+            format!("{tip}, line {number}, {} comments", count.unwrap_or(0))
+        });
         paint_gutter_mark(ui, area, count, resp.hovered(), active);
         if resp.clicked() {
             let target = LineTarget {
@@ -604,4 +637,90 @@ fn column_of(side: Side) -> Option<DiffSide> {
         Side::New => Some(DiffSide::Right),
         Side::Unified | Side::Both => None,
     }
+}
+
+/// The painted line's identity, change kind, and content are available without hovering.
+fn line_label(line: &super::DiffLine) -> String {
+    let kind = match line.kind {
+        Kind::Add => "added",
+        Kind::Del => "deleted",
+        Kind::Hunk => "hunk",
+        Kind::Context => "context",
+        Kind::Fold => "folded",
+        Kind::Meta => "metadata",
+    };
+    format!(
+        "{kind}, old line {}, new line {}: {}",
+        line.old
+            .map_or_else(|| "none".to_owned(), |n| n.to_string()),
+        line.new
+            .map_or_else(|| "none".to_owned(), |n| n.to_string()),
+        line.text
+    )
+}
+
+#[cfg(test)]
+mod accessibility_tests {
+    use super::*;
+    #[test]
+    fn change_map_keys_scroll_and_clamp_and_leave_modified_keys_alone() {
+        use egui::{Key, Modifiers};
+        for (key, modifiers, expected) in [
+            (Key::ArrowDown, Modifiers::NONE, Some(100.0 + LINE_H)),
+            (Key::PageUp, Modifiers::NONE, Some(0.0)),
+            (Key::End, Modifiers::NONE, Some(800.0)),
+            (Key::Home, Modifiers::NONE, Some(0.0)),
+            (Key::ArrowDown, Modifiers::CTRL, None),
+        ] {
+            let ctx = egui::Context::default();
+            ctx.run_ui(
+                egui::RawInput {
+                    events: vec![egui::Event::Key {
+                        key,
+                        physical_key: Some(key),
+                        pressed: true,
+                        repeat: false,
+                        modifiers,
+                    }],
+                    ..Default::default()
+                },
+                |ui| {
+                    assert_eq!(map_keyboard(ui, 100.0, 200.0, 1000.0), expected);
+                },
+            )
+            .drop_without_applying_deltas();
+        }
+    }
+
+    #[test]
+    fn diff_names_include_change_kind_both_coordinates_and_content() {
+        let line = super::super::DiffLine {
+            kind: Kind::Add,
+            old: None,
+            new: Some(42),
+            text: "let 日本語 = 1;".to_owned(),
+            raw: "+let 日本語 = 1;".to_owned(),
+        };
+        assert_eq!(
+            line_label(&line),
+            "added, old line none, new line 42: let 日本語 = 1;"
+        );
+    }
+}
+
+fn map_keyboard(ui: &Ui, offset: f32, page: f32, total: f32) -> Option<f32> {
+    use egui::Key;
+    for (key, value) in [
+        (Key::Home, 0.0),
+        (Key::End, total),
+        (Key::ArrowUp, offset - LINE_H),
+        (Key::ArrowDown, offset + LINE_H),
+        (Key::PageUp, offset - page),
+        (Key::PageDown, offset + page),
+    ] {
+        if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, key)) {
+            return Some(value.clamp(0.0, (total - page).max(0.0)));
+        }
+    }
+    None
 }

@@ -95,7 +95,7 @@ impl RepoTab {
                 extra,
                 self.owner_tag(&f.path).as_ref(),
             );
-            self.keyboard_file_row(ui, &r.row, &key(&f.path));
+            self.keyboard_file_row(keyboard_scope, &r.row, &key(&f.path));
             super::weakened_marks::hover(ui, &r, flags);
             // A file the commit deleted isn't in it, and has nothing to link to.
             let links = || self.link_menu(None).filter(|_| f.status != 'D');

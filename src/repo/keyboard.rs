@@ -181,15 +181,21 @@ impl RepoTab {
             state.pane = Some(pane);
         }
         drop(state);
-        crate::a11y::a11y(
+        crate::a11y::pane(
             &response,
-            egui::WidgetType::Other,
             match pane {
                 Pane::Sidebar => "Repository sidebar",
                 Pane::Graph => "Repository graph or diff",
                 Pane::Detail => "Commit details and changed files",
             },
         );
+    }
+
+    pub(super) fn keyboard_graph_focus(&self, response: &egui::Response) {
+        let mut state = self.keyboard.borrow_mut();
+        if response.has_focus() && !state.focus_requested && !state.focus_row {
+            state.pane = Some(Pane::Graph);
+        }
     }
 
     pub(super) fn keyboard_graph_active(&self) -> bool {
@@ -214,7 +220,7 @@ impl RepoTab {
         state.enter = false;
     }
 
-    pub(super) fn keyboard_file_row(&self, ui: &Ui, response: &egui::Response, key: &DiffKey) {
+    pub(super) fn keyboard_file_row(&self, scope: Id, response: &egui::Response, key: &DiffKey) {
         if self.keyboard.borrow().pane == Some(Pane::Detail) && self.keyboard_file_selected(key) {
             let mut state = self.keyboard.borrow_mut();
             if state.focus_row {
@@ -225,7 +231,11 @@ impl RepoTab {
             drop(state);
             crate::a11y::a11y_selected(response, || format!("File {}", key.path()), true);
         }
-        let _ = ui;
+        let mut state = self.keyboard.borrow_mut();
+        if response.has_focus() && !state.focus_requested && !state.focus_row {
+            state.pane = Some(Pane::Detail);
+            state.cursor = Some((scope, key.clone()));
+        }
     }
 
     pub(super) fn keyboard_work_files(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
