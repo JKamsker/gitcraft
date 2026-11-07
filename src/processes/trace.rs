@@ -25,6 +25,18 @@ const STAGES: [&str; 7] = [
     "draining",
 ];
 
+#[derive(Clone, Copy)]
+#[repr(usize)]
+pub(super) enum Stage {
+    Queued,
+    Spawning,
+    Supervising,
+    Running,
+    Stopping,
+    Reaping,
+    Draining,
+}
+
 impl Trace {
     pub(super) fn new(command: &Command) -> Option<Self> {
         if std::env::var_os("GITCRAFT_TEST_PROCESS_TRACE").as_deref()
@@ -42,7 +54,7 @@ impl Trace {
                 .collect(),
             command: label(command),
             started: Instant::now(),
-            stage: AtomicUsize::new(0),
+            stage: AtomicUsize::new(Stage::Queued as usize),
             pid: AtomicUsize::new(0),
             pipes: AtomicUsize::new(0),
             written: AtomicUsize::new(0),
@@ -50,9 +62,8 @@ impl Trace {
             stderr: AtomicUsize::new(0),
         })
     }
-    pub(super) fn stage(&self, stage: &str) {
-        self.stage
-            .store(STAGES.iter().position(|&s| s == stage).unwrap(), Relaxed);
+    pub(super) fn stage(&self, stage: Stage) {
+        self.stage.store(stage as usize, Relaxed);
     }
     pub(super) fn spawned(&self, pid: Option<u32>) {
         self.pid.store(pid.unwrap_or(0) as usize, Relaxed);
@@ -186,7 +197,7 @@ fn snapshots_record_stages_and_pipe_state_without_process_control() {
         test: "synthetic".into(),
         command: "commit",
         started: Instant::now(),
-        stage: AtomicUsize::new(0),
+        stage: AtomicUsize::new(Stage::Queued as usize),
         pid: AtomicUsize::new(0),
         pipes: AtomicUsize::new(0),
         written: AtomicUsize::new(0),
@@ -194,10 +205,10 @@ fn snapshots_record_stages_and_pipe_state_without_process_control() {
         stderr: AtomicUsize::new(0),
     };
     assert!(trace.snapshot().contains("stage=queued"));
-    trace.stage("supervising");
+    trace.stage(Stage::Supervising);
     trace.spawned(Some(42));
     assert!(trace.snapshot().contains("stage=supervising pid=42"));
-    trace.stage("running");
+    trace.stage(Stage::Running);
     trace.io(true, false, true, false, 10, 20, 30);
     let snapshot = trace.snapshot();
     assert!(snapshot.contains("stdin_open=true stdout_open=false stderr_open=true exited=false"));

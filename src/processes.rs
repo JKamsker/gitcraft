@@ -362,6 +362,8 @@ pub(crate) fn shutdown() {
     }
 }
 
+// The eighth argument only exists in opt-in libtest diagnostics.
+#[cfg_attr(test, allow(clippy::too_many_arguments))]
 async fn execute(
     command: Command,
     mut options: Options,
@@ -406,7 +408,7 @@ async fn execute(
     cmd.creation_flags(0x0800_0004); // CREATE_NO_WINDOW | CREATE_SUSPENDED
     #[cfg(test)]
     if let Some(trace) = trace {
-        trace.stage("spawning");
+        trace.stage(trace::Stage::Spawning);
     }
     let mut child = cmd
         .spawn()
@@ -414,7 +416,7 @@ async fn execute(
     #[cfg(test)]
     if let Some(trace) = trace {
         trace.spawned(child.id());
-        trace.stage("supervising");
+        trace.stage(trace::Stage::Supervising);
     }
     #[cfg(windows)]
     let mut process_job = match child
@@ -432,7 +434,7 @@ async fn execute(
     stats.spawned.fetch_add(1, Ordering::Relaxed);
     #[cfg(test)]
     if let Some(trace) = trace {
-        trace.stage("running");
+        trace.stage(trace::Stage::Running);
     }
     #[cfg(unix)]
     let pid = child.id();
@@ -526,6 +528,7 @@ async fn execute(
             }
             result = child.wait(), if status.is_none() => {
                 match result {
+                    // Preserve early-reader semantics: an exited child need not consume all input.
                     Ok(s) => { status = Some(s); input = None; drain_deadline = Some(Instant::now() + options.drain_for); }
                     Err(e) => stopped = Some(format!("could not wait for process: {e}")),
                 }
@@ -552,7 +555,7 @@ async fn execute(
     if stopped.is_some() {
         #[cfg(test)]
         if let Some(trace) = trace {
-            trace.stage("stopping");
+            trace.stage(trace::Stage::Stopping);
         }
         // Remote cleanup may need its PID marker. The stderr callback has consumed every
         // chunk read so far. Run the legacy protocol off the event loop, before killing SSH.
@@ -566,7 +569,7 @@ async fn execute(
         if status.is_none() {
             #[cfg(test)]
             if let Some(trace) = trace {
-                trace.stage("reaping");
+                trace.stage(trace::Stage::Reaping);
             }
             status = child
                 .try_wait()
@@ -606,7 +609,7 @@ async fn execute(
         let until = tokio::time::Instant::now() + options.drain_for;
         #[cfg(test)]
         if let Some(trace) = trace {
-            trace.stage("draining");
+            trace.stage(trace::Stage::Draining);
         }
         let mut overflow = None;
         while out.is_some() || err.is_some() {
@@ -649,7 +652,8 @@ async fn execute(
 }
 
 /// Windows pipe writes can report acceptance before their blocking I/O finishes. Keep
-/// polling that final write through flush before dropping the handle to deliver EOF.
+/// polling that final write through flush before dropping the handle to deliver EOF,
+/// while the child is alive. Child exit or BrokenPipe can still end input early.
 /// Each await stays inside the main select so cancellation and deadlines still advance.
 async fn write_input<W: tokio::io::AsyncWrite + Unpin>(
     pipe: &mut W,
@@ -686,7 +690,7 @@ mod tests {
     use std::io::{Read, Write};
 
     #[test]
-    fn final_buffered_stdin_write_is_flushed_and_its_error_is_observed() {
+    fn final_buffered_stdin_write_is_flushed_and_its_error_is_observed() -> io::Result<()> {
         use std::pin::Pin;
         use std::task::{Context, Poll};
         struct Buffered {
@@ -717,9 +721,7 @@ mod tests {
                 unreachable!()
             }
         }
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .build()
-            .unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread().build()?;
         runtime.block_on(async {
             for fail in [false, true] {
                 let mut pipe = Buffered {
@@ -727,22 +729,19 @@ mod tests {
                     flushed: false,
                 };
                 let mut written = 0;
-                assert!(
-                    !write_input(&mut pipe, b"input", &mut written)
-                        .await
-                        .unwrap()
-                );
+                assert!(!write_input(&mut pipe, b"input", &mut written).await?);
                 assert_eq!(written, 5);
                 assert!(!pipe.flushed, "acceptance is not completion");
                 let result = write_input(&mut pipe, b"input", &mut written).await;
                 assert!(pipe.flushed);
                 if fail {
-                    assert_eq!(result.unwrap_err().to_string(), "deferred write failed");
+                    assert!(result.is_err_and(|e| e.to_string() == "deferred write failed"));
                 } else {
-                    assert!(result.unwrap());
+                    assert!(result?);
                 }
             }
-        });
+            Ok(())
+        })
     }
 
     /// A real child executable on every OS, independent of shell quoting/tools.
