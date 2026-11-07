@@ -40,12 +40,12 @@
       "id": "CONTENT-1",
       "priority": "P2",
       "file": "src/git/recovery/file.rs",
-      "line": 153,
+      "line": 152,
       "title": "Pin the selected worktree root before exclusive file recovery",
       "trigger": "After perform verifies the string repository identity, physical worktree root or an ancestor is renamed/replaced by a symlink before file::parent opens it.",
-      "behavior": "Unix initial root open subtracts NOFOLLOW. Stored Results/Preview identity contains path strings only, so the opened replacement is not compared with the searched root inode/device. A new recovery filename can be created outside the selected repository. Exclusive final name creation preserves existing files but does not preserve destination ownership. Windows initial root similarly follows the root and needs stable opened-directory identity.",
+      "behavior": "Unix initial root open subtracts NOFOLLOW. Stored Results/Preview identity contains path strings only, so the opened replacement is not compared with the searched root inode/device. A new recovery filename can be created outside the selected repository. Exclusive final name creation preserves existing files but does not preserve destination ownership. Windows initial root similarly follows the root and needs stable opened-directory identity. Remote remote_script similarly follows its initial root/common paths and records the new pwd without checking captured root filesystem identity; a replacement destination with .git directory can publish outside the selected repository.",
       "evidence_scope": "Static source finding; no runtime reproduction or native Windows execution. Author audit_32_38 independently agreed in coordination message and plans pinned opened-root identity + NOFOLLOW regression fix.",
-      "recommendation": "Capture stable filesystem root identity during search/preview; reject links and compare opened root handle identity immediately before parent traversal/file creation, retaining handles. Cover root and ancestor replacement using owned temp fixtures."
+      "recommendation": "Capture stable filesystem root identity during search/preview; reject links and compare opened root handle identity immediately before parent traversal/file creation, retaining handles. Cover root and ancestor replacement using owned temp fixtures. Cover typed-remote initial root/ancestor substitution through an owned recording/local-shell fixture as well as local filesystem helpers."
     }
   ],
   "other_review_notes": [
