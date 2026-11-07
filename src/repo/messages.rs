@@ -62,6 +62,10 @@ pub(super) enum Msg {
         diff::rich::RichKind,
         Box<Result<diff::rich::Rich, String>>,
     ),
+    DiffStructural(
+        (u64, u64),
+        Box<Result<diff::structural::Structural, String>>,
+    ),
     FileHistory(String, Option<String>, Result<Vec<git::FileCommit>, String>),
     Blame(String, Option<String>, Result<file_view::BlameData, String>),
     /// A file as it is at a revision, for the file view.
@@ -107,6 +111,7 @@ pub(super) enum Msg {
     },
     /// A commit's patch was written to the file, or wasn't.
     PatchSaved(std::path::PathBuf, Result<(), String>),
+    BundleDone(String, Result<(), String>, Refresh),
     /// The commits to replay for a drop or move from a commit's menu.
     QuickEditCommits {
         edit: quick_edit::Edit,
@@ -379,6 +384,9 @@ impl RepoTab {
                 result,
             } => self.reword_older(hash, message, result, ctx),
             Msg::PatchSaved(file, result) => self.patch_saved(file, result),
+            Msg::BundleDone(label, result, refresh) => {
+                self.bundle_done(label, result, refresh, ctx)
+            }
             Msg::QuickEditCommits { edit, hash, result } => {
                 self.run_quick_edit(edit, hash, result, ctx)
             }
@@ -440,6 +448,15 @@ impl RepoTab {
             Msg::DiffRendered(request, result) => {
                 if let Some(view) = &mut self.diff {
                     view.rendered_arrived(request, *result, ctx);
+                }
+            }
+            Msg::DiffStructural(ids, result) => {
+                let reload = self
+                    .diff
+                    .as_mut()
+                    .is_some_and(|view| view.structural.arrived(ids, view.request, *result));
+                if reload {
+                    self.load_diff_structural(ctx);
                 }
             }
             Msg::PrDetails(request, result) => self.pr_details_arrived(request, *result, ctx),

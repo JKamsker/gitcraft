@@ -271,6 +271,7 @@ impl RepoTab {
             Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
             Action::DiffRich(kind) => self.show_diff_rich(kind, ctx),
             Action::DiffGoToLine { old, new } => self.diff_go_to_line(old, new),
+            Action::DiffStructural(on) => self.show_diff_structural(on, ctx),
             Action::DiffStep(delta) => {
                 // Shown in place of the lines (not fallen back to them).
                 let rich = self.diff_rich_kind().is_some()
@@ -282,7 +283,7 @@ impl RepoTab {
                 if let Some(view) = self
                     .diff
                     .as_mut()
-                    .filter(|_| !self.diff_as_file && !rendered && !rich)
+                    .filter(|v| !self.diff_as_file && !rendered && !rich && !v.structural.enabled)
                 {
                     view.step_change(Settings::get(ctx).diff_split, delta);
                 }
@@ -342,6 +343,10 @@ impl RepoTab {
             Action::ReviewBranch { branch, base } => self.start_review(ctx, branch, base),
             Action::SavePatch { hash, summary } => self.save_patch(hash, &summary, ctx),
             Action::ApplyPatch => self.apply_patch(ctx),
+            Action::OpenBundleExport => self.open_bundle_export(ctx),
+            Action::OpenBundleImport => self.open_bundle_import(ctx),
+            Action::ExportBundle { refs, base } => self.export_bundle(refs, base, ctx),
+            Action::ImportBundle { preview, imports } => self.import_bundle(preview, imports, ctx),
             Action::QuickEdit { edit, hash } => self.quick_edit(edit, hash, ctx),
             Action::DropMenu(menu) => self.drop_menu = Some(menu),
             Action::CommitDrop(drop) => self.commit_drop(drop, ctx),

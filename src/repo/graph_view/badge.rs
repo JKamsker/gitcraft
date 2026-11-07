@@ -1,5 +1,7 @@
 //! The pills of the refs column: which branches and tags point at a commit.
 
+use std::collections::{HashMap, HashSet};
+
 use crate::git::Refs;
 use crate::repo::sidebar;
 
@@ -85,21 +87,34 @@ impl Badge {
 /// Turns `git log --format=%D` decorations into pills: `x` and `origin/x` at the same commit
 /// become one pill marked local and remote.
 pub(super) fn badges(decorations: &[String], refs: &Refs) -> Vec<Badge> {
+    if decorations.is_empty() {
+        return Vec::new();
+    }
+    // A single commit can carry thousands of refs. Index each list once instead of
+    // rescanning all local/remote branches for every decoration and every visible frame.
+    let local: HashSet<&str> = refs.local.iter().map(|b| b.name.as_str()).collect();
+    let names: Vec<&str> = refs.remotes.iter().map(|(r, _)| r.as_str()).collect();
+    let mut remote_branches = HashMap::new();
+    for (remote, branches) in &refs.remotes {
+        for branch in branches {
+            // Match the first remote in the supplied lists, as the linear lookup did.
+            remote_branches
+                .entry(branch.name.as_str())
+                .or_insert(remote.as_str());
+        }
+    }
     // The remote whose branch list has it, else the longest remote it is under (`my/fork/main`
     // is `my/fork`'s even when there is a remote `my`), unless it is a local branch's name.
     // `tracking`: it is known to be a remote-tracking branch (a full `refs/remotes/` name),
     // then of its first part when no remote fits (one since removed from the config).
     let remote_of = |d: &str, tracking: bool| {
-        let remote = refs
-            .remotes
-            .iter()
-            .find(|(_, list)| list.iter().any(|b| b.name == d))
-            .map(|(remote, _)| remote.to_owned())
+        let remote = remote_branches
+            .get(d)
+            .map(|remote| (*remote).to_owned())
             .or_else(|| {
-                if !tracking && refs.local.iter().any(|b| b.name == d) {
+                if !tracking && local.contains(d) {
                     return None;
                 }
-                let names: Vec<&str> = refs.remotes.iter().map(|(r, _)| r.as_str()).collect();
                 match sidebar::remote_of(d, &names) {
                     Some(remote) => Some(remote.to_owned()),
                     None if tracking => d.split_once('/').map(|(remote, _)| remote.to_owned()),
@@ -109,24 +124,22 @@ pub(super) fn badges(decorations: &[String], refs: &Refs) -> Vec<Badge> {
         let branch = sidebar::remote_short(d, &remote)?;
         Some((branch.to_owned(), remote))
     };
-    fn branch(out: &mut Vec<Badge>, name: &str) -> usize {
-        match out
-            .iter()
-            .position(|b| b.kind == BadgeKind::Branch && b.label == name)
-        {
-            Some(i) => i,
-            None => {
-                out.push(Badge {
-                    label: name.to_owned(),
-                    kind: BadgeKind::Branch,
-                    local: false,
-                    remotes: Vec::new(),
-                    head: false,
-                });
-                out.len() - 1
-            }
+    fn branch(out: &mut Vec<Badge>, indices: &mut HashMap<String, usize>, name: &str) -> usize {
+        if let Some(&i) = indices.get(name) {
+            return i;
         }
+        let i = out.len();
+        out.push(Badge {
+            label: name.to_owned(),
+            kind: BadgeKind::Branch,
+            local: false,
+            remotes: Vec::new(),
+            head: false,
+        });
+        indices.insert(name.to_owned(), i);
+        i
     }
+    let mut indices = HashMap::new();
     let mut out: Vec<Badge> = Vec::new();
     for d in decorations {
         // What gitcraft keeps of earlier versions (`refs/gitcraft/`) is no branch: an older
@@ -137,7 +150,7 @@ pub(super) fn badges(decorations: &[String], refs: &Refs) -> Vec<Badge> {
         // With `log.decorate=full` in the user's config, `%D` gives full ref names.
         if let Some(name) = d.strip_prefix("HEAD -> ") {
             let name = name.strip_prefix("refs/heads/").unwrap_or(name);
-            let i = branch(&mut out, name);
+            let i = branch(&mut out, &mut indices, name);
             if let Some(b) = out.get_mut(i) {
                 b.local = true;
                 b.head = true;
@@ -160,7 +173,7 @@ pub(super) fn badges(decorations: &[String], refs: &Refs) -> Vec<Badge> {
                 head: false,
             });
         } else if let Some(name) = d.strip_prefix("refs/heads/") {
-            let i = branch(&mut out, name);
+            let i = branch(&mut out, &mut indices, name);
             if let Some(b) = out.get_mut(i) {
                 b.local = true;
             }
@@ -172,12 +185,12 @@ pub(super) fn badges(decorations: &[String], refs: &Refs) -> Vec<Badge> {
             if name == "HEAD" {
                 continue;
             }
-            let i = branch(&mut out, &name);
+            let i = branch(&mut out, &mut indices, &name);
             if let Some(b) = out.get_mut(i) {
                 b.remotes.push(remote);
             }
         } else {
-            let i = branch(&mut out, d);
+            let i = branch(&mut out, &mut indices, d);
             if let Some(b) = out.get_mut(i) {
                 b.local = true;
             }
@@ -326,5 +339,41 @@ mod tests {
         let decos = ["feature/x".to_owned()];
         let b = badges(&decos, &refs_with_origin());
         assert!(b[0].kind == BadgeKind::Branch && b[0].local && b[0].remotes.is_empty());
+    }
+    #[test]
+    fn thousands_of_local_and_remote_twins_keep_head_order_and_separate_tags() {
+        let names: Vec<String> = (0..3000).map(|i| format!("team/feature-{i}")).collect();
+        let refs = Refs {
+            local: names.iter().map(|name| branch(name)).collect(),
+            remotes: vec![(
+                "origin".to_owned(),
+                names
+                    .iter()
+                    .map(|name| branch(&format!("origin/{name}")))
+                    .collect(),
+            )],
+            ..Refs::default()
+        };
+        let mut decorations: Vec<String> = names
+            .iter()
+            .flat_map(|name| [format!("origin/{name}"), name.clone()])
+            .collect();
+        decorations.push("HEAD -> team/feature-2999".to_owned());
+        decorations.push("tag: team/feature-2999".to_owned());
+        let got = badges(&decorations, &refs);
+        assert_eq!(got.len(), 3001);
+        assert_eq!(got[0].label, "team/feature-2999");
+        assert!(got[0].head);
+        for (badge, name) in got[1..3000].iter().zip(&names[..2999]) {
+            assert_eq!(&badge.label, name);
+            assert!(!badge.head);
+        }
+        assert!(
+            got[..3000]
+                .iter()
+                .all(|b| b.kind == BadgeKind::Branch && b.local && b.remotes == ["origin"])
+        );
+        assert_eq!(got[3000].kind, BadgeKind::Tag);
+        assert_eq!(got[3000].label, "team/feature-2999");
     }
 }

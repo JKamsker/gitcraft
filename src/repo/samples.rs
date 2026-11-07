@@ -98,6 +98,8 @@ impl RepoTab {
                     old: None,
                     new: Some(1),
                 });
+                acts.push(Action::DiffStructural(true));
+                acts.push(Action::DiffStructural(false));
                 acts.push(Action::RunRebase);
                 acts.push(Action::Stash(StashRequest::everything("sample")));
                 // A bisect from start to end, a run in it, and the dialog that starts one.

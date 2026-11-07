@@ -190,6 +190,17 @@ impl RepoTab {
         egui::Popup::menu(&more.inner)
             .style(crate::theme::menu_style)
             .show(|ui| pull_menu(ui, acts));
+        if let Some(dialog) = self.review_dialog() {
+            if icons::tool_button(ui, "arrow-up-from-line", "Push for review", has_remote)
+                .on_hover_text(
+                    "Submit commits to Gerrit; amend and submit again to update the patch set",
+                )
+                .clicked()
+            {
+                acts.push(Action::Dialog(dialog));
+            }
+            return;
+        }
         let push = icons::tool_button_count(ui, "arrow-up-from-line", "Push", ahead, has_remote)
             .named(|| behind_ahead("Push", ahead, "ahead"))
             .on_hover_text(keymap::tip(
@@ -340,7 +351,7 @@ impl RepoTab {
         let t = Tokens::get(ui.ctx());
         // A repository on another machine says which, first.
         if let Some(target) = crate::remote::parse(&self.path) {
-            widgets::chip(ui, &target.host.label(), t.accent).on_hover_text(format!(
+            widgets::chip(ui, &target.host.label(), t.accent_fg).on_hover_text(format!(
                 "git runs on {}, in {}",
                 target.host.label(),
                 target.path

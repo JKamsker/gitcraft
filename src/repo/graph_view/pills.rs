@@ -18,6 +18,32 @@ use crate::repo::{Action, RepoTab, ci_status, widgets};
 use crate::theme::{self, Tokens};
 
 impl RepoTab {
+    /// Natural width of the pill, icons, stack count and connector margin on one visible row.
+    pub(super) fn required_refs_width(&self, ui: &Ui, i: usize) -> Option<f32> {
+        let commit = self.commits.get(i)?;
+        let badges = badges(&commit.refs, &self.refs);
+        let first = badges.first()?;
+        let marks = self.marks(first, &commit.hash);
+        let (lead, trail) = pill_icons(first, marks.pr);
+        let font = if first.head {
+            theme::semibold(11.0)
+        } else {
+            theme::medium(11.0)
+        };
+        let text = ui
+            .painter()
+            .layout_no_wrap(first.label.clone(), font, Color32::WHITE)
+            .size()
+            .x;
+        Some(
+            text + 16.0
+                + (lead.len() + trail.len()) as f32 * 15.0
+                + if marks.ci.is_some() { 12.0 } else { 0.0 }
+                + if badges.len() > 1 { 28.0 } else { 0.0 }
+                + 29.0,
+        )
+    }
+
     /// Branch and tag pills, left of the graph, joined to the commit's dot. Returns `resp`
     /// with the column's tooltip, and the row's own pill.
     pub(super) fn refs_cell(
@@ -300,8 +326,10 @@ fn more_count(painter: &Painter, t: &Tokens, r: Rect, more: usize, lane: Color32
     painter.rect_filled(
         r,
         CornerRadius::same(t.radius as u8),
-        lane.lerp_to_gamma(Color32::BLACK, 0.35)
-            .lerp_to_gamma(Color32::BLACK, DIMMED),
+        theme::palette::white_text_fill(
+            lane.lerp_to_gamma(Color32::BLACK, 0.35)
+                .lerp_to_gamma(Color32::BLACK, DIMMED),
+        ),
     );
     painter.text(
         r.center(),
@@ -351,19 +379,7 @@ fn ghost_pill_marks(p: &Painter, t: &Tokens, pill: Rect, moved: bool, gone: bool
     }
 }
 
-/// Paints a pill with white text and icons, at most `max_w` wide; returns its rect.
-fn ref_pill(
-    ui: &Ui,
-    painter: &Painter,
-    left_center: Pos2,
-    badge: &Badge,
-    lane: Color32,
-    max_w: f32,
-    marks: Marks,
-) -> Rect {
-    const ICON: f32 = 15.0;
-    let t = Tokens::get(ui.ctx());
-    let white = Color32::WHITE;
+fn pill_fill(t: &Tokens, badge: &Badge, lane: Color32) -> Color32 {
     let fill = match badge.kind {
         BadgeKind::Branch if badge.local => lane,
         // Only on a remote: a darker shade of the lane.
@@ -377,6 +393,23 @@ fn ref_pill(
     } else {
         fill.lerp_to_gamma(Color32::BLACK, DIMMED)
     };
+    theme::palette::white_text_fill(fill)
+}
+
+/// Paints a pill with white text and icons, at most `max_w` wide; returns its rect.
+fn ref_pill(
+    ui: &Ui,
+    painter: &Painter,
+    left_center: Pos2,
+    badge: &Badge,
+    lane: Color32,
+    max_w: f32,
+    marks: Marks,
+) -> Rect {
+    const ICON: f32 = 15.0;
+    let t = Tokens::get(ui.ctx());
+    let white = Color32::WHITE;
+    let fill = pill_fill(&t, badge, lane);
     let (lead, trail) = pill_icons(badge, marks.pr);
     let font = if badge.head {
         theme::semibold(11.0)
@@ -391,28 +424,25 @@ fn ref_pill(
     let w = (galley.size().x + 16.0 + icons_w).min(max_w);
     let r = Rect::from_min_size(pos2(left_center.x, left_center.y - 10.0), vec2(w, 20.0));
     painter.rect_filled(r, CornerRadius::same(t.radius as u8), fill);
+    // Small manual widths can leave too little room for all marks. Text and icons must
+    // stay inside the pill's actual hitbox; SVG images use the Ui's clip, not this painter's.
+    let painter = &painter.with_clip_rect(painter.clip_rect().intersect(r));
     let mut x = r.left() + 7.0;
     for icon in lead {
-        icons::paint(
-            ui,
-            Rect::from_center_size(pos2(x + 6.0, r.center().y), vec2(12.0, 12.0)),
-            icon,
-            11.0,
-            white,
-        );
+        let icon_rect = Rect::from_center_size(pos2(x + 6.0, r.center().y), vec2(12.0, 12.0));
+        if painter.clip_rect().contains_rect(icon_rect) {
+            icons::paint(ui, icon_rect, icon, 11.0, white);
+        }
         x += ICON;
     }
     let gw = galley.size().x;
     painter.galley(pos2(x, r.center().y - galley.size().y / 2.0), galley, white);
     x += gw + 1.0;
     for icon in trail {
-        icons::paint(
-            ui,
-            Rect::from_center_size(pos2(x + 8.0, r.center().y), vec2(12.0, 12.0)),
-            icon,
-            11.0,
-            white,
-        );
+        let icon_rect = Rect::from_center_size(pos2(x + 8.0, r.center().y), vec2(12.0, 12.0));
+        if painter.clip_rect().contains_rect(icon_rect) {
+            icons::paint(ui, icon_rect, icon, 11.0, white);
+        }
         x += ICON;
     }
     if let Some(state) = marks.ci {
@@ -496,6 +526,45 @@ mod tests {
             local: false,
             remotes: vec![remote.to_owned()],
             head: false,
+        }
+    }
+
+    #[test]
+    fn white_pill_labels_meet_aa_for_every_builtin_and_lane_setting() {
+        use crate::theme::{LaneColors, Tweaks, catalog::BUILTIN, palette::contrast};
+        for builtin in BUILTIN {
+            for lanes in LaneColors::ALL {
+                let mut t = builtin.palette().tokens();
+                Tweaks {
+                    lanes,
+                    ..Tweaks::default()
+                }
+                .apply(&mut t);
+                for lane in t.lanes {
+                    for head in [false, true] {
+                        for (kind, local) in [
+                            (BadgeKind::Branch, true),
+                            (BadgeKind::Branch, false),
+                            (BadgeKind::Tag, false),
+                            (BadgeKind::DetachedHead, false),
+                        ] {
+                            let badge = Badge {
+                                label: "test".to_owned(),
+                                kind,
+                                local,
+                                remotes: vec![],
+                                head,
+                            };
+                            assert!(
+                                contrast(Color32::WHITE, pill_fill(&t, &badge, lane)) >= 4.5,
+                                "{}: {:?}, head={head}, lanes={lanes:?}",
+                                builtin.name,
+                                badge.kind
+                            );
+                        }
+                    }
+                }
+            }
         }
     }
 

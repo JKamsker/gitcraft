@@ -9,6 +9,8 @@
 pub mod catalog;
 pub mod files;
 pub mod palette;
+#[cfg(test)]
+pub(crate) mod test_paint;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -269,19 +271,23 @@ pub fn theme_errors() -> Vec<(String, String)> {
 fn builtin_infos() -> Vec<ThemeInfo> {
     catalog::BUILTIN
         .iter()
-        .map(|b| ThemeInfo {
-            id: ThemeId::new(b.id),
-            name: b.name.to_owned(),
-            credit: b.credit.to_owned(),
-            group: if b.credit == "gitcraft" || b.id.chars().next().is_some_and(char::is_uppercase)
-            {
-                Group::Gitcraft
-            } else if b.palette.dark {
-                Group::Dark
-            } else {
-                Group::Light
-            },
-            palette: b.palette,
+        .map(|b| {
+            let palette = b.palette();
+            ThemeInfo {
+                id: ThemeId::new(b.id),
+                name: b.name.to_owned(),
+                credit: b.credit.to_owned(),
+                group: if b.credit == "gitcraft"
+                    || b.id.chars().next().is_some_and(char::is_uppercase)
+                {
+                    Group::Gitcraft
+                } else if palette.dark {
+                    Group::Dark
+                } else {
+                    Group::Light
+                },
+                palette,
+            }
         })
         .collect()
 }
@@ -356,6 +362,7 @@ impl Tweaks {
         if let Some([r, g, b]) = self.accent {
             let accent = Color32::from_rgb(r, g, b);
             t.accent = accent;
+            t.accent_fg = accent;
             t.accent_text = palette::readable_on(accent);
             t.row_selected = t
                 .dock
@@ -405,6 +412,8 @@ pub struct Tokens {
     pub icon: Color32,
     pub accent: Color32,
     pub accent_text: Color32,
+    /// Accent foreground for links and small labels, independent of button fills.
+    pub accent_fg: Color32,
     pub separator: Color32,
     pub shadow: Color32,
     pub danger: Color32,
@@ -427,11 +436,34 @@ pub struct Tokens {
 impl Default for Tokens {
     /// gitcraft's dark theme.
     fn default() -> Self {
-        catalog::BUILTIN[0].palette.tokens()
+        catalog::BUILTIN[0].palette().tokens()
     }
 }
 
 impl Tokens {
+    /// Tint behind small status text, capped so the composited row still meets AA.
+    pub(crate) fn text_tint(&self, color: Color32, opacity: f32, background: Color32) -> Color32 {
+        palette::readable_tint(color, opacity, &[background], &[color])
+    }
+
+    /// Search-match shading shares a row with every kind of metadata and status label.
+    pub(crate) fn match_tint(&self) -> Color32 {
+        palette::readable_tint(
+            self.warning,
+            0.10,
+            &[self.dock],
+            &[
+                self.text,
+                self.text_dim,
+                self.text_faint,
+                self.accent_fg,
+                self.danger,
+                self.warning,
+                self.success,
+            ],
+        )
+    }
+
     pub fn dark(&self) -> bool {
         self.dark
     }
@@ -621,7 +653,10 @@ pub fn set_tokens(ctx: &egui::Context, t: Tokens) {
     v.faint_bg_color = t.card;
     v.code_bg_color = t.field;
     v.override_text_color = Some(t.text);
-    v.hyperlink_color = t.accent;
+    // egui otherwise fades placeholders to 60%, bypassing the checked faint token.
+    v.weak_text_color = Some(t.text_faint);
+    v.weak_text_alpha = 1.0;
+    v.hyperlink_color = t.accent_fg;
     v.warn_fg_color = t.warning;
     v.error_fg_color = t.danger;
     v.window_corner_radius = CornerRadius::same(t.radius_lg as u8);

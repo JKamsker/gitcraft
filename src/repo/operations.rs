@@ -532,7 +532,16 @@ pub(super) fn run_steps_counted(
             continue;
         }
         let args: Vec<&str> = op.iter().map(String::as_str).collect();
-        result = run_step(path, &args, creds, quiet, control);
+        result = (|| {
+            if let [mark, original @ ..] = op.as_slice()
+                && mark == crate::gerrit::AMEND
+            {
+                let prepared = crate::gerrit::amend_args(path, original)?;
+                let args: Vec<&str> = prepared.iter().map(String::as_str).collect();
+                return run_step(path, &args, creds, quiet, control);
+            }
+            run_step(path, &args, creds, quiet, control)
+        })();
         if result.is_err() {
             stopped = i;
             break;
@@ -672,10 +681,20 @@ pub(super) fn tried_note(out: &str) -> Option<&str> {
 
 /// Whether `op` is a step that runs nothing, only checks.
 pub(super) fn is_expectation(op: &[String]) -> bool {
-    expected_ref(op).is_some() || expected_symref(op).is_some() || expected_tree(op).is_some()
+    expected_ref(op).is_some()
+        || expected_symref(op).is_some()
+        || expected_tree(op).is_some()
+        || matches!(op, [mark, _, _] if mark == crate::gerrit::CHECK)
 }
 
 fn check_expected(path: &Path, ops: &[Vec<String>]) -> Result<(), String> {
+    for op in ops {
+        if let [mark, base, head] = op.as_slice()
+            && mark == crate::gerrit::CHECK
+        {
+            crate::gerrit::check_stack(path, base, head)?;
+        }
+    }
     for (rev, tree) in ops.iter().filter_map(|op| expected_tree(op)) {
         let now = git::run(
             Some(path),

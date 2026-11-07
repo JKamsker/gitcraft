@@ -181,6 +181,12 @@ so your config, credentials and hooks apply as usual.
   it at that commit (`x` and `origin/x` make one pill), a pull-request icon when one is open,
   `+N` when more refs share the commit, the author's avatar and how long ago it was ("2 hours
   ago"). Author, date and hash columns are optional (Settings).
+- Description takes the flexible width. Branch / Tag fits visible pills and shrinks when none
+  are in view; dragging its border keeps a fixed width. Restore _Fit visible branch / tag
+  pills_ from the header's menu. Faint branch names (or _detached_) identify lanes whose tips
+  are offscreen. Long summaries end in an ellipsis; hover the description to read its original
+  message, loaded in the background. Messages over the 256 KiB tooltip limit open in the detail
+  pane by selecting the commit.
 - Drag the column borders in the header to resize. Right-click the header to pick the columns,
   make the graph column compact (lanes closer together), or _Reset columns_ to their first
   widths.
@@ -245,6 +251,18 @@ so your config, credentials and hooks apply as usual.
   patch…_ (the latest commit's menu, the changes row's menu or the palette) turns one from
   `git format-patch` into commits (`git am`) and puts any other diff on the working tree
   (`git apply`). Ctrl+Z undoes either.
+- Git bundles: **Export Git bundle…** in the palette saves selected refs, with an optional
+  excluded base commit for an incremental range. Ref tips are pinned to the dialog's snapshot;
+  a moved ref asks you to reopen it. Output is a new local file; existing files are preserved.
+  **Inspect / import local Git bundle…** shows incoming refs, prerequisite commits and Git's
+  verification result before importing. Edit each new destination (branches, tags or
+  `refs/bundles/…`); collisions stop the whole ref transaction. Import does not check out or
+  merge incoming work. SSH and WSL repositories receive a temporary copy for verification and
+  import; file pickers and saved bundles always refer to this machine's disk. Supports v2/v3
+  bundles and matching SHA-1/SHA-256 repositories, up to 128 MiB and 1000 header entries, with
+  a two minute deadline per Git stream. Requires Git 2.36 or newer. Larger exchanges can use
+  Git in the terminal. In partial clones, inspection and import require Git's explicit
+  `--no-lazy-fetch` support; older Git refuses them instead of fetching from the remote.
 - Interactive rebase: the commits to rewrite, newest on top; pick, reword (edit the message in
   place), edit (stop there to change the commit; _Continue rebase_ amends it with what is staged
   and goes on), squash, fix up
@@ -499,6 +517,9 @@ so your config, credentials and hooks apply as usual.
   their fork and here. _Remove unused fork remotes_ (in the palette when there are some) takes
   out the marked remotes no branch uses any more, keeping those whose branches hold commits no
   branch here has (Ctrl+Z adds them back).
+- Gerrit: _Push for review_ picks a fetched target branch and optional topic, validates every
+  commit's `Change-Id`, and submits to `refs/for/<branch>`. Graph rows link to the change.
+  Amending preserves its `Change-Id`; submit again for a new patch set.
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
 - CODEOWNERS: the file at HEAD, found where the forge of `origin` looks for it (GitHub:
   `.github/`, the root, `docs/`; GitLab: the root, `docs/`, `.gitlab/`; Gitea: the root, `docs/`,
@@ -705,6 +726,11 @@ so your config, credentials and hooks apply as usual.
   Python 3 script: what is staged has no outputs, execution counts or widget state while the
   file on disk keeps them, so a notebook whose outputs alone changed no longer shows as
   modified. A filter set by another tool is shown and left alone.
+- **Syntax** in a diff compares syntax through an installed [Difftastic](https://difftastic.wilfred.me.uk/)
+  (`difft`), so reindentation and wrapping do not obscure the tokens that changed. It is a reading
+  mode: turn off Syntax to stage changes or see formatting edits. Unsupported languages, parse
+  errors, a missing tool or a comparison over its limits show the patch with an explanation.
+  Difftastic runs where the repository is (locally, in WSL or over SSH), off the window thread.
 - A file kept in Git LFS shows as its LFS objects before and after, with their sizes, rather
   than the text of the pointer git stores. With git-lfs installed, the palette (Ctrl+P) of a
   repository that uses LFS has _LFS: Fetch_ and _LFS: Pull_.
@@ -1306,7 +1332,12 @@ so your config, credentials and hooks apply as usual.
     (Dark, Light), One Dark and One Light, GitHub (Dark, Light), Ayu (Dark, Mirage, Light),
     Monokai, Monokai Pro, Night Owl, Material Palenight, Tomorrow Night, Horizon and
     SynthWave '84. A theme colours everything: panels, text, the graph's lanes and pills, diffs
-    and the terminal's 16 colours. A test keeps every one's text readable (WCAG contrast).
+    and the terminal's 16 colours. WCAG AA checks (4.5:1) cover built-in text colours on their
+    panel and row backgrounds, text-field hints, graph descriptions and status badges. Button
+    and branch-pill labels are checked against their fills. Accent text is separate from the
+    button fill so both remain readable. Status tints adapt to the
+    selected or hovered background. Imported themes and custom colour values keep their
+    author's choices; derived pill shading can change to keep white labels readable.
   - A gallery of thumbnails; pointing at one shows the whole window in it before choosing.
   - _Follow VS Code_: the interface takes the workbench colours of the theme VS Code (or
     Insiders, VSCodium) is using, and changes with it.
@@ -1416,6 +1447,29 @@ git config gitcraft.forge gitea                               # just this reposi
 ```
 
 The value is one of `github`, `gitlab`, `forgejo` or `gitea`.
+
+### Gerrit
+
+Hosts named `gerrit.…` and `*.googlesource.com` are recognised. For another host, set
+`git config gitcraft.forge gerrit` (or `git config --global gitcraft.review.example.org.forge gerrit`).
+The workflow uses `origin`, or the first remote when there is no origin, and git's existing
+transport and credentials. Fetch first, then choose _Push for review_ in the toolbar, command
+palette, or a branch's Push action. The dialog previews the exact commit and review ref.
+The optional topic travels as a Git push option, so punctuation cannot become Gerrit options.
+
+Install your server's `commit-msg` hook using its own instructions, and amend existing commits
+that lack a `Change-Id`. gitcraft validates the complete series above the fetched target,
+including commits outside the visible graph. Missing, malformed or duplicate IDs stop the push.
+This flow submits linear series based on the target; fetch and rebase first when the target has
+diverged. Merge commits are refused. It never changes the branch's upstream or force pushes.
+
+Use _Amend last commit_ to update a reviewed change. Its original `Change-Id` is preserved even
+when replacing the description; changing it to another ID is refused. _Push for review_ again
+uploads the new patch set. The arrow on a graph row and _Open Gerrit change_ in its menu open
+a project-qualified change search, which also works without knowing the change number.
+Googlesource links use its corresponding `-review` host.
+For SSH, the default web URL uses HTTPS without the SSH port. Override the review web address
+(including a reverse-proxy prefix) with `git config gitcraft.gerritUrl https://review.example.org/gerrit`.
 
 ### Testing against a real Forgejo and Gitea
 
