@@ -419,6 +419,13 @@ pub(in crate::repo) fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<
             "Keeps every change, unstaged.",
         ),
         (
+            "--keep",
+            "--keep",
+            "Keep",
+            "Drops the commits after this one, keeps uncommitted changes. It stops, changing \
+             nothing, if a file with changes is one those commits touched.",
+        ),
+        (
             "--hard",
             "--keep",
             "Hard",
@@ -585,5 +592,69 @@ mod tests {
         assert!(reset_detached.is_ok(), "{reset_detached:?}");
         assert_eq!(head, base);
         assert_eq!(feature_after, Ok(seen));
+    }
+
+    /// A repository at `dir` with `ünï cödé.txt` (a space and accents in its name) changed
+    /// between `base` and `two`, and `other file.txt` left alone. The hashes of both.
+    fn keep_repo(name: &str) -> (std::path::PathBuf, String, String) {
+        let dir = std::env::temp_dir().join(format!("gitcraft-keep-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::create_dir_all(&dir);
+        let git = |args: &[&str]| git::run(Some(&dir), args);
+        for args in [
+            &["init", "-q", "-b", "main"][..],
+            &["config", "user.name", "t"],
+            &["config", "user.email", "t@t"],
+            // The files read back as written, whatever Windows' git would convert.
+            &["config", "core.autocrlf", "false"],
+        ] {
+            assert!(git(args).is_ok(), "{args:?}");
+        }
+        let _ = std::fs::write(dir.join("ünï cödé.txt"), "one\n");
+        let _ = std::fs::write(dir.join("other file.txt"), "same\n");
+        assert!(git(&["add", "-A"]).is_ok());
+        assert!(git(&["commit", "-q", "-m", "base"]).is_ok());
+        let base = git::head(&dir);
+        let _ = std::fs::write(dir.join("ünï cödé.txt"), "two\n");
+        assert!(git(&["commit", "-q", "-am", "two"]).is_ok());
+        let two = git::head(&dir);
+        (dir, base, two)
+    }
+
+    /// `reset --keep` moves the branch and keeps a change to a file the move doesn't touch.
+    #[test]
+    fn a_keep_reset_moves_the_branch_and_keeps_local_changes() {
+        let (dir, base, two) = keep_repo("ok");
+        let _ = std::fs::write(dir.join("other file.txt"), "mine, not committed\n");
+        let steps = reset_steps("--keep", &base, "main", &two);
+        let (result, _) = run_steps(&dir, &steps, OpKind::plain(), None);
+        let head = git::head(&dir);
+        let kept = std::fs::read_to_string(dir.join("other file.txt")).unwrap_or_default();
+        let moved = std::fs::read_to_string(dir.join("ünï cödé.txt")).unwrap_or_default();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(result.is_ok(), "{result:?}");
+        assert_eq!(head, base);
+        assert_eq!(kept, "mine, not committed\n");
+        assert_eq!(moved, "one\n");
+    }
+
+    /// When the move would touch a file with changes, it stops with git's own message and
+    /// changes nothing: the branch stays, the change stays.
+    #[test]
+    fn a_keep_reset_refuses_to_touch_a_changed_file() {
+        let (dir, base, two) = keep_repo("refused");
+        let _ = std::fs::write(dir.join("ünï cödé.txt"), "mine, not committed\n");
+        let steps = reset_steps("--keep", &base, "main", &two);
+        let (result, _) = run_steps(&dir, &steps, OpKind::plain(), None);
+        let head = git::head(&dir);
+        let kept = std::fs::read_to_string(dir.join("ünï cödé.txt")).unwrap_or_default();
+        let _ = std::fs::remove_dir_all(&dir);
+        let err = result.err().unwrap_or_default();
+        assert!(
+            err.contains("ünï cödé.txt") || err.contains("not uptodate"),
+            "{err}"
+        );
+        assert_eq!(head, two);
+        assert_eq!(kept, "mine, not committed\n");
     }
 }

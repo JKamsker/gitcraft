@@ -37,6 +37,7 @@ impl RepoTab {
             )
             .show(ui, |ui| self.toolbar(ui, &mut acts));
         self.push_banner(ui, &mut acts);
+        self.detached_panel(ui, &mut acts);
         self.side_panels(ui, &mut acts);
         if self.terminal_open {
             egui::Panel::bottom("repo_terminal")

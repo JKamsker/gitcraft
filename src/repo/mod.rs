@@ -14,6 +14,7 @@ mod commit_actions;
 mod conflict;
 mod conflict_check;
 pub(crate) mod custom_commands;
+mod detached;
 mod detail;
 mod dialogs;
 mod diff;
@@ -27,8 +28,10 @@ mod file_view;
 mod forge_link;
 mod fold;
 mod find;
+mod graph_order;
 pub(crate) mod graph_view;
 pub(crate) mod highlight;
+mod hooks;
 mod keep_submodules;
 mod keys;
 mod layout;
@@ -135,6 +138,8 @@ pub struct RepoTab {
     visibility: branch_visibility::Visibility,
     /// What `history` was logged from: `None` for every branch.
     log_from: Option<Vec<String>>,
+    /// The order `history` was read in, and whether it follows first parents only.
+    log_order: git::LogOrder,
     /// Counts the reloads of `history`, so that a page asked for before one is dropped.
     history_gen: u64,
     /// The `git log` older pages are read from, and the `history_gen` it reads for.
@@ -227,6 +232,10 @@ pub struct RepoTab {
     amend: bool,
     /// The AI tool's commit message and branch review (see `ai`).
     ai: ai::AiState,
+    /// The next commit, or push, runs without its hooks (`--no-verify`).
+    skip_hooks: hooks::SkipHooks,
+    /// HEAD on no branch: its banner, and checkouts that would leave commits behind.
+    detached: detached::Detached,
     dialog: Option<Dialog>,
     search: Search,
     /// Find in the diff, file or blame shown.
@@ -334,6 +343,7 @@ impl RepoTab {
             loading_more: false,
             visibility: Default::default(),
             log_from: None,
+            log_order: Default::default(),
             history_gen: 0,
             log_stream: Default::default(),
             work: WorkStatus::default(),
@@ -394,6 +404,8 @@ impl RepoTab {
             compose: Default::default(),
             amend: false,
             ai: Default::default(),
+            skip_hooks: Default::default(),
+            detached: Default::default(),
             dialog: None,
             search: Search::default(),
             find: find::Find::default(),

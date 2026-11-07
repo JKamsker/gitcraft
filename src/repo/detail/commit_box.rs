@@ -103,6 +103,16 @@ impl RepoTab {
                     .small(),
             );
         }
+        if rebasing {
+            // `--continue` takes no `--no-verify`: nothing ticked waits for the next commit.
+            self.skip_hooks.commit = false;
+        } else {
+            ui.checkbox(&mut self.skip_hooks.commit, "Skip hooks")
+                .on_hover_text(
+                    "Commit once without the pre-commit and commit-msg hooks (git commit \
+                     --no-verify); it unticks once the commit runs",
+                );
+        }
         ui.add_space(4.0);
         let staged = self.work.staged.len();
         let label = if let Some(s) = continuing {

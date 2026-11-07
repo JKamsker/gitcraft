@@ -96,6 +96,8 @@ struct Ran {
     status: String,
     stdout: Vec<u8>,
     stderr: Vec<u8>,
+    /// The hook that failed, when the call's hooks were traced.
+    failed_hook: Option<super::hooks::FailedHook>,
 }
 
 /// Options before the subcommand, and variables, a call is run with on top of [`GIT_ENV`].
@@ -109,6 +111,8 @@ pub(super) struct Extra {
     long: bool,
     /// It starts a program the user works in (a diff or merge tool) and waits until it closes.
     tool: bool,
+    /// Find out which hook failed, if one does (see [`super::hooks`]).
+    trace_hooks: bool,
 }
 
 /// How long a diff or merge tool started on another machine may stay open before it is stopped.
@@ -128,17 +132,26 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
     for (name, value) in &extra.env {
         cmd.env(name, value);
     }
+    let trace = extra
+        .trace_hooks
+        .then(super::hooks::TraceFile::new)
+        .flatten();
+    if let Some(trace) = &trace {
+        cmd.env(super::hooks::TRACE_VAR, trace.path());
+    }
     cmd.args(args);
     let out = match &extra.stdin {
         Some(input) => output_with_input(cmd, input),
         None => cmd.output(),
     }
     .map_err(|e| format!("could not run git: {e}"))?;
+    let failed = !out.status.success();
     Ok(Ran {
         code: out.status.code(),
         status: out.status.to_string(),
         stdout: out.stdout,
         stderr: out.stderr,
+        failed_hook: trace.filter(|_| failed).and_then(|t| t.failed_hook(args)),
     })
 }
 
@@ -197,9 +210,14 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
         .chain(args.iter().copied())
         .map(remote::sh_quote)
         .collect();
+    let script = if extra.trace_hooks {
+        super::hooks::traced_script(&words.join(" "))
+    } else {
+        format!("exec git {}", words.join(" "))
+    };
     remote::Request {
         cwd: Some(target.path.clone()),
-        script: format!("exec git {}", words.join(" ")),
+        script,
         env: GIT_ENV
             .iter()
             .map(|(n, v)| ((*n).to_owned(), (*v).to_owned()))
@@ -296,11 +314,19 @@ fn execute_there(target: &Target, extra: &Extra, args: &[&str]) -> Result<Ran, S
             target.host.label()
         ));
     }
+    let (stderr, events) = if extra.trace_hooks {
+        super::hooks::split_trace(&out.stderr)
+    } else {
+        (out.stderr, String::new())
+    };
     Ok(Ran {
         code: Some(out.code),
         status: format!("exit status: {}", out.code),
         stdout: out.stdout,
-        stderr: out.stderr,
+        stderr,
+        failed_hook: (out.code != 0)
+            .then(|| super::hooks::failed_hook(&events, args))
+            .flatten(),
     })
 }
 
@@ -425,6 +451,25 @@ pub fn run_ok_codes(dir: Option<&Path>, args: &[&str], ok: &[i32]) -> Result<Str
     run_inner(dir, args, ok, None, false)
 }
 
+/// [`run_with`] for an operation someone asked for: when one of its hooks makes it fail (a
+/// commit's `pre-commit`, a push's `pre-push`…), the error names that hook first.
+pub fn run_naming_hooks(
+    dir: Option<&Path>,
+    args: &[&str],
+    creds: Option<&Credentials>,
+) -> Result<String, String> {
+    run_extra(
+        dir,
+        args,
+        &[0],
+        creds,
+        Extra {
+            trace_hooks: super::hooks::wants_trace(args),
+            ..Extra::default()
+        },
+    )
+}
+
 /// A username and password (or token) for an HTTPS remote, typed into gitcraft.
 #[derive(Clone)]
 pub struct Credentials {
@@ -481,6 +526,7 @@ fn unattended_extra(unix: bool) -> Extra {
         ..Extra::default()
         tool: false,
         stdin: None,
+        trace_hooks: false,
     }
 }
 
@@ -523,6 +569,17 @@ fn run_inner(
         let unix = cfg!(unix) || dir.is_some_and(remote::is_remote);
         extra = unattended_extra(unix);
     }
+    run_extra(dir, args, ok, creds, extra)
+}
+
+/// Runs git with `extra` (and the credentials `creds`, when given), as [`run_inner`] says.
+fn run_extra(
+    dir: Option<&Path>,
+    args: &[&str],
+    ok: &[i32],
+    creds: Option<&Credentials>,
+    mut extra: Extra,
+) -> Result<String, String> {
     if let Some(c) = creds {
         extra.pre.extend(["-c", ENV_HELPER]);
         extra
@@ -560,13 +617,17 @@ fn outcome(out: Ran, args: &[&str], ok: &[i32]) -> Result<String, String> {
         // Merges and pulls report conflicts on stdout and the summary on stderr.
         let stderr = String::from_utf8_lossy(&out.stderr).trim().to_owned();
         let stdout = String::from_utf8_lossy(&out.stdout).trim().to_owned();
-        let err = match (stderr.is_empty(), stdout.is_empty()) {
-            (true, true) => format!("git {} failed ({})", args.join(" "), out.status),
+        let said = match (stderr.is_empty(), stdout.is_empty()) {
+            (true, true) => String::new(),
             (false, true) => stderr,
             (true, false) => stdout,
             (false, false) => format!("{stderr}\n{stdout}"),
         };
-        Err(err)
+        Err(match (&out.failed_hook, said.is_empty()) {
+            (Some(hook), _) => hook.explain(&said, args),
+            (None, true) => format!("git {} failed ({})", args.join(" "), out.status),
+            (None, false) => said,
+        })
     }
 }
 

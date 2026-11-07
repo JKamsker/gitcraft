@@ -7,14 +7,17 @@ mod commit_msg;
 mod commits;
 mod conflict;
 mod contained;
+mod detached;
 mod diff;
 pub mod external_tool;
 mod files;
 mod fold;
+mod hooks;
 mod lfs;
 mod reflog;
 mod preview;
 mod notes;
+mod log_order;
 mod refs;
 pub mod simulate;
 pub mod search_query;
@@ -32,13 +35,16 @@ pub use self::commit_msg::*;
 pub use self::commits::*;
 pub use self::conflict::*;
 pub use self::contained::*;
+pub use self::detached::*;
 pub use self::diff::*;
 pub use self::files::*;
 pub use self::fold::*;
+pub use self::hooks::subcommand;
 pub use self::lfs::*;
 pub use self::reflog::*;
 pub use self::preview::*;
 pub use self::notes::*;
+pub use self::log_order::*;
 pub use self::refs::*;
 pub use self::signature::*;
 pub use self::stash::*;
@@ -210,6 +216,8 @@ pub fn now() -> i64 {
 
 #[cfg(test)]
 mod extras_tests;
+#[cfg(test)]
+mod order_tests;
 #[cfg(test)]
 mod tests;
 

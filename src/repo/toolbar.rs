@@ -113,17 +113,18 @@ impl RepoTab {
         egui::Popup::menu(&more.inner)
             .style(crate::theme::menu_style)
             .show(|ui| pull_menu(ui, acts));
-        if icons::tool_button_count(ui, "arrow-up-from-line", "Push", ahead, idle && has_remote)
+        let push = icons::tool_button_count(ui, "arrow-up-from-line", "Push", ahead, idle && has_remote)
             .named(|| behind_ahead("Push", ahead, "ahead"))
             .on_hover_text(keymap::tip(
                 "Push the current branch (publishes it if it has no upstream yet)",
                 Command::Push,
             ))
             .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Push))
-            .clicked()
-        {
+;
+        if push.clicked() {
             acts.push(Action::Push);
         }
+        super::hooks::push_menu(&push, acts);
         let sync_tip = format!(
             "Pull, then push the current branch (git {}, then git push)\nIf the pull fails \
              (conflicts, or it can't fast-forward), nothing is pushed",
@@ -339,9 +340,16 @@ pub(super) fn headline(msg: &str) -> String {
         let files = if conflicts == 1 { "file" } else { "files" };
         return format!("{label}: conflicts in {conflicts} {files}, resolve them in Changes");
     }
-    let line = body
-        .lines()
-        .find(|l| l.starts_with("error:") || l.starts_with("fatal:"))
+    // A hook named as what stopped it (see `git::FailedHook`) says more than git's own
+    // `error: failed to push some refs` after it.
+    let hook = body.lines().next().filter(|l| {
+        (l.starts_with("the ") || l.starts_with("it was done, but the ")) && l.contains(" hook ")
+    });
+    let line = hook
+        .or_else(|| {
+            body.lines()
+                .find(|l| l.starts_with("error:") || l.starts_with("fatal:"))
+        })
         .or_else(|| body.lines().find(|l| !l.trim().is_empty()))
         .unwrap_or_default();
     if label.is_empty() {

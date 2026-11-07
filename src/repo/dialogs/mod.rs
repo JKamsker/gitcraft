@@ -5,6 +5,7 @@ mod confirm;
 mod fold;
 mod preview;
 mod custom;
+mod keep_detached;
 mod remote;
 mod stash;
 mod upstream;
@@ -118,6 +119,8 @@ pub enum Dialog {
     },
     /// A custom command's prompts, or a repository's commands to trust.
     Custom(Box<CustomDialog>),
+    /// A checkout would leave the commits of a detached HEAD on no branch.
+    KeepDetached(Box<super::detached::KeepDialog>),
 }
 
 impl Dialog {
@@ -447,6 +450,7 @@ impl RepoTab {
                 } => remote::create_pr(ui, noun, branch, base, title, body, draft, focus),
                 Dialog::Fold(plan) => fold::fold(ui, enter, plan),
                 Dialog::Custom(custom) => custom::custom(ui, enter, custom),
+                Dialog::KeepDetached(keep) => keep_detached::keep_detached(ui, enter, keep, local),
                 Dialog::Confirm {
                     title,
                     body,

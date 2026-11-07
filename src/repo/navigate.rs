@@ -433,13 +433,14 @@ impl RepoTab {
         let path = self.path.clone();
         // In the branches the graph shows.
         let from = self.log_from.clone();
+        let order = self.log_order;
         // Answered all the same if it panics: the search runs until it is.
         let failed = {
             let query = query.clone();
             move |e| Msg::Search(query, code, Err(e))
         };
         super::messages::spawn_or(&self.tx, ctx, failed, move || {
-            let result = git::search_query::run(&path, from.as_deref(), &plan);
+            let result = git::search_query::run_with_order(&path, from.as_deref(), order, &plan);
             Msg::Search(query, code, result)
         });
     }

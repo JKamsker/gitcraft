@@ -110,6 +110,14 @@ so your config, credentials and hooks apply as usual.
 - Drag the column borders in the header to resize. Right-click the header to pick the columns,
   make the graph column compact (lanes closer together), or _Reset columns_ to their first
   widths.
+- Click _GRAPH_ in the header to order history topologically, by commit date (the default) or
+  by author date, and to show _First parent only_: a merge without the commits it brought in,
+  so main reads one merge per pull request. Kept per repository; the header names the order
+  when it isn't the default.
+- While HEAD is detached, a banner says so in plain words, with _Create branch here_ and _Back
+  to main_ (the branch it was on). Checking out something else from the app after committing
+  there stops first, lists the commits that would be left on no branch, and offers to keep them on a new
+  branch.
 - The checked-out branch's pill is solid, the others a darker shade. Double-click a pill to
   check that branch (or tag) out; hover `+N` to list every pill of the commit and double-click
   the one you want.
@@ -127,8 +135,10 @@ so your config, credentials and hooks apply as usual.
   field.
 - Right-click a commit: create a branch, a tag or a worktree on a new branch there, check it
   out, interactive rebase onto it,
-  cherry-pick, revert, reset the current branch to it (soft / mixed / hard, confirmed with what
-  it changes), the menu of each branch on it, copy the hash, message or branch name. Right-click a branch's pill to get
+  cherry-pick, revert, reset the current branch to it (soft / mixed / keep / hard, confirmed with what it changes;
+  _Keep_ drops the commits after it but keeps uncommitted changes, and stops with git's message
+  if a file with changes would be touched), the menu
+  of each branch on it, copy the hash, message or branch name. Right-click a branch's pill to get
   check out, fast-forward, merge, rebase and interactive rebase for that branch on top.
 - Compare: Ctrl+click a second commit (or _Compare with…_ in the commit menu, the changes row
   standing for the working tree) to list the files that differ between the two and open each
@@ -221,6 +231,10 @@ so your config, credentials and hooks apply as usual.
   (warns when the commit is already pushed), the identity you commit as (and whether it is the
   repository's own, the profile's or the global one), and saved identities or profile authors
   to switch a repository to; _Use the profile's author_ takes the repository's own out again.
+- _Skip hooks_ in the commit box, or _Push, skipping hooks_ (right-click Push, or the palette),
+  runs that one commit or push with `--no-verify`. When a hook makes an operation fail, the
+  error names it (`the pre-commit hook stopped it (exit code 1)`), then says what it printed;
+  hooks whose exit git ignores (`post-commit`…) are never blamed.
 - AI commit messages through a command-line tool you already have: the sparkles button in the
   commit box sends the staged diff to `claude -p`, `codex exec`, `gh copilot` or a command of
   your own (Settings → AI) and fills in the message; a message already typed is only replaced

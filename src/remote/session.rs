@@ -63,7 +63,11 @@ impl Request {
     /// What it runs, in short, for a message: its script's first line.
     fn what(&self) -> String {
         let first = self.script.lines().next().unwrap_or_default();
-        let first = first.strip_prefix("exec ").unwrap_or(first);
+        // `exec git …`, or `: git …` before a script that runs it (see `git::hooks`).
+        let first = (first
+            .strip_prefix("exec ")
+            .or_else(|| first.strip_prefix(": ")))
+        .unwrap_or(first);
         first.chars().take(80).collect()
     }
 

@@ -7,6 +7,7 @@ mod handles;
 mod header;
 mod lanes;
 mod menu;
+mod order;
 mod pills;
 mod row;
 mod search;
@@ -99,9 +100,18 @@ impl RepoTab {
         // Column headers.
         let (header, header_resp) =
             ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::CLICK);
-        header::column_headers(ui, &t, header, &cols);
+        let graph_label = crate::repo::graph_order::header_label(self.log_order);
+        header::column_headers(ui, &t, header, &cols, &graph_label);
         self.column_handles(ui, header, &prefs, &cols, &settings);
         header::header_menu(&header_resp, &settings);
+        order::order_button(
+            ui,
+            header,
+            &cols,
+            (&graph_label, self.log_order),
+            &settings,
+            acts,
+        );
 
         let mut scroll = egui::ScrollArea::vertical()
             .id_salt("graph_scroll")

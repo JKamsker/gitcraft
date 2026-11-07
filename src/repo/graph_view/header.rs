@@ -6,8 +6,8 @@ use crate::repo::columns::Cols;
 use crate::settings::{self, Settings};
 use crate::theme::{self, Tokens};
 
-/// The names of the columns, in the strip `header` above the graph.
-pub(super) fn column_headers(ui: &Ui, t: &Tokens, header: Rect, cols: &Cols) {
+/// The names of the columns, in the strip `header` above the graph; `graph` for the graph's.
+pub(super) fn column_headers(ui: &Ui, t: &Tokens, header: Rect, cols: &Cols, graph: &str) {
     let p = ui.painter();
     p.rect_filled(header, 0.0, t.chrome);
     p.line_segment(
@@ -19,7 +19,7 @@ pub(super) fn column_headers(ui: &Ui, t: &Tokens, header: Rect, cols: &Cols) {
     let right = header.right();
     let mut labels = vec![
         (header.left() + 10.0, "BRANCH / TAG"),
-        (header.left() + cols.refs + 10.0, "GRAPH"),
+        (header.left() + cols.refs + 10.0, graph),
         (header.left() + cols.refs + cols.graph + 6.0, "DESCRIPTION"),
     ];
     if cols.hash > 0.0 {

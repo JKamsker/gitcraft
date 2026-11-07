@@ -58,6 +58,8 @@ pub(crate) enum Action {
         undo: Undo,
     },
     Checkout(String),
+    /// What the detached HEAD's banner and dialog ask for.
+    Detached(super::detached::DetachedAct),
     /// Checks out a local branch behind its upstream, then fast-forwards it.
     CheckoutPull(String),
     CheckoutRemote(String),
@@ -72,6 +74,8 @@ pub(crate) enum Action {
     Sync,
     /// A button of the banner after a refused push.
     PushFlow(super::push::PushAct),
+    /// Push without running the `pre-push` hook, this once.
+    PushSkippingHooks,
     Reload,
     LoadMore,
     Undo,
@@ -92,6 +96,8 @@ pub(crate) enum Action {
     OpenBranches(Option<&'static str>),
     /// Hide, show or solo branches in the graph.
     BranchVisibility(branch_visibility::Change),
+    /// Read the graph's history in this order (and first parent only, or not).
+    GraphOrder(git::LogOrder),
     /// Collapse or bring back the detail panel.
     ToggleDetail,
     NewTerminal {
@@ -378,6 +384,11 @@ impl RepoTab {
                 "Sync (pull, then push)".into(),
                 "remote".into(),
                 Action::Sync,
+            ),
+            (
+                "Push, skipping hooks".into(),
+                "--no-verify".into(),
+                Action::PushSkippingHooks,
             ),
         ];
         items.extend(

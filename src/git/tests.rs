@@ -36,25 +36,37 @@ fn hostile_config_and_option_like_refs() -> Result<(), String> {
     git(&["update-ref", &format!("refs/tags/{tag}"), "HEAD~1"])?;
     let head = head(&dir);
 
-    let commits = log(&dir, None, 0, 10)?;
+    let commits = log(&dir, None, Default::default(), 0, 10)?;
     assert_eq!(commits.len(), 2);
     assert_eq!(commits[0].hash, head);
     // From the option-like tag alone: only the commit it is on.
-    let from_tag = log(&dir, Some(&[format!("refs/tags/{tag}")]), 0, 10)?;
+    let from_tag = log(
+        &dir,
+        Some(&[format!("refs/tags/{tag}")]),
+        Default::default(),
+        0,
+        10,
+    )?;
     assert_eq!(from_tag.len(), 1);
-    assert!(log(&dir, Some(&[]), 0, 10)?.is_empty());
+    assert!(log(&dir, Some(&[]), Default::default(), 0, 10)?.is_empty());
     let tag_only = [format!("refs/tags/{tag}")];
-    assert_eq!(search(&dir, None, "two")?, std::slice::from_ref(&head));
+    assert_eq!(
+        search(&dir, None, Default::default(), "two")?,
+        std::slice::from_ref(&head)
+    );
     // A query that names a commit (here a tag `2024`) and is in its message: found once.
     git(&["commit", "-q", "--allow-empty", "-m", "release 2024"])?;
     git(&["tag", "2024"])?;
-    let found = search(&dir, None, "2024")?;
+    let found = search(&dir, None, Default::default(), "2024")?;
     let release = git(&["rev-parse", "HEAD"])?;
     git(&["tag", "-d", "2024"])?;
     git(&["reset", "-q", "--soft", "HEAD~1"])?;
     assert_eq!(found, [release.trim()]);
-    assert!(search(&dir, Some(&tag_only), "two")?.is_empty());
-    assert_eq!(search_code(&dir, Some(&tag_only), "a")?.len(), 1);
+    assert!(search(&dir, Some(&tag_only), Default::default(), "two")?.is_empty());
+    assert_eq!(
+        search_code(&dir, Some(&tag_only), Default::default(), "a")?.len(),
+        1
+    );
     let patch = file_diff(&dir, &head, name, DiffOptions::default())?;
     assert!(patch.starts_with("diff --git \"a/q"), "{patch}");
     assert!(!patch.contains('\x1b'), "{patch}");
@@ -152,9 +164,9 @@ fn history_read_in_pages_is_the_whole_log() -> Result<(), String> {
             git(&["branch", &format!("b{i}")])?;
         }
     }
-    let whole = log(&dir, None, 0, 100)?;
-    let mut stream = LogStream::start(&dir, None, 3)?;
-    let mut paged = log(&dir, None, 0, 3)?;
+    let whole = log(&dir, None, Default::default(), 0, 100)?;
+    let mut stream = LogStream::start(&dir, None, Default::default(), 3)?;
+    let mut paged = log(&dir, None, Default::default(), 0, 3)?;
     loop {
         let page = stream.next_page(7)?;
         let last = page.len() < 7;
@@ -164,7 +176,7 @@ fn history_read_in_pages_is_the_whole_log() -> Result<(), String> {
         }
     }
     // No revisions have no history, as with `log` (git alone would log HEAD).
-    let none = LogStream::start(&dir, Some(&[]), 0)?.next_page(7)?;
+    let none = LogStream::start(&dir, Some(&[]), Default::default(), 0)?.next_page(7)?;
     let _ = std::fs::remove_dir_all(&dir);
     assert!(none.is_empty());
     let hashes = |c: &[Commit]| c.iter().map(|c| c.hash.clone()).collect::<Vec<_>>();
@@ -199,7 +211,8 @@ fn history_read_in_pages_reports_failure() -> Result<(), String> {
         ],
     )?;
     let gone = ["no-such-branch".to_owned()];
-    let result = LogStream::start(&dir, Some(&gone), 0).and_then(|mut s| s.next_page(10));
+    let result = LogStream::start(&dir, Some(&gone), Default::default(), 0)
+        .and_then(|mut s| s.next_page(10));
     let _ = std::fs::remove_dir_all(&dir);
     assert!(result.is_err());
     Ok(())
@@ -228,7 +241,7 @@ fn messages_in_utf8_whatever_the_log_encoding() -> Result<(), String> {
     git(&["stash", "push", "-qm", "stäsh"])?;
     git(&["config", "i18n.commitEncoding", "ISO-8859-1"])?;
     let head = head(&dir);
-    let commits = log(&dir, None, 0, 10);
+    let commits = log(&dir, None, Default::default(), 0, 10);
     let detail = commit_detail(&dir, &head);
     let message = head_message(&dir);
     let history = file_history(&dir, None, "a.txt");

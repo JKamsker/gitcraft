@@ -36,6 +36,8 @@ impl RepoTab {
         if self.busy_op.is_some() {
             return;
         }
+        // A push asked to skip its hooks, this once (set only while that push starts).
+        let ops = self.skip_hooks.push_steps(ops);
         self.busy_op = Some(label.to_owned());
         self.op_started = Some(Instant::now());
         self.note_checkout_move(&ops, ctx);
@@ -178,6 +180,7 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         self.busy_op = None;
+        self.detached_op_done(&label, result.is_ok());
         let long = self
             .op_started
             .take()
@@ -363,7 +366,7 @@ pub(super) fn run_steps_counted(
         result = if quiet {
             git::run_unattended(Some(path), &args, creds)
         } else {
-            git::run_with(Some(path), &args, creds)
+            git::run_naming_hooks(Some(path), &args, creds)
         };
         if result.is_err() {
             stopped = i;
