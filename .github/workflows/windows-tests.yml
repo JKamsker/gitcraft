@@ -1,0 +1,75 @@
+# Shared by PR checks and releases so both execute the same complete Windows suite.
+name: Windows tests
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  windows-build:
+    name: Windows test build
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # Dev releases populate this cache, so new PRs can restore it too.
+          shared-key: build
+          cache-on-failure: true
+      - name: Build test binaries
+        run: python ci/windows-test-build.py
+      - name: Verify complete and disjoint Windows test shards
+        run: python ci/test-shards.py --check-only
+      - name: Windows doctests (not included in compiled test executables)
+        run: cargo test --locked --doc
+      - name: Upload Windows test binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-binaries
+          path: |
+            target/debug/deps/*.exe
+            target/debug/deps/*.dll
+            target/debug/*.exe
+            target/debug/*.dll
+            ci/test-binaries.json
+          if-no-files-found: error
+          compression-level: 1
+          retention-days: 1
+
+  windows-tests:
+    name: Windows tests (${{ matrix.shard }})
+    needs: windows-build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - git-a-m
+          - git-rest
+          - repo-a-c
+          - repo-d-f
+          - repo-g-m
+          - repo-n-p
+          - repo-q-r
+          - repo-s
+          - repo-rest
+          - core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-test-binaries
+      - name: Run precompiled test shard
+        timeout-minutes: 20
+        env:
+          RUST_BACKTRACE: "1"
+        run: python ci/test-shards.py ${{ matrix.shard }}
+

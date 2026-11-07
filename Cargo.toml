@@ -12,10 +12,13 @@ readme = "README.md"
 [features]
 # Oniguruma is substantially faster for the syntax grammars used while opening diffs.
 # `--no-default-features` retains the pure-Rust regex backend for builds without a C compiler.
-default = ["native-highlighting"]
+default = ["native-highlighting", "native-git"]
+# Local read operations use gitoxide; all unsupported operations retain the installed Git.
+native-git = ["dep:gix"]
 native-highlighting = ["syntect/default-onig", "two-face/syntect-default-onig"]
 
 [dependencies]
+gix = { version = "0.90", optional = true, default-features = false, features = ["revision", "sha1", "sha256"] }
 eframe = { version = "0.36", default-features = false, features = ["default_fonts", "wgpu", "accesskit", "wayland", "x11", "persistence", "links"] }
 egui = { version = "0.36", features = ["bytemuck"] }
 bytemuck = "1"
@@ -55,7 +58,7 @@ flate2 = "1"
 vt100 = "0.18"
 # `gitcraft mcp`: the Model Context Protocol over stdio (the official SDK), on a small runtime.
 rmcp = { version = "3.7", default-features = false, features = ["server", "transport-io"] }
-tokio = { version = "1", features = ["rt", "io-std", "process", "io-util", "sync", "time", "macros"] }
+tokio = { version = "1", features = ["rt", "net", "io-std", "process", "io-util", "sync", "time", "macros"] }
 gitcraft-os = { path = "crates/gitcraft-os" }
 # Config files read by key in diffs (with where each key is): TOML and YAML.
 toml_edit = { version = "0.25.17", default-features = false, features = ["parse"] }
