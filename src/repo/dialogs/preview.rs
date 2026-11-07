@@ -60,6 +60,19 @@ impl Default for WhatItDoes {
 impl RepoTab {
     /// Shows `dialog`, starting to read what a confirmation's operation would change.
     pub(in crate::repo) fn open_dialog(&mut self, mut dialog: Dialog, ctx: &egui::Context) {
+        if let Dialog::AddWorktree { repo, root, .. } = &mut dialog {
+            *repo = self
+                .worktrees
+                .first()
+                .map_or(&self.path, |w| &w.path)
+                .clone();
+            *root = if self.worktree_root.is_empty() {
+                crate::remote::git_path(&git::default_worktree_root(repo))
+            } else {
+                self.worktree_root.clone()
+            };
+            dialog.suggest_path();
+        }
         if let Dialog::Confirm { preview, .. } = &mut dialog {
             self.read_preview(preview, ctx);
         }

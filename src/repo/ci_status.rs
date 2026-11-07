@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 use egui::{Color32, Id, Painter, Pos2, Rect, Response, Stroke, Ui, vec2};
 
 use super::{Action, Msg, RepoTab, WIP_HASH};
+use crate::ci::route::{self, Answers, Plan};
 use crate::ci::{self, CheckState, Project, Status};
 use crate::theme::Tokens;
 
@@ -23,11 +24,15 @@ pub(super) const DOT_R: f32 = 3.5;
 /// The statuses of a tab's commits.
 #[derive(Default)]
 pub(super) struct CiStatuses {
-    /// Where they were read from.
-    project: Option<Project>,
+    /// The projects they are read from (a fork and its upstream, say).
+    projects: HashSet<Project>,
     pub(super) by_sha: HashMap<String, Status>,
-    /// The commits last asked about.
-    asked: HashSet<String>,
+    /// The project each commit's status came from, whose builds its dot opens.
+    source: HashMap<String, Project>,
+    /// Unmerged statuses, retained independently when one project cannot be read.
+    cached: route::Cached,
+    /// The commits last asked about, each with the project it was asked of.
+    asked: HashSet<(Project, String)>,
     loading: bool,
     loaded: Option<Instant>,
     /// When to read them again: a build runs, or one may only just have started.
@@ -40,35 +45,57 @@ pub(super) struct CiStatuses {
 
 impl CiStatuses {
     pub(super) fn account_changed(&mut self) {
-        self.moved_to(self.project.clone());
-    }
-    /// The repository's builds are now read from `project` (its remotes changed): what was read
-    /// from the one before goes, along with the answer still on its way from there. That one
-    /// keeps the slot until it comes, so the two can't land in the wrong order.
-    fn moved_to(&mut self, project: Option<Project>) {
         let in_flight = self.loading;
         *self = CiStatuses {
-            project,
+            projects: self.projects.clone(),
+            loading: in_flight,
+            superseded: in_flight,
+            ..Default::default()
+        };
+    }
+    /// The repository's builds are now read from `projects` (its remotes or upstreams
+    /// changed): what was read from a project no longer among them goes, along with the answer
+    /// still on its way. That one keeps the slot until it comes, so the two can't land in the
+    /// wrong order.
+    fn moved_to(&mut self, projects: HashSet<Project>) {
+        let in_flight = self.loading;
+        let answers = std::mem::take(&mut self.cached)
+            .into_iter()
+            .filter(|(project, _)| projects.contains(project))
+            .map(|(project, statuses)| (project, Ok(statuses)))
+            .collect();
+        let merged = route::merge(answers, &[]).unwrap_or_default();
+        *self = CiStatuses {
+            projects,
+            by_sha: merged.by_sha,
+            source: merged.source,
+            cached: merged.cached,
             loading: in_flight,
             superseded: in_flight,
             ..CiStatuses::default()
         };
     }
 
-    fn arrived(&mut self, fresh: bool, result: Result<HashMap<String, Status>, String>) {
+    /// Applies a refresh while preserving each failed project's last contribution.
+    fn arrived(&mut self, fresh: bool, answers: Answers) {
         self.loading = false;
         if std::mem::take(&mut self.superseded) {
-            // Of the project before: read them again, from this one, right away.
-            if self.project.is_some() {
+            // Asked of the projects before: read them again, from these, right away.
+            if !self.projects.is_empty() {
                 self.next = Some(Instant::now());
             }
             return;
         }
-        match result {
-            Ok(by_sha) => {
-                let running = by_sha.values().any(|s| s.state == CheckState::Running);
-                self.by_sha = by_sha;
-                self.error = None;
+        match route::merge(answers, &self.cached) {
+            Ok(merged) => {
+                let running = merged
+                    .by_sha
+                    .values()
+                    .any(|s| s.state == CheckState::Running);
+                self.by_sha = merged.by_sha;
+                self.source = merged.source;
+                self.cached = merged.cached;
+                self.error = merged.error;
                 if running || fresh {
                     self.next = Some(Instant::now() + RUNNING_POLL);
                 }
@@ -80,9 +107,24 @@ impl CiStatuses {
 }
 
 impl RepoTab {
-    /// The repository on its forge, whose builds are shown.
+    /// The repository's main project on its forge (that of `origin`): whether builds can be
+    /// shown at all, and where those of a commit no remote has are asked.
     pub(super) fn ci_project(&self) -> Option<Project> {
         Project::of(self.forge()?, &self.remotes)
+    }
+
+    /// Every candidate for a commit's builds, preferring its last status source.
+    pub(super) fn ci_projects_for(&self, sha: &str) -> Vec<Project> {
+        let Some(main) = self.ci_project() else {
+            return Vec::new();
+        };
+        let mut projects = route::projects_for(sha, &main, &self.remotes, &self.refs);
+        if let Some(source) = self.ci.source.get(sha)
+            && let Some(index) = projects.iter().position(|p| p == source)
+        {
+            projects[..=index].rotate_right(1);
+        }
+        projects
     }
 
     /// The build status of commit `sha`, if it has one.
@@ -90,73 +132,78 @@ impl RepoTab {
         self.ci.by_sha.get(sha)
     }
 
-    /// The commits whose status is worth knowing: HEAD, the branches, the pull requests and the
-    /// latest commits.
-    fn ci_shas(&self) -> Vec<String> {
-        let refs = &self.refs;
-        let remote_tips = refs.remotes.iter().flat_map(|(_, list)| list);
-        let candidates = std::iter::once(&refs.head)
-            .chain(refs.local.iter().map(|b| &b.target))
-            .chain(self.prs.iter().map(|pr| &pr.sha))
-            .chain(self.history.iter().take(RECENT).map(|c| &c.hash))
-            .chain(remote_tips.map(|b| &b.target));
-        let mut seen = HashSet::new();
-        candidates
-            .filter(|sha| !sha.is_empty() && sha.as_str() != WIP_HASH)
-            .filter(|sha| seen.insert(sha.as_str()))
-            .take(MAX_SHAS)
-            .cloned()
-            .collect()
+    /// The commits whose status is worth knowing (HEAD, the branches, the pull requests and
+    /// the latest commits), grouped by the project each is asked of.
+    fn ci_plan(&self) -> Plan {
+        let Some(main) = self.ci_project() else {
+            return Vec::new();
+        };
+        let sources = route::Sources {
+            main: &main,
+            remotes: &self.remotes,
+            refs: &self.refs,
+            prs: self.prs.iter().map(|pr| pr.sha.as_str()).collect(),
+            recent: self
+                .history
+                .iter()
+                .map(|c| c.hash.as_str())
+                .filter(|hash| *hash != WIP_HASH)
+                .take(RECENT)
+                .collect(),
+        };
+        route::plan(&sources, MAX_SHAS)
     }
 
     /// Reads the statuses again if they are old, or commits came that weren't asked about
     /// (after a push, a fetch, a new pull request).
     pub(super) fn refresh_ci(&mut self, ctx: &egui::Context) {
-        let project = self.ci_project();
-        if project != self.ci.project {
-            self.ci.moved_to(project);
+        let plan = self.ci_plan();
+        let projects: HashSet<Project> = plan.iter().map(|(p, _)| p.clone()).collect();
+        if projects != self.ci.projects {
+            self.ci.moved_to(projects);
         }
-        if self.ci.project.is_none() {
+        if self.ci.projects.is_empty() {
             return;
         }
         let stale = self.ci.loaded.is_none_or(|t| t.elapsed() > STALE);
-        let unasked = self
-            .ci_shas()
+        let unasked = route::pairs(&plan)
             .iter()
-            .any(|sha| !self.ci.asked.contains(sha));
+            .any(|pair| !self.ci.asked.contains(pair));
         if stale || unasked {
             self.load_ci(ctx);
         }
     }
 
     pub(super) fn load_ci(&mut self, ctx: &egui::Context) {
-        let Some(project) = self.ci.project.clone() else {
-            return;
-        };
-        let shas = self.ci_shas();
-        if self.ci.loading || shas.is_empty() {
+        let plan = self.ci_plan();
+        if self.ci.loading || plan.is_empty() {
             return;
         }
+        let pairs = route::pairs(&plan);
         // New commits after others were asked about: maybe a push, whose build starts soon.
-        let fresh = !self.ci.asked.is_empty() && shas.iter().any(|s| !self.ci.asked.contains(s));
+        let fresh = !self.ci.asked.is_empty() && pairs.iter().any(|p| !self.ci.asked.contains(p));
         self.ci.loading = true;
         self.ci.loaded = Some(Instant::now());
         self.ci.next = None;
-        self.ci.asked = shas.iter().cloned().collect();
+        self.ci.asked = pairs;
         let path = self.path.clone();
+        let first = plan[0].0.clone();
         // Answered all the same if it panics: no statuses are read again until it is.
-        let failed = move |e| Msg::CiStatuses(fresh, Err(e));
+        let failed = move |e| Msg::CiStatuses(fresh, vec![(first, Err(e))]);
         super::messages::spawn_or(&self.tx, ctx, failed, move || {
-            Msg::CiStatuses(fresh, ci::statuses(&path, &project, &shas))
+            let answers = plan
+                .into_iter()
+                .map(|(project, shas)| {
+                    let answer = ci::statuses(&path, &project, &shas);
+                    (project, answer)
+                })
+                .collect();
+            Msg::CiStatuses(fresh, answers)
         });
     }
 
-    pub(super) fn ci_arrived(
-        &mut self,
-        fresh: bool,
-        result: Result<HashMap<String, Status>, String>,
-    ) {
-        self.ci.arrived(fresh, result);
+    pub(super) fn ci_arrived(&mut self, fresh: bool, answers: Answers) {
+        self.ci.arrived(fresh, answers);
     }
 
     /// Reads the statuses again when it's time to; called every frame.
@@ -318,18 +365,28 @@ mod tests {
         }
     }
 
+    fn only(path: &str) -> HashSet<Project> {
+        HashSet::from([project(path)])
+    }
+
+    fn answer(path: &str, sha: &str) -> Answers {
+        vec![(
+            project(path),
+            Ok(HashMap::from([(sha.to_owned(), passed())])),
+        )]
+    }
+
     #[test]
     fn statuses_asked_of_the_project_before_are_dropped() {
         let mut ci = CiStatuses {
-            project: Some(project("me/fork")),
+            projects: only("me/fork"),
             loading: true,
             ..CiStatuses::default()
         };
         // The remote is pointed elsewhere while the fork's statuses are being read.
-        ci.moved_to(Some(project("org/upstream")));
+        ci.moved_to(only("org/upstream"));
         assert!(ci.loading, "no second read while the first is on its way");
-        let fork = HashMap::from([("abc".to_owned(), passed())]);
-        ci.arrived(false, Ok(fork));
+        ci.arrived(false, answer("me/fork", "abc"));
         assert!(
             ci.by_sha.is_empty(),
             "the fork's statuses aren't upstream's"
@@ -337,23 +394,74 @@ mod tests {
         assert!(!ci.loading);
         assert!(ci.next.is_some(), "read again from upstream");
         // Upstream's own answer is taken.
-        let upstream = HashMap::from([("abc".to_owned(), passed())]);
-        ci.arrived(false, Ok(upstream));
+        ci.arrived(false, answer("org/upstream", "abc"));
         assert_eq!(ci.by_sha.len(), 1);
+        assert_eq!(ci.source["abc"].path, "org/upstream");
     }
 
     #[test]
-    fn a_project_change_with_nothing_on_its_way_starts_afresh() {
+    fn a_project_change_with_nothing_on_its_way_drops_what_the_old_one_said() {
         let mut ci = CiStatuses {
-            project: Some(project("me/fork")),
+            projects: only("me/fork"),
             by_sha: HashMap::from([("abc".to_owned(), passed())]),
+            source: HashMap::from([("abc".to_owned(), project("me/fork"))]),
+            cached: vec![(
+                project("me/fork"),
+                HashMap::from([("abc".to_owned(), passed())]),
+            )],
             ..CiStatuses::default()
         };
-        ci.moved_to(Some(project("org/upstream")));
+        ci.moved_to(only("org/upstream"));
         assert!(ci.by_sha.is_empty());
         assert!(!ci.loading);
-        ci.arrived(false, Ok(HashMap::from([("abc".to_owned(), passed())])));
+        ci.arrived(false, answer("org/upstream", "abc"));
         assert_eq!(ci.by_sha.len(), 1);
+    }
+
+    /// A remote added (a fork checked out to push to) doesn't blank the dots meanwhile.
+    #[test]
+    fn a_project_added_keeps_what_the_others_said() {
+        let mut ci = CiStatuses {
+            projects: only("org/upstream"),
+            by_sha: HashMap::from([("abc".to_owned(), passed())]),
+            source: HashMap::from([("abc".to_owned(), project("org/upstream"))]),
+            cached: vec![(
+                project("org/upstream"),
+                HashMap::from([("abc".to_owned(), passed())]),
+            )],
+            ..CiStatuses::default()
+        };
+        ci.moved_to(HashSet::from([project("org/upstream"), project("me/fork")]));
+        assert_eq!(ci.by_sha.len(), 1);
+        assert_eq!(ci.source.len(), 1);
+    }
+
+    /// Removing a secondary source removes only its checks, even if the next read fails.
+    #[test]
+    fn removing_a_project_rebuilds_shared_statuses_from_retained_contributions() {
+        let mut ci = CiStatuses::default();
+        let mut failed = passed();
+        failed.state = CheckState::Failed;
+        ci.arrived(
+            false,
+            vec![
+                (
+                    project("me/fork"),
+                    Ok(HashMap::from([("abc".to_owned(), passed())])),
+                ),
+                (
+                    project("org/upstream"),
+                    Ok(HashMap::from([("abc".to_owned(), failed)])),
+                ),
+            ],
+        );
+        assert_eq!(ci.by_sha["abc"].state, CheckState::Failed);
+        ci.moved_to(only("me/fork"));
+        assert_eq!(ci.by_sha["abc"].state, CheckState::Passed);
+        assert_eq!(ci.cached.len(), 1);
+        ci.arrived(false, vec![(project("me/fork"), Err("offline".to_owned()))]);
+        assert_eq!(ci.by_sha["abc"].state, CheckState::Passed);
+        assert_eq!(ci.source["abc"], project("me/fork"));
     }
 
     #[test]
