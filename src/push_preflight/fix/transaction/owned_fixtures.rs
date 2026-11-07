@@ -574,7 +574,7 @@ fn full_fix_case(root: &Path) -> Result<(), String> {
     );
     let result = crate::push_preflight::fix(&f.repo, &plan, "secrets");
     let after = snapshot(&f.repo)?;
-    write(root.join("case.json"), serde_json::to_vec_pretty(&json!({"case":"full-fix","before":before,"after":after,"result":result,"secret_file_exists_after":f.repo.join("private.txt").exists(),"receiver_head":run(&receiver,&["rev-parse","HEAD"],b"",None)?,"baseline":f.old})).map_err(|error| error.to_string())?)?;
+    write(root.join("case.json"), serde_json::to_vec_pretty(&json!({"case":"full-fix","before":before,"after":after,"result":result,"secret_file_exists_after":f.repo.join("private.txt").exists(),"receiver_head":run(&receiver,&["rev-parse","refs/heads/main"],b"",None)?,"baseline":f.old})).map_err(|error| error.to_string())?)?;
     result?;
     let new = run(&f.repo, &["rev-parse", "HEAD"], b"", None)?;
     assert_ne!(new, outgoing);
