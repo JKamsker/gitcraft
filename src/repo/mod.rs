@@ -10,6 +10,7 @@ mod apply;
 mod authorship_view;
 mod bakeoff;
 mod bisect;
+mod branch_bands;
 mod branch_cleanup;
 mod branch_health;
 mod branch_order;
@@ -55,6 +56,7 @@ mod graph_order;
 pub(crate) mod graph_view;
 mod guide;
 pub(crate) mod highlight;
+mod history_reader;
 mod hooks;
 mod hotfix;
 mod interaction;
@@ -403,6 +405,8 @@ pub struct RepoTab {
     waiting: running::Waiting,
     /// The operations run, with their commands and output (the Activity panel).
     activity: activity::ActivityLog,
+    branch_bands: branch_bands::Preferences,
+    band_reader: history_reader::Reader<crate::graph::Graph>,
     /// A network operation failed (taken by `App`, for the taskbar button).
     network_failed: bool,
     /// The running operation moves the checkout: update the submodules after it, if asked to.
@@ -508,6 +512,7 @@ impl RepoTab {
             cancel: jobs.0.clone(),
             repo: messages::mutation_key(&path),
         };
+        let branch_bands = branch_bands::Preferences::load(_ctx, &path);
         Self {
             path,
             name,
@@ -652,6 +657,8 @@ impl RepoTab {
             running: None,
             waiting: Default::default(),
             activity: Default::default(),
+            branch_bands,
+            band_reader: Default::default(),
             network_failed: false,
             update_submodules: false,
             status: None,

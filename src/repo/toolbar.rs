@@ -280,6 +280,7 @@ impl RepoTab {
         if terminal.clicked() {
             acts.push(Action::ToggleTerminal);
         }
+        self.branch_bands_header(ui);
         let activity = icons::tool_button(ui, "list", "", true)
             .on_hover_text("Activity: each operation's git commands and all they printed");
         if self.activity.open {

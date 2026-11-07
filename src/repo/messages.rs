@@ -385,6 +385,7 @@ impl RepoTab {
         while let Ok(msg) = self.rx.try_recv() {
             self.handle(msg, ctx);
         }
+        self.poll_branch_bands(ctx);
         self.agent_step(ctx);
         // A tab not read yet, or suspended, neither fetches nor follows builds.
         if !shown || self.sleeping() {
