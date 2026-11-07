@@ -61,6 +61,13 @@ impl RepoTab {
         self.activity = None;
         self.tour = None;
         self.cancel_draft_reads();
+        for draft in self.pr_drafts.values_mut() {
+            if draft.native_post_request.take().is_some() {
+                draft.posting = false;
+                draft.settling = false;
+                draft.error=Some((super::pr_review::Place::Review,"A request using the previous connections may have reached the forge. Reload before retrying; your newer text is preserved.".into()));
+            }
+        }
         self.reload_identity(ctx);
         self.load_prs(ctx);
         if self.pr_view.is_some() {

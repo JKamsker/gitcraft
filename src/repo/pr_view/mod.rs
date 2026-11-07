@@ -140,6 +140,7 @@ impl RepoTab {
             // With details come the files, which is when it's settled. Without, nothing comes.
             if result.is_err() && std::mem::take(&mut draft.settling) {
                 draft.posting = false;
+                draft.native_post_request = None;
             }
         }
         if let Ok(details) = &result {
@@ -171,6 +172,7 @@ impl RepoTab {
             && std::mem::take(&mut draft.settling)
         {
             draft.posting = false;
+            draft.native_post_request = None;
         }
         let before = view.files.take().and_then(Result::ok);
         view.files = Some(result);

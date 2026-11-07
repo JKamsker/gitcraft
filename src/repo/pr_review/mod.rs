@@ -136,6 +136,8 @@ pub(crate) struct PrDraft {
     pub(super) focus_line: bool,
     /// Something is being sent, or the page is being loaded again after it.
     pub(super) posting: bool,
+    /// New native providers bind completion to the exact write, including after profile edits.
+    pub(super) native_post_request: Option<u64>,
     /// What's left of `posting` is the page being loaded again.
     pub(super) settling: bool,
     pub(super) error: Option<(Place, String)>,

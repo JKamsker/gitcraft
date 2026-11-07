@@ -100,6 +100,7 @@ pub(super) enum Msg {
         /// Where it was sent: an answer from a repository the tab has moved away from is no answer.
         hosting: Box<Hosting>,
         number: u64,
+        request: Option<u64>,
         what: pr_review::Posted,
         result: Result<(), String>,
     },
@@ -445,10 +446,11 @@ impl RepoTab {
                 if !super::load::same_repository(Some(&*hosting), self.hosting.as_ref()) => {}
             Msg::PrPosted {
                 number,
+                request,
                 what,
                 result,
                 ..
-            } => self.pr_posted(number, what, result, ctx),
+            } => self.pr_posted(number, request, what, result, ctx),
             Msg::Compare(request, result) => {
                 if let Some(c) = &mut self.compare
                     && c.request == request

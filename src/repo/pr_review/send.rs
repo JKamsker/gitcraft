@@ -149,11 +149,17 @@ impl RepoTab {
         // What says something on the pull request is made where it's sent: finding its login can
         // run a credential helper, which mustn't hold the window up.
         let (repo, details) = (self.path.clone(), details.clone());
+        let request = details.extras.connection_binding.map(|_| {
+            static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        });
+        draft.native_post_request = request;
         draft.posting = true;
         draft.error = None;
         spawn(&self.tx, ctx, move || Msg::PrPosted {
             hosting: Box::new(hosting.clone()),
             number,
+            request,
             what,
             result: match pages.target(&repo, &hosting, &details) {
                 Some(target) => job(target.as_ref()),
@@ -165,10 +171,20 @@ impl RepoTab {
     pub(in crate::repo) fn pr_posted(
         &mut self,
         number: u64,
+        request: Option<u64>,
         what: Posted,
         result: Result<(), String>,
         ctx: &egui::Context,
     ) {
+        if request.is_some()
+            && self
+                .pr_drafts
+                .get(&number)
+                .and_then(|d| d.native_post_request)
+                != request
+        {
+            return;
+        }
         let draft = self.pr_drafts.entry(number).or_default();
         draft.posting = false;
         let outcome = match result {
@@ -179,12 +195,16 @@ impl RepoTab {
             Err(e) => {
                 draft.error = Some((what.place(), e.clone()));
                 if !what.catches_up_after_failure() {
+                    draft.native_post_request = None;
                     return;
                 }
                 // Said here too, as the box with the error goes if it was merged after all.
                 (e, true)
             }
         };
+        if !self.pr_view.as_ref().is_some_and(|v| v.number == number) {
+            draft.native_post_request = None;
+        }
         self.finished.push(outcome);
         // Until the page shows the new state, anything sent would go by the old one.
         if self.pr_view.as_ref().is_some_and(|v| v.number == number) {
@@ -296,4 +316,44 @@ fn post_job(act: PrAct, draft: &PrDraft, details: &PrDetails) -> Option<(Posted,
         _ => return None,
     };
     Some(sent)
+}
+
+#[cfg(test)]
+mod native_ownership_tests {
+    use super::*;
+    #[test]
+    fn old_native_write_completion_after_profile_reload_cannot_clear_a_new_draft() {
+        crate::connections::Context::default().run(|| {
+            let ctx = egui::Context::default();
+            let mut tab =
+                RepoTab::new_deferred("/recording-only/native-review-completion".into(), &ctx);
+            tab.pr_drafts.insert(
+                7,
+                PrDraft {
+                    comment: "Original text".into(),
+                    posting: true,
+                    native_post_request: Some(1),
+                    ..Default::default()
+                },
+            );
+            tab.reload_profile_connections(&ctx);
+            let draft = tab.pr_drafts.get_mut(&7).expect("draft");
+            assert!(!draft.posting);
+            assert!(!draft.settling);
+            assert!(draft.native_post_request.is_none());
+            assert_eq!(draft.comment, "Original text");
+            draft.comment = "New account draft".into();
+            draft.native_post_request = Some(2);
+            draft.posting = true;
+            tab.pr_posted(7, Some(1), Posted::Comment, Ok(()), &ctx);
+            let draft = tab.pr_drafts.get(&7).expect("draft");
+            assert_eq!(draft.comment, "New account draft");
+            assert!(draft.posting);
+            assert_eq!(draft.native_post_request, Some(2));
+            tab.pr_posted(7, Some(2), Posted::Comment, Ok(()), &ctx);
+            let draft = tab.pr_drafts.get(&7).expect("draft");
+            assert!(draft.comment.is_empty());
+            assert!(!draft.posting);
+        });
+    }
 }
