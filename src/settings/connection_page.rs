@@ -37,7 +37,7 @@ impl Settings {
                             profile.connections.ssh_key = path.to_string_lossy().into_owned();
                         }
                     });
-                    note(ui, "An absolute path on this computer, separate from the commit-signing key. Other IdentityFile entries for the host are refused to avoid using another account. A repository's own core.sshCommand still wins.");
+                    note(ui, "An absolute path on this computer, separate from the commit-signing key. Connections authenticate directly with this key file; shared SSH masters, agent identities and certificates are not substituted. Encrypted keys can ask for their passphrase. Other IdentityFile/CertificateFile entries for the host are refused. A repository's own core.sshCommand still wins.");
                 });
                 for (tool, label, account) in [
                     ("gh", "GitHub", &mut profile.connections.github),

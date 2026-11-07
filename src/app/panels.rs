@@ -86,13 +86,6 @@ impl App {
                 self.apply_theme(&ctx);
             }
         }
-        for (path, url) in crate::settings::network_page::take_rejections(&ctx) {
-            for tab in &mut self.tabs {
-                if let Tab::Repo(repo) = tab {
-                    repo.forget_https_memory(&path, &url);
-                }
-            }
-        }
         let check_now = view.check_updates_now;
         if view.go_back {
             self.go_back(&ctx);

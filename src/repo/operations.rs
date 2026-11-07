@@ -150,15 +150,22 @@ impl RepoTab {
         self.run_ops(label, ops, refresh, OpKind::Normal(undo, before), ctx);
     }
 
-    /// An explicit helper rejection also clears tab-local credentials for that repository host.
+    /// Clear all views of this endpoint, including parked worktrees. A cached
+    /// transient secret already has an exact scope; fetch URL guesses are not needed.
     pub(crate) fn forget_https_memory(&mut self, path: &std::path::Path, url: &str) {
-        let host = crate::connection_doctor::endpoint(url);
         if self.path == path
-            || self.remotes.iter().any(|r| {
-                r.url.starts_with("https://") && crate::connection_doctor::endpoint(&r.url) == host
-            })
+            || self
+                .credentials
+                .as_ref()
+                .is_some_and(|c| c.scope.as_ref().is_some_and(|scope| scope.matches_url(url)))
         {
             self.credentials = None;
+            if matches!(self.dialog, Some(Dialog::Credentials { .. })) {
+                self.dialog = None;
+            }
+        }
+        for parked in &mut self.parked {
+            parked.forget_https_memory(path, url);
         }
     }
     pub(super) fn switch_https(&mut self, url: String, ctx: &egui::Context) {
@@ -174,7 +181,8 @@ impl RepoTab {
         }
         let path = self.path.clone();
         let original = url.clone();
-        self.credentials = None;
+        self.forget_https_memory(&path, &url);
+        crate::settings::network_page::rejected(ctx, path.clone(), url.clone());
         self.then_or(ctx,true,Err,move || git::https_reject(&path,&url),move |tab,result,_|match result {
             Ok(())=>{tab.status=Some(("Stored HTTPS sign-in rejected. Choose the correct account; profile-selected forge accounts can be changed in Settings → Profile.".into(),false));tab.dialog=Some(Dialog::credentials(&original,false));},
             Err(e)=>tab.status=Some((format!("Could not forget the stored sign-in: {}",crate::diagnostics::crash::scrub(&e)),true)),
@@ -1038,5 +1046,39 @@ mod tests {
         assert_eq!(head_now, mine);
         assert!(matches!(undone, Some(Ok(_))));
         assert_eq!(main_after, Ok(was));
+    }
+}
+
+#[cfg(test)]
+mod signout_tests {
+    use super::*;
+    #[test]
+    fn signout_clears_nested_parked_credentials_before_a_view_is_reopened() -> Result<(), String> {
+        let ctx = egui::Context::default();
+        let url = "https://push-a.invalid/team/repo.git";
+        let mut main = RepoTab::new_deferred("/nonexistent/signout-main".into(), &ctx);
+        let mut parked = RepoTab::new_deferred("/nonexistent/signout-worktree".into(), &ctx);
+        let mut nested = RepoTab::new_deferred("/nonexistent/signout-nested".into(), &ctx);
+        let unrelated = git::Credentials::for_url(
+            "https://push-b.invalid/team/repo.git",
+            "other".into(),
+            "DUMMY_OTHER".into(),
+        )?;
+        main.credentials = Some(unrelated);
+        parked.credentials = Some(git::Credentials::for_url(
+            url,
+            "old-account".into(),
+            "DUMMY_OLD".into(),
+        )?);
+        nested.credentials = parked.credentials.clone();
+        parked.parked.push(Box::new(nested));
+        let path = parked.path.clone();
+        main.parked.push(Box::new(parked));
+        main.forget_https_memory(std::path::Path::new("/nonexistent/another-tab"), url);
+        assert!(main.credentials.is_some());
+        let reopened = main.take_parked(&path).ok_or("Parked view missing")?;
+        assert!(reopened.credentials.is_none());
+        assert!(reopened.parked[0].credentials.is_none());
+        Ok(())
     }
 }

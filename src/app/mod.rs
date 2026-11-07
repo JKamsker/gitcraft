@@ -803,6 +803,13 @@ impl eframe::App for App {
         self.repo_scan_dialog(&ctx);
         self.my_work_ui(&ctx);
         self.poll_diagnostics(&ctx);
+        for (path, url) in crate::settings::network_page::take_rejections(&ctx) {
+            for tab in &mut self.tabs {
+                if let Tab::Repo(repo) = tab {
+                    repo.forget_https_memory(&path, &url);
+                }
+            }
+        }
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
         self.dropped_files(&ctx);

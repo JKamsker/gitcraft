@@ -41,6 +41,17 @@ pub(crate) fn take_rejections(ctx: &egui::Context) -> Vec<(PathBuf, String)> {
     ctx.data_mut(|d| d.remove_temp::<Vec<(PathBuf, String)>>(Id::new("https-rejections")))
         .unwrap_or_default()
 }
+pub(crate) fn rejected(ctx: &egui::Context, repo: PathBuf, url: String) {
+    ctx.data_mut(|d| {
+        let key = Id::new("https-rejections");
+        let mut events = d
+            .get_temp::<Vec<(PathBuf, String)>>(key)
+            .unwrap_or_default();
+        events.push((repo, url));
+        d.insert_temp(key, events);
+    });
+}
+
 impl State {
     fn launch(
         &mut self,
@@ -105,14 +116,7 @@ impl State {
             Ok(Answer::Rejected(repo, url)) => {
                 self.account = None;
                 self.lines=vec!["Asked this repository's effective credential helpers to forget the selected HTTPS sign-in. The next network operation can sign in again. Named forge accounts selected by the profile must be changed in Profile connections.".into()];
-                ctx.data_mut(|d| {
-                    let key = Id::new("https-rejections");
-                    let mut events = d
-                        .get_temp::<Vec<(PathBuf, String)>>(key)
-                        .unwrap_or_default();
-                    events.push((repo, url));
-                    d.insert_temp(key, events);
-                });
+                rejected(ctx, repo, url);
             }
             Err(e) => self.lines = vec![crate::diagnostics::crash::scrub(&e)],
         }
