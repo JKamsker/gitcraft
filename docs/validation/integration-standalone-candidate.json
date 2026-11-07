@@ -1,0 +1,82 @@
+{
+  "status": "WIP / UNVALIDATED combined integration source; runtime/build hold honored; no Cargo/check/tests/CI executed",
+  "base": "ab68bdedd387236c03f26f839572860d405a2f7f",
+  "feature_application": "9bb73a3256573a68f665f09cc390def05ba2f139",
+  "feature_independent_review": "891b2f5555debea15e3041b5000b99e3524f15e5",
+  "excluded_evidence_commit": "f1ee4f33cea9f0b3efdd9c9f38e5afc4ea976083",
+  "branch": "codex/integration-standalone",
+  "worktree": "/workspace/work/integration-standalone",
+  "merge_conflict_resolution": {
+    "src/repo/mod.rs": "Preserve content_recovery and drafts modules; expose conflict and file_comparison pub(crate); retain every other declaration/field/action"
+  },
+  "protected_base_files_sha256": {
+    "AGENTS.md": "dd41e050679ab2cd33683e28e2c2db6e43bdd611042a6faa56708f12010dec3f",
+    ".github/workflows/ci.yml": "70d2a21e1aa735e32bb7ad3fc40fae09355b6866409eec15fdb6adadf5907145",
+    ".github/workflows/release.yml": "d1c0682bd1448d356730c58fe44e20a338ba1fb7bb4c02294902c33a3a94ef8f"
+  },
+  "exact_accepted_feature_files_sha256": {
+    "src/standalone/access.rs": "6c6352c2c9605d0be8e46d06bbd391c7a38ac4ec2940c8d001413c874ce9cca1",
+    "src/standalone/cli.rs": "7838644d7db1d327e06d7da565253e3f9afcd0a381644539886338451047a852",
+    "src/standalone/directory.rs": "315096b884aabfbf42ab2adf9614a7ce0bb1a25622c422adf9eb3d0c4a61cb2e",
+    "src/standalone/files.rs": "6db85d61938411c5a06beafa912c93de0069aee3fe00a5c00f61e06d9cabeefd",
+    "src/standalone/mod.rs": "5100de1a7c4bc3d373dbf3af9889cf0aeda6d709f7ecc758e47b4941cfcfbc90",
+    "src/standalone/model.rs": "9a9d33b45ad36d3206cf662c842545ac229cd4ddfb4aed4b91007b3bdc35cbc2",
+    "src/standalone/permissions.rs": "df12458a1238126b2a38fc4a1c10722267b60f22e59681390c76b222d3a631e7",
+    "src/standalone/registration.rs": "0eccf67a270d414c2fcdff6ba6427bc778888c61d19269ee35f373569fe36025",
+    "src/standalone/save.rs": "be889d415f60dac2cc89c01aab9a4c13f8f1928ebac6e9649a000e4024171e3b",
+    "src/standalone/ui.rs": "c46b3680136e61ae721950480fbc0c825c1b86fe9c1c214b1f1d6c3e7b4d31a9",
+    "src/standalone/windows_metadata.rs": "4fa0efa860f685ebf89c84db9d515398123753a1b70284dd0860fc0e827a0972",
+    "tests/standalone_cli.rs": "a3515f56ac378de472168d38966e1d89e86758f215b331402d8485544da8fa82"
+  },
+  "changed_application_files": [
+    "Cargo.lock",
+    "Cargo.toml",
+    "docs/standalone-file-tools-plan.md",
+    "docs/standalone-file-tools.md",
+    "src/app/mod.rs",
+    "src/git/bundles.rs",
+    "src/lib.rs",
+    "src/main.rs",
+    "src/manual.rs",
+    "src/repo/conflict/mod.rs",
+    "src/repo/conflict/view.rs",
+    "src/repo/file_comparison/mod.rs",
+    "src/repo/file_comparison/view.rs",
+    "src/repo/mod.rs",
+    "src/settings/mod.rs",
+    "src/standalone/access.rs",
+    "src/standalone/cli.rs",
+    "src/standalone/directory.rs",
+    "src/standalone/files.rs",
+    "src/standalone/mod.rs",
+    "src/standalone/model.rs",
+    "src/standalone/permissions.rs",
+    "src/standalone/registration.rs",
+    "src/standalone/save.rs",
+    "src/standalone/ui.rs",
+    "src/standalone/windows_metadata.rs",
+    "tests/standalone_cli.rs"
+  ],
+  "source_checks": [
+    "No unmerged paths or conflict markers",
+    "No staged changes beyond the27accepted feature paths",
+    "All15standalone source files and executable fixture byte-identical to accepted9bb",
+    "All AGENTS/workflow files byte-identical to acceptedab68",
+    "No later evidence commit/transient docs-validation logs imported"
+  ],
+  "expected_linux_tests": {
+    "baseline_registered": 948,
+    "standalone_new_registered": 28,
+    "combined_registered": 976,
+    "expected_passed": 973,
+    "ignored": 3,
+    "actual_execution": "NOT RUN"
+  },
+  "pending_validation": [
+    "Bounded execution handoff required before Cargo/build/runtime fixtures",
+    "Private exact-head fmt/strictClippy/focused/full Linux gates and test-name union",
+    "Independent combined-source review as root requires",
+    "Native macOS/Windows remain unexecuted; do not claim native green"
+  ],
+  "ci": "No use/dispatch/poll/rerun/wait"
+}

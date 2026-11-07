@@ -544,7 +544,7 @@ impl BundleFile {
     }
 }
 
-fn bundle_git_path(path: &Path) -> Result<String, String> {
+pub(crate) fn bundle_git_path(path: &Path) -> Result<String, String> {
     let native = path.to_str().ok_or("Temporary path is not UTF-8")?;
     #[cfg(windows)]
     return windows_bundle_path(native);

@@ -493,7 +493,7 @@ fn line_cell(ui: &mut egui::Ui, text: &Option<String>, width: f32, undoes: bool,
         .truncate(),
     );
 }
-fn show_pair(ui: &mut egui::Ui, pair: &model::Pair, t: &Tokens) {
+pub(super) fn show_pair(ui: &mut egui::Ui, pair: &model::Pair, t: &Tokens) {
     ui.heading("Content edits only");
     ui.label(format!("{} → {}", pair.labels[0], pair.labels[1]));
     ui.label(format!(

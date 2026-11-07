@@ -616,9 +616,27 @@ fn repo_root(path: &Path) -> Result<PathBuf, String> {
 /// question and returns the exit code to end with, before any window is made. `None` for an
 /// ordinary start.
 pub fn askpass_helper() -> Option<i32> {
-    crate::connections::ssh_helper()
-        .or_else(crate::connections::credential_helper)
-        .or_else(crate::remote::askpass::run_helper)
+    let mut args = std::env::args_os().skip(1);
+    let first = args.next();
+    let helper = first.as_ref().and_then(|a| a.to_str());
+    let internal = matches!(
+        helper,
+        Some("--gitcraft-profile-ssh" | "--gitcraft-profile-credential")
+    );
+    let askpass = std::env::var_os("GITCRAFT_ASKPASS").is_some();
+    if (internal || askpass)
+        && (first.as_ref().is_some_and(|a| a.to_str().is_none())
+            || args.any(|a| a.to_str().is_none()))
+    {
+        // A malformed UTF-8 helper request must fail as a helper, never panic or
+        // fall through into opening a repository/profile window.
+        return Some(1);
+    }
+    match helper {
+        Some("--gitcraft-profile-ssh") => crate::connections::ssh_helper(),
+        Some("--gitcraft-profile-credential") => crate::connections::credential_helper(),
+        _ => crate::remote::askpass::run_helper(),
+    }
 }
 
 /// How many commands for a repository on another machine were asked from the window's thread
