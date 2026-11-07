@@ -10,7 +10,7 @@ mod view;
 pub(in crate::repo) use model::Structural;
 pub(super) use view::show;
 
-use crate::repo::{Action, Msg, RepoTab, spawn};
+use crate::repo::{Action, Msg, RepoTab};
 
 #[derive(Default)]
 pub(in crate::repo) struct State {
@@ -96,10 +96,15 @@ impl RepoTab {
         self.structural_pending = false;
         view.structural.reload = false;
         let (repo, key) = (self.path.clone(), view.key.clone());
-        spawn(&self.tx, ctx, move || {
-            let result = reader::load(&repo, &key);
-            Msg::DiffStructural(ids, Box::new(result))
-        });
+        crate::repo::messages::spawn_or(
+            &self.tx,
+            ctx,
+            move |error| Msg::DiffStructural(ids, Box::new(Err(error))),
+            move || {
+                let result = reader::load(&repo, &key);
+                Msg::DiffStructural(ids, Box::new(result))
+            },
+        );
     }
 }
 

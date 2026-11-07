@@ -288,6 +288,54 @@ fn real_git_tooltip_retains_long_message_paragraphs_and_follows_hover_not_select
             .iter()
             .any(|s| s.galley.job.text == message)
     );
+    let message_geometry = |shapes: &[ClippedShape]| {
+        shapes.iter().find_map(|clipped| match &clipped.shape {
+            Shape::Text(text) if text.galley.job.text == message => {
+                let tail = text
+                    .galley
+                    .rows
+                    .last()?
+                    .rect()
+                    .translate(text.pos.to_vec2());
+                Some((clipped.clip_rect, tail))
+            }
+            _ => None,
+        })
+    };
+    let (clip, tail) = message_geometry(&first_tooltip).ok_or("missing message geometry")?;
+    assert!(
+        !clip.contains_rect(tail),
+        "fixture must need scrolling to reach its tail"
+    );
+    let point = clip
+        .intersect(Rect::from_min_size(Pos2::ZERO, size))
+        .center();
+    frame(&ctx, &mut tab, size, vec![Event::PointerMoved(point)], 3.21);
+    frame(
+        &ctx,
+        &mut tab,
+        size,
+        vec![Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: vec2(0.0, -4000.0),
+            modifiers: egui::Modifiers::NONE,
+        }],
+        3.22,
+    );
+    let (scrolled_tooltip, _) = frame(&ctx, &mut tab, size, vec![], 3.25);
+    let (clip, tail) =
+        message_geometry(&scrolled_tooltip).ok_or("tooltip closed while scrolling")?;
+    assert!(
+        clip.contains_rect(tail),
+        "final paragraph must be reachable: {tail:?} {clip:?}"
+    );
+    frame(
+        &ctx,
+        &mut tab,
+        size,
+        vec![Event::PointerMoved(first_point)],
+        3.26,
+    );
     assert_eq!(
         tab.selected,
         Some(2),
