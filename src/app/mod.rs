@@ -607,7 +607,6 @@ impl App {
             keymap::cancel(ctx, keymap::Scope::Window);
             Vec::new()
         } else if modal_open {
-            keymap::cancel(ctx, keymap::Scope::Window);
             keymap::pressed(ctx, keymap::Scope::Window)
                 .into_iter()
                 .filter(|c| matches!(c, keymap::Command::Manual | keymap::Command::Palette))

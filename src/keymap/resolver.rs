@@ -31,6 +31,26 @@ pub(crate) fn cancel(ctx: &Context, scope: Scope) {
     });
 }
 
+/// A blocked repository preserves only explicit text/modal exceptions installed by its window.
+/// Standalone views with no such exception cancel any pending command.
+pub(crate) fn retain_allowed(ctx: &Context) {
+    let key = id(ctx, Scope::Window);
+    ctx.data_mut(|d| {
+        if let Some(mut r) = d.get_temp::<Resolver>(key) {
+            let permitted = r.allowed.as_ref().is_some_and(|allowed| {
+                allowed.iter().any(|&c| {
+                    let seq = config::effective(&r.config, c);
+                    r.eligible(c) && seq.len() > r.prefix.len() && seq[..r.prefix.len()] == r.prefix
+                })
+            });
+            if !permitted {
+                r.prefix.clear();
+            }
+            d.insert_temp(key, r);
+        }
+    });
+}
+
 /// Changing tabs/repositories cancels prefixes even when no individual widget owned focus.
 pub(crate) fn owner(ctx: &Context, owner: Id) {
     let key = id(ctx, Scope::Window).with("owner");
@@ -42,6 +62,15 @@ pub(crate) fn owner(ctx: &Context, owner: Id) {
 }
 
 impl Resolver {
+    fn eligible(&self, command: Command) -> bool {
+        self.allowed
+            .as_ref()
+            .is_none_or(|allowed| allowed.contains(&command))
+            && (self.active.is_empty()
+                && matches!(command.scope(), Scope::Window | Scope::Repository)
+                || self.active.contains(&command.scope()))
+    }
+
     fn resolve(
         &mut self,
         _scope: Scope,
@@ -67,17 +96,7 @@ impl Resolver {
         });
         let mut found = None;
         let mut candidates = Vec::new();
-        for c in config::commands()
-            .filter(|c| {
-                self.allowed
-                    .as_ref()
-                    .is_none_or(|allowed| allowed.contains(c))
-            })
-            .filter(|c| {
-                self.active.is_empty() && matches!(c.scope(), Scope::Window | Scope::Repository)
-                    || self.active.contains(&c.scope())
-            })
-        {
+        for c in config::commands().filter(|&c| self.eligible(c)) {
             let seq = config::effective(&self.config, c);
             if seq.len() <= self.prefix.len() || seq[..self.prefix.len()] != self.prefix {
                 continue;
@@ -195,6 +214,7 @@ pub(crate) fn pressed(ctx: &Context, scope: Scope) -> Vec<Command> {
     }
     let mut commands = Vec::new();
     let mut consumed = Vec::new();
+    let mut chord_text = !r.prefix.is_empty();
     for e in events {
         if let Event::Key {
             key,
@@ -204,11 +224,13 @@ pub(crate) fn pressed(ctx: &Context, scope: Scope) -> Vec<Command> {
             modifiers,
         } = e
         {
+            let was_pending = !r.prefix.is_empty();
             let (command, used) = r.resolve(scope, key, physical_key, modifiers, repeat, now);
             if let Some(c) = command {
                 commands.push(c);
             }
             if used {
+                chord_text |= was_pending || !r.prefix.is_empty();
                 consumed.push((key, modifiers));
             }
         }
@@ -223,7 +245,7 @@ pub(crate) fn pressed(ctx: &Context, scope: Scope) -> Vec<Command> {
             } => !consumed.contains(&(*key, *modifiers)),
             // Suppress textual continuations of an active chord. They must never leak into
             // an editor appearing during the same frame.
-            Event::Text(_) if !r.prefix.is_empty() => false,
+            Event::Text(_) if chord_text => false,
             _ => true,
         });
     });
@@ -260,7 +282,7 @@ pub(crate) fn which_key(ctx: &Context, refused: impl Fn(Command) -> Option<Strin
             .show(ctx, |ui| {
                 egui::Frame::popup(ui.style()).show(ui, |ui| {
                     ui.label("Chord pending · Escape cancels");
-                    for c in config::commands() {
+                    for c in config::commands().filter(|&c| r.eligible(c)) {
                         let seq = config::effective(&r.config, c);
                         if seq.len() > r.prefix.len() && seq[..r.prefix.len()] == r.prefix {
                             ui.horizontal(|ui| {
@@ -461,5 +483,109 @@ mod owner_tests {
         )
         .textures_delta
         .clear();
+    }
+}
+
+#[cfg(test)]
+mod modal_chord_tests {
+    use super::*;
+
+    fn event(key: Key, modifiers: egui::Modifiers) -> Event {
+        Event::Key {
+            key,
+            physical_key: Some(key),
+            pressed: true,
+            repeat: false,
+            modifiers,
+        }
+    }
+
+    #[test]
+    fn permitted_modal_chords_survive_repository_blocking_and_do_not_type_continuations() {
+        for (end, expected) in [(Key::P, vec![Command::Palette]), (Key::X, vec![])] {
+            let ctx = Context::default();
+            let mut settings = crate::settings::Settings::default();
+            settings.key_bindings.insert(
+                Command::Palette.id().into(),
+                vec![
+                    Stroke::new(Key::K, egui::Modifiers::COMMAND),
+                    Stroke::new(Key::P, egui::Modifiers::NONE),
+                ],
+            );
+            settings.put_for_test(&ctx);
+            let mut text = String::new();
+            for (pass, events) in [
+                vec![],
+                vec![event(Key::K, egui::Modifiers::COMMAND)],
+                vec![
+                    event(end, egui::Modifiers::NONE),
+                    Event::Text(if end == Key::P { "p" } else { "x" }.into()),
+                ],
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                ctx.run_ui(
+                    egui::RawInput {
+                        time: Some(pass as f64 * 0.1),
+                        events,
+                        ..Default::default()
+                    },
+                    |ui| {
+                        restrict(&ctx, Some(vec![Command::Palette, Command::Manual]));
+                        let commands = pressed(&ctx, Scope::Window);
+                        if pass == 2 {
+                            assert_eq!(commands, expected);
+                        } else {
+                            assert!(commands.is_empty());
+                        }
+                        retain_allowed(&ctx);
+                        let r = ui.text_edit_singleline(&mut text);
+                        if pass == 0 {
+                            r.request_focus();
+                        }
+                    },
+                )
+                .drop_without_applying_deltas();
+            }
+            assert_eq!(
+                text, "",
+                "completed and rejected chord strokes belong to the resolver"
+            );
+        }
+    }
+
+    #[test]
+    fn blocked_repository_cancels_prefix_without_a_deliberate_exception() {
+        let ctx = Context::default();
+        let key = id(&ctx, Scope::Window);
+        let mut r = Resolver::default();
+        r.prefix.push(Stroke::new(Key::K, egui::Modifiers::COMMAND));
+        ctx.data_mut(|d| d.insert_temp(key, r));
+        retain_allowed(&ctx);
+        assert!(
+            ctx.data(|d| d.get_temp::<Resolver>(key))
+                .unwrap()
+                .prefix
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn overlay_and_dispatch_use_the_same_active_and_allowed_candidates() {
+        let r = Resolver {
+            active: vec![Scope::Window, Scope::Repository, Scope::Files],
+            allowed: Some(vec![Command::Palette, Command::HunkStage]),
+            ..Default::default()
+        };
+        assert!(r.eligible(Command::Palette));
+        assert!(
+            !r.eligible(Command::FileNext),
+            "modal exclusions apply to which-key too"
+        );
+        assert!(
+            !r.eligible(Command::HunkStage),
+            "an inactive diff binding is not a continuation"
+        );
     }
 }

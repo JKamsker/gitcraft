@@ -339,7 +339,7 @@ impl RepoTab {
                 self.search.focus = true;
             }
         } else {
-            keymap::cancel(ctx, keymap::Scope::Repository);
+            keymap::retain_allowed(ctx);
         }
         if !free_keys
             && self.search.open

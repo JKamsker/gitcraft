@@ -8,7 +8,9 @@ mod resolver;
 
 pub(crate) use config::{Overrides, Stroke};
 use egui::{Key, Modifiers};
-pub(crate) use resolver::{active, cancel, owner, pressed, queued, restrict, take, which_key};
+pub(crate) use resolver::{
+    active, cancel, owner, pressed, queued, restrict, retain_allowed, take, which_key,
+};
 
 /// What a key does.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
