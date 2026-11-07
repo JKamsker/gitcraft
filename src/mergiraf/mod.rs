@@ -236,14 +236,33 @@ pub fn solve(repo: &Path, path: &str) -> Result<String, String> {
 fn solve_copy(program: &Path, repo: &Path, path: &str) -> Result<String, String> {
     let text = crate::remote::read_to_string(&crate::remote::join(repo, path))
         .map_err(|e| format!("Could not read {path}: {e}"))?;
+    solve_contents(program, path, &text)
+}
+
+/// Checks forecast conflict contents on a private copy; never reads or edits the working tree.
+pub(crate) fn solve_text(path: &str, text: &str) -> Result<String, String> {
+    let found = current().found.ok_or("Mergiraf isn't installed")?;
+    solve_contents(&found.program, path, text)
+}
+
+fn solve_contents(program: &Path, path: &str, text: &str) -> Result<String, String> {
     let name = path.rsplit(['/', '\\']).next().unwrap_or("file");
+    if name.is_empty() || matches!(name, "." | "..") || name.contains(':') {
+        return Err(format!("Cannot copy {path} for Mergiraf"));
+    }
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     let dir =
         std::env::temp_dir().join(format!("gitcraft-mergiraf-{}-{nanos}", std::process::id()));
-    std::fs::create_dir_all(&dir).map_err(|e| format!("Could not copy {path}: {e}"))?;
+    // A fresh private directory: another process cannot substitute the copy or its contents.
+    let mut builder = std::fs::DirBuilder::new();
+    #[cfg(unix)]
+    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+    builder
+        .create(&dir)
+        .map_err(|e| format!("Could not copy {path}: {e}"))?;
     let result = std::fs::write(dir.join(name), text)
         .map_err(|e| format!("Could not copy {path}: {e}"))
         .and_then(|()| {
@@ -291,6 +310,33 @@ fn error_message(stderr: &str, path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn forecast_contents_are_checked_on_a_private_copy() -> Result<(), String> {
+        use std::os::unix::fs::PermissionsExt;
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| e.to_string())?
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("gitcraft-mergiraf-test-{nanos}"));
+        std::fs::create_dir(&dir).map_err(|e| e.to_string())?;
+        let program = dir.join("solver");
+        let result = (|| -> Result<(), String> {
+            std::fs::write(&program, "#!/bin/sh\ntest \"$1\" = solve && test \"$2\" = --stdout && test \"$3\" = -- && test \"$4\" = both.rs && cat -- \"$4\"\n")
+                .map_err(|e| e.to_string())?;
+            std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700))
+                .map_err(|e| e.to_string())?;
+            let text = "<<<<<<< ours\nfn a() {}\n=======\nfn b() {}\n>>>>>>> theirs\n";
+            assert_eq!(solve_contents(&program, "src/both.rs", text)?, text);
+            assert!(solve_contents(&program, "../..", text).is_err());
+            assert!(solve_contents(&program, "C:outside", text).is_err());
+            assert!(!dir.join("both.rs").exists());
+            Ok(())
+        })();
+        let _ = std::fs::remove_dir_all(&dir);
+        result
+    }
 
     /// A conflicted file in WSL is solved by Mergiraf here, from a copy (run with
     /// `GITCRAFT_TEST_MERGIRAF=<mergiraf program>` and `GITCRAFT_TEST_WSL=<distro>`; skipped

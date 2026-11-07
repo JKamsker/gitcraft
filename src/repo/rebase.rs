@@ -2,6 +2,8 @@
 //! reworded, squashed, fixed up or dropped, and reordered. Starting it writes git's todo list
 //! and hands it over as `sequence.editor`; rewords become an `exec git commit --amend -F`.
 
+mod weather;
+
 use std::path::{Path, PathBuf};
 
 use egui::{Stroke, Ui};
@@ -75,6 +77,7 @@ pub(crate) struct RebaseEditor {
     /// Its rebase is being prepared (on another machine, in the background): it can't be
     /// started again, nor changed, meanwhile.
     pub starting: bool,
+    weather: weather::Weather,
 }
 
 impl RebaseEditor {
@@ -97,6 +100,7 @@ impl RebaseEditor {
             head,
             id: IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             starting: false,
+            weather: weather::Weather::default(),
         }
     }
 
@@ -275,6 +279,7 @@ fn short(hash: &str) -> &str {
 
 impl RepoTab {
     pub(super) fn rebase_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        self.poll_rebase_weather(ui.ctx());
         let t = Tokens::get(ui.ctx());
         let idle = self.busy_op.is_none();
         let branch = self
@@ -304,6 +309,10 @@ impl RepoTab {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if icons::small_button(ui, "x", "Cancel (Esc)").clicked() {
                             acts.push(Action::CloseRebase);
+                        }
+                        if icons::small_button(ui, "refresh-cw", "Recheck rebase weather").clicked()
+                        {
+                            editor.weather.refresh(ui.ctx());
                         }
                     });
                 });
@@ -369,6 +378,7 @@ impl RepoTab {
                 ui.add_space(6.0);
                 // Newest first, like the graph; `i` indexes git's oldest-first order.
                 for i in (0..n).rev() {
+                    let forecast = editor.weather.rows.get(i).cloned();
                     let Some(e) = editor.entries.get_mut(i) else {
                         continue;
                     };
@@ -398,6 +408,7 @@ impl RepoTab {
                                             .on_hover_text(step.explain());
                                     }
                                 });
+                            weather::badge(ui, forecast.as_ref(), e.step == Step::Drop, &t);
                             let dim = e.step == Step::Drop;
                             ui.label(
                                 egui::RichText::new(short(&e.commit.hash))
@@ -448,6 +459,8 @@ impl RepoTab {
         if let Some((a, b)) = swap {
             editor.entries.swap(a, b);
         }
+        // Invalidates the old forecast immediately after a reorder or changed action.
+        editor.weather.observe(&editor.entries, ui.ctx());
     }
 }
 
