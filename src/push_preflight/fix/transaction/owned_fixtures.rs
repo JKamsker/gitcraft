@@ -248,11 +248,7 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
     f.observer(case)?;
     let before = snapshot(&f.repo)?;
     if case == "old-git" {
-        // Child-only PATH, no concurrent tests or other threads rely on this environment.
-        // No network command exists in this fixture.
-        unsafe {
-            std::env::set_var("PATH", "/usr/bin:/bin");
-        }
+        // The outer fixture supplied the old-Git PATH before this process started.
         let result = Hook::new(&f.repo, "refs/heads/main", &f.old, &f.new);
         let after = snapshot(&f.repo)?;
         let error = result
@@ -505,7 +501,14 @@ fn gate2_owned_local_fixture() -> Result<(), String> {
             "--nocapture",
             "--test-threads=1",
         ])
-        .env("PATH", "/usr/local/bin:/usr/bin:/bin")
+        .env(
+            "PATH",
+            if case == "old-git" {
+                "/usr/bin:/bin"
+            } else {
+                "/usr/local/bin:/usr/bin:/bin"
+            },
+        )
         .env("HOME", root.join("home"))
         .env("XDG_CONFIG_HOME", root.join("xdg"))
         .env("TMPDIR", root.join("tmp"))
