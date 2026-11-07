@@ -188,9 +188,9 @@ fn clone_command(
                 },
             ));
         }
-        if selected.len() > 1 {
-            return Err("Select one profile account for the previewed server before restoring this repository".into());
-        }
+        // Match the reviewed profile config: each explicit same-host choice resets
+        // the previous helper (GitHub, then GitLab, then Tea). Never fall back to an
+        // ambient helper when the final explicitly selected account refuses auth.
         if let Some((tool, account)) = selected.pop() {
             let helpers = HelperPaths::capture()?;
             let generated = connections::helper_command(tool, &account, executable);

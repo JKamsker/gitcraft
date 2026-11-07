@@ -177,6 +177,41 @@ fn network_setup_clone_pins_https_and_explicit_profile_authentication_under_host
                 .map_err(|e| e.to_string())?
                 .is_empty()
         );
+        // Preserve normal Profile helper precedence if two explicitly selected
+        // tools share a host, instead of introducing a new unsupported choice.
+        let mut both = profile.clone();
+        both.choices.gitlab = connections::Account {
+            host: "expected.fixture.invalid".into(),
+            user: "expected-work".into(),
+            config_dir: root
+                .join("explicit-glab-folder")
+                .to_string_lossy()
+                .into_owned(),
+        };
+        let CloneCommand { command, workspace } = both.run(|| {
+            clone_command(
+                &parent,
+                expected,
+                &parent.join("last-explicit-helper"),
+                "origin",
+                false,
+                &exe,
+            )
+        })?;
+        let out = crate::bounded_process::run(command, &|| true, Duration::from_secs(10))?;
+        assert!(!out.status.success());
+        drop(workspace);
+        let args =
+            std::fs::read_to_string(root.join("selected-args")).map_err(|e| e.to_string())?;
+        let args = args.lines().collect::<Vec<_>>();
+        assert_eq!(args[1], "glab");
+        let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(args[2])
+            .map_err(|e| e.to_string())?;
+        let account: connections::Account =
+            serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+        assert_eq!(account, both.choices.gitlab);
+        assert!(!root.join("ambient-executed").exists());
         // SSH uses only the explicit selected key and fixed OpenSSH dialect; its helper
         // boundary records argv instead of starting any SSH executable/connection.
         let key = root.join("explicit-selected-key");
@@ -212,8 +247,10 @@ fn network_setup_clone_pins_https_and_explicit_profile_authentication_under_host
         assert!(!args.contains("wrong.fixture.invalid"));
         assert!(!root.join("wrong-ssh-host").exists());
         assert_eq!(
-            std::env::var_os("SSH_AUTH_SOCK"),
-            Some(root.join("recording-selected-agent.sock").into_os_string())
+            std::fs::read_to_string(root.join("selected-ssh-agent"))
+                .map_err(|e| e.to_string())?
+                .trim(),
+            root.join("recording-selected-agent.sock").to_string_lossy()
         );
         assert_eq!(
             std::fs::read(parent.join(".git/config")).map_err(|e| e.to_string())?,
@@ -241,10 +278,11 @@ fn network_setup_clone_pins_https_and_explicit_profile_authentication_under_host
     write_script(
         &selected,
         &format!(
-            "#!/bin/sh\ncase \"$1\" in\n--gitcraft-profile-credential) printf '%s\\n' \"$@\" > {}; printf '%s\\n' \"$HOME\" > {}; printf 'username=expected-work\\npassword=FIXTURE_SELECTED_TOKEN\\n\\n';;\n--gitcraft-profile-ssh) printf '%s\\n' \"$@\" > {}; exit 7;;\n*) exit 8;;\nesac\n",
+            "#!/bin/sh\ncase \"$1\" in\n--gitcraft-profile-credential) printf '%s\\n' \"$@\" > {}; printf '%s\\n' \"$HOME\" > {}; printf 'username=expected-work\\npassword=FIXTURE_SELECTED_TOKEN\\n\\n';;\n--gitcraft-profile-ssh) printf '%s\\n' \"$@\" > {}; printf '%s\\n' \"$SSH_AUTH_SOCK\" > {}; exit 7;;\n*) exit 8;;\nesac\n",
             shell(&root.join("selected-args")),
             shell(&root.join("selected-home")),
-            shell(&root.join("selected-ssh-args"))
+            shell(&root.join("selected-ssh-args")),
+            shell(&root.join("selected-ssh-agent"))
         ),
     )?;
     let ambient = root.join("ambient-helper");
