@@ -68,7 +68,7 @@ impl RepoTab {
         let as_file = self.diff_as_file;
         // A Markdown file can show rendered: `Some(whether it does)`.
         let markdown = view.key.renders().then_some(self.diff_rendered);
-        let folded = if as_file || markdown == Some(true) {
+        let folded = if as_file || markdown == Some(true) || view.encrypted.enabled {
             None
         } else {
             self.fold_reason(view, &settings, acts)

@@ -256,6 +256,13 @@ fn private_text_layout_does_not_enter_eguis_shared_galley_cache() {
                 "fixture-private-text-that-must-not-be-cached".into(),
                 egui::Color32::WHITE,
             );
+            let wrapped = super::view::private_wrapped_galley(
+                ui,
+                "fixture-private-text-that-must-not-be-cached".repeat(10),
+                egui::Color32::WHITE,
+                Some(100.),
+            );
+            assert!(wrapped.rows.len() > 3);
             let after = ui.fonts_mut(|fonts| fonts.num_galleys_in_cache());
             counts = Some((before, after));
             ui.painter()

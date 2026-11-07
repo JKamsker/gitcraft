@@ -41,6 +41,8 @@ pub(in crate::repo) struct State {
     result: Option<Result<Comparison, String>>,
     receiver: Option<Receiver<Result<Comparison, String>>>,
     active: Option<Arc<AtomicBool>>,
+    wrap: bool,
+    wrap_geometry: Option<(u32, Vec<f32>)>,
 }
 impl State {
     pub fn close(&mut self) {
@@ -51,6 +53,7 @@ impl State {
         self.receiver = None;
         self.result = None;
         self.enabled = false;
+        self.wrap_geometry = None;
     }
     fn begin(&mut self) -> (mpsc::Sender<Result<Comparison, String>>, Arc<AtomicBool>) {
         self.close();
