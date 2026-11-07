@@ -1,0 +1,12 @@
+{
+  "application_candidate": "531bb1ed528cb0c1ae68812d77e4cd309975fedd",
+  "status": "WIP corrected-source assessment; author preparing conservative Windows ancestor guard and will refreeze; no final verdict",
+  "original_CONTENT_1": "Corrected for independently reproduced Unix/remote root substitutions. Local RootPin holds original directory allocation and compares dev/ino at NOFOLLOW reopened root before openat/exclusive creation. Typed remote script checks captured physical pwd and GNU stat dev/ino/ctime token before private scratch and ln-T publication. Focused22/22existing-binary pass includes original root/ancestor and remote substitutions.",
+  "windows_static_review": "GetFileInformationByHandle narrow unsafe boundary matches windows-sys signature/structure; live file owns handle; unusable zero file-index fails closed. RootPin captures actual volume/index, denies delete sharing and rechecks reopened root; descendants retained before absolute CREATE_NEW. Whether held child directory blocks every ancestor rename was investigated, not confirmed as an actionable defect. Existing safe_read uses final-handle path defense; author elects explicit ancestor handles for simpler proof.",
+  "windows_documentation": {
+    "url": "https://learn.microsoft.com/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information",
+    "scope": "Microsoft describes ancestor rename restrictions when descendants have open file handles, which weakens the initial hypothesis. Directory-handle interpretation/native filesystem behavior not tested here; no unsupported confirmed-bug claim."
+  },
+  "validation": "All20 source/6log hashes match; author811passed3ignored0filtered814total/all22executed; independent bound retained binary22passed0failed792filtered in9.89s. No fresh compilation/native Windows/live remote/CI.",
+  "remaining": "Await exact new frozen source/gates; inspect narrow Windows ancestor change and bind new evidence. Original8011 failure notes immutable."
+}
