@@ -51,7 +51,8 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             for name in &p.prune { ui.monospace(name); }
         }
         ui.checkbox(&mut state.acknowledged, "I reviewed these URLs, mappings and mirror consequences");
-        let ready = state.acknowledged && e.preview.as_ref().is_some_and(|p| p.draft == e.draft);
+        if let Some(why)=&e.saving_blocked { ui.colored_label(egui::Color32::YELLOW,why); }
+        let ready = e.saving_blocked.is_none() && state.acknowledged && e.preview.as_ref().is_some_and(|p| p.draft == e.draft);
         if ui.add_enabled(ready, egui::Button::new("Save remote configuration")).clicked() { acts.push(Action::RepositoryTools(Act::SaveRemote(Box::new(e.clone())))); }
     });
 }

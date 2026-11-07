@@ -22,6 +22,7 @@ pub(crate) struct Editor {
     pub original: Settings,
     pub draft: Settings,
     pub preview: Option<Preview>,
+    pub saving_blocked: Option<String>,
 }
 pub(crate) fn values(repo: &Path, key: &str) -> Result<Vec<String>, String> {
     let normalized = key
@@ -54,14 +55,13 @@ pub(crate) fn inspect(repo: &Path, name: &str) -> Result<Editor, String> {
         push_urls: get("pushurl")?,
         fetch: get("fetch")?,
         push: get("push")?,
-        mirror: get("mirror")?
-            .last()
-            .is_some_and(|v| matches!(v.as_str(), "true" | "yes" | "1" | "on")),
+        mirror: boolean(repo, &format!("remote.{name}.mirror"), false)?,
     };
     Ok(Editor {
         snapshot: Snapshot::capture(repo)?,
         original: draft.clone(),
         draft,
+        saving_blocked: local_edit_blocker(repo, name)?,
         preview: None,
     })
 }
@@ -117,18 +117,54 @@ fn map(pattern: &str, replacement: &str, value: &str) -> Option<String> {
         (pattern == value).then(|| replacement.into())
     }
 }
+pub(crate) fn boolean(repo: &Path, key: &str, default: bool) -> Result<bool, String> {
+    let out = crate::git::run_captured(repo, &["config", "--bool", "--get", key], None)?;
+    match out.code {
+        Some(0) => match out.stdout.trim() {
+            "true" => Ok(true),
+            "false" => Ok(false),
+            _ => Err(format!("Invalid boolean configuration for {key}")),
+        },
+        Some(1) => Ok(default),
+        _ => Err(format!("Cannot read {key}: {}", out.stderr.trim())),
+    }
+}
+pub(crate) fn validate_url(url: &str) -> Result<(), String> {
+    let helper = url
+        .find("::")
+        .is_some_and(|i| !url[..i].contains(['/', '\\']));
+    if url.is_empty() || url.starts_with('-') || url.contains(['\n', '\r', '\0']) || helper {
+        return Err("Use a regular HTTPS, SSH, Git or filesystem URL without options or external transport helpers".into());
+    }
+    Ok(())
+}
+fn local_edit_blocker(repo: &Path, name: &str) -> Result<Option<String>, String> {
+    let local = text(
+        repo,
+        &["config", "--local", "--no-includes", "--null", "--list"],
+    )?;
+    for field in ["url", "pushurl", "fetch", "push", "mirror"] {
+        let key = format!("remote.{name}.{field}");
+        let own: Vec<_> = local
+            .split('\0')
+            .filter_map(|r| r.split_once('\n'))
+            .filter(|(k, _)| *k == key)
+            .map(|(_, v)| v.to_owned())
+            .collect();
+        if values(repo, &key)? != own {
+            return Ok(Some(format!(
+                "{key} contains inherited, included, profile or worktree values. This editor writes the repository config only; remove or edit those values at their source first."
+            )));
+        }
+    }
+    Ok(None)
+}
 pub(crate) fn validate(settings: &Settings) -> Result<(), String> {
     if settings.fetch_urls.is_empty() {
         return Err("A fetch URL is required".into());
     }
     for url in settings.fetch_urls.iter().chain(&settings.push_urls) {
-        if url.is_empty()
-            || url.starts_with('-')
-            || url.contains(['\n', '\r', '\0'])
-            || url.contains("::")
-        {
-            return Err("Use a regular HTTPS, SSH, Git or filesystem URL without options or helper commands".into());
-        }
+        validate_url(url)?;
     }
     for s in &settings.fetch {
         parse(s, true)?;
@@ -253,6 +289,9 @@ pub(crate) fn save(runner: &Runner<'_>, editor: &Editor) -> Result<String, Strin
         return Err("Preview these exact edits before saving".into());
     }
     editor.snapshot.check(runner.repo)?;
+    if let Some(why) = local_edit_blocker(runner.repo, &editor.draft.name)? {
+        return Err(why);
+    }
     let s = &editor.draft;
     for (field, value) in [
         ("url", s.fetch_urls.clone()),
@@ -263,6 +302,9 @@ pub(crate) fn save(runner: &Runner<'_>, editor: &Editor) -> Result<String, Strin
     ] {
         set_values(runner, &format!("remote.{}.{field}", s.name), &value).map_err(|e| format!("Remote configuration save stopped at {field}: {e}. Earlier fields may already be saved; reopen the editor before retrying."))?;
     }
+    if inspect(runner.repo, &s.name)?.draft != *s {
+        return Err("Effective remote settings differ after saving. Reopen the editor and check inherited configuration before using this remote.".into());
+    }
     Ok(
         "Remote URLs, refspecs and mirror policy saved. No fetch, push or prune was performed."
             .into(),
@@ -271,6 +313,46 @@ pub(crate) fn save(runner: &Runner<'_>, editor: &Editor) -> Result<String, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn inherited_remote_values_are_refused_before_any_config_write() -> Result<(), String> {
+        let source = crate::git::fixture::Repo::new("refspec-inherited-source")?;
+        source.commit("base", &[])?;
+        let r = crate::git::fixture::Repo::new("refspec-inherited-local")?;
+        r.commit("base", &[])?;
+        r.git(&["remote", "add", "vendor", &source.path().to_string_lossy()])?;
+        let included = r.path().join(".git/remote-include");
+        std::fs::write(
+            &included,
+            "[remote \"vendor\"]\n fetch = +refs/tags/*:refs/tags/*\n",
+        )
+        .map_err(|e| e.to_string())?;
+        r.git(&[
+            "config",
+            "include.path",
+            included.to_str().ok_or("include path")?,
+        ])?;
+        let mut e = inspect(r.path(), "vendor")?;
+        assert!(e.saving_blocked.is_some());
+        e.draft.push_urls = vec![source.path().to_string_lossy().into_owned()];
+        let e = preview(r.path(), e)?;
+        let before = r.git(&["config", "--local", "--no-includes", "--list"])?;
+        let control = crate::git::OpControl::new(|| {});
+        let runner = Runner {
+            repo: r.path(),
+            control: &control,
+            credentials: None,
+        };
+        assert!(save(&runner, &e).is_err());
+        assert_eq!(
+            r.git(&["config", "--local", "--no-includes", "--list"])?,
+            before
+        );
+        r.git(&["config", "remote.vendor.mirror", "TRUE"])?;
+        assert!(inspect(r.path(), "vendor")?.draft.mirror);
+        assert!(validate_url("ssh://git@[::1]/repo.git").is_ok());
+        assert!(validate_url("ext::arbitrary command").is_err());
+        Ok(())
+    }
     #[test]
     fn negative_mapping_pruning_and_guarded_url_edits() -> Result<(), String> {
         let source = crate::git::fixture::Repo::new("refspec-source")?;
