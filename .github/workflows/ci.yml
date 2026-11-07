@@ -61,7 +61,14 @@ jobs:
         timeout-minutes: 30
         env:
           RUST_BACKTRACE: "1"
-        run: cargo test --locked -- --nocapture
+        run: cargo test --locked -- --nocapture --skip parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped
+      # This test counts `sleep 6789` processes globally on Linux. Running it in
+      # parallel with other subprocess-heavy tests can produce a false failure.
+      - name: Timed-out subprocess cleanup (isolated)
+        timeout-minutes: 5
+        env:
+          RUST_BACKTRACE: "1"
+        run: cargo test --locked -p gitcraft --lib parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped -- --exact --nocapture
 
   windows-build:
     name: Windows test build
