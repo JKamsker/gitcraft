@@ -61,6 +61,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Undo and redo commits, merges, rebases, folds, resets, checkouts, branches, tags and stashes.",
             "Reflog (left pane, a branch's menu, or Ctrl+P): where HEAD and each branch have been, what moved them (commit, checkout, reset, rebase…) and from which commit to which, also for what was done in the terminal or before gitcraft was opened. Select an entry to see its commit; Create branch here (or a double-click) gets it back, or cherry-pick it, check it out or copy its hash.",
             "Find lost commits scans for the commits no branch, tag or stash has any more, even once their reflog has expired, newest first, with the same buttons; a dropped stash is applied back with Apply stash. It reads every object, so on a big repository it takes a while; Cancel stops it.",
+            "Before a reset, deleting a branch (here or on a remote), dropping a commit or discarding a file, the dialog says what it will do: the commits leaving the branch (for a delete, those the checked-out branch hasn't), each marked still on another branch or only here; the files whose uncommitted changes are lost; whether the commits it rewrites were pushed, so that a force push will be needed; the git commands it runs (folded); and whether Ctrl+Z restores it.",
         ],
     ),
     (

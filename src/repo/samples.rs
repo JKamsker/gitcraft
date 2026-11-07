@@ -48,6 +48,16 @@ impl RepoTab {
                         target: tag.target.clone(),
                     });
                 }
+                // What a hard reset to HEAD would change, read in the background.
+                let target = self.refs.current.as_deref().unwrap_or("HEAD");
+                let head = &self.refs.head;
+                acts.push(Action::Dialog(
+                    Dialog::confirm("Hard reset", String::new(), "Reset", Vec::new(), None)
+                        .preview(
+                            crate::git::PreviewAsk::reset(target, head, head, None, true),
+                            String::new(),
+                        ),
+                ));
                 acts.push(Action::Dialog(Dialog::add_worktree(
                     &self.path, None, "HEAD",
                 )));

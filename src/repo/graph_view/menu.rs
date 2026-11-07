@@ -81,12 +81,18 @@ impl RepoTab {
         self.quick_edit_items(ui, &hash, idle, acts);
         self.fold_item(ui, &hash, idle, acts);
         ui.separator();
+        let upstream = self
+            .refs
+            .current
+            .as_deref()
+            .and_then(|b| self.upstream_ref(b));
         let rewrite = Rewrite {
             hash: &hash,
             short: &short,
             summary: &summary,
             target: &target,
             head: &self.refs.head,
+            upstream: upstream.as_deref(),
         };
         rewrite_items(ui, &rewrite, idle, is_head, acts);
         ui.separator();
@@ -296,6 +302,8 @@ pub(in crate::repo) struct Rewrite<'a> {
     pub(in crate::repo) target: &'a str,
     /// HEAD's commit, as the menu saw it.
     pub(in crate::repo) head: &'a str,
+    /// The remote-tracking branch `target` is pushed to (`refs/remotes/origin/main`).
+    upstream: Option<&'a str>,
 }
 
 /// Entries that rewrite `target` (the checked-out branch) from the commit: interactive rebase,
@@ -360,6 +368,7 @@ pub(in crate::repo) fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<
         summary,
         target,
         head,
+        upstream,
     } = *r;
     for (mode, undo_mode, label, explain) in [
         ("--soft", "--soft", "Soft", "Keeps every change, staged."),
@@ -387,7 +396,21 @@ pub(in crate::repo) fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<
                     reset_steps(mode, hash, target, head),
                     None,
                 )
-                .undo(Undo::HeadMove { mode: undo_mode }),
+                .undo(Undo::HeadMove { mode: undo_mode })
+                .preview(
+                    git::PreviewAsk::reset(
+                        target,
+                        head,
+                        hash,
+                        upstream.map(str::to_owned),
+                        mode == "--hard",
+                    ),
+                    if mode == "--hard" {
+                        format!("Leaving {target}")
+                    } else {
+                        format!("Leaving {target}, changes kept")
+                    },
+                ),
             ));
         }
     }

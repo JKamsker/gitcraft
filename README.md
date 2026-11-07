@@ -89,8 +89,8 @@ so your config, credentials and hooks apply as usual.
   Shift+Enter jump between results, loading older history when needed.
 - Right-click a commit: create a branch, a tag or a worktree on a new branch there, check it
   out, interactive rebase onto it,
-  cherry-pick, revert, reset the current branch to it (soft / mixed / hard, confirmed), the menu
-  of each branch on it, copy the hash, message or branch name. Right-click a branch's pill to get
+  cherry-pick, revert, reset the current branch to it (soft / mixed / hard, confirmed with what
+  it changes), the menu of each branch on it, copy the hash, message or branch name. Right-click a branch's pill to get
   check out, fast-forward, merge, rebase and interactive rebase for that branch on top.
 - Compare: Ctrl+click a second commit (or _Compare with…_ in the commit menu, the changes row
   standing for the working tree) to list the files that differ between the two and open each
@@ -105,8 +105,8 @@ so your config, credentials and hooks apply as usual.
   place), squash, fix up or drop each one, move them up and down, then _Start rebase_. Ctrl+Z
   undoes it.
 - Quick edits from a commit's menu, for commits of the checked-out branch: _Edit commit
-  message_, _Drop commit_, _Move commit up_ / _down_, each a rebase without the editor and undone
-  with Ctrl+Z. What can't be done (a merge, merges after the commit) is greyed out with why.
+  message_, _Drop commit_ (which asks first), _Move commit up_ / _down_, each a rebase without
+  the editor and undone with Ctrl+Z. What can't be done (a merge, merges after the commit) is greyed out with why.
 
 **Branches, remotes, worktrees, stashes, tags** (left)
 
@@ -168,6 +168,13 @@ so your config, credentials and hooks apply as usual.
   it, or another operation (rebase, merge, cherry-pick…) is in progress.
 - Undo / redo (Ctrl+Z / Ctrl+Y) of commits, amends, merges, rebases, folds, pulls, resets,
   cherry-picks, reverts, checkouts, branch create / rename / delete, tags and stashes.
+- _What will this do_: before a reset, deleting a branch (here, on the remote or both),
+  dropping a commit or discarding a file, the dialog lists the commits leaving the branch (for a
+  delete, those the checked-out branch hasn't), each marked _still on x_ or _only here_; the
+  files whose uncommitted changes will be lost; that a force push will be needed when the
+  commits rewritten are already on the upstream; the git commands it runs, folded; and
+  _Ctrl+Z restores this_ when undo covers it. It is read in the background (also for
+  repositories in WSL or over SSH); long lists end with _and 340 more_.
 
 **Reflog and lost commits** (above the graph)
 
@@ -442,6 +449,7 @@ was made this way, on a demo repository.
 | `src/repo/file_view.rs`  | a file's history, blame and contents at a commit                                   |
 | `src/repo/file_text.rs`  | a whole file at a commit, coloured, for the file view and diffs                    |
 | `src/repo/dialogs.rs`    | branch, tag, stash, remote, worktree, pull request and confirm dialogs             |
+| `src/git/preview.rs`     | what a destructive operation would change, read before it runs                     |
 | `src/repo/widgets.rs`    | shared painted widgets (panel headers, file rows, avatars, tabs)                   |
 | `src/app.rs`             | window shell: tabs, start page, cloning, palette, settings, toasts                 |
 

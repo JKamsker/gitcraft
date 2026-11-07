@@ -8,7 +8,7 @@ use egui::Ui;
 
 use super::operations::expect_ref_at;
 use super::rebase::{RebaseEditor, Step};
-use super::{Action, Msg, Refresh, RepoTab, Undo, short, spawn};
+use super::{Action, Dialog, Msg, Refresh, RepoTab, Undo, short, spawn};
 use crate::git::{self, Commit, RebaseCommit};
 
 /// A change to one commit made from its menu.
@@ -161,6 +161,7 @@ impl RepoTab {
             if button.clicked() {
                 acts.push(match edit {
                     Edit::Message => Action::EditMessage(hash.to_owned()),
+                    Edit::Drop => self.confirm_drop(&line, hash),
                     _ => Action::QuickEdit {
                         edit,
                         hash: hash.to_owned(),
@@ -168,6 +169,57 @@ impl RepoTab {
                 });
             }
         }
+    }
+
+    /// Asks before dropping `hash` (of the checked-out branch, `line` from HEAD down), saying
+    /// what leaves the branch and whether it was pushed.
+    fn confirm_drop(&self, line: &[&Commit], hash: &str) -> Action {
+        let drop = Action::QuickEdit {
+            edit: Edit::Drop,
+            hash: hash.to_owned(),
+        };
+        let (Some(commit), Some(branch)) = (
+            line.iter().find(|c| c.hash == hash),
+            self.refs.current.as_deref(),
+        ) else {
+            return drop;
+        };
+        let parent = commit
+            .parents
+            .first()
+            .map(String::as_str)
+            .unwrap_or_default();
+        let short = short(hash);
+        let described = vec![
+            format!("git rebase -i --autostash {short}^"),
+            format!("todo: drop {short} {}", commit.summary),
+        ];
+        Action::Dialog(
+            Dialog::confirm(
+                "Drop commit",
+                format!(
+                    "Remove {short} ({}) and its changes from {branch}? The commits after it \
+                     are replayed on its parent; if one conflicts, the rebase stops for you to \
+                     resolve it.",
+                    commit.summary
+                ),
+                "Drop",
+                Vec::new(),
+                None,
+            )
+            .instead(drop, described)
+            .undo(Undo::HeadMove { mode: "--keep" })
+            .preview(
+                git::PreviewAsk::drop_commit(
+                    hash,
+                    parent,
+                    branch,
+                    &self.refs.head,
+                    self.upstream_ref(branch),
+                ),
+                format!("Leaving {branch}"),
+            ),
+        )
     }
 
     /// Opens the editor of the message of `hash` in the detail pane, once its detail is in.
@@ -209,7 +261,17 @@ impl RepoTab {
 
     /// Reads the commits the rebase for `edit` replays.
     pub(super) fn quick_edit(&mut self, edit: Edit, hash: String, ctx: &egui::Context) {
-        if self.busy_op.is_some() {
+        // Confirmed (a drop) while something started meanwhile (the background fetch): said,
+        // not dropped without a word.
+        if let Some(busy) = &self.busy_op {
+            self.status = Some((
+                format!(
+                    "{} {}: {busy} is still running, try again when it's done",
+                    edit.label(),
+                    short(&hash)
+                ),
+                true,
+            ));
             return;
         }
         let path = self.path.clone();

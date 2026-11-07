@@ -8,6 +8,7 @@ mod files;
 mod fold;
 mod lfs;
 mod reflog;
+mod preview;
 mod refs;
 mod status;
 mod submodule;
@@ -20,6 +21,7 @@ pub use self::files::*;
 pub use self::fold::*;
 pub use self::lfs::*;
 pub use self::reflog::*;
+pub use self::preview::*;
 pub use self::refs::*;
 pub use self::status::*;
 pub use self::submodule::*;
@@ -173,3 +175,6 @@ pub fn now() -> i64 {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod preview_tests;

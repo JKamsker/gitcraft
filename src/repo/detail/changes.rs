@@ -275,6 +275,11 @@ fn discard_dialog(f: &StatusFile) -> Dialog {
             None,
         )
         .refresh(Refresh::Status)
+        .preview(
+            crate::git::PreviewAsk::files(vec![f.path.clone()]),
+            String::new(),
+        )
+        .files_heading("Deleted")
     } else {
         Dialog::confirm(
             "Discard changes",
@@ -288,6 +293,11 @@ fn discard_dialog(f: &StatusFile) -> Dialog {
             None,
         )
         .refresh(Refresh::Status)
+        .preview(
+            crate::git::PreviewAsk::files(vec![f.path.clone()]),
+            String::new(),
+        )
+        .files_heading("Unstaged changes lost")
     }
 }
 

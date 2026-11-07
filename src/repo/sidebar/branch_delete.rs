@@ -22,6 +22,7 @@ impl RepoTab {
             "Can't delete the checked-out branch"
         };
         let can = !b.is_head && !elsewhere && idle;
+        let local_ref = format!("refs/heads/{}", b.name);
         // Only while the branch is where the menu saw it: commits made on it since (in the
         // terminal, while the dialog is open) are not what was asked to be deleted, nor what
         // undoing would bring back.
@@ -46,7 +47,8 @@ impl RepoTab {
                 .undo(Undo::Custom {
                     undo: restore.clone(),
                     redo: redo_delete(&b.name, ops(&[&["branch", "-D", "--", &b.name]])),
-                }),
+                })
+                .preview_of(self.delete_preview(&[&b.target], vec![local_ref.clone()])),
             ));
         }
         // Where the upstream is, on the remote and here.
@@ -100,7 +102,12 @@ impl RepoTab {
                 .undo(Undo::Custom {
                     undo,
                     redo: redo_delete(&b.name, delete("-D")),
-                }),
+                })
+                // Commits pushed there that this branch hasn't go with the remote branch too.
+                .preview_of(self.delete_preview(
+                    &[&b.target, &tracked.target],
+                    vec![local_ref, format!("refs/remotes/{}", tracked.name)],
+                )),
             ));
         }
     }

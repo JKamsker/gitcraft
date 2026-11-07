@@ -72,7 +72,7 @@ impl RepoTab {
             Action::Checkout(name) => self.checkout(&name, ctx),
             Action::CheckoutPull(name) => self.checkout_pull(&name, ctx),
             Action::CheckoutRemote(name) => self.checkout_remote(&name, ctx),
-            Action::Dialog(dialog) => self.dialog = Some(dialog),
+            Action::Dialog(dialog) => self.open_dialog(dialog, ctx),
             Action::DeleteTag { name, target } => self.delete_tag(name, target, ctx),
             Action::Commit => self.commit(ctx),
             Action::Fetch => {

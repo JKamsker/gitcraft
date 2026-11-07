@@ -628,3 +628,30 @@ fn an_operation_that_panics_leaves_the_tab_idle() {
     );
     assert_eq!(job_status.as_deref(), Some("Internal error: bang"));
 }
+
+/// A drop confirmed while another operation started meanwhile (the background fetch) says so,
+/// rather than closing the dialog with nothing done and nothing said.
+#[test]
+fn a_drop_confirmed_while_busy_says_so() {
+    use super::{Action, RepoTab, quick_edit::Edit};
+    let dir = repo("drop-busy");
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    tab.busy_op = Some("Fetch".to_owned());
+    tab.apply(
+        Action::QuickEdit {
+            edit: Edit::Drop,
+            hash: "0123456789abcdef".to_owned(),
+        },
+        &ctx,
+    );
+    let status = tab.status.clone();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(
+        status,
+        Some((
+            "Drop commit 01234567: Fetch is still running, try again when it's done".to_owned(),
+            true
+        ))
+    );
+}
