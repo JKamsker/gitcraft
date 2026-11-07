@@ -95,6 +95,14 @@ impl PrExtras {
     }
 }
 
+/// Bind new provider actions to the exact Profile settings which read their page.
+pub(crate) fn connection_binding() -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hash = std::collections::hash_map::DefaultHasher::new();
+    crate::connections::current().hash(&mut hash);
+    hash.finish()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -115,12 +123,4 @@ mod tests {
             assert_eq!(extras.can_write(), may, "{permission}");
         }
     }
-}
-
-/// Bind new provider actions to the exact Profile settings which read their page.
-pub(crate) fn connection_binding() -> u64 {
-    use std::hash::{Hash, Hasher};
-    let mut hash = std::collections::hash_map::DefaultHasher::new();
-    crate::connections::current().hash(&mut hash);
-    hash.finish()
 }

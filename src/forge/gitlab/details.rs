@@ -19,9 +19,10 @@ pub(super) fn read(api: &Api, number: u64) -> Result<PrDetails, String> {
         let approvals = api.get(&format!("{}/approvals", api.mr(number)));
         let discussions = api.all(&format!("{}/discussions", api.mr(number)));
         let commits = api.all(&format!("{}/commits", api.mr(number)))?;
+        let diffs = api.all(&format!("{}/diffs", api.mr(number)))?;
         let after = api.get(&api.mr(number))?;
         if same_revision(&mr, &after) {
-            return assemble(
+            let mut result = assemble(
                 &mr,
                 &project,
                 &viewer,
@@ -29,7 +30,28 @@ pub(super) fn read(api: &Api, number: u64) -> Result<PrDetails, String> {
                 &discussions,
                 &commits,
                 number,
-            );
+            )?;
+            let identity = crate::pull_request::repo_of_url(&result.url);
+            if identity != Some((api.hosting.host.clone(), api.hosting.path.clone())) {
+                return Err("GitLab returned a merge request for a different repository".into());
+            }
+            result.changed_files = diffs.len() as u64;
+            for diff in &diffs {
+                if diff.get("too_large").and_then(Value::as_bool) == Some(true)
+                    || diff.get("collapsed").and_then(Value::as_bool) == Some(true)
+                {
+                    result.inline_error=Some("GitLab omitted a large or collapsed diff; line comments on omitted lines are unavailable.".into());
+                }
+                for line in at(diff, "/diff").lines() {
+                    if line.starts_with('+') && !line.starts_with("+++") {
+                        result.additions += 1;
+                    }
+                    if line.starts_with('-') && !line.starts_with("---") {
+                        result.deletions += 1;
+                    }
+                }
+            }
+            return Ok(result);
         }
     }
     Err("The merge request changed while it was read. Reload it before reviewing.".into())
@@ -95,7 +117,7 @@ pub(super) fn blocker(
     };
     Some(message.into())
 }
-fn assemble(
+pub(super) fn assemble(
     mr: &Value,
     project: &Value,
     viewer: &Value,

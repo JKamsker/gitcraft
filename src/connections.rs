@@ -276,6 +276,28 @@ const GL_TOKENS: &[&str] = &[
 
 /// A selected account ignores tokens inherited from a terminal/other profile. No process
 /// environment is changed: this affects this one command only.
+#[cfg(test)]
+pub(crate) fn with_test_program<T>(tool: &str, path: &Path, job: impl FnOnce() -> T) -> T {
+    struct Restore(String, Option<PathBuf>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            TEST_PROGRAMS.with(|p| {
+                let mut p = p.borrow_mut();
+                if let Some(path) = self.1.take() {
+                    p.insert(self.0.clone(), path);
+                } else {
+                    p.remove(&self.0);
+                }
+            });
+        }
+    }
+    let _restore = Restore(
+        tool.into(),
+        TEST_PROGRAMS.with(|p| p.borrow_mut().insert(tool.into(), path.into())),
+    );
+    job()
+}
+
 pub(crate) fn program(tool: &str) -> PathBuf {
     #[cfg(test)]
     if let Some(path) = TEST_PROGRAMS.with(|p| p.borrow().get(tool).cloned()) {

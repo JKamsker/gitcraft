@@ -2,6 +2,8 @@
 mod api;
 mod details;
 mod post;
+#[cfg(test)]
+mod tests;
 
 use std::path::Path;
 

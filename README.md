@@ -238,6 +238,15 @@ disabled. Snapshots and recovery run on the repository's machine, including SSH 
   and above the changed files of an open pull request) opens the worktree its branch is checked
   out in, or makes one beside the repository first: on the local branch, on a new one tracking
   the remote branch, or fetched from the forge for a fork that isn't a remote here.
+- GitLab merge requests open in the main review area with commits, pipeline status,
+  changed files and native line discussions. Publish comments explicitly, reply, resolve
+  or reopen discussions, approve the reviewed SHA and merge using the project's allowed
+  merge/squash policy. Native approval, pipeline and discussion blockers stay visible.
+  Each action rechecks the repository, signed-in account and exact revision; a changed
+  head requires a refresh. Pending GitHub-style reviews, review dismissal and direct
+  suggestion commits are not offered for GitLab. Reads are bounded to 1,000 items per
+  collection; omitted discussions/diffs and API failures are reported. Authentication
+  uses the existing captured `glab` Profile choice; pending imported profiles stay blocked.
 - Gerrit: _Push for review_ picks a fetched target branch and optional topic, validates every
   commit's `Change-Id`, and submits to `refs/for/<branch>`. Graph rows link to the change.
   Amending preserves its `Change-Id`; submit again for a new patch set.

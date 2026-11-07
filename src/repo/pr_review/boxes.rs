@@ -171,3 +171,45 @@ fn pending_list(ui: &mut Ui, extras: &PrExtras, posting: bool, acts: &mut Vec<Ac
 fn first_line(text: &str) -> &str {
     text.lines().next().unwrap_or("")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui_kittest::kittest::Queryable as _;
+    #[test]
+    fn native_approval_ui_hides_unsupported_verdicts_and_requires_explicit_click() {
+        let extras = PrExtras {
+            review_features: crate::pr_threads::ReviewFeatures {
+                pending: false,
+                request_changes: false,
+                approve: true,
+                apply_suggestions: false,
+            },
+            ..Default::default()
+        };
+        let mut h = egui_kittest::Harness::builder()
+            .with_size([1000.0, 500.0])
+            .build_ui_state(
+                |ui, state: &mut (PrDraft, PrExtras, Vec<Action>)| {
+                    let (draft, extras, actions) = state;
+                    review_box(ui, draft, extras, false, true, actions);
+                },
+                (PrDraft::default(), extras, Vec::new()),
+            );
+        h.run();
+        assert!(h.state().2.is_empty());
+        assert!(h.query_by_label("Request changes").is_none());
+        assert!(h.query_by_label("Discard").is_none());
+        h.get_by_label("Approve").click();
+        h.run_steps(3);
+        assert!(
+            h.state()
+                .2
+                .iter()
+                .any(|a| matches!(a, Action::Pr(PrAct::Submit(Verdict::Approve))))
+        );
+        h.state_mut().1.review_features.approve = false;
+        h.run_steps(2);
+        assert!(h.query_by_label("Approve").is_none());
+    }
+}

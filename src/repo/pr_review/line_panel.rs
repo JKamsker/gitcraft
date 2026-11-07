@@ -317,3 +317,41 @@ pub(in crate::repo) fn paint_gutter_mark(
         );
     }
 }
+
+#[cfg(test)]
+mod native_tests {
+    use super::*;
+    use egui_kittest::kittest::Queryable as _;
+    #[test]
+    fn direct_comment_ui_does_not_offer_a_pending_review_for_native_discussions() {
+        let draft = PrDraft {
+            line_text: "A direct comment".into(),
+            ..Default::default()
+        };
+        let mut h = egui_kittest::Harness::builder()
+            .with_size([900.0, 400.0])
+            .build_ui_state(
+                |ui, state: &mut (PrDraft, Vec<Action>)| {
+                    let shown = ThreadsShown {
+                        reply_to: None,
+                        pending_exists: false,
+                        pending_supported: false,
+                        open: true,
+                    };
+                    line_buttons(ui, &mut state.0, &shown, None, &mut state.1);
+                },
+                (draft, Vec::new()),
+            );
+        h.run();
+        assert!(h.state().1.is_empty());
+        assert!(h.query_by_label("Add to review").is_none());
+        h.get_by_label("Comment now").click();
+        h.run_steps(3);
+        assert!(
+            h.state()
+                .1
+                .iter()
+                .any(|a| matches!(a, Action::Pr(PrAct::PostLineNow)))
+        );
+    }
+}

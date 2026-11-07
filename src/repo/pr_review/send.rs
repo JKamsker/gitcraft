@@ -6,7 +6,7 @@ use crate::pull_request::PrDetails;
 use crate::repo::{Action, DiffKey, Msg, RepoTab, spawn};
 
 use super::lines::{DiffReview, line_marks};
-use super::{Posted, PrAct, PrDraft};
+use super::{Place, Posted, PrAct, PrDraft};
 
 /// Something to send, on a thread of its own.
 type PostJob = Box<dyn FnOnce(&dyn Target) -> Result<(), String> + Send>;
