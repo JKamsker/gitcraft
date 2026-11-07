@@ -432,9 +432,11 @@ mod tests {
         let control = OpControl::new(|| {});
         let canceller = Arc::clone(&control);
         let pid_seen = pid_file.clone();
-        std::thread::spawn(move || {
+        let canceller_thread = std::thread::spawn(move || {
             for _ in 0..200 {
-                if pid_seen.exists() {
+                if std::fs::read_to_string(&pid_seen).ok().is_some_and(|pid| {
+                    pid.ends_with('\n') && pid.trim().parse::<u32>().is_ok_and(|pid| pid > 0)
+                }) {
                     break;
                 }
                 std::thread::sleep(Duration::from_millis(25));
@@ -451,26 +453,55 @@ mod tests {
             &control,
         );
         let took = started.elapsed();
+        canceller_thread.join().map_err(|_| "canceller panicked")?;
         let pid = std::fs::read_to_string(&pid_file).unwrap_or_default();
-        let alive = std::process::Command::new("kill")
-            .args(["-0", pid.trim()])
-            .stderr(Stdio::null())
-            .status()
-            .is_ok_and(|s| s.success());
-        // A container's PID 1 may not reap orphans. A zombie was stopped; kill -0 alone
-        // reports it as alive even though it cannot execute anything.
-        let zombie = std::fs::read_to_string(format!("/proc/{}/stat", pid.trim()))
-            .ok()
-            .is_some_and(|stat| {
-                stat.rsplit_once(") ")
-                    .is_some_and(|(_, rest)| rest.starts_with("Z "))
-            });
-        let alive = alive && !zombie;
-        let _ = std::fs::remove_dir_all(&dir);
+        let pid = pid.trim();
         assert_eq!(result, Err(CANCELLED.to_owned()));
-        assert!(!pid.trim().is_empty(), "the fake ssh never ran");
+        assert!(!pid.is_empty(), "the fake ssh never ran");
         assert!(took < Duration::from_secs(15), "took {took:?}");
-        assert!(!alive, "what git started still runs");
+        let running = || -> Result<bool, String> {
+            // One /proc snapshot avoids a kill-0/read-stat race: the process can be
+            // reaped between those calls. A container's PID 1 may also leave zombies,
+            // which have stopped executing and must not count as surviving helpers.
+            #[cfg(target_os = "linux")]
+            match std::fs::read_to_string(format!("/proc/{pid}/stat")) {
+                Ok(stat) => {
+                    return Ok(!stat.rsplit_once(") ").is_some_and(|(_, rest)| {
+                        rest.starts_with("Z ") || rest.starts_with("X ")
+                    }));
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+                Err(_) => {}
+            }
+            std::process::Command::new("kill")
+                .args(["-0", pid])
+                .stderr(Stdio::null())
+                .status()
+                .map(|status| status.success())
+                .map_err(|error| error.to_string())
+        };
+        // SIGKILL delivery and waiting for Git do not synchronize the scheduler's exit
+        // transition of its nonchild helper. Still require that helper to stop promptly:
+        // an escaped sleep would continue for 60 seconds and fail this bounded check.
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let alive = loop {
+            let alive = running()?;
+            if !alive || Instant::now() >= deadline {
+                break alive;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        let state = if alive {
+            std::process::Command::new("ps")
+                .args(["-o", "pid=,ppid=,pgid=,stat=,command=", "-p", pid])
+                .output()
+                .map(|out| String::from_utf8_lossy(&out.stdout).into_owned())
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(!alive, "what git started still runs: {state}");
         Ok(())
     }
 
