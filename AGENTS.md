@@ -1,3 +1,12 @@
+# gitcraft agent notes
+
+## Forge
+
+- Forge: **github** (`api_base`: `https://api.github.com`).
+- Canonical checkout aliases: `origin` = upstream `Vancete/gitcraft` (read-only for us); `fork` = `JKamsker/gitcraft` (admin) — issues and PRs go to the fork.
+- Tooling: `gh` (pass `-R JKamsker/gitcraft`).
+- Worktree aliases can differ: verify configured URLs before use. All writes and PRs target `JKamsker/gitcraft`.
+
 # Work preservation
 
 - Commit **and push** every completed unit before starting the next unit or any risky test. Verify the remote branch SHA equals the local commit, and report whether the unit is WIP, reviewed, or validated.
