@@ -88,6 +88,9 @@ pub(super) fn image_id(old: Option<&[u8]>, new: Option<&[u8]>) -> String {
 pub(super) fn image_view(ui: &mut Ui, images: &ImagePair) {
     let t = Tokens::get(ui.ctx());
     ui.add_space(12.0);
+    if images.svg {
+        ui.label("Isolated SVG preview: external resources disabled; bounded embedded PNG/JPEG images only. Unsupported effects can be inspected in SVG source.");
+    }
     ui.columns(2, |cols| {
         for (col, (label, bytes, side)) in cols.iter_mut().zip([
             ("Before", &images.old, "old"),
@@ -153,6 +156,7 @@ mod svg_tests {
         assert!(data.partial);
         let ctx = egui::Context::default();
         egui_extras::install_image_loaders(&ctx);
+        crate::svg::install(&ctx);
         ctx.include_bytes(
             "bytes://test.svg",
             image.new.as_ref().ok_or("new")?.to_vec(),
