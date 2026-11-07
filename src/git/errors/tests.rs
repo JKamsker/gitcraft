@@ -458,13 +458,14 @@ fn locks_of_a_linked_worktree() -> Result<(), String> {
 
 #[test]
 fn git_processes_of_ps() {
-    let ps = "    1     0 /sbin/init\n  200     1 /usr/bin/git commit -m wip\n  201   200 vim .git/COMMIT_EDITMSG\n  300    42 /usr/lib/git-core/git-remote-https origin https://x\n  400   999 git status\n  401   400 git-lfs filter-process\n  500     1 gitcraft\n  501     1 gitk --all\n";
+    let ps = "    1     0 /sbin/init\n  200     1 /usr/bin/git commit -m wip\n  201   200 vim .git/COMMIT_EDITMSG\n  300    42 /usr/lib/git-core/git-remote-https origin https://x\n  400   999 git status\n  401   400 git-lfs filter-process\n  500     1 gitcraft\n  501     1 gitk --all\n  502     1 git ls-remote https://github.com/JKamsker/gitcraft\n";
     // 999 is this app: its git and what that git started are its own.
     assert_eq!(
         lock::git_lines(ps, Some(999)),
         [
             "/usr/bin/git commit -m wip",
             "/usr/lib/git-core/git-remote-https origin https://x",
+            "git ls-remote https://github.com/JKamsker/gitcraft",
         ]
     );
     assert!(lock::git_lines("", None).is_empty());
@@ -489,7 +490,13 @@ fn git_processes_here() -> Result<(), String> {
     let dir = repo("processes")?;
     let running = lock::git_processes(&dir)?;
     assert!(
-        running.iter().all(|line| !line.contains("gitcraft")),
+        running.iter().all(|line| {
+            // Another checkout can be running Git against a path or URL containing
+            // "gitcraft". Only the executable identifies the application itself.
+            let program = line.split_whitespace().next().unwrap_or_default();
+            let name = program.rsplit(['/', '\\']).next().unwrap_or_default();
+            !matches!(name, "gitcraft" | "gitcraft.exe")
+        }),
         "{running:?}"
     );
     let _ = std::fs::remove_dir_all(&dir);
