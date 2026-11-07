@@ -146,7 +146,7 @@ impl RepoTab {
         if !force && self.branch_bands.model == Model::Compact && self.branch_bands.pins.is_empty()
         {
             self.band_reader.cancel();
-            self.band_context=None;
+            self.band_context = None;
             return;
         }
         let prefs = self.branch_bands.clone();
@@ -173,9 +173,19 @@ impl RepoTab {
         });
     }
     pub(super) fn poll_branch_bands(&mut self, ctx: &egui::Context) {
-        if !self.shown {self.band_reader.cancel();self.band_dirty=true;return;}
-        if self.band_context.as_ref().is_some_and(|owner|owner!=&crate::connections::current()) {
-            self.band_reader.cancel();self.band_context=None;self.band_dirty=true;
+        if !self.shown {
+            self.band_reader.cancel();
+            self.band_dirty = true;
+            return;
+        }
+        if self
+            .band_context
+            .as_ref()
+            .is_some_and(|owner| owner != &crate::connections::current())
+        {
+            self.band_reader.cancel();
+            self.band_context = None;
+            self.band_dirty = true;
         }
         if self.band_dirty {
             self.queue_branch_bands(false);
