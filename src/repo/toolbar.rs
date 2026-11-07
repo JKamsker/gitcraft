@@ -37,7 +37,7 @@ fn agent_badge(ui: &Ui, undo: &egui::Response) {
 
 impl RepoTab {
     pub(super) fn toolbar(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing.x = 2.0;
             let idle = self.busy_op.is_none();
             self.nav_buttons(ui, acts);
@@ -555,6 +555,43 @@ pub(super) fn headline(msg: &str) -> String {
 mod area_d_tests {
     use super::*;
     use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn repository_toolbar_keeps_trailing_actions_reachable_at_narrow_scales() {
+        for width in [640.0, 800.0, 1400.0] {
+            for scale in [1.0, 1.25, 1.5] {
+                let ctx = egui::Context::default();
+                let mut tab = RepoTab::new_deferred("/nonexistent/toolbar-layout".into(), &ctx);
+                tab.refs.current = Some("feature/a-long-branch-name-with-many-words".into());
+                let mut h = egui_kittest::Harness::builder()
+                    .with_size([width / scale, 500.0 / scale])
+                    .with_pixels_per_point(scale)
+                    .build_ui_state(
+                        |ui, (tab, fonts, actions): &mut (RepoTab, bool, Vec<Action>)| {
+                            if !*fonts {
+                                crate::theme::install_fonts(ui.ctx());
+                                egui_extras::install_image_loaders(ui.ctx());
+                                *fonts = true;
+                                return;
+                            }
+                            egui::Panel::top("toolbar-test").show(ui, |ui| {
+                                tab.toolbar(ui, actions);
+                            });
+                        },
+                        (tab, false, Vec::new()),
+                    );
+                h.run();
+                let reload = h.get_by_label("Reload (F5)").rect();
+                assert!(
+                    h.ctx.content_rect().contains_rect(reload),
+                    "{width}/{scale}: {reload:?}"
+                );
+                h.get_by_label("Reload (F5)").click();
+                h.run();
+                assert!(h.state().2.iter().any(|a| matches!(a, Action::Reload)));
+            }
+        }
+    }
 
     #[test]
     fn area_d_open_in_order_icons_remote_reasons_and_copy_scope() -> Result<(), String> {
