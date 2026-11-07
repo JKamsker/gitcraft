@@ -546,26 +546,7 @@ pub(super) fn show_pair(ui: &mut egui::Ui, pair: &model::Pair, t: &Tokens) {
         }
         return;
     }
-    egui::ScrollArea::both()
-        .id_salt("snapshot_content_diff")
-        .show_rows(ui, 20., pair.boundary.lines.len(), |ui, range| {
-            for i in range {
-                let line = &pair.boundary.lines[i];
-                let color = match line.kind {
-                    super::super::diff::Kind::Add => t.accent,
-                    super::super::diff::Kind::Del => t.warning,
-                    _ => t.text,
-                };
-                ui.add(
-                    egui::Label::new(
-                        RichText::new(shorten(&line.raw, 2000))
-                            .monospace()
-                            .color(color),
-                    )
-                    .wrap_mode(egui::TextWrapMode::Extend),
-                );
-            }
-        });
+    super::text::show(ui, &pair.boundary, t);
 }
 fn shorten(text: &str, n: usize) -> String {
     let mut chars = text.chars();

@@ -3,6 +3,7 @@ mod code_moves;
 mod model;
 #[cfg(test)]
 mod tests;
+mod text;
 mod view;
 
 use super::{
