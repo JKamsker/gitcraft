@@ -286,6 +286,9 @@ mod integration_tests {
         ] {
             run(&args)?;
         }
+        std::fs::write(path.join("review.txt"), "review\n").map_err(|e| e.to_string())?;
+        run(&["add", "review.txt"])?;
+        run(&["commit", "--amend", "--no-edit"])?;
         let hook = path.join(".git/hooks/pre-commit");
         std::fs::write(&hook, "#!/bin/sh\nexit 1\n").map_err(|e| e.to_string())?;
         std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755))
