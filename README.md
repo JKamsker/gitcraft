@@ -97,9 +97,10 @@ so your config, credentials and hooks apply as usual.
   Linux), never in gitcraft's own files, and forgotten when it stops working or with
   **Forget saved SSH sign-ins** in the command palette (or Settings → Git).
 - Names with a `\` in them (Linux allows one) work like any other.
-- Network operations (fetch, pull, push, clone) run in shells of their own, so the reads never
-  wait behind them. A command that hangs is stopped there, with what it started, after 5
-  minutes (30 for network operations).
+- Network operations (fetch, pull, push, clone) run in processes of their own, so the reads
+  never wait behind them, and show git's progress as they go. A command that hangs is stopped
+  there, with what it started, after 5 minutes (30 for network operations); _Cancel_ stops one
+  at once the same way.
 - Changes made there show up by themselves: the repository is looked at every few seconds
   (every 15 while the window isn't focused).
 - The terminal opens a shell on that machine, in the repository, whatever the login shell
@@ -586,6 +587,26 @@ so your config, credentials and hooks apply as usual.
   `--force-if-includes` where git has it), so a remote that moved since pushes nothing. A hook's
   or a protected branch's refusal shows git's message in full, with no force push offered. Read
   from `git push --porcelain`, not from git's sentences.
+- Fetch, pull, push and clone show how far git is ("Receiving objects: 45%", from git's own
+  `--progress`) beside the spinner and as a thin bar under the toolbar, with _Cancel_: it
+  stops git and everything git started (`git-remote-https`, `ssh`; on another machine, the git
+  command there is stopped the same way as one that hangs), runs none of the later steps, and
+  leaves undo as it was. A cancelled clone removes what it had cloned; a lock file a stopped
+  git couldn't remove (`index.lock`…) is named in the toolbar's message, and a pull stopped
+  while merging or rebasing leaves that in progress, with _Abort_. Fetch, Pull and Push stay
+  clickable while something runs and start once it is done (up to three wait, in order; the
+  toolbar says which, and Cancel or a failure drops them, saying so). Anything else asked for
+  meanwhile is not started and says why, and the toolbar's other buttons say what they wait
+  for.
+- Activity (the list button in the toolbar, or _Activity_ in the palette): every operation of
+  the tab, newest first, with how it ended and how long it took; unfold one for each git
+  command it ran (as you would type it; tokens in URLs, `Authorization` headers and a password
+  typed into the tab are hidden), its exit code, its time and
+  all it printed, selectable, with a button that copies the lot. The operation running shows
+  its commands so far. A message in the toolbar (an error, cut to its first line there) opens
+  the operation's entry when clicked. The last 100 operations are kept, each command's output
+  up to 64 KiB (its start and its end); a background fetch only when it fails, and the same
+  failure again and again as one entry, counted.
 - Background fetch every few minutes (Settings; 0 turns it off).
 - HTTPS sign-in: when a remote wants a username and password (or token) and no credential helper
   provides them, a dialog asks and the operation runs again. They stay in memory for the tab;

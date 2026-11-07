@@ -42,7 +42,27 @@ impl RepoTab {
         self.push_banner(ui, &mut acts);
         self.detached_panel(ui, &mut acts);
         self.error_card_panel(ui);
+        if self.running.as_ref().is_some_and(|r| r.network) {
+            egui::Panel::top("repo_progress")
+                .exact_size(3.0)
+                .resizable(false)
+                .show_separator_line(false)
+                .frame(egui::Frame::new())
+                .show(ui, |ui| self.progress_bar(ui));
+        }
         self.side_panels(ui, &mut acts);
+        if self.activity.open {
+            egui::Panel::bottom("repo_activity")
+                .resizable(true)
+                .default_size(240.0)
+                .size_range(90.0..=900.0)
+                .frame(
+                    egui::Frame::new()
+                        .fill(t.card)
+                        .inner_margin(egui::Margin::symmetric(8, 6)),
+                )
+                .show(ui, |ui| self.activity_panel(ui, &mut acts));
+        }
         if self.terminal_open && self.docked(Panel::Terminal) {
             egui::Panel::bottom("repo_terminal")
                 .resizable(true)

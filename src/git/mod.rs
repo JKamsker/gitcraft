@@ -4,6 +4,8 @@
 mod backlinks;
 mod branch_health;
 mod bisect;
+#[cfg(test)]
+mod clone_tests;
 mod command;
 mod commit_msg;
 mod commits;
@@ -25,6 +27,9 @@ mod log_order;
 mod lfs_locks;
 #[cfg(test)]
 pub(crate) mod lfs_test_server;
+mod locks;
+pub mod progress;
+mod redact;
 mod refs;
 pub mod simulate;
 pub mod search_query;
@@ -56,6 +61,8 @@ pub use self::preview::*;
 pub use self::notes::*;
 pub use self::log_order::*;
 pub use self::lfs_locks::*;
+pub use self::locks::*;
+pub use self::redact::redact;
 pub use self::refs::*;
 pub use self::signature::*;
 pub use self::stash::*;
@@ -103,30 +110,71 @@ fn not_an_option(rev: &str) -> Result<&str, String> {
     }
 }
 
-/// `git clone url dest`, run from `dest`'s parent.
-/// For a `dest` in WSL or over SSH, git there clones it, from that machine's home folder.
-pub fn clone(url: &str, dest: &Path, creds: Option<&Credentials>) -> Result<(), String> {
-    clone_with(url, dest, creds, &[])
-}
-
-/// [`clone`] with `options` (`--no-checkout`) before the URL.
-pub fn clone_with(
+/// Clones `url` into `dest` (a folder of this machine or another one), followed through
+/// `control`: its progress reported there, and stopped on a cancel. A clone stopped so leaves
+/// no folder behind that wasn't there before.
+pub fn clone(
     url: &str,
     dest: &Path,
     creds: Option<&Credentials>,
-    options: &[&str],
+    control: &std::sync::Arc<OpControl>,
 ) -> Result<(), String> {
-    let (from, there) = match crate::remote::parse(dest) {
+    let existed = dest_exists(dest);
+    let result = match crate::remote::parse(dest) {
         Some(target) => {
             let (from, there) = clone_from(&target.path);
-            (Some(crate::remote::encode(&target.host, from)), there)
+            let from = crate::remote::encode(&target.host, from);
+            run_watched(
+                Some(&from),
+                &["clone", "--", url, &there],
+                creds,
+                false,
+                control,
+            )
         }
-        None => (None, dest.to_string_lossy().into_owned()),
+        None => {
+            let dest = dest.to_string_lossy();
+            run_watched(None, &["clone", "--", url, &dest], creds, false, control)
+        }
     };
-    let mut args = vec!["clone"];
-    args.extend_from_slice(options);
-    args.extend(["--", url, &there]);
-    run_with(from.as_deref(), &args, creds).map(|_| ())
+    if result.is_err() && control.is_cancelled() && existed == Some(false) {
+        remove_cancelled_clone(dest);
+    }
+    result.map(|_| ())
+}
+
+/// Whether anything is at `dest`: a folder, a file or a link, even a broken one (`None`: it
+/// couldn't be told).
+fn dest_exists(dest: &Path) -> Option<bool> {
+    if crate::remote::is_remote(dest) {
+        let dir = crate::remote::try_is_dir(dest).ok()?;
+        let file = crate::remote::try_is_file(dest).ok()?;
+        let link = crate::remote::try_is_link(dest).ok()?;
+        Some(dir || file || link)
+    } else {
+        Some(dest.symlink_metadata().is_ok())
+    }
+}
+
+/// Removes what a cancelled clone left in `dest`, which wasn't there before it (git removes it
+/// itself when stopped politely, but not when killed outright).
+fn remove_cancelled_clone(dest: &Path) {
+    match crate::remote::parse(dest) {
+        // Never a home or the root, whatever went wrong before.
+        Some(target) if matches!(target.path.as_str(), "" | "/" | "~" | "~/") => {}
+        Some(target) => {
+            let _ = crate::remote::exec(
+                &target.host,
+                &crate::remote::Request {
+                    script: format!("rm -rf -- {}", crate::remote::sh_path(&target.path)),
+                    ..Default::default()
+                },
+            );
+        }
+        None => {
+            let _ = std::fs::remove_dir_all(dest);
+        }
+    }
 }
 
 /// Where git clones into `dest` (a path on another machine) from, and `dest` as it is given:
@@ -238,3 +286,23 @@ mod tests;
 
 #[cfg(test)]
 mod preview_tests;
+
+pub fn clone_with(
+    url: &str,
+    dest: &Path,
+    creds: Option<&Credentials>,
+    options: &[&str],
+) -> Result<(), String> {
+    let (from, there) = match crate::remote::parse(dest) {
+        Some(target) => {
+            let (from, there) = clone_from(&target.path);
+            (Some(crate::remote::encode(&target.host, from)), there)
+        }
+        None => (None, dest.to_string_lossy().into_owned()),
+    };
+    let mut args = vec!["clone"];
+    args.extend_from_slice(options);
+    args.extend(["--", url, &there]);
+    run_with(from.as_deref(), &args, creds).map(|_| ())
+
+}

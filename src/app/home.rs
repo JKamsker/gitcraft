@@ -100,12 +100,9 @@ impl App {
                         ui.colored_label(t.danger, err);
                     }
                     self.error_card_ui(ui);
-                    if let Some((dest, _)) = &self.cloning {
+                    if let Some(cloning) = &self.cloning {
                         ui.add_space(12.0);
-                        ui.horizontal(|ui| {
-                            ui.add(crate::spinner::Spinner::new());
-                            ui.label(format!("Cloning into {}…", dest.display()));
-                        });
+                        super::clone::cloning_line(ui, cloning);
                     }
                     for connecting in &self.connecting {
                         ui.add_space(12.0);

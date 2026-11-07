@@ -1,6 +1,7 @@
 //! Running git commands in the background, taking in how they ended, and undo / redo.
 
 use std::path::Path;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use super::messages::spawn_or;
@@ -33,13 +34,23 @@ impl RepoTab {
         quiet: bool,
         ctx: &egui::Context,
     ) {
-        if self.busy_op.is_some() {
+        if let Some(busy) = &self.busy_op {
+            // Fetch, Pull and Push wait for it (see `running::Waiter`); anything else is not
+            // started, and says so. A quiet one (the background fetch) just comes again later.
+            if !quiet {
+                self.status = Some((
+                    format!("{label}: not started, {busy} is still running"),
+                    true,
+                ));
+            }
             return;
         }
         // A push asked to skip its hooks, this once (set only while that push starts).
         let ops = self.skip_hooks.push_steps(ops);
         self.busy_op = Some(label.to_owned());
         self.op_started = Some(Instant::now());
+        let control = self.follow_op(&ops, ctx);
+        let cancellable = self.can_cancel();
         self.note_checkout_move(&ops, ctx);
         if !quiet {
             self.status = None;
@@ -76,8 +87,20 @@ impl RepoTab {
             }
         };
         spawn_or(&self.tx, ctx, failed, move || {
+            // The locks there already belong to someone else: only new ones are the cancel's.
+            let locks_before = if cancellable {
+                git::leftover_locks(&path)
+            } else {
+                Vec::new()
+            };
             let (result, kind, stopped) =
-                run_steps_counted(&path, &ops, kind, creds.as_ref(), quiet);
+                run_steps_counted(&path, &ops, kind, creds.as_ref(), quiet, Some(&control));
+            let result = match result {
+                Err(e) if control.is_cancelled() && !e.contains("CONFLICT") => {
+                    Err(cancelled_message(&path, &ops, &locks_before))
+                }
+                result => result,
+            };
             Msg::OpDone {
                 label,
                 result,
@@ -192,10 +215,16 @@ impl RepoTab {
         self.detached_op_done(&label, result.is_ok());
         let mut undoable = false;
         self.dropped_patch_done(&label, &result);
+        // Done with it before anything starts after it (updating the submodules).
+        let running = self.running.take();
+        let cancelled =
+            result.is_err() && running.as_ref().is_some_and(|r| r.control.is_cancelled());
+        let steps = running.map(|r| r.control.take_steps()).unwrap_or_default();
+        self.log_activity(&label, &result, cancelled, quiet, steps);
         let long = self
             .op_started
             .take()
-            .is_some_and(|t| t.elapsed() > LONG_OP);
+            .is_some_and(|t| t.elapsed() > LONG_OP && !cancelled);
         match &result {
             Ok(_) => {
                 if label == "Commit" || label == "Amend" || label.starts_with("Continue ") {
@@ -217,6 +246,18 @@ impl RepoTab {
                     self.open_request = Some(super::OpenRequest::Worktree(path));
                 }
                 undoable = self.record_undo(&label, kind);
+            }
+            Err(e) if cancelled => {
+                self.open_when_done.take_if(|(l, _)| *l == label);
+                // Red only when it left something to clear up.
+                let left_locks = e.starts_with(&format!("{}, but", git::CANCELLED));
+                self.status = Some((format!("{label}: {e}"), left_locks));
+                // Not done: what would undo it stays where it was.
+                match kind {
+                    OpKind::Undo(entry) => self.undo_stack.push(entry),
+                    OpKind::Redo(entry) => self.redo_stack.push(entry),
+                    OpKind::Normal(..) => {}
+                }
             }
             Err(e) if git::is_auth_error(e) && !quiet => {
                 self.agent_needs_sign_in(&label);
@@ -271,6 +312,8 @@ impl RepoTab {
         self.follow_checkout_move(result.is_ok(), ctx);
         // Last: it may start the next operation (Sync's push after its pull).
         self.push_op_ended(&label, &result, ctx);
+        self.after_op(result.is_ok(), quiet, ctx);
+        self.link_status();
     }
 
     /// Puts what `kind` did on the undo (or redo) stack. Returns whether a new step went on
@@ -329,6 +372,76 @@ impl RepoTab {
     }
 }
 
+/// Runs one step of an operation: one that goes over the network followed through `control`
+/// (its progress shown, and stopped on a cancel), any other as it is; none once cancelled.
+/// What each did is kept in `control`, for the activity log.
+fn run_step(
+    path: &Path,
+    args: &[&str],
+    creds: Option<&git::Credentials>,
+    quiet: bool,
+    control: Option<&Arc<git::OpControl>>,
+) -> Result<String, String> {
+    let Some(control) = control else {
+        return if quiet {
+            git::run_unattended(Some(path), args, creds)
+        } else {
+            git::run_naming_hooks(Some(path), args, creds)
+        };
+    };
+    if control.is_cancelled() {
+        return Err(git::CANCELLED.to_owned());
+    }
+    // Each call kept for the activity log.
+    let (result, recorded) = if git::goes_over_network(args) {
+        git::run_watched_recorded(Some(path), args, creds, quiet, control)
+    } else {
+        git::run_recorded(Some(path), args, creds, quiet)
+    };
+    let mut recorded = recorded;
+    recorded.output = super::activity::bounded(&recorded.output);
+    control.record(recorded);
+    result
+}
+
+/// What a cancelled operation says: that it was, with what it may have left behind: the lock
+/// files a stopped git couldn't remove (not those `before` it started: they are someone
+/// else's), and for a pull, a merge or rebase it had started.
+fn cancelled_message(path: &Path, ops: &[Vec<String>], before: &[std::path::PathBuf]) -> String {
+    let mut msg = git::CANCELLED.to_owned();
+    let locks: Vec<String> = git::leftover_locks(path)
+        .into_iter()
+        .filter(|l| !before.contains(l))
+        .map(|l| {
+            l.strip_prefix(path)
+                .map_or_else(|_| l.display().to_string(), |r| r.display().to_string())
+        })
+        .collect();
+    if !locks.is_empty() {
+        let (them, are) = if locks.len() == 1 {
+            ("it", "is")
+        } else {
+            ("them", "are")
+        };
+        msg.push_str(&format!(
+            ", but git left {} behind\nUntil {them} {are} deleted, git refuses to work in this \
+             repository. Delete {them} if no other git program is running here.",
+            locks.join(", ")
+        ));
+    }
+    let pulls = ops.iter().any(|op| {
+        op.iter().any(|w| w == "pull")
+            && git::goes_over_network(&op.iter().map(String::as_str).collect::<Vec<_>>())
+    });
+    if pulls {
+        msg.push_str(
+            "\nIf the pull had started merging or rebasing, that is left in progress: Abort in \
+             the toolbar goes back to where the branch was.",
+        );
+    }
+    msg
+}
+
 /// [`run_steps_counted`] without where it stopped.
 #[cfg(test)]
 pub(super) fn run_steps(
@@ -337,7 +450,7 @@ pub(super) fn run_steps(
     kind: OpKind,
     creds: Option<&git::Credentials>,
 ) -> (Result<String, String>, OpKind) {
-    let (result, kind, _) = run_steps_counted(path, ops, kind, creds, false);
+    let (result, kind, _) = run_steps_counted(path, ops, kind, creds, false, None);
     (result, kind)
 }
 
@@ -351,6 +464,7 @@ pub(super) fn run_steps_counted(
     kind: OpKind,
     creds: Option<&git::Credentials>,
     quiet: bool,
+    control: Option<&Arc<git::OpControl>>,
 ) -> (Result<String, String>, OpKind, usize) {
     // Undoing a HEAD move resets the branch checked out now: after a checkout or a commit made
     // elsewhere since, that would throw away commits that aren't the operation's.
@@ -394,11 +508,7 @@ pub(super) fn run_steps_counted(
             continue;
         }
         let args: Vec<&str> = op.iter().map(String::as_str).collect();
-        result = if quiet {
-            git::run_unattended(Some(path), &args, creds)
-        } else {
-            git::run_naming_hooks(Some(path), &args, creds)
-        };
+        result = run_step(path, &args, creds, quiet, control);
         if result.is_err() {
             stopped = i;
             break;
@@ -616,7 +726,7 @@ mod tests {
         .chain(ops(&[&["commit", "-q", "--allow-empty", "-m", "quiet"]]))
         .collect();
         let (result, _, stopped) =
-            super::run_steps_counted(&dir, &steps, OpKind::plain(), None, true);
+            super::run_steps_counted(&dir, &steps, OpKind::plain(), None, true, None);
         let after = git::head(&dir);
         let _ = std::fs::remove_dir_all(&dir);
         assert!(result.is_ok(), "{result:?}");

@@ -4,6 +4,7 @@
 mod actions;
 mod ai;
 pub(crate) mod agent;
+mod activity;
 mod apply;
 mod branch_cleanup;
 mod branch_health;
@@ -70,6 +71,7 @@ mod rebase;
 mod reflog;
 mod remerge;
 mod rewrite;
+mod running;
 #[cfg(test)]
 mod samples;
 mod sidebar;
@@ -289,6 +291,12 @@ pub struct RepoTab {
 
     busy_op: Option<String>,
     op_started: Option<Instant>,
+    /// The operation running: its progress, and how to cancel it.
+    running: Option<running::Running>,
+    /// Operations asked for while another ran, to run after it.
+    waiting: running::Waiting,
+    /// The operations run, with their commands and output (the Activity panel).
+    activity: activity::ActivityLog,
     /// The running operation moves the checkout: update the submodules after it, if asked to.
     update_submodules: bool,
     status: Option<(String, bool)>,
@@ -481,6 +489,9 @@ impl RepoTab {
             agents: Default::default(),
             busy_op: None,
             op_started: None,
+            running: None,
+            waiting: Default::default(),
+            activity: Default::default(),
             update_submodules: false,
             status: None,
             branch_filter: String::new(),

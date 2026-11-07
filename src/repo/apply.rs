@@ -17,6 +17,13 @@ impl RepoTab {
             return;
         };
         let plain = OpKind::plain();
+        // Fetch, Pull and Push asked for while something runs start once it is done.
+        if self.busy_op.is_some()
+            && let Some(waiter) = super::running::Waiter::of(&action, ctx)
+        {
+            self.wait_for_running(waiter);
+            return;
+        }
         match action {
             Action::Select(row) => {
                 self.leave_pages();
@@ -108,6 +115,9 @@ impl RepoTab {
             Action::Sync => self.sync(ctx),
             Action::PushFlow(act) => self.push_act(act, ctx),
             Action::Reload => self.refresh(ctx),
+            Action::CancelOp => self.cancel_op(),
+            Action::ToggleActivity => self.activity.open = !self.activity.open,
+            Action::ShowActivity(id) => self.activity.reveal(id),
             Action::LoadMore => self.load_more(ctx),
             Action::Undo => {
                 if !self.refuse_undo() {

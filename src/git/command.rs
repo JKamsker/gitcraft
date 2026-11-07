@@ -53,6 +53,9 @@ pub(super) fn with_profile(cmd: &mut Command, args: &[&str]) {
 
 use crate::remote::{self, Target};
 
+mod watched;
+pub use watched::{CANCELLED, OpControl, run_watched, run_watched_recorded};
+
 /// What every git call is run with.
 /// - `GIT_TERMINAL_PROMPT`: never block on an interactive prompt (credential helpers with a
 ///   GUI still work).
@@ -101,7 +104,7 @@ struct Ran {
 }
 
 /// Options before the subcommand, and variables, a call is run with on top of [`GIT_ENV`].
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(super) struct Extra {
     pre: Vec<&'static str>,
     env: Vec<(&'static str, String)>,
@@ -125,6 +128,23 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
     if let Some(target) = dir.and_then(remote::parse) {
         return execute_there(&target, extra, args);
     }
+    let mut extra = extra.clone();
+    let trace = extra.trace_hooks.then(super::hooks::TraceFile::new).flatten();
+    if let Some(trace) = &trace { extra.env.push((super::hooks::TRACE_VAR, trace.path().to_string_lossy().into_owned())); }
+    let mut cmd = local_command(dir, &extra, args);
+    let out = match &extra.stdin {
+        Some(input) => output_with_input(cmd, input),
+        None => cmd.output(),
+    }.map_err(|e| format!("could not run git: {e}"))?;
+    let failed = !out.status.success();
+    Ok(Ran {
+        code: out.status.code(), status: out.status.to_string(), stdout: out.stdout, stderr: out.stderr,
+        failed_hook: trace.filter(|_| failed).and_then(|t| t.failed_hook(args)),
+    })
+}
+
+/// git with `args` in `dir` on this machine, `extra` before them.
+fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Command {
     let mut cmd = git_cmd();
     with_profile(&mut cmd, args);
     if let Some(dir) = dir {
@@ -134,27 +154,8 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
     for (name, value) in &extra.env {
         cmd.env(name, value);
     }
-    let trace = extra
-        .trace_hooks
-        .then(super::hooks::TraceFile::new)
-        .flatten();
-    if let Some(trace) = &trace {
-        cmd.env(super::hooks::TRACE_VAR, trace.path());
-    }
     cmd.args(args);
-    let out = match &extra.stdin {
-        Some(input) => output_with_input(cmd, input),
-        None => cmd.output(),
-    }
-    .map_err(|e| format!("could not run git: {e}"))?;
-    let failed = !out.status.success();
-    Ok(Ran {
-        code: out.status.code(),
-        status: out.status.to_string(),
-        stdout: out.stdout,
-        stderr: out.stderr,
-        failed_hook: trace.filter(|_| failed).and_then(|t| t.failed_hook(args)),
-    })
+    cmd
 }
 
 /// Runs `cmd` with `input` on its input, written from a thread of its own: git may answer
@@ -179,7 +180,7 @@ fn output_with_input(mut cmd: Command, input: &[u8]) -> std::io::Result<std::pro
     out
 }
 
-/// Runs `cmd` with `input` on its standard input, written from a thread of its own so that a
+
 /// large input doesn't wait on output nobody reads yet.
 fn output_with_input(mut cmd: Command, input: &[u8]) -> std::io::Result<std::process::Output> {
     use std::io::Write;
@@ -236,7 +237,7 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
 }
 
 /// Whether the git command `args` (its options first) talks to a remote and may take minutes.
-fn goes_over_network(args: &[&str]) -> bool {
+pub fn goes_over_network(args: &[&str]) -> bool {
     matches!(
         after_options(args).first().copied(),
         Some(
@@ -611,13 +612,9 @@ pub fn is_auth_error(err: &str) -> bool {
     .any(|s| e.contains(s))
 }
 
-fn run_inner(
-    dir: Option<&Path>,
-    args: &[&str],
-    ok: &[i32],
-    creds: Option<&Credentials>,
-    quiet: bool,
-) -> Result<String, String> {
+/// What a call is run with on top of [`GIT_ENV`]: nobody asked to sign in when `quiet`,
+/// `creds` given to git when there are some.
+fn extra_for(dir: Option<&Path>, creds: Option<&Credentials>, quiet: bool) -> Extra {
     let mut extra = Extra::default();
     if quiet {
         // Unix on the machine git runs on: another one is always Linux (WSL, an SSH server).
@@ -644,6 +641,29 @@ fn run_extra(
             .env
             .push(("GITCRAFT_GIT_PASSWORD", c.password.clone()));
     }
+    extra
+}
+
+/// The error of a git call that failed: what it said, or how it ended when it said nothing.
+fn failure_message(args: &[&str], status: &str, stdout: &str, stderr: &str) -> String {
+    // Merges and pulls report conflicts on stdout and the summary on stderr.
+    let (stderr, stdout) = (stderr.trim(), stdout.trim());
+    match (stderr.is_empty(), stdout.is_empty()) {
+        (true, true) => format!("git {} failed ({status})", args.join(" ")),
+        (false, true) => stderr.to_owned(),
+        (true, false) => stdout.to_owned(),
+        (false, false) => format!("{stderr}\n{stdout}"),
+    }
+}
+
+fn run_inner(
+    dir: Option<&Path>,
+    args: &[&str],
+    ok: &[i32],
+    creds: Option<&Credentials>,
+    quiet: bool,
+) -> Result<String, String> {
+    let extra = extra_for(dir, creds, quiet);
     finish(execute(dir, &extra, args)?, args, ok)
 }
 
@@ -684,6 +704,91 @@ fn outcome(out: Ran, args: &[&str], ok: &[i32]) -> Result<String, String> {
             (None, false) => said,
         })
     }
+}
+
+/// [`run_inner`], and what the call did, for the activity log.
+fn run_inner_recorded(
+    dir: Option<&Path>,
+    args: &[&str],
+    ok: &[i32],
+    creds: Option<&Credentials>,
+    quiet: bool,
+) -> (Result<String, String>, Recorded) {
+    let started = std::time::Instant::now();
+    let extra = extra_for(dir, creds, quiet);
+    let out = match execute(dir, &extra, args) {
+        Ok(out) => out,
+        Err(e) => {
+            return (
+                Err(e.clone()),
+                Recorded::new(args, None, &e, creds, started),
+            );
+        }
+    };
+    let (stdout, stderr) = (
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr),
+    );
+    let recorded = Recorded::new(args, out.code, &both(&stdout, &stderr), creds, started);
+    let result = if out.code.is_some_and(|c| ok.contains(&c)) {
+        Ok(stdout.into_owned())
+    } else {
+        Err(failure_message(args, &out.status, &stdout, &stderr))
+    };
+    (result, recorded)
+}
+
+/// What a command printed, its output then its error output.
+fn both(stdout: &str, stderr: &str) -> String {
+    match (stdout.trim_end(), stderr.trim_end()) {
+        ("", err) => err.to_owned(),
+        (out, "") => out.to_owned(),
+        (out, err) => format!("{out}\n{err}"),
+    }
+}
+
+/// What one git call did, for the activity log: its command line, how it ended, what it
+/// printed and how long it took.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Recorded {
+    /// The arguments after `git`, as the caller gave them (credentials never are: they go to
+    /// git through the environment).
+    pub args: Vec<String>,
+    /// Its exit code; `None` when it couldn't run, or was stopped.
+    pub code: Option<i32>,
+    /// What it printed (output, then error output; progress lines as last drawn).
+    pub output: String,
+    pub took: std::time::Duration,
+}
+
+impl Recorded {
+    /// What a call did, its secrets hidden (see [`super::redact`]): the password typed into
+    /// the tab (`creds`) among them.
+    pub(crate) fn new(
+        args: &[&str],
+        code: Option<i32>,
+        output: &str,
+        creds: Option<&Credentials>,
+        started: std::time::Instant,
+    ) -> Self {
+        let password = creds.map(|c| c.password.as_str());
+        Self {
+            args: args.iter().map(|a| super::redact(a, password)).collect(),
+            code,
+            output: super::redact(output, password),
+            took: started.elapsed(),
+        }
+    }
+}
+
+/// [`run_with`] (or [`run_unattended`] when `quiet`), and what the call did.
+pub fn run_recorded(
+    dir: Option<&Path>,
+    args: &[&str],
+    creds: Option<&Credentials>,
+    quiet: bool,
+) -> (Result<String, String>, Recorded) {
+    run_inner_recorded(dir, args, &[0], creds, quiet)
 }
 
 /// What git's credential helpers keep for `url` (`https://host`), asking nobody: no terminal

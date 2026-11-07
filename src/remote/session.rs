@@ -102,7 +102,7 @@ impl Request {
 const QUICK_FOR: Duration = Duration::from_secs(300);
 
 /// How long a network operation may take at most.
-const LONG_FOR: Duration = Duration::from_secs(1800);
+pub const LONG_FOR: Duration = Duration::from_secs(1800);
 
 /// Without the variables' values (a password) nor the input.
 impl std::fmt::Debug for Request {
@@ -237,9 +237,21 @@ pub fn stop_process(host: &Host, pid: u32) {
     stop(host.clone(), pid);
 }
 
-/// The script [`stop`] runs: `pid` and its descendants (from `ps`, which every system has with
+/// [`stop`], waiting until it is done (from a thread that may wait).
+pub fn stop_now(host: &Host, pid: u32) {
+    let _ = exec(
+        host,
+        &Request {
+            script: stop_script(pid),
+            timeout: Some(Duration::from_secs(30)),
+            ..Request::default()
+        },
+    );
+}
+
+/// The script [`stop`] runs (and a command stopped here, on Unix): `pid` and its descendants (from `ps`, which every system has with
 /// these options), else `pid` alone.
-fn stop_script(pid: u32) -> String {
+pub fn stop_script(pid: u32) -> String {
     format!(
         concat!(
             "all=$(ps -A -o pid= -o ppid= 2>/dev/null | awk -v root={pid} '",

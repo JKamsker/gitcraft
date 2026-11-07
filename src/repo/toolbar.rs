@@ -44,7 +44,7 @@ impl RepoTab {
             ui.add_space(4.0);
             self.history_buttons(ui, idle, acts);
             widgets::toolbar_separator(ui);
-            self.remote_buttons(ui, idle, acts);
+            self.remote_buttons(ui, acts);
             widgets::toolbar_separator(ui);
             self.repo_buttons(ui, idle, acts);
             widgets::toolbar_separator(ui);
@@ -59,7 +59,7 @@ impl RepoTab {
             self.head_label(ui, idle, acts);
             self.target_conflict_badge(ui);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                self.op_status(ui);
+                self.op_status(ui, acts);
                 self.hint_status(ui);
             });
         });
@@ -71,10 +71,16 @@ impl RepoTab {
             Some(e) => step_tip("Undo", e, &keymap::written("Cmd+Z")),
             None => "Nothing to undo".to_owned(),
         };
+        let waits = self.waits_text();
+        let why = |nothing: bool, none: &str| match &waits {
+            _ if nothing => none.to_owned(),
+            Some(w) => w.clone(),
+            None => none.to_owned(),
+        };
         let undo = icons::tool_button(ui, "undo-2", "", idle && !self.undo_stack.is_empty())
             .named(&undo_tip)
             .on_hover_text(&undo_tip)
-            .on_disabled_hover_text("Nothing to undo");
+            .on_disabled_hover_text(why(self.undo_stack.is_empty(), "Nothing to undo"));
         if undo.clicked() {
             acts.push(Action::Undo);
         }
@@ -89,7 +95,7 @@ impl RepoTab {
         if icons::tool_button(ui, "redo-2", "", idle && !self.redo_stack.is_empty())
             .named(&redo_tip)
             .on_hover_text(redo_tip)
-            .on_disabled_hover_text("Nothing to redo")
+            .on_disabled_hover_text(why(self.redo_stack.is_empty(), "Nothing to redo"))
             .clicked()
         {
             acts.push(Action::Redo);
@@ -97,19 +103,31 @@ impl RepoTab {
     }
 
     /// Fetch, pull and push, with how far the current branch is behind and ahead.
-    fn remote_buttons(&self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
+    /// Fetch, pull and push stay available while another operation runs: they wait for it.
+    fn remote_buttons(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let has_remote = !self.remotes.is_empty();
+        let no_remote = "This repository has no remote";
+        let waits = self
+            .waits_text()
+            .map(|_| {
+                format!(
+                    "\nClick now and it starts after {}",
+                    self.busy_op.as_deref().unwrap_or_default()
+                )
+            })
+            .unwrap_or_default();
         let fetched = format!(
-            "{}\nLast fetched {} ago",
+            "{}\nLast fetched {} ago{waits}",
             keymap::tip(
                 "Fetch all remotes (git fetch --all --prune)",
                 Command::Fetch
             ),
             short_duration(self.last_fetch.elapsed())
         );
-        if icons::tool_button(ui, "cloud-download", "Fetch", idle && has_remote)
+        if icons::tool_button(ui, "cloud-download", "Fetch", has_remote)
             .on_hover_text(fetched)
             .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Fetch))
+            .on_disabled_hover_text(no_remote)
             .clicked()
         {
             acts.push(Action::Fetch);
@@ -123,9 +141,9 @@ impl RepoTab {
             .unwrap_or((0, 0));
         let mode = Settings::get(ui.ctx()).pull_mode;
         let pull =
-            icons::tool_button_count(ui, "arrow-down-to-line", "Pull", behind, idle && has_remote)
+            icons::tool_button_count(ui, "arrow-down-to-line", "Pull", behind, has_remote)
                 .named(|| behind_ahead("Pull", behind, "behind"))
-                .on_hover_text(mode.tip())
+                .on_hover_text(format!("{}{waits}", mode.tip()))
                 .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Pull));
         crate::repo::ghost::offer(&pull, || crate::repo::ghost::GhostOp::Pull(mode));
         if pull.clicked() {
@@ -134,19 +152,19 @@ impl RepoTab {
         egui::Popup::context_menu(&pull)
             .style(crate::theme::menu_style)
             .show(|ui| pull_menu(ui, acts));
-        let more = ui.add_enabled_ui(idle && has_remote, |ui| {
+        let more = ui.add_enabled_ui(has_remote, |ui| {
             icons::small_button(ui, "chevron-down", "What Pull does, and Fetch all")
         });
         egui::Popup::menu(&more.inner)
             .style(crate::theme::menu_style)
             .show(|ui| pull_menu(ui, acts));
-        let push = icons::tool_button_count(ui, "arrow-up-from-line", "Push", ahead, idle && has_remote)
+        let push = icons::tool_button_count(ui, "arrow-up-from-line", "Push", ahead, has_remote)
             .named(|| behind_ahead("Push", ahead, "ahead"))
             .on_hover_text(keymap::tip(
                 "Push the current branch (publishes it if it has no upstream yet)",
                 Command::Push,
             ))
-            .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Push))
+            .on_disabled_hover_text(no_remote)
 ;
         if push.clicked() {
             acts.push(Action::Push);
@@ -157,7 +175,7 @@ impl RepoTab {
              (conflicts, or it can't fast-forward), nothing is pushed",
             mode.args().join(" ")
         );
-        if icons::tool_button(ui, "arrow-down-up", "Sync", idle && has_remote)
+        if icons::tool_button(ui, "arrow-down-up", "Sync", has_remote)
             .on_hover_text(sync_tip)
             .clicked()
         {
@@ -176,9 +194,15 @@ impl RepoTab {
     fn repo_buttons(&self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         let head = self.refs.head.clone();
+        let waits = self.waits_text();
         if icons::tool_button(ui, "git-branch-plus", "Branch", idle && !head.is_empty())
             .on_hover_text(keymap::tip("Create a branch at HEAD", Command::NewBranch))
             .on_disabled_hover_ui(|ui| self.why_not(ui, Command::NewBranch))
+            .on_disabled_hover_text(match &waits {
+                _ if head.is_empty() => "No commit to branch from yet".to_owned(),
+                Some(w) => w.clone(),
+                None => String::new(),
+            })
             .clicked()
         {
             acts.push(Action::Dialog(Dialog::create_branch(&head, "HEAD")));
@@ -188,7 +212,11 @@ impl RepoTab {
                 "Stash everything, staged changes, a snapshot, or picked files",
                 Command::Stash,
             ))
-            .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Stash))
+                        .on_disabled_hover_text(match &waits {
+                _ if self.work.is_clean() => "No changes to stash".to_owned(),
+                Some(w) => w.clone(),
+                None => String::new(),
+            })
             .clicked()
         {
             acts.push(Action::Dialog(Dialog::stash()));
@@ -201,6 +229,14 @@ impl RepoTab {
         }
         if terminal.clicked() {
             acts.push(Action::ToggleTerminal);
+        }
+        let activity = icons::tool_button(ui, "list", "", true)
+            .on_hover_text("Activity: each operation's git commands and all they printed");
+        if self.activity.open {
+            widgets::active_underline(ui, activity.rect, t.accent);
+        }
+        if activity.clicked() {
+            acts.push(Action::ToggleActivity);
         }
         let search = icons::tool_button(ui, "search", "", true)
             .named("Search commits")
@@ -315,21 +351,83 @@ impl RepoTab {
         }
     }
 
-    /// The last operation's outcome, and a spinner while one runs (right to left).
-    fn op_status(&self, ui: &mut Ui) {
+    /// While an operation runs, what it is doing and _Cancel_; else the last operation's
+    /// outcome (right to left).
+    fn op_status(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
-        if let Some((msg, is_err)) = &self.status {
+        // While one runs, only a problem (one that couldn't wait for it) is worth showing.
+        if let Some((msg, is_err)) = &self.status
+            && (self.busy_op.is_none() || *is_err)
+        {
             let color = if *is_err { t.danger } else { t.text_dim };
             let first_line = headline(msg);
-            ui.add(egui::Label::new(egui::RichText::new(first_line).color(color)).truncate())
-                .on_hover_text(msg.as_str());
+            let entry = self.status_entry();
+            let mut label =
+                egui::Label::new(egui::RichText::new(first_line).color(color)).truncate();
+            if entry.is_some() {
+                label = label.sense(egui::Sense::click());
+            }
+            let shown = ui.add(label).on_hover_ui(|ui| {
+                ui.label(msg.as_str());
+                if entry.is_some() {
+                    ui.label(
+                        egui::RichText::new(
+                            "Click for its git commands and all they printed (Activity)",
+                        )
+                        .color(t.text_dim),
+                    );
+                }
+            });
+            if let Some(id) = entry
+                && shown.clicked()
+            {
+                acts.push(Action::ShowActivity(id));
+            }
         }
-        if let Some(op) = &self.busy_op {
-            ui.label(egui::RichText::new(format!("{op}…")).color(t.text_dim));
-            ui.add(crate::spinner::Spinner::new());
-        } else if self.loading {
-            ui.add(crate::spinner::Spinner::new());
+        let Some(op) = &self.busy_op else {
+            if self.loading {
+                ui.add(crate::spinner::Spinner::new());
+            }
+            return;
+        };
+        if self.can_cancel()
+            && ui
+                .button("Cancel")
+                .on_hover_text(if self.waiting.is_empty() {
+                    format!("Stop {op}, and what it started")
+                } else {
+                    format!("Stop {op}, and what it started; what waits for it won't run")
+                })
+                .clicked()
+        {
+            acts.push(Action::CancelOp);
         }
+        let progress = self.op_progress();
+        let doing = match &progress {
+            _ if self.was_cancelled() => format!("Cancelling {op}…"),
+            Some(p) => format!("{op}… {}", p.label()),
+            None => format!("{op}…"),
+        };
+        let label = ui.label(egui::RichText::new(doing).color(t.text_dim));
+        if let Some(p) = &progress
+            && !p.detail.is_empty()
+        {
+            label.on_hover_text(format!("{}: {}", p.phase, p.detail));
+        }
+        ui.add(crate::spinner::Spinner::new());
+        if !self.waiting.is_empty() {
+            let names: Vec<&str> = self.waiting.iter().map(|w| w.label()).collect();
+            widgets::chip(ui, &format!("then {}", names.join(", ")), t.text_dim).on_hover_text(
+                format!("Start after {op}, in this order. Cancel or a failure drops them."),
+            );
+        }
+    }
+
+    /// Why a button that changes the repository waits: the operation running.
+    fn waits_text(&self) -> Option<String> {
+        self.busy_op
+            .as_ref()
+            .map(|op| format!("Available once {op} is done"))
     }
 }
 
