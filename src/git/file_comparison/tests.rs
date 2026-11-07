@@ -444,8 +444,17 @@ fn link_targets_and_binary_versions_are_read_without_following_links() -> Result
     assert_eq!(link.versions[2].mode.as_deref(), Some("120000"));
     assert_eq!(link.versions[2].bytes, b"/dev/zero");
     assert!(r.lens("binary")?.versions[2].text().is_none());
-    std::os::unix::fs::symlink("/tmp", r.0.join("escape")).map_err(|e| e.to_string())?;
-    assert!(r.lens("escape/anything")?.versions[2].warning.is_some());
+    let outside = Repo::new()?;
+    outside.write("secret", b"outside bytes must not be exposed")?;
+    std::os::unix::fs::symlink(&outside.0, r.0.join("escape")).map_err(|e| e.to_string())?;
+    assert!(
+        r.lens("escape/secret")
+            .is_err_and(|e| e.contains("not safely readable"))
+    );
+    assert_eq!(
+        std::fs::read(outside.0.join("secret")).map_err(|e| e.to_string())?,
+        b"outside bytes must not be exposed"
+    );
     Ok(())
 }
 #[cfg(unix)]
