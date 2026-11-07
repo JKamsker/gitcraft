@@ -1149,3 +1149,51 @@ fn scoped_workers_keep_the_captured_profile_and_cancellation_even_after_context_
     );
     Ok(())
 }
+
+#[test]
+fn selected_key_transport_refuses_session_and_identity_substitution() -> Result<(), String> {
+    let command = ssh_command("/fixture/selected-key");
+    let args = command
+        .get_args()
+        .map(|a| a.to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    for policy in [
+        "ControlPath=none",
+        "ControlMaster=no",
+        "ControlPersist=no",
+        "IdentitiesOnly=yes",
+        "IdentityAgent=none",
+        "CertificateFile=none",
+        "PKCS11Provider=none",
+        "ForwardAgent=no",
+        "PreferredAuthentications=publickey",
+    ] {
+        assert!(args.iter().any(|a| a == policy), "{policy}");
+    }
+    for args in [
+        ["-S", "/fixture/personal-master", "git@fixture"],
+        ["-I", "/fixture/provider", "git@fixture"],
+        ["-i", "/fixture/personal-key", "git@fixture"],
+    ] {
+        assert!(
+            validate_ssh_options(&args.into_iter().map(str::to_owned).collect::<Vec<_>>()).is_err()
+        );
+    }
+    assert!(
+        validate_ssh_identities(
+            "/fixture/selected-key",
+            "identityfile /fixture/selected-key\ncertificatefile /fixture/other-account-cert.pub\n",
+            &[]
+        )
+        .is_err()
+    );
+    assert!(
+        validate_ssh_identities(
+            "/fixture/selected-key",
+            "identityfile /fixture/selected-key\ncertificatefile none\n",
+            &[]
+        )
+        .is_ok()
+    );
+    Ok(())
+}
