@@ -100,6 +100,7 @@ pub(super) enum Msg {
     },
     /// A commit's patch was written to the file, or wasn't.
     PatchSaved(std::path::PathBuf, Result<(), String>),
+    BundleDone(String, Result<(), String>, Refresh),
     /// The commits to replay for a drop or move from a commit's menu.
     QuickEditCommits {
         edit: quick_edit::Edit,
@@ -357,6 +358,9 @@ impl RepoTab {
                 result,
             } => self.reword_older(hash, message, result, ctx),
             Msg::PatchSaved(file, result) => self.patch_saved(file, result),
+            Msg::BundleDone(label, result, refresh) => {
+                self.bundle_done(label, result, refresh, ctx)
+            }
             Msg::QuickEditCommits { edit, hash, result } => {
                 self.run_quick_edit(edit, hash, result, ctx)
             }

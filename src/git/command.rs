@@ -2,6 +2,8 @@
 //! repository in WSL or over SSH runs git there (see [`crate::remote`]), with the same
 //! environment.
 
+pub(super) mod bounded;
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::RwLock;

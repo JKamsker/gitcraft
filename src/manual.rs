@@ -19,6 +19,7 @@ const FEATURES: &[(&str, &[&str])] = &[
         "Repositories and tabs",
         &[
             "Open, create or clone a repository from the start page; recent ones are listed there.",
+            "The palette exports Git bundles of selected refs or an incremental range (exclude a base commit), and inspects local bundle refs/prerequisites before a deliberate import. Choose new destination refs: existing refs are never overwritten and import does not check out work. File pickers use this machine's disk; SSH/WSL repositories receive temporary copies. Bundle limit: 128 MiB, 1000 header entries and two minutes per Git call. Incremental bundles need their base commits already present.",
             "One tab per repository. Changes made elsewhere (editor, terminal) show up by themselves.",
             "Right-click a tab to give it its own icon and highlight colour.",
             "Drag a tab along the strip to reorder the tabs.",
