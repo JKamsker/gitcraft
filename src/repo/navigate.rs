@@ -130,7 +130,22 @@ impl RepoTab {
     /// Shows a diff (or the conflict editor) in the central area; asking for the open one
     /// closes it.
     pub(super) fn open_diff(&mut self, key: DiffKey, ctx: &egui::Context) {
-        if self.diff.as_ref().is_some_and(|d| d.key == key) {
+        self.open_diff_of_lines(key, None, ctx);
+    }
+
+    /// [`Self::open_diff`]; with `lines`, only the part of the commit's diff that changed those
+    /// lines (see [`DiffView::lines`]).
+    pub(super) fn open_diff_of_lines(
+        &mut self,
+        key: DiffKey,
+        lines: Option<Vec<git::LineRange>>,
+        ctx: &egui::Context,
+    ) {
+        if self
+            .diff
+            .as_ref()
+            .is_some_and(|d| d.key == key && d.lines == lines)
+        {
             self.diff = None;
             self.conflict = None;
             return;
@@ -161,7 +176,9 @@ impl RepoTab {
             }
             _ => None,
         };
-        self.diff = Some(DiffView::new(key));
+        let mut view = DiffView::new(key);
+        view.lines = lines;
+        self.diff = Some(view);
         self.refresh_diff(ctx);
     }
 
@@ -213,6 +230,7 @@ impl RepoTab {
         let Some(view) = &mut self.diff else { return };
         let request = view.next_request();
         let key = view.key.clone();
+        let lines = view.lines.clone();
         let path = self.path.clone();
         let opts = git::DiffOptions {
             ignore_ws: self.diff_ignore_ws,
@@ -220,7 +238,7 @@ impl RepoTab {
         };
         let dark = Tokens::get(ctx).dark();
         spawn(&self.tx, ctx, move || {
-            let result = diff::load(&path, &key, opts, dark).map(Box::new);
+            let result = diff::load_lines(&path, &key, lines.as_deref(), opts, dark).map(Box::new);
             Msg::Diff(request, result)
         });
         self.load_diff_file(ctx);
@@ -369,7 +387,8 @@ impl RepoTab {
         self.diff = None;
         self.conflict = None;
         let view = match self.file_view.take() {
-            Some(mut v) if v.path == path && v.rev == rev => {
+            // Not one showing the history of some lines only.
+            Some(mut v) if v.path == path && v.rev == rev && v.lines.is_none() => {
                 v.tab = tab;
                 v
             }

@@ -118,6 +118,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Stage, unstage or discard whole files from the right pane.",
             "Path / Tree at the top of the right pane lists the files flat or in their folders; click a folder to fold it.",
             "In a file's diff, stage, unstage or discard one hunk, or click the lines you want and act on only those.",
+            "Undo part of a past commit: right-click a file in its list for Revert changes to this file, or in its diff use Revert file, Revert hunk, or click lines and Revert N lines. The change goes into the working tree to look over before committing (Ctrl+Z undoes it when the file hadn't changed since). When the file changed since, a 3-way merge puts it in (staged), and conflicts are marked in the file. Binary files can't be reverted this way.",
             "A file kept in Git LFS shows as its LFS objects and their sizes; the palette has LFS: Fetch and LFS: Pull when git-lfs is installed.",
             "LFS locks: a padlock on a file's row shows who holds it (hover it for since when); Lock and Unlock are in its menu. LFS: Locks… (Ctrl+P) lists every lock, unlocks several at once, force-unlocks someone else's (admins only) and makes a pattern lockable. Changed files someone else holds, and changed lockable files nobody holds, are flagged above the changes; after a push, gitcraft offers to give back your locks on the files it carried.",
             "LFS: Storage… (Ctrl+P, in a repository that uses LFS) shows the disk the LFS objects take, the files that are only pointers with Download, which folders git-lfs downloads, and Prune. In View all files of the checked-out commit a cloud marks those files; their menu has LFS: Download. A file's menu also has LFS: Fetch only its folder, and Track *.ext in LFS for a type not yet in LFS.",
@@ -171,6 +172,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "How this conflict came about, above the conflicts of a merge, rebase, cherry-pick or revert, lists each side's commits that touched the file; pick one on each side to see what it changed or to test-merge the two. Find where it started finds the first pair whose merge already conflicts in the file (test merges with git merge-tree; your files and the index stay as they are). Cancel stops it.",
             "Right-click a file for its history, its blame or the whole file as it is at the commit.",
             "A file or hunk that makes the checks weaker gets a “weakens checks” badge: it removes assertions or tests, skips, disables or focuses tests, adds an assertion that can't fail, loosens a tolerance, rewrites a snapshot wholesale, lets CI fail or removes a CI job, or adds --no-verify. Hover the badge for the lines that made it.",
+            "History of these lines: select lines in a diff (drag over them, or click changed lines) or in a file (click, Shift+click or drag), then right-click (Ctrl+C copies them). It lists every commit up to that version that touched them, followed back through earlier edits and renames; click one to see only what it did to them.",
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
             "Ctrl+F in a diff, a file or a blame finds in it (in the graph it searches the commits): every match is marked, Enter and Shift+Enter (or F3 and Shift+F3) go to the next and previous one. Aa matches case, ab matches whole words only, .* takes the text as a regular expression.",
             "Copy link to … and Open … on GitHub (GitLab, Forgejo, Gitea) in the menu of a commit, a branch or a file, and of a commit's diff lines (right-click a line, or select text for a range) or a file's lines at a commit (click one, Shift+click for a range, then right-click). Links to a commit, file or lines use the commit's hash; a branch's follows the branch. They go to the remote the checked-out (or right-clicked) branch tracks, else origin, else the one you pick; the status line warns when the commit or branch isn't on that remote yet.",
@@ -313,7 +315,7 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("Cmd+Enter", "Save a note, or commit from the message fields"),
             (
                 "Click / Shift+click",
-                "Pick lines in a diff, or a range of them",
+                "Pick lines in a diff or a file, or a range of them",
             ),
             (
                 "Click / Shift+click",

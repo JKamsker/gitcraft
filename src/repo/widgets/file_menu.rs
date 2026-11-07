@@ -37,6 +37,7 @@ pub fn file_menu_with(
     acts: &mut Vec<Action>,
     more: impl FnOnce(&mut Ui, &mut Vec<Action>),
 ) {
+    let revert = matches!(diff, Some(DiffKey::Commit { hash, .. }) if rev == Some(hash.as_str()));
     egui::Popup::context_menu(resp)
         .style(crate::theme::menu_style)
         .show(|ui| {
@@ -76,6 +77,19 @@ pub fn file_menu_with(
                     rev: rev.map(str::to_owned),
                     tab: FileTab::Blame,
                 });
+            }
+            if revert && let Some(hash) = rev {
+                ui.separator();
+                let b = ui.button("Revert changes to this file").on_hover_text(
+                    "Undo this commit's changes to the file in the working tree, to look over \
+                     before committing",
+                );
+                if b.clicked() {
+                    acts.push(Action::RevertFile {
+                        hash: hash.to_owned(),
+                        path: path.to_owned(),
+                    });
+                }
             }
             if ignorable {
                 ui.menu_button("Ignore", |ui| {

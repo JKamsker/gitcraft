@@ -347,6 +347,12 @@ so your config, credentials and hooks apply as usual.
   (warns when the commit is already pushed), the identity you commit as (and whether it is the
   repository's own, the profile's or the global one), and saved identities or profile authors
   to switch a repository to; _Use the profile's author_ takes the repository's own out again.
+- Undo part of a past commit: _Revert changes to this file_ in a commit's file list, _Revert
+  file_, _Revert hunk_ and _Revert N lines_ (after clicking lines) in its diff. The piece is
+  reverse-applied to the working tree (`git apply -R`), to look over before committing; when it
+  applies as it is, Ctrl+Z takes it out again. When the file has changed since, a 3-way merge
+  puts it in (staged); overlapping changes are left as conflicts to settle. Binary files and
+  submodules are refused.
 - _Sign off_ in the commit box adds `Signed-off-by` with your name and email (DCO). It is on
   by itself in a repository with a `DCO` file (`DCO.md`, `DCO.txt`…) or `.github/dco.yml`
   committed, and while a pull request whose DCO check fails is open. Turning it the other way is
@@ -540,7 +546,10 @@ so your config, credentials and hooks apply as usual.
   _Abort_; the commit box finishes it (_Continue rebase_ during a rebase, _Continue patch_ while
   `git am` applies one).
 - File history (every commit that changed the file, following renames; click one for its diff
-  or the file as it was, beside the list), blame (who last changed each line, newer changes
+  or the file as it was, beside the list), the history of a few lines (select them in a diff or
+  a file, right-click → _History of these lines_: every commit up to that version that touched
+  them, `git log -L`, followed back through earlier edits and renames, each showing only what it
+  did to them), blame (who last changed each line, newer changes
   marked brighter; click to go to the commit) and the whole file at a commit (_View file_ in a
   file's menu).
 - _View all files_ under a commit's files lists every file of the commit, not only those it
@@ -967,7 +976,8 @@ was made this way, on a demo repository.
 | `src/repo/dco/` | DCO sign-off: the commit box's toggle, commits without one, signing off a branch |
 | `src/repo/versions/` | two versions of a series compared (range-diff), before / after rewrites, pull requests since last looked at |
 | `src/git/range_diff.rs` | running and reading `git range-diff`; `rewrites.rs` and `reviewed.rs` keep the old versions in refs |
-| `src/repo/file_view.rs`  | a file's history, blame and contents at a commit                                   |
+| `src/repo/file_view.rs`  | a file's history (or a few lines'), blame and contents at a commit                 |
+| `src/repo/revert_piece.rs` | reverting a file, hunk or lines of a past commit into the working tree           |
 | `src/repo/file_text.rs`  | a whole file at a commit, coloured, for the file view and diffs                    |
 | `src/repo/find/`         | find in the diff, file or blame shown: the bar, matching, marks, keys              |
 | `src/custom_commands/`   | custom commands: what they are, the script each runs (its variables quoted), a repository's `.gitcraft/commands.json` and its trust |

@@ -180,6 +180,24 @@ pub(crate) enum Action {
     CloseFileView,
     /// Go back (`-1`) or forward (`1`) through the recent views.
     Navigate(i32),
+    /// The history of lines `range` of `path` (numbered as they are `at`), in the file view.
+    LineHistory {
+        path: String,
+        at: crate::git::LinesAt,
+        range: crate::git::LineRange,
+    },
+    /// The part of commit `hash`'s diff that changed lines `lines` of `path` (as they are in
+    /// the commit); its whole diff of the file when there are none.
+    OpenDiffOfLines {
+        hash: String,
+        path: String,
+        lines: Vec<crate::git::LineRange>,
+    },
+    /// Undo commit `hash`'s changes to `path` in the working tree.
+    RevertFile {
+        hash: String,
+        path: String,
+    },
     /// Open the interactive rebase editor for the commits after `onto`.
     /// Gives a commit of the checked-out branch a new message: amending the latest, rebasing
     /// for an older one.

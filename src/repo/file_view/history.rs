@@ -60,8 +60,13 @@ impl RepoTab {
             Some(Ok(c)) => c,
         };
         if commits.is_empty() {
+            let note = if view.lines.is_some() {
+                "No commits touch these lines yet."
+            } else {
+                "No commits touch this file yet."
+            };
             ui.centered_and_justified(|ui| {
-                ui.label(egui::RichText::new("No commits touch this file yet.").color(t.text_dim));
+                ui.label(egui::RichText::new(note).color(t.text_dim));
             });
             return;
         }
@@ -119,6 +124,9 @@ impl RepoTab {
                     if c.path != view.path {
                         summary = format!("{summary}  ·  as {}", c.path);
                     }
+                    if let (Some(&(start, _)), Some(&(_, end))) = (c.lines.first(), c.lines.last()) {
+                        summary = format!("{summary}  ·  {}", super::line_history::lines_label((start, end)).to_lowercase());
+                    }
                     p.with_clip_rect(Rect::from_min_max(
                         rect.min,
                         pos2(author.left() - 16.0, rect.bottom()),
@@ -130,12 +138,21 @@ impl RepoTab {
                         FontId::proportional(12.5),
                         t.text,
                     );
-                    let resp = resp.on_hover_text(
-                        "Click: this commit's changes to the file, or the file as it was\nDouble-click: show the commit in the graph",
-                    );
+                    let resp = resp.on_hover_text(if view.lines.is_some() {
+                        "Click: what this commit did to the lines (numbered as they were in it)\nDouble-click: show the commit in the graph"
+                    } else {
+                        "Click: this commit's changes to the file, or the file as it was\nDouble-click: show the commit in the graph"
+                    });
                     if resp.double_clicked() {
                         acts.push(Action::CloseFileView);
                         acts.push(Action::SelectHash(c.hash.clone()));
+                    } else if resp.clicked() && view.lines.is_some() {
+                        // Only the part of its diff that changed the lines.
+                        acts.push(Action::OpenDiffOfLines {
+                            hash: c.hash.clone(),
+                            path: c.path.clone(),
+                            lines: c.lines.clone(),
+                        });
                     } else if resp.clicked() {
                         acts.push(Action::OpenDiff(DiffKey::Commit {
                             hash: c.hash.clone(),

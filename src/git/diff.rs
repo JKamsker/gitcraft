@@ -141,6 +141,17 @@ impl DiffOptions {
     }
 }
 
+/// Lines picked from a patch go back through `git apply`, which refuses a hunk without lines
+/// of context around it: with `diff.context=0` in the user's config, every one. Asks for the
+/// usual three then.
+fn keep_context(repo: &Path, opts: DiffOptions, args: &mut Vec<&str>) {
+    let no_context = run(Some(repo), &["config", "--type=int", "diff.context"])
+        .is_ok_and(|n| n.trim().parse::<u64>().is_ok_and(|n| n == 0));
+    if no_context && !opts.whole_file {
+        args.push("--unified=3");
+    }
+}
+
 /// The patch of one file in a commit.
 pub fn file_diff(repo: &Path, hash: &str, path: &str, opts: DiffOptions) -> Result<String, String> {
     let mut args = vec![
@@ -153,6 +164,8 @@ pub fn file_diff(repo: &Path, hash: &str, path: &str, opts: DiffOptions) -> Resu
         "-M",
     ];
     opts.push_args(&mut args);
+    // Its hunks and lines can be reverted, through `git apply`.
+    keep_context(repo, opts, &mut args);
     args.extend([END_OPTS, hash, "--", path]);
     // Limited to its new name, a file renamed in the commit looks new from top to bottom.
     let old_path = run(Some(repo), &commit_files_args("--name-status", hash))
@@ -232,13 +245,7 @@ pub fn work_diff(repo: &Path, file: &StatusFile, opts: DiffOptions) -> Result<St
         _ => vec![LITERAL_PATHS, "diff"],
     };
     opts.push_args(&mut args);
-    // Lines picked from this patch go back through `git apply`, which refuses a hunk without
-    // lines of context around it: with `diff.context=0` in the user's config, every one.
-    let no_context = run(Some(repo), &["config", "--type=int", "diff.context"])
-        .is_ok_and(|n| n.trim().parse::<u64>().is_ok_and(|n| n == 0));
-    if no_context && !opts.whole_file {
-        args.push("--unified=3");
-    }
+    keep_context(repo, opts, &mut args);
     args.extend(["--", path]);
     // A staged rename limited to its new name would look like a new file.
     if file.area == Area::Staged {

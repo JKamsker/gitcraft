@@ -8,6 +8,7 @@ mod interdiff;
 mod jump;
 mod lfs;
 pub(in crate::repo) mod link;
+mod lines;
 mod map;
 mod paint;
 mod parse;
@@ -28,10 +29,11 @@ use super::highlight::{self, MAX_LINE_CHARS, Spans, cap_line};
 use crate::git::{self, Area, DiffOptions};
 
 pub use images::ImagePair;
-use images::{is_image, load_images, renamed_from};
+use images::{is_image, load_images};
 pub(in crate::repo) use interdiff::{interdiff_data, interdiff_rows};
 pub use lfs::LfsPair;
 use lfs::lfs_pair;
+pub use lines::{old_name, picked_in_file, picked_lines};
 pub use parse::parse;
 use parse::{is_new_file, pair_lines, patch_header};
 pub use patch::{hunk_changes, partial_patch};
@@ -81,6 +83,8 @@ pub struct DiffData {
     pub header: String,
     /// Hunks and lines can be staged, unstaged or discarded on their own.
     pub partial: bool,
+    /// Hunks and lines of a commit's diff can be reverted on their own.
+    pub revertable: bool,
     /// The file is new: it has no old side, so it shows unified even side by side.
     pub new_file: bool,
     /// Characters in the longest line, for the width to scroll (counted once, not every frame).
@@ -115,7 +119,7 @@ impl DiffData {
     }
 }
 
-/// What to do with some hunks or lines of an uncommitted file's diff.
+/// What to do with some hunks or lines of an uncommitted file's diff, or of a commit's.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Pick {
     /// Unstaged lines into the index.
@@ -124,6 +128,8 @@ pub enum Pick {
     Unstage,
     /// Unstaged lines out of the working tree.
     Discard,
+    /// A commit's lines undone in the working tree.
+    Revert,
 }
 
 impl Pick {
@@ -137,7 +143,7 @@ impl Pick {
         match self {
             Pick::Stage => &["apply", "--cached"],
             Pick::Unstage => &["apply", "--cached", "--reverse"],
-            Pick::Discard => &["apply", "--reverse"],
+            Pick::Discard | Pick::Revert => &["apply", "--reverse"],
         }
     }
 
@@ -146,7 +152,27 @@ impl Pick {
             Pick::Stage => "Stage",
             Pick::Unstage => "Unstage",
             Pick::Discard => "Discard",
+            Pick::Revert => "Revert",
         }
+    }
+}
+
+/// [`load`], or with `lines` only the part of a commit's diff that changed those lines of the
+/// file (as they are in the commit), as `git log -L` shows it.
+pub fn load_lines(
+    repo: &Path,
+    key: &DiffKey,
+    lines: Option<&[git::LineRange]>,
+    opts: DiffOptions,
+    dark: bool,
+) -> Result<DiffData, String> {
+    match (lines, key) {
+        (Some(ranges), DiffKey::Commit { hash, path }) => {
+            let text = git::line_diff(repo, hash, path, ranges)?;
+            // Not the commit's patch: nothing of it is picked to revert.
+            Ok(prepare(repo, key, path, &text, false, dark))
+        }
+        _ => load(repo, key, opts, dark),
     }
 }
 
@@ -169,17 +195,38 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
             path.clone(),
         ),
     };
-    let mut lines = parse(&text);
+    let pickable = !opts.ignore_ws;
+    Ok(prepare(repo, key, &path, &text, pickable, dark))
+}
+
+/// The diff `text` of `path` read into lines, coloured and paired. `pickable`: hunks and lines
+/// of it can be picked on their own (it is the patch git would apply).
+fn prepare(
+    repo: &Path,
+    key: &DiffKey,
+    path: &str,
+    text: &str,
+    pickable: bool,
+    dark: bool,
+) -> DiffData {
+    let path = path.to_owned();
+    let mut lines = parse(text);
     if let DiffKey::Remerge { conflicts, .. } = key {
-        lines = remerge::label(conflicts, lines, opts.ignore_ws);
+        lines = remerge::label(conflicts, lines, !pickable);
     }
-    let header = patch_header(&text);
-    let partial = can_pick(key, opts, &header, &lines);
-    let new_file = is_new_file(&text);
+    let header = patch_header(text);
+    let picks = pickable && can_pick(&header, &lines);
+    let partial =
+        picks && matches!(key, DiffKey::Work(f) if matches!(f.area, Area::Staged | Area::Unstaged));
+    // Not a submodule's change, which `git apply` would report done and leave as it was.
+    let revertable = picks
+        && matches!(key, DiffKey::Commit { .. })
+        && git::check_revertable(text, &path).is_ok();
+    let new_file = is_new_file(text);
     let lfs = lfs_pair(&lines);
     // An image in LFS: git has only its pointer.
     let image = if is_image(&path) && lfs.is_none() {
-        Some(load_images(repo, key, &path, renamed_from(&text)))
+        Some(load_images(repo, key, &path, images::renamed_from(text)))
     } else {
         None
     };
@@ -200,7 +247,7 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         .max()
         .unwrap_or(0);
     let weakened = weakened::by_hunk_line(&text, &lines);
-    Ok(DiffData {
+    DiffData {
         lines,
         spans,
         changed,
@@ -209,21 +256,21 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         lfs,
         header,
         partial,
+        revertable,
         new_file,
         longest,
         uncut,
         weakened,
         map: Default::default(),
-    })
+    }
 }
 
-/// Whether hunks and lines of this diff can be picked on their own.
-fn can_pick(key: &DiffKey, opts: DiffOptions, header: &str, lines: &[DiffLine]) -> bool {
-    // A patch made from a `-w` diff wouldn't apply; new, deleted, renamed and binary files,
-    // truncated diffs and text that isn't UTF-8 only go whole.
-    matches!(key, DiffKey::Work(f) if matches!(f.area, Area::Staged | Area::Unstaged))
-        && !opts.ignore_ws
-        && !header.is_empty()
+/// Whether hunks and lines of this diff can be picked on their own (it isn't a `-w` diff,
+/// whose patch wouldn't apply: see [`prepare`]).
+fn can_pick(header: &str, lines: &[DiffLine]) -> bool {
+    // New, deleted, renamed and binary files, truncated diffs and text that isn't UTF-8 only
+    // go whole.
+    !header.is_empty()
         && ![
             "new file mode",
             "deleted file mode",

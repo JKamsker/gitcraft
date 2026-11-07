@@ -4,6 +4,7 @@
 
 mod blame;
 mod history;
+mod line_history;
 
 use egui::{Stroke, Ui};
 
@@ -12,7 +13,7 @@ use super::find::Source;
 use super::widgets;
 use super::{Action, RepoTab};
 use crate::forge::links::{Lines, Target};
-use crate::git::FileCommit;
+use crate::git::{self, FileCommit};
 use crate::icons;
 use crate::theme::{self, Tokens};
 
@@ -34,6 +35,9 @@ pub(crate) struct FileView {
     pub history: Option<Result<Vec<FileCommit>, String>>,
     pub blame: Option<Result<BlameData, String>>,
     pub text: Option<Result<FileText, String>>,
+    /// The history of only these lines (where their numbers count from, and the lines), not
+    /// of the whole file.
+    pub lines: Option<(git::LinesAt, git::LineRange)>,
 }
 
 impl FileView {
@@ -45,6 +49,7 @@ impl FileView {
             history: None,
             blame: None,
             text: None,
+            lines: None,
         }
     }
 
@@ -62,6 +67,10 @@ impl RepoTab {
     pub(super) fn file_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         let Some(view) = &self.file_view else { return };
+        if view.lines.is_some() {
+            self.line_history_view(ui, acts);
+            return;
+        }
 
         egui::Frame::new()
             .fill(t.chrome)
@@ -139,8 +148,26 @@ impl RepoTab {
                 // Lines are picked only when there's something to link them to.
                 let links = (view.rev.is_some() && self.link_menu(None).is_some())
                     .then_some(&mut link as file_text::LineMenu<'_>);
-                let id = ("file_view", &view.path, &view.rev);
-                file_text::show(ui, id, view.text.as_ref(), &mut self.find, || Source::File { path: view.path.clone(), rev: view.rev.clone() }, links);
+                let picked = file_text::show(
+                    ui,
+                    ("file_view", &view.path, &view.rev),
+                    view.text.as_ref(),
+                    &mut self.find,
+                    || Source::File { path: view.path.clone(), rev: view.rev.clone() },
+                    Ok(()),
+                    links,
+                );
+                if let Some(range) = picked {
+                    let at = view
+                        .rev
+                        .clone()
+                        .map_or(git::LinesAt::WorkTree, git::LinesAt::Rev);
+                    acts.push(Action::LineHistory {
+                        path: view.path.clone(),
+                        at,
+                        range,
+                    });
+                }
             }
         }
     }

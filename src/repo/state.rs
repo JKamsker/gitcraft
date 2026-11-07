@@ -139,6 +139,9 @@ pub(crate) struct DiffView {
     /// The latest read of this diff: only its answer is shown, so a slower answer to an older
     /// read (before the whitespace or whole-file setting changed…) can't replace it.
     pub(super) request: u64,
+    /// Opened from the history of some lines: only the part of the commit's diff that changed
+    /// these lines of the file (as they are in the commit).
+    pub(super) lines: Option<Vec<crate::git::LineRange>>,
 }
 
 /// Numbers the diff reads of every tab, so no two diffs ever wait for the same number.
@@ -160,6 +163,7 @@ impl DiffView {
             jump: None,
             at_change: None,
             request: 0,
+            lines: None,
         }
     }
 

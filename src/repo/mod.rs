@@ -51,6 +51,8 @@ mod layout;
 mod lfs_locks;
 mod lifecycle;
 mod lfs_storage;
+#[cfg(test)]
+mod line_history_tests;
 mod load;
 mod messages;
 mod nav_history;
@@ -72,6 +74,9 @@ mod quick_edit;
 mod rebase;
 mod reflog;
 mod remerge;
+mod revert_piece;
+#[cfg(test)]
+mod revert_tests;
 mod rewrite;
 mod running;
 #[cfg(test)]

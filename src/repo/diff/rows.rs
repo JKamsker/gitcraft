@@ -54,6 +54,9 @@ pub(super) struct Rows<'a> {
     pub(super) seen: Seen,
     /// Where the lines' menu links to, for a commit's diff.
     pub(super) links: Option<&'a LineLinks<'a>>,
+    /// The changed lines that can be clicked: they take the right-click over them, so they
+    /// open the lines' menu too.
+    picks: Vec<egui::Response>,
 }
 
 impl<'a> Rows<'a> {
@@ -68,6 +71,7 @@ impl<'a> Rows<'a> {
         let hunk_picks: &[Pick] = match &view.key {
             DiffKey::Work(f) if partial && f.area == Area::Staged => &[Pick::Unstage],
             DiffKey::Work(_) if partial => &[Pick::Stage, Pick::Discard],
+            DiffKey::Commit { .. } if partial => &[Pick::Revert],
             _ => &[],
         };
         let (press, pointer) = ui.input(|i| (i.pointer.press_origin(), i.pointer.interact_pos()));
@@ -93,6 +97,7 @@ impl<'a> Rows<'a> {
             reveal: None,
             seen: Seen::default(),
             links: None,
+            picks: Vec::new(),
         }
     }
 
@@ -239,11 +244,35 @@ impl<'a> Rows<'a> {
             }
         }
         let links = self.links;
-        copy_selection(ui, &text_drag, sel, &data.lines, &data.uncut, |ui| {
-            if let Some(links) = links {
-                links.items(ui, (&data.lines, &data.header), sel, acts);
-            }
-        });
+        let history = || {
+            let old_path = super::old_name(&data.header);
+            super::picked_lines(
+                &self.view.key,
+                old_path.as_deref(),
+                &data.lines,
+                sel.as_ref(),
+                &self.view.chosen,
+            )
+            .map(|p| Action::LineHistory {
+                path: p.path,
+                at: p.at,
+                range: p.range,
+            })
+        };
+        let picks = std::mem::take(&mut self.picks);
+        copy_selection(
+            ui,
+            &text_drag,
+            &picks,
+            sel,
+            &data.lines,
+            &data.uncut,
+            |ui, acts| {
+                if let Some(links) = links { links.items(ui, (&data.lines, &data.header), sel, acts); }
+            },
+            &history,
+            acts,
+        );
         sel
     }
 
@@ -330,9 +359,12 @@ impl<'a> Rows<'a> {
             let resp = ui
                 .interact(rect, ui.id().with(("diff_line", i)), Sense::click())
                 .on_hover_cursor(egui::CursorIcon::PointingHand);
-            if resp.clicked() {
+            // A right-click on a changed line not picked picks it, for its menu to be about it.
+            let unpicked = !self.view.chosen.contains(&i) && self.text_sel.is_none();
+            if resp.clicked() || resp.secondary_clicked() && unpicked {
                 self.clicked = Some(i);
             }
+            self.picks.push(resp);
         }
         if kind == Some(Kind::Hunk) {
             let mut right = rect.right().min(ui.clip_rect().right()) - 6.0;
