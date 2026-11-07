@@ -5,6 +5,7 @@ mod ai;
 pub mod app;
 mod avatars;
 mod ci;
+mod custom_commands;
 mod desktop_entry;
 mod drafts;
 mod folder_browser;

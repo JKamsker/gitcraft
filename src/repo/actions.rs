@@ -213,6 +213,8 @@ pub(crate) enum Action {
     CloseCompare,
     /// Search commit messages, or what commits changed in files.
     SearchCode(bool),
+    /// Run a custom command, or trust a repository's.
+    Custom(super::custom_commands::CustomAct),
 }
 
 /// Compares two branches, given to git by their full refs (a tag of the same name is not
@@ -520,6 +522,7 @@ impl RepoTab {
                 ));
             }
         }
+        items.extend(self.custom_palette_items());
         items
     }
 }

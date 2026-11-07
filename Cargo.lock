@@ -1638,6 +1638,7 @@ dependencies = [
  "rustix 1.1.6",
  "serde",
  "serde_json",
+ "sha2",
  "syntect",
  "two-face",
  "ureq 2.12.1",

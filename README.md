@@ -339,6 +339,18 @@ so your config, credentials and hooks apply as usual.
   real pseudo-terminal (ConPTY on Windows) with colours, scrollback, mouse selection and copy
   (Ctrl+C with a selection, Ctrl+Shift+C or right-click).
 - Command palette (Ctrl+P): every action and branch, fuzzy matched.
+- Custom commands (Settings → Custom commands): your own command lines in a commit's, a branch's
+  or a file's menu, or the palette. Each runs with `sh` on the repository's machine (here, in
+  WSL or over SSH) in its folder, with `$SHA`, `$SHORT_SHA`, `$BRANCH`, `$REMOTE`, `$FILE` and
+  `$REPO` (and the answers to its prompts: a text or a branch, asked first) as shell variables,
+  never pasted into the command line. It can ask before running, and its output goes to a toast
+  or to a terminal tab of its own. A repository can bring its own in `.gitcraft/commands.json`
+  (`{"commands": [{"name": …, "where": "commit" | "branch" | "file" | "palette", "command": …,
+  "prompts": [{"variable": "NAME", "label": …, "kind": "text" | "branch", "default": …}],
+  "confirm": true, "output": "toast" | "terminal"}]}`); they are offered only once you have read
+  the file and trusted it, and asked about again whenever it changes. `confirm` is `true` and
+  `output` `"toast"` when left out; a field the format doesn't know makes the file unusable (the
+  review says why). A toast shows only the last 8 lines of what a command printed.
 - Manual (F1, or the book in the title bar): what each part does and every keyboard shortcut.
 - Avatars: on a GitHub repository, the authors' GitHub accounts (through `gh` when installed, else
   GitHub's API); on Forgejo and Gitea, the accounts the host ties the commits to; on GitLab, the
@@ -347,8 +359,8 @@ so your config, credentials and hooks apply as usual.
 - Settings (Ctrl+, or the gear in the title bar), in pages listed on the left: the profile in
   use and what is its own, zoom, branch column width, graph columns, avatars, notifications,
   update check (with a Check for updates button), background fetch, keeping submodules up to
-  date, editor command, default shell and terminal font size, saved identities, SSH sign-ins,
-  the AI tool and its prompts, and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
+  date, editor command, default shell and terminal font size, saved identities, custom commands,
+  SSH sign-ins, the AI tool and its prompts, and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
   Alt+↓ go through the pages.
 - Previews beside the settings: point at a setting and a panel on the right (above the page in
   a narrow window) draws what it does with the values set now, as the app draws it. The branch
@@ -563,6 +575,8 @@ was made this way, on a demo repository.
 | `src/repo/file_view.rs`  | a file's history, blame and contents at a commit                                   |
 | `src/repo/file_text.rs`  | a whole file at a commit, coloured, for the file view and diffs                    |
 | `src/repo/find/`         | find in the diff, file or blame shown: the bar, matching, marks, keys              |
+| `src/custom_commands/`   | custom commands: what they are, the script each runs (its variables quoted), a repository's `.gitcraft/commands.json` and its trust |
+| `src/repo/custom_commands/` | custom commands in a tab: menu and palette entries, the repository's file, running one (toast or terminal) |
 | `src/repo/dialogs.rs`    | branch, tag, stash, remote, worktree, pull request and confirm dialogs             |
 | `src/git/preview.rs`     | what a destructive operation would change, read before it runs                     |
 | `src/repo/widgets.rs`    | shared painted widgets (panel headers, file rows, avatars, tabs)                   |

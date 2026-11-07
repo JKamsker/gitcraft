@@ -203,6 +203,12 @@ impl RepoTab {
         self.visibility_items(ui, acts, &local_ref(&b.name), b.is_head);
         ui.separator();
         self.delete_items(ui, acts, b, idle);
+        crate::repo::custom_commands::menu_items(
+            ui,
+            crate::custom_commands::Placement::Branch,
+            self.branch_scope(&b.name, &b.target, None),
+            acts,
+        );
     }
 
     /// _Review this branch_: the AI tool reviews what `b` adds to the branch pull requests

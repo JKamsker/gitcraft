@@ -30,6 +30,7 @@ impl RepoTab {
                 self.select_stash(i, ctx);
             }
             Action::OpenDiff(key) => self.open_diff(key, ctx),
+            Action::Custom(act) => self.custom_act(act, ctx),
             Action::OpenPr(number) => {
                 // It refuses while an editor takes the big area: the builds shown stay then.
                 let requests = self.pr_requests;

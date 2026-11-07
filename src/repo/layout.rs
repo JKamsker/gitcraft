@@ -22,6 +22,7 @@ impl RepoTab {
                 .show(ui, |ui| self.opening_screen(ui));
             return;
         }
+        self.publish_custom_commands(&ctx);
         let mut acts: Vec<Action> = std::mem::take(&mut self.queued);
         self.shortcuts(&ctx, &mut acts);
         self.drag_frame_start(&ctx);

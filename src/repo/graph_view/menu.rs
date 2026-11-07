@@ -121,6 +121,13 @@ impl RepoTab {
         }
         ui.separator();
         copy_items(ui, &hash, &summary, branch_name.as_deref());
+        let scope = self.commit_scope(&hash, branch_name.as_deref());
+        crate::repo::custom_commands::menu_items(
+            ui,
+            crate::custom_commands::Placement::Commit,
+            scope,
+            acts,
+        );
     }
 
     /// Actions on the right-clicked `branch`: check it out, or bring it into the checked-out

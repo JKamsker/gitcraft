@@ -70,6 +70,17 @@ pub fn file_menu(
             if ui.button("Copy path").clicked() {
                 ui.ctx().copy_text(path.to_owned());
             }
+            let scope = crate::custom_commands::Scope {
+                sha: rev.unwrap_or_default().to_owned(),
+                file: path.to_owned(),
+                ..Default::default()
+            };
+            crate::repo::custom_commands::menu_items(
+                ui,
+                crate::custom_commands::Placement::File,
+                scope,
+                acts,
+            );
         });
 }
 

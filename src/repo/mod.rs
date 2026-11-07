@@ -12,6 +12,7 @@ pub(crate) mod columns;
 mod commands;
 mod conflict;
 mod conflict_check;
+pub(crate) mod custom_commands;
 mod detail;
 mod dialogs;
 mod diff;
@@ -273,6 +274,8 @@ pub struct RepoTab {
     /// Long operations that just ended, its own and its parked worktrees': (message, failed),
     /// for a notification each (taken by `App`).
     pub finished: Vec<(String, bool)>,
+    /// The repository's own custom commands, and what the palette offers of them.
+    custom: custom_commands::TabCommands,
 }
 
 impl RepoTab {
@@ -402,6 +405,7 @@ impl RepoTab {
             parked_status: Vec::new(),
             keys_blocked: false,
             finished: Vec::new(),
+            custom: Default::default(),
         };
         tab.watch(ctx);
         // What was typed here and not used, the last time this repository was open.

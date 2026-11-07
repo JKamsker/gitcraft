@@ -1,6 +1,7 @@
 //! User settings: stored with the app state, readable from anywhere through the egui context.
 
 mod ai_page;
+mod custom_commands;
 mod layout;
 mod page;
 mod preview;
@@ -104,6 +105,10 @@ pub struct Settings {
     pub active_profile: u64,
     /// The AI tool that writes commit messages and reviews branches (Settings → AI).
     pub ai: crate::ai::AiSettings,
+    /// Commands added to the menus and the palette (Settings → Custom commands).
+    pub custom_commands: Vec<crate::custom_commands::CustomCommand>,
+    /// The repositories' command files the user trusted, as they were then.
+    pub trusted_command_files: Vec<crate::custom_commands::TrustedFile>,
 }
 
 impl Default for Settings {
@@ -147,6 +152,8 @@ impl Default for Settings {
             user_profiles: vec![UserProfile::default()],
             active_profile: UserProfile::default().id,
             ai: Default::default(),
+            custom_commands: Vec::new(),
+            trusted_command_files: Vec::new(),
         }
     }
 }
@@ -798,6 +805,7 @@ impl Settings {
                     },
                 );
             }
+            Page::CustomCommands => custom_commands::page(self, ui, f),
             Page::Shortcuts => {
                 for (group, keys) in crate::manual::SHORTCUTS {
                     section(ui, f, group, None, |card| {
@@ -848,6 +856,7 @@ pub(crate) enum Page {
     Terminal,
     Identities,
     Ai,
+    CustomCommands,
     Shortcuts,
 }
 
@@ -862,6 +871,7 @@ impl Page {
         Page::Terminal,
         Page::Identities,
         Page::Ai,
+        Page::CustomCommands,
         Page::Shortcuts,
     ];
 
@@ -876,6 +886,7 @@ impl Page {
             Page::Terminal => "Terminal",
             Page::Identities => "Identities",
             Page::Ai => "AI",
+            Page::CustomCommands => "Custom commands",
             Page::Shortcuts => "Keyboard shortcuts",
         }
     }
@@ -891,6 +902,7 @@ impl Page {
             Page::Terminal => "square-terminal",
             Page::Identities => "user-round",
             Page::Ai => "sparkles",
+            Page::CustomCommands => "command",
             Page::Shortcuts => "keyboard",
         }
     }
