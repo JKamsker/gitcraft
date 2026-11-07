@@ -1,0 +1,7 @@
+
+running 1 test
+test push_preflight::fix::remote_repair::tests::recording_receipts_require_complete_schema_nonce_code_kind_and_oid ... complete receipt accepted; all truncations/wrong schema/nonce/code/kind/OID/extra rejected
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 937 filtered out; finished in 0.00s
+

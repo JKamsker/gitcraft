@@ -1,0 +1,77 @@
+{
+  "verdict": "PASS_RECORDING_ONLY",
+  "source": "e5d1c100f6f20918f3f7c3564d28234cc64a3133",
+  "application_source_tree": "b8a1acb618c8bf3b02c67f1c9b0d541ce4c0f0cc",
+  "binary_sha256": "3fb0dc166388d1f0504bb18861a0df7ba44405a45ff9847882b0203b0286e67c",
+  "compiler_binding_commit": "8e013f35e2f129ee06dba6e8d63e9ca7915d7f76",
+  "passed": 9,
+  "failed": 0,
+  "tests": [
+    {
+      "test": "remote::ownership::tests::recording_cancelled_queued_work_cannot_dispatch",
+      "exit_code": 0,
+      "exactly_one_pass": true,
+      "log": "recording-01.log",
+      "sha256": "2f1d87b074914661810ad8108af9e29b3f222d5c5d1e8cd634fa9d9658b9ed21"
+    },
+    {
+      "test": "remote::ownership::tests::recording_cancellation_after_dispatch_never_claims_stopped",
+      "exit_code": 0,
+      "exactly_one_pass": true,
+      "log": "recording-02.log",
+      "sha256": "1c5dc5c60f8ba56a3967814cb3afdcc49e6e3f6cd2ef90cae59e7415296024d4"
+    },
+    {
+      "test": "remote::ownership::tests::recording_only_pre_dispatch_refusal_can_retire_ownership",
+      "exit_code": 0,
+      "exactly_one_pass": true,
+      "log": "recording-03.log",
+      "sha256": "f7c5aa776427f295e6bceeb694510dcbac754eb804608f7808216a727c7ff3a4"
+    },
+    {
+      "test": "remote::ownership::tests::recording_owned_failures_never_select_the_legacy_stop_controller",
+      "exit_code": 0,
+      "exactly_one_pass": true,
+      "log": "recording-04.log",
+      "sha256": "045988259c4b821ff9602bf7875e1c5bc0bbceb1e35e3a887fa585a05fb212f4"
+    },
+    {
+      "test": "remote::ownership::tests::recording_partial_and_flush_write_failures_are_unknown_without_retry",
+      "exit_code": 0,
+      "exactly_one_pass": true,
+      "log": "recording-05.log",
+      "sha256": "28d29ab47f77e0348952983a772455d1799260e72a79837a4c434febf4e4042c"
+    },
+    {
+      "test": "remote::ownership::tests::recording_scope_retains_context_and_ticket_for_the_whole_owned_wait",
+      "exit_code": 0,
+      "exactly_one_pass": true,
+      "log": "recording-06.log",
+      "sha256": "25f3ce9f079150f2f69684862c0aa8478632dced39e5604643b56c36eb064c3a"
+    },
+    {
+      "test": "remote::ownership::tests::recording_terminal_receipt_is_distinct_from_transport_uncertainty",
+      "exit_code": 0,
+      "exactly_one_pass": true,
+      "log": "recording-07.log",
+      "sha256": "52e98bb51eee844b772e3c523870637006af2bc773401065cf664906cb5d18fe"
+    },
+    {
+      "test": "push_preflight::fix::remote_repair::tests::recording_receipts_require_complete_schema_nonce_code_kind_and_oid",
+      "exit_code": 0,
+      "exactly_one_pass": true,
+      "log": "recording-08.log",
+      "sha256": "cfdc2691b21c2379421244b3560557c5283e6116915659c8250b9769a9e1e473"
+    },
+    {
+      "test": "push_preflight::fix::remote_repair::tests::recording_registry_retirement_cannot_erase_a_replacement_owner",
+      "exit_code": 0,
+      "exactly_one_pass": true,
+      "log": "recording-09.log",
+      "sha256": "1acf9b774aa9609b0e271d40162e22755f4b817e80ac968ff85130026044f90f"
+    }
+  ],
+  "protocol_or_host_processes_executed": false,
+  "ci_used": false,
+  "next": "Rootstandingreleaseboundedownedtransportfixtures, thenminimalsharedcut; noextraapprovalafterPASS"
+}
