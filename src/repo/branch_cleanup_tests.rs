@@ -306,6 +306,8 @@ fn deleting_here_and_on_the_remote_is_undone_and_redone() -> Result<(), String> 
     assert!(!there("fix/ünïcode-✓"));
     assert!(here("main") && here("wip") && here("in-worktree"));
     let entry = UndoEntry {
+        id: 0,
+        agent: None,
         label: "Delete branches".to_owned(),
         undo: undo.clone(),
         redo,
@@ -424,6 +426,8 @@ fn many_branches_are_deleted_in_batches() -> Result<(), String> {
         return Err("not undoable".to_owned());
     };
     let entry = UndoEntry {
+        id: 0,
+        agent: None,
         label: "Delete branches".to_owned(),
         undo: undo.clone(),
         redo,

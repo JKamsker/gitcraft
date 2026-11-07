@@ -141,7 +141,10 @@ impl App {
                 }
             }
             Outcome::Choose(i) => self.choose(i, ctx),
-            Outcome::OpenLink(link) => { self.palette = None; self.open_link(link, ctx); }
+            Outcome::OpenLink(link) => {
+                self.palette = None;
+                self.open_link(link, ctx);
+            }
         }
     }
 
@@ -281,10 +284,18 @@ impl Palette {
                 match &link {
                     Some(Ok(link)) => {
                         let what = super::links::describe(link);
-                        if ui.button(format!("Open link: {what}")).clicked() { open_link = true; }
+                        if ui.button(format!("Open link: {what}")).clicked() {
+                            open_link = true;
+                        }
                     }
-                    Some(Err(why)) => { ui.label(RichText::new(why).color(t.text_faint)); }
-                    None => if let Some(i) = self.list_ui(ui, &t, count, moved) { outcome = Outcome::Choose(i); },
+                    Some(Err(why)) => {
+                        ui.label(RichText::new(why).color(t.text_faint));
+                    }
+                    None => {
+                        if let Some(i) = self.list_ui(ui, &t, count, moved) {
+                            outcome = Outcome::Choose(i);
+                        }
+                    }
                 }
             });
         });
@@ -414,4 +425,13 @@ fn scroll_to_show(k: usize, scroll: f32, view: f32) -> f32 {
     } else {
         scroll
     }
+}
+
+/// Matching used by the start-page filter as well as the palette.
+pub(super) fn fuzzy(haystack: &str, needle: &str) -> bool {
+    let mut chars = haystack.chars();
+    needle
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .all(|n| chars.any(|h| h == n))
 }

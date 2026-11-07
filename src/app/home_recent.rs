@@ -229,7 +229,9 @@ fn elided(
 fn recent_row(ui: &mut Ui, path: &Path, info: &RowInfo) -> (Option<RowClick>, bool) {
     let t = Tokens::get(ui.ctx());
     let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 40.0), Sense::click());
-    crate::repo::widgets::a11y(&resp, egui::WidgetType::Button, || crate::remote::display(path));
+    crate::repo::widgets::a11y(&resp, egui::WidgetType::Button, || {
+        crate::remote::display(path)
+    });
     let hovered = resp.hovered();
     if hovered || info.highlighted {
         ui.painter().rect_filled(rect, t.radius, t.hover);

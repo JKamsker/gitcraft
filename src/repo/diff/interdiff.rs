@@ -43,6 +43,7 @@ pub(in crate::repo) fn interdiff_data(body: &[String]) -> DiffData {
         longest,
         uncut,
         map: Default::default(),
+        ..Default::default()
     }
 }
 
@@ -94,7 +95,19 @@ pub(in crate::repo) fn interdiff_rows(
             let width = (24.0 + data.longest as f32 * char_w + 24.0).max(ui.available_width());
             for i in range {
                 let (rect, _) = ui.allocate_exact_size(vec2(width, LINE_H), Sense::hover());
-                paint_line(ui, rect, data, i, Side::Both, 0.0, &font, &t, false, None);
+                paint_line(
+                    ui,
+                    rect,
+                    data,
+                    i,
+                    Side::Both,
+                    0.0,
+                    &font,
+                    &t,
+                    false,
+                    None,
+                    None,
+                );
             }
         });
 }

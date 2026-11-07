@@ -43,11 +43,11 @@ impl RepoTab {
         self.compare = None;
         if !keep_diff
             && (matches!(
-            self.diff,
-            Some(DiffView {
-                key: DiffKey::Commit { .. } | DiffKey::Range { .. } | DiffKey::Remerge { .. },
-                ..
-            })
+                self.diff,
+                Some(DiffView {
+                    key: DiffKey::Commit { .. } | DiffKey::Range { .. } | DiffKey::Remerge { .. },
+                    ..
+                })
             ) || hash != WIP_HASH)
         {
             self.diff = None;

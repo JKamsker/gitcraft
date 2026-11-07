@@ -133,13 +133,17 @@ impl RepoTab {
                 ));
                 if n > 0 {
                     let (undo, redo) = undo_steps(&moved);
-                    self.undo_stack.push(UndoEntry {
-                        label: "Restack".to_owned(),
-                        undo,
-                        redo,
-                        heads: None,
-                    });
-                    self.redo_stack.clear();
+                    self.push_undo(
+                        UndoEntry {
+                            id: 0,
+                            agent: None,
+                            label: "Restack".to_owned(),
+                            undo,
+                            redo,
+                            heads: None,
+                        },
+                        ctx,
+                    );
                 }
             }
             Outcome::Aborted(kept) => {

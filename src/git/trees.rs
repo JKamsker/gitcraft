@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use super::{END_OPTS, NO_SIGNATURE, UTF8, run, run_env};
+use super::{END_OPTS, NO_SIGNATURE, UTF8, run, run_env_owned};
 
 /// Who wrote a commit, and when, as git takes them back (`GIT_AUTHOR_*`).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -166,9 +166,9 @@ pub fn tree_after(repo: &Path, base: &str, patches: &[String]) -> Result<String,
     let scratch = format!("{}.index", super::save_patch_for(repo, "")?);
     let env = [("GIT_INDEX_FILE", scratch.clone())];
     let result = (|| {
-        run_env(repo, &env, &["read-tree", END_OPTS, base])?;
+        run_env_owned(repo, &env, &["read-tree", END_OPTS, base])?;
         for (n, patch) in patches.iter().enumerate() {
-            run_env(
+            run_env_owned(
                 repo,
                 &env,
                 &["apply", "--cached", "--whitespace=nowarn", patch],
@@ -181,7 +181,9 @@ pub fn tree_after(repo: &Path, base: &str, patches: &[String]) -> Result<String,
                 }
             })?;
         }
-        Ok(run_env(repo, &env, &["write-tree"])?.trim().to_owned())
+        Ok(run_env_owned(repo, &env, &["write-tree"])?
+            .trim()
+            .to_owned())
     })();
     match crate::remote::parse(repo) {
         None => {
@@ -228,7 +230,7 @@ pub fn commit_tree_signed(
     if sign {
         args.push("-S");
     }
-    Ok(run_env(repo, &env, &args)?.trim().to_owned())
+    Ok(run_env_owned(repo, &env, &args)?.trim().to_owned())
 }
 
 #[cfg(test)]

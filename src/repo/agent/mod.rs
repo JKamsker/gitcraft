@@ -148,6 +148,14 @@ fn shown_command(args: &[String]) -> Option<String> {
 }
 
 impl RepoTab {
+    pub(in crate::repo) fn operation_agent(&self, label: &str) -> Option<String> {
+        self.agent_calls
+            .running
+            .as_ref()
+            .filter(|r| r.label == label)
+            .map(|r| r.agent.clone())
+    }
+
     /// Takes a request from an agent: it waits its turn, and is planned once the tab is free.
     pub(crate) fn agent_request(&mut self, incoming: Incoming, ctx: &egui::Context) {
         self.agent_calls.queue.push_back(Job::new(incoming));

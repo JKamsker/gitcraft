@@ -1,10 +1,10 @@
 //! User settings: stored with the app state, readable from anywhere through the egui context.
 
+mod agents;
 mod ai_page;
 mod custom_commands;
-mod external_tools;
-mod agents;
 mod diffs;
+mod external_tools;
 mod file_menus;
 mod layout;
 mod page;
@@ -1088,7 +1088,7 @@ pub(crate) enum Page {
 }
 
 impl Page {
-    pub const ALL: [Page; 10] = [
+    pub const ALL: [Page; 12] = [
         Page::Profile,
         Page::General,
         Page::Appearance,

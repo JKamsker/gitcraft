@@ -129,7 +129,16 @@ impl RepoTab {
                         self.storage_menu_items(ui, path, Some(&detail.hash), acts);
                     };
                     let links = || self.link_menu(None);
-                    widgets::file_menu_with(&r.row, path, Some(&detail.hash), false, None, &links, acts, locks);
+                    widgets::file_menu_with(
+                        &r.row,
+                        path,
+                        Some(&detail.hash),
+                        false,
+                        None,
+                        &links,
+                        acts,
+                        locks,
+                    );
                     if r.row.clicked() {
                         acts.push(Action::FileView {
                             path: path.clone(),

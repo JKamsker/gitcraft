@@ -575,7 +575,10 @@ impl RepoTab {
         }
         let rebase = format!("Rebase {current} onto {}", b.name);
         let rebase = self.conflict_button(ui, rebase, idle, Op::Rebase, &b.target);
-        offer(&rebase, || GhostOp::Rebase { onto: BranchRef::local(&b.name).full(), label: b.name.clone() });
+        offer(&rebase, || GhostOp::Rebase {
+            onto: BranchRef::local(&b.name).full(),
+            label: b.name.clone(),
+        });
         if rebase.clicked() {
             acts.push(rebase_action(BranchRef::local(&b.name), current));
         }
@@ -590,6 +593,8 @@ impl RepoTab {
         }
         ui.separator();
         graph_view::compare_items(ui, acts, BranchRef::local(&b.name), current);
+        crate::repo::interaction::interaction_item(ui, acts, &b.name);
+        crate::repo::rehearse::rehearse_item(ui, acts, BranchRef::local(&b.name));
     }
 }
 
@@ -602,7 +607,7 @@ fn badge(reasons: &[Reason]) -> Option<Badge> {
     } else {
         None
     }
-    }
+}
 
 /// `Merged into main` from `merged into main`.
 fn capitalise(text: &str) -> String {
@@ -610,9 +615,7 @@ fn capitalise(text: &str) -> String {
     chars.next().map_or_else(String::new, |first| {
         first.to_uppercase().chain(chars).collect()
     })
-    }
-    crate::repo::interaction::interaction_item(ui, acts, &b.name);
-    crate::repo::rehearse::rehearse_item(ui, acts, BranchRef::local(&b.name));
+}
 
 /// A word on a branch's row saying it could be cleaned up.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -84,6 +84,7 @@ pub enum Unfold {
 /// unchanged lines to fold: a new or untracked file is all added, a conflict's diff combined.
 pub fn new_side(key: &DiffKey) -> Option<Option<String>> {
     match key {
+        DiffKey::Remerge { .. } => return None,
         DiffKey::Commit { hash, .. } => Some(Some(hash.clone())),
         DiffKey::Range { to, .. } => Some(to.clone()),
         DiffKey::Work(file) => match file.area {

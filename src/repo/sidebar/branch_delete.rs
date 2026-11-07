@@ -48,7 +48,10 @@ impl RepoTab {
             // The entry below, for the remote too, says the same reason.
             .explained_below(upstream.is_some())
             .show(ui);
-        offer(&delete, || GhostOp::DeleteBranch { branch: b.name.clone(), remote: false });
+        offer(&delete, || GhostOp::DeleteBranch {
+            branch: b.name.clone(),
+            remote: false,
+        });
         if delete.clicked() {
             acts.push(Action::Dialog(
                 Dialog::confirm(
@@ -75,9 +78,11 @@ impl RepoTab {
             .enabled(idle)
             .refused(refused)
             .show(ui)
-            .on_hover_text(format!("Also delete {} from {remote}", b.upstream))
-;
-        offer(&both, || GhostOp::DeleteBranch { branch: b.name.clone(), remote: true });
+            .on_hover_text(format!("Also delete {} from {remote}", b.upstream));
+        offer(&both, || GhostOp::DeleteBranch {
+            branch: b.name.clone(),
+            remote: true,
+        });
         if both.clicked() {
             let remote_ref = format!("refs/heads/{name}");
             let delete =

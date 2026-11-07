@@ -57,6 +57,7 @@ pub(crate) enum ToolItem {
 
 pub(crate) fn tool_item(key: &DiffKey) -> ToolItem {
     match key {
+        DiffKey::Remerge { .. } => ToolItem::None,
         DiffKey::Work(f) if f.area == Area::Conflicted => ToolItem::ResolveInMergeTool,
         DiffKey::Work(f) if f.area == Area::Untracked => ToolItem::None,
         _ => ToolItem::OpenInDiffTool,
@@ -67,6 +68,9 @@ pub(crate) fn tool_item(key: &DiffKey) -> ToolItem {
 /// rename): not on the window's thread.
 fn diff_target(repo: &Path, key: &DiffKey) -> Result<DiffTarget, String> {
     match key {
+        DiffKey::Remerge { .. } => {
+            Err("A remerge has a synthetic base: view it in gitcraft".to_owned())
+        }
         DiffKey::Work(f) => match f.area {
             Area::Unstaged => Ok(DiffTarget::Unstaged {
                 path: f.path.clone(),

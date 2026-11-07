@@ -142,7 +142,15 @@ impl RepoTab {
         let mut items = self.selection_items();
         items.extend(self.command_items());
         items.extend(self.pick_items());
-        items.extend(self.custom_palette_items().into_iter().map(|(label, hint, action)| PaletteItem::action(label, &hint, action)));
+        let mut labels: std::collections::HashSet<String> = items
+            .iter()
+            .map(|i| i.label.trim_end_matches('…').to_owned())
+            .collect();
+        for (label, hint, action) in self.additional_palette_items() {
+            if labels.insert(label.trim_end_matches('…').to_owned()) {
+                items.push(PaletteItem::action(label, &hint, action));
+            }
+        }
         items
     }
 
@@ -158,10 +166,26 @@ impl RepoTab {
         );
         items.extend([
             PaletteItem::action("Sync (pull, then push)", "remote", Action::Sync),
-            PaletteItem::action("Reflog", "recovery", Action::Reflog(super::reflog::ReflogAct::Show(super::reflog::Source::head()))),
-            PaletteItem::action("Find lost commits", "recovery", Action::Reflog(super::reflog::ReflogAct::FindLost)),
-            PaletteItem::action("Stage all changes", "changes", Action::Key(crate::keymap::Command::StageAll)),
-            PaletteItem::action("Commit", "changes", Action::Key(crate::keymap::Command::Commit)),
+            PaletteItem::action(
+                "Reflog",
+                "recovery",
+                Action::Reflog(super::reflog::ReflogAct::Show(super::reflog::Source::head())),
+            ),
+            PaletteItem::action(
+                "Find lost commits",
+                "recovery",
+                Action::Reflog(super::reflog::ReflogAct::FindLost),
+            ),
+            PaletteItem::action(
+                "Stage all changes",
+                "changes",
+                Action::Key(crate::keymap::Command::StageAll),
+            ),
+            PaletteItem::action(
+                "Commit",
+                "changes",
+                Action::Key(crate::keymap::Command::Commit),
+            ),
             PaletteItem::action("Apply patch…", "patch", Action::ApplyPatch),
             PaletteItem::action("Undo", "history", Action::Undo).shortcut("Ctrl+Z"),
             PaletteItem::action("Redo", "history", Action::Redo).shortcut("Ctrl+Y"),
@@ -249,7 +273,9 @@ impl RepoTab {
                 "Reload" => Some(crate::keymap::Command::Reload),
                 _ => None,
             };
-            if let Some(command) = command { item.shortcut = Some(crate::keymap::label(command)); }
+            if let Some(command) = command {
+                item.shortcut = Some(crate::keymap::label(command));
+            }
         }
         items
     }

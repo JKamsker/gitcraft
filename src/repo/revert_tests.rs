@@ -438,6 +438,7 @@ fn a_whitespace_blind_diff_offers_no_pieces_to_revert() -> Result<(), String> {
     let opts = git::DiffOptions {
         ignore_ws: true,
         whole_file: false,
+        ..Default::default()
     };
     let key = DiffKey::Commit {
         hash: two,

@@ -117,6 +117,8 @@ impl Drop for World {
 fn custom(kind: OpKind) -> Option<UndoEntry> {
     match kind {
         OpKind::Normal(Undo::Custom { undo, redo }, _) => Some(UndoEntry {
+            id: 0,
+            agent: None,
             label: "x".into(),
             undo,
             redo,

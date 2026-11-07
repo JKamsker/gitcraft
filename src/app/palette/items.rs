@@ -94,15 +94,26 @@ impl Item {
 impl App {
     /// Every entry of the palette's first step.
     pub(super) fn palette_entries(&self) -> Vec<Item> {
-        let mut list = vec![Item::app("New tab", "app", AppCommand::NewTab).shortcut(&crate::keymap::label(crate::keymap::Command::NewTab))];
+        let mut list = vec![
+            Item::app("New tab", "app", AppCommand::NewTab)
+                .shortcut(&crate::keymap::label(crate::keymap::Command::NewTab)),
+        ];
         if !self.closed.is_empty() {
             list.push(
                 Item::app("Reopen closed tab", "app", AppCommand::ReopenTab)
                     .shortcut(&crate::keymap::label(crate::keymap::Command::ReopenTab)),
             );
         }
-        list.push(Item::app("Where's my work? (unpushed commits, stashes, changes everywhere)", "app", AppCommand::MyWork));
-        list.push(Item::app("Help: Copy diagnostics", "app", AppCommand::CopyDiagnostics));
+        list.push(Item::app(
+            "Where's my work? (unpushed commits, stashes, changes everywhere)",
+            "app",
+            AppCommand::MyWork,
+        ));
+        list.push(Item::app(
+            "Help: Copy diagnostics",
+            "app",
+            AppCommand::CopyDiagnostics,
+        ));
         list.extend([
             Item::app("Open repository…", "app", AppCommand::Open),
             Item::app("Create repository…", "app", AppCommand::Create),
@@ -117,8 +128,10 @@ impl App {
                 "app",
                 AppCommand::ForgetSignIns,
             ),
-            Item::app("Settings", "app", AppCommand::Settings).shortcut(&crate::keymap::label(crate::keymap::Command::Settings)),
-            Item::app("Manual and keyboard shortcuts", "app", AppCommand::Manual).shortcut(&crate::keymap::label(crate::keymap::Command::Manual)),
+            Item::app("Settings", "app", AppCommand::Settings)
+                .shortcut(&crate::keymap::label(crate::keymap::Command::Settings)),
+            Item::app("Manual and keyboard shortcuts", "app", AppCommand::Manual)
+                .shortcut(&crate::keymap::label(crate::keymap::Command::Manual)),
         ]);
         for t in theme::themes().iter() {
             let hint = if t.dark() {
@@ -144,7 +157,11 @@ impl App {
         }
         list.push(Item::app("New profile", "profile", AppCommand::NewProfile));
         if let Some(Tab::Repo(repo)) = self.tabs.get(self.active) {
-            list.push(Item::app("Teleport to another machine…", "tab", AppCommand::Teleport));
+            list.push(Item::app(
+                "Teleport to another machine…",
+                "tab",
+                AppCommand::Teleport,
+            ));
             let mut repo_items: Vec<Item> = repo
                 .palette_items()
                 .into_iter()

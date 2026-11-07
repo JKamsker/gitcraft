@@ -118,7 +118,7 @@ fn both_versions_are_kept_listed_and_let_go_of() -> Result<(), String> {
             .is_ok()
     );
     // And none of it is in the graph's history.
-    let history = crate::git::log(&repo.0, None, 0, 100)?;
+    let history = crate::git::log(&repo.0, None, crate::git::LogOrder::default(), 0, 100)?;
     assert!(history.iter().all(|c| c.hash != b), "{history:?}");
 
     // A month on, only what is newer stays.

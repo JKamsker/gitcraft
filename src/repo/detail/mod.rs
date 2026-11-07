@@ -10,14 +10,14 @@ mod extras;
 mod stash_picks;
 
 pub(super) use all_files::AllFiles;
-pub(super) use extras::Extras;
 pub(super) use changes::{discard_dialog, stage_action};
+pub(super) use extras::Extras;
 
 use egui::{Align2, Sense, Ui, pos2, vec2};
 
 use super::branch_tree;
 use super::widgets::{self, RowExtra};
-use super::{Action, DiffKey, DiffView, RepoTab, fold};
+use super::{Action, DiffKey, DiffView, RepoTab, folding};
 use crate::git::ChangedFile;
 use crate::settings::Settings;
 use crate::theme::{self, Tokens};
@@ -53,8 +53,8 @@ impl RepoTab {
         key: impl Fn(&str) -> DiffKey,
     ) {
         let id = egui::Id::new(("file-folder", self.repo_key(), tree));
-        let rules = fold::Rules::from_settings(&Settings::get(ui.ctx()));
-        let group = fold::split(
+        let rules = folding::Rules::from_settings(&Settings::get(ui.ctx()));
+        let group = folding::split(
             ui,
             id.with(rev),
             files,
@@ -68,27 +68,34 @@ impl RepoTab {
         let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
         self.owners_summary(ui, &paths);
         let row = |ui: &mut Ui, indent, f: &ChangedFile, acts: &mut Vec<Action>| {
-                    let stats = RowExtra::Stats(f.added, f.removed);
-                    let (extra, flags) =
-                        super::weakened_marks::extra(found.as_ref(), &f.path, &stats);
-                    let r = widgets::file_row_owned(
-                        ui,
-                        f.status,
-                        &f.path,
-                        f.old_path.as_deref(),
-                        indent,
-                        self.open_key() == Some(&key(&f.path)),
-                        extra,
-                        self.owner_tag(&f.path).as_ref(),
-                    );
-                    super::weakened_marks::hover(ui, &r, flags);
-                    // A file the commit deleted isn't in it, and has nothing to link to.
-                    let links = || self.link_menu(None).filter(|_| f.status != 'D');
-                    widgets::file_menu(&r.row, &f.path, rev, false, Some(&key(&f.path)), &links, acts);
-                    if r.row.clicked() {
-                        acts.push(Action::OpenDiff(key(&f.path)));
-                        acts.push(Action::UnfoldDiff);
-                    }
+            let stats = RowExtra::Stats(f.added, f.removed);
+            let (extra, flags) = super::weakened_marks::extra(found.as_ref(), &f.path, &stats);
+            let r = widgets::file_row_owned(
+                ui,
+                f.status,
+                &f.path,
+                f.old_path.as_deref(),
+                indent,
+                self.open_key() == Some(&key(&f.path)),
+                extra,
+                self.owner_tag(&f.path).as_ref(),
+            );
+            super::weakened_marks::hover(ui, &r, flags);
+            // A file the commit deleted isn't in it, and has nothing to link to.
+            let links = || self.link_menu(None).filter(|_| f.status != 'D');
+            widgets::file_menu(
+                &r.row,
+                &f.path,
+                rev,
+                false,
+                Some(&key(&f.path)),
+                &links,
+                acts,
+            );
+            if r.row.clicked() {
+                acts.push(Action::OpenDiff(key(&f.path)));
+                acts.push(Action::UnfoldDiff);
+            }
         };
         // Rows are known by their path within the list of this commit (or range): a menu left
         // open while another one is shown is not that one's file of the same path.

@@ -60,6 +60,9 @@ pub fn resolve_among(
     clones: &[super::open_link::Known],
 ) -> Result<Resolved, String> {
     match cmd {
+        Command::Clone | Command::PickFolder => {
+            Err("This command opens a dialog in the window".to_owned())
+        }
         Command::Link(link) => super::open_link::resolve_link(link, clones),
         Command::Open(path) => Ok(Resolved {
             root: repo_root(&absolute(cwd, path))?,

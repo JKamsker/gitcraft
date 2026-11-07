@@ -6,8 +6,8 @@ use super::file_row::split_dir;
 use crate::forge::links::Target;
 use crate::repo::external_tools::{ToolItem, tool_item};
 use crate::repo::file_view::FileTab;
-use crate::repo::{Action, DiffKey};
 use crate::repo::forge_link::LinkMenu;
+use crate::repo::{Action, DiffKey};
 
 /// Right-click menu for a file of the working tree or a commit: open it, its folder, copy path.
 /// Right-click menu of a file. `rev`: the commit it is shown in (it is viewed as it is there,

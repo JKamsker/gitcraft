@@ -193,8 +193,9 @@ fn a_finish_that_stops_part_way_is_undoable() {
     tab.hotfix_act(HotfixAct::Finish, &ctx);
     settle(&mut tab, &ctx);
     wait(&mut tab, &ctx, |t| {
-        t.undo_stack
-            .last()
+        t.timeline
+            .current_entry()
+            .and_then(|e| e.undo.as_ref())
             .is_some_and(|e| e.label.contains("stopped part-way"))
     });
     let develop_merged =

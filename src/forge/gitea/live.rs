@@ -16,7 +16,9 @@ use serde_json::json;
 
 use super::details::{self, thread_id};
 use super::post::GiteaTarget;
-use super::{Api, FORGEJO, GITEA, GiteaFamily, Login, create, create_release, upload_assets, list, retarget};
+use super::{
+    Api, FORGEJO, GITEA, GiteaFamily, Login, create, create_release, list, retarget, upload_assets,
+};
 use crate::forge::{self, Forge, Found, Hosting, NewPullRequest, Provider};
 use crate::git;
 use crate::pr_post::{self, LineComment, MergeMethod, Suggestion, Target, Verdict};

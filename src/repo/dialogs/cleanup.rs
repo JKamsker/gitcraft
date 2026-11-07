@@ -180,7 +180,7 @@ pub(super) fn cleanup(ui: &mut Ui, dialog: &mut CleanupDialog) -> Outcome {
         if ui.add_enabled(count > 0, danger).clicked()
             && let Some(action) = dialog.action()
         {
-            outcome = Outcome::Done(action);
+            outcome = Outcome::Done(Box::new(action));
         }
         if cancel_button(ui) {
             outcome = Outcome::Cancel;

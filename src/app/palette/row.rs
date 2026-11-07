@@ -21,7 +21,11 @@ pub(super) struct Row<'a> {
 /// Draws a row; `scroll` brings the selected one into view. True when clicked.
 pub(super) fn palette_row(ui: &mut Ui, t: &Tokens, row: &Row<'_>, selected: bool) -> bool {
     let (rect, r) = ui.allocate_exact_size(vec2(ui.available_width(), ROW_H), Sense::click());
-    crate::repo::widgets::a11y_selected(&r, || crate::a11y::labels::join([row.label, row.hint]), selected);
+    crate::repo::widgets::a11y_selected(
+        &r,
+        || crate::a11y::labels::join([row.label, row.hint]),
+        selected,
+    );
     if !ui.is_rect_visible(rect) {
         return r.clicked();
     }

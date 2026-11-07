@@ -273,7 +273,9 @@ impl<'a> Rows<'a> {
             &data.lines,
             &data.uncut,
             |ui, acts| {
-                if let Some(links) = links { links.items(ui, (&data.lines, &data.header), sel, acts); }
+                if let Some(links) = links {
+                    links.items(ui, (&data.lines, &data.header), sel, acts);
+                }
             },
             &history,
             acts,
@@ -383,7 +385,10 @@ impl<'a> Rows<'a> {
             right = self.hunk_buttons(ui, rect, i, acts) - 8.0;
         }
         if kind == Some(Kind::Hunk) {
-            if let Some(tip) = data.weakened.get(&i) { super::weakened::badge(ui, right, rect.center().y, tip, i); right -= 24.0; }
+            if let Some(tip) = data.weakened.get(&i) {
+                super::weakened::badge(ui, right, rect.center().y, tip, i);
+                right -= 24.0;
+            }
         }
         if matches!(kind, Some(Kind::Hunk | Kind::Fold)) {
             // Right of where the header's own text ends.

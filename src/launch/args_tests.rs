@@ -198,3 +198,13 @@ fn links_from_the_browser() {
         Some(Command::Open("gitcraft-src".into()))
     );
 }
+
+#[test]
+fn launcher_dialogs_share_the_command_line_and_handoff_parser() {
+    assert_eq!(run(&[crate::os_shell::CLONE_ARG]), Some(Command::Clone));
+    assert_eq!(run(&[crate::os_shell::OPEN_ARG]), Some(Command::PickFolder));
+    assert_eq!(
+        run(&["--", "--clone"]),
+        Some(Command::Open("--clone".into()))
+    );
+}

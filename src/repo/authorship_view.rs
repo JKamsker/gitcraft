@@ -304,7 +304,7 @@ mod tests {
 
         let ctx = egui::Context::default();
         let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
-        tab.commits = git::log(&dir, None, 0, 100)?
+        tab.commits = git::log(&dir, None, git::LogOrder::default(), 0, 100)?
             .into_iter()
             .map(std::sync::Arc::new)
             .collect();

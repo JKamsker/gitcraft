@@ -495,6 +495,7 @@ fn data_from(lines: Vec<DiffLine>) -> DiffData {
         uncut: Default::default(),
         map: Default::default(),
         lines,
+        ..Default::default()
     }
 }
 

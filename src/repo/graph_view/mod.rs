@@ -131,7 +131,13 @@ impl RepoTab {
         let rows_id = ui.id().with("graph-rows");
         let keys_free =
             !ui.ctx().egui_wants_keyboard_input() || crate::a11y::list_has_focus(ui.ctx(), rows_id);
-        if !ghost && keys_free && self.dialog.is_none() && self.package.is_none() && !self.stacks.modal_open() && !self.keys_blocked {
+        if !ghost
+            && keys_free
+            && self.dialog.is_none()
+            && self.package.is_none()
+            && !self.stacks.modal_open()
+            && !self.keys_blocked
+        {
             let ringed = ui.data(|d| d.get_temp::<usize>(rows_id));
             self.arrow_keys(ui, ringed, acts);
         }
@@ -223,20 +229,20 @@ impl RepoTab {
                     continue;
                 }
                 if !ghost {
-                if self.commits[i].parents.len() == 2 {
-                    shown_merges.push(self.commits[i].hash.clone());
-                }
-                let resp = self.commit_row(ui, i, cols, lanes, now, i == stop, acts);
-                if i == stop {
-                    crate::a11y::list_stop(&resp, rows_id, self.selected == Some(i));
-                }
-                if resp.clicked() {
-                    // Ctrl+click: compare the selected commit with this one.
-                    let compare = ui
-                        .input(|inp| inp.modifiers.command)
-                        .then(|| self.compare_rows(self.selected?, i))
-                        .flatten();
-                    acts.push(compare.unwrap_or(Action::Select(i)));
+                    if self.commits[i].parents.len() == 2 {
+                        shown_merges.push(self.commits[i].hash.clone());
+                    }
+                    let resp = self.commit_row(ui, i, cols, lanes, now, i == stop, acts);
+                    if i == stop {
+                        crate::a11y::list_stop(&resp, rows_id, self.selected == Some(i));
+                    }
+                    if resp.clicked() {
+                        // Ctrl+click: compare the selected commit with this one.
+                        let compare = ui
+                            .input(|inp| inp.modifiers.command)
+                            .then(|| self.compare_rows(self.selected?, i))
+                            .flatten();
+                        acts.push(compare.unwrap_or(Action::Select(i)));
                     }
                     if resp.secondary_clicked() {
                         let hash = self.commits[i].hash.clone();
@@ -258,6 +264,9 @@ impl RepoTab {
             }
         });
         ui.data_mut(|d| d.insert_temp(offset_id, out.state.offset.y));
+        if let Some(steps) = first_steps {
+            self.first_steps_view(ui, steps, acts);
+        }
         self.want_remerge_badges(&shown_merges, ui.ctx());
     }
 
@@ -272,7 +281,7 @@ impl RepoTab {
         let before = ui.opacity();
         ui.multiply_opacity(fade);
         // What its pills and build dots would do is dropped: nothing here is real yet.
-        let resp = self.commit_row(ui, i, cols, lanes, now, &mut Vec::new());
+        let resp = self.commit_row(ui, i, cols, lanes, now, false, &mut Vec::new());
         ui.set_opacity(before);
         resp
     }
@@ -286,9 +295,6 @@ impl RepoTab {
         let at = egui::Rect::from_min_size(ui.min_rect().min, vec2(0.0, 0.0));
         let resp = ui.interact(at, row::row_id(ui, &self.commits[i].hash), Sense::click());
         self.row_menu(&resp, i, idle, acts);
-        if let Some(steps) = first_steps {
-            self.first_steps_view(ui, steps, acts);
-        }
     }
 
     /// Up and down select the row above or below the selected one.

@@ -23,6 +23,18 @@ pub(super) struct Launching {
 impl App {
     /// Starts carrying out `cmd`, its relative paths taken from `cwd`.
     pub(crate) fn launch(&mut self, cmd: Command, cwd: PathBuf, ctx: &egui::Context) {
+        match cmd {
+            Command::Clone => {
+                self.start_clone();
+                return;
+            }
+            Command::PickFolder => {
+                self.pick_on_start = true;
+                ctx.request_repaint();
+                return;
+            }
+            _ => {}
+        }
         // A folder elsewhere opens as the start page's Remote does, asking what ssh asks.
         if let Command::Open(path) = &cmd {
             let path = crate::launch::resolve::absolute(&cwd, path);

@@ -384,7 +384,15 @@ pub(crate) fn tips() -> &'static [&'static str] {
 pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
     (
         "Keyboard navigation",
-        &[("Alt+← / Alt+→", "Back / forward through recent views"), ("Mouse back / forward", "Back / forward through recent views"), ("Tab / Shift+Tab", "Next / previous button, row or field"), ("Enter / Space", "Click the focused button or row")],
+        &[
+            ("Alt+← / Alt+→", "Back / forward through recent views"),
+            (
+                "Mouse back / forward",
+                "Back / forward through recent views",
+            ),
+            ("Tab / Shift+Tab", "Next / previous button, row or field"),
+            ("Enter / Space", "Click the focused button or row"),
+        ],
     ),
     (
         "Start page",
@@ -430,7 +438,10 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
     (
         "Changes",
         &[
-            ("Cmd+Enter", "Save a note, or commit from the message fields"),
+            (
+                "Cmd+Enter",
+                "Save a note, or commit from the message fields",
+            ),
             (
                 "Click / Shift+click",
                 "Pick lines in a diff or a file, or a range of them",

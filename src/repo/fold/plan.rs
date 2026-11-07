@@ -318,6 +318,8 @@ impl Stopped {
     pub(in crate::repo) fn leftover_undo(&self, fixup: &str) -> UndoEntry {
         let on_branch = expect_symref("HEAD", &format!("refs/heads/{}", self.branch));
         UndoEntry {
+            id: 0,
+            agent: None,
             label: format!("{} (its fixup! commit)", self.label),
             undo: vec![on_branch.clone(), soft_reset(&self.before)],
             redo: vec![on_branch, soft_reset(fixup)],

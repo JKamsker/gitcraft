@@ -212,7 +212,9 @@ pub(super) fn parallel_bisect(ui: &mut Ui, enter: bool, form: &mut ParallelForm)
         if let Some(setup) = setup
             && (start.clicked() || enter)
         {
-            outcome = Outcome::Done(Action::ParallelBisect(ParallelAct::Start(Box::new(setup))));
+            outcome = Outcome::Done(Box::new(Action::ParallelBisect(ParallelAct::Start(
+                Box::new(setup),
+            ))));
         }
         if cancel_button(ui) {
             outcome = Outcome::Cancel;

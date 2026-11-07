@@ -81,6 +81,7 @@ fn inbox_life(family: &'static GiteaFamily) -> Result<(), String> {
         title: "Change ünïcode",
         body: "",
         draft: false,
+        reviewers: &[],
     };
     create(&server.author(), &hosting, &new)?;
     server.author().send(

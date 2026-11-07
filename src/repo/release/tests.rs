@@ -89,7 +89,11 @@ fn a_release_cut_from_the_dialog_is_undone_and_redone_here() {
     let steps = statuses(&tab);
     let bumped = std::fs::read_to_string(dir.join("package.json")).unwrap_or_default();
     let remote_tag = git::resolve(&bare, "refs/tags/v2.3.2").is_ok();
-    let undo_label = tab.undo_stack.last().map(|e| e.label.clone());
+    let undo_label = tab
+        .timeline
+        .current_entry()
+        .and_then(|e| e.undo.as_ref())
+        .map(|e| e.label.clone());
     tab.release_act(ReleaseAct::Close, &ctx);
     let closed = tab.release.is_none();
     tab.undo(&ctx);
@@ -129,13 +133,23 @@ fn a_failed_push_is_resumed_and_the_undo_covers_it_all() {
     tab.release_act(ReleaseAct::Run, &ctx);
     wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
     let first = statuses(&tab);
-    let entries = tab.undo_stack.len();
+    let entries = tab
+        .timeline
+        .entries
+        .iter()
+        .filter(|e| e.undo.is_some())
+        .count();
     let _ = std::fs::rename(&moved, &bare);
     tab.release_act(ReleaseAct::Run, &ctx);
     wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
     let second = statuses(&tab);
     let remote_tag = git::resolve(&bare, "refs/tags/v2.3.2").is_ok();
-    let entries_after = tab.undo_stack.len();
+    let entries_after = tab
+        .timeline
+        .entries
+        .iter()
+        .filter(|e| e.undo.is_some())
+        .count();
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::remove_dir_all(&bare);
     assert_eq!(first.len(), 2);

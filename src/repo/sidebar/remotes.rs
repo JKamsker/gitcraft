@@ -172,7 +172,10 @@ impl RepoTab {
             }
             let rebase = format!("Rebase {current} onto it");
             let rebase = self.conflict_button(ui, rebase, idle, Op::Rebase, &b.target);
-            offer(&rebase, || GhostOp::Rebase { onto: BranchRef::remote(&b.name).full(), label: b.name.clone() });
+            offer(&rebase, || GhostOp::Rebase {
+                onto: BranchRef::remote(&b.name).full(),
+                label: b.name.clone(),
+            });
             if rebase.clicked() {
                 acts.push(rebase_action(BranchRef::remote(&b.name), current));
             }

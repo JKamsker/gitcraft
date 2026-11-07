@@ -4,7 +4,7 @@ use egui::{Color32, RichText, Ui};
 
 use super::ExtrasCmd;
 use super::section::{self, Summary};
-use crate::git::{Signature, Verdict};
+use crate::git::{Signature, SignatureVerdict};
 use crate::theme::{self, Tokens};
 
 pub(super) fn section(
@@ -21,7 +21,7 @@ pub(super) fn section(
     let mut again = false;
     // Anything but unsigned can turn out otherwise: a key imported, allowed signers set up.
     let checkable = match signature {
-        Some(Ok(sig)) => sig.verdict != Verdict::Unsigned,
+        Some(Ok(sig)) => sig.verdict != SignatureVerdict::Unsigned,
         Some(Err(_)) => true,
         None => false,
     };
@@ -55,22 +55,22 @@ fn headline(sig: &Signature) -> String {
     parts.join(" · ")
 }
 
-fn verdict_color(t: &Tokens, verdict: &Verdict) -> Color32 {
+fn verdict_color(t: &Tokens, verdict: &SignatureVerdict) -> Color32 {
     match verdict {
-        Verdict::Valid { trusted: true } => t.success,
-        Verdict::Valid { trusted: false }
-        | Verdict::Expired { .. }
-        | Verdict::UnknownKey
-        | Verdict::NotChecked => t.warning,
-        Verdict::Revoked | Verdict::Invalid => t.danger,
-        Verdict::Unsigned => t.text_dim,
+        SignatureVerdict::Valid { trusted: true } => t.success,
+        SignatureVerdict::Valid { trusted: false }
+        | SignatureVerdict::Expired { .. }
+        | SignatureVerdict::UnknownKey
+        | SignatureVerdict::NotChecked => t.warning,
+        SignatureVerdict::Revoked | SignatureVerdict::Invalid => t.danger,
+        SignatureVerdict::Unsigned => t.text_dim,
     }
 }
 
 fn body(ui: &mut Ui, sig: &Signature) {
     let t = Tokens::get(ui.ctx());
     ui.add(egui::Label::new(RichText::new(sig.verdict.explanation()).color(t.text_dim)).wrap());
-    if sig.verdict == Verdict::Unsigned {
+    if sig.verdict == SignatureVerdict::Unsigned {
         return;
     }
     egui::Grid::new("commit_signature")
@@ -101,7 +101,7 @@ fn body(ui: &mut Ui, sig: &Signature) {
             }
         });
     if sig.raw.trim().is_empty() {
-        if sig.verdict == Verdict::NotChecked {
+        if sig.verdict == SignatureVerdict::NotChecked {
             section::faint(ui, "git gave no output.");
         }
     } else {
@@ -117,7 +117,7 @@ mod tests {
     #[test]
     fn the_headline_names_the_verdict_kind_and_signer() {
         let mut sig = Signature {
-            verdict: Verdict::Valid { trusted: true },
+            verdict: SignatureVerdict::Valid { trusted: true },
             format: Some(SignatureFormat::Ssh),
             signer: "Zoë <z@example.org>".to_owned(),
             key: "SHA256:k".to_owned(),
@@ -126,10 +126,10 @@ mod tests {
         };
         assert_eq!(headline(&sig), "Valid · SSH · Zoë <z@example.org>");
         sig.signer.clear();
-        sig.verdict = Verdict::UnknownKey;
+        sig.verdict = SignatureVerdict::UnknownKey;
         assert_eq!(headline(&sig), "Unknown key · SSH");
         sig.format = None;
-        sig.verdict = Verdict::Unsigned;
+        sig.verdict = SignatureVerdict::Unsigned;
         assert_eq!(headline(&sig), "Unsigned");
     }
 }

@@ -254,7 +254,7 @@ mod tests {
         let dir = repo("background");
         let ctx = egui::Context::default();
         let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
-        tab.deferred = false;
+        tab.life.shown(Instant::now());
         tab.remotes = vec![git::Remote {
             name: "origin".to_owned(),
             url: "/nowhere".to_owned(),

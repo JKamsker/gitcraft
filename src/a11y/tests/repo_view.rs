@@ -53,7 +53,11 @@ fn harness(path: &Path) -> H<'static> {
                     };
                     settings.set(ui.ctx());
                     crate::theme::install_fonts(ui.ctx());
-                    crate::theme::apply(ui.ctx(), crate::theme::ThemeKind::default());
+                    crate::theme::apply(
+                        ui.ctx(),
+                        &crate::theme::ThemeId::default(),
+                        &Default::default(),
+                    );
                     RepoTab::new(path.clone(), ui.ctx())
                 });
                 tab.ui(ui);

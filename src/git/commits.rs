@@ -64,7 +64,7 @@ pub fn log(
 /// reads them. Asked a hundred at a time, so the command line stays short (Windows allows
 /// 32k characters).
 pub fn commits_of(repo: &Path, hashes: &[String]) -> Result<Vec<Commit>, String> {
-    let format = log_args(None, 0, None).format;
+    let format = log_args(None, LogOrder::default(), 0, None).format;
     let mut commits = Vec::with_capacity(hashes.len());
     for chunk in hashes.chunks(100) {
         let mut args = vec![

@@ -177,7 +177,7 @@ fn texts_of_a_row() {
 
 #[test]
 fn a_rows_parts_say_what_matters() {
-    let t = Tokens::for_kind(crate::theme::ThemeKind::default());
+    let t = Tokens::get(&egui::Context::default());
     let o = Overview {
         branch: Some("main".into()),
         changed: 2,

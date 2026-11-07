@@ -310,6 +310,7 @@ impl RepoTab {
     fn release_stopped(&mut self, ctx: &Context) {
         self.busy_op = None;
         let started = self.op_started.take();
+        let mut remember = None;
         let Some(run) = self.release.as_mut().and_then(|v| v.run.as_mut()) else {
             return;
         };
@@ -318,20 +319,14 @@ impl RepoTab {
         if local_done {
             let (undo, redo) = undo(&run.plan, &run.done);
             let entry = UndoEntry {
+                id: 0,
+                agent: None,
                 label: label.clone(),
                 undo,
                 redo,
                 heads: None,
             };
-            // Resumed: the entry recorded before is this release's, made whole now.
-            if run.recorded && self.undo_stack.last().is_some_and(|e| e.label == label) {
-                self.undo_stack.pop();
-            }
-            self.undo_stack.push(entry);
-            if self.undo_stack.len() > 50 {
-                self.undo_stack.remove(0);
-            }
-            self.redo_stack.clear();
+            remember = Some((entry, run.recorded));
             run.recorded = true;
         }
         let failed = run.steps.iter().find_map(|(step, s)| match s {
@@ -343,6 +338,13 @@ impl RepoTab {
             None if run.finished() => (format!("Released {}", run.plan.tag), false),
             None => (format!("{label}: stopped"), false),
         });
+        if let Some((entry, replace)) = remember {
+            if replace {
+                self.replace_recent_undo(entry, ctx);
+            } else {
+                self.push_undo(entry, ctx);
+            }
+        }
         let long = started.is_some_and(|t| t.elapsed() > std::time::Duration::from_secs(4));
         if long {
             self.finished.push(match &self.status {

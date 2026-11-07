@@ -3,18 +3,18 @@
 mod agent_card;
 mod askpass_dialog;
 mod clone;
-mod draft_saving;
-mod handoff;
-mod dropped;
 mod diagnostics;
+mod draft_saving;
+mod dropped;
+mod handoff;
 mod home;
 mod home_filter;
 mod home_recent;
-mod my_work;
-mod os_shell;
 mod inbox;
 mod launch;
 mod links;
+mod my_work;
+mod os_shell;
 mod palette;
 mod panels;
 mod profiles;
@@ -560,8 +560,12 @@ impl App {
             || self.manual_open
             || self.repo_scan.is_some()
             || (crate::a11y::keyboard_taken(ctx) && !home_filter::search_has_focus(ctx));
-        let (commands, focused) =
-            ctx.input(|i| (keymap::pressed(i, keymap::Scope::Window), i.focused || i.raw.viewports.values().any(|v| v.focused == Some(true))));
+        let (commands, focused) = ctx.input(|i| {
+            (
+                keymap::pressed(i, keymap::Scope::Window),
+                i.focused || i.raw.viewports.values().any(|v| v.focused == Some(true)),
+            )
+        });
         let mut refresh = false;
         for command in commands {
             refresh |= self.window_command(command, modal_open, ctx);
@@ -587,7 +591,11 @@ impl App {
     ) -> bool {
         use keymap::Command;
         // Not over a dialog that asks something (the clone, the remote one, ssh's question).
-        let asking = self.clone_form.is_some() || self.remote_form.is_some() || self.teleport.is_some() || self.my_work.open || self.askpass_open();
+        let asking = self.clone_form.is_some()
+            || self.remote_form.is_some()
+            || self.teleport.is_some()
+            || self.my_work.open
+            || self.askpass_open();
         match command {
             Command::Manual if !asking && self.palette.is_none() => {
                 self.manual_open = !self.manual_open;
@@ -776,17 +784,13 @@ impl eframe::App for App {
         self.poll_diagnostics(&ctx);
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
-        crate::a11y::end_frame(&ctx);
-    }
-
-    fn on_exit(&mut self) {
-        self.stop_teleport();
         self.dropped_files(&ctx);
         self.app_button_events(&ctx);
         crate::app_buttons::end_frame(&ctx);
         if title_bar::wanted(&self.settings) {
             title_bar::resize_edges(&ctx);
         }
+        crate::a11y::end_frame(&ctx);
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
@@ -813,11 +817,8 @@ impl eframe::App for App {
     }
 
     fn on_exit(&mut self) {
+        self.stop_teleport();
         self.close_drafts();
-    }
-
-    fn on_exit(&mut self) {
-        // Saved: what later starts ask is no longer taken here.
         crate::instance::closing();
     }
 }

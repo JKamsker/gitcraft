@@ -12,7 +12,10 @@ use std::path::Path;
 use serde_json::Value;
 
 use super::inbox;
-use super::{ForkInfo, Hosting, Found, PrState, Issue, MergedPullRequest, NewPullRequest, Pages, Provider, PullRequest, cli};
+use super::{
+    ForkInfo, Found, Hosting, Issue, MergedPullRequest, NewPullRequest, Pages, PrState, Provider,
+    PullRequest, cli,
+};
 use crate::avatars::Hint;
 use crate::pr_post::Target;
 use crate::pull_request::{PrDetails, at};

@@ -116,6 +116,7 @@ fn an_undo_that_ran_keeps_its_updated_commands() {
     let mut t = Timeline::default();
     let mut e = entry("stash");
     e.undo = Some(UndoEntry {
+        agent: None,
         id: 0,
         label: "stash".to_owned(),
         undo: vec![vec!["stash".to_owned(), "pop".to_owned()]],
@@ -241,6 +242,7 @@ fn what_was_done_before_the_file_came_in_goes_after_it() {
     let mut t = Timeline::default();
     let mut undoable = entry("mine one");
     undoable.undo = Some(UndoEntry {
+        agent: None,
         id: 0,
         label: "mine one".to_owned(),
         undo: Vec::new(),
@@ -561,6 +563,7 @@ fn entries_that_moved_no_branch_are_found_on_a_jumps_way() {
     let mut t = Timeline::default();
     let mut stash = entry("Stash");
     stash.undo = Some(UndoEntry {
+        agent: None,
         id: 0,
         label: "Stash".to_owned(),
         undo: Vec::new(),

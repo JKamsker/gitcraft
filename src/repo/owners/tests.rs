@@ -153,7 +153,7 @@ fn the_create_pull_request_dialog_suggests_the_owners_of_what_the_branch_changes
     let dir = repo("suggest");
     let ctx = egui::Context::default();
     let mut tab = open(&dir, &ctx);
-    tab.dialog = Some(Dialog::create_pr("pull request", "feat", "main", "Pay"));
+    tab.dialog = Some(Dialog::create_pr("pull request", "feat", "main", "Pay", ""));
     wait(
         &mut tab,
         &ctx,

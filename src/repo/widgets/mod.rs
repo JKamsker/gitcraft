@@ -10,7 +10,7 @@ use crate::theme::{self, Tokens};
 
 pub use crate::a11y::{a11y, a11y_selected};
 pub use file_menu::{file_menu, file_menu_with};
-pub use file_row::{OwnerTag, file_row_owned, FileRowResponse, RowExtra, badge_text, file_row};
+pub use file_row::{FileRowResponse, OwnerTag, RowExtra, badge_text, file_row, file_row_owned};
 pub use terminal_tabs::terminal_tabs;
 
 pub const ROW_H: f32 = 24.0;

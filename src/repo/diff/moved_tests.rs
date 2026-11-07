@@ -326,6 +326,7 @@ fn data_of(text: &str) -> DiffData {
         uncut: Default::default(),
         map: Default::default(),
         lines,
+        ..Default::default()
     }
 }
 

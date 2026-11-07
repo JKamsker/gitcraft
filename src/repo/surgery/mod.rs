@@ -4,12 +4,12 @@
 //! them in place of the old one and replays the commits after it, so a conflict goes to the
 //! usual conflict flow and Ctrl+Z puts the branch back as one step.
 
-#[cfg(test)]
-mod move_tests;
-mod moving;
 mod absorb;
 #[cfg(test)]
 mod absorb_tests;
+#[cfg(test)]
+mod move_tests;
+mod moving;
 mod patchset;
 mod replay;
 mod split;

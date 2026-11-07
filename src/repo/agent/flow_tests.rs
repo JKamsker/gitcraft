@@ -68,6 +68,13 @@ fn answer(tab: &mut RepoTab, ctx: &egui::Context, rx: &Receiver<Reply>) -> Optio
     while Instant::now() < until {
         tab.poll(ctx);
         if let Ok(reply) = rx.try_recv() {
+            settle(tab, ctx, |t| {
+                !t.loading
+                    && matches!(
+                        t.timeline.awaiting,
+                        crate::repo::timeline::Awaiting::Nothing
+                    )
+            });
             return Some(reply);
         }
         std::thread::sleep(Duration::from_millis(5));
@@ -98,7 +105,11 @@ fn an_undoable_request_runs_at_once_and_is_marked_the_agents() {
     );
     let reply = answer(&mut tab, &ctx, &rx);
     let made = git::resolve(&dir, "refs/heads/feature").is_ok();
-    let top = tab.undo_stack.last().cloned();
+    let top = tab
+        .timeline
+        .current_entry()
+        .and_then(|e| e.undo.as_ref())
+        .cloned();
     let card = tab.agent_card();
     let _ = std::fs::remove_dir_all(&dir);
     assert!(card.is_none(), "an undoable operation asks nobody");
@@ -106,6 +117,7 @@ fn an_undoable_request_runs_at_once_and_is_marked_the_agents() {
     assert!(reply.is_some_and(|r| r.message.contains("Ctrl+Z")));
     assert!(made);
     let top = top.unwrap_or_else(|| crate::repo::UndoEntry {
+        id: 0,
         label: String::new(),
         undo: Vec::new(),
         redo: Vec::new(),
@@ -128,7 +140,11 @@ fn an_approved_request_runs_and_stays_undoable() {
     tab.agent_decide(true, &ctx);
     let reply = answer(&mut tab, &ctx, &rx);
     let gone = git::resolve(&dir, "refs/heads/old").is_err();
-    let top = tab.undo_stack.last().and_then(|e| e.agent.clone());
+    let top = tab
+        .timeline
+        .current_entry()
+        .and_then(|e| e.undo.as_ref())
+        .and_then(|e| e.agent.clone());
     let _ = std::fs::remove_dir_all(&dir);
     assert!(before, "nothing runs before the user answers");
     let armed_at_once = card
@@ -167,7 +183,7 @@ fn a_denied_request_changes_nothing() {
     assert_eq!(reply.map(|r| r.outcome), Some(Outcome::Denied));
     assert!(kept);
     assert!(tab.agent_card().is_none());
-    assert!(tab.undo_stack.is_empty());
+    assert!(tab.timeline.entries.iter().all(|e| e.undo.is_none()));
 }
 
 #[test]

@@ -255,18 +255,23 @@ impl RepoTab {
         self.then(
             ctx,
             move || crate::git::resolve(&repo, &local).unwrap_or_default(),
-            move |tab, now, _| {
+            move |tab, now, ctx| {
                 if now.is_empty() || now == plan.head {
                     return;
                 }
                 let (undo, redo) = plan.local_undo(&now);
-                tab.undo_stack.push(UndoEntry {
-                    label: format!("Sign off the commits of {} (here only)", plan.branch),
-                    undo,
-                    redo,
-                    heads: None,
-                });
-                tab.redo_stack.clear();
+                tab.push_undo(
+                    UndoEntry {
+                        id: 0,
+                        agent: None,
+                        label: format!("Sign off the commits of {} (here only)", plan.branch),
+                        undo,
+                        redo,
+                        heads: None,
+                    },
+                    ctx,
+                );
+
                 let push = plan.push.as_ref().map(signoff::PushTarget::label);
                 tab.status = Some((
                     format!(

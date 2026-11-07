@@ -163,6 +163,8 @@ fn walk(root: &Path, dir: &Path, out: &mut Vec<(String, Vec<u8>)>) {
 fn entry(kind: OpKind) -> Result<UndoEntry, String> {
     match kind {
         OpKind::Normal(Undo::Custom { undo, redo }, _) => Ok(UndoEntry {
+            id: 0,
+            agent: None,
             label: "stash".to_owned(),
             undo,
             redo,

@@ -64,6 +64,7 @@ fn sides(key: &DiffKey, old_path: Option<&str>) -> Option<((LinesAt, String), (L
     let path = key.path().to_owned();
     let old = old_path.map_or_else(|| path.clone(), str::to_owned);
     let (new_at, old_at) = match key {
+        DiffKey::Remerge { .. } => return None,
         DiffKey::Commit { hash, .. } => {
             (LinesAt::Rev(hash.clone()), LinesAt::Rev(format!("{hash}^")))
         }

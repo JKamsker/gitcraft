@@ -1704,8 +1704,8 @@ dependencies = [
  "egui_commonmark",
  "egui_extras",
  "egui_kittest",
- "gitcraft-os",
  "flate2",
+ "gitcraft-os",
  "image",
  "keyring",
  "md5",
@@ -1715,8 +1715,8 @@ dependencies = [
  "open",
  "portable-pty",
  "pulldown-cmark",
- "regex",
  "raw-window-handle",
+ "regex",
  "rfd",
  "rmcp",
  "ron",
@@ -1733,6 +1733,7 @@ dependencies = [
  "windows",
  "windows-sys 0.61.2",
  "winresource",
+ "yaml-rust2",
  "zbus",
 ]
 
@@ -1741,7 +1742,6 @@ name = "gitcraft-os"
 version = "0.1.0"
 dependencies = [
  "windows",
- "yaml-rust2",
 ]
 
 [[package]]

@@ -8,14 +8,13 @@ use crate::forge::links::Target;
 use crate::git;
 use crate::menu_item::MenuItem;
 use crate::repo::actions::{BranchRef, cherry_pick_action, interactive_rebase_action};
+use crate::repo::commit_actions::revert_action;
 use crate::repo::conflict_check::Op;
-use crate::repo::commit_actions::{
-    revert_action,
-};
 use crate::repo::ghost::{GhostOp, offer};
 use crate::repo::operations::{expect_ref_at, expect_symref};
 use crate::repo::{
-    Action, Dialog, RepoTab, Refresh, Undo, WIP_HASH, ops, fast_forward_action, merge_action, rebase_action,
+    Action, Dialog, Refresh, RepoTab, Undo, WIP_HASH, fast_forward_action, merge_action, ops,
+    rebase_action,
 };
 
 /// Where a row remembers which branch pill was right-clicked, for its menu.
@@ -222,7 +221,10 @@ impl RepoTab {
         }
         let rebase = format!("Rebase {current} onto {branch}");
         let rebase = self.conflict_button(ui, rebase, idle, Op::Rebase, hash);
-        offer(&rebase, || GhostOp::Rebase { onto: git_ref.full(), label: branch.to_owned() });
+        offer(&rebase, || GhostOp::Rebase {
+            onto: git_ref.full(),
+            label: branch.to_owned(),
+        });
         if rebase.clicked() {
             acts.push(rebase_action(git_ref, current));
         }

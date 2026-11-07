@@ -5,8 +5,8 @@ use std::path::Path;
 use egui::{Align2, Rect, RichText, Sense, Stroke, Ui, WidgetType, pos2, vec2};
 
 use super::App;
-use crate::a11y::labels;
 use super::home_recent::RecentClick;
+use crate::a11y::labels;
 use crate::git;
 use crate::icons;
 use crate::repo::widgets;

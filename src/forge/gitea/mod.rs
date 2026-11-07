@@ -13,14 +13,14 @@
 //! unasked, takes only the first two or a login found before (see [`known_login`]).
 
 mod details;
-mod issues;
 mod inbox;
+mod issues;
 #[cfg(test)]
 mod live;
 #[cfg(test)]
-mod live_issues;
-#[cfg(test)]
 mod live_inbox;
+#[cfg(test)]
+mod live_issues;
 mod post;
 
 use std::collections::HashMap;
@@ -32,7 +32,10 @@ use serde_json::{Value, json};
 
 use super::http::{Api, Login};
 use super::inbox::Answer;
-use super::{Forge, ForkInfo, Hosting, PrState, Issue, MergedPullRequest, NewPullRequest, Pages, Provider, PullRequest};
+use super::{
+    Forge, ForkInfo, Hosting, Issue, MergedPullRequest, NewPullRequest, Pages, PrState, Provider,
+    PullRequest,
+};
 use crate::avatars::Hint;
 use crate::pr_post::Target;
 use crate::pull_request::{PrDetails, at};

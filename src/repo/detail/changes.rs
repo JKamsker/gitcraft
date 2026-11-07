@@ -9,7 +9,7 @@ use crate::icons;
 use crate::repo::diff::{literal_path, unstage_args};
 use crate::repo::partial_stash::row_problem;
 use crate::repo::widgets::{self, RowExtra};
-use crate::repo::{Action, Dialog, DiffKey, Refresh, RepoTab, branch_tree, fold, ops};
+use crate::repo::{Action, Dialog, DiffKey, Refresh, RepoTab, branch_tree, folding, ops};
 use crate::settings::Settings;
 use crate::theme::{self, Tokens};
 
@@ -234,13 +234,17 @@ impl RepoTab {
         mut on: impl FnMut(&mut Vec<Action>, &StatusFile, RowClick),
     ) {
         let id = egui::Id::new(("file-folder", self.repo_key(), tree));
-        let rules = fold::Rules::from_settings(&Settings::get(ui.ctx()));
-        let group = fold::split(ui, id, files, |f| &f.path, (&self.folding, &rules), acts);
+        let rules = folding::Rules::from_settings(&Settings::get(ui.ctx()));
+        let group = folding::split(ui, id, files, |f| &f.path, (&self.folding, &rules), acts);
         let selected = |f: &&&StatusFile| self.open_key() == Some(&DiffKey::Work((**f).clone()));
         let mut row = |ui: &mut Ui, indent, f: &StatusFile, acts: &mut Vec<Action>| {
             let click = self.work_row(ui, acts, f, indent, buttons);
             let opened = matches!(click, RowClick::Open);
-            if matches!(click, RowClick::Pick) { acts.push(Action::PickToStash(f.path.clone())); } else { on(acts, f, click); }
+            if matches!(click, RowClick::Pick) {
+                acts.push(Action::PickToStash(f.path.clone()));
+            } else {
+                on(acts, f, click);
+            }
             if opened {
                 // Clicked: its lines are what was asked for, folded or not.
                 acts.push(Action::UnfoldDiff);
@@ -326,7 +330,20 @@ impl RepoTab {
                 self.link_menu(None)
                     .filter(|_| !matches!(f.code, 'A' | '?') && f.old_path.is_none())
             };
-            widgets::file_menu_with(&r.row, &f.path, None, true, Some(&key), &links, acts, |ui, acts| { self.lock_menu_items(ui, &f.path, None, acts); self.storage_menu_items(ui, &f.path, None, acts); stash(ui, acts); });
+            widgets::file_menu_with(
+                &r.row,
+                &f.path,
+                None,
+                true,
+                Some(&key),
+                &links,
+                acts,
+                |ui, acts| {
+                    self.lock_menu_items(ui, &f.path, None, acts);
+                    self.storage_menu_items(ui, &f.path, None, acts);
+                    stash(ui, acts);
+                },
+            );
         } else {
             // A deleted file has nothing to open, but can be stashed.
             egui::Popup::context_menu(&r.row)

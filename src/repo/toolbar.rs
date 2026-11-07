@@ -83,15 +83,28 @@ impl RepoTab {
             Some(w) => w.clone(),
             None => none.to_owned(),
         };
-        let undo = icons::tool_button(ui, "undo-2", "", idle && self.timeline.current_entry().is_some())
-            .named(&undo_tip)
-            .on_hover_text(&undo_tip)
-            .on_disabled_hover_text(why(self.timeline.current_entry().is_none(), "Nothing to undo"));
+        let undo = icons::tool_button(
+            ui,
+            "undo-2",
+            "",
+            idle && self.timeline.current_entry().is_some(),
+        )
+        .named(&undo_tip)
+        .on_hover_text(&undo_tip)
+        .on_disabled_hover_text(why(
+            self.timeline.current_entry().is_none(),
+            "Nothing to undo",
+        ));
         if undo.clicked() {
             acts.push(Action::Undo);
         }
         // What Ctrl+Z takes back next is an agent's.
-        if self.timeline.current_entry().and_then(|e| e.undo.as_ref()).is_some_and(|e| e.agent.is_some()) {
+        if self
+            .timeline
+            .current_entry()
+            .and_then(|e| e.undo.as_ref())
+            .is_some_and(|e| e.agent.is_some())
+        {
             agent_badge(ui, &undo);
         }
         let redo = self.timeline.redo_target();
@@ -102,7 +115,10 @@ impl RepoTab {
         if icons::tool_button(ui, "redo-2", "", idle && redo.is_some())
             .named(&redo_tip)
             .on_hover_text(redo_tip)
-            .on_disabled_hover_text(why(self.timeline.redo_target().is_none(), "Nothing to redo"))
+            .on_disabled_hover_text(why(
+                self.timeline.redo_target().is_none(),
+                "Nothing to redo",
+            ))
             .clicked()
         {
             acts.push(Action::Redo);
@@ -157,11 +173,10 @@ impl RepoTab {
             .map(|b| b.ahead_behind())
             .unwrap_or((0, 0));
         let mode = Settings::get(ui.ctx()).pull_mode;
-        let pull =
-            icons::tool_button_count(ui, "arrow-down-to-line", "Pull", behind, has_remote)
-                .named(|| behind_ahead("Pull", behind, "behind"))
-                .on_hover_text(format!("{}{waits}", mode.tip()))
-                .on_disabled_hover_text(&off_why);
+        let pull = icons::tool_button_count(ui, "arrow-down-to-line", "Pull", behind, has_remote)
+            .named(|| behind_ahead("Pull", behind, "behind"))
+            .on_hover_text(format!("{}{waits}", mode.tip()))
+            .on_disabled_hover_text(&off_why);
         crate::repo::ghost::offer(&pull, || crate::repo::ghost::GhostOp::Pull(mode));
         if pull.clicked() {
             acts.push(Action::Pull);
@@ -181,8 +196,7 @@ impl RepoTab {
                 "Push the current branch (publishes it if it has no upstream yet)",
                 Command::Push,
             ))
-            .on_disabled_hover_text(no_remote)
-;
+            .on_disabled_hover_text(no_remote);
         if push.clicked() {
             acts.push(Action::Push);
         }
@@ -230,7 +244,7 @@ impl RepoTab {
                 "Stash everything, staged changes, a snapshot, or picked files",
                 Command::Stash,
             ))
-                        .on_disabled_hover_text(match &waits {
+            .on_disabled_hover_text(match &waits {
                 _ if self.work.is_clean() => "No changes to stash".to_owned(),
                 Some(w) => w.clone(),
                 None => String::new(),

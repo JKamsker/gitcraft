@@ -152,6 +152,7 @@ impl RepoTab {
         let (undo, state, status) = match result {
             Ok(Outcome::Done { branch, tip }) => {
                 let undo = UndoEntry {
+                    agent: None,
                     id: 0,
                     label: label.to_owned(),
                     undo: [expect_ref_at(&format!("refs/heads/{branch}"), &tip)]

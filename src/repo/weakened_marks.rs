@@ -172,7 +172,9 @@ fn keep(
 /// (`read`).
 pub(crate) fn scope_of(key: &DiffKey, read: u64) -> (Scope, u64) {
     match key {
-        DiffKey::Commit { hash, .. } => (Scope::Commit(hash.clone()), 0),
+        DiffKey::Remerge { hash, .. } | DiffKey::Commit { hash, .. } => {
+            (Scope::Commit(hash.clone()), 0)
+        }
         DiffKey::Range { from, to, .. } => (
             Scope::Range {
                 from: from.clone(),

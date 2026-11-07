@@ -38,7 +38,9 @@ impl RepoTab {
         // A diff shows whenever there is one: on its own, or beside its file's history.
         if let Some(diff) = &self.diff {
             let path = match &diff.key {
-                DiffKey::Commit { path, .. } | DiffKey::Range { path, .. } => path,
+                DiffKey::Commit { path, .. }
+                | DiffKey::Range { path, .. }
+                | DiffKey::Remerge { path, .. } => path,
                 DiffKey::Work(file) => &file.path,
             };
             return if rendered::is_markdown(path) && self.diff_rendered {

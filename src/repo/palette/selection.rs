@@ -115,7 +115,7 @@ impl RepoTab {
             _ => Vec::new(),
         };
         let rev = match key {
-            DiffKey::Commit { hash, .. } => Some(hash.clone()),
+            DiffKey::Commit { hash, .. } | DiffKey::Remerge { hash, .. } => Some(hash.clone()),
             DiffKey::Range { to, .. } => to.clone(),
             DiffKey::Work(_) => None,
         };

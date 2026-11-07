@@ -49,6 +49,7 @@ fn run(dir: &Path, plan: &Plan) -> Result<Option<UndoEntry>, String> {
     result?;
     Ok(match kind {
         OpKind::Normal(Undo::Custom { undo, redo }, _) => Some(UndoEntry {
+            id: 0,
             label: plan.label.clone(),
             undo,
             redo,
@@ -59,6 +60,7 @@ fn run(dir: &Path, plan: &Plan) -> Result<Option<UndoEntry>, String> {
             let mut parts = heads.split('\u{0}');
             let before = parts.next().unwrap_or_default().to_owned();
             Some(UndoEntry {
+                id: 0,
                 label: plan.label.clone(),
                 undo: crate::repo::ops(&[&["reset", mode, &before]]),
                 redo: Vec::new(),

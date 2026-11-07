@@ -10,14 +10,14 @@
 mod cli;
 pub(crate) use cli::tool_location;
 mod forks;
-pub use forks::ForkInfo;
 pub(crate) use cli::{ToolReport, tool_report};
+pub use forks::ForkInfo;
 mod gitea;
 mod github;
 mod gitlab;
 pub(crate) mod http;
-pub mod links;
 pub mod inbox;
+pub mod links;
 pub mod stack;
 #[cfg(test)]
 mod stack_tests;

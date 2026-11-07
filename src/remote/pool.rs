@@ -30,6 +30,7 @@ impl Lane {
             Lane::Long => 3,
             Lane::Apart => 2,
             Lane::Tool => 4,
+            Lane::Test => TEST_SHELLS,
         }
     }
 
@@ -37,7 +38,7 @@ impl Lane {
     /// may stay so for hours.
     fn wait_at_most(self) -> Duration {
         match self {
-            Lane::Quick | Lane::Long => WAIT_AT_MOST,
+            Lane::Quick | Lane::Long | Lane::Apart | Lane::Test => WAIT_AT_MOST,
             Lane::Tool => Duration::ZERO,
         }
     }
@@ -45,7 +46,7 @@ impl Lane {
     /// What a command that found every shell busy for too long says.
     pub(super) fn busy(self, host: &Host) -> String {
         match self {
-            Lane::Quick | Lane::Long => format!(
+            Lane::Quick | Lane::Long | Lane::Apart | Lane::Test => format!(
                 "every connection to {} is busy; try again when what runs there is done",
                 host.label()
             ),
@@ -54,7 +55,6 @@ impl Lane {
                 self.max(),
                 host.label()
             ),
-            Lane::Test => TEST_SHELLS,
         }
     }
 }

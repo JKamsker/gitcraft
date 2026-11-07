@@ -316,7 +316,7 @@ pub(crate) fn run_push(
     };
     let before = git::resolve(path, "refs/stash").ok();
     let (result, mut kind, _) =
-        run_steps_counted(path, &[args], OpKind::Normal(undo, head), None, false);
+        run_steps_counted(path, &[args], OpKind::Normal(undo, head), None, false, None);
     if roll_back_staged
         && result.is_ok()
         && let OpKind::Normal(Undo::Custom { undo, .. }, _) = &mut kind
@@ -416,7 +416,7 @@ fn run_snapshot(
         redo: store.clone(),
     };
     let (result, kind, _) =
-        run_steps_counted(path, &store, OpKind::Normal(undo, head), None, false);
+        run_steps_counted(path, &store, OpKind::Normal(undo, head), None, false, None);
     (result, kind)
 }
 

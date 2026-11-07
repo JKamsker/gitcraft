@@ -45,6 +45,7 @@ pub(crate) struct UndoEntry {
     pub(super) heads: Option<(String, String)>,
     /// The agent that asked for it over `gitcraft mcp`, when it wasn't the user: the toolbar
     /// marks it with a robot.
+    #[serde(default)]
     pub(super) agent: Option<String>,
 }
 

@@ -38,6 +38,11 @@ pub enum Request {
     /// An agent's change, from `gitcraft mcp` (see `crate::mcp`): run in the tab of its
     /// repository, answered once done (see `server`).
     Agent(AgentCall),
+    /// Do what the command line `args` asks (`log <file>`, `blame <file>:<line>`, see
+    /// `crate::launch`), its relative paths read against `cwd`, the start's folder. Read
+    /// again on arrival, as the start read them: only a request `crate::launch` takes is
+    /// taken.
+    Launch { cwd: PathBuf, args: Vec<String> },
 }
 
 /// What an agent asks the window to do: `op` in the repository `repo` (as a tab names it).
@@ -47,11 +52,6 @@ pub struct AgentCall {
     /// Who asks, as the agent names itself.
     pub agent: String,
     pub op: WriteOp,
-    /// Do what the command line `args` asks (`log <file>`, `blame <file>:<line>`, see
-    /// `crate::launch`), its relative paths read against `cwd`, the start's folder. Read
-    /// again on arrival, as the start read them: only a request `crate::launch` takes is
-    /// taken.
-    Launch { cwd: PathBuf, args: Vec<String> },
 }
 
 impl Request {

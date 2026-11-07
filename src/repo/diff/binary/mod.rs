@@ -247,6 +247,7 @@ pub(super) fn load_pair(
     .or(renamed_from)
     .unwrap_or(path);
     let (old, new) = match key {
+        DiffKey::Remerge { hash, .. } => (Ok(None), read_side(repo, Some(hash), path)),
         DiffKey::Commit { hash, .. } => (
             read_side(repo, Some(&format!("{hash}^")), old_path),
             read_side(repo, Some(hash), path),

@@ -5,7 +5,7 @@
 use std::path::{Path, PathBuf};
 
 use super::{Extras, ExtrasCmd};
-use crate::git::{self, LinkKind, Verdict};
+use crate::git::{self, LinkKind, SignatureVerdict};
 use crate::repo::{Action, RepoTab};
 
 fn repo(name: &str) -> PathBuf {
@@ -71,7 +71,7 @@ fn selecting_a_commit_reads_its_sections_and_notes_round_trip() {
     tab.load_extras(&target, &ctx);
     wait(&mut tab, &ctx, all_read);
     let e = &tab.extras;
-    assert!(matches!(&e.signature, Some(Ok(s)) if s.verdict == Verdict::Unsigned));
+    assert!(matches!(&e.signature, Some(Ok(s)) if s.verdict == SignatureVerdict::Unsigned));
     assert!(matches!(&e.contained, Some(Ok(c)) if c.first_tag() == Some("v1.0")));
     let links: Vec<(&str, &LinkKind)> = match &e.backlinks {
         Some(Ok((links, false))) => links.iter().map(|l| (&l.hash[..], &l.kind)).collect(),

@@ -1,7 +1,7 @@
 //! One commit row of the graph: its background, the description and the hash, author, when
 //! and date columns.
 
-use egui::{Align2, Color32, CornerRadius, FontId, Painter, Pos2, Rect, Response, Stroke};
+use egui::{Align2, Color32, CornerRadius, FontId, Painter, Pos2, Rect, Response, Sense, Stroke};
 use egui::{Ui, pos2, vec2};
 
 use super::badge::{Badge, badges};
@@ -318,7 +318,15 @@ fn row_background(
 
 /// The summary, then the rest of the message faded, cut with an ellipsis.
 /// `reserved`: room left at the end (for the build status, a merge's badge).
-fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool, reserved: f32, robot: f32) -> f32 {
+fn description(
+    ui: &Ui,
+    painter: &Painter,
+    t: &Tokens,
+    row: &Row,
+    is_match: bool,
+    reserved: f32,
+    robot: f32,
+) -> f32 {
     let (rect, mid) = (row.rect, row.mid());
     let x = row.gx + row.cols.graph + 6.0 + robot;
     let text_right = rect.right() - row.cols.trailing() - 10.0 - reserved;

@@ -10,9 +10,92 @@ use crate::git;
 use crate::repo::{OpKind, Refresh, RepoTab, Undo, UndoEntry};
 
 impl RepoTab {
-    pub(in crate::repo) fn remember_undo(&mut self, label: &str, undo: UndoEntry, ctx: &egui::Context) {
+    /// A multi-step feature finished outside run_ops; the next read records its undo.
+    pub(in crate::repo) fn push_undo(&mut self, entry: UndoEntry, ctx: &egui::Context) {
+        let label = entry.label.clone();
+        self.timeline_op_started(false, Refresh::All);
+        self.timeline_op_ended(
+            &label,
+            &OpKind::plain(),
+            Some(entry),
+            true,
+            Refresh::All,
+            ctx,
+        );
+        self.reload(ctx);
+    }
+
+    /// Resuming a release fills in the same undo entry rather than making a second step.
+    pub(in crate::repo) fn replace_recent_undo(
+        &mut self,
+        mut undo: UndoEntry,
+        ctx: &egui::Context,
+    ) {
+        if let Some(entry) = self
+            .timeline
+            .entries
+            .iter_mut()
+            .rev()
+            .find(|e| e.label == undo.label)
+        {
+            undo.id = entry.id;
+            entry.undo = Some(undo);
+            self.save_timeline(ctx);
+        } else {
+            self.push_undo(undo, ctx);
+        }
+    }
+
+    pub(in crate::repo) fn update_recent_redo(
+        &mut self,
+        label: &str,
+        redo: Vec<Vec<String>>,
+        ctx: &egui::Context,
+    ) {
+        fn update(then: &mut Ended, label: &str, redo: &[Vec<String>]) {
+            if let Ended::New {
+                label: name,
+                undo: Some(undo),
+            } = then
+                && name == label
+            {
+                undo.redo = redo.to_vec();
+            }
+        }
+        if let Awaiting::Ended { then, .. } = &mut self.timeline.awaiting {
+            update(then, label, &redo);
+        }
+        for then in &mut self.timeline.backlog {
+            update(then, label, &redo);
+        }
+        if let Some(entry) = self
+            .timeline
+            .entries
+            .iter_mut()
+            .rev()
+            .find(|e| e.label == label)
+            && let Some(undo) = &mut entry.undo
+        {
+            undo.redo = redo;
+        }
+        self.save_timeline(ctx);
+    }
+
+    pub(in crate::repo) fn remember_undo(
+        &mut self,
+        label: &str,
+        undo: UndoEntry,
+        ctx: &egui::Context,
+    ) {
         let state = self.ref_state();
-        self.record(label.to_owned(), Origin::Gitcraft, state.clone(), state, Some(undo), ctx);
+        self.record(
+            label.to_owned(),
+            Origin::Gitcraft,
+            state.clone(),
+            state,
+            Some(undo),
+            ctx,
+        );
     }
 
     /// Reads what was kept for this folder, in the background.

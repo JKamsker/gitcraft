@@ -2,17 +2,17 @@
 //! (branches on the left, commit graph or diff in the middle, commit detail / changes on the right).
 
 mod actions;
-mod ai;
-pub(crate) mod agent;
 mod activity;
+pub(crate) mod agent;
 mod agents;
+mod ai;
 mod apply;
+mod authorship_view;
+mod bakeoff;
+mod bisect;
 mod branch_cleanup;
 mod branch_health;
 mod branch_order;
-mod bisect;
-mod bakeoff;
-mod authorship_view;
 mod branch_tree;
 mod branch_visibility;
 mod ci_status;
@@ -24,43 +24,43 @@ mod commit_actions;
 mod conflict;
 mod conflict_check;
 pub(crate) mod custom_commands;
-mod detached;
 mod dco;
+mod detached;
 mod detail;
 mod dialogs;
 mod diff;
+mod diff_split;
+pub(crate) mod doctor;
 mod drafts;
 #[cfg(test)]
 mod drafts_tests;
 mod drag_drop;
-mod external_tools;
-mod error_help;
-mod diff_split;
-pub(crate) mod fence_view;
 mod drift_view;
-pub(crate) mod doctor;
+mod error_help;
+mod external_tools;
+pub(crate) mod fence_view;
 mod file_text;
 pub(crate) mod file_view;
-mod forge_link;
-mod fold;
 mod find;
-mod graph_order;
-mod ghost;
 mod fold;
+mod folding;
+mod forge_link;
 pub(crate) mod forks;
+mod ghost;
+mod graph_order;
 pub(crate) mod graph_view;
 mod guide;
 pub(crate) mod highlight;
 mod hooks;
-mod issue_work;
-mod interaction;
 mod hotfix;
+mod interaction;
+mod issue_work;
 mod keep_submodules;
 mod keys;
 mod layout;
 mod lfs_locks;
-mod lifecycle;
 mod lfs_storage;
+mod lifecycle;
 #[cfg(test)]
 mod line_history_tests;
 mod load;
@@ -70,11 +70,11 @@ mod navigate;
 mod navigation;
 mod offline;
 mod operations;
-mod palette;
-mod partial_stash;
-mod parallel_bisect;
 mod owners;
 mod package;
+mod palette;
+mod parallel_bisect;
+mod partial_stash;
 mod patches;
 mod pinned_sections;
 pub(crate) mod popout;
@@ -86,12 +86,12 @@ mod push;
 mod quick_edit;
 mod rebase;
 mod reflog;
+mod rehearse;
+mod release;
 mod remerge;
 mod revert_piece;
 #[cfg(test)]
 mod revert_tests;
-mod rehearse;
-mod release;
 mod rewrite;
 mod running;
 #[cfg(test)]
@@ -106,8 +106,8 @@ mod test_lane;
 mod tests;
 mod timeline;
 mod toolbar;
-mod versions;
 mod unity;
+mod versions;
 mod watch;
 mod watch_remote;
 mod weakened_marks;
@@ -310,7 +310,7 @@ pub struct RepoTab {
     /// Markdown files show rendered in diffs (their changes, or the file).
     diff_rendered: bool,
     /// What is known of which files start folded (generated, lockfiles).
-    folding: fold::Folding,
+    folding: folding::Folding,
     /// Diffs show as this rich view, for the files it reads.
     diff_rich: Option<diff::rich::RichKind>,
     /// The file a rich view was turned on for that only its contents offer (an API document

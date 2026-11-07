@@ -89,7 +89,10 @@ impl RepoTab {
         if std::mem::take(&mut self.focus_commit_summary) && !rebasing {
             summary.request_focus();
         }
-        if self.guide.take_focus_summary(ui.ctx().cumulative_frame_nr()) {
+        if self
+            .guide
+            .take_focus_summary(ui.ctx().cumulative_frame_nr())
+        {
             summary.request_focus();
             summary.scroll_to_me(None);
         }
@@ -149,7 +152,7 @@ impl RepoTab {
         if untouched {
             resp.on_hover_text("Edit the message first: it is still the template");
         } else {
-        resp.on_hover_text(keymap::label(Command::Commit));
+            resp.on_hover_text(keymap::label(Command::Commit));
         }
 
         ui.add_space(4.0);

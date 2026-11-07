@@ -245,6 +245,7 @@ pub(super) fn hunk_button(
             "Unstage this hunk. Click lines to unstage only some of them (Shift+click for a range)."
         }
         Pick::Discard => "Throw away this hunk's changes (Ctrl+Z brings them back).",
+        Pick::Revert => "Undo this hunk in the working tree, to review before committing.",
     };
     (resp.on_hover_text(tip), left)
 }

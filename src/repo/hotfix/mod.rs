@@ -186,14 +186,10 @@ impl RepoTab {
             self.then(
                 ctx,
                 move || plan::now(&repo, &finish, &choices),
-                move |tab, now, _| {
+                move |tab, now, ctx| {
                     let Some(tag) = now.tag else { return };
                     let redo = run.plan.redo(&run.choices, &now.branches, &tag);
-                    if let Some(entry) =
-                        tab.undo_stack.last_mut().filter(|e| e.label == entry_label)
-                    {
-                        entry.redo = redo;
-                    }
+                    tab.update_recent_redo(&entry_label, redo, ctx);
                 },
             );
             if let Some(push) = run.push {
@@ -212,18 +208,23 @@ impl RepoTab {
         self.then(
             ctx,
             move || plan::now(&repo, &finish, &choices),
-            move |tab, now, _| {
+            move |tab, now, ctx| {
                 let Some(undo) = plan::recover(&run.plan, &run.choices, &now) else {
                     return;
                 };
                 let redo = run.plan.steps(&run.choices);
-                tab.undo_stack.push(super::state::UndoEntry {
-                    label: format!("{} (stopped part-way)", run.label),
-                    undo,
-                    redo,
-                    heads: None,
-                });
-                tab.redo_stack.clear();
+                tab.push_undo(
+                    super::state::UndoEntry {
+                        id: 0,
+                        agent: None,
+                        label: format!("{} (stopped part-way)", run.label),
+                        undo,
+                        redo,
+                        heads: None,
+                    },
+                    ctx,
+                );
+
                 if let Some((text, true)) = &mut tab.status {
                     text.push_str(" — Ctrl+Z puts back what it did");
                 }

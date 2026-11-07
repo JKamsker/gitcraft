@@ -137,19 +137,36 @@ const TOOL_FOR: std::time::Duration = std::time::Duration::from_secs(12 * 3600);
 /// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
 fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
     if let Some(target) = dir.and_then(remote::parse) {
-        return execute_there(&target, extra, args);
+        let result = execute_there(&target, extra, args);
+        if let Ok(out) = &result {
+            super::doctor::hook_log::record(dir, args, out.code == Some(0), &out.stderr);
+        }
+        return result;
     }
     let mut extra = extra.clone();
-    let trace = extra.trace_hooks.then(super::hooks::TraceFile::new).flatten();
-    if let Some(trace) = &trace { extra.env.push((super::hooks::TRACE_VAR, trace.path().to_string_lossy().into_owned())); }
+    let trace = extra
+        .trace_hooks
+        .then(super::hooks::TraceFile::new)
+        .flatten();
+    if let Some(trace) = &trace {
+        extra.env.push((
+            super::hooks::TRACE_VAR,
+            trace.path().to_string_lossy().into_owned(),
+        ));
+    }
     let mut cmd = local_command(dir, &extra, args);
     let out = match &extra.stdin {
         Some(input) => output_with_input(cmd, input),
         None => cmd.output(),
-    }.map_err(|e| format!("could not run git: {e}"))?;
+    }
+    .map_err(|e| format!("could not run git: {e}"))?;
+    super::doctor::hook_log::record(dir, args, out.status.success(), &out.stderr);
     let failed = !out.status.success();
     Ok(Ran {
-        code: out.status.code(), status: out.status.to_string(), stdout: out.stdout, stderr: out.stderr,
+        code: out.status.code(),
+        status: out.status.to_string(),
+        stdout: out.stdout,
+        stderr: out.stderr,
         failed_hook: trace.filter(|_| failed).and_then(|t| t.failed_hook(args)),
     })
 }
@@ -191,30 +208,6 @@ fn output_with_input(mut cmd: Command, input: &[u8]) -> std::io::Result<std::pro
     out
 }
 
-
-/// large input doesn't wait on output nobody reads yet.
-fn output_with_input(mut cmd: Command, input: &[u8]) -> std::io::Result<std::process::Output> {
-    use std::io::Write;
-    use std::process::Stdio;
-    let mut child = cmd
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-    let writer = child.stdin.take().map(|mut stdin| {
-        let input = input.to_vec();
-        // A git that stops reading early (an error) closes the pipe: what it said tells why.
-        std::thread::spawn(move || {
-            let _ = stdin.write_all(&input);
-        })
-    });
-    let out = child.wait_with_output();
-    if let Some(writer) = writer {
-        let _ = writer.join();
-    }
-    out
-}
-
 /// The request that runs git with `args` in `target`'s folder, on its machine.
 pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Request {
     let words: Vec<String> = extra
@@ -241,7 +234,10 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
         stdin: extra.stdin.clone(),
         // A tool stays open as long as the user works in it, apart from ordinary git reads.
         long: extra.tool || extra.long || goes_over_network(args),
-        timeout: extra.timeout.or(extra.test).or_else(|| extra.tool.then_some(TOOL_FOR)),
+        timeout: extra
+            .timeout
+            .or(extra.test)
+            .or_else(|| extra.tool.then_some(TOOL_FOR)),
         test: extra.test.is_some(),
         apart: false,
     }
@@ -302,6 +298,7 @@ pub fn run_shell(dir: &Path, script: &str) -> Result<ShellRun, String> {
     let extra = Extra {
         pre: vec!["-c", SHELL_ALIAS_ENV_DEF],
         env: vec![(SHELL_SCRIPT_VAR, script.to_owned())],
+        ..Extra::default()
     };
     let out = execute(Some(dir), &extra, &[SHELL_ALIAS])?;
     Ok(ShellRun {
@@ -424,6 +421,7 @@ pub fn run_captured(dir: &Path, args: &[&str], input: Option<&[u8]>) -> Result<C
                 status: format!("exit status: {}", out.code),
                 stdout: out.stdout,
                 stderr: out.stderr,
+                failed_hook: None,
             }
         }
         (None, None) => execute(Some(dir), &Extra::default(), args)?,
@@ -467,6 +465,7 @@ fn run_here_with_input(dir: &Path, args: &[&str], input: &[u8]) -> Result<Ran, S
         status: out.status.to_string(),
         stdout: out.stdout,
         stderr: out.stderr,
+        failed_hook: None,
     })
 }
 
@@ -480,6 +479,7 @@ pub fn run_env(
     let extra = Extra {
         pre: Vec::new(),
         env: env.iter().map(|(n, v)| (*n, (*v).to_owned())).collect(),
+        ..Extra::default()
     };
     let out = execute(dir, &extra, args)?;
     if out.code == Some(0) {
@@ -593,6 +593,7 @@ pub fn run_call(dir: Option<&Path>, args: &[&str], call: Call) -> Result<Vec<u8>
         env: call.env,
         stdin: call.stdin,
         long: call.long,
+        ..Extra::default()
     };
     let out = execute(dir, &extra, args)?;
     if out.code == Some(0) {
@@ -720,11 +721,6 @@ fn unattended_extra(unix: bool) -> Extra {
         pre: vec!["-c", "credential.interactive=false", "-c", "core.askPass="],
         env,
         ..Extra::default()
-        tool: false,
-        stdin: None,
-        trace_hooks: false,
-        test: None,
-        timeout: None,
     }
 }
 
@@ -757,35 +753,11 @@ pub fn is_auth_error(err: &str) -> bool {
 /// What a call is run with on top of [`GIT_ENV`]: nobody asked to sign in when `quiet`,
 /// `creds` given to git when there are some.
 fn extra_for(dir: Option<&Path>, creds: Option<&Credentials>, quiet: bool) -> Extra {
-    run_inner_extra(dir, args, ok, creds, quiet, None)
-}
-
-fn run_inner_extra(
-    dir: Option<&Path>,
-    args: &[&str],
-    ok: &[i32],
-    creds: Option<&Credentials>,
-    quiet: bool,
-    timeout: Option<std::time::Duration>,
-) -> Result<String, String> {
-    let mut extra = Extra::default();
-    if quiet {
-        // Unix on the machine git runs on: another one is always Linux (WSL, an SSH server).
-        let unix = cfg!(unix) || dir.is_some_and(remote::is_remote);
-        extra = unattended_extra(unix);
-    }
-    run_extra(dir, args, ok, creds, extra)
-}
-
-/// Runs git with `extra` (and the credentials `creds`, when given), as [`run_inner`] says.
-fn run_extra(
-    dir: Option<&Path>,
-    args: &[&str],
-    ok: &[i32],
-    creds: Option<&Credentials>,
-    mut extra: Extra,
-) -> Result<String, String> {
-    extra.timeout = timeout;
+    let mut extra = if quiet {
+        unattended_extra(cfg!(unix) || dir.is_some_and(remote::is_remote))
+    } else {
+        Extra::default()
+    };
     if let Some(c) = creds {
         extra.pre.extend(["-c", ENV_HELPER]);
         extra
@@ -796,6 +768,32 @@ fn run_extra(
             .push(("GITCRAFT_GIT_PASSWORD", c.password.clone()));
     }
     extra
+}
+
+fn run_inner_extra(
+    dir: Option<&Path>,
+    args: &[&str],
+    ok: &[i32],
+    creds: Option<&Credentials>,
+    quiet: bool,
+    timeout: Option<std::time::Duration>,
+) -> Result<String, String> {
+    let mut extra = extra_for(dir, creds, quiet);
+    extra.timeout = timeout;
+    finish(execute(dir, &extra, args)?, args, ok)
+}
+
+fn run_extra(
+    dir: Option<&Path>,
+    args: &[&str],
+    ok: &[i32],
+    creds: Option<&Credentials>,
+    mut extra: Extra,
+) -> Result<String, String> {
+    let credentials = extra_for(dir, creds, false);
+    extra.pre.extend(credentials.pre);
+    extra.env.extend(credentials.env);
+    finish(execute(dir, &extra, args)?, args, ok)
 }
 
 /// The error of a git call that failed: what it said, or how it ended when it said nothing.
@@ -823,9 +821,6 @@ fn run_inner(
 
 /// What a git call that ended so gives: its output when its code is one of `ok`, otherwise
 /// what it said went wrong.
-fn finish(out: Ran, args: &[&str], ok: &[i32]) -> Result<String, String> {
-    outcome(out, args, ok)
-}
 
 /// [`run`] with `GIT_INDEX_FILE` set to `index`, a path on the machine git runs on: for work
 /// on a copy of the index (or a new one) that leaves the repository's own index alone.
@@ -845,7 +840,7 @@ fn outcome(out: Ran, args: &[&str], ok: &[i32]) -> Result<String, String> {
 
 /// [`run`] with variables for git on top of the usual ones, here or on the machine git runs on
 /// for `dir`: a scratch index (`GIT_INDEX_FILE`), the author of a commit being made.
-pub fn run_env(
+pub fn run_env_owned(
     dir: &Path,
     env: &[(&'static str, String)],
     args: &[&str],
@@ -853,6 +848,7 @@ pub fn run_env(
     let extra = Extra {
         pre: Vec::new(),
         env: env.to_vec(),
+        ..Extra::default()
     };
     finish(execute(Some(dir), &extra, args)?, args, &[0])
 }
@@ -862,7 +858,6 @@ pub fn run_env(
 fn finish(out: Ran, args: &[&str], ok: &[i32]) -> Result<String, String> {
     // For the doctor: what hooks print is lost once the command succeeds.
     let succeeded = out.code.is_some_and(|c| ok.contains(&c));
-    super::doctor::hook_log::record(dir, args, succeeded, &out.stderr);
     if succeeded {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {
@@ -892,7 +887,8 @@ fn run_inner_recorded(
     quiet: bool,
 ) -> (Result<String, String>, Recorded) {
     let started = std::time::Instant::now();
-    let extra = extra_for(dir, creds, quiet);
+    let mut extra = extra_for(dir, creds, quiet);
+    extra.trace_hooks = !quiet && super::hooks::wants_trace(args);
     let out = match execute(dir, &extra, args) {
         Ok(out) => out,
         Err(e) => {
@@ -907,11 +903,7 @@ fn run_inner_recorded(
         String::from_utf8_lossy(&out.stderr),
     );
     let recorded = Recorded::new(args, out.code, &both(&stdout, &stderr), creds, started);
-    let result = if out.code.is_some_and(|c| ok.contains(&c)) {
-        Ok(stdout.into_owned())
-    } else {
-        Err(failure_message(args, &out.status, &stdout, &stderr))
-    };
+    let result = finish(out, args, ok);
     (result, recorded)
 }
 

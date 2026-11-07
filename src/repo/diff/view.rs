@@ -7,13 +7,13 @@ use super::binary::{binary_view, textconv_note};
 use super::image_compare::compare_view;
 use super::images::image_view;
 use super::lfs::lfs_view;
-use super::notebook::notebook_bar;
 use super::link::LineLinks;
+use super::notebook::notebook_bar;
+use super::remerge;
 use super::rows::Rows;
 use super::{DiffData, Kind, Pick, old_name, picked_in_file, unstage_args};
-use crate::forge::links::Target;
-use super::{remerge, rendered};
 use super::{rendered, rich};
+use crate::forge::links::Target;
 use crate::git::{Area, StatusFile};
 use crate::icons;
 use crate::pull_request::DiffSide;
@@ -22,7 +22,7 @@ use crate::repo::popout::{self, Panel};
 use crate::repo::pr_review::{self, PrDraft};
 use crate::repo::pr_view::{self, PrView};
 use crate::repo::{
-    Action, DiffKey, DiffView, Refresh, RepoTab, file_text, fold, ops, short, widgets,
+    Action, DiffKey, DiffView, Refresh, RepoTab, file_text, folding, ops, short, widgets,
 };
 use crate::settings::Settings;
 use crate::theme::{self, Tokens};
@@ -111,7 +111,8 @@ impl RepoTab {
                 _ => None,
             };
             let rev = sides(&view.key).map(|(new, old)| if before { old } else { new });
-            let menu = || self.link_menu(None);
+            let link_menu = self.link_menu(None);
+            let menu = || link_menu.clone();
             let mut link = |ui: &mut Ui, lines| {
                 if let (Some(rev), Some(menu)) = (&rev, menu()) {
                     let target = Target::File {
@@ -131,7 +132,17 @@ impl RepoTab {
                 .ok_or("Untracked and conflicted files have no line history");
             // Lines picked in one version aren't those of another one of the same file.
             let id = ("diff_file", &path, format!("{:?}", view.key));
-            if let Some(p) = file_text::show(ui, id, view.file.as_ref(), &mut self.find, || find::Source::DiffFile(path.clone()), history, links).and_then(pick) {
+            if let Some(p) = file_text::show(
+                ui,
+                id,
+                view.file.as_ref(),
+                &mut self.find,
+                || find::Source::DiffFile(path.clone()),
+                history,
+                links,
+            )
+            .and_then(pick)
+            {
                 acts.push(Action::LineHistory {
                     path: p.path,
                     at: p.at,
@@ -168,7 +179,7 @@ impl RepoTab {
                 Some(Ok(data)) => Some(data),
                 _ => None,
             };
-            if fold::folded_diff(ui, &path, data, reason) {
+            if folding::folded_diff(ui, &path, data, reason) {
                 acts.push(Action::UnfoldDiff);
             }
             return;
@@ -265,9 +276,9 @@ impl RepoTab {
         view: &DiffView,
         settings: &Settings,
         acts: &mut Vec<Action>,
-    ) -> Option<fold::FoldReason> {
+    ) -> Option<folding::FoldReason> {
         let conflicted = matches!(&view.key, DiffKey::Work(f) if f.area == Area::Conflicted);
-        let rules = fold::Rules::from_settings(settings);
+        let rules = folding::Rules::from_settings(settings);
         // A diff that failed to read shows why, folded or not.
         let failed = matches!(view.data, Some(Err(_)));
         if view.unfolded || conflicted || failed || !rules.on {
@@ -358,10 +369,24 @@ impl RepoTab {
                                 !matches!(f.code, 'A' | '?') && f.old_path.is_none()
                             }
                             DiffKey::Range { to: None, .. } => false,
-                            DiffKey::Commit { .. } | DiffKey::Range { .. } => true,
+                            DiffKey::Commit { .. }
+                            | DiffKey::Range { .. }
+                            | DiffKey::Remerge { .. } => true,
                         })
                     };
-                    widgets::file_menu_with(&title, path, rev, ignorable, Some(&view.key), &links, acts, |ui, acts| { self.lock_menu_items(ui, path, rev, acts); self.storage_menu_items(ui, path, rev, acts); });
+                    widgets::file_menu_with(
+                        &title,
+                        path,
+                        rev,
+                        ignorable,
+                        Some(&view.key),
+                        &links,
+                        acts,
+                        |ui, acts| {
+                            self.lock_menu_items(ui, path, rev, acts);
+                            self.storage_menu_items(ui, path, rev, acts);
+                        },
+                    );
                     widgets::chip(ui, origin, t.text_dim);
                     if let Some(ranges) = &view.lines {
                         widgets::chip(ui, &lines_chip(ranges), t.accent);
@@ -396,10 +421,10 @@ impl RepoTab {
                             // A diff of some lines only (`git log -L`) shows them whole, with
                             // whitespace: those options don't apply to it.
                             if view.lines.is_none() {
-                            view_options(ui, &t, (split, ignore_ws, whole_file), acts);
-                            ui.add_space(4.0);
-                            super::algorithm::algorithm_menu(ui, path, view.repairing, acts);
-                            ui.add_space(8.0);
+                                view_options(ui, &t, (split, ignore_ws, whole_file), acts);
+                                ui.add_space(4.0);
+                                super::algorithm::algorithm_menu(ui, path, view.repairing, acts);
+                                ui.add_space(8.0);
                             }
                             change_steps(ui, acts);
                             ui.add_space(8.0);
@@ -606,7 +631,7 @@ fn sides(key: &DiffKey) -> Option<(String, String)> {
         DiffKey::Range {
             from, to: Some(to), ..
         } => Some((to.clone(), from.clone())),
-        DiffKey::Range { to: None, .. } | DiffKey::Work(_) => None,
+        DiffKey::Remerge { .. } | DiffKey::Range { to: None, .. } | DiffKey::Work(_) => None,
     }
 }
 

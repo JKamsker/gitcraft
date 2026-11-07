@@ -543,15 +543,15 @@ const REPORT_TIMEOUT: Duration = Duration::from_secs(5);
 /// server; the token itself is never read), `glab` (`auth status`, which asks the server) or
 /// `tea` (its configured logins counted).
 pub(crate) fn tool_report(tool: &'static str) -> ToolReport {
-    let version = answer(tool, &["--version"], true).and_then(|(ok, out)| {
+    let version = report_answer(tool, &["--version"], true).and_then(|(ok, out)| {
         ok.then(|| out.lines().next().unwrap_or_default().trim().to_owned())
             .filter(|v| !v.is_empty())
     });
     let signed_in = match tool {
         _ if version.is_none() => None,
         "tea" => Some(!super::gitea::tea_servers().is_empty()),
-        "gh" => answer(tool, &["auth", "token"], false).map(|(ok, _)| ok),
-        _ => answer(tool, &["auth", "status"], false).map(|(ok, _)| ok),
+        "gh" => report_answer(tool, &["auth", "token"], false).map(|(ok, _)| ok),
+        _ => report_answer(tool, &["auth", "status"], false).map(|(ok, _)| ok),
     };
     ToolReport {
         tool,
@@ -564,7 +564,7 @@ pub(crate) fn tool_report(tool: &'static str) -> ToolReport {
 /// succeeded, and its standard output when `keep` (else it goes nowhere). `None` when it
 /// couldn't be run or took too long. The output is read as it comes, so a long one can't stall
 /// the tool.
-fn answer(tool: &str, args: &[&str], keep: bool) -> Option<(bool, String)> {
+fn report_answer(tool: &str, args: &[&str], keep: bool) -> Option<(bool, String)> {
     let mut cmd = tool_command(tool);
     cmd.args(args)
         .current_dir(std::env::temp_dir())

@@ -25,9 +25,7 @@ notify-rust = "4"
 open = "5"
 portable-pty = "0.9"
 pulldown-cmark = { version = "0.13", default-features = false }
-# Issue references in commit messages (the patterns set in the commit box).
-regex = "1"
-# Find in a diff, a file or blame: its regular expressions and whole-word matching.
+# Issue references, find-in-view expressions, and CODEOWNERS patterns.
 regex = "1"
 # Reads one setting from eframe's saved state before the window is made (app::title_bar).
 ron = "0.12"
@@ -45,8 +43,6 @@ ureq = { version = "2", features = ["native-certs"] }
 base64 = "0.22"
 # What a repository's trusted command file read as (Settings → Custom commands).
 sha2 = "0.11"
-# Gitea's and Forgejo's CODEOWNERS patterns are regular expressions.
-regex = "1"
 # Reading the files of a package published already (a gzip'd tar).
 flate2 = "1"
 vt100 = "0.18"

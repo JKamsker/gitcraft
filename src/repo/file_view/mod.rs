@@ -140,8 +140,9 @@ impl RepoTab {
             FileTab::File => {
                 // Lines link to the commit the file is at; on disk, they may be in none.
                 let rev = view.rev.clone();
+                let menu = self.link_menu(None);
                 let mut link = |ui: &mut Ui, lines: Lines| {
-                    if let (Some(rev), Some(menu)) = (&rev, self.link_menu(None)) {
+                    if let (Some(rev), Some(menu)) = (&rev, menu.clone()) {
                         let target = Target::File {
                             rev: rev.clone(),
                             path: view.path.clone(),
@@ -158,7 +159,10 @@ impl RepoTab {
                     ("file_view", &view.path, &view.rev),
                     view.text.as_ref(),
                     &mut self.find,
-                    || Source::File { path: view.path.clone(), rev: view.rev.clone() },
+                    || Source::File {
+                        path: view.path.clone(),
+                        rev: view.rev.clone(),
+                    },
                     Ok(()),
                     links,
                 );

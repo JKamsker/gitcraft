@@ -119,7 +119,7 @@ impl RepoTab {
                 } else if self.rebase.is_some() {
                     self.rebase_view(ui, &mut acts);
                 } else if self.split.is_some() {
-                    self.split_view(ui, &mut acts);
+                    self.graph_diff_view(ui, &mut acts);
                 } else if self.absorb.is_some() {
                     self.absorb_view(ui, &mut acts);
                 } else if self.diff_beside_graph(&ctx) {
@@ -222,8 +222,16 @@ impl RepoTab {
     /// [`crate::keymap`] fetch, pull, push, stash, branch, stage, commit and open the terminal.
     /// None of them while a dialog, a text field or the terminal has the keyboard.
     pub(super) fn shortcuts(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
-        let free_keys =
-            self.dialog.is_none() && self.package.is_none() && self.release.is_none() && self.hotfix.finish.is_none() && self.agents.dialog.is_none() && self.bakeoff.picker.is_none() && !self.stacks.modal_open() && !self.issue_picker_open() && !self.keys_blocked && !crate::a11y::keyboard_taken(ctx);
+        let free_keys = self.dialog.is_none()
+            && self.package.is_none()
+            && self.release.is_none()
+            && self.hotfix.finish.is_none()
+            && self.agents.dialog.is_none()
+            && self.bakeoff.picker.is_none()
+            && !self.stacks.modal_open()
+            && !self.issue_picker_open()
+            && !self.keys_blocked
+            && !crate::a11y::keyboard_taken(ctx);
         // Ctrl+F, Esc and the steps of the find bar, when a diff, file or blame is shown.
         self.find_keys(ctx, free_keys);
         if free_keys {
@@ -251,7 +259,9 @@ impl RepoTab {
                 && (self.main_keys(ctx, Panel::Diff) || self.conflict.is_some());
             if esc && self.close_drop_menu() {
             } else if esc && diff_keys && self.note_open(ctx) {
-                acts.push(Action::Agent(super::agents::AgentAct::Tray(super::agents::TrayAct::Close)));
+                acts.push(Action::Agent(super::agents::AgentAct::Tray(
+                    super::agents::TrayAct::Close,
+                )));
             } else if esc && diff_keys && self.line_comment_open() {
                 acts.push(Action::Pr(pr_review::PrAct::CloseLine));
             } else if esc && self.diff.as_ref().is_some_and(|d| d.moved.is_some()) {
@@ -301,7 +311,11 @@ impl RepoTab {
             } else if esc && self.reflog.is_some() {
                 acts.push(Action::CloseReflog);
             }
-            let diff_shown = diff_keys && self.conflict.is_none() && self.rebase.is_none() && self.split.is_none() && self.absorb.is_none();
+            let diff_shown = diff_keys
+                && self.conflict.is_none()
+                && self.rebase.is_none()
+                && self.split.is_none()
+                && self.absorb.is_none();
             if let Some(delta) = ctx.input(change_step).filter(|_| diff_shown) {
                 acts.push(Action::DiffStep(delta));
             }

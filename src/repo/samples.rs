@@ -2,8 +2,8 @@
 
 use super::bisect::BisectAct;
 use super::file_view::FileTab;
-use super::reflog::{ReflogAct, Source};
 use super::partial_stash::StashRequest;
+use super::reflog::{ReflogAct, Source};
 use super::timeline::view::TimelineAct;
 use super::{Action, Dialog, DiffKey, DiffView, RepoTab, diff};
 

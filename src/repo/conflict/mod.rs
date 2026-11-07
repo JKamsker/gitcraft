@@ -1,15 +1,15 @@
 //! Three-pane conflict editor: each conflict's "ours" and "theirs" side by side with buttons to
 //! pick a side (or both), and the resulting file below, editable by hand.
 
+mod align;
+pub mod archaeology;
+pub mod decisions;
 mod keep_both;
 mod keep_both_view;
 mod original;
 mod original_view;
 #[cfg(test)]
 mod repo_tests;
-pub mod archaeology;
-mod align;
-pub mod decisions;
 pub mod rerere;
 mod reused;
 mod view;

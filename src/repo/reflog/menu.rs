@@ -103,7 +103,11 @@ impl RepoTab {
             .current
             .clone()
             .unwrap_or_else(|| "HEAD".to_owned());
-        let upstream = self.refs.current.as_deref().and_then(|b| self.upstream_ref(b));
+        let upstream = self
+            .refs
+            .current
+            .as_deref()
+            .and_then(|b| self.upstream_ref(b));
         let rewrite = Rewrite {
             tab: self,
             merge: false,

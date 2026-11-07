@@ -68,6 +68,8 @@ fn make_empty_commit(dir: &Path) -> (Result<String, String>, Option<UndoEntry>) 
     let (made, kind) = run_steps(dir, &commit, OpKind::Normal(undo, String::new()), None);
     let entry = match kind {
         OpKind::Normal(Undo::Custom { undo, redo }, _) => Some(UndoEntry {
+            id: 0,
+            agent: None,
             label: EMPTY_COMMIT_LABEL.to_owned(),
             undo,
             redo,
@@ -213,6 +215,8 @@ fn the_empty_first_commit_is_undone_back_to_no_commits_and_redone() {
     let (made, entry) = make_empty_commit(&dir);
     let head = git::head(&dir);
     let entry = entry.unwrap_or_else(|| UndoEntry {
+        id: 0,
+        agent: None,
         label: String::new(),
         undo: Vec::new(),
         redo: Vec::new(),
@@ -343,12 +347,21 @@ fn undoing_the_empty_commit_after_publishing_it_is_refused() {
         assert!(git::run(Some(&dir), args).is_ok());
     }
     let mut tab = read_tab(&ctx, &dir, false);
-    tab.undo_stack = entry.into_iter().collect();
+    if let Some(entry) = entry {
+        tab.remember_undo(&entry.label, entry.clone(), &ctx);
+    }
     tab.apply(Action::Undo, &ctx);
     let main = branch_exists(&dir, "refs/heads/main");
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::remove_dir_all(&bare);
-    assert_eq!(tab.undo_stack.len(), 1);
+    assert_eq!(
+        tab.timeline
+            .entries
+            .iter()
+            .filter(|e| e.undo.is_some())
+            .count(),
+        1
+    );
     assert!(tab.busy_op.is_none());
     assert!(
         tab.status
@@ -358,35 +371,41 @@ fn undoing_the_empty_commit_after_publishing_it_is_refused() {
     assert!(main);
 }
 
-/// A first commit records no undo (there is nothing before it), but what was undone before it
-/// can't be redone on top of it.
+/// A new first commit starts a new timeline branch; the old redo remains available in the tree.
 #[test]
-fn a_first_commit_drops_what_could_be_redone() {
+fn a_first_commit_does_not_redo_an_old_empty_commit_on_top() {
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred("/nonexistent/redo-test".into(), &ctx);
-    tab.redo_stack.push(UndoEntry {
+    let dir = empty_repo("redo-tree");
+    let mut tab = read_tab(&ctx, &dir, false);
+    tab.timeline.loaded = true;
+    let entry = UndoEntry {
+        id: 0,
+        agent: None,
         label: EMPTY_COMMIT_LABEL.to_owned(),
         undo: Vec::new(),
         redo: Vec::new(),
         heads: None,
-    });
-    let after = "b".repeat(40);
-    // HEAD did not move: the redo stays.
-    tab.record_undo(
-        "Commit",
-        OpKind::Normal(Undo::HeadMove { mode: "--soft" }, "\u{0}\u{0}".to_owned()),
+    };
+    tab.remember_undo(&entry.label, entry.clone(), &ctx);
+    let old = tab.timeline.current;
+    tab.timeline.move_to(None, Some(entry));
+    assert!(tab.timeline.redo_target().is_some());
+    assert!(
+        git::run(
+            Some(&dir),
+            &["commit", "-q", "--allow-empty", "-m", "real first"]
+        )
+        .is_ok()
     );
-    let kept = tab.redo_stack.len();
-    tab.record_undo(
-        "Commit",
-        OpKind::Normal(
-            Undo::HeadMove { mode: "--soft" },
-            format!("\u{0}{after}\u{0}refs/heads/main"),
-        ),
+    tab.refs = git::refs(&dir).unwrap_or_default();
+    tab.timeline_read(1, &ctx);
+    assert_ne!(tab.timeline.current, old);
+    assert!(tab.timeline.redo_target().is_none());
+    assert!(
+        old.is_some_and(|id| tab.timeline.get(id).is_some()),
+        "the old redo stays in the undo tree"
     );
-    assert_eq!(kept, 1);
-    assert!(tab.redo_stack.is_empty());
-    assert!(tab.undo_stack.is_empty());
+    let _ = std::fs::remove_dir_all(dir);
 }
 
 /// A tab of `dir` as if its first read were in: no history, the changes row when `dirty`.

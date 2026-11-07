@@ -133,7 +133,14 @@ impl RepoTab {
         };
         if let Some(mut args) = super::forks::plan::renamed_push(self.forks.setup(), &current) {
             args.insert(1, "--porcelain".to_owned());
-            let attempt = Attempt { label: label.to_owned(), branch: current, target: None, commit: None, publish: false, done };
+            let attempt = Attempt {
+                label: label.to_owned(),
+                branch: current,
+                target: None,
+                commit: None,
+                publish: false,
+                done,
+            };
             self.start_push(attempt, vec![args], ctx);
             return;
         }

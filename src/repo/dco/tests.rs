@@ -199,6 +199,8 @@ fn pushed_branch(name: &str) -> (PathBuf, PathBuf) {
 fn entry(kind: OpKind) -> Option<UndoEntry> {
     match kind {
         OpKind::Normal(Undo::Custom { undo, redo }, _) => Some(UndoEntry {
+            id: 0,
+            agent: None,
             label: "sign off".to_owned(),
             undo,
             redo,
@@ -327,10 +329,16 @@ fn a_refused_push_leaves_the_rewrite_undoable_here() {
         );
     }
     settle(&mut tab, &ctx);
-    wait(&mut tab, &ctx, |tab| !tab.undo_stack.is_empty());
+    wait(&mut tab, &ctx, |tab| {
+        !tab.timeline.entries.iter().all(|e| e.undo.is_none())
+    });
     let remote = git::resolve(&bare, "refs/heads/feat").unwrap_or_default();
     let rewritten = git::head(&dir) != head;
-    let undo_label = tab.undo_stack.last().map(|e| e.label.clone());
+    let undo_label = tab
+        .timeline
+        .current_entry()
+        .and_then(|e| e.undo.as_ref())
+        .map(|e| e.label.clone());
     tab.undo(&ctx);
     settle(&mut tab, &ctx);
     let back = git::head(&dir);

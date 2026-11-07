@@ -75,6 +75,8 @@ impl ConflictEditor {
             None => (vec![None; conflicts], vec![None; conflicts]),
         };
         let mut ed = Self {
+            original: Default::default(),
+            history: Default::default(),
             path: path.to_owned(),
             segments,
             choices,

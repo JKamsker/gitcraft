@@ -422,7 +422,7 @@ impl RepoTab {
         self.then(
             ctx,
             move || crate::git::resolve(&repo, &local).unwrap_or_default(),
-            move |tab, now, _| {
+            move |tab, now, ctx| {
                 // Stopped by its conflicts: once they are resolved and the rebase continued,
                 // the push is offered.
                 if conflicts {
@@ -440,13 +440,18 @@ impl RepoTab {
                     return;
                 }
                 let (undo, redo) = plan.local_undo(&now);
-                tab.undo_stack.push(UndoEntry {
-                    label: format!("{asked} (here only)"),
-                    undo,
-                    redo,
-                    heads: None,
-                });
-                tab.redo_stack.clear();
+                tab.push_undo(
+                    UndoEntry {
+                        id: 0,
+                        agent: None,
+                        label: format!("{asked} (here only)"),
+                        undo,
+                        redo,
+                        heads: None,
+                    },
+                    ctx,
+                );
+
                 tab.status = Some((
                     format!(
                         "{} is rebased here, but not pushed to {}: Ctrl+Z puts it back as it was",

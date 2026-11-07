@@ -47,7 +47,13 @@ fn log(ctx: &Ctx, a: &Args) -> Result<Value, String> {
     }
     let from = rev.map(|r| vec![r.to_owned()]);
     // One more than asked: whether there is a next page.
-    let mut commits = git::log(&ctx.repo, from.as_deref(), skip, limit + 1)?;
+    let mut commits = git::log(
+        &ctx.repo,
+        from.as_deref(),
+        git::LogOrder::default(),
+        skip,
+        limit + 1,
+    )?;
     let more = commits.len() > limit;
     commits.truncate(limit);
     let mut page = json!({

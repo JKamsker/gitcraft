@@ -219,6 +219,8 @@ fn sections_there(target: &crate::remote::Target, limit: Duration) -> Result<Vec
         stdin: None,
         long: false,
         timeout: Some(limit),
+        apart: false,
+        test: false,
     };
     let out = crate::remote::exec(&target.host, &req)?;
     if out.code == 1 && crate::remote::is_missing_folder(&out.stderr) {

@@ -246,6 +246,7 @@ fn step_name(step: Step) -> &'static str {
         Step::Squash => "squash",
         Step::Fixup => "fixup",
         Step::Drop => "drop",
+        Step::Edit => "edit",
     }
 }
 
@@ -257,6 +258,7 @@ fn step_named(name: &str) -> Option<Step> {
         "squash" => Step::Squash,
         "fixup" => Step::Fixup,
         "drop" => Step::Drop,
+        "edit" => Step::Edit,
         _ => return None,
     })
 }

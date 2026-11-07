@@ -19,6 +19,8 @@ use std::path::PathBuf;
 /// A request from the command line, its paths as typed (see `resolve` for what they mean).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Command {
+    Clone,
+    PickFolder,
     Open(PathBuf),
     Log(PathBuf),
     Blame {
@@ -63,6 +65,7 @@ Usage:
   gitcraft <forge link>           a pull request, commit or file of a forge, in its clone
                                   (or gitcraft://open?url=<link>)
   gitcraft -- <folder>            a folder named like a command
+  gitcraft --clone | --open     the clone dialog or folder picker
   gitcraft --help | --version";
 
 /// The arguments as the system gave them, without what macOS adds on its own (`-psn_…`, the
@@ -78,6 +81,8 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Parsed {
     let args: Vec<OsString> = args.into_iter().collect();
     match args.as_slice() {
         [] => Parsed::Run(None),
+        [one] if one == crate::os_shell::CLONE_ARG => Parsed::Run(Some(Command::Clone)),
+        [one] if one == crate::os_shell::OPEN_ARG => Parsed::Run(Some(Command::PickFolder)),
         [one] if one == "-h" || one == "--help" => Parsed::Print(USAGE.to_owned()),
         [one] if one == "-V" || one == "--version" => {
             Parsed::Print(format!("gitcraft {}", env!("CARGO_PKG_VERSION")))

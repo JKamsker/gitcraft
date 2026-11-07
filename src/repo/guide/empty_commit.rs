@@ -127,6 +127,8 @@ mod tests {
         let (_, undo) = empty_commit_steps("refs/heads/main");
         let Undo::Custom { undo, redo } = undo else {
             return UndoEntry {
+                id: 0,
+                agent: None,
                 label: String::new(),
                 undo: Vec::new(),
                 redo: Vec::new(),
@@ -134,6 +136,8 @@ mod tests {
             };
         };
         UndoEntry {
+            id: 0,
+            agent: None,
             label: label.to_owned(),
             undo,
             redo,

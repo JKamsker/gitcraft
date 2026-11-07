@@ -361,7 +361,9 @@ impl RepoTab {
                 self.take_loaded(*loaded, ctx);
                 self.read_custom_commands(ctx);
                 self.versions_after_load(ctx);
-                if self.rerere.setup.is_none() { self.read_rerere(ctx); }
+                if self.rerere.setup.is_none() {
+                    self.read_rerere(ctx);
+                }
             }
             Err(e) => {
                 self.explain_failure(&e, super::error_help::RELOAD, ctx);
@@ -400,7 +402,7 @@ impl RepoTab {
             self.work = loaded.work;
             self.stash_picks.keep_changed(&self.work);
         }
-        self.fold_loaded(loaded.read, state);
+        self.fold_loaded(loaded.read, state, ctx);
         self.refresh_detached(ctx);
         self.folding
             .saw_status(&self.work, &self.refs.head, std::time::Instant::now());

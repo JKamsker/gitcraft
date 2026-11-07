@@ -21,12 +21,16 @@ use std::path::{Path, PathBuf};
 
 pub use discover::{ssh_config_hosts, wsl_distros};
 pub use fs::{
-    copy_keeping_time, create_dir_all, host_temp_file, is_file, is_link, is_same_dir_as, read_to_string, read_within, remove_file, same_dir, try_is_dir, try_is_file, try_is_link, worktree_file, write, host_scratch_dir, remove_host_scratch_dir, read,
+    copy_keeping_time, create_dir_all, host_scratch_dir, host_temp_file, is_file, is_link,
+    is_same_dir_as, read, read_to_string, read_within, remove_file, remove_host_scratch_dir,
+    same_dir, try_is_dir, try_is_file, try_is_link, worktree_file, write,
 };
 #[cfg(all(test, unix))]
 pub use session::LOOPBACK;
-pub use session::{Output, Request, exec, exec_if_connected, is_missing_folder, spawn, stop_process, stop};
 pub use session::{LONG_FOR as NETWORK_LIMIT, stop_now, stop_script};
+pub use session::{
+    Output, Request, exec, exec_if_connected, is_missing_folder, spawn, stop, stop_process,
+};
 pub use ui_guard::{mark_ui_thread, refused_on_ui_thread};
 
 /// Whether gitcraft has a connection open to `host` now: asking it something won't connect

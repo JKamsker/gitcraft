@@ -16,7 +16,6 @@ impl RepoTab {
         let state = self.work.in_progress;
         let rerere = self.rerere.setup;
         // The switch waits for what is being read or set, and for the operation running.
-        let switchable = idle && !self.rerere.busy;
         let smart = self
             .conflict
             .as_ref()
@@ -25,6 +24,7 @@ impl RepoTab {
         // A merge tool open on the file writes it when it saves: nothing is chosen here meanwhile.
         let idle = self.busy_op.is_none()
             && !crate::repo::external_tools::is_merging(&self.path, &ed.path);
+        let switchable = idle && !self.rerere.busy;
         // "Note why…" under each conflict from the start, whatever becomes of the read.
         let conflicts = ed.choices.len();
         ed.memo.drafts.resize_with(conflicts, Default::default);

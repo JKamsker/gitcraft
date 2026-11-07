@@ -11,7 +11,7 @@ mod linux;
 #[cfg(windows)]
 mod windows;
 
-pub use menu::{MenuItem, StartAction, menu_items, start_action};
+pub use menu::{CLONE_ARG, MenuItem, OPEN_ARG, StartAction, menu_items, start_action};
 pub use taskbar::{Taskbar, TaskbarState};
 
 #[cfg(target_os = "linux")]

@@ -83,7 +83,7 @@ fn ssh_signatures_valid_tampered_unknown_and_unchecked() -> Result<(), String> {
 
     // Nothing to check against yet.
     let sig = verify_signature(&dir, &signed)?;
-    assert_eq!(sig.verdict, Verdict::NotChecked, "{sig:?}");
+    assert_eq!(sig.verdict, SignatureVerdict::NotChecked, "{sig:?}");
     assert_eq!(sig.format, Some(SignatureFormat::Ssh));
     assert!(sig.raw.contains("allowedSignersFile"), "{}", sig.raw);
 
@@ -94,14 +94,18 @@ fn ssh_signatures_valid_tampered_unknown_and_unchecked() -> Result<(), String> {
     )?;
     std::fs::write(&allowed, format!("t@example.org {public}")).map_err(|e| e.to_string())?;
     let sig = verify_signature(&dir, &signed)?;
-    assert_eq!(sig.verdict, Verdict::Valid { trusted: true }, "{sig:?}");
+    assert_eq!(
+        sig.verdict,
+        SignatureVerdict::Valid { trusted: true },
+        "{sig:?}"
+    );
     assert_eq!(sig.signer, "t@example.org");
     assert!(sig.key.starts_with("SHA256:"), "{}", sig.key);
     assert!(sig.raw.contains("Good"), "{}", sig.raw);
 
     // Unsigned: told without running anything.
     let sig = verify_signature(&dir, &unsigned)?;
-    assert_eq!(sig.verdict, Verdict::Unsigned);
+    assert_eq!(sig.verdict, SignatureVerdict::Unsigned);
     assert_eq!(sig.format, None);
 
     // The same signature over a changed message.
@@ -113,12 +117,12 @@ fn ssh_signatures_valid_tampered_unknown_and_unchecked() -> Result<(), String> {
         &changed,
     )?;
     let sig = verify_signature(&dir, forged.trim())?;
-    assert_eq!(sig.verdict, Verdict::Invalid, "{sig:?}");
+    assert_eq!(sig.verdict, SignatureVerdict::Invalid, "{sig:?}");
 
     // Only someone else is allowed.
     std::fs::write(&allowed, format!("x@example.org {other}")).map_err(|e| e.to_string())?;
     let sig = verify_signature(&dir, &signed)?;
-    assert_eq!(sig.verdict, Verdict::UnknownKey, "{sig:?}");
+    assert_eq!(sig.verdict, SignatureVerdict::UnknownKey, "{sig:?}");
 
     // No program to check with: not "invalid", as git would have it.
     run(
@@ -126,7 +130,7 @@ fn ssh_signatures_valid_tampered_unknown_and_unchecked() -> Result<(), String> {
         &["config", "gpg.ssh.program", "/nonexistent/ssh-keygen"],
     )?;
     let sig = verify_signature(&dir, &signed)?;
-    assert_eq!(sig.verdict, Verdict::NotChecked, "{sig:?}");
+    assert_eq!(sig.verdict, SignatureVerdict::NotChecked, "{sig:?}");
     assert!(!sig.raw.is_empty());
 
     assert!(verify_signature(&dir, "0000000000000000000000000000000000000000").is_err());

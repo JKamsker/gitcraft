@@ -78,6 +78,7 @@ impl View {
 fn diff_label(key: &DiffKey) -> String {
     let name = file_name(key.path());
     match key {
+        DiffKey::Remerge { hash, .. } => format!("{name}, resolution of {}", short(hash)),
         DiffKey::Commit { hash, .. } => format!("{name} in {}", short(hash)),
         DiffKey::Work(file) => match file.area {
             Area::Unstaged => format!("the unstaged changes of {name}"),
@@ -190,7 +191,7 @@ impl RepoTab {
     /// Goes back (`-1`) or forward (`1`) through the recent views. Places that are gone (a
     /// change since staged or committed) are passed over, and said so.
     pub(super) fn navigate(&mut self, step: i32, ctx: &egui::Context) {
-        if let Some(editor) = self.editor_open() {
+        if let Some(editor) = self.navigation_editor_open() {
             self.status = Some((format!("Finish or close the {editor} first"), true));
             return;
         }
@@ -211,7 +212,7 @@ impl RepoTab {
             self.status = Some((why, false));
         }
         if let Some(view) = view {
-            self.restore(&view, ctx);
+            self.restore_navigation(&view, ctx);
         }
         self.nav_jump = false;
         // What could really be shown (a commit gone from the graph leaves another selected)
@@ -223,7 +224,7 @@ impl RepoTab {
 
     /// What going elsewhere would throw away: an editor taking the big area, or a commit's
     /// message being edited in the commit pane.
-    fn editor_open(&self) -> Option<&'static str> {
+    fn navigation_editor_open(&self) -> Option<&'static str> {
         if self.conflict.is_some() {
             Some("conflict editor")
         } else if self.rebase.is_some() {
@@ -272,7 +273,7 @@ impl RepoTab {
     }
 
     /// Shows `view` again through the actions that open it.
-    fn restore(&mut self, view: &View, ctx: &egui::Context) {
+    fn restore_navigation(&mut self, view: &View, ctx: &egui::Context) {
         match view {
             View::Graph { selected } => {
                 self.close_pages(true, ctx);

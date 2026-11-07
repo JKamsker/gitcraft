@@ -593,7 +593,7 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
             let (mark, color) = match line.kind {
                 Kind::Add => ("+", t.text),
                 Kind::Del => ("-", t.text),
-                Kind::Hunk | Kind::Meta => ("", t.text_faint),
+                Kind::Hunk | Kind::Meta | Kind::Fold => ("", t.text_faint),
                 Kind::Context => (" ", t.text_dim),
             };
             ui.label(

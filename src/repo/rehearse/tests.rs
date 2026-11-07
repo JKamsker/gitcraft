@@ -153,13 +153,25 @@ fn applying_does_it_for_real_and_it_can_be_undone() -> Result<(), String> {
     let Played::Clean { tree, .. } = played(&tab, RehearseKind::Rebase)? else {
         return Err("the rebase didn't go through".to_owned());
     };
-    let undo_before = tab.undo_stack.len();
+    let undo_before = tab
+        .timeline
+        .entries
+        .iter()
+        .filter(|e| e.undo.is_some())
+        .count();
     act(&mut tab, &ctx, RehearseAct::Apply(RehearseKind::Rebase))?;
     assert!(tab.rehearsing.run.is_none());
     // The real rebase gives what the rehearsal said.
     assert_eq!(repo.rev("main")?, repo.rev("feature~3")?);
     assert_eq!(repo.tree("feature")?, tree);
-    assert_eq!(tab.undo_stack.len(), undo_before + 1);
+    assert_eq!(
+        tab.timeline
+            .entries
+            .iter()
+            .filter(|e| e.undo.is_some())
+            .count(),
+        undo_before + 1
+    );
     Ok(())
 }
 

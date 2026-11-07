@@ -192,7 +192,10 @@ impl RepoTab {
         let cancelled =
             result.is_err() && running.as_ref().is_some_and(|r| r.control.is_cancelled());
         // For the taskbar button, which turns red.
-        if result.is_err() && !cancelled && running.as_ref().is_some_and(|r| r.network && !r.background) {
+        if result.is_err()
+            && !cancelled
+            && running.as_ref().is_some_and(|r| r.network && !r.background)
+        {
             self.network_failed = true;
         }
         let steps = running.map(|r| r.control.take_steps()).unwrap_or_default();
@@ -265,7 +268,7 @@ impl RepoTab {
             let ok = result.is_ok();
             let mut undo = if ok { undo_entry(&label, &kind) } else { None };
             if let Some(undo) = &mut undo {
-                undo.agent = self.agent_calls.running.as_ref().filter(|r| r.label == label).map(|r| r.agent.clone());
+                undo.agent = self.operation_agent(&label);
             }
             self.agent_op_done(&label, &result, undo.is_some());
             self.timeline_op_ended(&label, &kind, undo, ok, refresh, ctx);
@@ -298,7 +301,9 @@ impl RepoTab {
 
 impl RepoTab {
     pub(super) fn record_undo(&mut self, label: &str, kind: OpKind, ctx: &egui::Context) -> bool {
-        let Some(undo) = undo_entry(label, &kind) else { return false; };
+        let Some(undo) = undo_entry(label, &kind) else {
+            return false;
+        };
         self.remember_undo(label, undo, ctx);
         true
     }
@@ -324,7 +329,6 @@ fn undo_entry(label: &str, kind: &OpKind) -> Option<UndoEntry> {
             let reset = |to: &str| [guard.clone(), ops(&[&["reset", mode, to]])].concat();
             Some(UndoEntry {
                 id: 0,
-            agent: None,
                 agent: None,
                 label: label.to_owned(),
                 undo: reset(before),
@@ -449,14 +453,6 @@ pub(super) fn reaches_a_remote(op: &[String]) -> bool {
         },
         Some("lfs") => matches!(rest.first().copied(), Some("fetch" | "pull" | "push")),
         _ => false,
-        OpKind::Normal(Undo::Custom { undo, redo }, _) => Some(UndoEntry {
-            id: 0,
-            agent: None,
-            label: label.to_owned(),
-            undo: undo.clone(),
-            redo: redo.clone(),
-            heads: None,
-        }),
     }
 }
 
@@ -805,13 +801,11 @@ mod tests {
         match kind {
             OpKind::Normal(Undo::Custom { undo, redo }, _) => Some(UndoEntry {
                 id: 0,
-            agent: None,
                 agent: None,
                 label: "op".to_owned(),
                 undo,
                 redo,
                 heads: None,
-                agent: None,
             }),
             _ => None,
         }

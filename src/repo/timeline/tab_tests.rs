@@ -250,7 +250,7 @@ fn a_rebase_gives_its_old_tip_back_after_a_restart_and_a_gc() {
         &["cat-file", "-e", &format!("{old_tip}^{{commit}}")],
     );
     // The graph doesn't show what is kept.
-    let graph = git::log(&dir, None, 0, 100).unwrap_or_default();
+    let graph = git::log(&dir, None, git::LogOrder::default(), 0, 100).unwrap_or_default();
 
     let mut tab = open(&dir, &ctx);
     tab.toggle_timeline();

@@ -37,7 +37,7 @@ impl RepoTab {
 
     /// The graph on top, the diff below, the border between them dragged to resize (egui keeps
     /// the height for the session). Without room for both, the diff in the graph's place.
-    pub(super) fn split_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+    pub(super) fn graph_diff_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         let height = ui.available_height();
         if height < 2.0 * MIN_HEIGHT {

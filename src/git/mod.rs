@@ -1,13 +1,13 @@
 //! Thin wrapper over the `git` command line. Every call shells out to the installed git, so
 //! gitcraft behaves exactly like the user's own git (config, credentials, hooks).
 
+mod absorb;
+mod attributes;
 mod backlinks;
-mod branch_health;
 mod bisect;
+mod branch_health;
 #[cfg(test)]
 mod clone_tests;
-mod attributes;
-mod absorb;
 mod command;
 mod commit_msg;
 mod commits;
@@ -15,44 +15,44 @@ mod conflict;
 mod contained;
 mod detached;
 mod diff;
-pub mod external_tool;
-pub mod errors;
-pub mod dry_run;
 mod diff_algorithm;
 pub mod doctor;
+pub mod dry_run;
+pub mod errors;
+pub mod external_tool;
 mod files;
 mod fold;
 mod hooks;
 mod interaction;
 mod lfs;
-mod reflog;
-mod preview;
-mod notes;
-mod log_order;
-mod lfs_locks;
-#[cfg(test)]
-pub(crate) mod lfs_test_server;
-mod locks;
-pub mod progress;
-mod redact;
 #[cfg(test)]
 pub(crate) mod lfs_fixtures;
+mod lfs_locks;
 mod lfs_storage;
-mod range_diff;
+#[cfg(test)]
+pub(crate) mod lfs_test_server;
 mod line_log;
-mod overview;
+mod locks;
+mod log_order;
 mod notebook_filter;
+mod notes;
+mod overview;
+mod preview;
+pub mod progress;
+mod range_diff;
+mod redact;
+mod reflog;
 mod refs;
-pub mod simulate;
-pub mod search_query;
-mod signature;
-mod stash;
+mod rehearse;
 mod remerge;
+mod revert;
 mod reviewed;
 mod rewrites;
-mod revert;
-mod rehearse;
+pub mod search_query;
+mod signature;
+pub mod simulate;
 pub mod stack;
+mod stash;
 mod status;
 mod stream;
 mod submodule;
@@ -64,11 +64,11 @@ pub(crate) use self::unity::tests as unity_tests;
 mod testlane;
 mod worktree;
 
-pub use self::backlinks::*;
-pub use self::branch_health::*;
-pub use self::bisect::*;
-pub use self::attributes::*;
 pub use self::absorb::*;
+pub use self::attributes::*;
+pub use self::backlinks::*;
+pub use self::bisect::*;
+pub use self::branch_health::*;
 pub use self::command::*;
 pub use self::commit_msg::*;
 pub use self::commits::*;
@@ -82,37 +82,43 @@ pub use self::fold::*;
 pub use self::hooks::subcommand;
 pub use self::interaction::*;
 pub use self::lfs::*;
-pub use self::reflog::*;
-pub use self::preview::*;
-pub use self::notes::*;
-pub use self::log_order::*;
 pub use self::lfs_locks::*;
-pub use self::locks::*;
-pub use self::redact::redact;
 pub use self::lfs_storage::*;
-pub use self::range_diff::*;
 pub use self::line_log::{LineRange, LinesAt, line_diff, line_history, unquote_path};
-pub use self::overview::*;
+pub use self::locks::*;
+pub use self::log_order::*;
 pub use self::notebook_filter::*;
+pub use self::notes::*;
+pub use self::overview::*;
+pub use self::preview::*;
+pub use self::range_diff::*;
+pub use self::redact::redact;
+pub use self::reflog::*;
 pub use self::refs::*;
-pub use self::signature::*;
-pub use self::stash::*;
+pub use self::rehearse::*;
 pub use self::remerge::*;
+pub use self::revert::*;
 pub use self::reviewed::*;
 pub use self::rewrites::*;
-pub use self::revert::*;
-pub use self::rehearse::*;
+pub use self::signature::*;
+pub use self::stash::*;
 pub use self::status::*;
 pub use self::stream::*;
 pub use self::submodule::*;
-pub use self::timed::*;
-pub use self::trees::*;
-pub use self::unity::*;
 #[cfg(test)]
 pub(crate) use self::testlane::fixture;
 pub use self::testlane::*;
+pub use self::timed::*;
+pub use self::trees::*;
+pub use self::unity::*;
 pub use self::worktree::*;
 
+// Explicit names for types and helpers independently added by feature stacks.
+pub use self::commit_msg::Author;
+pub use self::notes::notes_ref;
+pub use self::rewrites::is_ancestor;
+pub use self::signature::Verdict as SignatureVerdict;
+pub use self::testlane::Verdict;
 use std::path::{Path, PathBuf};
 
 /// Field and record separators for `--format` strings (unit/record separator control chars).
@@ -344,5 +350,4 @@ pub fn clone_with(
     args.extend_from_slice(options);
     args.extend(["--", url, &there]);
     run_with(from.as_deref(), &args, creds).map(|_| ())
-
 }

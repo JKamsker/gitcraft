@@ -77,6 +77,7 @@ pub(crate) fn load(
 /// The file of a diff as it is after the change, or before it when the change deleted it.
 pub(crate) fn load_for_diff(repo: &Path, key: &DiffKey, dark: bool) -> Result<FileText, String> {
     let (path, after, before): (&str, Option<String>, Option<Option<String>>) = match key {
+        DiffKey::Remerge { hash, path, .. } => (path, Some(hash.clone()), None),
         DiffKey::Commit { hash, path } => {
             (path, Some(hash.clone()), Some(Some(format!("{hash}^"))))
         }
@@ -201,69 +202,89 @@ pub(crate) fn show(
     ui.spacing_mut().item_spacing.y = 0.0;
     let lines = &data.lines;
     if find.open {
-        let key = SourceKey { what: source(), at: lines.as_ptr() as usize, len: lines.len() };
-        find.update(ui.ctx(), key, lines.len(), |i| find::nth(lines, i), Layout::Lines);
+        let key = SourceKey {
+            what: source(),
+            at: lines.as_ptr() as usize,
+            len: lines.len(),
+        };
+        find.update(
+            ui.ctx(),
+            key,
+            lines.len(),
+            |i| find::nth(lines, i),
+            Layout::Lines,
+        );
     }
     let mut scroll = egui::ScrollArea::both()
         .id_salt(("file_text", id))
         .auto_shrink(false);
     if let Some(hit) = find.take_reveal() {
-        scroll = find.scroll_to(scroll, &hit, find::nth(lines, hit.line).unwrap_or_default(), char_w);
+        scroll = find.scroll_to(
+            scroll,
+            &hit,
+            find::nth(lines, hit.line).unwrap_or_default(),
+            char_w,
+        );
     }
     let found = &*find;
     let out = scroll.show_rows(ui, LINE_H, data.lines.len(), |ui, range| {
-            for i in range {
-                let Some(line) = data.lines.get(i) else {
-                    continue;
-                };
-                let (rect, resp) =
-                    ui.allocate_exact_size(vec2(width, LINE_H), Sense::click_and_drag());
-                if resp.drag_started() {
-                    // A drag picks the lines it goes over, from where it started.
-                    dragging = true;
-                    pick = Some(LinePick {
-                        anchor: i,
-                        cursor: i,
-                    });
-                } else if resp.clicked() {
-                    pick = LinePick::clicked(pick, i, extend);
-                } else if resp.secondary_clicked() && !pick.is_some_and(|p| p.contains(i)) {
-                    // The menu is for the line right-clicked, unless it is among those picked.
-                    pick = Some(LinePick {
-                        anchor: i,
-                        cursor: i,
-                    });
-                }
-                if dragging
-                    && let Some(p) = &mut pick
-                    && pointer_y.is_some_and(|y| rect.y_range().contains(y))
-                {
-                    p.cursor = i;
-                }
-                let p = ui.painter().with_clip_rect(rect.intersect(ui.clip_rect()));
-                if pick.is_some_and(|p| p.contains(i)) {
-                    p.rect_filled(rect, 0.0, t.row_selected);
-                }
-                if let Some(picked) = pick {
-                    lines_menu(&resp, data, picked, history, &mut asked, &mut links);
-                }
-                let gutter = Rect::from_min_size(rect.min, vec2(NUM_W, LINE_H));
-                p.rect_filled(gutter, 0.0, t.card.gamma_multiply(0.6));
-                let mid = rect.center().y;
-                p.text(
-                    pos2(gutter.right() - 8.0, mid),
-                    Align2::RIGHT_CENTER,
-                    (i + 1).to_string(),
-                    theme::mono(11.0),
-                    t.text_faint,
-                );
-                let x = gutter.right() + 10.0;
-                let spans = data.spans.as_ref().and_then(|s| s.get(i));
-                let galley = line_galley(ui, spans, line, &font, t.text);
-                find::paint_line(&p, (x, mid, LINE_H), galley, found.marks(i), &t);
+        for i in range {
+            let Some(line) = data.lines.get(i) else {
+                continue;
+            };
+            let (rect, resp) = ui.allocate_exact_size(vec2(width, LINE_H), Sense::click_and_drag());
+            if resp.drag_started() {
+                // A drag picks the lines it goes over, from where it started.
+                dragging = true;
+                pick = Some(LinePick {
+                    anchor: i,
+                    cursor: i,
+                });
+            } else if resp.clicked() {
+                pick = LinePick::clicked(pick, i, extend);
+            } else if resp.secondary_clicked() && !pick.is_some_and(|p| p.contains(i)) {
+                // The menu is for the line right-clicked, unless it is among those picked.
+                pick = Some(LinePick {
+                    anchor: i,
+                    cursor: i,
+                });
             }
-        });
-    find.saw(Seen { x: out.state.offset.x, y: out.state.offset.y, height: out.inner_rect.height(), text_w: out.inner_rect.width() - NUM_W - 10.0, line_h: LINE_H });
+            if dragging
+                && let Some(p) = &mut pick
+                && pointer_y.is_some_and(|y| rect.y_range().contains(y))
+            {
+                p.cursor = i;
+            }
+            let p = ui.painter().with_clip_rect(rect.intersect(ui.clip_rect()));
+            if pick.is_some_and(|p| p.contains(i)) {
+                p.rect_filled(rect, 0.0, t.row_selected);
+            }
+            if let Some(picked) = pick {
+                lines_menu(&resp, data, picked, history, &mut asked, &mut links);
+            }
+            let gutter = Rect::from_min_size(rect.min, vec2(NUM_W, LINE_H));
+            p.rect_filled(gutter, 0.0, t.card.gamma_multiply(0.6));
+            let mid = rect.center().y;
+            p.text(
+                pos2(gutter.right() - 8.0, mid),
+                Align2::RIGHT_CENTER,
+                (i + 1).to_string(),
+                theme::mono(11.0),
+                t.text_faint,
+            );
+            let x = gutter.right() + 10.0;
+            let spans = data.spans.as_ref().and_then(|s| s.get(i));
+            let galley = line_galley(ui, spans, line, &font, t.text);
+            find::paint_line(&p, (x, mid, LINE_H), galley, found.marks(i), &t);
+        }
+    });
+    find.saw(Seen {
+        x: out.state.offset.x,
+        y: out.state.offset.y,
+        height: out.inner_rect.height(),
+        text_w: out.inner_rect.width() - NUM_W - 10.0,
+        line_h: LINE_H,
+    });
     // Ctrl+C copies the lines picked.
     let copy = !ui.ctx().egui_wants_keyboard_input()
         && ui.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Copy)));
@@ -307,7 +328,9 @@ fn lines_menu(
             if ui.button("Copy").clicked() {
                 ui.ctx().copy_text(picked_text(data, picked));
             }
-            if let (Some(menu), Some(lines)) = (links.as_deref_mut(), Lines::new(start, end)) { menu(ui, lines); }
+            if let (Some(menu), Some(lines)) = (links.as_deref_mut(), Lines::new(start, end)) {
+                menu(ui, lines);
+            }
             match history {
                 Ok(()) => {
                     let b = ui.button("History of these lines").on_hover_text(format!(
@@ -355,7 +378,6 @@ pub(crate) fn line_galley(
             .layout_no_wrap(line.to_owned(), font.clone(), color),
     }
 }
-
 
 #[cfg(test)]
 mod tests {

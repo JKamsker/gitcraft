@@ -17,6 +17,10 @@ fn main() -> eframe::Result {
     if args.first().is_some_and(|a| a == "mcp") {
         std::process::exit(gitcraft::mcp::main(&args[1..]));
     }
+    // Run by a coding agent's hook after each turn (see `agent::checkpoint`): no window.
+    if let Some(code) = app::checkpoint_cli() {
+        std::process::exit(code);
+    }
     let args = gitcraft::launch::args::from_system(std::env::args_os().skip(1));
     let launch = match gitcraft::launch::parse(args.clone()) {
         gitcraft::launch::Parsed::Run(cmd) => cmd,
@@ -37,10 +41,6 @@ fn main() -> eframe::Result {
             app::report_failed_start(&message);
             std::process::exit(1);
         }
-    }
-    // Run by a coding agent's hook after each turn (see `agent::checkpoint`): no window.
-    if let Some(code) = app::checkpoint_cli() {
-        std::process::exit(code);
     }
     app::warm_up();
     let options = eframe::NativeOptions {

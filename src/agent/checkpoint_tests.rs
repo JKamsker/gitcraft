@@ -91,7 +91,7 @@ fn each_turn_is_saved_with_its_prompt_and_an_unchanged_one_is_not() -> Result<()
     let status = git::run(Some(dir), &["status", "--porcelain"])?;
     assert!(status_before.is_empty());
     assert_eq!(status, " M a.txt\n?? b.txt\n");
-    let log = git::log(dir, None, 0, 10)?;
+    let log = git::log(dir, None, git::LogOrder::default(), 0, 10)?;
     assert_eq!(log.len(), 1, "turns aren't history");
     // Another worktree's turns aren't this one's.
     assert!(checkpoint::turns(dir, "/elsewhere")?.is_empty());

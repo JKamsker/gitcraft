@@ -280,12 +280,15 @@ mod tests {
         let ctx = egui::Context::default();
         let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
         let entry = UndoEntry {
+            id: 0,
+            agent: None,
             label: "Commit".to_owned(),
             undo: ops(&[&["status"]]),
             redo: ops(&[&["status"]]),
             heads: None,
         };
-        tab.undo_stack.push(entry.clone());
+        tab.remember_undo(&entry.label, entry.clone(), &ctx);
+        let entry = tab.timeline.current_entry().and_then(|e| e.undo.clone());
         tab.run_ops(
             "Fetch",
             hanging_fetch(&dir),
@@ -327,7 +330,10 @@ mod tests {
             tab.status.as_ref().map(|(s, e)| (s.as_str(), *e)),
             Some(("Fetch (Push not run): cancelled", false))
         );
-        assert_eq!(tab.undo_stack, vec![entry]);
+        assert_eq!(
+            tab.timeline.current_entry().and_then(|e| e.undo.clone()),
+            entry
+        );
         assert_eq!(tags.as_deref(), Ok(""));
         assert!(tab.finished.is_empty(), "a cancel is no notification");
     }

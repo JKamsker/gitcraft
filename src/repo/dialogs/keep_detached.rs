@@ -63,18 +63,20 @@ pub(super) fn keep_detached(
                 d.name.trim()
             ));
         if keep.clicked() || (enter && valid) {
-            outcome = Outcome::Done(Action::Detached(DetachedAct::Keep {
+            outcome = Outcome::Done(Box::new(Action::Detached(DetachedAct::Keep {
                 name: d.name.trim().to_owned(),
                 head: d.head.clone(),
                 leave: d.leave.clone(),
-            }));
+            })));
         }
         if ui
             .add(egui::Button::new("Leave them").min_size(egui::vec2(80.0, 30.0)))
             .on_hover_text(format!("Check {target} out; the commits stay on no branch"))
             .clicked()
         {
-            outcome = Outcome::Done(Action::Detached(DetachedAct::Leave(d.leave.clone())));
+            outcome = Outcome::Done(Box::new(Action::Detached(DetachedAct::Leave(
+                d.leave.clone(),
+            ))));
         }
         if cancel_button(ui) {
             outcome = Outcome::Cancel;

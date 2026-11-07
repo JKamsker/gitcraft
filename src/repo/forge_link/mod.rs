@@ -17,10 +17,12 @@ pub(crate) struct LinkRequest {
 }
 
 /// The remotes a menu's links can go to, each with what it's called in the menu.
+#[derive(Clone)]
 pub(crate) struct LinkMenu {
     choices: Vec<Choice>,
 }
 
+#[derive(Clone)]
 struct Choice {
     remote: String,
     /// "GitHub", or "the forge" when its host doesn't tell.

@@ -1,11 +1,13 @@
 //! What the views ask the tab to do, and the actions several views build.
 
+use super::toolbar::reveal_label;
 use std::path::PathBuf;
 
 use super::dialogs::StashChoice;
 use super::pull::PullMode;
 use super::{
-    Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view, ops, pr_review, quick_edit, reflog, drag_drop, partial_stash, issue_work, versions, timeline, doctor,
+    Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, doctor, drag_drop,
+    file_view, issue_work, ops, partial_stash, pr_review, quick_edit, reflog, timeline, versions,
 };
 use crate::git::{self, InProgress};
 use crate::keymap::{Command, label, written};
@@ -515,14 +517,8 @@ pub(super) fn abort_action(state: InProgress) -> Action {
 }
 
 impl RepoTab {
-    /// Changes whenever what [`Self::palette_items`] is made from (refs, remotes, submodules…)
-    /// is read again: the reload, and the submodules read since.
-    pub(crate) fn palette_generation(&self) -> (u64, u64) {
-        (self.history_gen, self.submodules_read)
-    }
-
     /// What the command palette offers for this repository.
-    pub(crate) fn palette_items(&self) -> Vec<(String, String, Action)> {
+    pub(crate) fn additional_palette_items(&self) -> Vec<(String, String, Action)> {
         let mut items: Vec<(String, String, Action)> = vec![
             ("Fetch".into(), label(Command::Fetch), Action::Fetch),
             ("Pull".into(), label(Command::Pull), Action::Pull),
@@ -542,8 +538,16 @@ impl RepoTab {
             PullMode::ALL.map(|m| (m.label().into(), "remote".into(), Action::PullWith(m))),
         );
         items.extend([
-            ("Stash only what is staged…".into(), "stash".into(), Action::Dialog(Dialog::stash_as(StashChoice::Staged))),
-            ("Save snapshot (stash, keep the changes)…".into(), "stash".into(), Action::Dialog(Dialog::stash_as(StashChoice::Snapshot))),
+            (
+                "Stash only what is staged…".into(),
+                "stash".into(),
+                Action::Dialog(Dialog::stash_as(StashChoice::Staged)),
+            ),
+            (
+                "Save snapshot (stash, keep the changes)…".into(),
+                "stash".into(),
+                Action::Dialog(Dialog::stash_as(StashChoice::Snapshot)),
+            ),
             ("Apply patch…".into(), "patch".into(), Action::ApplyPatch),
             (
                 "Distribute staged fixes…".into(),
@@ -800,61 +804,6 @@ impl RepoTab {
         items.extend(self.test_palette_items());
         items.extend(self.rehearse_palette_items());
         items.extend(self.interaction_palette_items());
-        for b in &self.refs.local {
-            if !b.is_head {
-                items.push((
-                    format!("Check out {}", b.name),
-                    "branch".into(),
-                    Action::Checkout(b.name.clone()),
-                ));
-                if let Some((to, push)) = self.push_branch(b) {
-                    items.push((format!("Push {} to {to}", b.name), "remote".into(), push));
-                }
-            }
-        }
-        if let Some(current) = &self.refs.current {
-            for b in &self.refs.local {
-                if !b.is_head {
-                    items.push((
-                        format!("Changes {} adds to {current}", b.name),
-                        "compare".into(),
-                        compare_branches_action(
-                            BranchRef::local(current),
-                            BranchRef::local(&b.name),
-                            true,
-                        ),
-                    ));
-                    items.push((
-                        format!("Compare {current} with {}", b.name),
-                        "compare".into(),
-                        compare_branches_action(
-                            BranchRef::local(current),
-                            BranchRef::local(&b.name),
-                            false,
-                        ),
-                    ));
-                    items.push((
-                        format!("Merge {} into {current}", b.name),
-                        "merge".into(),
-                        merge_action(BranchRef::local(&b.name), current),
-                    ));
-                    items.push((
-                        format!("Rebase {current} onto {}", b.name),
-                        "rebase".into(),
-                        rebase_action(BranchRef::local(&b.name), current),
-                    ));
-                }
-            }
-        }
-        for (remote, branches) in &self.refs.remotes {
-            for b in branches {
-                items.push((
-                    format!("Check out {}", b.name),
-                    remote.clone(),
-                    Action::CheckoutRemote(b.name.clone()),
-                ));
-            }
-        }
         items.extend(self.custom_palette_items());
         items
     }

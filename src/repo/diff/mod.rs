@@ -7,27 +7,27 @@ mod algorithm;
 #[cfg(test)]
 mod algorithm_tests;
 mod binary;
-mod image_compare;
 pub(super) mod context;
 mod fold_view;
+mod image_compare;
 mod images;
 mod interdiff;
 mod jump;
 mod lfs;
-pub(in crate::repo) mod link;
-mod lines;
 pub(super) mod line_diff;
+mod lines;
+pub(in crate::repo) mod link;
 mod map;
-mod notebook;
 pub(super) mod moved;
 #[cfg(test)]
 mod moved_tests;
 pub(super) mod moved_view;
+mod notebook;
 mod paint;
 mod parse;
 mod patch;
-mod remerge;
 mod place;
+mod remerge;
 pub(super) mod rendered;
 pub(super) mod rich;
 mod rows;
@@ -89,6 +89,7 @@ pub struct DiffLine {
 }
 
 /// Everything the view needs, prepared on a background thread.
+#[derive(Default)]
 pub struct DiffData {
     pub lines: Vec<DiffLine>,
     /// Syntax colours per line (`None` when the file type isn't known).
@@ -230,6 +231,15 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
                 git::range_file_diff(repo, from, to.as_deref(), path, opts)?,
                 path.clone(),
             ),
+            DiffKey::Remerge {
+                hash,
+                path,
+                old_path,
+                ..
+            } => (
+                git::remerge_file_diff(repo, hash, path, old_path.as_deref(), opts)?,
+                path.clone(),
+            ),
         })
     };
     // A textconv driver that fails (Git for Windows maps `*.docx` and `*.pdf` to its own
@@ -242,18 +252,17 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         })
         .map_err(|_| e)?,
         done => done?,
-        DiffKey::Remerge {
-            hash,
-            path,
-            old_path,
-            ..
-        } => (
-            git::remerge_file_diff(repo, hash, path, old_path.as_deref(), opts)?,
-            path.clone(),
-        ),
     };
     let pickable = !opts.ignore_ws;
-    Ok(prepare(repo, key, &path, &text, pickable, opts.whole_file, dark))
+    Ok(prepare(
+        repo,
+        key,
+        &path,
+        &text,
+        pickable,
+        opts.whole_file,
+        dark,
+    ))
 }
 
 /// The diff `text` of `path` read into lines, coloured and paired. `pickable`: hunks and lines
@@ -300,7 +309,7 @@ fn prepare(
         None
     };
     let binary = (image.is_none() && lfs.is_none() && binary::is_binary_patch(&text))
-        .then(|| binary::load_pair(repo, key, &path, renamed_from(&text)));
+        .then(|| binary::load_pair(repo, key, &path, images::renamed_from(&text)));
     // A diff of what the file's textconv made of it: its lines aren't the file's. Not for a
     // symbolic link: git diffs those with its default driver, whatever the attribute says.
     let textconv = (binary.is_none() && !lines.is_empty() && !is_symlink_patch(&text))
@@ -311,7 +320,7 @@ fn prepare(
         .as_ref()
         .and_then(|pair| image_compare::compare(repo, key, &path, pair));
     let notebook = (notebook::is_notebook(&path) && lfs.is_none())
-        .then(|| notebook::load(repo, key, &path, renamed_from(&text)))
+        .then(|| notebook::load(repo, key, &path, images::renamed_from(&text)))
         .flatten();
     let mut spans = highlight_sides(&path, &lines, dark);
     let moves = find_moves(&lines);

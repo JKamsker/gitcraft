@@ -15,7 +15,12 @@ pub fn run(repo: &Path, from: Option<&[String]>, plan: &Plan) -> Result<Vec<Stri
     run_with_order(repo, from, crate::git::LogOrder::default(), plan)
 }
 
-pub fn run_with_order(repo: &Path, from: Option<&[String]>, order: crate::git::LogOrder, plan: &Plan) -> Result<Vec<String>, String> {
+pub fn run_with_order(
+    repo: &Path,
+    from: Option<&[String]>,
+    order: crate::git::LogOrder,
+    plan: &Plan,
+) -> Result<Vec<String>, String> {
     let (passes, paths, hash) = match plan {
         Plan::Plain { query, code: true } => return search_code(repo, from, order, query),
         Plan::Plain { query, code: false } => return search(repo, from, order, query),

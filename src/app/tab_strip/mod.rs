@@ -342,7 +342,12 @@ impl App {
                 }
                 _ => {
                     let at = place.get(i).copied().unwrap_or(row.left()) - row.left();
-                    row.left() + ctx.animate_value_with_time(id.with("x"), at, crate::a11y::motion::seconds(&ctx, TAB_SLIDE))
+                    row.left()
+                        + ctx.animate_value_with_time(
+                            id.with("x"),
+                            at,
+                            crate::a11y::motion::seconds(&ctx, TAB_SLIDE),
+                        )
                 }
             };
             let rect = Rect::from_min_size(pos2(x, row.top()), vec2(title.width, TAB_H));

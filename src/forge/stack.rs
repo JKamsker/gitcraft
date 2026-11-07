@@ -215,6 +215,7 @@ fn publish_one(
                 None => String::new(),
             };
             let new = NewPullRequest {
+                reviewers: &[],
                 branch: &plan.branch,
                 base: &plan.base,
                 title: &plan.title,

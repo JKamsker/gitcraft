@@ -270,8 +270,12 @@ impl RebaseEditor {
             "-i".to_owned(),
             "--autostash".to_owned(),
         ];
-        if self.update_refs { args.push("--update-refs".to_owned()); }
-        if self.no_ff { args.push("--no-ff".to_owned()); }
+        if self.update_refs {
+            args.push("--update-refs".to_owned());
+        }
+        if self.no_ff {
+            args.push("--no-ff".to_owned());
+        }
         if self.onto.is_empty() {
             args.push("--root".to_owned());
         } else {
