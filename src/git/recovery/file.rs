@@ -37,7 +37,7 @@ pub(super) fn capture(reader: &Reader<'_>, root: &str) -> Result<RootPin, String
 }
 fn pin_script(root: &str) -> String {
     format!(
-        "cd -P -- {} || exit 1\nprintf '%s\\0' \"$(pwd -P)\"\nLC_ALL=C TZ=UTC0 stat -c '%d:%i:%z' .\n",
+        "cd -P -- {} || exit 1\nprintf '%s\\0' \"$(pwd -P)\"\n(LC_ALL=C TZ=UTC0 stat -c '%d:%i:%z' . 2>/dev/null || LC_ALL=C stat -f '%d:%i:%c' .)\n",
         crate::remote::sh_quote(root)
     )
 }
@@ -267,7 +267,7 @@ fn remote_script(identity: &Identity, path: &str, create: bool) -> Result<String
         "umask 077\ncd -P -- {} || exit 1\nrecovery_root=$(pwd -P) || exit 1\n[ \"$recovery_root\" = / ] && recovery_root=\n",
         sh_quote(root)
     );
-    script.push_str(&format!("[ \"$(pwd -P)\" = {} ] || exit 1\n[ \"$(LC_ALL=C TZ=UTC0 stat -c '%d:%i:%z' .)\" = {} ] || exit 1\n",sh_quote(&pin.physical),sh_quote(&pin.token)));
+    script.push_str(&format!("[ \"$(pwd -P)\" = {} ] || exit 1\n[ \"$((LC_ALL=C TZ=UTC0 stat -c '%d:%i:%z' . 2>/dev/null || LC_ALL=C stat -f '%d:%i:%c' .))\" = {} ] || exit 1\n",sh_quote(&pin.physical),sh_quote(&pin.token)));
     script.push_str(&format!("recovery_metadata=$(cd -P -- {} && pwd -P) || exit 1\n[ \"$recovery_metadata\" = / ] && recovery_metadata=\n[ \"$recovery_root\" != \"$recovery_metadata\" ] || exit 1\n", sh_quote(&identity.common)));
     let mut relative = String::new();
     for parent in parents {
@@ -286,7 +286,7 @@ fn remote_script(identity: &Identity, path: &str, create: bool) -> Result<String
         // A private Git-metadata scratch file avoids a partial or visible working
         // file. GNU ln -T performs create-only publication even if a directory/FIFO
         // races the final name; cross-filesystem publication refuses safely.
-        script.push_str(&format!("recovery_tmp=$(mktemp -d -- {template}) || exit 1\ntrap 'rm -rf -- \"$recovery_tmp\"' 0\ntrap 'exit 1' HUP INT TERM PIPE\ncat >\"$recovery_tmp/blob\" || exit 1\nln -T -- \"$recovery_tmp/blob\" {name} || exit 1\nprintf 'created\\n'\n"));
+        script.push_str(&format!("recovery_tmp=$(mktemp -d -- {template}) || exit 1\ntrap 'rm -rf -- \"$recovery_tmp\"' 0\ntrap 'exit 1' HUP INT TERM PIPE\ncat >\"$recovery_tmp/blob\" || exit 1\nif ln -T -- \"$recovery_tmp/blob\" {name} 2>/dev/null; then :; elif command -v perl >/dev/null 2>&1; then perl -e 'link($ARGV[0], $ARGV[1]) or die \"create-only publication: $!\\n\"' -- \"$recovery_tmp/blob\" {name} || exit 1; else printf 'Create-only recovery needs GNU ln or Perl\\n' >&2; exit 1; fi\nprintf 'created\\n'\n"));
     } else {
         script.push_str("printf 'available\\n'\n");
     }
