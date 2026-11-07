@@ -6,7 +6,7 @@ use std::time::Instant;
 use super::detached::Leave;
 use super::{
     Action, Compare, DiffKey, DiffView, Msg, OpKind, OpenRequest, Refresh, RepoTab, Undo, diff,
-    ops, spawn,
+    guide, ops, spawn,
 };
 use crate::git;
 use crate::settings::Settings;
@@ -22,6 +22,7 @@ impl RepoTab {
                 self.close_pr();
                 self.ci_view = None;
                 self.select(row, ctx);
+                self.hint_after_select(row, ctx);
             }
             Action::SelectHash(hash) => {
                 self.close_pr();
@@ -33,7 +34,12 @@ impl RepoTab {
                 self.ci_view = None;
                 self.select_stash(i, ctx);
             }
-            Action::OpenDiff(key) => self.open_diff(key, ctx),
+            Action::OpenDiff(key) => {
+                self.open_diff(key, ctx);
+                if self.diff.is_some() {
+                    self.offer_hint(guide::Hint::ChangeNavigation, ctx);
+                }
+            }
             Action::Custom(act) => self.custom_act(act, ctx),
             Action::OpenPr(number) => {
                 // It refuses while an editor takes the big area: the builds shown stay then.
@@ -103,7 +109,11 @@ impl RepoTab {
             Action::PushFlow(act) => self.push_act(act, ctx),
             Action::Reload => self.refresh(ctx),
             Action::LoadMore => self.load_more(ctx),
-            Action::Undo => self.undo(ctx),
+            Action::Undo => {
+                if !self.refuse_undo() {
+                    self.undo(ctx);
+                }
+            }
             Action::Redo => self.redo(ctx),
             Action::Stash(request) => self.stash(request, ctx),
             Action::PickToStash(path) => self.stash_picks.toggle(&path),
@@ -115,7 +125,14 @@ impl RepoTab {
                 settings.show_branches = !settings.show_branches;
                 settings.set(ctx);
             }
-            Action::BranchVisibility(change) => self.change_visibility(change, ctx),
+            Action::BranchVisibility(change) => {
+                let current = self.refs.current.as_deref();
+                let hint = guide::visibility_hint(&change, &self.visibility, current);
+                self.change_visibility(change, ctx);
+                if let Some(hint) = hint {
+                    self.offer_hint(hint, ctx);
+                }
+            }
             Action::GraphOrder(order) => self.set_log_order(order, ctx),
             Action::OpenBranches(section) => {
                 let mut settings = Settings::get(ctx);
@@ -284,6 +301,7 @@ impl RepoTab {
             Action::LfsLocks(act) => self.apply_lock_act(act, ctx),
             Action::Bisect(act) => self.bisect_act(act, ctx),
             Action::ParallelBisect(act) => self.parallel_act(act, ctx),
+            Action::Guide(act) => self.guide_act(act, ctx),
             Action::SaveConflict => self.save_conflict(ctx),
             Action::KeepBoth(path) => self.keep_both(path, ctx),
             Action::Archaeology(act) => self.archaeology_act(act, ctx),

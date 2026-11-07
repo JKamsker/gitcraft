@@ -41,6 +41,16 @@ so your config, credentials and hooks apply as usual.
   tabs were restored_. They are kept in gitcraft's data folder (never in the repository), each
   file written whole or not at all; a box keeps up to 256 KB, and drafts untouched for three
   months are let go of. Nothing typed into a password or sign-in prompt is saved.
+- A repository with no commits shows its first steps in the graph: _Make the first commit_
+  (the changes open at the commit summary, or an empty first commit, undoable, when there is
+  nothing to commit), _Add a remote_ and _Publish_ (push and track the branch), those done
+  ticked off. They stay under the first commit until it is published or a second commit is
+  made; _Hide these steps_ puts them away for the tab.
+- Tips: a "Did you know" line under the graph, a different tip each day (the arrow shows the
+  next one; the eye turns tips and hints off, Settings → General → Tips turns them back on), and
+  a one-line hint, once ever, the first time you do something with a shortcut nearby (selecting
+  a commit: Ctrl+click another to compare; clicking a pill: double-click checks it out; hiding a
+  branch: Solo; opening a diff: F7 / Alt+↓).
 - Repositories on another machine, in a WSL distribution or over SSH: the window stays here and
   git runs there (see below).
 

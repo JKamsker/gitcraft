@@ -274,7 +274,7 @@ impl RepoTab {
 
     /// Puts what `kind` did on the undo (or redo) stack. Returns whether a new step went on
     /// the undo list.
-    fn record_undo(&mut self, label: &str, kind: OpKind) -> bool {
+    pub(super) fn record_undo(&mut self, label: &str, kind: OpKind) -> bool {
         let mut added = false;
         match kind {
             OpKind::Normal(Undo::None, _) => {}
@@ -282,6 +282,11 @@ impl RepoTab {
                 let mut parts = heads.split('\u{0}');
                 let (before, after) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""));
                 if before.is_empty() || after.is_empty() || before == after {
+                    // Nothing to undo (a first commit), but HEAD moved: what was undone
+                    // before is not redone on top of it.
+                    if before != after {
+                        self.redo_stack.clear();
+                    }
                     return false;
                 }
                 // Resetting moves whatever branch is checked out: another one at the same
@@ -541,6 +546,8 @@ fn check_expected(path: &Path, ops: &[Vec<String>]) -> Result<(), String> {
             let what = name.strip_prefix("refs/heads/").unwrap_or(name);
             return Err(if name == "refs/stash" {
                 "The newest stash is not the one this made any more".to_owned()
+            } else if value.is_empty() {
+                format!("{what} has commits now: going ahead would go on top of them")
             } else {
                 format!(
                     "{what} has moved since (it is at {}, not {}): going ahead would lose \

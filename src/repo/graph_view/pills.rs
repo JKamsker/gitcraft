@@ -13,6 +13,7 @@ use super::row::Row;
 use crate::ci::CheckState;
 use crate::icons;
 use crate::repo::columns::Cols;
+use crate::repo::guide::{GuideAct, Hint};
 use crate::repo::{Action, RepoTab, ci_status, widgets};
 use crate::theme::{self, Tokens};
 
@@ -139,6 +140,13 @@ impl RepoTab {
             && let Some(act) = self.pill_checkout(badge)
         {
             acts.push(act);
+            acts.push(Action::Guide(GuideAct::Withdraw(Hint::DoubleClickPill)));
+        } else if resp.clicked()
+            && on_pill()
+            && badge.kind == BadgeKind::Branch
+            && self.pill_checkout(badge).is_some()
+        {
+            acts.push(Action::Guide(GuideAct::Hint(Hint::DoubleClickPill)));
         }
     }
 

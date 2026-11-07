@@ -38,6 +38,7 @@ mod find;
 mod graph_order;
 mod ghost;
 pub(crate) mod graph_view;
+mod guide;
 pub(crate) mod highlight;
 mod hooks;
 mod keep_submodules;
@@ -260,6 +261,8 @@ pub struct RepoTab {
     /// HEAD on no branch: its banner, and checkouts that would leave commits behind.
     detached: detached::Detached,
     dialog: Option<Dialog>,
+    /// The first steps, tips and first-time hints.
+    guide: guide::Guide,
     search: Search,
     /// Find in the diff, file or blame shown.
     find: find::Find,
@@ -442,6 +445,7 @@ impl RepoTab {
             skip_hooks: Default::default(),
             detached: Default::default(),
             dialog: None,
+            guide: Default::default(),
             search: Search::default(),
             find: find::Find::default(),
             pending_goto: None,

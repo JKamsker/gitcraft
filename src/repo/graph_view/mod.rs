@@ -104,7 +104,13 @@ impl RepoTab {
             });
             return;
         }
+        self.tip_bar(ui);
+        let first_steps = self.first_steps();
         if self.commits.is_empty() {
+            if let Some(steps) = first_steps {
+                self.first_steps_view(ui, steps, acts);
+                return;
+            }
             ui.centered_and_justified(|ui| {
                 if self.loading {
                     ui.add(crate::spinner::Spinner::new());
@@ -185,6 +191,11 @@ impl RepoTab {
         let total = self.commits.len() + usize::from(self.has_more);
         // The merges shown, for their badges: only those are read.
         let mut shown_merges = Vec::new();
+        // A new repository's first steps go under its few rows.
+        let first_steps = first_steps.filter(|_| !self.guide.steps_hidden);
+        if first_steps.is_some() {
+            scroll = scroll.max_height(total as f32 * ROW_PITCH);
+        }
         let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
             // Near the end: fetch the next page of history.
             // Not from the ghost graph, whose rows don't grow as pages come in.
@@ -271,6 +282,9 @@ impl RepoTab {
         let at = egui::Rect::from_min_size(ui.min_rect().min, vec2(0.0, 0.0));
         let resp = ui.interact(at, row::row_id(ui, &self.commits[i].hash), Sense::click());
         self.row_menu(&resp, i, idle, acts);
+        if let Some(steps) = first_steps {
+            self.first_steps_view(ui, steps, acts);
+        }
     }
 
     /// Up and down select the row above or below the selected one.

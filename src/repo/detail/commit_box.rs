@@ -89,6 +89,10 @@ impl RepoTab {
         if std::mem::take(&mut self.focus_commit_summary) && !rebasing {
             summary.request_focus();
         }
+        if self.guide.take_focus_summary(ui.ctx().cumulative_frame_nr()) {
+            summary.request_focus();
+            summary.scroll_to_me(None);
+        }
         if rebasing {
             ui.label(
                 RichText::new("The commit keeps its message: reword it once this is done.")

@@ -58,6 +58,7 @@ impl RepoTab {
             self.target_conflict_badge(ui);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 self.op_status(ui);
+                self.hint_status(ui);
             });
         });
     }

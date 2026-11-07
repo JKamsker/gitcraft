@@ -70,6 +70,8 @@ pub enum Dialog {
         /// What the operation changes, read when the dialog opens, and an action that runs
         /// in place of `ops`, if any.
         preview: Box<WhatItDoes>,
+        /// Nothing is lost: the button is the accent colour, not the danger one.
+        safe: bool,
     },
     Stash(stash::StashDialog),
     Tag {
@@ -172,6 +174,7 @@ impl Dialog {
             refresh: Refresh::All,
             undo: Undo::None,
             preview: Box::default(),
+            safe: false,
         }
     }
 
@@ -202,6 +205,14 @@ impl Dialog {
     pub fn instead(mut self, action: Action, described: Vec<String>) -> Self {
         if let Dialog::Confirm { preview, .. } = &mut self {
             preview.instead = Some(Instead { action, described });
+        }
+        self
+    }
+
+    /// A confirmation of something that loses nothing: its button is not the danger colour.
+    pub fn safe(mut self) -> Self {
+        if let Dialog::Confirm { safe, .. } = &mut self {
+            *safe = true;
         }
         self
     }
@@ -538,6 +549,7 @@ impl RepoTab {
                     refresh,
                     undo,
                     preview,
+                    safe,
                 } => confirm::confirm(
                     ui,
                     confirm::Asked {
@@ -551,6 +563,7 @@ impl RepoTab {
                     },
                     use_alternative,
                     preview,
+                    *safe,
                 ),
             }
         });

@@ -27,6 +27,7 @@ pub(super) fn confirm(
     asked: Asked<'_>,
     use_alternative: &mut bool,
     preview: &mut WhatItDoes,
+    safe: bool,
 ) -> Outcome {
     let t = Tokens::get(ui.ctx());
     ui.label(RichText::new(asked.title).font(theme::semibold(15.0)));
@@ -47,13 +48,14 @@ pub(super) fn confirm(
     ui.add_space(14.0);
     let mut outcome = Outcome::Open;
     ui.horizontal(|ui| {
-        let danger = egui::Button::new(
-            RichText::new(asked.button)
-                .color(egui::Color32::WHITE)
-                .font(theme::medium(12.5)),
-        )
-        .fill(t.danger)
-        .min_size(egui::vec2(90.0, 30.0));
+        let (fill, text) = if safe {
+            (t.accent, t.accent_text)
+        } else {
+            (t.danger, egui::Color32::WHITE)
+        };
+        let danger = egui::Button::new(RichText::new(asked.button).color(text).font(theme::medium(12.5)))
+            .fill(fill)
+            .min_size(egui::vec2(90.0, 30.0));
         if ui.add(danger).clicked() {
             outcome = Outcome::Done(Box::new(match preview.instead.take() {
                 Some(instead) => instead.action,
