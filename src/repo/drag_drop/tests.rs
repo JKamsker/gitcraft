@@ -482,7 +482,7 @@ fn a_fast_forward_refuses_a_branch_being_rebased_elsewhere() {
         &wt,
         &[
             "-c",
-            "sequence.editor=sed -i s/^pick/edit/",
+            "sequence.editor=sed -i.bak s/^pick/edit/",
             "rebase",
             "-q",
             "-i",

@@ -421,13 +421,19 @@ fn released_divider_exchanges_with_description_and_restores_after_viewport_resiz
             }
             let after_graph = find(&h, "GRAPH");
             let after_desc = find(&h, "DESCRIPTION");
-            assert!((after_graph.left() - before_graph.left() + 20.0).abs() < 0.1);
+            // Painted clip bounds round to physical pixels. One pixel of tolerance cannot
+            // mask the review's 20-point exchange into the wrong column.
+            let pixel = 1.0 / scale + 0.01;
+            eprintln!(
+                "released {width}/{percent}: graph {before_graph:?} -> {after_graph:?}, description {before_desc:?} -> {after_desc:?}"
+            );
+            assert!((after_graph.left() - before_graph.left() + 20.0).abs() < pixel);
             assert!(
-                (after_graph.width() - before_graph.width()).abs() < 0.1,
+                (after_graph.width() - before_graph.width()).abs() < pixel,
                 "Graph expanded at {width}/{percent}"
             );
             assert!(
-                (after_desc.width() - before_desc.width() - 20.0).abs() < 0.1,
+                (after_desc.width() - before_desc.width() - 20.0).abs() < pixel,
                 "Description lost the exchange at {width}/{percent}"
             );
             let saved = Settings::get(&h.ctx);

@@ -157,6 +157,8 @@ mod tests {
             .enumerate()
             .map(|(i, h)| (h.clone(), i))
             .collect();
+        tab.history = tab.commits.clone();
+        tab.history_index = tab.index.clone();
         tab.refs.head = hashes[0].clone();
         tab.refs.current = Some("main".to_owned());
         tab
