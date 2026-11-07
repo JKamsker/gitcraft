@@ -491,8 +491,7 @@ mod tests {
         tab.commits = vec![std::sync::Arc::new(crate::git::Commit {
             hash: "root".into(),
             ..Default::default()
-        })]
-        .into();
+        })];
         tab.index.insert("root".into(), 0);
         tab.selected = Some(0);
         tab.refs.local.push(crate::git::Branch {

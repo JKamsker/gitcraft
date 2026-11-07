@@ -179,14 +179,6 @@ impl Growth {
         }
         Ok(files)
     }
-    #[cfg(test)]
-    pub fn files_at(&self, cursor: usize) -> BTreeSet<Vec<u8>> {
-        self.files_at_borrowed(cursor, &|| true)
-            .expect("active fixture")
-            .into_iter()
-            .map(<[u8]>::to_vec)
-            .collect()
-    }
 }
 #[cfg(test)]
 mod tests {
@@ -206,12 +198,12 @@ mod tests {
             shallow: false,
         };
         assert_eq!(
-            growth.files_at(0),
-            [b"src/a".to_vec()].into_iter().collect()
+            growth.files_at_borrowed(0, &|| true)?,
+            [b"src/a".as_slice()].into_iter().collect()
         );
         assert_eq!(
-            growth.files_at(1),
-            [b"src/b".to_vec()].into_iter().collect()
+            growth.files_at_borrowed(1, &|| true)?,
+            [b"src/b".as_slice()].into_iter().collect()
         );
         assert_eq!(growth.frames[1].name, "Two");
         assert!(parse(b"\0broken\0").is_err());

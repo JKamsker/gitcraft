@@ -56,7 +56,7 @@ pub(crate) fn read(
     query: Query,
     active: &dyn Fn() -> bool,
 ) -> Result<Atlas, String> {
-    read_observing(repo, limit, query, active, || {})
+    read_observing(repo, limit, query, active, || Ok(()))
 }
 // Tests can change HEAD immediately after capture. Both history and bytes must
 // still use this same set of immutable roots, including its captured HEAD.
@@ -65,10 +65,10 @@ pub(in crate::git) fn read_observing(
     limit: usize,
     query: Query,
     active: &dyn Fn() -> bool,
-    captured: impl FnOnce(),
+    captured: impl FnOnce() -> Result<(), String>,
 ) -> Result<Atlas, String> {
     let roots = activity::capture_roots(repo, active)?;
-    captured();
+    captured()?;
     let history = Arc::new(activity::read_roots(
         repo,
         limit,
@@ -341,9 +341,9 @@ fn allocate(
 mod tests {
     use super::super::activity::{Day, Record};
     use super::*;
-    fn history_with_paths(paths: Vec<Vec<u8>>, name: String) -> Arc<History> {
-        let day = Day::parse("2026-11-07").expect("date");
-        Arc::new(History {
+    fn history_with_paths(paths: Vec<Vec<u8>>, name: String) -> Result<Arc<History>, String> {
+        let day = Day::parse("2026-11-07").ok_or("date")?;
+        Ok(Arc::new(History {
             commits: vec![Record {
                 hash: "side".into(),
                 name,
@@ -354,7 +354,7 @@ mod tests {
                 paths: paths.into_iter().collect(),
             }],
             ..Default::default()
-        })
+        }))
     }
     #[test]
     fn historical_directory_and_current_file_keep_separate_totals_and_navigation()
@@ -362,7 +362,7 @@ mod tests {
         let tree = format!("100644 blob {} 100\ta\0", "b".repeat(40));
         let atlas = build(
             "head".into(),
-            history_with_paths(vec![b"a/old".to_vec()], "A".into()),
+            history_with_paths(vec![b"a/old".to_vec()], "A".into())?,
             tree.as_bytes(),
             Query::default(),
             &|| true,
@@ -402,16 +402,17 @@ mod tests {
             work: 100_000,
         };
         let path = b"aaaa/bbbb/cccc/dddd/eeee";
-        let error = ensure_file(
-            path,
-            &mut nodes,
-            &mut dirs,
-            &mut files,
-            &mut budget,
-            &|| true,
-        )
-        .expect_err("budget");
-        assert!(error.contains("allocation/work budget"));
+        assert!(
+            ensure_file(
+                path,
+                &mut nodes,
+                &mut dirs,
+                &mut files,
+                &mut budget,
+                &|| true,
+            )
+            .is_err_and(|e| e.contains("allocation/work budget"))
+        );
         assert!(nodes.len() < 6);
         let calls = std::cell::Cell::new(0);
         assert!(
@@ -436,7 +437,7 @@ mod tests {
     #[test]
     fn long_identity_is_interned_once_and_labels_share_storage() -> Result<(), String> {
         let paths = (0..512).map(|i| format!("f{i}").into_bytes()).collect();
-        let history = history_with_paths(paths, "x".repeat(16_384));
+        let history = history_with_paths(paths, "x".repeat(16_384))?;
         let atlas = build_budget(
             "head".into(),
             history,

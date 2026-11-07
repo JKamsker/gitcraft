@@ -88,7 +88,7 @@ fn atlas_growth_and_postcard_read_a_real_pinned_release_without_mutation() -> Re
     );
     let growth = growth::read(&repo.0, &|| true)?;
     assert_eq!(growth.frames.len(), 3); // feature enters via the first-parent merge
-    let final_tree = growth.files_at(growth.frames.len() - 1);
+    let final_tree = growth.files_at_borrowed(growth.frames.len() - 1, &|| true)?;
     assert!(final_tree.contains(b"src/b".as_slice()));
     assert!(final_tree.contains(b"side".as_slice()));
     assert!(!final_tree.contains(b"src/a".as_slice()));
@@ -115,8 +115,7 @@ fn atlas_side_branch_history_and_captured_head_survive_concurrent_checkout() -> 
     let side = repo.commit("side adds file")?;
     repo.git(&["checkout", "-q", &main])?;
     let atlas = atlas::read_observing(&repo.0, 100, Query::default(), &|| true, || {
-        repo.git(&["checkout", "-q", "side"])
-            .expect("checkout after capture");
+        repo.git(&["checkout", "-q", "side"]).map(|_| ())
     })?;
     assert_eq!(atlas.head, base);
     assert_eq!(atlas.history.commits.len(), 2);
