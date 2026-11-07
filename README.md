@@ -729,7 +729,11 @@ so your config, credentials and hooks apply as usual.
   (`difft`), so reindentation and wrapping do not obscure the tokens that changed. It is a reading
   mode: turn off Syntax to stage changes or see formatting edits. Unsupported languages, parse
   errors, a missing tool or a comparison over its limits show the patch with an explanation.
-  Difftastic runs where the repository is (locally, in WSL or over SSH), off the window thread.
+  Syntax comparison currently runs only for local repositories; WSL and SSH use the patch
+  until comparison cleanup can be supervised independently on the remote host. Local Git
+  preparation requires `--no-lazy-fetch` support, has a shared 20 second deadline, and is
+  followed by a 20 second tool deadline. Each tab runs one comparison with one latest queued
+  replacement. On Windows, descendant cleanup for custom tool launchers remains best effort.
 - A file kept in Git LFS shows as its LFS objects before and after, with their sizes, rather
   than the text of the pointer git stores. With git-lfs installed, the palette (Ctrl+P) of a
   repository that uses LFS has _LFS: Fetch_ and _LFS: Pull_.

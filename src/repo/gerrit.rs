@@ -314,7 +314,7 @@ mod integration_tests {
         settle(&mut tab, &ctx);
         assert!(
             tab.gerrit.is_some(),
-            "status={:?}, loading={}, head={}, remotes={:?}",
+            "status={:?}, error={:?}, loading={}, head={}, remotes={:?}",
             tab.status,
             tab.loading,
             tab.refs.head,

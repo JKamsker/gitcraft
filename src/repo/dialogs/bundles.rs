@@ -119,7 +119,6 @@ pub(super) fn incoming(ui: &mut Ui, label: &str, preview: &BundlePreview) -> Out
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     #[test]
     fn incoming_dialog_is_read_only_and_escape_cancels_without_ref_changes() -> Result<(), String> {
         use crate::git;

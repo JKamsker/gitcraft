@@ -322,7 +322,8 @@ fn remote_request_is_data_safe_and_runs_the_same_real_tool() -> Result<(), Strin
     let repo = Repo::new()?;
     let old = "fn f() { call(1); }\n";
     let new = "fn f() { call(2); }\n";
-    let report = remote_compare(&repo, "x '$(touch gotcha) ü.rs", old, new)?;
+    let marker = crate::remote::sh_quote(repo.0.join("gotcha").to_str().ok_or("marker path")?);
+    let report = remote_compare(&repo, &format!("x $(touch {marker}) ü.rs"), old, new)?;
     assert!(model::parse(&report, old, new).is_ok());
     assert!(!repo.0.join("gotcha").exists());
     Ok(())
@@ -498,8 +499,14 @@ fn temporary_writes_preserve_outside_files_for_absolute_and_windows_tree_names()
         "code ü.rs".to_owned(),
         "--override=*.rs:Text.rs".to_owned(),
         "nested/..\\..\\victim.rs".to_owned(),
-        "$(touch gotcha).rs".to_owned(),
-        "x '$(touch gotcha) ü.rs".to_owned(),
+        format!(
+            "$(touch {}).rs",
+            crate::remote::sh_quote(repo.0.join("gotcha").to_str().ok_or("marker path")?)
+        ),
+        format!(
+            "x $(touch {}) ü.rs",
+            crate::remote::sh_quote(repo.0.join("gotcha").to_str().ok_or("marker path")?)
+        ),
     ];
     // On native Windows these reproduce drive-absolute, drive-relative, rooted and
     // backslash traversal forms targeting an existing file, with no drive assumptions.

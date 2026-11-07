@@ -40,14 +40,19 @@ impl Builtin {
             t.pressed,
             t.row_selected,
         ];
+        // Button fill changes also affect the tint over picked diff lines.
+        p.accent = aa_foreground(p.accent, &[t.accent_text]);
         let mut text_surfaces = surfaces.to_vec();
         for bg in [
             t.field,
+            t.card,
             over(t.diff_add_bg, t.field),
             over(t.diff_del_bg, t.field),
+            over(t.diff_add_bg, t.card),
+            over(t.diff_del_bg, t.card),
         ] {
             text_surfaces.push(bg);
-            text_surfaces.push(over(t.accent.gamma_multiply(0.22), bg));
+            text_surfaces.push(over(p.accent.gamma_multiply(0.22), bg));
         }
         p.text = aa_foreground(p.text, &text_surfaces);
         // Pressed controls use normal or dim labels. Faint metadata belongs to rows/panels;

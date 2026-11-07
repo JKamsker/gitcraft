@@ -107,7 +107,7 @@ impl RepoTab {
 pub(super) fn toggle(ui: &mut egui::Ui, on: bool, acts: &mut Vec<Action>) {
     if ui
         .selectable_label(on, "Syntax")
-        .on_hover_text("Compare syntax with Difftastic (difft), installed where the repository is. Use the patch to stage changes.")
+        .on_hover_text("Compare syntax with Difftastic (difft), installed locally. SSH/WSL use the patch. Use the patch to stage changes.")
         .clicked()
     {
         acts.push(Action::DiffStructural(!on));
