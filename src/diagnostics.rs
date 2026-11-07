@@ -147,7 +147,7 @@ pub fn report(
         out.push_str(&row);
         out.push('\n');
     }
-    redact_users(&redact_home(&out, home))
+    sanitize_report(&redact_users(&redact_home(&out, home)))
 }
 
 /// The settings of the doctor's allowlist in effect in `repo`, but the personal ones: `key =
@@ -173,18 +173,21 @@ pub fn settings_rows(all: &[config::Origin]) -> Vec<String> {
         .filter(|s| !PERSONAL.iter().any(|p| p.eq_ignore_ascii_case(s.key)))
         .filter_map(|s| {
             let winner = config::values_of(all, s.key).into_iter().last()?;
-            let value = winner.shown_value();
-            // A path (an editor, a program, a folder) can name its user: only that it is set.
-            let value = if value.contains(['/', '\\']) {
-                "(a path)"
-            } else {
-                value
-            };
+            let raw = winner.shown_value();
+            // Command/program/path/free-text fields may embed credentials even without
+            // a slash. Only validated finite choices may leave this machine as values.
+            let value = s
+                .choices
+                .iter()
+                .copied()
+                .find(|choice| raw.eq_ignore_ascii_case(choice))
+                .unwrap_or("(configured; value withheld)");
             let file = winner
                 .file
                 .as_deref()
-                .map(|f| f.rsplit(['/', '\\']).next().unwrap_or(f))
-                .unwrap_or("-");
+                .and_then(|f| f.rsplit(['/', '\\']).next())
+                .filter(|name| matches!(*name, "config" | ".gitconfig" | "gitconfig"))
+                .unwrap_or("(origin filename withheld)");
             Some(format!(
                 "{} = {value} · {} · {file}",
                 s.key,
@@ -356,7 +359,7 @@ mod tests {
         assert!(text.contains("glab 1.50, auth status failed"));
         assert!(text.contains("**tea:** not found"));
         assert!(text.contains("pull.rebase = true · Global · .gitconfig"));
-        assert!(text.contains(r"a WSL path ~/x and ~\y"), "{text}");
+        assert!(text.contains("a WSL path"), "{text}");
         assert!(!text.contains("zoë") && !text.contains("example.com") && !text.contains("Ana"));
         let none = report(&facts, "git", &[], None, "");
         assert!(none.contains("No repository open"));
@@ -422,9 +425,15 @@ mod tests {
     }
 }
 
+/// Apply to the complete clipboard/review/outgoing report, not only config rows.
+pub(crate) fn sanitize_report(text: &str) -> String {
+    crash::scrub(&redact_users(text))
+}
+
 /// A bounded prefilled issue URL. Full diagnostics remain on the clipboard.
 pub(crate) fn issue_url(report: &str) -> String {
     let mut body = String::from("Please describe what happened and how to reproduce it.\n\n");
+    let report = sanitize_report(report);
     for line in report.lines() {
         if encode(&(body.clone() + line)).len() > 6500 {
             body.push_str("\n[Remaining diagnostics are on the clipboard.]\n");
@@ -458,5 +467,29 @@ mod issue_tests {
         assert!(url.starts_with("https://github.com/JKamsker/gitcraft/issues/new?"));
         assert!(url.contains("%26") && url.len() < 7200 && !url.contains('\n'));
         assert!(url.contains("clipboard"));
+    }
+}
+
+#[cfg(test)]
+mod privacy_regression_tests {
+    use super::*;
+    #[test]
+    fn command_values_and_invalid_enum_values_cannot_enter_an_issue_query() {
+        let all = config::parse_origins(
+            "local\0file:/owned/config\0core.editor\nenv API_TOKEN=FIXTURE_SECRET nvim\0local\0file:/owned/config\0pull.rebase\nFIXTURE_ENUM_SECRET\0local\0file:/owned/config\0gpg.program\nenv SIGNING_TOKEN=FIXTURE_SIGNING_SECRET gpg\0",
+        );
+        let rows = settings_rows(&all).join("\n");
+        for secret in [
+            "FIXTURE_SECRET",
+            "FIXTURE_ENUM_SECRET",
+            "FIXTURE_SIGNING_SECRET",
+            "nvim",
+            "env ",
+        ] {
+            assert!(!rows.contains(secret));
+            assert!(!issue_url(&rows).contains(secret));
+        }
+        assert!(rows.contains("core.editor = (configured; value withheld)"));
+        assert!(!issue_url("panic token=FIXTURE_PANIC_SECRET").contains("FIXTURE_PANIC_SECRET"));
     }
 }
