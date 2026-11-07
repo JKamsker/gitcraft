@@ -11,6 +11,7 @@ use super::{DiffData, Kind, Pick, unstage_args};
 use crate::git::{Area, StatusFile};
 use crate::icons;
 use crate::pull_request::DiffSide;
+use crate::repo::find;
 use crate::repo::pr_review::{self, PrDraft};
 use crate::repo::pr_view::{self, PrView};
 use crate::repo::{Action, DiffKey, DiffView, Refresh, RepoTab, file_text, ops, short, widgets};
@@ -61,8 +62,18 @@ impl RepoTab {
             }
             return;
         }
+        if let Some(what) = self.find_in() {
+            self.find.bar(ui, what.name());
+        }
         if as_file {
-            file_text::show(ui, ("diff_file", &path), view.file.as_ref());
+            let source = || find::Source::DiffFile(path.clone());
+            file_text::show(
+                ui,
+                ("diff_file", &path),
+                view.file.as_ref(),
+                &mut self.find,
+                source,
+            );
             return;
         }
         let Some(data) = ready_data(ui, view, ignore_ws, &t) else {
@@ -79,10 +90,13 @@ impl RepoTab {
         }
 
         let split = data.shows_split(split);
+        let reveal = find::search_diff(&mut self.find, ui.ctx(), &path, data, split);
         let shift = ui.input(|i| i.modifiers.shift);
-        let mut rows = Rows::new(ui, view, data, review.as_ref(), partial, split);
+        let mut rows = Rows::new(ui, view, data, review.as_ref(), partial, split)
+            .with_find(&self.find, reveal);
         let sel = rows.show(ui, &path, acts);
-        let (clicked, offset, jumped) = (rows.clicked, rows.offset, rows.jumped);
+        let (clicked, offset, jumped, seen) = (rows.clicked, rows.offset, rows.jumped, rows.seen);
+        self.find.saw(seen);
 
         if let Some(view) = &mut self.diff {
             view.text_sel = sel;
@@ -102,7 +116,7 @@ impl RepoTab {
     }
 
     /// The file shown and where its diff comes from.
-    fn diff_origin(&self, key: &DiffKey) -> (String, String) {
+    pub(in crate::repo) fn diff_origin(&self, key: &DiffKey) -> (String, String) {
         match key {
             DiffKey::Commit { hash, path } => (
                 path.clone(),

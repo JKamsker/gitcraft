@@ -8,6 +8,7 @@ mod history;
 use egui::{Stroke, Ui};
 
 use super::file_text::{self, FileText};
+use super::find::Source;
 use super::widgets;
 use super::{Action, RepoTab};
 use crate::git::FileCommit;
@@ -111,12 +112,26 @@ impl RepoTab {
                 });
             });
 
+        // A diff beside the history has its own bar.
+        if self.diff.is_none()
+            && let Some(what) = self.find_in()
+        {
+            self.find.bar(ui, what.name());
+        }
+        let Some(view) = &self.file_view else { return };
         match view.tab {
             FileTab::History => self.file_history(ui, acts),
             FileTab::Blame => self.blame_lines(ui, acts),
-            FileTab::File => {
-                file_text::show(ui, ("file_view", &view.path, &view.rev), view.text.as_ref())
-            }
+            FileTab::File => file_text::show(
+                ui,
+                ("file_view", &view.path, &view.rev),
+                view.text.as_ref(),
+                &mut self.find,
+                || Source::File {
+                    path: view.path.clone(),
+                    rev: view.rev.clone(),
+                },
+            ),
         }
     }
 }

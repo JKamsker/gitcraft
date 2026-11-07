@@ -84,6 +84,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Keep both… on a conflicted file that can't be merged (an image, an archive) previews, then writes each side's version beside it, named after its branch (logo.main.png, logo.feature-x.png; ours / theirs without one, -2 when a name is taken), never over an existing file. Check them in the changes list, then Stage both, which removes the old name: references to it may need updating.",
             "Right-click a file for its history, its blame or the whole file as it is at the commit.",
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
+            "Ctrl+F in a diff, a file or a blame finds in it (in the graph it searches the commits): every match is marked, Enter and Shift+Enter (or F3 and Shift+F3) go to the next and previous one. Aa matches case, ab matches whole words only, .* takes the text as a regular expression.",
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",
             "Sync (toolbar, or the command palette) pulls the current branch the way Pull is set to, then pushes it; if the pull fails (conflicts, or it can't fast-forward), nothing is pushed.",
             "A push the remote refuses because it has commits you don't have opens a banner: how many, and whether your branch was rewritten here (amended, rebased, undone) or both moved on, or is only behind. Pull, then push joins them; Force push (with lease)… names the commits it removes from the remote first, and pushes nothing if the remote (or your branch) moved since it was checked.",
@@ -120,7 +121,7 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
                 "Drag a pill or a commit",
                 "Merge, rebase, fast-forward, cherry-pick, move or squash",
             ),
-            ("Esc", "Close the diff, comparison or search"),
+            ("Esc", "Close the find bar, diff, comparison or search"),
         ],
     ),
     (
@@ -135,6 +136,18 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("Alt+↓ / Alt+↑", "Next / previous change in a diff"),
             ("Cmd+Z", "Undo"),
             ("Cmd+Y / Cmd+Shift+Z", "Redo"),
+        ],
+    ),
+    (
+        "Find in a diff, file or blame",
+        &[
+            ("Cmd+F", "Find in the diff, file or blame shown"),
+            (
+                "Enter / Shift+Enter",
+                "Next / previous match (while the find bar is open)",
+            ),
+            ("F3 / Shift+F3", "Next / previous match"),
+            ("Esc", "Close the find bar"),
         ],
     ),
     (

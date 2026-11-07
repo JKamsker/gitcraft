@@ -6,6 +6,7 @@ use std::path::Path;
 use egui::{Align2, Rect, Sense, Ui, pos2, vec2};
 
 use super::DiffKey;
+use super::find::{self, Find, Layout, Seen, Source, SourceKey};
 use super::highlight::{self, Spans};
 use crate::git::{self, Area};
 use crate::theme::{self, Tokens};
@@ -99,11 +100,14 @@ pub(crate) fn load_for_diff(repo: &Path, key: &DiffKey, dark: bool) -> Result<Fi
     }
 }
 
-/// The file, or a spinner, the error or a note in its place. `id`: what keeps its scrolling.
+/// The file, or a spinner, the error or a note in its place. `id`: what keeps its scrolling;
+/// `find`: the find bar's search, of `source` (what shows the file).
 pub(crate) fn show(
     ui: &mut Ui,
     id: impl std::hash::Hash + std::fmt::Debug,
     text: Option<&Result<FileText, String>>,
+    find: &mut Find,
+    source: impl FnOnce() -> Source,
 ) {
     let t = Tokens::get(ui.ctx());
     let data = match text {
@@ -139,57 +143,90 @@ pub(crate) fn show(
         .size()
         .x;
     let width = (NUM_W + 16.0 + data.longest as f32 * char_w + 24.0).max(ui.available_width());
-    ui.spacing_mut().item_spacing.y = 0.0;
-    egui::ScrollArea::both()
+    let lines = &data.lines;
+    if find.open {
+        let key = SourceKey {
+            what: source(),
+            at: lines.as_ptr() as usize,
+            len: lines.len(),
+        };
+        let text = |i| find::nth(lines, i);
+        find.update(ui.ctx(), key, lines.len(), text, Layout::Lines);
+    }
+    let mut scroll = egui::ScrollArea::both()
         .id_salt(("file_text", id))
-        .auto_shrink(false)
-        .show_rows(ui, LINE_H, data.lines.len(), |ui, range| {
-            for i in range {
-                let Some(line) = data.lines.get(i) else {
-                    continue;
-                };
-                let (rect, _) = ui.allocate_exact_size(vec2(width, LINE_H), Sense::hover());
-                let p = ui.painter().with_clip_rect(rect.intersect(ui.clip_rect()));
-                let gutter = Rect::from_min_size(rect.min, vec2(NUM_W, LINE_H));
-                p.rect_filled(gutter, 0.0, t.card.gamma_multiply(0.6));
-                let mid = rect.center().y;
-                p.text(
-                    pos2(gutter.right() - 8.0, mid),
-                    Align2::RIGHT_CENTER,
-                    (i + 1).to_string(),
-                    theme::mono(11.0),
-                    t.text_faint,
+        .auto_shrink(false);
+    if let Some(hit) = find.take_reveal() {
+        let text = find::nth(lines, hit.line).unwrap_or_default();
+        scroll = find.scroll_to(scroll, &hit, text, char_w);
+    }
+    ui.spacing_mut().item_spacing.y = 0.0;
+    let find_ref = &*find;
+    let out = scroll.show_rows(ui, LINE_H, lines.len(), |ui, range| {
+        for i in range {
+            let Some(line) = lines.get(i) else {
+                continue;
+            };
+            let (rect, _) = ui.allocate_exact_size(vec2(width, LINE_H), Sense::hover());
+            let p = ui.painter().with_clip_rect(rect.intersect(ui.clip_rect()));
+            let gutter = Rect::from_min_size(rect.min, vec2(NUM_W, LINE_H));
+            p.rect_filled(gutter, 0.0, t.card.gamma_multiply(0.6));
+            let mid = rect.center().y;
+            p.text(
+                pos2(gutter.right() - 8.0, mid),
+                Align2::RIGHT_CENTER,
+                (i + 1).to_string(),
+                theme::mono(11.0),
+                t.text_faint,
+            );
+            let spans = data.spans.as_ref().and_then(|s| s.get(i));
+            let galley = line_galley(ui, spans, line, &font, t.text);
+            find::paint_line(
+                &p,
+                (gutter.right() + 10.0, mid, LINE_H),
+                galley,
+                find_ref.marks(i),
+                &t,
+            );
+        }
+    });
+    find.saw(Seen {
+        x: out.state.offset.x,
+        y: out.state.offset.y,
+        height: out.inner_rect.height(),
+        text_w: out.inner_rect.width() - NUM_W - 10.0,
+        line_h: LINE_H,
+    });
+}
+
+/// A line laid out in its syntax colours (`spans`), or all in `color` when there are none.
+pub(crate) fn line_galley(
+    ui: &Ui,
+    spans: Option<&Spans>,
+    line: &str,
+    font: &egui::FontId,
+    color: egui::Color32,
+) -> std::sync::Arc<egui::Galley> {
+    match spans {
+        Some(spans) => {
+            let mut job = egui::text::LayoutJob::default();
+            for (color, text) in spans {
+                job.append(
+                    text,
+                    0.0,
+                    egui::TextFormat {
+                        font_id: font.clone(),
+                        color: *color,
+                        ..Default::default()
+                    },
                 );
-                let x = gutter.right() + 10.0;
-                match data.spans.as_ref().and_then(|s| s.get(i)) {
-                    Some(spans) => {
-                        let mut job = egui::text::LayoutJob::default();
-                        for (color, text) in spans {
-                            job.append(
-                                text,
-                                0.0,
-                                egui::TextFormat {
-                                    font_id: font.clone(),
-                                    color: *color,
-                                    ..Default::default()
-                                },
-                            );
-                        }
-                        let galley = ui.painter().layout_job(job);
-                        p.galley(pos2(x, mid - galley.size().y / 2.0), galley, t.text);
-                    }
-                    None => {
-                        p.text(
-                            pos2(x, mid),
-                            Align2::LEFT_CENTER,
-                            line,
-                            font.clone(),
-                            t.text,
-                        );
-                    }
-                }
             }
-        });
+            ui.painter().layout_job(job)
+        }
+        None => ui
+            .painter()
+            .layout_no_wrap(line.to_owned(), font.clone(), color),
+    }
 }
 
 #[cfg(test)]
