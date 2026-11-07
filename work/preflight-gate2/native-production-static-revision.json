@@ -1,0 +1,14 @@
+{
+  "status": "STATIC SOURCE ONLY; NO COMPILE/RECORDING/PRODUCTION RUNTIME YET",
+  "basis": "native-v2-results/results.json7diagnosticPASS preserved097c00f; original actual production Hook capability FAIL files/sha1; exact duplicateHEAD stderr preserved72db763",
+  "change": [
+    "Native transaction now only update HEAD new old, dereferencing symbolically so Git owns HEAD+referent without duplicate HEAD registration",
+    "Scratch proof requires exact single expected realbranch old/new native stdin, ACKs and actual expected symbolic HEAD/new OID",
+    "Prepared wrapper rejects wrong/multiple/extra refs and wrong old/new before invoking originalhook; requires expected symbolic HEAD/old OID before and after originalhook",
+    "Existing rawindex/dependency/statcoldwork/affectedpath checks, checkout ACK, committedhook relay/postchecks, uncertain evidence and local-only interim remote refusal preserved",
+    "Removed now-unused stored branch field; branch remains bound into private wrapper, proof and recovery metadata",
+    "Recording expected command and diagnostic call signatures updated; no changed production protocol executed"
+  ],
+  "required_next": "Independent static PASS before recording or real changed production protocol. Then replay Gate1 recording plus Gate2 full compiled production repair cases and full scan/fix integration, not refs-only diagnostics. Remote completion/outcome stillOPEN.",
+  "transaction_rs_sha256": "40e6ede340b6e7fb91ce79617884bd56ef2656da73590973acfe9d23c5ecb83a"
+}

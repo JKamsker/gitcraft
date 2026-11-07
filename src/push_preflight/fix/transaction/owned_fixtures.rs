@@ -298,7 +298,7 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
                         .find(|oid| *oid != old)
                         .ok_or("missing owned candidate commit")?;
                     let hooks = format!("core.hooksPath={}", directory.display());
-                    let input = transaction("refs/heads/gitcraft-capability", &old, new);
+                    let input = transaction(&old, new);
                     let output = git::local_repair_input(
                         &f.repo,
                         &[

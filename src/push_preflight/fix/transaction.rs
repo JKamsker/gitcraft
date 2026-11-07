@@ -10,7 +10,6 @@ const NO_REMOTE: &str = "Automatic remote repair requires completion-aware owner
 pub(super) struct Hook {
     directory: PathBuf,
     keep: bool,
-    branch: String,
     old: String,
     new: String,
     proof: String,
@@ -83,12 +82,12 @@ fn owned(
     local(context_repo, &words, input, env)
 }
 
-fn transaction(branch: &str, old: &str, new: &str) -> String {
-    // symref-verify pins HEAD itself, not merely its current referent. The scratch
-    // proof uses this exact current-branch update to catch backend conflicts/deadlocks.
-    format!(
-        "start\noption no-deref\nsymref-verify HEAD {branch}\nupdate {branch} {new} {old}\nprepare\ncommit\n"
-    )
+fn transaction(old: &str, new: &str) -> String {
+    // Updating symbolic HEAD lets Git acquire HEAD and its referent together. An
+    // explicit symref-verify plus referent update collides with Git's implicit HEAD
+    // reflog update. The private hook separately requires the exact intended branch
+    // in native stdin and symbolic HEAD before/after the original prepared hook.
+    format!("start\nupdate HEAD {new} {old}\nprepare\ncommit\n")
 }
 
 fn snapshot(source: &str, destination: &Path) -> Result<(), String> {
@@ -228,7 +227,6 @@ impl Hook {
         let mut hook = Self {
             directory,
             keep: false,
-            branch: branch.into(),
             old: old.into(),
             new: new.into(),
             proof: format!("{branch}\n{old}\n{new}\n"),
@@ -442,7 +440,7 @@ impl Hook {
             repo,
             &probe,
             &["-c", &hooks, "update-ref", "--stdin"],
-            transaction(branch, old.trim(), new.trim()).as_bytes(),
+            transaction(old.trim(), new.trim()).as_bytes(),
             &[],
         );
         if result.is_err()
@@ -454,9 +452,7 @@ impl Hook {
         let expected_update = format!("{} {} {branch}\n", old.trim(), new.trim());
         let recorded = std::fs::read(self.directory.join("probe-updates-prepared"))
             .map_err(|_| "Missing native transaction input proof")?;
-        if !recorded
-            .split_inclusive(|byte| *byte == b'\n')
-            .any(|line| line == expected_update.as_bytes())
+        if recorded != expected_update.as_bytes()
             || path_line(owned(repo, &probe, &["symbolic-ref", "HEAD"], b"", &[])?)? != branch
             || path_line(owned(
                 repo,
@@ -497,7 +493,7 @@ impl Hook {
                 "gitcraft push preflight fix",
                 "--stdin",
             ],
-            transaction(&self.branch, &self.old, &self.new).as_bytes(),
+            transaction(&self.old, &self.new).as_bytes(),
             &[],
         );
         let completed = result.is_ok()
@@ -579,15 +575,17 @@ fi
 updates="$directory/updates-$1"
 cat >"$updates" || exit 1
 if [ "$1" = prepared ]; then
-    git hook run --ignore-missing --to-stdin="$updates" reference-transaction -- "$@" || exit $?
     matched=0
-    while read -r before after reference; do
-        if [ "$reference" = {branch} ]; then
-            [ "$before" = {old} ] && [ "$after" = {new} ] || exit 1
-            matched=1
-        fi
+    while read -r before after reference extra; do
+        [ -z "$extra" ] || exit 1
+        [ "$reference" = {branch} ] || exit 1
+        [ "$before" = {old} ] && [ "$after" = {new} ] || exit 1
+        matched=$((matched+1))
     done <"$updates"
     [ "$matched" = 1 ] || exit 1
+    [ "$(git symbolic-ref -q HEAD)" = {branch} ] || exit 1
+    [ "$(git rev-parse --verify HEAD)" = {old} ] || exit 1
+    git hook run --ignore-missing --to-stdin="$updates" reference-transaction -- "$@" || exit $?
     [ "$(git symbolic-ref -q HEAD)" = {branch} ] || exit 1
     [ "$(git rev-parse --verify HEAD)" = {old} ] || exit 1
     cmp -s -- {index} "$directory/before.index" || exit 1
@@ -711,11 +709,12 @@ mod tests {
         }
         assert!(supported_version(b"git version 2.50.0.windows.1\n"));
         assert!(supported_version(b"git version 3.0.0\n"));
-        assert!(!transaction("refs/heads/main", "old", "new").contains("HEAD.lock"));
-        assert!(
-            transaction("refs/heads/main", "old", "new")
-                .contains("symref-verify HEAD refs/heads/main")
+        assert_eq!(
+            transaction("old", "new"),
+            "start\nupdate HEAD new old\nprepare\ncommit\n"
         );
+        assert!(!transaction("old", "new").contains("symref-verify"));
+        assert!(!transaction("old", "new").contains("HEAD.lock"));
     }
 
     #[test]
@@ -761,7 +760,6 @@ mod tests {
             let hook = Hook {
                 directory: directory.clone(),
                 keep: true,
-                branch: "refs/heads/main".into(),
                 old: "1".repeat(40),
                 new: "2".repeat(40),
                 proof: "owned".into(),
