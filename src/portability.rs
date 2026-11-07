@@ -21,16 +21,31 @@ pub enum Provider {
     Github,
     Gitlab,
     Tea,
+    Azure,
+    Bitbucket,
 }
+impl Provider {
+    pub(crate) fn cloud_service(&self) -> Option<crate::forge::CloudService> {
+        match self {
+            Self::Azure => Some(crate::forge::CloudService::Azure),
+            Self::Bitbucket => Some(crate::forge::CloudService::Bitbucket),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PublicAccountExpectation {
     pub provider: Provider,
     pub host: String,
     pub user_or_alias: String,
-    /// Tea aliases are local labels; pin their actual public owner as well.
+    /// Actual public owner: Tea username, or a verified cloud provider subject ID.
     #[serde(default)]
     pub account_user: Option<String>,
+    /// Public local credential-store username; never a password or token.
+    #[serde(default)]
+    pub credential_user: Option<String>,
 }
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -86,6 +101,21 @@ impl PublicProfile {
                         host: account.host.clone(),
                         user_or_alias: account.user.clone(),
                         account_user: None,
+                        credential_user: None,
+                    });
+                }
+            }
+            for (provider, account) in [
+                (Provider::Azure, &p.connections.azure),
+                (Provider::Bitbucket, &p.connections.bitbucket),
+            ] {
+                if account.selected() {
+                    setup.accounts.push(PublicAccountExpectation {
+                        provider,
+                        host: account.server.clone(),
+                        user_or_alias: account.user.clone(),
+                        account_user: (!account.subject.is_empty()).then(|| account.subject.clone()),
+                        credential_user: (!account.credential_user.is_empty()).then(|| account.credential_user.clone()),
                     });
                 }
             }
@@ -95,6 +125,7 @@ impl PublicProfile {
                     host: p.connections.tea_host.clone(),
                     user_or_alias: p.connections.tea_login.clone(),
                     account_user: None,
+                    credential_user: None,
                 });
             }
         }
@@ -306,7 +337,7 @@ impl Setup {
             if !["", "openpgp", "ssh", "x509"].contains(&p.signing_format.as_str()) {
                 return Err("Unsupported signing format".into());
             }
-            if p.setup.accounts.len() > 3 {
+            if p.setup.accounts.len() > 5 {
                 return Err("Too many account expectations".into());
             }
             let mut providers = std::collections::BTreeSet::new();
@@ -315,7 +346,21 @@ impl Setup {
                     return Err("Duplicate provider expectation".into());
                 }
                 text(&a.user_or_alias, 256)?;
-                host(&a.host)?;
+                if let Some(service) = a.provider.cloud_service() {
+                    crate::connections::CloudAccount {
+                        server: a.host.clone(),
+                        user: a.user_or_alias.clone(),
+                        credential_user: a.credential_user.clone().unwrap_or_default(),
+                        subject: a.account_user.clone().unwrap_or_default(),
+                        config_dir: String::new(),
+                    }.validate(service)?;
+                    if a.account_user.as_ref().is_none_or(String::is_empty) {
+                        return Err("Check cloud accounts before exporting: portable expectations require their verified public owner ID".into());
+                    }
+                } else {
+                    host(&a.host)?;
+                    if a.credential_user.is_some() { return Err("Credential-store username metadata applies only to cloud providers".into()); }
+                }
                 if a.user_or_alias.is_empty() {
                     return Err("Expected account is empty".into());
                 }

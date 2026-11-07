@@ -142,7 +142,7 @@ impl Default for Choices {
             tea_login: String::new(),
             tea_host: String::new(),
             azure: CloudAccount::default(),
-            bitbucket: CloudAccount::default(),
+            bitbucket: CloudAccount { server: "https://bitbucket.org".into(), ..Default::default() },
         }
     }
 }

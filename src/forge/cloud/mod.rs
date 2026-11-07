@@ -132,18 +132,6 @@ fn bitbucket_login(account: &CloudAccount) -> Result<Login, String> {
         password: credentials.password,
     })
 }
-/// Fresh import checks verify server-reported ownership before enabling a pending profile.
-pub(crate) fn check_connection(service: Service, account: &CloudAccount) -> Result<String, String> {
-    account.validate(service)?;
-    if !account.selected() {
-        return Err("Choose an expected account name or ID first".into());
-    }
-    let mut context = connections::current();
-    context.error = None;
-    let api = context.run(|| Api::authenticated(service, account.clone(), None))?;
-    Ok(format!("{} as {}", account.server, api.viewer))
-}
-
 /// An explicit local check records the immutable public owner for later exports and requests.
 pub(crate) fn verified_account(
     service: Service,

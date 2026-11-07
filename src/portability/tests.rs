@@ -486,3 +486,45 @@ fn ssh_alias_repository_forces_fresh_key_setup_even_when_the_old_profile_used_an
     );
     Ok(())
 }
+
+#[test]
+fn cloud_portable_expectations_exclude_authentication_folders_and_require_fresh_owner_verification() -> Result<(), String> {
+    let mut settings=Settings::default();
+    let private=std::env::temp_dir().join("AZURE_AUTH_FOLDER_MUST_REMAIN_LOCAL").to_string_lossy().into_owned();
+    settings.user_profiles[0].connections.azure=crate::connections::CloudAccount {
+        server:"https://dev.azure.com/work".into(),
+        user:"work@example.invalid".into(),
+        subject:"azure-public-owner-id".into(),
+        config_dir:private.clone(),
+        ..Default::default()
+    };
+    settings.user_profiles[0].connections.bitbucket=crate::connections::CloudAccount {
+        server:"https://bitbucket.org".into(),
+        user:"{bitbucket-public-owner-id}".into(),
+        subject:"{bitbucket-public-owner-id}".into(),
+        credential_user:"login@example.invalid".into(),
+        ..Default::default()
+    };
+    let file=Setup::new(&settings,&Default::default());
+    let bytes=file.encode()?;
+    let text=String::from_utf8_lossy(&bytes);
+    assert!(!text.contains(&private));
+    assert!(!text.contains("config_dir"));
+    assert!(!text.contains("AZURE_AUTH_FOLDER"));
+    assert!(text.contains("azure-public-owner-id"));
+    let decoded=Setup::decode(&bytes)?;
+    let imported=decoded.profiles[0].materialize(99);
+    assert!(imported.pending_setup());
+    assert!(!imported.connections.azure.selected());
+    assert!(!imported.connections.bitbucket.selected());
+    assert_eq!(imported.pending_setup.as_ref().map(|p|p.accounts.len()),Some(2));
+    let mut malformed=decoded.clone();
+    malformed.profiles[0].setup.accounts[0].host="https://dev.azure.com@other.invalid/work".into();
+    assert!(malformed.validate().is_err());
+    let mut missing_owner=decoded;
+    missing_owner.profiles[0].setup.accounts[0].account_user=None;
+    assert!(missing_owner.validate().is_err());
+    settings.user_profiles[0].connections.azure.subject.clear();
+    assert!(Setup::new(&settings,&Default::default()).encode().is_err());
+    Ok(())
+}

@@ -4,7 +4,7 @@ use egui::{RichText, Ui};
 
 use super::Settings;
 use super::layout::{self, Filter, section};
-use crate::connections::{self, Account};
+use crate::connections::{self, Account, CloudAccount};
 use crate::theme::Tokens;
 
 #[derive(Clone, Default)]
@@ -50,6 +50,14 @@ impl Settings {
                             account_fields(ui, id, tool, account);
                         },
                     );
+                }
+                for (service, account) in [
+                    (crate::forge::CloudService::Azure, &mut profile.connections.azure),
+                    (crate::forge::CloudService::Bitbucket, &mut profile.connections.bitbucket),
+                ] {
+                    card.row(&format!("{} account", service.name()), "azure bitbucket provider account identity", |ui| {
+                        cloud_account_fields(ui, id, service, account);
+                    });
                 }
                 card.row("Forgejo / Gitea login", "tea forge account login alias", |ui| {
                     ui.horizontal_wrapped(|ui| {
@@ -195,4 +203,60 @@ fn account_check(
         );
     }
     host
+}
+
+#[derive(Clone, Default)]
+struct CloudCheck {
+    running: bool,
+    result: Option<Result<CloudAccount, String>>,
+}
+fn cloud_source(account: &CloudAccount) -> CloudAccount {
+    let mut source=account.clone();
+    source.subject.clear();
+    source
+}
+fn cloud_account_fields(ui:&mut Ui, profile:u64, service:crate::forge::CloudService, account:&mut CloudAccount) {
+    let mut changed=false;
+    ui.horizontal_wrapped(|ui| {
+        ui.label("Expected account name or ID");
+        changed|=ui.add(layout::field(&mut account.user).hint_text("Public account name, UUID or Azure unique name").desired_width(layout::fit(ui,250.0))).changed();
+    });
+    ui.horizontal(|ui| {
+        ui.label(if service==crate::forge::CloudService::Azure {"Organization HTTPS URL"} else {"Service"});
+        changed|=ui.add(layout::field(&mut account.server).hint_text(if service==crate::forge::CloudService::Azure {"https://dev.azure.com/organization"}else{"https://bitbucket.org"}).desired_width(layout::fit(ui,300.0))).changed();
+    });
+    match service {
+        crate::forge::CloudService::Azure=>{
+            changed|=ui.add(layout::field(&mut account.config_dir).hint_text("Optional local AZURE_CONFIG_DIR").desired_width(layout::fit(ui,300.0))).changed();
+            note(ui,"Install Azure CLI and sign in locally. gitcraft verifies the Azure DevOps server's authenticated identity before repository requests; it never stores the access token.");
+        }
+        crate::forge::CloudService::Bitbucket=>{
+            changed|=ui.add(layout::field(&mut account.credential_user).hint_text("Credential-store username / Atlassian email (optional)").desired_width(layout::fit(ui,300.0))).changed();
+            note(ui,"Use your local Git credential store for https://bitbucket.org. Enter its public username or Atlassian email here, never a password or API token. The API account ID is verified before repository requests.");
+        }
+    }
+    if changed {account.subject.clear();}
+    let source=cloud_source(account);
+    let key=egui::Id::new(("cloud-account-check",profile,service,source.clone()));
+    let state=ui.ctx().data(|d|d.get_temp::<CloudCheck>(key)).unwrap_or_default();
+    if let Some(result)=state.result {
+        match result {
+            Ok(verified) if cloud_source(&verified)==source=>{
+                account.subject=verified.subject;
+                note(ui,&format!("Verified public owner: {}",account.subject));
+            }
+            Ok(_)=>{},
+            Err(error)=>note(ui,&error),
+        }
+    }
+    if ui.add_enabled(account.selected()&&!state.running,egui::Button::new(if state.running {"Checking provider…"}else{"Check provider account"})).clicked() {
+        ui.ctx().data_mut(|d|d.insert_temp(key,CloudCheck{running:true,result:None}));
+        let account=account.clone();let ctx=ui.ctx().clone();
+        connections::spawn(move||{
+            let result=crate::forge::verify_cloud_account(service,&account);
+            ctx.data_mut(|d|d.insert_temp(key,CloudCheck{running:false,result:Some(result)}));
+            ctx.request_repaint();
+        });
+    }
+    note(ui,"These selections authenticate forge API actions. Git transport still uses the profile's existing SSH/Git credential configuration; portable clones never fall back to an ambient personal login.");
 }

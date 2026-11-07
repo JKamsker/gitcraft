@@ -81,3 +81,12 @@ ref/folder names use a conservative ASCII subset; unsupported names or non-UTF-8
 produce an explicit export/import error. Worktree-specific author overrides, custom
 themes, hook installers, authentication and machine-specific commands require local
 setup. Display settings may be restored independently of profiles.
+
+Azure DevOps and Bitbucket expectations retain only public service/account metadata and
+the verified public owner ID. Optional credential-store usernames are public login
+metadata; Azure CLI authentication directories, access tokens and credential-helper
+passwords are excluded. Check a cloud account before exporting so its public owner can
+be pinned. Import keeps those profiles pending until local authentication has been
+verified again against that owner. An Azure CLI folder must be selected on the new
+machine; no old path is applied. Git transport still requires local SSH/Git credential
+setup, and isolated restoration never falls back to a personal ambient login.

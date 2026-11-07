@@ -10,7 +10,7 @@
 mod cli;
 mod cloud;
 pub(crate) use cli::tool_location;
-pub(crate) use cloud::{Service as CloudService, check_connection as check_cloud_connection};
+pub(crate) use cloud::{Service as CloudService, verified_account as verify_cloud_account};
 mod gitea;
 pub(crate) use gitea::{selected_tea_metadata, selected_tea_secret};
 mod github;

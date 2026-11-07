@@ -34,7 +34,7 @@ pub(super) fn fields(ui: &mut egui::Ui, profile: &UserProfile, fresh: &mut Fresh
             "Required {:?}: {} on {}",
             a.provider, a.user_or_alias, a.host
         ));
-        if a.provider != Provider::Tea {
+        if matches!(a.provider, Provider::Github | Provider::Gitlab | Provider::Azure) {
             ui.label(
                 "Optional local CLI authentication folder (empty uses this machine's CLI store)",
             );
@@ -91,6 +91,17 @@ pub(super) fn verify(
             Provider::Gitlab => {
                 connections::check_account("glab", &account)?;
                 choices.gitlab = account;
+            }
+            Provider::Azure | Provider::Bitbucket => {
+                let service=a.provider.cloud_service().ok_or("Unknown cloud provider")?;
+                let account=connections::CloudAccount {
+                    server:a.host.clone(),user:a.user_or_alias.clone(),
+                    subject:a.account_user.clone().ok_or("The imported provider expectation has no verified public owner")?,
+                    credential_user:a.credential_user.clone().unwrap_or_default(),
+                    config_dir:if a.provider==Provider::Azure {account.config_dir}else{String::new()},
+                };
+                let verified=crate::forge::verify_cloud_account(service,&account)?;
+                match a.provider {Provider::Azure=>choices.azure=verified,Provider::Bitbucket=>choices.bitbucket=verified,_=>return Err("Unknown cloud provider".into())}
             }
             Provider::Tea => {
                 let (host, user) = crate::forge::selected_tea_metadata(&account.user)
