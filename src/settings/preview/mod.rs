@@ -96,9 +96,14 @@ impl Preview {
             Preview::FileList => "The changed files of a commit or the working tree.".to_owned(),
             Preview::GraphRefs => format!(
                 "The room left of the graph for the branch and tag pills: {:.0} px. Names \
-                 longer than fits are cut short with “…”; drag the column's edge in the \
+                 longer than fits keep their {}; drag the column's edge in the \
                  graph's header to change it there.",
-                s.refs_width
+                s.refs_width,
+                if s.branch_names_keep_end {
+                    "end (…xyz)"
+                } else {
+                    "start (xyz…)"
+                }
             ),
             Preview::GraphColumns => "The columns right of each commit's description. Their \
                                       widths are dragged in the graph's header."

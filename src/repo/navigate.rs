@@ -336,6 +336,7 @@ impl RepoTab {
 
     /// Starts comparing two points of history (replacing the comparison shown).
     pub(super) fn compare(&mut self, compare: Compare, ctx: &egui::Context) {
+        self.pr_selection_request = None;
         self.close_pr();
         self.close_range_diff();
         self.file_view = None;
@@ -345,6 +346,15 @@ impl RepoTab {
 
     /// Reads the comparison's files again (the working tree or a branch moved).
     pub(super) fn reload_compare(&mut self, ctx: &egui::Context) {
+        // Background file-system refreshes must not replace the request still resolving a
+        // PR's exact endpoints with a comparison against stale tracking refs.
+        if self
+            .compare
+            .as_ref()
+            .is_some_and(|c| self.pr_selection_request == Some(c.request))
+        {
+            return;
+        }
         self.compare_requests += 1;
         let request = self.compare_requests;
         let Some(c) = &mut self.compare else { return };

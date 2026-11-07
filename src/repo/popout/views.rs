@@ -270,6 +270,7 @@ impl RepoTab {
             }
             Action::Select(_)
             | Action::SelectHash(_)
+            | Action::SelectPr(_)
             | Action::SelectStash(_)
             | Action::OpenPr(_) => {
                 let keep_pr = !matches!(action, Action::OpenPr(_))

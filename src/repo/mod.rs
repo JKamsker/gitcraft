@@ -189,6 +189,8 @@ pub struct RepoTab {
     refs: Refs,
     /// Commits as git listed them.
     history: Vec<Arc<Commit>>,
+    /// A selected pull request's tip, including one with no local or tracking ref.
+    pr_graph_head: Option<Arc<Commit>>,
     has_more: bool,
     loading_more: bool,
     /// The branches hidden from the graph or soloed in it.
@@ -276,6 +278,8 @@ pub struct RepoTab {
     /// What was written on each pull request and not sent, by its number.
     pr_drafts: HashMap<u64, pr_review::PrDraft>,
     compare_requests: u64,
+    /// A PR's exact endpoints are still being fetched for this comparison request.
+    pr_selection_request: Option<u64>,
     file_view: Option<file_view::FileView>,
     /// The recent views, for back and forward.
     nav: nav_history::NavHistory<navigation::View>,
@@ -514,6 +518,7 @@ impl RepoTab {
             load_error: None,
             refs: Refs::default(),
             history: Vec::new(),
+            pr_graph_head: None,
             has_more: false,
             loading_more: false,
             visibility: Default::default(),
@@ -570,6 +575,7 @@ impl RepoTab {
             pr_requests: 0,
             pr_drafts: HashMap::new(),
             compare_requests: 0,
+            pr_selection_request: None,
             file_view: None,
             nav: Default::default(),
             nav_jump: false,

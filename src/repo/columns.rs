@@ -9,7 +9,8 @@
 
 use serde::{Deserialize, Serialize};
 
-pub(super) const MIN_REFS_W: f32 = 210.0;
+/// Enough room for a short branch name such as `dev`, with its pill's padding.
+pub(crate) const MIN_REFS_W: f32 = 70.0;
 pub(super) const MIN_GRAPH_W: f32 = 60.0;
 pub(super) const MIN_COL_W: f32 = 50.0;
 const MIN_DESCRIPTION_W: f32 = 140.0;
@@ -272,14 +273,14 @@ mod tests {
         assert_eq!(shown.refs, MIN_REFS_W);
         assert_eq!(shown.graph, MIN_GRAPH_W);
         assert_eq!(description(&shown, AVAILABLE), MIN_DESCRIPTION_W);
-        assert_eq!(shown.author, 420.0);
+        assert_eq!(shown.author, 560.0);
     }
 
     #[test]
     fn dragging_back_restores_every_squeezed_column() {
         let squeezed = drag(preferred(), None, Bar::Author, -10.0, 100);
-        // From 420 back to the 150 it started at.
-        let restored = drag(squeezed, Some(Bar::Author), Bar::Author, 10.0, 27);
+        // From 560 back to the 150 it started at.
+        let restored = drag(squeezed, Some(Bar::Author), Bar::Author, 10.0, 41);
         assert_eq!(restored.squeezed(AVAILABLE, Some(Bar::Author)), preferred());
     }
 
@@ -287,7 +288,7 @@ mod tests {
     fn squeezed_columns_come_back_in_reverse_order() {
         let squeezed = drag(preferred(), None, Bar::Author, -10.0, 100);
         // At 280 the branch column has its width back; the graph is still 20 short.
-        let shown = drag(squeezed, Some(Bar::Author), Bar::Author, 10.0, 14)
+        let shown = drag(squeezed, Some(Bar::Author), Bar::Author, 10.0, 28)
             .squeezed(AVAILABLE, Some(Bar::Author));
         assert_eq!(shown.author, 280.0);
         assert_eq!(shown.refs, 330.0);
@@ -302,7 +303,7 @@ mod tests {
         };
         let shown = drag(prefs, None, Bar::Date, -10.0, 100).squeezed(AVAILABLE, Some(Bar::Date));
         assert_eq!(shown.author, MIN_COL_W);
-        assert_eq!(shown.date, 370.0);
+        assert_eq!(shown.date, 510.0);
     }
 
     #[test]

@@ -184,6 +184,9 @@ so your config, credentials and hooks apply as usual.
 - Drag the column borders in the header to resize. Right-click the header to pick the columns,
   make the graph column compact (lanes closer together), or _Reset columns_ to their first
   widths.
+- The branch column can shrink to 70 px for short names such as `dev`. Long pill names keep
+  their end (`…xyz`) by default; Settings → Graph → Shortened branch names can keep the start
+  (`xyz…`) instead. Pill icons give way to the name when the column is narrow.
 - Click _GRAPH_ in the header to order history topologically, by commit date (the default) or
   by author date, and to show _First parent only_: a merge without the commits it brought in,
   so main reads one merge per pull request. Kept per repository; the header names the order
@@ -451,7 +454,9 @@ so your config, credentials and hooks apply as usual.
   working tree and the staging exactly as they are. All of them are undone with Ctrl+Z.
 - Pull / merge requests of GitHub (through `gh`), GitLab (through `glab`), Forgejo and Gitea
   (through their API; Codeberg is Forgejo): list, open in the browser, check out, create from a
-  branch. On GitHub, Forgejo and Gitea a click opens one in the big area: description, checks,
+  branch. Click a request to focus its branch pill and show its full patch since the merge base.
+  Double-click opens its details (in the browser for GitLab). On GitHub, Forgejo and Gitea
+  the details open in the big area: description, checks,
   commits, conversation and changed files; comment, review (with comments on lines, pending until
   sent), reply, apply suggested changes, dismiss reviews and merge. Forgejo's and Gitea's API can't
   resolve conversations, so that stays on their web page. _Open in worktree_ (in a request's menu,

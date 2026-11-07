@@ -551,7 +551,7 @@ impl RepoTab {
 
     /// The WIP pseudo-commit (when the tree is dirty), then `history` with its stashes, laid out
     /// as the graph.
-    fn rebuild_rows(&mut self) {
+    pub(super) fn rebuild_rows(&mut self) {
         let old_rows = std::mem::take(&mut self.commits);
         if !self.work.is_clean() {
             self.commits.push(Arc::new(Commit {
@@ -591,6 +591,7 @@ impl RepoTab {
             // Shared with `history`, not copied: tens of thousands of commits may be loaded.
             self.commits.push(Arc::clone(commit));
         }
+        self.insert_pr_graph_head();
         let graph = graph::layout_with(&self.commits, self.log_order.first_parent);
         let index = self
             .commits
@@ -609,6 +610,19 @@ impl RepoTab {
 
     /// Keeps the selection; otherwise starts on the changes, or HEAD.
     fn restore_selection(&mut self, previous: Option<String>, ctx: &egui::Context) {
+        if self
+            .compare
+            .as_ref()
+            .is_some_and(|c| self.pr_selection_request == Some(c.request))
+        {
+            // A PR head not fetched yet has no row. Keep its comparison while a background
+            // refresh chooses a temporary graph cursor; selecting HEAD would close it.
+            self.selected = previous
+                .as_ref()
+                .and_then(|hash| self.index.get(hash).copied())
+                .or_else(|| self.index.get(&self.refs.head).copied());
+            return;
+        }
         // A commit of the reflog view that the graph didn't have: shown there once it has it
         // (made a branch of), kept in the detail pane until then.
         // An operation that left conflicts goes to the changes row first.
