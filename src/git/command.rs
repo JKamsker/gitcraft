@@ -721,7 +721,8 @@ pub(crate) fn local_repair_input(
     for (key, value) in env {
         command.env(key, value);
     }
-    command.args(args);
+    command.env("GIT_NO_LAZY_FETCH", "1");
+    command.arg("--no-lazy-fetch").args(args);
     crate::bounded_process::run_input(
         command,
         Some(input.to_vec()),
