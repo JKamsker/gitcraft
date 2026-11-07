@@ -1,3 +1,5 @@
+mod transaction;
+
 use super::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -304,8 +306,44 @@ pub(crate) fn fix(repo: &Path, plan: &Plan, kind: &str) -> Result<String, String
     )?;
     let after_tree = read(repo, &["rev-parse", &format!("{new}^{{tree}}")], &|| true)?;
     if before_tree != after_tree {
-        run(&["read-tree", "-u", "-m", &plan.head, new], &[])?;
+        let mut hook = transaction::Hook::new(repo, &plan.branch, &plan.head, new)?;
+        let result = git::forecast_run(
+            repo,
+            &[
+                "update-ref",
+                "-m",
+                "gitcraft push preflight fix",
+                &plan.branch,
+                new,
+                &plan.head,
+            ],
+            &hook.environment(),
+            &[0],
+            &|| true,
+        );
+        if result.is_err() {
+            if let Some(evidence) = hook.recovery() {
+                return Err(format!(
+                    "The repair was interrupted and checkout may have started. An owned recovery directory is retained at {evidence} on the repository host, with the original index and old/new object IDs when checkout was attempted. Save concurrent edits and inspect recovery.txt before restoring anything; no automatic rollback overwrote them."
+                ));
+            }
+            return Err("The repair reference transaction was refused before checkout. The index and working files were not changed by the repair.".into());
+        }
+    } else {
+        git::run(
+            Some(repo),
+            &[
+                "update-ref",
+                "-m",
+                "gitcraft push preflight fix",
+                &plan.branch,
+                new,
+                &plan.head,
+            ],
+        )
+        .map_err(|_| {
+            "The branch moved or its update was refused; no checkout was needed.".to_owned()
+        })?;
     }
-    git::run(Some(repo),&["update-ref","-m","gitcraft push preflight fix",&plan.branch,new,&plan.head]).map_err(|_|"The branch moved while fixing history. It was not overwritten; inspect the index before continuing.".to_owned())?;
     Ok("Outgoing history fixed. Reopen preflight to verify it; Ctrl+Z restores the previous history.".into())
 }
