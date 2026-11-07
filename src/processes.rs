@@ -460,16 +460,13 @@ async fn execute(
             }
             result = async {
                 match &mut input {
-                    Some(pipe) => pipe.write(&options.input.as_deref().unwrap_or_default()[written..]).await,
+                    Some(pipe) => write_input(pipe, options.input.as_deref().unwrap_or_default(), &mut written).await,
                     None => std::future::pending().await,
                 }
             } => {
                 match result {
-                    Ok(0) => input = None,
-                    Ok(n) => {
-                        written += n;
-                        if written == options.input.as_ref().map_or(0, Vec::len) { input = None; }
-                    }
+                    Ok(true) => input = None,
+                    Ok(false) => {},
                     Err(e) if e.kind() == io::ErrorKind::BrokenPipe => input = None,
                     Err(e) => stopped = Some(format!("could not pass process its input: {e}")),
                 }
@@ -586,6 +583,27 @@ async fn execute(
     })
 }
 
+/// Windows pipe writes can report acceptance before their blocking I/O finishes. Keep
+/// polling that final write through flush before dropping the handle to deliver EOF.
+/// Each await stays inside the main select so cancellation and deadlines still advance.
+async fn write_input<W: tokio::io::AsyncWrite + Unpin>(
+    pipe: &mut W,
+    bytes: &[u8],
+    written: &mut usize,
+) -> io::Result<bool> {
+    if *written < bytes.len() {
+        let n = pipe.write(&bytes[*written..]).await?;
+        if n == 0 {
+            return Err(io::ErrorKind::WriteZero.into());
+        }
+        *written += n;
+        Ok(false)
+    } else {
+        pipe.flush().await?;
+        Ok(true)
+    }
+}
+
 fn append(output: &mut Vec<u8>, bytes: &[u8], limit: usize, stopped: &mut Option<String>) {
     let keep = bytes.len().min(limit.saturating_sub(output.len()));
     output.extend_from_slice(&bytes[..keep]);
@@ -601,6 +619,66 @@ fn append(output: &mut Vec<u8>, bytes: &[u8], limit: usize, stopped: &mut Option
 mod tests {
     use super::*;
     use std::io::{Read, Write};
+
+    #[test]
+    fn final_buffered_stdin_write_is_flushed_and_its_error_is_observed() {
+        use std::pin::Pin;
+        use std::task::{Context, Poll};
+        struct Buffered {
+            fail: bool,
+            flushed: bool,
+        }
+        impl tokio::io::AsyncWrite for Buffered {
+            fn poll_write(
+                self: Pin<&mut Self>,
+                _: &mut Context<'_>,
+                bytes: &[u8],
+            ) -> Poll<io::Result<usize>> {
+                Poll::Ready(Ok(bytes.len()))
+            }
+            fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+                if !self.flushed {
+                    self.flushed = true;
+                    cx.waker().wake_by_ref();
+                    return Poll::Pending;
+                }
+                Poll::Ready(if self.fail {
+                    Err(io::Error::other("deferred write failed"))
+                } else {
+                    Ok(())
+                })
+            }
+            fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+                unreachable!()
+            }
+        }
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            for fail in [false, true] {
+                let mut pipe = Buffered {
+                    fail,
+                    flushed: false,
+                };
+                let mut written = 0;
+                assert!(
+                    !write_input(&mut pipe, b"input", &mut written)
+                        .await
+                        .unwrap()
+                );
+                assert_eq!(written, 5);
+                assert!(!pipe.flushed, "acceptance is not completion");
+                let result = write_input(&mut pipe, b"input", &mut written).await;
+                assert!(pipe.flushed);
+                if fail {
+                    assert_eq!(result.unwrap_err().to_string(), "deferred write failed");
+                } else {
+                    assert!(result.unwrap());
+                }
+            }
+        });
+    }
 
     /// A real child executable on every OS, independent of shell quoting/tools.
     #[test]
