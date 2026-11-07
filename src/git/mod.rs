@@ -14,6 +14,7 @@ mod reflog;
 mod preview;
 mod refs;
 pub mod simulate;
+pub mod search_query;
 mod status;
 mod submodule;
 mod timed;

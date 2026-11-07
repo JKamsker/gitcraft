@@ -10,6 +10,8 @@ mod menu;
 mod pills;
 mod row;
 mod search;
+pub(super) mod suggest;
+mod suggest_popup;
 
 use egui::{Align2, FontId, Key, Response, Sense, Ui, vec2};
 

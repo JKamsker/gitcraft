@@ -41,6 +41,8 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Double-click a pill to check that branch out (and pull it when its remote is ahead; on the checked-out branch's remote pill, just pull); hover +N to see every branch of the commit, and right-click any of them.",
             "Right-click a commit or a pill for branches, tags, merge, rebase, cherry-pick, revert, reset and more.",
             "Search messages, authors and hashes, or switch to Code to find the commits that added or removed some text.",
+            "Search operators narrow a search and combine with each other and with text: author: and committer: (name or email), path: (a file or folder, letter case as in the repository; *.md works), after: and before: (by commit date: 2024-05-01, 2024-05, 2024, today, yesterday, or a time ago such as 12h, 3d, 2w, 6m for months, 1y), message:, contents: (git log -S), regex: (git log -G), merges: and -merges:. Quote values with spaces: author:\"Jane Doe\". Names and messages ignore the case of A–Z; changes match the case typed unless a name or message is matched too. A hash in the text still finds its commit.",
+            "Typing an operator lists suggestions: authors and committers from history (as .mailmap names them), files and folders of the checked-out commit, dates. ↑ / ↓ highlight one, Tab or Enter puts it in, Esc closes the list. A search written wrong says why under the field.",
             "Drag the borders in the column header to resize; right-click it to pick the columns, make the graph column compact or reset the columns.",
             "Interactive rebase: reorder, reword, squash, fix up or drop commits, then start it.",
             "Drag a branch's pill (or its row on the left) onto another branch or a commit: a menu offers merging, rebasing, an interactive rebase or a fast-forward, those that make sense there. The targets that take it light up; Esc cancels.",
@@ -151,6 +153,7 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("↑ / ↓", "Previous / next commit"),
             ("Cmd+F", "Search commits"),
             ("Enter / Shift+Enter", "Next / previous search result"),
+            ("↑ / ↓ then Tab or Enter", "Pick a search suggestion"),
             ("Cmd+click", "Compare with the selected commit"),
             ("Double-click a pill", "Check out that branch or tag"),
             (

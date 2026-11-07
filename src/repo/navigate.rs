@@ -410,17 +410,29 @@ impl RepoTab {
     pub(super) fn run_search(&mut self, ctx: &egui::Context) {
         let query = self.search.query.trim().to_owned();
         self.search.edited = None;
-        if query.is_empty() {
-            // One still being read answers a query that is gone.
+        self.search.problem = None;
+        let code = self.search.code;
+        let plan = if query.is_empty() {
+            None
+        } else {
+            match git::search_query::prepare(&query, code) {
+                Ok(plan) => Some(plan),
+                Err(e) => {
+                    self.search.problem = Some(e.message);
+                    None
+                }
+            }
+        };
+        let Some(plan) = plan else {
+            // One still being read answers a query that is gone (or can't be searched).
             self.search.running = false;
             self.search.results.clear();
             self.search.matches.clear();
             self.search.searched.clear();
             return;
-        }
+        };
         self.search.running = true;
         let path = self.path.clone();
-        let code = self.search.code;
         // In the branches the graph shows.
         let from = self.log_from.clone();
         // Answered all the same if it panics: the search runs until it is.
@@ -429,11 +441,7 @@ impl RepoTab {
             move |e| Msg::Search(query, code, Err(e))
         };
         super::messages::spawn_or(&self.tx, ctx, failed, move || {
-            let result = if code {
-                git::search_code(&path, from.as_deref(), &query)
-            } else {
-                git::search(&path, from.as_deref(), &query)
-            };
+            let result = git::search_query::run(&path, from.as_deref(), &plan);
             Msg::Search(query, code, result)
         });
     }
@@ -455,6 +463,7 @@ impl RepoTab {
         self.search.searched = query;
         match result {
             Ok(hashes) => {
+                self.search.problem = None;
                 self.search.matches = hashes.iter().cloned().collect();
                 self.search.results = hashes;
                 self.search.current = 0;
@@ -462,7 +471,11 @@ impl RepoTab {
                     self.goto(&first, ctx);
                 }
             }
-            Err(e) => self.status = Some((e, true)),
+            Err(e) => {
+                self.search.results.clear();
+                self.search.matches.clear();
+                self.search.problem = Some(e);
+            }
         }
     }
 
@@ -488,6 +501,9 @@ impl RepoTab {
             self.search.matches.clear();
             self.search.results.clear();
             self.search.searched.clear();
+            self.search.problem = None;
+            // Read again next time: history and files may have changed by then.
+            self.search.suggest.reset();
         }
     }
 }
@@ -530,5 +546,50 @@ mod tests {
         assert!(!tab.search.running);
         assert!(tab.search.matches.is_empty());
         assert!(tab.pending_goto.is_none());
+    }
+
+    /// An operator written wrong is explained under the field, and nothing is searched (nor
+    /// left from the search before).
+    #[test]
+    fn a_query_written_wrong_says_why_and_searches_nothing() {
+        let ctx = egui::Context::default();
+        let mut tab = tab();
+        tab.search.results = vec!["a".to_owned()];
+        tab.search.matches.insert("a".to_owned());
+        tab.search.query = "fix author:".to_owned();
+        tab.run_search(&ctx);
+        assert!(!tab.search.running);
+        assert!(tab.search.results.is_empty() && tab.search.matches.is_empty());
+        let problem = tab.search.problem.clone().unwrap_or_default();
+        assert!(problem.contains("author: needs a name"), "{problem}");
+        // Written right, the hint goes and the search runs.
+        tab.search.query = "fix author:bob".to_owned();
+        tab.run_search(&ctx);
+        assert!(tab.search.running);
+        assert!(tab.search.problem.is_none());
+    }
+
+    /// What git says when a search fails (a regex it can't read) shows under the field.
+    #[test]
+    fn a_failed_search_says_why_under_the_field() {
+        let ctx = egui::Context::default();
+        let mut tab = tab();
+        tab.search.results = vec!["a".to_owned()];
+        tab.search.matches.insert("a".to_owned());
+        tab.search.query = "regex:[".to_owned();
+        tab.search.running = true;
+        let e = "git could not search: invalid regex".to_owned();
+        tab.search_done("regex:[".to_owned(), false, Err(e.clone()), &ctx);
+        assert!(tab.search.results.is_empty() && tab.search.matches.is_empty());
+        // Answered right afterwards, the hint goes.
+        tab.search.running = true;
+        tab.search_done("regex:[".to_owned(), false, Ok(Vec::new()), &ctx);
+        assert!(tab.search.problem.is_none());
+        tab.search_done("regex:[".to_owned(), false, Err(e.clone()), &ctx);
+        assert_eq!(tab.search.problem, Some(e));
+        assert!(!tab.search.running);
+        assert!(tab.status.is_none());
+        tab.toggle_search();
+        assert!(tab.search.problem.is_none());
     }
 }
