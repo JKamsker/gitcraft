@@ -63,6 +63,8 @@ pub struct Settings {
     pub show_detail: bool,
     /// A worktree opens in the tab it was opened from, which then shows its branch.
     pub worktrees_in_same_tab: bool,
+    /// Windows: the tab strip stands in for the system's title bar.
+    pub tabs_in_title_bar: bool,
     /// Changed files in a tree of their folders rather than a flat list.
     pub files_as_tree: bool,
     /// Diffs side by side rather than unified.
@@ -125,6 +127,7 @@ impl Default for Settings {
             show_branches: true,
             show_detail: true,
             worktrees_in_same_tab: true,
+            tabs_in_title_bar: false,
             files_as_tree: true,
             diff_split: false,
             diff_whole_file: false,
@@ -482,6 +485,12 @@ impl Settings {
                             }
                         }
                     });
+                    if cfg!(windows) {
+                        card.row("Title bar", "window frame caption native tabs", |ui| {
+                            ui.checkbox(&mut self.tabs_in_title_bar, "Tabs in the title bar")
+                                .on_hover_text("The tabs take the place of Windows' title bar, as in a browser: drag the space next to them to move the window, double-click it to maximize, and the buttons to minimize, maximize and close are at the end of the strip.");
+                        });
+                    }
                     card.preview(Preview::CodeColors);
                     card.row(
                         "Code colours",

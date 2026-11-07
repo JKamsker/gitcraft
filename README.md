@@ -219,6 +219,11 @@ so your config, credentials and hooks apply as usual.
   date, editor command, default shell and terminal font size, saved identities, SSH sign-ins,
   and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
   Alt+↓ go through the pages.
+- Tabs in the title bar (Windows, Settings → Appearance): the tab strip takes the place of the
+  system's title bar, as in a browser. Drag the space next to the tabs to move the window (it
+  snaps to the screen's edges as usual), double-click it to maximize; minimize, maximize and
+  close sit at the end of the strip, drawn as Windows 11 draws them, and the window's edges
+  resize it.
 - Previews beside the settings: point at a setting and a panel on the right (above the page in
   a narrow window) draws what it does with the values set now, as the app draws it. The branch
   column measured on a small graph with long branch names cut to fit, the columns at their
@@ -388,6 +393,7 @@ was made this way, on a demo repository.
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |
 | `src/shell_path.rs`      | on macOS, the login shell's PATH for the commands gitcraft starts                  |
 | `src/remote/` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
+| `src/app/title_bar.rs`   | Windows: the tab strip as the title bar (moving, caption buttons, resizing)       |
 | `src/settings/`          | user settings, profiles, the settings pages, the theme gallery and the previews    |
 | `src/manual.rs`          | the manual (F1): features and keyboard shortcuts                                   |
 | `src/theme/`             | colour tokens, fonts, egui style; themes: catalogue, palettes, theme files         |

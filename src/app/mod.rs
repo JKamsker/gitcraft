@@ -11,6 +11,7 @@ mod tab_strip;
 mod tabs;
 #[cfg(test)]
 mod tests;
+mod title_bar;
 mod update_banner;
 mod worktrees;
 
@@ -122,6 +123,8 @@ pub struct App {
     /// The folders of the last repository tabs closed, the last one at the end.
     closed: Vec<PathBuf>,
     tab_drag: Option<TabDrag>,
+    /// The window has the system's title bar (see `title_bar`).
+    decorated: bool,
 }
 
 impl App {
@@ -164,6 +167,7 @@ impl App {
             toasts: Vec::new(),
             closed: Vec::new(),
             tab_drag: None,
+            decorated: title_bar::decorated_now(),
             error: None,
             was_focused: true,
             clone_form: None,
@@ -182,6 +186,8 @@ impl App {
             skipped_version: saved.skipped_version,
             tab_looks: saved.tab_looks,
         };
+        // Before the window first shows, so its title bar doesn't flash.
+        title_bar::apply(ctx, &app.settings, &mut app.decorated);
         update::clean_up();
         let mut kept = Vec::new();
         if app.git_version.is_ok() {
@@ -464,6 +470,7 @@ impl eframe::App for App {
         self.settings = Settings::get(&ctx);
         // A theme file being edited, VS Code's theme switched: shown as they change.
         theme::poll(&ctx);
+        title_bar::apply(&ctx, &self.settings, &mut self.decorated);
 
         // eframe shows the window after the first frame; maximize it on the next one.
         if MAXIMIZE_WHEN_SHOWN.load(Ordering::Relaxed) {
@@ -508,13 +515,19 @@ impl eframe::App for App {
             }
         }
 
+        // The caption buttons go up to the window's corner.
+        let strip_right = if title_bar::wanted(&self.settings) {
+            0
+        } else {
+            6
+        };
         egui::Panel::top("tabs")
             .frame(
                 egui::Frame::new()
                     .fill(t.tab_strip)
                     .inner_margin(egui::Margin {
                         left: 6,
-                        right: 6,
+                        right: strip_right,
                         top: 0,
                         bottom: 0,
                     }),
@@ -536,6 +549,9 @@ impl eframe::App for App {
         self.manual_ui(&ctx);
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
+        if title_bar::wanted(&self.settings) {
+            title_bar::resize_edges(&ctx);
+        }
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
@@ -607,6 +623,13 @@ pub fn warm_up() {
 /// Once the window closed: starts the version an update put in place, if it did.
 pub fn after_exit() {
     update::relaunch();
+}
+
+/// Whether to make the window with the system's title bar: not when the saved settings put the
+/// tabs in its place. Call it once, before the window is made.
+pub fn window_decorated() -> bool {
+    let app_ron = eframe::storage_dir("gitcraft").map(|dir| dir.join("app.ron"));
+    title_bar::decorated_at_start(app_ron.as_deref())
 }
 
 /// The window and taskbar icon (the `.exe` gets the same picture from `build.rs`).

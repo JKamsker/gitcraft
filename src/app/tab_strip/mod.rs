@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use egui::{Color32, Galley, Rect, Sense, Ui, pos2, vec2};
+use egui::{Color32, Galley, Rect, Sense, Ui, UiBuilder, pos2, vec2};
 
 use super::{App, Tab};
 use crate::icons;
@@ -93,7 +93,19 @@ impl App {
     pub(super) fn tab_strip(&mut self, ui: &mut Ui) {
         let t = Tokens::get(ui.ctx());
         let mut actions = StripActions::default();
-        ui.horizontal(|ui| {
+        let title_bar = super::title_bar::wanted(&self.settings);
+        // Room to move the window and the caption buttons keep their place at the end however
+        // many tabs there are: the tabs are cut off before them.
+        let end = if title_bar {
+            super::title_bar::reserved_width(ui.ctx())
+        } else {
+            0.0
+        };
+        let strip = ui.available_rect_before_wrap();
+        let row = Rect::from_min_size(strip.min, vec2(strip.width() - end, TAB_H));
+        let layout = egui::Layout::left_to_right(egui::Align::Center);
+        ui.scope_builder(UiBuilder::new().max_rect(row).layout(layout), |ui| {
+            ui.set_clip_rect(row.intersect(ui.clip_rect()));
             ui.spacing_mut().item_spacing.x = GAP;
             self.tabs_row(ui, &t, &mut actions);
             ui.add_space(4.0);
@@ -103,8 +115,17 @@ impl App {
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 self.bar_buttons(ui, &t);
+                if title_bar {
+                    // What is left between `+` and the buttons moves the window too.
+                    let rest = ui.available_rect_before_wrap();
+                    super::title_bar::drag_area(ui, rest, "between");
+                }
             });
         });
+        if title_bar {
+            let rect = Rect::from_min_size(pos2(row.right(), strip.top()), vec2(end, TAB_H));
+            super::title_bar::strip_end(ui, &t, rect);
+        }
         self.apply_strip_actions(actions, ui.ctx());
     }
 
