@@ -14,6 +14,7 @@ impl RepoTab {
         let t = Tokens::get(ui.ctx());
         let title = match state.page {
             Page::Migration => "File migration map",
+            Page::CodeMoves => "Code moved across files",
             Page::Lens => "Three-state staging lens",
             Page::Matrix => "File versions across branches",
         };
@@ -32,8 +33,37 @@ impl RepoTab {
                 acts.push(Action::CloseFileComparison);
             }
         });
-        ui.label(RichText::new("Raw snapshots · refresh after repository changes · no decrypted data or automatic downloads · 2 MiB per version").small().color(t.text_dim));
+        ui.label(
+            RichText::new(
+                "Raw snapshots · refresh after repository changes · no automatic downloads",
+            )
+            .small()
+            .color(t.text_dim),
+        );
         match state.page {
+            Page::CodeMoves => {
+                ui.horizontal_wrapped(|ui| {
+                    ui.selectable_value(&mut state.source, 0, "Staged");
+                    ui.selectable_value(&mut state.source, 3, "Working copy");
+                    ui.selectable_value(&mut state.source, 1, "Commit");
+                    ui.selectable_value(&mut state.source, 2, "Between commits");
+                    ui.selectable_value(&mut state.source, 4, "Commit → working copy");
+                });
+                ui.horizontal_wrapped(|ui| {
+                    if matches!(state.source, 2 | 4) {
+                        ui.label("From");
+                        ui.text_edit_singleline(&mut state.from);
+                    }
+                    if matches!(state.source, 1 | 2) {
+                        ui.label("To / commit");
+                        ui.text_edit_singleline(&mut state.to);
+                    }
+                    if ui.button("Find moved code").clicked() {
+                        acts.push(Action::RefreshFileComparison);
+                    }
+                });
+                ui.label("Compare deleted and added blocks across tracked files; whitespace around lines is ignored. Stage newly created files first. Analysis is bounded to 300 files, 50,000 lines and 40 seconds; encrypted files are excluded.");
+            }
             Page::Migration => {
                 ui.horizontal_wrapped(|ui| {
                     ui.selectable_value(&mut state.source, 0, "Staged moves");
@@ -128,6 +158,7 @@ impl RepoTab {
         if let Some(data) = data {
             ui.separator();
             match data.as_ref() {
+                Data::CodeMoves(m) => code_moves::view(ui, state, m, &t, acts),
                 Data::Migration(m) => migration(ui, state, m, &t, acts),
                 Data::Matrix(m) => matrix(ui, state, m, &t, acts),
                 Data::Lens(l) => lens(ui, state, l, &t, self.busy_op.is_none(), acts),

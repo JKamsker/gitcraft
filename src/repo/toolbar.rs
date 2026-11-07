@@ -59,6 +59,10 @@ impl RepoTab {
             ui.menu_button("File views", |ui| {
                 for (label, page) in [
                     (
+                        "Code moved across files",
+                        super::file_comparison::Page::CodeMoves,
+                    ),
+                    (
                         "File migration map",
                         super::file_comparison::Page::Migration,
                     ),

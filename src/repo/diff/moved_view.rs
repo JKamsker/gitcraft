@@ -132,18 +132,23 @@ pub(super) fn panel(
         .show(ui, |ui| {
             header(ui, t, &data.lines, block, open, acts);
             ui.add_space(6.0);
-            let font = theme::mono(12.0);
-            ui.spacing_mut().item_spacing.y = 0.0;
-            egui::ScrollArea::vertical()
-                .id_salt(("diff_moved_rows", open.block))
-                .max_height(MAX_H)
-                .auto_shrink([false, true])
-                .show_rows(ui, ROW_H, open.rows.len(), |ui, range| {
-                    for r in &open.rows[range] {
-                        let text = data.lines.get(r.line).map_or("", |l| l.text.as_str());
-                        row(ui, t, &font, r.mark, text, r.changed);
-                    }
-                });
+            content(ui, t, data, open);
+        });
+}
+
+/// Read-only moved content, also used by the change-wide source/destination view.
+pub(in crate::repo) fn content(ui: &mut Ui, t: &Tokens, data: &DiffData, open: &Opened) {
+    let font = theme::mono(12.0);
+    ui.spacing_mut().item_spacing.y = 0.0;
+    egui::ScrollArea::vertical()
+        .id_salt(("diff_moved_rows", open.block))
+        .max_height(MAX_H)
+        .auto_shrink([false, true])
+        .show_rows(ui, ROW_H, open.rows.len(), |ui, range| {
+            for r in &open.rows[range] {
+                let text = data.lines.get(r.line).map_or("", |l| l.text.as_str());
+                row(ui, t, &font, r.mark, text, r.changed);
+            }
         });
 }
 

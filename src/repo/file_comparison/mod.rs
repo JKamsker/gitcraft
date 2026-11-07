@@ -1,4 +1,5 @@
 //! Separate raw snapshot panes. Opening one drops DiffView and its reading-mode lifetimes.
+mod code_moves;
 mod model;
 #[cfg(test)]
 mod tests;
@@ -53,11 +54,13 @@ impl ReadOnlyComparison {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Page {
     Migration,
+    CodeMoves,
     Lens,
     Matrix,
 }
 enum Data {
     Migration(files::Migration),
+    CodeMoves(code_moves::CodeMoves),
     Lens(Box<model::LensData>),
     Matrix(files::Matrix),
 }
@@ -71,6 +74,7 @@ pub(super) struct State {
     data: Option<Result<Arc<Data>, String>>,
     pair: Option<Result<model::Pair, String>>,
     source: u8,
+    code_move: Option<usize>,
     from: String,
     to: String,
     path: String,
@@ -98,6 +102,7 @@ impl State {
         if clear {
             self.data = None;
             self.cells.clear();
+            self.code_move = None;
         }
         self.request
     }
@@ -158,6 +163,28 @@ impl RepoTab {
             .selected_hash()
             .filter(|h| h != super::WIP_HASH)
             .unwrap_or_else(|| "HEAD".into());
+        let (source, from, to) = if page == Page::CodeMoves {
+            match self.diff.as_ref().map(|d| &d.key) {
+                Some(DiffKey::Work(f)) => (
+                    if f.area == crate::git::Area::Staged {
+                        0
+                    } else {
+                        3
+                    },
+                    "HEAD~1".into(),
+                    revision.clone(),
+                ),
+                Some(DiffKey::Commit { hash, .. }) => (1, "HEAD~1".into(), hash.clone()),
+                Some(DiffKey::Range { from, to, .. }) => (
+                    if to.is_some() { 2 } else { 4 },
+                    from.clone(),
+                    to.clone().unwrap_or(revision.clone()),
+                ),
+                _ => (0, "HEAD~1".into(), revision.clone()),
+            }
+        } else {
+            (0, "HEAD~1".into(), revision)
+        };
         self.leave_pages();
         self.diff = None;
         self.file_view = None;
@@ -171,9 +198,10 @@ impl RepoTab {
             loading: false,
             data: None,
             pair: None,
-            source: 0,
-            from: "HEAD~1".into(),
-            to: revision,
+            source,
+            code_move: None,
+            from,
+            to,
             path,
             previous,
             folder: String::new(),
@@ -217,6 +245,9 @@ impl RepoTab {
                         .is_some_and(|g| g.load(Ordering::Relaxed) == request)
                 };
                 let result = match page {
+                    Page::CodeMoves => {
+                        code_moves::read(&repo, source, &from, &to, &active).map(Data::CodeMoves)
+                    }
                     Page::Migration => files::read_migration(
                         &repo,
                         &match source {

@@ -472,6 +472,13 @@ impl RepoTab {
                                     crate::repo::file_comparison::Page::Lens,
                                 ));
                             }
+                            if !matches!(view.key, DiffKey::Remerge { .. })
+                                && ui.button("Moves across files").clicked()
+                            {
+                                acts.push(Action::OpenFileComparison(
+                                    crate::repo::file_comparison::Page::CodeMoves,
+                                ));
+                            }
                             structural::toggle(ui, view.structural.enabled, acts);
                             ui.add_space(4.0);
                         }

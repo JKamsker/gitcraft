@@ -150,6 +150,7 @@ pub(crate) struct DiffView {
     pub(super) at_change: Option<(usize, f32)>,
     /// A line (by its index in the diff) to scroll to on the next frame.
     pub(super) jump_line: Option<usize>,
+    pub(super) pending_line_target: Option<(Option<u32>, Option<u32>)>,
     /// The moved block whose two places are shown together.
     pub(super) moved: Option<diff::moved_view::Opened>,
     /// Unchanged lines opened from their folds (by their number on the new side), opened again
@@ -206,6 +207,7 @@ impl DiffView {
             jump: None,
             at_change: None,
             jump_line: None,
+            pending_line_target: None,
             moved: None,
             revealed: Default::default(),
             auto_opened: Default::default(),
@@ -255,6 +257,17 @@ impl DiffView {
         // The blocks are found again, numbered anew.
         self.moved = None;
         self.reopen();
+        if let Some((old, new)) = self.pending_line_target.take() {
+            if let Some(Ok(data)) = &self.data {
+                self.jump_line = data.lines.iter().position(|l| {
+                    if let Some(n) = new {
+                        l.kind != diff::Kind::Del && l.new == Some(n)
+                    } else {
+                        old.is_some() && l.old == old
+                    }
+                });
+            }
+        }
         self.moved = match (&self.data, place) {
             (Some(Ok(data)), Some(place)) => (0..data.moves.blocks.len())
                 .find(|&b| diff::moved_view::Opened::place(data, b) == Some(place))

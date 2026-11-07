@@ -496,3 +496,46 @@ fn emulated_symlinks_keep_the_index_type_like_git_add_and_guard_config_changes()
     assert_eq!(r.git(&["ls-files", "--stage", "link"])?, native_result);
     Ok(())
 }
+
+#[test]
+fn actual_cross_file_move_opens_both_places_and_navigates_after_the_patch_arrives()
+-> Result<(), String> {
+    let r = Repo::new()?;
+    let content = "fn important_validation_function(value: i32) {\n    validate_input(value);\n    record_the_validation_result(value);\n}\n";
+    r.write("source.rs", content)?;
+    r.commit()?;
+    r.write("source.rs", "")?;
+    r.write("destination.rs", content)?;
+    r.git(&["add", "."])?;
+    let mut h = harness(&r, Page::CodeMoves)?;
+    settle(&mut h)?;
+    h.get_by_label("source.rs:1 → destination.rs:1").click();
+    h.run_steps(2);
+    assert!(h.query_by_label_contains("M1 · Moved to").is_some());
+    h.get_by_label("Open destination destination.rs:1").click();
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        h.run_steps(1);
+        if h.state().0.diff.as_ref().is_some_and(|v| v.data.is_some()) {
+            break;
+        }
+        if std::time::Instant::now() > until {
+            return Err("Destination patch did not arrive".into());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    assert!(h.state().0.file_comparison.is_none());
+    let view = h.state().0.diff.as_ref().ok_or("destination")?;
+    assert_eq!(view.key.path(), "destination.rs");
+    let data = view
+        .data
+        .as_ref()
+        .ok_or("patch")?
+        .as_ref()
+        .map_err(Clone::clone)?;
+    assert_eq!(
+        data.lines[view.jump_line.ok_or("line target")?].new,
+        Some(1)
+    );
+    Ok(())
+}

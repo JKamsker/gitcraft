@@ -560,6 +560,11 @@ impl RepoTab {
                 Action::DvcPull,
             ),
             (
+                "Code moved across files".into(),
+                "refactor moved block".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::CodeMoves),
+            ),
+            (
                 "File migration map".into(),
                 "files".into(),
                 Action::OpenFileComparison(super::file_comparison::Page::Migration),

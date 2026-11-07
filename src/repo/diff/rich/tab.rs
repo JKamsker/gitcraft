@@ -83,10 +83,13 @@ impl RepoTab {
     pub(in crate::repo) fn diff_go_to_line(&mut self, old: Option<u32>, new: Option<u32>) {
         self.diff_rich = None;
         self.diff_as_file = false;
+        self.diff_rendered = false;
         if let Some(view) = &mut self.diff {
             view.rich = None;
             if let Some(Ok(data)) = &view.data {
                 view.jump_line = line_index(&data.lines, old, new);
+            } else {
+                view.pending_line_target = Some((old, new));
             }
         }
     }
