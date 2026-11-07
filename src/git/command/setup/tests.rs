@@ -152,6 +152,30 @@ fn network_setup_clone_pins_https_and_explicit_profile_authentication_under_host
         assert!(root.join("netrc-was-isolated").exists());
         drop(workspace);
         assert!(!isolated_home.exists());
+        // A secondary fetch uses an owned fresh Git directory, not the hostile parent
+        // or profile includes, and must reach the same selected helper boundary.
+        let fetched = root.join("owned-secondary-target");
+        std::fs::create_dir(&fetched).map_err(|e| e.to_string())?;
+        crate::git::practice_run(&fetched, &["init", "-q"])?;
+        let CloneCommand { command, workspace } =
+            profile.run(|| fetch_command(&fetched, expected, "secondary", &exe))?;
+        let out = setup_process(command, &|| true, Duration::from_secs(10))?;
+        assert!(
+            !out.status.success(),
+            "Recording transport refuses a real connection"
+        );
+        drop(workspace);
+        let transport =
+            std::fs::read_to_string(root.join("https-args")).map_err(|e| e.to_string())?;
+        assert_eq!(transport.lines().collect::<Vec<_>>(), [expected, expected]);
+        let credentials =
+            std::fs::read_to_string(root.join("credentials")).map_err(|e| e.to_string())?;
+        assert!(
+            credentials.contains("username=expected-work")
+                && credentials.contains("password=FIXTURE_SELECTED_TOKEN")
+        );
+        assert!(!root.join("ambient-executed").exists());
+        assert!(!root.join("wrong-ssh-host").exists());
         std::fs::remove_file(root.join("selected-args")).map_err(|e| e.to_string())?;
         let CloneCommand { command, workspace } = connections::Context::default().run(|| {
             clone_command(
