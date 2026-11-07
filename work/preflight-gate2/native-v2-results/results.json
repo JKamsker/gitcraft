@@ -1,0 +1,177 @@
+{
+  "verdict": "PASS_DIAGNOSTIC_ONLY; production feature remains FAIL/unaccepted",
+  "source_commit": "fb8428f369c163c05bab06eb317687e2d9cb08fe",
+  "compiler_binding_commit": "17aeeb0eb7f5d0e0cdd8c01f7894e8f19757eec7",
+  "production_protocol_unchanged": true,
+  "cases": [
+    {
+      "case": "native-files-sha1",
+      "outer": "1 passed,0failed",
+      "isolated_child": "1 passed,0failed",
+      "native_status": "exit status: 0",
+      "mutation_stderr": null,
+      "hashes": {
+        "native-committed.ok": "43d497a346b3cdfcc09c2751f3f13aed8bc72094d318f64f7d2ebce3a570878e",
+        "native-input-prepared": "9896f97ffa3611b7c1b4390e25b0ba101619d872c2030f596a456aee1a1ed602",
+        "native-transaction-input": "48710c513a0e9e2f1a184de413b3e7d44f96f4bdb91feb7ff2b05dd530c003a0",
+        "outer.log": "585df12efd8f956af302a56c2d5f15387532b7743fcbc6f6cd402c7d4c953de9",
+        "native-args-prepared": "386cd37e88e71809c6198b993f41428a3a837e0de96ca2610f406bbd2db6a878",
+        "native.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "native-input-committed": "9896f97ffa3611b7c1b4390e25b0ba101619d872c2030f596a456aee1a1ed602",
+        "case.json": "374b8d183d212bb769f48437c2edb7cbfaa6bf1819b014bde1bc1c291fd25666",
+        "child.stdout": "7580da937e8050d1387468accff9bd05e36636a8afa3c843e08bbe810b9dc291",
+        "native.stdout": "2c64d63a7722739106d43f24fdc94fd3dce0bdde4926cfcffaf255229409ec66",
+        "native-prepared.ok": "95c19bf47e6d4df3b6cc49c148972e4a282c8ae0902d29a1c96357df4f64bf0d",
+        "native-args-committed": "ead7e2d4fc77badac1acfe250f7cb575d89ea984c02d55ba154cd6c57f340abd",
+        "child.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "native-files-sha256",
+      "outer": "1 passed,0failed",
+      "isolated_child": "1 passed,0failed",
+      "native_status": "exit status: 0",
+      "mutation_stderr": null,
+      "hashes": {
+        "native-committed.ok": "43d497a346b3cdfcc09c2751f3f13aed8bc72094d318f64f7d2ebce3a570878e",
+        "native-input-prepared": "275299b494159adbc4c08df173ddfc5ae3d3bcbd43ebb98e582d318601e323ba",
+        "native-transaction-input": "623c3b1f8eb7f1f2aa1b5b4ac9566005f480e8403ac985889053f9d88c05f62f",
+        "outer.log": "0b2c19a72a2f951ad62cde5c689c2a96c948a719183c0b82b6e11481ca9a04ec",
+        "native-args-prepared": "386cd37e88e71809c6198b993f41428a3a837e0de96ca2610f406bbd2db6a878",
+        "native.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "native-input-committed": "275299b494159adbc4c08df173ddfc5ae3d3bcbd43ebb98e582d318601e323ba",
+        "case.json": "d96efe03d129b27c2770881bd3e28b44876377d69bd18b55e62fd368df56d58e",
+        "child.stdout": "a991c1866053655749815eef91998d8511c2d265f68230d500821422f456e118",
+        "native.stdout": "2c64d63a7722739106d43f24fdc94fd3dce0bdde4926cfcffaf255229409ec66",
+        "native-prepared.ok": "95c19bf47e6d4df3b6cc49c148972e4a282c8ae0902d29a1c96357df4f64bf0d",
+        "native-args-committed": "ead7e2d4fc77badac1acfe250f7cb575d89ea984c02d55ba154cd6c57f340abd",
+        "child.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "native-reftable-sha1",
+      "outer": "1 passed,0failed",
+      "isolated_child": "1 passed,0failed",
+      "native_status": "exit status: 0",
+      "mutation_stderr": null,
+      "hashes": {
+        "native-committed.ok": "43d497a346b3cdfcc09c2751f3f13aed8bc72094d318f64f7d2ebce3a570878e",
+        "native-input-prepared": "24628b8511770342971e4a8ef7a13ed018d2d102acbbfb9e35deb04bf784425b",
+        "native-transaction-input": "e0f691c289cf28abeb1ed30fdfe9a3f18c91cfaa99f3a6d846264764c2a7da56",
+        "outer.log": "068a15bce26662976f9f08601a58cbb7e10beefd8135c00c28806e29964a65d8",
+        "native-args-prepared": "386cd37e88e71809c6198b993f41428a3a837e0de96ca2610f406bbd2db6a878",
+        "native.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "native-input-committed": "24628b8511770342971e4a8ef7a13ed018d2d102acbbfb9e35deb04bf784425b",
+        "case.json": "f68ec5945d979d2c4441f06671046d5e440967a3c97abfbb6e28bd46f217b64d",
+        "child.stdout": "7580da937e8050d1387468accff9bd05e36636a8afa3c843e08bbe810b9dc291",
+        "native.stdout": "2c64d63a7722739106d43f24fdc94fd3dce0bdde4926cfcffaf255229409ec66",
+        "native-prepared.ok": "95c19bf47e6d4df3b6cc49c148972e4a282c8ae0902d29a1c96357df4f64bf0d",
+        "native-args-committed": "ead7e2d4fc77badac1acfe250f7cb575d89ea984c02d55ba154cd6c57f340abd",
+        "child.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "native-reftable-sha256",
+      "outer": "1 passed,0failed",
+      "isolated_child": "1 passed,0failed",
+      "native_status": "exit status: 0",
+      "mutation_stderr": null,
+      "hashes": {
+        "native-committed.ok": "43d497a346b3cdfcc09c2751f3f13aed8bc72094d318f64f7d2ebce3a570878e",
+        "native-input-prepared": "a64a25a6606cf64cb1a8dff18a7285c7ff239644dc21ada100ededc5414aa59d",
+        "native-transaction-input": "5bfd93eaca4f5cc8bda3e88cc6d15431dcb984ff0a0b5a22260e832a5e1412aa",
+        "outer.log": "86e9c27b8890078ecabb3f2289ccf938411da786090086689b67601f623abb63",
+        "native-args-prepared": "386cd37e88e71809c6198b993f41428a3a837e0de96ca2610f406bbd2db6a878",
+        "native.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "native-input-committed": "a64a25a6606cf64cb1a8dff18a7285c7ff239644dc21ada100ededc5414aa59d",
+        "case.json": "e8985dbef59f0a82eec0ee073be897f6170f3424e5cfacd2eb2932f0f867f0d2",
+        "child.stdout": "a991c1866053655749815eef91998d8511c2d265f68230d500821422f456e118",
+        "native.stdout": "2c64d63a7722739106d43f24fdc94fd3dce0bdde4926cfcffaf255229409ec66",
+        "native-prepared.ok": "95c19bf47e6d4df3b6cc49c148972e4a282c8ae0902d29a1c96357df4f64bf0d",
+        "native-args-committed": "ead7e2d4fc77badac1acfe250f7cb575d89ea984c02d55ba154cd6c57f340abd",
+        "child.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "native-switch-head",
+      "outer": "1 passed,0failed",
+      "isolated_child": "1 passed,0failed",
+      "native_status": "exit status: 0",
+      "mutation_stderr": "error: cannot lock ref 'HEAD': Unable to create '/workspace/work/push-preflight-gate2-v2-native-switch-head/repository ' quoted \\ path/.git/HEAD.lock': File exists.\n\nAnother git process seems to be running in this repository, e.g.\nan editor opened by 'git commit'. Please make sure all processes\nare terminated then try again. If it still fails, a git process\nmay have crashed in this repository earlier:\nremove the file manually to continue.\n",
+      "hashes": {
+        "native-committed.ok": "43d497a346b3cdfcc09c2751f3f13aed8bc72094d318f64f7d2ebce3a570878e",
+        "native-input-prepared": "cf11af8e4a0bf15179476b92a3f94eed0e854d53b58d83eeb9a009c11e5d4a55",
+        "native-transaction-input": "2ed20682c2c6c54e8d6d7d3cf898c9ebc18dde4ac0f8d1dda89e318c9cd7d3ee",
+        "mutation.stderr": "c3923e8e38760adb19150d61909183a98274816ad0a305f29b025d047a461667",
+        "outer.log": "5d837cba2487c687e150d6435e9b547fc3939855b83c26421286fe95ca9ad60a",
+        "native-args-prepared": "386cd37e88e71809c6198b993f41428a3a837e0de96ca2610f406bbd2db6a878",
+        "native.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "native-input-committed": "cf11af8e4a0bf15179476b92a3f94eed0e854d53b58d83eeb9a009c11e5d4a55",
+        "case.json": "ee5b742d34d5384e0fd44991a7532082a677e2fec57240655cc32de0010378ea",
+        "mutation.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "child.stdout": "be065165fb89fb7b2065886f74c7979aea61c69373149a895e156c21dcf9a8b0",
+        "mutation-status": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+        "native.stdout": "2c64d63a7722739106d43f24fdc94fd3dce0bdde4926cfcffaf255229409ec66",
+        "native-prepared.ok": "95c19bf47e6d4df3b6cc49c148972e4a282c8ae0902d29a1c96357df4f64bf0d",
+        "native-args-committed": "ead7e2d4fc77badac1acfe250f7cb575d89ea984c02d55ba154cd6c57f340abd",
+        "child.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "native-detach-head",
+      "outer": "1 passed,0failed",
+      "isolated_child": "1 passed,0failed",
+      "native_status": "exit status: 0",
+      "mutation_stderr": "fatal: update_ref failed for ref 'HEAD': cannot lock ref 'HEAD': Unable to create '/workspace/work/push-preflight-gate2-v2-native-detach-head/repository ' quoted \\ path/.git/HEAD.lock': File exists.\n\nAnother git process seems to be running in this repository, e.g.\nan editor opened by 'git commit'. Please make sure all processes\nare terminated then try again. If it still fails, a git process\nmay have crashed in this repository earlier:\nremove the file manually to continue.\n",
+      "hashes": {
+        "native-committed.ok": "43d497a346b3cdfcc09c2751f3f13aed8bc72094d318f64f7d2ebce3a570878e",
+        "native-input-prepared": "362af2cd5499782666e69d12dd43b0706f00d20b5b9165d8b73177d4202aba08",
+        "native-transaction-input": "87d98271e9120a530fa956cf109b01d60825aac18b49915af608349cba9ed8a3",
+        "mutation.stderr": "0d3a593aac4d218b5a5fa6704cbb9d48bbaefc37fab587bc416da380cd19bd4f",
+        "outer.log": "d419a007249d84913c0e61cf5dd0973eda6d8ef26d7d7a67fbbfdb7cd8b6085c",
+        "native-args-prepared": "386cd37e88e71809c6198b993f41428a3a837e0de96ca2610f406bbd2db6a878",
+        "native.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "native-input-committed": "362af2cd5499782666e69d12dd43b0706f00d20b5b9165d8b73177d4202aba08",
+        "case.json": "741adc3d17fd8e340e50a3f1dba1ad6c508e50741f42f2ab6d16a3bae5a48224",
+        "mutation.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "child.stdout": "83aff9cd4b034865e577995074d11a80f04cbea93fc184648918a57847a81260",
+        "mutation-status": "56292515f7d3a7110811eb8de26b3f75f82a0766aa5a1fd66ebcfcb84fe6d5ff",
+        "native.stdout": "2c64d63a7722739106d43f24fdc94fd3dce0bdde4926cfcffaf255229409ec66",
+        "native-prepared.ok": "95c19bf47e6d4df3b6cc49c148972e4a282c8ae0902d29a1c96357df4f64bf0d",
+        "native-args-committed": "ead7e2d4fc77badac1acfe250f7cb575d89ea984c02d55ba154cd6c57f340abd",
+        "child.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "native-prelock-switch",
+      "outer": "1 passed,0failed",
+      "isolated_child": "1 passed,0failed",
+      "native_status": "exit status: 128",
+      "mutation_stderr": null,
+      "hashes": {
+        "native-args-aborted": "7c73de6bcd6f78379cac7ecea08492432c7057088cd95e16021fb8bbe5966783",
+        "native-input-prepared": "0fb3a9638726fd1740cf79e04f007990cc5db5a7cc39560a602a0331d203824c",
+        "native-transaction-input": "87d98271e9120a530fa956cf109b01d60825aac18b49915af608349cba9ed8a3",
+        "outer.log": "9d776d73753fff7ebae22d212f050a534ff2fe2447e0d5152af67116ac7a96b1",
+        "native-args-prepared": "386cd37e88e71809c6198b993f41428a3a837e0de96ca2610f406bbd2db6a878",
+        "native-input-aborted": "0fb3a9638726fd1740cf79e04f007990cc5db5a7cc39560a602a0331d203824c",
+        "native.stderr": "fa7f12fc91dff1bd40445ba2795a24d29268a54debb04c7a31d20cea08345d41",
+        "case.json": "8c0145faf87ce4702c3876fc689ae8657d77c3876e59dfa549b96d2c2d5f3411",
+        "child.stdout": "9e4a6769ebec2501738b87a7523825839486de81e34f54c1dbe4f16ec95f6318",
+        "native.stdout": "b8c47225f6122fb05d09b8cda3890b910a5953658dc7f76bfb40aa897da0b14f",
+        "child.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "findings": [
+    "Native update HEAD new old succeeds on files/reftable x sha1/sha256 without separate symref-verify or explicit currentbranch update",
+    "reference-transaction receives exactly expected realbranch old/new line; symbolic HEAD checked before/after testhook",
+    "Actual nested symbolic-ref HEAD and detach update-ref --no-deref HEAD both refused on owned HEAD.lock; outer intended native transaction succeeded",
+    "Pre-lock HEAD switched to same-tip other branch; exact target validation rejected transaction and retained external HEAD plus both refs/index/work unchanged"
+  ],
+  "limits": [
+    "Refs-only diagnostic: working tree/index deliberately untouched, no actual changed production repair run",
+    "No production fix yet; source change requires independent static re-review before runtime",
+    "Broader Gate2 actual repair cases and remote completion/outcome remain OPEN"
+  ]
+}

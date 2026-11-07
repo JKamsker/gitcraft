@@ -1,0 +1,41 @@
+{
+  "after": {
+    "head": "c92face79a29bb3a35e9bcb8de8abc548718037c3c78572c5c7606fbdde8c34b",
+    "index": {
+      "hex": "4449524300000002000000016aeead792f3ac2086aeead792f3ac2080000001b00181540000081a4000003e8000003e800000007d5e4cf563fb67895f4ab12ebf6963c84390ac573d85babf8348acd9d06ffe10a000866696c652e7478740000000000005452454500000025003120300a6afe7db8b25f3340bf99bcf0d4e495fd28d29f181299458d9cf6e58ad9b8d8ee4ce7593995f6309fe314056721c1c605c96f1591df2f30e94751e08f09f57cf7",
+      "mode": 33152
+    },
+    "refs": "c92face79a29bb3a35e9bcb8de8abc548718037c3c78572c5c7606fbdde8c34b refs/heads/main\nb8dcbebe2c58be04debb3dd70f86dcd10de34e8af7207b19a07eb6f2ae070cfb refs/heads/other",
+    "shared": null,
+    "shared_path": "",
+    "symref": "refs/heads/main",
+    "work": {
+      "hex": "6265666f72650a",
+      "mode": 33152
+    }
+  },
+  "backend": "reftable",
+  "before": {
+    "head": "b8dcbebe2c58be04debb3dd70f86dcd10de34e8af7207b19a07eb6f2ae070cfb",
+    "index": {
+      "hex": "4449524300000002000000016aeead792f3ac2086aeead792f3ac2080000001b00181540000081a4000003e8000003e800000007d5e4cf563fb67895f4ab12ebf6963c84390ac573d85babf8348acd9d06ffe10a000866696c652e7478740000000000005452454500000025003120300a6afe7db8b25f3340bf99bcf0d4e495fd28d29f181299458d9cf6e58ad9b8d8ee4ce7593995f6309fe314056721c1c605c96f1591df2f30e94751e08f09f57cf7",
+      "mode": 33152
+    },
+    "refs": "b8dcbebe2c58be04debb3dd70f86dcd10de34e8af7207b19a07eb6f2ae070cfb refs/heads/main\nb8dcbebe2c58be04debb3dd70f86dcd10de34e8af7207b19a07eb6f2ae070cfb refs/heads/other",
+    "shared": null,
+    "shared_path": "",
+    "symref": "refs/heads/main",
+    "work": {
+      "hex": "6265666f72650a",
+      "mode": 33152
+    }
+  },
+  "case": "native-reftable-sha256",
+  "diagnostic_only": true,
+  "new": "c92face79a29bb3a35e9bcb8de8abc548718037c3c78572c5c7606fbdde8c34b",
+  "no_checkout_attempted": true,
+  "object_format": "sha256",
+  "old": "b8dcbebe2c58be04debb3dd70f86dcd10de34e8af7207b19a07eb6f2ae070cfb",
+  "production_protocol_unchanged": true,
+  "status": "exit status: 0"
+}

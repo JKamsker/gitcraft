@@ -1,0 +1,41 @@
+{
+  "after": {
+    "head": "294974c42ff971fecf93da6d0c2e601bd40499a021f8380f81a9e54b29b22f7d",
+    "index": {
+      "hex": "4449524300000002000000016aeead782ba74bb66aeead782ba74bb60000001b001811be000081a4000003e8000003e800000007d5e4cf563fb67895f4ab12ebf6963c84390ac573d85babf8348acd9d06ffe10a000866696c652e7478740000000000005452454500000025003120300a6afe7db8b25f3340bf99bcf0d4e495fd28d29f181299458d9cf6e58ad9b8d8eee1b1bc93b1bdce35bece0098cb94610a9f2a56f2717c41c0a46b9b685b54202f",
+      "mode": 33152
+    },
+    "refs": "294974c42ff971fecf93da6d0c2e601bd40499a021f8380f81a9e54b29b22f7d refs/heads/main\n3123bdede8f970468f3201e36cfe8d8a564d72eaf6514af584263bb6cc400775 refs/heads/other",
+    "shared": null,
+    "shared_path": "",
+    "symref": "refs/heads/main",
+    "work": {
+      "hex": "6265666f72650a",
+      "mode": 33152
+    }
+  },
+  "backend": "files",
+  "before": {
+    "head": "3123bdede8f970468f3201e36cfe8d8a564d72eaf6514af584263bb6cc400775",
+    "index": {
+      "hex": "4449524300000002000000016aeead782ba74bb66aeead782ba74bb60000001b001811be000081a4000003e8000003e800000007d5e4cf563fb67895f4ab12ebf6963c84390ac573d85babf8348acd9d06ffe10a000866696c652e7478740000000000005452454500000025003120300a6afe7db8b25f3340bf99bcf0d4e495fd28d29f181299458d9cf6e58ad9b8d8eee1b1bc93b1bdce35bece0098cb94610a9f2a56f2717c41c0a46b9b685b54202f",
+      "mode": 33152
+    },
+    "refs": "3123bdede8f970468f3201e36cfe8d8a564d72eaf6514af584263bb6cc400775 refs/heads/main\n3123bdede8f970468f3201e36cfe8d8a564d72eaf6514af584263bb6cc400775 refs/heads/other",
+    "shared": null,
+    "shared_path": "",
+    "symref": "refs/heads/main",
+    "work": {
+      "hex": "6265666f72650a",
+      "mode": 33152
+    }
+  },
+  "case": "native-files-sha256",
+  "diagnostic_only": true,
+  "new": "294974c42ff971fecf93da6d0c2e601bd40499a021f8380f81a9e54b29b22f7d",
+  "no_checkout_attempted": true,
+  "object_format": "sha256",
+  "old": "3123bdede8f970468f3201e36cfe8d8a564d72eaf6514af584263bb6cc400775",
+  "production_protocol_unchanged": true,
+  "status": "exit status: 0"
+}
