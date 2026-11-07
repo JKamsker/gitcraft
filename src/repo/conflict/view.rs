@@ -13,6 +13,7 @@ impl RepoTab {
     pub(in crate::repo) fn conflict_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         self.request_conflict_bases(ui.ctx());
+        let state = self.work.in_progress;
         let Some(ed) = &mut self.conflict else { return };
         // A merge tool open on the file writes it when it saves: nothing is chosen here meanwhile.
         let idle = self.busy_op.is_none()
@@ -23,6 +24,7 @@ impl RepoTab {
         let editable = !ed.saving;
 
         ed.header(ui, &t, idle && editable, left, acts);
+        ed.history_strip(ui, &t, ((&ours_name, &theirs_name), state), acts);
         ed.result_panel(ui, &t, editable);
         ed.conflict_list(ui, &t, (&ours_name, &theirs_name), editable);
     }

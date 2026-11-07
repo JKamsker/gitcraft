@@ -7,6 +7,7 @@ mod original;
 mod original_view;
 #[cfg(test)]
 mod repo_tests;
+pub mod archaeology;
 mod view;
 
 use std::path::Path;
@@ -58,6 +59,8 @@ pub struct ConflictEditor {
     pub saving: bool,
     /// Each conflict's original (its base) and the cards that show it.
     original: original::State,
+    /// Each side's commits that touched the file, and where the conflict started.
+    pub history: archaeology::History,
 }
 
 /// Whether `line` (without its line ending) is git's `kind` conflict marker: exactly seven
@@ -330,6 +333,7 @@ impl ConflictEditor {
             on_disk: conflicts,
             generation: 0,
             saving: false,
+            history: Default::default(),
         })
     }
 
@@ -515,6 +519,7 @@ mod tests {
             generation: 0,
             saving: false,
             original: original::State::default(),
+            history: Default::default(),
         };
         assert_eq!(ed.unresolved(), 1);
         ed.choose(0, Choice::Ours);
@@ -542,6 +547,7 @@ mod tests {
             generation: 0,
             saving: false,
             original: original::State::default(),
+            history: Default::default(),
         }
     }
 

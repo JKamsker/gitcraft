@@ -155,6 +155,8 @@ pub(crate) enum Action {
     SaveConflict,
     /// Something done with the Git LFS file locks.
     LfsLocks(super::lfs_locks::LockAct),
+    /// The conflict editor's history of the file on each side.
+    Archaeology(super::conflict::archaeology::Act),
     /// Let Mergiraf solve what it can of the open conflict.
     SolveWithMergiraf,
     /// Preview keeping both versions of a conflicted file that can't be merged.

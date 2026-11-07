@@ -286,6 +286,7 @@ impl RepoTab {
             Action::ParallelBisect(act) => self.parallel_act(act, ctx),
             Action::SaveConflict => self.save_conflict(ctx),
             Action::KeepBoth(path) => self.keep_both(path, ctx),
+            Action::Archaeology(act) => self.archaeology_act(act, ctx),
         }
     }
 
