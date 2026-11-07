@@ -840,6 +840,56 @@ fn activity_bytes_with_codes(
     limit: std::time::Duration,
     ok: &[i32],
 ) -> Result<Vec<u8>, String> {
+    let out = analysis_output(dir, args, input, active, limit, false)?;
+    if ok.contains(&out.code) && out.stderr.is_empty() {
+        Ok(out.stdout)
+    } else {
+        Err(format!(
+            "Could not analyze history: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ))
+    }
+}
+
+/// Shared bounded raw transport for content recovery. Retains captured profile and
+/// Practice routing; inherited repository overrides cannot redirect object/ref reads.
+pub(super) fn recovery_output(
+    dir: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+    active: &dyn Fn() -> bool,
+    limit: std::time::Duration,
+) -> Result<remote::Output, String> {
+    analysis_output(dir, args, input, active, limit, true)
+}
+
+fn analysis_output(
+    dir: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+    active: &dyn Fn() -> bool,
+    limit: std::time::Duration,
+    isolated: bool,
+) -> Result<remote::Output, String> {
+    const REMOVE: &[&str] = &[
+        "GIT_DIR",
+        "GIT_COMMON_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_ATTR_SOURCE",
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_NAMESPACE",
+        "GIT_SHALLOW_FILE",
+        "GIT_REPLACE_REF_BASE",
+        "GIT_SUPER_PREFIX",
+        "GIT_LITERAL_PATHSPECS",
+        "GIT_GLOB_PATHSPECS",
+        "GIT_NOGLOB_PATHSPECS",
+        "GIT_ICASE_PATHSPECS",
+    ];
     use std::{
         sync::mpsc,
         time::{Duration, Instant},
@@ -850,6 +900,11 @@ fn activity_bytes_with_codes(
     }
     let out = if let Some(target) = remote::parse(dir) {
         let mut request = remote_request(&target, &Extra::default(), args);
+        if isolated {
+            request
+                .unset
+                .extend(REMOVE.iter().map(|name| (*name).to_owned()));
+        }
         // The shared remote runner captures whole outputs. Bound both streams *there*,
         // before they cross the connection or allocate a large local buffer. FIFO readers
         // cap scratch files and give Git SIGPIPE on overflow; preserve Git's exit status.
@@ -877,27 +932,39 @@ fn activity_bytes_with_codes(
         request.stdin = input.map(<[u8]>::to_vec);
         request.timeout = Some(limit);
         request.long = true;
-        let (tx, rx) = mpsc::channel();
-        std::thread::spawn(move || {
-            let _ = tx.send(remote::exec(&target.host, &request));
-        });
-        let deadline = Instant::now() + limit;
-        loop {
-            if !active() {
-                return Err("Analysis cancelled".into());
-            }
-            if Instant::now() >= deadline {
-                return Err("History analysis timed out".into());
-            }
-            match rx.recv_timeout(Duration::from_millis(20)) {
-                Ok(out) => break out?,
-                Err(mpsc::RecvTimeoutError::Timeout) => (),
-                Err(_) => return Err("History worker stopped".into()),
+        if isolated {
+            // Recovery keeps one background owner until the underlying call actually
+            // returns. Cancellation stops subsequent queries; it cannot release a
+            // queued replacement while connection/pool work is still in flight.
+            remote::exec(&target.host, &request)?
+        } else {
+            let (tx, rx) = mpsc::channel();
+            std::thread::spawn(move || {
+                let _ = tx.send(remote::exec(&target.host, &request));
+            });
+            let deadline = Instant::now() + limit;
+            loop {
+                if !active() {
+                    return Err("Analysis cancelled".into());
+                }
+                if Instant::now() >= deadline {
+                    return Err("History analysis timed out".into());
+                }
+                match rx.recv_timeout(Duration::from_millis(20)) {
+                    Ok(out) => break out?,
+                    Err(mpsc::RecvTimeoutError::Timeout) => (),
+                    Err(_) => return Err("History worker stopped".into()),
+                }
             }
         }
     } else {
         let mut command = repository_command(Some(dir), args)?;
         command.args(args);
+        if isolated {
+            for name in REMOVE {
+                command.env_remove(name);
+            }
+        }
         let output = crate::bounded_process::run_with_input(
             command,
             input.map(<[u8]>::to_vec),
@@ -921,14 +988,10 @@ fn activity_bytes_with_codes(
     if out.stdout.len() > MAX || out.stderr.len() > MAX {
         return Err("A history page exceeded 16 MiB".into());
     }
-    if ok.contains(&out.code) && out.stderr.is_empty() {
-        Ok(out.stdout)
-    } else {
-        Err(format!(
-            "Could not analyze history: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
-        ))
+    if isolated && !active() && after_options(args).first() != Some(&"update-ref") {
+        return Err("Content recovery cancelled".into());
     }
+    Ok(out)
 }
 
 /// An absent option (exit 1) differs from an explicitly empty configured value (NUL).

@@ -1,0 +1,18 @@
+{
+  "status": "SOURCE-ONLY MERGE; no runtime/build",
+  "preflight_parent": "dec360644898985a4e79f609ae5a5db69534f96a",
+  "shared_parent": "41ee79e2f7274f94d38937622898caf3e57a5fa6",
+  "accepted_shared_base": "ab68bdedd387236c03f26f839572860d405a2f7f",
+  "resolution": [
+    "Keepbothpush_hooksandrecoveryGitmodules",
+    "Keepgenericownershipcode+sharedownedfixturesource; genericfivefilesbyte-identicalpublishedcut"
+  ],
+  "generic_hashes": {
+    "src/remote/ownership.rs": "81affc4a6e1689925846f9f88f0f8021b20df0936bc0bd68126a6f100651553c",
+    "src/remote/session.rs": "958c963e5723f78b4c5ca5ed2c8c14819db0f5035772c3aa7d244b270c1de253",
+    "src/remote/shell.rs": "efab00f399fec1e482019f403182711d31b00164271749eb12f0d3c0c7bd0c50",
+    "src/remote/mod.rs": "8c29ce4ed021e52f04be300cefb851233f72dbc22cc846d25ea75229a33ce67a",
+    "src/git/command/completion.rs": "927274521a75e4485d003c71306c826004f1bc1fef5ba8a4c6d6a39bc0e7c4c3"
+  },
+  "claims": "OnlyinheritedscopedgenericSTATICe5/7puregenericrecordingsPASS; fullmergedtree/fixture/newremotevalidationpendingexecutionhold; noCI"
+}

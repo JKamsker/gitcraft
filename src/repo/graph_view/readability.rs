@@ -46,10 +46,19 @@ impl RepoTab {
         range: Range<usize>,
         shown_lanes: usize,
     ) -> Viewport {
+        self.readable_rows(ui, range, shown_lanes)
+    }
+
+    pub(super) fn readable_rows(
+        &self,
+        ui: &Ui,
+        rows: impl Iterator<Item = usize>,
+        shown_lanes: usize,
+    ) -> Viewport {
         let mut first = HashMap::new();
         let mut decorated = HashSet::new();
         let mut width = MIN_REFS_W;
-        for i in range {
+        for i in rows {
             let Some(row) = self.graph.rows.get(i) else {
                 continue;
             };

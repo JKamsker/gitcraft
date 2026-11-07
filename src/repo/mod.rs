@@ -12,6 +12,7 @@ mod ci_view;
 pub(crate) mod columns;
 mod commands;
 mod conflict;
+mod content_recovery;
 mod detail;
 mod dialogs;
 mod diff;
@@ -42,8 +43,10 @@ mod rebase;
 mod rewrite;
 #[cfg(test)]
 mod samples;
+mod saved_views;
 mod sidebar;
 mod sparse;
+mod ssh_setup;
 mod state;
 mod terminals;
 #[cfg(test)]
@@ -94,6 +97,7 @@ pub struct RepoTab {
     pub name: String,
     tx: Sender<Msg>,
     rx: Receiver<Msg>,
+    content_recovery: content_recovery::State,
 
     /// When the tab was made: its opening screen shows only if the first read takes a while.
     opened: Instant,
@@ -123,6 +127,7 @@ pub struct RepoTab {
     partial_clone: bool,
     sparse_requests: u64,
     drafts: drafts::State,
+    saved_views: saved_views::State,
     history_requests: u64,
     history_download_allowed: bool,
     /// Commits as git listed them.
@@ -236,6 +241,7 @@ pub struct RepoTab {
     focus_wip: bool,
     last_fetch: Instant,
 
+    ssh_setup: Option<ssh_setup::State>,
     terminals: Vec<Terminal>,
     active_terminal: usize,
     terminal_open: bool,
@@ -294,6 +300,7 @@ impl RepoTab {
             name,
             tx,
             rx,
+            content_recovery: Default::default(),
             opened: Instant::now(),
             deferred: true,
             reads: 0,
@@ -311,6 +318,7 @@ impl RepoTab {
             partial_clone: false,
             sparse_requests: 0,
             drafts: Default::default(),
+            saved_views: Default::default(),
             history_requests: 0,
             history_download_allowed: false,
             history: Vec::new(),
@@ -392,6 +400,7 @@ impl RepoTab {
             focus_branch_filter: false,
             focus_wip: false,
             last_fetch: Instant::now(),
+            ssh_setup: None,
             terminals: Vec::new(),
             active_terminal: 0,
             terminal_open: false,

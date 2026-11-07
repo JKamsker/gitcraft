@@ -167,7 +167,8 @@ impl RepoTab {
     fn work(&mut self) -> Unfinished {
         Unfinished {
             operation: self.busy_op.is_some(),
-            terminal: self.terminals.iter_mut().any(|t| !t.has_exited()),
+            terminal: self.terminals.iter_mut().any(|t| !t.has_exited())
+                || self.ssh_setup.as_ref().is_some_and(|setup| setup.running()),
             commit_message: !self.commit_summary.trim().is_empty()
                 || !self.commit_body.trim().is_empty()
                 || self.reword.is_some(),
@@ -259,6 +260,7 @@ impl RepoTab {
     /// keeping any more.
     pub(crate) fn park(&mut self, mut view: Box<RepoTab>) {
         view.cancel_draft_reads();
+        view.content_recovery.dismiss();
         // One on another machine stops being asked every few seconds while it isn't shown
         // (a dozen parked views would keep the shells there busy); it is looked at again on
         // coming back.

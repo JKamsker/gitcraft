@@ -234,6 +234,7 @@ impl RepoTab {
     }
     pub(super) fn dismiss_dialog(&mut self) {
         self.cancel_draft_reads();
+        self.content_recovery.dismiss();
         self.dialog = None;
     }
     pub(super) fn sync_draft_reader(&mut self) {
@@ -708,26 +709,31 @@ mod tests {
     {
         let ctx = egui::Context::default();
         let mut tab = reader_tab(&ctx);
-        let (step, states) = delayed_reader(&mut tab, &ctx);
-        assert!(
-            states
-                .recv_timeout(Duration::from_secs(5))
-                .map_err(|e| e.to_string())?
-        );
-        // This is the normal Action::Dialog path, not a direct generation mutation.
-        tab.apply(super::super::Action::Dialog(Dialog::stash()), &ctx);
-        step.send(()).map_err(|e| e.to_string())?;
-        assert!(
-            !states
-                .recv_timeout(Duration::from_secs(5))
-                .map_err(|e| e.to_string())?
-        );
-        step.send(()).map_err(|e| e.to_string())?;
-        finish_reader(&mut tab, &ctx)?;
-        assert!(!matches!(
-            tab.dialog,
-            Some(Dialog::DraftLoading(_) | Dialog::DraftHistory { .. })
-        ));
+        for action in [
+            super::super::Action::Dialog(Dialog::stash()),
+            super::super::Action::OpenSshSetup,
+        ] {
+            let (step, states) = delayed_reader(&mut tab, &ctx);
+            assert!(
+                states
+                    .recv_timeout(Duration::from_secs(5))
+                    .map_err(|e| e.to_string())?
+            );
+            // Both modal entry points must cancel the actual owned reader.
+            tab.apply(action, &ctx);
+            step.send(()).map_err(|e| e.to_string())?;
+            assert!(
+                !states
+                    .recv_timeout(Duration::from_secs(5))
+                    .map_err(|e| e.to_string())?
+            );
+            step.send(()).map_err(|e| e.to_string())?;
+            finish_reader(&mut tab, &ctx)?;
+            assert!(!matches!(
+                tab.dialog,
+                Some(Dialog::DraftLoading(_) | Dialog::DraftHistory { .. })
+            ));
+        }
         let (step, states) = delayed_reader(&mut tab, &ctx);
         assert!(
             states

@@ -105,6 +105,7 @@ pub(crate) enum Action {
         hunks: Vec<usize>,
     },
     DraftUndo,
+    OpenSshSetup,
     AllowHistoryDownload(Box<Action>),
     SetSparse {
         before: Box<git::SparseState>,
@@ -197,6 +198,11 @@ pub(crate) enum Action {
     },
     /// Apply a patch file, asking which.
     ApplyPatch,
+    OpenContentRecovery,
+    ContentSearch(String),
+    ContentInspect(usize, Option<usize>),
+    ContentPrepare(git::recovery::Target),
+    ContentPerform(std::sync::Arc<git::recovery::Prepared>),
     OpenBundleExport,
     OpenBundleImport,
     ExportBundle {
@@ -380,6 +386,11 @@ impl RepoTab {
     pub(crate) fn palette_items(&self) -> Vec<(String, String, Action)> {
         let mut items: Vec<(String, String, Action)> = vec![
             (
+                "Set up SSH…".into(),
+                "keys and accounts".into(),
+                Action::OpenSshSetup,
+            ),
+            (
                 "File migration map".into(),
                 "files".into(),
                 Action::OpenFileComparison(super::file_comparison::Page::Migration),
@@ -436,6 +447,11 @@ impl RepoTab {
                 "Earlier versions of working changes…".into(),
                 "working drafts".into(),
                 Action::EarlierVersions,
+            ),
+            (
+                "Lost and found by content…".into(),
+                "recovery search staged blobs".into(),
+                Action::OpenContentRecovery,
             ),
             (
                 "Export Git bundle…".into(),

@@ -287,3 +287,6 @@ mod tests {
         assert!(!other.begin());
     }
 }
+
+#[cfg(all(test, unix))]
+mod fixtures;

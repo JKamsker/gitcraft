@@ -18,6 +18,8 @@ pub(super) type Continuation = Box<dyn FnOnce(&mut RepoTab, &egui::Context) + Se
 
 /// Results coming back from background git calls.
 pub(super) enum Msg {
+    ContentRead(u64, Result<Box<super::content_recovery::Read>, String>),
+    ContentRecovered(Result<String, String>),
     Loaded(Result<Box<Loaded>, String>),
     /// The submodules, from the read numbered so (see `RepoTab::reads`).
     Submodules(u64, Vec<git::Submodule>),
@@ -243,6 +245,8 @@ impl RepoTab {
             self.handle(msg, ctx);
         }
         self.sync_draft_reader();
+        self.poll_content_recovery(ctx);
+        self.poll_saved_views(ctx);
         if !shown {
             return;
         }
@@ -299,6 +303,8 @@ impl RepoTab {
 
     fn handle(&mut self, msg: Msg, ctx: &egui::Context) {
         match msg {
+            Msg::ContentRead(id, result) => self.content_read(id, result, ctx),
+            Msg::ContentRecovered(result) => self.content_recovered(result, ctx),
             Msg::Loaded(result) => self.loaded(result, ctx),
             Msg::Submodules(read, list) => {
                 if Self::newer(read, &mut self.submodules_read) {
@@ -320,7 +326,10 @@ impl RepoTab {
                 }
                 self.conflict_saved(path, saved, ctx)
             }
-            Msg::Identity(identity) => self.identity = identity,
+            Msg::Identity(identity) => {
+                self.identity = identity;
+                self.saved_views.dirty = true;
+            }
             Msg::Watcher(watcher) => {
                 self.watcher = watcher.map(|w| *w);
                 self.watcher_arrived(ctx);
