@@ -17,13 +17,29 @@ use crate::repo::find;
 use crate::repo::popout::{self, Panel};
 use crate::repo::pr_review::{self, PrDraft};
 use crate::repo::pr_view::{self, PrView};
-use crate::repo::{Action, DiffKey, DiffView, Refresh, RepoTab, file_text, ops, short, widgets};
+use crate::repo::{
+    Action, DiffKey, DiffView, Refresh, RepoTab, file_text, fold, ops, short, widgets,
+};
 use crate::settings::Settings;
 use crate::theme::{self, Tokens};
 
 impl RepoTab {
     pub(in crate::repo) fn diff_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
+        let settings = Settings::get(ui.ctx());
+        if let Some(view) = &mut self.diff {
+            // Back where it was, read another way: in the layout shown now.
+            if let (Some(Ok(data)), Some(place)) = (&view.data, view.restore) {
+                let split = data.shows_split(settings.diff_split);
+                view.scroll_to = Some(super::offset_of_place(data, split, place));
+                view.restore = None;
+            }
+            // The choice for its file type changed elsewhere (another tab, the settings).
+            let algorithm = super::algorithm_for(&settings, view.key.path());
+            if view.algorithm != algorithm {
+                acts.push(Action::SetDiffAlgorithm(algorithm));
+            }
+        }
         let Some(view) = &self.diff else { return };
         let idle = self.busy_op.is_none();
 
@@ -34,7 +50,6 @@ impl RepoTab {
         let revert = self.stash_view.is_none();
         let pickable =
             matches!(&view.data, Some(Ok(d)) if d.partial || d.revertable && revert) && idle;
-        let settings = Settings::get(ui.ctx());
         let (split, ignore_ws, whole_file) = (
             settings.diff_split,
             self.diff_ignore_ws,
@@ -43,12 +58,17 @@ impl RepoTab {
         let as_file = self.diff_as_file;
         // A Markdown file can show rendered: `Some(whether it does)`.
         let markdown = view.key.renders().then_some(self.diff_rendered);
+        let folded = if as_file || markdown == Some(true) {
+            None
+        } else {
+            self.fold_reason(view, &settings, acts)
+        };
         let clear = self.diff_header(
             ui,
             view,
             (&path, &origin),
             partial,
-            (split, ignore_ws, whole_file, as_file),
+            (split, ignore_ws, whole_file, as_file, folded.is_some()),
             markdown,
             acts,
         );
@@ -109,6 +129,16 @@ impl RepoTab {
             }
             return;
         }
+        if let Some(reason) = folded {
+            let data = match &view.data {
+                Some(Ok(data)) => Some(data),
+                _ => None,
+            };
+            if fold::folded_diff(ui, &path, data, reason) {
+                acts.push(Action::UnfoldDiff);
+            }
+            return;
+        }
         let Some(data) = ready_data(ui, view, ignore_ws, &t) else {
             return;
         };
@@ -143,6 +173,7 @@ impl RepoTab {
             view.text_sel = sel;
             view.scroll = offset;
             view.jump = None;
+            view.scroll_to = None;
             if let Some(i) = jumped {
                 view.at_change = Some((i, offset));
             }
@@ -154,6 +185,35 @@ impl RepoTab {
                 view.pick_line(i, shift);
             }
         }
+    }
+
+    /// Why the diff shown starts folded, while it does (a conflicted file never does, nor one
+    /// opened from a file list). Asks what `.gitattributes` says of it the first time.
+    fn fold_reason(
+        &self,
+        view: &DiffView,
+        settings: &Settings,
+        acts: &mut Vec<Action>,
+    ) -> Option<fold::FoldReason> {
+        let conflicted = matches!(&view.key, DiffKey::Work(f) if f.area == Area::Conflicted);
+        let rules = fold::Rules::from_settings(settings);
+        // A diff that failed to read shows why, folded or not.
+        let failed = matches!(view.data, Some(Err(_)));
+        if view.unfolded || conflicted || failed || !rules.on {
+            return None;
+        }
+        let path = view.key.path();
+        let unknown = self.folding.unknown([path]);
+        if !unknown.is_empty() {
+            acts.push(Action::FoldAttributes(unknown));
+        }
+        let reason = self.folding.reason(&rules, path);
+        if reason.is_none() && matches!(view.data, Some(Ok(_))) {
+            // Its lines show: they stay, rather than fold away under the reader when an
+            // answer about its attributes comes (the first one, or one read again).
+            acts.push(Action::UnfoldDiff);
+        }
+        reason
     }
 
     /// The file shown and where its diff comes from.
@@ -178,7 +238,7 @@ impl RepoTab {
     }
 
     /// Header: file, where it comes from, options, actions, close. `opts`: (side by side,
-    /// ignore whitespace, whole file, the file instead of the diff); `markdown`: for a Markdown
+    /// ignore whitespace, whole file, the file instead of the diff, folded); `markdown`: for a Markdown
     /// file, whether it shows rendered. True when the picked lines are to be cleared.
     #[allow(clippy::too_many_arguments)]
     fn diff_header(
@@ -187,7 +247,7 @@ impl RepoTab {
         view: &DiffView,
         (path, origin): (&str, &str),
         partial: bool,
-        (split, ignore_ws, whole_file, as_file): (bool, bool, bool, bool),
+        (split, ignore_ws, whole_file, as_file, folded): (bool, bool, bool, bool, bool),
         markdown: Option<bool>,
         acts: &mut Vec<Action>,
     ) -> bool {
@@ -254,12 +314,15 @@ impl RepoTab {
                             clear = self.commit_actions(ui, view, (hash, path), lines, acts);
                         }
                         ui.add_space(8.0);
-                        if !as_file && !rendered {
+                        // A folded diff shows no lines to arrange.
+                        if !as_file && !rendered && !folded {
                             // A diff of some lines only (`git log -L`) shows them whole, with
                             // whitespace: those options don't apply to it.
                             if view.lines.is_none() {
-                                view_options(ui, &t, (split, ignore_ws, whole_file), acts);
-                                ui.add_space(8.0);
+                            view_options(ui, &t, (split, ignore_ws, whole_file), acts);
+                            ui.add_space(4.0);
+                            super::algorithm::algorithm_menu(ui, path, view.repairing, acts);
+                            ui.add_space(8.0);
                             }
                             change_steps(ui, acts);
                             ui.add_space(8.0);

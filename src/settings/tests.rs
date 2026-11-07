@@ -90,6 +90,8 @@ fn settings_survive_a_restart() {
         column_push: 12.5,
         compact_graph: true,
         diff_whole_file: true,
+        fold_generated: false,
+        fold_patterns: "*.snap, dist/**".to_owned(),
         pull_mode: crate::repo::pull::PullMode::Rebase,
         ..Settings::default()
     };

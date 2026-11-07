@@ -560,6 +560,20 @@ so your config, credentials and hooks apply as usual.
   them in the order of the rows; the bar shows which match of how many (e.g. 3 of 12). Match
   case, whole words and regular expressions are toggles; Esc closes the bar. A very long file
   is searched a few lines per frame, so the window stays responsive.
+- The algorithm in a diff's header (_Default_, _Myers_, _Minimal_, _Patience_, _Histogram_)
+  pairs the lines another way when they line up badly: the diff is read again with
+  `--diff-algorithm`, the line at the top of the view stays at the top, and the choice is kept
+  for that file type (`*.rs`, `makefile`…; Settings → Git → Diffs lists and forgets them). The
+  repository's config is never written; _Default_ is what `diff.algorithm` says.
+- Generated files and lockfiles start folded: files marked `linguist-generated` or `-diff` in
+  `.gitattributes` (read with `git check-attr`, so every attributes file counts, and
+  `linguist-generated=false` keeps a file open), lockfiles (`Cargo.lock`, `package-lock.json`,
+  `yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`, `go.sum`, `Gemfile.lock`, `composer.lock`…) and
+  minified files (`*.min.js`, `*.min.css`). File lists gather them at their end under one
+  closed row (_2 lockfiles +1,204 −880_; the working tree's lists have no counts), and a file
+  clicked there opens. Reached another way (its history, a pull request's timeline), its diff
+  shows only a line such as _+1,204 −880, lockfile_ until _Show the changes_. Settings → Git → Diffs adds patterns of your
+  own (`*.snap`, `dist/**`, `vendor/`) or turns folding off.
 - A Markdown file's diff has an eye button that renders it: the changes block by block (removed
   ones red, added ones green, the rest as they are) or, with _File_, the whole file. Images of
   the repository show as they are on each side of the change; any other image is a link, so a
@@ -1091,6 +1105,7 @@ was made this way, on a demo repository.
 | `src/repo/diff_split.rs` | the diff below the graph instead of in its place |
 | `src/repo/nav_history.rs` | the back / forward list of a tab's recent views |
 | `src/repo/navigation/` | back and forward: the view shown as a place, showing one again, keys and buttons |
+| `src/repo/fold/` | generated files and lockfiles folded in file lists and diffs |
 | `src/repo/highlight.rs`  | syntax colours (syntect)                                                           |
 | `src/vscode_theme.rs`    | VS Code's current colour theme as a syntect theme                                  |
 | `src/repo/conflict.rs`   | three-pane conflict editor, each conflict's original, Keep both                    |

@@ -173,6 +173,9 @@ impl<'a> Rows<'a> {
         }
         if let Some(change) = self.jumped.and_then(|i| changes.get(i)) {
             scroll = scroll.vertical_scroll_offset(offset_of(change.start));
+        } else if let Some(offset) = self.view.scroll_to {
+            // Back where it was, read another way.
+            scroll = scroll.vertical_scroll_offset(offset);
         }
         if let (Some(find), Some(hit)) = (self.find, self.reveal) {
             let text = data.lines.get(hit.line).map_or("", |l| l.text.as_str());

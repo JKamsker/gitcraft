@@ -245,10 +245,13 @@ impl RepoTab {
         let key = view.key.clone();
         let lines = view.lines.clone();
         let path = self.path.clone();
+        let settings = Settings::get(ctx);
         let opts = git::DiffOptions {
             ignore_ws: self.diff_ignore_ws,
-            whole_file: Settings::get(ctx).diff_whole_file,
+            whole_file: settings.diff_whole_file,
+            algorithm: diff::algorithm_for(&settings, key.path()),
         };
+        view.algorithm = opts.algorithm;
         let dark = Tokens::get(ctx).dark();
         spawn(&self.tx, ctx, move || {
             let result = diff::load_lines(&path, &key, lines.as_deref(), opts, dark).map(Box::new);
@@ -307,6 +310,10 @@ impl RepoTab {
         if let Some(view) = self.diff.take() {
             self.conflict = None;
             self.open_diff(view.key, ctx);
+            // A folded file opened stays open.
+            if let Some(reopened) = &mut self.diff {
+                reopened.unfolded = view.unfolded;
+            }
         }
     }
 

@@ -142,6 +142,20 @@ pub(crate) struct DiffView {
     /// Opened from the history of some lines: only the part of the commit's diff that changed
     /// these lines of the file (as they are in the commit).
     pub(super) lines: Option<Vec<crate::git::LineRange>>,
+    /// A folded file's lines (a lockfile…) were opened.
+    pub(super) unfolded: bool,
+    /// Where the view was when the diff was asked for again another way (another algorithm):
+    /// put back at the top once the new reading arrives.
+    pub(super) keep_place: Option<diff::Place>,
+    /// That place, once the new reading is in: put back at the top in the layout shown then.
+    pub(super) restore: Option<diff::Place>,
+    /// The algorithm the diff was last asked for with (`None`: git's default).
+    pub(super) algorithm: Option<crate::git::DiffAlgorithm>,
+    /// The diff is being read again with another algorithm: the lines shown are still the
+    /// old pairing.
+    pub(super) repairing: bool,
+    /// A scroll offset to go to on the next frame.
+    pub(super) scroll_to: Option<f32>,
 }
 
 /// Numbers the diff reads of every tab, so no two diffs ever wait for the same number.
@@ -164,6 +178,12 @@ impl DiffView {
             at_change: None,
             request: 0,
             lines: None,
+            unfolded: false,
+            keep_place: None,
+            restore: None,
+            algorithm: None,
+            repairing: false,
+            scroll_to: None,
         }
     }
 
@@ -177,6 +197,10 @@ impl DiffView {
     pub(super) fn arrived(&mut self, request: u64, result: Result<diff::DiffData, String>) {
         if request != self.request {
             return;
+        }
+        self.repairing = false;
+        if result.is_ok() {
+            self.restore = self.keep_place.take();
         }
         self.data = Some(result);
         // The lines may have moved.

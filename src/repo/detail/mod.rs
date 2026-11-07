@@ -17,8 +17,9 @@ use egui::{Align2, Sense, Ui, pos2, vec2};
 
 use super::branch_tree;
 use super::widgets::{self, RowExtra};
-use super::{Action, DiffKey, DiffView, RepoTab};
+use super::{Action, DiffKey, DiffView, RepoTab, fold};
 use crate::git::ChangedFile;
+use crate::settings::Settings;
 use crate::theme::{self, Tokens};
 
 impl RepoTab {
@@ -41,7 +42,7 @@ impl RepoTab {
 
     /// Changed files, each opening its diff (`key`) when clicked; `rev`: where the files are,
     /// for their menu (`None`: the working tree); `tree`: which list this is, for the folders
-    /// opened and closed in it.
+    /// opened and closed in it. Generated files and lockfiles are folded at the end.
     pub(super) fn file_list(
         &self,
         ui: &mut Ui,
@@ -52,21 +53,21 @@ impl RepoTab {
         key: impl Fn(&str) -> DiffKey,
     ) {
         let id = egui::Id::new(("file-folder", self.repo_key(), tree));
-        let selected = |f: &&ChangedFile| self.open_key() == Some(&key(&f.path));
+        let rules = fold::Rules::from_settings(&Settings::get(ui.ctx()));
+        let group = fold::split(
+            ui,
+            id.with(rev),
+            files,
+            |f| &f.path,
+            (&self.folding, &rules),
+            acts,
+        );
+        let selected = |f: &&&ChangedFile| self.open_key() == Some(&key(&f.path));
         let (scope, generation) = super::weakened_marks::scope_of(&key(""), self.work_read);
         let found = self.weakened.get(ui.ctx(), &self.path, scope, generation);
         let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
         self.owners_summary(ui, &paths);
-        // Rows are known by their path within the list of this commit (or range): a menu left
-        // open while another one is shown is not that one's file of the same path.
-        ui.push_id(("file-list", tree, rev), |ui| {
-            branch_tree::files(
-                ui,
-                (id, true),
-                files,
-                |f| &f.path,
-                &selected,
-                &mut |ui, indent, f| {
+        let row = |ui: &mut Ui, indent, f: &ChangedFile, acts: &mut Vec<Action>| {
                     let stats = RowExtra::Stats(f.added, f.removed);
                     let (extra, flags) =
                         super::weakened_marks::extra(found.as_ref(), &f.path, &stats);
@@ -76,7 +77,7 @@ impl RepoTab {
                         &f.path,
                         f.old_path.as_deref(),
                         indent,
-                        selected(&f),
+                        self.open_key() == Some(&key(&f.path)),
                         extra,
                         self.owner_tag(&f.path).as_ref(),
                     );
@@ -86,9 +87,38 @@ impl RepoTab {
                     widgets::file_menu(&r.row, &f.path, rev, false, Some(&key(&f.path)), &links, acts);
                     if r.row.clicked() {
                         acts.push(Action::OpenDiff(key(&f.path)));
+                        acts.push(Action::UnfoldDiff);
                     }
-                },
+        };
+        // Rows are known by their path within the list of this commit (or range): a menu left
+        // open while another one is shown is not that one's file of the same path.
+        ui.push_id(("file-list", tree, rev), |ui| {
+            branch_tree::files(
+                ui,
+                (id, true),
+                &group.shown,
+                |f| &f.path,
+                &selected,
+                &mut |ui, indent, f| row(ui, indent, f, acts),
             );
+            let stats = group.folded.iter().fold((0u32, 0u32), |(a, d), f| {
+                (
+                    a.saturating_add(f.added.unwrap_or(0)),
+                    d.saturating_add(f.removed.unwrap_or(0)),
+                )
+            });
+            let holds_open = group.folded.iter().any(|f| selected(&f));
+            let open_id = id.with(("folded-open", rev));
+            if group.header(ui, open_id, Some(stats), holds_open) {
+                branch_tree::files(
+                    ui,
+                    (id.with("folded"), true),
+                    &group.folded,
+                    |f| &f.path,
+                    &selected,
+                    &mut |ui, indent, f| row(ui, indent, f, acts),
+                );
+            }
         });
         super::weakened_marks::error_note(ui, found.as_ref());
     }

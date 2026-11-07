@@ -4,6 +4,7 @@ mod ai_page;
 mod custom_commands;
 mod external_tools;
 mod agents;
+mod diffs;
 mod layout;
 mod page;
 mod portable_page;
@@ -77,6 +78,13 @@ pub struct Settings {
     pub diff_whole_file: bool,
     /// Diffs of commits and of the working tree show below the graph, not in its place.
     pub diff_beside_graph: bool,
+    /// The diff algorithm chosen for each file type (see [`crate::git::file_type`]); a type
+    /// not listed uses git's own default.
+    pub diff_algorithms: std::collections::BTreeMap<String, crate::git::DiffAlgorithm>,
+    /// Generated files, lockfiles and minified files start folded in file lists and diffs.
+    pub fold_generated: bool,
+    /// More files to fold: glob patterns separated by commas, spaces or new lines.
+    pub fold_patterns: String,
     /// Background fetch interval in minutes; 0 turns it off.
     pub auto_fetch_minutes: u32,
     /// Offline mode: nothing goes on the network by itself, and fetch, pull, push and the like
@@ -175,6 +183,9 @@ impl Default for Settings {
             diff_split: false,
             diff_whole_file: false,
             diff_beside_graph: false,
+            diff_algorithms: Default::default(),
+            fold_generated: true,
+            fold_patterns: String::new(),
             auto_fetch_minutes: 10,
             offline: false,
             pause_on_metered: true,
@@ -772,6 +783,7 @@ impl Settings {
                         },
                     );
                 });
+                section(ui, f, "Diffs", None, |card| self.diffs_ui(card));
                 section(
                     ui,
                     f,

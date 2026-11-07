@@ -395,6 +395,8 @@ impl RepoTab {
         }
         self.fold_loaded(loaded.read, state);
         self.refresh_detached(ctx);
+        self.folding
+            .saw_status(&self.work, &self.refs.head, std::time::Instant::now());
         // The last counts of worktrees this read left uncounted (on another machine) stay
         // until they are counted again.
         let counted: Vec<(PathBuf, Option<usize>)> = self

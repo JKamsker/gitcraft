@@ -154,6 +154,13 @@ pub(crate) enum Action {
         ignore_ws: bool,
         whole_file: bool,
     },
+    /// The diff algorithm for the open diff's file type (`None`: git's default), kept for
+    /// that type; the diff is read again where it was scrolled to.
+    SetDiffAlgorithm(Option<git::DiffAlgorithm>),
+    /// The open diff of a folded file (a lockfile…) shows its lines.
+    UnfoldDiff,
+    /// Ask git what `.gitattributes` says about folding these files.
+    FoldAttributes(Vec<String>),
     /// Diffs show the whole file as it is after the change, or the changes.
     DiffAsFile(bool),
     /// Markdown files show rendered in diffs, or as text.

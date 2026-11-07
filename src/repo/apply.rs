@@ -239,6 +239,13 @@ impl RepoTab {
                 ignore_ws,
                 whole_file,
             } => self.set_diff_options(split, ignore_ws, whole_file, ctx),
+            Action::SetDiffAlgorithm(algorithm) => self.set_diff_algorithm(algorithm, ctx),
+            Action::UnfoldDiff => {
+                if let Some(view) = &mut self.diff {
+                    view.unfolded = true;
+                }
+            }
+            Action::FoldAttributes(paths) => self.ask_fold_attributes(&paths, ctx),
             Action::DiffAsFile(on) => self.show_diff_as_file(on, ctx),
             Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
             Action::DiffStep(delta) => {

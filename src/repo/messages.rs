@@ -227,6 +227,9 @@ impl RepoTab {
         if !shown || self.sleeping() {
             return;
         }
+        if let Some(wait) = self.folding.tick(Instant::now()) {
+            ctx.request_repaint_after(wait);
+        }
         if let Some((change, at)) = self.fs_pending
             && at.elapsed() > Duration::from_millis(400)
             && !self.loading
@@ -331,6 +334,8 @@ impl RepoTab {
                         here.changes = Some(changes);
                     }
                     let wip_row_changed = work.is_clean() != self.work.is_clean();
+                    self.folding
+                        .saw_status(&work, &self.refs.head, Instant::now());
                     self.work = work;
                     self.stash_picks.keep_changed(&self.work);
                     if wip_row_changed {

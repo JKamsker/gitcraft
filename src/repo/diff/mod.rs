@@ -3,6 +3,9 @@
 //! their objects. Uncommitted changes can be staged, unstaged or discarded a hunk or a few
 //! lines at a time.
 
+mod algorithm;
+#[cfg(test)]
+mod algorithm_tests;
 mod images;
 mod interdiff;
 mod jump;
@@ -14,6 +17,7 @@ mod paint;
 mod parse;
 mod patch;
 mod remerge;
+mod place;
 pub(super) mod rendered;
 mod rows;
 mod select;
@@ -28,6 +32,7 @@ use super::DiffKey;
 use super::highlight::{self, MAX_LINE_CHARS, Spans, cap_line};
 use crate::git::{self, Area, DiffOptions};
 
+pub(super) use algorithm::algorithm_for;
 pub use images::ImagePair;
 use images::{is_image, load_images};
 pub(in crate::repo) use interdiff::{interdiff_data, interdiff_rows};
@@ -38,6 +43,7 @@ pub use parse::parse;
 pub(in crate::repo) use parse::patch_header;
 use parse::{is_new_file, pair_lines};
 pub use patch::{hunk_changes, partial_patch};
+pub(super) use place::{Place, offset_of_place};
 pub(super) use select::TextSel;
 
 const LINE_H: f32 = 19.0;
@@ -88,6 +94,9 @@ pub struct DiffData {
     pub revertable: bool,
     /// The file is new: it has no old side, so it shows unified even side by side.
     pub new_file: bool,
+    /// The lines added and removed; `None` when there are none to count (a binary file, one
+    /// git doesn't diff), as `--numstat` says of those.
+    pub line_counts: (Option<u32>, Option<u32>),
     /// Characters in the longest line, for the width to scroll (counted once, not every frame).
     longest: usize,
     /// The lines cut to be shown, as they were: what copying them copies.
@@ -102,7 +111,7 @@ pub struct DiffData {
 impl DiffData {
     /// Whether the lines show side by side when that's the setting (`split`): a new file takes
     /// the whole width, rather than half of it next to an empty old side.
-    pub(in crate::repo::diff) fn shows_split(&self, split: bool) -> bool {
+    pub(in crate::repo) fn shows_split(&self, split: bool) -> bool {
         split && !self.new_file
     }
 
@@ -247,8 +256,10 @@ fn prepare(
         .map(|l| l.text.chars().count())
         .max()
         .unwrap_or(0);
+    let line_counts = count_lines(&lines);
     let weakened = weakened::by_hunk_line(&text, &lines);
     DiffData {
+        line_counts,
         lines,
         spans,
         changed,
@@ -264,6 +275,19 @@ fn prepare(
         weakened,
         map: Default::default(),
     }
+}
+
+/// The lines `lines` adds and removes; `None` when it has none to count (a binary file, one
+/// git doesn't diff).
+fn count_lines(lines: &[DiffLine]) -> (Option<u32>, Option<u32>) {
+    if lines.iter().all(|l| l.kind == Kind::Meta) {
+        return (None, None);
+    }
+    let count = |kind| {
+        let n = lines.iter().filter(|l| l.kind == kind).count();
+        Some(u32::try_from(n).unwrap_or(u32::MAX))
+    };
+    (count(Kind::Add), count(Kind::Del))
 }
 
 /// Whether hunks and lines of this diff can be picked on their own (it isn't a `-w` diff,

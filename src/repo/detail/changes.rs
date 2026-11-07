@@ -9,7 +9,8 @@ use crate::icons;
 use crate::repo::diff::{literal_path, unstage_args};
 use crate::repo::partial_stash::row_problem;
 use crate::repo::widgets::{self, RowExtra};
-use crate::repo::{Action, Dialog, DiffKey, Refresh, RepoTab, branch_tree, ops};
+use crate::repo::{Action, Dialog, DiffKey, Refresh, RepoTab, branch_tree, fold, ops};
+use crate::settings::Settings;
 use crate::theme::{self, Tokens};
 
 impl RepoTab {
@@ -174,7 +175,8 @@ impl RepoTab {
     }
 
     /// Working-tree files, each with `buttons`; `on` handles what was clicked on a row. `tree`:
-    /// which list this is, for the folders opened and closed in it.
+    /// which list this is, for the folders opened and closed in it. Generated files and
+    /// lockfiles are folded at the end.
     fn work_list(
         &self,
         ui: &mut Ui,
@@ -185,20 +187,39 @@ impl RepoTab {
         mut on: impl FnMut(&mut Vec<Action>, &StatusFile, RowClick),
     ) {
         let id = egui::Id::new(("file-folder", self.repo_key(), tree));
-        let selected = |f: &&StatusFile| self.open_key() == Some(&DiffKey::Work((*f).clone()));
+        let rules = fold::Rules::from_settings(&Settings::get(ui.ctx()));
+        let group = fold::split(ui, id, files, |f| &f.path, (&self.folding, &rules), acts);
+        let selected = |f: &&&StatusFile| self.open_key() == Some(&DiffKey::Work((**f).clone()));
+        let mut row = |ui: &mut Ui, indent, f: &StatusFile, acts: &mut Vec<Action>| {
+            let click = self.work_row(ui, acts, f, indent, buttons);
+            let opened = matches!(click, RowClick::Open);
+            if matches!(click, RowClick::Pick) { acts.push(Action::PickToStash(f.path.clone())); } else { on(acts, f, click); }
+            if opened {
+                // Clicked: its lines are what was asked for, folded or not.
+                acts.push(Action::UnfoldDiff);
+            }
+        };
         // Rows are known by their path within the list: a file can be both staged and unstaged.
         ui.push_id(("work-list", tree), |ui| {
             branch_tree::files(
                 ui,
                 (id, true),
-                files,
+                &group.shown,
                 |f| &f.path,
                 &selected,
-                &mut |ui, indent, f| match self.work_row(ui, acts, f, indent, buttons) {
-                    RowClick::Pick => acts.push(Action::PickToStash(f.path.clone())),
-                    click => on(acts, f, click),
-                },
+                &mut |ui, indent, f| row(ui, indent, f, acts),
             );
+            let holds_open = group.folded.iter().any(|f| selected(&f));
+            if group.header(ui, id.with("folded-open"), None, holds_open) {
+                branch_tree::files(
+                    ui,
+                    (id.with("folded"), true),
+                    &group.folded,
+                    |f| &f.path,
+                    &selected,
+                    &mut |ui, indent, f| row(ui, indent, f, acts),
+                );
+            }
         });
         if let Some(first) = files.first() {
             let area = super::super::weakened_marks::area_of(first.area);
