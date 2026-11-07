@@ -66,8 +66,8 @@ pub(super) enum Mergiraf {
     NotText(String),
     /// A text conflict, and Mergiraf isn't installed.
     NotInstalled,
-    /// A text conflict, and Mergiraf is installed but couldn't list its languages.
-    Unchecked,
+    /// A text conflict, and Mergiraf is installed but couldn't list its languages: why.
+    Unchecked(String),
 }
 
 /// A finished check: the prediction, and what Mergiraf could do with each conflicted file.
@@ -341,7 +341,7 @@ fn mergiraf_hints(ctx: &egui::Context, files: &[ConflictFile]) -> Vec<Mergiraf> 
     files
         .iter()
         .map(|file| match &patterns {
-            Some(Err(_)) if file.text_only() => Mergiraf::Unchecked,
+            Some(Err(e)) if file.text_only() => Mergiraf::Unchecked(e.clone()),
             Some(Ok(patterns)) => mergiraf_hint(file, Some(patterns)),
             _ => mergiraf_hint(file, None),
         })
@@ -490,10 +490,14 @@ fn verdict_text(op: Op, verdict: &Verdict) -> String {
                     "\n\nThe commits after it aren't checked: they depend on how this is solved.",
                 );
             }
-            if verdict.mergiraf.contains(&Mergiraf::Unchecked) {
-                text.push_str(
-                    "\n\nMergiraf is installed but couldn't list the file types it knows",
-                );
+            let unchecked = verdict.mergiraf.iter().find_map(|m| match m {
+                Mergiraf::Unchecked(e) => Some(e),
+                _ => None,
+            });
+            if let Some(e) = unchecked {
+                text.push_str(&format!(
+                    "\n\nMergiraf is installed but couldn't list the file types it knows: {e}"
+                ));
             }
             if verdict.mergiraf.contains(&Mergiraf::NotInstalled) {
                 text.push_str(
@@ -514,7 +518,9 @@ fn file_lines(files: &[ConflictFile], mergiraf: &[Mergiraf]) -> String {
             Some(Mergiraf::Likely) => "Mergiraf can likely solve it".to_owned(),
             Some(Mergiraf::UnknownLanguage) => "a file type Mergiraf doesn't know".to_owned(),
             Some(Mergiraf::NotText(kinds)) => format!("{kinds}: solve by hand"),
-            Some(Mergiraf::NotInstalled | Mergiraf::Unchecked) | None => "text conflict".to_owned(),
+            Some(Mergiraf::NotInstalled | Mergiraf::Unchecked(_)) | None => {
+                "text conflict".to_owned()
+            }
         };
         text.push_str(&format!("\n• {} — {hint}", file.path));
     }
@@ -807,6 +813,27 @@ mod tests {
         assert!(text.contains("…and 5 more"), "{text}");
         assert!(text.contains("Settings → Git → Mergiraf"), "{text}");
         assert!(!text.contains("Uncommitted"), "{text}");
+    }
+
+    /// Mergiraf found but unable to list its languages says so, with why, instead of
+    /// suggesting to install it.
+    #[test]
+    fn a_failed_language_query_is_shown_with_its_error() {
+        let check = done(
+            Outcome::Conflicts {
+                files: vec![file("a.rs", &["contents"])],
+                stop: None,
+            },
+            0,
+            vec![Mergiraf::Unchecked("Mergiraf: bad flag".into())],
+        );
+        let text = tooltip(Op::Merge, &check, false);
+        assert!(text.contains("• a.rs — text conflict"), "{text}");
+        assert!(
+            text.contains("couldn't list the file types it knows: Mergiraf: bad flag"),
+            "{text}"
+        );
+        assert!(!text.contains("installs it"), "{text}");
     }
 
     /// The cache answers again without asking git, keeps what is asked for often, and drops

@@ -542,6 +542,11 @@ fn a_clean_merge_can_still_be_a_conflicting_rebase() -> Result<(), String> {
 fn a_partial_clone_is_recognised() -> Result<(), String> {
     let repo = forked("partial")?;
     assert_eq!(partial_clone(repo.path()), Ok(false));
+    repo.git(&["config", "remote.other.promisor", "false"])?;
+    assert_eq!(partial_clone(repo.path()), Ok(false));
+    repo.git(&["config", "remote.other.promisor", "true"])?;
+    assert_eq!(partial_clone(repo.path()), Ok(true));
+    repo.git(&["config", "--unset", "remote.other.promisor"])?;
     repo.git(&["config", "extensions.partialClone", "origin"])?;
     assert_eq!(partial_clone(repo.path()), Ok(true));
     // Not knowing (no repository there) is an error, not a "no".
