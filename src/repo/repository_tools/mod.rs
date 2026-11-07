@@ -1,5 +1,6 @@
 mod outbox;
 mod sharing;
+mod turns;
 use crate::git::repository_tools::sharing as borrowing;
 mod dependencies;
 use crate::git::repository_tools::dependencies as dependency;
@@ -29,10 +30,15 @@ enum Tool {
     Dependencies,
     Sharing,
     Outbox,
+    Turn,
 }
 static REQUESTS: AtomicU64 = AtomicU64::new(1);
 
 pub(crate) enum Act {
+    Turn(String, String, String),
+    MarkTurn(Box<crate::git::drafts::turn::Review>, Vec<usize>),
+    PreviewInverse(Box<crate::git::drafts::turn::Review>),
+    RevertTurn(Box<crate::git::drafts::turn::Inverse>),
     Outbox,
     QueuePush(Box<crate::git::repository_tools::outbox::View>, bool),
     PrepareOutbox(String),
@@ -69,6 +75,8 @@ pub(crate) enum Act {
     PublishDependencies(Box<dependency::Plan>),
 }
 enum Data {
+    Turn(crate::git::drafts::turn::Review),
+    Inverse(Box<crate::git::drafts::turn::Inverse>),
     Outbox(crate::git::repository_tools::outbox::View),
     PreparedOutbox(Box<crate::git::repository_tools::outbox::Prepared>),
     Sharing(borrowing::Sharing),
@@ -96,6 +104,10 @@ pub(crate) struct State {
 }
 impl RepoTab {
     pub(super) fn repository_tools_act(&mut self, act: Act, ctx: &egui::Context) {
+        let act = match turns::act(self, act, ctx) {
+            Some(act) => act,
+            None => return,
+        };
         let act = match outbox::act(self, act, ctx) {
             Some(act) => act,
             None => return,
@@ -217,6 +229,10 @@ impl RepoTab {
             act => act,
         };
         let (query, tool) = match act {
+            Act::Turn(parent, turn, session) => {
+                (format!("{parent}\0{turn}\0{session}"), Tool::Turn)
+            }
+            Act::MarkTurn(..) | Act::PreviewInverse(..) | Act::RevertTurn(..) => return,
             Act::Outbox => (String::new(), Tool::Outbox),
             Act::ReviewOutbox(..)
             | Act::QueuePush(..)
@@ -271,6 +287,16 @@ impl RepoTab {
                     !crate::tasks::cancellation().is_cancelled()
                 })
                 .map(Data::Object),
+                Tool::Turn => {
+                    let parts = query.splitn(3, '\0').collect::<Vec<_>>();
+                    if parts.len() != 3 {
+                        return Err("Missing saved turn".into());
+                    }
+                    crate::git::drafts::turn::review(&path, parts[0], parts[1], parts[2], &|| {
+                        !crate::tasks::cancellation().is_cancelled()
+                    })
+                    .map(Data::Turn)
+                }
                 Tool::Outbox => crate::git::repository_tools::outbox::read(&path).map(Data::Outbox),
                 Tool::Sharing => borrowing::inspect(&path).map(Data::Sharing),
                 Tool::Refs => all_refs::read(&path, &query).map(Data::Refs),
@@ -358,6 +384,10 @@ impl RepoTab {
 
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.set_width(850.0);
+    if state.tool == Tool::Turn {
+        turns::show(ui, state, acts);
+        return;
+    }
     if state.tool == Tool::Outbox {
         outbox::show(ui, state, acts);
         return;

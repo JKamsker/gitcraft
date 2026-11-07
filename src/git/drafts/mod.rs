@@ -5,6 +5,8 @@ mod permissions;
 mod restore;
 #[cfg(test)]
 mod tests;
+pub mod turn;
+mod working_transaction;
 
 use crate::{git, remote};
 use context::Context;
@@ -112,6 +114,16 @@ fn capture_preserving(
     force_path: Option<&str>,
     requested: &dyn Fn() -> bool,
 ) -> Result<Option<Draft>, String> {
+    let paths = force_path.map(|p| vec![p.to_owned()]).unwrap_or_default();
+    capture_preserving_paths(repo, reason, keep, &paths, requested)
+}
+fn capture_preserving_paths(
+    repo: &Path,
+    reason: &str,
+    keep: Option<&Id>,
+    force_paths: &[String],
+    requested: &dyn Fn() -> bool,
+) -> Result<Option<Draft>, String> {
     let start = std::time::Instant::now();
     let active = || requested() && start.elapsed() < std::time::Duration::from_secs(120);
     let ctx = Context::new(repo, &active)?;
@@ -127,7 +139,7 @@ fn capture_preserving(
         &active,
     )?)?;
     candidates.extend(untracked.iter().cloned());
-    if let Some(path) = force_path {
+    for path in force_paths {
         valid_path(path)?;
         candidates.insert(path.to_owned());
     }

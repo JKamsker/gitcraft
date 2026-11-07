@@ -205,6 +205,15 @@ fn turn_chip(ui: &mut Ui, turn: &Turn, t: &Tokens, acts: &mut Vec<Action>) {
         acts.push(turn_diff(turn, &label));
     }
     r.context_menu(|ui| {
+        if ui.button("Review hunks / revert only this turn…").clicked() {
+            acts.push(Action::RepositoryTools(
+                crate::repo::repository_tools::Act::Turn(
+                    turn.parent.clone(),
+                    turn.commit.clone(),
+                    turn.session.clone(),
+                ),
+            ));
+        }
         if ui.button("What this turn changed").clicked() {
             acts.push(turn_diff(turn, &label));
         }
