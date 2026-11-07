@@ -7,7 +7,7 @@
   "agent_model": "All subagents explicitly GPT-6.1-sol high reasoning, fork none. User authorizes orchestrated agents; do not spawn other models.",
   "agents": {
     "audit_32_38": "Working drafts author; static edits pending test-hold release",
-    "audit_39_44": "Three file-comparison features author; static edits pending test-hold release",
+    "audit_39_44": "Finish three file-comparison candidate; then separate Windows CI path/fixture failures fix from82189c4",
     "audit_45_50": "Tour and portability author; static edits pending test-hold release",
     "baseline_validation": "Independent static SOPS safety review ee6e848; preserve Preflight FAIL review",
     "implement_gerrit": "SOPS local-only safety unit ee6e848 pushed, compile quarantine remains",
@@ -34,7 +34,8 @@
       "Profile SSH/accounts"
     ],
     "initial_green_base": "4f4fb565c3ade34d3b974f0545af21c51bb34b93 (firstfive,686pass3ignored)",
-    "final_gate": "At complete intended scope, exact combined final commit all required tests pass AND independent adversarial whole-combination review PASS before creating ONE PR. Existing scoped reviews do not replace finalcombinedreview."
+    "final_gate": "At complete intended scope, exact combined final commit all required tests pass AND independent adversarial whole-combination review PASS before creating ONE PR. Existing scoped reviews do not replace finalcombinedreview.",
+    "platform_gates": "Linux/local green, actualWindowsCI failure11 from da0143c; no finalPR untilfixed andWindowsPASS. See ci-recovered-status.json."
   },
   "validation": "CRITICAL shared /workspace/gitcraft/target returned wrong-branch cached tests. Every feature uses PRIVATE CARGO_TARGET_DIR, force cargo clean -p gitcraft in private copy before gates; verify compiler worktree and added tests. Source /workspace/.gitcraft-env/env.sh. Dependency cp-al rootcache, unlink PRIVATE debug/.cargo-lock and target/.rustc_info.json before cargo. No sharedtarget gates. Review log hashes/commit binding; default3ignored tests documented. Windows/liveSSHWSL unavailable.",
   "cleanup": "All reviewed+integrated private targets Gerrit/clone/practice/contrast/structural/weather removed after checking noactivecargo tosave32GBdisk; source/logs/manifests/reviews preserved. Integrationtarget activekeep. Rootcache cargo clean-pgitcraft done, dependenciesretained. Monitor df; delete only completed inactive artifacts.",

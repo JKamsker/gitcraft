@@ -408,7 +408,8 @@
     ],
     "validation": "Prior YAML BaseLoader semantic comparison and diff review passed; only branch filter/comment changed; jobs/permissions/PR/manual triggers/manual-only forge guard preserved.",
     "push": "SUCCESS, remote SHA verified before recovery",
-    "actions_result": "UNKNOWN; prior gh run list returned Forbidden. No CI result claimed."
+    "actions_result": "Recovered via public Actions run IDs + GitHub plugin job/logs. da0143c run42329842602 Linux+lintPASS, WindowsFAIL11 (724pass3ignored). 82189c4 run42332992572 Linux+lintPASS, WindowsIN_PROGRESS. Not fully green.",
+    "recovered_status": "/workspace/work/ci-recovered-status.json"
   },
   "unit_preservation": {
     "commit": "82189c4fcdb2d77fbb2746cb25d6390072266e9e",

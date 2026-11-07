@@ -1,0 +1,1872 @@
+﻿2026-11-07T02:33:34.8671462Z Current runner version: '2.338.2'
+2026-11-07T02:33:34.8697865Z ##[group]Runner Image Provisioner
+2026-11-07T02:33:34.8698701Z Hosted Compute Agent
+2026-11-07T02:33:34.8699362Z Version: 20261103.629
+2026-11-07T02:33:34.8700019Z Commit: 15dbd9ccb5dbf34fae002b6ed1a2670f52df37bc
+2026-11-07T02:33:34.8700704Z Build Date: 2026-11-03T17:26:59Z
+2026-11-07T02:33:34.8701325Z Worker ID: {ebd90eee-ec44-435a-93fe-0c4ef602e388}
+2026-11-07T02:33:34.8702019Z Region: westcentralus
+2026-11-07T02:33:34.8702537Z Cloud: Azure
+2026-11-07T02:33:34.8703003Z ##[endgroup]
+2026-11-07T02:33:34.8704234Z ##[group]Operating System
+2026-11-07T02:33:34.8704849Z Microsoft Windows Server 2025
+2026-11-07T02:33:34.8705383Z 10.0.26100
+2026-11-07T02:33:34.8706229Z Datacenter
+2026-11-07T02:33:34.8706725Z ##[endgroup]
+2026-11-07T02:33:34.8707224Z ##[group]Runner Image
+2026-11-07T02:33:34.8707815Z Image: windows-2025-vs2026
+2026-11-07T02:33:34.8708388Z Version: 20261103.298.1
+2026-11-07T02:33:34.8709904Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20261103.298/images/windows/Windows2025-VS2026-Readme.md
+2026-11-07T02:33:34.8711805Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20261103.298
+2026-11-07T02:33:34.8712779Z ##[endgroup]
+2026-11-07T02:33:34.8713767Z ##[group]GITHUB_TOKEN Permissions
+2026-11-07T02:33:34.8715813Z Contents: read
+2026-11-07T02:33:34.8716304Z Metadata: read
+2026-11-07T02:33:34.8716812Z ##[endgroup]
+2026-11-07T02:33:34.8718721Z Secret source: Actions
+2026-11-07T02:33:34.8719566Z Cache mode: write
+2026-11-07T02:33:34.8720227Z Prepare workflow directory
+2026-11-07T02:33:34.9119076Z Prepare all required actions
+2026-11-07T02:33:34.9177785Z Getting action download info
+2026-11-07T02:33:35.1603274Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-07T02:33:35.2888239Z Download action repository 'dtolnay/rust-toolchain@stable' (SHA:b725eda525362e7cf34af9a7243cac1e3f01a7ec)
+2026-11-07T02:33:35.5013016Z Download action repository 'Swatinem/rust-cache@v2' (SHA:d1527c8f67ef9af357290475d4af4b0fab8f12e0)
+2026-11-07T02:33:36.2077639Z Complete job name: test (windows-latest)
+2026-11-07T02:33:36.3675629Z ##[group]Run actions/checkout@v4
+2026-11-07T02:33:36.3676928Z with:
+2026-11-07T02:33:36.3677561Z   repository: JKamsker/gitcraft
+2026-11-07T02:33:36.3681681Z   token: ***
+2026-11-07T02:33:36.3682269Z   ssh-strict: true
+2026-11-07T02:33:36.3682771Z   ssh-user: git
+2026-11-07T02:33:36.3683252Z   persist-credentials: true
+2026-11-07T02:33:36.3683756Z   clean: true
+2026-11-07T02:33:36.3684257Z   sparse-checkout-cone-mode: true
+2026-11-07T02:33:36.3684817Z   fetch-depth: 1
+2026-11-07T02:33:36.3685246Z   fetch-tags: false
+2026-11-07T02:33:36.3685838Z   show-progress: true
+2026-11-07T02:33:36.3686305Z   lfs: false
+2026-11-07T02:33:36.3686768Z   submodules: false
+2026-11-07T02:33:36.3687345Z   set-safe-directory: true
+2026-11-07T02:33:36.3687855Z   allow-unsafe-pr-checkout: false
+2026-11-07T02:33:36.3688785Z env:
+2026-11-07T02:33:36.3689222Z   CARGO_TERM_COLOR: always
+2026-11-07T02:33:36.3689725Z ##[endgroup]
+2026-11-07T02:33:36.5148416Z Syncing repository: JKamsker/gitcraft
+2026-11-07T02:33:36.5150091Z ##[group]Getting Git version info
+2026-11-07T02:33:36.5150681Z Working directory is 'D:\a\gitcraft\gitcraft'
+2026-11-07T02:33:36.5915156Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-11-07T02:33:36.9506341Z git version 2.56.0.windows.4
+2026-11-07T02:33:36.9562057Z ##[endgroup]
+2026-11-07T02:33:36.9587608Z Temporarily overriding HOME='D:\a\_temp\c195cd8d-6cb9-4122-970c-24da0c183e33' before making global git config changes
+2026-11-07T02:33:36.9590457Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-07T02:33:36.9599178Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\gitcraft\gitcraft
+2026-11-07T02:33:37.0283629Z Deleting the contents of 'D:\a\gitcraft\gitcraft'
+2026-11-07T02:33:37.0290386Z ##[group]Initializing the repository
+2026-11-07T02:33:37.0300520Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\gitcraft\gitcraft
+2026-11-07T02:33:37.1116304Z Initialized empty Git repository in D:/a/gitcraft/gitcraft/.git/
+2026-11-07T02:33:37.1166095Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/JKamsker/gitcraft
+2026-11-07T02:33:37.1926159Z ##[endgroup]
+2026-11-07T02:33:37.1927166Z ##[group]Disabling automatic garbage collection
+2026-11-07T02:33:37.1935670Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-11-07T02:33:37.2376875Z ##[endgroup]
+2026-11-07T02:33:37.2378760Z ##[group]Setting up auth
+2026-11-07T02:33:37.2390400Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-11-07T02:33:37.2788340Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-11-07T02:33:38.7886311Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-07T02:33:38.8261934Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-11-07T02:33:39.3772517Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-07T02:33:39.4158356Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-11-07T02:33:39.9870771Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-11-07T02:33:40.0266566Z ##[endgroup]
+2026-11-07T02:33:40.0267457Z ##[group]Fetching the repository
+2026-11-07T02:33:40.0282275Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +da0143c4f7574ab4ab9ec3607f927c89968c1a1f:refs/remotes/origin/codex/remaining-features
+2026-11-07T02:33:41.6512147Z From https://github.com/JKamsker/gitcraft
+2026-11-07T02:33:41.6513519Z  * [new ref]         da0143c4f7574ab4ab9ec3607f927c89968c1a1f -> origin/codex/remaining-features
+2026-11-07T02:33:41.6564319Z ##[endgroup]
+2026-11-07T02:33:41.6565243Z ##[group]Determining the checkout info
+2026-11-07T02:33:41.6566772Z ##[endgroup]
+2026-11-07T02:33:41.6580386Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-11-07T02:33:41.7163971Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-11-07T02:33:41.7547545Z ##[group]Checking out the ref
+2026-11-07T02:33:41.7557090Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force -B codex/remaining-features refs/remotes/origin/codex/remaining-features
+2026-11-07T02:33:41.9189077Z Switched to a new branch 'codex/remaining-features'
+2026-11-07T02:33:41.9293392Z branch 'codex/remaining-features' set up to track 'origin/codex/remaining-features'.
+2026-11-07T02:33:41.9849535Z ##[endgroup]
+2026-11-07T02:33:41.9856013Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-11-07T02:33:42.0202728Z da0143c4f7574ab4ab9ec3607f927c89968c1a1f
+2026-11-07T02:33:42.0749631Z ##[group]Run dtolnay/rust-toolchain@stable
+2026-11-07T02:33:42.0750136Z with:
+2026-11-07T02:33:42.0750408Z   toolchain: stable
+2026-11-07T02:33:42.0751092Z env:
+2026-11-07T02:33:42.0751368Z   CARGO_TERM_COLOR: always
+2026-11-07T02:33:42.0751662Z ##[endgroup]
+2026-11-07T02:33:42.0824548Z ##[start-action display=Parse toolchain version;id=__dtolnay_rust-toolchain.parse]
+2026-11-07T02:33:42.0995281Z ##[group]Run if [[ -z $toolchain ]]; then
+2026-11-07T02:33:42.0995835Z if [[ -z $toolchain ]]; then
+2026-11-07T02:33:42.0997302Z   # GitHub does not enforce `required: true` inputs itself. https://github.com/actions/runner/issues/1070
+2026-11-07T02:33:42.0997904Z   echo "'toolchain' is a required input" >&2
+2026-11-07T02:33:42.0998318Z   exit 1
+2026-11-07T02:33:42.0998747Z elif [[ $toolchain =~ ^stable' '[0-9]+' '(year|month|week|day)s?' 'ago$ ]]; then
+2026-11-07T02:33:42.0999337Z   if [[ Windows == macOS ]]; then
+2026-11-07T02:33:42.0999948Z     echo "toolchain=1.$((($(date -v-$(sed 's/stable \([0-9]*\) \(.\).*/\1\2/' <<< $toolchain) +%s)/60/60/24-16569)/7/6))" >> $GITHUB_OUTPUT
+2026-11-07T02:33:42.1001189Z   else
+2026-11-07T02:33:42.1001884Z     echo "toolchain=1.$((($(date --date "${toolchain#stable }" +%s)/60/60/24-16569)/7/6))" >> $GITHUB_OUTPUT
+2026-11-07T02:33:42.1002397Z   fi
+2026-11-07T02:33:42.1002758Z elif [[ $toolchain =~ ^stable' 'minus' '[0-9]+' 'releases?$ ]]; then
+2026-11-07T02:33:42.1003428Z   echo "toolchain=1.$((($(date +%s)/60/60/24-16569)/7/6-${toolchain//[^0-9]/}))" >> $GITHUB_OUTPUT
+2026-11-07T02:33:42.1003947Z elif [[ $toolchain =~ ^1\.[0-9]+$ ]]; then
+2026-11-07T02:33:42.1004551Z   echo "toolchain=1.$((i=${toolchain#1.}, c=($(date +%s)/60/60/24-16569)/7/6, i+9*i*(10*i<=c)+90*i*(100*i<=c)))" >> $GITHUB_OUTPUT
+2026-11-07T02:33:42.1005072Z else
+2026-11-07T02:33:42.1005337Z   delimiter=EOF
+2026-11-07T02:33:42.1005730Z   while [[ $toolchain == *$delimiter* ]]; do delimiter+=_; done
+2026-11-07T02:33:42.1006313Z   printf 'toolchain<<%s\n%s\n%s\n' "$delimiter" "$toolchain" "$delimiter" >> $GITHUB_OUTPUT
+2026-11-07T02:33:42.1006831Z fi
+2026-11-07T02:33:42.1024192Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-07T02:33:42.1024798Z env:
+2026-11-07T02:33:42.1025226Z   CARGO_TERM_COLOR: always
+2026-11-07T02:33:42.1025539Z   toolchain: stable
+2026-11-07T02:33:42.1025848Z ##[endgroup]
+2026-11-07T02:33:42.2943273Z ##[end-action id=__dtolnay_rust-toolchain.parse;outcome=success;conclusion=success;duration_ms=211]
+2026-11-07T02:33:42.2948933Z ##[start-action display=Set $CARGO_HOME;id=__dtolnay_rust-toolchain.__run]
+2026-11-07T02:33:42.3096790Z ##[group]Run echo CARGO_HOME=${CARGO_HOME:-"$USERPROFILE\.cargo"} >> $GITHUB_ENV
+2026-11-07T02:33:42.3097621Z echo CARGO_HOME=${CARGO_HOME:-"$USERPROFILE\.cargo"} >> $GITHUB_ENV
+2026-11-07T02:33:42.3109691Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-07T02:33:42.3110244Z env:
+2026-11-07T02:33:42.3110561Z   CARGO_TERM_COLOR: always
+2026-11-07T02:33:42.3110928Z ##[endgroup]
+2026-11-07T02:33:42.3522511Z ##[end-action id=__dtolnay_rust-toolchain.__run;outcome=success;conclusion=success;duration_ms=57]
+2026-11-07T02:33:42.3525643Z ##[start-action display=Install rustup if needed;id=__dtolnay_rust-toolchain.__run_2]
+2026-11-07T02:33:42.3538412Z ##[end-action id=__dtolnay_rust-toolchain.__run_2;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-11-07T02:33:42.3541248Z ##[start-action display=Install rustup if needed on windows;id=__dtolnay_rust-toolchain.__run_3]
+2026-11-07T02:33:42.3672744Z ##[group]Run if ! command -v rustup &>/dev/null; then
+2026-11-07T02:33:42.3673480Z if ! command -v rustup &>/dev/null; then
+2026-11-07T02:33:42.3675880Z   curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused --location --silent --show-error --fail https://win.rustup.rs/x86_64 --output 'D:\a\_temp\rustup-init.exe'
+2026-11-07T02:33:42.3676817Z   'D:\a\_temp\rustup-init.exe' --default-toolchain none --no-modify-path -y
+2026-11-07T02:33:42.3677359Z   echo "$CARGO_HOME\bin" >> $GITHUB_PATH
+2026-11-07T02:33:42.3677730Z fi
+2026-11-07T02:33:42.3689074Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-07T02:33:42.3689596Z env:
+2026-11-07T02:33:42.3689943Z   CARGO_TERM_COLOR: always
+2026-11-07T02:33:42.3690491Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-11-07T02:33:42.3691053Z ##[endgroup]
+2026-11-07T02:33:42.4279162Z ##[end-action id=__dtolnay_rust-toolchain.__run_3;outcome=success;conclusion=success;duration_ms=73]
+2026-11-07T02:33:42.4297615Z ##[start-action display=rustup toolchain install stable;id=__dtolnay_rust-toolchain.__run_4]
+2026-11-07T02:33:42.4423888Z ##[group]Run set -f  # split targets and components on commas and whitespace, without glob expansion
+2026-11-07T02:33:42.4425061Z set -f  # split targets and components on commas and whitespace, without glob expansion
+2026-11-07T02:33:42.4425622Z flags=()
+2026-11-07T02:33:42.4426104Z for t in ${targets//,/ }; do flags+=(--target "$t"); done
+2026-11-07T02:33:42.4426654Z for c in ${components//,/ }; do flags+=(--component "$c"); done
+2026-11-07T02:33:42.4427194Z if [[ $toolchain == nightly && -n $components ]]; then flags+=(--allow-downgrade); fi
+2026-11-07T02:33:42.4427684Z log=$(mktemp)
+2026-11-07T02:33:42.4428005Z trap 'rm -f "$log"' EXIT
+2026-11-07T02:33:42.4428330Z for attempt in 1 2 3 4 5; do
+2026-11-07T02:33:42.4428989Z   if rustup toolchain install "$toolchain" "${flags[@]}" --profile minimal --no-self-update --force-non-host 2>&1 | tee "$log"; then
+2026-11-07T02:33:42.4429592Z     break
+2026-11-07T02:33:42.4429851Z   else
+2026-11-07T02:33:42.4430154Z     status=$?
+2026-11-07T02:33:42.4430443Z   fi
+2026-11-07T02:33:42.4430812Z   if [[ $attempt == 5 ]] || ! grep -Fq 'checksum failed for ' "$log" \
+2026-11-07T02:33:42.4431394Z       || ! grep -Fq 'this is likely due to an ongoing update of the official release server' "$log"; then
+2026-11-07T02:33:42.4431883Z     exit "$status"
+2026-11-07T02:33:42.4432245Z   fi
+2026-11-07T02:33:42.4432658Z   echo "Retrying rustup toolchain install in 30 seconds (retry $attempt of 4)" >&2
+2026-11-07T02:33:42.4433142Z   sleep 30
+2026-11-07T02:33:42.4433417Z done
+2026-11-07T02:33:42.4445444Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-07T02:33:42.4445978Z env:
+2026-11-07T02:33:42.4446262Z   CARGO_TERM_COLOR: always
+2026-11-07T02:33:42.4446595Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-11-07T02:33:42.4446959Z   toolchain: stable
+2026-11-07T02:33:42.4447256Z   targets: 
+2026-11-07T02:33:42.4447528Z   components: 
+2026-11-07T02:33:42.4447821Z   RUSTUP_PERMIT_COPY_RENAME: 1
+2026-11-07T02:33:42.4448115Z ##[endgroup]
+2026-11-07T02:33:46.6159152Z info: syncing channel updates for stable-x86_64-pc-windows-msvc
+2026-11-07T02:33:47.1356487Z 
+2026-11-07T02:33:47.1676771Z   stable-x86_64-pc-windows-msvc unchanged - rustc 1.99.1 (58cf8f9c3 2026-10-13)
+2026-11-07T02:33:47.1678131Z 
+2026-11-07T02:33:47.2158050Z ##[end-action id=__dtolnay_rust-toolchain.__run_4;outcome=success;conclusion=success;duration_ms=4785]
+2026-11-07T02:33:47.2167588Z ##[start-action display=rustup default stable;id=__dtolnay_rust-toolchain.__run_5]
+2026-11-07T02:33:47.2311712Z ##[group]Run rustup default "$toolchain" --force-non-host
+2026-11-07T02:33:47.2312182Z rustup default "$toolchain" --force-non-host
+2026-11-07T02:33:47.2323647Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-07T02:33:47.2324138Z env:
+2026-11-07T02:33:47.2325069Z   CARGO_TERM_COLOR: always
+2026-11-07T02:33:47.2325402Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-11-07T02:33:47.2325768Z   toolchain: stable
+2026-11-07T02:33:47.2326075Z ##[endgroup]
+2026-11-07T02:33:47.3004761Z info: using existing install for stable-x86_64-pc-windows-msvc
+2026-11-07T02:33:47.3062371Z info: default toolchain set to stable-x86_64-pc-windows-msvc
+2026-11-07T02:33:47.3062788Z 
+2026-11-07T02:33:47.3281280Z   stable-x86_64-pc-windows-msvc unchanged - rustc 1.99.1 (58cf8f9c3 2026-10-13)
+2026-11-07T02:33:47.3281807Z 
+2026-11-07T02:33:47.3362751Z ##[end-action id=__dtolnay_rust-toolchain.__run_5;outcome=success;conclusion=success;duration_ms=119]
+2026-11-07T02:33:47.3367416Z ##[start-action display=Create cachekey;id=__dtolnay_rust-toolchain.rustc-version]
+2026-11-07T02:33:47.3504453Z ##[group]Run DATE=$(rustc +"$toolchain" --version --verbose | sed -ne 's/^commit-date: \(20[0-9][0-9]\)-\([01][0-9]\)-\([0-3][0-9]\)$/\1\2\3/p')
+2026-11-07T02:33:47.3505410Z DATE=$(rustc +"$toolchain" --version --verbose | sed -ne 's/^commit-date: \(20[0-9][0-9]\)-\([01][0-9]\)-\([0-3][0-9]\)$/\1\2\3/p')
+2026-11-07T02:33:47.3506091Z HASH=$(rustc +"$toolchain" --version --verbose | sed -ne 's/^commit-hash: //p')
+2026-11-07T02:33:47.3506669Z echo "cachekey=$(echo $DATE$HASH | head -c12)" >> $GITHUB_OUTPUT
+2026-11-07T02:33:47.3518723Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-07T02:33:47.3519208Z env:
+2026-11-07T02:33:47.3519521Z   CARGO_TERM_COLOR: always
+2026-11-07T02:33:47.3519879Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-11-07T02:33:47.3520238Z   toolchain: stable
+2026-11-07T02:33:47.3520528Z ##[endgroup]
+2026-11-07T02:33:48.2402234Z ##[end-action id=__dtolnay_rust-toolchain.rustc-version;outcome=success;conclusion=success;duration_ms=903]
+2026-11-07T02:33:48.2405734Z ##[start-action display=Disable incremental compilation;id=__dtolnay_rust-toolchain.__run_6]
+2026-11-07T02:33:48.2551467Z ##[group]Run if [ -z "${CARGO_INCREMENTAL+set}" ]; then
+2026-11-07T02:33:48.2551918Z if [ -z "${CARGO_INCREMENTAL+set}" ]; then
+2026-11-07T02:33:48.2552289Z   echo CARGO_INCREMENTAL=0 >> $GITHUB_ENV
+2026-11-07T02:33:48.2552701Z fi
+2026-11-07T02:33:48.2564183Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-07T02:33:48.2564672Z env:
+2026-11-07T02:33:48.2564983Z   CARGO_TERM_COLOR: always
+2026-11-07T02:33:48.2565328Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-11-07T02:33:48.2565698Z ##[endgroup]
+2026-11-07T02:33:48.3021236Z ##[end-action id=__dtolnay_rust-toolchain.__run_6;outcome=success;conclusion=success;duration_ms=61]
+2026-11-07T02:33:48.3025725Z ##[start-action display=Enable colors in Cargo output;id=__dtolnay_rust-toolchain.__run_7]
+2026-11-07T02:33:48.3158804Z ##[group]Run if [ -z "${CARGO_TERM_COLOR+set}" ]; then
+2026-11-07T02:33:48.3159264Z if [ -z "${CARGO_TERM_COLOR+set}" ]; then
+2026-11-07T02:33:48.3159667Z   echo CARGO_TERM_COLOR=always >> $GITHUB_ENV
+2026-11-07T02:33:48.3160047Z fi
+2026-11-07T02:33:48.3171850Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-07T02:33:48.3172319Z env:
+2026-11-07T02:33:48.3172690Z   CARGO_TERM_COLOR: always
+2026-11-07T02:33:48.3173022Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-11-07T02:33:48.3173387Z   CARGO_INCREMENTAL: 0
+2026-11-07T02:33:48.3173666Z ##[endgroup]
+2026-11-07T02:33:48.3574119Z ##[end-action id=__dtolnay_rust-toolchain.__run_7;outcome=success;conclusion=success;duration_ms=54]
+2026-11-07T02:33:48.3578898Z ##[start-action display=Enable Cargo sparse registry;id=__dtolnay_rust-toolchain.__run_8]
+2026-11-07T02:33:48.3702335Z ##[group]Run # implemented in 1.66, stabilized in 1.68, made default in 1.70
+2026-11-07T02:33:48.3702938Z # implemented in 1.66, stabilized in 1.68, made default in 1.70
+2026-11-07T02:33:48.3703825Z if [ -z "${CARGO_REGISTRIES_CRATES_IO_PROTOCOL+set}" -o -f "D:\a\_temp"/.implicit_cargo_registries_crates_io_protocol ]; then
+2026-11-07T02:33:48.3704561Z   if rustc +"$toolchain" --version --verbose | grep -q '^release: 1\.6[89]\.'; then
+2026-11-07T02:33:48.3705182Z     touch "D:\a\_temp"/.implicit_cargo_registries_crates_io_protocol || true
+2026-11-07T02:33:48.3705750Z     echo CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse >> $GITHUB_ENV
+2026-11-07T02:33:48.3706333Z   elif rustc +"$toolchain" --version --verbose | grep -q '^release: 1\.6[67]\.'; then
+2026-11-07T02:33:48.3707621Z     touch "D:\a\_temp"/.implicit_cargo_registries_crates_io_protocol || true
+2026-11-07T02:33:48.3708151Z     echo CARGO_REGISTRIES_CRATES_IO_PROTOCOL=git >> $GITHUB_ENV
+2026-11-07T02:33:48.3708564Z   fi
+2026-11-07T02:33:48.3708910Z fi
+2026-11-07T02:33:48.3720834Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-07T02:33:48.3721309Z env:
+2026-11-07T02:33:48.3721623Z   CARGO_TERM_COLOR: always
+2026-11-07T02:33:48.3721958Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-11-07T02:33:48.3722360Z   CARGO_INCREMENTAL: 0
+2026-11-07T02:33:48.3722651Z   toolchain: stable
+2026-11-07T02:33:48.3722933Z ##[endgroup]
+2026-11-07T02:33:48.5659504Z ##[end-action id=__dtolnay_rust-toolchain.__run_8;outcome=success;conclusion=success;duration_ms=207]
+2026-11-07T02:33:48.5663915Z ##[start-action display=Work around spurious network errors in curl 8.0;id=__dtolnay_rust-toolchain.__run_9]
+2026-11-07T02:33:48.5796217Z ##[group]Run # https://rust-lang.zulipchat.com/#narrow/stream/246057-t-cargo/topic/timeout.20investigation
+2026-11-07T02:33:48.5797018Z # https://rust-lang.zulipchat.com/#narrow/stream/246057-t-cargo/topic/timeout.20investigation
+2026-11-07T02:33:48.5797691Z if rustc +"$toolchain" --version --verbose | grep -q '^release: 1\.7[01]\.'; then
+2026-11-07T02:33:48.5798210Z   echo CARGO_HTTP_MULTIPLEXING=false >> $GITHUB_ENV
+2026-11-07T02:33:48.5798745Z fi
+2026-11-07T02:33:48.5811011Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-07T02:33:48.5811571Z env:
+2026-11-07T02:33:48.5811913Z   CARGO_TERM_COLOR: always
+2026-11-07T02:33:48.5812241Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-11-07T02:33:48.5812627Z   CARGO_INCREMENTAL: 0
+2026-11-07T02:33:48.5812915Z   toolchain: stable
+2026-11-07T02:33:48.5813192Z ##[endgroup]
+2026-11-07T02:33:48.6807173Z ##[end-action id=__dtolnay_rust-toolchain.__run_9;outcome=success;conclusion=success;duration_ms=114]
+2026-11-07T02:33:48.6812127Z ##[start-action display=rustc +stable --version --verbose;id=__dtolnay_rust-toolchain.__run_10]
+2026-11-07T02:33:48.6936742Z ##[group]Run rustc +"$toolchain" --version --verbose
+2026-11-07T02:33:48.6937225Z rustc +"$toolchain" --version --verbose
+2026-11-07T02:33:48.6947388Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-07T02:33:48.6947871Z env:
+2026-11-07T02:33:48.6948459Z   CARGO_TERM_COLOR: always
+2026-11-07T02:33:48.6948850Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-11-07T02:33:48.6949194Z   CARGO_INCREMENTAL: 0
+2026-11-07T02:33:48.6949474Z   toolchain: stable
+2026-11-07T02:33:48.6949769Z ##[endgroup]
+2026-11-07T02:33:48.7759965Z rustc 1.99.1 (58cf8f9c3 2026-10-13)
+2026-11-07T02:33:48.7760563Z binary: rustc
+2026-11-07T02:33:48.7761086Z commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-11-07T02:33:48.7761861Z commit-date: 2026-10-13
+2026-11-07T02:33:48.7762683Z host: x86_64-pc-windows-msvc
+2026-11-07T02:33:48.7763078Z release: 1.99.1
+2026-11-07T02:33:48.7763703Z LLVM version: 23.1.1
+2026-11-07T02:33:48.7893404Z ##[end-action id=__dtolnay_rust-toolchain.__run_10;outcome=success;conclusion=success;duration_ms=108]
+2026-11-07T02:33:48.8132195Z ##[group]Run Swatinem/rust-cache@v2
+2026-11-07T02:33:48.8132683Z with:
+2026-11-07T02:33:48.8133303Z   prefix-key: v0-rust
+2026-11-07T02:33:48.8133605Z   add-job-id-key: true
+2026-11-07T02:33:48.8133927Z   add-rust-environment-hash-key: true
+2026-11-07T02:33:48.8134269Z   cache-targets: true
+2026-11-07T02:33:48.8134542Z   cache-all-crates: false
+2026-11-07T02:33:48.8134925Z   cache-workspace-crates: false
+2026-11-07T02:33:48.8135242Z   save-if: true
+2026-11-07T02:33:48.8135569Z   cache-provider: github
+2026-11-07T02:33:48.8135857Z   cache-bin: true
+2026-11-07T02:33:48.8136116Z   lookup-only: false
+2026-11-07T02:33:48.8136418Z   cmd-format: {0}
+2026-11-07T02:33:48.8136680Z env:
+2026-11-07T02:33:48.8136933Z   CARGO_TERM_COLOR: always
+2026-11-07T02:33:48.8137490Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-11-07T02:33:48.8137832Z   CARGO_INCREMENTAL: 0
+2026-11-07T02:33:48.8138165Z ##[endgroup]
+2026-11-07T02:33:51.2283559Z ##[group]Cache Configuration
+2026-11-07T02:33:51.2284406Z Cache Provider:
+2026-11-07T02:33:51.2300238Z     github
+2026-11-07T02:33:51.2302107Z Workspaces:
+2026-11-07T02:33:51.2303279Z     D:\a\gitcraft\gitcraft
+2026-11-07T02:33:51.2305613Z Cache Paths:
+2026-11-07T02:33:51.2307325Z     C:\Users\runneradmin\.cargo\bin
+2026-11-07T02:33:51.2308056Z     C:\Users\runneradmin\.cargo\.crates.toml
+2026-11-07T02:33:51.2309054Z     C:\Users\runneradmin\.cargo\.crates2.json
+2026-11-07T02:33:51.2309669Z     C:\Users\runneradmin\.cargo\registry
+2026-11-07T02:33:51.2310214Z     C:\Users\runneradmin\.cargo\git
+2026-11-07T02:33:51.2311049Z     D:\a\gitcraft\gitcraft\target
+2026-11-07T02:33:51.2311600Z Restore Key:
+2026-11-07T02:33:51.2312192Z     v0-rust-test-Windows_NT-x64-e70cdc14
+2026-11-07T02:33:51.2312671Z Cache Key:
+2026-11-07T02:33:51.2313155Z     v0-rust-test-Windows_NT-x64-e70cdc14-b288e43d
+2026-11-07T02:33:51.2313683Z .. Prefix:
+2026-11-07T02:33:51.2314078Z   - v0-rust-test-Windows_NT-x64
+2026-11-07T02:33:51.2314586Z .. Environment considered:
+2026-11-07T02:33:51.2315008Z   - Rust Versions:
+2026-11-07T02:33:51.2315606Z     - 1.99.1 x86_64-pc-windows-msvc 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-11-07T02:33:51.2316474Z   - CARGO_HOME
+2026-11-07T02:33:51.2316853Z   - CARGO_INCREMENTAL
+2026-11-07T02:33:51.2317232Z   - CARGO_TERM_COLOR
+2026-11-07T02:33:51.2317630Z .. Lockfiles considered:
+2026-11-07T02:33:51.2318040Z   - D:\a\gitcraft\gitcraft\Cargo.lock
+2026-11-07T02:33:51.2318549Z   - D:\a\gitcraft\gitcraft\Cargo.toml
+2026-11-07T02:33:51.2319377Z ##[endgroup]
+2026-11-07T02:33:51.2319578Z 
+2026-11-07T02:33:51.2319800Z ... Restoring cache ...
+2026-11-07T02:33:51.5621676Z No cache found.
+2026-11-07T02:33:51.5944490Z ##[group]Run cargo test --locked
+2026-11-07T02:33:51.5945061Z cargo test --locked
+2026-11-07T02:33:51.6659123Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-11-07T02:33:51.6659620Z env:
+2026-11-07T02:33:51.6659941Z   CARGO_TERM_COLOR: always
+2026-11-07T02:33:51.6660283Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-11-07T02:33:51.6660899Z   CARGO_INCREMENTAL: 0
+2026-11-07T02:33:51.6661253Z   CACHE_ON_FAILURE: false
+2026-11-07T02:33:51.6661554Z ##[endgroup]
+2026-11-07T02:33:52.9610713Z     Updating git repository `https://github.com/JKamsker/winit`
+2026-11-07T02:33:55.3123436Z     Updating crates.io index
+2026-11-07T02:33:57.0772244Z  Downloading crates ...
+2026-11-07T02:33:57.3525262Z   Downloaded cursor-icon v1.2.0
+2026-11-07T02:33:57.3921509Z   Downloaded document-features v0.2.12
+2026-11-07T02:33:57.5274330Z   Downloaded form_urlencoded v1.2.2
+2026-11-07T02:33:57.5387501Z   Downloaded fnv v1.0.7
+2026-11-07T02:33:57.5521832Z   Downloaded simd-adler32 v0.3.10
+2026-11-07T02:33:57.5791851Z   Downloaded shlex v2.0.1
+2026-11-07T02:33:57.5909360Z   Downloaded color_quant v1.1.0
+2026-11-07T02:33:57.6044887Z   Downloaded downcast-rs v1.2.1
+2026-11-07T02:33:57.6158876Z   Downloaded glutin_wgl_sys v0.6.1
+2026-11-07T02:33:57.6227359Z   Downloaded cfg-if v1.0.5
+2026-11-07T02:33:57.6326986Z   Downloaded cfg_aliases v0.2.2
+2026-11-07T02:33:57.6448399Z   Downloaded glutin_egl_sys v0.7.1
+2026-11-07T02:33:57.6514481Z   Downloaded serde_spanned v1.1.2
+2026-11-07T02:33:57.6636047Z   Downloaded bit-set v0.10.0
+2026-11-07T02:33:57.6733518Z   Downloaded crossbeam-deque v0.8.8
+2026-11-07T02:33:57.6840597Z   Downloaded cfg_aliases v0.1.1
+2026-11-07T02:33:57.6943980Z   Downloaded fdeflate v0.3.7
+2026-11-07T02:33:57.7108568Z   Downloaded shared_library v0.1.9
+2026-11-07T02:33:57.7189430Z   Downloaded accesskit_consumer v0.35.0
+2026-11-07T02:33:57.7304479Z   Downloaded enum-map v2.7.3
+2026-11-07T02:33:57.7471463Z   Downloaded guillotiere v0.7.0
+2026-11-07T02:33:57.7565480Z   Downloaded clipboard-win v5.4.3
+2026-11-07T02:33:57.7695880Z   Downloaded find-msvc-tools v0.1.15
+2026-11-07T02:33:57.7878054Z   Downloaded error-code v3.4.0
+2026-11-07T02:33:57.7961248Z   Downloaded glutin-winit v0.5.0
+2026-11-07T02:33:57.8039240Z   Downloaded arrayref v0.3.9
+2026-11-07T02:33:57.8195696Z   Downloaded byteorder-lite v0.1.0
+2026-11-07T02:33:57.8269512Z   Downloaded bit-set v0.8.0
+2026-11-07T02:33:57.8366468Z   Downloaded adler2 v2.0.1
+2026-11-07T02:33:57.8460131Z   Downloaded float-cmp v0.9.0
+2026-11-07T02:33:57.8591496Z   Downloaded untrusted v0.9.0
+2026-11-07T02:33:57.8710200Z   Downloaded enumn v0.1.14
+2026-11-07T02:33:57.8814452Z   Downloaded filedescriptor v0.8.3
+2026-11-07T02:33:57.8929773Z   Downloaded autocfg v1.5.1
+2026-11-07T02:33:57.9065554Z   Downloaded bincode v1.3.3
+2026-11-07T02:33:57.9229735Z   Downloaded deranged v0.5.9
+2026-11-07T02:33:57.9386098Z   Downloaded foldhash v0.2.0
+2026-11-07T02:33:57.9484369Z   Downloaded type-map v0.5.1
+2026-11-07T02:33:57.9551492Z   Downloaded bitflags v1.3.2
+2026-11-07T02:33:57.9914925Z   Downloaded byteorder v1.5.0
+2026-11-07T02:33:58.0023343Z   Downloaded equivalent v1.0.3
+2026-11-07T02:33:58.0133401Z   Downloaded utf8-zero v0.8.1
+2026-11-07T02:33:58.0235356Z   Downloaded enum-map-derive v0.17.0
+2026-11-07T02:33:58.0314417Z   Downloaded renderdoc-sys v1.1.0
+2026-11-07T02:33:58.0386650Z   Downloaded either v1.19.0
+2026-11-07T02:33:58.0550266Z   Downloaded getopts v0.2.24
+2026-11-07T02:33:58.0656040Z   Downloaded ehttp v0.7.2
+2026-11-07T02:33:58.0771459Z   Downloaded rustc-hash v2.1.3
+2026-11-07T02:33:58.0906146Z   Downloaded arboard v3.7.0
+2026-11-07T02:33:58.1100840Z   Downloaded data-url v0.3.2
+2026-11-07T02:33:58.1280036Z   Downloaded ecolor v0.36.2
+2026-11-07T02:33:58.1406749Z   Downloaded bytemuck_derive v1.12.1
+2026-11-07T02:33:58.1507024Z   Downloaded bit-vec v0.8.0
+2026-11-07T02:33:58.1658141Z   Downloaded fax v0.2.7
+2026-11-07T02:33:58.1804866Z   Downloaded gl_generator v0.14.0
+2026-11-07T02:33:58.1936319Z   Downloaded displaydoc v0.2.7
+2026-11-07T02:33:58.2152851Z   Downloaded windows-interface v0.59.3
+2026-11-07T02:33:58.2219711Z   Downloaded egui_commonmark_backend v0.25.0
+2026-11-07T02:33:58.2328081Z   Downloaded anyhow v1.0.104
+2026-11-07T02:33:58.2685091Z   Downloaded fastrand v2.5.0
+2026-11-07T02:33:58.2835410Z   Downloaded crossbeam-utils v0.8.23
+2026-11-07T02:33:58.3087417Z   Downloaded getrandom v0.2.17
+2026-11-07T02:33:58.3361553Z   Downloaded shell-words v1.1.1
+2026-11-07T02:33:58.3435956Z   Downloaded crossbeam-epoch v0.9.21
+2026-11-07T02:33:58.3683134Z   Downloaded egui-winit v0.36.2
+2026-11-07T02:33:58.3789596Z   Downloaded bit-vec v0.9.1
+2026-11-07T02:33:58.3897973Z   Downloaded dify v0.8.0
+2026-11-07T02:33:58.4031182Z   Downloaded accesskit v0.24.1
+2026-11-07T02:33:58.4116424Z   Downloaded accesskit_winit v0.32.2
+2026-11-07T02:33:58.4262051Z   Downloaded arrayvec v0.7.8
+2026-11-07T02:33:58.4488131Z   Downloaded egui_commonmark v0.25.0
+2026-11-07T02:33:58.4573553Z   Downloaded egui_glow v0.36.2
+2026-11-07T02:33:58.4697665Z   Downloaded gif v0.14.2
+2026-11-07T02:33:58.4855028Z   Downloaded ahash v0.8.12
+2026-11-07T02:33:58.5023195Z   Downloaded allocator-api2 v0.2.21
+2026-11-07T02:33:58.5254246Z   Downloaded bitflags v2.13.2
+2026-11-07T02:33:58.5677145Z   Downloaded bytemuck v1.25.2
+2026-11-07T02:33:58.6025007Z   Downloaded codespan-reporting v0.13.1
+2026-11-07T02:33:59.3834586Z   Downloaded colored v2.2.0
+2026-11-07T02:33:59.5097391Z   Downloaded crc32fast v1.5.3
+2026-11-07T02:33:59.6102521Z   Downloaded egui-wgpu v0.36.2
+2026-11-07T02:33:59.6550812Z   Downloaded egui_extras v0.36.2
+2026-11-07T02:33:59.7259290Z   Downloaded emath v0.36.2
+2026-11-07T02:33:59.8516297Z   Downloaded getrandom v0.3.4
+2026-11-07T02:33:59.9802290Z   Downloaded getrandom v0.4.3
+2026-11-07T02:34:00.1149305Z   Downloaded rustls-pki-types v1.15.1
+2026-11-07T02:34:00.2566354Z   Downloaded typeid v1.0.3
+2026-11-07T02:34:00.2736868Z   Downloaded xmlwriter v0.1.0
+2026-11-07T02:34:00.2831487Z   Downloaded base64 v0.22.1
+2026-11-07T02:34:00.6915382Z   Downloaded bytes v1.12.1
+2026-11-07T02:34:00.8895095Z   Downloaded font-types v0.12.7
+2026-11-07T02:34:00.9854237Z   Downloaded glifo v0.2.0
+2026-11-07T02:34:01.0000194Z   Downloaded glutin v0.32.3
+2026-11-07T02:34:01.0309355Z   Downloaded gpu-allocator v0.28.0
+2026-11-07T02:34:01.0610473Z   Downloaded half v2.7.1
+2026-11-07T02:34:01.0838835Z   Downloaded strict-num v0.1.1
+2026-11-07T02:34:01.0970203Z   Downloaded zerovec-derive v0.11.7
+2026-11-07T02:34:01.1171358Z   Downloaded accesskit_windows v0.32.1
+2026-11-07T02:34:01.1367353Z   Downloaded aho-corasick v1.1.5
+2026-11-07T02:34:01.1985504Z   Downloaded base64 v0.23.1
+2026-11-07T02:34:01.2590174Z   Downloaded color v0.3.3
+2026-11-07T02:34:01.2828875Z   Downloaded egui_kittest v0.36.2
+2026-11-07T02:34:01.3039259Z   Downloaded fancy-regex v0.16.2
+2026-11-07T02:34:01.3316620Z   Downloaded yoke v0.8.4
+2026-11-07T02:34:01.3497163Z   Downloaded euclid v0.22.14
+2026-11-07T02:34:01.3717533Z   Downloaded flate2 v1.1.10
+2026-11-07T02:34:01.4200742Z   Downloaded yaml-rust v0.4.5
+2026-11-07T02:34:01.4443427Z   Downloaded zerotrie v0.2.5
+2026-11-07T02:34:01.4790378Z   Downloaded eframe v0.36.2
+2026-11-07T02:34:01.5063007Z   Downloaded epaint v0.36.2
+2026-11-07T02:34:01.5431311Z   Downloaded hashbrown v0.16.1
+2026-11-07T02:34:01.5787415Z   Downloaded imagesize v0.13.0
+2026-11-07T02:34:01.6038789Z   Downloaded keyring-core v1.0.1
+2026-11-07T02:34:01.6193502Z   Downloaded khronos-egl v6.0.0
+2026-11-07T02:34:01.6416259Z   Downloaded linebender_resource_handle v0.1.1
+2026-11-07T02:34:01.6505718Z   Downloaded smol_str v0.2.2
+2026-11-07T02:34:01.6659769Z   Downloaded cc v1.10.0
+2026-11-07T02:34:01.7042858Z   Downloaded glow v0.17.0
+2026-11-07T02:34:01.7201709Z   Downloaded hashbrown v0.17.1
+2026-11-07T02:34:01.7611241Z   Downloaded peniko v0.6.1
+2026-11-07T02:34:01.7724061Z   Downloaded webpki-roots v0.26.11
+2026-11-07T02:34:01.7828518Z   Downloaded winapi-util v0.1.11
+2026-11-07T02:34:01.7946033Z   Downloaded zerovec v0.11.9
+2026-11-07T02:34:02.7261070Z   Downloaded fearless_simd v0.4.1
+2026-11-07T02:34:02.7641505Z   Downloaded harfrust v0.12.0
+2026-11-07T02:34:02.8233552Z   Downloaded quote v1.0.47
+2026-11-07T02:34:02.8497980Z   Downloaded windows-targets v0.52.6
+2026-11-07T02:34:02.8561588Z   Downloaded ash v0.38.0+1.3.281
+2026-11-07T02:34:02.9554064Z   Downloaded egui v0.36.2
+2026-11-07T02:34:03.0436687Z   Downloaded presser v0.3.1
+2026-11-07T02:34:03.0577186Z   Downloaded time-core v0.1.9
+2026-11-07T02:34:03.0662822Z   Downloaded litemap v0.8.3
+2026-11-07T02:34:03.0912529Z   Downloaded miniz_oxide v0.9.1
+2026-11-07T02:34:03.1135943Z   Downloaded writeable v0.6.4
+2026-11-07T02:34:03.1291498Z   Downloaded wgpu-naga-bridge v30.0.1
+2026-11-07T02:34:03.1349495Z   Downloaded notify-types v2.1.0
+2026-11-07T02:34:03.1764451Z   Downloaded profiling v1.0.18
+2026-11-07T02:34:03.1864558Z   Downloaded stable_deref_trait v1.2.1
+2026-11-07T02:34:03.1984380Z   Downloaded windows-result v0.4.1
+2026-11-07T02:34:03.4672788Z   Downloaded subtle v2.6.1
+2026-11-07T02:34:03.4763497Z   Downloaded utf8_iter v1.0.4
+2026-11-07T02:34:03.4841811Z   Downloaded windows-implement v0.60.2
+2026-11-07T02:34:03.4958162Z   Downloaded windows-version v0.1.7
+2026-11-07T02:34:03.5045128Z   Downloaded termcolor v1.4.1
+2026-11-07T02:34:03.5121297Z   Downloaded thiserror v1.0.69
+2026-11-07T02:34:03.5598067Z   Downloaded thiserror-impl v1.0.69
+2026-11-07T02:34:03.5691196Z   Downloaded thiserror-impl v2.0.21
+2026-11-07T02:34:03.5794708Z   Downloaded toml_writer v1.1.3+spec-1.1.0
+2026-11-07T02:34:03.5876611Z   Downloaded tinystr v0.8.5
+2026-11-07T02:34:03.6026542Z   Downloaded toml_datetime v1.1.2+spec-1.1.0
+2026-11-07T02:34:03.6149398Z   Downloaded windows-threading v0.2.1
+2026-11-07T02:34:03.6237141Z   Downloaded wgpu-core-deps-windows-linux-android v30.0.1
+2026-11-07T02:34:03.6319790Z   Downloaded svgtypes v0.15.3
+2026-11-07T02:34:03.6527173Z   Downloaded unicode-ident v1.0.27
+2026-11-07T02:34:03.6709295Z   Downloaded synstructure v0.14.0
+2026-11-07T02:34:03.6766962Z   Downloaded scopeguard v1.2.0
+2026-11-07T02:34:03.6843646Z   Downloaded siphasher v1.0.4
+2026-11-07T02:34:03.6939786Z   Downloaded linked-hash-map v0.5.6
+2026-11-07T02:34:03.7486446Z   Downloaded version_check v0.9.5
+2026-11-07T02:34:03.7567043Z   Downloaded windows-link v0.2.1
+2026-11-07T02:34:03.7625839Z   Downloaded windows-collections v0.3.2
+2026-11-07T02:34:03.7701348Z   Downloaded miniz_oxide v0.8.9
+2026-11-07T02:34:03.7934437Z   Downloaded unicase v2.10.0
+2026-11-07T02:34:03.8019109Z   Downloaded windows-future v0.3.2
+2026-11-07T02:34:03.8135109Z   Downloaded kittest v0.4.0
+2026-11-07T02:34:03.8235594Z   Downloaded rustc-hash v1.1.0
+2026-11-07T02:34:03.8297919Z   Downloaded same-file v1.0.6
+2026-11-07T02:34:03.8385118Z   Downloaded libloading v0.8.9
+2026-11-07T02:34:03.8570970Z   Downloaded parking_lot_core v0.9.12
+2026-11-07T02:34:03.8727689Z   Downloaded epaint_default_fonts v0.36.2
+2026-11-07T02:34:03.8920070Z   Downloaded lock_api v0.4.14
+2026-11-07T02:34:03.9015124Z   Downloaded windows-strings v0.5.1
+2026-11-07T02:34:03.9152175Z   Downloaded static_assertions v1.1.0
+2026-11-07T02:34:03.9279499Z   Downloaded open v5.4.5
+2026-11-07T02:34:03.9399052Z   Downloaded thiserror v2.0.21
+2026-11-07T02:34:03.9960388Z   Downloaded quick-error v2.0.1
+2026-11-07T02:34:04.0039031Z   Downloaded httparse v1.10.1
+2026-11-07T02:34:04.0177464Z   Downloaded pollster v1.0.1
+2026-11-07T02:34:04.0268676Z   Downloaded rayon-core v1.13.0
+2026-11-07T02:34:04.0513672Z   Downloaded schannel v0.1.30
+2026-11-07T02:34:04.0638423Z   Downloaded serde_derive v1.0.229
+2026-11-07T02:34:04.0883258Z   Downloaded serial2 v0.2.39
+2026-11-07T02:34:04.1142361Z   Downloaded simplecss v0.2.2
+2026-11-07T02:34:04.1268552Z   Downloaded smallvec v1.16.4
+2026-11-07T02:34:04.1340508Z   Downloaded tempfile v3.27.0
+2026-11-07T02:34:04.1481356Z   Downloaded toml_parser v1.1.5+spec-1.1.0
+2026-11-07T02:34:04.1653664Z   Downloaded unicode-general-category v1.1.0
+2026-11-07T02:34:04.1757649Z   Downloaded walkdir v2.5.0
+2026-11-07T02:34:04.1912384Z   Downloaded weezl v0.1.12
+2026-11-07T02:34:04.2089653Z   Downloaded yoke-derive v0.8.4
+2026-11-07T02:34:04.2194634Z   Downloaded icu_provider v2.4.0
+2026-11-07T02:34:04.2350865Z   Downloaded itoa v1.0.18
+2026-11-07T02:34:04.2439780Z   Downloaded keyring v4.2.0
+2026-11-07T02:34:04.2618340Z   Downloaded notify-rust v4.18.2
+2026-11-07T02:34:04.2853545Z   Downloaded plist v1.10.3
+2026-11-07T02:34:04.3221341Z   Downloaded rustls-pemfile v2.2.0
+2026-11-07T02:34:04.3412414Z   Downloaded tiny-skia-path v0.11.4
+2026-11-07T02:34:04.3554901Z   Downloaded windows-numerics v0.3.1
+2026-11-07T02:34:04.3653684Z   Downloaded xml-rs v0.8.29
+2026-11-07T02:34:04.3884979Z   Downloaded icu_collections v2.4.0
+2026-11-07T02:34:04.4367028Z   Downloaded ordered-float v5.5.1
+2026-11-07T02:34:04.4456326Z   Downloaded web-time v1.1.0
+2026-11-07T02:34:04.4548432Z   Downloaded windows-native-keyring-store v1.1.0
+2026-11-07T02:34:04.4638241Z   Downloaded winreg v0.10.1
+2026-11-07T02:34:04.4841815Z   Downloaded icu_locale_core v2.4.0
+2026-11-07T02:34:04.5335824Z   Downloaded image-webp v0.2.4
+2026-11-07T02:34:04.5458829Z   Downloaded roxmltree v0.20.0
+2026-11-07T02:34:04.6359996Z   Downloaded tracing-attributes v0.1.31
+2026-11-07T02:34:04.6544209Z   Downloaded vt100 v0.18.1
+2026-11-07T02:34:05.2659182Z   Downloaded icu_normalizer_data v2.4.0
+2026-11-07T02:34:05.2934303Z   Downloaded memchr v2.8.3
+2026-11-07T02:34:05.3252619Z   Downloaded num-traits v0.2.19
+2026-11-07T02:34:05.3456264Z   Downloaded png v0.17.16
+2026-11-07T02:34:05.3730266Z   Downloaded png v0.18.1
+2026-11-07T02:34:05.3986777Z   Downloaded serde v1.0.229
+2026-11-07T02:34:05.4191163Z   Downloaded tracing-core v0.1.36
+2026-11-07T02:34:05.4386738Z   Downloaded windows-core v0.62.2
+2026-11-07T02:34:05.4644109Z   Downloaded icu_properties v2.4.0
+2026-11-07T02:34:05.4841136Z   Downloaded itertools v0.15.0
+2026-11-07T02:34:05.5388805Z   Downloaded rayon v1.12.0
+2026-11-07T02:34:05.6108151Z   Downloaded spirv v0.4.0+sdk-1.4.341.0
+2026-11-07T02:34:05.6164279Z   Downloaded time-macros v0.2.32
+2026-11-07T02:34:05.6342073Z   Downloaded vte v0.15.0
+2026-11-07T02:34:05.6447677Z   Downloaded webbrowser v1.2.6
+2026-11-07T02:34:05.6737456Z   Downloaded quick-xml v0.42.0
+2026-11-07T02:34:05.7043949Z   Downloaded rfd v0.17.2
+2026-11-07T02:34:05.7430900Z   Downloaded toml v1.1.8+spec-1.1.0
+2026-11-07T02:34:05.7701294Z   Downloaded nix v0.28.0
+2026-11-07T02:34:05.8359366Z   Downloaded powerfmt v0.2.1
+2026-11-07T02:34:05.8460928Z   Downloaded serde_core v1.0.229
+2026-11-07T02:34:05.8632759Z   Downloaded ureq-proto v0.7.1
+2026-11-07T02:34:05.8982677Z   Downloaded uuid v1.29.0
+2026-11-07T02:34:05.9188417Z   Downloaded icu_normalizer v2.4.0
+2026-11-07T02:34:05.9490980Z   Downloaded tauri-winrt-notification v0.8.1
+2026-11-07T02:34:05.9692676Z   Downloaded http v1.5.0
+2026-11-07T02:34:05.9903741Z   Downloaded zerofrom v0.1.8
+2026-11-07T02:34:05.9964246Z   Downloaded libm v0.2.16
+2026-11-07T02:34:06.5428942Z   Downloaded ring v0.17.14
+2026-11-07T02:34:06.7806606Z   Downloaded url v2.5.8
+2026-11-07T02:34:06.7953405Z   Downloaded read-fonts v0.41.0
+2026-11-07T02:34:06.9070763Z   Downloaded winresource v0.1.34
+2026-11-07T02:34:06.9195649Z   Downloaded tiff v0.11.3
+2026-11-07T02:34:06.9535450Z   Downloaded naga v30.0.1
+2026-11-07T02:34:07.0691430Z   Downloaded unicode-segmentation v1.13.3
+2026-11-07T02:34:07.0814433Z   Downloaded ureq v2.12.1
+2026-11-07T02:34:07.1106992Z   Downloaded serde_json v1.0.154
+2026-11-07T02:34:07.1642466Z   Downloaded vello_cpu v0.1.0
+2026-11-07T02:34:07.1944386Z   Downloaded usvg v0.45.1
+2026-11-07T02:34:07.2161288Z   Downloaded vello_common v0.1.0
+2026-11-07T02:34:07.2398158Z   Downloaded wgpu-types v30.0.1
+2026-11-07T02:34:07.2627324Z   Downloaded zune-jpeg v0.5.15
+2026-11-07T02:34:07.2844773Z   Downloaded polycool v0.4.0
+2026-11-07T02:34:07.2976851Z   Downloaded rustls-webpki v0.103.16
+2026-11-07T02:34:07.3193054Z   Downloaded winnow v1.0.4
+2026-11-07T02:34:07.3826536Z   Downloaded idna v1.1.0
+2026-11-07T02:34:07.4000102Z   Downloaded log v0.4.34
+2026-11-07T02:34:07.4125876Z   Downloaded pin-project-lite v0.2.17
+2026-11-07T02:34:08.1441141Z   Downloaded proc-macro2 v1.0.107
+2026-11-07T02:34:08.1656055Z   Downloaded zerocopy-derive v0.8.63
+2026-11-07T02:34:08.2606773Z   Downloaded moxcms v0.8.1
+2026-11-07T02:34:08.3299292Z   Downloaded notify v8.2.1
+2026-11-07T02:34:08.3440886Z   Downloaded regex v1.13.1
+2026-11-07T02:34:08.3768921Z   Downloaded tiny-skia v0.11.4
+2026-11-07T02:34:08.4786690Z   Downloaded ureq v3.5.1
+2026-11-07T02:34:08.5143086Z   Downloaded zerofrom-derive v0.1.8
+2026-11-07T02:34:08.5226327Z   Downloaded md5 v0.7.0
+2026-11-07T02:34:08.5292656Z   Downloaded pkg-config v0.3.34
+2026-11-07T02:34:08.5384050Z   Downloaded potential_utf v0.1.6
+2026-11-07T02:34:08.5450566Z   Downloaded raw-window-handle v0.6.2
+2026-11-07T02:34:08.5579327Z   Downloaded zerocopy v0.8.63
+2026-11-07T02:34:08.7505273Z   Downloaded khronos_api v3.1.0
+2026-11-07T02:34:09.1908382Z   Downloaded rustls v0.23.46
+2026-11-07T02:34:09.2644228Z   Downloaded webpki-roots v1.0.11
+2026-11-07T02:34:09.2749125Z   Downloaded wgpu v30.0.1
+2026-11-07T02:34:09.3767314Z   Downloaded zlib-rs v0.6.8
+2026-11-07T02:34:09.4111277Z   Downloaded image v0.25.10
+2026-11-07T02:34:09.4666360Z   Downloaded nohash-hasher v0.2.0
+2026-11-07T02:34:09.4729098Z   Downloaded portable-pty v0.9.0
+2026-11-07T02:34:09.4827243Z   Downloaded time v0.3.55
+2026-11-07T02:34:09.5837843Z   Downloaded zune-core v0.5.3
+2026-11-07T02:34:09.5988788Z   Downloaded lazy_static v1.5.1
+2026-11-07T02:34:09.6112909Z   Downloaded litrs v1.0.1
+2026-11-07T02:34:09.6292809Z   Downloaded num-conv v0.2.2
+2026-11-07T02:34:09.6352681Z   Downloaded skrifa v0.44.0
+2026-11-07T02:34:09.6922434Z   Downloaded unicode-width v0.2.2
+2026-11-07T02:34:09.7092605Z   Downloaded idna_adapter v1.2.2
+2026-11-07T02:34:09.7157300Z   Downloaded rustls-native-certs v0.7.3
+2026-11-07T02:34:09.7320910Z   Downloaded syn v2.0.119
+2026-11-07T02:34:09.7932582Z   Downloaded syn v3.0.9
+2026-11-07T02:34:09.8567198Z   Downloaded naga-types v30.0.1
+2026-11-07T02:34:09.8637336Z   Downloaded wgpu-core v30.0.1
+2026-11-07T02:34:09.9856491Z   Downloaded zmij v1.0.23
+2026-11-07T02:34:09.9958400Z   Downloaded resvg v0.45.1
+2026-11-07T02:34:10.0163955Z   Downloaded zeroize v1.9.1
+2026-11-07T02:34:10.0255853Z   Downloaded icu_properties_data v2.4.0
+2026-11-07T02:34:10.1042445Z   Downloaded pulldown-cmark v0.13.6
+2026-11-07T02:34:10.1319285Z   Downloaded tracing v0.1.44
+2026-11-07T02:34:10.7541758Z   Downloaded wgpu-hal v30.0.1
+2026-11-07T02:34:10.8251429Z   Downloaded ron v0.12.2
+2026-11-07T02:34:10.9067985Z   Downloaded kurbo v0.11.3
+2026-11-07T02:34:10.9315811Z   Downloaded jobserver v0.1.35
+2026-11-07T02:34:10.9450285Z   Downloaded windows_x86_64_msvc v0.52.6
+2026-11-07T02:34:10.9638074Z   Downloaded syntect v5.3.0
+2026-11-07T02:34:11.0076356Z   Downloaded libc v0.2.191
+2026-11-07T02:34:11.5487704Z   Downloaded range-alloc v0.1.5
+2026-11-07T02:34:11.7860716Z   Downloaded rgb v0.8.53
+2026-11-07T02:34:11.8064476Z   Downloaded kurbo v0.13.1
+2026-11-07T02:34:11.8366392Z   Downloaded regex-automata v0.4.18
+2026-11-07T02:34:11.9245674Z   Downloaded regex-syntax v0.8.11
+2026-11-07T02:34:11.9541120Z   Downloaded winapi v0.3.9
+2026-11-07T02:34:12.1754497Z   Downloaded indexmap v2.14.2
+2026-11-07T02:34:12.2000970Z   Downloaded once_cell v1.21.4
+2026-11-07T02:34:12.2180141Z   Downloaded windows-sys v0.59.0
+2026-11-07T02:34:12.4535097Z   Downloaded windows-sys v0.61.2
+2026-11-07T02:34:12.6932130Z   Downloaded percent-encoding v2.3.2
+2026-11-07T02:34:12.6990632Z   Downloaded windows-sys v0.52.0
+2026-11-07T02:34:12.9273090Z   Downloaded self_cell v1.3.0
+2026-11-07T02:34:12.9336423Z   Downloaded parking_lot v0.12.5
+2026-11-07T02:34:13.0521310Z   Downloaded pico-args v0.5.0
+2026-11-07T02:34:13.5817866Z   Downloaded two-face v0.5.2+bat-0.26.1
+2026-11-07T02:34:13.7125280Z   Downloaded pxfm v0.1.30
+2026-11-07T02:34:13.8674802Z   Downloaded windows v0.62.2
+2026-11-07T02:34:16.1669822Z    Compiling proc-macro2 v1.0.107
+2026-11-07T02:34:16.1671351Z    Compiling unicode-ident v1.0.27
+2026-11-07T02:34:16.1671796Z    Compiling quote v1.0.47
+2026-11-07T02:34:16.1672438Z    Compiling serde_core v1.0.229
+2026-11-07T02:34:26.2657547Z    Compiling serde v1.0.229
+2026-11-07T02:34:30.1764097Z    Compiling windows-link v0.2.1
+2026-11-07T02:34:30.2497501Z    Compiling cfg-if v1.0.5
+2026-11-07T02:34:30.2782077Z    Compiling log v0.4.34
+2026-11-07T02:34:30.3631254Z    Compiling foldhash v0.2.0
+2026-11-07T02:34:32.2211493Z    Compiling libm v0.2.16
+2026-11-07T02:34:32.2513910Z    Compiling autocfg v1.5.1
+2026-11-07T02:34:34.7479459Z    Compiling syn v3.0.9
+2026-11-07T02:34:35.3777104Z    Compiling syn v2.0.119
+2026-11-07T02:34:35.4973412Z    Compiling bitflags v2.13.2
+2026-11-07T02:34:36.2092308Z    Compiling num-traits v0.2.19
+2026-11-07T02:34:36.4967954Z    Compiling arrayvec v0.7.8
+2026-11-07T02:34:36.5104167Z    Compiling once_cell v1.21.4
+2026-11-07T02:34:37.0345888Z    Compiling thiserror v2.0.21
+2026-11-07T02:34:38.1510495Z    Compiling simd-adler32 v0.3.10
+2026-11-07T02:34:40.2245031Z    Compiling hashbrown v0.17.1
+2026-11-07T02:34:41.2968422Z    Compiling adler2 v2.0.1
+2026-11-07T02:34:41.5116333Z    Compiling equivalent v1.0.3
+2026-11-07T02:34:41.5785775Z    Compiling cfg_aliases v0.2.2
+2026-11-07T02:34:41.6135001Z    Compiling crc32fast v1.5.3
+2026-11-07T02:34:41.6335032Z    Compiling synstructure v0.14.0
+2026-11-07T02:34:42.8690637Z    Compiling miniz_oxide v0.9.1
+2026-11-07T02:34:46.3756112Z    Compiling flate2 v1.1.10
+2026-11-07T02:34:47.4299339Z    Compiling windows-sys v0.61.2
+2026-11-07T02:34:50.8669849Z    Compiling zerocopy v0.8.63
+2026-11-07T02:34:52.4558182Z    Compiling windows-strings v0.5.1
+2026-11-07T02:34:53.8756497Z    Compiling windows-result v0.4.1
+2026-11-07T02:34:54.5154325Z    Compiling stable_deref_trait v1.2.1
+2026-11-07T02:34:54.5761912Z    Compiling parking_lot_core v0.9.12
+2026-11-07T02:34:54.9667682Z    Compiling memchr v2.8.3
+2026-11-07T02:34:58.4060565Z    Compiling windows-threading v0.2.1
+2026-11-07T02:34:58.6635773Z    Compiling scopeguard v1.2.0
+2026-11-07T02:34:58.8360344Z    Compiling zeroize v1.9.1
+2026-11-07T02:34:59.1909441Z    Compiling version_check v0.9.5
+2026-11-07T02:35:00.9932389Z    Compiling libc v0.2.191
+2026-11-07T02:35:01.8948717Z    Compiling lock_api v0.4.14
+2026-11-07T02:35:02.8987444Z    Compiling indexmap v2.14.2
+2026-11-07T02:35:04.8158710Z    Compiling serde_derive v1.0.229
+2026-11-07T02:35:05.0914336Z    Compiling bytemuck_derive v1.12.1
+2026-11-07T02:35:05.4532688Z    Compiling thiserror-impl v2.0.21
+2026-11-07T02:35:26.3052511Z    Compiling bytemuck v1.25.2
+2026-11-07T02:35:27.2376537Z    Compiling zerofrom-derive v0.1.8
+2026-11-07T02:35:29.5152562Z    Compiling windows-interface v0.59.3
+2026-11-07T02:35:32.7664438Z    Compiling zerocopy-derive v0.8.63
+2026-11-07T02:35:45.8614321Z    Compiling smallvec v1.16.4
+2026-11-07T02:35:46.2171627Z    Compiling windows-implement v0.60.2
+2026-11-07T02:35:46.4750329Z    Compiling yoke-derive v0.8.4
+2026-11-07T02:35:51.3552042Z    Compiling zerofrom v0.1.8
+2026-11-07T02:35:51.7517615Z    Compiling zerovec-derive v0.11.7
+2026-11-07T02:36:03.3421027Z    Compiling windows-core v0.62.2
+2026-11-07T02:36:04.9532661Z    Compiling displaydoc v0.2.7
+2026-11-07T02:36:05.1649337Z    Compiling yoke v0.8.4
+2026-11-07T02:36:05.4446362Z    Compiling windows-collections v0.3.2
+2026-11-07T02:36:05.9966654Z    Compiling zerovec v0.11.9
+2026-11-07T02:36:06.1712548Z    Compiling windows-future v0.3.2
+2026-11-07T02:36:07.0973281Z    Compiling windows-numerics v0.3.1
+2026-11-07T02:36:07.7502515Z    Compiling allocator-api2 v0.2.21
+2026-11-07T02:36:08.2495501Z    Compiling hashbrown v0.16.1
+2026-11-07T02:36:08.2969990Z    Compiling parking_lot v0.12.5
+2026-11-07T02:36:09.3489025Z    Compiling windows v0.62.2
+2026-11-07T02:36:10.6111200Z    Compiling enumn v0.1.14
+2026-11-07T02:36:14.0650674Z    Compiling miniz_oxide v0.8.9
+2026-11-07T02:36:17.4503511Z    Compiling fdeflate v0.3.7
+2026-11-07T02:36:17.4740315Z    Compiling polycool v0.4.0
+2026-11-07T02:36:17.9308781Z    Compiling uuid v1.29.0
+2026-11-07T02:36:18.9203970Z    Compiling raw-window-handle v0.6.2
+2026-11-07T02:36:19.2734527Z    Compiling find-msvc-tools v0.1.15
+2026-11-07T02:36:19.3012803Z    Compiling shlex v2.0.1
+2026-11-07T02:36:19.7434071Z    Compiling khronos_api v3.1.0
+2026-11-07T02:36:20.0658517Z    Compiling windows_x86_64_msvc v0.52.6
+2026-11-07T02:36:20.1471148Z    Compiling profiling v1.0.18
+2026-11-07T02:36:20.2008077Z    Compiling unicode-width v0.2.2
+2026-11-07T02:36:20.3607272Z    Compiling cc v1.10.0
+2026-11-07T02:36:20.5734025Z    Compiling accesskit v0.24.1
+2026-11-07T02:36:23.2627879Z    Compiling kurbo v0.13.1
+2026-11-07T02:36:25.4816808Z    Compiling tinystr v0.8.5
+2026-11-07T02:36:25.7254545Z    Compiling font-types v0.12.7
+2026-11-07T02:36:26.8643706Z    Compiling color v0.3.3
+2026-11-07T02:36:30.0302089Z    Compiling rustls-pki-types v1.15.1
+2026-11-07T02:36:30.7503319Z    Compiling euclid v0.22.14
+2026-11-07T02:36:31.6040663Z    Compiling linebender_resource_handle v0.1.1
+2026-11-07T02:36:31.7108052Z    Compiling percent-encoding v2.3.2
+2026-11-07T02:36:31.8649212Z    Compiling litemap v0.8.3
+2026-11-07T02:36:32.1152921Z    Compiling writeable v0.6.4
+2026-11-07T02:36:32.1564910Z    Compiling static_assertions v1.1.0
+2026-11-07T02:36:32.2165749Z    Compiling peniko v0.6.1
+2026-11-07T02:36:32.5841808Z    Compiling icu_locale_core v2.4.0
+2026-11-07T02:36:33.1258563Z    Compiling guillotiere v0.7.0
+2026-11-07T02:36:33.4124793Z    Compiling ring v0.17.14
+2026-11-07T02:36:34.7876681Z    Compiling read-fonts v0.41.0
+2026-11-07T02:36:36.5626812Z    Compiling zerotrie v0.2.5
+2026-11-07T02:36:37.2581692Z    Compiling potential_utf v0.1.6
+2026-11-07T02:36:37.4915659Z    Compiling ahash v0.8.12
+2026-11-07T02:36:37.7684194Z    Compiling utf8_iter v1.0.4
+2026-11-07T02:36:38.2126053Z    Compiling icu_normalizer_data v2.4.0
+2026-11-07T02:36:38.4585305Z    Compiling typeid v1.0.3
+2026-11-07T02:36:38.9876495Z    Compiling icu_properties_data v2.4.0
+2026-11-07T02:36:39.1235289Z    Compiling either v1.19.0
+2026-11-07T02:36:39.2468586Z    Compiling unicode-segmentation v1.13.3
+2026-11-07T02:36:39.3993015Z    Compiling fearless_simd v0.4.1
+2026-11-07T02:36:40.3269905Z    Compiling xml-rs v0.8.29
+2026-11-07T02:36:45.6688892Z    Compiling rustc-hash v1.1.0
+2026-11-07T02:36:45.6707492Z    Compiling itoa v1.0.18
+2026-11-07T02:36:45.7542015Z    Compiling unicode-general-category v1.1.0
+2026-11-07T02:36:46.0605850Z    Compiling naga-types v30.0.1
+2026-11-07T02:36:46.2906699Z    Compiling vello_common v0.1.0
+2026-11-07T02:36:46.8836075Z    Compiling gl_generator v0.14.0
+2026-11-07T02:36:49.9233156Z    Compiling icu_collections v2.4.0
+2026-11-07T02:36:51.4900616Z    Compiling icu_provider v2.4.0
+2026-11-07T02:36:52.6818838Z    Compiling windows-targets v0.52.6
+2026-11-07T02:36:58.6534383Z    Compiling emath v0.36.2
+2026-11-07T02:36:59.7756898Z    Compiling naga v30.0.1
+2026-11-07T02:37:00.8026484Z    Compiling libloading v0.8.9
+2026-11-07T02:37:01.3458068Z    Compiling quick-error v2.0.1
+2026-11-07T02:37:01.4843729Z    Compiling zune-core v0.5.3
+2026-11-07T02:37:02.0314122Z    Compiling pxfm v0.1.30
+2026-11-07T02:37:03.0206180Z    Compiling weezl v0.1.12
+2026-11-07T02:37:05.5350868Z    Compiling color_quant v1.1.0
+2026-11-07T02:37:06.1629107Z    Compiling ash v0.38.0+1.3.281
+2026-11-07T02:37:06.3687462Z    Compiling byteorder-lite v0.1.0
+2026-11-07T02:37:06.7420131Z    Compiling litrs v1.0.1
+2026-11-07T02:37:08.8388679Z    Compiling bit-vec v0.9.1
+2026-11-07T02:37:09.2841547Z    Compiling bit-set v0.10.0
+2026-11-07T02:37:09.4688048Z    Compiling document-features v0.2.12
+2026-11-07T02:37:12.3217346Z    Compiling image-webp v0.2.4
+2026-11-07T02:37:19.9365051Z    Compiling gif v0.14.2
+2026-11-07T02:37:20.4644744Z    Compiling moxcms v0.8.1
+2026-11-07T02:37:24.8653470Z    Compiling zune-jpeg v0.5.15
+2026-11-07T02:37:28.3712933Z    Compiling ecolor v0.36.2
+2026-11-07T02:37:28.9757632Z    Compiling glutin_wgl_sys v0.6.1
+2026-11-07T02:37:29.0098727Z    Compiling vello_cpu v0.1.0
+2026-11-07T02:37:29.7470175Z    Compiling skrifa v0.44.0
+2026-11-07T02:37:37.9502007Z    Compiling harfrust v0.12.0
+2026-11-07T02:38:09.7816761Z    Compiling codespan-reporting v0.13.1
+2026-11-07T02:38:11.1907209Z    Compiling png v0.18.1
+2026-11-07T02:38:11.6837952Z    Compiling half v2.7.1
+2026-11-07T02:38:12.3354433Z    Compiling spirv v0.4.0+sdk-1.4.341.0
+2026-11-07T02:38:12.7474956Z    Compiling getrandom v0.2.17
+2026-11-07T02:38:12.9427240Z    Compiling untrusted v0.9.0
+2026-11-07T02:38:13.0614832Z    Compiling khronos-egl v6.0.0
+2026-11-07T02:38:13.2762711Z    Compiling self_cell v1.3.0
+2026-11-07T02:38:13.3874279Z    Compiling nohash-hasher v0.2.0
+2026-11-07T02:38:13.5442397Z    Compiling base64 v0.23.1
+2026-11-07T02:38:15.1654723Z    Compiling epaint_default_fonts v0.36.2
+2026-11-07T02:38:15.2807454Z    Compiling epaint v0.36.2
+2026-11-07T02:38:29.3628654Z    Compiling image v0.25.10
+2026-11-07T02:38:46.1980735Z    Compiling icu_properties v2.4.0
+2026-11-07T02:38:49.4962556Z    Compiling ron v0.12.2
+2026-11-07T02:38:59.4925171Z    Compiling icu_normalizer v2.4.0
+2026-11-07T02:39:24.1222555Z    Compiling wgpu-types v30.0.1
+2026-11-07T02:39:32.0068089Z    Compiling itertools v0.15.0
+2026-11-07T02:39:33.9466630Z    Compiling wgpu-hal v30.0.1
+2026-11-07T02:39:34.2367239Z    Compiling httparse v1.10.1
+2026-11-07T02:39:34.6402189Z    Compiling presser v0.3.1
+2026-11-07T02:39:34.7862208Z    Compiling winnow v1.0.4
+2026-11-07T02:39:35.6130777Z    Compiling float-cmp v0.9.0
+2026-11-07T02:39:35.7439298Z    Compiling rustls v0.23.46
+2026-11-07T02:39:35.8111501Z    Compiling strict-num v0.1.1
+2026-11-07T02:39:35.9846680Z    Compiling gpu-allocator v0.28.0
+2026-11-07T02:39:36.0208100Z    Compiling egui v0.36.2
+2026-11-07T02:39:36.4127740Z    Compiling wgpu-naga-bridge v30.0.1
+2026-11-07T02:39:36.6850474Z    Compiling idna_adapter v1.2.2
+2026-11-07T02:39:36.9679122Z    Compiling rustls-webpki v0.103.16
+2026-11-07T02:39:43.0538008Z    Compiling webpki-roots v1.0.11
+2026-11-07T02:39:43.4099310Z    Compiling aho-corasick v1.1.5
+2026-11-07T02:39:44.7037191Z    Compiling winit v0.30.13 (https://github.com/JKamsker/winit?rev=12fdcb03ef036f0fcb7fa26d19dd7395b1feb141#12fdcb03)
+2026-11-07T02:39:46.5521844Z    Compiling ordered-float v5.5.1
+2026-11-07T02:39:46.9073223Z    Compiling bytes v1.12.1
+2026-11-07T02:39:48.9971552Z    Compiling tracing-core v0.1.36
+2026-11-07T02:39:50.5280868Z    Compiling pin-project-lite v0.2.17
+2026-11-07T02:39:50.6100640Z    Compiling bitflags v1.3.2
+2026-11-07T02:39:50.6719873Z    Compiling subtle v2.6.1
+2026-11-07T02:39:50.8733329Z    Compiling regex-syntax v0.8.11
+2026-11-07T02:39:58.8468258Z    Compiling renderdoc-sys v1.1.0
+2026-11-07T02:39:59.0631231Z    Compiling glow v0.17.0
+2026-11-07T02:40:04.0948703Z    Compiling crossbeam-utils v0.8.23
+2026-11-07T02:40:04.7414487Z    Compiling arrayref v0.3.9
+2026-11-07T02:40:04.8006471Z    Compiling range-alloc v0.1.5
+2026-11-07T02:40:05.7270641Z    Compiling tiny-skia-path v0.11.4
+2026-11-07T02:40:09.1504499Z    Compiling regex-automata v0.4.18
+2026-11-07T02:40:55.0401053Z    Compiling tracing v0.1.44
+2026-11-07T02:40:55.4173621Z    Compiling http v1.5.0
+2026-11-07T02:40:59.8301212Z    Compiling idna v1.1.0
+2026-11-07T02:41:08.4364559Z    Compiling windows-sys v0.52.0
+2026-11-07T02:41:09.7053163Z    Compiling form_urlencoded v1.2.2
+2026-11-07T02:41:10.1655284Z    Compiling accesskit_consumer v0.35.0
+2026-11-07T02:41:13.2769137Z    Compiling kurbo v0.11.3
+2026-11-07T02:41:19.7189984Z    Compiling wgpu-core v30.0.1
+2026-11-07T02:41:20.7061566Z    Compiling base64 v0.22.1
+2026-11-07T02:41:21.6263708Z    Compiling crossbeam-epoch v0.9.21
+2026-11-07T02:41:21.6387173Z    Compiling smol_str v0.2.2
+2026-11-07T02:41:22.0299469Z    Compiling cursor-icon v1.2.0
+2026-11-07T02:41:22.1929732Z    Compiling siphasher v1.0.4
+2026-11-07T02:41:22.2020681Z    Compiling dpi v0.1.1 (https://github.com/JKamsker/winit?rev=12fdcb03ef036f0fcb7fa26d19dd7395b1feb141#12fdcb03)
+2026-11-07T02:41:22.3919127Z    Compiling svgtypes v0.15.3
+2026-11-07T02:41:26.2820248Z    Compiling url v2.5.8
+2026-11-07T02:41:26.3005218Z    Compiling ureq-proto v0.7.1
+2026-11-07T02:41:26.9221112Z    Compiling wgpu-core-deps-windows-linux-android v30.0.1
+2026-11-07T02:41:28.2599534Z    Compiling png v0.17.16
+2026-11-07T02:41:32.4783272Z    Compiling winapi-util v0.1.11
+2026-11-07T02:41:32.8921241Z    Compiling wgpu v30.0.1
+2026-11-07T02:41:33.6079126Z    Compiling simplecss v0.2.2
+2026-11-07T02:41:34.0422380Z    Compiling zmij v1.0.23
+2026-11-07T02:41:34.5625567Z    Compiling data-url v0.3.2
+2026-11-07T02:41:36.1381209Z    Compiling error-code v3.4.0
+2026-11-07T02:41:36.3375307Z    Compiling imagesize v0.13.0
+2026-11-07T02:41:36.5811193Z    Compiling winapi v0.3.9
+2026-11-07T02:41:37.1199136Z    Compiling roxmltree v0.20.0
+2026-11-07T02:41:37.5589632Z    Compiling xmlwriter v0.1.0
+2026-11-07T02:41:38.2985718Z    Compiling anyhow v1.0.104
+2026-11-07T02:41:38.4351724Z    Compiling pico-args v0.5.0
+2026-11-07T02:41:38.5182758Z    Compiling crossbeam-deque v0.8.8
+2026-11-07T02:41:38.9052397Z    Compiling lazy_static v1.5.1
+2026-11-07T02:41:39.0062470Z    Compiling utf8-zero v0.8.1
+2026-11-07T02:41:39.0746296Z    Compiling usvg v0.45.1
+2026-11-07T02:41:39.1439357Z    Compiling ureq v3.5.1
+2026-11-07T02:41:39.2949661Z    Compiling clipboard-win v5.4.3
+2026-11-07T02:41:40.9044483Z    Compiling same-file v1.0.6
+2026-11-07T02:41:41.1614478Z    Compiling tiny-skia v0.11.4
+2026-11-07T02:41:56.1192475Z    Compiling accesskit_windows v0.32.1
+2026-11-07T02:42:02.4682426Z    Compiling toml_datetime v1.1.2+spec-1.1.0
+2026-11-07T02:42:03.0844902Z    Compiling serde_spanned v1.1.2
+2026-11-07T02:42:03.2096382Z    Compiling toml_parser v1.1.5+spec-1.1.0
+2026-11-07T02:42:05.4299267Z    Compiling enum-map-derive v0.17.0
+2026-11-07T02:42:05.6512962Z    Compiling rgb v0.8.53
+2026-11-07T02:42:06.1553149Z    Compiling deranged v0.5.9
+2026-11-07T02:42:06.3303778Z    Compiling cfg_aliases v0.1.1
+2026-11-07T02:42:06.3881905Z    Compiling thiserror v1.0.69
+2026-11-07T02:42:07.0624881Z    Compiling web-time v1.1.0
+2026-11-07T02:42:07.1313741Z    Compiling time-core v0.1.9
+2026-11-07T02:42:07.4236068Z    Compiling bit-vec v0.8.0
+2026-11-07T02:42:07.8517153Z    Compiling serde_json v1.0.154
+2026-11-07T02:42:07.9748543Z    Compiling rustc-hash v2.1.3
+2026-11-07T02:42:08.1043945Z    Compiling powerfmt v0.2.1
+2026-11-07T02:42:08.1568802Z    Compiling num-conv v0.2.2
+2026-11-07T02:42:08.3465996Z    Compiling rayon-core v1.13.0
+2026-11-07T02:42:08.3532211Z    Compiling pulldown-cmark v0.13.6
+2026-11-07T02:42:08.5980542Z    Compiling time v0.3.55
+2026-11-07T02:42:08.6280303Z    Compiling type-map v0.5.1
+2026-11-07T02:42:09.2677056Z    Compiling bit-set v0.8.0
+2026-11-07T02:42:09.5540320Z    Compiling nix v0.28.0
+2026-11-07T02:42:11.1613748Z    Compiling resvg v0.45.1
+2026-11-07T02:42:13.9798466Z    Compiling enum-map v2.7.3
+2026-11-07T02:42:14.1743396Z    Compiling toml v1.1.8+spec-1.1.0
+2026-11-07T02:42:14.8209130Z    Compiling accesskit_winit v0.32.2
+2026-11-07T02:42:15.6900602Z    Compiling walkdir v2.5.0
+2026-11-07T02:42:18.2553245Z    Compiling ehttp v0.7.2
+2026-11-07T02:42:20.6477930Z    Compiling arboard v3.7.0
+2026-11-07T02:42:27.3002516Z    Compiling webbrowser v1.2.6
+2026-11-07T02:42:28.4488499Z    Compiling thiserror-impl v1.0.69
+2026-11-07T02:42:28.5115099Z    Compiling quick-xml v0.42.0
+2026-11-07T02:42:34.3198523Z    Compiling linked-hash-map v0.5.6
+2026-11-07T02:42:34.5464562Z    Compiling unicase v2.10.0
+2026-11-07T02:42:34.9307041Z    Compiling getrandom v0.4.3
+2026-11-07T02:42:35.3522574Z    Compiling winreg v0.10.1
+2026-11-07T02:42:46.3312793Z    Compiling yaml-rust v0.4.5
+2026-11-07T02:42:46.9426083Z    Compiling plist v1.10.3
+2026-11-07T02:42:48.0503598Z    Compiling egui-winit v0.36.2
+2026-11-07T02:42:50.8226104Z    Compiling egui-wgpu v0.36.2
+2026-11-07T02:42:53.0039552Z    Compiling egui_extras v0.36.2
+2026-11-07T02:43:05.5118305Z    Compiling winresource v0.1.34
+2026-11-07T02:43:07.4248325Z    Compiling fancy-regex v0.16.2
+2026-11-07T02:43:08.8959488Z    Compiling regex v1.13.1
+2026-11-07T02:43:12.6132292Z    Compiling windows-sys v0.59.0
+2026-11-07T02:43:13.4817414Z    Compiling rustls-pemfile v2.2.0
+2026-11-07T02:43:13.9339853Z    Compiling bincode v1.3.3
+2026-11-07T02:43:14.6610253Z    Compiling schannel v0.1.30
+2026-11-07T02:43:16.9654221Z    Compiling keyring-core v1.0.1
+2026-11-07T02:43:18.3442449Z    Compiling windows-version v0.1.7
+2026-11-07T02:43:18.4686380Z    Compiling rfd v0.17.2
+2026-11-07T02:43:18.7774863Z    Compiling byteorder v1.5.0
+2026-11-07T02:43:19.0710936Z    Compiling pollster v1.0.1
+2026-11-07T02:43:19.1485416Z    Compiling fnv v1.0.7
+2026-11-07T02:43:19.2278305Z    Compiling syntect v5.3.0
+2026-11-07T02:43:19.2514289Z    Compiling eframe v0.36.2
+2026-11-07T02:43:19.7605879Z    Compiling windows-native-keyring-store v1.1.0
+2026-11-07T02:43:24.1027153Z    Compiling tauri-winrt-notification v0.8.1
+2026-11-07T02:43:25.9109096Z    Compiling rustls-native-certs v0.7.3
+2026-11-07T02:43:27.8079199Z    Compiling colored v2.2.0
+2026-11-07T02:43:29.3209857Z    Compiling gitcraft v0.3.4 (D:\a\gitcraft\gitcraft)
+2026-11-07T02:43:29.6943944Z    Compiling rayon v1.12.0
+2026-11-07T02:43:33.5698746Z    Compiling egui_commonmark_backend v0.25.0
+2026-11-07T02:43:40.8606017Z    Compiling filedescriptor v0.8.3
+2026-11-07T02:43:43.2363265Z    Compiling shared_library v0.1.9
+2026-11-07T02:43:43.8804883Z    Compiling webpki-roots v0.26.11
+2026-11-07T02:43:46.6143551Z    Compiling getopts v0.2.24
+2026-11-07T02:43:47.1610456Z    Compiling serial2 v0.2.39
+2026-11-07T02:43:48.3650449Z    Compiling vte v0.15.0
+2026-11-07T02:43:48.6236120Z    Compiling notify-types v2.1.0
+2026-11-07T02:43:49.5879186Z    Compiling downcast-rs v1.2.1
+2026-11-07T02:43:49.6372800Z    Compiling open v5.4.5
+2026-11-07T02:43:49.6658556Z    Compiling fastrand v2.5.0
+2026-11-07T02:43:50.1252806Z    Compiling shell-words v1.1.1
+2026-11-07T02:43:50.3379678Z    Compiling portable-pty v0.9.0
+2026-11-07T02:43:50.5804584Z    Compiling tempfile v3.27.0
+2026-11-07T02:43:53.0312888Z    Compiling notify v8.2.1
+2026-11-07T02:43:57.2714558Z    Compiling vt100 v0.18.1
+2026-11-07T02:44:01.4494383Z    Compiling dify v0.8.0
+2026-11-07T02:44:04.5550975Z    Compiling ureq v2.12.1
+2026-11-07T02:44:04.6260066Z    Compiling egui_commonmark v0.25.0
+2026-11-07T02:44:14.0144231Z    Compiling notify-rust v4.18.2
+2026-11-07T02:44:17.2247982Z    Compiling two-face v0.5.2+bat-0.26.1
+2026-11-07T02:44:19.1865555Z    Compiling keyring v4.2.0
+2026-11-07T02:44:19.3959882Z    Compiling kittest v0.4.0
+2026-11-07T02:44:21.5421737Z    Compiling md5 v0.7.0
+2026-11-07T02:44:21.9317877Z    Compiling egui_kittest v0.36.2
+2026-11-07T02:44:29.6242619Z warning: variable does not need to be mutable
+2026-11-07T02:44:29.6264072Z    --> src\git\bundles.rs:508:17
+2026-11-07T02:44:29.6438301Z     |
+2026-11-07T02:44:29.6449413Z 508 |             let mut builder = std::fs::DirBuilder::new();
+2026-11-07T02:44:29.6486813Z     |                 ----^^^^^^^
+2026-11-07T02:44:29.6588804Z     |                 |
+2026-11-07T02:44:29.6758908Z     |                 help: remove this `mut`
+2026-11-07T02:44:29.6777874Z     |
+2026-11-07T02:44:29.6918738Z     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+2026-11-07T02:44:29.7075812Z 
+2026-11-07T02:44:29.9953886Z warning: variable does not need to be mutable
+2026-11-07T02:44:29.9957256Z    --> src\mergiraf\mod.rs:288:9
+2026-11-07T02:44:30.0077031Z     |
+2026-11-07T02:44:30.0115312Z 288 |     let mut builder = std::fs::DirBuilder::new();
+2026-11-07T02:44:30.0276283Z     |         ----^^^^^^^
+2026-11-07T02:44:30.0279102Z     |         |
+2026-11-07T02:44:30.0413676Z     |         help: remove this `mut`
+2026-11-07T02:44:30.0454059Z 
+2026-11-07T02:44:31.1172486Z warning: variable does not need to be mutable
+2026-11-07T02:44:31.1223627Z    --> src\repo\diff\structural\tool.rs:182:17
+2026-11-07T02:44:31.1271818Z     |
+2026-11-07T02:44:31.1329935Z 182 |             let mut builder = std::fs::DirBuilder::new();
+2026-11-07T02:44:31.1361146Z     |                 ----^^^^^^^
+2026-11-07T02:44:31.1362678Z     |                 |
+2026-11-07T02:44:31.1363807Z     |                 help: remove this `mut`
+2026-11-07T02:44:31.1364744Z 
+2026-11-07T02:44:39.3490051Z warning: unused imports: `Duration` and `Instant`
+2026-11-07T02:44:39.3606408Z  --> src\repo\diff\structural\tests.rs:4:17
+2026-11-07T02:44:39.3624021Z   |
+2026-11-07T02:44:39.3626723Z 4 | use std::time::{Duration, Instant};
+2026-11-07T02:44:39.3804721Z   |                 ^^^^^^^^  ^^^^^^^
+2026-11-07T02:44:39.3924050Z   |
+2026-11-07T02:44:39.3944645Z   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+2026-11-07T02:44:39.4097912Z 
+2026-11-07T02:44:54.6036566Z warning: `gitcraft` (lib) generated 3 warnings (run `cargo fix --lib -p gitcraft` to apply 3 suggestions)
+2026-11-07T02:45:19.1390501Z warning: `gitcraft` (lib test) generated 4 warnings (3 duplicates) (run `cargo fix --lib -p gitcraft --tests` to apply 1 suggestion)
+2026-11-07T02:45:19.1391460Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 11m 27s
+2026-11-07T02:45:19.2892095Z      Running unittests src\lib.rs (target\debug\deps\gitcraft-03f7cb6f78718988.exe)
+2026-11-07T02:45:19.3693858Z 
+2026-11-07T02:45:19.3695127Z running 738 tests
+2026-11-07T02:45:19.3704745Z test app::panels::tests::a_notification_shows_tags_as_text ... ok
+2026-11-07T02:45:19.3710586Z test app::remote_open::tests::a_wsl_folder_names_its_distribution ... ok
+2026-11-07T02:45:19.3711591Z test app::remote_open::tests::the_form_names_a_folder_there ... ok
+2026-11-07T02:45:19.3719205Z test app::tabs::tests::only_the_last_few_are_kept ... ok
+2026-11-07T02:45:19.3725149Z test app::tabs::tests::the_last_closed_is_on_top_once ... ok
+2026-11-07T02:45:19.3725846Z test app::tabs::tests::tabs_elsewhere_are_reopened_unasked ... ok
+2026-11-07T02:45:19.3726523Z test app::tests::a_remote_repository_never_holds_up_the_window ... ok
+2026-11-07T02:45:19.3731245Z test app::tests::active_tab_survives_a_gone_folder ... ok
+2026-11-07T02:45:19.3732681Z test app::tests::fuzzy_matching ... ok
+2026-11-07T02:45:19.3759959Z test app::tests::profile_tabs_survive_a_restart ... ok
+2026-11-07T02:45:19.3760797Z test app::tests::themes_saved_before_and_now_load ... ok
+2026-11-07T02:45:19.3761423Z test app::tests::tab_looks_survive_a_restart ... ok
+2026-11-07T02:45:19.3781882Z test avatars::tests::a_commit_address_only_names_a_github_account_it_can_be ... ok
+2026-11-07T02:45:19.3783684Z test app::tests::window_icon_decodes ... ok
+2026-11-07T02:45:19.3792132Z test avatars::tests::a_picture_fetched_before_a_hint_came_is_not_kept_as_its_answer ... ok
+2026-11-07T02:45:19.3793863Z test avatars::tests::avatar_urls ... ok
+2026-11-07T02:45:19.3794511Z test avatars::tests::a_cached_picture_is_written_whole_and_alone ... ok
+2026-11-07T02:45:19.3826013Z test avatars::tests::only_a_whole_picture_is_kept ... ok
+2026-11-07T02:45:19.3832787Z test ci::github::tests::checks_of_actions_name_their_run ... ok
+2026-11-07T02:45:19.3839174Z test ci::github::tests::one_query_asks_for_every_commit ... ok
+2026-11-07T02:45:19.3844694Z test ci::github::tests::output_that_is_not_json_is_an_error ... ok
+2026-11-07T02:45:19.3861301Z test ci::github::tests::reads_the_jobs_and_steps_of_a_run ... ok
+2026-11-07T02:45:19.3873290Z test ci::github::tests::reads_the_rollup_of_each_commit ... ok
+2026-11-07T02:45:19.3883908Z test ci::github::tests::reads_the_runs_of_a_commit ... ok
+2026-11-07T02:45:19.3889078Z test ci::github::tests::states_read_the_same_in_either_case ... ok
+2026-11-07T02:45:19.3899991Z test ci::gitlab::tests::jobs_come_in_the_order_of_their_stages ... ok
+2026-11-07T02:45:19.3906291Z test ci::gitlab::tests::output_that_is_not_json_is_an_error ... ok
+2026-11-07T02:45:19.3912793Z test ci::gitlab::tests::projects_go_by_their_path ... ok
+2026-11-07T02:45:19.3919629Z test ci::gitlab::tests::reads_the_pipelines_of_a_commit ... ok
+2026-11-07T02:45:19.3924663Z test ci::gitlab::tests::states_of_pipelines_and_jobs ... ok
+2026-11-07T02:45:19.3931877Z test ci::gitlab::tests::the_newest_pipeline_of_a_commit_is_its_status ... ok
+2026-11-07T02:45:19.3939880Z test ci::tests::a_gitlab_project_keeps_the_port_of_its_web_pages ... ok
+2026-11-07T02:45:19.3946293Z test ci::tests::a_line_ended_by_a_colour_reset_stays ... ok
+2026-11-07T02:45:19.3954398Z test ci::tests::durations_read_short ... ok
+2026-11-07T02:45:19.4100413Z test ci::tests::logs_lose_their_colours ... ok
+2026-11-07T02:45:19.4103262Z test ci::tests::only_commit_ids_go_to_the_forge ... ok
+2026-11-07T02:45:19.4106173Z test ci::tests::reads_times_in_any_zone ... ok
+2026-11-07T02:45:19.4110654Z test ci::tests::tallies_read_worst_first ... ok
+2026-11-07T02:45:19.4113024Z test ci::tests::the_project_is_origin ... ok
+2026-11-07T02:45:19.4116196Z test ci::tests::what_a_log_wrote_over_is_left_out ... ok
+2026-11-07T02:45:19.4126355Z test connections::tests::a_config_snapshot_survives_until_the_last_worker_releases_it ... ok
+2026-11-07T02:45:19.4130604Z test connections::tests::expected_accounts_are_nonsecret_exact_host_metadata_not_transport_or_tea_aliases ... ok
+2026-11-07T02:45:19.4135616Z test connections::tests::explicit_account_commands_remove_ambient_identity_without_changing_the_process ... ok
+2026-11-07T02:45:19.4142824Z test connections::tests::fenced_ssh_expansion_preserves_the_whole_path_and_refuses_ambiguous_fields ... ok
+2026-11-07T02:45:19.4146378Z test connections::tests::persisted_profiles_keep_connections_separate_from_author_and_signing ... ok
+2026-11-07T02:45:19.4150445Z test connections::tests::profile_openssh_checks_options_after_the_hostname_until_the_command_boundary ... ok
+2026-11-07T02:45:19.4154476Z test connections::tests::profile_openssh_options_refuse_plink_dialects_before_any_probe ... ok
+2026-11-07T02:45:19.4164815Z test connections::tests::selected_accounts_are_data_not_shell_arguments ... FAILED
+2026-11-07T02:45:19.4168695Z test connections::tests::ssh_effective_config_cannot_fall_back_to_another_identity ... ok
+2026-11-07T02:45:19.4175980Z test connections::tests::workers_inherit_the_initiating_profile_and_nested_contexts_restore ... ok
+2026-11-07T02:45:19.4179003Z test desktop_entry::tests::quotes_the_appimage_path ... ok
+2026-11-07T02:45:19.4220193Z test desktop_entry::tests::writes_and_refreshes_the_entry ... ok
+2026-11-07T02:45:19.4223798Z test folder_browser::tests::a_listing_reads_folders_and_repositories ... ok
+2026-11-07T02:45:19.4226689Z test folder_browser::tests::folders_there_are_listed ... ok
+2026-11-07T02:45:19.4230021Z test folder_browser::tests::paths_and_their_parts ... ok
+2026-11-07T02:45:19.4232792Z test folder_browser::tests::the_script_names_the_folder_safely ... ok
+2026-11-07T02:45:19.4236031Z test forge::cli::tests::gitlab_keeps_the_port_of_its_web_pages ... ok
+2026-11-07T02:45:19.4238607Z test forge::cli::tests::only_glab_commands_about_a_project_take_repo ... ok
+2026-11-07T02:45:19.4241922Z test forge::cli::tests::only_plain_paths_reach_the_tools ... ok
+2026-11-07T02:45:19.4245247Z test forge::cli::tests::the_hosts_arguments_name_are_found ... ok
+2026-11-07T02:45:19.4249364Z test forge::cli::tests::tools_answer_in_plain_json_about_this_repository ... ok
+2026-11-07T02:45:19.4267711Z test forge::gitea::details::tests::a_thread_from_an_older_commit_is_outdated ... ok
+2026-11-07T02:45:19.4278471Z test forge::gitea::details::tests::a_thread_is_as_current_as_the_review_it_came_with ... ok
+2026-11-07T02:45:19.4280693Z test forge::gitea::details::tests::a_threads_id_says_where_it_is ... ok
+2026-11-07T02:45:19.4290099Z test forge::gitea::details::tests::comments_on_the_same_line_make_one_thread ... ok
+2026-11-07T02:45:19.4297130Z test forge::gitea::details::tests::commits_come_oldest_first ... ok
+2026-11-07T02:45:19.4305007Z test forge::gitea::details::tests::each_reviewers_last_verdict_counts ... ok
+2026-11-07T02:45:19.4314809Z test forge::gitea::details::tests::merged_and_conflicting_say_so ... ok
+2026-11-07T02:45:19.4321228Z test forge::gitea::details::tests::nobody_logged_in_can_reply ... ok
+2026-11-07T02:45:19.4328713Z test forge::gitea::details::tests::only_official_reviews_decide ... ok
+2026-11-07T02:45:19.4333655Z test forge::gitea::details::tests::reads_the_pull_request_itself ... ok
+2026-11-07T02:45:19.4340389Z test forge::gitea::details::tests::reads_the_statuses_as_checks ... ok
+2026-11-07T02:45:19.4350750Z test forge::gitea::details::tests::reads_who_may_do_what ... ok
+2026-11-07T02:45:19.4354758Z test forge::gitea::details::tests::relative_links_are_made_whole ... ok
+2026-11-07T02:45:19.4363158Z test forge::gitea::details::tests::someone_elses_draft_is_not_the_viewers ... ok
+2026-11-07T02:45:19.4370544Z test avatars::tests::hinted_sources ... ok
+2026-11-07T02:45:19.4372106Z test avatars::tests::only_a_missing_picture_is_remembered_as_missing ... ok
+2026-11-07T02:45:19.4374871Z test forge::gitea::details::tests::statuses_that_couldnt_be_read_are_no_empty_list ... ok
+2026-11-07T02:45:19.4378669Z test forge::gitea::details::tests::uploads_show_from_the_forge ... ok
+2026-11-07T02:45:19.4379653Z test forge::gitea::details::tests::the_timeline_has_comments_reviews_and_comments_on_lines ... ok
+2026-11-07T02:45:19.4381079Z test forge::gitea::live::live_forgejo ... ignored, needs a Forgejo: see ci/forge-server.sh
+2026-11-07T02:45:19.4383257Z test forge::gitea::live::live_gitea ... ignored, needs a Gitea: see ci/forge-server.sh
+2026-11-07T02:45:19.4384868Z test forge::gitea::post::tests::a_merge_is_tried_again_only_while_the_server_tests_it ... ok
+2026-11-07T02:45:19.4387733Z test forge::gitea::post::tests::a_merge_names_its_method_and_commit ... ok
+2026-11-07T02:45:19.4389582Z test forge::gitea::details::tests::without_the_repository_nothing_can_be_done_from_the_page ... ok
+2026-11-07T02:45:19.4392445Z test forge::gitea::post::tests::a_review_names_its_verdict_and_commit ... ok
+2026-11-07T02:45:19.4393372Z test forge::gitea::post::tests::comments_on_lines_go_on_their_side ... ok
+2026-11-07T02:45:19.4396104Z test forge::gitea::post::tests::a_thread_from_elsewhere_cant_be_answered ... ok
+2026-11-07T02:45:19.4398736Z test forge::gitea::post::tests::conversations_cant_be_resolved_through_the_api ... ok
+2026-11-07T02:45:19.4400307Z test forge::gitea::post::tests::knows_a_refusal_for_want_of_words ... ok
+2026-11-07T02:45:19.4401198Z test forge::gitea::post::tests::nothing_folds_a_pending_review_in_unknowingly ... ok
+2026-11-07T02:45:19.4402137Z test forge::gitea::post::tests::nothing_is_pending_to_discard ... ok
+2026-11-07T02:45:19.4404381Z test forge::gitea::post::tests::nothing_goes_out_without_knowing_the_pull_request ... ok
+2026-11-07T02:45:19.4405500Z test forge::gitea::post::tests::reads_which_commit_a_branch_is_on ... ok
+2026-11-07T02:45:19.4406526Z test forge::gitea::tests::a_login_is_only_for_its_own_server ... ok
+2026-11-07T02:45:19.4408502Z test forge::gitea::tests::a_work_in_progress_title_is_a_draft ... ok
+2026-11-07T02:45:19.4410579Z test forge::gitea::profile_connection_tests::a_selected_alias_never_becomes_another_account_or_another_server ... ok
+2026-11-07T02:45:19.4412061Z test forge::gitea::tests::claims_its_hosts ... ok
+2026-11-07T02:45:19.4412643Z test forge::gitea::tests::reads_teas_logins ... ok
+2026-11-07T02:45:19.4414522Z test forge::gitea::tests::reads_the_list_of_pull_requests ... ok
+2026-11-07T02:45:19.4415703Z test forge::gitea::tests::teas_list_can_sit_flush_with_its_key ... ok
+2026-11-07T02:45:19.4417478Z test forge::github::details::tests::approvals_and_requests_for_changes_can_be_dismissed ... ok
+2026-11-07T02:45:19.4419206Z test forge::github::details::tests::output_that_is_not_json_is_an_error ... ok
+2026-11-07T02:45:19.4420144Z test forge::github::details::tests::counts_the_checks_by_outcome ... ok
+2026-11-07T02:45:19.4421703Z test forge::github::details::tests::threads_read_on_another_commit_are_not_shown_on_this_one ... ok
+2026-11-07T02:45:19.4424177Z test forge::github::details::tests::the_timeline_has_comments_and_reviews_that_say_something ... ok
+2026-11-07T02:45:19.4425373Z test forge::github::details::tests::reads_the_pull_request_itself ... ok
+2026-11-07T02:45:19.4426529Z test forge::github::post::tests::a_branch_gone_already_is_what_deleting_it_wanted ... ok
+2026-11-07T02:45:19.4429518Z test forge::github::post::tests::a_merge_names_its_method_and_commit ... ok
+2026-11-07T02:45:19.4431014Z test forge::github::details::tests::understands_both_kinds_of_check ... ok
+2026-11-07T02:45:19.4432188Z test forge::github::post::tests::a_ref_that_isnt_there_is_told_from_other_failures ... ok
+2026-11-07T02:45:19.4433130Z test forge::github::post::tests::a_review_without_comments_on_lines_sends_none ... ok
+2026-11-07T02:45:19.4434464Z test forge::github::post::tests::a_review_names_its_verdict_and_commit ... ok
+2026-11-07T02:45:19.4437742Z test forge::github::post::tests::nothing_goes_out_without_knowing_the_pull_request ... ok
+2026-11-07T02:45:19.4439778Z test forge::github::post::tests::comments_on_lines_go_along_with_their_side ... ok
+2026-11-07T02:45:19.4440814Z test forge::github::post::tests::reads_which_commit_a_branch_is_on ... ok
+2026-11-07T02:45:19.4443112Z test forge::github::post::tests::text_is_sent_as_it_is_whatever_it_contains ... ok
+2026-11-07T02:45:19.4444879Z test forge::github::tests::an_app_goes_by_its_name_alone ... ok
+2026-11-07T02:45:19.4445976Z test forge::github::tests::an_app_opening_a_pull_request_goes_by_its_name_alone ... ok
+2026-11-07T02:45:19.4446809Z test forge::github::tests::parses_pull_requests ... ok
+2026-11-07T02:45:19.4447926Z test forge::github::threads::tests::a_pull_request_that_does_not_exist_is_an_error ... ok
+2026-11-07T02:45:19.4449646Z test forge::github::threads::tests::an_outdated_thread_keeps_the_line_it_was_on ... ok
+2026-11-07T02:45:19.4450958Z test forge::github::threads::tests::finds_the_comments_waiting_in_the_pending_review ... ok
+2026-11-07T02:45:19.4454571Z test forge::github::threads::tests::knows_when_there_are_more_threads ... ok
+2026-11-07T02:45:19.4456307Z test forge::github::threads::tests::reads_threads_and_their_comments ... ok
+2026-11-07T02:45:19.4460044Z test forge::github::threads::tests::reads_what_the_page_needs_to_be_careful ... ok
+2026-11-07T02:45:19.4462523Z test forge::github::threads::tests::pages_of_another_commit_are_not_put_together ... ok
+2026-11-07T02:45:19.4464024Z test forge::github::threads::tests::reads_who_may_do_what ... ok
+2026-11-07T02:45:19.4466055Z test forge::gitlab::tests::parses_merge_requests ... ok
+2026-11-07T02:45:19.4468060Z test forge::gitlab::tests::avatars_are_asked_on_the_remotes_port ... ok
+2026-11-07T02:45:19.4471359Z test forge::http::tests::a_token_and_a_password_go_as_their_own_kind ... ok
+2026-11-07T02:45:19.4472938Z test forge::http::tests::a_refusal_without_a_login_says_how_to_get_one ... ok
+2026-11-07T02:45:19.4474484Z test forge::http::tests::reads_what_an_error_says ... ok
+2026-11-07T02:45:19.4475936Z test forge::http::tests::the_proxy_is_the_schemes_unless_no_proxy_names_the_host ... ok
+2026-11-07T02:45:19.4479214Z test forge::tests::a_remote_whose_host_doesnt_tell_goes_by_its_whole_url ... ok
+2026-11-07T02:45:19.4481870Z test forge::tests::an_ipv6_host_keeps_its_brackets ... ok
+2026-11-07T02:45:19.4482885Z test forge::tests::a_repositorys_own_setting_wins ... ok
+2026-11-07T02:45:19.4483736Z test forge::tests::an_ssh_remote_gets_its_web_address_from_teas_login ... ok
+2026-11-07T02:45:19.4484517Z test forge::tests::avatars_by_email ... ok
+2026-11-07T02:45:19.4485151Z test forge::tests::detects_forge_from_origin ... ok
+2026-11-07T02:45:19.4486260Z test forge::tests::detects_forge_from_the_host ... ok
+2026-11-07T02:45:19.4487117Z test forge::tests::git_config_names_the_forge_of_a_host_its_name_doesnt_tell ... ok
+2026-11-07T02:45:19.4488389Z test forge::tests::remote_locations ... ok
+2026-11-07T02:45:19.4489149Z test forge::tests::only_the_host_tells_the_forge ... ok
+2026-11-07T02:45:19.4491705Z test forge::tests::the_web_server_keeps_its_port_and_an_ssh_one_is_dropped ... ok
+2026-11-07T02:45:19.4493277Z test forge::tests::web_pages_of_remotes ... ok
+2026-11-07T02:45:19.4494708Z test gerrit::tests::amendments_keep_the_review_identity_when_replacing_the_description ... ok
+2026-11-07T02:45:19.4497718Z test gerrit::tests::gerrit_projects_and_explicit_web_overrides_are_detected_without_a_network_probe ... ok
+2026-11-07T02:45:19.4502614Z test gerrit::tests::identity_is_a_single_nonzero_final_trailer ... ok
+2026-11-07T02:45:19.4508504Z test gerrit::tests::push_refspec_and_topic_cannot_introduce_git_options_or_gerrit_magic_options ... ok
+2026-11-07T02:45:21.1353207Z test app::practice::tests::the_start_page_picker_creates_and_opens_the_selected_scenario ... ok
+2026-11-07T02:45:21.1852069Z test gerrit::tests::divergence_and_merge_commits_need_a_linear_rebase_first ... ok
+2026-11-07T02:45:21.4693633Z test git::activity::tests::aliases_refs_dates_renames_binary_and_empty_commits_share_one_snapshot ... FAILED
+2026-11-07T02:45:21.6600005Z test gerrit::tests::all_commits_in_the_series_are_checked_and_duplicates_are_refused ... ok
+2026-11-07T02:45:22.6866548Z test git::activity::tests::analysis_does_not_change_dirty_worktree_index_or_refs ... ok
+2026-11-07T02:45:23.6314374Z test git::activity::tests::blobless_history_analysis_does_not_download_file_contents ... ok
+2026-11-07T02:45:23.9806808Z test git::activity::tests::configured_missing_mailmap_file_and_successful_git_errors_are_reported ... ok
+2026-11-07T02:45:24.6207904Z test git::activity::tests::bare_mailmap_defaults_and_absent_optional_maps_match_git ... ok
+2026-11-07T02:45:25.4661235Z test git::activity::tests::detached_head_commits_are_included_once ... ok
+2026-11-07T02:45:27.6456166Z test git::activity::tests::configured_submodule_display_filters_never_hide_committed_gitlink_paths ... ok
+2026-11-07T02:45:27.9737198Z test git::activity::tests::empty_repositories_page_limits_and_cancellation_are_explicit ... ok
+2026-11-07T02:45:27.9744277Z test git::activity::tests::month_math_and_recorded_timezone_boundaries_are_validated ... ok
+2026-11-07T02:45:27.9749064Z test git::activity::tests::nul_records_keep_non_utf8_paths_and_reject_incomplete_metadata ... ok
+2026-11-07T02:45:29.6100740Z test git::activity::tests::shallow_history_reports_its_coverage_boundary ... ok
+2026-11-07T02:45:29.6986383Z test git::activity::tests::merges_count_once_and_files_compare_with_the_first_parent ... ok
+2026-11-07T02:45:31.8819884Z test git::activity::tests::stash_and_application_refs_do_not_inflate_project_activity ... ok
+2026-11-07T02:45:32.3662649Z test git::activity::tests::mailmap_blob_and_configured_file_precedence_match_git ... ok
+2026-11-07T02:45:33.5586288Z test git::activity::tests::unavailable_promised_mailmap_blob_is_an_error_without_downloading ... ok
+2026-11-07T02:45:34.4433368Z test git::bundles::tests::full_bundle_preview_is_read_only_and_import_creates_refs_without_checkout ... FAILED
+2026-11-07T02:45:34.5176458Z test git::bundles::tests::export_ref_snapshots_and_saved_files_cannot_be_overwritten ... FAILED
+2026-11-07T02:45:36.1154635Z test git::bundles::tests::import_cannot_create_the_checked_out_unborn_branch ... FAILED
+2026-11-07T02:45:36.9206885Z test git::bundles::tests::incremental_bundle_explains_missing_prerequisites_then_imports_after_base ... FAILED
+2026-11-07T02:45:37.8136647Z test git::bundles::tests::import_collisions_and_concurrent_ref_changes_fail_atomically ... ok
+2026-11-07T02:45:37.8142646Z test git::bundles::tests::old_git_verification_is_fail_closed_for_promisor_or_unreadable_configuration ... ok
+2026-11-07T02:45:38.2950838Z test git::bundles::tests::malformed_objects_with_a_valid_pack_checksum_are_rejected_before_refs ... FAILED
+2026-11-07T02:45:38.7386020Z test git::bundles::tests::malformed_headers_untrusted_refs_and_corrupt_packs_never_create_refs ... ok
+2026-11-07T02:45:38.9488114Z test git::bundles::tests::regular_file_size_limits_and_private_temp_cleanup_are_enforced ... ok
+2026-11-07T02:45:40.1950271Z test git::bundles::tests::v2_and_sha256_bundles_preserve_object_formats ... FAILED
+2026-11-07T02:45:41.0399364Z test git::bundles::tests::symbolic_and_namespace_collision_destinations_are_not_followed ... FAILED
+2026-11-07T02:45:41.0407552Z test git::clone_options::tests::option_arguments_do_not_become_commands_or_patterns ... ok
+2026-11-07T02:45:42.6298334Z test git::clone_options::tests::blobless_clone_downloads_only_selected_contents_then_can_expand ... ok
+2026-11-07T02:45:42.8217601Z test git::clone_options::tests::missing_blob_probe_does_not_download_and_changes_after_reading ... ok
+2026-11-07T02:45:42.9220672Z test git::activity::tests::a_mailmap_edit_between_real_git_pages_cannot_split_an_author ... ok
+2026-11-07T02:45:42.9230802Z test git::command::practice_tests::practice_commands_cannot_inherit_a_caller_repository_or_global_configuration ... ok
+2026-11-07T02:45:42.9248673Z test git::command::profile_connection_tests::local_git_gets_the_pinned_profile_but_remote_git_does_not_get_local_paths_or_accounts ... ok
+2026-11-07T02:45:43.0342902Z test git::command::tests::credentials_reach_git_as_typed ... ok
+2026-11-07T02:45:43.0348350Z test git::command::tests::network_operations_are_told_apart ... ok
+2026-11-07T02:45:43.0354335Z test git::command::tests::only_global_config_commands_skip_the_profile ... ok
+2026-11-07T02:45:43.0358586Z test git::command::tests::reads_a_stored_credential ... ok
+2026-11-07T02:45:43.1599468Z test git::command::tests::typed_credentials_answer_a_quiet_operation ... ok
+2026-11-07T02:45:43.1622284Z test git::commits::tests::bodies_fit_on_one_line ... ok
+2026-11-07T02:45:44.2456978Z test git::commits::tests::history_of_branches_has_no_notes_or_prefetched_commits ... ok
+2026-11-07T02:45:45.6648420Z test git::commits::tests::separators_in_a_message_are_only_text ... ok
+2026-11-07T02:45:46.4173417Z test git::diff::tests::a_renamed_file_shows_what_changed_rather_than_all_of_it ... ok
+2026-11-07T02:45:48.0522685Z test git::diff::tests::file_names_are_not_patterns_and_the_first_commit_has_files ... ok
+2026-11-07T02:45:48.0532491Z test git::diff::tests::name_status_with_rename ... ok
+2026-11-07T02:45:48.0535961Z test git::diff::tests::numstat_with_rename_and_binary ... ok
+2026-11-07T02:45:48.0616675Z test git::diff::tests::old_patches_of_this_run_are_kept ... ok
+2026-11-07T02:45:48.9466331Z test git::diff::tests::work_patches_keep_context_for_git_apply ... ok
+2026-11-07T02:45:48.9483420Z test git::files::tests::blame_of_a_sha256_repository ... ok
+2026-11-07T02:45:48.9487308Z test git::files::tests::blame_reuses_commit_headers ... ok
+2026-11-07T02:45:49.7326082Z test git::files::tests::blame_without_the_ignore_revs_file ... ok
+2026-11-07T02:45:49.7332442Z test git::files::tests::file_history_follows_renames ... ok
+2026-11-07T02:45:49.7339587Z test git::files::tests::gitignore_lines ... ok
+2026-11-07T02:45:49.7401339Z test git::clone_options::tests::shallow_sparse_clone_and_folder_edits_preserve_history_and_changes ... ok
+2026-11-07T02:45:49.7415574Z test git::lfs::tests::a_pointer_file ... ok
+2026-11-07T02:45:49.7433380Z test git::lfs::tests::attributes_with_lfs ... ok
+2026-11-07T02:45:49.7437456Z test git::lfs::tests::not_a_pointer_file ... ok
+2026-11-07T02:45:49.7441823Z test git::lfs::tests::sizes_people_read ... ok
+2026-11-07T02:45:49.7571627Z test git::clone_options::tests::sparse_normal_repo_non_cone_untracked_and_head_guards ... ok
+2026-11-07T02:45:49.7579650Z test git::refs::tests::remote_urls_with_spaces ... ok
+2026-11-07T02:45:49.7583255Z test git::refs::tests::remote_with_a_slash ... ok
+2026-11-07T02:45:50.1046206Z test git::files::tests::odd_names_in_the_index ... ok
+2026-11-07T02:45:50.1051477Z test git::status::tests::a_file_staged_and_changed_again_counts_once ... ok
+2026-11-07T02:45:50.1056972Z test git::status::tests::status_rename_in_the_working_tree ... ok
+2026-11-07T02:45:50.1061424Z test git::status::tests::status_sides_renames_and_conflicts ... ok
+2026-11-07T02:45:50.1065651Z test git::submodule::tests::gitmodules_paths_and_urls ... ok
+2026-11-07T02:45:50.7113529Z test git::refs::tests::refs_names_and_remotes ... ok
+2026-11-07T02:45:50.7139142Z test git::submodule::tests::submodule_status_lines ... ok
+2026-11-07T02:45:50.7143800Z test git::submodule::tests::submodules_with_changes_of_their_own ... ok
+2026-11-07T02:45:50.7149055Z test git::tests::a_clone_elsewhere_names_its_folder_from_there ... ok
+2026-11-07T02:45:50.7153694Z test git::tests::clone_folder_names ... ok
+2026-11-07T02:45:50.8294684Z test git::refs::tests::stashes_are_named_by_number ... ok
+2026-11-07T02:45:51.1426085Z test git::tests::history_read_in_pages_reports_failure ... ok
+2026-11-07T02:45:54.3905165Z test git::tests::history_read_in_pages_is_the_whole_log ... ok
+2026-11-07T02:45:55.4220169Z test git::tests::hostile_config_and_option_like_refs ... ok
+2026-11-07T02:45:55.4225589Z test git::tests::relative_times ... ok
+2026-11-07T02:45:55.4230132Z test git::worktree::tests::remote_counts_come_back_in_order ... ok
+2026-11-07T02:45:55.4236825Z test git::worktree::tests::worktree_list ... ok
+2026-11-07T02:45:55.4374729Z test git::clone_options::tests::sparse_changes_refuse_ignored_files_and_directories_without_mutation ... ok
+2026-11-07T02:45:55.4378105Z test glossary::hover_tests::a_real_ui_hover_shows_the_glossary_after_a_pause ... ok
+2026-11-07T02:45:55.4384759Z test glossary::tests::vocabulary_uses_words_and_unicode_character_positions ... ok
+2026-11-07T02:45:55.4391739Z test graph::tests::lane_names_follow_first_parent_runs_without_leaking_into_reused_columns ... ok
+2026-11-07T02:45:55.4396352Z test glossary::tests::painted_text_only_matches_under_the_pointer ... ok
+2026-11-07T02:45:55.4398708Z test graph::tests::linear_history_uses_one_lane ... ok
+2026-11-07T02:45:55.4400110Z test graph::tests::merge_and_branch ... ok
+2026-11-07T02:45:55.4406559Z test image_fit::tests::icons_still_reach_the_svg_loader ... ok
+2026-11-07T02:45:55.4551822Z test image_fit::tests::the_loader_hands_out_pictures_that_fit ... ok
+2026-11-07T02:45:55.4556860Z test mergiraf::setup::tests::a_block_without_its_end_takes_only_its_own_lines ... ok
+2026-11-07T02:45:55.4574602Z test mergiraf::setup::tests::an_unreadable_attributes_file_is_not_taken_for_empty ... ok
+2026-11-07T02:45:55.4579622Z test mergiraf::setup::tests::the_block_is_added_replaced_and_taken_out_alone ... ok
+2026-11-07T02:45:55.4582857Z test mergiraf::setup::tests::the_driver_names_its_own_copy_by_path ... ok
+2026-11-07T02:45:55.4599631Z test mergiraf::setup::tests::windows_line_ends_stay ... ok
+2026-11-07T02:45:55.4604951Z test mergiraf::tests::a_file_elsewhere_is_solved_from_a_copy ... ok
+2026-11-07T02:45:55.4608411Z test mergiraf::tests::errors_lose_their_log_level ... ok
+2026-11-07T02:45:55.4612724Z test pr_post::suggestion::tests::a_blank_line_is_not_the_same_as_no_line ... ok
+2026-11-07T02:45:55.4616590Z test pr_post::suggestion::tests::a_suggestion_can_be_to_remove_the_line ... ok
+2026-11-07T02:45:55.4624998Z test pr_post::suggestion::tests::a_suggestion_hidden_from_the_reader_is_not_offered ... ok
+2026-11-07T02:45:55.4628682Z test pr_post::suggestion::tests::a_suggestion_in_plain_view_is_offered ... ok
+2026-11-07T02:45:55.4631752Z test pr_post::suggestion::tests::a_suggestion_shown_as_code_is_no_suggestion ... ok
+2026-11-07T02:45:55.4651216Z test pr_post::suggestion::tests::an_empty_suggestion_removes_the_line ... ok
+2026-11-07T02:45:55.4656667Z test pr_post::suggestion::tests::finds_a_suggested_change ... ok
+2026-11-07T02:45:55.4660534Z test pr_post::suggestion::tests::keeps_a_last_line_without_a_line_end ... ok
+2026-11-07T02:45:55.4663949Z test pr_post::suggestion::tests::keeps_the_line_ends_of_the_file ... ok
+2026-11-07T02:45:55.4667075Z test pr_post::suggestion::tests::keeps_the_line_ends_of_the_lines_replaced ... ok
+2026-11-07T02:45:55.4669880Z test pr_post::suggestion::tests::lines_that_are_not_there_are_an_error ... ok
+2026-11-07T02:45:55.4672686Z test pr_post::suggestion::tests::other_code_blocks_are_no_suggestion ... ok
+2026-11-07T02:45:55.4675837Z test pr_post::suggestion::tests::replaces_a_line ... ok
+2026-11-07T02:45:55.4678622Z test pr_post::suggestion::tests::replaces_several_lines_with_several ... ok
+2026-11-07T02:45:55.4681353Z test pr_post::suggestion::tests::spaces_at_the_end_of_a_suggested_line_stay ... ok
+2026-11-07T02:45:55.4684092Z test pr_post::suggestion::tests::windows_line_ends_in_a_comment_make_no_difference ... ok
+2026-11-07T02:45:55.4687219Z test pr_post::target::tests::a_branch_goes_only_while_it_is_on_the_merged_commit ... ok
+2026-11-07T02:45:55.4692169Z test pr_post::target::tests::a_file_too_large_for_the_api_is_said_to_be ... ok
+2026-11-07T02:45:55.4697033Z test pr_post::target::tests::a_suggestion_stays_in_its_repository ... ok
+2026-11-07T02:45:55.4702875Z test pr_post::target::tests::encodes_a_path_but_not_its_slashes ... ok
+2026-11-07T02:45:55.4705983Z test pr_post::tests::a_comment_review_has_to_say_something_somewhere ... ok
+2026-11-07T02:45:55.4709002Z test pr_post::tests::a_ready_pull_request_can_be_merged ... ok
+2026-11-07T02:45:55.4711722Z test pr_post::tests::an_approval_needs_no_words ... ok
+2026-11-07T02:45:55.4714517Z test pr_post::tests::nobody_reviews_their_own_pull_request ... ok
+2026-11-07T02:45:55.4718732Z test pr_post::tests::requesting_changes_can_say_so_on_the_lines_alone ... ok
+2026-11-07T02:45:55.4723153Z test pr_post::tests::requesting_changes_has_to_say_which ... ok
+2026-11-07T02:45:55.4728717Z test pr_post::tests::rules_are_no_blocker_for_who_may_bypass_them ... ok
+2026-11-07T02:45:55.4731750Z test pr_post::tests::what_keeps_a_pull_request_from_being_merged ... ok
+2026-11-07T02:45:55.4734535Z test pr_threads::tests::only_some_permissions_may_write ... ok
+2026-11-07T02:45:55.4810939Z test image_fit::tests::a_picture_too_wide_for_a_texture_is_shrunk_to_fit ... ok
+2026-11-07T02:45:56.0407223Z test git::tests::messages_in_utf8_whatever_the_log_encoding ... ok
+2026-11-07T02:45:56.9635412Z test practice::tests::an_opened_practice_path_keeps_its_safe_environment_if_the_marker_is_removed ... ok
+2026-11-07T02:45:58.8175086Z test practice::tests::detached_commit_needs_a_branch_that_reaches_it ... ok
+2026-11-07T02:45:59.5891537Z test practice::tests::a_conflict_requires_finishing_the_merge_without_markers ... ok
+2026-11-07T02:46:00.2393515Z test git::submodule::tests::submodule_states_in_a_repository ... ok
+2026-11-07T02:46:00.2695129Z test practice::tests::diverged_branches_must_be_joined_on_main ... ok
+2026-11-07T02:46:00.2701857Z test pull_request::html::tests::a_line_break_tag_breaks_the_line ... ok
+2026-11-07T02:46:00.2706893Z test pull_request::html::tests::html_comments_are_left_out ... ok
+2026-11-07T02:46:00.2711325Z test pull_request::html::tests::html_tags_go_and_what_they_enclose_stays ... ok
+2026-11-07T02:46:00.2717951Z test pull_request::html::tests::img_tags_become_images_by_the_same_rule ... ok
+2026-11-07T02:46:00.2760494Z test pull_request::html::tests::tags_in_code_stay ... ok
+2026-11-07T02:46:00.2767008Z test pull_request::html::tests::tags_with_attributes_go_too ... ok
+2026-11-07T02:46:00.2772473Z test pull_request::html::tests::what_only_looks_like_a_tag_stays ... ok
+2026-11-07T02:46:00.2776858Z test pull_request::markdown::tests::a_host_that_only_ends_right_is_no_trusted_host ... ok
+2026-11-07T02:46:00.2784775Z test pull_request::markdown::tests::a_table_outside_the_parsers_view_gets_no_image_through ... ok
+2026-11-07T02:46:00.2790508Z test pull_request::markdown::tests::an_image_link_without_text_still_has_something_to_click ... ok
+2026-11-07T02:46:00.2799165Z test pull_request::markdown::tests::bangs_before_an_image_leave_no_image ... ok
+2026-11-07T02:46:00.2806177Z test pull_request::markdown::tests::enterprise_hosts_trust_themselves ... ok
+2026-11-07T02:46:00.2811319Z test pull_request::markdown::tests::images_from_elsewhere_become_links ... ok
+2026-11-07T02:46:00.2816991Z test pull_request::markdown::tests::images_from_the_pull_requests_host_stay ... ok
+2026-11-07T02:46:00.2828014Z test pull_request::markdown::tests::no_way_of_writing_an_image_gets_one_fetched_from_elsewhere ... ok
+2026-11-07T02:46:00.2835439Z test pull_request::markdown::tests::plain_text_with_exclamation_marks_is_left_alone ... ok
+2026-11-07T02:46:00.2840408Z test pull_request::markdown::tests::what_looks_like_an_image_in_code_stays_code ... ok
+2026-11-07T02:46:00.2844109Z test pull_request::parse::tests::parses_utc_times ... ok
+2026-11-07T02:46:00.2852931Z test pull_request::tables::tests::a_table_at_the_very_start_and_end_has_no_empty_text_around_it ... ok
+2026-11-07T02:46:00.2863816Z test pull_request::tables::tests::a_table_in_a_code_block_is_code ... ok
+2026-11-07T02:46:00.2867805Z test pull_request::tables::tests::a_table_of_images_becomes_a_block_between_the_text_around_it ... ok
+2026-11-07T02:46:00.2871476Z test pull_request::tables::tests::a_table_without_images_is_left_to_the_markdown ... ok
+2026-11-07T02:46:00.2874016Z test pull_request::tables::tests::no_text_makes_no_blocks ... ok
+2026-11-07T02:46:00.2876954Z test pull_request::tables::tests::pipes_without_a_delimiter_row_are_not_a_table ... ok
+2026-11-07T02:46:00.2882954Z test pull_request::tables::tests::text_without_tables_stays_one_block ... ok
+2026-11-07T02:46:00.2889677Z test pull_request::tables::tests::windows_line_ends_make_no_difference ... ok
+2026-11-07T02:46:00.2895837Z test pull_request::tests::a_forge_naming_anything_but_commits_gets_nothing_fetched ... ok
+2026-11-07T02:46:00.2900056Z test pull_request::tests::a_review_without_a_verdict_still_counts_as_a_review ... ok
+2026-11-07T02:46:00.2904216Z test pull_request::tests::a_verdict_says_more_than_that_there_was_a_review ... ok
+2026-11-07T02:46:00.2908068Z test pull_request::tests::finds_the_remote_of_a_pull_request_whatever_its_url_looks_like ... ok
+2026-11-07T02:46:00.2913834Z test pull_request::tests::finds_the_repository_of_a_pull_request ... ok
+2026-11-07T02:46:00.2917406Z test pull_request::tests::no_review_is_coming_on_a_finished_pull_request ... ok
+2026-11-07T02:46:00.2921319Z test pull_request::tests::only_commit_ids_and_branch_names_reach_the_fetch ... ok
+2026-11-07T02:46:00.2926770Z test pull_request::tests::only_full_commit_ids_go_to_git ... ok
+2026-11-07T02:46:00.2932013Z test pull_request::tests::only_web_links_may_be_opened ... ok
+2026-11-07T02:46:00.3173728Z test remote::askpass::tests::a_remembered_secret_outlives_the_app_until_it_is_wrong ... ok
+2026-11-07T02:46:00.3284092Z test remote::askpass::tests::a_secret_is_not_kept_for_a_connection_that_failed ... ok
+2026-11-07T02:46:00.3475366Z test practice::tests::malformed_oversized_foreign_and_remote_markers_are_not_accepted ... ok
+2026-11-07T02:46:00.3486145Z test remote::askpass::tests::a_stranger_gets_no_answer ... ok
+2026-11-07T02:46:00.3496830Z test remote::askpass::tests::an_endless_request_is_cut_off ... ok
+2026-11-07T02:46:00.3517221Z test remote::askpass::tests::a_secret_typed_serves_the_machine_until_it_is_wrong ... ok
+2026-11-07T02:46:00.3734901Z test remote::askpass::tests::questions_come_to_the_window_and_answers_go_back ... ok
+2026-11-07T02:46:00.3737002Z test remote::askpass::tests::what_ssh_asks_is_told_apart ... ok
+2026-11-07T02:46:00.3741022Z test remote::discover::tests::config_hosts_leave_out_patterns ... ok
+2026-11-07T02:46:00.3744164Z test remote::discover::tests::distros_come_from_utf16 ... ok
+2026-11-07T02:46:00.3746813Z test remote::discover::tests::quoted_values_are_one_word ... ok
+2026-11-07T02:46:00.3789961Z test remote::discover::tests::wildcard_includes_are_read ... ok
+2026-11-07T02:46:00.3793535Z test remote::discover::tests::wildcards_match_as_glob_does ... ok
+2026-11-07T02:46:00.3795109Z test remote::live_tests::a_repository_in_wsl_can_be_worked_in ... ok
+2026-11-07T02:46:00.3797490Z test remote::live_tests::a_repository_over_ssh_reads_like_a_local_one ... ok
+2026-11-07T02:46:00.3799840Z test remote::session::tests::a_framed_script_is_one_group ... ok
+2026-11-07T02:46:00.3801957Z test remote::session::tests::a_ready_shell_says_its_process ... ok
+2026-11-07T02:46:00.3805034Z test remote::session::tests::a_request_sets_its_folder_and_variables_in_a_subshell ... ok
+2026-11-07T02:46:00.3807192Z test remote::session::tests::a_request_shows_no_values ... ok
+2026-11-07T02:46:00.3810293Z test remote::session::tests::framing_files_differ_beyond_case ... ok
+2026-11-07T02:46:00.3812628Z test remote::session::tests::headers_read_with_padded_numbers_for_their_command_only ... ok
+2026-11-07T02:46:00.3815189Z test remote::tests::a_wsl_folder_picked_here_is_its_path_there ... ok
+2026-11-07T02:46:00.3818057Z test remote::tests::backslashes_in_names_there_survive ... ok
+2026-11-07T02:46:00.3820440Z test remote::tests::encoding_and_parsing_go_back_and_forth ... ok
+2026-11-07T02:46:00.3826884Z test remote::tests::folders_for_git_are_paths_on_the_repository_machine ... ok
+2026-11-07T02:46:00.3831725Z test remote::tests::git_paths_and_parents_are_those_of_the_machine ... ok
+2026-11-07T02:46:00.3833755Z test remote::tests::hosts_are_names_users_and_ports_only ... ok
+2026-11-07T02:46:00.3835263Z test remote::tests::hosts_that_read_as_options_are_refused ... ok
+2026-11-07T02:46:00.3837812Z test remote::tests::joined_ssh_paths_keep_their_host ... ok
+2026-11-07T02:46:00.3839831Z test remote::tests::local_paths_are_not_remote ... ok
+2026-11-07T02:46:00.3842368Z test remote::tests::printed_paths_resolve_on_the_repository_machine ... ok
+2026-11-07T02:46:00.3844190Z test remote::tests::quoting_keeps_one_word_and_the_home ... ok
+2026-11-07T02:46:00.3846741Z test remote::tests::ssh_paths_are_never_opened_here ... ok
+2026-11-07T02:46:00.3848911Z test remote::tests::ssh_paths_name_a_host_and_a_path_there ... ok
+2026-11-07T02:46:00.3851013Z test remote::tests::the_terminal_command_is_for_any_login_shell ... ok
+2026-11-07T02:46:00.3852991Z test remote::tests::wsl_paths_are_their_unc_form ... ok
+2026-11-07T02:46:00.4391987Z test remote::askpass::tests::only_the_secret_that_signed_in_is_kept ... ok
+2026-11-07T02:46:00.4401499Z test remote::vault::tests::forgetting_all_empties_the_store ... ok
+2026-11-07T02:46:00.4408958Z test remote::vault::tests::kept_secrets_are_recalled_until_forgotten ... ok
+2026-11-07T02:46:00.4412833Z test remote::vault::tests::names_say_the_machine_and_the_question ... ok
+2026-11-07T02:46:00.4413748Z test remote::vault::tests::the_system_store_keeps_and_forgets ... ignored, uses the system's credential store
+2026-11-07T02:46:00.4421250Z test repo::activity::tests::activity_range_validates_input_and_normalizes_backward_drag ... ok
+2026-11-07T02:46:00.5507967Z test repo::activity::tests::calendar_and_contributors_buttons_change_the_actual_view_and_select_commit ... ok
+2026-11-07T02:46:00.5547355Z test repo::activity::tests::cancelled_closed_or_superseded_activity_cannot_accept_old_answers ... ok
+2026-11-07T02:46:00.5615337Z test repo::activity::tests::reopening_the_same_repository_cannot_receive_a_closed_views_answer ... ok
+2026-11-07T02:46:00.5624305Z test repo::branch_tree::tests::a_chain_of_lone_folders_becomes_one ... ok
+2026-11-07T02:46:00.5637272Z test repo::branch_tree::tests::a_folder_collects_names_that_are_not_next_to_each_other ... ok
+2026-11-07T02:46:00.5668679Z test repo::branch_tree::tests::a_folder_counts_the_branches_at_any_depth ... ok
+2026-11-07T02:46:00.5712378Z test repo::branch_tree::tests::a_folder_finds_a_branch_at_any_depth ... ok
+2026-11-07T02:46:00.5718347Z test repo::branch_tree::tests::a_folder_with_files_of_its_own_is_not_merged ... ok
+2026-11-07T02:46:00.5763006Z test repo::branch_tree::tests::a_leaf_out_of_sight_with_its_menu_open_is_drawn ... ok
+2026-11-07T02:46:00.5769685Z test repo::branch_tree::tests::a_name_after_one_in_the_same_folders_goes_in_them ... ok
+2026-11-07T02:46:00.5778237Z test repo::branch_tree::tests::a_name_and_a_folder_of_the_same_name_stay_apart ... ok
+2026-11-07T02:46:00.5793726Z test repo::branch_tree::tests::a_shared_prefix_becomes_one_folder ... ok
+2026-11-07T02:46:00.5798775Z test repo::branch_tree::tests::a_trailing_slash_names_a_leaf_not_an_empty_folder ... ok
+2026-11-07T02:46:00.9554569Z test repo::branch_tree::tests::a_very_deep_tree_is_quick_and_needs_little_stack ... ok
+2026-11-07T02:46:00.9560453Z test repo::branch_tree::tests::folders_come_before_files_keeping_their_order ... ok
+2026-11-07T02:46:00.9565640Z test repo::branch_tree::tests::folders_nest_and_know_their_whole_path ... ok
+2026-11-07T02:46:00.9571291Z test repo::branch_tree::tests::folders_of_the_same_name_in_different_places_stay_apart ... ok
+2026-11-07T02:46:00.9582104Z test repo::branch_tree::tests::merging_stops_where_folders_branch ... ok
+2026-11-07T02:46:00.9607611Z test repo::branch_tree::tests::names_without_a_slash_stay_flat ... ok
+2026-11-07T02:46:00.9612289Z test repo::branch_tree::tests::no_branches_make_no_nodes ... ok
+2026-11-07T02:46:00.9617314Z test repo::branch_tree::tests::siblings_keep_the_order_they_first_appear_in ... ok
+2026-11-07T02:46:00.9621763Z test repo::branch_tree::tests::unicode_names_split_at_their_slashes ... ok
+2026-11-07T02:46:00.9627061Z test repo::branch_visibility::tests::deleted_branches_are_forgotten ... ok
+2026-11-07T02:46:00.9631998Z test repo::branch_visibility::tests::hidden_branches_are_left_out_of_the_log ... ok
+2026-11-07T02:46:00.9636270Z test repo::branch_visibility::tests::hiding_everything_on_an_unborn_branch_logs_nothing ... ok
+2026-11-07T02:46:00.9640793Z test repo::branch_visibility::tests::nothing_hidden_logs_every_branch ... ok
+2026-11-07T02:46:00.9645537Z test repo::branch_visibility::tests::soloed_branches_are_the_only_ones_logged_besides_head ... ok
+2026-11-07T02:46:00.9650705Z test repo::branch_visibility::tests::the_checked_out_branch_is_logged_through_head ... ok
+2026-11-07T02:46:00.9656828Z test repo::bundles::tests::cancelled_and_replaced_bundle_readings_are_not_current ... ok
+2026-11-07T02:46:00.9667422Z test repo::ci_status::tests::a_project_change_with_nothing_on_its_way_starts_afresh ... ok
+2026-11-07T02:46:00.9671741Z test repo::ci_status::tests::a_status_without_checks_says_its_state ... ok
+2026-11-07T02:46:00.9678372Z test repo::ci_status::tests::statuses_asked_of_the_project_before_are_dropped ... ok
+2026-11-07T02:46:00.9682633Z test repo::ci_status::tests::the_tooltip_tallies_and_names_what_failed_first ... ok
+2026-11-07T02:46:00.9687038Z test repo::ci_view::graph::tests::jobs_that_waited_for_others_come_after_them ... ok
+2026-11-07T02:46:00.9691075Z test repo::ci_view::graph::tests::no_jobs_no_columns ... ok
+2026-11-07T02:46:00.9697305Z test repo::ci_view::graph::tests::stages_are_columns_in_their_order_with_failures_on_top ... ok
+2026-11-07T02:46:00.9700468Z test repo::ci_view::steps::tests::bars_sit_where_their_steps_ran ... ok
+2026-11-07T02:46:00.9706710Z test repo::ci_view::tests::a_failed_poll_of_a_running_build_is_tried_again ... ok
+2026-11-07T02:46:00.9713249Z test repo::columns::tests::a_column_stops_at_its_minimum_when_dragged_narrower ... ok
+2026-11-07T02:46:00.9716455Z test repo::columns::tests::a_narrow_window_squeezes_and_a_wider_one_restores ... ok
+2026-11-07T02:46:00.9719333Z test repo::columns::tests::a_push_that_is_not_a_number_pushes_nothing ... ok
+2026-11-07T02:46:00.9722171Z test repo::columns::tests::a_right_hand_column_pushes_the_columns_right_of_it_past_its_minimum ... ok
+2026-11-07T02:46:00.9726526Z test repo::columns::tests::a_window_too_narrow_for_the_minimums_shows_the_minimums ... ok
+2026-11-07T02:46:00.9730815Z test repo::columns::tests::author_bar_does_not_squeeze_the_column_right_of_it ... ok
+2026-11-07T02:46:00.9734093Z test repo::columns::tests::author_bar_squeezes_every_column_to_its_minimum_and_stops ... ok
+2026-11-07T02:46:00.9739120Z test repo::columns::tests::branch_and_graph_bars_push_the_columns_on_the_right_once_the_description_is_full ... ok
+2026-11-07T02:46:00.9742015Z test repo::columns::tests::date_bar_squeezes_the_columns_left_of_it_including_author ... ok
+2026-11-07T02:46:00.9744680Z test repo::columns::tests::description_gives_way_before_the_graph ... ok
+2026-11-07T02:46:00.9748153Z test repo::columns::tests::dragging_another_bar_keeps_what_was_pushed ... ok
+2026-11-07T02:46:00.9752138Z test repo::columns::tests::dragging_another_bar_starts_from_what_is_on_screen ... ok
+2026-11-07T02:46:00.9756467Z test repo::columns::tests::dragging_back_gives_pushed_columns_their_width_back ... ok
+2026-11-07T02:46:00.9759429Z test repo::columns::tests::dragging_back_restores_every_squeezed_column ... ok
+2026-11-07T02:46:00.9764394Z test repo::columns::tests::dragging_the_branch_bar_back_restores_the_columns_on_the_right ... ok
+2026-11-07T02:46:00.9766559Z test repo::columns::tests::graph_gives_way_before_the_branch_column ... ok
+2026-11-07T02:46:00.9770934Z test repo::columns::tests::hidden_columns_stay_hidden ... ok
+2026-11-07T02:46:00.9773978Z test repo::columns::tests::hiding_the_pushed_column_leaves_no_dead_zone_on_the_pushing_bar ... ok
+2026-11-07T02:46:00.9786864Z test repo::columns::tests::hiding_the_pushing_column_gives_the_pushed_ones_their_width_back ... ok
+2026-11-07T02:46:00.9791717Z test repo::columns::tests::leaves_widths_alone_when_they_fit ... ok
+2026-11-07T02:46:00.9797231Z test repo::columns::tests::pushing_stops_when_the_columns_on_the_right_are_at_their_minimum ... ok
+2026-11-07T02:46:00.9803638Z test repo::columns::tests::squeezed_columns_come_back_in_reverse_order ... ok
+2026-11-07T02:46:01.0569773Z test remote::ui_guard::tests::only_the_marked_thread_is_refused ... ok
+2026-11-07T02:46:01.0572702Z test repo::commands::tests::remote_branches_start_from_their_full_ref ... ok
+2026-11-07T02:46:01.0575572Z test repo::conflict::tests::a_solved_file_is_saved_there ... ok
+2026-11-07T02:46:01.0579414Z test repo::conflict::tests::choices_wait_while_edited_by_hand ... ok
+2026-11-07T02:46:01.0584048Z test repo::conflict::tests::hand_edits_that_leave_markers_are_unresolved ... ok
+2026-11-07T02:46:01.0587972Z test repo::conflict::tests::keeps_crlf_line_endings ... ok
+2026-11-07T02:46:01.0590676Z test repo::conflict::tests::longer_runs_are_content ... ok
+2026-11-07T02:46:01.0593290Z test repo::conflict::tests::parses_conflicts_and_labels ... ok
+2026-11-07T02:46:01.0596160Z test repo::conflict::tests::renders_choices_and_keeps_undecided_markers ... ok
+2026-11-07T02:46:01.0654334Z test repo::conflict::tests::results_for_an_earlier_editor_are_not_taken ... ok
+2026-11-07T02:46:01.0829431Z test repo::conflict::tests::solved_elsewhere_leaves_the_rest_to_choose ... ok
+2026-11-07T02:46:01.0929319Z test repo::conflict::tests::the_save_script_replaces_rather_than_follows ... ok
+2026-11-07T02:46:01.0989817Z test repo::conflict::tests::unterminated_conflict_stays_text ... ok
+2026-11-07T02:46:01.1417697Z test repo::detail::changes::tests::a_file_menu_does_not_move_to_the_file_that_takes_its_row ... ok
+2026-11-07T02:46:01.9968450Z test repo::commands::tests::a_tag_named_like_the_remote_branch_does_not_shadow_it ... ok
+2026-11-07T02:46:02.0463540Z test repo::detail::commit::tests::ctrl_enter_elsewhere_does_not_save_a_reword ... ok
+2026-11-07T02:46:02.0937300Z test repo::detail::commit::tests::escape_elsewhere_does_not_cancel_a_reword ... ok
+2026-11-07T02:46:02.7309297Z test repo::detail::changes::tests::unstage_all_keeps_the_merge_in_progress ... ok
+2026-11-07T02:46:03.3844636Z test repo::dialogs::branch::tests::undoing_a_branch_keeps_commits_made_on_it ... ok
+2026-11-07T02:46:03.3851408Z test repo::dialogs::remote::tests::hosts ... ok
+2026-11-07T02:46:03.3855579Z test repo::dialogs::tests::option_like_names_are_refused ... ok
+2026-11-07T02:46:03.3863173Z test repo::diff::lfs::tests::a_changed_lfs_file_is_its_two_objects ... ok
+2026-11-07T02:46:03.3873963Z test repo::diff::lfs::tests::a_new_lfs_file_has_no_object_before ... ok
+2026-11-07T02:46:03.3896355Z test repo::diff::lfs::tests::other_diffs_are_no_lfs_objects ... ok
+2026-11-07T02:46:03.9229831Z test practice::tests::setup_is_disposable_and_does_not_change_its_parent_or_other_repositories ... ok
+2026-11-07T02:46:03.9237344Z test repo::diff::rendered::tests::a_repository_image_stays_and_any_other_becomes_a_link ... ok
+2026-11-07T02:46:03.9244584Z test repo::diff::rendered::tests::blocks_are_the_top_level_ones_and_each_item_of_a_list ... ok
+2026-11-07T02:46:03.9277590Z test repo::diff::rendered::tests::images_are_read_from_the_repository_only ... ok
+2026-11-07T02:46:03.9283648Z test repo::diff::rendered::tests::link_definitions_go_along_with_the_blocks ... ok
+2026-11-07T02:46:03.9289490Z test repo::diff::rendered::tests::markdown_files_are_known_by_their_extension ... ok
+2026-11-07T02:46:03.9312669Z test repo::diff::rendered::tests::the_changed_blocks_are_removed_then_added_between_those_kept ... ok
+2026-11-07T02:46:03.9317382Z test repo::diff::structural::tests::rapid_refreshes_coalesce_and_a_closed_diff_cannot_accept_the_previous_job ... ok
+2026-11-07T02:46:03.9337825Z test repo::diff::structural::tests::real_difftastic_ignores_rewrapping_but_keeps_changed_expressions ... ok
+2026-11-07T02:46:03.9976325Z test repo::dialogs::bundles::tests::incoming_dialog_previews_collisions_and_escape_cancels_without_ref_changes ... FAILED
+2026-11-07T02:46:03.9984358Z test repo::diff::structural::tests::report_keeps_only_novel_tokens_and_checks_utf8_byte_ranges ... ok
+2026-11-07T02:46:04.0063603Z test repo::diff::structural::tests::safe_staging_preserves_real_difftastic_language_detection ... ok
+2026-11-07T02:46:04.2713604Z test repo::diff::structural::tests::rename_uses_the_old_name_even_when_git_quotes_it ... FAILED
+2026-11-07T02:46:04.2737458Z test practice::tests::published_undo_needs_a_new_pushed_commit_and_keeps_the_old_history ... ok
+2026-11-07T02:46:04.4897414Z test repo::diff::rendered::tests::a_file_reads_with_its_pictures_on_each_side ... ok
+2026-11-07T02:46:04.5027741Z test repo::diff::structural::tests::syntax_view_renders_unicode_source_and_no_syntax_changes ... ok
+2026-11-07T02:46:04.6043716Z test repo::diff::structural::tests::stale_answers_cannot_replace_a_newer_diff_or_read ... ok
+2026-11-07T02:46:04.9607003Z test repo::diff::structural::tests::temporary_writes_preserve_outside_files_for_absolute_and_windows_tree_names ... ok
+2026-11-07T02:46:04.9615160Z test repo::diff::structural::tests::unsupported_languages_parse_errors_and_resource_fallbacks_are_explained ... ok
+2026-11-07T02:46:05.2182854Z test repo::diff::structural::tests::syntax_view_draws_read_only_and_patch_fallback_cannot_stage_lines ... ok
+2026-11-07T02:46:05.2188106Z test repo::diff::tests::a_click_on_a_change_mark_finds_its_change ... ok
+2026-11-07T02:46:05.2202639Z test repo::diff::tests::a_line_cut_to_be_shown_is_copied_whole ... ok
+2026-11-07T02:46:05.2208538Z test repo::diff::tests::binary_notice ... ok
+2026-11-07T02:46:05.2213724Z test repo::diff::tests::changed_part_gets_its_own_section ... ok
+2026-11-07T02:46:05.2219951Z test repo::diff::tests::changes_group_into_runs_per_kind ... ok
+2026-11-07T02:46:05.2223853Z test repo::diff::tests::combined_conflict_diff ... ok
+2026-11-07T02:46:05.2227733Z test repo::diff::tests::crlf_lines_keep_their_carriage_return ... ok
+2026-11-07T02:46:05.2232375Z test repo::diff::tests::images_are_named_by_their_contents ... ok
+2026-11-07T02:46:05.2237714Z test repo::diff::tests::later_hunks_follow_the_lines_earlier_ones_add ... ok
+2026-11-07T02:46:05.2244702Z test repo::diff::tests::new_files_are_told_apart ... ok
+2026-11-07T02:46:05.2266642Z test repo::diff::tests::no_newline_note_follows_its_line ... ok
+2026-11-07T02:46:05.2281967Z test repo::diff::tests::no_newline_note_keeps_the_last_lines_paired ... ok
+2026-11-07T02:46:05.2287924Z test repo::diff::tests::no_newline_note_only_ends_its_side ... ok
+2026-11-07T02:46:05.2307400Z test repo::diff::tests::numbers_follow_hunk_headers ... ok
+2026-11-07T02:46:05.2311706Z test repo::diff::tests::numbers_ignore_the_hunk_headers_function_name ... ok
+2026-11-07T02:46:05.2316636Z test repo::diff::tests::numbers_past_the_largest_stay_there ... ok
+2026-11-07T02:46:05.2321820Z test repo::diff::tests::partial_patch_keeps_only_the_chosen_lines ... ok
+2026-11-07T02:46:05.3696440Z test repo::diff::structural::tests::windows_absolute_git_name_cannot_overwrite_an_existing_file ... ok
+2026-11-07T02:46:06.6226530Z test repo::diff::structural::tests::unreadable_binary_non_utf8_large_and_conflicted_sources_fall_back ... ok
+2026-11-07T02:46:06.6234413Z test repo::diff::tests::removals_and_additions_next_to_each_other_are_one_change ... ok
+2026-11-07T02:46:06.6366510Z test repo::diff::tests::partial_patches_apply_with_git ... ok
+2026-11-07T02:46:06.6387690Z test repo::diff::tests::rewrites_are_not_marked_inline ... ok
+2026-11-07T02:46:06.6404422Z test repo::diff::tests::selected_text_follows_the_side_it_was_made_on ... ok
+2026-11-07T02:46:06.6412265Z test repo::diff::tests::selection_belongs_to_the_layout_it_was_made_in ... ok
+2026-11-07T02:46:06.6417560Z test repo::diff::tests::side_by_side_pairs_and_inline_changes ... ok
+2026-11-07T02:46:06.6422138Z test repo::diff::tests::stepping_goes_from_the_change_jumped_to_or_from_what_is_in_view ... ok
+2026-11-07T02:46:06.8018736Z test repo::diff::tests::partial_patches_of_the_whole_file_apply_with_git ... ok
+2026-11-07T02:46:07.2726195Z test repo::diff::tests::text_that_is_not_utf8_is_not_picked_from ... ok
+2026-11-07T02:46:07.5846572Z test repo::diff::structural::tests::sources_distinguish_commit_index_working_tree_root_and_deletion ... ok
+2026-11-07T02:46:07.5859672Z test repo::file_text::tests::a_nul_makes_a_file_binary ... ok
+2026-11-07T02:46:07.5863741Z test repo::file_text::tests::lines_lose_their_endings_and_tabs ... ok
+2026-11-07T02:46:07.5870950Z test repo::gerrit::flow_tests::review_targets_come_only_from_the_detected_remote_and_prefer_the_upstream ... ok
+2026-11-07T02:46:07.6065047Z test repo::diff::tests::renamed_image_shows_its_old_picture ... ok
+2026-11-07T02:46:07.6075930Z test repo::graph_view::badge::tests::a_local_branch_named_under_a_remote_is_local ... ok
+2026-11-07T02:46:07.6081079Z test repo::graph_view::badge::tests::a_remote_named_like_the_start_of_another_does_not_take_its_branches ... ok
+2026-11-07T02:46:07.6086362Z test repo::graph_view::badge::tests::full_ref_names_make_the_same_pills ... ok
+2026-11-07T02:46:07.6090873Z test repo::graph_view::badge::tests::local_branch_with_slash_is_not_remote ... ok
+2026-11-07T02:46:07.6095361Z test repo::graph_view::badge::tests::remote_twin_folds_into_local_badge ... ok
+2026-11-07T02:46:07.6103069Z test repo::graph_view::handles::tests::dragging_another_bar_keeps_the_graph_fitted_to_its_lanes ... ok
+2026-11-07T02:46:07.6113618Z test repo::graph_view::handles::tests::resizing_auto_refs_fixes_the_width_without_an_initial_jump ... ok
+2026-11-07T02:46:07.7087296Z test repo::diff::tests::unstaging_a_file_does_not_treat_its_name_as_a_pattern ... ok
+2026-11-07T02:46:08.6318279Z test repo::file_text::tests::a_diff_shows_the_file_after_the_change_or_before_its_deletion ... ok
+2026-11-07T02:46:08.6324767Z test repo::graph_view::message_tooltip::tests::hover_requests_are_debounced_serialized_hash_owned_and_bounded ... ok
+2026-11-07T02:46:08.6330250Z test repo::graph_view::message_tooltip::tests::moved_repository_and_superseded_worker_cannot_populate_current_tooltip ... ok
+2026-11-07T02:46:08.6341285Z test repo::graph_view::pills::tests::only_the_tracked_remote_pill_of_the_checked_out_branch_pulls ... ok
+2026-11-07T02:46:08.6912494Z test repo::graph_view::pills::tests::white_pill_labels_meet_aa_for_every_builtin_and_lane_setting ... ok
+2026-11-07T02:46:08.7477334Z test repo::graph_view::readability_tests::auto_sized_pills_keep_double_click_and_branch_context_hitboxes ... ok
+2026-11-07T02:46:08.7513864Z test repo::graph_view::readability_tests::lane_names_distinguish_refs_tags_detached_and_reused_columns ... ok
+2026-11-07T02:46:08.8098957Z test repo::graph_view::readability_tests::manual_refs_optional_columns_and_compact_graph_survive_auto_sizing ... ok
+2026-11-07T02:46:09.3997407Z test repo::graph_view::menu::tests::a_reset_refuses_once_another_branch_is_checked_out ... ok
+2026-11-07T02:46:09.5063396Z test repo::graph_view::menu::tests::a_reset_refuses_once_a_branch_at_the_same_commit_is_checked_out ... ok
+2026-11-07T02:46:09.5236533Z test repo::graph_view::readability_tests::scrolling_reclaims_empty_refs_without_width_jitter_or_full_history_paint ... ok
+2026-11-07T02:46:09.5555576Z test repo::graph_view::tests::a_commit_menu_does_not_move_to_the_commit_that_takes_its_row ... ok
+2026-11-07T02:46:09.5566955Z test repo::graph_view::tests::a_compact_graph_column_fits_its_lanes_closer_together ... ok
+2026-11-07T02:46:09.7122501Z test repo::graph_view::row::tests::painted_graph_bodies_and_wip_chips_meet_aa_in_combined_row_states ... ok
+2026-11-07T02:46:09.7162937Z test repo::highlight::tests::colours_rust_and_skips_plain_text ... ok
+2026-11-07T02:46:09.7172236Z test repo::highlight::tests::long_lines_are_cut_with_their_colours ... ok
+2026-11-07T02:46:09.7724693Z test repo::highlight::tests::very_long_text_stays_plain ... ok
+2026-11-07T02:46:09.7967743Z test repo::highlight::tests::whole_names_win_over_extensions ... ok
+2026-11-07T02:46:09.7974731Z test repo::keep_submodules::tests::what_moves_the_checkout ... ok
+2026-11-07T02:46:10.2171452Z test repo::graph_view::readability_tests::real_git_tooltip_retains_long_message_paragraphs_and_follows_hover_not_selection ... ok
+2026-11-07T02:46:11.2059737Z test repo::gerrit::tests::submission_pushes_to_the_review_namespace_and_amendment_uploads_the_next_object ... ok
+2026-11-07T02:46:11.5291070Z test repo::highlight::tests::colours_common_languages ... ok
+2026-11-07T02:46:13.8560648Z test repo::keyboard::tests::delayed_patch_completion_cannot_apply_after_an_actual_failed_full_reload ... ok
+2026-11-07T02:46:16.3180121Z test repo::keyboard::tests::pane_keys_file_navigation_stage_unstage_and_open_use_the_normal_git_workers ... ok
+2026-11-07T02:46:16.4034654Z test repo::keyboard::tests::delayed_patch_completion_cannot_apply_during_a_real_full_reload ... ok
+2026-11-07T02:46:17.1858191Z test repo::keyboard::tests::current_hunk_keys_stage_unstage_and_confirm_discard_with_undo ... ok
+2026-11-07T02:46:17.3237570Z test repo::keyboard::tests::rename_reload_preserves_identity_and_invalidates_pre_reload_file_commands ... ok
+2026-11-07T02:46:17.3392312Z test repo::load::tests::an_older_list_of_pull_requests_answering_last_is_dropped ... ok
+2026-11-07T02:46:17.3529063Z test repo::navigate::tests::a_closed_search_takes_no_answer ... ok
+2026-11-07T02:46:17.3819011Z test repo::navigate::tests::clearing_the_query_ends_the_search_running ... ok
+2026-11-07T02:46:18.4523290Z test repo::operations::tests::a_quiet_operation_runs_its_steps_but_not_its_expectations ... ok
+2026-11-07T02:46:19.3530792Z test repo::keyboard::tests::text_terminal_palette_modal_and_context_menu_own_their_keys ... ok
+2026-11-07T02:46:19.7392236Z test repo::keyboard::tests::stale_status_path_diff_and_conflict_targets_never_execute ... ok
+2026-11-07T02:46:20.3101986Z test repo::operations::tests::a_redone_stash_that_saved_nothing_is_not_popped ... ok
+2026-11-07T02:46:20.4482021Z test repo::operations::tests::an_expected_head_that_moved_stops_the_operation ... ok
+2026-11-07T02:46:20.4487278Z test repo::patches::tests::mails_and_diffs ... ok
+2026-11-07T02:46:20.4492274Z test repo::patches::tests::patch_names_like_git ... ok
+2026-11-07T02:46:20.4496804Z test repo::pinned_sections::tests::a_header_above_the_pane_stops_at_the_top ... ok
+2026-11-07T02:46:20.4501052Z test repo::pinned_sections::tests::a_header_below_the_pane_stops_at_the_bottom ... ok
+2026-11-07T02:46:20.4505088Z test repo::pinned_sections::tests::a_header_in_view_stays_at_its_place ... ok
+2026-11-07T02:46:20.4509497Z test repo::pinned_sections::tests::a_header_stops_where_the_stack_begins_not_at_the_edge ... ok
+2026-11-07T02:46:20.4514228Z test repo::pinned_sections::tests::a_pane_too_short_for_all_headers_keeps_them_in_order_from_the_top ... ok
+2026-11-07T02:46:20.4518717Z test repo::pinned_sections::tests::content_as_tall_as_the_pane_leaves_no_gap ... ok
+2026-11-07T02:46:20.4523670Z test repo::pinned_sections::tests::content_not_measured_yet_leaves_no_gap ... ok
+2026-11-07T02:46:20.4528033Z test repo::pinned_sections::tests::content_shorter_than_the_pane_leaves_the_difference ... ok
+2026-11-07T02:46:20.4531459Z test repo::pinned_sections::tests::content_taller_than_the_pane_leaves_no_gap_not_a_negative_one ... ok
+2026-11-07T02:46:20.4534685Z test repo::pinned_sections::tests::headers_above_the_pane_stack_in_order ... ok
+2026-11-07T02:46:20.4538167Z test repo::pinned_sections::tests::headers_below_the_pane_stack_in_order ... ok
+2026-11-07T02:46:20.4541892Z test repo::pinned_sections::tests::jumping_lands_where_the_header_is_no_longer_pinned ... ok
+2026-11-07T02:46:20.4545333Z test repo::pinned_sections::tests::jumping_leaves_room_for_the_headers_above ... ok
+2026-11-07T02:46:20.4549941Z test repo::pinned_sections::tests::jumping_never_asks_for_a_negative_offset ... ok
+2026-11-07T02:46:20.4580922Z test repo::pinned_sections::tests::jumping_to_the_first_header_scrolls_it_to_the_top_of_the_pane ... ok
+2026-11-07T02:46:20.4586386Z test repo::pr_merge::tests::checks_past_the_rules_are_not_said_to_be_optional ... ok
+2026-11-07T02:46:20.4590877Z test repo::pr_review::lines::tests::a_line_that_stayed_opens_the_thread_it_has ... ok
+2026-11-07T02:46:20.4597389Z test repo::pr_review::lines::tests::a_suggestion_applies_only_while_it_can_land ... ok
+2026-11-07T02:46:20.4608606Z test repo::pr_review::lines::tests::a_thread_is_on_its_own_line_and_side_only ... ok
+2026-11-07T02:46:20.4634358Z test repo::pr_review::lines::tests::headers_and_notes_take_no_comments ... ok
+2026-11-07T02:46:20.4639065Z test repo::pr_review::lines::tests::in_the_unified_diff_a_line_has_one_place_to_comment ... ok
+2026-11-07T02:46:20.4644046Z test repo::pr_review::lines::tests::marks_count_the_comments_of_this_file ... ok
+2026-11-07T02:46:20.4649940Z test repo::pr_review::lines::tests::outdated_threads_mark_no_line ... ok
+2026-11-07T02:46:20.4654750Z test repo::pr_review::lines::tests::says_which_lines_a_suggestion_replaces ... ok
+2026-11-07T02:46:20.4658444Z test repo::pr_review::lines::tests::side_by_side_a_line_that_stayed_can_be_commented_on_either_side ... ok
+2026-11-07T02:46:20.4662408Z test repo::pr_review::tests::a_draft_with_nothing_typed_is_nothing_to_lose ... ok
+2026-11-07T02:46:20.4669559Z test repo::pr_review::tests::a_reply_into_the_pending_review_is_not_said_to_be_sent ... ok
+2026-11-07T02:46:20.4673926Z test repo::pr_review::tests::discarding_the_pending_comments_keeps_the_text_of_the_review ... ok
+2026-11-07T02:46:20.4678240Z test repo::pr_review::tests::errors_show_where_they_belong ... ok
+2026-11-07T02:46:20.4682766Z test repo::pr_review::tests::leaving_the_page_keeps_only_what_is_typed ... ok
+2026-11-07T02:46:20.4686863Z test repo::pr_review::tests::new_commits_let_go_of_the_line_picked_in_the_old_diff ... ok
+2026-11-07T02:46:20.4690753Z test repo::pr_review::tests::new_commits_take_back_the_yes_to_merging ... ok
+2026-11-07T02:46:20.4695180Z test repo::pr_review::tests::the_repository_deleting_branches_leaves_nothing_to_delete ... ok
+2026-11-07T02:46:20.4702283Z test repo::pr_review::tests::what_can_stop_halfway_is_loaded_again_after_a_failure ... ok
+2026-11-07T02:46:20.4706559Z test repo::pr_view::tests::a_file_no_longer_changed_closes ... ok
+2026-11-07T02:46:20.4710142Z test repo::pr_view::tests::a_move_is_seen_across_a_reading_that_failed ... ok
+2026-11-07T02:46:20.4715249Z test repo::pr_view::tests::an_editor_open_keeps_its_place ... ok
+2026-11-07T02:46:20.4719017Z test repo::pr_view::tests::an_open_file_follows_a_new_merge_base ... ok
+2026-11-07T02:46:20.4723761Z test repo::pr_view::tests::an_open_file_follows_new_commits ... ok
+2026-11-07T02:46:20.4729396Z test repo::pr_view::tests::other_diffs_and_unchanged_ones_stay ... ok
+2026-11-07T02:46:21.9368551Z test repo::operations::tests::undoing_a_stash_refuses_once_another_was_pushed ... ok
+2026-11-07T02:46:22.0183942Z test repo::operations::tests::undoing_checkout_and_pull_keeps_commits_made_since ... ok
+2026-11-07T02:46:22.0204641Z test repo::pull::tests::every_pull_mode_says_how_to_reconcile ... ok
+2026-11-07T02:46:22.0210722Z test repo::quick_edit::tests::dropping_marks_the_commit ... ok
+2026-11-07T02:46:22.0215572Z test repo::quick_edit::tests::moving_swaps_with_a_neighbour ... ok
+2026-11-07T02:46:22.0220488Z test repo::quick_edit::tests::plans_that_cant_be ... ok
+2026-11-07T02:46:22.0229146Z test repo::quick_edit::tests::what_the_menu_allows ... ok
+2026-11-07T02:46:22.0245488Z test repo::rebase::tests::a_branch_moved_since_the_read_is_not_rebased ... ok
+2026-11-07T02:46:22.0266396Z test repo::rebase::tests::private_dirs_are_new ... ok
+2026-11-07T02:46:22.0269318Z test repo::rebase::tests::problems ... ok
+2026-11-07T02:46:22.0272495Z test repo::rebase::tests::shell_paths ... ok
+2026-11-07T02:46:22.0274585Z test repo::rebase::tests::todo_lines ... ok
+2026-11-07T02:46:22.3805902Z test repo::keyboard::tests::tree_navigation_reveals_collapsed_folders_scrolls_and_preserves_path_selection ... ok
+2026-11-07T02:46:22.3887385Z test repo::rebase::weather::tests::budget_expiring_between_rows_publishes_a_complete_terminal_answer ... ok
+2026-11-07T02:46:22.3907437Z test repo::rebase::weather::tests::budget_expiring_inside_a_step_finalizes_that_position_and_every_later_row ... ok
+2026-11-07T02:46:22.3919608Z test repo::rebase::weather::tests::closing_the_editor_cancels_weather_even_while_a_todo_snapshot_exists ... ok
+2026-11-07T02:46:26.5714436Z test repo::practice::tests::an_answer_from_before_a_reload_is_discarded ... ok
+2026-11-07T02:46:26.5765214Z test repo::rebase::weather::tests::expired_setup_budget_is_terminal_but_generation_cancellation_can_abandon_rows ... ok
+2026-11-07T02:46:26.7819498Z test repo::practice::tests::a_reopened_tab_loads_and_checks_its_goal_in_the_background ... ok
+2026-11-07T02:46:26.7830343Z test repo::rebase::weather::tests::commits_that_become_empty_are_cloudy_and_later_commits_are_still_checked ... ok
+2026-11-07T02:46:27.8849810Z test repo::rebase::weather::tests::attributes_come_from_each_simulated_parent_and_ignore_checkout_and_info ... ok
+2026-11-07T02:46:27.9865165Z test repo::rebase::weather::tests::nul_paths_errors_and_cancellation_are_not_mistaken_for_clean_forecasts ... ok
+2026-11-07T02:46:27.9874134Z test repo::rebase::weather::tests::stale_answers_are_dropped_and_refresh_discards_an_inflight_cache ... ok
+2026-11-07T02:46:29.1349123Z test repo::rewrite::tests::a_rebase_does_not_drop_a_commit_the_tab_has_not_seen_yet ... ok
+2026-11-07T02:46:29.3727707Z test repo::rebase::weather::tests::forecasting_preserves_dirty_files_index_refs_reflogs_and_stashes ... ok
+2026-11-07T02:46:29.9078177Z test repo::rewrite::tests::a_rebase_prepared_for_an_editor_gone_since_does_not_run ... ok
+2026-11-07T02:46:30.4969017Z test repo::rewrite::tests::rewording_an_older_commit_refuses_once_head_moved ... ok
+2026-11-07T02:46:30.8756198Z test repo::rewrite::tests::rewording_the_last_commit_seen_leaves_a_newer_one_alone ... ok
+2026-11-07T02:46:31.7915485Z test repo::sidebar::branch_delete::tests::redoing_a_delete_keeps_commits_made_on_the_branch_since ... ok
+2026-11-07T02:46:31.9049751Z test repo::rebase::weather::tests::replay_accumulates_trees_and_reports_the_exact_conflict_position ... ok
+2026-11-07T02:46:31.9215956Z test repo::sidebar::branches::tests::a_branch_menu_does_not_move_to_the_branch_that_takes_its_row ... ok
+2026-11-07T02:46:31.9224429Z test repo::sidebar::pull_requests::tests::a_pull_request_branch_is_found_on_the_remote_that_has_it ... ok
+2026-11-07T02:46:31.9242844Z test repo::sidebar::pull_requests::tests::a_pull_request_on_another_machine_gets_a_worktree_there ... ok
+2026-11-07T02:46:31.9261579Z test repo::sidebar::pull_requests::tests::a_pull_request_opens_in_its_worktree_made_when_needed ... ok
+2026-11-07T02:46:31.9291290Z test repo::sidebar::pull_requests::tests::only_plain_branch_names_are_taken_as_they_are ... ok
+2026-11-07T02:46:31.9308641Z test repo::sidebar::remotes::tests::a_remote_branch_is_named_without_its_remote ... ok
+2026-11-07T02:46:31.9316216Z test repo::sidebar::remotes::tests::a_remote_with_a_slash_owns_its_branches ... ok
+2026-11-07T02:46:31.9320050Z test repo::sidebar::remotes::tests::an_ambiguous_remote_branch_is_still_found ... ok
+2026-11-07T02:46:32.3768129Z test repo::rebase::weather::tests::independent_reorders_squashes_and_fixups_have_the_same_final_tree ... ok
+2026-11-07T02:46:32.7737837Z test repo::sidebar::branch_delete::tests::remote_branch_pushed_to_since_is_not_deleted ... ok
+2026-11-07T02:46:33.2203468Z test repo::sidebar::tags::tests::undoing_a_tag_delete_keeps_it_annotated ... ok
+2026-11-07T02:46:33.2232331Z test repo::tests::a_change_on_disk_reads_again_what_it_can_have_changed ... ok
+2026-11-07T02:46:33.6618473Z test repo::sidebar::branch_delete::tests::undoing_a_delete_on_the_remote_can_be_tried_again ... ok
+2026-11-07T02:46:33.7698738Z test repo::tests::a_linked_worktree_is_watched_where_git_keeps_its_data ... ok
+2026-11-07T02:46:33.7705846Z test repo::tests::a_remote_branch_is_checked_out_under_its_name_on_the_remote ... ok
+2026-11-07T02:46:33.7716598Z test repo::tests::aborting_asks_first ... ok
+2026-11-07T02:46:34.0577376Z test repo::tests::a_pull_request_that_cannot_open_leaves_the_builds_shown ... ok
+2026-11-07T02:46:34.0583459Z test repo::tests::an_older_diff_answer_does_not_replace_a_newer_one ... ok
+2026-11-07T02:46:34.1574385Z test repo::tests::an_interactive_rebase_does_not_start_once_the_branch_moved ... ok
+2026-11-07T02:46:34.1878704Z test repo::sidebar::stashes::tests::stash_ops_hit_the_stash_seen ... ok
+2026-11-07T02:46:34.4387630Z test repo::tests::an_older_read_of_the_working_tree_does_not_replace_a_newer_one ... ok
+2026-11-07T02:46:34.4393404Z test repo::tests::headline_prefers_conflicts_and_errors ... ok
+2026-11-07T02:46:34.4456138Z test repo::sparse::tests::missing_historical_file_waits_for_download_and_cancel_keeps_it_missing ... ok
+2026-11-07T02:46:34.4494910Z test repo::tests::names_git_would_read_as_options_are_not_checked_out ... ok
+2026-11-07T02:46:34.5867934Z test repo::tests::an_operation_that_panics_leaves_the_tab_idle ... ok
+2026-11-07T02:46:34.8588784Z test repo::tests::an_undo_whose_sign_in_is_cancelled_stays_undoable ... ok
+2026-11-07T02:46:35.5077570Z test repo::tests::signing_in_runs_again_only_the_steps_that_had_not_run ... ok
+2026-11-07T02:46:35.9111170Z test repo::tests::stashing_nothing_is_not_undoable ... ok
+2026-11-07T02:46:36.2768089Z test repo::tests::undoing_a_head_move_goes_back_to_where_head_really_was ... ok
+2026-11-07T02:46:36.2773104Z test repo::watch_remote::tests::a_look_is_read_by_its_sections ... ok
+2026-11-07T02:46:36.2777682Z test repo::watch_remote::tests::edits_that_keep_the_status_still_show ... ok
+2026-11-07T02:46:36.2782887Z test repo::watch_remote::tests::the_biggest_change_wins ... ok
+2026-11-07T02:46:36.2799641Z test repo::watch_remote::tests::the_script_times_every_changed_file ... ok
+2026-11-07T02:46:36.2804195Z test repo::widgets::file_menu::tests::a_name_with_a_line_break_is_never_written_to_gitignore ... ok
+2026-11-07T02:46:36.2809535Z test repo::widgets::file_menu::tests::a_nested_repository_is_ignored_as_a_folder ... ok
+2026-11-07T02:46:36.2814800Z test repo::widgets::file_menu::tests::glob_characters_in_a_name_match_only_themselves ... ok
+2026-11-07T02:46:36.2819411Z test repo::widgets::file_menu::tests::plain_paths_ignore_as_before ... ok
+2026-11-07T02:46:36.2822137Z test repo::widgets::file_menu::tests::trailing_spaces_are_kept ... ok
+2026-11-07T02:46:36.2824838Z test repo::widgets::file_row::tests::a_nested_repository_keeps_its_name ... ok
+2026-11-07T02:46:36.2827806Z test repo::widgets::file_row::tests::a_path_splits_into_folder_and_name ... ok
+2026-11-07T02:46:36.4139865Z test repo::widgets::file_row::tests::painted_file_badges_meet_aa_on_normal_hovered_and_selected_rows ... ok
+2026-11-07T02:46:36.4146720Z test repo::worktree_tab::tests::a_bare_repository_has_no_main_worktree_to_go_back_to ... ok
+2026-11-07T02:46:36.4152042Z test repo::worktree_tab::tests::a_bare_repository_is_named_without_its_suffix ... ok
+2026-11-07T02:46:36.4156197Z test repo::worktree_tab::tests::a_branch_is_cut_to_nothing_but_the_ellipsis_rather_than_overflow ... ok
+2026-11-07T02:46:36.4161203Z test repo::worktree_tab::tests::a_branch_of_wide_characters_is_cut_to_the_width ... ok
+2026-11-07T02:46:36.4168719Z test repo::worktree_tab::tests::a_branch_that_fits_keeps_its_characters ... ok
+2026-11-07T02:46:36.4194508Z test repo::worktree_tab::tests::a_detached_worktree_shows_its_short_hash_as_the_branch ... ok
+2026-11-07T02:46:36.4199136Z test repo::worktree_tab::tests::a_linked_worktree_shows_the_repository_and_its_branch ... ok
+2026-11-07T02:46:36.4203289Z test repo::worktree_tab::tests::a_long_branch_keeps_its_first_folder_and_its_end ... ok
+2026-11-07T02:46:36.4206899Z test repo::worktree_tab::tests::a_long_name_without_folders_keeps_more_of_its_end ... ok
+2026-11-07T02:46:36.4210343Z test repo::worktree_tab::tests::a_main_worktree_whose_folder_is_gone_cannot_be_gone_back_to ... ok
+2026-11-07T02:46:36.4213503Z test repo::worktree_tab::tests::a_short_branch_stays_as_it_is ... ok
+2026-11-07T02:46:36.4216536Z test repo::worktree_tab::tests::closing_a_worktree_goes_back_to_the_main_one ... ok
+2026-11-07T02:46:36.4219687Z test repo::worktree_tab::tests::each_kind_of_unfinished_work_keeps_the_tab_as_it_is ... ok
+2026-11-07T02:46:36.4223476Z test repo::worktree_tab::tests::folders_that_would_not_fit_are_cut_like_any_long_name ... ok
+2026-11-07T02:46:36.4227213Z test repo::worktree_tab::tests::idle_worktrees_within_the_limit_all_stay ... ok
+2026-11-07T02:46:36.4230117Z test repo::worktree_tab::tests::nothing_going_on_means_the_tab_can_move ... ok
+2026-11-07T02:46:36.4233074Z test repo::worktree_tab::tests::only_operations_and_terminals_run_on_by_themselves ... ok
+2026-11-07T02:46:36.4237087Z test repo::worktree_tab::tests::only_other_worktrees_with_changes_are_marked ... ok
+2026-11-07T02:46:36.4242844Z test repo::worktree_tab::tests::only_the_most_recent_idle_worktrees_are_kept ... ok
+2026-11-07T02:46:36.4246508Z test repo::worktree_tab::tests::parked_worktrees_with_unfinished_work_are_never_let_go_of ... ok
+2026-11-07T02:46:36.4250639Z test repo::worktree_tab::tests::shortening_counts_characters_not_bytes ... ok
+2026-11-07T02:46:36.4254742Z test repo::worktree_tab::tests::the_main_worktree_shows_no_branch ... ok
+2026-11-07T02:46:36.4257976Z test repo::worktree_tab::tests::the_plain_name_stands_in_until_the_worktrees_are_known ... ok
+2026-11-07T02:46:36.4261940Z test repo::worktree_tab::tests::the_switcher_finds_branches_and_folders_whatever_the_case ... ok
+2026-11-07T02:46:36.4265915Z test repo::worktree_tab::tests::the_switcher_leaves_out_a_bare_repository ... ok
+2026-11-07T02:46:36.4269183Z test repo::worktree_tab::tests::the_switcher_leaves_out_folders_that_are_gone ... ok
+2026-11-07T02:46:36.4273811Z test repo::worktree_tab::tests::the_switcher_lists_the_current_one_then_background_work_then_the_rest ... ok
+2026-11-07T02:46:36.4322998Z test safe_read::tests::a_plain_file_inside_is_read_within_its_limit ... ok
+2026-11-07T02:46:36.6641521Z test settings::profiles::connection_tests::ssh_key_and_host_helpers_round_trip_through_git_config ... ok
+2026-11-07T02:46:36.6648639Z test settings::profiles::tests::a_profile_sets_only_what_it_has ... ok
+2026-11-07T02:46:36.9982405Z test repo::tests::merging_and_rebasing_onto_a_branch_ignores_a_tag_of_the_same_name ... ok
+2026-11-07T02:46:36.9988333Z test settings::profiles::tests::git_versions_that_read_profiles ... ok
+2026-11-07T02:46:36.9993059Z test settings::profiles::tests::global_files_are_found_as_git_finds_them ... ok
+2026-11-07T02:46:36.9997124Z test settings::profiles::tests::initials_and_titles ... ok
+2026-11-07T02:46:37.0566206Z test settings::profiles::tests::a_repository_wins_over_the_profile_which_wins_over_the_global_config ... ok
+2026-11-07T02:46:37.0572591Z test settings::signing::tests::signing_settings_in_a_config_list ... ok
+2026-11-07T02:46:37.2484592Z test repo::tests::undoing_a_head_move_refuses_once_head_moved_elsewhere ... ok
+2026-11-07T02:46:37.2489761Z test settings::tests::a_compact_graph_fits_its_lanes_again ... ok
+2026-11-07T02:46:37.4239432Z test settings::signing::tests::signing_settings_set_twice_or_under_the_newer_name ... ok
+2026-11-07T02:46:37.4965180Z test repo::tests::undoing_a_remote_checkout_keeps_commits_made_on_the_branch_since ... ok
+2026-11-07T02:46:37.4971137Z test settings::tests::profiles_are_added_named_and_kept_apart ... ok
+2026-11-07T02:46:37.4976974Z test settings::tests::resetting_the_columns_keeps_which_show ... ok
+2026-11-07T02:46:37.5005024Z test settings::tests::settings_from_before_profiles_get_a_default_profile ... ok
+2026-11-07T02:46:37.5013537Z test settings::tests::settings_of_an_older_version_still_load ... ok
+2026-11-07T02:46:37.5022762Z test settings::tests::settings_survive_a_restart ... ok
+2026-11-07T02:46:37.5028232Z test shell_path::tests::the_path_is_read_between_the_marks ... ok
+2026-11-07T02:46:37.5048154Z test spinner::tests::spins_at_its_own_frame_rate ... ok
+2026-11-07T02:46:37.5053163Z test terminal::tests::clipboard_controls ... ok
+2026-11-07T02:46:37.5058582Z test terminal::tests::cursor_position_queries_are_answered ... ok
+2026-11-07T02:46:37.5064696Z test terminal::tests::indexed_colours ... ok
+2026-11-07T02:46:37.5068753Z test terminal::tests::keys_to_bytes ... ok
+2026-11-07T02:46:37.5072372Z test terminal::tests::modified_and_function_keys ... ok
+2026-11-07T02:46:37.5075832Z test terminal::tests::pastes ... ok
+2026-11-07T02:46:37.5082170Z test theme::catalog::tests::a_custom_palette_keeps_its_chosen_text_colours ... ok
+2026-11-07T02:46:37.5212495Z test theme::catalog::tests::contrast_changes_preserve_surfaces_terminal_and_graph_colours ... ok
+2026-11-07T02:46:37.5417061Z test theme::catalog::tests::every_builtin_small_text_token_meets_wcag_aa_on_its_surfaces ... ok
+2026-11-07T02:46:37.5422122Z test theme::catalog::tests::ids_are_unique ... ok
+2026-11-07T02:46:37.5431616Z test theme::catalog::tests::the_pro_themes_keep_their_colours ... ok
+2026-11-07T02:46:37.5465218Z test theme::files::tests::a_saved_copy_reads_back_as_the_same_theme ... ok
+2026-11-07T02:46:37.5470522Z test theme::files::tests::a_scheme_missing_colours_is_none ... ok
+2026-11-07T02:46:37.5514138Z test theme::files::tests::an_imported_vscode_theme_with_an_include_reads_back_as_one ... ok
+2026-11-07T02:46:37.5538894Z test theme::files::tests::importing_a_theme_already_there_copies_nothing ... ok
+2026-11-07T02:46:37.5543216Z test theme::files::tests::long_names_are_cut ... ok
+2026-11-07T02:46:37.5547789Z test theme::files::tests::maps_vscode_workbench_colours ... ok
+2026-11-07T02:46:37.5556195Z test theme::files::tests::own_files_extend_a_theme_and_set_any_colour ... ok
+2026-11-07T02:46:37.5560856Z test theme::files::tests::quoted_scheme_values_keep_their_hash ... ok
+2026-11-07T02:46:37.5565977Z test theme::files::tests::reads_a_classic_base16_scheme ... ok
+2026-11-07T02:46:37.5570705Z test theme::files::tests::reads_a_tinted_theming_scheme ... ok
+2026-11-07T02:46:37.5599049Z test theme::files::tests::scan_reports_files_it_cannot_read ... ok
+2026-11-07T02:46:37.5640938Z test theme::files::tests::the_fingerprint_follows_any_change ... ok
+2026-11-07T02:46:37.5696797Z test theme::palette::tests::accent_text_is_whichever_reads_better ... ok
+2026-11-07T02:46:37.5734332Z test theme::palette::tests::hex_colours_read_in_every_length ... ok
+2026-11-07T02:46:37.5925411Z test theme::palette::tests::translucent_colours_are_laid_over_their_background ... ok
+2026-11-07T02:46:37.6924358Z test theme::test_paint::enabled_text_field_hints_use_the_actual_aa_weak_colour ... ok
+2026-11-07T02:46:37.6935912Z test update::install::tests::release_files_as_the_workflow_names_them ... ok
+2026-11-07T02:46:37.6942812Z test update::install::tests::the_running_version_moves_aside_next_to_itself ... ok
+2026-11-07T02:46:37.6946701Z test update::tests::release_page_urls ... ok
+2026-11-07T02:46:37.6950495Z test update::tests::releases_in_the_feed ... ok
+2026-11-07T02:46:37.6954817Z test update::tests::version_order ... ok
+2026-11-07T02:46:37.6981061Z test vscode_theme::jsonc::tests::strips_comments_and_trailing_commas ... ok
+2026-11-07T02:46:37.6986415Z test vscode_theme::theme_file::tests::a_theme_without_a_foreground_gets_a_readable_one ... ok
+2026-11-07T02:46:37.6990833Z test vscode_theme::theme_file::tests::parses_colours ... ok
+2026-11-07T02:46:37.7060350Z test vscode_theme::theme_file::tests::reads_an_extension_theme_with_include ... ok
+2026-11-07T02:46:37.7064869Z test vscode_theme::theme_file::tests::versions_compare_by_value ... ok
+2026-11-07T02:46:37.9387169Z test settings::signing::tests::signing_settings_are_written_and_read_back ... ok
+2026-11-07T02:46:38.2306441Z test settings::tests::every_preview_and_page_draws ... ok
+2026-11-07T02:46:38.6897194Z test settings::tests::a_search_finds_settings_by_name_keyword_section_or_page ... ok
+2026-11-07T02:46:38.6897759Z 
+2026-11-07T02:46:38.6898765Z failures:
+2026-11-07T02:46:38.6899516Z 
+2026-11-07T02:46:38.6900148Z ---- connections::tests::selected_accounts_are_data_not_shell_arguments stdout ----
+2026-11-07T02:46:38.6902067Z 
+2026-11-07T02:46:38.6903124Z thread 'connections::tests::selected_accounts_are_data_not_shell_arguments' (6908) panicked at src\connections\tests.rs:10:5:
+2026-11-07T02:46:38.6904323Z assertion failed: account.validate().is_ok()
+2026-11-07T02:46:38.6905080Z note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+2026-11-07T02:46:38.6905624Z 
+2026-11-07T02:46:38.6906128Z ---- git::activity::tests::aliases_refs_dates_renames_binary_and_empty_commits_share_one_snapshot stdout ----
+2026-11-07T02:46:38.6907039Z Error: "The filename, directory name, or volume label syntax is incorrect. (os error 123)"
+2026-11-07T02:46:38.6907756Z 
+2026-11-07T02:46:38.6908570Z ---- git::bundles::tests::full_bundle_preview_is_read_only_and_import_creates_refs_without_checkout stdout ----
+2026-11-07T02:46:38.6909569Z 
+2026-11-07T02:46:38.6910168Z thread 'git::bundles::tests::full_bundle_preview_is_read_only_and_import_creates_refs_without_checkout' (5692) panicked at src\git\bundles\tests.rs:78:5:
+2026-11-07T02:46:38.6911299Z Some("error: could not open '//?/C:/Users/runneradmin/AppData/Local/Temp/gitcraft-bundle-7944-1/exchange.bundle'")
+2026-11-07T02:46:38.6911739Z 
+2026-11-07T02:46:38.6912039Z ---- git::bundles::tests::export_ref_snapshots_and_saved_files_cannot_be_overwritten stdout ----
+2026-11-07T02:46:38.6912721Z Error: "error: could not open '//?/C:/Users/runneradmin/AppData/Local/Temp/gitcraft-bundle-7944-2/exchange.bundle'"
+2026-11-07T02:46:38.6913107Z 
+2026-11-07T02:46:38.6913367Z ---- git::bundles::tests::import_cannot_create_the_checked_out_unborn_branch stdout ----
+2026-11-07T02:46:38.6914006Z Error: "error: could not open '//?/C:/Users/runneradmin/AppData/Local/Temp/gitcraft-bundle-7944-4/exchange.bundle'"
+2026-11-07T02:46:38.6914422Z 
+2026-11-07T02:46:38.6914720Z ---- git::bundles::tests::incremental_bundle_explains_missing_prerequisites_then_imports_after_base stdout ----
+2026-11-07T02:46:38.6915138Z 
+2026-11-07T02:46:38.6915561Z thread 'git::bundles::tests::incremental_bundle_explains_missing_prerequisites_then_imports_after_base' (5012) panicked at src\git\bundles\tests.rs:123:5:
+2026-11-07T02:46:38.6916384Z assertion failed: preview.verification_error.as_ref().is_some_and(|e| e.contains(&base))
+2026-11-07T02:46:38.6916706Z 
+2026-11-07T02:46:38.6917024Z ---- git::bundles::tests::malformed_objects_with_a_valid_pack_checksum_are_rejected_before_refs stdout ----
+2026-11-07T02:46:38.6917387Z 
+2026-11-07T02:46:38.6917812Z thread 'git::bundles::tests::malformed_objects_with_a_valid_pack_checksum_are_rejected_before_refs' (8260) panicked at src\git\bundles\tests.rs:495:5:
+2026-11-07T02:46:38.6918475Z assertion failed: preview.verification_error.is_none()
+2026-11-07T02:46:38.6918719Z 
+2026-11-07T02:46:38.6919739Z ---- git::bundles::tests::v2_and_sha256_bundles_preserve_object_formats stdout ----
+2026-11-07T02:46:38.6920068Z 
+2026-11-07T02:46:38.6920401Z thread 'git::bundles::tests::v2_and_sha256_bundles_preserve_object_formats' (6504) panicked at src\git\bundles\tests.rs:387:5:
+2026-11-07T02:46:38.6921014Z assertion failed: preview.verification_error.is_none()
+2026-11-07T02:46:38.6921234Z 
+2026-11-07T02:46:38.6921525Z ---- git::bundles::tests::symbolic_and_namespace_collision_destinations_are_not_followed stdout ----
+2026-11-07T02:46:38.6922206Z Error: "error: could not open '//?/C:/Users/runneradmin/AppData/Local/Temp/gitcraft-bundle-7944-15/exchange.bundle'"
+2026-11-07T02:46:38.6922618Z 
+2026-11-07T02:46:38.6922949Z ---- repo::dialogs::bundles::tests::incoming_dialog_previews_collisions_and_escape_cancels_without_ref_changes stdout ----
+2026-11-07T02:46:38.6923388Z 
+2026-11-07T02:46:38.6923850Z thread 'repo::dialogs::bundles::tests::incoming_dialog_previews_collisions_and_escape_cancels_without_ref_changes' (4332) panicked at src\repo\dialogs\bundles.rs:270:9:
+2026-11-07T02:46:38.6924539Z Inspect Git bundle
+2026-11-07T02:46:38.6924848Z Local file snapshot: selected.bundle
+2026-11-07T02:46:38.6925374Z This preview does not import objects or refs. SSH / WSL verification uses a temporary copy on the repository machine.
+2026-11-07T02:46:38.6925925Z Verification failed; import unavailable:
+2026-11-07T02:46:38.6926431Z error: could not open '//?/C:/Users/runneradmin/AppData/Local/Temp/gitcraft-bundle-7944-16/exchange.bundle'
+2026-11-07T02:46:38.6926925Z Prerequisites (0)
+2026-11-07T02:46:38.6927246Z Choose source refs and edit their new full destination names:
+2026-11-07T02:46:38.6927588Z HEAD
+2026-11-07T02:46:38.6928080Z dc92da2264982e2dab61b127ee1bed416d9d9a07
+2026-11-07T02:46:38.6928404Z refs/heads/master
+2026-11-07T02:46:38.6928825Z Destination already exists, is checked out, or is selected twice; choose a new name.
+2026-11-07T02:46:38.6929928Z Import creates all selected refs atomically. Existing refs and checkout are preserved; it never merges or checks out incoming work. A collision or changed prerequisite stops the import.
+2026-11-07T02:46:38.6930837Z Import selected as new refs
+2026-11-07T02:46:38.6931124Z CancelInspect Git bundle
+2026-11-07T02:46:38.6931412Z Local file snapshot: selected.bundle
+2026-11-07T02:46:38.6931941Z This preview does not import objects or refs. SSH / WSL verification uses a temporary copy on the repository machine.
+2026-11-07T02:46:38.6932471Z Verification failed; import unavailable:
+2026-11-07T02:46:38.6932967Z error: could not open '//?/C:/Users/runneradmin/AppData/Local/Temp/gitcraft-bundle-7944-16/exchange.bundle'
+2026-11-07T02:46:38.6933512Z Prerequisites (0)
+2026-11-07T02:46:38.6933832Z Choose source refs and edit their new full destination names:
+2026-11-07T02:46:38.6934186Z HEAD
+2026-11-07T02:46:38.6934428Z dc92da2264982e2dab61b127ee1bed416d9d9a07
+2026-11-07T02:46:38.6934721Z refs/heads/master
+2026-11-07T02:46:38.6935093Z Destination already exists, is checked out, or is selected twice; choose a new name.
+2026-11-07T02:46:38.6935940Z Import creates all selected refs atomically. Existing refs and checkout are preserved; it never merges or checks out incoming work. A collision or changed prerequisite stops the import.
+2026-11-07T02:46:38.6936664Z Import selected as new refs
+2026-11-07T02:46:38.6936927Z Cancel
+2026-11-07T02:46:38.6937069Z 
+2026-11-07T02:46:38.6937364Z ---- repo::diff::structural::tests::rename_uses_the_old_name_even_when_git_quotes_it stdout ----
+2026-11-07T02:46:38.6937959Z Error: "The filename, directory name, or volume label syntax is incorrect. (os error 123)"
+2026-11-07T02:46:38.6938311Z 
+2026-11-07T02:46:38.6938315Z 
+2026-11-07T02:46:38.6938437Z failures:
+2026-11-07T02:46:38.6938764Z     connections::tests::selected_accounts_are_data_not_shell_arguments
+2026-11-07T02:46:38.6939297Z     git::activity::tests::aliases_refs_dates_renames_binary_and_empty_commits_share_one_snapshot
+2026-11-07T02:46:38.6940411Z     git::bundles::tests::export_ref_snapshots_and_saved_files_cannot_be_overwritten
+2026-11-07T02:46:38.6941005Z     git::bundles::tests::full_bundle_preview_is_read_only_and_import_creates_refs_without_checkout
+2026-11-07T02:46:38.6941588Z     git::bundles::tests::import_cannot_create_the_checked_out_unborn_branch
+2026-11-07T02:46:38.6942140Z     git::bundles::tests::incremental_bundle_explains_missing_prerequisites_then_imports_after_base
+2026-11-07T02:46:38.6942813Z     git::bundles::tests::malformed_objects_with_a_valid_pack_checksum_are_rejected_before_refs
+2026-11-07T02:46:38.6943388Z     git::bundles::tests::symbolic_and_namespace_collision_destinations_are_not_followed
+2026-11-07T02:46:38.6943883Z     git::bundles::tests::v2_and_sha256_bundles_preserve_object_formats
+2026-11-07T02:46:38.6944486Z     repo::dialogs::bundles::tests::incoming_dialog_previews_collisions_and_escape_cancels_without_ref_changes
+2026-11-07T02:46:38.6945101Z     repo::diff::structural::tests::rename_uses_the_old_name_even_when_git_quotes_it
+2026-11-07T02:46:38.6945406Z 
+2026-11-07T02:46:38.6945708Z test result: FAILED. 724 passed; 11 failed; 3 ignored; 0 measured; 0 filtered out; finished in 79.32s
+2026-11-07T02:46:38.6946082Z 
+2026-11-07T02:46:38.7896066Z error: test failed, to rerun pass `--lib`
+2026-11-07T02:46:38.9104180Z ##[error]Process completed with exit code 1.
+2026-11-07T02:46:38.9382773Z Post job cleanup.
+2026-11-07T02:46:39.1097590Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-11-07T02:46:39.1534231Z git version 2.56.0.windows.4
+2026-11-07T02:46:39.1614440Z Temporarily overriding HOME='D:\a\_temp\b3ae30d8-6324-446e-bca5-de84ee28f7d1' before making global git config changes
+2026-11-07T02:46:39.1615772Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-07T02:46:39.1627480Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\gitcraft\gitcraft
+2026-11-07T02:46:39.2045099Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-11-07T02:46:39.2484176Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-11-07T02:46:39.8033636Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-07T02:46:39.8412265Z http.https://github.com/.extraheader
+2026-11-07T02:46:39.8461480Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-11-07T02:46:39.8855094Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-11-07T02:46:40.4667769Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-07T02:46:40.5048526Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-11-07T02:46:41.0970542Z Cleaning up orphan processes
+2026-11-07T02:46:41.1397989Z Terminate orphan process: pid (3472) (vctip)
+2026-11-07T02:46:41.1584604Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+

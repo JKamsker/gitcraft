@@ -1,0 +1,20 @@
+{
+  "repository": "JKamsker/gitcraft",
+  "previousCommit": "da0143c4f7574ab4ab9ec3607f927c89968c1a1f",
+  "previousRun": 42329842602,
+  "previousWindowsJob": 128273595388,
+  "previousWindowsResult": {
+    "passed": 724,
+    "failed": 11,
+    "ignored": 3
+  },
+  "source": "GitHub plugin workflow run jobs/job logs; runID from public Actions page (API native denied); no CI approval claimed",
+  "latestCommit": "82189c4fcdb2d77fbb2746cb25d6390072266e9e",
+  "latestRun": 42332992572,
+  "latest": {
+    "lint": "success",
+    "linux": "success",
+    "windows": "in_progress"
+  },
+  "log": "/workspace/work/ci-windows-da0143c.log"
+}

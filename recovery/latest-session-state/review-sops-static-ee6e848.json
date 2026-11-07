@@ -1,0 +1,120 @@
+{
+  "review": "Independent static SOPS process-safety review",
+  "verdict": "PASS",
+  "scope": "PASS for deletion/locality/quarantine static safety unit only. No runtime, SOPS feature, platform cancellation or final merge approval.",
+  "candidate": "ee6e8482a09c27a2c40286996433bd1bd996b3d0",
+  "remote_ref": "refs/heads/codex/encrypted-diffs",
+  "remote_sha_verified": "ee6e8482a09c27a2c40286996433bd1bd996b3d0",
+  "tree": "024db91797a13fd7d1a28f67faa497c3b7f9b6f4",
+  "parent_checkpoint": "2528738ff76f6d1bb04b2c8d5a109a1adb5db22e",
+  "green_source_base": "4fcb0dfe226f30785dd2758a2959ff4379daa8ed",
+  "patch_sha256": "69d4b00d3eaf66d7948c4aba45f262fc653dc40e73e37c852b5b540fc60542c6",
+  "canonical_source_changed": false,
+  "blocking_findings": [],
+  "evidence": [
+    {
+      "topic": "Unsafe runner and API deletion",
+      "result": "PASS",
+      "details": "Compared complete checkpoint-to-candidate diff. Unsafe stop_tree/watchdog/host ps-to-kill loop, private_output/private_script/private_transport APIs and executing remote-watchdog fixtures are deleted. Source search found no remaining SOPS caller or alternative runtime path for those APIs. src/remote/mod.rs and src/remote/session.rs match green source byte-for-byte."
+    },
+    {
+      "topic": "SOPS boundary is local only",
+      "result": "PASS STATIC",
+      "paths": [
+        "src/repo/diff/encrypted/tool.rs:25",
+        "src/repo/diff/encrypted/mod.rs:109"
+      ],
+      "details": "command takes only Format; decrypt takes Format, ciphertext and active predicate. No repository/host parameter or remote Request. Local Command::new(sops), sanitized shell_path PATH, temp_dir cwd, seven fixed argv tokens. Input is stdin; stdout/stderr remain bounded pipes. No shell script/watchdog at this boundary."
+    },
+    {
+      "topic": "Remaining cancellation contract",
+      "result": "UNCHANGED GREEN BASE",
+      "paths": [
+        "src/bounded_process.rs:38",
+        "src/bounded_process.rs:150"
+      ],
+      "details": "Production prefix matches green exactly; only one additional test is outside it. Existing owned Child, Unix process_group(0) and group cleanup retained; Windows taskkill path remains baseline and is not newly validated. No added host process-table selector or signal adapter."
+    },
+    {
+      "topic": "Plaintext ownership/persistence boundary",
+      "result": "PASS STATIC",
+      "paths": [
+        "src/repo/diff/encrypted/mod.rs:40",
+        "src/repo/diff/encrypted/view.rs:54",
+        "src/repo/diff/encrypted/tool.rs:35"
+      ],
+      "details": "Ciphertext reads use existing Practice-aware Git reader. Decrypted output stays in local bounded pipes, private worker/view channel and view-owned Comparison; no Debug/Serialize/Clone, shared Msg, file/log/settings/Git patch writer. Raw tool errors generalized. Private text uses raw text layout rather than shared GalleyCache. Closing/discarding view cancels owner and drops receiver/result. This is source inspection, not proof of secure memory erasure or all OS/key-backend behavior."
+    },
+    {
+      "topic": "Fixtures/generated scripts",
+      "result": "PASS STATIC",
+      "details": "Deleted fixture executed the unsafe remote watchdog. Replacement command-construction assertion launches nothing. Remaining SOPS scripts use dummy ciphertext/private fixture text, local test-only TEST_PROGRAM, owned local process runner and fixture-scoped marker paths; no ps/kill/stop_tree shell selector. Cancellation fixtures remain runtime UNVALIDATED and quarantined."
+    },
+    {
+      "topic": "Inert synthetic/recording suite",
+      "result": "PASS",
+      "details": "Independently read tools/sops_safety.py and tools/test_sops_safety.py before execution. Pure model imports dataclasses only; no OS/subprocess/I/O/dynamic evaluation/signal adapter. Immutable synthetic records and opaque-handle recording sink. Independent suite ran 11 tests, including 216 small parent graphs, in 0.006 seconds. Receipt is a fixture premise, not production authorization."
+    },
+    {
+      "topic": "Quarantine/source/log binding",
+      "result": "PASS",
+      "details": "Both unconditional compile_error guards retained in encrypted/mod.rs and encrypted/tool.rs. All 12 manifest source hashes and author static log hash match. Candidate clean and exact remote SHA independently read using git ls-remote."
+    }
+  ],
+  "existing_process_paths_not_removed": [
+    {
+      "path": "src/remote/session.rs:163",
+      "description": "Unchanged baseline stop_script uses host-wide ps/awk membership traversal followed by TERM/KILL. Membership check (up[p] in seen) avoids the deleted watchdog insertion bug but remains outside the new no-host-selector process policy. This review does not certify its ownership/race safety."
+    },
+    {
+      "path": "src/remote/session.rs:538",
+      "test": "remote::session::tests::stopping_ends_a_whole_tree",
+      "description": "NON-IGNORED default Unix test. Creates a local shell child then executes stop_script(tree.id()) via sh -c; host-wide process listing/signals occur at lines166-173. Must stay skipped until separately replaced/contained and independently reviewed."
+    },
+    {
+      "paths": [
+        "src/remote/session.rs:120",
+        "src/remote/live_tests.rs:88",
+        "src/remote/live_tests.rs:117"
+      ],
+      "description": "Production remote exec timeout can call baseline stop; live SSH/WSL tests are environment-gated, not universally ignored. Unset GITCRAFT_TEST_SSH and GITCRAFT_TEST_WSL to disable those plus other optional remote fixtures."
+    }
+  ],
+  "ordinary_independent_branch_tests": {
+    "may_resume": true,
+    "conditions": [
+      "Each branch/source unit must be committed, pushed and remote-SHA verified before risky runtime work.",
+      "Do not merge or build quarantined SOPS source. Ordinary independent branches without the unsafe runner may use private targets for fmt/check/Clippy.",
+      "Default tests must unset GITCRAFT_TEST_SSH and GITCRAFT_TEST_WSL and skip exactly remote::session::tests::stopping_ends_a_whole_tree.",
+      "No live SSH/WSL, host-PID/watchdog/stop selector or new process-control fixtures.",
+      "Label results PARTIAL GATE with one explicit skipped test; these cannot satisfy the final full-suite requirement."
+    ],
+    "example_not_executed": "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo test --locked -- --skip remote::session::tests::stopping_ends_a_whole_tree"
+  },
+  "guard_removal_conditions": [
+    "Root accepts this exact immutable static PASS and explicitly authorizes the next local-only owned-child fixture phase.",
+    "Guard removal must be a separate preserved commit, pushed and remote-SHA verified before any runtime fixture.",
+    "Retain local-only Format/ciphertext boundary and fixed argv; no remote decryption, host-wide selectors or new private remote output APIs.",
+    "Authorize fixture programs/dummy inputs with retained Child and isolated local launch containment only; private target, CARGO_INCREMENTAL=0, optional remote env unset and baseline host-tree test skipped.",
+    "Any changed process-control or fixture cleanup logic needs static/synthetic/recording review before real signals.",
+    "Formatting, Clippy and eventual full test suite plus independent exact-head feature review remain required. Baseline host-selector test must be safely replaced/contained before final full-suite PASS."
+  ],
+  "independent_static_test": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p test_sops_safety.py -v",
+    "passed": 11,
+    "failed": 0,
+    "synthetic_graphs": 216,
+    "log": "/workspace/work/review-sops-static-ee6e848.log",
+    "sha256": "48ec69023e524cde5c110a4ee21cc851e81aff47dd35ddcaa4451f1e2c09ef11",
+    "cargo_or_application_or_process_fixtures": false,
+    "actual_signals": false
+  },
+  "limits": [
+    "No Cargo/check/Clippy/application/runtime SOPS/process fixture execution or real signals in this review.",
+    "No credentials, real keys/accounts, live SSH/WSL or external transport operations; Git ls-remote read only verified the pushed commit.",
+    "No claim that existing baseline host PID stop code is safe under new policy; it is explicitly excluded.",
+    "No Windows/macOS runtime containment, feature acceptance, actual SOPS format compatibility, performance or complete stale UI behavior validation.",
+    "No secure erasure guarantee: view-owned plaintext uses ordinary Rust/egui allocations; glyph/render-frame data may exist during display.",
+    "Synthetic model is inert and never imported by the application; it must not be connected to numeric host PID signals."
+  ]
+}
