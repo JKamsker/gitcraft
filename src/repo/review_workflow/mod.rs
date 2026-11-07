@@ -21,3 +21,5 @@ mod contracts;
 mod intents;
 mod radar;
 mod reproducer;
+
+mod rust_dependencies;

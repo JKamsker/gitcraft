@@ -1,6 +1,6 @@
-//! Exact file/patch review receipts with explicit dependency witnesses. No language analysis
-//! is inferred: dependencies not named by the reviewer remain visibly unchecked.
-use super::store;
+//! Exact file/patch review receipts with explicit dependency witnesses and conservative
+//! Rust static call analysis. Unresolved dependency edges remain visibly unchecked.
+use super::{rust_dependencies, store};
 use crate::{
     git,
     pull_request::{PrDetails, PrFiles},
@@ -31,6 +31,7 @@ struct Row {
     status: Status,
     reviewed: Option<(String, String)>,
     dependencies_checked: bool,
+    rust: Option<rust_dependencies::Report>,
 }
 #[derive(Default)]
 pub(crate) struct Freshness {
@@ -120,11 +121,12 @@ fn rows(repo: &Path, d: &PrDetails, f: &PrFiles) -> Result<Vec<Row>, String> {
     let marks = store::load::<Marks>(repo, "freshness", &key(d))?.unwrap_or_default();
     let mut paths: std::collections::BTreeSet<_> = f.files.iter().map(|f| f.path.clone()).collect();
     paths.extend(marks.0.keys().cloned());
+    let mut indexes = BTreeMap::new();
     paths
         .into_iter()
         .map(|path| {
             let old = marks.0.get(&path);
-            let status = match old {
+            let mut status = match old {
                 None => Status::Unreviewed,
                 Some(old) => classify(
                     old,
@@ -137,7 +139,37 @@ fn rows(repo: &Path, d: &PrDetails, f: &PrFiles) -> Result<Vec<Row>, String> {
                     )?,
                 ),
             };
+            let rust = if path.ends_with(".rs") {
+                if let Some(old) = old {
+                    for rev in [&old.head, &f.to] {
+                        if !indexes.contains_key(rev) {
+                            indexes.insert(rev.clone(), if indexes.len() >= 8 { Err("More than eight receipt revisions: further Rust dependency snapshots remain unchecked".into()) } else { rust_dependencies::load(repo, rev) });
+                        }
+                    }
+                    match (indexes.get(&old.head), indexes.get(&f.to)) {
+                        (Some(Ok(before)), Some(Ok(now))) => {
+                            Some(rust_dependencies::compare(before, now, &path))
+                        }
+                        (Some(Err(e)), _) | (_, Some(Err(e))) => Some(rust_dependencies::Report {
+                            limitations: vec![e.clone()],
+                            ..Default::default()
+                        }),
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            if let Some(rust) = &rust
+                && !rust.witnesses.is_empty()
+                && status == Status::Unchanged
+            {
+                status = Status::Dependency(rust.witnesses.clone());
+            }
             Ok(Row {
+                rust,
                 path,
                 status,
                 reviewed: old.map(|m| (m.base.clone(), m.head.clone())),
@@ -203,6 +235,20 @@ impl RepoTab {
             move || {
                 let mut marks =
                     store::load::<Marks>(&repo, "freshness", &key(&d))?.unwrap_or_default();
+                for (role, rev) in [("base", &base), ("head", &head)] {
+                    git::run(
+                        Some(&repo),
+                        &[
+                            "update-ref",
+                            &format!(
+                                "refs/gitcraft/freshness-inputs/{:x}/{:x}/{role}",
+                                md5::compute(key(&d)),
+                                md5::compute(&path)
+                            ),
+                            rev,
+                        ],
+                    )?;
+                }
                 marks.0.insert(
                     path.clone(),
                     fingerprint(&repo, &base, &head, &path, &dependencies)?,
@@ -225,7 +271,7 @@ pub(in crate::repo) fn show(
     acts: &mut Vec<Action>,
 ) {
     egui::CollapsingHeader::new("Review freshness").default_open(false).show(ui,|ui|{
-        ui.label("Exact blob and patch receipts. Unnamed dependencies are unchecked; no language analysis has run.");
+        ui.label("Exact blob and patch receipts. Rust syntax analysis follows uniquely resolved static calls. Watched dependency paths add explicit witnesses for any language; other dependencies remain unchecked.");
         ui.horizontal(|ui|{ui.label("Dependency paths for the next receipt (one per line):");if ui.button("Refresh receipts").clicked(){acts.push(Action::Freshness(FreshnessAct::Refresh));}});
         ui.text_edit_multiline(&mut state.dependencies);
         let Some(rows)=&state.rows else{ui.add(crate::spinner::Spinner::new());return};
@@ -233,7 +279,12 @@ pub(in crate::repo) fn show(
             ui.horizontal_wrapped(|ui|{
                 ui.monospace(&row.path);
                 ui.label(match &row.status{Status::Unreviewed=>"Not reviewed".into(),Status::Unchanged=>"Unchanged since reviewed".into(),Status::Direct=>"Changed directly (blob or patch)".into(),Status::Dependency(paths)=>format!("Text unchanged; dependencies changed: {}",paths.join(", "))});
-                if !row.dependencies_checked{ui.weak("Dependencies unchecked");}
+                if !row.dependencies_checked && row.rust.is_none(){ui.weak("Dependencies unchecked");}
+                if let Some(rust)=&row.rust {
+                    ui.weak(format!("{} unchanged Rust symbols inspected",rust.checked));
+                    for witness in &rust.witnesses {ui.label(format!("Dependency freshness: {witness}"));}
+                    for limitation in &rust.limitations {ui.weak(format!("Unchecked: {limitation}"));}
+                }
                 if let Some((base,head))=&row.reviewed{ui.weak(format!("Receipt {}..{}",crate::repo::short(base),crate::repo::short(head)));}
                 if ui.button("Mark file reviewed").clicked(){acts.push(Action::Freshness(FreshnessAct::Mark{path:row.path.clone(),base:files.from.clone(),head:files.to.clone(),dependencies:state.dependencies.lines().map(str::trim).filter(|s|!s.is_empty()).map(str::to_owned).collect()}));}
             });
