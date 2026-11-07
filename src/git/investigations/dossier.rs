@@ -541,6 +541,26 @@ pub(crate) fn trace(
                 }
             }
         }
+        // A partial copy may be below whole-file rename/copy similarity. Follow its
+        // precise -C origin only after proving it belongs to an actual parent history.
+        let mut copied = None;
+        if mapped.is_empty() && attribution.commit != cursor.commit {
+            for parent in &parents {
+                let base = t.reader.run(
+                    &["merge-base", &attribution.commit, parent],
+                    vec![],
+                    &[0, 1],
+                )?;
+                if base.trim_ascii() == attribution.commit.as_bytes() {
+                    copied = Some(Seed {
+                        commit: attribution.commit.clone(),
+                        path: attribution.path.clone(),
+                        line: attribution.line,
+                    });
+                    break;
+                }
+            }
+        }
         let changed = mapped.first().is_none_or(|(seed, old, _)| {
             seed.path != cursor.path || one_line(&old.text, seed.line).ok() != Some(text.as_str())
         });
@@ -560,7 +580,9 @@ pub(crate) fn trace(
                 time,
                 subject,
                 attribution,
-                note: if step == 0 && !changed {
+                note: if copied.is_some(){
+                    "Git copy/move attribution verified in a parent history; whole-file patch mapping was unavailable".into()
+                } else if step == 0 && !changed {
                     "Selected snapshot context; attribution names the last semantic edit".into()
                 } else {
                     mapped
@@ -574,6 +596,15 @@ pub(crate) fn trace(
         if parents.is_empty() {
             result.stopped = "Reached a root or shallow history boundary".into();
             break;
+        }
+        if let Some(next) = copied {
+            cursor = next;
+            if step + 1 == STEPS {
+                result.stopped =
+                    "128 history steps reached; continue from the pinned earlier line".into();
+                result.continuation = Some(cursor.clone());
+            }
+            continue;
         }
         if mapped.is_empty() {
             result.stopped="Line introduction or an ambiguous/unequal parent edit; no earlier line was guessed".into();
@@ -715,6 +746,33 @@ mod tests {
                 .alternatives
                 .iter()
                 .all(|s| s.line == 2 && oid(&s.commit))
+        );
+        Ok(())
+    }
+    #[test]
+    fn partial_copy_uses_verified_blame_origin_when_whole_file_similarity_is_low()
+    -> Result<(), String> {
+        let r = Repo::new()?;
+        let remembered = "let copied_calculation_with_enough_distinctive_characters = expensive_algorithm(original_input, options);";
+        let mut original = (0..100)
+            .map(|i| format!("unrelated original source row {i} with distinct filler\n"))
+            .collect::<Vec<_>>();
+        original[50] = format!("{remembered}\n");
+        let source = commit(&r, "source.rs", &original.concat(), 1_700_000_000)?;
+        let body = format!("fresh prefix\n{remembered}\nfresh suffix\n");
+        let copy = commit(&r, "copy.rs", &body, 1_700_000_001)?;
+        let result = trace(&r.0, &copy, "copy.rs", 2, &|| true)?;
+        assert!(
+            result
+                .cards
+                .iter()
+                .any(|c| c.at.commit == source && c.at.path == "source.rs" && c.at.line == 51)
+        );
+        assert!(
+            result
+                .cards
+                .iter()
+                .any(|c| c.at.commit == copy && c.note.contains("copy/move"))
         );
         Ok(())
     }
