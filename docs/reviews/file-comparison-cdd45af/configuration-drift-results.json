@@ -1,0 +1,28 @@
+{
+  "candidate": "cdd45af340b433b125f29e2347705cf2335053c3",
+  "source_edits": false,
+  "scope": "Frozen candidate production remote transaction, existing fake SSH fixture with reviewer-only PATH adapter replacing original conversion marker by each configuration drift during alternate apply. Original fixture asserts stale/changed refusal, unchanged index bytes/content and working file, and lock cleanup.",
+  "results": [
+    {
+      "case": "filemode",
+      "exit_code": 0,
+      "test_result": true,
+      "trace": "INJECTED filemode while real index lock held and alternate index selected\n",
+      "log_sha256": "8d397436a2e068529592a9f12f1e32b284e8f8bdd2a78dce080fcc6693e6c9c0"
+    },
+    {
+      "case": "symlinks",
+      "exit_code": 0,
+      "test_result": true,
+      "trace": "INJECTED symlinks while real index lock held and alternate index selected\n",
+      "log_sha256": "3c54a58546d0b81a6e7f1a9cb49be7312c4a56695504300ed526e4fb84e26fe8"
+    },
+    {
+      "case": "autocrlf",
+      "exit_code": 0,
+      "test_result": true,
+      "trace": "INJECTED autocrlf while real index lock held and alternate index selected\n",
+      "log_sha256": "e03158511c5f3674a89627652a6c00ded65e26fd58fedca72fee9041fa2b89bb"
+    }
+  ]
+}
