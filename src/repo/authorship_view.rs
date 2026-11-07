@@ -177,6 +177,7 @@ impl RepoTab {
             .collect::<std::collections::HashSet<_>>()
             .into();
         self.search.results = found;
+        self.cancel_minimap();
         if jump {
             self.search.current = 0;
             if let Some(first) = self.search.results.first().cloned() {
@@ -198,6 +199,7 @@ impl RepoTab {
             self.search.searched.clear();
             self.search.results.clear();
             self.search.matches = Default::default();
+            self.cancel_minimap();
         }
     }
 
@@ -330,7 +332,9 @@ mod tests {
         assert_eq!(tab.authorship.map.len(), 2);
 
         // The filter: the agent-written commits as the search's results.
+        tab.history_minimap.dirty = false;
         tab.apply(Action::AgentFilter(true), &ctx);
+        assert!(tab.history_minimap.dirty);
         let mut found = tab.search.results.clone();
         found.sort();
         let mut want = vec![agent.clone(), trailer.clone()];
@@ -339,13 +343,17 @@ mod tests {
         // A reload keeps the one shown; closing the search turns the filter off.
         tab.search.current = 1;
         let shown = tab.search.results[1].clone();
+        tab.history_minimap.dirty = false;
         tab.filter_agent_commits(false, &ctx);
+        assert!(tab.history_minimap.dirty);
         assert_eq!(tab.search.results[tab.search.current], shown);
         tab.search.open = true;
         tab.toggle_search();
         assert!(!tab.authorship.filter && tab.search.results.is_empty());
         tab.apply(Action::AgentFilter(true), &ctx);
+        tab.history_minimap.dirty = false;
         tab.apply(Action::AgentFilter(false), &ctx);
+        assert!(tab.history_minimap.dirty);
         assert!(tab.search.results.is_empty());
 
         // The diff's stripe: the two lines added are the agent's (line 1 was there).
