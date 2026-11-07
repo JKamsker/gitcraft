@@ -57,6 +57,21 @@ fn export_import_ui_round_trip_preserves_active_profile_and_requires_local_setup
     }
     let repo = crate::practice::create(crate::practice::Scenario::Published)?;
     let root = repo.parent().ok_or("root")?.to_owned();
+    crate::git::practice_run(
+        &repo,
+        &[
+            "remote",
+            "set-url",
+            "origin",
+            "ssh://git@work-alias/team/repository.git",
+        ],
+    )?;
+    let selected_key = root.join("fresh-selected-key");
+    std::fs::write(
+        &selected_key,
+        "Synthetic selected key path; no private bytes",
+    )
+    .map_err(|e| e.to_string())?;
     let mut h = egui_kittest::Harness::builder()
         .with_size([1200.0, 1200.0])
         .build_eframe(|cc| {
@@ -78,6 +93,11 @@ fn export_import_ui_round_trip_preserves_active_profile_and_requires_local_setup
     wait(&mut h)?;
     let file = h.state().setup.file.clone().ok_or("No export preview")?;
     assert_eq!(file.repositories.len(), 1);
+    assert!(
+        file.profiles[0].setup.ssh_key_reselection_required,
+        "SSH repository bindings must not fall back to an ambient agent"
+    );
+    assert!(file.repositories[0].remotes[0].fetch.contains("work-alias"));
     let path = root.join("portable.json");
     files::save(&path, &file, &|| true)?;
     assert!(files::save(&path, &file, &|| true).is_err());
@@ -111,6 +131,8 @@ fn export_import_ui_round_trip_preserves_active_profile_and_requires_local_setup
     let ctx = h.ctx.clone();
     assert!(!h.state_mut().switch_profile(id, &ctx));
     h.state_mut().setup.fresh.entry(id).or_default().signing = "new-local-signing-id".into();
+    h.state_mut().setup.fresh.entry(id).or_default().ssh =
+        selected_key.to_string_lossy().into_owned();
     click(&mut h, "Verify required setup and enable profile");
     wait(&mut h)?;
     assert!(
@@ -132,7 +154,18 @@ fn export_import_ui_round_trip_preserves_active_profile_and_requires_local_setup
         plan.selected = true;
         plan.parent = parent;
         plan.source = Some(repo.clone());
+        plan.remotes[0].fetch = "ssh://git@expected.fixture.invalid/team/repository.git".into();
     }
+    assert!(
+        !h.state().setup.plans[0].binding_ready(&h.state().settings.profile()),
+        "Alias editing still requires explicit confirmation before restoration"
+    );
+    h.run_steps(3);
+    click(
+        &mut h,
+        "I confirmed these SSH addresses use literal hostnames, not unexported SSH aliases",
+    );
+    assert!(h.state().setup.plans[0].binding_ready(&h.state().settings.profile()));
     h.run_steps(3);
     click(&mut h, "Clone and restore selected setup");
     wait(&mut h)?;
@@ -147,6 +180,11 @@ fn export_import_ui_round_trip_preserves_active_profile_and_requires_local_setup
         .ok_or("No UI restore receipt")?
         .root;
     assert!(restored.join(".git").is_dir());
+    let remote = crate::git::setup_run(restored, &["remote", "get-url", "origin"], &|| true)?;
+    assert_eq!(
+        String::from_utf8_lossy(&remote).trim(),
+        "ssh://git@expected.fixture.invalid/team/repository.git"
+    );
     drop(h);
     std::fs::remove_dir_all(root).map_err(|e| e.to_string())?;
     Ok(())

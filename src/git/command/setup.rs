@@ -127,9 +127,11 @@ fn clone_command(
         if !source.starts_with("https://") && context.choices.ssh_key.is_empty() {
             return Err("Select an explicit SSH key in this profile before restoring an SSH repository; ambient identities are not used".into());
         }
+        if !source.starts_with("https://") && !Path::new(&context.choices.ssh_key).is_file() {
+            return Err("The explicitly selected SSH key file is unavailable; finish this profile's local setup before restoring SSH repositories".into());
+        }
         context.choices
     };
-    let helpers = HelperPaths::capture()?;
     let workspace = Workspace::new()?;
     let mut command = practice_command(&workspace.0);
     command
@@ -140,6 +142,7 @@ fn clone_command(
         .env_remove("HOMEDRIVE")
         .env_remove("HOMEPATH")
         .env_remove("NETRC")
+        .env_remove("GIT_SSL_NO_VERIFY")
         .env_remove("GIT_SSL_CERT")
         .env_remove("GIT_SSL_KEY")
         .env_remove("GIT_SSL_CERT_PASSWORD_PROTECTED")
@@ -189,6 +192,7 @@ fn clone_command(
             return Err("Select one profile account for the previewed server before restoring this repository".into());
         }
         if let Some((tool, account)) = selected.pop() {
+            let helpers = HelperPaths::capture()?;
             let generated = connections::helper_command(tool, &account, executable);
             let raw = generated
                 .strip_prefix('!')
@@ -200,6 +204,7 @@ fn clone_command(
             ));
         }
     } else if !local {
+        let helpers = HelperPaths::capture()?;
         let null = if cfg!(windows) { "NUL" } else { "/dev/null" };
         let raw = format!(
             "{} -F {} -o BatchMode=yes",

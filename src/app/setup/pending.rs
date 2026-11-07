@@ -14,7 +14,7 @@ pub(super) fn fields(ui: &mut egui::Ui, profile: &UserProfile, fresh: &mut Fresh
         return false;
     };
     if requirements.ssh_key_reselection_required {
-        ui.label("Select this machine's SSH private key (no key is read into the setup file)");
+        ui.label("Select this machine's explicit SSH key file (its matching private key may be in your local agent). Agent-only defaults and SSH-config aliases are not restored; no key is read into the setup file.");
         if ui.button("Choose local SSH key…").clicked()
             && let Some(path) = rfd::FileDialog::new().pick_file()
         {

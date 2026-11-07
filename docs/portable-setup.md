@@ -40,16 +40,27 @@ machine path labels are intentionally included.
 settings creates new profiles and saved authors; it does not replace or activate the
 current profile. Imported account host/username expectations remain pending. Tea also
 pins the actual public owner behind its local alias. Select this machine's SSH/signing
-keys and authentication folders and verify every required account before explicitly
-activating an imported profile. Missing or mismatched setup fails closed. No account is
+key files and authentication folders and verify every required account before explicitly
+activating an imported profile. Any imported SSH address requires a fresh explicit key
+binding, including profiles that formerly relied on an ambient agent. A local agent may
+supply the private key matching that explicitly selected key file; agent-only defaults
+are not restored. Missing or mismatched setup fails closed. No account is
 signed in or switched automatically.
 
 Select repositories individually, choose an existing local destination parent and a new
 plain folder name, and review the resulting repository/worktree paths. Previous paths
 are labels only. A current-machine local source can be picked explicitly for offline
-restoration. Repository clones associated with an imported profile require a matching,
+restoration. Edit restoration addresses in the preview: URLs that relied on unexported
+SSH-config aliases must use the intended literal server hostname instead. Confirm those
+SSH addresses and select a supported key before restoration; incomplete bindings stay
+pending. Repository clones associated with an imported profile require a matching,
 ready profile to be active. A clone/checkout never runs imported hooks, templates,
-filters or arbitrary config. The selected named branch must exist; detached commits
+filters or arbitrary config. A private Git working folder/HOME excludes parent/global
+URL rewrites, personal credential helpers and `.netrc`; only captured explicit profile
+authentication receives its original local auth-folder paths. HTTPS redirects are
+disabled. SSH uses the explicit selected key and ignores unexported SSH configuration.
+Anonymous HTTPS remains available without silently using another account. The selected
+named branch must exist; detached commits
 must be available locally. No replacement branch is chosen. A named branch restores its
 current source tip, with a notice when it differs from the export. Local-only commits
 need a separate object backup. LFS objects/submodules are not installed automatically.

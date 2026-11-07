@@ -36,6 +36,28 @@ fn setup_network_context_refuses_pending_profiles_and_unselected_ssh_identities(
             ))
             .is_err_and(|e| e.contains("explicit SSH key"))
     );
+    let missing = connections::Context {
+        choices: Choices {
+            ssh_key: parent
+                .join("missing-selected-key")
+                .to_string_lossy()
+                .into_owned(),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    assert!(
+        missing
+            .run(|| clone_command(
+                parent,
+                "ssh://git@expected.fixture.invalid/team/repo.git",
+                &target,
+                "origin",
+                false,
+                &exe
+            ))
+            .is_err_and(|e| e.contains("unavailable"))
+    );
     for source in [
         "https://user:SECRET@expected.fixture.invalid/team/repo.git",
         "ext::untrusted",
@@ -190,6 +212,10 @@ fn network_setup_clone_pins_https_and_explicit_profile_authentication_under_host
         assert!(!args.contains("wrong.fixture.invalid"));
         assert!(!root.join("wrong-ssh-host").exists());
         assert_eq!(
+            std::env::var_os("SSH_AUTH_SOCK"),
+            Some(root.join("recording-selected-agent.sock").into_os_string())
+        );
+        assert_eq!(
             std::fs::read(parent.join(".git/config")).map_err(|e| e.to_string())?,
             before
         );
@@ -270,7 +296,7 @@ fn network_setup_clone_pins_https_and_explicit_profile_authentication_under_host
             "https://expected.fixture.invalid/",
         ],
     )?;
-    let out=Command::new(std::env::current_exe().map_err(|e|e.to_string())?).args(["--exact","git::command::setup::tests::network_setup_clone_pins_https_and_explicit_profile_authentication_under_hostile_configuration","--nocapture"]).env(CHILD,root).env("HOME",&home).env("USERPROFILE",&home).env("XDG_CONFIG_HOME",root.join("original-xdg")).env("GIT_EXEC_PATH",&exec).env("GIT_CONFIG_GLOBAL",&global).env("GIT_DIR",parent.join(".git")).env("GIT_WORK_TREE",&parent).env("GIT_SSH_COMMAND",&ssh).env("GIT_CONFIG_COUNT","1").env("GIT_CONFIG_KEY_0","url.ssh://git@wrong.fixture.invalid/.insteadOf").env("GIT_CONFIG_VALUE_0","https://expected.fixture.invalid/").output().map_err(|e|e.to_string())?;
+    let out=Command::new(std::env::current_exe().map_err(|e|e.to_string())?).args(["--exact","git::command::setup::tests::network_setup_clone_pins_https_and_explicit_profile_authentication_under_hostile_configuration","--nocapture"]).env(CHILD,root).env("HOME",&home).env("USERPROFILE",&home).env("XDG_CONFIG_HOME",root.join("original-xdg")).env("GIT_EXEC_PATH",&exec).env("SSH_AUTH_SOCK",root.join("recording-selected-agent.sock")).env("GIT_CONFIG_GLOBAL",&global).env("GIT_DIR",parent.join(".git")).env("GIT_WORK_TREE",&parent).env("GIT_SSH_COMMAND",&ssh).env("GIT_CONFIG_COUNT","1").env("GIT_CONFIG_KEY_0","url.ssh://git@wrong.fixture.invalid/.insteadOf").env("GIT_CONFIG_VALUE_0","https://expected.fixture.invalid/").output().map_err(|e|e.to_string())?;
     assert!(
         out.status.success(),
         "{}\n{}",

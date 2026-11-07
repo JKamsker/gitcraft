@@ -223,18 +223,42 @@ impl Setup {
         }
         Ok(())
     }
+    /// SSH addresses cannot carry the old machine's alias/agent policy. Require a
+    /// fresh supported explicit key even when the original profile used ambient SSH.
+    pub(crate) fn require_repository_key_setup(&mut self) {
+        let ids = self
+            .repositories
+            .iter()
+            .filter(|r| {
+                r.remotes.iter().any(|remote| {
+                    std::iter::once(&remote.fetch)
+                        .chain(&remote.push)
+                        .any(|url| !url.starts_with("https://"))
+                })
+            })
+            .flat_map(|r| r.profile_ids.iter().copied())
+            .collect::<std::collections::BTreeSet<_>>();
+        for profile in &mut self.profiles {
+            if ids.contains(&profile.source_id) {
+                profile.setup.ssh_key_reselection_required = true;
+            }
+        }
+    }
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
         if bytes.len() > FILE_LIMIT {
             return Err("Setup file exceeds 8 MiB".into());
         }
-        let file: Self =
+        let mut file: Self =
             serde_json::from_slice(bytes).map_err(|e| format!("Invalid setup file: {e}"))?;
+        file.require_repository_key_setup();
         file.validate()?;
         Ok(file)
     }
     pub fn encode(&self) -> Result<Vec<u8>, String> {
-        self.validate()?;
-        let bytes = serde_json::to_vec_pretty(self).map_err(|e| e.to_string())?;
+        let mut file = self.clone();
+        file.require_repository_key_setup();
+        file.validate()?;
+        let bytes = serde_json::to_vec_pretty(&file).map_err(|e| e.to_string())?;
         if bytes.len() > FILE_LIMIT {
             return Err("Setup file exceeds 8 MiB".into());
         }

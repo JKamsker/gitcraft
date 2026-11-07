@@ -36,6 +36,21 @@ struct Plan {
     receipt: Option<Receipt>,
     messages: Vec<String>,
     complete: bool,
+    remotes: Vec<portability::Remote>,
+    ssh_addresses_confirmed: bool,
+}
+impl Plan {
+    fn needs_ssh(&self) -> bool {
+        self.remotes.iter().any(|r| {
+            std::iter::once(&r.fetch)
+                .chain(&r.push)
+                .any(|url| !url.starts_with("https://"))
+        })
+    }
+    fn binding_ready(&self, profile: &UserProfile) -> bool {
+        !self.needs_ssh()
+            || (!profile.connections.ssh_key.is_empty() && self.ssh_addresses_confirmed)
+    }
 }
 struct Job {
     rx: Receiver<Result<Answer, String>>,
@@ -107,12 +122,14 @@ impl SetupWindow {
         }
         Some(answer)
     }
-    fn set_file(&mut self, file: Setup) {
+    fn set_file(&mut self, mut file: Setup) {
+        file.require_repository_key_setup();
         self.plans = file
             .repositories
             .iter()
             .map(|r| Plan {
                 name: r.name.clone(),
+                remotes: r.remotes.clone(),
                 ..Default::default()
             })
             .collect();
@@ -331,15 +348,31 @@ impl App {
                         ui.push_id(index,|ui|{ui.group(|ui|{
                             ui.label(format!("{} — previous location: {}",r.name,r.previous_path));
                             ui.label(format!("Checkout: {} · {} linked worktrees · {} hidden branches",r.branch.as_deref().unwrap_or("detached"),r.worktrees.len(),r.hidden.len()));
-                            for remote in &r.remotes {ui.label(format!("{}: {}",remote.name,remote.fetch));for url in &remote.push{ui.label(format!("Push: {url}"));}}
+                            if !self.setup.import {for remote in &r.remotes {ui.label(format!("{}: {}",remote.name,remote.fetch));for url in &remote.push{ui.label(format!("Push: {url}"));}}}
                             for w in &r.worktrees{ui.label(format!("Worktree {}: {} at {} ({})",w.name,w.branch.as_deref().unwrap_or("detached"),w.commit,w.previous_path));}
                             for notice in &r.notices {ui.label(notice);}
                             if self.setup.import {
                                 let matching=r.profile_ids.iter().filter_map(|id|self.setup.mappings.get(id)).copied().collect::<Vec<_>>();
                                 let permitted=self.setup.applied && (r.profile_ids.is_empty() || matching.contains(&self.settings.active_profile)) && !self.settings.profile().pending_setup();
+                                let current_profile=self.settings.profile();
                                 let plan=&mut self.setup.plans[index];
                                 ui.add_enabled_ui(!busy,|ui|{
                                     ui.checkbox(&mut plan.selected,"Select this repository");
+                                    ui.add_enabled_ui(plan.receipt.is_none(),|ui|{
+                                        ui.label("Restoration addresses: edit unexported SSH-config aliases to literal server hostnames. Only the selected profile's explicit supported authentication is used; agent-only fallback and ambient URL redirects are not used.");
+                                        let mut changed=false;
+                                        for remote in &mut plan.remotes {
+                                            ui.label(format!("Remote {}",remote.name));
+                                            ui.horizontal(|ui|{ui.label("Fetch address");changed|=ui.add(egui::TextEdit::singleline(&mut remote.fetch).char_limit(4096)).changed();});
+                                            for (n,url) in remote.push.iter_mut().enumerate(){ui.horizontal(|ui|{ui.label(format!("Push address {}",n+1));changed|=ui.add(egui::TextEdit::singleline(url).char_limit(4096)).changed();});}
+                                        }
+                                        if changed {plan.ssh_addresses_confirmed=false;}
+                                        if plan.needs_ssh(){
+                                            ui.checkbox(&mut plan.ssh_addresses_confirmed,"I confirmed these SSH addresses use literal hostnames, not unexported SSH aliases");
+                                            if current_profile.connections.ssh_key.is_empty(){ui.label("SSH restoration pending: finish imported profile setup or choose an explicit SSH key file in this profile's Connections. A matching key may be supplied by your local agent; agent-only defaults are not restored.");}
+                                        }
+                                    });
+                                    if plan.source.is_none() && let Some(remote)=plan.remotes.first(){ui.label(format!("Previewed clone source: {}",remote.fetch));}
                                     ui.add_enabled_ui(plan.receipt.is_none(),|ui|{
                                         ui.horizontal(|ui|{ui.label("New folder name");ui.text_edit_singleline(&mut plan.name);});
                                         if ui.button("Choose destination parent…").clicked() && let Some(path)=rfd::FileDialog::new().pick_folder(){plan.parent=path;}
@@ -350,7 +383,7 @@ impl App {
                                     if let Some(source)=&plan.source{ui.label(format!("Current-machine source: {}",source.display()));}
                                     if !r.worktrees.is_empty(){ui.label(format!("New worktree root: {}",plan.parent.join(format!("{}-worktrees",plan.name)).display()));}
                                     if !permitted {ui.label("Add the public profiles, finish their required setup, then explicitly activate a corresponding profile before cloning.");for id in &matching {if let Some(p)=self.settings.user_profiles.iter().find(|p|p.id==*id && !p.pending_setup()) && ui.button(format!("Activate {}",p.title())).clicked(){activate=Some(*id);}}}
-                                    if ui.add_enabled(plan.selected && permitted && !plan.parent.as_os_str().is_empty() && !plan.complete,egui::Button::new(if plan.receipt.is_some(){"Retry remaining steps"}else{"Clone and restore selected setup"})).clicked(){restore=Some(index);}
+                                    if ui.add_enabled(plan.selected && permitted && plan.binding_ready(&current_profile) && !plan.parent.as_os_str().is_empty() && !plan.complete,egui::Button::new(if plan.receipt.is_some(){"Retry remaining steps"}else{"Clone and restore selected setup"})).clicked(){restore=Some(index);}
                                     if plan.receipt.is_some() && ui.button("Choose a new destination instead").clicked(){plan.receipt=None;plan.complete=false;plan.parent=PathBuf::new();plan.name=format!("{}-retry",r.name);plan.messages.push("Previous clone/worktrees were retained. Choose a new unused destination.".into());}
                                     if plan.complete && ui.button("Open restored repository").clicked(){open=plan.receipt.as_ref().map(|r|r.root.clone());}
                                 });
@@ -447,6 +480,7 @@ impl App {
             let plan = &self.setup.plans[index];
             let mut repo = file.repositories[index].clone();
             repo.name = plan.name.clone();
+            repo.remotes = plan.remotes.clone();
             let parent = plan.parent.clone();
             let source = plan.source.clone();
             let previous = plan.receipt.clone();

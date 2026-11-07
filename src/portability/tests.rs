@@ -454,3 +454,35 @@ fn worktree_lock_detection_uses_directory_identity_for_native_and_git_spellings(
     )?);
     Ok(())
 }
+
+#[test]
+fn ssh_alias_repository_forces_fresh_key_setup_even_when_the_old_profile_used_an_ambient_agent()
+-> Result<(), String> {
+    let fixture = Fixture::new()?;
+    let mut repository = fixture.definition()?;
+    repository.remotes = vec![Remote {
+        name: "origin".into(),
+        fetch: "ssh://git@work-alias/team/repo.git".into(),
+        push: Vec::new(),
+    }];
+    let mut file = Setup::new(&Settings::default(), &Default::default());
+    file.repositories.push(repository);
+    assert!(!file.profiles[0].setup.ssh_key_reselection_required);
+    // Simulate an older/untrusted file omitting the flag instead of using encode's guard.
+    let bytes = serde_json::to_vec(&file).map_err(|e| e.to_string())?;
+    let decoded = Setup::decode(&bytes)?;
+    let imported = decoded.profiles[0].materialize(99);
+    assert!(imported.pending_setup());
+    assert!(imported.connections.ssh_key.is_empty());
+    assert!(
+        imported
+            .pending_setup
+            .as_ref()
+            .is_some_and(|s| s.ssh_key_reselection_required)
+    );
+    assert_eq!(
+        decoded.repositories[0].remotes[0].fetch,
+        "ssh://git@work-alias/team/repo.git"
+    );
+    Ok(())
+}
