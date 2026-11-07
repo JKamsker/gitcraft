@@ -166,6 +166,7 @@ impl RepoTab {
             Action::DraftPreview { id, path, index } => self.preview_draft(id, path, index, ctx),
             Action::DraftRecover { preview, hunks } => self.recover_draft(*preview, hunks, ctx),
             Action::DraftUndo => self.undo_draft(ctx),
+            Action::OpenSshSetup => self.open_ssh_setup(ctx),
             Action::SetSparse { before, folders } => self.set_sparse(*before, folders, ctx),
             Action::LoadMore => self.load_more(ctx),
             Action::Undo => self.undo(ctx),

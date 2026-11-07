@@ -80,6 +80,17 @@ impl Api {
         }
     }
 
+    /// Owned loopback fixtures bypass proxy/environment state and use a short deadline.
+    #[cfg(all(test, unix))]
+    pub(super) fn fixture(base: &str, login: Login) -> Self {
+        let mut api = Self::new("fixture", base, "127.0.0.1", Some(login));
+        api.agent = ureq::AgentBuilder::new()
+            .timeout(Duration::from_secs(3))
+            .redirects(0)
+            .build();
+        api
+    }
+
     /// The refusal belongs to the captured profile/login, even if the UI switched since.
     pub fn on_refused_key(mut self, forget: fn(&str), key: &str) -> Api {
         self.on_refused = Some(forget);
