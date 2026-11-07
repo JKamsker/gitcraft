@@ -32,6 +32,8 @@ pub(super) struct Key {
     pub op: Op,
     pub head: String,
     pub other: String,
+    /// For a rebase that a pull does: the upstream's name, whose fork point it starts from.
+    pub upstream: Option<String>,
 }
 
 impl Key {
@@ -40,6 +42,15 @@ impl Key {
             op,
             head: head.to_owned(),
             other: other.to_owned(),
+            upstream: None,
+        }
+    }
+
+    /// `git pull --rebase` from `upstream`, at commit `other`.
+    pub fn pull_rebase(head: &str, other: &str, upstream: &str) -> Self {
+        Self {
+            upstream: Some(upstream.to_owned()),
+            ..Self::new(Op::Rebase, head, other)
         }
     }
 }
@@ -53,8 +64,10 @@ pub(super) enum Mergiraf {
     UnknownLanguage,
     /// Not a text conflict (binary, deleted or renamed on one side…): the kinds.
     NotText(String),
-    /// A text conflict, and Mergiraf isn't installed (or couldn't be asked).
+    /// A text conflict, and Mergiraf isn't installed.
     NotInstalled,
+    /// A text conflict, and Mergiraf is installed but couldn't list its languages.
+    Unchecked,
 }
 
 /// A finished check: the prediction, and what Mergiraf could do with each conflicted file.
@@ -92,6 +105,8 @@ struct Inner {
     workers: usize,
     /// Counts the questions, for [`Inner::entries`]' ages.
     asked: u64,
+    /// Counts [`ConflictChecks::forget`]s: what a worker started before one is not kept.
+    generation: u64,
 }
 
 /// A check, as [`Inner::entries`] keeps it.
@@ -111,6 +126,10 @@ struct RepoInfo {
     partial: bool,
 }
 
+/// The most checks waiting for a worker; beyond, the oldest asked for are dropped (their menus
+/// are long closed).
+const MAX_QUEUE: usize = 32;
+
 /// How long a failed check stands before it is tried again.
 const RETRY: Duration = Duration::from_secs(30);
 
@@ -126,6 +145,14 @@ impl Inner {
             .collect();
         self.queue.retain(|k| k.head == head);
         for key in stale {
+            self.entries.remove(&key);
+        }
+    }
+
+    /// Drops the oldest waiting checks beyond [`MAX_QUEUE`].
+    fn bound_queue(&mut self) {
+        let over = self.queue.len().saturating_sub(MAX_QUEUE);
+        for key in self.queue.drain(..over).collect::<Vec<_>>() {
             self.entries.remove(&key);
         }
     }
@@ -156,14 +183,14 @@ pub(super) struct ConflictChecks {
 }
 
 impl ConflictChecks {
-    /// Forgets every finished check (F5): what merges cleanly also depends on
-    /// `.gitattributes` and git's config, which the commits don't capture.
-    pub fn forget_finished(&self) {
+    /// Forgets every check, those running included (F5): what merges cleanly also depends
+    /// on `.gitattributes` and git's config, which the commits don't capture.
+    pub fn forget(&self) {
         if let Ok(mut inner) = self.inner.lock() {
-            inner
-                .entries
-                .retain(|_, e| matches!(e.check, Check::Checking));
+            inner.entries.clear();
+            inner.queue.clear();
             inner.repo_info = None;
+            inner.generation += 1;
         }
     }
 }
@@ -187,13 +214,13 @@ impl ConflictChecks {
         inner.asked += 1;
         let asked = inner.asked;
         let retry = |e: &Entry| e.failed.is_some_and(|at| at.elapsed() >= RETRY);
+        inner.drop_stale(&key.head);
         if let Some(entry) = inner.entries.get_mut(&key)
             && !retry(entry)
         {
             entry.asked = asked;
             return entry.check.clone();
         }
-        inner.drop_stale(&key.head);
         let entry = Entry {
             asked,
             check: Check::Checking,
@@ -201,6 +228,7 @@ impl ConflictChecks {
         };
         inner.entries.insert(key.clone(), entry);
         inner.queue.push(key);
+        inner.bound_queue();
         inner.evict();
         if inner.workers < WORKERS {
             inner.workers += 1;
@@ -214,18 +242,20 @@ impl ConflictChecks {
 /// A worker: takes checks from the queue until it is empty.
 fn work(shared: &Mutex<Inner>, ctx: &egui::Context, repo: &Path) {
     loop {
-        let (key, info) = {
+        let (key, info, generation) = {
             let Ok(mut inner) = shared.lock() else { return };
             let Some(key) = inner.queue.pop() else {
                 inner.workers -= 1;
                 return;
             };
-            (key, inner.repo_info)
+            (key, inner.repo_info, inner.generation)
         };
         let info = match info {
             Some(info) => Ok(info),
             None => repo_info(repo).inspect(|found| {
-                if let Ok(mut inner) = shared.lock() {
+                if let Ok(mut inner) = shared.lock()
+                    && inner.generation == generation
+                {
                     inner.repo_info = Some(*found);
                 }
             }),
@@ -235,6 +265,7 @@ fn work(shared: &Mutex<Inner>, ctx: &egui::Context, repo: &Path) {
         }))
         .unwrap_or_else(|_| Check::Failed("internal error".to_owned()));
         if let Ok(mut inner) = shared.lock()
+            && inner.generation == generation
             && let Some(entry) = inner.entries.get_mut(&key)
         {
             entry.failed = matches!(check, Check::Failed(_)).then(Instant::now);
@@ -248,7 +279,7 @@ fn work(shared: &Mutex<Inner>, ctx: &egui::Context, repo: &Path) {
 fn repo_info(repo: &Path) -> Result<RepoInfo, String> {
     Ok(RepoInfo {
         features: simulate::features(repo)?,
-        partial: simulate::partial_clone(repo),
+        partial: simulate::partial_clone(repo)?,
     })
 }
 
@@ -272,7 +303,12 @@ fn run_check(ctx: &egui::Context, repo: &Path, info: Result<RepoInfo, String>, k
     }
     let predicted = match key.op {
         Op::Merge => simulate::merge(repo, &key.head, &key.other),
-        Op::Rebase => simulate::rebase(repo, features, &key.head, &key.other),
+        Op::Rebase => match &key.upstream {
+            Some(upstream) => {
+                simulate::pull_rebase(repo, features, &key.head, upstream, &key.other)
+            }
+            None => simulate::rebase(repo, features, &key.head, &key.other),
+        },
         Op::CherryPick => simulate::cherry_pick(repo, features, &key.head, &[&key.other]),
     };
     match predicted {
@@ -301,10 +337,14 @@ fn mergiraf_hints(ctx: &egui::Context, files: &[ConflictFile]) -> Vec<Mergiraf> 
     if files.is_empty() {
         return Vec::new();
     }
-    let patterns = crate::mergiraf::found(ctx).and_then(|f| crate::mergiraf::patterns(&f).ok());
+    let patterns = crate::mergiraf::found(ctx).map(|f| crate::mergiraf::patterns(&f));
     files
         .iter()
-        .map(|file| mergiraf_hint(file, patterns.as_deref()))
+        .map(|file| match &patterns {
+            Some(Err(_)) if file.text_only() => Mergiraf::Unchecked,
+            Some(Ok(patterns)) => mergiraf_hint(file, Some(patterns)),
+            _ => mergiraf_hint(file, None),
+        })
         .collect()
 }
 
@@ -450,6 +490,11 @@ fn verdict_text(op: Op, verdict: &Verdict) -> String {
                     "\n\nThe commits after it aren't checked: they depend on how this is solved.",
                 );
             }
+            if verdict.mergiraf.contains(&Mergiraf::Unchecked) {
+                text.push_str(
+                    "\n\nMergiraf is installed but couldn't list the file types it knows",
+                );
+            }
             if verdict.mergiraf.contains(&Mergiraf::NotInstalled) {
                 text.push_str(
                     "\n\nMergiraf can solve many text conflicts: Settings → Git → Mergiraf \
@@ -469,7 +514,7 @@ fn file_lines(files: &[ConflictFile], mergiraf: &[Mergiraf]) -> String {
             Some(Mergiraf::Likely) => "Mergiraf can likely solve it".to_owned(),
             Some(Mergiraf::UnknownLanguage) => "a file type Mergiraf doesn't know".to_owned(),
             Some(Mergiraf::NotText(kinds)) => format!("{kinds}: solve by hand"),
-            Some(Mergiraf::NotInstalled) | None => "text conflict".to_owned(),
+            Some(Mergiraf::NotInstalled | Mergiraf::Unchecked) | None => "text conflict".to_owned(),
         };
         text.push_str(&format!("\n• {} — {hint}", file.path));
     }
@@ -495,6 +540,13 @@ pub(super) struct TargetWatch {
 }
 
 impl RepoTab {
+    /// Reads the repository again and forgets the conflict checks (F5, the toolbar's button,
+    /// coming back to the window): `.gitattributes` or git's config may have changed.
+    pub fn refresh(&mut self, ctx: &egui::Context) {
+        self.conflict_checks.forget();
+        self.reload(ctx);
+    }
+
     /// A menu entry for `op` with `other`, marked with whether it would conflict.
     pub(super) fn conflict_button(
         &self,
@@ -529,22 +581,26 @@ impl RepoTab {
     fn conflict_target(&self) -> Option<(String, String, bool)> {
         let current = self.refs.current.as_deref()?;
         let branch = self.refs.local.iter().find(|b| b.name == current)?;
-        let upstream = (!branch.upstream.is_empty() && !branch.upstream_gone())
-            .then(|| branch.upstream.clone());
-        let is_upstream = upstream.is_some();
-        let name = upstream.or_else(|| self.base_ref().map(|b| b.name))?;
-        if name == current {
+        let local = || self.refs.local.iter();
+        let remote = || self.refs.remotes.iter().flat_map(|(_, list)| list);
+        if !branch.upstream.is_empty() && !branch.upstream_gone() {
+            // `%(upstream:short)` names a remote branch as `origin/x`, a local one as `x`.
+            let name = &branch.upstream;
+            let found = remote()
+                .find(|b| b.name == *name)
+                .or_else(|| local().find(|b| b.name == *name))?;
+            return Some((name.clone(), found.target.clone(), true));
+        }
+        let base = self.base_ref()?;
+        if !base.remote && base.name == current {
             return None;
         }
-        let target = self
-            .refs
-            .local
-            .iter()
-            .chain(self.refs.remotes.iter().flat_map(|(_, list)| list))
-            .find(|b| b.name == name)?
-            .target
-            .clone();
-        Some((name, target, is_upstream))
+        let found = if base.remote {
+            remote().find(|b| b.name == base.name)
+        } else {
+            local().find(|b| b.name == base.name)
+        }?;
+        Some((base.name, found.target.clone(), false))
     }
 
     /// The toolbar's badge, when merging the checked-out branch's target into it would
@@ -558,19 +614,19 @@ impl RepoTab {
         let key = target
             .as_ref()
             .filter(|(_, commit, _)| !self.refs.head.is_empty() && *commit != self.refs.head)
-            .map(|(_, commit, upstream)| {
-                let op = if rebase && *upstream {
-                    Op::Rebase
+            .map(|(name, commit, upstream)| {
+                if rebase && *upstream {
+                    Key::pull_rebase(&self.refs.head, commit, name)
                 } else {
-                    Op::Merge
-                };
-                Key::new(op, &self.refs.head, commit)
+                    Key::new(Op::Merge, &self.refs.head, commit)
+                }
             });
         let watch = &mut self.target_watch;
+        // Named as it is now, even when another branch at the same commit took its place.
+        watch.upstream = target.as_ref().is_some_and(|(_, _, upstream)| *upstream);
+        watch.target = target.map(|(name, _, _)| name).unwrap_or_default();
         if watch.key != key {
             watch.key = key;
-            watch.upstream = target.as_ref().is_some_and(|(_, _, upstream)| *upstream);
-            watch.target = target.map(|(name, _, _)| name).unwrap_or_default();
             watch.since = Some(Instant::now());
         }
         let Some(key) = watch.key.clone() else {
@@ -839,6 +895,39 @@ mod tests {
         assert_eq!(inner.lock().map(|i| i.queue.len()).ok(), Some(0));
     }
 
+    /// The queue keeps the latest questions only, and a check that was running when the
+    /// checks were forgotten (F5) doesn't come back with its old answer.
+    #[test]
+    fn the_queue_is_bounded_and_forgetting_drops_running_work() {
+        let mut inner = Inner::default();
+        let key = |n: usize| Key::new(Op::Merge, "head", &format!("c{n}"));
+        for n in 0..MAX_QUEUE + 5 {
+            inner.queue.push(key(n));
+            let entry = Entry {
+                asked: n as u64,
+                check: Check::Checking,
+                failed: None,
+            };
+            inner.entries.insert(key(n), entry);
+        }
+        inner.bound_queue();
+        assert_eq!(inner.queue.len(), MAX_QUEUE);
+        assert_eq!(inner.queue.first(), Some(&key(5)));
+        assert!(!inner.entries.contains_key(&key(4)));
+        let checks = ConflictChecks::default();
+        if let Ok(mut shared) = checks.inner.lock() {
+            *shared = inner;
+        }
+        let before = checks.inner.lock().map(|i| i.generation).ok();
+        checks.forget();
+        let after = checks
+            .inner
+            .lock()
+            .map(|i| (i.generation, i.entries.len(), i.queue.len()))
+            .ok();
+        assert_eq!(after, before.map(|g| (g + 1, 0, 0)));
+    }
+
     /// Through the real thing: a check starts, finishes in the background, and is answered
     /// from the cache after; a key it has is not checked again.
     #[test]
@@ -851,6 +940,7 @@ mod tests {
             &["init", "-q", "-b", "main"][..],
             &["config", "user.name", "t"],
             &["config", "user.email", "t@t"],
+            &["config", "commit.gpgSign", "false"],
             &["commit", "-q", "--allow-empty", "-m", "base"],
             &["commit", "-q", "--allow-empty", "-m", "two"],
         ] {

@@ -535,8 +535,86 @@ fn a_clean_merge_can_still_be_a_conflicting_rebase() -> Result<(), String> {
 #[test]
 fn a_partial_clone_is_recognised() -> Result<(), String> {
     let repo = forked("partial")?;
-    assert!(!partial_clone(repo.path()));
+    assert_eq!(partial_clone(repo.path()), Ok(false));
     repo.git(&["config", "extensions.partialClone", "origin"])?;
-    assert!(partial_clone(repo.path()));
+    assert_eq!(partial_clone(repo.path()), Ok(true));
+    // Not knowing (no repository there) is an error, not a "no".
+    let gone = repo.path().join("not-a-folder");
+    assert!(partial_clone(&gone).is_err());
+    Ok(())
+}
+
+/// Two branches with the same files but their own commits still merge into a merge commit:
+/// not "already merged".
+#[test]
+fn same_files_on_another_history_is_not_already_merged() -> Result<(), String> {
+    let repo = forked("same-tree")?;
+    if features_here(&repo)?.is_none() {
+        return Ok(());
+    }
+    repo.write("g.txt", b"same\n")?;
+    let main = repo.commit("main adds g")?;
+    repo.git(&["checkout", "-q", "side"])?;
+    repo.write("g.txt", b"same\n")?;
+    let side = repo.commit("side adds g too")?;
+    let merged = merge(repo.path(), &main, &side)?;
+    assert_eq!(merged.outcome, Outcome::Clean { changes: true });
+    Ok(())
+}
+
+/// When the user's git recreates merges in a rebase, a branch with merges isn't predicted
+/// commit by commit: it says it can't be sure.
+#[test]
+fn a_rebase_that_recreates_merges_is_unsure() -> Result<(), String> {
+    let repo = forked("rebase-merges")?;
+    let Some(features) = features_here(&repo)? else {
+        return Ok(());
+    };
+    repo.write("up.txt", b"up\n")?;
+    let main = repo.commit("upstream")?;
+    repo.git(&["checkout", "-q", "side"])?;
+    repo.git(&["checkout", "-q", "-b", "inner"])?;
+    repo.write("inner.txt", b"x\n")?;
+    repo.commit("inner")?;
+    repo.git(&["checkout", "-q", "side"])?;
+    repo.write("own.txt", b"y\n")?;
+    repo.commit("own")?;
+    repo.git(&["merge", "-q", "--no-ff", "-m", "merge inner", "inner"])?;
+    let head = repo.git(&["rev-parse", "HEAD"])?;
+    let plain = rebase(repo.path(), features, &head, &main)?;
+    assert!(matches!(plain.outcome, Outcome::Clean { .. }), "{plain:?}");
+    repo.git(&["config", "rebase.rebaseMerges", "rebase-cousins"])?;
+    let recreated = rebase(repo.path(), features, &head, &main)?;
+    assert!(
+        matches!(recreated.outcome, Outcome::Unsure(_)),
+        "{recreated:?}"
+    );
+    Ok(())
+}
+
+/// After the upstream was rewritten (a commit the branch started on dropped and replaced),
+/// a pull replays only the branch's own commits, from the upstream's fork point; a plain
+/// rebase would replay the dropped commit too, and conflict on it.
+#[test]
+fn a_pull_rebase_starts_from_the_fork_point() -> Result<(), String> {
+    let repo = forked("fork-point")?;
+    let Some(features) = features_here(&repo)? else {
+        return Ok(());
+    };
+    repo.git(&["config", "core.logAllRefUpdates", "true"])?;
+    repo.write("f.txt", b"a\nold\nc\n")?;
+    repo.commit("upstream, before the rewrite")?;
+    repo.git(&["checkout", "-q", "-b", "topic"])?;
+    repo.write("own.txt", b"mine\n")?;
+    let head = repo.commit("own work")?;
+    repo.git(&["checkout", "-q", "main"])?;
+    repo.git(&["reset", "-q", "--hard", "HEAD~1"])?;
+    repo.write("f.txt", b"a\nnew\nc\n")?;
+    let upstream = repo.commit("upstream, rewritten")?;
+    let plain = rebase(repo.path(), features, &head, &upstream)?;
+    assert_eq!(conflicts(&plain).0, ["f.txt"]);
+    let pulled = pull_rebase(repo.path(), features, &head, "main", &upstream)?;
+    assert_eq!(pulled.commits, 1);
+    assert_eq!(pulled.outcome, Outcome::Clean { changes: true });
     Ok(())
 }

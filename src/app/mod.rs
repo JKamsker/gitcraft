@@ -413,7 +413,7 @@ impl App {
         if let Some(Tab::Repo(r)) = self.tabs.get_mut(self.active)
             && ((refresh && !modal_open) || regained)
         {
-            r.reload(ctx);
+            r.refresh(ctx);
         }
         focused
     }
