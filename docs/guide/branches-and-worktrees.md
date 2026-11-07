@@ -61,7 +61,7 @@ The left panel: local and remote branches, stacked branches, worktrees, submodul
   Type or browse for another root, or choose **Inside repository** for `.worktrees/`.
   Relative roots are resolved from the main checkout, and the setting is shared by all its
   worktrees, including worktrees created for pull requests, issues and agent tasks.
-  Roots inside a checkout are ignored through Git's local `info/exclude`, without changing
+  Worktree folders inside a checkout are ignored through Git's local `info/exclude`, without changing
   the repository's `.gitignore`. The final **Worktree folder** can still be overridden for
   an individual worktree; **Use branch folder** restores the suggestion.
 - Collision matrix (a worktree's menu → _Collision matrix…_): for branches worked on side by side,

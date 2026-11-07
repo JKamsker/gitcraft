@@ -72,9 +72,6 @@ pub fn prepare_worktree_folder(repo: &Path, folder: &str) -> Result<(), String> 
             .to_string_lossy(),
     );
     let list = super::worktree_list(repo, None)?;
-    let main = list.first().map_or(repo, |w| w.path.as_path());
-    let configured = resolve_worktree_root(main, &read_worktree_root(repo)?)?;
-    let root = canonical_dir(&configured).ok();
     for wt in list.iter().filter(|w| !w.bare && w.prunable.is_none()) {
         let checkout = match canonical_dir(&wt.path) {
             Ok(checkout) => checkout,
@@ -88,15 +85,9 @@ pub fn prepare_worktree_folder(repo: &Path, folder: &str) -> Result<(), String> 
         if relative.as_os_str().is_empty() {
             continue;
         }
-        // Never ignore the entire checkout, even when the root was set to `.` or `..`.
-        let ignored = root
-            .as_deref()
-            .filter(|r| destination.starts_with(r))
-            .and_then(|r| r.strip_prefix(&checkout).ok())
-            .filter(|r| !r.as_os_str().is_empty())
-            .unwrap_or(relative);
-        exclude_folder(repo, ignored)?;
-        let folder = ignored
+        // Ignore this checkout only: a saved root can also contain project files.
+        exclude_folder(repo, relative)?;
+        let folder = relative
             .components()
             .map(|c| c.as_os_str().to_string_lossy())
             .collect::<Vec<_>>()
@@ -114,6 +105,7 @@ pub fn prepare_worktree_folder(repo: &Path, folder: &str) -> Result<(), String> 
     Ok(())
 }
 
+/// Resolve a directory on its own machine, following symlinks and parent components.
 fn canonical_dir(dir: &Path) -> Result<PathBuf, String> {
     if let Some(target) = remote::parse(dir) {
         let output = remote::exec(
@@ -136,6 +128,7 @@ fn canonical_dir(dir: &Path) -> Result<PathBuf, String> {
         .map_err(|e| format!("Could not resolve {}: {e}", dir.display()))
 }
 
+/// Append a literal directory rule without rewriting existing ignore rules.
 fn exclude_folder(repo: &Path, relative: &Path) -> Result<(), String> {
     // Anchored, literal directory pattern, including roots with spaces or glob characters.
     let name = relative
@@ -156,22 +149,23 @@ fn exclude_folder(repo: &Path, relative: &Path) -> Result<(), String> {
     pattern.push('/');
     let printed = super::run(Some(repo), &["rev-parse", "--git-path", "info/exclude"])?;
     let file = remote::resolve(repo, printed.trim_end_matches(['\r', '\n']));
-    let mut text = match remote::read_to_string(&file) {
+    let text = match remote::read(&file) {
         Ok(text) => text,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
         Err(e) => return Err(format!("Could not read info/exclude: {e}")),
     };
-    if text.lines().any(|line| line == pattern) {
+    if text
+        .split(|b| *b == b'\n')
+        .any(|line| line.strip_suffix(b"\r").unwrap_or(line) == pattern.as_bytes())
+    {
         return Ok(());
     }
-    if !text.is_empty() && !text.ends_with('\n') {
-        text.push('\n');
-    }
-    text.push_str("# Worktree folders managed by gitcraft\n");
-    text.push_str(&pattern);
-    text.push('\n');
+    // Always start with a newline, even if another writer changed the file after the read.
+    // Append only our rule so that a newer version of the file is never replaced by a snapshot.
+    let addition = format!("\n# Worktree folders managed by gitcraft\n{pattern}\n");
     if let Some(parent) = file.parent() {
         remote::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    remote::write(&file, text.as_bytes()).map_err(|e| format!("Could not write info/exclude: {e}"))
+    remote::append(&file, addition.as_bytes())
+        .map_err(|e| format!("Could not write info/exclude: {e}"))
 }

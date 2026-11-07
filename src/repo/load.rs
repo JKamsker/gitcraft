@@ -129,7 +129,8 @@ impl RepoTab {
                     crate::tasks::read(move || super::issue_work::read(&path))?
                 };
                 let identity = git::identity(&path);
-                let worktree_root = git::read_worktree_root(&path).unwrap_or_default();
+                let worktree_root = git::read_worktree_root(&path)
+                    .map_err(|e| format!("Could not read the worktrees root: {e}"))?;
                 let history = history.join()??.into_iter().map(Arc::new).collect();
                 let (work, worktrees) = work_trees.join()??;
                 let (stashes, remotes, submodules, lfs, issues) = (

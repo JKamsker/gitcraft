@@ -656,6 +656,27 @@ mod tests {
         );
     }
 
+    /// A saved root takes precedence over the default, including from linked checkouts.
+    #[test]
+    fn a_pull_request_worktree_uses_the_saved_root() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("ssh://build/elsewhere/linked".into(), &ctx);
+        tab.worktrees = vec![worktree("ssh://build/home/me/app", "main", false)];
+        tab.worktree_root = "custom.worktrees".to_owned();
+        tab.refs.local = vec![branch("feat/awesome-stuff", "f")];
+        let path = "/home/me/app/custom.worktrees/feat/awesome-stuff";
+        assert_eq!(
+            tab.pr_worktree_plan(3, "feat/awesome-stuff", "f"),
+            PrWorktree::Create {
+                ops: vec![
+                    strings(&["worktree", "prune"]),
+                    strings(&["worktree", "add", "--", path, "feat/awesome-stuff"])
+                ],
+                path: format!("ssh://build{path}").into(),
+            }
+        );
+    }
+
     #[test]
     fn a_pull_request_opens_in_its_worktree_made_when_needed() {
         let ctx = egui::Context::default();

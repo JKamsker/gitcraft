@@ -400,4 +400,23 @@ mod tests {
             "/home/me/app.wt/agent/x-2"
         );
     }
+
+    /// Agent tasks use the configured root when opened from a linked worktree.
+    #[test]
+    fn a_task_form_uses_the_saved_root_of_the_main_checkout() {
+        let ctx = egui::Context::default();
+        let mut tab =
+            crate::repo::RepoTab::new_deferred("ssh://build/elsewhere/linked".into(), &ctx);
+        tab.worktrees = vec![crate::git::Worktree {
+            path: "ssh://build/home/me/app".into(),
+            main: true,
+            ..Default::default()
+        }];
+        tab.worktree_root = "custom.worktrees".to_owned();
+        let form = super::StartForm::new(&tab);
+        assert_eq!(
+            (form.folder_for)("feat/awesome-stuff"),
+            "/home/me/app/custom.worktrees/feat/awesome-stuff"
+        );
+    }
 }

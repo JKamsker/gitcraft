@@ -189,6 +189,7 @@ pub(super) fn add_worktree(
     })
 }
 
+/// Suggest a branch subfolder using the root resolved from the main checkout.
 fn suggested_folder(repo: &std::path::Path, root: &str, name: &str) -> String {
     git::resolve_worktree_root(repo, root)
         .map(|root| crate::remote::git_path(&git::branch_worktree_folder(&root, name)))

@@ -9,6 +9,7 @@ use crate::remote;
 use crate::repo::{OpKind, operations::run_steps, ops};
 use std::path::{Path, PathBuf};
 
+/// Create through the normal operation worker so preparation and Git both run.
 fn add(repo: &Path, folder: &Path, branch: &str) -> Result<(), String> {
     let folder = remote::git_path(folder);
     run_steps(
@@ -86,7 +87,8 @@ fn worktree_root_and_local_ignore_are_shared_from_linked_checkouts() -> Result<(
     let text = std::fs::read_to_string(&exclude).map_err(|e| e.to_string())?;
     assert!(text.starts_with("# Existing rule\n/build\n"));
     assert_eq!(
-        text.matches("/.worktrees\\ \\[local\\]/").count(),
+        text.matches("/.worktrees\\ \\[local\\]/feat/awesome-stuff/")
+            .count(),
         1,
         "{text}"
     );
@@ -110,6 +112,89 @@ fn external_worktree_root_needs_no_ignore_changes() -> Result<(), String> {
     add(repo.path(), &folder, "feat/nested")?;
     assert!(folder.join(".git").is_file());
     assert_eq!(std::fs::read(&exclude).map_err(|e| e.to_string())?, before);
+    Ok(())
+}
+
+/// A valid destination remains usable even if the stored preference cannot be resolved.
+#[test]
+fn worktree_creation_uses_a_valid_destination_with_an_invalid_saved_root() -> Result<(), String> {
+    let repo = Repo::new("worktree-root-invalid")?;
+    repo.commit("base", &[])?;
+    repo.git(&["config", "--local", WORKTREE_ROOT_KEY, "~/worktrees"])?;
+    let root = default_worktree_root(repo.path());
+    let _cleanup = Repo { dir: root.clone() };
+    let folder = branch_worktree_folder(&root, "feat/fallback");
+    add(repo.path(), &folder, "feat/fallback")?;
+    assert!(folder.join(".git").is_file());
+    assert_eq!(read_worktree_root(repo.path())?, "~/worktrees");
+    Ok(())
+}
+
+/// Worktree rules must not hide unrelated files under an existing project directory.
+#[test]
+fn worktree_creation_keeps_project_files_visible_and_stageable() -> Result<(), String> {
+    let repo = Repo::new("worktree-root-project-files")?;
+    repo.commit("base", &[("src/tracked.rs", Some("tracked"))])?;
+    repo.git(&["config", "--local", WORKTREE_ROOT_KEY, "src"])?;
+    std::fs::write(repo.dir.join("src/new.rs"), "new").map_err(|e| e.to_string())?;
+    let folder = repo.dir.join("src/feat/task");
+    add(repo.path(), &folder, "feat/task")?;
+    assert_eq!(
+        repo.git(&["status", "--porcelain", "--untracked-files=all"])?,
+        "?? src/new.rs\n"
+    );
+    repo.git(&["add", "--all"])?;
+    assert_eq!(
+        repo.git(&["diff", "--cached", "--name-only"])?,
+        "src/new.rs\n"
+    );
+    Ok(())
+}
+
+/// Git accepts byte patterns that cannot be decoded as UTF-8; adding a rule preserves them.
+#[test]
+fn worktree_creation_preserves_non_utf8_exclude_rules() -> Result<(), String> {
+    let repo = Repo::new("worktree-root-exclude-bytes")?;
+    repo.commit("base", &[])?;
+    let exclude = repo.dir.join(".git/info/exclude");
+    let original = b"# Existing rules\r\nbad\xffname";
+    std::fs::write(&exclude, original).map_err(|e| e.to_string())?;
+    let folder = repo.dir.join(".worktrees/feat/task");
+    add(repo.path(), &folder, "feat/task")?;
+    let bytes = std::fs::read(&exclude).map_err(|e| e.to_string())?;
+    assert!(bytes.starts_with(original));
+    assert!(bytes.ends_with(b"/.worktrees/feat/task/\n"));
+    git::prepare_worktree_folder(repo.path(), &folder.to_string_lossy())?;
+    assert_eq!(std::fs::read(&exclude).map_err(|e| e.to_string())?, bytes);
+    Ok(())
+}
+
+/// Appending after another editor saved keeps the current bytes, here and over SSH.
+#[test]
+fn worktree_ignore_append_preserves_changes_since_the_read() -> Result<(), String> {
+    let repo = Repo::new("worktree-root-append")?;
+    let file = repo.dir.join("exclude");
+    let paths = vec![file.clone()];
+    #[cfg(unix)]
+    let paths = {
+        let mut paths = paths;
+        paths.push(remote::encode(
+            &remote::Host::Ssh(remote::LOOPBACK.to_owned()),
+            &file.to_string_lossy(),
+        ));
+        paths
+    };
+    for path in paths {
+        std::fs::write(&file, b"original\n").map_err(|e| e.to_string())?;
+        let snapshot = remote::read(&path).map_err(|e| e.to_string())?;
+        assert_eq!(snapshot, b"original\n");
+        std::fs::write(&file, b"original\nnew-rule\xff").map_err(|e| e.to_string())?;
+        remote::append(&path, b"\n/worktree/\n").map_err(|e| e.to_string())?;
+        assert_eq!(
+            std::fs::read(&file).map_err(|e| e.to_string())?,
+            b"original\nnew-rule\xff\n/worktree/\n"
+        );
+    }
     Ok(())
 }
 
@@ -230,7 +315,10 @@ fn worktree_root_at_checkout_never_ignores_the_entire_repository() -> Result<(),
 fn worktree_creation_explains_an_ignore_override_before_creating_the_checkout() -> Result<(), String>
 {
     let repo = Repo::new("worktree-root-negated")?;
-    repo.commit("ignore", &[(".gitignore", Some("!.worktrees/\n"))])?;
+    repo.commit(
+        "ignore",
+        &[(".gitignore", Some("!.worktrees/feat/blocked/\n"))],
+    )?;
     repo.git(&["config", "--local", WORKTREE_ROOT_KEY, ".worktrees"])?;
     let folder = repo.dir.join(".worktrees/feat/blocked");
     let error = add(repo.path(), &folder, "feat/blocked")

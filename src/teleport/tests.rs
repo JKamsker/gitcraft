@@ -367,6 +367,45 @@ fn work_arrives_exactly_and_the_source_is_untouched() -> Result<(), String> {
     Ok(())
 }
 
+/// Teleport uses the same local excludes when the selected folder is inside the target.
+#[test]
+fn an_internal_teleport_worktree_is_ignored() -> Result<(), String> {
+    let _one = serial();
+    let root = scratch("internal-worktree")?;
+    let (src, target) = source_with_work(&root)?;
+    let mut plan = plan_to(&src, &target, &Machine::Here);
+    plan.folder = target.join(".worktrees/feature/x");
+    let landed = run(&plan, &job())?;
+    assert_arrived(&src, &landed.folder)?;
+    assert!(
+        git(&target, &["check-ignore", "--", ".worktrees/feature/x/"])?
+            .contains(".worktrees/feature/x/")
+    );
+    assert!(git(&target, &["status", "--porcelain", "--untracked-files=all"])?.is_empty());
+    let _ = std::fs::remove_dir_all(&root);
+    Ok(())
+}
+
+/// An overriding .gitignore rule stops Teleport before it creates or moves a branch.
+#[test]
+fn an_internal_teleport_worktree_checks_ignore_overrides() -> Result<(), String> {
+    let _one = serial();
+    let root = scratch("internal-worktree-negation")?;
+    let (src, target) = source_with_work(&root)?;
+    write(&target.join(".gitignore"), b"!.worktrees/feature/x/\n")?;
+    let mut plan = plan_to(&src, &target, &Machine::Here);
+    plan.folder = target.join(".worktrees/feature/x");
+    let error = run(&plan, &job())
+        .err()
+        .map(String::from)
+        .ok_or("Expected an ignore error")?;
+    assert!(error.contains(".gitignore"), "{error}");
+    assert!(!plan.folder.join(".git").exists());
+    assert!(git(&target, &["show-ref", "--verify", "refs/heads/feature/x"]).is_err());
+    let _ = std::fs::remove_dir_all(&root);
+    Ok(())
+}
+
 /// To another machine and back from one, through its shells: the same, exactly.
 #[cfg(unix)]
 #[test]
