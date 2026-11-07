@@ -79,13 +79,24 @@ pub fn resolve(program: &str) -> String {
     if program.contains('/') {
         return program.to_owned();
     }
+    executable(program).map_or_else(|| program.to_owned(), |p| p.display().to_string())
+}
+
+/// A bare program's executable path, keeping non-UTF-8 folder names intact. Resolve against
+/// the same PATH passed to the child, so Unix can use posix_spawn even when PATH is changed.
+#[cfg(unix)]
+pub fn executable(program: &str) -> Option<PathBuf> {
     let own = std::env::var_os("PATH").unwrap_or_default();
-    let dirs = path().cloned().unwrap_or(own);
-    std::env::split_paths(&dirs)
+    let dirs = path().unwrap_or(&own);
+    executable_in(program, dirs)
+}
+
+#[cfg(unix)]
+fn executable_in(program: &str, dirs: &std::ffi::OsStr) -> Option<PathBuf> {
+    std::env::split_paths(dirs)
         .filter(|d| d.is_absolute())
         .map(|d| d.join(program))
-        .find(|p| p.is_file())
-        .map_or_else(|| program.to_owned(), |p| p.display().to_string())
+        .find(|p| p.is_file() && rustix::fs::access(p, rustix::fs::Access::EXEC_OK).is_ok())
 }
 
 /// Gives `cmd` that PATH.
@@ -180,6 +191,41 @@ fn marked(out: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn executable_lookup_skips_relative_and_non_executable_entries() -> std::io::Result<()> {
+        use std::os::unix::ffi::OsStringExt;
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp = std::env::temp_dir().join(format!("gitcraft-executable-{}", std::process::id()));
+        std::fs::create_dir_all(&temp)?;
+        let blocked = temp.join("not executable");
+        // APFS requires valid Unicode names; other Unix filesystems also exercise raw bytes.
+        let folder = if cfg!(target_os = "macos") {
+            OsString::from("tools é")
+        } else {
+            OsString::from_vec(b"tools \xff".to_vec())
+        };
+        let allowed = temp.join(folder);
+        std::fs::create_dir(&blocked)?;
+        std::fs::create_dir(&allowed)?;
+        for (dir, mode) in [(&blocked, 0o644), (&allowed, 0o755)] {
+            let file = dir.join("git");
+            std::fs::write(&file, "#!/bin/sh\nexit 0\n")?;
+            std::fs::set_permissions(&file, std::fs::Permissions::from_mode(mode))?;
+        }
+        let dirs = std::env::join_paths([
+            std::path::Path::new("."),
+            blocked.as_path(),
+            allowed.as_path(),
+        ])
+        .map_err(std::io::Error::other)?;
+        assert_eq!(executable_in("git", &dirs), Some(allowed.join("git")));
+        assert_eq!(executable_in("missing-program", &dirs), None);
+        assert_eq!(executable_in("git", std::ffi::OsStr::new(".:bin")), None);
+        std::fs::remove_dir_all(temp)
+    }
 
     #[cfg(unix)]
     #[test]

@@ -9,6 +9,12 @@ publish = false
 repository = "https://github.com/Vancete/gitcraft"
 readme = "README.md"
 
+[features]
+# Oniguruma is substantially faster for the syntax grammars used while opening diffs.
+# `--no-default-features` retains the pure-Rust regex backend for builds without a C compiler.
+default = ["native-highlighting"]
+native-highlighting = ["syntect/default-onig", "two-face/syntect-default-onig"]
+
 [dependencies]
 eframe = { version = "0.36", default-features = false, features = ["default_fonts", "wgpu", "accesskit", "wayland", "x11", "persistence", "links"] }
 egui = { version = "0.36", features = ["bytemuck"] }
@@ -136,6 +142,10 @@ winresource = "0.1"
 
 [dev-dependencies]
 egui_kittest = { version = "0.36", features = ["wgpu", "snapshot", "eframe"] }
+
+[target.'cfg(unix)'.dev-dependencies]
+# Process CPU time for the opt-in real-world benchmarks (separate from Git wait time).
+rustix = { version = "1", features = ["time"] }
 
 # winit 0.30.13 with two Windows fixes for moving the window between monitors of different
 # scales: the fix of rust-windowing/winit#4341 (released only in 0.31) and a minimum size that

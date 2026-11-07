@@ -1399,6 +1399,10 @@ cargo run --release -- path/to/repo   # open a repository directly
 cargo test
 ```
 
+The default syntax highlighter compiles bundled Oniguruma with the platform's C compiler.
+`cargo run --release --no-default-features` selects the pure-Rust regex backend instead.
+For reproducible browsing and diff CPU benchmarks, see [CPU performance](docs/cpu-performance.md).
+
 Linux needs the usual eframe system packages (e.g. `libxkbcommon-dev`, `libgtk-3-dev` for the
 file dialogs, `libdbus-1-dev` for notifications). Pull requests need the GitHub CLI (`gh`) or
 GitLab CLI (`glab`), logged in.

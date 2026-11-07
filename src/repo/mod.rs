@@ -23,6 +23,8 @@ mod commands;
 mod commit_actions;
 mod conflict;
 mod conflict_check;
+#[cfg(test)]
+mod cpu_benchmarks;
 pub(crate) mod custom_commands;
 mod dco;
 mod detached;

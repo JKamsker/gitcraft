@@ -1,12 +1,11 @@
-//! Syntax colouring for diffs (syntect with bat's syntaxes, pure-Rust regex engine), chosen by
-//! file extension or name.
+//! Syntax colouring for diffs (syntect with bat's syntaxes), chosen by file extension or name.
+//! The default build uses Oniguruma; `--no-default-features` keeps the pure-Rust backend.
 
 use std::sync::OnceLock;
 
 use egui::Color32;
-use syntect::easy::HighlightLines;
-use syntect::highlighting::ThemeSet;
-use syntect::parsing::SyntaxSet;
+use syntect::highlighting::{HighlightIterator, HighlightState, Highlighter, Theme, ThemeSet};
+use syntect::parsing::{ParseState, ScopeStack, ScopeStackOp, SyntaxReference, SyntaxSet};
 
 /// Coloured pieces of one line.
 pub type Spans = Vec<(Color32, String)>;
@@ -65,24 +64,79 @@ pub fn highlight<'a>(
             "InspiredGitHub"
         })?,
     };
-    let mut h = HighlightLines::new(syntax, theme);
-    let mut out = Vec::new();
+    colour_lines(lines, syntax, theme, ss)
+}
+
+struct CachedContext<'a> {
+    state: ParseState,
+    lines: std::collections::HashMap<&'a str, Vec<(usize, ScopeStackOp)>>,
+}
+
+fn colour_lines(
+    lines: Vec<&str>,
+    syntax: &SyntaxReference,
+    theme: &Theme,
+    ss: &SyntaxSet,
+) -> Option<Vec<Spans>> {
+    let highlighter = Highlighter::new(theme);
+    let mut state = HighlightState::new(&highlighter, ScopeStack::new());
+    let mut parser = ParseState::new(syntax);
+    // Generated files repeat lines such as `[[package]]` and registry URLs thousands of times.
+    // Reuse operations only when the complete parser state is identical before and after a
+    // line. Apply them to the current highlight state, preserving multiline scopes and themes.
+    // At most four contexts and 128 short lines in total, dropped when this file finishes.
+    let mut contexts: Vec<CachedContext<'_>> = Vec::new();
+    let mut cached_lines = 0;
+    let can_cache = lines.len() >= 256 && lines.first().is_some_and(|l| l.len() <= 256);
+    let mut out = Vec::with_capacity(lines.len());
+    let mut with_nl = String::new();
     for line in lines {
-        let with_nl = format!("{line}\n");
-        let ranges = h.highlight_line(&with_nl, ss).ok()?;
-        out.push(
-            ranges
-                .into_iter()
-                .map(|(style, text)| {
-                    let c = style.foreground;
-                    (
-                        Color32::from_rgb(c.r, c.g, c.b),
-                        text.trim_end_matches('\n').to_owned(),
-                    )
-                })
-                .filter(|(_, t)| !t.is_empty())
-                .collect(),
-        );
+        with_nl.clear();
+        with_nl.push_str(line);
+        with_nl.push('\n');
+        let context = contexts.iter().position(|c| c.state == parser);
+        let parsed;
+        let ops = if let Some(ops) = context.and_then(|i| contexts[i].lines.get(line)) {
+            ops
+        } else {
+            parsed = parser.parse_line(&with_nl, ss).ok()?;
+            if let Some(i) = context
+                && contexts[i].state == parser
+                && line.len() <= 256
+                && cached_lines < 128
+            {
+                contexts[i].lines.insert(line, parsed.clone());
+                cached_lines += 1;
+            } else if can_cache
+                && contexts.len() < 4
+                && line.len() <= 256
+                && !contexts.iter().any(|c| c.state == parser)
+            {
+                contexts.push(CachedContext {
+                    state: parser.clone(),
+                    lines: Default::default(),
+                });
+            }
+            &parsed
+        };
+        let ranges = HighlightIterator::new(&mut state, ops, &with_nl, &highlighter);
+        let mut spans: Spans = Vec::new();
+        for (style, text) in ranges {
+            let text = text.trim_end_matches('\n');
+            if text.is_empty() {
+                continue;
+            }
+            let c = style.foreground;
+            let colour = Color32::from_rgb(c.r, c.g, c.b);
+            if let Some((last_colour, last_text)) = spans.last_mut()
+                && *last_colour == colour
+            {
+                last_text.push_str(text);
+            } else {
+                spans.push((colour, text.to_owned()));
+            }
+        }
+        out.push(spans);
     }
     Some(out)
 }
@@ -123,6 +177,71 @@ pub(crate) fn cap_line(text: &mut String, spans: Option<&mut Spans>) -> Option<S
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cached_lines_preserve_multiline_and_embedded_syntaxes() -> Result<(), String> {
+        let cases = [
+            (
+                "rs",
+                "// first\nfn a() {\n/*\nlet x = 1;\n*/\nlet x = 1;\nlet raw = r#\"\nlet x = 1;\n\"#;\n}\n",
+            ),
+            (
+                "toml",
+                "# first\n[[package]]\nname = \"example\"\ndependencies = [\n\"example\",\n]\ntext = '''\n[[package]]\nname = \"example\"\n'''\n",
+            ),
+            (
+                "js",
+                "// first\nfunction a() {\n/*\nconst x = 1;\n*/\nconst x = 1;\nconst raw = `\nconst x = 1;\n`;\n}\n",
+            ),
+            (
+                "html",
+                "<!-- first -->\n<div>example</div>\n<script>\nconst x = 1;\n</script>\n<style>\ndiv { color: red; }\n</style>\n",
+            ),
+        ];
+        let ss = syntaxes();
+        for (extension, block) in cases {
+            let source = block.repeat(40);
+            let lines: Vec<_> = source.lines().collect();
+            let syntax = ss
+                .find_syntax_by_extension(extension)
+                .ok_or("missing syntax")?;
+            for name in ["base16-ocean.dark", "InspiredGitHub"] {
+                let theme = themes().themes.get(name).ok_or("missing theme")?;
+                let actual =
+                    colour_lines(lines.clone(), syntax, theme, ss).ok_or("highlight failed")?;
+                let mut reference = syntect::easy::HighlightLines::new(syntax, theme);
+                let expected: Result<Vec<Spans>, _> = lines
+                    .iter()
+                    .map(|line| {
+                        let text = format!("{line}\n");
+                        reference.highlight_line(&text, ss).map(|spans| {
+                            spans
+                                .into_iter()
+                                .filter_map(|(style, text)| {
+                                    let text = text.trim_end_matches('\n');
+                                    let c = style.foreground;
+                                    (!text.is_empty()).then(|| {
+                                        (Color32::from_rgb(c.r, c.g, c.b), text.to_owned())
+                                    })
+                                })
+                                .collect()
+                        })
+                    })
+                    .collect();
+                let expected = expected.map_err(|e| e.to_string())?;
+                for (actual, expected) in actual.iter().zip(&expected) {
+                    let colours = |spans: &Spans| -> Vec<_> {
+                        spans
+                            .iter()
+                            .flat_map(|(c, s)| s.bytes().map(|b| (*c, b)))
+                            .collect()
+                    };
+                    assert_eq!(colours(actual), colours(expected), "{extension}, {name}");
+                }
+            }
+        }
+        Ok(())
+    }
 
     #[test]
     fn long_lines_are_cut_with_their_colours() {
