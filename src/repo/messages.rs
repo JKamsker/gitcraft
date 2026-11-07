@@ -450,15 +450,7 @@ impl RepoTab {
                     view.rendered_arrived(request, *result, ctx);
                 }
             }
-            Msg::DiffStructural(ids, result) => {
-                let reload = self
-                    .diff
-                    .as_mut()
-                    .is_some_and(|view| view.structural.arrived(ids, view.request, *result));
-                if reload {
-                    self.load_diff_structural(ctx);
-                }
-            }
+            Msg::DiffStructural(ids, result) => self.structural_arrived(ids, *result, ctx),
             Msg::PrDetails(request, result) => self.pr_details_arrived(request, *result, ctx),
             Msg::PrFiles(request, result) => self.pr_files_arrived(request, result, ctx),
             Msg::PrPosted { hosting, .. }

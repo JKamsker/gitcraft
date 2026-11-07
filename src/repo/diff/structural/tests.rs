@@ -246,6 +246,7 @@ fn stale_answers_cannot_replace_a_newer_diff_or_read() -> Result<(), String> {
         reload: false,
     };
     tab.diff = Some(view);
+    tab.structural_running = Some((current, 2));
     for ids in [(current - 1, 2), (current, 1)] {
         tab.tx
             .send(Msg::DiffStructural(ids, Box::new(Err("stale".into()))))
@@ -679,4 +680,82 @@ fn windows_absolute_git_name_cannot_overwrite_an_existing_file() -> Result<(), S
         b"new source"
     );
     Ok(())
+}
+
+#[test]
+fn loader_coalesces_replacements_across_views_and_ignores_old_completions() -> Result<(), String> {
+    let repo = Repo::new()?;
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(repo.0.clone(), &ctx);
+    let mut old = DiffView::new(work("old.rs", Area::Untracked, '?'));
+    let old_ids = (old.next_request(), 1);
+    old.structural.enabled = true;
+    old.structural.running = Some(old_ids);
+    old.structural.load = 1;
+    tab.structural_running = Some(old_ids);
+    tab.diff = Some(old);
+    for _ in 0..5 {
+        tab.load_diff_structural(&ctx);
+    }
+    let mut latest = DiffView::new(work("missing-latest.rs", Area::Untracked, '?'));
+    latest.next_request();
+    latest.structural.enabled = true;
+    tab.diff = Some(latest);
+    for _ in 0..5 {
+        tab.load_diff_structural(&ctx);
+    }
+    assert_eq!(tab.structural_running, Some(old_ids));
+    assert_eq!(tab.diff.as_ref().map(|v| v.structural.load), Some(0));
+    tab.tx
+        .send(Msg::DiffStructural(
+            old_ids,
+            Box::new(Err("obsolete".into())),
+        ))
+        .map_err(|e| e.to_string())?;
+    tab.poll(&ctx);
+    assert_eq!(tab.diff.as_ref().map(|v| v.structural.load), Some(1));
+    assert!(!tab.structural_pending);
+    tab.tx
+        .send(Msg::DiffStructural(
+            old_ids,
+            Box::new(Err("obsolete again".into())),
+        ))
+        .map_err(|e| e.to_string())?;
+    tab.poll(&ctx);
+    assert_eq!(tab.diff.as_ref().map(|v| v.structural.load), Some(1));
+    assert!(tab.diff.as_ref().is_some_and(|v| {
+        v.structural
+            .result
+            .as_ref()
+            .is_none_or(|r| !matches!(r, Err(e) if e.contains("obsolete")))
+    }));
+    Ok(())
+}
+
+#[test]
+fn unstaged_rename_reads_the_original_index_path() -> Result<(), String> {
+    let repo = Repo::new()?;
+    repo.write("old.rs", "fn old() {}\n")?;
+    repo.commit()?;
+    std::fs::rename(repo.0.join("old.rs"), repo.0.join("new.rs")).map_err(|e| e.to_string())?;
+    repo.git(&["add", "-N", "new.rs"])?;
+    let file = git::status(&repo.0)?
+        .unstaged
+        .into_iter()
+        .find(|f| f.path == "new.rs")
+        .ok_or("renamed status")?;
+    assert_eq!(file.code, 'R');
+    assert_eq!(file.old_path.as_deref(), Some("old.rs"));
+    assert_eq!(
+        reader::read_sides(&repo.0, &DiffKey::Work(file))?,
+        ("fn old() {}\n".to_owned(), "fn old() {}\n".to_owned())
+    );
+    Ok(())
+}
+
+#[test]
+fn remote_preparation_falls_back_before_starting_a_tool_or_transport() {
+    let key = work("file.rs", Area::Untracked, '?');
+    let result = reader::read_sides(std::path::Path::new("ssh://example.invalid/repo"), &key);
+    assert!(matches!(result, Err(e) if e.contains("local repositories")));
 }

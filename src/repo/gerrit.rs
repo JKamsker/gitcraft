@@ -312,7 +312,14 @@ mod integration_tests {
         let mut tab = RepoTab::new_deferred(path.clone(), &ctx);
         tab.reload(&ctx);
         settle(&mut tab, &ctx);
-        assert!(tab.gerrit.is_some());
+        assert!(
+            tab.gerrit.is_some(),
+            "status={:?}, loading={}, head={}, remotes={:?}",
+            tab.status,
+            tab.loading,
+            tab.refs.head,
+            tab.remotes
+        );
         tab.dco_act(crate::repo::dco::DcoAct::SetSignOff(true), &ctx);
         tab.amend = true;
         tab.commit_summary = "Amended".to_owned();

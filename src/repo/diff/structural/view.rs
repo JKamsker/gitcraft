@@ -29,10 +29,6 @@ pub(in crate::repo::diff) fn show(ui: &mut Ui, data: &Structural) {
         ui.label("No syntax changes. Formatting can still differ in the patch.");
         return;
     }
-    ui.columns(2, |cols| {
-        cols[0].label("Before");
-        cols[1].label("After");
-    });
     let char_w = ui
         .painter()
         .layout_no_wrap("M".to_owned(), theme::mono(12.0), t.text)
@@ -41,11 +37,26 @@ pub(in crate::repo::diff) fn show(ui: &mut Ui, data: &Structural) {
     egui::ScrollArea::both().id_salt("syntax_diff").show_rows(
         ui,
         HEIGHT,
-        data.rows.len(),
+        data.rows.len() + 1,
         |ui, range| {
             let width = ui.available_width().max(500.0);
-            for row in &data.rows[range] {
-                match row {
+            let half = (width / 2.0).max(data.longest as f32 * char_w + GUTTER + 12.0);
+            for index in range {
+                if index == 0 {
+                    let (rect, _) =
+                        ui.allocate_exact_size(vec2(half * 2.0, HEIGHT), Sense::hover());
+                    for (column, label) in ["Before", "After"].into_iter().enumerate() {
+                        ui.painter().text(
+                            pos2(rect.left() + half * column as f32 + GUTTER, rect.center().y),
+                            Align2::LEFT_CENTER,
+                            label,
+                            theme::mono(12.0),
+                            t.text_dim,
+                        );
+                    }
+                    continue;
+                }
+                match &data.rows[index - 1] {
                     Row::Heading(n) => {
                         let (rect, _) = ui.allocate_exact_size(vec2(width, HEIGHT), Sense::hover());
                         ui.painter()
@@ -63,7 +74,6 @@ pub(in crate::repo::diff) fn show(ui: &mut Ui, data: &Structural) {
                         // long expression. Rows are virtualized; only visible lines are laid out.
                         let jobs = [job(old.as_ref(), true, &t), job(new.as_ref(), false, &t)];
                         let galleys = jobs.map(|j| ui.fonts_mut(|f| f.layout_job(j)));
-                        let half = (width / 2.0).max(data.longest as f32 * char_w + GUTTER + 12.0);
                         let (rect, _) =
                             ui.allocate_exact_size(vec2(half * 2.0, HEIGHT), Sense::hover());
                         for (i, (line, galley)) in [old.as_ref(), new.as_ref()]

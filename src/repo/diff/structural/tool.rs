@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, channel};
 use std::time::{Duration, Instant};
 
+#[cfg(test)]
 use base64::Engine;
 
 use crate::remote;
@@ -53,10 +54,11 @@ fn removed_env() -> Vec<String> {
 }
 
 pub(super) fn compare(repo: &Path, path: &str, old: &str, new: &str) -> Result<Vec<u8>, String> {
-    if let Some(target) = remote::parse(repo) {
-        let request = request(&target, path, old, new);
-        let out = remote::exec(&target.host, &request)?;
-        return output(out.code, out.stdout, out.stderr);
+    if remote::is_remote(repo) {
+        return Err(
+            "Syntax comparison is currently available for local repositories. Showing the patch."
+                .to_owned(),
+        );
     }
     let (temp, before, after) = prepare(old, new)?;
     let mut command = Command::new("difft");
@@ -122,6 +124,7 @@ fn output(code: i32, stdout: Vec<u8>, stderr: Vec<u8>) -> Result<Vec<u8>, String
     Ok(stdout)
 }
 
+#[cfg(test)]
 pub(super) fn request(
     target: &remote::Target,
     path: &str,

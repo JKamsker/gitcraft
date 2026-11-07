@@ -261,6 +261,9 @@ pub struct RepoTab {
     /// The selected commit's signature, containment, notes and backlinks.
     extras: detail::Extras,
     diff: Option<DiffView>,
+    /// One active syntax comparison and at most one latest replacement across diff views.
+    structural_running: Option<(u64, u64)>,
+    structural_pending: bool,
     compare: Option<Compare>,
     /// The pull request the big area shows.
     pr_view: Option<pr_view::PrView>,
@@ -559,6 +562,8 @@ impl RepoTab {
             detail_error: None,
             extras: Default::default(),
             diff: None,
+            structural_running: None,
+            structural_pending: false,
             compare: None,
             pr_view: None,
             ci_view: None,
