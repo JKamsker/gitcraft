@@ -43,16 +43,16 @@ fn live_gitea() -> Result<(), String> {
 }
 
 /// A server and its two users.
-struct Server {
+pub(super) struct Server {
     family: &'static GiteaFamily,
     /// `http://127.0.0.1:3000`.
-    url: String,
-    author_token: String,
+    pub(super) url: String,
+    pub(super) author_token: String,
     reviewer_token: String,
 }
 
 impl Server {
-    fn from_env(family: &'static GiteaFamily) -> Result<Server, String> {
+    pub(super) fn from_env(family: &'static GiteaFamily) -> Result<Server, String> {
         let upper = family.name.to_uppercase();
         let var = |name: &str| {
             let key = format!("GITCRAFT_{upper}_{name}");
@@ -73,11 +73,11 @@ impl Server {
         Api::new(self.family.name, &self.url, "127.0.0.1", login)
     }
 
-    fn author(&self) -> Api {
+    pub(super) fn author(&self) -> Api {
         self.api(Some(&self.author_token))
     }
 
-    fn reviewer(&self) -> Api {
+    pub(super) fn reviewer(&self) -> Api {
         self.api(Some(&self.reviewer_token))
     }
 }
@@ -99,15 +99,15 @@ fn eventually<T>(
     }
 }
 
-fn run(dir: &Path, args: &[&str]) -> Result<String, String> {
+pub(super) fn run(dir: &Path, args: &[&str]) -> Result<String, String> {
     git::run(Some(dir), args).map_err(|e| format!("git {}: {e}", args.join(" ")))
 }
 
-fn write(dir: &Path, file: &str, text: &str) -> Result<(), String> {
+pub(super) fn write(dir: &Path, file: &str, text: &str) -> Result<(), String> {
     std::fs::write(dir.join(file), text).map_err(|e| e.to_string())
 }
 
-fn scratch(name: &str) -> Result<PathBuf, String> {
+pub(super) fn scratch(name: &str) -> Result<PathBuf, String> {
     let dir = std::env::temp_dir().join(name);
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;

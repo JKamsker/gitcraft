@@ -26,6 +26,11 @@ so your config, credentials and hooks apply as usual.
   _Open_; a branch has _Push_ when it goes to a remote branch of its own name. One round trip per
   repository, a few at a time; it can also search a machine's home folder (here, WSL
   distributions, `~/.ssh/config` hosts) for repositories gitcraft doesn't know yet.
+- A pull-request inbox on the start page: across every repository opened and every forge (GitHub,
+  GitLab, Forgejo, Gitea), the pull requests waiting for your review, and yours with failing checks
+  or comments you haven't seen. A click opens one in its repository's tab (a GitLab merge request
+  in the browser). It uses the logins gh and glab have; for Forgejo and Gitea, one from the
+  environment, tea's, or one gitcraft already used: it never runs git's credential helper unasked.
 - Browser-like tabs, one per repository (Ctrl+T, Ctrl+W, middle-click; Ctrl+Shift+T reopens a
   closed one; Ctrl+Tab / Ctrl+Shift+Tab go round them, also on macOS; Ctrl+1 … 8 and Ctrl+9 for
   the last pick one, Cmd on macOS). Open tabs, recents, theme and settings are remembered.

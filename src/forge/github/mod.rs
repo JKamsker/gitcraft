@@ -11,6 +11,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
+use super::inbox;
 use super::{Hosting, Issue, MergedPullRequest, NewPullRequest, Pages, Provider, PullRequest, cli};
 use crate::avatars::Hint;
 use crate::pr_post::Target;
@@ -133,6 +134,32 @@ impl Provider for GitHub {
             .into_iter()
             .map(|(email, url)| (email, Hint::Url(url)))
             .collect()
+    }
+
+    /// Two lists: those whose review is asked of you (or a team of yours), and yours with
+    /// their checks, comments and reviews.
+    fn inbox(&self, repo: &Path, _: &Hosting) -> Result<inbox::Answer, String> {
+        const FIELDS: &str = "number,title,url,author,isDraft,updatedAt";
+        const MAX: usize = 50;
+        let list = |filter: &[&str], fields: &str| {
+            let max = MAX.to_string();
+            let mut args = vec!["pr", "list", "--state", "open", "--limit", &max];
+            args.extend(filter);
+            args.extend(["--json", fields]);
+            cli::run_within(TOOL, NOUN, repo, &args, inbox::TOOL_FOR)
+        };
+        let asked =
+            inbox::parse_github(&list(&["--search", "review-requested:@me"], FIELDS)?, true)?;
+        let mine_fields = format!("{FIELDS},statusCheckRollup,comments,reviews");
+        let mine = inbox::parse_github(&list(&["--author", "@me"], &mine_fields)?, false)?;
+        let cut = [
+            inbox::cut_note(asked.len(), MAX, "asking your review"),
+            inbox::cut_note(mine.len(), MAX, "of yours"),
+        ];
+        Ok(inbox::Answer {
+            prs: inbox::merged(vec![asked, mine]),
+            cut: cut.into_iter().flatten().collect(),
+        })
     }
 
     fn pages(&self) -> Option<&dyn Pages> {

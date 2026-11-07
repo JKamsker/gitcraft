@@ -107,10 +107,8 @@ jobs:
       - name: Test against them
         run: |
           cargo test --locked --lib forge::gitea::live -- --ignored --nocapture 2>&1 | tee live.log
-          # Green has to mean all ran: a renamed module would match nothing and pass. Two of a
-          # pull request's whole life (live.rs), two of the issues assigned to you
-          # (live_issues.rs), on each server.
-          grep -q "test result: ok. 4 passed" live.log
+          # Require the lifecycle, assigned-issue and inbox tests on both servers.
+          grep -q "test result: ok. 6 passed" live.log
       - name: Server logs
         if: failure()
         env:

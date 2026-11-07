@@ -604,6 +604,11 @@ impl RepoTab {
         self.hosting.as_ref().map(|h| h.forge)
     }
 
+    /// Whether the tab knows its forge and can show that forge's pull requests in full.
+    pub(crate) fn shows_pull_requests(&self) -> bool {
+        self.hosting.as_ref().is_some_and(|h| h.forge.has_pages())
+    }
+
     /// HTTPS credentials for this tab's git commands (from the clone that made it).
     pub fn set_credentials(&mut self, creds: git::Credentials) {
         self.credentials = Some(creds);

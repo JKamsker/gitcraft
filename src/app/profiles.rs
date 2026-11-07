@@ -171,6 +171,9 @@ impl App {
         // is noticed against what it is now.
         self.profile_git_seen = settings::profiles::config_text(&next, &[]);
         self.restore_state(state, ctx);
+        // The inbox starts over: a pull request waiting to open would wait on a tab that's
+        // gone. What was seen of each stays, being the forge account's, not the profile's.
+        self.inbox = Default::default();
         self.toasts.push(Toast::new(
             format!("Switched to the profile “{}”", next.title()),
             false,

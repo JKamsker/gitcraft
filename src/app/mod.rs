@@ -11,6 +11,7 @@ mod home_filter;
 mod home_recent;
 mod my_work;
 mod os_shell;
+mod inbox;
 mod palette;
 mod panels;
 mod profiles;
@@ -81,6 +82,8 @@ struct Saved {
     workspaces: crate::across::workspaces::Workspaces,
     /// Repositories found on a machine by "Where's my work?".
     found_repos: Vec<PathBuf>,
+    /// What was seen of each pull request (by URL) when it was opened from the inbox.
+    inbox_seen: BTreeMap<String, crate::forge::inbox::Seen>,
 }
 
 enum Tab {
@@ -183,6 +186,8 @@ pub struct App {
     /// Repositories found on a machine by "Where's my work?", looked at with the others.
     found_repos: Vec<PathBuf>,
     my_work: my_work::MyWork,
+    inbox: inbox::Inbox,
+    inbox_seen: BTreeMap<String, crate::forge::inbox::Seen>,
 }
 
 impl App {
@@ -266,6 +271,8 @@ impl App {
             workspaces_view: Default::default(),
             found_repos: saved.found_repos,
             my_work: Default::default(),
+            inbox: Default::default(),
+            inbox_seen: saved.inbox_seen,
         };
         update::clean_up();
         if let crate::portable::Mode::Unusable(why) = crate::portable::mode() {
@@ -631,6 +638,7 @@ impl eframe::App for App {
         self.os_shell(&ctx, frame);
         self.poll_connecting(&ctx);
         self.poll_update(&ctx);
+        self.poll_inbox_opening(&ctx);
         self.notice_profile_git(&ctx);
         let focused = self.shortcuts(&ctx);
         self.agent_requests(&ctx);
@@ -721,6 +729,7 @@ impl eframe::App for App {
             last_opened: self.last_opened.clone(),
             workspaces: self.workspaces.clone(),
             found_repos: self.found_repos.clone(),
+            inbox_seen: self.inbox_seen.clone(),
         };
         eframe::set_value(storage, eframe::APP_KEY, &saved);
     }
