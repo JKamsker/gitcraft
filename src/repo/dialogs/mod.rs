@@ -55,7 +55,6 @@ pub enum Dialog {
     BundleIncoming {
         label: String,
         preview: Box<crate::git::BundlePreview>,
-        imports: Vec<(bool, crate::git::BundleImport)>,
     },
     CreateBranch {
         /// Commit the branch starts at.
@@ -498,7 +497,7 @@ impl RepoTab {
                     if ui.button("Cancel").clicked() { Outcome::Cancel } else { Outcome::Open }
                 }
                 Dialog::BundleExport { refs, selected, base } => bundles::export(ui, refs, selected, base, idle),
-                Dialog::BundleIncoming { label, preview, imports } => bundles::incoming(ui, label, preview, imports, idle),
+                Dialog::BundleIncoming { label, preview } => bundles::incoming(ui, label, preview),
                 Dialog::CreateBranch {
                     at,
                     at_label,

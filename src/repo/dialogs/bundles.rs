@@ -1,5 +1,5 @@
 use super::Outcome;
-use crate::git::{BundleImport, BundlePreview, BundleRef};
+use crate::git::{BundlePreview, BundleRef};
 use crate::repo::Action;
 use crate::theme::Tokens;
 use egui::Ui;
@@ -68,13 +68,7 @@ pub(super) fn export(
     outcome
 }
 
-pub(super) fn incoming(
-    ui: &mut Ui,
-    label: &str,
-    preview: &BundlePreview,
-    imports: &mut [(bool, BundleImport)],
-    idle: bool,
-) -> Outcome {
+pub(super) fn incoming(ui: &mut Ui, label: &str, preview: &BundlePreview) -> Outcome {
     ui.set_width(720.0);
     let t = Tokens::get(ui.ctx());
     ui.heading("Inspect Git bundle");
@@ -83,11 +77,11 @@ pub(super) fn incoming(
     if let Some(error) = &preview.verification_error {
         ui.colored_label(
             t.danger,
-            format!("Verification failed; import unavailable:\n{error}"),
+            format!("Header/prerequisite verification failed:\n{error}"),
         );
     } else {
         ui.label(
-            "Git verified the header and prerequisites. Pack data is validated during import.",
+            "Git verified the header and prerequisites. Pack contents have not been validated.",
         );
     }
     ui.collapsing(
@@ -106,80 +100,28 @@ pub(super) fn incoming(
                 });
         },
     );
-    ui.label("Choose source refs and edit their new full destination names:");
-    let mut valid = preview.verification_error.is_none();
-    let mut names = BTreeSet::new();
-    let mut count = 0;
+    ui.label("Incoming refs:");
     egui::ScrollArea::vertical()
         .max_height(300.0)
-        .id_salt("bundle_import_refs")
+        .id_salt("bundle_preview_refs")
         .show(ui, |ui| {
-            for (on, i) in imports.iter_mut() {
-                ui.horizontal(|ui| {
-                    ui.checkbox(on, &i.source);
-                    if let Some(r) = preview.refs.iter().find(|r| r.name == i.source) {
-                        ui.monospace(&r.oid);
-                    }
-                });
-                ui.add_enabled_ui(*on, |ui| {
-                    ui.text_edit_singleline(&mut i.destination);
-                });
-                if *on {
-                    count += 1;
-                    if preview.existing_refs.contains(&i.destination)
-                        || !names.insert(&i.destination)
-                    {
-                        valid = false;
-                        ui.colored_label(
-                            t.warning,
-                            "Destination already exists, is checked out, or is selected twice; choose a new name.",
-                        );
-                    }
-                    if !["refs/heads/", "refs/tags/", "refs/bundles/"]
-                        .iter()
-                        .any(|p| i.destination.starts_with(p))
-                    {
-                        valid = false;
-                        ui.colored_label(
-                            t.warning,
-                            "Use a full refs/heads/…, refs/tags/… or refs/bundles/… destination.",
-                        );
-                    }
-                }
+            for r in &preview.refs {
+                ui.monospace(format!("{} {}", r.oid, r.name));
             }
         });
-    ui.label("Import creates all selected refs atomically. Existing refs and checkout are preserved; it never merges or checks out incoming work. A collision or changed prerequisite stops the import.");
-    let mut outcome = Outcome::Open;
-    ui.horizontal(|ui| {
-        if ui
-            .add_enabled(
-                valid && count > 0 && idle,
-                egui::Button::new("Import selected as new refs"),
-            )
-            .clicked()
-        {
-            outcome = Outcome::Done(Box::new(Action::ImportBundle {
-                preview: Box::new(preview.clone()),
-                imports: imports
-                    .iter()
-                    .filter(|(on, _)| *on)
-                    .map(|(_, i)| i.clone())
-                    .collect(),
-            }));
-        }
-        if ui.button("Cancel").clicked() {
-            outcome = Outcome::Cancel;
-        }
-    });
-    outcome
+    ui.label("Import is deferred until resource limits can safely contain unpacking untrusted data. Inspecting this file does not install its objects or refs.");
+    if ui.button("Close").clicked() {
+        Outcome::Cancel
+    } else {
+        Outcome::Open
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
-    fn incoming_dialog_previews_collisions_and_escape_cancels_without_ref_changes()
-    -> Result<(), String> {
+    fn incoming_dialog_is_read_only_and_escape_cancels_without_ref_changes() -> Result<(), String> {
         use crate::git;
         use crate::repo::{Dialog, RepoTab};
         let root = std::env::temp_dir().join(format!("gitcraft-bundle-ui-{}", std::process::id()));
@@ -212,10 +154,6 @@ mod tests {
         )?;
         let refs = git::bundle_refs(&root)?;
         let head = refs.iter().find(|r| r.name == "HEAD").ok_or("no HEAD")?;
-        let existing = refs
-            .iter()
-            .find(|r| r.name.starts_with("refs/heads/"))
-            .ok_or("no branch")?;
         let preview = git::inspect_bundle(
             &root,
             git::export_bundle(&root, std::slice::from_ref(head), None)?,
@@ -226,13 +164,6 @@ mod tests {
         tab.dialog = Some(Dialog::BundleIncoming {
             label: "selected.bundle".into(),
             preview: Box::new(preview),
-            imports: vec![(
-                true,
-                BundleImport {
-                    source: "HEAD".into(),
-                    destination: existing.name.clone(),
-                },
-            )],
         });
         let mut actions = Vec::new();
         let mut text = String::new();
@@ -268,7 +199,7 @@ mod tests {
             output.textures_delta.clear();
         }
         assert!(text.contains("Git verified the header"), "{text}");
-        assert!(text.contains("Destination already exists"), "{text}");
+        assert!(text.contains("Import is deferred"), "{text}");
         assert!(tab.dialog.is_none());
         assert!(actions.is_empty());
         assert_eq!(

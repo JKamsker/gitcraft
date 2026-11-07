@@ -1,9 +1,8 @@
-//! Offline exchange: immutable bundle previews and create-only atomic ref imports.
+//! Offline export and read-only bundle inspection. Import awaits OS resource containment.
 use std::collections::BTreeSet;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::{command::bounded, run};
@@ -22,16 +21,8 @@ pub struct BundleRef {
 pub struct BundlePreview {
     pub refs: Vec<BundleRef>,
     pub prerequisites: Vec<BundleRef>,
-    /// Header and prerequisites checked by `git bundle verify`; the pack is checked on import.
+    /// Only header/prerequisites are verified. Pack data is never unpacked by inspection.
     pub verification_error: Option<String>,
-    /// Existing refs plus checked-out branch names, including unborn worktrees.
-    pub existing_refs: BTreeSet<String>,
-    bytes: Arc<Vec<u8>>,
-}
-#[derive(Clone, Debug)]
-pub struct BundleImport {
-    pub source: String,
-    pub destination: String,
 }
 
 pub fn bundle_refs(repo: &Path) -> Result<Vec<BundleRef>, String> {
@@ -85,17 +76,17 @@ pub fn export_bundle(
     if refs.is_empty() || refs.len() > REF_LIMIT {
         return Err("Choose between 1 and 1000 refs".into());
     }
+    let available: std::collections::HashMap<_, _> = bundle_refs(repo)?
+        .into_iter()
+        .map(|r| (r.name, r.oid))
+        .collect();
     let mut seen = BTreeSet::new();
     for r in refs {
-        valid_ref(repo, &r.name)?;
+        valid_ref(&r.name)?;
         if !valid_oid(&r.oid) || !seen.insert(&r.name) {
             return Err("Invalid or duplicate export ref".into());
         }
-        let current = run(
-            Some(repo),
-            &["rev-parse", "--verify", "--end-of-options", &r.name],
-        )?;
-        if current.trim() != r.oid {
+        if available.get(&r.name) != Some(&r.oid) {
             return Err(format!(
                 "{} moved since the export dialog opened; reopen it",
                 r.name
@@ -170,121 +161,15 @@ pub fn save_bundle_file(file: &Path, bytes: &[u8]) -> Result<(), String> {
 pub fn inspect_bundle(repo: &Path, bytes: Vec<u8>) -> Result<BundlePreview, String> {
     let (refs, prerequisites) = header(&bytes)?;
     for r in &refs {
-        valid_ref(repo, &r.name)?;
+        valid_ref(&r.name)?;
     }
     let temp = BundleFile::new(repo, &bytes)?;
     let verification_error = verify(repo, &temp.path, &refs, &bytes).err();
-    let existing = bounded::run(
-        repo,
-        &["for-each-ref", "--format=%(refname)"],
-        vec![],
-        HEADER_LIMIT,
-    )?;
-    let mut existing_refs: BTreeSet<String> = std::str::from_utf8(&existing)
-        .map_err(|_| "Repository refs are not UTF-8")?
-        .lines()
-        .map(str::to_owned)
-        .collect();
-    existing_refs.extend(checked_out_refs(repo)?);
     Ok(BundlePreview {
         refs,
         prerequisites,
         verification_error,
-        existing_refs,
-        bytes: Arc::new(bytes),
     })
-}
-
-pub fn import_bundle(
-    repo: &Path,
-    preview: &BundlePreview,
-    imports: &[BundleImport],
-) -> Result<(), String> {
-    if imports.is_empty() || imports.len() > REF_LIMIT {
-        return Err("Choose at least one ref to import".into());
-    }
-    // Reparse immutable bytes, not a potentially replaced file or edited preview fields.
-    let (refs, _) = header(&preview.bytes)?;
-    let checked_out = checked_out_refs(repo)?;
-    let mut destinations = BTreeSet::new();
-    let mut transaction = String::from("start\n");
-    for i in imports {
-        if !["refs/heads/", "refs/tags/", "refs/bundles/"]
-            .iter()
-            .any(|p| i.destination.starts_with(p))
-        {
-            return Err("Import destinations must be new refs/heads/…, refs/tags/… or refs/bundles/… refs; HEAD and special namespaces cannot change".into());
-        }
-        valid_ref(repo, &i.destination)?;
-        if checked_out.contains(&i.destination) {
-            return Err(format!(
-                "{} is checked out in a worktree; choose a different destination",
-                i.destination
-            ));
-        }
-        if !destinations.insert(&i.destination) {
-            return Err("Duplicate destination refs".into());
-        }
-        let source = refs
-            .iter()
-            .find(|r| r.name == i.source)
-            .ok_or("Selected source is not in this bundle")?;
-        transaction.push_str(&format!("create {} {}\n", i.destination, source.oid));
-    }
-    transaction.push_str("prepare\ncommit\n");
-    let temp = BundleFile::new(repo, &preview.bytes)?;
-    let no_lazy = verify(repo, &temp.path, &refs, &preview.bytes)?;
-    // `bundle unbundle` does not honor fetch/transfer.fsckObjects. Feed only the pack
-    // to strict index-pack so malformed objects, not only bad checksums, stop the import.
-    let pack_at = preview
-        .bytes
-        .windows(2)
-        .position(|s| s == b"\n\n")
-        .ok_or("No bundle pack")?
-        + 2;
-    let pack_args: Vec<_> = no_lazy
-        .iter()
-        .copied()
-        .chain([
-            "index-pack",
-            "--stdin",
-            "--fix-thin",
-            "--strict",
-            "--max-input-size=134217728",
-        ])
-        .collect();
-    bounded::run(
-        repo,
-        &pack_args,
-        preview.bytes[pack_at..].to_vec(),
-        HEADER_LIMIT,
-    )?;
-    let checked_out = checked_out_refs(repo)?;
-    if imports.iter().any(|i| checked_out.contains(&i.destination)) {
-        return Err("A destination became checked out while reading the bundle; choose different destination refs".into());
-    }
-    let ref_args: Vec<_> = no_lazy
-        .iter()
-        .copied()
-        .chain(["update-ref", "--no-deref", "--stdin"])
-        .collect();
-    bounded::run(repo, &ref_args, transaction.into_bytes(), HEADER_LIMIT)?;
-    Ok(())
-}
-
-fn checked_out_refs(repo: &Path) -> Result<BTreeSet<String>, String> {
-    let out = bounded::run(
-        repo,
-        &["worktree", "list", "--porcelain", "-z"],
-        vec![],
-        HEADER_LIMIT,
-    )?;
-    let out = std::str::from_utf8(&out).map_err(|_| "Worktree paths are not UTF-8")?;
-    Ok(out
-        .split('\0')
-        .filter_map(|line| line.strip_prefix("branch "))
-        .map(str::to_owned)
-        .collect())
 }
 
 fn verify(
@@ -393,39 +278,33 @@ fn no_lazy_compatibility(
     }
 }
 
-pub fn bundle_destination(source: &str) -> String {
-    if source == "HEAD" {
-        "refs/heads/bundle/HEAD".into()
-    } else if let Some(name) = source.strip_prefix("refs/heads/") {
-        format!("refs/heads/bundle/{name}")
-    } else if let Some(name) = source.strip_prefix("refs/tags/") {
-        format!("refs/tags/bundle/{name}")
-    } else {
-        format!(
-            "refs/bundles/{}",
-            source.strip_prefix("refs/").unwrap_or(source)
-        )
-    }
-}
-
 fn valid_oid(oid: &str) -> bool {
     matches!(oid.len(), 40 | 64)
         && oid.bytes().all(|b| b.is_ascii_hexdigit())
         && oid.bytes().any(|b| b != b'0')
 }
-fn valid_ref(repo: &Path, name: &str) -> Result<(), String> {
+fn valid_ref(name: &str) -> Result<(), String> {
+    // Git's full-ref grammar is repository-independent. Validate locally so an
+    // inspection never needs one remote round trip per advertised ref.
     if name == "HEAD" {
         return Ok(());
     }
-    if name.len() > 1024 || !name.starts_with("refs/") || name.chars().any(char::is_control) {
-        return Err("Bundle ref must be a full refs/… name without control characters".into());
+    let invalid = name.len() > 1024
+        || !name.starts_with("refs/")
+        || name.ends_with(['/', '.'])
+        || name.contains("..")
+        || name.contains("@{")
+        || name
+            .split('/')
+            .any(|part| part.is_empty() || part.starts_with('.') || part.ends_with(".lock"))
+        || name
+            .bytes()
+            .any(|b| b <= b' ' || b == 127 || b"~^:?*[\\".contains(&b));
+    if invalid {
+        Err(format!("Invalid bundle ref: {name}"))
+    } else {
+        Ok(())
     }
-    // Ref syntax is repository-independent. Avoid a remote shell round trip per ref,
-    // while keeping Practice independent from the active profile's config/error state.
-    let checked = run(Some(repo), &["check-ref-format", name]);
-    checked
-        .map(|_| ())
-        .map_err(|_| format!("Invalid bundle ref: {name}"))
 }
 
 fn header(bytes: &[u8]) -> Result<(Vec<BundleRef>, Vec<BundleRef>), String> {

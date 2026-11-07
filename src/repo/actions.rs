@@ -284,14 +284,10 @@ pub(crate) enum Action {
     /// Move or squash a commit of the checked-out branch onto another of it.
     CommitDrop(drag_drop::CommitDrop),
     OpenBundleExport,
-    OpenBundleImport,
+    OpenBundleInspect,
     ExportBundle {
         refs: Vec<git::BundleRef>,
         base: String,
-    },
-    ImportBundle {
-        preview: Box<git::BundlePreview>,
-        imports: Vec<git::BundleImport>,
     },
     /// Drop or move a commit of the checked-out branch.
     QuickEdit {
@@ -573,9 +569,9 @@ impl RepoTab {
                 Action::OpenBundleExport,
             ),
             (
-                "Inspect / import local Git bundle…".into(),
+                "Inspect local Git bundle…".into(),
                 "offline exchange".into(),
-                Action::OpenBundleImport,
+                Action::OpenBundleInspect,
             ),
             (
                 "Stash only what is staged…".into(),

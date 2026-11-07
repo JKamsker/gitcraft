@@ -48,7 +48,7 @@ impl RepoTab {
             },
         );
     }
-    pub(super) fn open_bundle_import(&mut self, ctx: &egui::Context) {
+    pub(super) fn open_bundle_inspect(&mut self, ctx: &egui::Context) {
         let Some(file) = rfd::FileDialog::new()
             .set_title("Inspect local Git bundle (temporary copy to repository machine)")
             .add_filter("Git bundle", &["bundle"])
@@ -68,23 +68,9 @@ impl RepoTab {
                 }
                 match result {
                     Ok(preview) => {
-                        let imports = preview
-                            .refs
-                            .iter()
-                            .map(|r| {
-                                (
-                                    true,
-                                    git::BundleImport {
-                                        source: r.name.clone(),
-                                        destination: git::bundle_destination(&r.name),
-                                    },
-                                )
-                            })
-                            .collect();
                         tab.dialog = Some(Dialog::BundleIncoming {
                             label,
                             preview: Box::new(preview),
-                            imports,
                         });
                     }
                     Err(e) => {
@@ -117,20 +103,6 @@ impl RepoTab {
         self.bundle_job(label, Refresh::Status, ctx, move || {
             let bytes = git::export_bundle(&repo, &refs, Some(&base))?;
             git::save_bundle_file(&file, &bytes)
-        });
-    }
-    pub(super) fn import_bundle(
-        &mut self,
-        preview: Box<git::BundlePreview>,
-        imports: Vec<git::BundleImport>,
-        ctx: &egui::Context,
-    ) {
-        if self.busy_op.is_some() {
-            return;
-        }
-        let repo = self.path.clone();
-        self.bundle_job("Import bundle refs".into(), Refresh::All, ctx, move || {
-            git::import_bundle(&repo, &preview, &imports)
         });
     }
     fn bundle_job(

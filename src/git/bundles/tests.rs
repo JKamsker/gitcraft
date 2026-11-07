@@ -47,12 +47,6 @@ fn head(repo: &Path) -> Result<BundleRef, String> {
         .find(|r| r.name == "HEAD")
         .ok_or_else(|| "no HEAD".into())
 }
-fn mapping(destination: &str) -> BundleImport {
-    BundleImport {
-        source: "HEAD".into(),
-        destination: destination.into(),
-    }
-}
 fn refs(repo: &Path) -> Result<String, String> {
     run(
         Some(repo),
@@ -149,240 +143,6 @@ fn native_long_bundle_paths_verify_exact_bytes_and_cleanup_without_changing_conf
     Ok(())
 }
 
-#[test]
-fn full_bundle_preview_is_read_only_and_import_creates_refs_without_checkout() -> Result<(), String>
-{
-    let f = Fixture::new()?;
-    let source = f.repo("source")?;
-    let oid = f.commit(&source, "one")?;
-    run(Some(&source), &["tag", "-a", "v1", "-m", "annotated"])?;
-    let selected: Vec<_> = bundle_refs(&source)?
-        .into_iter()
-        .filter(|r| r.name == "HEAD" || r.name == "refs/tags/v1")
-        .collect();
-    let bytes = export_bundle(&source, &selected, None)?;
-    let dest = f.repo("dest")?;
-    let before = refs(&dest)?;
-    let preview = inspect_bundle(&dest, bytes)?;
-    assert!(
-        preview.verification_error.is_none(),
-        "{:?}",
-        preview.verification_error
-    );
-    assert!(preview.prerequisites.is_empty());
-    assert_eq!(refs(&dest)?, before);
-    assert!(run(Some(&dest), &["cat-file", "-e", &oid]).is_err());
-    import_bundle(
-        &dest,
-        &preview,
-        &[
-            mapping("refs/heads/imported"),
-            BundleImport {
-                source: "refs/tags/v1".into(),
-                destination: "refs/tags/imported-v1".into(),
-            },
-        ],
-    )?;
-    assert_eq!(
-        run(Some(&dest), &["rev-parse", "refs/heads/imported"])?.trim(),
-        oid
-    );
-    assert_eq!(
-        run(Some(&dest), &["cat-file", "-t", "refs/tags/imported-v1"])?.trim(),
-        "tag"
-    );
-    assert!(!dest.join("file").exists());
-    assert!(!dest.join(".git/FETCH_HEAD").exists());
-    assert!(run(Some(&dest), &["rev-parse", "--verify", "HEAD"]).is_err());
-    Ok(())
-}
-
-#[test]
-fn incremental_bundle_explains_missing_prerequisites_then_imports_after_base() -> Result<(), String>
-{
-    let f = Fixture::new()?;
-    let source = f.repo("source")?;
-    let base = f.commit(&source, "base\twith tab")?;
-    let full = export_bundle(&source, &[head(&source)?], None)?;
-    let tip = f.commit(&source, "tip")?;
-    let incremental = export_bundle(&source, &[head(&source)?], Some(&base))?;
-    let dest = f.repo("dest")?;
-    let preview = inspect_bundle(&dest, incremental)?;
-    assert_eq!(preview.prerequisites[0].oid, base);
-    assert!(
-        preview
-            .verification_error
-            .as_ref()
-            .is_some_and(|e| e.contains(&base))
-    );
-    assert!(import_bundle(&dest, &preview, &[mapping("refs/heads/tip")]).is_err());
-    assert!(refs(&dest)?.is_empty());
-    let base_preview = inspect_bundle(&dest, full)?;
-    import_bundle(&dest, &base_preview, &[mapping("refs/heads/base")])?;
-    // Import re-verifies the pinned preview even if its earlier prerequisite check failed.
-    import_bundle(&dest, &preview, &[mapping("refs/heads/tip")])?;
-    assert_eq!(
-        run(Some(&dest), &["rev-parse", "refs/heads/tip"])?.trim(),
-        tip
-    );
-    Ok(())
-}
-
-#[test]
-fn export_ref_snapshots_and_saved_files_cannot_be_overwritten() -> Result<(), String> {
-    let f = Fixture::new()?;
-    let source = f.repo("source")?;
-    let oid = f.commit(&source, "one")?;
-    let selected = head(&source)?;
-    let bytes = export_bundle(&source, std::slice::from_ref(&selected), None)?;
-    f.commit(&source, "two")?;
-    assert!(export_bundle(&source, &[selected], None).is_err());
-    let out = f.0.join("quoted ' output.bundle");
-    save_bundle_file(&out, &bytes)?;
-    assert!(save_bundle_file(&out, b"replace").is_err());
-    let snapshot = read_bundle_file(&out)?;
-    assert_eq!(snapshot, bytes);
-    std::fs::write(&out, b"replaced after preview").map_err(|e| e.to_string())?;
-    let dest = f.repo("dest")?;
-    let preview = inspect_bundle(&dest, snapshot)?;
-    import_bundle(&dest, &preview, &[mapping("refs/heads/old-snapshot")])?;
-    assert_eq!(
-        run(Some(&dest), &["rev-parse", "refs/heads/old-snapshot"])?.trim(),
-        oid
-    );
-    Ok(())
-}
-
-#[test]
-fn import_collisions_and_concurrent_ref_changes_fail_atomically() -> Result<(), String> {
-    let f = Fixture::new()?;
-    let source = f.repo("source")?;
-    f.commit(&source, "source")?;
-    let bytes = export_bundle(&source, &[head(&source)?], None)?;
-    let dest = f.repo("dest")?;
-    let old = f.commit(&dest, "destination")?;
-    let current = run(Some(&dest), &["symbolic-ref", "HEAD"])?;
-    let preview = inspect_bundle(&dest, bytes)?;
-    let before = refs(&dest)?;
-    assert!(
-        import_bundle(
-            &dest,
-            &preview,
-            &[mapping("refs/heads/new"), mapping(current.trim())]
-        )
-        .is_err()
-    );
-    assert_eq!(refs(&dest)?, before);
-    assert!(!dest.join(".git/refs/heads/new").exists());
-    run(Some(&dest), &["update-ref", "refs/heads/raced", &old])?;
-    let after_race = refs(&dest)?;
-    assert!(
-        import_bundle(
-            &dest,
-            &preview,
-            &[
-                mapping("refs/heads/another-new"),
-                mapping("refs/heads/raced")
-            ]
-        )
-        .is_err()
-    );
-    assert_eq!(refs(&dest)?, after_race);
-    assert_eq!(
-        std::fs::read_to_string(dest.join("file")).map_err(|e| e.to_string())?,
-        "destination"
-    );
-    assert!(import_bundle(&dest, &preview, &[mapping("HEAD")]).is_err());
-    assert!(import_bundle(&dest, &preview, &[mapping("refs/replace/evil")]).is_err());
-    Ok(())
-}
-
-#[test]
-fn symbolic_and_namespace_collision_destinations_are_not_followed() -> Result<(), String> {
-    let f = Fixture::new()?;
-    let source = f.repo("source")?;
-    f.commit(&source, "one")?;
-    let dest = f.repo("dest")?;
-    let preview = inspect_bundle(&dest, export_bundle(&source, &[head(&source)?], None)?)?;
-    run(
-        Some(&dest),
-        &["symbolic-ref", "refs/heads/alias", "refs/heads/missing"],
-    )?;
-    assert!(import_bundle(&dest, &preview, &[mapping("refs/heads/alias")]).is_err());
-    assert!(
-        run(
-            Some(&dest),
-            &["rev-parse", "--verify", "refs/heads/missing"]
-        )
-        .is_err()
-    );
-    import_bundle(&dest, &preview, &[mapping("refs/heads/prefix")])?;
-    assert!(
-        import_bundle(
-            &dest,
-            &preview,
-            &[
-                mapping("refs/heads/prefix/child"),
-                mapping("refs/heads/other")
-            ]
-        )
-        .is_err()
-    );
-    assert!(run(Some(&dest), &["rev-parse", "--verify", "refs/heads/other"]).is_err());
-    Ok(())
-}
-
-#[test]
-fn malformed_headers_untrusted_refs_and_corrupt_packs_never_create_refs() -> Result<(), String> {
-    let f = Fixture::new()?;
-    let source = f.repo("source")?;
-    f.commit(&source, "one")?;
-    let bytes = export_bundle(&source, &[head(&source)?], None)?;
-    let oid = head(&source)?.oid;
-    let pack = &bytes[bytes
-        .windows(2)
-        .position(|s| s == b"\n\n")
-        .ok_or("no pack")?
-        + 2..];
-    for description in ["", "\tTabbed subject"] {
-        let mut sample =
-            format!("# v2 git bundle\n-{oid}{description}\n{oid} HEAD\n\n").into_bytes();
-        // A tabbed subject uses the normal space after the prerequisite OID.
-        if !description.is_empty() {
-            sample = format!("# v2 git bundle\n-{oid} {description}\n{oid} HEAD\n\n").into_bytes();
-        }
-        sample.extend(pack);
-        let (_, prerequisites) = header(&sample)?;
-        assert_eq!(prerequisites.len(), 1);
-        assert!(!prerequisites[0].name.chars().any(char::is_control));
-    }
-    let dest = f.repo("dest")?;
-    for bad in [
-        b"not a bundle".to_vec(),
-        b"# v2 git bundle\n\nPACK".to_vec(),
-        bytes[..20].to_vec(),
-    ] {
-        assert!(inspect_bundle(&dest, bad).is_err());
-    }
-    for name in [
-        "--output=evil",
-        "refs/heads/a b",
-        "refs/heads/../escape",
-        "refs/heads/a\ncreate refs/heads/evil",
-        "refs/heads/a.lock",
-    ] {
-        let bad = String::from_utf8_lossy(&bytes).replacen(" HEAD\n", &format!(" {name}\n"), 1);
-        assert!(inspect_bundle(&dest, bad.into_bytes()).is_err(), "{name}");
-    }
-    let mut corrupt = bytes;
-    let last = corrupt.len() - 1;
-    corrupt[last] ^= 1;
-    let preview = inspect_bundle(&dest, corrupt)?;
-    assert!(import_bundle(&dest, &preview, &[mapping("refs/heads/corrupt")]).is_err());
-    assert!(refs(&dest)?.is_empty());
-    Ok(())
-}
-
 #[cfg(unix)]
 #[test]
 fn remote_binary_request_quotes_paths_refs_and_stdin_as_data() -> Result<(), String> {
@@ -461,39 +221,6 @@ fn remote_binary_request_quotes_paths_refs_and_stdin_as_data() -> Result<(), Str
 }
 
 #[test]
-fn v2_and_sha256_bundles_preserve_object_formats() -> Result<(), String> {
-    let f = Fixture::new()?;
-    let source = f.repo("source")?;
-    f.commit(&source, "one")?;
-    let v2 = bounded::run(
-        &source,
-        &["bundle", "create", "--version=2", "-", "HEAD"],
-        vec![],
-        BUNDLE_LIMIT,
-    )?;
-    let dest = f.repo("dest")?;
-    let preview = inspect_bundle(&dest, v2)?;
-    assert!(preview.verification_error.is_none());
-    import_bundle(&dest, &preview, &[mapping("refs/heads/v2")])?;
-    let sha_source = f.repo_format("sha-source", "sha256")?;
-    let oid = f.commit(&sha_source, "sha256")?;
-    assert_eq!(oid.len(), 64);
-    let sha_bundle = export_bundle(&sha_source, &[head(&sha_source)?], None)?;
-    let wrong_format = inspect_bundle(&dest, sha_bundle.clone())?;
-    assert!(wrong_format.verification_error.is_some());
-    assert!(import_bundle(&dest, &wrong_format, &[mapping("refs/heads/wrong")]).is_err());
-    let sha_dest = f.repo_format("sha-dest", "sha256")?;
-    let preview = inspect_bundle(&sha_dest, sha_bundle)?;
-    assert!(preview.verification_error.is_none());
-    import_bundle(&sha_dest, &preview, &[mapping("refs/heads/sha256")])?;
-    assert_eq!(
-        run(Some(&sha_dest), &["rev-parse", "refs/heads/sha256"])?.trim(),
-        oid
-    );
-    Ok(())
-}
-
-#[test]
 fn regular_file_size_limits_and_private_temp_cleanup_are_enforced() -> Result<(), String> {
     let f = Fixture::new()?;
     let source = f.repo("source")?;
@@ -556,60 +283,6 @@ fn blocked_git_children_and_input_writers_obey_the_deadline() -> Result<(), Stri
         assert!(result.is_err());
         assert!(start.elapsed() < Duration::from_secs(3));
     }
-    Ok(())
-}
-
-#[test]
-fn malformed_objects_with_a_valid_pack_checksum_are_rejected_before_refs() -> Result<(), String> {
-    let f = Fixture::new()?;
-    let source = f.repo("source")?;
-    // A valid pack checksum alone is insufficient: native bundle unbundle accepts this.
-    let oid = bounded::run(
-        &source,
-        &["hash-object", "--literally", "-w", "-t", "tree", "--stdin"],
-        b"not-a-valid-tree".to_vec(),
-        1024,
-    )?;
-    let pack = bounded::run(
-        &source,
-        &["pack-objects", "--stdout"],
-        oid.clone(),
-        BUNDLE_LIMIT,
-    )?;
-    let oid = std::str::from_utf8(&oid).map_err(|e| e.to_string())?.trim();
-    let mut bytes = format!("# v2 git bundle\n{oid} refs/tags/malformed\n\n").into_bytes();
-    bytes.extend(pack);
-    let dest = f.repo("dest")?;
-    let preview = inspect_bundle(&dest, bytes)?;
-    assert!(preview.verification_error.is_none());
-    let result = import_bundle(
-        &dest,
-        &preview,
-        &[BundleImport {
-            source: "refs/tags/malformed".into(),
-            destination: "refs/tags/imported".into(),
-        }],
-    );
-    assert!(result.is_err());
-    assert!(refs(&dest)?.is_empty());
-    Ok(())
-}
-
-#[test]
-fn import_cannot_create_the_checked_out_unborn_branch() -> Result<(), String> {
-    let f = Fixture::new()?;
-    let source = f.repo("source")?;
-    f.commit(&source, "one")?;
-    let dest = f.repo("unborn")?;
-    let current = run(Some(&dest), &["symbolic-ref", "HEAD"])?;
-    let preview = inspect_bundle(&dest, export_bundle(&source, &[head(&source)?], None)?)?;
-    assert!(preview.existing_refs.contains(current.trim()));
-    assert!(import_bundle(&dest, &preview, &[mapping(current.trim())]).is_err());
-    assert!(refs(&dest)?.is_empty());
-    assert!(run(Some(&dest), &["rev-parse", "--verify", "HEAD"]).is_err());
-    import_bundle(&dest, &preview, &[mapping("refs/heads/safe-backup")])?;
-    assert!(run(Some(&dest), &["rev-parse", "--verify", "HEAD"]).is_err());
-    assert!(!dest.join("file").exists());
     Ok(())
 }
 
@@ -692,7 +365,6 @@ fn partial_shallow_bundle_preview_never_fetches_missing_prerequisites() -> Resul
     assert_eq!(run(Some(&dest), &["count-objects", "-v"])?, object_store);
     assert_eq!(refs(&dest)?, refs_before);
     assert!(!marker.exists());
-    assert!(import_bundle(&dest, &preview, &[mapping("refs/heads/imported")]).is_err());
     assert_eq!(run(Some(&dest), &["count-objects", "-v"])?, object_store);
     assert_eq!(refs(&dest)?, refs_before);
     assert_eq!(
@@ -721,7 +393,6 @@ fn partial_shallow_bundle_preview_never_fetches_missing_prerequisites() -> Resul
     assert!(marker.exists());
     assert_ne!(run(Some(&dest), &["count-objects", "-v"])?, object_store);
     let calls = std::fs::read(&marker).map_err(|e| e.to_string())?;
-    import_bundle(&dest, &preview, &[mapping("refs/heads/imported")])?;
     assert_eq!(std::fs::read(&marker).map_err(|e| e.to_string())?, calls);
     assert_eq!(
         std::fs::read(dest.join(".git/index")).map_err(|e| e.to_string())?,
@@ -785,5 +456,126 @@ fn verification_streams_only_the_validated_header_and_keeps_the_old_git_fallback
     assert_eq!(args.last().copied(), Some(long_path.as_str()));
     assert!(input.is_empty());
     assert!(verification_command(true, &["--no-lazy-fetch"], &long_path, b"not a bundle").is_err());
+    Ok(())
+}
+
+#[test]
+fn preview_never_unpacks_even_a_corrupt_pack() -> Result<(), String> {
+    let f = Fixture::new()?;
+    let source = f.repo("inspection-source")?;
+    f.commit(&source, "one")?;
+    let mut bytes = export_bundle(&source, &[head(&source)?], None)?;
+    let end = bytes
+        .windows(2)
+        .position(|b| b == b"\n\n")
+        .ok_or("header")?
+        + 2;
+    bytes.truncate(end);
+    bytes.extend_from_slice(b"PACK deliberately corrupt: inspection must not unpack");
+    let dest = f.repo("inspection-dest")?;
+    let before = run(Some(&dest), &["count-objects", "-v"])?;
+    let preview = inspect_bundle(&dest, bytes)?;
+    assert!(
+        preview.verification_error.is_none(),
+        "{:?}",
+        preview.verification_error
+    );
+    assert_eq!(preview.refs.len(), 1);
+    assert_eq!(run(Some(&dest), &["count-objects", "-v"])?, before);
+    assert!(refs(&dest)?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn local_ref_validation_matches_native_git_without_remote_round_trips() {
+    for name in [
+        "refs/heads/main",
+        "refs/tags/ü",
+        "refs/heads/quote'$(literal)",
+        "refs/heads/a@b",
+        "refs/heads/has]bracket",
+        "refs/heads/a.lock/x",
+        "refs/heads/.hidden",
+        "refs/heads/a..b",
+        "refs/heads/a@{b",
+        "refs/heads/a[",
+        "refs/heads/a ",
+        "refs/heads/a\\b",
+        "refs/heads/a.",
+        "refs//head",
+        "refs/heads/x/",
+        "refs/heads/a.lock",
+    ] {
+        assert_eq!(
+            valid_ref(name).is_ok(),
+            run(None, &["check-ref-format", name]).is_ok(),
+            "{name}"
+        );
+    }
+}
+#[test]
+fn export_ref_snapshots_and_saved_files_cannot_be_overwritten() -> Result<(), String> {
+    let f = Fixture::new()?;
+    let source = f.repo("source")?;
+    let oid = f.commit(&source, "one")?;
+    let selected = head(&source)?;
+    let bytes = export_bundle(&source, std::slice::from_ref(&selected), None)?;
+    f.commit(&source, "two")?;
+    assert!(export_bundle(&source, &[selected], None).is_err());
+    let out = f.0.join("quoted ' output.bundle");
+    save_bundle_file(&out, &bytes)?;
+    assert!(save_bundle_file(&out, b"replace").is_err());
+    let snapshot = read_bundle_file(&out)?;
+    assert_eq!(snapshot, bytes);
+    std::fs::write(&out, b"replaced after preview").map_err(|e| e.to_string())?;
+    let dest = f.repo("dest")?;
+    let preview = inspect_bundle(&dest, snapshot)?;
+    assert_eq!(preview.refs[0].oid, oid);
+    assert!(refs(&dest)?.is_empty());
+    Ok(())
+}
+#[test]
+fn malformed_headers_and_untrusted_refs_are_rejected_without_unpacking() -> Result<(), String> {
+    let f = Fixture::new()?;
+    let source = f.repo("source")?;
+    f.commit(&source, "one")?;
+    let bytes = export_bundle(&source, &[head(&source)?], None)?;
+    let oid = head(&source)?.oid;
+    let pack = &bytes[bytes
+        .windows(2)
+        .position(|s| s == b"\n\n")
+        .ok_or("no pack")?
+        + 2..];
+    for description in ["", "\tTabbed subject"] {
+        let mut sample =
+            format!("# v2 git bundle\n-{oid}{description}\n{oid} HEAD\n\n").into_bytes();
+        // A tabbed subject uses the normal space after the prerequisite OID.
+        if !description.is_empty() {
+            sample = format!("# v2 git bundle\n-{oid} {description}\n{oid} HEAD\n\n").into_bytes();
+        }
+        sample.extend(pack);
+        let (_, prerequisites) = header(&sample)?;
+        assert_eq!(prerequisites.len(), 1);
+        assert!(!prerequisites[0].name.chars().any(char::is_control));
+    }
+    let dest = f.repo("dest")?;
+    for bad in [
+        b"not a bundle".to_vec(),
+        b"# v2 git bundle\n\nPACK".to_vec(),
+        bytes[..20].to_vec(),
+    ] {
+        assert!(inspect_bundle(&dest, bad).is_err());
+    }
+    for name in [
+        "--output=evil",
+        "refs/heads/a b",
+        "refs/heads/../escape",
+        "refs/heads/a\ncreate refs/heads/evil",
+        "refs/heads/a.lock",
+    ] {
+        let bad = String::from_utf8_lossy(&bytes).replacen(" HEAD\n", &format!(" {name}\n"), 1);
+        assert!(inspect_bundle(&dest, bad.into_bytes()).is_err(), "{name}");
+    }
+    assert!(refs(&dest)?.is_empty());
     Ok(())
 }
