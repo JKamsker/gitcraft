@@ -264,17 +264,18 @@ fn work(shared: &Mutex<Inner>, ctx: &egui::Context, repo: &Path) {
             };
             (key, inner.repo_info, inner.generation)
         };
-        let info = match info {
-            Some(info) => Ok(info),
-            None => repo_info(repo).inspect(|found| {
-                if let Ok(mut inner) = shared.lock()
-                    && inner.generation == generation
-                {
-                    inner.repo_info = Some(*found);
-                }
-            }),
-        };
+        // Nothing here may unwind past the loop, or this worker's slot is never given back.
         let check = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let info = match info {
+                Some(info) => Ok(info),
+                None => repo_info(repo).inspect(|found| {
+                    if let Ok(mut inner) = shared.lock()
+                        && inner.generation == generation
+                    {
+                        inner.repo_info = Some(*found);
+                    }
+                }),
+            };
             run_check(ctx, repo, info, &key)
         }))
         .unwrap_or_else(|_| Check::Failed("internal error".to_owned()));
