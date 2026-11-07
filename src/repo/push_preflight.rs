@@ -108,6 +108,10 @@ impl RepoTab {
     }
 
     pub(super) fn fix_preflight(&mut self, plan: Plan, kind: &str, ctx: &egui::Context) {
+        if crate::remote::is_remote(&self.path) {
+            self.status = Some(("Automatic preflight repair is temporarily local-only. Repair explicitly on the repository host, then recheck; remote preview and reviewed push remain available.".into(), true));
+            return;
+        }
         if !self.same_preflight_profile(&plan, ctx) {
             return;
         }

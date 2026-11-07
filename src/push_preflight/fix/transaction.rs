@@ -173,6 +173,15 @@ impl Hook {
         {
             return Err("Clear sparse/skip-worktree/assume-unchanged index flags before automatic tree repair".into());
         }
+        let before_tree = path_line(read(
+            repo,
+            &["rev-parse", "--verify", &format!("{old}^{{tree}}")],
+        )?)?;
+        let after_tree = path_line(read(
+            repo,
+            &["rev-parse", "--verify", &format!("{new}^{{tree}}")],
+        )?)?;
+        let needs_checkout = before_tree != after_tree;
         let affected = read(
             repo,
             &[
@@ -239,6 +248,7 @@ impl Hook {
             shared.as_deref(),
             &affected,
             &hook.proof,
+            needs_checkout,
         );
         let wrapper_path = hook.directory.join("reference-transaction");
         std::fs::write(&wrapper_path, wrapper)
@@ -501,6 +511,7 @@ fn script(
     shared: Option<&str>,
     affected: &[String],
     proof: &str,
+    needs_checkout: bool,
 ) -> String {
     let original_dir = original
         .rsplit_once('/')
@@ -544,11 +555,15 @@ if [ "$1" = prepared ]; then
     cmp -s -- {index} "$directory/before.index" || exit 1
     {shared_check}
     GIT_INDEX_FILE="$directory/check-before.index" git -c core.fsmonitor=false -c core.trustctime=true -c core.ignoreStat=false diff-files --quiet --no-ext-diff --no-textconv --ignore-submodules=none -- || exit 1
-    git --literal-pathspecs -c core.fsmonitor=false status --porcelain=v1 -z --untracked-files=all --ignored=matching -- {paths} >"$directory/affected-status" || exit 1
-    [ ! -s "$directory/affected-status" ] || exit 1
+    if [ {needs_checkout} = true ]; then
+        git --literal-pathspecs -c core.fsmonitor=false status --porcelain=v1 -z --untracked-files=all --ignored=matching -- {paths} >"$directory/affected-status" || exit 1
+        [ ! -s "$directory/affected-status" ] || exit 1
+    fi
     printf '%s' {proof} >"$directory/prepared.ok" || exit 1
-    printf 'attempted\n' >"$directory/checkout-attempted" || exit 1
-    git -c core.fsmonitor=false read-tree -u -m {old} {new} || exit 1
+    if [ {needs_checkout} = true ]; then
+        printf 'attempted\n' >"$directory/checkout-attempted" || exit 1
+        git -c core.fsmonitor=false read-tree -u -m {old} {new} || exit 1
+    fi
     [ "$(git symbolic-ref -q HEAD)" = {branch} ] || exit 1
     [ "$(git rev-parse --verify HEAD)" = {old} ] || exit 1
     git -c core.fsmonitor=false diff-index --cached --quiet --no-ext-diff --no-textconv {new} -- || exit 1
@@ -771,6 +786,7 @@ esac
                         None,
                         &["file.txt".into()],
                         &proof,
+                        true,
                     ),
                 )
                 .map_err(|e| e.to_string())?;

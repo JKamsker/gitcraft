@@ -304,30 +304,8 @@ pub(crate) fn fix(repo: &Path, plan: &Plan, kind: &str) -> Result<String, String
         .get(&plan.head)
         .ok_or("There are no outgoing commits to fix")?;
     check(repo, plan)?;
-    let before_tree = read(
-        repo,
-        &["rev-parse", &format!("{}^{{tree}}", plan.head)],
-        &|| true,
-    )?;
-    let after_tree = read(repo, &["rev-parse", &format!("{new}^{{tree}}")], &|| true)?;
-    if before_tree != after_tree {
-        let mut hook = transaction::Hook::new(repo, &plan.branch, &plan.head, new)?;
-        hook.execute(repo)?;
-    } else {
-        git::run(
-            Some(repo),
-            &[
-                "update-ref",
-                "-m",
-                "gitcraft push preflight fix",
-                &plan.branch,
-                new,
-                &plan.head,
-            ],
-        )
-        .map_err(|_| {
-            "The branch moved or its update was refused; no checkout was needed.".to_owned()
-        })?;
-    }
+    // Metadata-only repairs also need HEAD ownership so the existing undo journal
+    // cannot bind a different checkout after an original reference hook runs.
+    transaction::Hook::new(repo, &plan.branch, &plan.head, new)?.execute(repo)?;
     Ok("Outgoing history fixed. Reopen preflight to verify it; Ctrl+Z restores the previous history.".into())
 }

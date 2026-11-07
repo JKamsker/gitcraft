@@ -415,6 +415,8 @@ Glossary tips stay out of the way while typing, scrolling or dragging.
   - For any theme: your own accent colour, rounder or square corners, and the graph's lanes in
     the theme's hues, gitcraft's classic ones or colour-blind-safe ones (Okabe–Ito).
 
+Automatic preflight repairs currently require a local repository, Git 2.50 or later, and a successful checkout/reference capability check. Remote previews and reviewed pushes remain available; automatic remote repair awaits completion-aware request ownership.
+
 ## Download
 
 Ready-made builds for Windows, Linux (x86-64) and macOS (Apple silicon and Intel) are on the
