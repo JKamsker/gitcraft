@@ -107,6 +107,25 @@ fn snapshot(source: &str, destination: &Path) -> Result<(), String> {
         .map_err(|_| "Could not save the owned index recovery snapshot".into())
 }
 
+/// The resolver observes only the immutable owned main-index snapshot. If Git cannot
+/// load that snapshot's dependency in this repository context, refuse before dispatch.
+fn snapshot_pair(
+    source_index: &str,
+    directory: &Path,
+    resolve: impl FnOnce(&Path) -> Result<Option<String>, String>,
+) -> Result<Option<String>, String> {
+    let saved_index = directory.join("before.index");
+    snapshot(source_index, &saved_index)?;
+    let dependency = resolve(&saved_index)?;
+    if let Some(path) = &dependency {
+        if !Path::new(path).is_absolute() {
+            return Err("Saved index dependency was not an absolute path; repair refused".into());
+        }
+        snapshot(path, &directory.join("before.shared-index"))?;
+    }
+    Ok(dependency)
+}
+
 impl Hook {
     pub(super) fn new(repo: &Path, branch: &str, old: &str, new: &str) -> Result<Self, String> {
         if remote::is_remote(repo) {
@@ -146,21 +165,7 @@ impl Hook {
             repo,
             &["rev-parse", "--path-format=absolute", "--git-path", "index"],
         )?)?;
-        let shared = read(
-            repo,
-            &["rev-parse", "--path-format=absolute", "--shared-index-path"],
-        )?;
-        let shared = if shared == b"\n" || shared.is_empty() {
-            None
-        } else {
-            Some(path_line(shared)?)
-        };
-        if !Path::new(&original).is_absolute()
-            || !Path::new(&index).is_absolute()
-            || shared
-                .as_deref()
-                .is_some_and(|path| !Path::new(path).is_absolute())
-        {
+        if !Path::new(&original).is_absolute() || !Path::new(&index).is_absolute() {
             return Err(
                 "Git did not provide absolute metadata paths; safe repair was refused".into(),
             );
@@ -229,10 +234,30 @@ impl Hook {
             proof: format!("{branch}\n{old}\n{new}\n"),
             capability_acknowledged: false,
         };
-        snapshot(&index, &hook.directory.join("before.index"))?;
-        if let Some(shared) = &shared {
-            snapshot(shared, &hook.directory.join("before.shared-index"))?;
-        }
+        let mut ownership_uncertain = false;
+        let pair = snapshot_pair(&index, &hook.directory, |saved_index| {
+            let saved_index = saved_index
+                .to_str()
+                .ok_or("Owned index path is not UTF-8")?;
+            ownership_uncertain = true;
+            // Resolve the dependency encoded by the immutable saved main index,
+            // never a separately observed live index. Retain the originating repository
+            // context for Git's shared-index lookup and Practice/profile isolation.
+            let shared = local(
+                repo,
+                &["rev-parse", "--path-format=absolute", "--shared-index-path"],
+                b"",
+                &[("GIT_INDEX_FILE", saved_index.to_owned())],
+            )?;
+            ownership_uncertain = false;
+            if shared == b"\n" || shared.is_empty() {
+                Ok(None)
+            } else {
+                path_line(shared).map(Some)
+            }
+        });
+        hook.keep = ownership_uncertain;
+        let shared = pair?;
         let recovery = format!(
             "Guarded repair recovery\nBranch: {branch}\nOriginal: {old}\nRewritten: {new}\nIndex path: {index}\nShared-index dependency: {}\n\nInspect HEAD, git status, git diff and git diff --cached before recovery.\nSaved before.index and before.shared-index (when present) are owned evidence, not permission to overwrite concurrent edits.\nSave concurrent work before deliberately restoring the original tree/ref.\nAfter saving work, git reset --merge {old} may help; do not remove locks owned by another operation.\n",
             shared.as_deref().unwrap_or("none")
@@ -598,6 +623,64 @@ fi
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn rotated_split_index_dependency_is_resolved_from_the_saved_index() -> Result<(), String> {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|error| error.to_string())?
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "gitcraft-index-pair-{}-{stamp}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&root).map_err(|error| error.to_string())?;
+        let result = (|| {
+            let old_shared = root.join("old.shared");
+            let new_shared = root.join("new.shared");
+            let live_index = root.join("index");
+            let owned = root.join("evidence");
+            std::fs::create_dir(&owned).map_err(|error| error.to_string())?;
+            std::fs::write(&old_shared, b"old dependency").map_err(|error| error.to_string())?;
+            std::fs::write(&new_shared, b"new dependency").map_err(|error| error.to_string())?;
+            // A previous live lookup saw old.shared; an ordinary writer rotated before
+            // our main snapshot was captured. Only the saved main index is authoritative.
+            let previously_observed = old_shared;
+            std::fs::write(&live_index, b"main referring to new.shared")
+                .map_err(|error| error.to_string())?;
+            let selected = snapshot_pair(
+                live_index.to_str().ok_or("Fixture path is not UTF-8")?,
+                &owned,
+                |saved| {
+                    assert_eq!(saved, owned.join("before.index"));
+                    assert_eq!(
+                        std::fs::read(saved).map_err(|error| error.to_string())?,
+                        b"main referring to new.shared"
+                    );
+                    Ok(Some(new_shared.to_string_lossy().into_owned()))
+                },
+            )?;
+            assert_eq!(selected.as_deref(), new_shared.to_str());
+            assert_ne!(selected.as_deref(), previously_observed.to_str());
+            assert_eq!(
+                std::fs::read(owned.join("before.shared-index"))
+                    .map_err(|error| error.to_string())?,
+                b"new dependency"
+            );
+            let refused = root.join("refused");
+            std::fs::create_dir(&refused).map_err(|error| error.to_string())?;
+            let unresolved = snapshot_pair(
+                live_index.to_str().ok_or("Fixture path is not UTF-8")?,
+                &refused,
+                |_| Err("The dependency named by the saved main index cannot be proven".into()),
+            );
+            assert!(unresolved.is_err());
+            assert!(!refused.join("before.shared-index").exists());
+            Ok(())
+        })();
+        let _ = std::fs::remove_dir_all(root);
+        result
+    }
+
     #[test]
     fn synthetic_capability_versions_refuse_before_user_dispatch() {
         for text in [
