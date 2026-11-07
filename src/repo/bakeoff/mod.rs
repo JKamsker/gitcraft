@@ -7,6 +7,11 @@ mod view;
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+static COMPARISONS: AtomicU64 = AtomicU64::new(1);
+fn next_request() -> u64 {
+    COMPARISONS.fetch_add(1, Ordering::Relaxed)
+}
 use std::time::{Duration, Instant};
 
 use crate::agent::Launch;
@@ -118,7 +123,7 @@ impl Bakeoff {
             polled: None,
             assembling: false,
             note: None,
-            request: 0,
+            request: next_request(),
             picked_trees: Vec::new(),
             rows: Vec::new(),
             statuses: vec![None; n],
@@ -247,7 +252,7 @@ impl RepoTab {
         view.builds.fill(None);
         view.statuses.fill(None);
         view.file = None;
-        view.request += 1;
+        view.request = next_request();
         let request = view.request;
         let attempts = view.attempts.clone();
         let repo = self.path.clone();
@@ -301,6 +306,7 @@ impl RepoTab {
         view.file = Some((path.clone(), None));
         let repo = self.path.clone();
         let wanted = path.clone();
+        let request = view.request;
         self.then(
             ctx,
             move || {
@@ -316,6 +322,7 @@ impl RepoTab {
             },
             move |tab, sides, _| {
                 if let Some(view) = &mut tab.bakeoff.view
+                    && view.request == request
                     && let Some((shown, slot)) = &mut view.file
                     && *shown == wanted
                 {
@@ -343,14 +350,17 @@ impl RepoTab {
                 .collect(),
             branch: view.branch.trim().to_owned(),
         };
+        let request = view.request;
         view.assembling = true;
         view.note = None;
         let repo = self.path.clone();
         self.then(
             ctx,
             move || assemble::assemble(&repo, &plan).map(|commit| (plan.branch, commit)),
-            |tab, result, ctx| {
-                if let Some(view) = &mut tab.bakeoff.view {
+            move |tab, result, ctx| {
+                if let Some(view) = &mut tab.bakeoff.view
+                    && view.request == request
+                {
                     view.assembling = false;
                     view.note = Some(match &result {
                         Ok((branch, commit)) => {
@@ -448,7 +458,9 @@ impl RepoTab {
                     );
                 }
                 Err(e) => {
-                    if let Some(view) = &mut tab.bakeoff.view {
+                    if let Some(view) = &mut tab.bakeoff.view
+                        && view.request == request
+                    {
                         view.note = Some((e, true));
                         if let Some(slot) = view.builds.get_mut(n) {
                             *slot = None;
@@ -479,6 +491,7 @@ impl RepoTab {
             return;
         }
         view.polled = Some(Instant::now());
+        let request = view.request;
         self.then(
             ctx,
             move || {
@@ -486,19 +499,13 @@ impl RepoTab {
                     .into_iter()
                     .map(|(i, file)| {
                         let text = crate::remote::read_to_string(&file).ok();
-                        (i, build::read_status(text.as_deref()))
+                        (i, file, build::read_status(text.as_deref()))
                     })
                     .collect::<Vec<_>>()
             },
-            |tab, found, _| {
+            move |tab, found, _| {
                 if let Some(view) = &mut tab.bakeoff.view {
-                    for (i, built) in found {
-                        if let Some(slot) = view.builds.get_mut(i)
-                            && *slot == Some(Built::Running)
-                        {
-                            *slot = Some(built);
-                        }
-                    }
+                    view.accept_builds(request, found);
                 }
             },
         );
@@ -517,3 +524,53 @@ fn next_name(branch: &str) -> String {
 
 #[cfg(test)]
 mod tests;
+
+impl Bakeoff {
+    fn accept_builds(&mut self, request: u64, found: Vec<(usize, PathBuf, Built)>) {
+        if self.request != request {
+            return;
+        }
+        for (i, path, built) in found {
+            if self.statuses.get(i) == Some(&Some(path))
+                && let Some(slot) = self.builds.get_mut(i)
+                && *slot == Some(Built::Running)
+            {
+                *slot = Some(built);
+            }
+        }
+    }
+}
+#[cfg(test)]
+mod generation_tests {
+    use super::*;
+    #[test]
+    fn closed_or_reloaded_comparisons_reject_old_build_statuses() {
+        let attempts = vec![
+            Attempt {
+                name: "a".into(),
+                rev: "a".into(),
+                worktree: None,
+            },
+            Attempt {
+                name: "b".into(),
+                rev: "b".into(),
+                worktree: None,
+            },
+        ];
+        let old = Bakeoff::new(attempts.clone(), String::new());
+        let mut current = Bakeoff::new(attempts, String::new());
+        assert_ne!(old.request, current.request);
+        let path = PathBuf::from("new-owned-status");
+        current.builds[0] = Some(Built::Running);
+        current.statuses[0] = Some(path.clone());
+        current.accept_builds(old.request, vec![(0, path.clone(), Built::Passed)]);
+        assert_eq!(current.builds[0], Some(Built::Running));
+        current.accept_builds(
+            current.request,
+            vec![(0, PathBuf::from("old-owned-status"), Built::Passed)],
+        );
+        assert_eq!(current.builds[0], Some(Built::Running));
+        current.accept_builds(current.request, vec![(0, path, Built::Passed)]);
+        assert_eq!(current.builds[0], Some(Built::Passed));
+    }
+}
