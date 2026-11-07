@@ -88,9 +88,12 @@ fn data_envelopes_require_explicit_format_independent_of_filename() -> Result<()
     let envelope = r#"{"data":"ENC[cipher]","sops":{"version":"3.10.0","mac":"ENC[mac]"}}"#;
     for path in ["config", "config.yaml", "config.json", "config.bin"] {
         assert!(inspect(path, envelope)?.is_some_and(|e| e.ambiguous_json));
+        let mut calls = 0;
         let refused = compare(path, envelope, envelope, &|| true, |_, _| {
-            panic!("Ambiguous detection must not invoke SOPS")
+            calls += 1;
+            Err("Ambiguous detection must not invoke SOPS".to_owned())
         });
+        assert_eq!(calls, 0);
         assert!(refused.is_err_and(|e| e.contains("Choose JSON document or Binary envelope")));
         for (encoding, format, plaintext) in [
             (JsonEncoding::Document, Format::Json, r#"{"data":42}"#),
