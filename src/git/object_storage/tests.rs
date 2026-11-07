@@ -178,7 +178,7 @@ fn actual_pack_representation_exposes_delta_ancestry() -> Result<(), String> {
     assert!(packed.chain[0].depth > 0);
     assert!(packed.chain.last().is_some_and(|row| row.base.is_none()));
     assert_eq!(packed.chain[0].base.as_ref(), Some(&packed.chain[1].oid));
-    assert!(packed.chain[0].disk < packed.chain[0].size);
+    assert!(packed.chain[0].disk < got.object.as_ref().ok_or("missing object")?.size);
     Ok(())
 }
 #[test]

@@ -131,9 +131,9 @@ fn required(repo: &Path, active: &dyn Fn() -> bool) -> Result<BTreeSet<String>, 
     }
     Ok(objects)
 }
-fn copy_pack(repo: &Path) -> Result<String, String> {
+fn copy_pack(repo: &Path, active: &dyn Fn() -> bool) -> Result<String, String> {
     // No --thin and no object/delta reuse: every base is inside the produced pack.
-    let pack = super::super::command::bounded::run(
+    let pack = super::run(
         repo,
         &[
             "--no-lazy-fetch",
@@ -155,11 +155,12 @@ fn copy_pack(repo: &Path) -> Result<String, String> {
         ],
         Vec::new(),
         MAX_PACK_BYTES,
+        active,
     )?;
     if !pack.starts_with(b"PACK") {
         return Err("Git did not produce a complete pack; borrowing is preserved.".into());
     }
-    let indexed = super::super::command::bounded::run(
+    let indexed = super::run(
         repo,
         &[
             "--no-lazy-fetch",
@@ -174,6 +175,7 @@ fn copy_pack(repo: &Path) -> Result<String, String> {
         ],
         pack,
         4096,
+        active,
     )?;
     let out = String::from_utf8(indexed).map_err(|_| "Invalid index-pack response")?;
     let oid = out
@@ -307,7 +309,7 @@ pub(super) fn make_with_checkpoints(
     let _lock = Lock::acquire(&snapshot.primary)?;
     current(snapshot, active)?;
     let before = required(&snapshot.repo, active)?;
-    let imported = copy_pack(&snapshot.repo)?;
+    let imported = copy_pack(&snapshot.repo, active)?;
     let index = remote::join(&snapshot.primary, &format!("pack/pack-{imported}.idx"));
     let rows = pack_rows(&super::text(
         &snapshot.repo,

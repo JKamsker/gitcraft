@@ -194,7 +194,7 @@ pub(super) fn dialog(ui: &mut egui::Ui, state: &mut State) -> super::dialogs::Ou
                     for (i, row) in representation.chain.iter().enumerate() {
                         ui.horizontal_wrapped(|ui| {
                             if ui.link(format!("{}{}", if i == 0 { "Object " } else { "Base " }, row.oid)).clicked() { outcome = Outcome::Done(Action::InspectObject(row.oid.clone())); }
-                            ui.label(format!("{} · {} logical / {} packed bytes · offset {} · depth {}", row.kind, row.size, row.disk, row.offset, row.depth));
+                            ui.label(format!("{} · {} inflated entry / {} packed bytes · offset {} · depth {}", row.kind, row.size, row.disk, row.offset, row.depth));
                         });
                     }
                 }
@@ -205,6 +205,7 @@ pub(super) fn dialog(ui: &mut egui::Ui, state: &mut State) -> super::dialogs::Ou
             }
         }}
     });
+    ui.label("For delta rows, inflated entry size is the delta program size; the object header above gives the logical content size.");
     ui.label("Limits: 64 packs per store, 16 MiB per Git response, 2,000 tree entries and 128 delta levels; each Git analysis has a deadline.");
     if ui.button("Close").clicked() {
         outcome = Outcome::Cancel;

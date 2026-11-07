@@ -1146,3 +1146,68 @@ mod profile_connection_tests {
         });
     }
 }
+
+/// Object storage plumbing uses the existing bounded guards and pins the selected repo,
+/// clearing inherited directory/index/namespace overrides before any read or deliberate copy.
+pub(super) fn object_storage_output(
+    repo: &Path,
+    args: &[&str],
+    input: Vec<u8>,
+    max: usize,
+    active: &dyn Fn() -> bool,
+) -> Result<remote::Output, String> {
+    const REMOVE: &[&str] = &[
+        "GIT_DIR",
+        "GIT_COMMON_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_ATTR_SOURCE",
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_NAMESPACE",
+        "GIT_SHALLOW_FILE",
+        "GIT_REPLACE_REF_BASE",
+        "GIT_SUPER_PREFIX",
+    ];
+    if !active() {
+        return Err("Object storage operation cancelled".into());
+    }
+    let args: Vec<_> = [
+        "--no-lazy-fetch",
+        "--no-replace-objects",
+        "--no-optional-locks",
+    ]
+    .into_iter()
+    .chain(args.iter().copied())
+    .collect();
+    let out = if let Some(target) = remote::parse(repo) {
+        let mut request = bounded::request(&target, &args, input, max);
+        request.unset.extend(REMOVE.iter().map(|s| (*s).into()));
+        comparison_remote(&target.host, request, active)?
+    } else {
+        let mut command = repository_command(Some(repo), &args)?;
+        command.args(&args);
+        for key in REMOVE {
+            command.env_remove(key);
+        }
+        let out = crate::bounded_process::run_input(
+            command,
+            Some(input),
+            active,
+            std::time::Duration::from_secs(20),
+            max,
+            64 * 1024,
+        )?;
+        remote::Output {
+            code: out.status.code().unwrap_or(-1),
+            stdout: out.stdout,
+            stderr: out.stderr,
+        }
+    };
+    if out.stdout.len() > max || out.stderr.len() > 64 * 1024 {
+        return Err("Object storage output exceeds its byte limit; inspect fewer objects or use Git in the terminal.".into());
+    }
+    Ok(out)
+}

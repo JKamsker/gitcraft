@@ -96,14 +96,15 @@ pub(super) fn read(
     active: &dyn Fn() -> bool,
 ) -> Result<Topology, String> {
     let worktrees = line(repo, &["worktree", "list", "--porcelain"], active)?;
-    let config = super::super::command::comparison_output(
+    let config = super::super::command::object_storage_output(
         repo,
         &[
             "config",
             "--get-regexp",
             "^(remote\\..*\\.promisor|extensions\\.partialclone)$",
         ],
-        &[],
+        Vec::new(),
+        64 * 1024,
         active,
     )?;
     if !matches!(config.code, 0 | 1) {

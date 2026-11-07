@@ -5,11 +5,10 @@ pub(crate) mod independent;
 mod tests;
 mod topology;
 
-use super::command::{activity_bytes_with_limit, comparison_output};
+use super::command::object_storage_output;
 use crate::remote;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 const MAX_PACKS: usize = 64;
 const MAX_TREE: usize = 2_000;
@@ -60,21 +59,29 @@ pub(crate) struct Inspection {
     pub independence: Option<independent::Snapshot>,
 }
 
+pub(super) fn run(
+    repo: &Path,
+    args: &[&str],
+    input: Vec<u8>,
+    cap: usize,
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    let out = object_storage_output(repo, args, input, cap, active)?;
+    if out.code != 0 {
+        return Err(format!(
+            "Object storage Git failed ({}): {}. Install/update Git on the repository machine if --no-lazy-fetch or verify-pack is unavailable (Git 2.45+ required).",
+            out.code,
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+    Ok(out.stdout)
+}
 pub(super) fn bytes(
     repo: &Path,
     args: &[&str],
     active: &dyn Fn() -> bool,
 ) -> Result<Vec<u8>, String> {
-    let args: Vec<_> = [
-        "--no-lazy-fetch",
-        "--no-replace-objects",
-        "--no-optional-locks",
-    ]
-    .into_iter()
-    .chain(args.iter().copied())
-    .collect();
-    activity_bytes_with_limit(repo, &args, None, active, Duration::from_secs(20))
-        .map_err(|e| format!("Object storage: {e}. This view requires Git with --no-lazy-fetch (2.45+) and verify-pack; install/update Git on the repository machine if unavailable."))
+    run(repo, args, Vec::new(), 16 * 1024 * 1024, active)
 }
 pub(super) fn text(
     repo: &Path,
@@ -111,7 +118,7 @@ fn resolve(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<String
 }
 fn metadata(repo: &Path, oid: &str, active: &dyn Fn() -> bool) -> Result<Option<Object>, String> {
     let input = format!("{oid}\n");
-    let out = super::command::bounded::run(
+    let out = run(
         repo,
         &[
             "--no-lazy-fetch",
@@ -121,6 +128,7 @@ fn metadata(repo: &Path, oid: &str, active: &dyn Fn() -> bool) -> Result<Option<
         ],
         input.into_bytes(),
         4096,
+        active,
     )?;
     if !active() {
         return Err("Object inspection cancelled".into());
@@ -260,7 +268,7 @@ fn entries(repo: &Path, object: &Object, active: &dyn Fn() -> bool) -> Result<Ve
         }
         Ok(entries)
     } else if matches!(object.kind.as_str(), "commit" | "tag") {
-        let out = super::command::bounded::run(
+        let out = run(
             repo,
             &[
                 "--no-lazy-fetch",
@@ -271,6 +279,7 @@ fn entries(repo: &Path, object: &Object, active: &dyn Fn() -> bool) -> Result<Ve
             ],
             Vec::new(),
             128 * 1024,
+            active,
         )?;
         let header = String::from_utf8_lossy(&out);
         Ok(header
@@ -349,7 +358,13 @@ pub(crate) fn inspect(
     if object.is_some() && representations.is_empty() {
         notes.push("Git can read this object, but no representation was found in the primary store. It may be borrowed from an alternate; inspect shared and borrowed objects.".into());
     }
-    let snapshot = comparison_output(repo, &["rev-parse", "--verify", "HEAD"], &[], active)?;
+    let snapshot = object_storage_output(
+        repo,
+        &["rev-parse", "--verify", "HEAD"],
+        Vec::new(),
+        4096,
+        active,
+    )?;
     if snapshot.code != 0 {
         notes.push("HEAD is unborn or unavailable. Object inspection still uses the immutable resolved object ID.".into());
     }
