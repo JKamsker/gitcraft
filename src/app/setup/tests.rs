@@ -17,8 +17,16 @@ fn wait(h: &mut egui_kittest::Harness<'_, App>) -> Result<(), String> {
 // scrolling the target into view rather than clicking an off-screen AccessKit rectangle.
 fn click(h: &mut egui_kittest::Harness<'_, App>, label: &str) {
     h.get_by_label(label).scroll_to_me();
-    h.run_steps(3);
-    h.get_by_label(label).click();
+    // Smooth scrolling/modal re-layout can move a control between pointer-down and
+    // pointer-up; let those requested animation frames finish before clicking.
+    h.run();
+    let node = h.get_by_label(label);
+    eprintln!(
+        "setup pointer target {label}: rect={:?}, screen={:?}, node={node:?}",
+        node.rect(),
+        h.ctx.content_rect()
+    );
+    node.click();
     h.run_steps(3);
 }
 #[test]
