@@ -1,0 +1,209 @@
+{
+  "status": "STATIC FAIL",
+  "recommendation": "block",
+  "workflow_label": "block",
+  "source": {
+    "repository": "JKamsker/gitcraft",
+    "base": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
+    "head": "f2b7968b45d90afc1bd2f7d2347482a2463f0742",
+    "tree": "b8c5a1dc2e4e2c2ff2b466663791d2fa0f71c2fa",
+    "branch": "codex/object-storage",
+    "remote_verified": "f2b7968b45d90afc1bd2f7d2347482a2463f0742",
+    "clean": true,
+    "patch_sha256": "378f6c8da1a1923379b4073f97b88a36964d0921575b5807558a2577914cee4b",
+    "patch_bytes": 154403,
+    "changed_files": [
+      "Cargo.lock",
+      "Cargo.toml",
+      "README.md",
+      "src/app/mod.rs",
+      "src/bin/gitcraft-object-storage-helper.rs",
+      "src/git/command.rs",
+      "src/git/mod.rs",
+      "src/git/object_storage/files.rs",
+      "src/git/object_storage/helper.rs",
+      "src/git/object_storage/independent.rs",
+      "src/git/object_storage/independent/held.rs",
+      "src/git/object_storage/independent/held_windows.rs",
+      "src/git/object_storage/independent/local.rs",
+      "src/git/object_storage/mod.rs",
+      "src/git/object_storage/tests.rs",
+      "src/git/object_storage/topology.rs",
+      "src/repo/actions.rs",
+      "src/repo/apply.rs",
+      "src/repo/dialogs/mod.rs",
+      "src/repo/mod.rs",
+      "src/repo/object_storage/mod.rs",
+      "src/repo/toolbar.rs",
+      "src/safe_read.rs"
+    ],
+    "verified_source_hashes": {
+      "Cargo.lock": "27621f03b501806539fa2ef1106d061531d4c4e7cc1224e63d555b5c450553a4",
+      "Cargo.toml": "bb511c5a7b137d37e06a58d624767f38ca885e8575f9f2d65122a0cd2b0f2bac",
+      "README.md": "116b50c0a611e1403d105efe27e93aed96c7048d1559b5b96b9bf45a6d618171",
+      "src/app/mod.rs": "8368833cd252a5bfe5381a8eb3e7a83b06cb4d220d9b0843e69a22b8e832a248",
+      "src/bin/gitcraft-object-storage-helper.rs": "d244eb5c46909a3606d4f9cce728f6f816f6075c24121afaa41458a1e81d8b6b",
+      "src/git/command.rs": "9a02df9c85c02ef2335f69af5aae322d959a36e518c1ca311b0b0f7494b7c0ae",
+      "src/git/mod.rs": "ab750d7356a8d9d41b93ce1a3312489063e99201173be221197ef2f1c6726d3a",
+      "src/git/object_storage/files.rs": "aee31e9d68265731368ed36fb5fd538ba076a47db47a6bc68258c2df798039ee",
+      "src/git/object_storage/helper.rs": "c65127d05f673e95ef150cdd733c91edc2a38e72b36a8cbcb0b22984cfc22764",
+      "src/git/object_storage/independent.rs": "d4a46dcc85a734f9493eea9ed21bbb18429a159df549b23b708a7c864928bf83",
+      "src/git/object_storage/independent/held.rs": "f9910741a8920cf828f0db560a890aae155973b1334dc5ed555cffe70596a15b",
+      "src/git/object_storage/independent/held_windows.rs": "14addc0d25cd38a85c5ce53b12478818a772b23ac507207657ec9afa8d7de7fc",
+      "src/git/object_storage/independent/local.rs": "3111dc8366a2cc86d741531536f5a45608330c7dd808325d5fac720c910bb9aa",
+      "src/git/object_storage/mod.rs": "009d96f5bdfadc20b567b4c50492b0813721d499005e4ea23ec8ebd25af9be59",
+      "src/git/object_storage/tests.rs": "df5bc8e3e135f3f0e7b94ee32a6d2bf6c2223c6f7e38c159d2bd9a4d87e24227",
+      "src/git/object_storage/topology.rs": "864d5e8612977a85818bbba2955a4f12377dbefd0d395dfa34fddc783f281cd1",
+      "src/repo/actions.rs": "10ddc9820b41b157d329a71d5cf39e5ea562e0f968c538f234915da316f1c3cb",
+      "src/repo/apply.rs": "a43b2c8bff933c695ee4f829a0638c4301ce6a449e005fbd1bff944dcdd46f18",
+      "src/repo/dialogs/mod.rs": "5ac0f8ad0c696ab6bc6cc8e10e40de0008c3578849239371e1f29eed72688166",
+      "src/repo/mod.rs": "887e6d59925e1ffe27758cf42015dbab0b7dee2cd99ee931b135edeb52076ab8",
+      "src/repo/object_storage/mod.rs": "cd2634dd3986259a42518b9b56d72dc58f3a0ed60bcb9c4efd7ef4419dbff5e3",
+      "src/repo/toolbar.rs": "27779e08548f018c91885164caf233a8966b3bc421aa78ab01686fd1d0068add",
+      "src/safe_read.rs": "015855df550574af5b39483f9598c6011eb9331e498ecc46405eb4cd50370def"
+    },
+    "verified_logs": {
+      "fmt": {
+        "file": "object-storage-protocol-fmt.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "clippy": {
+        "file": "object-storage-protocol-clippy.log",
+        "sha256": "d67273e011d111233331103993d3f4276a0f5c7935e26a45baced2147a273b78"
+      },
+      "windows-typecheck": {
+        "file": "object-storage-windows-typecheck.log",
+        "sha256": "4472e225200cf31282e580108343d92a07282e0a28692e20f9409da519465730"
+      }
+    },
+    "all_20_authors_match": true,
+    "manifest_sha256": "83dcf492a6db6fad0b9e89b9b179c0150f5750cb7a0c1c9199189588912aeec3",
+    "author_evidence_head": "323336ed17e0a5fc31d1a8c9f9d1accafb9a7ef0"
+  },
+  "findings": [
+    {
+      "id": "OBJECT-PROTOCOL-1",
+      "priority": "P1",
+      "blocking": true,
+      "title": "New helper mutation reaches legacy host PID stop selection",
+      "locations": [
+        "src/git/object_storage/helper.rs:92",
+        "src/git/command.rs:1089",
+        "src/remote/session.rs:128",
+        "src/remote/session.rs:163"
+      ],
+      "evidence": "helper request_target -> comparison_remote -> remote::exec; after timeout remote::exec invokes stop(host,pid), whose script performs host ps/awk -> TERM/KILL. PID<=1 guard does not establish command ownership or prevent PID reuse/foreign descendants. The new helper fixture invokes this real path through fake SSH/WSL.",
+      "required_change": "Route the helper through the separately independently accepted owned transport cut; no legacy stop/retry on uncertain mutation. Review exact adaptation and fixture before runtime.",
+      "runtime_repro": "Not executed; source-visible call graph, known open blocker confirmed."
+    },
+    {
+      "id": "OBJECT-PROTOCOL-2",
+      "priority": "P2",
+      "blocking": true,
+      "title": "Cancelled helper request can still dispatch and ownership returns before remote completion",
+      "locations": [
+        "src/git/object_storage/helper.rs:130",
+        "src/git/command.rs:1089",
+        "src/git/command.rs:1094"
+      ],
+      "evidence": "execute calls request without checking active; comparison_remote spawns remote::exec before its first active check. Even active()==false at entry can send the prepared execute ticket. On cancellation/deadline the outer function returns while the spawned remote operation remains live, releasing UI busy ownership early. Recovery wording is honest but does not prevent this dispatch.",
+      "required_change": "Check cancellation at actual pre-send boundary and retain/capture completion ownership until the actual transport returns, including any nested queue/connect work. Use accepted owned transport with explicit unknown outcome and no automatic replay.",
+      "runtime_repro": "Not executed; deterministic source ordering establishes the boundary failure."
+    },
+    {
+      "id": "OBJECT-WINDOWS-3",
+      "priority": "P2",
+      "blocking": true,
+      "title": "Windows alternate truncation relies on unestablished hard-link exclusion",
+      "locations": [
+        "src/git/object_storage/independent/held_windows.rs:24",
+        "src/git/object_storage/independent/held_windows.rs:82",
+        "src/git/object_storage/independent/held_windows.rs:190",
+        "src/git/object_storage/independent/held_windows.rs:272"
+      ],
+      "evidence": "Actual-handle linkcount1 checks reject preexisting aliases, but the alternate is opened with SHARE_READ. The asserted noDELETEsharing -> nohardlink proof assumes link creation requires DELETE; author found Microsoft FILE_LINK_INFORMATION remarks state no specific access rights are required. Sampling cannot itself exclude an alias created after current(true) and before set_len(0), which could clear another clone borrowing. Existing native assertion has not run and cannot establish that exclusion.",
+      "required_change": "Avoid content mutation through a potentially aliased file, preferably no-replace rename of the retained original handle with identity-bound create-only recovery; or establish an authoritative fully exclusive contract plus owned native regression. New native wrapper requires separate static review before execution.",
+      "runtime_repro": "No native reproduction or exploit confirmation claimed. Blocking source-contract gap: cross-clone mutation safety remains unproved; author withdrew the DELETE-access inference.",
+      "external_reference": "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_link_information",
+      "external_reference_limit": "Author-provided authoritative excerpt; reviewer independent fetch received managed proxy403."
+    }
+  ],
+  "ratings": {
+    "impact_if_wrong": "high",
+    "regression_likelihood": "critical",
+    "regression_protection": "partial",
+    "recoverability": "hard",
+    "confidence": "moderate"
+  },
+  "rating_evidence": {
+    "impact_if_wrong": "Mutates persistent object ownership; legacy cleanup can affect unrelated remote processes; aliased Windows metadata may cross clone boundaries.",
+    "regression_likelihood": "Source-visible unsafe execution boundary and cancelled dispatch remain; no current-helper runtime gate exists.",
+    "regression_protection": "Exact fmt/strict all-target Clippy and Windows metadata-only module check hashes verified. Current full/protocol/native runtime are deferred; earlier886pass+3 applies only to a3b4d7d.",
+    "recoverability": "Linux create-only backups and retained stages are useful, but uncertain remote execution/Windows alias truncation cannot be treated as an easy revert.",
+    "confidence": "Source call graph and exact bindings high confidence; native sharing/link semantics and new protocol runtime lack execution evidence."
+  },
+  "strict_auto_merge_exclusions": [
+    "persistent-state mutation",
+    "new public installed-helper protocol",
+    "platform-specific ownership",
+    "confirmed transport/cancellation blockers",
+    "required runtime/platform validation missing"
+  ],
+  "positive_static_assessments": [
+    "Inspector resolves queries with --end-of-options, immutable full IDs, no-lazy-fetch/no-replace guards and response/depth/store limits; routes repository commands Practice first and Profile fallibly.",
+    "Linux ownership rejects symlink/nonconventional clones, holds ancestors/store/alternate descriptors, writes relative to held descriptors, uses create-only install/backup/recovery, proves required object coverage and connectivity. Existing local failure fixtures target same-text replacement, held-info recovery and newer alternate preservation.",
+    "Ticket compares exact repo/primary/ordered actual device-inode-birth identities plus refs/index/reflogs/worktrees/topology recaptured by each helper invocation; missing birthtime refuses. Handles are honestly recaptured between processes, held through action. No additional confirmed ticket bypass found.",
+    "Dedicated headless helper is supplied via Cargo binary/deb/rpm assets, documented matching-checkout build/PATH setup and versioned capability; unavailable/incompatible helpers refuse without automatic installation. No CI was queried or changed.",
+    "Only exact protocol+transaction completion is success. Lost/malformed/mismatched replies report no proof, backup location and no automatic retry. This reporting does not cure transport ownership failures."
+  ],
+  "boundary_challenges": [
+    {
+      "boundary": "query/transport arguments",
+      "counterexample": "Option-like revision or quote/substitution bytes in repo/file names",
+      "legitimate_control": "Existing full immutable object ID / ordinary absolute path",
+      "source_result": "Supported statically: --end-of-options, constant helper shell text, JSON stdin, quoted reviewed Git transport."
+    },
+    {
+      "boundary": "local retained ownership",
+      "counterexample": "Same-text .git/ancestor replacement, changed alternate or newer recovery target",
+      "legitimate_control": "Unchanged conventional single-worktree clone with complete donors",
+      "source_result": "Supported Linux source: nofollow actual descriptor identity and create-only recovery; exact runtime current head remains deferred."
+    },
+    {
+      "boundary": "helper ticket/replay",
+      "counterexample": "Replaced store with same text, changed refs or replay after detach",
+      "legitimate_control": "Unchanged snapshot with filesystem birthtime support",
+      "source_result": "Supported statically: full recapture/equality, required current snapshot checks, create-only transaction/stage; replay after removal refuses."
+    },
+    {
+      "boundary": "remote dispatch/lifetime",
+      "counterexample": "Already cancelled request or timeout after mutation dispatch",
+      "legitimate_control": "Complete protocol reply for exact transaction",
+      "source_result": "Contradicted: findings1/2; successful reply checks do not constrain presend/unknown execution."
+    },
+    {
+      "boundary": "Windows aliased alternate",
+      "counterexample": "New hardlink between last count sample and truncate",
+      "legitimate_control": "Preexisting multiple links are rejected; single original unchanged bytes",
+      "source_result": "Unresolved safety contract blocks execution: finding3; source sampling is not exclusive ownership proof."
+    }
+  ],
+  "execution_scope": {
+    "approved": "Source inspection, inert manifest/patch hashing, ordinary compile-only checks; no new application or protocol runtime approval.",
+    "not_approved": [
+      "fixed_owned_helper_roundtrips_ssh_and_wsl_and_checks_completion",
+      "any helper protocol/fake SSH/WSL mutation fixture",
+      "native Windows ownership fixtures or truncation path",
+      "full default suite containing helper fixture",
+      "original blocked c805 harness (remains prohibited)"
+    ],
+    "reviewer_executed": "Only Git/source reads and inert Python binding/hash inspection. No Cargo/application/helper/native/process-control fixture/signals/CI."
+  },
+  "next_review_plan": [
+    "Adapt exact independently accepted shared owned transport; preserve/push candidate; re-review presend cancellation/completion/unknown paths and fixture.",
+    "Replace or prove Windows no-content-mutation ownership contract with separately reviewed wrapper; preserve/push native fixture source before execution.",
+    "After scoped static acceptance/root authorization run contained targeted helper failure matrix, ordinary local fixtures/full suite and eventually owned native Windows gates; do not dispatch CI during implementation."
+  ],
+  "status_quo_risk": "Without the feature, supported inspection/independence functionality remains unavailable; do not expose a new mutation path via legacy transport merely to deliver it. Existing legacy transport risk is not solved by this patch.",
+  "skill_note": "assess-patch-risk rubric applied; plugin common artifact-storage/schema resources and local validator were unavailable in exposed skill/tool filesystem. This is a custom review JSON, not claimed schema-validated plugin output."
+}

@@ -1,0 +1,78 @@
+{
+  "repository": "JKamsker/gitcraft",
+  "base": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
+  "head": "f2b7968b45d90afc1bd2f7d2347482a2463f0742",
+  "tree": "b8c5a1dc2e4e2c2ff2b466663791d2fa0f71c2fa",
+  "branch": "codex/object-storage",
+  "remote_verified": "f2b7968b45d90afc1bd2f7d2347482a2463f0742",
+  "clean": true,
+  "patch_sha256": "378f6c8da1a1923379b4073f97b88a36964d0921575b5807558a2577914cee4b",
+  "patch_bytes": 154403,
+  "changed_files": [
+    "Cargo.lock",
+    "Cargo.toml",
+    "README.md",
+    "src/app/mod.rs",
+    "src/bin/gitcraft-object-storage-helper.rs",
+    "src/git/command.rs",
+    "src/git/mod.rs",
+    "src/git/object_storage/files.rs",
+    "src/git/object_storage/helper.rs",
+    "src/git/object_storage/independent.rs",
+    "src/git/object_storage/independent/held.rs",
+    "src/git/object_storage/independent/held_windows.rs",
+    "src/git/object_storage/independent/local.rs",
+    "src/git/object_storage/mod.rs",
+    "src/git/object_storage/tests.rs",
+    "src/git/object_storage/topology.rs",
+    "src/repo/actions.rs",
+    "src/repo/apply.rs",
+    "src/repo/dialogs/mod.rs",
+    "src/repo/mod.rs",
+    "src/repo/object_storage/mod.rs",
+    "src/repo/toolbar.rs",
+    "src/safe_read.rs"
+  ],
+  "verified_source_hashes": {
+    "Cargo.lock": "27621f03b501806539fa2ef1106d061531d4c4e7cc1224e63d555b5c450553a4",
+    "Cargo.toml": "bb511c5a7b137d37e06a58d624767f38ca885e8575f9f2d65122a0cd2b0f2bac",
+    "README.md": "116b50c0a611e1403d105efe27e93aed96c7048d1559b5b96b9bf45a6d618171",
+    "src/app/mod.rs": "8368833cd252a5bfe5381a8eb3e7a83b06cb4d220d9b0843e69a22b8e832a248",
+    "src/bin/gitcraft-object-storage-helper.rs": "d244eb5c46909a3606d4f9cce728f6f816f6075c24121afaa41458a1e81d8b6b",
+    "src/git/command.rs": "9a02df9c85c02ef2335f69af5aae322d959a36e518c1ca311b0b0f7494b7c0ae",
+    "src/git/mod.rs": "ab750d7356a8d9d41b93ce1a3312489063e99201173be221197ef2f1c6726d3a",
+    "src/git/object_storage/files.rs": "aee31e9d68265731368ed36fb5fd538ba076a47db47a6bc68258c2df798039ee",
+    "src/git/object_storage/helper.rs": "c65127d05f673e95ef150cdd733c91edc2a38e72b36a8cbcb0b22984cfc22764",
+    "src/git/object_storage/independent.rs": "d4a46dcc85a734f9493eea9ed21bbb18429a159df549b23b708a7c864928bf83",
+    "src/git/object_storage/independent/held.rs": "f9910741a8920cf828f0db560a890aae155973b1334dc5ed555cffe70596a15b",
+    "src/git/object_storage/independent/held_windows.rs": "14addc0d25cd38a85c5ce53b12478818a772b23ac507207657ec9afa8d7de7fc",
+    "src/git/object_storage/independent/local.rs": "3111dc8366a2cc86d741531536f5a45608330c7dd808325d5fac720c910bb9aa",
+    "src/git/object_storage/mod.rs": "009d96f5bdfadc20b567b4c50492b0813721d499005e4ea23ec8ebd25af9be59",
+    "src/git/object_storage/tests.rs": "df5bc8e3e135f3f0e7b94ee32a6d2bf6c2223c6f7e38c159d2bd9a4d87e24227",
+    "src/git/object_storage/topology.rs": "864d5e8612977a85818bbba2955a4f12377dbefd0d395dfa34fddc783f281cd1",
+    "src/repo/actions.rs": "10ddc9820b41b157d329a71d5cf39e5ea562e0f968c538f234915da316f1c3cb",
+    "src/repo/apply.rs": "a43b2c8bff933c695ee4f829a0638c4301ce6a449e005fbd1bff944dcdd46f18",
+    "src/repo/dialogs/mod.rs": "5ac0f8ad0c696ab6bc6cc8e10e40de0008c3578849239371e1f29eed72688166",
+    "src/repo/mod.rs": "887e6d59925e1ffe27758cf42015dbab0b7dee2cd99ee931b135edeb52076ab8",
+    "src/repo/object_storage/mod.rs": "cd2634dd3986259a42518b9b56d72dc58f3a0ed60bcb9c4efd7ef4419dbff5e3",
+    "src/repo/toolbar.rs": "27779e08548f018c91885164caf233a8966b3bc421aa78ab01686fd1d0068add",
+    "src/safe_read.rs": "015855df550574af5b39483f9598c6011eb9331e498ecc46405eb4cd50370def"
+  },
+  "verified_logs": {
+    "fmt": {
+      "file": "object-storage-protocol-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "clippy": {
+      "file": "object-storage-protocol-clippy.log",
+      "sha256": "d67273e011d111233331103993d3f4276a0f5c7935e26a45baced2147a273b78"
+    },
+    "windows-typecheck": {
+      "file": "object-storage-windows-typecheck.log",
+      "sha256": "4472e225200cf31282e580108343d92a07282e0a28692e20f9409da519465730"
+    }
+  },
+  "all_20_authors_match": true,
+  "manifest_sha256": "83dcf492a6db6fad0b9e89b9b179c0150f5750cb7a0c1c9199189588912aeec3",
+  "author_evidence_head": "323336ed17e0a5fc31d1a8c9f9d1accafb9a7ef0"
+}
