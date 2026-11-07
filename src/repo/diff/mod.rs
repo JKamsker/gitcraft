@@ -313,7 +313,7 @@ fn prepare(
     let lfs = lfs_pair(&lines);
     // An image in LFS: git has only its pointer.
     let image = if is_image(&path) && lfs.is_none() {
-        Some(load_images(repo, key, &path, images::renamed_from(text)))
+        Some(load_images(repo, key, &path, old_name(text).as_deref()))
     } else {
         None
     };

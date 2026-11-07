@@ -163,4 +163,30 @@ mod svg_tests {
         );
         Ok(())
     }
+    #[test]
+    fn renamed_svg_with_git_quoted_paths_keeps_both_rendered_versions() -> Result<(), String> {
+        let r = crate::git::file_comparison::tests::Repo::new()?;
+        let old = "old\tü.svg";
+        let new = "new ü.svg";
+        let bytes=br#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="5" height="5"/></svg>"#;
+        r.write(old, bytes)?;
+        r.commit()?;
+        r.git(&["mv", old, new])?;
+        r.commit()?;
+        let data = super::super::load(
+            &r.0,
+            &DiffKey::Commit {
+                hash: "HEAD".into(),
+                path: new.into(),
+            },
+            git::DiffOptions::default(),
+            true,
+        )?;
+        assert!(data.header.contains("rename from \""));
+        let image = data.image.as_ref().ok_or("SVG preview")?;
+        assert!(image.svg);
+        assert_eq!(image.old.as_deref(), Some(bytes.as_slice()));
+        assert_eq!(image.new.as_deref(), Some(bytes.as_slice()));
+        Ok(())
+    }
 }
