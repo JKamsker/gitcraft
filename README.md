@@ -204,6 +204,18 @@ so your config, credentials and hooks apply as usual.
   it up into it. The targets that take what is dragged light up, the graph scrolls near its
   edges, Esc cancels, and each entry runs the same operation as the right-click menu, undone
   with Ctrl+Z.
+- Ghost run: rest the pointer on a rebase entry (_Rebase main onto x_), the hard reset of
+  _Reset main to here_, _Pull_ (the toolbar button or a mode in its menu), _Force push to
+  origin/x (with lease)…_, _Delete…_ / _Delete locally and on origin…_ or _Drop commit_ (hold
+  Alt to skip the wait), and the graph draws the result before anything is done: the commits it
+  would make on top, faint with dashed lanes, the pills where they would point outlined, the
+  commits it would leave on no branch crossed out with their lanes faded. A strip over the foot
+  of the graph lists those commits with their authors, the files of the working tree that would
+  change, and the step that would conflict. It is worked out in the background without touching
+  refs, index, working tree or reflog: `git replay` (git 2.44+) or `git merge-tree` (2.40+;
+  merges from 2.38) in memory, or a scratch clone in the temporary folder on an older git. A
+  hover never goes to the network: a pull is shown as of the last fetch. _Force push to origin/x (with
+  lease)…_ is in a local branch's menu when its upstream has commits it hasn't.
 
 **Branches, remotes, worktrees, stashes, tags** (left)
 

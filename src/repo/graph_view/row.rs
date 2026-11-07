@@ -135,7 +135,15 @@ impl RepoTab {
                 .remerge_badge(commit)
                 .and_then(|b| b.fit(&painter, room).map(|(label, w)| (b, label, w)));
             let badge_w = resolved.map_or(0.0, |(_, _, w)| w + 6.0);
-            description(ui, &painter, &t, &row, is_match, dot_w + badge_w);
+            let end = description(ui, &painter, &t, &row, is_match, dot_w + badge_w);
+            if self.ghost.kind(i) == crate::repo::ghost::Kind::Going {
+                // Left on no ref by the operation a ghost run shows: struck through.
+                let x = row.gx + row.cols.graph + 6.0;
+                painter.line_segment(
+                    [pos2(x, row.mid()), pos2(end, row.mid())],
+                    Stroke::new(1.2, t.text),
+                );
+            }
             trailing_columns(ui, &painter, &t, &row, now);
             if let Some(status) = ci {
                 let center = pos2(rect.right() - cols.trailing() - 9.0, row.mid());
@@ -292,7 +300,7 @@ fn row_background(
 
 /// The summary, then the rest of the message faded, cut with an ellipsis.
 /// `reserved`: room left at the end (for the build status, a merge's badge).
-fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool, reserved: f32) {
+fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool, reserved: f32) -> f32 {
     let (rect, mid) = (row.rect, row.mid());
     let x = row.gx + row.cols.graph + 6.0;
     let text_right = rect.right() - row.cols.trailing() - 10.0 - reserved;
@@ -313,6 +321,7 @@ fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool
         t.text,
     );
     let room = text_right - summary.right() - 12.0;
+    let end = summary.right().min(text_right);
     if !row.commit.body.is_empty() && room > 24.0 {
         let mut job = egui::text::LayoutJob::single_section(
             row.commit.body.clone(),
@@ -326,6 +335,7 @@ fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool
             t.text,
         );
     }
+    end
 }
 
 /// The hash, author, when and date columns, those the settings show.
@@ -336,7 +346,12 @@ fn trailing_columns(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, now: i64)
         painter.text(
             pos2(rect.right() - cols.trailing(), mid),
             Align2::LEFT_CENTER,
-            commit.hash.get(..7).unwrap_or(&commit.hash),
+            // A ghost run's merge has no commit yet, so no hash.
+            if commit.hash.starts_with('\0') {
+                "—"
+            } else {
+                commit.hash.get(..7).unwrap_or(&commit.hash)
+            },
             theme::mono(11.0),
             t.text_faint,
         );

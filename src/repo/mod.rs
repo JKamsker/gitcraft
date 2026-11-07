@@ -36,6 +36,7 @@ mod forge_link;
 mod fold;
 mod find;
 mod graph_order;
+mod ghost;
 pub(crate) mod graph_view;
 pub(crate) mod highlight;
 mod hooks;
@@ -312,6 +313,8 @@ pub struct RepoTab {
     /// A change on disk not yet reloaded: (inside .git, when).
     fs_pending: Option<(watch::FsChange, Instant)>,
 
+    /// The ghost run of the operation under the pointer.
+    ghost: ghost::Ghost,
     /// Actions queued from outside (the command palette).
     queued: Vec<Action>,
     /// A folder the app should open (taken by `App`).
@@ -469,6 +472,7 @@ impl RepoTab {
             counted_at: Instant::now(),
             fs_rx: None,
             fs_pending: None,
+            ghost: ghost::Ghost::default(),
             queued: Vec::new(),
             open_request: None,
             open_when_done: None,

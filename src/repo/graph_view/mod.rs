@@ -18,6 +18,7 @@ use egui::{Align2, FontId, Key, Response, Sense, Ui, vec2};
 
 use super::actions::{BranchRef, compare_branches_action};
 use super::columns::{Cols, MIN_COL_W, MIN_GRAPH_W, MIN_REFS_W};
+use super::ghost::{Kind, Shift};
 use super::{Action, Dialog, Refresh, RepoTab, WIP_HASH, ops};
 use crate::git;
 use crate::keymap::Command;
@@ -52,9 +53,45 @@ const HANDLE_WIDTH: f32 = 2.0;
 /// How far a handle sits left of the column it resizes.
 const HANDLE_GAP: f32 = 5.0;
 const AVATAR_D: f32 = 20.0;
+/// How opaque a commit a ghost run would make is drawn.
+const GHOST_OPACITY: f32 = 0.6;
+/// How opaque a commit it would leave on no ref is drawn.
+const GOING_OPACITY: f32 = 0.4;
 
 impl RepoTab {
+    /// The graph, or during a ghost run the graph as the operation would leave it (see
+    /// [`super::ghost`]), with the strip that says what it would do above it.
     pub(super) fn graph_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        let area = ui.available_rect_before_wrap();
+        let ghost = self
+            .ghost
+            .swap_in(&mut self.commits, &mut self.graph, &mut self.index);
+        // Rows are numbered differently in the ghost graph: the selected commit is found there
+        // by its hash (the open menu's entries, "Compare with" among them, stay as they were).
+        let selected = self.selected;
+        if ghost {
+            self.selected = self
+                .ghost
+                .real_hash(selected)
+                .and_then(|h| self.index.get(&h).copied());
+        }
+        self.graph_rows_view(ui, acts);
+        if ghost {
+            self.ghost
+                .swap_out(&mut self.commits, &mut self.graph, &mut self.index);
+            self.selected = selected;
+        }
+        // Over the graph's foot rather than above it: the rows (and the menu open on one)
+        // don't move as it comes and goes, or grows when the result is in.
+        egui::Area::new(ui.id().with("ghost-strip"))
+            .order(egui::Order::Middle)
+            .interactable(false)
+            .pivot(Align2::LEFT_BOTTOM)
+            .fixed_pos(area.left_bottom() + vec2(8.0, -8.0))
+            .show(ui.ctx(), |ui| self.ghost_strip(ui, area.width() - 16.0));
+    }
+
+    fn graph_rows_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         if self.search.open {
             self.search_bar(ui, acts);
@@ -83,11 +120,12 @@ impl RepoTab {
 
         // Keyboard navigation (only when no text field has focus, nor a window of the app's
         // is over the tab: the manual, the palette, the clone form).
+        let ghost = self.ghost.drawing();
         // The rows are one Tab stop (see `a11y::list_stop`), whose ↑ / ↓ are these.
         let rows_id = ui.id().with("graph-rows");
         let keys_free =
             !ui.ctx().egui_wants_keyboard_input() || crate::a11y::list_has_focus(ui.ctx(), rows_id);
-        if keys_free && self.dialog.is_none() && !self.keys_blocked {
+        if !ghost && keys_free && self.dialog.is_none() && !self.keys_blocked {
             let ringed = ui.data(|d| d.get_temp::<usize>(rows_id));
             self.arrow_keys(ui, ringed, acts);
         }
@@ -117,7 +155,20 @@ impl RepoTab {
             .id_salt("graph_scroll")
             .auto_shrink(false);
         let offset_id = ui.id().with("graph_offset");
-        if let Some(row) = self.scroll_to.take() {
+        let offset_now = ui.data(|d| d.get_temp::<f32>(offset_id)).unwrap_or(0.0);
+        match self.ghost.take_shift() {
+            // Rows added on top: the rows in view stay where they are, unless the top is shown.
+            Some(Shift::In(rows)) if offset_now > 0.0 => {
+                let by = rows as f32 * ROW_PITCH;
+                self.ghost.shifted = by;
+                scroll = scroll.vertical_scroll_offset(offset_now + by);
+            }
+            Some(Shift::Out(by)) => {
+                scroll = scroll.vertical_scroll_offset((offset_now - by).max(0.0));
+            }
+            _ => {}
+        }
+        if let Some(row) = self.scroll_to.take_if(|_| !ghost) {
             let view_h = ui.available_height();
             let top = row as f32 * ROW_PITCH;
             // Only scroll if the row is outside the visible part.
@@ -136,7 +187,9 @@ impl RepoTab {
         let mut shown_merges = Vec::new();
         let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
             // Near the end: fetch the next page of history.
-            if range.end + 40 >= self.commits.len() && self.has_more && !self.loading_more {
+            // Not from the ghost graph, whose rows don't grow as pages come in.
+            if range.end + 40 >= self.commits.len() && self.has_more && !self.loading_more && !ghost
+            {
                 acts.push(Action::LoadMore);
             }
             self.drag_auto_scroll(ui);
@@ -147,11 +200,14 @@ impl RepoTab {
                 .unwrap_or(range.start);
             // Where ↑ / ↓ start from while nothing is selected: the row Tab rings.
             ui.data_mut(|d| d.insert_temp(rows_id, stop));
+            let menu_row = ui.data(|d| d.get_temp::<String>(menu_row_id()));
+            let mut menu_drawn = false;
             for i in range {
                 if i >= self.commits.len() {
                     loading_row(ui, &t);
                     continue;
                 }
+                if !ghost {
                 if self.commits[i].parents.len() == 2 {
                     shown_merges.push(self.commits[i].hash.clone());
                 }
@@ -166,12 +222,55 @@ impl RepoTab {
                         .then(|| self.compare_rows(self.selected?, i))
                         .flatten();
                     acts.push(compare.unwrap_or(Action::Select(i)));
+                    }
+                    if resp.secondary_clicked() {
+                        let hash = self.commits[i].hash.clone();
+                        ui.data_mut(|d| d.insert_temp(menu_row_id(), hash));
+                    }
+                    self.row_menu(&resp, i, idle, acts);
+                    continue;
                 }
-                self.row_menu(&resp, i, idle, acts);
+                // The ghost graph is only looked at: its rows do nothing, but the menu open
+                // on a real commit (whose entry is being previewed) stays open.
+                let resp = self.ghost_row(ui, i, cols, lanes, now);
+                if !self.is_ghost_row(i) {
+                    menu_drawn |= menu_row.as_deref() == Some(self.commits[i].hash.as_str());
+                    self.row_menu(&resp, i, idle, acts);
+                }
+            }
+            if ghost && !menu_drawn {
+                self.keep_menu_open(ui, menu_row.as_deref(), idle, acts);
             }
         });
         ui.data_mut(|d| d.insert_temp(offset_id, out.state.offset.y));
         self.want_remerge_badges(&shown_merges, ui.ctx());
+    }
+
+    /// A row of the ghost graph, faded as what it is: a commit the operation would make, one
+    /// it would leave on no ref, or one as it is.
+    fn ghost_row(&self, ui: &mut Ui, i: usize, cols: Cols, lanes: Lanes, now: i64) -> Response {
+        let fade = match self.ghost.kind(i) {
+            Kind::New => GHOST_OPACITY,
+            Kind::Going => GOING_OPACITY,
+            Kind::Real => 1.0,
+        };
+        let before = ui.opacity();
+        ui.multiply_opacity(fade);
+        // What its pills and build dots would do is dropped: nothing here is real yet.
+        let resp = self.commit_row(ui, i, cols, lanes, now, &mut Vec::new());
+        ui.set_opacity(before);
+        resp
+    }
+
+    /// The menu of the commit right-clicked last when its row has scrolled out of the ghost
+    /// graph's view (the rows it adds push it down): drawn without its row, so it stays open.
+    fn keep_menu_open(&self, ui: &mut Ui, hash: Option<&str>, idle: bool, acts: &mut Vec<Action>) {
+        let Some(i) = hash.and_then(|h| self.index.get(h)).copied() else {
+            return;
+        };
+        let at = egui::Rect::from_min_size(ui.min_rect().min, vec2(0.0, 0.0));
+        let resp = ui.interact(at, row::row_id(ui, &self.commits[i].hash), Sense::click());
+        self.row_menu(&resp, i, idle, acts);
     }
 
     /// Up and down select the row above or below the selected one.
@@ -242,6 +341,11 @@ impl RepoTab {
             since_fork: false,
         })
     }
+}
+
+/// Where the graph remembers the commit whose menu was opened last.
+fn menu_row_id() -> egui::Id {
+    egui::Id::new("graph-menu-row")
 }
 
 /// The lanes to draw, from the settings and the graph's `width` in lanes.
@@ -399,6 +503,87 @@ mod tests {
             .enumerate()
             .map(|(i, h)| ((*h).to_owned(), i))
             .collect();
+    }
+
+    /// A commit's menu stays open while a ghost run's rows push its row out of view (the
+    /// entry under the pointer is what is previewed), and the ghost graph draws in its place.
+    #[test]
+    fn a_menu_stays_open_while_ghost_rows_push_its_row_away() {
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let mut tab = RepoTab::new_deferred("/nonexistent/ghost-menu-test".into(), &ctx);
+        let hashes: Vec<String> = ["c", "b", "a"].iter().map(|h| h.repeat(40)).collect();
+        let refs: Vec<&str> = hashes.iter().map(String::as_str).collect();
+        show_commits(&mut tab, &refs);
+        // A short window: the header and a few rows.
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(1200.0, 160.0));
+        let second = egui::pos2(600.0, 26.0 + ROW_PITCH * 1.5);
+        let frame = |tab: &mut RepoTab, events: Vec<egui::Event>| {
+            let input = egui::RawInput {
+                screen_rect: Some(screen),
+                events,
+                ..Default::default()
+            };
+            ctx.run_ui(input, |ui| {
+                egui::CentralPanel::default()
+                    .frame(egui::Frame::NONE)
+                    .show(ui, |ui| tab.graph_view(ui, &mut Vec::new()));
+            })
+            .drop_without_applying_deltas();
+        };
+        frame(&mut tab, vec![egui::Event::PointerMoved(second)]);
+        let click = |pressed| egui::Event::PointerButton {
+            pos: second,
+            button: egui::PointerButton::Secondary,
+            pressed,
+            modifiers: egui::Modifiers::NONE,
+        };
+        frame(&mut tab, vec![click(true), click(false)]);
+        frame(&mut tab, Vec::new());
+        let opened = egui::Popup::is_any_open(&ctx);
+        // Twenty commits on top: the right-clicked row is far below the view now.
+        let created = (0..20)
+            .map(|n| git::Commit {
+                hash: format!("{n:040}"),
+                parents: vec![if n == 19 {
+                    hashes[0].clone()
+                } else {
+                    format!("{:040}", n + 1)
+                }],
+                summary: format!("copy {n}"),
+                ..Default::default()
+            })
+            .collect();
+        let outcome = crate::repo::ghost::Outcome {
+            created,
+            copies: 20,
+            ..Default::default()
+        };
+        let rows = tab.commits.clone();
+        tab.ghost.show_for_test(outcome, &rows);
+        // Near the end of what is loaded, with more to load: the ghost graph asks for none.
+        tab.has_more = true;
+        tab.selected = Some(2);
+        let mut asked = Vec::new();
+        for _ in 0..3 {
+            let input = egui::RawInput {
+                screen_rect: Some(screen),
+                ..Default::default()
+            };
+            ctx.run_ui(input, |ui| {
+                egui::CentralPanel::default()
+                    .frame(egui::Frame::NONE)
+                    .show(ui, |ui| tab.graph_view(ui, &mut asked));
+            })
+            .drop_without_applying_deltas();
+        }
+        assert!(!asked.iter().any(|a| matches!(a, Action::LoadMore)));
+        assert_eq!(tab.selected, Some(2));
+        assert!(opened, "the right-click opened no menu");
+        assert!(egui::Popup::is_any_open(&ctx), "the menu closed");
+        // The tab's own rows are back once the graph is drawn.
+        assert_eq!(tab.commits.len(), 3);
+        assert!(!tab.ghost.drawing());
     }
 
     /// A commit's menu left open while a reload replaces the rows is that commit's: when the

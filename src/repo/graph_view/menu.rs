@@ -12,6 +12,8 @@ use crate::repo::conflict_check::Op;
 use crate::repo::commit_actions::{
     revert_action,
 };
+use crate::repo::ghost::{GhostOp, offer};
+use crate::repo::operations::{expect_ref_at, expect_symref};
 use crate::repo::{
     Action, Dialog, RepoTab, Refresh, Undo, WIP_HASH, ops, fast_forward_action, merge_action, rebase_action,
 };
@@ -217,10 +219,9 @@ impl RepoTab {
             acts.push(merge_action(git_ref, current));
         }
         let rebase = format!("Rebase {current} onto {branch}");
-        if self
-            .conflict_button(ui, rebase, idle, Op::Rebase, hash)
-            .clicked()
-        {
+        let rebase = self.conflict_button(ui, rebase, idle, Op::Rebase, hash);
+        offer(&rebase, || GhostOp::Rebase { onto: git_ref.full(), label: branch.to_owned() });
+        if rebase.clicked() {
             acts.push(rebase_action(git_ref, current));
         }
         if ui
@@ -437,7 +438,13 @@ pub(in crate::repo) fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<
         ),
     ] {
         let first = explain.split('.').next().unwrap_or(explain);
-        if ui.button(format!("{label} — {first}")).clicked() {
+        let button = ui.button(format!("{label} — {first}"));
+        if mode == "--hard" {
+            offer(&button, || GhostOp::ResetHard {
+                to: hash.to_owned(),
+            });
+        }
+        if button.clicked() {
             acts.push(Action::Dialog(
                 Dialog::confirm(
                     &format!("{label} reset"),

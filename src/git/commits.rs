@@ -58,6 +58,37 @@ pub fn log(
         .collect())
 }
 
+/// The commits `hashes` themselves (none of their ancestors), in the order given, as [`log`]
+/// reads them. Asked a hundred at a time, so the command line stays short (Windows allows
+/// 32k characters).
+pub fn commits_of(repo: &Path, hashes: &[String]) -> Result<Vec<Commit>, String> {
+    let format = log_args(None, 0, None).format;
+    let mut commits = Vec::with_capacity(hashes.len());
+    for chunk in hashes.chunks(100) {
+        let mut args = vec![
+            "log",
+            NO_SIGNATURE,
+            UTF8,
+            "--no-walk=unsorted",
+            "--date=format-local:%Y-%m-%d %H:%M",
+            &format,
+            END_OPTS,
+        ];
+        args.extend(chunk.iter().map(String::as_str));
+        args.push("--");
+        let out = run(Some(repo), &args)?;
+        let fields: Vec<&str> = out.split('\0').collect();
+        commits.extend(
+            fields
+                .as_chunks::<LOG_FIELDS>()
+                .0
+                .iter()
+                .filter_map(|record| parse_record(record)),
+        );
+    }
+    Ok(commits)
+}
+
 /// How many fields [`log_args`]' format has, each ended by a NUL. No commit can hold one (git
 /// refuses it in a message), where the unit and record separators may well be in a message
 /// someone pasted, and would cut the commit in two or leave it out of the graph.

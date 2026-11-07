@@ -5,6 +5,7 @@ use egui::Ui;
 use crate::git::Branch;
 use crate::menu_item::MenuItem;
 use crate::repo::branch_cleanup::Candidate;
+use crate::repo::ghost::{GhostOp, offer};
 use crate::repo::operations::{expect_ref, expect_ref_at};
 use crate::repo::{Action, Dialog, RepoTab, Undo, ops};
 
@@ -41,14 +42,14 @@ impl RepoTab {
                     .flat_map(|(_, bs)| bs)
                     .find(|r| r.name == b.upstream),
             );
-        if MenuItem::new("Delete…")
+        let delete = MenuItem::new("Delete…")
             .enabled(idle)
             .refused(refused)
             // The entry below, for the remote too, says the same reason.
             .explained_below(upstream.is_some())
-            .show(ui)
-            .clicked()
-        {
+            .show(ui);
+        offer(&delete, || GhostOp::DeleteBranch { branch: b.name.clone(), remote: false });
+        if delete.clicked() {
             acts.push(Action::Dialog(
                 Dialog::confirm(
                     "Delete branch",
@@ -70,13 +71,14 @@ impl RepoTab {
         let Some(((remote, name), tracked)) = upstream else {
             return;
         };
-        if MenuItem::new(format!("Delete locally and on {remote}…"))
+        let both = MenuItem::new(format!("Delete locally and on {remote}…"))
             .enabled(idle)
             .refused(refused)
             .show(ui)
             .on_hover_text(format!("Also delete {} from {remote}", b.upstream))
-            .clicked()
-        {
+;
+        offer(&both, || GhostOp::DeleteBranch { branch: b.name.clone(), remote: true });
+        if both.clicked() {
             let remote_ref = format!("refs/heads/{name}");
             let delete =
                 |flag: &str| guarded(delete_both(flag, &b.name, &remote, name, &tracked.target));

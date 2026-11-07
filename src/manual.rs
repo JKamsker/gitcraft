@@ -62,6 +62,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Interactive rebase: reorder, reword, edit, squash, fix up or drop commits, then start it. Drag a row by its handle to move it; Edit stops the rebase after that commit: stage what should change, and Continue rebase amends it and goes on.",
             "Drag a branch's pill (or its row on the left) onto another branch or a commit: a menu offers merging, rebasing, an interactive rebase or a fast-forward, those that make sense there. The targets that take it light up; Esc cancels.",
             "Drag a commit onto the checked-out branch to cherry-pick it, or onto another commit of the checked-out branch to move it above or below that one, or squash or fix it up into it. Ctrl+Z undoes a drop like the menu's entries.",
+            "Ghost run: rest the pointer on a Rebase, Hard reset, Pull, Force push, Delete or Drop commit entry, in a menu or on the toolbar (hold Alt to skip the wait), and the graph shows the result: the new commits faint with dashed lanes, the pills where they would point outlined, the commits that would be lost crossed out. A strip over the foot of the graph lists those commits with their authors, the files of the working tree that would change and where it would stop on a conflict. Looking changes nothing: only choosing the entry does.",
         ],
     ),
     (
@@ -225,6 +226,10 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("↑ / ↓ then Tab or Enter", "Pick a search suggestion"),
             ("Cmd+click", "Compare with the selected commit"),
             ("Double-click a pill", "Check out that branch or tag"),
+            (
+                "Alt over Rebase, Reset hard, Pull…",
+                "Preview the result in the graph (ghost run)",
+            ),
             (
                 "Drag a pill or a commit",
                 "Merge, rebase, fast-forward, cherry-pick, move or squash",

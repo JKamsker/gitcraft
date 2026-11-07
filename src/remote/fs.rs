@@ -358,9 +358,94 @@ pub fn host_temp_file(t: &Target, suffix: &str, bytes: &[u8]) -> Result<String, 
     }
 }
 
+/// The script that makes (or, with `remove`, removes) a scratch folder in this user's private
+/// folder of the machine (see [`host_temp_file`]). Removing refuses anything but a folder of
+/// that private folder: a path it is given is never trusted to be one.
+fn scratch_script(remove: Option<&str>) -> String {
+    let private = concat!(
+        "umask 077\n",
+        "d=\"${TMPDIR:-/tmp}/gitcraft-$(id -u)\"\n",
+        "mkdir -p -m 700 \"$d\" || exit 1\n",
+        "if [ -L \"$d\" ] || [ ! -O \"$d\" ]; then echo \"$d isn't gitcraft's\" >&2; exit 1; fi\n",
+    );
+    match remove {
+        // Those a run that ended mid-way left (a dropped connection) go after a day.
+        None => format!(
+            concat!(
+                "{private}",
+                "find \"$d\" -mindepth 1 -maxdepth 1 -name 'scratch.*' -mtime +0 -exec rm -rf {{}} + 2>/dev/null\n",
+                "mktemp -d \"$d/scratch.XXXXXXXX\"",
+            ),
+            private = private,
+        ),
+        Some(path) => format!(
+            concat!(
+                "{private}p={path}\n",
+                "case \"$p\" in \"$d\"/scratch.*) ;; *) echo \"$p isn't a scratch folder\" >&2; exit 1 ;; esac\n",
+                "case \"$p\" in */../*|*/..) exit 1 ;; esac\n",
+                "rm -rf -- \"$p\"",
+            ),
+            private = private,
+            path = sh_quote(path),
+        ),
+    }
+}
+
+/// Makes a new empty folder in this user's private folder of `t`'s machine, for work done there
+/// apart from the repository (a scratch clone), and returns its path there. Remove it with
+/// [`remove_host_scratch_dir`].
+pub fn host_scratch_dir(t: &Target) -> Result<String, String> {
+    let out = run(t, scratch_script(None), None).map_err(|e| e.to_string())?;
+    let path = String::from_utf8_lossy(&out.stdout).trim().to_owned();
+    if out.code == 0 && !path.is_empty() {
+        Ok(path)
+    } else {
+        Err(format!(
+            "could not make a scratch folder on {}: {}",
+            t.host.label(),
+            failed(&out)
+        ))
+    }
+}
+
+/// Removes a folder [`host_scratch_dir`] made on `t`'s machine, and nothing else.
+pub fn remove_host_scratch_dir(t: &Target, path: &str) -> Result<(), String> {
+    let out = run(t, scratch_script(Some(path)), None).map_err(|e| e.to_string())?;
+    if out.code == 0 {
+        Ok(())
+    } else {
+        Err(failed(&out).to_string())
+    }
+}
+
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    /// The scratch folder script, run here by `sh`: it makes a private folder, removes it, and
+    /// refuses to remove anything outside gitcraft's own folder.
+    #[test]
+    fn a_scratch_folder_is_made_and_only_it_is_removed() -> Result<(), String> {
+        let sh = |script: String| {
+            std::process::Command::new("sh")
+                .args(["-c", &script])
+                .output()
+                .map_err(|e| e.to_string())
+        };
+        let made = sh(scratch_script(None))?;
+        let path = String::from_utf8_lossy(&made.stdout).trim().to_owned();
+        assert!(made.status.success() && Path::new(&path).is_dir(), "{path}");
+        let outside = std::env::temp_dir().join(format!("gitcraft-keep-{}", std::process::id()));
+        std::fs::create_dir_all(&outside).map_err(|e| e.to_string())?;
+        let refused = sh(scratch_script(Some(&outside.display().to_string())))?;
+        let escaped = sh(scratch_script(Some(&format!("{path}/../.."))))?;
+        let removed = sh(scratch_script(Some(&path)))?;
+        let kept = outside.is_dir();
+        let _ = std::fs::remove_dir_all(&outside);
+        assert!(!refused.status.success() && !escaped.status.success() && kept);
+        assert!(removed.status.success() && !Path::new(&path).exists());
+        Ok(())
+    }
 
     /// The script run on another machine, run here by `sh` the same way: a linked folder, a
     /// missing file, a file too large and a link are refused; a plain file is read.

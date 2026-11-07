@@ -101,6 +101,7 @@ impl RepoTab {
         self.keep_both_dialog(&ctx);
         self.ai_review_window(&ctx);
         self.lfs_locks_ui(&ctx, &mut acts);
+        self.ghost_frame(&ctx);
         for action in acts {
             self.apply(action, &ctx);
         }

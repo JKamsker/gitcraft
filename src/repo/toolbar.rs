@@ -124,6 +124,7 @@ impl RepoTab {
                 .named(|| behind_ahead("Pull", behind, "behind"))
                 .on_hover_text(mode.tip())
                 .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Pull));
+        crate::repo::ghost::offer(&pull, || crate::repo::ghost::GhostOp::Pull(mode));
         if pull.clicked() {
             acts.push(Action::Pull);
         }

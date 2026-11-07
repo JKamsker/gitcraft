@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use super::{Action, Refresh, RepoTab, Undo, ops};
 use crate::settings::Settings;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PullMode {
     /// Fast-forward if possible, merge otherwise.
     Merge,
@@ -69,12 +69,11 @@ impl RepoTab {
 pub(super) fn pull_menu(ui: &mut Ui, acts: &mut Vec<Action>) {
     let mut settings = Settings::get(ui.ctx());
     for mode in PullMode::ALL {
-        if ui
+        let radio = ui
             .radio(settings.pull_mode == mode, mode.label())
-            .on_hover_text(format!("git {}", mode.args().join(" ")))
-            .clicked()
-            && settings.pull_mode != mode
-        {
+            .on_hover_text(format!("git {}", mode.args().join(" ")));
+        super::ghost::offer(&radio, || super::ghost::GhostOp::Pull(mode));
+        if radio.clicked() && settings.pull_mode != mode {
             settings.pull_mode = mode;
             settings.set(ui.ctx());
         }

@@ -13,6 +13,7 @@ mod detached;
 mod diff;
 pub mod external_tool;
 pub mod errors;
+pub mod dry_run;
 mod files;
 mod fold;
 mod hooks;
