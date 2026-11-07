@@ -178,7 +178,18 @@ impl RepoTab {
                 .remerge_badge(commit)
                 .and_then(|b| b.fit(&painter, room).map(|(label, w)| (b, label, w)));
             let badge_w = resolved.map_or(0.0, |(_, _, w)| w + 6.0);
-            let end = description(ui, &painter, &t, &row, is_match, dot_w + badge_w, robot);
+            let end = description(
+                ui,
+                &painter,
+                &t,
+                &row,
+                (
+                    is_match,
+                    self.graph_motion.new_commit(&commit.hash) && !self.ghost.drawing(),
+                ),
+                dot_w + badge_w,
+                robot,
+            );
             if self.ghost.kind(i) == crate::repo::ghost::Kind::Going {
                 // Left on no ref by the operation a ghost run shows: struck through.
                 let x = row.gx + row.cols.graph + 6.0;
@@ -408,13 +419,31 @@ fn description(
     painter: &Painter,
     t: &Tokens,
     row: &Row,
-    is_match: bool,
+    (is_match, new_commit): (bool, bool),
     reserved: f32,
     robot: f32,
 ) -> f32 {
     let (rect, mid) = (row.rect, row.mid());
-    let x = row.gx + row.cols.graph + 6.0 + robot;
+    let mut x = row.gx + row.cols.graph + 6.0 + robot;
     let text_right = rect.right() - row.cols.trailing() - 10.0 - reserved;
+    if new_commit && text_right - x > 70.0 {
+        let marker = Rect::from_center_size(pos2(x + 13.0, mid), vec2(27.0, 17.0));
+        painter.rect_filled(marker, 3.0, t.card);
+        painter.rect_stroke(
+            marker,
+            3.0,
+            Stroke::new(1.0, t.accent),
+            egui::StrokeKind::Inside,
+        );
+        painter.text(
+            marker.center(),
+            Align2::CENTER_CENTER,
+            "new",
+            FontId::proportional(10.0),
+            t.text,
+        );
+        x += 34.0;
+    }
     let font = if is_match {
         theme::medium(12.5)
     } else {
@@ -620,7 +649,7 @@ mod tests {
                                 state == 3,
                                 false,
                             );
-                            description(ui, painter, &t, &row, state == 3, 0.0, 0.0);
+                            description(ui, painter, &t, &row, (state == 3, false), 0.0, 0.0);
                             row.rect = row.rect.translate(vec2(0.0, ROW_PITCH));
                             let background = row_background(
                                 painter,

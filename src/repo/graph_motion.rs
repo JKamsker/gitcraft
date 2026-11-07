@@ -101,9 +101,7 @@ impl RepoTab {
             .take(MAX_MARKS)
             .collect();
         self.graph_motion.started = Some(Instant::now());
-        if !before.fetch {
-            self.scroll_to = self.index.get(&self.refs.head).copied();
-        }
+        self.scroll_to = self.index.get(&self.refs.head).copied();
         ctx.request_repaint();
     }
 }
