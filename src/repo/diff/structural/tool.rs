@@ -57,16 +57,7 @@ pub(super) fn compare(repo: &Path, path: &str, old: &str, new: &str) -> Result<V
         let out = remote::exec(&target.host, &request)?;
         return output(out.code, out.stdout, out.stderr);
     }
-    let temp = Temp::new()?;
-    let name = file_name(path)?;
-    let (before, after) = (
-        temp.0.join("before").join(name),
-        temp.0.join("after").join(name),
-    );
-    for (file, text) in [(&before, old), (&after, new)] {
-        std::fs::write(file, text)
-            .map_err(|e| format!("Couldn't prepare syntax comparison: {e}"))?;
-    }
+    let (temp, before, after) = prepare(path, old, new)?;
     let mut command = Command::new("difft");
     crate::shell_path::apply(&mut command);
     command
@@ -83,11 +74,68 @@ pub(super) fn compare(repo: &Path, path: &str, old: &str, new: &str) -> Result<V
     output(out.code, out.stdout, out.stderr)
 }
 
-fn file_name(path: &str) -> Result<&str, String> {
-    path.rsplit('/')
-        .next()
-        .filter(|p| !p.is_empty() && !matches!(*p, "." | ".."))
-        .ok_or_else(|| "This file has no name to compare.".to_owned())
+/// Repository paths are language hints only, never names to join to a temporary folder.
+/// Git tree names can contain Windows drives, roots, backslashes and device names even when
+/// Windows would refuse to check them out. Only a short ASCII extension crosses this boundary;
+/// extensionless/special names map to application-owned constants.
+pub(super) fn staging_name(path: &str) -> String {
+    let name = path.rsplit('/').next().unwrap_or_default();
+    let special = match name {
+        "Dockerfile" | "Containerfile" => Some("source.dockerfile"),
+        "CMakeLists.txt" => Some("source.cmake"),
+        "Makefile" | "makefile" | "GNUmakefile" | "BSDmakefile" | "Kbuild" | "mkfile"
+        | "Makefile.am" | "Makefile.boot" | "Makefile.frag" | "Makefile.inc" | "Makefile.wat"
+        | "makefile.sco" => Some("source.mk"),
+        "Gemfile" | "Rakefile" => Some("source.rb"),
+        "Cargo.lock" | "Gopkg.lock" | "Pipfile" | "pdm.lock" | "poetry.lock" | "uv.lock" => {
+            Some("source.toml")
+        }
+        ".bash_aliases" | ".bash_history" | ".bash_logout" | ".bash_profile" | ".bashrc"
+        | ".cshrc" | ".env" | ".env.example" | ".flaskenv" | ".kshrc" | ".login" | ".profile"
+        | ".zlogin" | ".zlogout" | ".zprofile" | ".zshenv" | ".zshrc" | "9fs" | "PKGBUILD"
+        | "bash_aliases" | "bash_logout" | "bash_profile" | "bashrc" | "cshrc" | "gradlew"
+        | "kshrc" | "login" | "man" | "profile" | "zlogin" | "zlogout" | "zprofile" | "zshenv"
+        | "zshrc" => Some("source.sh"),
+        _ if name.starts_with("Dockerfile.") => Some("source.dockerfile"),
+        _ if name.starts_with("Makefile") && name.ends_with(".in") => Some("source.mk"),
+        _ if name.ends_with(".sh.in") => Some("source.sh"),
+        _ if name.ends_with(".cmake.in") => Some("source.cmake"),
+        _ => None,
+    };
+    if let Some(name) = special {
+        return name.to_owned();
+    }
+    match name.rsplit_once('.').map(|(_, extension)| extension) {
+        Some(extension)
+            if !extension.is_empty()
+                && extension.len() <= 32
+                && extension
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'_' | b'-')) =>
+        {
+            format!("source.{extension}")
+        }
+        _ => "source".to_owned(),
+    }
+}
+
+/// Keep the actual write boundary shared by production and containment regression tests.
+pub(super) fn prepare(
+    path: &str,
+    old: &str,
+    new: &str,
+) -> Result<(Temp, PathBuf, PathBuf), String> {
+    let temp = Temp::new()?;
+    let name = staging_name(path);
+    let (before, after) = (
+        temp.0.join("before").join(&name),
+        temp.0.join("after").join(&name),
+    );
+    for (file, text) in [(&before, old), (&after, new)] {
+        std::fs::write(file, text)
+            .map_err(|e| format!("Couldn't prepare syntax comparison: {e}"))?;
+    }
+    Ok((temp, before, after))
 }
 
 fn output(code: i32, stdout: Vec<u8>, stderr: Vec<u8>) -> Result<Vec<u8>, String> {
@@ -115,7 +163,7 @@ pub(super) fn request(
     old: &str,
     new: &str,
 ) -> remote::Request {
-    let name = remote::sh_quote(file_name(path).unwrap_or("file"));
+    let name = remote::sh_quote(&staging_name(path));
     let args = ARGS
         .iter()
         .map(|a| remote::sh_quote(a))
@@ -154,7 +202,7 @@ pub(super) fn request(
     }
 }
 
-struct Temp(PathBuf);
+pub(super) struct Temp(PathBuf);
 impl Temp {
     fn new() -> Result<Self, String> {
         static SEQ: AtomicU64 = AtomicU64::new(0);

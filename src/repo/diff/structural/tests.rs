@@ -458,3 +458,186 @@ fn syntax_view_renders_unicode_source_and_no_syntax_changes() -> Result<(), Stri
     }
     Ok(())
 }
+
+#[test]
+fn staging_names_are_portable_language_hints_not_repository_paths() {
+    for (path, expected) in [
+        (r"C:\victim.rs", "source.rs"),
+        (r"C:drive-relative.rs", "source.rs"),
+        (r"\victim.rs", "source.rs"),
+        (r"..\victim.rs", "source.rs"),
+        (r"\\server\share\victim.rs", "source.rs"),
+        (r"\\?\C:\victim.rs", "source.rs"),
+        (r"\\.\C:\victim.rs", "source.rs"),
+        ("/outside/victim.rs", "source.rs"),
+        ("../../victim.rs", "source.rs"),
+        (r"nested/..\..\victim.rs", "source.rs"),
+        (r"C:\victim.rs:stream", "source"),
+        ("CON.rs", "source.rs"),
+        ("NUL", "source"),
+        ("file.rs.", "source"),
+        ("file.rs ", "source"),
+        ("file.\0rs", "source"),
+        ("code ü.rs", "source.rs"),
+        ("日本語.py", "source.py"),
+        ("header.c++", "source.c++"),
+        ("Dockerfile", "source.dockerfile"),
+        ("containers/Dockerfile.dev", "source.dockerfile"),
+        ("CMakeLists.txt", "source.cmake"),
+        ("Makefile", "source.mk"),
+        ("Gemfile", "source.rb"),
+        ("Cargo.lock", "source.toml"),
+        (".bashrc", "source.sh"),
+        ("configure.sh.in", "source.sh"),
+        ("unknown", "source"),
+    ] {
+        let name = tool::staging_name(path);
+        assert_eq!(name, expected, "{path:?}");
+        assert!(name.starts_with("source"));
+        assert!(
+            name.bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'+' | b'_' | b'-'))
+        );
+        assert!(!name.contains(".."));
+        assert_eq!(std::path::Path::new(&name).components().count(), 1);
+        assert!(!std::path::Path::new(&name).is_absolute());
+    }
+    assert_eq!(
+        tool::staging_name(&format!("file.{}", "r".repeat(33))),
+        "source"
+    );
+}
+
+#[test]
+fn temporary_writes_preserve_outside_files_for_absolute_and_windows_tree_names()
+-> Result<(), String> {
+    let repo = Repo::new()?;
+    let outside = repo.0.join("victim.rs");
+    std::fs::write(&outside, b"keep this outside file").map_err(|e| e.to_string())?;
+    let mut paths = vec![
+        outside.display().to_string(),
+        r"C:\victim.rs".to_owned(),
+        r"C:victim.rs".to_owned(),
+        r"\victim.rs".to_owned(),
+        r"..\victim.rs".to_owned(),
+        r"\\server\share\victim.rs".to_owned(),
+        r"\\?\C:\victim.rs".to_owned(),
+        r"\\.\C:\victim.rs".to_owned(),
+        "../victim.rs".to_owned(),
+        "code ü.rs".to_owned(),
+    ];
+    // On native Windows these reproduce drive-absolute, drive-relative, rooted and
+    // backslash traversal forms targeting an existing file, with no drive assumptions.
+    #[cfg(windows)]
+    {
+        use std::path::Component;
+        let drive = outside
+            .components()
+            .find_map(|c| match c {
+                Component::Prefix(p) => Some(p.as_os_str().to_string_lossy().into_owned()),
+                _ => None,
+            })
+            .ok_or("no Windows drive prefix")?;
+        paths.push(format!("{drive}victim.rs"));
+        paths.push(format!(r"{drive}\victim.rs"));
+        paths.push(format!(
+            r"..\..\{}",
+            outside.file_name().unwrap_or_default().to_string_lossy()
+        ));
+    }
+    for path in paths.drain(..) {
+        let (_temp, before, after) = tool::prepare(&path, "fn old() {}", "fn new() {}")?;
+        let root = before
+            .parent()
+            .and_then(std::path::Path::parent)
+            .ok_or("no temp root")?;
+        assert_eq!(before, root.join("before").join("source.rs"), "{path:?}");
+        assert_eq!(after, root.join("after").join("source.rs"), "{path:?}");
+        assert_ne!(before, outside);
+        assert_ne!(after, outside);
+        assert_eq!(
+            std::fs::read(&before).map_err(|e| e.to_string())?,
+            b"fn old() {}"
+        );
+        assert_eq!(
+            std::fs::read(&after).map_err(|e| e.to_string())?,
+            b"fn new() {}"
+        );
+        assert_eq!(
+            std::fs::read(&outside).map_err(|e| e.to_string())?,
+            b"keep this outside file"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn safe_staging_preserves_real_difftastic_language_detection() -> Result<(), String> {
+    if Command::new("difft").arg("--version").output().is_err() {
+        return Ok(());
+    }
+    let repo = Repo::new()?;
+    for (path, old, new, language) in [
+        (
+            r"C:\victim.rs",
+            "fn f() { x(1); }",
+            "fn f() { x(2); }",
+            "Rust",
+        ),
+        ("code ü.rs", "fn f() { x(1); }", "fn f() { x(2); }", "Rust"),
+        ("日本語.py", "x = 1\n", "x = 2\n", "Python"),
+        (
+            "Dockerfile",
+            "FROM alpine:3.20\n",
+            "FROM alpine:3.21\n",
+            "Dockerfile",
+        ),
+        ("CMakeLists.txt", "set(X 1)\n", "set(X 2)\n", "CMake"),
+        ("Cargo.lock", "version = 3\n", "version = 4\n", "TOML"),
+    ] {
+        let report = tool::compare(&repo.0, path, old, new)?;
+        let parsed = model::parse(&report, old, new)?;
+        assert_eq!(parsed.language, language, "{path}");
+        assert!(!parsed.unchanged);
+    }
+    Ok(())
+}
+
+/// Exercise PathBuf's native drive/root interpretation at the real write boundary, including
+/// Git names that Windows cannot check out. This also runs with an absolute UNC temp folder.
+#[cfg(windows)]
+#[test]
+fn windows_absolute_git_name_cannot_overwrite_an_existing_file() -> Result<(), String> {
+    let repo = Repo::new()?;
+    let outside = repo.0.join("outside.rs");
+    std::fs::write(&outside, b"preserve native Windows file").map_err(|e| e.to_string())?;
+    let git_name = outside
+        .to_str()
+        .ok_or("non-UTF8 test path")?
+        .replace('/', "\\");
+    assert!(std::path::Path::new(&git_name).is_absolute());
+    let (_temp, before, after) = tool::prepare(&git_name, "old source", "new source")?;
+    assert_eq!(
+        before.file_name().and_then(|n| n.to_str()),
+        Some("source.rs")
+    );
+    assert_eq!(
+        after.file_name().and_then(|n| n.to_str()),
+        Some("source.rs")
+    );
+    assert_ne!(before, outside);
+    assert_ne!(after, outside);
+    assert_eq!(
+        std::fs::read(&outside).map_err(|e| e.to_string())?,
+        b"preserve native Windows file"
+    );
+    assert_eq!(
+        std::fs::read(&before).map_err(|e| e.to_string())?,
+        b"old source"
+    );
+    assert_eq!(
+        std::fs::read(&after).map_err(|e| e.to_string())?,
+        b"new source"
+    );
+    Ok(())
+}
