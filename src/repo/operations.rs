@@ -53,6 +53,18 @@ impl RepoTab {
             }
             return;
         }
+        if self.echo_before_operation(
+            PendingOp {
+                label: label.to_owned(),
+                ops: ops.clone(),
+                refresh,
+                kind: kind.clone(),
+                quiet,
+            },
+            ctx,
+        ) {
+            return;
+        }
         self.busy_op = Some(label.to_owned());
         self.op_started = Some(Instant::now());
         let control = self.follow_op(&ops, quiet, ctx);

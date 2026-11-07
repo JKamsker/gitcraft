@@ -1,9 +1,9 @@
 //! An opt-in personal rulebook with citations. Imported text never becomes a command.
-use super::tools::ToolsAct;
+use super::{echo_push, tools::ToolsAct};
 use crate::{
     ai, git,
     pull_request::PrDetails,
-    repo::{Action, RepoTab},
+    repo::{Action, PendingOp, RepoTab},
     settings::Settings,
 };
 use serde::{Deserialize, Serialize};
@@ -48,8 +48,13 @@ pub(crate) struct State {
     request: u64,
     error: Option<String>,
     hits: Vec<Hit>,
-    pub passed: Option<String>,
-    pending_push: Option<String>,
+    passed: Option<Vec<Vec<String>>>,
+    pending_push: Option<Waiting>,
+    checking_push: bool,
+}
+struct Waiting {
+    op: PendingOp,
+    stamp: String,
 }
 impl Drop for State {
     fn drop(&mut self) {
@@ -171,25 +176,34 @@ fn check_patch(patch: &str, book: &Book) -> Result<Vec<Hit>, String> {
     }
     Ok(hits)
 }
-fn outgoing(repo: &Path, book: &Book) -> Result<Vec<Hit>, String> {
-    let upstream = git::run(Some(repo), &["rev-parse", "--verify", "@{upstream}"])
-        .map_err(|_| "No upstream: choose one before checking outgoing changes")?;
-    let head = git::run(Some(repo), &["rev-parse", "HEAD"])?;
-    let patch = git::run(
-        Some(repo),
-        &[
-            "-c",
-            "core.quotePath=false",
-            "diff",
-            "--no-color",
-            "--no-ext-diff",
-            "--no-textconv",
-            upstream.trim(),
-            head.trim(),
-            "--",
-        ],
-    )?;
-    check_patch(&patch, book)
+fn outgoing(repo: &Path, book: &Book, steps: &[Vec<String>]) -> Result<Vec<Hit>, String> {
+    if !book.enabled {
+        return Ok(vec![]);
+    }
+    let mut hits = vec![];
+    for (base, head) in echo_push::sources(repo, steps)? {
+        let patch = git::run(
+            Some(repo),
+            &[
+                "-c",
+                "core.quotePath=false",
+                "diff",
+                "--no-color",
+                "--no-ext-diff",
+                "--no-textconv",
+                &base,
+                &head,
+                "--",
+            ],
+        )?;
+        hits.extend(check_patch(&patch, book)?);
+    }
+    Ok(hits)
+}
+fn push_stamp(repo: &Path) -> Result<String, String> {
+    let git = echo_push::stamp(repo)?;
+    let book = serde_json::to_string(&load()?).map_err(|e| e.to_string())?;
+    Ok(format!("{:x}", md5::compute(format!("{git}\0{book}"))))
 }
 pub(super) fn model(
     repo: &Path,
@@ -220,10 +234,15 @@ impl RepoTab {
             self.review_tools.echo.cancel.cancel();
             return;
         }
-        if let Act::PushAnyway(head) = act {
-            if self.refs.head == head {
-                self.review_tools.echo.passed = Some(head);
-                self.push(ctx);
+        if let Act::PushAnyway(stamp) = act {
+            if self
+                .review_tools
+                .echo
+                .pending_push
+                .as_ref()
+                .is_some_and(|p| p.stamp == stamp)
+            {
+                self.resume_echo_push(ctx);
             }
             return;
         }
@@ -270,77 +289,94 @@ impl RepoTab {
            save(&book)?;
          },_=>{}
        }
-       let hits=if checking{outgoing(&repo,&book)?}else{vec![]};Ok((book,hits))
+       let hits=if checking{outgoing(&repo,&book,&[vec!["push".into()]])?}else{vec![]};Ok((book,hits))
     },move|tab,result,_|{if tab.review_tools.echo.request!=request{return;}let s=&mut tab.review_tools.echo;s.busy=false;match result{Ok((book,hits))=>{s.book=book;s.hits=hits;s.error=None;},Err(e)=>s.error=Some(e)}});
     }
-    /// Normal Push waits for opt-in deterministic checks, bound to the exact local head.
-    pub(in crate::repo) fn echo_before_push(&mut self, ctx: &egui::Context) -> bool {
-        if !self.review_tools.echo.book.enabled {
-            return false;
-        }
-        if self.review_tools.echo.passed.take().as_deref() == Some(&self.refs.head) {
-            return false;
-        }
-        if self
-            .review_tools
-            .echo
-            .pending_push
-            .as_ref()
-            .is_some_and(|head| head != &self.refs.head)
-        {
-            self.review_tools.echo.pending_push = None;
-        }
-        if self.review_tools.echo.pending_push.is_some() {
+    pub(in crate::repo) fn echo_push_pending(&mut self) -> bool {
+        let pending =
+            self.review_tools.echo.checking_push || self.review_tools.echo.pending_push.is_some();
+        if pending {
             self.review_tools.open = true;
+        }
+        pending
+    }
+    /// Shared operation entry point: normal, Sync, branch, force, Gerrit and retry pushes
+    /// all keep their original operation and remote/lease guards while the advisory runs.
+    pub(in crate::repo) fn echo_before_operation(
+        &mut self,
+        op: PendingOp,
+        ctx: &egui::Context,
+    ) -> bool {
+        if !echo_push::contains_push(&op.ops) {
+            return false;
+        }
+        // An absent opt-in book has no effect on ordinary operations. If another tab has
+        // written it, read the persisted preference rather than trusting this tab's cache.
+        if !self.review_tools.echo.book.enabled
+            && location().ok().and_then(|p| p.try_exists().ok()) == Some(false)
+        {
+            return false;
+        }
+        if self.review_tools.echo.passed.take().as_ref() == Some(&op.ops) {
+            return false;
+        }
+        if self.review_tools.echo.checking_push || self.review_tools.echo.pending_push.is_some() {
+            self.review_tools.open = true;
+            self.status = Some((
+                "Review or cancel the pending reviewer-echo operation first".into(),
+                true,
+            ));
             return true;
         }
-        let head = self.refs.head.clone();
         let repo = self.path.clone();
-        self.review_tools.echo.pending_push = Some(head.clone());
-        self.then_or(
-            ctx,
-            false,
-            Err,
-            move || {
-                let book = load()?;
-                let hits = if book.enabled {
-                    outgoing(&repo, &book)?
-                } else {
-                    vec![]
-                };
-                Ok((book, hits))
-            },
-            move |tab, result, ctx| {
-                tab.review_tools.echo.pending_push = None;
-                if tab.refs.head != head {
-                    tab.status =
-                        Some(("HEAD changed during reviewer echo; push again".into(), true));
-                    return;
-                }
-                match result {
-                    Ok((book, hits)) if hits.is_empty() => {
-                        tab.review_tools.echo.book = book;
-                        tab.review_tools.echo.passed = Some(head);
-                        tab.push(ctx);
+        self.review_tools.echo.checking_push = true;
+        self.then_or(ctx,false,Err,move|| {
+            let before=push_stamp(&repo)?;
+            let book=load()?;
+            let result=outgoing(&repo,&book,&op.ops);
+            if push_stamp(&repo)?!=before {return Err("Push source or remote configuration changed during reviewer echo; start the push again".into());}
+            Ok((Waiting{op,stamp:before},book,result))
+        },|tab,result,ctx|{
+            tab.review_tools.echo.checking_push=false;
+            match result {
+                Ok((waiting,book,hits))=>{
+                    let s=&mut tab.review_tools.echo;
+                    s.book=book;
+                    s.pending_push=Some(waiting);
+                    match hits {
+                        Ok(hits) if hits.is_empty()=>{s.hits=hits;s.error=None;tab.resume_echo_push(ctx);},
+                        Ok(hits)=>{s.hits=hits;s.error=None;tab.review_tools.open=true;},
+                        Err(e)=>{s.error=Some(e);tab.review_tools.open=true;}
                     }
-                    Ok((book, hits)) => {
-                        tab.review_tools.open = true;
-                        let s = &mut tab.review_tools.echo;
-                        s.book = book;
-                        s.hits = hits;
-                        s.pending_push = Some(head);
-                    }
-                    Err(e) => {
-                        tab.review_tools.open = true;
-                        tab.review_tools.echo.error = Some(e);
-                        tab.review_tools.echo.pending_push = Some(head);
-                    }
-                }
-            },
-        );
+                },
+                Err(e)=>{tab.review_tools.echo.error=Some(e);tab.review_tools.open=true;}
+            }
+        });
         true
     }
+    fn resume_echo_push(&mut self, ctx: &egui::Context) {
+        let Some(waiting) = self.review_tools.echo.pending_push.take() else {
+            return;
+        };
+        let repo = self.path.clone();
+        self.review_tools.echo.checking_push = true;
+        self.then_or(ctx,false,Err,move|| {
+            if push_stamp(&repo)?!=waiting.stamp {return Err("Push source or remote configuration changed after reviewer echo; start the push again".into());}
+            Ok(waiting.op)
+        },|tab,result,ctx|{
+            tab.review_tools.echo.checking_push=false;
+            match result {
+                Ok(op)=>{
+                    tab.review_tools.echo.passed=Some(op.ops.clone());
+                    tab.run_ops_ex(&op.label,op.ops,op.refresh,op.kind,op.quiet,ctx);
+                    tab.review_tools.echo.passed=None;
+                },
+                Err(e)=>{tab.status=Some((e.clone(),true));tab.review_tools.echo.error=Some(e);}
+            }
+        });
+    }
 }
+
 pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
     ui.heading("Reviewer echo");
     ui.label("Opt in to collect your own published comments from pull requests on any supported forge. The personal rulebook is shared by this app's repositories.");
@@ -348,7 +384,7 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
     if ui
         .checkbox(
             &mut enabled,
-            "Enable personal reviewer rules before normal Push",
+            "Enable personal reviewer rules before push operations",
         )
         .changed()
     {
@@ -403,15 +439,23 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
             ui.hyperlink_to("Your comment", &hit.url);
         });
     }
-    if let Some(head) = &s.pending_push
-        && ui
-            .button("I reviewed these observations; push this head")
+    if s.checking_push {
+        ui.add(crate::spinner::Spinner::new());
+        ui.label("Checking pinned push sources…");
+    }
+    if let Some(waiting) = &s.pending_push {
+        ui.label(format!("Pending operation: {}", waiting.op.label));
+        if ui
+            .button("I reviewed these observations; continue this operation")
             .clicked()
-    {
-        acts.push(Action::ReviewTools(ToolsAct::Echo(Act::PushAnyway(
-            head.clone(),
-        ))));
-        s.pending_push = None;
+        {
+            acts.push(Action::ReviewTools(ToolsAct::Echo(Act::PushAnyway(
+                waiting.stamp.clone(),
+            ))));
+        }
+        if ui.button("Cancel this push operation").clicked() {
+            s.pending_push = None;
+        }
     }
 }
 #[cfg(test)]
