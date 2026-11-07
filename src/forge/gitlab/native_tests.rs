@@ -177,9 +177,10 @@ with (root/'requests.jsonl').open('a') as out:out.write(json.dumps({'method':met
 if e=='user':print(json.dumps(f['viewer']));sys.exit(0)
 p='projects/group%2Fsub%2Frepo'
 assert e==p or e.startswith(p+'/'),e
-if method!='GET':print(json.dumps({'ok':True}));sys.exit(0)
+if method!='GET':print(json.dumps(f['mr'] if e.endswith('/merge_requests') else {'ok':True}));sys.exit(0)
 plain=e.split('?')[0]
 if plain==p:result=f['project']
+elif plain.endswith('/merge_requests'):result=[f['mr']]
 elif plain.endswith('/approvals'):result=f['approvals']
 elif plain.endswith('/discussions'):
  if f['mode']=='pages':result=[f['discussions'][0]]*100 if 'page=1&' in e or e.endswith('page=1') else []
@@ -270,6 +271,7 @@ print(json.dumps(result))
     -> Result<(), String> {
         let f = Fixture::new()?;
         f.run(|api| {
+            assert_eq!(GitLab.list(&f.repo, &f.hosting())?.len(), 1);
             let d = details::read(api, 7)?;
             assert_eq!(d.changed_files, 1);
             assert_eq!((d.additions, d.deletions), (1, 1));
@@ -287,6 +289,20 @@ print(json.dumps(result))
             t.set_resolved("thread-with-a-removed-line", true)?;
             t.review(Verdict::Approve, "")?;
             t.merge(MergeMethod::Squash, true)?;
+            assert_eq!(
+                GitLab.create(
+                    &f.repo,
+                    &f.hosting(),
+                    &NewPullRequest {
+                        branch: "topic",
+                        base: "main",
+                        title: "New MR",
+                        body: "Body $(data)",
+                        draft: true
+                    }
+                )?,
+                "https://gitlab.com/group/sub/repo/-/merge_requests/7"
+            );
             assert!(
                 t.add_pending(&LineComment {
                     path: "new name.rs".into(),
@@ -303,7 +319,7 @@ print(json.dumps(result))
             .into_iter()
             .filter(|r| r["method"] != "GET")
             .collect();
-        assert_eq!(writes.len(), 6);
+        assert_eq!(writes.len(), 7);
         assert_eq!(
             writes[0]["body"]["body"],
             "quotes \" and $(only text)\nnext"
@@ -314,6 +330,7 @@ print(json.dumps(result))
             writes[5]["body"],
             json!({"sha":"a".repeat(40),"squash":true,"should_remove_source_branch":true})
         );
+        assert_eq!(writes[6]["body"]["title"], "Draft: New MR");
         Ok(())
     }
     #[test]

@@ -1,26 +1,20 @@
 //! GitLab merge requests, native discussions, approvals and SHA-guarded merges through glab.
 mod api;
 mod details;
-mod post;
 #[cfg(test)]
 mod native_tests;
+mod post;
 
 use std::path::Path;
 
 use serde_json::Value;
 
-use super::{Hosting, NewPullRequest, Pages, Provider, PullRequest, cli};
+use super::{Hosting, NewPullRequest, Pages, Provider, PullRequest};
 use crate::avatars::Hint;
 
 pub(super) struct GitLab;
 
 const TOOL: &str = "glab";
-
-impl GitLab {
-    fn run(&self, repo: &Path, args: &[&str]) -> Result<String, String> {
-        cli::run(TOOL, self.noun(), repo, args)
-    }
-}
 
 impl Provider for GitLab {
     fn name(&self) -> &'static str {
@@ -35,30 +29,38 @@ impl Provider for GitLab {
         host.contains("gitlab")
     }
 
-    fn list(&self, repo: &Path, _: &Hosting) -> Result<Vec<PullRequest>, String> {
-        // glab gives 30 at a time otherwise; 100, as GitHub's and Forgejo's lists have.
-        let args = ["mr", "list", "--output", "json", "--per-page", "100"];
-        parse_list(&self.run(repo, &args)?)
+    fn list(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<PullRequest>, String> {
+        let api = api::Api::new(repo, hosting)?;
+        let value = api.get(&format!(
+            "{}/merge_requests?state=opened&per_page=100",
+            api.project()
+        ))?;
+        parse_list(&value.to_string())
     }
 
-    fn create(&self, repo: &Path, _: &Hosting, new: &NewPullRequest) -> Result<String, String> {
-        let mut args = vec![
-            "mr",
-            "create",
-            "--source-branch",
-            new.branch,
-            "--target-branch",
-            new.base,
-            "--title",
-            new.title,
-            "--description",
-            new.body,
-            "--yes",
-        ];
-        if new.draft {
-            args.push("--draft");
+    fn create(
+        &self,
+        repo: &Path,
+        hosting: &Hosting,
+        new: &NewPullRequest,
+    ) -> Result<String, String> {
+        let api = api::Api::new(repo, hosting)?;
+        let title = if new.draft {
+            format!("Draft: {}", new.title)
+        } else {
+            new.title.into()
+        };
+        let value=api.send("POST",&format!("{}/merge_requests",api.project()),Some(&serde_json::json!({"source_branch":new.branch,"target_branch":new.base,"title":title,"description":new.body})))?;
+        let url = value
+            .get("web_url")
+            .and_then(Value::as_str)
+            .ok_or("GitLab did not return the created merge request URL")?;
+        if crate::pull_request::repo_of_url(url)
+            != Some((hosting.host.clone(), hosting.path.clone()))
+        {
+            return Err("GitLab returned a merge request URL for another repository".into());
         }
-        self.run(repo, &args).map(|out| out.trim().to_owned())
+        Ok(url.into())
     }
 
     fn pages(&self) -> Option<&dyn Pages> {
@@ -96,7 +98,7 @@ fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
     };
     Ok(value
         .as_array()
-        .map_or(&[][..], Vec::as_slice)
+        .ok_or("GitLab returned an invalid merge request list")?
         .iter()
         .map(|item| PullRequest {
             number: item.get("iid").and_then(Value::as_u64).unwrap_or(0),

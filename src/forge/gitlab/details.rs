@@ -42,11 +42,19 @@ pub(super) fn read(api: &Api, number: u64) -> Result<PrDetails, String> {
                 {
                     result.inline_error=Some("GitLab omitted a large or collapsed diff; line comments on omitted lines are unavailable.".into());
                 }
+                let mut in_hunk = false;
                 for line in at(diff, "/diff").lines() {
-                    if line.starts_with('+') && !line.starts_with("+++") {
+                    if line.starts_with("@@ ") {
+                        in_hunk = true;
+                        continue;
+                    }
+                    if !in_hunk {
+                        continue;
+                    }
+                    if line.starts_with('+') {
                         result.additions += 1;
                     }
-                    if line.starts_with('-') && !line.starts_with("---") {
+                    if line.starts_with('-') {
                         result.deletions += 1;
                     }
                 }
@@ -90,7 +98,13 @@ pub(super) fn blocker(
     ) {
         return Some("GitLab's merge policy could not be read. Reload before merging.".into());
     }
-    if approvals.is_err() {
+    if approvals
+        .as_ref()
+        .ok()
+        .and_then(|a| a.get("approvals_left"))
+        .and_then(Value::as_u64)
+        .is_none()
+    {
         return Some(
             "GitLab approval requirements could not be read. Reload before merging.".into(),
         );
@@ -282,7 +296,7 @@ pub(super) fn assemble(
         .into(),
         review_decision: if approvals
             .as_ref()
-            .is_ok_and(|a| id(a, "/approvals_left") == 0)
+            .is_ok_and(|a| a.get("approvals_left").and_then(Value::as_u64) == Some(0))
         {
             "APPROVED"
         } else {
