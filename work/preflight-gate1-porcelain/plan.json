@@ -1,0 +1,31 @@
+{
+  "status": "PRESERVED PLAN; NOT EXECUTED",
+  "reviewed_production_commit": "ffc2851a9e5077443d0ec9a4f32654886e3435de",
+  "review": "/workspace/work/review-push-repair-ffc2851/review-evidence/push-repair-protocol-ffc2851.json STATIC PASS/rootaccepted",
+  "transaction_rs_sha256": "198e08476c1091d1a452926936d02b5ea4ac5346a7237bd1467ea08aa8df2f65",
+  "production_prefix_sha256": "5cc97a803f8f86afb71c1097d14c5f80f76cb13b14cafdb80b3b1e2989c0704f",
+  "application_source_tree": "d7e71fc9ff630b17ea4ed54f9552fafc84dd3853",
+  "tests": [
+    "rotated_split_index_dependency_is_resolved_from_the_saved_index",
+    "synthetic_capability_versions_refuse_before_user_dispatch",
+    "missing_backend_acknowledgement_cannot_qualify_user_dispatch",
+    "synthetic_uncertain_lifecycle_always_retains_owned_evidence",
+    "recording_hook_changes_are_refused_before_checkout_and_keep_external_bytes",
+    "recording_pre_hook_identity_guards_prevent_relay_and_checkout"
+  ],
+  "new_guard_cases": [
+    "wrong-target",
+    "wrong-old",
+    "wrong-new",
+    "duplicate-input",
+    "extra-reference",
+    "extra-field",
+    "empty-input",
+    "pre-head-other",
+    "pre-head-detached",
+    "pre-head-oid-changed"
+  ],
+  "authorization": "Root accepts ffc2851STATIC; run6recordingrepeats only after preserved compilerbinding; report/pushresults/rootacceptance before21productioncases",
+  "containment": "Owned plainfiletemps/suppliedfakeGit; existingboundedrunner5s; no realrefprotocol, livehosts, remote/userrepo/credentials/newcontrollers/CI/defaultfullsuite",
+  "production_delta": "Onlyreviewed3coldprivateindexporcelaindiffchecks+OPTIONAL_LOCKS0; no otherpayload drift"
+}
