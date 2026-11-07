@@ -203,21 +203,31 @@ fn sweep_left_over(repo: &Path, root: &Path) {
     let Ok(out) = run(Some(repo), &["worktree", "list", "--porcelain"]) else {
         return;
     };
-    let root = remote::git_path(root).replace('\\', "/");
+    // By the folders' names, not the whole path: the same folder can be printed otherwise than
+    // it was given (Windows' short `RUNNER~1` against the long name, the case of a drive).
+    let key = root
+        .file_name()
+        .map(|k| k.to_string_lossy().into_owned())
+        .unwrap_or_default();
     let me = this_machine();
     for printed in out.lines().filter_map(|l| l.strip_prefix("worktree ")) {
-        let Some(name) = printed
-            .replace('\\', "/")
-            .strip_prefix(root.as_str())
-            .and_then(|rest| rest.strip_prefix('/'))
-            .and_then(ScratchName::parse)
-        else {
+        let Some(name) = scratch_name_in(printed, &key) else {
             continue;
         };
         if name.machine == me && name.pid != std::process::id() && !process_alive(name.pid) {
             let _ = remove_worktree(repo, &remote::resolve(repo, printed));
         }
     }
+}
+
+/// The scratch name of the worktree git prints at `printed`, when it is in the scratch folder
+/// `key` (`…/gitcraft-scratch/<key>/<name>`).
+fn scratch_name_in(printed: &str, key: &str) -> Option<ScratchName> {
+    let mut parts = printed.trim_end_matches(['/', '\\']).rsplit(['/', '\\']);
+    let (name, folder, dir) = (parts.next()?, parts.next()?, parts.next()?);
+    (folder == key && dir == SCRATCH_DIR)
+        .then(|| ScratchName::parse(name))
+        .flatten()
 }
 
 /// Whether the process `pid` of this machine is running.
@@ -289,6 +299,19 @@ mod tests {
         assert_eq!(ScratchName::parse("test-box-1-2-3"), None);
         assert_eq!(machine_word(" my-pc.local\n"), "mypclocal");
         assert_eq!(machine_word(""), "here");
+    }
+
+    /// Found by the folders' names, however the path before them is written.
+    #[test]
+    fn a_scratch_worktree_is_found_by_its_folders() {
+        let long = "C:/Users/runneradmin/AppData/Local/Temp/gitcraft-scratch/abc/test-box-1-0";
+        let found = scratch_name_in(long, "abc").map(|n| n.pid);
+        assert_eq!(found, Some(1));
+        let back = r"C:\Users\RUNNER~1\Temp\gitcraft-scratch\abc\test-box-2-0";
+        assert_eq!(scratch_name_in(back, "abc").map(|n| n.pid), Some(2));
+        assert!(scratch_name_in(long, "other").is_none());
+        assert!(scratch_name_in("/home/me/abc/test-box-1-0", "abc").is_none());
+        assert!(scratch_name_in("/tmp/gitcraft-scratch/abc/wip", "abc").is_none());
     }
 
     #[test]
