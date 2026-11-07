@@ -2,6 +2,7 @@
 
 pub mod app;
 mod avatars;
+mod audio;
 mod bounded_process;
 mod ci;
 mod connections;

@@ -63,6 +63,7 @@ impl RepoTab {
         }
         self.graph_motion.expire();
         self.saved_graph_header(ui);
+        self.graph_walk_header(ui);
         if self.commits.is_empty() {
             ui.centered_and_justified(|ui| {
                 if self.loading {
@@ -131,6 +132,7 @@ impl RepoTab {
             self.commits.len() + usize::from(self.has_more)
         };
         let mut hovered_message = None;
+        let mut mounted = std::collections::HashMap::new();
         let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
             // show_rows includes overscan and partially clipped rows. Require the text's
             // centre to be inside the viewport with enough room for its glyphs: a label on
@@ -190,6 +192,7 @@ impl RepoTab {
                     continue;
                 }
                 let (resp, hovered) = self.commit_row(ui, i, cols, lanes, &readable, acts);
+                mounted.insert(i, resp.id);
                 if hovered.is_some() {
                     hovered_message = hovered;
                 }
@@ -204,6 +207,14 @@ impl RepoTab {
                 self.row_menu(&resp, i, idle, acts);
             }
         });
+        for (&raw, &id) in &mounted {
+            ui.ctx().accesskit_node_builder(id, |node| {
+                node.set_description(self.graph_description(raw));
+                let parents: Vec<_> = self.topology.parents.get(raw).into_iter().flatten()
+                    .filter_map(|parent| mounted.get(parent).map(egui::Id::accesskit_id)).collect();
+                node.set_flow_to(parents);
+            });
+        }
         ui.data_mut(|d| d.insert_temp(offset_id, out.state.offset.y));
         header::column_headers(ui, &t, header, &cols);
         self.column_handles(ui, header, &prefs, &cols, &settings);
@@ -213,6 +224,20 @@ impl RepoTab {
 
     /// Up and down select the row above or below the selected one.
     fn arrow_keys(&mut self, ui: &Ui, acts: &mut Vec<Action>) {
+        if Settings::get(ui.ctx()).graph_lane_walk {
+            let direction = ui.input(|i| {
+                use crate::repo::graph_walk::Direction;
+                if i.key_pressed(Key::ArrowDown) { Some(Direction::Parent) }
+                else if i.key_pressed(Key::ArrowUp) { Some(Direction::Child) }
+                else if i.key_pressed(Key::ArrowRight) { Some(Direction::Merge) }
+                else if i.key_pressed(Key::ArrowLeft) { Some(Direction::Tip) }
+                else { None }
+            });
+            if let Some(direction) = direction && let Some(next) = self.graph_walk(direction, ui.ctx()) {
+                acts.push(Action::Select(next)); self.scroll_to = Some(next);
+            }
+            return;
+        }
         let (up, down) = ui.input(|i| (i.key_pressed(Key::ArrowUp), i.key_pressed(Key::ArrowDown)));
         let current = self.selected.unwrap_or(0);
         let next = if self.saved_views.active() && (up || down) {

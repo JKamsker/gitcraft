@@ -15,3 +15,29 @@ zero-duration policy, finishes scrolling immediately and suppresses highlights a
 
 Implementation status: UNVALIDATED. Runtime, formatting, tests and independent review are
 pending the working execution handoff.
+
+## Hear the graph
+
+Enable **Walk graph topology** above the graph. Down follows the first parent, up follows
+a loaded child, right finds the nearest descendant merge, and left finds the nearest reachable
+branch tip. These follow parent edges even when an unrelated commit occupies the next row.
+When several children are possible, the first in Git's displayed topological order is used.
+Saved Views retain their filters and include the selected commit as context. No walk downloads
+objects or runs Git. At a loaded-history boundary, the status explains why no step was taken.
+
+Graph rows expose merge, root, divergence, parent and loaded-child counts to AccessKit, with
+flow relationships between mounted parent rows. Branch tips include their upstream's actual
+ahead/behind counts. A selected commit also gets a background comparison with main, master or
+the checked-out branch: ahead/behind within loaded ancestry, shared ancestor's author date and
+merge count. Incomplete ancestry is explicitly identified; author date is not claimed to be
+the date the branch was created.
+
+**Graph sounds** is separately opt-in and defaults off. Soft harmonic earcons distinguish lane
+crossings and merges. Rodio's native backend supports desktop platforms without subprocesses;
+only playback is enabled, with no media decoders. Device initialization is deferred until a
+requested cue. Queue length is bounded, sound failure leaves navigation usable and offers Retry
+audio. Test builds record dispatches without opening a sound device.
+
+Native dependency note: Linux playback requires the ALSA development package when building.
+Cargo.lock must be resolved in the working execution handoff; no dependency installation,
+compilation, protocol fixture or real audio playback has run for this source cut.

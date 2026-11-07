@@ -24,6 +24,8 @@ open = "5"
 portable-pty = "0.9"
 pulldown-cmark = { version = "0.13", default-features = false }
 rfd = "0.17"
+# Native desktop earcons: no codecs, enabled only by explicit sound preferences.
+rodio = { version = "0.21", default-features = false, features = ["playback"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 yaml-rust = "0.4.5"

@@ -47,6 +47,10 @@ pub struct Settings {
     pub compact_graph: bool,
     /// Explain graph changes with short motion (also follows the shared accessibility policy).
     pub graph_motion: bool,
+    /// Arrow keys follow topology instead of adjacent visual rows.
+    pub graph_lane_walk: bool,
+    /// Quiet lane-crossing and merge earcons; always opt-in.
+    pub graph_sounds: bool,
     /// Widths of the author, when, date and hash columns (dragged in the graph header).
     pub author_width: f32,
     pub when_width: f32,
@@ -119,6 +123,8 @@ impl Default for Settings {
             graph_width: 0.0,
             compact_graph: false,
             graph_motion: true,
+            graph_lane_walk: false,
+            graph_sounds: false,
             author_width: 150.0,
             when_width: 100.0,
             date_width: 118.0,

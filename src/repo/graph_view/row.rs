@@ -73,6 +73,8 @@ impl RepoTab {
         // Known by its commit, not its place: rows shift when a reload adds commits or the
         // changes row above them, and a menu opened on one must stay that commit's.
         let resp = ui.interact(rect, row_id(ui, &commit.hash), Sense::click());
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::SelectableLabel, true,
+            format!("Commit {}, {}, by {}. {}", commit.hash.get(..8).unwrap_or(&commit.hash), commit.summary, commit.author, self.graph_description(i))));
         let painter = ui.painter_at(rect);
         let mut hovered_message = None;
         let is_wip = commit.hash == WIP_HASH;
