@@ -35,6 +35,10 @@ fn locations(repo: &Path, key: &DiffKey) -> Result<(At, At), String> {
         Ok((before, after))
     };
     match key {
+        DiffKey::Remerge { .. } => Err(
+            "Syntax comparison is not available for merge-resolution diffs. Showing the patch."
+                .to_owned(),
+        ),
         DiffKey::Commit { hash, path } => {
             let detail = git::commit_detail(repo, hash)?;
             changed(

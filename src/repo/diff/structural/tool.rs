@@ -165,6 +165,7 @@ pub(super) fn request(
         unset: removed_env(),
         timeout: Some(TIMEOUT),
         long: true,
+        ..Default::default()
     }
 }
 

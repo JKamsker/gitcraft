@@ -544,7 +544,7 @@ mod tests {
                                 state == 3,
                                 false,
                             );
-                            description(ui, painter, &t, &row, state == 3, false);
+                            description(ui, painter, &t, &row, state == 3, 0.0, 0.0);
                             row.rect = row.rect.translate(vec2(0.0, ROW_PITCH));
                             let background = row_background(
                                 painter,
