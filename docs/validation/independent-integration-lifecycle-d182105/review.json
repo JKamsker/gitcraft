@@ -1,0 +1,36 @@
+{
+  "verdict": "PASS (STATIC scoped lifecycle delta only)",
+  "application_candidate": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+  "base": "0447e56a42564bd87debda9988e1809a3fa90119",
+  "tree": "60b4ae6146a22083c657d1745bcc3e5d4b67ba2e",
+  "manifest_sha256": "f9f0c4058bec6180667cf3031a55b2bf731f5699bca64025be40b6b810a9d119",
+  "source_diff_sha256": "e3363ffcf47588d69d7a96b0f77ba4fbc297fd946501e1329b70fe7b9dafb223",
+  "changed_files_sha256": {
+    "src/repo/file_comparison/mod.rs": "c2fede1720edf613293ed88cac524f02b0d38eeed655548392657d75030c1aaa",
+    "src/repo/load.rs": "22d0a64bb42dfc2387bd98e8d10aa1ead53e6d89b33f8b29be9041b08894c987",
+    "src/repo/tour/mod.rs": "fb67ac7ea5ba23a6691448ae319b70b348a9f0ceb29885d91dc4ed8ed63db670"
+  },
+  "author_log_hashes": {
+    "fmt": true,
+    "targeted": true,
+    "clippy": true,
+    "test": true,
+    "test-list": true
+  },
+  "author_full_results": [
+    "test result: ok. 891 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 42.83s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  ],
+  "author_focused_results": [
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 893 filtered out; finished in 0.38s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  ],
+  "findings": [],
+  "assessment": [
+    "Opening Tour clears file-comparison state and opening comparison clears Tour, removing the higher-priority hidden pane and dropping old weak-generation reader lifetime tokens. Existing globally unique request/generation checks reject late completions.",
+    "Profile connection reload clears Activity/Tour snapshots as well as existing comparison state; cached data from an old captured connection context cannot survive into current profile.",
+    "Extended existing realPractice UI test drives dispatcher transitions and profile reload, checks retired Tour generation lifetimes, and preserves existing test name. No transport/API/unique-module changes in delta."
+  ],
+  "validation_scope": "Independent STATIC source review of these three changed files and adjacent cancellation/arrival paths. Verified supplied5log hashes; author focused1/1 and full891passed3ignored0filtered894total evidence. No independent integration runtime test, new compilation, native Windows/live credentials or CI use. Original exact55df PortabilityPASS remains unchanged; final combined review separate."
+}
