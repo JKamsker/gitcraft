@@ -61,6 +61,16 @@ pub(crate) fn recover_owner(record: &Path) -> Result<Vec<u8>, String> {
     }
     Ok(bytes)
 }
+
+/// After confirmed workspace cleanup, remove only the authenticated owner's private
+/// terminal artifacts. Failure retains temporary evidence and never sends a signal.
+pub(crate) fn retire_owner(record: &Path, bytes: &[u8]) -> Result<(), String> {
+    if let Some(target) = parse(record) {
+        session::retire_endpoint(&target.host, &supervisor::Endpoint::from_record(bytes)?)
+    } else {
+        native_owner::Endpoint::from_record(bytes)?.retire()
+    }
+}
 pub use ui_guard::{mark_ui_thread, refused_on_ui_thread};
 
 /// Whether gitcraft has a connection open to `host` now: asking it something won't connect

@@ -9,6 +9,14 @@ class Recording:
     def kill(self,p,s): self.events.append(('direct',p,s))
     def waitpid(self,p,f): self.events.append(('reap',p,f)); return p,0
 class Pure(unittest.TestCase):
+    def test_retirement_without_receipt_erases_nothing(self):
+        owner=dict(v=1,nonce='a',path=m.ROOT+'b'*32,token='c'*64)
+        actions=[]
+        def missing(_): raise ValueError('missing atomic receipt')
+        with self.assertRaises(ValueError): m.retire(owner,missing,actions.append,actions.append)
+        self.assertEqual(actions,[])
+        m.retire(owner,lambda _:None,actions.append,actions.append)
+        self.assertEqual(actions,[owner['path']+'/'+n for n in ('input','control','terminal')]+[owner['path']])
     def test_forwarding_backpressure_never_blocks_control_and_is_bounded(self):
         def blocked(fd, data): raise BlockingIOError()
         forward = m.Forwarder(blocked)

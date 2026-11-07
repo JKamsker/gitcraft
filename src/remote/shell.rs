@@ -247,6 +247,18 @@ impl Shell {
         if expired {
             return Err(Failure::TimedOut(true));
         }
+        // Only the complete receipt and frozen binary output permit retiring evidence.
+        // This uses the same connection, including passive reads; no reconnect is needed.
+        let ack = format!("A {nonce}\n");
+        if self.stdin.as_mut().is_none_or(|stdin| {
+            stdin
+                .write_all(ack.as_bytes())
+                .and_then(|()| stdin.flush())
+                .is_err()
+        }) {
+            self.stdin.take();
+        }
+        self.lease = None;
         Ok(Output {
             code,
             stdout,

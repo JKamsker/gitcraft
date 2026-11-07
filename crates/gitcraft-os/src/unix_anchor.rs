@@ -12,13 +12,24 @@ use std::process::{Command, ExitStatus};
 use std::sync::OnceLock;
 
 const IMAGE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/gitcraft-group-anchor"));
+static HELPER: OnceLock<Result<PathBuf, String>> = OnceLock::new();
 
 fn helper() -> io::Result<&'static PathBuf> {
-    static HELPER: OnceLock<Result<PathBuf, String>> = OnceLock::new();
     HELPER
         .get_or_init(|| install().map_err(|e| e.to_string()))
         .as_ref()
         .map_err(|e| io::Error::other(e.clone()))
+}
+
+pub(super) fn retire() {
+    if let Some(Ok(path)) = HELPER.get() {
+        // This exact private artifact was installed by this process. No process selectors,
+        // directory scans or guessed paths are used. Call only after all owners shut down.
+        let _ = std::fs::remove_file(path);
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::remove_dir(parent);
+        }
+    }
 }
 fn install() -> io::Result<PathBuf> {
     let mut random = [0u8; 16];

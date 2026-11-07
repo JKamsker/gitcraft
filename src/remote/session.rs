@@ -245,6 +245,7 @@ pub(crate) struct Streaming {
     pub lease: super::supervisor::Lease,
     nonce: String,
     host: Host,
+    durable: bool,
 }
 impl Streaming {
     pub(crate) fn configure(self, options: &mut crate::processes::Options) -> Command {
@@ -256,6 +257,14 @@ impl Streaming {
         options.stderr_filter = Some(Box::new(move |bytes| marker.feed(bytes)));
         let ready = self.lease.clone();
         options.stop_ready = Some(Box::new(move || ready.endpoint().is_some()));
+        if !self.durable {
+            let lease = self.lease.clone();
+            let host = self.host.clone();
+            options.retire_remote = Some(Box::new(move || {
+                let endpoint = lease.endpoint().ok_or("no endpoint to retire")?;
+                retire_endpoint(&host, &endpoint)
+            }));
+        }
         let lease = self.lease;
         let host = self.host;
         options.stop_remote = Some(Box::new(move || {
@@ -293,6 +302,7 @@ pub(crate) fn streaming_command_record(
         lease: Default::default(),
         nonce,
         host: host.clone(),
+        durable: record.is_some(),
     })
 }
 
@@ -317,6 +327,30 @@ pub(crate) fn stop_endpoint(
         Ok(())
     } else {
         Err("the supervisor did not confirm its atomic stop/reap receipt".into())
+    }
+}
+
+pub(crate) fn retire_endpoint(
+    host: &Host,
+    endpoint: &super::supervisor::Endpoint,
+) -> Result<(), String> {
+    let _cleanup = Cleanup::new();
+    let (command, _connection) = shell_command(host, false);
+    let out = crate::processes::run_cleanup(
+        command,
+        crate::processes::Options {
+            input: Some(endpoint.retire_script()?.into_bytes()),
+            timeout: Some(Duration::from_secs(10)),
+            output_limit: 4096,
+            stderr_limit: Some(4096),
+            ..Default::default()
+        },
+    )?
+    .complete()?;
+    if out.status.success() && out.stdout.trim_ascii() == b"retired" {
+        Ok(())
+    } else {
+        Err("private endpoint evidence retained".into())
     }
 }
 

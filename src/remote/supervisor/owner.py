@@ -67,6 +67,14 @@ def control(owner):
         return read_receipt(owner)
     finally: s.close()
 
+def retire(owner, read=read_receipt, unlink=os.unlink, rmdir=os.rmdir):
+    owner = endpoint(owner)
+    read(owner)  # Never erase recovery evidence without complete cleanup proof.
+    for name in ('input', 'control', 'terminal'):
+        try: unlink(owner['path'] + '/' + name)
+        except FileNotFoundError: pass
+    rmdir(owner['path'])
+
 def finish_owned(anchor, established, ops=os, pause=time.sleep):
     failure = None
     try:
@@ -278,6 +286,7 @@ def serve():
     # Unbuffered reads prevent input for the next request from being stolen by buffering.
     controller = os.fdopen(os.dup(0), 'rb', buffering=0)
     print('__GITCRAFT_READY__', flush=True)
+    previous = None
     while True:
         line = bytearray()
         while len(line) <= 96 << 20:
@@ -288,11 +297,17 @@ def serve():
         if len(line) > 96 << 20 or line.count(b'\n') != 1 or not line.endswith(b'\n'):
             raise ValueError('oversized or pipelined request')
         line = bytes(line)
+        if line.startswith(b'A '):
+            if previous is None or line != ('A ' + previous['nonce'] + '\n').encode():
+                raise ValueError('invalid retirement acknowledgement')
+            retire(previous); previous = None
+            continue
         if line.startswith(b'P '):
             sys.stdout.buffer.write(line); sys.stdout.buffer.flush(); continue
         req = json.loads(line)
         print('S ' + req['nonce'], flush=True)
         code, output, owner = run(req, controller)
+        previous = owner
         sys.stdout.buffer.write(b'C1 ' + encode(receipt(owner, 'stopped', code))); sys.stdout.buffer.flush()
         print('R {} {} {} {}'.format(req['nonce'], code, len(output[0]), len(output[1])), flush=True)
         sys.stdout.buffer.write(output[0]); sys.stdout.buffer.write(output[1]); sys.stdout.buffer.flush()
@@ -302,6 +317,9 @@ def main():
     if mode == 'probe':
         if not all(hasattr(os, n) for n in ('fork', 'setsid', 'killpg')): raise RuntimeError('POSIX ownership unavailable')
     elif mode == 'serve': serve()
+    elif mode == 'retire':
+        retire(json.loads(sys.stdin.buffer.readline(2049)))
+        print('retired', flush=True)
     elif mode == 'control':
         print(json.dumps(control(json.loads(sys.stdin.buffer.readline(2049)))), flush=True)
     elif mode == 'stream':

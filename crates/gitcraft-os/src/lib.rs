@@ -38,6 +38,12 @@ mod unix_anchor;
 mod windows_shell;
 pub use owned_child::OwnedChild;
 
+/// Retire this process's installed helper only after every process service has shut down.
+pub fn retire_process_helpers() {
+    #[cfg(unix)]
+    unix_anchor::retire();
+}
+
 /// Sets the progress the taskbar button of the window `hwnd` (its `HWND`, as a number) shows.
 /// From the window's own thread.
 pub fn set_taskbar_progress(hwnd: isize, progress: Progress) -> Result<(), String> {

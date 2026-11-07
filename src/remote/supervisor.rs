@@ -71,11 +71,17 @@ impl Endpoint {
         Ok(endpoint)
     }
     pub(super) fn control_script(&self) -> Result<String, String> {
+        self.operation_script("control")
+    }
+    pub(super) fn retire_script(&self) -> Result<String, String> {
+        self.operation_script("retire")
+    }
+    fn operation_script(&self, mode: &str) -> Result<String, String> {
         if !self.valid() {
             return Err("invalid ownership endpoint".into());
         }
         let data = serde_json::to_string(self).map_err(|e| e.to_string())?;
-        let launch = launcher("control", "");
+        let launch = launcher(mode, "");
         // Capability goes over stdin, never into a process command line.
         Ok(format!(
             "{{\n{launch}\n}} <<'GITCRAFT_CONTROL_V1'\n{data}\nGITCRAFT_CONTROL_V1\n"

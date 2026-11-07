@@ -41,6 +41,8 @@ pub(crate) struct Options {
     /// Cleanup on the other machine, before returning a cancelled/timed-out operation.
     /// This is a blocking protocol API, isolated from the I/O loop on bounded workers.
     pub stop_remote: Option<Box<dyn FnOnce() -> Result<(), String> + Send>>,
+    /// Best-effort removal of private artifacts, authenticated by a terminal receipt.
+    pub retire_remote: Option<Box<dyn FnOnce() -> Result<(), String> + Send>>,
     pub stop_ready: Option<Box<dyn Fn() -> bool + Send + Sync>>,
     pub stdout_ready: Option<&'static str>,
     pub output_limit: usize,
@@ -64,6 +66,7 @@ impl Default for Options {
             ready: None,
             stdout_file: None,
             stop_remote: None,
+            retire_remote: None,
             stop_ready: None,
             stdout_ready: None,
             output_limit: OUTPUT_LIMIT,
@@ -358,6 +361,7 @@ impl Drop for Service {
 }
 
 static SERVICE: OnceLock<Result<Service, String>> = OnceLock::new();
+static CLEANUP: OnceLock<Result<Service, String>> = OnceLock::new();
 pub(crate) fn service() -> Result<&'static Service, String> {
     SERVICE
         .get_or_init(|| {
@@ -372,7 +376,6 @@ pub(crate) fn run(command: Command, options: Options) -> ResultOutput {
 /// Dedicated bounded cleanup capacity cannot deadlock behind the transports whose
 /// owners are waiting for this acknowledgement. It never inherits caller cancellation.
 pub(crate) fn run_cleanup(command: Command, mut options: Options) -> ResultOutput {
-    static CLEANUP: OnceLock<Result<Service, String>> = OnceLock::new();
     options.cancel = Cancellation::default();
     let service = CLEANUP.get_or_init(|| Service::new(2, 32).map_err(|e| e.to_string()));
     service
@@ -390,6 +393,12 @@ pub(crate) fn counts() -> Option<Counts> {
 }
 pub(crate) fn shutdown() {
     if let Some(Ok(service)) = SERVICE.get() {
+        service.shutdown();
+    }
+}
+
+pub(crate) fn shutdown_cleanup() {
+    if let Some(Ok(service)) = CLEANUP.get() {
         service.shutdown();
     }
 }
@@ -584,18 +593,19 @@ async fn execute(
             break;
         }
     }
+    let mut remote_confirmed = stopped.is_none() || options.stop_remote.is_none();
     if stopped.is_some() {
         #[cfg(test)]
         if let Some(trace) = trace {
             trace.stage(trace::Stage::Stopping);
         }
-        // Remote cleanup may need its PID marker. The stderr callback has consumed every
-        // chunk read so far. Run the legacy protocol off the event loop, before killing SSH.
+        // The stderr filter has consumed every ownership handshake chunk read so far.
+        // Authenticate stop/reap off the event loop, before ending the local transport.
         if let Some(stop) = options.stop_remote.take()
             && let Ok(_permit) = Arc::clone(blocking).acquire_owned().await
         {
             match tokio::task::spawn_blocking(stop).await {
-                Ok(Ok(())) => {}
+                Ok(Ok(())) => remote_confirmed = true,
                 result => {
                     let why = match result {
                         Ok(Err(why)) => why,
@@ -664,6 +674,14 @@ async fn execute(
     child
         .finish()
         .map_err(|e| format!("could not finish owned process: {e}"))?;
+    if remote_confirmed
+        && let Some(retire) = options.retire_remote.take()
+        && let Ok(_permit) = Arc::clone(blocking).acquire_owned().await
+    {
+        // The endpoint itself requires its atomic receipt before unlinking anything.
+        // Failed retirement leaves private evidence; it never authorizes further signals.
+        let _ = tokio::task::spawn_blocking(retire).await;
+    }
     if !ready && stopped.is_none() {
         let said = String::from_utf8_lossy(&stderr);
         stopped = Some(if said.trim().is_empty() {

@@ -51,7 +51,7 @@ sub terminal {
     my $v = $JSON->decode($bytes);
     die 'invalid receipt' unless ref($v) eq 'HASH' && join(',',sort keys %$v) eq 'code,nonce,path,state,token,v';
     for my $k (keys %$o) { die 'unconfirmed receipt' unless $v->{$k} eq $o->{$k}; }
-    die 'unconfirmed receipt' unless $v->{state} eq 'stopped' && $v->{code} =~ /\A[0-9]+\z/;
+    die 'unconfirmed receipt' unless $v->{state} eq 'stopped' && $v->{code} =~ /\A[0-9]+\z/ && $v->{code} <= 255;
     return $v;
 }
 sub control {
@@ -69,6 +69,20 @@ sub control {
     return $final;
 }
 sub cloexec { my $fd = fcntl($_[0], F_GETFD, 0); defined($fd) && fcntl($_[0], F_SETFD, $fd|FD_CLOEXEC) or die 'close-on-exec failed'; }
+sub retire {
+    my ($owner,$ops)=@_; identity($owner);
+    $ops //= {
+        receipt=>sub { terminal($_[0]) or die 'missing atomic retirement receipt'; },
+        unlink=>sub { my ($path)=@_; unlink($path) or die 'retirement unlink failed' if -e $path || -l $path; },
+        rmdir=>sub { rmdir($_[0]) or die 'retirement directory failed'; }
+    };
+    $ops->{receipt}->($owner);
+    for my $name ('input','control','terminal') {
+        my $path="$owner->{path}/$name";
+        $ops->{unlink}->($path);
+    }
+    $ops->{rmdir}->($owner->{path});
+}
 sub finish_owned {
     my ($anchor, $established, $ops) = @_;
     $ops //= {
@@ -231,14 +245,20 @@ sub serve {
     open(my $controller, '<&', \*STDIN) or die 'controller missing'; cloexec($controller);
     STDOUT->autoflush(1); binmode(STDOUT); binmode(STDERR); binmode($controller);
     print "__GITCRAFT_READY__\n";
+    my $previous;
     while (1) {
         my $line = '';
         while (length($line) <= (96 << 20)) { my $n = sysread($controller,my $part,65536); return unless $n; $line .= $part; last if index($part,"\n") >= 0; }
         die 'pipelined request rejected' unless $line =~ /\A[^\n]*\n\z/s;
         die 'oversized request' if length($line) > (96 << 20);
+        if ($line =~ /\AA ([0-9a-f]{1,96})\n\z/) {
+            die 'invalid retirement acknowledgement' unless $previous && $previous->{nonce} eq $1;
+            retire($previous); undef($previous); next;
+        }
         if ($line =~ /\AP ([0-9a-f]{1,96})\n\z/) { print $line; next; }
         my $req = $JSON->decode($line); print "S $req->{nonce}\n";
         my ($code,$out,$owner) = run($req,$controller,0);
+        $previous=$owner;
         print "C1 ",encode({%$owner,state=>'stopped',code=>$code});
         print "R $req->{nonce} $code ",length($out->[0]),' ',length($out->[1]),"\n",$out->[0],$out->[1];
     }
@@ -251,6 +271,7 @@ if ($mode eq 'serve' || $mode eq 'stream') {
 }
 if ($mode eq 'probe') { exit(0); }
 elsif ($mode eq 'serve') { serve(); }
+elsif ($mode eq 'retire') { my $line = <STDIN>; retire($JSON->decode($line)); print "retired\n"; }
 elsif ($mode eq 'control') { my $line = <STDIN>; print encode(control($JSON->decode($line))); }
 elsif ($mode eq 'stream') {
     print STDOUT "\n__GITCRAFT_READY__\n"; STDOUT->flush;
@@ -259,6 +280,14 @@ elsif ($mode eq 'stream') {
     my ($code,$out) = run($req,$controller,1); exit($code);
 }
 elsif ($mode eq 'recording') {
+    my @retired;
+    my $retiring={v=>1,nonce=>'a',path=>'/tmp/gitcraft-owned-'.('b'x32),token=>'c'x64};
+    my $retire_ops={receipt=>sub {die 'missing atomic receipt';},unlink=>sub {push @retired,$_[0];},rmdir=>sub {push @retired,$_[0];}};
+    my $erased=eval {retire($retiring,$retire_ops);1;};
+    die 'retired without proof' if $erased || @retired;
+    $retire_ops->{receipt}=sub {};
+    retire($retiring,$retire_ops);
+    die 'unexpected retirement target' unless join(',',@retired) eq join(',',map {"$retiring->{path}/$_"} ('input','control','terminal')).",$retiring->{path}";
     my @queued=('abcdef','');
     die 'blocked forward lost bytes' unless forward_flush(\@queued,sub {$!=EAGAIN; return undef;}) && $queued[0] eq 'abcdef';
     die 'partial forward lost bytes' unless forward_flush(\@queued,sub {return 2;}) && $queued[0] eq 'cdef';
@@ -278,6 +307,6 @@ elsif ($mode eq 'recording') {
     my $ops = {signal=>sub {push @events, $_[0] ? 'group' : 'direct'; die 'refused' if $_[0];},pause=>sub {},reap=>sub {push @events,'reap';}};
     my $ok = eval {finish_owned(424242,1,$ops);1;};
     die 'refusal acknowledged' if $ok || join(',',@events) ne 'group,direct,reap';
-    print "6 recording-only owner gates passed\n";
+    print "8 recording-only owner gates passed\n";
 }
 else { die 'unknown owner operation'; }

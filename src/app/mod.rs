@@ -955,6 +955,8 @@ pub fn after_exit() {
     crate::parallel_bisect::shutdown();
     crate::processes::shutdown();
     crate::remote::shutdown();
+    crate::processes::shutdown_cleanup();
+    gitcraft_os::retire_process_helpers();
     crate::instance::shut_down();
     update::relaunch();
 }

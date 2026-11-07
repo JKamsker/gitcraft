@@ -167,6 +167,14 @@ impl Endpoint {
         }
         self.terminal().map(|_| ())
     }
+    pub(crate) fn retire(&self) -> Result<(), String> {
+        if !self.valid() {
+            return Err("invalid native endpoint".into());
+        }
+        self.terminal()?;
+        std::fs::remove_file(self.path.join("terminal")).map_err(|e| e.to_string())?;
+        std::fs::remove_dir(&self.path).map_err(|e| e.to_string())
+    }
 }
 
 /// Start only the packaged helper; Command remains private until all safeguards are set.
@@ -435,13 +443,17 @@ fn helper() -> Result<i32, String> {
 }
 /// Called before normal app initialization; no window or persisted app state is touched.
 pub(crate) fn entrypoint() -> i32 {
-    match helper() {
+    let code = match helper() {
         Ok(code) => code,
         Err(error) => {
             eprintln!("gitcraft owned endpoint: {error}");
             125
         }
-    }
+    };
+    crate::processes::shutdown();
+    crate::processes::shutdown_cleanup();
+    gitcraft_os::retire_process_helpers();
+    code
 }
 
 #[cfg(test)]

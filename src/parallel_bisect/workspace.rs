@@ -192,21 +192,24 @@ impl Workspace {
         // Every record is authenticated before CLEAR may mutate worktrees or refs. Keep
         // the exact bytes as a final barrier against replaced/new records during recovery.
         let listing = runner::shell(&self.repo, RECORDS, &[&self.base_there])?;
+        let mut retired = Vec::new();
         let proof = clear_proof(&listing, |name| {
             let path = remote::join(&self.base, name);
-            remote::recover_owner(&path).map_err(|e| {
+            let bytes = remote::recover_owner(&path).map_err(|e| {
                 format!(
                     "unresolved test owner {name}; {} preserved: {e}",
                     self.base_there
                 )
-            })
+            })?;
+            retired.push((path, bytes.clone()));
+            Ok(bytes)
         })?;
         let pid = std::process::id().to_string();
         let input = format!("{}\n", proof.join("\n")).into_bytes();
         if input.len() > 64 << 20 {
             return Err("recovery proof exceeds 64 MiB; workspace preserved".into());
         }
-        runner::shell_input(&self.repo, CLEAR, &[&self.base_there, &pid], Some(input))
+        let result = runner::shell_input(&self.repo, CLEAR, &[&self.base_there, &pid], Some(input))
             .map(|_| ())
             .map_err(|e| {
                 format!(
@@ -214,7 +217,13 @@ impl Workspace {
                     self.base_there,
                     self.machine.label()
                 )
-            })
+            });
+        if result.is_ok() {
+            for (path, bytes) in retired {
+                let _ = remote::retire_owner(&path, &bytes);
+            }
+        }
+        result
     }
 
     fn make_private(&self) -> Result<(), String> {
