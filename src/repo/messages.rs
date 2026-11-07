@@ -1,7 +1,6 @@
 //! Results of background work coming back to the tab, and the per-frame polling that takes
 //! them in (with file-system events, the background fetch and the debounced search).
 
-use std::collections::HashMap;
 use std::sync::mpsc::Sender;
 use std::time::{Duration, Instant};
 
@@ -106,8 +105,9 @@ pub(super) enum Msg {
     Compare(u64, Result<CompareData, String>),
     /// The open pull requests, as asked for at that moment (see `RepoTab::prs_loaded`).
     Prs(Instant, Result<Vec<PullRequest>, String>),
-    /// Build statuses by commit; `true` when new commits were asked about.
-    CiStatuses(bool, Result<HashMap<String, crate::ci::Status>, String>),
+    /// Build statuses by commit, as each project said them; `true` when new commits were
+    /// asked about.
+    CiStatuses(bool, crate::ci::route::Answers),
     /// The runs of the commit the pipeline view shows, for the read numbered so.
     CiRuns(u64, Result<Vec<crate::ci::Run>, String>),
     /// The jobs of a run (by id), for the read numbered so.

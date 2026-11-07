@@ -112,7 +112,7 @@ impl RepoTab {
 
     /// Reads the runs of the commit shown (again), then the jobs of the one shown.
     fn load_ci_view(&mut self, ctx: &egui::Context) {
-        let project = self.ci_project();
+        let project = self.ci_view_project();
         let Some(view) = &mut self.ci_view else {
             return;
         };
@@ -130,8 +130,13 @@ impl RepoTab {
         });
     }
 
+    /// The project whose builds the view shows: the one its commit's status came from.
+    fn ci_view_project(&self) -> Option<crate::ci::Project> {
+        self.ci_project_for(&self.ci_view.as_ref()?.sha)
+    }
+
     fn load_ci_jobs(&mut self, ctx: &egui::Context) {
-        let project = self.ci_project();
+        let project = self.ci_view_project();
         let Some(view) = &mut self.ci_view else {
             return;
         };
@@ -238,7 +243,7 @@ impl RepoTab {
     }
 
     pub(super) fn ci_act(&mut self, act: CiAct, ctx: &egui::Context) {
-        let project = self.ci_project();
+        let project = self.ci_view_project();
         let Some(view) = &mut self.ci_view else {
             return;
         };
