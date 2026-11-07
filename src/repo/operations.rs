@@ -106,6 +106,7 @@ impl RepoTab {
             } else {
                 Vec::new()
             };
+            let celebration_before = observe_celebration_head.then(|| git::head(&path));
             let (result, kind, stopped) =
                 run_steps_counted(&path, &ops, kind, creds.as_ref(), quiet, Some(&control));
             let result = match result {
@@ -127,7 +128,7 @@ impl RepoTab {
             };
             if let Some(head) = observed {
                 Msg::Then(Box::new(move |tab, ctx| {
-                    tab.celebration_observed_head(head);
+                    tab.celebration_observed_heads(celebration_before.unwrap_or_default(), head);
                     tab.handle(done, ctx);
                 }))
             } else {

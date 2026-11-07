@@ -80,7 +80,18 @@ impl RepoTab {
             Some(Event::FirstCommit | Event::Merge { .. })
         )
     }
-    pub(super) fn celebration_observed_head(&mut self, head: String) {
+    /// Both observations come from the same mutation worker, around this operation.
+    /// The UI's last loaded HEAD may predate another queued operation.
+    pub(super) fn celebration_observed_heads(&mut self, before_head: String, head: String) {
+        match self.celebration.candidate.as_mut() {
+            Some(Event::Merge { before, .. }) if !before_head.is_empty() => {
+                *before = before_head;
+            }
+            Some(Event::FirstCommit) if before_head.is_empty() => {}
+            _ => {
+                self.celebration.candidate = None;
+            }
+        }
         self.celebration.observed = (!head.is_empty()).then_some(head);
     }
 
@@ -265,6 +276,45 @@ mod tests {
             crate::audio::take_recorded(),
             [crate::audio::Cue::Celebration]
         );
+        // Keep the tab's old HEAD while another actor creates a real merge.
+        let second = tab.refs.head.clone();
+        let merged = git(&[
+            "commit-tree",
+            "HEAD^{tree}",
+            "-p",
+            &second,
+            "-p",
+            &first,
+            "-m",
+            "merge",
+        ])?;
+        let merged = merged.trim().to_owned();
+        git(&["update-ref", "HEAD", &merged])?;
+        tab.run_ops_ex(
+            "Merge",
+            super::super::ops(&[&["merge", "--ff-only", "HEAD"]]),
+            super::super::Refresh::All,
+            super::super::OpKind::plain(),
+            true,
+            &ctx,
+        );
+        let start = Instant::now();
+        while tab.busy_op.is_some() {
+            while let Ok(msg) = tab.rx.try_recv() {
+                tab.handle(msg, &ctx);
+            }
+            if start.elapsed() > Duration::from_secs(5) {
+                return Err("Owned no-op merge did not complete".into());
+            }
+            std::thread::yield_now();
+        }
+        tab.refs.head = merged;
+        tab.history = crate::git::log(&fixture.0, None, crate::git::LogOrder::default(), 0, 10)?
+            .into_iter()
+            .map(std::sync::Arc::new)
+            .collect();
+        tab.celebration_loaded(tab.reads + 1, &ctx);
+        assert!(crate::audio::take_recorded().is_empty());
         Ok(())
     }
     #[test]
@@ -279,7 +329,7 @@ mod tests {
         let mut tab = RepoTab::new_deferred("/nonexistent/exact-celebration-target".into(), &ctx);
         tab.refs.head = "old".into();
         tab.celebration_begin("Merge", &[vec!["merge".into(), "topic".into()]], &ctx);
-        tab.celebration_observed_head("old".into()); // success was a no-op
+        tab.celebration_observed_heads("old".into(), "old".into()); // success was a no-op
         tab.celebration_done(true);
         tab.refs.head = "later".into();
         tab.history = vec![std::sync::Arc::new(crate::git::Commit {
@@ -292,7 +342,7 @@ mod tests {
         tab.refs = Default::default();
         tab.history.clear();
         tab.celebration_begin("Commit", &[vec!["commit".into()]], &ctx);
-        tab.celebration_observed_head("root".into());
+        tab.celebration_observed_heads(String::new(), "root".into());
         tab.celebration_done(true);
         tab.refs.head = "second".into();
         tab.history = vec![
@@ -336,7 +386,7 @@ mod tests {
             track: String::new(),
         });
         tab.waiting.push_back(super::super::running::Waiter::Push);
-        tab.celebration_observed_head("root".into());
+        tab.celebration_observed_heads(String::new(), "root".into());
         tab.op_done(
             "Commit".into(),
             Ok(String::new()),
@@ -388,7 +438,7 @@ mod tests {
             crate::audio::take_recorded();
             tab.refs.head = "old".into();
             tab.celebration_begin("Sync: pull", &pull, &ctx);
-            tab.celebration_observed_head("new".into());
+            tab.celebration_observed_heads("old".into(), "new".into());
             tab.celebration_done(success);
             tab.celebration_begin("Sync: push", &[vec!["push".into()]], &ctx);
             tab.celebration_done(true);
@@ -401,6 +451,32 @@ mod tests {
             tab.celebration_loaded(tab.reads + 1, &ctx);
             assert_eq!(crate::audio::take_recorded().len(), expected);
         }
+    }
+    #[test]
+    fn stale_ui_head_does_not_celebrate_an_already_completed_merge_on_pull() {
+        let ctx = egui::Context::default();
+        crate::settings::Settings {
+            celebration_sound: true,
+            ..Default::default()
+        }
+        .set(&ctx);
+        crate::audio::take_recorded();
+        let mut tab = RepoTab::new_deferred("/nonexistent/stale-pull-celebration".into(), &ctx);
+        tab.refs.head = "old".into();
+        tab.celebration_begin(
+            "Pull",
+            &super::super::ops(&[super::super::pull::PullMode::Merge.args()]),
+            &ctx,
+        );
+        tab.celebration_observed_heads("merge".into(), "merge".into());
+        tab.celebration_done(true);
+        tab.history = vec![std::sync::Arc::new(crate::git::Commit {
+            hash: "merge".into(),
+            parents: vec!["old".into(), "topic".into()],
+            ..Default::default()
+        })];
+        tab.celebration_loaded(tab.reads + 1, &ctx);
+        assert!(crate::audio::take_recorded().is_empty());
     }
     #[test]
     fn failed_noop_and_unconfirmed_operations_do_not_celebrate() {
@@ -418,14 +494,14 @@ mod tests {
         tab.celebration_done(false);
         assert!(tab.celebration.candidate.is_none());
         tab.celebration_begin("Merge topic", &merge, &ctx);
-        tab.celebration_observed_head("old".into());
+        tab.celebration_observed_heads("old".into(), "old".into());
         tab.celebration_done(true);
         tab.celebration_loaded(tab.reads + 1, &ctx);
         assert!(tab.celebration.visible.is_none());
         assert!(tab.celebration.candidate.is_none());
         assert!(crate::audio::take_recorded().is_empty());
         tab.celebration_begin("Merge topic", &merge, &ctx);
-        tab.celebration_observed_head("merged".into());
+        tab.celebration_observed_heads("old".into(), "merged".into());
         tab.celebration_done(true);
         tab.refs.head = "merged".into();
         tab.history.push(std::sync::Arc::new(crate::git::Commit {
@@ -459,7 +535,7 @@ mod tests {
         .set(&ctx);
         crate::audio::take_recorded();
         tab.celebration_begin("Commit", &commit, &ctx);
-        tab.celebration_observed_head("root".into());
+        tab.celebration_observed_heads(String::new(), "root".into());
         tab.celebration_done(true);
         tab.refs.head = "root".into();
         tab.history.push(std::sync::Arc::new(crate::git::Commit {
