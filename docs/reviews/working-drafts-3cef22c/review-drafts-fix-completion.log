@@ -1,0 +1,6 @@
+
+running 1 test
+test git::command::completion::tests::completion_tracks_nested_workers_after_the_original_caller_stops_waiting ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 818 filtered out; finished in 0.00s
+

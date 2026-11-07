@@ -1,0 +1,24 @@
+
+running 19 tests
+test git::drafts::tests::ignored_rule_read_warnings_fail_closed_before_any_version_is_published ... ok
+test git::drafts::tests::changed_symlinks_and_conflicted_indexes_fail_without_following_targets_or_touching_index ... ok
+test git::drafts::tests::missing_paths_below_symlinks_fail_closed_and_do_not_publish_deletions ... ok
+test git::drafts::tests::limits_invalid_paths_and_cancellation_leave_all_real_state_untouched ... ok
+test git::drafts::tests::nested_untracked_repositories_are_excluded_without_hiding_outer_changes ... ok
+test git::drafts::tests::configured_filters_hooks_fsmonitor_and_signing_never_run_for_drafts_or_recovery ... ok
+test git::drafts::tests::mixed_index_work_and_untracked_are_independent_and_ignored_files_stay_out ... ok
+test git::drafts::tests::partial_shallow_drafts_and_missing_index_preview_never_call_network_helpers ... ok
+test git::drafts::tests::private_index_cache_handles_split_and_sparse_indexes_without_rewriting_the_real_index ... ok
+test git::drafts::tests::recovery_detects_intent_to_add_changes_even_when_index_object_records_match ... ok
+test git::drafts::tests::rename_unicode_no_newline_and_hardlinks_recover_only_the_selected_path ... ok
+test git::drafts::tests::recovery_refuses_stale_files_indexes_refs_and_new_ignore_rules ... ok
+test git::drafts::tests::tree_roots_survive_gc_restart_and_do_not_change_history_branches_reflog_or_normal_push ... ok
+test git::drafts::tests::typed_remote_reader_quotes_paths_and_never_confuses_links_with_missing_files ... ok
+test git::drafts::tests::retention_expires_owned_refs_with_cas_and_preserves_unknown_versions ... ok
+test git::drafts::tests::unchanged_large_tracked_files_are_not_copied_as_working_changes ... ok
+test git::drafts::tests::binary_empty_files_deletions_and_index_layer_recovery_preserve_the_real_index ... ok
+test git::drafts::tests::selected_hunks_recover_without_changing_staged_state_and_have_a_safety_version ... ok
+test git::drafts::tests::unborn_sha256_and_linked_worktree_versions_keep_separate_identities ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 800 filtered out; finished in 13.51s
+

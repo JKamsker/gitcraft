@@ -1,0 +1,6 @@
+
+running 1 test
+test repo::operations::tests::working_drafts_protect_checkout_and_rebase_before_any_operation_step ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 818 filtered out; finished in 3.20s
+
