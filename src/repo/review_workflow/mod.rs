@@ -11,3 +11,5 @@ mod freshness;
 pub(super) use freshness::{Freshness, FreshnessAct};
 
 pub(super) use freshness::show as freshness_ui;
+mod storyboard;
+pub(super) use storyboard::{StoryAct, Storyboard, show as storyboard_ui};

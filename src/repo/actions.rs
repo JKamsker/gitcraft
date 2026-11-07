@@ -35,6 +35,7 @@ pub(crate) enum Action {
     OpenDiff(DiffKey),
     Review(super::review_workflow::ReviewAct),
     Freshness(super::review_workflow::FreshnessAct),
+    Story(super::review_workflow::StoryAct),
     /// Show a pull request in the big area.
     OpenPr(u64),
     /// Open the worktree of a pull request (proposing `branch`, at `sha`), making it first

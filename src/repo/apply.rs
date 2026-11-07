@@ -30,6 +30,7 @@ impl RepoTab {
         if matches!(
             &action,
             Action::OpenDiff(_)
+                | Action::FileView { .. }
                 | Action::OpenPr(_)
                 | Action::Select(_)
                 | Action::SelectHash(_)
@@ -40,6 +41,7 @@ impl RepoTab {
             self.review_document.open = false;
         }
         match action {
+            Action::Story(act) => self.story_act(act, ctx),
             Action::Freshness(act) => self.freshness_act(act, ctx),
             Action::Review(act) => self.review_act(act, ctx),
             Action::Select(row) => {

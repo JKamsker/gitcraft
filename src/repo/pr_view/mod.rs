@@ -17,6 +17,7 @@ pub(super) use text::{blocks, only_web_links};
 
 pub(crate) struct PrView {
     pub number: u64,
+    pub(super) storyboard: super::review_workflow::Storyboard,
     pub(super) freshness: super::review_workflow::Freshness,
     pub(super) relocated: super::review_workflow::Relocations,
     request: u64,
@@ -87,6 +88,7 @@ impl RepoTab {
         self.versions.view = None;
         self.pr_view = Some(PrView {
             number,
+            storyboard: Default::default(),
             freshness: Default::default(),
             relocated: Default::default(),
             request: 0,
