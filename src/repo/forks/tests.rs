@@ -104,7 +104,7 @@ impl World {
 
     fn checkout(&self, locals: &[String]) -> Result<plan::Checkout, String> {
         let remotes = git::remotes(&self.me).unwrap_or_default();
-        plan::checkout(&self.info(), &remotes, &self.setup(), locals, "main")
+        plan::checkout(&self.info(), &remotes, &self.setup(), locals, "main", None)
     }
 }
 
@@ -239,7 +239,7 @@ fn rebasing_onto_the_base_pushes_to_the_fork_and_undo_puts_both_back() {
         .unwrap_or_default();
     let (checked_out, _) = run_steps(&w.me, &steps, OpKind::plain(), None);
     let before = git::head(&w.me);
-    let plan = plan::plan_rebase(&w.me, &w.info(), "origin", &w.setup(), None);
+    let plan = plan::plan_rebase(&w.me, &w.info(), "origin", &w.setup(), None, None);
     assert!(plan.is_ok(), "{plan:?}");
     let Ok(plan) = plan else { return };
     let (result, kind) = run_steps(
@@ -283,7 +283,7 @@ fn a_rebase_is_refused_when_the_contributor_pushed_commits_not_here() {
     run(&w.ann, &["checkout", "-q", "fix"]);
     commit(&w.ann, "more.txt");
     run(&w.ann, &["push", "-q", "fork", "fix"]);
-    let plan = plan::plan_rebase(&w.me, &w.info(), "origin", &w.setup(), None);
+    let plan = plan::plan_rebase(&w.me, &w.info(), "origin", &w.setup(), None, None);
     assert!(checked_out.is_ok());
     assert!(plan.is_err_and(|e| e.contains("pull them first")));
 }

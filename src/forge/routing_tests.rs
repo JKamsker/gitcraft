@@ -721,3 +721,68 @@ fn provider_boundary_creation_url_cannot_override_selected_repository_for_review
     }
     Ok(())
 }
+
+#[test]
+fn review13_creation_and_review_targets_validate_the_web_instance() -> Result<(), String> {
+    for forge in Forge::ALL {
+        let h = Hosting {
+            forge,
+            host: "forge.example".into(),
+            path: "Team/Repo".into(),
+            web: "https://forge.example:4000".into(),
+        };
+        let marker = if forge == Forge::GitLab {
+            "-/merge_requests"
+        } else {
+            "pull"
+        };
+        for (base, path, expected) in [
+            ("https://forge.example:3000", "Team/Repo", false),
+            ("http://forge.example:4000", "Team/Repo", false),
+            (
+                "https://forge.example:4000",
+                "team/repo",
+                forge != Forge::GitLab,
+            ),
+            ("HTTPS://FORGE.example:4000", "Team/Repo", true),
+        ] {
+            let url = format!("{base}/{path}/{marker}/7");
+            assert_eq!(
+                created_pr_number(&h, &url).is_ok(),
+                expected,
+                "{forge:?} {url}"
+            );
+            if forge == Forge::GitHub {
+                let details = crate::pull_request::PrDetails {
+                    number: 7,
+                    url,
+                    ..Default::default()
+                };
+                assert_eq!(
+                    github::GitHub
+                        .target(Path::new("/nonexistent/review13"), &h, &details)
+                        .is_some(),
+                    expected
+                );
+            }
+        }
+        if matches!(forge, Forge::GitHub | Forge::GitLab) {
+            let unexpected = format!("https://forge.example:3000/Team/Repo/{marker}/7");
+            let calls = capture(&h, vec![ok(&unexpected)], || {
+                assert!(
+                    forge
+                        .provider()
+                        .create(&std::env::temp_dir(), &h, &new_pr(&["reviewer".into()]))
+                        .is_err_and(|e| e.contains("reviewers were not requested"))
+                );
+                Ok(())
+            })?;
+            assert_eq!(
+                calls.len(),
+                1,
+                "mismatched create URL must stop before follow-up mutation"
+            );
+        }
+    }
+    Ok(())
+}

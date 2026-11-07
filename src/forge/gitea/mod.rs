@@ -519,11 +519,9 @@ fn tea_login(web: &str) -> Option<Login> {
         .map(|login| Login::Token(login.token))
 }
 
-/// Whether two base URLs are the same server: scheme, host and port, whatever the case or a slash
-/// at the end.
+/// A login belongs to one web instance, including its case-sensitive proxy prefix.
 fn same_server(a: &str, b: &str) -> bool {
-    let norm = |url: &str| url.trim().trim_end_matches('/').to_lowercase();
-    norm(a) == norm(b)
+    super::identity::same_web_instance(a, b)
 }
 
 /// The servers `tea` is logged in to, as `(host, web address)`: a server whose name doesn't say
@@ -717,6 +715,14 @@ mod tests {
     #[test]
     fn a_login_is_only_for_its_own_server() {
         assert!(same_server("https://Codeberg.org/", "https://codeberg.org"));
+        assert!(same_server(
+            "https://Codeberg.org:443/reviews/",
+            "https://codeberg.org/reviews"
+        ));
+        assert!(!same_server(
+            "https://codeberg.org/REVIEWS",
+            "https://codeberg.org/reviews"
+        ));
         assert!(!same_server(
             "https://codeberg.org",
             "https://codeberg.org:3000"

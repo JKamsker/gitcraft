@@ -4,7 +4,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use super::editor_in_the_way;
-use crate::forge::{Forge, PullRequest};
+use crate::forge::{Forge, Hosting, PullRequest};
 use crate::git::{self, Credentials, Remote};
 use crate::pull_request::{self, PrDetails};
 use crate::repo::{Compare, CompareData, RepoTab};
@@ -85,11 +85,9 @@ impl RepoTab {
             move || match hosting.forge.provider().pages() {
                 Some(pages) => {
                     let details = pages.details(&path, &hosting, number)?;
-                    selection_data(&path, &details, &remotes, credentials.as_ref())
+                    selection_data(&path, &hosting, &details, &remotes, credentials.as_ref())
                 }
-                None => {
-                    remote_selection_data(&path, &pr, hosting.forge, &remotes, credentials.as_ref())
-                }
+                None => remote_selection_data(&path, &pr, &hosting, &remotes, credentials.as_ref()),
             },
             move |tab, result, _| tab.pr_selection_arrived(request, result),
         );
@@ -179,11 +177,11 @@ impl RepoTab {
 fn remote_selection_data(
     path: &Path,
     pr: &PullRequest,
-    forge: Forge,
+    hosting: &Hosting,
     remotes: &[Remote],
     credentials: Option<&Credentials>,
 ) -> Result<Selection, String> {
-    let remote = pull_request::remote_for(remotes, &pr.url)
+    let remote = pull_request::remote_for(remotes, &pr.url, hosting)
         .ok_or("No remote belongs to this pull request's repository")?;
     let base_ref = format!("refs/heads/{}", pr.base);
     git::run(Some(path), &["check-ref-format", &base_ref])?;
@@ -204,24 +202,25 @@ fn remote_selection_data(
         base_oid,
         head_oid: pr.sha.clone(),
         url: pr.url.clone(),
-        head_ref: match forge {
+        head_ref: match hosting.forge {
             Forge::GitLab => format!("refs/merge-requests/{}/head", pr.number),
             _ => format!("refs/pull/{}/head", pr.number),
         },
         ..PrDetails::default()
     };
-    selection_data(path, &details, remotes, credentials)
+    selection_data(path, hosting, &details, remotes, credentials)
 }
 
 /// Uses the forge's exact commits, fetching missing objects without changing any branches.
 /// Reading the patch here does not mark the pull request as reviewed or open its details.
 fn selection_data(
     path: &Path,
+    hosting: &Hosting,
     details: &PrDetails,
     remotes: &[Remote],
     credentials: Option<&Credentials>,
 ) -> Result<Selection, String> {
-    let files = pull_request::files(path, details, remotes, credentials)?;
+    let files = pull_request::files(path, hosting, details, remotes, credentials)?;
     let data = CompareData {
         apart: git::count_apart(path, &details.base_oid, &details.head_oid)?,
         from: files.from,
@@ -354,7 +353,19 @@ mod tests {
             head_oid: head.clone(),
             ..PrDetails::default()
         };
-        let selection = selection_data(&dir, &details, &[], None).unwrap();
+        let selection = selection_data(
+            &dir,
+            &Hosting {
+                forge: Forge::GitHub,
+                host: "github.com".into(),
+                path: "o/r".into(),
+                web: "https://github.com".into(),
+            },
+            &details,
+            &[],
+            None,
+        )
+        .unwrap();
         let data = selection.data;
         assert_eq!(selection.head.hash, head);
         assert_eq!(data.from, common);
@@ -433,7 +444,19 @@ mod tests {
             name: "origin".into(),
             url: "https://gitlab.example/team/repo.git".into(),
         }];
-        let selection = remote_selection_data(&clone, &pr, Forge::GitLab, &remotes, None).unwrap();
+        let selection = remote_selection_data(
+            &clone,
+            &pr,
+            &Hosting {
+                forge: Forge::GitLab,
+                host: "gitlab.example".into(),
+                path: "team/repo".into(),
+                web: "https://gitlab.example".into(),
+            },
+            &remotes,
+            None,
+        )
+        .unwrap();
         assert_eq!(selection.base, remote_base);
         assert_eq!(selection.head.hash, head);
         assert_eq!(

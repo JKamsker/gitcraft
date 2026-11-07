@@ -166,7 +166,7 @@ fn prepared(
     let remote = crate::remote::parse(repo).is_some();
     if remote {
         let remotes = remote_catalog(repo)?;
-        validate_remote_target(&remotes, forge, &authority, &hosting.path)?;
+        validate_remote_target(&remotes, hosting)?;
         // A named target bypasses the CLI's usual known-host filtering. Only an explicitly
         // configured login (never an inherited global token) may authorize an SSH-tab host.
         if !trusted_host(forge, tool, &authority)? {
@@ -250,16 +250,11 @@ fn remote_catalog(repo: &Path) -> Result<Vec<crate::git::Remote>, String> {
     crate::git::remotes(repo)
 }
 
-fn validate_remote_target(
-    remotes: &[crate::git::Remote],
-    forge: Forge,
-    host: &str,
-    path: &str,
-) -> Result<(), String> {
-    if remotes.iter().any(|remote| {
-        tool_location(forge, &remote.url)
-            .is_some_and(|(h, p)| h.eq_ignore_ascii_case(host) && p == path)
-    }) {
+fn validate_remote_target(remotes: &[crate::git::Remote], hosting: &Hosting) -> Result<(), String> {
+    if remotes
+        .iter()
+        .any(|remote| hosting.matches_git_remote(&remote.url))
+    {
         Ok(())
     } else {
         Err("The selected forge remote changed or was removed: refresh the tab".to_owned())
@@ -530,6 +525,37 @@ mod tests {
         assert!(named_hosts(&["run", "list", "-R", "o/r"]).is_empty());
         assert!(same_host("git.example.org:8443", "git.example.org"));
         assert!(!same_host("github.evil.example", "github.com"));
+    }
+
+    #[test]
+    fn review13_ssh_catalog_check_keeps_web_authority_prefix_and_forge_case() {
+        for forge in [Forge::GitHub, Forge::GitLab] {
+            let h = Hosting {
+                forge,
+                host: "forge.example".into(),
+                path: "Team/Repo".into(),
+                web: "https://forge.example:4000/reviews".into(),
+            };
+            for (url, expected) in [
+                ("https://forge.example:3000/reviews/Team/Repo.git", false),
+                ("https://forge.example:4000/Team/Repo.git", false),
+                ("https://forge.example:4000/REVIEWS/Team/Repo.git", false),
+                ("https://FORGE.example:4000/reviews/Team/Repo.git", true),
+                ("git@forge.example:Team/Repo.git", true),
+                ("ssh://git@forge.example:2222/Team/Repo.git", true),
+                ("git@forge.example:team/repo.git", forge != Forge::GitLab),
+            ] {
+                let remotes = [crate::git::Remote {
+                    name: "origin".into(),
+                    url: url.into(),
+                }];
+                assert_eq!(
+                    validate_remote_target(&remotes, &h).is_ok(),
+                    expected,
+                    "{forge:?} {url}"
+                );
+            }
+        }
     }
 
     /// A tool that hangs is stopped at its time; a long answer still comes whole.

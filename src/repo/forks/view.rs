@@ -90,7 +90,7 @@ fn allow_edits(forge: Option<Forge>) -> &'static str {
 impl RepoTab {
     /// The local branch set up to push to `info`'s fork (found by its URL), if any.
     fn pushing_to_fork(&self, info: &ForkInfo) -> Option<&BranchSetup> {
-        let remote = fork_remote(info, &self.remotes)?;
+        let remote = fork_remote(info, &self.remotes, self.hosting.as_ref())?;
         self.forks.setup.pushing_to(&remote, &info.branch)
     }
 

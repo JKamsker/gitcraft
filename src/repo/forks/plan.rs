@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use crate::forge::ForkInfo;
+use crate::forge::{ForkInfo, Hosting};
 use crate::git::{self, Remote};
 use crate::repo::operations::{expect_ref, expect_ref_at, expect_symref};
 
@@ -141,16 +141,6 @@ pub(crate) struct Checkout {
     pub undo: Vec<Vec<String>>,
 }
 
-/// Whether two remote URLs are the same repository, however they're written.
-fn same_repository(a: &str, b: &str) -> bool {
-    match (crate::forge::location(a), crate::forge::location(b)) {
-        (Some((ha, pa)), Some((hb, pb))) => {
-            ha.eq_ignore_ascii_case(&hb) && pa.eq_ignore_ascii_case(&pb)
-        }
-        _ => a.trim_end_matches('/') == b.trim_end_matches('/'),
-    }
-}
-
 /// Whether a remote URL is reached over SSH: `ssh://…`, or `user@host:path`.
 fn is_ssh(url: &str) -> bool {
     url.starts_with("ssh://")
@@ -161,12 +151,25 @@ fn is_ssh(url: &str) -> bool {
 }
 
 /// The remote that is `info`'s fork (by its URL, however written), if there is one.
-pub(crate) fn fork_remote(info: &ForkInfo, remotes: &[Remote]) -> Option<String> {
+pub(crate) fn fork_remote(
+    info: &ForkInfo,
+    remotes: &[Remote],
+    hosting: Option<&Hosting>,
+) -> Option<String> {
+    let fork = hosting
+        .filter(|_| !info.repo_path.is_empty())
+        .map(|h| Hosting {
+            path: info.repo_path.clone(),
+            ..h.clone()
+        });
     remotes
         .iter()
         .find(|r| {
-            (!info.clone_https.is_empty() && same_repository(&r.url, &info.clone_https))
-                || (!info.clone_ssh.is_empty() && same_repository(&r.url, &info.clone_ssh))
+            // Exact advertised URLs also support owned local fixtures. Otherwise use the
+            // selected forge's identity; an HTTP remote cannot bypass its port via clone_ssh.
+            [&info.clone_https, &info.clone_ssh].iter().any(|url| {
+                !url.is_empty() && r.url.trim_end_matches('/') == url.trim_end_matches('/')
+            }) || fork.as_ref().is_some_and(|h| h.matches_git_remote(&r.url))
         })
         .map(|r| r.name.clone())
 }
@@ -206,6 +209,7 @@ pub(crate) fn checkout(
     setup: &Setup,
     locals: &[String],
     previous: &str,
+    hosting: Option<&Hosting>,
 ) -> Result<Checkout, String> {
     if !info.cross {
         return Err(format!(
@@ -241,7 +245,7 @@ pub(crate) fn checkout(
             info.owner
         ));
     }
-    let (remote, new_remote) = match fork_remote(info, remotes) {
+    let (remote, new_remote) = match fork_remote(info, remotes, hosting) {
         Some(r) => (r, false),
         None => {
             let base = remote_name(&info.owner);
@@ -368,9 +372,10 @@ pub(crate) fn plan_rebase(
     upstream: &str,
     setup: &Setup,
     creds: Option<&git::Credentials>,
+    hosting: Option<&Hosting>,
 ) -> Result<Rebase, String> {
     let remotes = git::remotes(repo)?;
-    let fork = fork_remote(info, &remotes).ok_or_else(|| {
+    let fork = fork_remote(info, &remotes, hosting).ok_or_else(|| {
         format!(
             "Check out #{}'s branch to push to {} first: no remote is their fork",
             info.number, info.owner
@@ -601,14 +606,76 @@ mod tests {
 
     #[test]
     fn urls_of_the_same_repository_are_the_same() {
-        assert!(same_repository(
-            "git@github.com:Ann/App.git",
-            "https://github.com/ann/app"
-        ));
-        assert!(!same_repository(
-            "git@github.com:ann/app.git",
-            "https://github.com/ann/other"
-        ));
+        let h = Hosting {
+            forge: crate::forge::Forge::GitHub,
+            host: "github.com".into(),
+            path: "ann/app".into(),
+            web: "https://github.com".into(),
+        };
+        assert!(h.matches_git_remote("git@github.com:Ann/App.git"));
+        assert!(!h.matches_git_remote("https://github.com/ann/other"));
+    }
+
+    #[test]
+    fn review13_fork_remote_reuse_keeps_web_authority_and_gitlab_case() {
+        use crate::forge::Forge;
+        for (forge, path) in [
+            (Forge::Forgejo, "Team/Repo"),
+            (Forge::GitLab, "Group/Project"),
+        ] {
+            let h = Hosting {
+                forge,
+                host: "forge.example".into(),
+                path: "upstream/repo".into(),
+                web: "https://forge.example:4000/reviews".into(),
+            };
+            let mut fork = info();
+            fork.repo_path = path.into();
+            fork.clone_https = format!("{}/{path}.git", h.web);
+            fork.clone_ssh = format!("git@forge.example:{path}.git");
+            let remotes = [
+                remote(
+                    "wrong-port",
+                    &format!("https://forge.example:3000/reviews/{path}.git"),
+                ),
+                remote(
+                    "wrong-prefix",
+                    &format!("https://forge.example:4000/{path}.git"),
+                ),
+                remote(
+                    "wrong-prefix-case",
+                    &format!("https://forge.example:4000/REVIEWS/{path}.git"),
+                ),
+                remote("selected", &fork.clone_https),
+            ];
+            assert_eq!(
+                fork_remote(&fork, &remotes, Some(&h)).as_deref(),
+                Some("selected")
+            );
+            let remotes = [
+                remote(
+                    "wrong-case",
+                    "https://forge.example:4000/reviews/group/project.git",
+                ),
+                remote(
+                    "selected",
+                    &format!("ssh://git@forge.example:2222/{path}.git"),
+                ),
+            ];
+            assert_eq!(
+                fork_remote(&fork, &remotes, Some(&h)).as_deref(),
+                Some("selected")
+            );
+        }
+    }
+
+    fn selected_hosting() -> Hosting {
+        Hosting {
+            forge: crate::forge::Forge::GitHub,
+            host: "example.org".into(),
+            path: "acme/app".into(),
+            web: "https://example.org".into(),
+        }
     }
 
     fn info() -> ForkInfo {
@@ -616,6 +683,7 @@ mod tests {
             number: 7,
             cross: true,
             owner: "ann".into(),
+            repo_path: "ann/app".into(),
             clone_https: "https://example.org/ann/app.git".into(),
             clone_ssh: "git@example.org:ann/app.git".into(),
             branch: "fix".into(),
@@ -636,13 +704,13 @@ mod tests {
     fn a_checkout_is_refused_where_the_author_doesnt_allow_it() {
         let mut no = info();
         no.maintainers_can_edit = false;
-        assert!(checkout(&no, &[], &Setup::default(), &[], "main").is_err());
+        assert!(checkout(&no, &[], &Setup::default(), &[], "main", None).is_err());
         let mut own = info();
         own.cross = false;
-        assert!(checkout(&own, &[], &Setup::default(), &[], "main").is_err());
+        assert!(checkout(&own, &[], &Setup::default(), &[], "main", None).is_err());
         let mut odd = info();
         odd.branch = "-x".into();
-        assert!(checkout(&odd, &[], &Setup::default(), &[], "main").is_err());
+        assert!(checkout(&odd, &[], &Setup::default(), &[], "main", None).is_err());
     }
 
     #[test]
@@ -657,6 +725,7 @@ mod tests {
             &Setup::default(),
             &["fix".into()],
             "main",
+            Some(&selected_hosting()),
         );
         assert!(plan.is_ok(), "{plan:?}");
         let Ok(plan) = plan else { return };
@@ -674,7 +743,14 @@ mod tests {
             remote("origin", "https://example.org/acme/app.git"),
             remote("annie", "https://example.org/ann/app"),
         ];
-        let plan = checkout(&info(), &remotes, &Setup::default(), &[], "main");
+        let plan = checkout(
+            &info(),
+            &remotes,
+            &Setup::default(),
+            &[],
+            "main",
+            Some(&selected_hosting()),
+        );
         assert!(plan.is_ok_and(|p| p.remote == "annie" && !p.new_remote && p.local == "fix"));
     }
 }

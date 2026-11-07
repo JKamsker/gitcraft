@@ -9,13 +9,7 @@ impl Hosting {
         self.forge == other.forge
             && self.host.eq_ignore_ascii_case(&other.host)
             && self.same_repository_path(&other.path)
-            && match (web(&self.web), web(&other.web)) {
-                (Some(a), Some(b)) => {
-                    same_authority(&a, &b)
-                        && a.path().trim_end_matches('/') == b.path().trim_end_matches('/')
-                }
-                _ => false,
-            }
+            && same_web_instance(&self.web, &other.web)
     }
 
     pub(crate) fn same_repository_path(&self, path: &str) -> bool {
@@ -23,6 +17,57 @@ impl Hosting {
             Forge::GitLab => self.path == path,
             Forge::GitHub | Forge::Forgejo | Forge::Gitea => self.path.eq_ignore_ascii_case(path),
         }
+    }
+
+    /// A returned or saved PR URL may never redirect a follow-up action to another instance.
+    pub(crate) fn matches_pull_request(&self, url: &str) -> bool {
+        crate::pull_request::repository_url(url)
+            .is_some_and(|repo| self.matches_http_repository(repo))
+    }
+
+    /// HTTP explicitly names a web instance. SSH names only the host and repository path;
+    /// its port is independent of the captured web server and reverse-proxy prefix.
+    pub(crate) fn matches_git_remote(&self, url: &str) -> bool {
+        let url = url.trim();
+        if let Some((scheme, _)) = url.split_once("://") {
+            if scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https") {
+                return self.matches_http_repository(url);
+            }
+            if !scheme.eq_ignore_ascii_case("ssh") {
+                return false;
+            }
+        }
+        super::location(url).is_some_and(|(host, path)| {
+            host.eq_ignore_ascii_case(&self.host) && self.same_repository_path(&path)
+        })
+    }
+
+    /// Persisted review state uses the same identity as the in-memory repository lifetime.
+    /// Legacy host/path keys cannot safely be attributed to a particular web instance.
+    pub(crate) fn review_repository_key(&self) -> Option<String> {
+        use sha2::{Digest, Sha256};
+        let base = web(&self.web)?;
+        let path = if self.forge == Forge::GitLab {
+            self.path.clone()
+        } else {
+            self.path.to_ascii_lowercase()
+        };
+        let identity = serde_json::to_vec(&(
+            self.forge.key(),
+            base.scheme(),
+            base.host(),
+            base.as_url().port_or_known_default(),
+            base.path().trim_end_matches('/'),
+            path,
+        ))
+        .ok()?;
+        // Git sanitizes ref components; hash the tuple so distinct valid URL paths cannot
+        // collapse there (for example `/reviews:prod` versus `/reviews_prod`).
+        let digest: String = Sha256::digest(identity)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        Some(format!("v2/{digest}"))
     }
 
     /// An explicit HTTP Git destination must name the captured web authority and prefix.
@@ -52,6 +97,16 @@ fn web(url: &str) -> Option<ureq::RequestUrl> {
         && parsed.as_url().query().is_none()
         && parsed.as_url().fragment().is_none())
     .then_some(parsed)
+}
+
+pub(super) fn same_web_instance(a: &str, b: &str) -> bool {
+    match (web(a), web(b)) {
+        (Some(a), Some(b)) => {
+            same_authority(&a, &b)
+                && a.path().trim_end_matches('/') == b.path().trim_end_matches('/')
+        }
+        _ => false,
+    }
 }
 
 fn same_authority(a: &ureq::RequestUrl, b: &ureq::RequestUrl) -> bool {

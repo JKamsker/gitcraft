@@ -548,3 +548,205 @@ fn a_saved_upstream_issue_is_not_refreshed_or_closed_by_number_on_the_fork() {
     }
     assert!(tab.issue_pull_request("topic").is_some());
 }
+
+// Captured on the caller's thread before dispatch, so an accidental scheduled refresh is
+// recorded and receives a local answer even though the actual job runs on another thread.
+struct RefreshRecording {
+    answer: Issue,
+    calls: Vec<(crate::forge::Hosting, u64)>,
+}
+
+thread_local! {
+    static REFRESH_RECORDING: std::cell::RefCell<Option<RefreshRecording>> = const { std::cell::RefCell::new(None) };
+}
+
+pub(super) fn record_refresh(hosting: &crate::forge::Hosting, number: u64) -> Option<Issue> {
+    REFRESH_RECORDING.with(|r| {
+        let mut r = r.borrow_mut();
+        let recording = r.as_mut()?;
+        recording.calls.push((hosting.clone(), number));
+        Some(recording.answer.clone())
+    })
+}
+
+fn recorded_refresh(answer: Issue, work: impl FnOnce()) -> Vec<(crate::forge::Hosting, u64)> {
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            REFRESH_RECORDING.with(|r| *r.borrow_mut() = None);
+        }
+    }
+    REFRESH_RECORDING.with(|r| {
+        assert!(r.borrow().is_none());
+        *r.borrow_mut() = Some(RefreshRecording {
+            answer,
+            calls: Vec::new(),
+        });
+    });
+    let _reset = Reset;
+    work();
+    REFRESH_RECORDING.with(|r| r.borrow_mut().take().map(|r| r.calls).unwrap_or_default())
+}
+
+fn review13_cases() -> Vec<(crate::forge::Hosting, String, bool)> {
+    use crate::forge::{Forge, Hosting};
+    let mut cases = Vec::new();
+    for forge in Forge::ALL {
+        let h = Hosting {
+            forge,
+            host: "forgejo.example".into(),
+            path: "Team/Repo".into(),
+            web: "https://forgejo.example:4000/reviews".into(),
+        };
+        let marker = if forge == Forge::GitLab {
+            "-/issues"
+        } else {
+            "issues"
+        };
+        for (base, path, expected) in [
+            ("https://forgejo.example:3000/reviews", "Team/Repo", false),
+            ("http://forgejo.example:4000/reviews", "Team/Repo", false),
+            ("https://forgejo.example:4000/REVIEWS", "Team/Repo", false),
+            ("https://forgejo.example:4000/other", "Team/Repo", false),
+            ("https://forgejo.example:4000", "Team/Repo", false),
+            ("https://forgejo.example:4000/reviews", "Other/Repo", false),
+            ("HTTPS://FORGEJO.example:4000/reviews", "Team/Repo", true),
+            (
+                "https://forgejo.example:4000/reviews",
+                "team/repo",
+                forge != Forge::GitLab,
+            ),
+        ] {
+            cases.push((h.clone(), format!("{base}/{path}/{marker}/7"), expected));
+        }
+        let standard = Hosting {
+            web: "https://forgejo.example".into(),
+            ..h.clone()
+        };
+        cases.push((
+            standard,
+            format!("https://FORGEJO.example:443/Team/Repo/{marker}/7"),
+            true,
+        ));
+        // The exact reported case, without a proxy prefix, must also fail.
+        cases.push((
+            Hosting {
+                web: "https://forgejo.example:4000".into(),
+                ..h
+            },
+            format!("https://forgejo.example:3000/Team/Repo/{marker}/7"),
+            false,
+        ));
+    }
+    cases
+}
+
+#[test]
+fn review13_saved_issue_pr_preparation_uses_canonical_instance_identity() {
+    for (hosting, url, expected) in review13_cases() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/saved-issue-pr".into(), &ctx);
+        let mut saved = issue(7, "Saved issue title");
+        saved.url = url.clone();
+        tab.issue_work
+            .links
+            .insert("topic".into(), IssueLink::of(&saved));
+        tab.hosting = Some(hosting.clone());
+        // A selected SSH origin has the same captured web identity; the URL guard must not
+        // try to infer its web port/prefix from that Git transport.
+        tab.remotes = vec![crate::git::Remote {
+            name: "origin".into(),
+            url: "ssh://git@forgejo.example:2222/Team/Repo.git".into(),
+        }];
+        let prepared = tab.issue_pull_request("topic");
+        assert_eq!(prepared.is_some(), expected, "{hosting:?} {url}");
+        if let Some((title, body, _)) = prepared {
+            assert_eq!(title, saved.title);
+            assert_eq!(body, "Closes #7");
+        }
+    }
+}
+
+fn review13_refresh_cases(expected: bool, fixture: &str) {
+    let _pause = crate::network::test_pause::set(Some(crate::network::Pause::Switch));
+    let dir = repo(fixture);
+    assert!(git::run(Some(&dir), &["branch", "topic"]).is_ok());
+    for (hosting, url, _) in review13_cases()
+        .into_iter()
+        .filter(|(_, _, matches)| *matches == expected)
+    {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+        let mut saved = issue(7, "Original title");
+        saved.url = url.clone();
+        let saved = IssueLink::of(&saved);
+        let (wrote, _) = run_steps(
+            &dir,
+            &link::write_ops("topic", &saved),
+            OpKind::plain(),
+            None,
+        );
+        assert!(wrote.is_ok(), "{wrote:?}");
+        let before = std::fs::read(dir.join(".git/config")).unwrap_or_default();
+        tab.issue_work.links.insert("topic".into(), saved.clone());
+        tab.hosting = Some(hosting.clone());
+        let mut answer = issue(7, "Refreshed selected issue");
+        let marker = if hosting.forge == crate::forge::Forge::GitLab {
+            "-/issues"
+        } else {
+            "issues"
+        };
+        answer.url = format!("{}/{}/{marker}/7", hosting.web, hosting.path);
+        let refreshed = IssueLink::of(&answer);
+        let calls = recorded_refresh(answer, || {
+            tab.refresh_issue("topic".into(), &ctx);
+            for _ in 0..400 {
+                tab.poll(&ctx);
+                if tab.issue_work.refreshing.is_none() && tab.busy_op.is_none() && !tab.loading {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(25));
+            }
+        });
+        assert!(tab.issue_work.refreshing.is_none() && tab.busy_op.is_none() && !tab.loading);
+        if expected {
+            assert_eq!(calls, vec![(hosting.clone(), 7)], "{url}");
+            assert_eq!(
+                link::read(&dir).unwrap_or_default().get("topic"),
+                Some(&refreshed)
+            );
+            assert_eq!(tab.issue_work.links.get("topic"), Some(&refreshed));
+        } else {
+            assert!(
+                calls.is_empty(),
+                "must refuse before scheduling a read: {hosting:?} {url}"
+            );
+            assert_eq!(
+                std::fs::read(dir.join(".git/config")).unwrap_or_default(),
+                before,
+                "metadata changed for {url}"
+            );
+            assert_eq!(
+                link::read(&dir).unwrap_or_default().get("topic"),
+                Some(&saved)
+            );
+            assert_eq!(tab.issue_work.links.get("topic"), Some(&saved));
+            assert!(
+                tab.status
+                    .as_ref()
+                    .is_some_and(|(s, _)| s.contains("another forge repository"))
+            );
+        }
+    }
+    clean(&dir);
+}
+
+#[test]
+fn review13_saved_issue_refresh_refuses_mismatch_and_preserves_metadata() {
+    review13_refresh_cases(false, "instance-refused");
+}
+
+#[test]
+fn review13_saved_issue_refresh_accepts_same_canonical_instance() {
+    review13_refresh_cases(true, "instance-accepted");
+}
