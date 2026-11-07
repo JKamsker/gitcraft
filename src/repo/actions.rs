@@ -175,6 +175,8 @@ pub(crate) enum Action {
     Rerere(super::conflict::rerere::RerereAct),
     /// Conflict decisions: reading them for the open editor, sending or fetching them.
     Decisions(super::conflict::decisions::Act),
+    /// Something done for the repository's Unity project.
+    Unity(super::unity::UnityAct),
     /// Let Mergiraf solve what it can of the open conflict.
     SolveWithMergiraf,
     /// Preview keeping both versions of a conflicted file that can't be merged.
@@ -582,6 +584,13 @@ impl RepoTab {
                 "Update submodules".into(),
                 "submodule".into(),
                 super::keep_submodules::update_all(),
+            ));
+        }
+        if self.unity.project().is_some() {
+            items.push((
+                "Unity: Set-up…".into(),
+                "settings".into(),
+                Action::Unity(super::unity::UnityAct::OpenPanel),
             ));
         }
         if self.lfs {

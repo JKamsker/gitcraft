@@ -50,6 +50,9 @@ mod stream;
 mod submodule;
 mod timed;
 mod trees;
+mod unity;
+#[cfg(test)]
+pub(crate) use self::unity::tests as unity_tests;
 mod worktree;
 
 pub use self::backlinks::*;
@@ -89,6 +92,7 @@ pub use self::stream::*;
 pub use self::submodule::*;
 pub use self::timed::*;
 pub use self::trees::*;
+pub use self::unity::*;
 pub use self::worktree::*;
 
 use std::path::{Path, PathBuf};

@@ -92,6 +92,7 @@ mod terminals;
 mod tests;
 mod toolbar;
 mod versions;
+mod unity;
 mod watch;
 mod watch_remote;
 mod weakened_marks;
@@ -194,6 +195,8 @@ pub struct RepoTab {
     lfs_locks: lfs_locks::LockState,
     /// What it keeps in LFS on disk, and what is only pointers.
     lfs_storage: lfs_storage::StorageState,
+    /// Its Unity project, if it has one.
+    unity: unity::UnityState,
     identity: Identity,
     /// Where `origin` is hosted, when it's on a forge gitcraft knows.
     hosting: Option<Hosting>,
@@ -462,6 +465,7 @@ impl RepoTab {
             lfs: false,
             lfs_locks: Default::default(),
             lfs_storage: Default::default(),
+            unity: Default::default(),
             identity: Identity::default(),
             hosting: None,
             prs: Vec::new(),

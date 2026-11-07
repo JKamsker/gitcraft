@@ -37,6 +37,7 @@ impl RepoTab {
                 }
                 self.stash_picks_bar(ui, acts);
                 self.lock_banners(ui, acts);
+                self.unity_banners(ui, acts);
                 if !self.work.conflicted.is_empty() {
                     self.conflicted_list(ui, acts);
                 }

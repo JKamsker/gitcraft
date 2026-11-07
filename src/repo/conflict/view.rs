@@ -17,6 +17,10 @@ impl RepoTab {
         let rerere = self.rerere.setup;
         // The switch waits for what is being read or set, and for the operation running.
         let switchable = idle && !self.rerere.busy;
+        let smart = self
+            .conflict
+            .as_ref()
+            .and_then(|ed| self.unity.smart_merge_for(&ed.path));
         let Some(ed) = &mut self.conflict else { return };
         // A merge tool open on the file writes it when it saves: nothing is chosen here meanwhile.
         let idle = self.busy_op.is_none()
@@ -32,7 +36,7 @@ impl RepoTab {
         // While it is written (on another machine), what is saved is what is shown.
         let editable = !ed.saving;
 
-        ed.header(ui, &t, idle && editable, left, acts);
+        ed.header(ui, &t, (idle && editable, smart), left, acts);
         ed.history_strip(ui, &t, ((&ours_name, &theirs_name), state), acts);
         ed.reused_banner(ui, &t, idle, acts);
         ed.result_panel(ui, &t, editable, (rerere, switchable), acts);
@@ -42,7 +46,15 @@ impl RepoTab {
 
 impl ConflictEditor {
     /// Header: the file, how many conflicts are resolved, save, the whole-file actions, close.
-    fn header(&self, ui: &mut Ui, t: &Tokens, idle: bool, left: usize, acts: &mut Vec<Action>) {
+    /// `smart`: for a Unity YAML file, whether Unity's Smart Merge can solve it.
+    fn header(
+        &self,
+        ui: &mut Ui,
+        t: &Tokens,
+        (idle, smart): (bool, Option<bool>),
+        left: usize,
+        acts: &mut Vec<Action>,
+    ) {
         let total = self.choices.len();
         egui::Frame::new()
             .fill(t.chrome)
@@ -76,9 +88,35 @@ impl ConflictEditor {
                             acts.push(Action::SaveConflict);
                         }
                         self.whole_file_buttons(ui, idle, acts);
+                        if let Some(found) = smart {
+                            self.smart_merge_button(ui, idle && found, found, acts);
+                        }
                     });
                 });
             });
+    }
+
+    /// Solve with UnityYAMLMerge, for a Unity YAML file of a Unity project.
+    /// `found`: UnityYAMLMerge was found (else the button says where to choose it).
+    fn smart_merge_button(&self, ui: &mut Ui, idle: bool, found: bool, acts: &mut Vec<Action>) {
+        if self.solving {
+            ui.add(crate::spinner::Spinner::new());
+            return;
+        }
+        let r = ui
+            .add_enabled(idle, egui::Button::new("Solve with UnityYAMLMerge"))
+            .on_hover_text(
+                "Let Unity's Smart Merge merge this Unity file by its structure. Nothing is \
+                 saved before you check the result.",
+            )
+            .on_disabled_hover_text(if found {
+                "Wait for the running operation"
+            } else {
+                "UnityYAMLMerge wasn't found: choose it in Unity set-up… (Ctrl+P)"
+            });
+        if r.clicked() {
+            acts.push(Action::Unity(crate::repo::unity::UnityAct::SolveConflict));
+        }
     }
 
     /// Mergiraf when it's set up, and the whole file from either side.

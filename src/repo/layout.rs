@@ -139,6 +139,7 @@ impl RepoTab {
         self.issue_picker(&ctx, &mut acts);
         self.owners_lint_window(&ctx, &mut acts);
         self.fence_window(&ctx, &mut acts);
+        self.unity_ui(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
         }
