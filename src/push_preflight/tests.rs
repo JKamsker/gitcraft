@@ -136,7 +136,7 @@ fn host_and_namespace_policies_preserve_profile_serialization_and_transport_iden
     );
     assert_eq!(
         p.expected_author("https://github.com:443/company/repo").1,
-        "work@example.org"
+        "company@example.org"
     );
     let json = serde_json::to_string(&p).unwrap_or_default();
     assert_eq!(serde_json::from_str::<UserProfile>(&json).ok(), Some(p));
@@ -737,4 +737,57 @@ fn selected_account_metadata_and_reviewed_connection_context_stay_bound() -> Res
         assert!(check(&f.repo, &plan).is_ok());
         Ok(())
     })
+}
+
+#[test]
+fn explicit_default_ports_keep_host_and_namespace_identity_policy() -> Result<(), String> {
+    let f = Fixture::new()?;
+    f.commit("next", "next", "Next")?;
+    let mut profile = f.profile();
+    profile
+        .author_hosts
+        .push(crate::settings::profiles::HostAuthor {
+            host: "github.com/personal".into(),
+            name: "Personal".into(),
+            email: "personal@example.org".into(),
+        });
+    for url in [
+        "https://github.com/personal/repo.git",
+        "https://github.com:443/personal/repo.git",
+    ] {
+        f.git(&["remote", "set-url", "origin", url])?;
+        let plan = f.plan(profile.clone())?;
+        assert_eq!(plan.expected_email, "personal@example.org");
+        assert!(
+            plan.findings
+                .iter()
+                .any(|finding| finding.kind == Kind::Identity)
+        );
+    }
+    assert_eq!(
+        profile
+            .expected_author("https://github.com:8443/personal/repo.git")
+            .1,
+        profile.author_email
+    );
+    profile.author_hosts[0].host = "github.com:443/personal".into();
+    assert_eq!(
+        profile
+            .expected_author("https://github.com/personal/repo.git")
+            .1,
+        "personal@example.org"
+    );
+    assert_eq!(
+        profile
+            .expected_author("ssh://git@github.com:443/personal/repo.git")
+            .1,
+        "personal@example.org"
+    );
+    assert_eq!(
+        profile
+            .expected_author("ssh://git@github.com/personal/repo.git")
+            .1,
+        profile.author_email
+    );
+    Ok(())
 }

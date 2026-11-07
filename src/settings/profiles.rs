@@ -63,19 +63,23 @@ impl Default for UserProfile {
 
 impl UserProfile {
     pub(crate) fn expected_author(&self, url: &str) -> (&str, &str) {
+        let scheme = url.split_once("://").map_or("ssh", |(scheme, _)| scheme);
+        let policy_host = |host: &str| {
+            crate::push_preflight::location(&format!("{scheme}://{host}/_")).map(|(host, _)| host)
+        };
         let policy = crate::push_preflight::location(url).and_then(|(host, path)| {
             self.author_hosts
                 .iter()
                 .filter(|p| {
                     let key = p.host.trim().to_ascii_lowercase();
                     if let Some((h, namespace)) = key.split_once('/') {
-                        h == host
+                        policy_host(h).as_deref() == Some(host.as_str())
                             && path
                                 .to_ascii_lowercase()
                                 .strip_prefix(namespace)
                                 .is_some_and(|tail| tail.is_empty() || tail.starts_with('/'))
                     } else {
-                        key == host
+                        policy_host(&key).as_deref() == Some(host.as_str())
                     }
                 })
                 .max_by_key(|p| p.host.len())
