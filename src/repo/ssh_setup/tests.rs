@@ -14,7 +14,7 @@ impl Fixture {
         std::fs::create_dir(&path).map_err(|e| e.to_string())?;
         Ok(Self(path))
     }
-    fn state(&self, ctx: &egui::Context) -> State {
+    fn state(&self, ctx: &egui::Context) -> Result<State, String> {
         State::new(&RepoTab::new_deferred(self.0.clone(), ctx), ctx)
     }
 }
@@ -56,7 +56,7 @@ fn exclusive_folder_reservation_never_reuses_or_removes_existing_files() -> Resu
 fn closing_worker_drops_late_results_without_applying_an_action() -> Result<(), String> {
     let fixture = Fixture::new()?;
     let ctx = egui::Context::default();
-    let mut state = fixture.state(&ctx);
+    let mut state = fixture.state(&ctx)?;
     let (started, wait_started) = mpsc::channel();
     let (release, wait_release) = mpsc::channel();
     state.background(&ctx, move |_| {
@@ -153,7 +153,7 @@ fn practice_backstop_refuses_before_any_setup_job() -> Result<(), String> {
     assert!(crate::practice::is_repository(&repo));
     let ctx = egui::Context::default();
     let tab = RepoTab::new_deferred(repo.clone(), &ctx);
-    let mut state = State::new(&tab, &ctx);
+    let mut state = State::new(&tab, &ctx)?;
     let touched = fixture.0.join("should-not-run");
     let attempted = touched.clone();
     state.background(&ctx, move |_| {
@@ -178,7 +178,7 @@ fn owned_recording_terminal_reports_actual_exit_without_generating_a_key() -> Re
         use std::os::unix::fs::PermissionsExt;
         let fixture = Fixture::new()?;
         let ctx = egui::Context::default();
-        let mut state = fixture.state(&ctx);
+        let mut state = fixture.state(&ctx)?;
         let fake = fixture.0.join("record-only-tool");
         let marker = fixture.0.join("arguments");
         std::fs::write(
@@ -454,7 +454,7 @@ fn opening_setup_ui_exposes_each_step_without_running_tools_or_changing_profiles
     Context::default().run(|| {
         let fixture = Fixture::new()?;
         let ctx = egui::Context::default();
-        let mut state = fixture.state(&ctx);
+        let mut state = fixture.state(&ctx)?;
         state.folder = fixture.0.join("new key").to_string_lossy().into_owned();
         state.key = fixture.0.join("selected").to_string_lossy().into_owned();
         let profile = Settings::get(&ctx).profile();

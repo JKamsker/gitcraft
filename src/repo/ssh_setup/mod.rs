@@ -71,8 +71,8 @@ pub(super) struct State {
     status: String,
 }
 impl State {
-    fn new(repo: &RepoTab, ctx: &egui::Context) -> Self {
-        let machine = Machine::of(&repo.path);
+    fn new(repo: &RepoTab, ctx: &egui::Context) -> Result<Self, String> {
+        let machine = Machine::of(&repo.path)?;
         let context = connections::current();
         let settings = Settings::get(ctx);
         let hosting = repo.hosting.as_ref();
@@ -111,7 +111,7 @@ impl State {
         } else {
             String::new()
         };
-        Self {
+        Ok(Self {
             repo: repo.path.clone(),
             machine,
             context,
@@ -135,7 +135,7 @@ impl State {
             status:
                 "No key, agent, account or network action has run. Choose each step explicitly."
                     .into(),
-        }
+        })
     }
     pub fn running(&self) -> bool {
         self.receiver.is_some() || self.command.is_some()
@@ -404,9 +404,11 @@ impl State {
                     .clicked()
                     && let Some(account) = self.account.take()
                 {
-                    let path = PathBuf::from(format!("{}.pub", self.key));
+                    let machine = self.machine.clone();
+                    let key = self.key.clone();
                     let title = self.title.clone();
                     self.background(ui.ctx(), move |live| {
+                        let path = public_companion(&machine, &key)?;
                         let public = ssh_keys::public_key::read(&path)?;
                         account.upload(&title, &public, live)?;
                         Ok(Ready::Uploaded)
@@ -458,6 +460,14 @@ impl Drop for State {
     }
 }
 
+fn public_companion(machine: &Machine, key: &str) -> Result<PathBuf, String> {
+    machine.validate_path(key)?;
+    if !machine.is_local() {
+        return Err("Remote public keys must stay on their repository machine.".into());
+    }
+    Ok(PathBuf::from(format!("{key}.pub")))
+}
+
 fn reserve_folder(folder: &std::path::Path) -> Result<(), String> {
     #[cfg(unix)]
     let create = {
@@ -477,7 +487,10 @@ impl RepoTab {
             self.status=Some(("SSH setup is unavailable in Practice repositories; open a real repository to choose account/key actions.".into(),true));
             return;
         }
-        self.ssh_setup = Some(State::new(self, ctx));
+        match State::new(self, ctx) {
+            Ok(state) => self.ssh_setup = Some(state),
+            Err(error) => self.status = Some((error, true)),
+        }
     }
     pub(super) fn ssh_setup_window(&mut self, ctx: &egui::Context) {
         let Some(mut state) = self.ssh_setup.take() else {
