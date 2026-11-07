@@ -220,6 +220,17 @@ const FEATURES: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "Repository doctor",
+        &[
+            "The wrench in the toolbar (or Doctor: … in the palette) opens the repository doctor in the big area, its sections on the left; Esc closes it.",
+            "Ignore rules and attributes: type a path, or pick Ignore rules and attributes in a working-tree file's menu, to see the rule that ignores it (or takes it back with !), whether it is tracked, its line endings in the repository and the working tree, and what its attributes make of it: text or binary, LFS, merge and diff drivers, and drivers named but not set up here. The ignored files are listed; edit the repository's .gitignore files, .git/info/exclude or your own excludes file, preview the files the change would ignore or stop ignoring (by that file's rules alone), then save.",
+            "Hooks: the folder git runs hooks from (core.hooksPath or .git/hooks), each hook with the operations that run it, and what keeps one from running: not executable, CRLF line endings, an interpreter that isn't installed, a folder with a hook's name. Make executable and Convert to LF fix it in one click. husky, lefthook and pre-commit are recognised, with where to change their hooks. What git and its hooks printed during the last operations is kept in memory, until gitcraft closes, to read after.",
+            "Health and maintenance: commits, packed and loose objects and their size, how long git status and the tab's last reloads took, and what would make git faster here (the commit-graph, scheduled maintenance, the file system monitor where git has one, the untracked cache, packing loose objects), each turned on with one click. It also says what the graph's 100 000-commit limit means for this repository.",
+            "Which configuration wins: each setting (pull, signing, line endings, …) with the value in effect and its scope and file; open one for every value git read, the one that wins on top. Remove a value from its file so the others apply again, set it for this repository, this worktree (with extensions.worktreeConfig), your global config or everyone on the machine (those asked first), and compare it across worktrees. Nothing credential-related is shown.",
+            "Hidden changes: tracked files marked assume-unchanged or skip-worktree, which never show under Changes, what each flag means, and clearing those set by mistake, all or the ticked ones (asked first). Files sparse-checkout leaves out are listed apart: they are not flags anyone set.",
+        ],
+    ),
+    (
         "Branches, remotes and more",
         &[
             "Left pane: local branches with ahead / behind counts, remotes, worktrees, submodules, stashes, pull requests and tags.",

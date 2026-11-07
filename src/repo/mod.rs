@@ -35,6 +35,7 @@ mod error_help;
 mod diff_split;
 pub(crate) mod fence_view;
 mod drift_view;
+pub(crate) mod doctor;
 mod file_text;
 pub(crate) mod file_view;
 mod forge_link;
@@ -135,7 +136,7 @@ pub use widgets::primary_button;
 /// Hash of the pseudo-commit that stands for uncommitted changes at the top of the graph.
 pub(crate) const WIP_HASH: &str = "\u{0}wip";
 /// History deeper than this isn't loaded by scrolling or searching.
-const MAX_HISTORY: usize = 100_000;
+pub(crate) const MAX_HISTORY: usize = 100_000;
 
 /// How a tab asks the app to open a folder.
 pub enum OpenRequest {
@@ -167,6 +168,10 @@ pub struct RepoTab {
     /// Polled as the view shown (not a parked worktree view).
     shown: bool,
     loading: bool,
+    /// When the reload running started, and how long the last ones took (newest last), for
+    /// the doctor.
+    load_started: Option<Instant>,
+    load_times: std::collections::VecDeque<std::time::Duration>,
     /// A reload was asked for while one was running, which may have read too early.
     reload_again: bool,
     load_error: Option<String>,
@@ -252,6 +257,8 @@ pub struct RepoTab {
     /// Two versions of a series of commits compared, the rewrites kept and the pull requests'
     /// versions seen.
     versions: versions::Versions,
+    /// The repository doctor, when the big area shows it.
+    doctor: Option<Box<doctor::DoctorView>>,
     pr_requests: u64,
     /// What was written on each pull request and not sent, by its number.
     pr_drafts: HashMap<u64, pr_review::PrDraft>,
@@ -465,6 +472,8 @@ impl RepoTab {
             recheck_after_load: false,
             shown: true,
             loading: false,
+            load_started: None,
+            load_times: Default::default(),
             reload_again: false,
             load_error: None,
             refs: Refs::default(),
@@ -520,6 +529,7 @@ impl RepoTab {
             ci_view: None,
             reflog: None,
             versions: Default::default(),
+            doctor: None,
             pr_requests: 0,
             pr_drafts: HashMap::new(),
             compare_requests: 0,

@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use super::dialogs::StashChoice;
 use super::pull::PullMode;
 use super::{
-    Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view, ops, pr_review, quick_edit, reflog, drag_drop, partial_stash, issue_work, versions, timeline,
+    Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view, ops, pr_review, quick_edit, reflog, drag_drop, partial_stash, issue_work, versions, timeline, doctor,
 };
 use crate::git::{self, InProgress};
 use crate::keymap::{Command, label, written};
@@ -55,6 +55,11 @@ pub(crate) enum Action {
     CloseReflog,
     /// Something asked of the issues assigned to you.
     Issue(issue_work::IssueAct),
+    /// Show the repository doctor in the big area, at a section.
+    OpenDoctor(doctor::Section),
+    CloseDoctor,
+    /// Something done in the repository doctor.
+    Doctor(doctor::DoctorAct),
     CloseDiff,
     Ops {
         label: String,
@@ -587,6 +592,11 @@ impl RepoTab {
                 Action::SelectStaleBranches,
             ),
             (
+                "Repository doctor".into(),
+                "doctor".into(),
+                Action::OpenDoctor(doctor::Section::ALL[0]),
+            ),
+            (
                 reveal_label().into(),
                 "folder".into(),
                 Action::OpenPath(PathBuf::new()),
@@ -598,6 +608,13 @@ impl RepoTab {
             ),
         ]);
         items.extend(super::popout::palette_items());
+        for section in doctor::Section::ALL {
+            items.push((
+                format!("Doctor: {}", section.title()),
+                "doctor".into(),
+                Action::OpenDoctor(section),
+            ));
+        }
         if let Some(url) = self.web_page() {
             items.push((
                 "Open in browser".into(),

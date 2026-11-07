@@ -73,6 +73,7 @@ impl RepoTab {
             return;
         }
         self.loading = true;
+        self.load_started = Some(Instant::now());
         let read = self.next_read();
         let path = self.path.clone();
         // Keep the pages already loaded.
@@ -349,6 +350,12 @@ impl RepoTab {
     pub(super) fn loaded(&mut self, result: Result<Box<Loaded>, String>, ctx: &egui::Context) {
         self.loading = false;
         let resumed = std::mem::take(&mut self.resuming);
+        if let Some(started) = self.load_started.take() {
+            if self.load_times.len() == 5 {
+                self.load_times.pop_front();
+            }
+            self.load_times.push_back(started.elapsed());
+        }
         match result {
             Ok(loaded) => {
                 self.take_loaded(*loaded, ctx);

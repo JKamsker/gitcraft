@@ -135,6 +135,8 @@ impl RepoTab {
                     self.pr_view_ui(ui, &mut acts);
                 } else if self.timeline_view.is_some() {
                     self.timeline_view_ui(ui, &mut acts);
+                } else if self.doctor.is_some() {
+                    self.doctor_ui(ui, &mut acts);
                 } else {
                     if self.reflog.is_some() {
                         self.reflog_panel(ui, &mut acts);
@@ -273,6 +275,8 @@ impl RepoTab {
                 acts.push(Action::ClosePr);
             } else if esc && self.timeline_view.is_some() {
                 acts.push(Action::ToggleTimeline);
+            } else if esc && self.doctor.as_ref().is_some_and(|d| !d.asking()) {
+                acts.push(Action::CloseDoctor);
             } else if esc && self.compare.is_some() {
                 acts.push(Action::CloseCompare);
             } else if esc && self.search.open {

@@ -19,12 +19,21 @@ pub fn set_profile_config(path: Option<PathBuf>) {
     }
 }
 
+/// The active profile's config file, when git reads it as the global config (see
+/// [`set_profile_config`]).
+pub fn profile_config() -> Option<PathBuf> {
+    PROFILE_CONFIG.read().ok().and_then(|p| p.clone())
+}
+
 /// Whether `args` reads or writes the user's own global config: `git config --global …`
-/// (signing settings, Mergiraf's set-up), which must never land in the profile's file, which is
-/// written over.
+/// (signing settings, Mergiraf's set-up) or `git maintenance` (its list of repositories), which
+/// must never land in the profile's file, which is written over.
 fn user_global_config(args: &[&str]) -> bool {
     let rest = after_options(args);
-    rest.first() == Some(&"config") && rest.contains(&"--global")
+    (rest.first() == Some(&"config") && rest.contains(&"--global"))
+        // `maintenance start` / `register` write `maintenance.repo` to the global config.
+        || (rest.first() == Some(&"maintenance")
+            && matches!(rest.get(1), Some(&("start" | "register" | "unregister" | "stop"))))
 }
 
 /// `args` from the subcommand on: past the options before it (`-c x=y`, `-C dir`,
@@ -827,7 +836,10 @@ pub fn run_env(
 /// What a call that ended as `out` gives: its output when its exit code is one of `ok`, else
 /// what it said went wrong.
 fn finish(out: Ran, args: &[&str], ok: &[i32]) -> Result<String, String> {
-    if out.code.is_some_and(|c| ok.contains(&c)) {
+    // For the doctor: what hooks print is lost once the command succeeds.
+    let succeeded = out.code.is_some_and(|c| ok.contains(&c));
+    super::doctor::hook_log::record(dir, args, succeeded, &out.stderr);
+    if succeeded {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {
         // Merges and pulls report conflicts on stdout and the summary on stderr.
@@ -1044,6 +1056,9 @@ mod tests {
             "x"
         ]));
         assert!(user_global_config(&["-ck=v", "config", "--global", "x"]));
+        assert!(user_global_config(&["maintenance", "start"]));
+        // Running it reads the configuration as every command does.
+        assert!(!user_global_config(&["maintenance", "run"]));
         assert!(!user_global_config(&[]));
     }
 

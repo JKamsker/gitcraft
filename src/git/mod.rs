@@ -19,6 +19,7 @@ pub mod external_tool;
 pub mod errors;
 pub mod dry_run;
 mod diff_algorithm;
+pub mod doctor;
 mod files;
 mod fold;
 mod hooks;
