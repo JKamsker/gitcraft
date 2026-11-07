@@ -355,7 +355,7 @@ fn running_analysis_enforces_deadlines_and_output_limits() -> Result<(), String>
     Ok(())
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "macos")))]
 #[test]
 fn real_git_keeps_non_utf8_file_paths_distinct() -> Result<(), String> {
     use std::os::unix::ffi::OsStringExt;

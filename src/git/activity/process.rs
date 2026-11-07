@@ -19,12 +19,44 @@ pub(super) fn run(
         "log.showSignature=false",
     ];
     safe.extend_from_slice(args);
-    let output = super::super::command::bounded::run(
-        repo,
-        &safe,
-        input.unwrap_or_default().to_vec(),
-        16 * 1024 * 1024,
-    )?;
+    let input = input.unwrap_or_default().to_vec();
+    let (output, errors, success) = if let Some(target) = crate::remote::parse(repo) {
+        let request =
+            super::super::command::bounded::request(&target, &safe, input, 16 * 1024 * 1024);
+        let result = crate::remote::exec(&target.host, &request)?;
+        (result.stdout, result.stderr, result.code == 0)
+    } else {
+        let command = super::super::command::local_command(
+            Some(repo),
+            &super::super::command::Extra::default(),
+            &safe,
+        );
+        let result = crate::processes::run(
+            command,
+            crate::processes::Options {
+                input: Some(input),
+                background: true,
+                timeout: Some(std::time::Duration::from_secs(120)),
+                output_limit: 16 * 1024 * 1024,
+                stderr_limit: Some(64 * 1024),
+                ..Default::default()
+            },
+        )?
+        .complete()?;
+        (result.stdout, result.stderr, result.status.success())
+    };
+    let error = String::from_utf8_lossy(&errors);
+    if !success
+        || error
+            .lines()
+            .any(|line| line.starts_with("error:") || line.starts_with("fatal:"))
+    {
+        return Err(if error.trim().is_empty() {
+            "Git history read failed".into()
+        } else {
+            error.trim().to_owned()
+        });
+    }
     if !active() {
         return Err("Analysis cancelled".into());
     }
