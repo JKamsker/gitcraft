@@ -135,6 +135,9 @@ fn capability(repo: &Path) -> Result<(), &'static str> {
     if !cfg!(feature = "native-git") {
         return Err("feature-disabled");
     }
+    if crate::practice::is_repository(repo) {
+        return Err("practice-environment");
+    }
     if std::env::var_os("GITCRAFT_GIT_BACKEND").is_some_and(|v| v == "cli") {
         return Err("explicit-cli");
     }

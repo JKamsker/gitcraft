@@ -94,6 +94,13 @@ impl App {
                         action = Some(4);
                     }
 
+                    if ui
+                        .button("Practice git…")
+                        .on_hover_text("Real throwaway repositories with goals and checks")
+                        .clicked()
+                    {
+                        self.practice_open = true;
+                    }
                     self.home_link_field(ui, &t);
 
                     // The card has git's words itself.

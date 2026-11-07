@@ -85,6 +85,7 @@ pub(crate) mod popout;
 mod pr_merge;
 mod pr_review;
 mod pr_view;
+mod practice;
 #[cfg(test)]
 mod process_benchmarks;
 pub(crate) mod pull;
@@ -225,6 +226,9 @@ pub struct RepoTab {
     submodules: Vec<Submodule>,
     /// It keeps files in Git LFS, and git-lfs is installed.
     lfs: bool,
+    practice: Option<crate::practice::Session>,
+    practice_checking: bool,
+    practice_result: Option<Result<bool, String>>,
     /// Its LFS file locks, when it keeps files in LFS.
     lfs_locks: lfs_locks::LockState,
     /// What it keeps in LFS on disk, and what is only pointers.
@@ -555,6 +559,9 @@ impl RepoTab {
             remotes: Vec::new(),
             submodules: Vec::new(),
             lfs: false,
+            practice: None,
+            practice_checking: false,
+            practice_result: None,
             lfs_locks: Default::default(),
             lfs_storage: Default::default(),
             unity: Default::default(),

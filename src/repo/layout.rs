@@ -44,6 +44,7 @@ impl RepoTab {
                     .stroke(egui::Stroke::new(1.0, t.separator)),
             )
             .show(ui, |ui| self.toolbar(ui, &mut acts));
+        self.practice_banner(ui);
         self.push_banner(ui, &mut acts);
         self.detached_panel(ui, &mut acts);
         self.error_card_panel(ui);

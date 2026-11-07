@@ -101,6 +101,14 @@ impl Terminal {
         if let Some(path) = crate::shell_path::terminal_path() {
             cmd.env("PATH", path);
         }
+        if crate::practice::is_repository(cwd) {
+            for name in crate::practice::ISOLATED_ENV_REMOVE {
+                cmd.env_remove(name);
+            }
+            for (name, value) in crate::practice::ISOLATED_ENV_SET {
+                cmd.env(name, value);
+            }
+        }
         let child = pair
             .slave
             .spawn_command(cmd)

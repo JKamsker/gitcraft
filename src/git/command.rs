@@ -197,11 +197,7 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
 
 /// git with `args` in `dir` on this machine, `extra` before them.
 pub(super) fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Command {
-    let mut cmd = git_cmd();
-    with_profile(&mut cmd, args);
-    if let Some(dir) = dir {
-        cmd.arg("-C").arg(dir);
-    }
+    let mut cmd = repository_command(dir, args);
     cmd.args(&extra.pre);
     for (name, value) in &extra.env {
         cmd.env(name, value);
@@ -579,9 +575,8 @@ pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Chi
             &remote_request(&target, &Extra::default(), args),
         );
     }
-    let mut cmd = git_cmd();
-    with_profile(&mut cmd, args);
-    cmd.arg("-C").arg(dir).args(args);
+    let mut cmd = repository_command(Some(dir), args);
+    cmd.args(args);
     cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
@@ -1367,4 +1362,69 @@ pub(crate) fn tour_read(
     input: Option<&[u8]>,
 ) -> Result<Vec<u8>, String> {
     bounded::run(repo, args, input.unwrap_or_default().to_vec(), 64 << 20)
+}
+
+/// All local execution routes, including streaming and watched operations, use this builder.
+pub(super) fn repository_command(dir: Option<&Path>, args: &[&str]) -> Command {
+    if let Some(dir) = dir.filter(|dir| crate::practice::is_repository(dir)) {
+        return practice_command(dir);
+    }
+    let mut cmd = git_cmd();
+    with_profile(&mut cmd, args);
+    if let Some(dir) = dir {
+        cmd.arg("-C").arg(dir);
+    }
+    cmd
+}
+fn practice_command(dir: &Path) -> Command {
+    let mut cmd = git_cmd();
+    for name in crate::practice::ISOLATED_ENV_REMOVE {
+        cmd.env_remove(name);
+    }
+    for (name, value) in crate::practice::ISOLATED_ENV_SET {
+        cmd.env(name, value);
+    }
+    cmd.arg("--no-replace-objects").arg("-C").arg(dir);
+    cmd
+}
+pub(crate) fn practice_run(dir: &Path, args: &[&str]) -> Result<String, String> {
+    if remote::is_remote(dir) {
+        return Err("Practice repositories are local".into());
+    }
+    let mut cmd = practice_command(dir);
+    cmd.args(args);
+    let out = crate::processes::run(
+        cmd,
+        crate::processes::Options {
+            timeout: Some(std::time::Duration::from_secs(30)),
+            ..Default::default()
+        },
+    )?
+    .complete()?;
+    if out.status.success() {
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).into_owned())
+    }
+}
+
+#[cfg(test)]
+mod practice_environment_tests {
+    use super::*;
+    #[test]
+    fn synthetic_practice_command_removes_every_inherited_route() {
+        let cmd = practice_command(Path::new("sandbox"));
+        let env: std::collections::HashMap<_, _> = cmd.get_envs().collect();
+        for name in crate::practice::ISOLATED_ENV_REMOVE {
+            assert_eq!(env.get(std::ffi::OsStr::new(name)), Some(&None), "{name}");
+        }
+        for (name, value) in crate::practice::ISOLATED_ENV_SET {
+            assert_eq!(
+                env.get(std::ffi::OsStr::new(name)).copied().flatten(),
+                Some(std::ffi::OsStr::new(value)),
+                "{name}"
+            );
+        }
+        assert!(cmd.get_args().any(|a| a == "--no-replace-objects"));
+    }
 }
