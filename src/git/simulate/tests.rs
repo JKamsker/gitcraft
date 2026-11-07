@@ -469,21 +469,27 @@ fn checking_leaves_the_working_tree_and_index_alone() -> Result<(), String> {
     repo.git(&["checkout", "-q", "side"])?;
     repo.write("f.txt", b"a\nside\nc\n")?;
     let side = repo.commit("side")?;
+    // Two commits that replay cleanly, so that an old git's replay makes its scratch commits.
+    repo.write("own1.txt", b"1\n")?;
+    let own1 = repo.commit("own 1")?;
+    repo.write("own2.txt", b"2\n")?;
+    let own2 = repo.commit("own 2")?;
     repo.write("staged.txt", b"staged\n")?;
     repo.git(&["add", "staged.txt"])?;
     repo.write("f.txt", b"a\nunsaved\nc\n")?;
     repo.write("untracked.txt", b"new\n")?;
     let before = snapshot(&repo)?;
-    let files_before = std::fs::read(repo.path().join("f.txt")).map_err(|e| e.to_string())?;
+    let read = |name: &str| std::fs::read(repo.path().join(name)).map_err(|e| e.to_string());
+    let files_before = (read("f.txt")?, read("untracked.txt")?);
     merge(repo.path(), &side, &main)?;
     rebase(repo.path(), features, &side, &main)?;
     rebase(repo.path(), Features::of((2, 40, 0)), &side, &main)?;
     cherry_pick(repo.path(), features, &side, &[&main])?;
+    let old_git = Features::of((2, 40, 0));
+    let clean = cherry_pick(repo.path(), old_git, &main, &[&own1, &own2])?;
+    assert_eq!(clean.outcome, Outcome::Clean { changes: true });
     assert_eq!(snapshot(&repo)?, before);
-    assert_eq!(
-        std::fs::read(repo.path().join("f.txt")).map_err(|e| e.to_string())?,
-        files_before
-    );
+    assert_eq!((read("f.txt")?, read("untracked.txt")?), files_before);
     for state in [
         "MERGE_HEAD",
         "CHERRY_PICK_HEAD",
