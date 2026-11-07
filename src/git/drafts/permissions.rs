@@ -127,7 +127,7 @@ finally:os.close(fd)
     }
     let output=git::forecast_remote(identity.host.as_ref().ok_or("Missing remote host")?,remote::Request {
         cwd:Some(pin.physical.clone()),script:format!("exec python3 -c {}",remote::sh_quote(script)),
-        stdin:Some(serde_json::json!({"root":pin.physical,"device":pin.token.split(':').next(),"inode":pin.token.split(':').nth(1),"path":path,"mode":mode,"expected":expected.map(|b|base64::engine::general_purpose::STANDARD.encode(b))}).to_string().into_bytes()),..Default::default()
+        stdin:Some(serde_json::json!({"root":pin.physical,"device":pin.device_inode().map(|p|p.0),"inode":pin.device_inode().map(|p|p.1),"path":path,"mode":mode,"expected":expected.map(|b|base64::engine::general_purpose::STANDARD.encode(b))}).to_string().into_bytes()),..Default::default()
     },active)?;
     if output.code != 0 {
         return Err("Remote permission preservation requires Python 3 and stable regular files; no unsafe chmod was attempted".into());

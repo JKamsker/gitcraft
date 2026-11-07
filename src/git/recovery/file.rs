@@ -17,6 +17,11 @@ impl PartialEq for RootPin {
 }
 impl Eq for RootPin {}
 impl RootPin {
+    pub(crate) fn device_inode(&self) -> Option<(&str, &str)> {
+        let mut parts = self.token.split(':');
+        Some((parts.next()?, parts.next()?))
+    }
+
     /// A caller must enter the captured repository directory before this guard.
     /// The shell's cwd then retains that object through subsequent relative operations.
     pub(crate) fn remote_guard(&self) -> String {
