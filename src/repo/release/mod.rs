@@ -246,10 +246,14 @@ impl RepoTab {
             return;
         };
         let (plan, done) = (run.plan.clone(), run.done.clone());
+        let hosting = run.hosting.clone();
         let repo = self.path.clone();
         self.then(
             ctx,
-            move || still_there(&repo, &plan, &done),
+            move || {
+                still_there(&repo, &plan, &done)
+                    .or_else(|| release::preflight(&repo, &plan, hosting.as_ref()).err())
+            },
             |tab, gone, ctx| match gone {
                 None => tab.next_release_step(ctx),
                 Some(why) => {

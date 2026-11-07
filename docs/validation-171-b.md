@@ -231,3 +231,31 @@ other areas; shared load.rs, messages.rs, mod.rs and graph files need merge revi
   deliberately excluded; provider command preparation, input and trust refusal
   are covered with recording-only fixtures. GitLab syntax was checked against
   official docs because glab is absent on this machine.
+
+## Review 10: refuse incompatible publication before mutation
+
+- [x] A publishing plan now checks its captured hosting against Git's resolved
+  push destinations in the dialog's asynchronous preflight, before executing
+  any step. The engine checks again before Bump, Tag and immediately before
+  Push, while retaining the Publish/Upload guards. Plans without publication
+  retain their existing Git transport behavior.
+- [x] Refusal leaves local HEAD, tag refs and Done untouched. A mismatch introduced
+  after completed local steps prevents the push and preserves those completed
+  steps for undo/resumption. Both failing-before and passing-after push fixtures
+  use owned local bare receivers; none can push to a live forge.
+- [x] Destination identity compares the web authority separately from the path.
+  GitLab subgroup/project paths retain their exact captured spelling; GitHub,
+  Forgejo and Gitea owner/repository names retain ASCII case-insensitive identity.
+  Scheme and port differences remain incompatible, and host case is ignored.
+- The existing changed-primary undo fixture now seeds a completed local phase
+  before pending publication, so it continues to test resumption/undo without
+  presenting an intentionally incompatible plan to the new initial preflight.
+- Actual private-target evidence under `/tmp/gitcraft-review10/area-b/`:
+  `before.log` reports **3 ran, 3 failed** on the previous implementation;
+  `after.log` reports **4 passed**, including the path/authority regression;
+  `release-suite.log` reports **21 passed**, zero ignored/failed. Test binary
+  inventory is 3,117 (4 selected + 3,113 filtered in the focused run). Formatting,
+  diff checks and `clippy --all-targets -- -D clippy::all` pass; see `fmt.log`
+  and `clippy.log` (existing dead-code warnings only). Rust 1.95.0, jobs 3,
+  private target `/tmp/gitcraft-167-171/target-b`, GNU Git/sed PATH. No provider
+  changes, live forge requests, broad 183-test rerun or layout changes were needed.

@@ -250,9 +250,17 @@ fn adversarial_changed_primary_stops_later_publication_but_keeps_local_undo() {
     };
     tab.hosting = Some(original.clone());
     if let Some(view) = &mut tab.release {
-        view.form.publish = true;
+        view.form.publish = false;
     }
     tab.release_act(ReleaseAct::Run, &ctx);
+    wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
+    // Seed a release paused after its completed local phase, before publication. This
+    // isolates resumption after a primary change without requiring a live forge push.
+    if let Some(run) = tab.release.as_mut().and_then(|v| v.run.as_mut()) {
+        run.plan.publish = true;
+        run.steps
+            .push((crate::release::Step::Publish, Status::Waiting));
+    }
     let replacement = crate::forge::Hosting {
         path: "replacement/project".into(),
         ..original.clone()
@@ -270,6 +278,7 @@ fn adversarial_changed_primary_stops_later_publication_but_keeps_local_undo() {
             .is_some_and(|run| run.hosting.as_ref() == Some(&original)),
         "publication destination was discarded or retargeted"
     );
+    tab.next_release_step(&ctx);
     wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
     let steps = statuses(&tab);
     assert_eq!(&steps[..3], &[Status::Done, Status::Done, Status::Done]);
@@ -379,4 +388,63 @@ fn review9_release_push_uses_selected_forge_remote_and_preserves_normal_upstream
     let _ = std::fs::remove_dir_all(dir);
     let _ = std::fs::remove_dir_all(origin);
     let _ = std::fs::remove_dir_all(fork);
+}
+
+#[test]
+fn review10_dialog_preflight_refuses_before_bump_tag_or_push() {
+    let _pause = crate::network::test_pause::set(Some(crate::network::Pause::Switch));
+    let (dir, receiver) = project("publication-preflight");
+    let before_head = git::head(&dir);
+    let before_remote = git::resolve(&receiver, "refs/heads/main");
+    run(
+        &dir,
+        &[
+            "remote",
+            "set-url",
+            "origin",
+            "https://github.com/selected/project",
+        ],
+    );
+    run(
+        &dir,
+        &[
+            "remote",
+            "set-url",
+            "--push",
+            "origin",
+            &receiver.to_string_lossy(),
+        ],
+    );
+    assert_eq!(
+        git::run(Some(&dir), &["remote", "get-url", "--push", "origin"])
+            .map(|s| s.trim().to_owned()),
+        Ok(receiver.to_string_lossy().into_owned())
+    );
+    let ctx = egui::Context::default();
+    let mut tab = open(&dir, &ctx);
+    assert!(tab.release.as_ref().is_some_and(|v| v.form.publish));
+    tab.release_act(ReleaseAct::Run, &ctx);
+    wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
+    let after_head = git::head(&dir);
+    let local_tag_absent = git::resolve(&dir, "refs/tags/v2.3.2").is_err();
+    let remote_tag_absent = git::resolve(&receiver, "refs/tags/v2.3.2").is_err();
+    let remote_head = git::resolve(&receiver, "refs/heads/main");
+    let done = tab
+        .release
+        .as_ref()
+        .and_then(|v| v.run.as_ref())
+        .map(|r| r.done.clone());
+    let refused = tab.status.as_ref().is_some_and(|(s, error)| {
+        *error && s.contains("does not match the selected forge repository")
+    });
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(&receiver);
+    assert!(refused);
+    assert_eq!(
+        after_head, before_head,
+        "preflight must run before a bump commit"
+    );
+    assert!(local_tag_absent && remote_tag_absent);
+    assert_eq!(remote_head, before_remote);
+    assert_eq!(done, Some(crate::release::Done::default()));
 }
