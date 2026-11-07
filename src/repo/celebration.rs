@@ -6,13 +6,13 @@ use std::time::{Duration, Instant};
 enum Event {
     FirstCommit,
     ReleaseTag { name: String, target: String },
-    Merge { before: String },
+    Merge { before: String, require_merge: bool },
 }
 
 #[derive(Default)]
 pub(super) struct State {
     candidate: Option<Event>,
-    min_read: Option<u64>,
+    pending: Vec<(u64, Event)>,
     visible: Option<(&'static str, Instant)>,
 }
 
@@ -24,7 +24,6 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         self.celebration.candidate = None;
-        self.celebration.min_read = None;
         let settings = crate::settings::Settings::get(ctx);
         if !settings.celebration_motion && !settings.celebration_sound {
             return;
@@ -60,11 +59,13 @@ impl RepoTab {
         } else if (command("merge").is_some_and(|op| {
             !op.iter()
                 .any(|arg| matches!(arg.as_str(), "--abort" | "--quit"))
-        }) || label == "Continue merge")
+        }) || label == "Continue merge"
+            || command("pull").is_some_and(|op| op.iter().any(|a| a == "--no-rebase")))
             && !self.refs.head.is_empty()
         {
             Some(Event::Merge {
                 before: self.refs.head.clone(),
+                require_merge: command("pull").is_some(),
             })
         } else {
             None
@@ -72,22 +73,23 @@ impl RepoTab {
     }
 
     pub(super) fn celebration_done(&mut self, success: bool) {
-        if success && self.celebration.candidate.is_some() {
-            self.celebration.min_read = Some(self.reads + 1);
-        } else {
-            self.celebration.candidate = None;
-            self.celebration.min_read = None;
+        if let Some(event) = self.celebration.candidate.take().filter(|_| success) {
+            self.celebration.pending.push((self.reads + 1, event));
         }
     }
 
     pub(super) fn celebration_loaded(&mut self, read: u64, ctx: &egui::Context) {
-        if self.celebration.min_read.is_none_or(|min| read < min) {
-            return;
+        let pending = std::mem::take(&mut self.celebration.pending);
+        for (min_read, event) in pending {
+            if read < min_read {
+                self.celebration.pending.push((min_read, event));
+                continue;
+            }
+            self.confirm_celebration(event, ctx);
         }
-        self.celebration.min_read = None;
-        let Some(event) = self.celebration.candidate.take() else {
-            return;
-        };
+    }
+
+    fn confirm_celebration(&mut self, event: Event, ctx: &egui::Context) {
         let label = match event {
             Event::FirstCommit
                 if !self.refs.head.is_empty()
@@ -107,7 +109,18 @@ impl RepoTab {
             {
                 "Release tag created"
             }
-            Event::Merge { before } if !self.refs.head.is_empty() && self.refs.head != before => {
+            Event::Merge {
+                before,
+                require_merge,
+            } if !self.refs.head.is_empty()
+                && self.refs.head != before
+                && (!require_merge
+                    || self.history.iter().any(|c| {
+                        c.hash == self.refs.head
+                            && c.parents.len() > 1
+                            && c.parents.first() == Some(&before)
+                    })) =>
+            {
                 "Merge completed"
             }
             _ => return,
@@ -162,6 +175,94 @@ fn reduced(ctx: &egui::Context) -> bool {
 mod tests {
     use super::*;
     #[test]
+    fn successful_first_commit_survives_queued_push_then_failure_until_confirmed_read() {
+        let ctx = egui::Context::default();
+        crate::settings::Settings {
+            celebration_sound: true,
+            ..Default::default()
+        }
+        .set(&ctx);
+        crate::audio::take_recorded();
+        let mut tab = RepoTab::new_deferred("/nonexistent/queued-celebration".into(), &ctx);
+        tab.life.phase = super::super::lifecycle::Phase::Live;
+        tab.loading = true;
+        tab.tx.cancel.cancel(); // queued jobs are rejected, no commands execute
+        tab.celebration_begin("Commit", &[vec!["commit".into()]], &ctx);
+        tab.busy_op = Some("Commit".into());
+        tab.refs.current = Some("main".into());
+        tab.refs.local.push(crate::git::Branch {
+            name: "main".into(),
+            target: "root".into(),
+            is_head: true,
+            upstream: "origin/main".into(),
+            track: String::new(),
+        });
+        tab.waiting.push_back(super::super::running::Waiter::Push);
+        tab.op_done(
+            "Commit".into(),
+            Ok(String::new()),
+            super::super::Refresh::All,
+            super::super::OpKind::plain(),
+            true,
+            &ctx,
+        );
+        assert_eq!(tab.busy_op.as_deref(), Some("Push"));
+        assert_eq!(tab.celebration.pending.len(), 1);
+        tab.op_done(
+            "Push".into(),
+            Err("recorded failure".into()),
+            super::super::Refresh::All,
+            super::super::OpKind::plain(),
+            true,
+            &ctx,
+        );
+        tab.refs.head = "root".into();
+        tab.history.push(std::sync::Arc::new(crate::git::Commit {
+            hash: "root".into(),
+            ..Default::default()
+        }));
+        tab.celebration_loaded(tab.reads, &ctx);
+        assert!(crate::audio::take_recorded().is_empty());
+        tab.celebration_loaded(tab.reads + 1, &ctx);
+        assert_eq!(
+            crate::audio::take_recorded(),
+            [crate::audio::Cue::Celebration]
+        );
+        tab.celebration_loaded(tab.reads + 2, &ctx);
+        assert!(crate::audio::take_recorded().is_empty());
+    }
+    #[test]
+    fn merging_pull_celebrates_confirmed_merge_but_not_fast_forward_or_failure() {
+        let ctx = egui::Context::default();
+        crate::settings::Settings {
+            celebration_sound: true,
+            ..Default::default()
+        }
+        .set(&ctx);
+        let mut tab = RepoTab::new_deferred("/nonexistent/pull-celebration".into(), &ctx);
+        let pull = super::super::ops(&[super::super::pull::PullMode::Merge.args()]);
+        for (success, parents, expected) in [
+            (true, vec!["old", "topic"], 1),
+            (true, vec!["old"], 0),
+            (false, vec!["old", "topic"], 0),
+        ] {
+            crate::audio::take_recorded();
+            tab.refs.head = "old".into();
+            tab.celebration_begin("Sync: pull", &pull, &ctx);
+            tab.celebration_done(success);
+            tab.celebration_begin("Sync: push", &[vec!["push".into()]], &ctx);
+            tab.celebration_done(true);
+            tab.refs.head = "new".into();
+            tab.history = vec![std::sync::Arc::new(crate::git::Commit {
+                hash: "new".into(),
+                parents: parents.into_iter().map(String::from).collect(),
+                ..Default::default()
+            })];
+            tab.celebration_loaded(tab.reads + 1, &ctx);
+            assert_eq!(crate::audio::take_recorded().len(), expected);
+        }
+    }
+    #[test]
     fn failed_noop_and_unconfirmed_operations_do_not_celebrate() {
         let ctx = egui::Context::default();
         let settings = crate::settings::Settings {
@@ -186,7 +287,7 @@ mod tests {
         tab.celebration_done(true);
         tab.refs.head = "merged".into();
         tab.celebration_loaded(0, &ctx);
-        assert!(tab.celebration.candidate.is_some());
+        assert_eq!(tab.celebration.pending.len(), 1);
         tab.celebration_loaded(tab.reads + 1, &ctx);
         assert!(tab.celebration.candidate.is_none());
         assert_eq!(
