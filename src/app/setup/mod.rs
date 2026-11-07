@@ -325,7 +325,9 @@ impl App {
                 if let Some(file)=self.setup.file.clone(){
                     ui.separator();ui.label(format!("Preview: {} profiles, {} saved authors, {} repositories",file.profiles.len(),file.identities.len(),file.repositories.len()));
                     for p in &file.profiles {ui.label(format!("Profile: {} — {} <{}>{}",p.name,p.author_name,p.author_email,if p.setup.pending(){" · local authentication/key setup required"}else{""}));for a in &p.setup.accounts{ui.label(format!("  {:?}: {} on {}",a.provider,a.user_or_alias,a.host));}}
-                    ui.add_enabled_ui(!busy,|ui|{if self.setup.import{ui.checkbox(&mut self.setup.preferences,"Restore public display settings");apply=ui.add_enabled(!self.setup.applied,egui::Button::new("Add profiles, authors and public settings")).clicked();}else{save=ui.button("Save setup file…").clicked();}});
+                    ui.add_enabled_ui(!busy,|ui|{if self.setup.import{ui.checkbox(&mut self.setup.preferences,"Restore public display settings");let response=ui.add_enabled(!self.setup.applied,egui::Button::new("Add profiles, authors and public settings"));
+                        #[cfg(test)] if ui.input(|i|i.pointer.any_pressed() || i.pointer.any_released()) {eprintln!("PUBLIC RESPONSE {response:?}, pointer={:?}, clip={:?}, modal={:?}",ui.input(|i|i.pointer.interact_pos()),ui.clip_rect(),ui.ctx().memory(|m|m.top_modal_layer()));}
+                        apply=response.clicked();}else{save=ui.button("Save setup file…").clicked();}});
                     for (index,r) in file.repositories.iter().enumerate(){
                         ui.push_id(index,|ui|{ui.group(|ui|{
                             ui.label(format!("{} — previous location: {}",r.name,r.previous_path));

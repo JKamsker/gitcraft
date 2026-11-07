@@ -33,6 +33,10 @@ fn click(h: &mut egui_kittest::Harness<'_, App>, label: &str) {
     }
     h.event(egui::Event::PointerMoved(pos));
     h.step();
+    eprintln!(
+        "After hover: requested {pos:?}, current target={:?}",
+        h.get_by_label(label).rect()
+    );
     for pressed in [true, false] {
         h.event(egui::Event::PointerButton {
             pos,
