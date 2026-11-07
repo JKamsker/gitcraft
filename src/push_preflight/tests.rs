@@ -678,7 +678,10 @@ fn explicit_annotated_tag_push_works_with_detached_head() -> Result<(), String> 
     assert_eq!(plan.checkout_oid, checkout);
     assert_eq!(plan.push_oid, tag);
     execute(&f.repo, &plan, None)?;
-    assert_eq!(git::resolve(&f.receiver, "refs/tags/release")?, tag);
+    assert_eq!(
+        git::run(Some(&f.receiver), &["rev-parse", "refs/tags/release"])?.trim(),
+        tag
+    );
     assert_eq!(f.git(&["rev-parse", "HEAD"])?, checkout);
     Ok(())
 }
