@@ -229,20 +229,23 @@ mod tests {
     }
     #[cfg(unix)]
     #[test]
-    fn native_byte_paths_and_explicit_input_links_are_read_only() -> Result<(), String> {
+    fn native_labels_and_explicit_input_links_are_read_only() -> Result<(), String> {
         use std::os::unix::ffi::OsStringExt;
         let temp = crate::git::file_comparison::Scratch::new()?;
         let name = std::ffi::OsString::from_vec(b"raw\xff\nname".to_vec());
-        let path = temp.0.join(name);
+        let raw_path = temp.0.join(name);
+        assert!(label(&raw_path).contains("\\xFF") || label(&raw_path).contains("\\xff"));
+        // APFS accepts only UTF-8 filenames. Native argument/label handling is still
+        // exercised above and by cli::tests, while the filesystem fixture uses a legal name.
+        #[cfg(target_os = "macos")]
+        let path = temp.0.join("raw\nname");
+        #[cfg(not(target_os = "macos"))]
+        let path = raw_path;
         std::fs::write(&path, b"original bytes").map_err(|e| e.to_string())?;
         let link = temp.0.join("input-link");
         std::os::unix::fs::symlink(&path, &link).map_err(|e| e.to_string())?;
         let snapshot = Snapshot::read(&link, &|| true)?;
         assert_eq!(snapshot.bytes, b"original bytes");
-        assert!(
-            label(&path).contains("\\xFF")
-                || label(&path).contains("\\xFF".to_ascii_lowercase().as_str())
-        );
         assert_eq!(
             std::fs::read(&path).map_err(|e| e.to_string())?,
             snapshot.bytes

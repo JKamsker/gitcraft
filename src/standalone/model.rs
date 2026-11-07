@@ -305,7 +305,7 @@ mod tests {
         Ok(())
     }
     #[test]
-    fn file_modes_work_under_a_profile_error_without_repository_fallback() -> Result<(), String> {
+    fn file_modes_use_isolated_byte_comparison_without_repository_fallback() -> Result<(), String> {
         let (_temp, paths) = fixture(b"base\n", b"local\n", b"remote\n", None)?;
         // The byte comparator clears inherited Git configuration before invoking Git.
         (|| {
