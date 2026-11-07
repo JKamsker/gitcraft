@@ -1,8 +1,8 @@
 //! Thin wrapper over the `git` command line. Every call shells out to the installed git, so
 //! gitcraft behaves exactly like the user's own git (config, credentials, hooks).
 
-mod bundles;
 pub(crate) mod activity;
+mod bundles;
 mod clone_options;
 mod command;
 mod commits;
