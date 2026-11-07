@@ -142,8 +142,8 @@ impl Output {
         let prepared = recovery
             .dir()?
             .snapshot(candidate, &recovery.dir()?.path.join(candidate))?;
-        if let Some(original) = &self.original {
-            if !prepared
+        if let Some(original) = &self.original
+            && (!prepared
                 .access
                 .as_ref()
                 .zip(original.access.as_ref())
@@ -152,10 +152,12 @@ impl Output {
                     .stamp
                     .as_ref()
                     .zip(original.stamp.as_ref())
-                    .is_some_and(|(a, b)| a.replacement_matches(b))
-            {
-                return Err("Prepared output did not preserve the captured access policy; original unchanged".into());
-            }
+                    .is_some_and(|(a, b)| a.replacement_matches(b)))
+        {
+            return Err(
+                "Prepared output did not preserve the captured access policy; original unchanged"
+                    .into(),
+            );
         }
         // Probe before moving MERGED. Unsupported hard-link filesystems fail with
         // the original destination untouched; there is deliberately no copy fallback.
@@ -522,15 +524,15 @@ mod tests {
             let original_stamp = output.original.as_ref().ok_or("No output")?.stamp.clone();
             let mut hook_error = None;
             let result = output.save_with(b"candidate", &[], &mut |at| {
-                if at == phase {
-                    if let Err(e) = fsetxattr(
+                if at == phase
+                    && let Err(e) = fsetxattr(
                         &source,
                         "system.posix_acl_access",
                         &tightened,
                         XattrFlags::empty(),
-                    ) {
-                        hook_error = Some(e.to_string());
-                    }
+                    )
+                {
+                    hook_error = Some(e.to_string());
                 }
             });
             if let Some(e) = hook_error {
@@ -547,7 +549,7 @@ mod tests {
                 original_stamp,
                 "ACL-only edit must leave the old guarded fields identical"
             );
-            let mut bytes = vec![0; 128];
+            let mut bytes = [0; 128];
             let n = fgetxattr(&source, "system.posix_acl_access", &mut bytes[..])
                 .map_err(|e| e.to_string())?;
             assert_eq!(&bytes[..n], tightened);
@@ -600,15 +602,16 @@ mod tests {
             }
             let mut hook_error = None;
             let result = output.save_with(b"candidate", &[], &mut |phase| {
-                if late && phase == Phase::BeforeMove {
-                    if let Err(e) = fsetxattr(
+                if late
+                    && phase == Phase::BeforeMove
+                    && let Err(e) = fsetxattr(
                         &source,
                         "user.gitcraft-policy",
                         b"after",
                         XattrFlags::empty(),
-                    ) {
-                        hook_error = Some(e.to_string());
-                    }
+                    )
+                {
+                    hook_error = Some(e.to_string());
                 }
             });
             if let Some(e) = hook_error {
