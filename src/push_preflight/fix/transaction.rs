@@ -264,17 +264,17 @@ impl Hook {
         );
         std::fs::write(hook.directory.join("recovery.txt"), recovery)
             .map_err(|_| "Could not write recovery instructions")?;
-        let wrapper = script(
-            &original,
+        let wrapper = script(HookScript {
+            original: &original,
             branch,
             old,
             new,
-            &index,
-            shared.as_deref(),
-            &affected,
-            &hook.proof,
+            index: &index,
+            shared: shared.as_deref(),
+            affected: &affected,
+            proof: &hook.proof,
             needs_checkout,
-        );
+        });
         let wrapper_path = hook.directory.join("reference-transaction");
         std::fs::write(&wrapper_path, wrapper)
             .map_err(|_| "Could not write the private repair hook")?;
@@ -527,17 +527,30 @@ impl Drop for Hook {
     }
 }
 
-fn script(
-    original: &str,
-    branch: &str,
-    old: &str,
-    new: &str,
-    index: &str,
-    shared: Option<&str>,
-    affected: &[String],
-    proof: &str,
+struct HookScript<'a> {
+    original: &'a str,
+    branch: &'a str,
+    old: &'a str,
+    new: &'a str,
+    index: &'a str,
+    shared: Option<&'a str>,
+    affected: &'a [String],
+    proof: &'a str,
     needs_checkout: bool,
-) -> String {
+}
+
+fn script(args: HookScript<'_>) -> String {
+    let HookScript {
+        original,
+        branch,
+        old,
+        new,
+        index,
+        shared,
+        affected,
+        proof,
+        needs_checkout,
+    } = args;
     let original_dir = original
         .rsplit_once('/')
         .map_or(original, |(directory, _)| directory);
@@ -860,17 +873,17 @@ esac
                 let wrapper = directory.join("reference-transaction");
                 std::fs::write(
                     &wrapper,
-                    script(
-                        "/owned/original/reference-transaction",
-                        "refs/heads/main",
-                        &old,
-                        &new,
-                        &directory.join("index").to_string_lossy(),
-                        None,
-                        &["file.txt".into()],
-                        &proof,
-                        true,
-                    ),
+                    script(HookScript {
+                        original: "/owned/original/reference-transaction",
+                        branch: "refs/heads/main",
+                        old: &old,
+                        new: &new,
+                        index: &directory.join("index").to_string_lossy(),
+                        shared: None,
+                        affected: &["file.txt".into()],
+                        proof: &proof,
+                        needs_checkout: true,
+                    }),
                 )
                 .map_err(|e| e.to_string())?;
                 let run = |phase: &str| -> Result<std::process::Output, String> {
