@@ -196,6 +196,37 @@ mod tests {
         assert!(crate::audio::take_recorded().is_empty());
     }
     #[test]
+    fn first_commit_is_opt_in_confirmed_once_and_sound_is_independent_of_motion() {
+        let ctx = egui::Context::default();
+        ctx.style_mut(|style| style.animation_time = 0.0);
+        let mut tab = RepoTab::new_deferred("/nonexistent/first-celebrate".into(), &ctx);
+        let commit = vec![vec!["commit".into(), "-m".into(), "first".into()]];
+        tab.celebration_begin("Commit", &commit, &ctx);
+        assert!(tab.celebration.candidate.is_none());
+        crate::settings::Settings {
+            celebration_sound: true,
+            celebration_motion: true,
+            ..Default::default()
+        }
+        .set(&ctx);
+        crate::audio::take_recorded();
+        tab.celebration_begin("Commit", &commit, &ctx);
+        tab.celebration_done(true);
+        tab.refs.head = "root".into();
+        tab.history.push(std::sync::Arc::new(crate::git::Commit {
+            hash: "root".into(),
+            ..Default::default()
+        }));
+        tab.celebration_loaded(tab.reads + 1, &ctx);
+        assert!(tab.celebration.visible.is_none());
+        assert_eq!(
+            crate::audio::take_recorded(),
+            [crate::audio::Cue::Celebration]
+        );
+        tab.celebration_loaded(tab.reads + 2, &ctx);
+        assert!(crate::audio::take_recorded().is_empty());
+    }
+    #[test]
     fn release_requires_explicit_designation_and_confirmed_target() {
         let ctx = egui::Context::default();
         crate::settings::Settings {

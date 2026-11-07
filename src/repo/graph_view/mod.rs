@@ -62,6 +62,7 @@ impl RepoTab {
             return;
         }
         self.graph_motion.expire();
+        self.graph_motion.schedule_expiry(ui.ctx());
         self.saved_graph_header(ui);
         self.graph_walk_header(ui);
         if self.commits.is_empty() {

@@ -123,6 +123,14 @@ impl State {
         }
     }
 
+    pub(super) fn schedule_expiry(&self, ctx: &egui::Context) {
+        if let Some(started) = self.started
+            && !self.incoming.is_empty()
+        {
+            ctx.request_repaint_after(MARK.saturating_sub(started.elapsed()));
+        }
+    }
+
     pub(super) fn new_commit(&self, hash: &str) -> bool {
         self.incoming.contains(hash)
     }
