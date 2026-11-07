@@ -690,6 +690,48 @@ fn parse_credentials(out: &str) -> Option<Credentials> {
     (!password.is_empty()).then_some(Credentials { username, password })
 }
 
+/// Local repair protocol input uses the existing owned, bounded process runner.
+/// Remote mutation deliberately refuses here: the forecast remote waiter can detach.
+pub(crate) fn local_repair_input(
+    dir: &Path,
+    args: &[&str],
+    input: &[u8],
+    env: &[(&'static str, String)],
+) -> Result<std::process::Output, String> {
+    if remote::is_remote(dir) {
+        return Err("Automatic remote history repair is unavailable until owned completion can be guaranteed. Preview and reviewed push remain available.".into());
+    }
+    let mut command = repository_command(Some(dir), args)?;
+    for name in [
+        "GIT_DIR",
+        "GIT_COMMON_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_NAMESPACE",
+        "GIT_SHALLOW_FILE",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_CONFIG",
+        "GIT_CONFIG_COUNT",
+        "GIT_ATTR_SOURCE",
+    ] {
+        command.env_remove(name);
+    }
+    for (key, value) in env {
+        command.env(key, value);
+    }
+    command.args(args);
+    crate::bounded_process::run_input(
+        command,
+        Some(input.to_vec()),
+        &|| true,
+        std::time::Duration::from_secs(15),
+        1024 * 1024,
+        1024 * 1024,
+    )
+}
+
 /// Read-only, bounded background analysis transport. Cancellation never holds a newer view.
 pub(super) fn activity_bytes_with_limit(
     dir: &Path,

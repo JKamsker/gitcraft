@@ -1,17 +1,139 @@
-//! Checkout during Git's prepared reference transaction, while Git owns the target lock.
-//! No PID discovery, signals, or independent process controller is introduced here.
+//! Local-only guarded repair. Git owns HEAD and branch locks in one native transaction.
+//! Capability proof occurs in an owned scratch repository before any user-ref mutation.
 use std::path::{Path, PathBuf};
 
 use crate::{git, remote};
 
+const MAX_INDEX: u64 = 64 * 1024 * 1024;
+const NO_REMOTE: &str = "Automatic remote repair requires completion-aware ownership; no remote repair was dispatched. Preview and reviewed push remain available.";
+
 pub(super) struct Hook {
     directory: PathBuf,
     keep: bool,
+    branch: String,
+    old: String,
+    new: String,
+    proof: String,
+    capability_acknowledged: bool,
+}
+
+fn supported_version(text: &[u8]) -> bool {
+    let Some(version) = std::str::from_utf8(text)
+        .ok()
+        .and_then(|text| text.strip_prefix("git version "))
+        .and_then(|text| text.split_whitespace().next())
+    else {
+        return false;
+    };
+    let mut parts = version.split('.');
+    let parsed = (|| {
+        Some((
+            parts.next()?.parse::<u64>().ok()?,
+            parts.next()?.parse::<u64>().ok()?,
+            parts.next()?.parse::<u64>().ok()?,
+        ))
+    })();
+    parsed.is_some_and(|version| version >= (2, 50, 0))
+}
+
+fn path_line(bytes: Vec<u8>) -> Result<String, String> {
+    let text = String::from_utf8(bytes).map_err(|_| "Safe repair requires UTF-8 metadata paths")?;
+    let text = text.strip_suffix('\n').unwrap_or(&text);
+    if text.is_empty() || text.chars().any(char::is_control) {
+        return Err("Safe repair requires metadata paths without control characters".into());
+    }
+    Ok(text.to_owned())
+}
+
+fn read(repo: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
+    git::forecast_bytes(repo, args, &[], &[0], &|| true)
+}
+
+fn success(output: std::process::Output) -> Result<Vec<u8>, String> {
+    if output.status.success() {
+        Ok(output.stdout)
+    } else {
+        Err("The guarded Git repair command was refused; tool diagnostics were withheld.".into())
+    }
+}
+
+fn local(
+    repo: &Path,
+    args: &[&str],
+    input: &[u8],
+    env: &[(&'static str, String)],
+) -> Result<Vec<u8>, String> {
+    success(git::local_repair_input(repo, args, input, env)?)
+}
+
+fn owned(
+    context_repo: &Path,
+    directory: &Path,
+    args: &[&str],
+    input: &[u8],
+    env: &[(&'static str, String)],
+) -> Result<Vec<u8>, String> {
+    // Keep the originating repository's Practice-first/profile context even while Git
+    // works in an application-owned scratch directory. The second -C is absolute.
+    let directory = remote::git_path(directory);
+    let words: Vec<_> = ["-C", directory.as_str()]
+        .into_iter()
+        .chain(args.iter().copied())
+        .collect();
+    local(context_repo, &words, input, env)
+}
+
+fn transaction(branch: &str, old: &str, new: &str) -> String {
+    // symref-verify pins HEAD itself, not merely its current referent. The scratch
+    // proof uses this exact current-branch update to catch backend conflicts/deadlocks.
+    format!(
+        "start\noption no-deref\nsymref-verify HEAD {branch}\nupdate {branch} {new} {old}\nprepare\ncommit\n"
+    )
+}
+
+fn snapshot(source: &str, destination: &Path) -> Result<(), String> {
+    use std::io::Read;
+    let mut input =
+        std::fs::File::open(source).map_err(|_| "Could not snapshot the original index")?;
+    let mut bytes = Vec::new();
+    (&mut input)
+        .take(MAX_INDEX + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| "Could not read the original index")?;
+    if bytes.len() as u64 > MAX_INDEX {
+        return Err("Index recovery snapshot exceeds 64 MiB".into());
+    }
+    std::fs::write(destination, bytes)
+        .map_err(|_| "Could not save the owned index recovery snapshot".into())
 }
 
 impl Hook {
     pub(super) fn new(repo: &Path, branch: &str, old: &str, new: &str) -> Result<Self, String> {
-        let original = git::forecast_run(
+        if remote::is_remote(repo) {
+            return Err(NO_REMOTE.into());
+        }
+        if !supported_version(&read(repo, &["--version"])?) {
+            return Err("Guarded repair requires Git 2.50 or later plus a successful native HEAD/ref capability proof. No repair reference update was launched.".into());
+        }
+        let ref_format = path_line(read(repo, &["rev-parse", "--show-ref-format"])?)?;
+        let object_format = path_line(read(repo, &["rev-parse", "--show-object-format"])?)?;
+        if !matches!(ref_format.as_str(), "files" | "reftable")
+            || !matches!(object_format.as_str(), "sha1" | "sha256")
+        {
+            return Err(
+                "This Git reference/object backend cannot be proven safe for automatic repair"
+                    .into(),
+            );
+        }
+        // Refuse a symbolic branch rather than replacing its indirection with a direct ref.
+        if !git::forecast_run(repo, &["symbolic-ref", "-q", branch], &[], &[0, 1], &|| {
+            true
+        })?
+        .is_empty()
+        {
+            return Err("Automatic repair requires a direct local branch reference".into());
+        }
+        let original = path_line(read(
             repo,
             &[
                 "rev-parse",
@@ -19,33 +141,59 @@ impl Hook {
                 "--git-path",
                 "hooks/reference-transaction",
             ],
-            &[],
-            &[0],
-            &|| true,
+        )?)?;
+        let index = path_line(read(
+            repo,
+            &["rev-parse", "--path-format=absolute", "--git-path", "index"],
+        )?)?;
+        let shared = read(
+            repo,
+            &["rev-parse", "--path-format=absolute", "--shared-index-path"],
         )?;
-        let wrapper = script(original.trim_end(), branch, old, new);
-        if let Some(target) = remote::parse(repo) {
-            let output = git::forecast_remote(&target.host, remote::Request {
-                script: "umask 077; d=$(mktemp -d \"${TMPDIR:-/tmp}/gitcraft-push-ref-transaction.XXXXXXXX\") || exit 1; cat >\"$d/reference-transaction\" && chmod 700 \"$d/reference-transaction\" || exit 1; printf '%s' \"$d\"".into(),
-                stdin: Some(wrapper.into_bytes()),
-                ..Default::default()
-            }, &|| true)?;
-            let path = String::from_utf8(output.stdout).map_err(|_| "Invalid repair hook path")?;
-            if output.code != 0
-                || !path.starts_with('/')
-                || path.contains(['\n', '\r', '\0'])
-                || !path
-                    .rsplit('/')
-                    .next()
-                    .is_some_and(|name| name.starts_with("gitcraft-push-ref-transaction."))
-            {
-                return Err("Could not prepare the reference transaction hook".into());
-            }
-            return Ok(Self {
-                directory: remote::encode(&target.host, &path),
-                keep: false,
-            });
+        let shared = if shared == b"\n" || shared.is_empty() {
+            None
+        } else {
+            Some(path_line(shared)?)
+        };
+        if !Path::new(&original).is_absolute()
+            || !Path::new(&index).is_absolute()
+            || shared
+                .as_deref()
+                .is_some_and(|path| !Path::new(path).is_absolute())
+        {
+            return Err(
+                "Git did not provide absolute metadata paths; safe repair was refused".into(),
+            );
         }
+        let flags = read(repo, &["ls-files", "-v", "-z"])?;
+        if flags
+            .split(|byte| *byte == 0)
+            .filter(|entry| !entry.is_empty())
+            .any(|entry| !entry.starts_with(b"H "))
+        {
+            return Err("Clear sparse/skip-worktree/assume-unchanged index flags before automatic tree repair".into());
+        }
+        let affected = read(
+            repo,
+            &[
+                "diff-tree",
+                "--no-commit-id",
+                "--name-only",
+                "-r",
+                "-z",
+                "--no-renames",
+                old,
+                new,
+            ],
+        )?;
+        let affected: Vec<String> = affected
+            .split(|byte| *byte == 0)
+            .filter(|path| !path.is_empty())
+            .map(|path| {
+                String::from_utf8(path.to_vec())
+                    .map_err(|_| "Safe repair requires UTF-8 changed paths".to_owned())
+            })
+            .collect::<Result<_, _>>()?;
         let stamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|_| "No clock")?
@@ -62,91 +210,323 @@ impl Hook {
         }
         builder
             .create(&directory)
-            .map_err(|_| "Could not prepare the reference transaction hook")?;
-        let hook = Self {
+            .map_err(|_| "Could not create owned repair evidence")?;
+        let mut hook = Self {
             directory,
             keep: false,
+            branch: branch.into(),
+            old: old.into(),
+            new: new.into(),
+            proof: format!("{branch}\n{old}\n{new}\n"),
+            capability_acknowledged: false,
         };
-        let path = hook.directory.join("reference-transaction");
-        std::fs::write(&path, wrapper)
-            .map_err(|_| "Could not write the reference transaction hook")?;
+        snapshot(&index, &hook.directory.join("before.index"))?;
+        if let Some(shared) = &shared {
+            snapshot(shared, &hook.directory.join("before.shared-index"))?;
+        }
+        let recovery = format!(
+            "Guarded repair recovery\nBranch: {branch}\nOriginal: {old}\nRewritten: {new}\nIndex path: {index}\nShared-index dependency: {}\n\nInspect HEAD, git status, git diff and git diff --cached before recovery.\nSaved before.index and before.shared-index (when present) are owned evidence, not permission to overwrite concurrent edits.\nSave concurrent work before deliberately restoring the original tree/ref.\nAfter saving work, git reset --merge {old} may help; do not remove locks owned by another operation.\n",
+            shared.as_deref().unwrap_or("none")
+        );
+        std::fs::write(hook.directory.join("recovery.txt"), recovery)
+            .map_err(|_| "Could not write recovery instructions")?;
+        let wrapper = script(
+            &original,
+            branch,
+            old,
+            new,
+            &index,
+            shared.as_deref(),
+            &affected,
+            &hook.proof,
+        );
+        let wrapper_path = hook.directory.join("reference-transaction");
+        std::fs::write(&wrapper_path, wrapper)
+            .map_err(|_| "Could not write the private repair hook")?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))
-                .map_err(|_| "Could not protect the reference transaction hook")?;
+            std::fs::set_permissions(wrapper_path, std::fs::Permissions::from_mode(0o700))
+                .map_err(|_| "Could not protect repair hook")?;
         }
+        hook.prove(repo, &ref_format, &object_format)?;
+        // Fresh private indexes have no old working-file stat cache. Comparing through
+        // them after the original hook re-reads working content without changing the
+        // actual index. Each check uses a separate never-refreshed index snapshot.
+        hook.keep = true;
+        for (name, tree) in [
+            ("check-before.index", old),
+            ("check-after.index", new),
+            ("check-committed.index", new),
+        ] {
+            local(
+                repo,
+                &[
+                    "-c",
+                    "core.hooksPath=",
+                    "-c",
+                    "core.sparseCheckout=false",
+                    "read-tree",
+                    tree,
+                ],
+                b"",
+                &[(
+                    "GIT_INDEX_FILE",
+                    hook.directory.join(name).to_string_lossy().into_owned(),
+                )],
+            )?;
+        }
+        std::fs::write(hook.directory.join("mode"), b"repair")
+            .map_err(|_| "Could not arm local repair")?;
+        hook.keep = false;
         Ok(hook)
     }
 
-    pub(super) fn environment(&self) -> Vec<(&'static str, String)> {
-        vec![
-            ("GIT_CONFIG_COUNT", "1".into()),
-            ("GIT_CONFIG_KEY_0", "core.hooksPath".into()),
-            ("GIT_CONFIG_VALUE_0", remote::git_path(&self.directory)),
-        ]
+    fn prove(&mut self, repo: &Path, refs: &str, objects: &str) -> Result<(), String> {
+        let probe = self.directory.join("capability.git");
+        let format = format!("--object-format={objects}");
+        let refs = format!("--ref-format={refs}");
+        // Every subprocess uses the existing owned bounded runner. If completion is
+        // uncertain even for a scratch request, retain its directory rather than racing it.
+        self.keep = true;
+        owned(
+            repo,
+            &self.directory,
+            &[
+                "-c",
+                "core.hooksPath=",
+                "init",
+                "--bare",
+                "--template=",
+                &format,
+                &refs,
+                &probe.to_string_lossy(),
+            ],
+            b"",
+            &[],
+        )?;
+        let blob = self.directory.join("empty-tree");
+        std::fs::write(&blob, b"").map_err(|_| "Could not write capability input")?;
+        let tree = path_line(owned(
+            repo,
+            &probe,
+            &[
+                "-c",
+                "core.hooksPath=",
+                "hash-object",
+                "-w",
+                "--no-filters",
+                "-t",
+                "tree",
+                "--",
+                &blob.to_string_lossy(),
+            ],
+            b"",
+            &[],
+        )?)?;
+        let metadata = vec![
+            ("GIT_AUTHOR_NAME", "Gitcraft capability".into()),
+            ("GIT_AUTHOR_EMAIL", "probe@example.invalid".into()),
+            ("GIT_COMMITTER_NAME", "Gitcraft capability".into()),
+            ("GIT_COMMITTER_EMAIL", "probe@example.invalid".into()),
+        ];
+        let commit = |message: &str| -> Result<String, String> {
+            path_line(owned(
+                repo,
+                &probe,
+                &[
+                    "-c",
+                    "core.hooksPath=",
+                    "commit-tree",
+                    "--no-gpg-sign",
+                    &tree,
+                    "-m",
+                    message,
+                ],
+                b"",
+                &metadata,
+            )?)
+        };
+        let old = commit("Before capability proof")?;
+        let new = commit("After capability proof")?;
+        let branch = "refs/heads/gitcraft-capability";
+        owned(
+            repo,
+            &probe,
+            &["-c", "core.hooksPath=", "symbolic-ref", "HEAD", branch],
+            b"",
+            &[],
+        )?;
+        owned(
+            repo,
+            &probe,
+            &["-c", "core.hooksPath=", "update-ref", branch, &old],
+            b"",
+            &[],
+        )?;
+        std::fs::write(self.directory.join("mode"), b"probe")
+            .map_err(|_| "Could not arm capability proof")?;
+        let hooks = format!("core.hooksPath={}", remote::git_path(&self.directory));
+        let command_probe = self.directory.join("gitcraft-capability");
+        std::fs::write(&command_probe, "#!/bin/sh\ndirectory=$(dirname \"$0\")\ncat >\"$directory/hook-command.stdin\" || exit 1\nprintf 'probe\\n' >\"$directory/hook-command.ok\"\n")
+            .map_err(|_| "Could not write owned hook-command proof")?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&command_probe, std::fs::Permissions::from_mode(0o700))
+                .map_err(|_| "Could not protect owned capability hook")?;
+        }
+        let hook_input = self.directory.join("hook-input");
+        std::fs::write(&hook_input, b"owned capability input\n")
+            .map_err(|_| "Could not prepare hook stdin proof")?;
+        let input_arg = format!("--to-stdin={}", hook_input.to_string_lossy());
+        owned(
+            repo,
+            &probe,
+            &[
+                "-c",
+                &hooks,
+                "hook",
+                "run",
+                "--ignore-missing",
+                &input_arg,
+                "gitcraft-capability",
+            ],
+            b"",
+            &[],
+        )?;
+        if !ack(&self.directory, "hook-command", b"probe\n")
+            || std::fs::read(self.directory.join("hook-command.stdin"))
+                .ok()
+                .as_deref()
+                != Some(&b"owned capability input\n"[..])
+        {
+            return Err("Git did not prove original-hook command/stdin support; no user update was launched".into());
+        }
+        let result = owned(
+            repo,
+            &probe,
+            &["-c", &hooks, "update-ref", "--stdin"],
+            transaction(branch, old.trim(), new.trim()).as_bytes(),
+            &[],
+        );
+        if result.is_err()
+            || !ack(&self.directory, "probe-prepared", b"probe\n")
+            || !ack(&self.directory, "probe-committed", b"probe\n")
+        {
+            return Err("This Git/backend did not prove private hook selection and an atomic current-HEAD/branch update. No user reference update was launched.".into());
+        }
+        let expected_update = format!("{} {} {branch}\n", old.trim(), new.trim());
+        let recorded = std::fs::read(self.directory.join("probe-updates-prepared"))
+            .map_err(|_| "Missing native transaction input proof")?;
+        if !recorded
+            .split_inclusive(|byte| *byte == b'\n')
+            .any(|line| line == expected_update.as_bytes())
+            || path_line(owned(repo, &probe, &["symbolic-ref", "HEAD"], b"", &[])?)? != branch
+            || path_line(owned(
+                repo,
+                &probe,
+                &["rev-parse", "--verify", "HEAD"],
+                b"",
+                &[],
+            )?)? != new.trim()
+        {
+            return Err("The native HEAD/branch transaction result was not proven; no user update was launched".into());
+        }
+        self.capability_acknowledged = true;
+        self.keep = false;
+        Ok(())
     }
 
-    /// Preserve owned evidence after any checkout attempt. Never restore over edits made
-    /// concurrently; an interrupted transaction needs an explicit recovery decision.
-    pub(super) fn recovery(&mut self) -> Option<String> {
-        let attempted = if let Some(target) = remote::parse(&self.directory) {
-            git::forecast_remote(
-                &target.host,
-                remote::Request {
-                    script: format!(
-                        "test -f {}/checkout-attempted",
-                        remote::sh_path(&target.path)
-                    ),
-                    ..Default::default()
-                },
-                &|| true,
-            )
-            .map(|output| output.code != 1)
-            .unwrap_or(true)
-        } else {
-            self.directory
-                .join("checkout-attempted")
-                .try_exists()
-                .unwrap_or(true)
-        };
-        self.keep = attempted;
-        attempted.then(|| remote::git_path(&self.directory))
+    pub(super) fn execute(mut self, repo: &Path) -> Result<(), String> {
+        if remote::is_remote(repo) {
+            return Err(NO_REMOTE.into());
+        }
+        if !self.capability_acknowledged {
+            return Err(
+                "No native checkout/ref capability acknowledgement; repair refused before dispatch"
+                    .into(),
+            );
+        }
+        // From dispatch onward, uncertainty ALWAYS retains the wrapper/evidence. Marker
+        // absence is never completion proof; no remote request is ever dispatched here.
+        self.keep = true;
+        let hooks = format!("core.hooksPath={}", remote::git_path(&self.directory));
+        let result = local(
+            repo,
+            &[
+                "-c",
+                &hooks,
+                "update-ref",
+                "-m",
+                "gitcraft push preflight fix",
+                "--stdin",
+            ],
+            transaction(&self.branch, &self.old, &self.new).as_bytes(),
+            &[],
+        );
+        let completed = result.is_ok()
+            && ["prepared", "checkout", "committed"]
+                .into_iter()
+                .all(|phase| ack(&self.directory, phase, self.proof.as_bytes()));
+        if !completed {
+            return Err(format!(
+                "The local repair did not establish complete owned acknowledgement. Preserve concurrent edits; inspect recovery.txt and saved index/dependency in {}. No automatic rollback overwrote later work.",
+                self.directory.display()
+            ));
+        }
+        self.keep = false;
+        Ok(())
     }
+}
+
+fn ack(directory: &Path, phase: &str, expected: &[u8]) -> bool {
+    std::fs::read(directory.join(format!("{phase}.ok"))).is_ok_and(|bytes| bytes == expected)
 }
 
 impl Drop for Hook {
     fn drop(&mut self) {
-        if self.keep {
-            return;
-        }
-        if let Some(target) = remote::parse(&self.directory) {
-            crate::connections::spawn(move || {
-                let _ = git::forecast_remote(
-                    &target.host,
-                    remote::Request {
-                        script: format!("rm -rf -- {}", remote::sh_path(&target.path)),
-                        ..Default::default()
-                    },
-                    &|| true,
-                );
-            });
-        } else {
+        if !self.keep {
             let _ = std::fs::remove_dir_all(&self.directory);
         }
     }
 }
 
-fn script(original: &str, branch: &str, old: &str, new: &str) -> String {
+fn script(
+    original: &str,
+    branch: &str,
+    old: &str,
+    new: &str,
+    index: &str,
+    shared: Option<&str>,
+    affected: &[String],
+    proof: &str,
+) -> String {
     let original_dir = original
         .rsplit_once('/')
         .map_or(original, |(directory, _)| directory);
-    let recovery = format!(
-        "Push repair recovery evidence\nReference: {branch}\nOriginal object: {old}\nRewritten object: {new}\n\nA checkout was attempted while Git held the reference transaction lock.\nInspect HEAD, git status, git diff and git diff --cached before recovery.\nThe original index is saved as before.index; do not copy it over newer work.\nSave any concurrent edits before deliberately restoring the original object.\nAfter preserving new work, git reset --merge {old} is a possible recovery.\nGit may also have left a lock after interruption; do not remove another process's lock.\n"
-    );
+    let paths = affected
+        .iter()
+        .map(|path| remote::sh_quote(path))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let shared_check = shared
+        .map(|path| {
+            format!(
+                "cmp -s -- {} \"$directory/before.shared-index\" || exit 1\n",
+                remote::sh_quote(path)
+            )
+        })
+        .unwrap_or_default();
     let payload = format!(
         r#"case "$1" in prepared|committed|aborted) ;; *) exit 1 ;; esac
 directory=$(dirname "$0")
+command -v cmp >/dev/null && command -v cp >/dev/null || exit 1
+if [ "$(cat "$directory/mode")" = probe ]; then
+    cat >"$directory/probe-updates-$1" || exit 1
+    printf 'probe\n' >"$directory/probe-$1.ok" || exit 1
+    exit 0
+fi
 updates="$directory/updates-$1"
 cat >"$updates" || exit 1
 if [ "$1" = prepared ]; then
@@ -159,109 +539,249 @@ if [ "$1" = prepared ]; then
         fi
     done <"$updates"
     [ "$matched" = 1 ] || exit 1
-    index=$(git rev-parse --path-format=absolute --git-path index) || exit 1
-    cp -- "$index" "$directory/before.index" || exit 1
-    printf '%s' {recovery} >"$directory/recovery.txt" || exit 1
-    printf '%s\n' attempted >"$directory/checkout-attempted" || exit 1
-    git read-tree -u -m {old} {new} || {{ printf '%s\n' checkout-failed >"$directory/phase"; exit 1; }}
-    printf '%s\n' prepared >"$directory/phase"
+    [ "$(git symbolic-ref -q HEAD)" = {branch} ] || exit 1
+    [ "$(git rev-parse --verify HEAD)" = {old} ] || exit 1
+    cmp -s -- {index} "$directory/before.index" || exit 1
+    {shared_check}
+    GIT_INDEX_FILE="$directory/check-before.index" git -c core.fsmonitor=false -c core.trustctime=true -c core.ignoreStat=false diff-files --quiet --no-ext-diff --no-textconv --ignore-submodules=none -- || exit 1
+    git --literal-pathspecs -c core.fsmonitor=false status --porcelain=v1 -z --untracked-files=all --ignored=matching -- {paths} >"$directory/affected-status" || exit 1
+    [ ! -s "$directory/affected-status" ] || exit 1
+    printf '%s' {proof} >"$directory/prepared.ok" || exit 1
+    printf 'attempted\n' >"$directory/checkout-attempted" || exit 1
+    git -c core.fsmonitor=false read-tree -u -m {old} {new} || exit 1
+    [ "$(git symbolic-ref -q HEAD)" = {branch} ] || exit 1
+    [ "$(git rev-parse --verify HEAD)" = {old} ] || exit 1
+    git -c core.fsmonitor=false diff-index --cached --quiet --no-ext-diff --no-textconv {new} -- || exit 1
+    GIT_INDEX_FILE="$directory/check-after.index" git -c core.fsmonitor=false -c core.trustctime=true -c core.ignoreStat=false diff-files --quiet --no-ext-diff --no-textconv --ignore-submodules=none -- || exit 1
+    printf '%s' {proof} >"$directory/checkout.ok" || exit 1
+elif [ "$1" = committed ]; then
+    git hook run --ignore-missing --to-stdin="$updates" reference-transaction -- "$@" || exit $?
+    [ "$(git symbolic-ref -q HEAD)" = {branch} ] || exit 1
+    [ "$(git rev-parse --verify HEAD)" = {new} ] || exit 1
+    git -c core.fsmonitor=false diff-index --cached --quiet --no-ext-diff --no-textconv {new} -- || exit 1
+    GIT_INDEX_FILE="$directory/check-committed.index" git -c core.fsmonitor=false -c core.trustctime=true -c core.ignoreStat=false diff-files --quiet --no-ext-diff --no-textconv --ignore-submodules=none -- || exit 1
+    printf '%s' {proof} >"$directory/committed.ok" || exit 1
 else
-    printf '%s\n' "$1" >"$directory/phase"
     git hook run --ignore-missing --to-stdin="$updates" reference-transaction -- "$@"
 fi
 "#,
         branch = remote::sh_quote(branch),
         old = remote::sh_quote(old),
         new = remote::sh_quote(new),
-        recovery = remote::sh_quote(&recovery)
+        index = remote::sh_quote(index),
+        proof = remote::sh_quote(proof)
     );
-    // As with the pre-push relay, nested Git calls and the original hook retain the
-    // original hooksPath. The outer update-ref alone selects this private wrapper.
+    // The outer command's sole -c selects this wrapper. Remove that inherited parameter
+    // before relaying the original hook; preserve the actual profile's remaining config.
     format!(
-        "#!/bin/sh\numask 077\nn=${{GIT_CONFIG_COUNT:-0}}\nexec env \"GIT_CONFIG_KEY_${{n}}=core.hooksPath\" \"GIT_CONFIG_VALUE_${{n}}=\"{} \"GIT_CONFIG_COUNT=$((n+1))\" sh -c {} \"$0\" \"$@\"\n",
+        "#!/bin/sh\numask 077\nunset GIT_CONFIG_PARAMETERS\nexec env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0={} sh -c {} \"$0\" \"$@\"\n",
         remote::sh_quote(original_dir),
         remote::sh_quote(&payload)
     )
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
-    use std::os::unix::fs::PermissionsExt;
-    use std::process::{Command, Stdio};
-
-    /// Recording-only protocol fixture: Git is a supplied recorder, no real repository,
-    /// ref transaction, process snapshot search, signal or network operation is used.
     #[test]
-    fn prepared_hook_recordings_gate_checkout_and_preserve_recovery_evidence() -> Result<(), String>
-    {
+    fn synthetic_capability_versions_refuse_before_user_dispatch() {
+        for text in [
+            "git version 2.28.0",
+            "git version 2.40.1",
+            "git version 2.49.9",
+            "unknown",
+            "git version 2.50.GIT",
+        ] {
+            let mut dispatched = false;
+            if supported_version(text.as_bytes()) {
+                dispatched = true;
+            }
+            assert!(!dispatched);
+        }
+        assert!(supported_version(b"git version 2.50.0.windows.1\n"));
+        assert!(supported_version(b"git version 3.0.0\n"));
+        assert!(!transaction("refs/heads/main", "old", "new").contains("HEAD.lock"));
+        assert!(
+            transaction("refs/heads/main", "old", "new")
+                .contains("symref-verify HEAD refs/heads/main")
+        );
+    }
+
+    #[test]
+    fn missing_backend_acknowledgement_cannot_qualify_user_dispatch() -> Result<(), String> {
+        let directory =
+            std::env::temp_dir().join(format!("gitcraft-ack-recording-{}", std::process::id()));
+        std::fs::create_dir(&directory).map_err(|e| e.to_string())?;
+        let mut dispatched = false;
+        if ack(&directory, "probe-prepared", b"probe\n")
+            && ack(&directory, "probe-committed", b"probe\n")
+        {
+            dispatched = true;
+        }
+        assert!(!dispatched); // a backend that ignored the hook cannot pass
+        std::fs::write(directory.join("probe-prepared.ok"), b"probe\n")
+            .map_err(|e| e.to_string())?;
+        assert!(!ack(&directory, "probe-committed", b"probe\n"));
+        let _ = std::fs::remove_dir_all(directory);
+        Ok(())
+    }
+
+    #[test]
+    fn synthetic_uncertain_lifecycle_always_retains_owned_evidence() -> Result<(), String> {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| e.to_string())?
+            .as_nanos();
+        for state in [
+            "queued",
+            "timeout-before-prepared",
+            "timeout-before-checkout",
+            "timeout-after-checkout",
+        ] {
+            let directory = std::env::temp_dir().join(format!(
+                "gitcraft-owned-evidence-{}-{stamp}-{state}",
+                std::process::id()
+            ));
+            std::fs::create_dir(&directory).map_err(|e| e.to_string())?;
+            if state == "timeout-after-checkout" {
+                std::fs::write(directory.join("checkout-attempted"), b"owned")
+                    .map_err(|e| e.to_string())?;
+            }
+            let hook = Hook {
+                directory: directory.clone(),
+                keep: true,
+                branch: "refs/heads/main".into(),
+                old: "1".repeat(40),
+                new: "2".repeat(40),
+                proof: "owned".into(),
+                capability_acknowledged: false,
+            };
+            drop(hook);
+            assert!(
+                directory.exists(),
+                "An uncertain {state} must never trigger cleanup"
+            );
+            std::fs::remove_dir_all(directory).map_err(|e| e.to_string())?;
+        }
+        // Actual production constructors refuse a remote location before even probing Git.
+        for state in [
+            "queued",
+            "before-prepared",
+            "marker-observed",
+            "after-checkout",
+        ] {
+            let refused = Hook::new(
+                Path::new("ssh://fixture/home/repository"),
+                "refs/heads/main",
+                "old",
+                "new",
+            )
+            .err();
+            assert!(
+                refused.is_some_and(|error| error.contains("no remote repair was dispatched")),
+                "{state}"
+            );
+        }
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn recording_hook_changes_are_refused_before_checkout_and_keep_external_bytes()
+    -> Result<(), String> {
+        use std::io::Write;
+        use std::os::unix::fs::PermissionsExt;
+        use std::process::{Command, Stdio};
         let stamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|e| e.to_string())?
             .as_nanos();
         let root = std::env::temp_dir().join(format!(
-            "gitcraft-ref-recording-{}-{stamp}",
+            "gitcraft-hook-recording-{}-{stamp}",
             std::process::id()
         ));
         std::fs::create_dir(&root).map_err(|e| e.to_string())?;
         let result = (|| {
             let bin = root.join("bin");
             std::fs::create_dir(&bin).map_err(|e| e.to_string())?;
-            let index = root.join("recorded-index");
-            std::fs::write(&index, "original-index").map_err(|e| e.to_string())?;
-            let recorder = bin.join("git");
-            std::fs::write(&recorder, r#"#!/bin/sh
-printf '%s\n' "$*" >>"$RECORDING_LOG"
+            let fake = bin.join("git");
+            std::fs::write(&fake, r#"#!/bin/sh
+while :; do case "$1" in -c) shift 2 ;; --literal-pathspecs) shift ;; *) break ;; esac; done
+printf '%s\n' "$*" >>"$REC_DIRECTORY/commands"
 case "$1" in
-    hook)
-        input=
-        for arg in "$@"; do case "$arg" in --to-stdin=*) input=${arg#--to-stdin=} ;; esac; phase=$arg; done
-        "$RECORDING_ORIGINAL" "$phase" <"$input"
-        ;;
-    rev-parse) printf '%s\n' "$RECORDING_INDEX" ;;
-    read-tree) [ "$RECORDING_FAIL_CHECKOUT" != yes ] ;;
-    *) exit 91 ;;
+hook)
+    input=
+    for arg in "$@"; do case "$arg" in --to-stdin=*) input=${arg#--to-stdin=} ;; esac; phase=$arg; done
+    cat "$input" >"$REC_DIRECTORY/original-input-$phase"
+    [ "$REC_SCENARIO" != unsupported-hook-command ] || exit 92
+    [ "$REC_SCENARIO" != veto ] || exit 1
+    if [ "$phase" = prepared ]; then
+        case "$REC_SCENARIO" in
+        head-other) printf '%s\n' refs/heads/other >"$REC_DIRECTORY/head" ;;
+        detached) : >"$REC_DIRECTORY/head" ;;
+        index-changed) printf 'external-index' >"$REC_DIRECTORY/index" ;;
+        work-changed) printf 'external-work' >"$REC_DIRECTORY/work" ;;
+        esac
+    fi
+    ;;
+symbolic-ref) [ -s "$REC_DIRECTORY/head" ] || exit 1; cat "$REC_DIRECTORY/head" ;;
+rev-parse) cat "$REC_DIRECTORY/oid" ;;
+diff-files) [ "$REC_SCENARIO" != work-changed ] ;;
+diff-index|status) exit 0 ;;
+read-tree) printf 'checkout\n' >>"$REC_DIRECTORY/checkout-record" ;;
+*) exit 91 ;;
 esac
-"#).map_err(|e| e.to_string())?;
-            std::fs::set_permissions(&recorder, std::fs::Permissions::from_mode(0o700))
-                .map_err(|e| e.to_string())?;
-            let original = root.join("original-hook");
-            std::fs::write(&original, "#!/bin/sh\nprintf '%s\\n' \"original:$1\" >>\"$RECORDING_LOG\"\ncat >\"$RECORDING_ORIGINAL_INPUT\"\n[ \"$RECORDING_VETO\" != yes ]\n").map_err(|e|e.to_string())?;
-            std::fs::set_permissions(&original, std::fs::Permissions::from_mode(0o700))
+"#).map_err(|e|e.to_string())?;
+            std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o700))
                 .map_err(|e| e.to_string())?;
             let old = "1".repeat(40);
             let new = "2".repeat(40);
+            let proof = format!("refs/heads/main\n{old}\n{new}\n");
             let updates = format!("{old} {new} refs/heads/main\n");
-            for (mode, veto, fail, should_attempt) in [
-                ("veto", "yes", "no", false),
-                ("checkout-error", "no", "yes", true),
-                ("prepared", "no", "no", true),
-                ("commit-failed", "no", "no", true),
+            for scenario in [
+                "unsupported-hook-command",
+                "veto",
+                "head-other",
+                "detached",
+                "index-changed",
+                "work-changed",
+                "unchanged",
             ] {
-                let directory = root.join(mode);
+                let directory = root.join(scenario);
                 std::fs::create_dir(&directory).map_err(|e| e.to_string())?;
+                for (name, value) in [
+                    ("mode", "repair"),
+                    ("index", "original-index"),
+                    ("before.index", "original-index"),
+                    ("work", "original-work"),
+                    ("head", "refs/heads/main\n"),
+                    ("oid", old.as_str()),
+                ] {
+                    std::fs::write(directory.join(name), value).map_err(|e| e.to_string())?;
+                }
                 let wrapper = directory.join("reference-transaction");
                 std::fs::write(
                     &wrapper,
-                    script(&original.to_string_lossy(), "refs/heads/main", &old, &new),
+                    script(
+                        "/owned/original/reference-transaction",
+                        "refs/heads/main",
+                        &old,
+                        &new,
+                        &directory.join("index").to_string_lossy(),
+                        None,
+                        &["file.txt".into()],
+                        &proof,
+                    ),
                 )
                 .map_err(|e| e.to_string())?;
-                let log = directory.join("commands");
-                let input = directory.join("original-input");
-                let run_phase = |phase: &str| -> Result<std::process::Output, String> {
+                let run = |phase: &str| -> Result<std::process::Output, String> {
                     let mut command = Command::new("sh");
                     command
                         .arg(&wrapper)
                         .arg(phase)
                         .env("PATH", format!("{}:/usr/bin:/bin", bin.display()))
-                        .env("GIT_CONFIG_COUNT", "0")
-                        .env("RECORDING_ORIGINAL", &original)
-                        .env("RECORDING_LOG", &log)
-                        .env("RECORDING_INDEX", &index)
-                        .env("RECORDING_ORIGINAL_INPUT", &input)
-                        .env("RECORDING_VETO", veto)
-                        .env("RECORDING_FAIL_CHECKOUT", fail)
+                        .env("REC_SCENARIO", scenario)
+                        .env("REC_DIRECTORY", &directory)
                         .stdin(Stdio::piped())
                         .stdout(Stdio::piped())
                         .stderr(Stdio::piped());
@@ -274,62 +794,49 @@ esac
                         .map_err(|e| e.to_string())?;
                     child.wait_with_output().map_err(|e| e.to_string())
                 };
-                let output = run_phase("prepared")?;
+                let output = run("prepared")?;
                 assert_eq!(
                     output.status.success(),
-                    matches!(mode, "prepared" | "commit-failed")
-                );
-                let final_phase = if mode == "prepared" {
-                    "committed"
-                } else {
-                    "aborted"
-                };
-                let _ = run_phase(final_phase)?;
-                assert_eq!(
-                    std::fs::read_to_string(directory.join("phase"))
-                        .map_err(|e| e.to_string())?
-                        .trim(),
-                    final_phase
-                );
-                let commands = std::fs::read_to_string(&log).map_err(|e| e.to_string())?;
-                assert!(commands.lines().any(|line| line == "original:prepared"));
-                assert!(
-                    commands.find("original:prepared").unwrap_or(usize::MAX)
-                        < commands.find("rev-parse").unwrap_or(usize::MAX)
-                        || !should_attempt
+                    scenario == "unchanged",
+                    "{scenario}"
                 );
                 assert_eq!(
-                    commands
-                        .lines()
-                        .filter(|line| line.starts_with("read-tree "))
-                        .count(),
-                    usize::from(should_attempt)
-                );
-                assert!(commands.contains(&format!("original:{final_phase}")));
-                assert_eq!(
-                    directory.join("checkout-attempted").exists(),
-                    should_attempt
+                    directory.join("checkout-record").exists(),
+                    scenario == "unchanged",
+                    "{scenario}"
                 );
                 assert_eq!(
-                    std::fs::read_to_string(&input).map_err(|e| e.to_string())?,
+                    std::fs::read_to_string(directory.join("index")).map_err(|e| e.to_string())?,
+                    if scenario == "index-changed" {
+                        "external-index"
+                    } else {
+                        "original-index"
+                    }
+                );
+                assert_eq!(
+                    std::fs::read_to_string(directory.join("work")).map_err(|e| e.to_string())?,
+                    if scenario == "work-changed" {
+                        "external-work"
+                    } else {
+                        "original-work"
+                    }
+                );
+                assert_eq!(
+                    std::fs::read_to_string(directory.join("original-input-prepared"))
+                        .map_err(|e| e.to_string())?,
                     updates
                 );
-                if should_attempt {
-                    assert_eq!(
-                        std::fs::read_to_string(directory.join("before.index"))
-                            .map_err(|e| e.to_string())?,
-                        "original-index"
-                    );
+                if scenario == "unchanged" {
                     assert!(
-                        std::fs::read_to_string(directory.join("recovery.txt"))
-                            .map_err(|e| e.to_string())?
-                            .contains(&old)
+                        ack(&directory, "prepared", proof.as_bytes())
+                            && ack(&directory, "checkout", proof.as_bytes())
                     );
+                    std::fs::write(directory.join("oid"), &new).map_err(|e| e.to_string())?;
+                    assert!(run("committed")?.status.success());
+                    assert!(ack(&directory, "committed", proof.as_bytes()));
+                } else {
+                    assert!(!ack(&directory, "checkout", proof.as_bytes()));
                 }
-                assert_eq!(
-                    std::fs::read_to_string(&index).map_err(|e| e.to_string())?,
-                    "original-index"
-                );
             }
             Ok(())
         })();

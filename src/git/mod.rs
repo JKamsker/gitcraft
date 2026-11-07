@@ -169,3 +169,6 @@ pub fn now() -> i64 {
 
 #[cfg(test)]
 mod tests;
+
+// Bounded local-only stdin transport for the guarded repair transaction.
+pub(crate) use command::local_repair_input;

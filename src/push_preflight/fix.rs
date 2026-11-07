@@ -55,6 +55,11 @@ impl Drop for Files {
 }
 
 pub(crate) fn fix(repo: &Path, plan: &Plan, kind: &str) -> Result<String, String> {
+    // INTERIM fail-closed limitation: no remote repair request may survive its caller's
+    // timeout. Read-only preview and reviewed pushes use their existing paths.
+    if crate::remote::is_remote(repo) {
+        return Err("Automatic remote history repair is temporarily unavailable: this transport cannot prove owned completion. Preview and reviewed push remain available; perform an explicitly supervised repair on the repository host instead.".into());
+    }
     check(repo, plan)?;
     if plan.branch != plan.checkout || !plan.branch.starts_with("refs/heads/") {
         return Err(
@@ -307,28 +312,7 @@ pub(crate) fn fix(repo: &Path, plan: &Plan, kind: &str) -> Result<String, String
     let after_tree = read(repo, &["rev-parse", &format!("{new}^{{tree}}")], &|| true)?;
     if before_tree != after_tree {
         let mut hook = transaction::Hook::new(repo, &plan.branch, &plan.head, new)?;
-        let result = git::forecast_run(
-            repo,
-            &[
-                "update-ref",
-                "-m",
-                "gitcraft push preflight fix",
-                &plan.branch,
-                new,
-                &plan.head,
-            ],
-            &hook.environment(),
-            &[0],
-            &|| true,
-        );
-        if result.is_err() {
-            if let Some(evidence) = hook.recovery() {
-                return Err(format!(
-                    "The repair was interrupted and checkout may have started. An owned recovery directory is retained at {evidence} on the repository host, with the original index and old/new object IDs when checkout was attempted. Save concurrent edits and inspect recovery.txt before restoring anything; no automatic rollback overwrote them."
-                ));
-            }
-            return Err("The repair reference transaction was refused before checkout. The index and working files were not changed by the repair.".into());
-        }
+        hook.execute(repo)?;
     } else {
         git::run(
             Some(repo),
