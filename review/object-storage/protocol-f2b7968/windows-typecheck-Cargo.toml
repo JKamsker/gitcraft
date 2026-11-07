@@ -1,0 +1,8 @@
+[package]
+name="object-storage-windows-check"
+version="0.0.0"
+edition="2024"
+[lib]
+path="/workspace/work/object-storage-windows-typecheck.rs"
+[dependencies]
+winapi-util="=0.1.11"
