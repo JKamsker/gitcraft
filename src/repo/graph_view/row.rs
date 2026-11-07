@@ -73,8 +73,19 @@ impl RepoTab {
         // Known by its commit, not its place: rows shift when a reload adds commits or the
         // changes row above them, and a menu opened on one must stay that commit's.
         let resp = ui.interact(rect, row_id(ui, &commit.hash), Sense::click());
-        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::SelectableLabel, true,
-            format!("Commit {}, {}, by {}. {}", commit.hash.get(..8).unwrap_or(&commit.hash), commit.summary, commit.author, self.graph_description(i))));
+        resp.widget_info(|| {
+            egui::WidgetInfo::labeled(
+                egui::WidgetType::SelectableLabel,
+                true,
+                format!(
+                    "Commit {}, {}, by {}. {}",
+                    commit.hash.get(..8).unwrap_or(&commit.hash),
+                    commit.summary,
+                    commit.author,
+                    self.graph_description(i)
+                ),
+            )
+        });
         let painter = ui.painter_at(rect);
         let mut hovered_message = None;
         let is_wip = commit.hash == WIP_HASH;
@@ -92,7 +103,13 @@ impl RepoTab {
         if self.graph_motion.new_commit(&commit.hash) {
             let fade = self.graph_motion.highlight(ui.ctx());
             painter.rect_filled(rect, 0.0, t.accent.gamma_multiply(fade));
-            painter.text(rect.right_top(), Align2::RIGHT_TOP, "new", FontId::proportional(9.0), t.accent);
+            painter.text(
+                rect.right_top(),
+                Align2::RIGHT_TOP,
+                "new",
+                FontId::proportional(9.0),
+                t.accent,
+            );
         }
 
         let gx = rect.left() + cols.refs;

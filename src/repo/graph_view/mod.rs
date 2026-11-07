@@ -111,7 +111,11 @@ impl RepoTab {
             let offset = ui.data(|d| d.get_temp::<f32>(offset_id)).unwrap_or(0.0);
             if top < offset || top + ROW_PITCH > offset + view_h {
                 let target = (top - view_h / 2.0).max(0.0);
-                scroll = scroll.vertical_scroll_offset(self.graph_motion.start_scroll(offset, target, ui.ctx()));
+                scroll = scroll.vertical_scroll_offset(self.graph_motion.start_scroll(
+                    offset,
+                    target,
+                    ui.ctx(),
+                ));
             }
         }
 
@@ -210,8 +214,14 @@ impl RepoTab {
         for (&raw, &id) in &mounted {
             ui.ctx().accesskit_node_builder(id, |node| {
                 node.set_description(self.graph_description(raw));
-                let parents: Vec<_> = self.topology.parents.get(raw).into_iter().flatten()
-                    .filter_map(|parent| mounted.get(parent).map(egui::Id::accesskit_id)).collect();
+                let parents: Vec<_> = self
+                    .topology
+                    .parents
+                    .get(raw)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|parent| mounted.get(parent).map(egui::Id::accesskit_id))
+                    .collect();
                 node.set_flow_to(parents);
             });
         }
@@ -227,14 +237,23 @@ impl RepoTab {
         if Settings::get(ui.ctx()).graph_lane_walk {
             let direction = ui.input(|i| {
                 use crate::repo::graph_walk::Direction;
-                if i.key_pressed(Key::ArrowDown) { Some(Direction::Parent) }
-                else if i.key_pressed(Key::ArrowUp) { Some(Direction::Child) }
-                else if i.key_pressed(Key::ArrowRight) { Some(Direction::Merge) }
-                else if i.key_pressed(Key::ArrowLeft) { Some(Direction::Tip) }
-                else { None }
+                if i.key_pressed(Key::ArrowDown) {
+                    Some(Direction::Parent)
+                } else if i.key_pressed(Key::ArrowUp) {
+                    Some(Direction::Child)
+                } else if i.key_pressed(Key::ArrowRight) {
+                    Some(Direction::Merge)
+                } else if i.key_pressed(Key::ArrowLeft) {
+                    Some(Direction::Tip)
+                } else {
+                    None
+                }
             });
-            if let Some(direction) = direction && let Some(next) = self.graph_walk(direction, ui.ctx()) {
-                acts.push(Action::Select(next)); self.scroll_to = Some(next);
+            if let Some(direction) = direction
+                && let Some(next) = self.graph_walk(direction, ui.ctx())
+            {
+                acts.push(Action::Select(next));
+                self.scroll_to = Some(next);
             }
             return;
         }

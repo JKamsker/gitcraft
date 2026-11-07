@@ -22,8 +22,8 @@ mod file_text;
 mod file_view;
 mod gerrit;
 mod graph_motion;
-mod graph_walk;
 pub(crate) mod graph_view;
+mod graph_walk;
 pub(crate) mod highlight;
 mod keep_submodules;
 pub(crate) mod keyboard;
@@ -49,6 +49,7 @@ mod sidebar;
 mod sparse;
 mod ssh_setup;
 mod state;
+mod system_motion;
 mod terminals;
 #[cfg(test)]
 mod tests;

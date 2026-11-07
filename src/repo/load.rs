@@ -584,7 +584,10 @@ impl RepoTab {
             .collect();
         let old_graph = std::mem::replace(&mut self.graph, graph);
         let old_index = std::mem::replace(&mut self.index, index);
-        self.topology = Arc::new(super::graph_walk::Topology::build(&self.commits, &self.index));
+        self.topology = Arc::new(super::graph_walk::Topology::build(
+            &self.commits,
+            &self.index,
+        ));
         self.graph_narration = Default::default();
         self.rebuild_graph_labels();
         // Freeing tens of thousands of commits (those a reload replaced), rows and index entries

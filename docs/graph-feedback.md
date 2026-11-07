@@ -12,6 +12,10 @@ with the same name cannot borrow each other's movement. Saved Views keep raw com
 while transitions use projected positions. Graph navigation scrolls into view over 350 ms;
 manual scrolling or a pointer press cancels it. Disabling animation, including egui's shared
 zero-duration policy, finishes scrolling immediately and suppresses highlights and sliding.
+The narrow system adapter honors GNOME enable-animations, KDE animation duration, macOS
+reduceMotion, Windows MinAnimate and GITCRAFT_REDUCE_MOTION (1/true/yes/on or 0/false/no/off).
+Queries run once on a worker using the shared bounded process runner, with a one-second
+deadline and 4 KiB limits per query. Pending, unknown and failed answers keep new motion quiet.
 
 Implementation status: UNVALIDATED. Runtime, formatting, tests and independent review are
 pending the working execution handoff.

@@ -569,9 +569,13 @@ impl Settings {
             }
             Page::Graph => {
                 section(ui, f, "Commit graph", None, |card| {
-                    card.row("Graph motion", "animation incoming new fetch refs HEAD", |ui| {
-                        ui.checkbox(&mut self.graph_motion, "Animate graph changes");
-                    });
+                    card.row(
+                        "Graph motion",
+                        "animation incoming new fetch refs HEAD",
+                        |ui| {
+                            ui.checkbox(&mut self.graph_motion, "Animate graph changes");
+                        },
+                    );
                     card.preview(Preview::GraphRefs);
                     card.row("Branch column width", "refs tags pills", |ui| {
                         ui.spacing_mut().slider_width = layout::fit(ui, SLIDER_WIDTH + 70.0) - 70.0;

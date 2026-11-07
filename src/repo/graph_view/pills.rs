@@ -70,9 +70,14 @@ impl RepoTab {
             BadgeKind::DetachedHead => String::new(),
         };
         let visual_row = self.saved_views.position(row.i).unwrap_or(row.i);
-        let offset = self.graph_motion.pill_offset(ui.ctx(), &identity, &row.commit.hash, visual_row);
+        let offset =
+            self.graph_motion
+                .pill_offset(ui.ctx(), &identity, &row.commit.hash, visual_row);
         let pill_mid = mid + offset;
-        let refs_clip = Rect::from_min_max(pos2(rect.left(), ui.clip_rect().top()), pos2(gx - 4.0, ui.clip_rect().bottom()));
+        let refs_clip = Rect::from_min_max(
+            pos2(rect.left(), ui.clip_rect().top()),
+            pos2(gx - 4.0, ui.clip_rect().bottom()),
+        );
         let rp = ui.painter().with_clip_rect(refs_clip);
         let more = badges.len() - 1;
         let more_w = if more > 0 { 28.0 } else { 0.0 };
@@ -86,7 +91,9 @@ impl RepoTab {
             max_w.max(40.0),
             self.marks(first, &row.commit.hash),
         );
-        if offset.abs() < 1.0 { self.pill_clicks(ui, &resp, pill, first, &row.commit.hash, acts); }
+        if offset.abs() < 1.0 {
+            self.pill_clicks(ui, &resp, pill, first, &row.commit.hash, acts);
+        }
         let mut end = pill.right();
         let mut more_rect = None;
         if more > 0 {
