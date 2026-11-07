@@ -1,0 +1,14 @@
+{
+  "verdict": "PASS_DIAGNOSTIC_ONLY; productionGate2 stillFAIL",
+  "source": "eca6eca728d3e2296645946d9649befd4f6c9193",
+  "compiler_binding_commit": "8082963e76938f4d3a897cc9c82324a208f58418",
+  "log_sha256": "2fd6882043eeab8c56b3fe517948f2db4059663e1543e81eae936aeb80a92899",
+  "controls": {
+    "actualoriginalclean": "diff-files quiet=1, diff quiet=0; rawactualindex==saved; actualuserwork/indexunchanged",
+    "independentcopyclean": "diff-files quiet=1,diff quiet=0",
+    "independentcopysame_lengthbytechange": "both quiet=1; porcelainpatch includesactualbytechange"
+  },
+  "conditions": "Fresh coldprivateindex; GIT_OPTIONAL_LOCKS0; no externaldiff/textconv, fsmonitorfalse, privateHOME/config/pinnedGit, approvedboundedrunner; no reference mutation/checkout/livehosts/CI",
+  "conclusion": "Porcelain diff content checking correctly distinguishes fresh stat-unpopulated privateindex clean files from actualchanges, unlike plumbing diff-files --quiet rawstatresult",
+  "next": "Narrow static production revision replaces only three coldprivateindex diff-files invocations with GIT_OPTIONAL_LOCKS0 git diff. Independent static review required before recording/real protocol."
+}
