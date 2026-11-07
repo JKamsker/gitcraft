@@ -96,17 +96,27 @@ impl RepoTab {
             ctx,
             move || storage::independent::make_independent(&snapshot, &|| true),
             move |tab, result, ctx| {
-                tab.busy_op = None;
-                tab.op_started = None;
-                tab.status = Some(match result {
-                    Ok(message) => (message, false),
-                    Err(error) => (format!("Make clone independent failed: {error}"), true),
-                });
-                if tab.path == repo && connections::current() == profile {
-                    tab.reload(ctx);
-                }
+                tab.finish_object_storage_independence(&repo, &profile, result, ctx);
             },
         );
+    }
+    fn finish_object_storage_independence(
+        &mut self,
+        repo: &std::path::Path,
+        profile: &connections::Context,
+        result: Result<String, String>,
+        ctx: &egui::Context,
+    ) {
+        self.busy_op = None;
+        self.op_started = None;
+        if self.path != repo || connections::current() != *profile {
+            return;
+        }
+        self.status = Some(match result {
+            Ok(message) => (message, false),
+            Err(error) => (format!("Make clone independent failed: {error}"), true),
+        });
+        self.reload(ctx);
     }
     pub(super) fn sync_object_storage(&mut self) {
         if let Some(Dialog::ObjectStorage(state)) = &mut self.dialog
@@ -269,5 +279,29 @@ mod tests {
                 .iter()
                 .any(|(label, _, _)| label.contains("Shared and borrowed"))
         );
+    }
+    #[test]
+    fn operation_completions_do_not_publish_into_another_tab_path_or_profile() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred(PathBuf::from("/current"), &ctx);
+        tab.busy_op = Some("independence".into());
+        tab.finish_object_storage_independence(
+            std::path::Path::new("/previous"),
+            &connections::current(),
+            Err("private result".into()),
+            &ctx,
+        );
+        assert!(tab.status.is_none());
+        assert!(tab.busy_op.is_none());
+        tab.finish_object_storage_independence(
+            std::path::Path::new("/current"),
+            &connections::Context {
+                error: Some("previous profile".into()),
+                ..Default::default()
+            },
+            Err("private result".into()),
+            &ctx,
+        );
+        assert!(tab.status.is_none());
     }
 }
