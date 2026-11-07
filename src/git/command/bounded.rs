@@ -29,9 +29,9 @@ pub(in crate::git) fn local(
     limit: usize,
     timeout: Duration,
 ) -> Result<Vec<u8>, String> {
-    let mut cmd = super::git_cmd();
-    super::with_profile(&mut cmd, args);
-    cmd.arg("-C").arg(repo).args(args);
+    // Binary bundle streams must use the same practice/profile context as other Git calls.
+    let mut cmd = super::repository_command(Some(repo), args);
+    cmd.args(args);
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
