@@ -1,0 +1,165 @@
+docker: Error response from daemon: failed to create task for container: failed to start shim: start failed: runtime: failed to create new OS thread (have 6 already; errno=11)
+runtime: may need to increase max user processes (ulimit -u)
+fatal error: newosproc
+
+runtime stack:
+runtime.throw({0x865586?, 0x8e285d49e10?})
+	/usr/local/go/src/runtime/panic.go:1229 +0x48 fp=0x8e285d49de8 sp=0x8e285d49db8 pc=0x483be8
+runtime.newosproc(0x8e285ef4008)
+	/usr/local/go/src/runtime/os_linux.go:199 +0x165 fp=0x8e285d49e58 sp=0x8e285d49de8 pc=0x449105
+runtime.newm1(0x8e285ef4008)
+	/usr/local/go/src/runtime/proc.go:2927 +0xbf fp=0x8e285d49e98 sp=0x8e285d49e58 pc=0x453eff
+runtime.newm(0x8e285d49f10?, 0x8e285d22008, 0x12b7708b0154?)
+	/usr/local/go/src/runtime/proc.go:2902 +0x125 fp=0x8e285d49ec8 sp=0x8e285d49e98 pc=0x453dc5
+runtime.startm(0x8e285d22008?, 0x1, 0x0)
+	/usr/local/go/src/runtime/proc.go:3096 +0x130 fp=0x8e285d49f10 sp=0x8e285d49ec8 pc=0x454390
+runtime.wakep()
+	/usr/local/go/src/runtime/proc.go:3243 +0xec fp=0x8e285d49f40 sp=0x8e285d49f10 pc=0x483e6c
+runtime.ready(0x8e285ede3c0, 0x4, 0x1)
+	/usr/local/go/src/runtime/proc.go:1138 +0x117 fp=0x8e285d49fa0 sp=0x8e285d49f40 pc=0x451077
+runtime.recv.goready.func1()
+	/usr/local/go/src/runtime/proc.go:483 +0x25 fp=0x8e285d49fc8 sp=0x8e285d49fa0 pc=0x419005
+runtime.systemstack(0x0)
+	/usr/local/go/src/runtime/asm_amd64.s:562 +0x4a fp=0x8e285d49fd8 sp=0x8e285d49fc8 pc=0x4897ea
+
+goroutine 1 gp=0x8e285cea1e0 m=3 mp=0x8e285d33008 [running]:
+runtime.systemstack_switch()
+	/usr/local/go/src/runtime/asm_amd64.s:516 +0x8 fp=0x8e285e4f370 sp=0x8e285e4f360 pc=0x489788
+runtime.goready(...)
+	/usr/local/go/src/runtime/proc.go:482
+runtime.recv(0x8e285eb2070, 0x8e285e2f730, 0x8e285ea0090?, 0x8e285e4f418, 0x3)
+	/usr/local/go/src/runtime/chan.go:745 +0x1e5 fp=0x8e285e4f3c0 sp=0x8e285e4f370 pc=0x418f85
+runtime.chanrecv(0x8e285eb2070, 0x0, 0x1)
+	/usr/local/go/src/runtime/chan.go:607 +0x6b3 fp=0x8e285e4f438 sp=0x8e285e4f3c0 pc=0x418d13
+runtime.chanrecv1(0x7fd5de0eea00?, 0x8e285ea0090?)
+	/usr/local/go/src/runtime/chan.go:509 +0x12 fp=0x8e285e4f460 sp=0x8e285e4f438 pc=0x418632
+runtime.sigenable(0xf)
+	/usr/local/go/src/runtime/signal_unix.go:204 +0x6a fp=0x8e285e4f4a8 sp=0x8e285e4f460 pc=0x464dca
+os/signal.signal_enable(0x7d9200?)
+	/usr/local/go/src/runtime/sigqueue.go:223 +0x65 fp=0x8e285e4f4c0 sp=0x8e285e4f4a8 pc=0x486185
+os/signal.enableSignal(...)
+	/usr/local/go/src/os/signal/signal_unix.go:49
+os/signal.Notify.func1(0xf)
+	/usr/local/go/src/os/signal/signal.go:146 +0x5a fp=0x8e285e4f4e0 sp=0x8e285e4f4c0 pc=0x735efa
+os/signal.Notify(0x8e285e2f650, {0x8e285e04de0, 0x4, 0x8e285cf804b?})
+	/usr/local/go/src/os/signal/signal.go:166 +0x18c fp=0x8e285e4f558 sp=0x8e285e4f4e0 pc=0x735d8c
+github.com/containerd/containerd/v2/pkg/shim.setupSignals({0x0?, 0xea?, 0xe?})
+	/go/src/github.com/containerd/containerd/pkg/shim/shim_unix.go:44 +0xeb fp=0x8e285e4f5e8 sp=0x8e285e4f558 pc=0x73f7cb
+github.com/containerd/containerd/v2/pkg/shim.run({0x88d870, 0x8e285e0da10}, {0x88d838, 0x8e285e16790}, {0xa0?, 0x67?, 0xe1?})
+	/go/src/github.com/containerd/containerd/pkg/shim/shim.go:227 +0x379 fp=0x8e285e4fe70 sp=0x8e285e4f5e8 pc=0x73bfb9
+github.com/containerd/containerd/v2/pkg/shim.RunShim({0x88d800, 0xbe5dc0}, {0x88d838, 0x8e285e16790}, {0x0, 0x0, 0x8e285cea1e0?})
+	/go/src/github.com/containerd/containerd/pkg/shim/shim.go:187 +0x12c fp=0x8e285e4ff00 sp=0x8e285e4fe70 pc=0x73ba4c
+main.main()
+	/go/src/github.com/containerd/containerd/cmd/containerd-shim-runc-v2/main.go:30 +0x51 fp=0x8e285e4ff48 sp=0x8e285e4ff00 pc=0x7536b1
+runtime.main()
+	/usr/local/go/src/runtime/proc.go:290 +0x2d5 fp=0x8e285e4ffe0 sp=0x8e285e4ff48 pc=0x44f435
+runtime.goexit({})
+	/usr/local/go/src/runtime/asm_amd64.s:1771 +0x1 fp=0x8e285e4ffe8 sp=0x8e285e4ffe0 pc=0x48b241
+
+goroutine 2 gp=0x8e285cea780 m=nil [force gc (idle)]:
+runtime.gopark(0x0?, 0x0?, 0x0?, 0x0?, 0x0?)
+	/usr/local/go/src/runtime/proc.go:462 +0xce fp=0x8e285d2efa8 sp=0x8e285d2ef88 pc=0x483d0e
+runtime.goparkunlock(...)
+	/usr/local/go/src/runtime/proc.go:468
+runtime.forcegchelper()
+	/usr/local/go/src/runtime/proc.go:375 +0xb3 fp=0x8e285d2efe0 sp=0x8e285d2efa8 pc=0x44f753
+runtime.goexit({})
+	/usr/local/go/src/runtime/asm_amd64.s:1771 +0x1 fp=0x8e285d2efe8 sp=0x8e285d2efe0 pc=0x48b241
+created by runtime.init.7 in goroutine 1
+	/usr/local/go/src/runtime/proc.go:363 +0x1a
+
+goroutine 3 gp=0x8e285cead20 m=nil [GC sweep wait]:
+runtime.gopark(0x0?, 0x0?, 0x0?, 0x0?, 0x0?)
+	/usr/local/go/src/runtime/proc.go:462 +0xce fp=0x8e285d2f788 sp=0x8e285d2f768 pc=0x483d0e
+runtime.goparkunlock(...)
+	/usr/local/go/src/runtime/proc.go:468
+runtime.bgsweep(0x8e285d4e000)
+	/usr/local/go/src/runtime/mgcsweep.go:279 +0x94 fp=0x8e285d2f7c8 sp=0x8e285d2f788 pc=0x439414
+runtime.gcenable.gowrap1()
+	/usr/local/go/src/runtime/mgc.go:214 +0x17 fp=0x8e285d2f7e0 sp=0x8e285d2f7c8 pc=0x42a797
+runtime.goexit({})
+	/usr/local/go/src/runtime/asm_amd64.s:1771 +0x1 fp=0x8e285d2f7e8 sp=0x8e285d2f7e0 pc=0x48b241
+created by runtime.gcenable in goroutine 1
+	/usr/local/go/src/runtime/mgc.go:214 +0x66
+
+goroutine 4 gp=0x8e285ceaf00 m=nil [GC scavenge wait]:
+runtime.gopark(0x8e285d4e000?, 0x885ca8?, 0x1?, 0x0?, 0x8e285ceaf00?)
+	/usr/local/go/src/runtime/proc.go:462 +0xce fp=0x8e285d2ff78 sp=0x8e285d2ff58 pc=0x483d0e
+runtime.goparkunlock(...)
+	/usr/local/go/src/runtime/proc.go:468
+runtime.(*scavengerState).park(0xbc53a0)
+	/usr/local/go/src/runtime/mgcscavenge.go:425 +0x49 fp=0x8e285d2ffa8 sp=0x8e285d2ff78 pc=0x436f49
+runtime.bgscavenge(0x8e285d4e000)
+	/usr/local/go/src/runtime/mgcscavenge.go:653 +0x3c fp=0x8e285d2ffc8 sp=0x8e285d2ffa8 pc=0x4374bc
+runtime.gcenable.gowrap2()
+	/usr/local/go/src/runtime/mgc.go:215 +0x17 fp=0x8e285d2ffe0 sp=0x8e285d2ffc8 pc=0x42a757
+runtime.goexit({})
+	/usr/local/go/src/runtime/asm_amd64.s:1771 +0x1 fp=0x8e285d2ffe8 sp=0x8e285d2ffe0 pc=0x48b241
+created by runtime.gcenable in goroutine 1
+	/usr/local/go/src/runtime/mgc.go:215 +0xa5
+
+goroutine 5 gp=0x8e285ceb4a0 m=nil [GOMAXPROCS updater (idle)]:
+runtime.gopark(0x0?, 0x0?, 0x0?, 0x0?, 0x0?)
+	/usr/local/go/src/runtime/proc.go:462 +0xce fp=0x8e285d30788 sp=0x8e285d30768 pc=0x483d0e
+runtime.goparkunlock(...)
+	/usr/local/go/src/runtime/proc.go:468
+runtime.updateMaxProcsGoroutine()
+	/usr/local/go/src/runtime/proc.go:7095 +0xe7 fp=0x8e285d307e0 sp=0x8e285d30788 pc=0x45dc27
+runtime.goexit({})
+	/usr/local/go/src/runtime/asm_amd64.s:1771 +0x1 fp=0x8e285d307e8 sp=0x8e285d307e0 pc=0x48b241
+created by runtime.defaultGOMAXPROCSUpdateEnable in goroutine 1
+	/usr/local/go/src/runtime/proc.go:7083 +0x37
+
+goroutine 6 gp=0x8e285ceb680 m=nil [finalizer wait]:
+runtime.gopark(0x45ec75?, 0xbe7300?, 0x13?, 0x0?, 0x8e285d2e670?)
+	/usr/local/go/src/runtime/proc.go:462 +0xce fp=0x8e285d2e620 sp=0x8e285d2e600 pc=0x483d0e
+runtime.runFinalizers()
+	/usr/local/go/src/runtime/mfinal.go:210 +0x107 fp=0x8e285d2e7e0 sp=0x8e285d2e620 pc=0x429687
+runtime.goexit({})
+	/usr/local/go/src/runtime/asm_amd64.s:1771 +0x1 fp=0x8e285d2e7e8 sp=0x8e285d2e7e0 pc=0x48b241
+created by runtime.createfing in goroutine 1
+	/usr/local/go/src/runtime/mfinal.go:172 +0x3d
+
+goroutine 17 gp=0x8e285ec7860 m=nil [cleanup wait]:
+runtime.gopark(0x0?, 0x0?, 0x0?, 0x0?, 0x0?)
+	/usr/local/go/src/runtime/proc.go:462 +0xce fp=0x8e285d2a768 sp=0x8e285d2a748 pc=0x483d0e
+runtime.goparkunlock(...)
+	/usr/local/go/src/runtime/proc.go:468
+runtime.(*cleanupQueue).dequeue(0xbc5720)
+	/usr/local/go/src/runtime/mcleanup.go:522 +0xd4 fp=0x8e285d2a7a0 sp=0x8e285d2a768 pc=0x4263d4
+runtime.runCleanups()
+	/usr/local/go/src/runtime/mcleanup.go:718 +0x45 fp=0x8e285d2a7e0 sp=0x8e285d2a7a0 pc=0x426a45
+runtime.goexit({})
+	/usr/local/go/src/runtime/asm_amd64.s:1771 +0x1 fp=0x8e285d2a7e8 sp=0x8e285d2a7e0 pc=0x48b241
+created by runtime.(*cleanupQueue).createGs in goroutine 1
+	/usr/local/go/src/runtime/mcleanup.go:672 +0xa5
+
+goroutine 18 gp=0x8e285ede1e0 m=nil [chan receive]:
+runtime.gopark(0x8e285d520f0?, 0x8e285d52070?, 0x0?, 0xac?, 0x883fc0?)
+	/usr/local/go/src/runtime/proc.go:462 +0xce fp=0x8e285d2af00 sp=0x8e285d2aee0 pc=0x483d0e
+runtime.chanrecv(0x8e285d52070, 0x8e285d2afb8, 0x1)
+	/usr/local/go/src/runtime/chan.go:667 +0x4ae fp=0x8e285d2af78 sp=0x8e285d2af00 pc=0x418b0e
+runtime.chanrecv2(0x6fc23ac00?, 0x0?)
+	/usr/local/go/src/runtime/chan.go:514 +0x12 fp=0x8e285d2afa0 sp=0x8e285d2af78 pc=0x418652
+github.com/containerd/containerd/v2/pkg/shim.setRuntime.func1()
+	/go/src/github.com/containerd/containerd/pkg/shim/shim.go:153 +0x5a fp=0x8e285d2afe0 sp=0x8e285d2afa0 pc=0x741eba
+runtime.goexit({})
+	/usr/local/go/src/runtime/asm_amd64.s:1771 +0x1 fp=0x8e285d2afe8 sp=0x8e285d2afe0 pc=0x48b241
+created by github.com/containerd/containerd/v2/pkg/shim.setRuntime in goroutine 1
+	/go/src/github.com/containerd/containerd/pkg/shim/shim.go:152 +0x25
+
+goroutine 19 gp=0x8e285ede3c0 m=nil [runnable, locked to thread]:
+runtime.gopark(0x0?, 0x0?, 0x94?, 0xb7?, 0x453dc5?)
+	/usr/local/go/src/runtime/proc.go:462 +0xce fp=0x8e285d2b6b8 sp=0x8e285d2b698 pc=0x483d0e
+runtime.chansend(0x8e285eb2070, 0x887258, 0x1, 0x2?)
+	/usr/local/go/src/runtime/chan.go:283 +0x3fc fp=0x8e285d2b728 sp=0x8e285d2b6b8 pc=0x417b1c
+runtime.chansend1(0x8e200000002?, 0x8e285d2b798?)
+	/usr/local/go/src/runtime/chan.go:161 +0x17 fp=0x8e285d2b758 sp=0x8e285d2b728 pc=0x417717
+runtime.ensureSigM.func1()
+	/usr/local/go/src/runtime/signal_unix.go:1102 +0x13e fp=0x8e285d2b7e0 sp=0x8e285d2b758 pc=0x47e93e
+runtime.goexit({})
+	/usr/local/go/src/runtime/asm_amd64.s:1771 +0x1 fp=0x8e285d2b7e8 sp=0x8e285d2b7e0 pc=0x48b241
+created by runtime.ensureSigM in goroutine 1
+	/usr/local/go/src/runtime/signal_unix.go:1074 +0xc5: exit status 2
+
+Run 'docker run --help' for more information
