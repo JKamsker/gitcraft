@@ -40,6 +40,16 @@ fn native_blockers_unknown_policy_and_approval_permissions_fail_closed() {
     assert!(details::blocker(&m, &p, &approvals).is_some());
     assert!(details::blocker(&mr(), &json!({}), &approvals).is_some());
     assert!(details::blocker(&mr(), &p, &Err("denied".into())).is_some());
+    assert!(
+        details::blocker(
+            &mr(),
+            &p,
+            &Ok(json!({"approved":true,"user_can_approve":true}))
+        )
+        .is_none()
+    );
+    assert!(details::blocker(&mr(), &p, &Ok(json!({"approved":false}))).is_some());
+    assert!(details::blocker(&mr(), &p, &Ok(json!({}))).is_some());
 }
 #[test]
 fn discussions_keep_removed_lines_replies_resolution_and_native_capabilities() -> Result<(), String>
@@ -184,7 +194,9 @@ if plain==p:result=f['project']
 elif plain.endswith('/merge_requests'):result=[f['mr']]
 elif plain.endswith('/approvals'):result=f['approvals']
 elif plain.endswith('/discussions'):
- if f['mode']=='pages':result=[f['discussions'][0]]*100 if 'page=1&' in e or e.endswith('page=1') else []
+ if f['mode'] in ['pages','limit','overflow']:
+  page=int(e.rsplit('page=',1)[1]);last=1 if f['mode']=='pages' else (10 if f['mode']=='limit' else 11)
+  result=[f['discussions'][0]]*100 if page<=last else []
  elif f['mode']=='discussion-error':print('denied',file=sys.stderr);sys.exit(1)
  else:result=f['discussions']
 elif plain.endswith('/commits'):result=f['commits']
@@ -388,6 +400,18 @@ print(json.dumps(result))
             f.requests()?
                 .iter()
                 .any(|r| at(r, "/endpoint").ends_with("page=2"))
+        );
+        fixture["mode"] = json!("limit");
+        f.store(&fixture)?;
+        f.run(|api| {
+            assert_eq!(api.all(&format!("{}/discussions", api.mr(7)))?.len(), 1000);
+            Ok(())
+        })?;
+        fixture["mode"] = json!("overflow");
+        f.store(&fixture)?;
+        assert!(
+            f.run(|api| api.all(&format!("{}/discussions", api.mr(7))))
+                .is_err_and(|e| e.contains("1,000"))
         );
         fixture["mode"] = json!("discussion-error");
         f.store(&fixture)?;

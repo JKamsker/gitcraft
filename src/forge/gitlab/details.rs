@@ -75,6 +75,15 @@ fn flag(v: &Value, p: &str) -> bool {
 fn id(v: &Value, p: &str) -> u64 {
     v.pointer(p).and_then(Value::as_u64).unwrap_or(0)
 }
+/// Community Edition reports `approved` without Enterprise approval-count fields.
+fn approval_state(value: &Value) -> Option<bool> {
+    value.get("approved").and_then(Value::as_bool).or_else(|| {
+        value
+            .get("approvals_left")
+            .and_then(Value::as_u64)
+            .map(|n| n == 0)
+    })
+}
 pub(super) fn blocker(
     mr: &Value,
     project: &Value,
@@ -98,16 +107,14 @@ pub(super) fn blocker(
     ) {
         return Some("GitLab's merge policy could not be read. Reload before merging.".into());
     }
-    if approvals
-        .as_ref()
-        .ok()
-        .and_then(|a| a.get("approvals_left"))
-        .and_then(Value::as_u64)
-        .is_none()
-    {
-        return Some(
-            "GitLab approval requirements could not be read. Reload before merging.".into(),
-        );
+    match approvals.as_ref().ok().and_then(approval_state) {
+        None => {
+            return Some(
+                "GitLab approval requirements could not be read. Reload before merging.".into(),
+            );
+        }
+        Some(false) => return Some("Required GitLab approvals are missing.".into()),
+        Some(true) => {}
     }
     let status = at(mr, "/detailed_merge_status");
     let message = match status {
@@ -295,10 +302,7 @@ pub(super) fn assemble(
             "CLEAN"
         }
         .into(),
-        review_decision: if approvals
-            .as_ref()
-            .is_ok_and(|a| a.get("approvals_left").and_then(Value::as_u64) == Some(0))
-        {
+        review_decision: if approvals.as_ref().ok().and_then(approval_state) == Some(true) {
             "APPROVED"
         } else {
             "REVIEW_REQUIRED"

@@ -195,6 +195,8 @@ mod tests {
                     if !*fonts {
                         crate::theme::install_fonts(ui.ctx());
                         *fonts = true;
+                        ui.ctx().request_repaint();
+                        return;
                     }
                     review_box(ui, draft, extras, false, true, actions);
                 },
