@@ -1,0 +1,22 @@
+{
+  "candidate": "a20ebf4a8ffd8da98fd89e5b1496ce473126a59e",
+  "visual_source": "cfc96d8ff949e35d0de5ea643e76b1551b874769",
+  "fork_dev": "0830614f89de60936b7e6358060f99ce18f4f3c0",
+  "resolution": "Preserved worktree_root assignment and sync_branch_bands after worktree load",
+  "checks": [
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked --all-targets",
+      "exit": 0,
+      "log": "check.log.gz",
+      "raw_sha256": "09e6fc626affcabd537be92e9dead93aa9c56f1ac3a02251faa1646203fca359"
+    },
+    {
+      "command": "cargo +1.95.0 fmt --all -- --check",
+      "exit": 0,
+      "log": "fmt.log.gz",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "test_execution": "None in this merge gate; writer focused tests remain bound to bc201e42",
+  "scope": "WIP compilation/format only; independent review and combined validation pending"
+}

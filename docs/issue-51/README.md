@@ -71,3 +71,13 @@ History round one rejected `0de454f0` with seven core and five investigation fin
 The process prerequisite advanced to preserved `bc2521c6`, including `b9ec1294` (Windows launch ordering), `103a6b4b` (nonblocking forwarding and stdin proofs), and endpoint retirement/shutdown changes. Required author and remote SHA were verified. Original static review of `6a289fd8` failed and is archived under `reviews/process-safety-round1`. Three reviewers now examine the exact follow-up candidate separately for remote transport, native ownership, and bisect/caller cleanup; runtime remains held. No recording result is treated as runtime validation.
 
 The integrations writer has preserved dependency license/changelog metadata (`dde8f355`) and rendered-rich search (`270a8a3b`); those two units are under independent review while the writer continues its other assigned integrations. Defaulted selected credential references and provider-native revision/account bindings will extend the existing profile/context interfaces. No external writes, hosted CI or PR have been started.
+
+## Corrected visualization and review follow-up
+
+Visualization correction candidate `cfc96d8f` (application `bc201e42`) is preserved and independently under review across content, UI and lifecycle. The writer records 176 unique passing tests / 180 executions, build, formatting and qualified lint; strict macOS lint retains the unchanged baseline warnings, and two process tests remain explicitly ignored. Its complete evidence is in `reviews/visualization-corrections`. WIP merge `a20ebf4a` incorporates the correction branch while retaining both the new worktree-root assignment and shared branch-band synchronization in the one resolved `load.rs` conflict. This is not acceptance of the batch.
+
+The freed coding slot is correcting setup findings and producing a shared endpoint-scoped cached-credential/helper API for the affected history/internals/integrations paths. All three static reviews of process candidate `bc2521c6` failed; reports are preserved under `reviews/process-safety-round2` and sent to its writer. No runtime process gate is cleared.
+
+Rich-content review rejected `270a8a3b` with eight P2 findings, now dispatched to its active writer; report and bounded reproductions are under `reviews/rich-round1`. Local `act` feature candidate `052721ed` is preserved with reported focused/recording/fake-tool gates and is under a separate independent review. No actual workflow, Docker execution, hosted CI or PR was started.
+
+The exact WIP merge `a20ebf4a` passed all-target locked compilation and formatting. No tests were run for this merge gate; evidence is under `validation/visualization-dev-merge-a20ebf4a`.
