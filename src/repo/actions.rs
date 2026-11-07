@@ -154,6 +154,14 @@ pub(crate) enum Action {
         onto: String,
         label: String,
     },
+    /// Ask before folding the staged changes into the commit `hash` (once what that rewrites
+    /// is read).
+    FoldInto(String),
+    /// Fold as the dialog confirmed it.
+    RunFold(Box<super::fold::Plan>),
+    /// Abort the rebase of a fold stopped on a conflict, asked first once it is checked to be
+    /// the fold's.
+    AbortFold,
     RunRebase,
     CloseRebase,
     /// Remember these HTTPS credentials and run the operation that needed them again.

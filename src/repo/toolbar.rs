@@ -7,7 +7,7 @@ use std::time::Duration;
 use egui::Ui;
 
 use super::pull::pull_menu;
-use super::{Action, Dialog, RepoTab, abort_action, ci_status, widgets};
+use super::{Action, Dialog, RepoTab, ci_status, widgets};
 use crate::icons;
 use crate::settings::Settings;
 use crate::theme::Tokens;
@@ -237,7 +237,7 @@ impl RepoTab {
                 )
                 .clicked()
             {
-                acts.push(abort_action(state));
+                acts.push(self.abort_for(state));
             }
         }
     }

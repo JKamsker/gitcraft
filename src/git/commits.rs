@@ -494,10 +494,14 @@ pub struct RebaseCommit {
 
 /// The commits `git rebase -i onto` would list (`onto..HEAD`), oldest first.
 pub fn rebase_commits(repo: &Path, onto: &str) -> Result<Vec<RebaseCommit>, String> {
+    rebase_commits_in(repo, &format!("{onto}..HEAD"))
+}
+
+/// The commits of `range` (`onto..HEAD`, or `HEAD` for all of them), oldest first.
+pub(super) fn rebase_commits_in(repo: &Path, range: &str) -> Result<Vec<RebaseCommit>, String> {
     // Each field ended by a NUL, which no commit has: a record separator in a message would
     // cut it short, and rewording the commit would lose the rest.
     let format = "--format=%H%x00%P%x00%an%x00%ae%x00%s%x00%B%x00";
-    let range = format!("{onto}..HEAD");
     let out = run(
         Some(repo),
         &[
@@ -507,7 +511,7 @@ pub fn rebase_commits(repo: &Path, onto: &str) -> Result<Vec<RebaseCommit>, Stri
             "--reverse",
             format,
             END_OPTS,
-            &range,
+            range,
         ],
     )?;
     Ok(parse_rebase_commits(&out))

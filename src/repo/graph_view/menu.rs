@@ -79,6 +79,7 @@ impl RepoTab {
         self.compare_with_items(ui, i, &hash, &short, acts);
         ui.separator();
         self.quick_edit_items(ui, &hash, idle, acts);
+        self.fold_item(ui, &hash, idle, acts);
         ui.separator();
         let rewrite = Rewrite {
             hash: &hash,

@@ -7,7 +7,7 @@ use crate::git::{Area, InProgress, StatusFile};
 use crate::icons;
 use crate::repo::diff::{literal_path, unstage_args};
 use crate::repo::widgets::{self, RowExtra};
-use crate::repo::{Action, Dialog, DiffKey, Refresh, RepoTab, abort_action, branch_tree, ops};
+use crate::repo::{Action, Dialog, DiffKey, Refresh, RepoTab, branch_tree, ops};
 use crate::theme::{self, Tokens};
 
 impl RepoTab {
@@ -52,14 +52,19 @@ impl RepoTab {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
                     icons::inline(ui, "circle-alert", 16.0, t.warning);
+                    // A fold stopped on a conflict says so: its changes are in the rebase.
+                    let what = match self.fold_stopped_here(state) {
+                        Some(fold) => format!("{} in progress (rebase)", fold.label),
+                        None => format!("{} in progress", state.label()),
+                    };
                     ui.label(
-                        RichText::new(format!("{} in progress", state.label()))
+                        RichText::new(what)
                             .color(t.warning)
                             .font(theme::medium(12.5)),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui.add_enabled(idle, egui::Button::new("Abort")).clicked() {
-                            acts.push(abort_action(state));
+                            acts.push(self.abort_for(state));
                         }
                     });
                 });

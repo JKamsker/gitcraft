@@ -15,6 +15,7 @@ mod dialogs;
 mod diff;
 mod file_text;
 mod file_view;
+mod fold;
 pub(crate) mod graph_view;
 pub(crate) mod highlight;
 mod keep_submodules;
@@ -187,6 +188,8 @@ pub struct RepoTab {
     pending_goto: Option<String>,
 
     undo_stack: Vec<UndoEntry>,
+    /// A fold of staged changes into an older commit running, or stopped on a conflict.
+    fold: fold::FoldState,
     redo_stack: Vec<UndoEntry>,
 
     busy_op: Option<String>,
@@ -331,6 +334,7 @@ impl RepoTab {
             search: Search::default(),
             pending_goto: None,
             undo_stack: Vec::new(),
+            fold: fold::FoldState::default(),
             redo_stack: Vec::new(),
             busy_op: None,
             op_started: None,
