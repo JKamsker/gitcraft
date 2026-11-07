@@ -18,10 +18,15 @@ pub(super) struct Toast {
 impl Toast {
     /// A toast shown for six seconds from now.
     pub(super) fn new(text: String, error: bool) -> Self {
+        Self::for_secs(text, error, 6)
+    }
+
+    /// A toast shown for `secs` seconds from now.
+    pub(super) fn for_secs(text: String, error: bool, secs: u64) -> Self {
         Self {
             text,
             error,
-            until: Instant::now() + Duration::from_secs(6),
+            until: Instant::now() + Duration::from_secs(secs),
         }
     }
 }

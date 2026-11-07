@@ -29,6 +29,7 @@ impl App {
             ));
             return;
         }
+        self.save_closing_tab(i);
         if let Tab::Repo(r) = self.tabs.remove(i) {
             remember_closed(&mut self.closed, &r.path);
         }
