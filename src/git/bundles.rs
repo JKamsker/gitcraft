@@ -388,11 +388,7 @@ fn valid_ref(repo: &Path, name: &str) -> Result<(), String> {
     }
     // Ref syntax is repository-independent. Avoid a remote shell round trip per ref,
     // while keeping Practice independent from the active profile's config/error state.
-    let checked = if crate::practice::is_repository(repo) {
-        super::practice_run(repo, &["check-ref-format", name])
-    } else {
-        run(None, &["check-ref-format", name])
-    };
+    let checked = run(Some(repo), &["check-ref-format", name]);
     checked
         .map(|_| ())
         .map_err(|_| format!("Invalid bundle ref: {name}"))

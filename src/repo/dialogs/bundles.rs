@@ -52,14 +52,14 @@ pub(super) fn export(
             )
             .clicked()
         {
-            outcome = Outcome::Done(Action::ExportBundle {
+            outcome = Outcome::Done(Box::new(Action::ExportBundle {
                 refs: refs
                     .iter()
                     .filter(|r| selected.contains(&r.name))
                     .cloned()
                     .collect(),
                 base: base.clone(),
-            });
+            }));
         }
         if ui.button("Cancel").clicked() {
             outcome = Outcome::Cancel;
@@ -158,14 +158,14 @@ pub(super) fn incoming(
             )
             .clicked()
         {
-            outcome = Outcome::Done(Action::ImportBundle {
+            outcome = Outcome::Done(Box::new(Action::ImportBundle {
                 preview: Box::new(preview.clone()),
                 imports: imports
                     .iter()
                     .filter(|(on, _)| *on)
                     .map(|(_, i)| i.clone())
                     .collect(),
-            });
+            }));
         }
         if ui.button("Cancel").clicked() {
             outcome = Outcome::Cancel;

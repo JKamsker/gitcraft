@@ -533,6 +533,7 @@ pub(super) fn compare_items(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::git;
 
     #[test]
     fn a_compact_graph_column_fits_its_lanes_closer_together() {
