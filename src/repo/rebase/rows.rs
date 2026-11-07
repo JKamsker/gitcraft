@@ -355,14 +355,14 @@ impl RebaseEditor {
                     if matches!(e.step, Step::Squash | Step::Fixup) {
                         ui.label(
                             egui::RichText::new("↓ into the commit below")
-                                .color(t.accent)
+                                .color(t.accent_fg)
                                 .small(),
                         );
                     }
                     if e.step == Step::Edit {
                         ui.label(
                             egui::RichText::new("stops here so you can change it")
-                                .color(t.accent)
+                                .color(t.accent_fg)
                                 .small(),
                         );
                     }

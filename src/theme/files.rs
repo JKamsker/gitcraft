@@ -310,6 +310,7 @@ pub fn from_vscode(colors: &Map<String, Value>, dark: Option<bool>) -> Palette {
         p.accent = over(c, p.chrome);
         p.accent_text = first(&["button.foreground"]).map(|c| over(c, p.accent));
     }
+    p.accent_fg = first(&["textLink.foreground"]).map(|c| over(c, p.chrome));
     p.hover = first(&["list.hoverBackground"]).map(|c| over(c, p.chrome));
     p.pressed = None;
     p.icon = first(&["icon.foreground"]).map(|c| over(c, p.chrome));
