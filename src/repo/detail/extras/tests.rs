@@ -319,7 +319,8 @@ fn a_note_being_written_survives_selecting_elsewhere() {
 }
 
 #[test]
-fn namespace_changes_during_real_page_search_and_backlink_reads_discard_old_scope() {
+fn namespace_changes_during_real_page_search_and_backlink_reads_discard_old_scope()
+-> Result<(), String> {
     let dir = repo("namespace-in-flight");
     let base = commit(&dir, "base");
     assert!(git::run(Some(&dir), &["switch", "-q", "--orphan", "checkpoint-temp"]).is_ok());
@@ -334,8 +335,7 @@ fn namespace_changes_during_real_page_search_and_backlink_reads_discard_old_scop
     let refs_before = git::run(
         Some(&dir),
         &["for-each-ref", "--format=%(refname) %(objectname)"],
-    )
-    .unwrap();
+    )?;
     let ctx = egui::Context::default();
     let mut settings = crate::settings::Settings {
         history_filter: crate::repo::history_filter::Rules::empty(),
@@ -344,9 +344,8 @@ fn namespace_changes_during_real_page_search_and_backlink_reads_discard_old_scop
     settings.set(&ctx);
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
     tab.life.phase = crate::repo::lifecycle::Phase::Live;
-    tab.refs = git::refs(&dir).unwrap();
-    tab.history = git::log_scoped(&dir, None, Default::default(), 0, 1, &[])
-        .unwrap()
+    tab.refs = git::refs(&dir)?;
+    tab.history = git::log_scoped(&dir, None, Default::default(), 0, 1, &[])?
         .into_iter()
         .map(std::sync::Arc::new)
         .collect();
@@ -364,7 +363,7 @@ fn namespace_changes_during_real_page_search_and_backlink_reads_discard_old_scop
     // Hold the actual log stream before requesting the page. Its worker cannot complete
     // until after the namespace toggle, and the reload generation deliberately stays equal.
     let stream = std::sync::Arc::clone(&tab.log_stream);
-    let hold = stream.lock().unwrap();
+    let hold = stream.lock().map_err(|e| e.to_string())?;
     let generation = tab.history_gen;
     let history_before = tab.history.clone();
     tab.load_more(&ctx);
@@ -431,15 +430,11 @@ fn namespace_changes_during_real_page_search_and_backlink_reads_discard_old_scop
         git::run(
             Some(&dir),
             &["for-each-ref", "--format=%(refname) %(objectname)"]
-        )
-        .unwrap(),
+        )?,
         refs_before
     );
     assert_eq!(git::head(&dir), base);
-    assert!(
-        git::run(Some(&dir), &["status", "--porcelain"])
-            .unwrap()
-            .is_empty()
-    );
+    assert!(git::run(Some(&dir), &["status", "--porcelain"])?.is_empty());
     let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
 }
