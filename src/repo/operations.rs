@@ -37,6 +37,7 @@ impl RepoTab {
             return;
         }
         self.busy_op = Some(label.to_owned());
+        self.drafts.cancel_pending();
         self.op_started = Some(Instant::now());
         self.note_checkout_move(&ops, ctx);
         if !quiet {
@@ -201,7 +202,11 @@ impl RepoTab {
                 }
                 self.record_undo(&label, kind);
             }
-            Err(e) if git::is_auth_error(e) && !quiet => {
+            Err(e)
+                if git::is_auth_error(e)
+                    && !quiet
+                    && !e.starts_with(super::drafts::CHECK_FAILED) =>
+            {
                 // Typed credentials that were refused are forgotten.
                 let refused = self.credentials.take().is_some();
                 self.status = Some((format!("{label}: sign-in needed"), true));
@@ -347,6 +352,24 @@ pub(super) fn run_steps_counted(
     // Checked before anything runs, so a refused undo changes nothing.
     if let Err(e) = check_expected(path, ops) {
         return (Err(e), kind, 0);
+    }
+    if super::keep_submodules::moves_checkout(ops) {
+        let saved = (|| {
+            if git::drafts::enabled(path)? {
+                git::drafts::capture(path, "Before checkout or rebase", &|| true)?;
+            }
+            Ok::<_, String>(())
+        })();
+        if let Err(e) = saved {
+            return (
+                Err(format!(
+                    "{} {e}. The operation was not started. Open Earlier versions to resolve the problem or turn off automatic drafts.",
+                    super::drafts::CHECK_FAILED
+                )),
+                kind,
+                0,
+            );
+        }
     }
     let mut result = Ok(String::new());
     let mut stopped = ops.len();

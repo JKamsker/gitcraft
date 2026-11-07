@@ -27,6 +27,13 @@ pub(super) enum Msg {
     RefsCheck(Result<git::Refs, String>),
     /// What to do on the UI thread with what a background job found (see `RepoTab::then`).
     Then(Continuation),
+    DraftConfigured(u64, Result<bool, String>),
+    DraftSaved(u64, Result<Option<git::drafts::Draft>, String>),
+    DraftRead(u64, Result<Box<super::drafts::Read>, String>),
+    DraftChanged(
+        super::drafts::Change,
+        Result<super::drafts::Changed, String>,
+    ),
     /// A conflict editor read in the background (for a repository on another machine), for
     /// the opening numbered so (see `RepoTab::conflict_generation`).
     ConflictOpened(u64, String, Option<Box<super::conflict::ConflictEditor>>),
@@ -217,6 +224,9 @@ impl RepoTab {
         // that work starts covers what it wrote itself (see `reload`).
         if let Some(rx) = &self.fs_rx {
             while let Ok(change) = rx.try_recv() {
+                if change != super::watch::FsChange::Git {
+                    self.drafts.observe();
+                }
                 let was = self.fs_pending.map(|(c, _)| c);
                 self.fs_pending = Some((was.max(Some(change)).unwrap_or(change), Instant::now()));
             }
@@ -228,6 +238,7 @@ impl RepoTab {
         if !shown {
             return;
         }
+        self.poll_drafts(ctx);
         if let Some((change, at)) = self.fs_pending
             && at.elapsed() > Duration::from_millis(400)
             && !self.loading
@@ -434,6 +445,10 @@ impl RepoTab {
             Msg::Mergiraf(path, result) => self.mergiraf_done(path, result),
             Msg::JobPanicked(e) => self.status = Some((e, true)),
             Msg::Then(then) => then(self, ctx),
+            Msg::DraftConfigured(id, result) => self.drafts_configured(id, result),
+            Msg::DraftSaved(id, result) => self.draft_saved(id, result),
+            Msg::DraftRead(id, result) => self.draft_read(id, result),
+            Msg::DraftChanged(change, result) => self.draft_changed(change, result, ctx),
             Msg::Search(query, code, result) => self.search_done(query, code, result, ctx),
             // Asked before the list asked for last (one read before a merge answering after
             // the one read since), or of the forge the remotes no longer point to.

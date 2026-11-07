@@ -5,6 +5,7 @@ mod clone_options;
 mod command;
 mod commits;
 mod diff;
+pub mod drafts;
 mod files;
 mod lfs;
 mod refs;

@@ -362,6 +362,81 @@ pub(crate) fn forecast_run(
     forecast_bytes(dir, args, env, ok, active).map(|out| String::from_utf8_lossy(&out).into_owned())
 }
 
+/// Draft plumbing: source index/directory overrides cannot escape the selected repository.
+/// The caller supplies explicit no-lazy-fetch and an isolated config for worktree reads.
+pub(crate) fn draft_bytes(
+    dir: &Path,
+    args: &[&str],
+    env: &[(&'static str, String)],
+    input: Vec<u8>,
+    ok: &[i32],
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    const REMOVE: &[&str] = &[
+        "GIT_DIR",
+        "GIT_COMMON_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_ATTR_SOURCE",
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_LITERAL_PATHSPECS",
+        "GIT_GLOB_PATHSPECS",
+        "GIT_NOGLOB_PATHSPECS",
+        "GIT_ICASE_PATHSPECS",
+    ];
+    if !active() {
+        return Err("Draft cancelled".into());
+    }
+    let out = if let Some(target) = remote::parse(dir) {
+        let extra = Extra {
+            pre: Vec::new(),
+            env: env.to_vec(),
+        };
+        let mut request = remote_request(&target, &extra, args);
+        request.unset.extend(REMOVE.iter().map(|s| (*s).to_owned()));
+        request.stdin = Some(input);
+        let git = request.script;
+        request.script = format!(
+            "umask 077\nd=$(mktemp -d) || exit 1\ntrap 'rm -rf \"$d\"' 0\ntrap 'exit 1' HUP INT TERM PIPE\n(ulimit -f 65536 || exit 1; {git}) >\"$d/out\" 2>\"$d/err\"\nr=$?\nhead -c 65536 \"$d/err\" >&2\n[ \"$(wc -c <\"$d/out\")\" -le 33554432 ] || {{ echo 'Draft output too large' >&2; exit 125; }}\ncat \"$d/out\"\nexit \"$r\""
+        );
+        forecast_remote(&target.host, request, active)?
+    } else {
+        let mut command = repository_command(Some(dir), args);
+        command.args(args);
+        for name in REMOVE {
+            command.env_remove(name);
+        }
+        for (name, value) in env {
+            command.env(name, value);
+        }
+        let out = crate::bounded_process::run_input(
+            command,
+            Some(input),
+            active,
+            std::time::Duration::from_secs(15),
+            32 * 1024 * 1024,
+            64 * 1024,
+        )?;
+        remote::Output {
+            code: out.status.code().unwrap_or(-1),
+            stdout: out.stdout,
+            stderr: out.stderr,
+        }
+    };
+    if ok.contains(&out.code) {
+        Ok(out.stdout)
+    } else {
+        Err(format!(
+            "Draft Git failed ({}): {}",
+            out.code,
+            String::from_utf8_lossy(&out.stderr[..out.stderr.len().min(65536)]).trim()
+        ))
+    }
+}
+
 /// A username and password (or token) for an HTTPS remote, typed into gitcraft.
 #[derive(Clone)]
 pub struct Credentials {

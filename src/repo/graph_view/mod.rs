@@ -251,6 +251,9 @@ fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
     egui::Popup::context_menu(resp)
         .style(crate::theme::menu_style)
         .show(|ui| {
+            if ui.button("Earlier versions…").clicked() {
+                acts.push(Action::EarlierVersions);
+            }
             if ui
                 .add_enabled(idle, egui::Button::new("Stage all changes"))
                 .clicked()

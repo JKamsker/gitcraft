@@ -13,6 +13,7 @@ mod conflict;
 mod detail;
 mod dialogs;
 mod diff;
+mod drafts;
 mod file_text;
 mod file_view;
 mod gerrit;
@@ -111,6 +112,7 @@ pub struct RepoTab {
     refs: Refs,
     partial_clone: bool,
     sparse_requests: u64,
+    drafts: drafts::State,
     history_requests: u64,
     history_download_allowed: bool,
     /// Commits as git listed them.
@@ -287,6 +289,7 @@ impl RepoTab {
             refs: Refs::default(),
             partial_clone: false,
             sparse_requests: 0,
+            drafts: Default::default(),
             history_requests: 0,
             history_download_allowed: false,
             history: Vec::new(),
