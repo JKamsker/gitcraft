@@ -40,6 +40,7 @@ jobs:
         run: cargo clippy --locked --all-targets -- -D warnings
 
   test:
+    name: ${{ matrix.name }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -47,7 +48,22 @@ jobs:
         # macOS is off for now: hosted macOS runners are often not assigned at all, which leaves
         # pull requests red over a job that never ran. The release workflow's macOS build is off
         # for the same reason for now.
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            name: test (ubuntu-latest)
+            shard: all
+          - os: windows-latest
+            name: Windows tests (git)
+            shard: git
+          - os: windows-latest
+            name: Windows tests (repo A-M)
+            shard: repo-a-m
+          - os: windows-latest
+            name: Windows tests (repo rest)
+            shard: repo-rest
+          - os: windows-latest
+            name: Windows tests (core)
+            shard: core
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -65,22 +81,42 @@ jobs:
       - name: Build tests
         run: cargo test --locked --no-run
       - name: Reflog recovery (Windows, isolated)
-        if: runner.os == 'Windows'
+        if: matrix.shard == 'repo-rest'
         timeout-minutes: 5
         env:
           RUST_BACKTRACE: "1"
         run: cargo test --locked -p gitcraft --lib repo::reflog::tests::a_commit_lost_in_the_terminal_comes_back_as_a_branch -- --exact --nocapture
       - name: Parallel bisect (Windows, isolated)
-        if: runner.os == 'Windows'
+        if: matrix.shard == 'core'
         timeout-minutes: 10
         env:
           RUST_BACKTRACE: "1"
         run: cargo test --locked -p gitcraft --lib parallel_bisect::tests::finds_the_first_bad_commit_with_any_parallelism -- --exact --nocapture
       - name: Test
+        if: matrix.shard == 'all'
         timeout-minutes: 30
         env:
           RUST_BACKTRACE: "1"
         run: cargo test --locked -- --nocapture
+      - name: Test shard (with coverage verification)
+        if: matrix.shard != 'all'
+        timeout-minutes: 20
+        env:
+          RUST_BACKTRACE: "1"
+        run: python ci/test-shards.py ${{ matrix.shard }}
+
+  windows-test-result:
+    # Preserve the existing check name for branch protection while the work runs
+    # in parallel. A failed or skipped matrix job cannot produce a green result.
+    name: test (windows-latest)
+    needs: test
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every test job to pass
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+        run: test "$TEST_RESULT" = success
 
   forges:
     name: forges (Forgejo ${{ matrix.forgejo }}, Gitea ${{ matrix.gitea }})
